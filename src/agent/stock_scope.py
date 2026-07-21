@@ -87,7 +87,6 @@ _ALWAYS_DENIED_TICKER_CANDIDATES = {
     "SMA",
     "VWAP",
 }
-_EXPLICIT_INDICATOR_TICKER_CANDIDATES = {"RSI"}
 _CONTEXTUAL_INDICATOR_TOKENS = {"MA"}
 _INDICATOR_CONTEXT_PATTERN = re.compile(
     r"指标|均线|移动平均|排列|多头|空头|金叉|死叉|支撑|压力|MA\d|SMA|EMA",
@@ -134,26 +133,17 @@ def _is_denied_candidate(
     text: str = "",
     *,
     allow_common_word: bool = False,
-    allow_reserved_token: bool = False,
 ) -> bool:
     token = candidate.strip().upper()
-    if (
-        not allow_reserved_token
-        and (
-            token in _EXCHANGE_TOKEN_CANDIDATES
-            or token in _COMPARISON_TOKEN_CANDIDATES
-        )
-    ):
-        return True
-    indicator_context = bool(_INDICATOR_CONTEXT_PATTERN.search(text or ""))
-    if token in _ALWAYS_DENIED_TICKER_CANDIDATES:
-        if token not in _EXPLICIT_INDICATOR_TICKER_CANDIDATES or indicator_context:
-            return True
-    if token in _CONTEXTUAL_INDICATOR_TOKENS and indicator_context:
-        return True
     if allow_common_word:
         return False
-    if token in _ALWAYS_DENIED_TICKER_CANDIDATES:
+    if (
+        token in _EXCHANGE_TOKEN_CANDIDATES
+        or token in _COMPARISON_TOKEN_CANDIDATES
+        or token in _ALWAYS_DENIED_TICKER_CANDIDATES
+    ):
+        return True
+    if token in _CONTEXTUAL_INDICATOR_TOKENS and _INDICATOR_CONTEXT_PATTERN.search(text or ""):
         return True
     try:
         from src.agent.orchestrator import _COMMON_WORDS
@@ -169,14 +159,12 @@ def _append_candidate(
     text: str = "",
     *,
     explicit: bool = False,
-    allow_reserved_token: bool = False,
 ) -> None:
     normalized = _normalize_stock_code(candidate)
     if not normalized or _is_denied_candidate(
         normalized,
         text,
         allow_common_word=explicit,
-        allow_reserved_token=allow_reserved_token,
     ):
         return
     if normalized not in candidates:
@@ -212,7 +200,6 @@ def extract_stock_codes(text: str) -> List[str]:
             match.group(1),
             text,
             explicit=True,
-            allow_reserved_token=True,
         )
 
     for match in _ENGLISH_LOWERCASE_SWITCH_TICKER_PATTERN.finditer(text):
@@ -220,7 +207,6 @@ def extract_stock_codes(text: str) -> List[str]:
             candidates,
             match.group(1),
             text,
-            allow_reserved_token=True,
         )
 
     for match in _CJK_EXPLICIT_TICKER_PATTERN.finditer(text):
@@ -229,7 +215,6 @@ def extract_stock_codes(text: str) -> List[str]:
             match.group(1),
             text,
             explicit=True,
-            allow_reserved_token=True,
         )
 
     for pattern in (
@@ -263,7 +248,6 @@ def extract_stock_codes(text: str) -> List[str]:
             bare_uppercase_ticker.group(0),
             text,
             explicit=True,
-            allow_reserved_token=True,
         )
     if (
         _LOWERCASE_SCAN_HINT_PATTERN.search(text)
@@ -342,20 +326,13 @@ def resolve_stock_scope(
     """Resolve the effective context and stock tool scope for one chat turn."""
     original_context = dict(context or {})
     message_text = message or ""
-    current_code = _normalize_stock_code(original_context.get("stock_code"))
-    invalid_context_code = bool(
-        current_code
-        and _is_denied_candidate(
-            current_code,
-            message_text,
-            allow_common_word=True,
-        )
-    )
+    raw_context_code = original_context.get("stock_code")
+    current_code = _normalize_stock_code(raw_context_code)
+    invalid_context_code = bool(raw_context_code) and not current_code
     original_context.pop("allowed_stock_codes", None)
-    if invalid_context_code:
+    if not current_code and "stock_code" in original_context:
         original_context.pop("stock_code", None)
         original_context.pop("stock_name", None)
-        current_code = ""
 
     if not current_code:
         candidates = extract_stock_codes(message_text)

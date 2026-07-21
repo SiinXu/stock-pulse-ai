@@ -369,10 +369,10 @@ class TestStockScopeResolution(unittest.TestCase):
         self.assertEqual(result.stock_scope.allowed_stock_codes, {"BRK.B", "AAPL"})
         self.assertNotIn("stock_code", result.effective_context)
 
-    def test_invalid_context_exchange_token_is_not_trusted_as_current_stock(self):
+    def test_invalid_context_code_is_not_trusted_as_current_stock(self):
         result = resolve_stock_scope(
             "继续看",
-            {"stock_code": "HK", "stock_name": "港股"},
+            {"stock_code": "NOT-A-SYMBOL", "stock_name": "invalid"},
         )
 
         self.assertEqual(result.stock_scope.mode, "maintain")

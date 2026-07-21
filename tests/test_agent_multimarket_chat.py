@@ -211,18 +211,32 @@ def test_lowercase_switch_slot_common_words_do_not_become_tickers(
     assert resolution.stock_scope.allowed_stock_codes == {"AAPL"}
 
 
-def test_trusted_active_indicator_named_ticker_is_preserved() -> None:
+@pytest.mark.parametrize(
+    ("message", "stock_code", "stock_name"),
+    [
+        ("continue with the valuation", "RSI", "Rush Street Interactive"),
+        ("RSI 指标怎么样", "RSI", "Rush Street Interactive"),
+        ("continue with the valuation", "SH", "ProShares Short S&P 500"),
+        ("continue with the valuation", "BJ", "BJ's Wholesale Club"),
+        ("continue with the valuation", "VS", "Versus Systems"),
+    ],
+)
+def test_trusted_active_ticker_is_preserved(
+    message: str,
+    stock_code: str,
+    stock_name: str,
+) -> None:
     resolution = resolve_stock_scope(
-        "continue with the valuation",
-        {"stock_code": "RSI", "stock_name": "Rush Street Interactive"},
+        message,
+        {"stock_code": stock_code, "stock_name": stock_name},
     )
 
     assert resolution.effective_context == {
-        "stock_code": "RSI",
-        "stock_name": "Rush Street Interactive",
+        "stock_code": stock_code,
+        "stock_name": stock_name,
     }
     assert resolution.stock_scope.mode == "maintain"
-    assert resolution.stock_scope.allowed_stock_codes == {"RSI"}
+    assert resolution.stock_scope.allowed_stock_codes == {stock_code}
 
 
 def test_indicator_token_in_free_text_does_not_switch_the_active_symbol() -> None:
