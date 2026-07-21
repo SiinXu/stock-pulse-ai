@@ -412,7 +412,7 @@ class TestFetcherSourceOptimization(unittest.TestCase):
             DataFetcherManager.reset_daily_source_health()
 
     @patch("src.config.get_config")
-    def test_daily_source_health_releases_half_open_probe_after_empty_result(self, mock_get_config):
+    def test_daily_source_health_returns_empty_half_open_probe_to_cooldown(self, mock_get_config):
         mock_get_config.return_value = SimpleNamespace()
         DataFetcherManager.reset_daily_source_health()
         try:
@@ -447,6 +447,15 @@ class TestFetcherSourceOptimization(unittest.TestCase):
 
             half_open.get_daily_data.reset_mock()
             half_open.get_daily_data.return_value = _make_daily_df()
+
+            df, source = manager.get_daily_data("000001", start_date="2026-05-01", end_date="2026-05-08")
+
+            self.assertFalse(df.empty)
+            self.assertEqual(source, "AkshareFetcher")
+            half_open.get_daily_data.assert_not_called()
+
+            with breaker._lock:
+                breaker._states[health_key]["last_failure_time"] -= breaker.cooldown_seconds + 1
 
             df, source = manager.get_daily_data("000001", start_date="2026-05-01", end_date="2026-05-08")
 
