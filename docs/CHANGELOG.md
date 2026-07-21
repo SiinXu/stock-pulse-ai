@@ -8,234 +8,232 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [改进] Web 新增统一页面与 Router Pattern：`AppPage`/`WorkspacePage`、可折叠 `ResponsiveRail`、稳定 H1 ref 的 `PageHeader`、语义 `Toolbar`、同页 `Tabs`/`TabPanel`、`SummaryStrip` 与基于 Router Link/原生紧凑选择器的 `WorkspaceNavigation` 分离页面、工作区、命令、指标和导航职责；应用级焦点协调器在同窗口 PUSH/REPLACE 后等待目标 ready 再聚焦 H1，POP 优先恢复稳定触发点且重复/失效标记回退 H1，direct/refresh/new-tab 不强制移焦，元数据仅存内存。生产守卫禁止复制公共 Pattern 或新增业务 `pushState`/`replaceState`，三处遗留按文件/方法/计数交由页面轨清理。
-- [改进] Web 固化共享 Surface 迁移契约：确认 `canvas`/`section`/`interactive`/`overlay` 四层与现有 subtle token 足以替代旧 `glass-card`、raw white-alpha 和无效 `bg-surface`，不新增 glass 层级；删除无生产消费者的 `dashboard-card` 重复样式，并以不依赖行号的“文件 + token 计数”守卫冻结其余 UI1/UI2/UI3 页面迁移债，双主题与九视口 fixture 验证语义边界、填充、分隔线、ring 和横向溢出。
-- [改进] Pipeline 新增 `resolve`、`fetch`、`intelligence`、`context`、`analyze`、`persist`、`render`、`dispatch` 阶段诊断，统一记录脱敏输入/输出摘要、trace、耗时、状态、降级与 retryability；观测失败保持 fail-open，通知失败与分析结果分离，既有行为、数据库结构和配置不变。
-- [改进] Web 新增共享 `SelectionChip` 选择控件：保持原生非提交 button 与 ref/disabled/loading/键盘语义，loading 期间以 `aria-busy` 禁止重复激活，单行最小可见高度 36px、长标签自动换行增高，粗指针命中区独立扩展至 44px；持续选择可选用 `aria-pressed` 与稳定选中标识，一次性选择命令不伪造 pressed 状态。控件拒绝页面覆盖 height/width/padding/radius/flex 几何，并由生产守卫阻止私有同名实现；Decision Signals 旧候选 Button 仍由 `UI-D01`/`TRACK-UI2` 独立迁移并删除精确 allowlist。
-- [改进] Web 新增共享 `DataTable` 基础：typed columns/row keys、原生 caption/column/row 语义、受控 `aria-sort` 排序、唯一 empty/loading/error/retrying 状态、click/Enter/Space 行激活与嵌套控件事件隔离；窄屏使用命名且可聚焦的内部横向滚动区和稳定最小宽度，不造成文档横溢。生产守卫阻止复制 DataTable 或新增 raw table，现有 12 处旧表格按精确行绑定 UI1/UI2/UI3 迁移项。
-- [测试] 新增 broad exception 分类门禁，以结构指纹冻结未审查存量，要求新增兜底路径明确标注 cleanup、optional_metadata 或 fallback_recorded，并禁止无说明的 BaseException pass。
-- [改进] Web 新增统一 Filter/Query 基础：`FilterBar`、响应式 `AdvancedFilterSheet`、可单项移除的 `AppliedFilterChips` 与 Router 驱动的 draft/applied 查询状态共同保证高级筛选渐进披露、无变化时禁用 Apply、保留无关 URL 参数，并支持刷新及前进/后退恢复；生产守卫阻止页面新增私有同名 Pattern 或直接调用 `pushState`/`replaceState`，现有三处旧筛选写法以精确迁移清单交由页面轨移除。
-- [改进] Web 选股页（`StockScreeningPage`）迁移到语义容器与控件契约：5 个 ad-hoc `<section>`/`<form>` 面板、顶部状态 chip 与热点/概念/因子等内部卡片改用 `Surface`（`interactive` 档，边框/圆角/底色/阴影收敛到设计 token），热点错误提示改用 `InlineAlert`、无结果空态改用 `EmptyState`；主"开始选股"按钮不再用 `min-w-40` 覆写共享 `Button`，改由 `grid` 包裹保留最小宽度并清除设计守卫 `UI-SCR01` allowlist 例外；选股结果、涨跌/热度语义色、筛选与提交行为不变。装饰性圆点/徽章、可选卡片按钮与表格行内部按现状保留。
-- [改进] Web 设置组件 `LLMConfigModeBanner` 与 `GenerationBackendStatusPanel` 的手搓边框面板迁移到语义 `Surface`（interactive 层级），圆角/边框/背景改由 token 与层级提供，徽章、状态、迁移弹窗与文案行为不变。
-- [改进] Web Chat 深度研究面板（`DeepResearchPanel`）收敛 ad-hoc surface 与内联状态：结论与引用两处手搓边框卡片改用语义 `Surface`（interactive 层级），运行中与空闲提示改用语义 `StatePanel`（loading/empty，compact），圆角/边框/背景改由 token 与层级提供，研究运行、取消、持久化与文案行为不变。
-- [改进] Web 任务面板（`TaskPanel`）收敛守卫债：移除根 `Card` 上无 CSS 定义的死类 `home-panel-card`（零视觉），保留 `overflow-hidden` 与 `${className}` 透传，设计守卫对应 allowlist 条目 token 收窄为仅 `dynamic:className`。`components/run-flow` 已普遍使用语义 `Button`/`IconButton`，其 `home-subpanel`/`home-accent-chip`/`home-spinner` 为原生元素上的真实定制样式（守卫不 flag），事件行点击包裹与运行流图节点为定制交互，均按现状保留。
-- [改进] Web 告警中心页（`AlertsPage`）编辑规则弹窗的加载占位统一走语义 `Loading`：将唯一遗留的 ad-hoc 加载文本 `<p>` 改用页面已引入的共享 `Loading`（compact `StatePanel`），与页内其余的 `Loading`/`EmptyState`/`ApiErrorAlert` 状态一致；加载文案与编辑行为不变。
-- [改进] 新增轻量 `ApplicationServices` composition root（`src/application_services.py`）统一持有进程级单例（`Config`/`DatabaseManager`/`SearchService`/`AnalysisTaskQueue`），默认透明惰性委托到现有访问器、行为不变，并可注入隔离实例供测试；`server.py`/`main.py` 启动层在 config 就绪后建立该 root，`get_db()` 改为经 root 委托（默认仍解析到 `DatabaseManager.get_instance()`）。`get_config` 代理因与开放 PR #72（config import-cycle）同改 `src/config.py` 暂缓、`get_search_service` 代理需先做去递归的构造下沉，均记为后续；不改 `system_config_service` 内部与 task queue 独占文件。
-- [改进] Web 设置页正文剩余手搓面板迁移到语义 `Surface`（interactive 层级）：快速配置横幅、AlphaSift 面板、版本信息卡片组、桌面更新卡、配置备份卡与调度状态卡内的信息小卡统一走 token/层级;调度器的“上次错误”与配置校验错误从裸 `text-danger` 块改用语义 `InlineAlert`(danger)。间距/圆角/边框/背景改由 token 提供，读写、保存、校验与文案行为不变。
-- [改进] Web 报告展示组件收敛守卫债：跨 `ReportOverview`/`ReportNews`/`ReportStrategy`/`ReportDetails`/`ReportDiagnostics`/`AnalysisContextSummary`/`MarketReviewReportView` 移除 15 处 `Card` 上无 CSS 定义的死类 `home-panel-card`（零视觉），并同步删除设计守卫里对应的本轨 allowlist 例外（`ReportOverview` 仍保留真实的 `home-insight-card`/`home-rail-card` 类及其 allowlist token）；`text-left`/`min-w-0` 等既有类不变。报告的 `home-insight-card`/`home-rail-card`/`home-report-hero`/`home-subpanel`/`home-accent-chip` 为真实定制视觉，其到 `Surface` 的收敛待可视化 QA，记为本轨后续。
-- [改进] Web 持仓中心页（`PortfolioPage`）迁移到语义容器与控件契约：账户视图控制条改用 `Surface`（`interactive` 档）；账户操作、CSV 导入与交易/现金/分红提交按钮不再用 `flex-1`/`w-full` 覆写共享 `Button` 尺寸，改由 `grid` 布局包裹拉伸，并清除设计守卫中 `PortfolioPage` 的 `UI-P01` allowlist 例外（连带把引用该例外的守卫自测 fixture 改指到仍在册的本轨 `DecisionSignalsPage` 例外，不动守卫规则逻辑）；账户/持仓数字、盈亏语义色、提交与幂等行为不变。滚动事件列表视口与 CSV 文件 chip 属列表内部/紧凑元素，记为本轨后续。
-- [改进] Web 历史趋势抽屉（`StockHistoryTrendDrawer`）收敛 ad-hoc 面板：移除 3 处 `Card` 上无 CSS 定义的死类 `home-panel-card`（零视觉，纯守卫债），并同步删除设计守卫里对应的本轨 allowlist 例外；页内 ad-hoc 指标卡片改用语义 `Surface`（`interactive` 档，圆角/内边距/数值不变，边框与底色对齐设计 token）。范围/查看报告按钮为保 44px 粗指针命中区暂不改用 `SegmentedControl`/`Button`，`glass-card` 列表面板的层级取舍待可视化 QA，均记为本轨后续。
-- [改进] Web 首页分析主流程的三处 ad-hoc 原生按钮迁移到冻结语义控件：移动端历史抽屉入口与重复任务横幅关闭改用 `IconButton`（视觉档位收敛，粗指针 44px 命中区不变），主“分析”CTA 改用 `Button` primary + `isLoading`/`loadingText`（移除 `btn-primary` 全局样式、`!important` 尺寸覆写与手写 spinner，满宽由 `grid` 包裹保留），可访问名、禁用/加载行为、策略菜单与响应式布局不变。
-- [改进] Web 回测页加载态统一走语义 `Loading`：性能侧栏与结果表两处 bespoke `backtest-spinner` 加载块改用共享 `Loading`（compact `StatePanel`），与页面既有的 `EmptyState`/`ApiErrorAlert` 空态/错误态一致；结果表加载文案、指标卡与数字涨跌语义色不变。
-- [改进] Web 设置页 FirstRunSetupCard 与 SchedulerSettingsCard 的手搓边框面板迁移到语义 `Surface`（interactive 层级），首次启动检查的裸加载文案改用 `Loading`；间距、圆角、边框与背景改由 token 与层级提供，读写、保存、调度状态与文案行为不变。
-- [chore] 解除 `decision_signal_service` 与 `decision_signal_extractor` 的 import 循环：将纯 payload 构建层（`build_decision_signal_payload_from_report` 及全部 helper）下沉到新的叶子模块 `src/services/decision_signal_payload.py`，service 与 extractor 均从叶子复用；service 不再反向 import extractor，行为不变，`build_decision_signal_payload_from_report` 仍可从 extractor 导入，另加 AST 回归守护。
-- [改进] Web 决策信号页迁移到冻结语义容器：重评估面板与预览指标块改用 `Surface`，全局后验统计卡改用 `StatCard`（涨跌语义色以内联 span 保留），重评估告警列表改用 `InlineAlert`，块级加载态统一改用 `Loading`（compact `StatePanel`），移除页面内 ad-hoc 卡片边框/背景/圆角；数字、方向、单位与文案不变，候选股多行 chip 按钮受限于基础层暂缺多行控件，保留其既有样式并记 Deferred to UIUX。
-- [chore] 解除 `llm.usage` 与 `llm.provider_cache` 的 import 循环：将 provider-family 推断下沉到新的叶子模块 `src/llm/provider_family.py`，两侧改为模块级依赖该叶子并移除两处函数内延迟 import；纯结构调整，provider 推断行为不变，`infer_provider_family` 仍可从 `provider_cache` 导入，另加 AST + 运行时防回归测试。
-- [改进] Web 新增统一的底部 Sheet 与 Toast 基础：筛选 Sheet 使用固定 header、单一滚动 body 和固定 footer，并复用 Dialog 的滚动锁、Escape、焦点循环与恢复；Toast 通过应用级 Provider、语义层级和保留 live region 在 Modal/Drawer/Sheet 打开时保持可见可读，设置与决策信号页不再维护私有高位 z-index。
-- [改进] Agent Runtime 按 ADR-002 恢复实验 PydanticAI Adapter、toolset、可选依赖清单与 `pydanticai-installed` 安装态 CI 门禁；cross-runtime conformance 改为显式 fixture ID 允许清单并对未知 `single_run` fixture fail closed；Native 保持永久默认、零 PydanticAI 依赖可运行、无 runtime fallback，且不新增用户设置或公开 API。
-- [新功能] Web Chat 新增显式“深度研究”模式：新增 typed `agentApi.research` 客户端与 Chat 内 Chat/深度研究模式开关，在同一页面就一个问题运行深度研究（问题 + 可选股票代码），同步执行、可取消（AbortController），错误/超时明确提示；结果含结论（Markdown 渲染）与子问题引用，并按会话持久化到 localStorage 实现刷新恢复（进行中的运行刷新后不可续跑，恢复为可重跑）；不新建 Research Hub。后端 research 为同步、无 task/SSE/会话落库，服务端持久化与乐观续跑记为 Non-goal。
-- [测试] 新增启动 DDL 守护回归测试：捕获 `DatabaseManager` 初始化期间的全部 `CREATE`/`ALTER`/`DROP`，断言它们只发生在 `metadata.create_all`（fresh baseline）或 `apply_pending_within_transaction`（已登记 migration）两个相位内，两相位之外的游离 schema DDL（重新引入的启动期 ensure）会被判失败；并断言已迁移库重启时不执行任何 DDL、`migration verify` 对 fresh 与 legacy 库均成功且解释到 target version。
-- [改进] Web 浮层基础统一使用语义层级：Navigation Drawer 固定为左侧 320px 导航面板，Detail Drawer 仅提供 480/576/640px 三档右侧宽度，调用方不能再覆写方向、宽度、遮罩或 z-index；Modal 与 Drawer 提供固定 header、可滚动 body 和可选 footer，Popover 在 Dialog 内就近 Portal，父 popup 不再把子 popup 的选项误判为外部点击，并保持 Escape、焦点循环、滚动锁和关闭后焦点恢复；AST 守卫阻止任意浮层几何、高位 z-index 与近全屏面板重新进入生产代码。
-- [新功能] Web 持仓中心支持编辑账户：选中具体账户后打开“编辑账户”，复用账户表单的编辑模式修改名称、券商、市场与基准币，经 `PUT /api/v1/portfolio/accounts/{id}` 做真更新——保持 account ID、账本/持仓与幂等关联不变，不删除重建；成功后刷新并选中该账户。后端为 last-write-wins，无单账户 GET 与乐观并发锁，记为 Non-goal。
-- [改进] `intelligence_items` 的 legacy scope 值规范化与 legacy url 唯一约束到 scoped 复合唯一键的重建 startup 兼容步骤转为正式 migration `202607190004_intelligence_item_scope_values` + `202607190005_intelligence_item_unique_index`（两者耦合：回填必须先于重建，故合并交付并在 apply_pending 内按序执行）；05 用冻结的原始 SQL 把 legacy 表重建为模型 schema、去除 url 唯一并建 scoped 唯一键，仅在需要时重建、幂等。移除运行时 `_ensure_intelligence_item_scope_values` / `_ensure_intelligence_items_unique_index` / `_rebuild_intelligence_items_table` / `_ensure_intelligence_items_scoped_unique_index_once` DDL。至此启动路径不再执行任何业务 schema DDL 兼容步骤，只保留 `create_all` 与 baseline 记录登记。
-- [新功能] Web 告警中心支持编辑告警规则：复用现有规则表单的 edit 模式，点击规则行“编辑”后经 `GET /api/v1/alerts/rules/{id}` 拉取最新服务端值再播种（并发变更防护），保存经 `PATCH` 部分更新；保持 rule ID、启停状态与触发/冷却历史不变，成功后按当前分页刷新列表并提示，失败（如规则已被并发删除返回 404）时明确报错且不丢弃编辑内容。后端为 last-write-wins，乐观并发锁（version/etag）记为 Non-goal。
-- [新功能] Web 新增股票行情工作区 `/stocks/:stockCode`：typed client 拉取实时行情与历史 K 线，行情与历史独立加载、独立失败与重试；支持日/周/月周期（周/月由日线数据在本地聚合）与 1–365 天可调，周期与天数写入 URL 并可刷新/前进后退恢复；股票代码统一 canonical 化避免 `00700`/`HK00700`/`00700.HK` 形成不同 URL、缓存键或自选项；提供加自选、分析、手工信号入口；K 线图配套可访问明细表与区间摘要，关键数据不只存在于图表 tooltip；行情如实标注为“最新可用行情 · 抓取时间”，在无法证明实时时不宣称实时。
-- [改进] `portfolio_idempotency_records` 的 scope 列、唯一索引、legacy 数据规范化与 legacy 冲突 guard trigger 的 startup 兼容步骤转为正式 migration `202607190003_portfolio_idempotency_scope_schema`（稳定 ID + 源码 checksum，内联冻结 v2 storage-id 哈希，仅规范化未 scoped 的 legacy 行、不发明 owner scope，索引/触发器创建后校验，幂等）；移除运行时 `_ensure_portfolio_idempotency_scope_schema` / `_backfill_portfolio_idempotency_scopes` / `_ensure_portfolio_legacy_idempotency_guard_trigger` DDL/DML。guard trigger 作为持久数据库对象保护回退 runtime 的 legacy 冲突写入，不再依赖每次启动自愈重建。
-- [改进] `decision_signals` 的 `decision_profile` 列、profile 感知索引与从 `metadata_json` 的 legacy 回填的 startup 兼容步骤转为正式 migration `202607190002_decision_signal_profile_schema`（稳定 ID + 源码 checksum，冻结的 profile 归一化，仅回填合法 profile 且不覆盖既有值，对无效/非对象/超深 JSON 安全跳过，幂等）；移除运行时 `_ensure_decision_signal_profile_schema` / `_ensure_decision_signal_profile_indexes` / `_backfill_decision_signal_profile_from_metadata` DDL/DML。
-- [新功能] Web 决策信号页新增“运行后验”入口：按安全默认参数（仅 active 信号、`force=false`、单次上限 100，只补算缺失或可重试结果）触发后验引擎，需二次确认；显示运行进度、`evaluated`/`created`/`updated`/`skipped` 结果、本会话内最近运行列表和失败时的错误 trace，并通过 in-flight 守卫与禁用态防重复提交，运行完成后刷新后验统计。
-- [新功能] Web 决策信号页新增“创建信号”手工创建抽屉：录入基础、交易计划与解释字段，来源固定为 `source_type=manual` / `trigger_source=web_manual` 且不可伪造；提供实时预览、客户端校验、基于规范化内容哈希的确定性 `web_manual:<hash>` trace_id 幂等去重（区分 `created=true` 新建与 `created=false` 去重命中），创建 active 方向性信号后刷新受影响视图以体现服务端相反信号失效，草稿在关闭重开、去重命中和请求失败时保留、仅创建成功后清空。
-- [改进] `llm_usage` 遥测列的 startup 兼容 DDL 转为正式 migration `202607190001_llm_usage_telemetry_columns`（稳定 ID + 源码 checksum，legacy 缺列时幂等补列、fresh 库 no-op）；startup 改为在初始化写锁与同一事务内、baseline 证明之前有序应用 pending migration，使 create_all、兼容修复、迁移 DDL 与 baseline 校验保持原子且整体回滚，并移除运行时 `_ensure_llm_usage_telemetry_columns` DDL；`apply_pending` engine 入口仍供独立诊断按 migration 单独取锁提交。
-- [改进] Web 新增权威 `Surface`、`Section`、`StatePanel` 与 `Alert` 契约，以 L0/L1/L2/Overlay 语义层级替代默认卡片边界；组件统一拥有 live-region / busy 语义与 compact/default Alert 密度，现有 Card、空态、加载态和 API 错误通过兼容适配器收敛，Token Usage 在加载、无数据与错误时只显示一个主状态、隐藏零值指标墙，并在跨周期请求失败时不再把旧周期数据标为当前结果；AST 守卫阻止页面重新叠加背景、边框、圆角和阴影。
-- [修复] Agent Runtime 历史证据治理改为精确 fixture ID：不再按 timeout/cancelrace profile 自动扩大 conformance 例外，删除缺少双环境快照的依赖包数量结论，并将仅覆盖离线子集的 AR-PY-05 状态校准为 `Historical / Partial`；同时明确 provider-error 脱敏不能代表 prompt、reasoning、tool result、日志和其它异常失败面已完成扫描。
-- [chore] Agent Runtime 完整执行 `Native Only` 裁决：删除休眠的 PydanticAI Adapter、toolset、可选依赖、内部注入点、cross-runtime 测试与专用 CI；保留 vendor-neutral Contract、Native Adapter、BoundToolSession、生命周期、事件、sanitizer 和 36 个 replay fixture，并将 API key、带凭据 URL、Bearer token 脱敏及 300 字符诊断上限迁入 Native 异常回归。
-- [改进] Web 共享 `Button` 的 90 处 `xsm`/`sm`/`md`/`lg` 旧尺寸调用改用 `compact`/`default`/`comfortable`/`primary` 语义档位，并删除兼容类型和重复样式；AST 设计守卫同时阻止共享样式表、直接调用、别名及命名空间调用重新引入旧尺寸，现有 28/32/36/40px 可见高度与交互行为保持不变。
-- [改进] Web 共享交互控件建立业务无关的 `Button` / `IconButton` / `Input` / `Field` / `Textarea` 权威：按钮必须显式声明 intent，普通控件使用 28/32/36/40px 可见档位与软圆角，粗指针命中区独立扩展到 44px；移除 Settings/Home/Chat 私有 Button variant、Button 图标尺寸和 29 处非必要 `size="xl"`，新增 AST 守卫阻止页面通过尺寸、圆角、宽度或 flex class 绕过公共契约；Chat 在默认策略目录请求完成前阻断 Composer、Enter 与快捷问题发送，请求失败后再降级为“通用”，避免慢环境绕过已配置的默认策略。
-- [修复] PR Review 静态检查只对仍存在的新增、修改、重命名或类型变更 Python 文件运行 Flake8，删除 Python 文件的 PR 不再因不存在路径被误判为代码质量失败；已删除文件仍保留在完整 diff 与自动审查范围内。
-- [修复] DecisionSignal 新增 canonical `presentation` 视图模型，以 `action` 统一动作方向，并集中提供本地化标签、置信度、摘要、风险和时间戳；API、通知、Web 卡片/详情/时间线、主报告动作卡、历史 badge 与组合风险不再分别信任可能冲突的 `action_label`、`operation_advice` 或平铺展示字段，状态 metadata 替换会保留正式语言 provenance，旧字段继续保留用于兼容。
-- [修复] Web 管理员当前密码、新密码、确认密码、Provider API Key 与通用敏感配置统一使用 `CredentialInput`：稳定且相互隔离的 `name` / `autocomplete` 契约阻止管理员密码被相邻 Provider 字段误接收；首次向导和模型连接弹窗中的填充式变更只保留在本地草稿，不会自动测试连接或保存配置，并由真实首次设密浏览器流程覆盖；多值密钥输入及其显示、隐藏、删除动作提供本地化行级可访问名称。
-- [修复] Web 登录页按实际传输协议显示安全状态：HTTPS 仅陈述加密传输，本机 HTTP 使用中性说明，非本机 HTTP 明确警告密码传输风险，并移除虚构的 `StockPulse-V3-TLS` 声明。
-- [修复] 诊断脱敏 `sanitize_diagnostic_text` / `sanitize_sensitive_text` 现同时脱敏非 HTTP 连接串（postgresql/mysql/redis/mongodb/amqp 等）userinfo 中的凭据，此前仅覆盖 http(s)，SQLAlchemy 等连接错误可能把数据库密码泄漏进 Agent 诊断与日志；host 保留以维持诊断可读性。
-- [改进] 实验性 PydanticAI 运行时的 Single RUN 模型桥补全（RF-05，AR-RF-04/05/06/10/11）：模型桥从 PydanticAI `model_request_parameters` 下发真实工具 schema（不再固定空数组），ToolCall/ToolReturn/reasoning/provider trace 跨轮无损往返，复用 `AgentExecutor.build_run_messages` 的 system/skill/dashboard prompt 权威，usage 每次调用经单一 recorder 记录并修正为 `prompt_tokens/completion_tokens`，execution deadline 与协作取消在每次调用前 fence，CHAT/RESEARCH 显式返回 `unsupported_capability`（RF-06 裁决前冻结）；仍为默认关闭、可整体删除的实验路径，Native 默认路径零 PydanticAI 依赖不变，36 replay fixture 零改。
-- [改进] Agent 运行时契约改为运行中控制柄（RF-02，AR-RF-01/02）：`AgentRuntime.start()` 返回可查询状态、消费事件、请求取消并等待终态的运行中 `ExecutionHandle`（原 `execute()` 保留为启动后等待终态的兼容 helper），`ExecutionContext` 深层冻结为只读快照，调用方后续修改嵌套 dict/list/set 不再影响执行；terminal first-wins 与 36 replay fixture 逐字节不变。
-- [文档] 新增《多语言金融术语指导》（`docs/financial-terminology-guide.md`）作为十语言 UI 金融术语的单一治理源：约 100 个来自真实产品的概念，含语义边界（UI/report language/用户内容/契约值）、`en`/`zh`/`zh-TW` 权威列与八语言产品译文基线、已知译文漂移清单、风险表达禁止项、格式化与审查流程；同步 `web-i18n.md`/`web-i18n_EN.md` 与 `INDEX.md` 入口。docs-only，不改运行时资源。
-- [chore] Agent 各入口的终态写入 fence 统一经单一分类器 `classify_result_terminal_state`（RF-04）：单智能体 `AgentExecutor.chat`、多智能体 `AgentOrchestrator.chat` 与 SSE 端点的 `ExecutionLifecycle.finish_from_result` 现共用同一终态判定，`cancelled` 优先于 `success`，取消的对话不再可能写入成功助手消息；纯内部重构，行为逐字节不变，36 replay fixture 与 SSE 测试零改。
-- [改进] Native Agent runtime 的工具调用统一改由单一 `BoundToolSession` 门禁分发（RF-03，AR-RF-03），消除绕过会话的第二套 ToolRegistry 权威：runner 每次运行构造一个 native 兼容会话（等价放行 allowlist/policy/permission，surface 跳过声明式契约校验）并在终态关闭，保持 36 个 replay fixture 逐字节不变；运行结束后迟到的工具结果（如超时 worker）经 late-result fence 丢弃，不再重新进入模型或写入成功结果。
-- [测试] CI 新增 `pydanticai-installed` 独立作业与 `backend-gate` 的 native 隔离断言：安装 `requirements-pydanticai.txt` 后强制导入 `pydantic-ai-slim` 并执行实验运行时测试，`STOCKPULSE_REQUIRE_PYDANTIC_AI=1` 下依赖缺失或模块级跳过判为失败（不再以 skip 冒充通过，AR-RF-09）；默认 `backend-gate` 保持零 PydanticAI 依赖。
-- [文档] 项目改为双许可证：上游原始代码保持 MIT License，StockPulse 新增与大幅修改的代码采用 AGPL-3.0；同步更新 LICENSE 与三语 README（含 badge、fork 说明与 License 章节）。
-- [改进] Agent 流式对话（`/api/v1/agent/chat/stream`）在客户端断连或流提前结束时协作取消后端执行：Agent 循环在每步开始、每次 LLM 调用后与流水线各阶段边界处检查取消意图并及时停止，取消结果记为 cancelled 而非失败，不再写入"分析失败"占位助手消息，也不残留部分 provider trace；SSE 事件线经单一降级点保持逐字节不变。
-- [修复] 修正新增界面语言的设置字段标题、金融告警方向、LLM 未配置提示及 Markdown/AlphaSift 产品术语翻译，并将设置导航翻译键改为稳定语义键。
-- [改进] Web 共享 Button、SegmentedControl、Checkbox、Search、Badge、Notification 与侧栏 Profile 按统一 Figma 规格收敛；设置和首页标签切换、全站 checkbox、侧栏语言/主题入口、精简配置提示及路由错误页改用共享组件。
-- [改进] Web 页面菜单、选择器、按钮和输入框进一步收敛到共享 Popover、Select、Button 与 Input；设置单位和调度默认值改由后端 schema 提供，持仓 CSV 导入不再伪造内置券商目录。
-- [修复] Web Chat、持仓、决策信号、回测与告警页面的局部控件尺寸和空态卡片高度，避免筛选行、操作按钮和规则列表在桌面视口中过度撑大。
-- [改进] Web 登录页改为极简居中卡片视觉：圆形品牌徽章、黑白反色主按钮、与工作台一致的纯色背景，移除 3D 倾斜、巨型背景图形、网格与渐变品牌字；密码认证流程、可访问性标签与 i18n 文案不变。
-- [改进] 全局按钮形状从胶囊形（rounded-full）统一为软圆角（rounded-lg），设计守卫同步反转校验规则；装饰性圆点改用 --radius-dot 语义 token。
-- [修复] 修复 Web 前端登录状态竞态：过期的 auth status 响应晚到时不再覆盖较新的登录状态，避免登录成功后偶发被弹回登录页。
-- [修复] Web 设置多选下拉改用视口定位并在空间不足时向上展开，避免被设置分组或弹窗的 `overflow` 边界裁切；弹层在窄屏中保留 8px 安全边距。
-- [修复] Web 通知路由严格按运行时完整凭据组判断可用渠道，辅助字段或半套 Telegram、邮件、飞书、Discord、Slack、Pushover、ntfy、Gotify 等配置不再误显示为可路由。
-- [修复] System Config API 从当前 live `Config` 快照复用通知运行时权威计算已配置渠道，未重载的 `.env` 修改不再被误报为已生效；ntfy / Gotify 畸形 authority、userinfo、端口和 NFKC URL 关闭式判为未配置且不泄漏原值。
-- [修复] Web 设置页统一保护加载、保存、冲突恢复和外部编辑刷新产生的配置快照，晚到的旧响应不再覆盖新版本，已被新快照取代的刷新失败也不再误报已提交的保存失败；滚动升级遇到旧后端缺少渠道状态时保留完整通知渠道目录和已有选择，后端明确返回空列表时仍保持关闭式过滤。
-- [修复] Web 登录 `redirect` 在解析前拒绝 ASCII 控制字符、空格、DEL 与任意反斜杠，并在固定同源基准上二次校验，防止 URL 规范化绕过或登录后跳转失败。
-- [修复] Web 侧栏搜索框移除误导性的 `/` 快捷键提示（此前并无全局 `/` 监听），避免暗示不存在的键盘快捷键。
-- [修复] Web 登录深链不再丢失：已登录用户访问带 `?redirect=` 的 `/login`、或登录成功后，都会按 `?redirect=` 返回原页面而非首页；redirect 仅接受同源绝对路径，外部 URL、协议相对与反斜杠变体一律回退首页。
-- [改进] Web 剩余按钮观感控件统一为胶囊形（设置帮助弹窗文档链接、持仓 CSV 文件选择、首页通知勾选 chip），与全站按钮形状规范一致。
-- [修复] Web 页面容器与回测页不再在应用外壳的 `main` 地标内嵌套第二个 `main`，回测页补充屏幕阅读器可见的 h1 标题，页面地标语义唯一。
-- [修复] Web 设置页文本/路径类输入框改为填满 240px 控件列，数值输入保持紧凑宽度，日志目录等长值不再被裁切到约 170px。
-- [修复] Web 设置页定时任务启用改为统一开关控件，定时时间改用共享时间选择器；“添加时间”直接展开小时/分钟面板、确认后才保存，并在展示层去重已有时间。新增共享日期选择器并替换回测、持仓页的原生日期控件，统一月历弹层、键盘输入和表单行为。
-- [修复] Web 设置页与模型渠道编辑器的密码类输入框统一包裹在 `form` 中，消除浏览器关于表单外密码框的告警。
-- [修复] 首页侧栏「历史/自选/今日」标签栏统一到共享容器中，切换视图时标签栏不再位移；标签栏改为标准 tablist/tab 语义并支持方向键与 Home/End 键切换。
-- [改进] Web 设置页多选类字段（大盘复盘市场、通知路由渠道等）从平铺 checkbox 改为下拉多选控件，支持搜索、已选摘要与未知存量值保留。
-- [改进] Web 通知路由（报告/告警/系统错误渠道）下拉选项只展示已配置成功的通知渠道；未配置任何渠道时展示空态引导并可一键跳转渠道配置。
-- [改进] `REALTIME_SOURCE_PRIORITY` 改为保序多选下拉：按选择顺序决定数据源优先级，后端 Schema 提供候选项但不强制 allowed_values，历史别名与自定义源继续兼容。
-- [测试] 新增 Agent Runtime characterization 回放数据集与兼容性门禁：36 个 fixture（24 个 A/HK/US 财务场景 + 12 个 ModelRef/fallback/工具范围/超时/取消竞态/畸形输出契约场景）经严格 transcript 回放冻结当前 Native runtime 行为，`tests/test_agent_runtime_compatibility.py` 校验回放期望、manifest 覆盖矩阵与工厂契约（模型路由不可变、数值回退、ToolRegistry 共享、SkillManager 克隆与失效、`build_executor` 别名、Risk(Intel) 输入契约）。
-- [新功能] Web 界面新增繁体中文、日语、韩语、德语、西班牙语、马来语、法语和印尼语完整翻译资源与十语言选择器，并同步浏览器语言识别、持久化、HTML language、Intl 格式化及全语言完整性校验。
-- [新功能] 增加有序数据库 Migration Runner，以稳定 ID、SHA-256 checksum、单迁移事务和 SQLite 写锁统一 Fresh/历史数据库升级，并补齐 Desktop、Docker 与 Actions 的资源发现和导入校验。
-- [修复] Migration Runner 以固定 v3.0.0/v3.4.0/v3.20.0 release profile 兼容无 registry 历史数据库并保留数据；`status`/`verify` 改为 SQLite 强制只读诊断，不再在检查前修改 Schema 或应用 pending migration。
-- [改进] Migration Runner 只向 upgrade 提供受限且仅在同步调用期间有效的 SQL execution capability；返回或抛错时先拒绝新调用和排队调用，等待已进入 driver path 的语句在同一事务内完成并物化结果后再撤销连接租约；语句失败与禁用能力请求使用不可清除 latch，migration 捕获异常也不能提交；`execute` 只接受精确 `sqlalchemy.text()` 的单次 SQL 快照，`exec_driver_sql` 只接受内建字符串，任意 executable、实例覆写回调和并发 statement mutation 都不能获得真实 Connection；事务控制 SQL（含注释、空语句或 BOM 前缀）在进入 Connection 前 fail closed，调用方 SQLite authorizer 保持不变，DDL/DML 与 applied row 仍由 runner 独占同一事务，source guard、随机 savepoint 与 transaction 状态检查保留为纵深防御而非 Python 安全沙箱。
-- [修复] Migration Runner 递归拒绝 coroutine/generator/async-generator、context-manager wrapper 和循环 upgrade callable，并要求运行时严格返回 `None`；非法返回会关闭可同步关闭的 coroutine/generator 并回滚 DDL/DML，避免未完整执行的 migration 被错误记录为 applied 或产生未 await warning。
-- [测试] Docker CI 将受支持的 legacy SQLite fixture 作为 `/app/data` volume 启动真实 `DatabaseManager`，校验业务 canary、migration checksum 和 target version，并复用同一 volume 二次启动验证幂等。
-- [修复] Web 可搜索选择器在移动端底部弹窗中会根据可用空间向上展开并限制在视口内，避免模型服务选择列表超出屏幕后无法操作。
-- [改进] Web 共享控件、导航、设置、任务、自选股、Chat、报告、Run Flow、告警、决策信号、回测、持仓、选股与 Token Usage 的交互目标统一提供至少 44px 触控命中区，页面高度改用动态视口单位，报告二级标题统一使用 28px 设计 token，提升移动端可达性与版式一致性。
-- [修复] Agent runtime 对被多个 Connection 共享的 legacy 裸模型路由改为 fail-closed，并返回 `ambiguous_legacy_model_route` 要求显式选择 Connection-aware ModelRef，避免把其它 Connection 的部署来源误判为当前路由可用。
-- [修复] Agent 与 Bot 失败边界不再向用户或会话历史返回 Provider 原始错误；新失败持久化稳定 sentinel，历史 API 以安全 `content` 和 `error + params` 返回并兼容旧 `[分析失败]` 记录，Web 按当前界面语言统一渲染、复制和导出失败消息；Native Tool handler 与未知工具失败使用稳定错误码，内置 Agent 工具的 Portfolio、基本面、资金流与搜索下游失败使用稳定状态、诊断码或公开文案，模型、Single provider trace 与日志均不再包含原始异常详情；SearchService provider 失败日志只保留 provider、HTTP status、error count 与稳定 error code 等有界字段，不再输出 response body、response keys、私有 endpoint 或 API Key 前缀，Tavily / SerpAPI SDK error payload 在成功记账前转为稳定失败。
-- [修复] Web 异步分析仅在 409 envelope 的 `error` 为 `duplicate_task` 时构造重复任务错误，其它分析冲突与大盘复盘 409 统一走共享错误解析，并完整保留 `params`、`details` 和 `trace_id` 诊断元数据。
-- [修复] Web 用户可见文案与通知测试默认文案中的旧 DSA 品牌统一为 StockPulse；环境变量、API 字段、协议标识、内部模块名和历史载荷中的兼容标识保持不变。
-- [测试] ReportMarkdown 四种 UI/report language 组合改用可控延迟请求验证 loading→content 转换，正文与复制控件断言等待真实加载完成信号，避免 CI 资源压力下把已挂载的 disabled 按钮误当成正文就绪。
-- [修复] System Config GET 默认遮罩所有 Schema 敏感字段；模型 Connection 的 `API_KEY` / `API_KEYS` / `EXTRA_HEADERS` 遮罩或省略复用增加身份作用域校验，只有 Connection 名称、Provider、协议和 Base URL 未改变时才保留原凭据，动态附加请求头必须是 JSON 对象，切换身份或端点时必须重新输入或明确清空。
-- [修复] API、Agent、Bot、System Config、Backtest、图片提取与 AlphaSift 的异常日志统一通过共享安全入口记录：保留 trace ID、稳定错误码和异常类型，同时递归移除凭据、Authorization/Cookie、URL query token 与私有端点，限制诊断长度且不再附带原始 traceback；静态守卫在原始日志 sink 对无注解或异常类参数执行 fail-closed 校验，覆盖同步/异步函数、方法、闭包、别名与提前渲染路径，只有可信 sanitizer 处理后的诊断文本和已证明为普通结构化值的参数可进入日志；未知下游异常仍返回安全的结构化 500，预期校验错误保留明确的 4xx 语义。
-- [修复] 全局 422 请求校验 envelope 删除 Pydantic `input` 与异常上下文，只保留安全的字段位置、类型和通用文案，避免登录或配置请求中的 password/API key 被响应与浏览器 trace 复制。
-- [测试] 语义 Playwright 的敏感配置播种改用测试进程直接请求；credential-bearing CI 关闭 screenshot、video 和 trace，只保留文本 service logs 与 JSON reporter，并显式关闭 commit 与 PR diff 元数据采集。仓库 smoke 入口拒绝 UI/替代 config，global setup 在 CLI/project 合并后逐 project 校验最终 trace，静态 preflight 覆盖相对 import、`test.use` option 后赋值、`Object.fromEntries` 与 BrowserContext tracing 常见入口；本地无凭据调试仍可显式 opt in 无媒体 trace。CI 先严格扫描原始文本、日志、HAR、意外 trace/ZIP 条目与原始二进制 canary，再以专用脚本校验 JSON、递归文本日志、符号链接、allowlist 和 archive/media magic，生成 SHA-256 manifest 后二次扫描 staging；只有 raw scan、staging 与 staged scan 全部成功才上传安全 JSON/文本诊断。新增独立真实登录故意失败 harness，验证非零退出、JSON failure、服务日志、无 trace/media 及双重扫描，临时 spec 不进入正式 suite。
-- [改进] Web 配置备份入口从普通“系统与安全”页移入“高级”，保留原有 `.env` 导入导出、鉴权和冲突保护契约，避免普通设置路径暴露内部部署细节。
-- [修复] Portfolio 交易、资金流水、公司行为和 CSV 提交的持久化 operation ID 按操作类型、账户、owner 与客户端 key 隔离；默认 7 天 replay window 内同 payload 回放首次响应、异 payload 稳定冲突，窗口外记录在既有写事务中原子惰性清理且不影响 ledger 数据；旧 SQLite 表采用 additive migration，无法证明历史 owner 的 raw-key 行保持 unscoped，legacy 写入保护 trigger 在代码回滚期间阻止 v2 key 重复入账，并保证再次升级不发生索引冲突。Web 重试继续复用 ID、提交中锁定表单与关闭行为，并将 320px 表单改为单列。
-- [改进] Provider Catalog 补充获取凭据、控制台、模型列表与官方文档地址，Web 模型接入和首次向导统一消费后端元数据；快捷链接仅接受不含内嵌用户名或密码的 HTTPS URL，并在规范化后去重，删除按 Provider ID 维护的前端业务外链表。
-- [修复] 配置 Schema API 完整透传字段条件契约；Web 对 AI 字段缺失/未知 `uiPlacement` 统一隔离到“高级”只读诊断，对未知条件保持可见但锁定，避免旧 Schema 或滚动部署重新暴露第二套普通编辑入口。
-- [改进] Web-facing API 错误统一为稳定 `error/message/params/details/trace_id` envelope，并在弃用窗口内以只读 legacy `detail` 同值别名兼容旧消费者；5xx 两字段都只携带相同安全结构或 `null`。前端优先读取 `details` 并兼容任意 JSON 形态的旧 `detail`，按 UI language 映射主错误并保留安全诊断；任务 POST、SSE 与轮询载荷补齐 `message_code/message_params`，切换语言时已有任务即时重渲染，断线恢复按 task ID 去重合并。
-- [chore] GitHub workflows、Issue/PR 模板、自动审查、step summary、bot 评论与自动 Release notes 统一使用英文；动态输出拒绝非英文字母脚本和 HTML 字符实体，并转义非 ASCII / `&` 路径与诊断，手动 Docker 发布 tag 使用 ASCII 格式校验与安全环境变量传递；CODEOWNERS、发布链接和桌面端更新目标切换到 SiinXu/stock-pulse-ai。
-- [修复] 移除上游 AIHubMix referral `APP-Code` 自动注入及 Anspire/AIHubMix/SerpAPI 推荐参数和优惠宣称；用户显式配置的自定义 headers 保持不变。
-- [改进] Workflow、邮件默认发件人、HTTP User-Agent、Web fallback 标题与 OpenAPI 标题统一使用 StockPulse；部署、桌面发布校验和远程股票索引切换到当前仓库。
-- [文档] Docker 指南不再把上游或尚未发布的镜像描述为 StockPulse 官方产物，并移除未启用的 Discussions 入口。
-- [测试] 新增 GitHub 协作资产英文守卫，并要求 PR 自动标签与审查报告通过分页 API 统计全部变更文件，避免大型 PR 只报告前 30 个文件。
-- [测试] SettingsPage 调度器运行态回填测试在两个状态方向都等待异步 API 响应，避免 CI 高负载下在运行态同步完成前提前断言。
-- [文档] 三语 README 将 StockPulse 明确为 ZhuLinsen/daily_stock_analysis 的 MIT License 独立维护 fork，并将当前仓库、CI、文档与反馈入口切换到 SiinXu/stock-pulse-ai。
-- [改进] StockPulse Web 补齐 Chat、Screening、Alerts、Portfolio、Settings、公共选择器、股票搜索和报告外围诊断的中英文界面，并将 UI language、report language 与动态原文边界分离。
-- [改进] Web 翻译按 alerts、portfolio、screening、settings、stock search、report chrome 等领域拆分为 typed locale 文件，便于后续扩展更多语言，避免单一字典持续膨胀。
-- [测试] 新增字典 key/空值/插值/重复项一致性、生产 TSX 中英文硬编码文案守卫及 30 项 Playwright i18n 验收；硬编码扫描扩展到 JSX 表达式、`aria-description`、`alt`、`label`、`message` 等用户可见语境，并要求 allowlist 精确到文件、字符串、语境和用途且仍被实际使用；CI `web-gate` 显式执行 i18n 门禁。
-- [文档] 新增中英文 Web 国际化开发约定，说明界面/报告语言边界、动态内容、错误码、locale-aware 格式化和验证命令。
-- [修复] 登录页品牌标题统一为可访问的 `StockPulse`，隔离 Playwright 登录 smoke 不再依赖旧 `DAILY STOCK / Analysis Engine` 文案。
-- [修复] 模型连接新增显式 `LLM_<CONNECTION>_PROVIDER` 身份契约，Provider 与可重命名的 Connection 名称分离；同一 Provider 多连接、重命名连接、Available Models 的 Provider/Connection 元数据、旧配置精确匹配兼容与 GitHub Actions 变量透传保持一致，不再按 `openai2` 等名称前缀猜测。
-- [修复] 删除仍被报告、Agent、Vision 或 fallback 引用的单个模型时，Web 模型管理弹窗列出全部引用并支持在统一草稿中选择替代模型，后端以结构化 `model_in_use/details.referenced_by` 阻止 API 绕过；替换引用与删除可在同一事务原子成功，历史失效值仍保留并标记不可用。
-- [改进] Provider Catalog 成为 Provider 身份、双语标签、默认端点、协议、发现能力与本地/自定义属性的唯一元数据来源；同一 API 返回的 `connection_fields` Schema 成为动态 Connection required/visible/enabled 与可写字段集合的唯一权威来源。该属性存在时（包括显式 `[]`）不读取 Catalog 的 legacy requirement flags，仅在旧后端完全省略属性时启用隔离的 rolling-upgrade fallback；只有完整包含 `connection_name`/`display_name`/`provider_id`/`protocol`/`base_url`/`api_key`/`api_keys`/`models`/`extra_headers`/`enabled` 的 Schema 才可启用写入，identity-only/partial Schema 与未知且当前可见必填的字段统一进入只读保护并阻断测试、草稿、自动保存与保存；AND 中任一未知 operator 优先于更早的未满足条件，字段保持可见、只读、诊断并阻止保存。显式空 `display_name` 由前后端一致拒绝，仅兼容完全省略该字段的旧配置；内置 Provider 提供 `label_zh`/`label_en`，旧 `label`/`is_required` 仅为 deprecated 兼容输出；Ollama 使用 `/api/tags` 空 Key 发现，模型多选收起为可搜索 listbox。
-- [测试] Playwright 使用隔离 `.env`、SQLite、密码哈希与 session secret，启动时确定性播种 Markdown 报告，结束后清理 runtime，并保留后端/Vite/fake-provider 服务日志；登录 smoke 按当前 StockPulse 首次设密/登录流程执行，不再依赖开发者状态或整套 skip。
-- [文档] 中英文贡献指南、模型配置指南、Provider 指南、设置帮助与 `.env.example` 同步 Provider/Connection/Model/Task Assignment、多连接、发现、stale 值保留和 E2E 隔离语义；设置路径统一为「AI 与模型 → 模型接入」。
-- [改进] Web 设置页任务模型（报告/Agent/Vision）与备用模型添加控件改为严格列表选择器（`SearchableSelect`，listbox 语义、支持搜索/键盘/读屏）：仅可从后端可用模型目录选择，删除自由输入组件 `CreatableCombobox`；目录外已存值标注「当前配置不可用」，空值显示占位提示而非误报不可用。
-- [改进] 后端配置 Schema 新增 `ui_placement` 标记（model_access/task_routing/developer_diagnostics/hidden_legacy）作为字段 UI 归属唯一权威源：Web 通用分类视图按该标记排除专属界面字段与隐藏 legacy Provider 字段，删除前端手写的 legacy Provider 分组名单（`LEGACY_MODEL_PROVIDER_GROUP_IDS`）；不改配置保存/读取契约。
-- [改进] Web 设置页普通路径术语与设计收敛：运行时注入密钥的提示不再引用 `.env`/内部变量名，模型备用顺序说明去除内部实现名词；设置面与基础控件清理魔法字号/圆角（`text-[11px]`→`text-xs`、`rounded-[10px]`→`rounded-lg`、`rounded-[6px]`→`rounded-md`）。
-- [改进] Web 的 Modal、Drawer、ConfirmDialog、Settings Help 与移动历史面板统一使用 Overlay stack：只允许顶层响应 Escape/Tab，背景 inert、引用计数滚动锁定、打开聚焦和关闭焦点恢复行为一致，Confirm 层级高于 Drawer/Modal，Home/Chat/Help 不再保留自制 Overlay 状态机。
-- [改进] Home 以 query 参数作为报告与 Run Flow 对象真源：`recordId`、task/history flow 深链支持刷新、分享与 Back/Forward 恢复，关闭 Drawer 只移除对应 flow 参数；非法/失效参数使用 replace 规范化，快速切换采用 latest-request-wins 且保留无关参数。
-- [chore] CI `web-gate` 阻断执行 lint、i18n、Vitest 与 build，关联 API/配置/服务改动同时触发 `web-e2e`；Playwright 使用隔离的真实后端、Vite、fake provider 与确定性数据，Python 按祖先 `.venv`→`python3`→`python` 查找并打印诊断，固定 `retries: 0`；含凭据 canary 的运行禁用 trace，只保留扫描通过的文本日志与 JSON 结果 7 天，PR 页面截图改由不含凭据的独立证据提供。
-- [文档] 补充前端开发代理变量 `DSA_WEB_DEV_API_PROXY` 到 `.env.example` 与贡献指南；修正本段中「模型供应商面板/高级视图」删除与保留的矛盾描述，统一为最终四视图状态；LLM 配置指南（中英）的旧术语统一为「设置 → AI 与模型 → 模型接入」。
-- [改进] Web 设置页「AI 与模型」收敛为 总览/模型接入/任务路由/可靠性 四个视图：删除「高级」二级视图与遗留「模型供应商」子页映射，legacy Provider 凭据键保持后端（env/YAML）兼容但不再形成 Web 第二编辑入口；模型接入页只展示紧凑连接卡片，内部配置来源、生成后端、CLI 与冒烟测试统一移入顶层「高级 → 开发者诊断」并默认折叠。
-- [改进] Web 设置页模型输入全面改为选择器交互：新增 `ModelMultiSelect` 多选组件，连接编辑器「发现的模型」改为搜索并勾选启用；手动添加模型改为每次回车/点击添加一项，粘贴逗号/空白分隔列表自动拆分去重；模型下拉搜索同时匹配显示名/模型路由/所属连接/服务商；可靠性页备用模型列表支持上移/下移排序，目录外的已配置路由保留并标注「当前配置不可用」而不静默清除。
-- [修复] 首次配置向导对 Ollama 等免密钥服务的首次配置不再受阻：API 密钥按后端 `connection_fields` Schema 标注「（可选）/可留空」；「自动发现模型」结果不再整批自动启用，改为展示候选列表由用户勾选确认；手动输入逐项添加并兼容粘贴逗号分隔列表。
-- [改进] 模型接入术语与文案降低理解成本：统一「主要模型 / 备用模型 / 服务地址 / API 密钥」用语，连接编辑器表单示例从 `KEY=value` 环境变量形式改为纯值示例（如 `https://api.deepseek.com`、`sk-xxxx`），中英文界面与帮助文案术语对齐（model connections）。
-- [改进] Web 设置页多值枚举字段（`NOTIFICATION_REPORT_CHANNELS`/`NOTIFICATION_ALERT_CHANNELS`/`NOTIFICATION_SYSTEM_ERROR_CHANNELS`、`MARKET_REVIEW_REGION`）渲染为勾选组，不再要求手输逗号分隔字符串；目录外的已存值保持可见、可取消，保存不静默丢弃；未显式设置的字段回填后端默认值展示（密码控件除外）；后端注册表为上述字段标注 `multi_value` 并修正英文描述措辞。
-- [改进] 后端配置保存校验补齐 Vision 模型引用保护：当本次更新触及渠道结构（删除/停用连接、修改 `LLM_CHANNELS` 或渠道键）导致 `VISION_MODEL` 指向已启用连接中不存在的模型时，保存被拒绝（`unknown_model`），与主模型/备用模型引用保护一致；历史失效的 Vision 引用仍不阻断无关配置保存。
-- [新功能] 大盘复盘报告页接入市场结构上下文卡片：持久化报告包含市场结构字段时，在复盘报告视图渲染题材主线与个股位置（`MarketStructureCard`），旧报告无该字段时静默跳过。
-- [改进] Web 设计守卫扫描全部生产 CSS/TSX，阻断非胶囊按钮覆盖、`primary`/`settings-primary`/`action-primary`/`gradient` CTA 经共享样式、别名、静态拼接、JSX spread 或内联样式引入的渐变/shimmer，以及组件内 hardcoded hex/颜色函数、魔法像素字号/尺寸/圆角和原始 `100vh`；独立 fixture 覆盖每类规则，Login 与 Settings 主操作统一复用共享黑白反色 solid primary 样式，原生按钮由全局胶囊基线兜底，且不牺牲 44px 触控目标或可访问 focus ring。`ParticleBackground` 通过单个实时 `CSSStyleDeclaration` 在 Light/Dark 切换后读取当前 Canvas token，`ScoreGauge` 保留既有类型与三层 SVG 结构并将 glow 样式归零。后端本轮触及的开发日志同步改为英文。
-- [文档] 修正模型接入相关文档与帮助文案的矛盾与过时描述：UI 路径统一为「设置 → AI 与模型 → 模型接入」（FAQ、LLM 配置指南、设置帮助、文档索引，中英文同步）；历史失效模型引用明确保留并标记不可用，删除在用模型由 `model_in_use` 阻断；market-support 中 `MARKET_REVIEW_REGION` 的「文本框输入逗号分隔」描述更新为勾选组现状。
-- [改进] 后端 Provider Catalog（`src/llm/provider_catalog.py`）不再写死具体模型 ID：移除 `placeholder_models` 字段，保留 provider id/label/protocol/默认端点/发现能力/capabilities/本地或自定义属性；`requires_api_key`/`requires_base_url` 仅作为旧后端 compatibility fallback，不在 `connection_fields` 存在时参与字段规则。新建连接不再用示例模型预填，也不会把示例模型写入运行时/fallback/任务模型；模型改由“获取模型”发现或逐项手动添加，没有模型时连接保持“未完成”。首次配置向导的模型输入同步改为 token-list（发现多选 + 手动逐项添加），不再是逗号输入框；旧的逗号模型配置读取时解析为 token。
-- [修复] 修复全量测试在本地开发 `.env` 存在时的模型与认证状态污染：`litellm` 在 import 时 `load_dotenv()` 会把开发者 `.env` 的 `LITELLM_FALLBACK_MODELS` 等 LLM 变量注入 `os.environ`，导致 System Config 校验测试仅在整套运行时因环境泄漏而失败（单文件运行通过）。新增 `tests/_llm_env_isolation.py`，在 `SystemConfigServiceTestCase`/`SystemConfigApiTestCase` 的 `setUp` 隔离 ambient LLM 环境变量并在 `tearDown` 还原；Auth API 与 ConfigManager 测试恢复原 `ENV_FILE`/`DATABASE_PATH`，Intelligence/Usage API 测试显式隔离认证状态，避免开发配置 `ADMIN_AUTH_ENABLED=true` 造成无关 401（不弱化断言、不跳过、不固定顺序）；新增 `tests/test_provider_catalog.py` 覆盖“无具体模型硬编码 / 返回数据不可被调用方污染 / catalog 使用后不影响后续配置校验”回归。仅剩 3 个与模型接入无关、单独运行也失败的既有 `test_decision_signal_service` 时序相关基线用例。
-- [改进] Web 设置页「AI 与模型 → 模型接入」收敛为唯一的模型服务/连接/模型配置入口：主页只保留标题、一个「添加模型服务」主操作、紧凑连接卡片与空状态；添加、编辑和模型管理统一使用同一个 Modal（390px 下为底部面板），服务商选择、凭据、模型发现/多选与手动 token 添加不再平铺到主页；同一服务商可创建多条连接，底层存储格式与 YAML/Legacy 兼容不变。
-- [改进] Web 设置页删除 AI 与模型「高级」下的独立「模型供应商」面板（`ModelProvidersPanel`）与前端 `modelProviders.ts` 映射：Provider 凭据/端点/模型不再有第二套编辑入口，模型服务商元数据统一来自后端 Provider Catalog（AI 与模型的「高级」二级视图随后在本轮收敛中整体移除，最终态见上文四视图条目）。
-- [改进] Web 设置页任务模型选择（报告/Agent/Vision）改为真正的 `SearchableSelect`，仅可从后端可用模型目录中选择；无可用模型时不渲染空选择框，改为统一空状态与单一「前往模型接入」操作；可用模型目录加载失败时展示错误与重试，历史失效值继续保留并标注「当前配置不可用」。
-- [改进] 后端 LLM 渠道校验的已知服务商列表由 `KNOWN_LLM_PROVIDER_CHANNEL_NAMES` 硬编码改为从 Provider Catalog 派生（单一权威源）；可用模型 API 每条模型补充 `provider_id/provider_label/connection_id/available` 字段，供 Web 选择器按服务商/连接分组而无需第二套前端清单。删除被引用连接会因任务模型引用失效被后端校验拒绝（`unknown_model`，直接调用 API 也无法绕过），需先改选替代模型再保存。
-- [测试] `test_daily_analysis_workflow_llm_env` 的服务商渠道清单来源由已收敛为纯展示层的前端 `llmProviderTemplates.ts`（不再声明 channelId/baseUrl）改为后端 Provider Catalog，使「每日分析 workflow env 与 `.env.example` 覆盖全部服务商渠道」的静态校验回到单一权威源。
-- [改进] Web 设置页 LLM 渠道编辑器的服务商业务元数据（标签、默认 Base URL、协议、示例模型、能力标签、是否已知服务商）改为统一从后端服务商目录（`GET /system/config/llm/providers`，经 useProviderCatalog）读取，删除前端并行维护的 `LLM_PROVIDER_TEMPLATES` 业务清单；仅保留能力显示文案、协议级占位与各服务商文档链接/配置提示等纯展示内容。前端不再维护第二套服务商业务源。
-- [改进] Web 设置页字段帮助弹窗新增「当前取值来源」说明：依据后端权威的 `raw_value_exists` 标识，明确该字段是「已显式设置」还是「未显式设置、使用内置默认值」（并展示默认值，敏感字段不展示），无内置默认值时提示「未设置」，帮助用户判断当前值来自显式配置还是默认回退。为字段帮助层展示，不改后端。
-- [新功能] Web 问股页支持中止生成：流式回复进行中时，发送按钮变为「停止生成」，点击立即中止当前请求并恢复输入框，已发出的用户消息与历史对话不受影响。
-- [修复] Web 问股页消息输入框在中文/日文等输入法组词过程中按 Enter 选词不再误发送消息：仅当不处于输入法组字状态（`isComposing`）且未按 Shift 时 Enter 才提交，Shift+Enter 仍为换行。
-- [新功能] 后端新增模型服务 Provider 权威目录 `GET /api/v1/system/config/llm/providers`（label/protocol/默认端点/凭据与 Base URL 是否必填/发现能力/capabilities），凭据与端点必填规则由既有渠道完整性契约推导，Web 前端统一消费该目录、不再维护第二套业务规则；首次配置向导改由该目录驱动服务商列表与必填校验（Gemini/Anthropic 免 Base URL、Ollama 免 Key、自定义端点必填 Base URL 就地拦截）。
-- [新功能] 后端可用模型目录 `GET /api/v1/system/config/llm/available-models` 使用 connection-aware `ModelRef`（`connection_id + runtime_route`）区分多 Connection 同名模型；报告/Agent/Vision/fallback 保存并解析到具体 Connection。legacy 裸 route 唯一匹配时兼容，多重匹配返回 `ambiguous_model_route` 要求确认；删除、停用和替换引用按 ModelRef 精确处理，不影响另一 Connection 的同名模型。
-- [改进] Web 设置页 AI 与模型「总览」任务矩阵的生效状态改为权威判定，不再以模型字符串非空猜测：任务主模型被某个已启用连接声明为可用路由时才显示「生效」，已设置但当前配置不可路由显示「当前配置不可用」，未设置显示「待配置」；本地 CLI 后端按自身可用判定。可用路由集来自 `GET /api/v1/system/config/llm/available-models`，与保存校验一致。
-- [改进] Web 设置页字段控件与数据语义对齐：任何带有限枚举 `options` 的字段一律渲染下拉选择（不再因 `ui_control` 提示退化为自由文本框）；普通字段正文不再内联渲染 `schema.docs` 外部文档链接与 `KEY=value` 示例，这些改由字段帮助弹窗提供，普通路径保持无环境变量/配置指南干扰。
-- [修复] Web 设置页首次配置向导保存的配置无法通过后端校验：主模型 `LITELLM_MODEL` 现写入包含 Connection 身份与规范运行路由的 ModelRef，不再保存被后端拒绝的裸模型名，也不会因同名模型来自不同 Connection 而丢失身份；Gemini/Anthropic 官方端点不再强制填写 Base URL（走 SDK 默认端点），Ollama 等本地运行时不再强制 API Key；新建连接合并进已有 `LLM_CHANNELS` 而不是整体覆盖；显式写入 `LLM_CONFIG_MODE=channels` 确保配置的渠道生效、不被 YAML/Legacy 静默覆盖；保存失败时错误在向导内当前步骤展示并保留草稿；摘要页只展示"执行方式/模型服务/可用模型/报告主模型"等用户文案，不再显示 `LLM_CHANNELS`、`API_KEY` 等内部 key。新增真实后端契约测试覆盖上述路径（裸模型名被拒、ModelRef 通过、Gemini 空 Base URL、Ollama 免 Key、合并已有渠道）。
-- [新功能] Web 设置页新增首次配置向导：在「概览」点击「启动向导」即可分步完成最小可运行配置——选择云 API 或本机 CLI；云 API 下选服务商、填写必要凭据、获取模型候选并由用户多选确认（不再预填或自动全选示例模型），也可逐项手动添加；最后统一「保存并应用」。达到最低可运行配置即可完成，不强制配置通知或高级项；移动端 390×844 全流程可用。
-- [改进] Web 设置页顶层「高级」section 按字段 placement 聚合内部/底层配置，并将配置来源、执行后端选择与调优、CLI 状态、冒烟测试等全部收进默认折叠的「开发者诊断」；这些字段不再出现在模型接入、任务路由或可靠性普通路径。
-- [改进] Web 设置页移动端（窄屏）用紧凑下拉选择一级 section 后，焦点自动移入内容区并滚动到所选 section，便于屏幕阅读器播报与继续操作；桌面端点击侧栏不受影响。
-- [新功能] Web 设置页标注需重启生效的配置：字段 schema 带 `restart_required` 时在字段旁显示"重启生效"徽章；当已修改的草稿中包含此类字段时，内容区顶部提示"部分已修改的配置需要重启服务后才会生效"，避免用户以为保存即时生效。
-- [新功能] Web 设置页新增页面级校验错误摘要：任一 section 存在校验错误时，内容区顶部列出所有出错字段及原因，点击可跨 section 跳转到该字段所属的 section/view 并自动聚焦、滚动到该字段，出错字段即使不在当前打开的 section 也能一键定位修正。
-- [改进] Web 设置页按字段级 placement 拆分共享后端分类的 section：报告（Reports）只展示报告输出（格式/语言/模板/渲染/完整性），告警与自动化（Alerts）只展示推送路由/频控/静默/摘要等投递规则，二者不再同时列出全部 notification 非渠道字段；对话（Conversation）独占 Agent 上下文压缩字段（`AGENT_CONTEXT_*`），Agent 行为不再重复展示；事件监控（`AGENT_EVENT_*`）从 Agent 行为迁移到告警与自动化下的独立「事件监控」卡片（跨后端 category 呈现）。section 状态徽章改由同一 placement 归属，报告/对话/事件监控可获得与告警/Agent 行为独立的错误/未保存徽章。该拆分为 Web 呈现层，不改后端 category。
-- [改进] Web 设置页「AI 与模型」模型配置收敛为唯一入口：连接视图的渠道编辑器不再内嵌运行时主模型/Agent 主模型/Vision/备用模型/Temperature 选择，这些运行时路由改由任务路由视图（报告/Agent/Vision 主模型与 Temperature）与可靠性视图（模型备用顺序）各自独占编辑；任务路由视图对备用模型顺序只读展示并提供“前往可靠性设置”跳转，避免同一键出现多个编辑入口。渠道编辑器在连接视图不再向草稿写入运行时键，字段值统一由任务路由/可靠性视图经统一草稿提交。
-- [新功能] Web 设置页「AI 与模型」新增总览与任务路由视图：总览以任务矩阵展示 股票报告/大盘复盘/问股·Agent/Vision 各任务当前的执行方式、主模型（大盘复盘、Agent、Vision 未单独配置时继承报告主模型并标注）、备用模型与生效状态，用户无需查看环境变量即可判断实际生效路径；任务路由视图集中编辑 报告/Agent/Vision 主模型与备用模型顺序。总览与任务路由视图下不再展示渠道编辑器与原始字段列表。
-- [改进] Web 设置页导航重构为两级信息架构（section/view）：一级 section（概览 / AI 与模型 / 数据源 / Agent 行为 / 对话 / 报告 / 告警与自动化 / 通知 / 回测 / 系统与安全 / 高级），AI 与模型下含 总览/连接/任务路由/可靠性 二级视图（引入时含「高级」视图，随后在本轮收敛中移除，见上文四视图条目）；桌面为一级侧栏 + 内容区二级 tab，移动端为紧凑横向滚动。URL 改用 `?section=&view=` 并对旧 `?category=&sub=` 深链做 replace 迁移，返回/刷新/深链稳定；侧栏 badge 只表达错误/未保存状态，不再显示字段数量。该重排为 Web 映射层，不改动后端 category、Desktop 或旧 API 消费方；移除旧 `SettingsCategoryNav`，不再维护双导航。
-- [新功能] Web 设置页普通配置改为 700ms 分组自动保存并移除全局 Save：后端 category 分组串行提交，Connection、任务路由与 fallback 共享 `ai_model` 原子组；每组显示 scheduled/saving/saved/failed/conflicted，失败保留草稿并可重试或恢复服务器值，409 使用 `base/server/local` 冲突视图，Reset 只作用当前组，保存中或未恢复失败会拦截离开，masked secret 仅实际修改时提交。连接测试与模型发现仍为显式诊断动作，不由自动保存触发。
-- [新功能] 配置字段 Schema 引入条件契约（`contract.visibleWhen/enabledWhen/requiredWhen/requirement`，仅 AND、未知 operator fail-safe 保持可见）：后端注册表输出 `contract`、提供 `evaluate_config_conditions`，并按契约执行权威必填校验（隐藏字段不参与校验，`requirement=required` 或 `requiredWhen` 满足时必填、为空则拒绝保存）；Web 依据 `visibleWhen` 隐藏不适用字段、依据 `enabledWhen` 只读、并显示必填/选填/继承徽章，对未保存草稿实时生效。保留 `is_required` 兼容输出。
-- [新功能] 新增 `LLM_CONFIG_MODE=auto|channels|yaml|legacy` 显式模型配置来源模式并保留既有优先级与迁移 API；Web 模型接入在外部配置生效时仅显示简洁只读提示与「查看详情」，具体来源、覆盖关系和 Legacy 迁移只在顶层「高级 → 开发者诊断」中按需展开。
-- [改进] 后端配置校验对 LLM 渠道增加与前端一致的结构完整性权威门禁：启用渠道必须具备凭据（Ollama/本地端点免）、Base URL（官方 provider 免、自定义端点必填）和至少一个模型，直接调用配置 API 也无法绕过；仅对本次更新涉及、或由停用切为启用的渠道执行严格校验，历史不完整渠道不会阻断无关设置保存；校验失败时整个更新事务失败、不部分落库；已保存并被 mask 的密钥不会被误判为缺失；YAML 模式仍豁免。
-- [改进] Web 设置页模型连接完整性门禁与后端契约对齐：启用连接必须具备合法名称、必要凭据、必要服务地址和至少一个模型；Ollama 及后端允许的 localhost OpenAI-compatible 地址可免 Key；未启用连接可保存为未完成草稿，连通性测试不作为保存硬门禁。
-- [改进] Web 设置页模型连接卡片改进可访问性：编辑与模型区域打开同一 Modal，菜单和开关不再嵌套交互；删除连接先弹确认，被报告/Agent/Vision/备用模型引用时由后端权威阻断并提供任务路由入口。
-- [改进] Web 设置页生成后端状态面板的草稿预览请求改为 debounce，并整体移入顶层「高级 → 开发者诊断」默认折叠区，普通模型接入首屏不再展示运行态诊断。
-- [改进] Web 设置页当前分类/子标签同步到 URL（`?category=&sub=`），支持深链直达具体设置入口，并在刷新、分享链接后恢复到同一位置。
-- [修复] 首次设置检查在主生成 Backend 为 Claude Code CLI / OpenCode CLI 时不再固定显示“Codex CLI”，改用对应本地 CLI 的显示名。
-- [改进] 为 multi-agent DecisionAgent 增加内部低敏分歧摘要输入管线，作为 #1904 P1 解释输出的前置 plumbing；不改变 public API、dashboard schema 或最终解释字段。
-- [改进] GitHub Actions 每日分析工作流补齐 TickFlow 数据源环境变量映射，并收敛 README 数据源稳定性说明到完整指南。
-- [修复] WebUI 启动时显式 `--host` / `--port` 不再被 `.env` 中的 `WEBUI_HOST` / `WEBUI_PORT` 覆盖，未传 CLI 参数时统一使用解析后的运行时配置。
-- [改进] GitHub Actions: 每日分析工作流（`00-daily-analysis.yml`）新增钉钉通知环境变量映射，支持在云端定时任务中直接使用钉钉机器人。
-- [修复] Web 持仓页首屏快照改用 `include_realtime=false` 快速估值，跳过逐票实时行情预取后先展示持仓列表，避免外部实时行情源变慢时长时间空白等待。
-- [修复] 修复任务状态接口重建报告动作字段时把合法情绪分 `0` 当成空值的问题，确保低分报告能按评分口径纠正为卖出建议。
-- [修复] 修复 Agent 流式回复在未收到完成事件就断开时被显示为“（无内容）”的问题，改为提示流式响应中断并保留用户消息，避免误判为空回答。
-- [修复] 修复桌面端 `WEBUI_HOST=*` / `WEBUI_HOST=[::]` 会被原样传给端口探测和后端启动导致无法监听的问题，启动前分别规范化为 `0.0.0.0` / `::`。
-- [改进] `STOCK_LIST` 自选股解析支持中文逗号、顿号、分号、空格和换行等常见粘贴分隔符，运行时、定时热刷新、CLI `--stocks`、Web 设置保存和自选 API 统一识别，并在写回时规范为英文逗号。
-- [改进] 新增 `NEWS_INTEL_AUTO_FETCH_ENABLED` 单开关，开启后个股分析、Agent 分析和大盘复盘会 fail-open 自动初始化并刷新 RSS/Atom/NewsNow 本地资讯池。
-- [改进] Web AI 建议页新增主股票上下文，复用最近分析和股票索引候选，并改进表现统计零样本说明。
-- [改进] DecisionSignal 将 `decision_profile` 升级为正式 nullable 字段，统一 same-profile 查询、去重、续期和失效语义，并保持 create metadata `null` 兼容与 SQLite 幂等回填诊断。
-- [改进] 补充本次设置页布局收敛：移动端分类导航改为横向滚动列表并保证设置内容首屏可见，桌面端保留分类说明并收紧字段布局层级与间距，提升首屏效率与可配置信息密度。
-- [文档] 在 README 快速开始中补充行情数据源配置说明（TUSHARE_TOKEN / Longbridge），明确未配置时仍可走 AkShare、Baostock、YFinance 等免费兜底源，日志中相关提示不影响运行。同步更新docs下的中英双份 README
-- [改进] 新增 #1743 Phase 6a 内部 DSA Tool Surface 契约，统一工具 schema、stock scope fail-closed guard、结构化错误、审计摘要和脱敏诊断边界，并明确外部 AgentBackend 工具能力仍需 wire-level probe 证明。
-
-- [修复] 桌面与 Docker 发布显式安装 `orjson`，桌面 PyInstaller 产物同时冻结并执行运行时导入探针，避免 LiteLLM 调用时报 `No module named 'orjson'`。
-- [改进] 个股报告不再单独展示“题材主线与个股位置”卡片，相关市场结构数据仍保留在分析上下文、模型 Prompt 与决策信号提取链路中。
-- [改进] 通知推送与完整 Markdown/微信报告不再重复附加“AI 决策信号”摘要，DecisionSignal 的存储、告警和 Web AI 建议页保持不变。
-- [改进] TickFlow 新增基于申万一级行业池的行业涨跌排行 fallback，并将基本面/市场结构单能力默认超时由 3 秒调整为 8 秒，降低正常慢响应被提前降级的概率。
-- [文档] 补充 macOS 未签名、未公证 DMG 被 Gatekeeper 拦截时的架构选择、安全排查与官方安装包临时放行步骤。
-- [新功能] Web AI 建议页支持确认保存基于历史报告快照重算的决策风格信号，以 created/existing/refreshed 区分新建、原样复用和既有记录续期或维度补齐，复用 profile-aware 去重与失效语义，将历史信号的创建时间、有效期和相反信号失效顺序锚定来源报告时间，并提供可审计 guardrail 提示与阻断。
-- [改进] Desktop 可见品牌、可执行文件、安装包与发布产物统一为 `StockPulse`，保留既有 `appId` / NSIS 安装身份；首次升级只迁移新目录中缺失的旧品牌用户数据与更新备份，打包版以单实例锁串行迁移，关键复制失败时清理本次部分结果并回退完整旧目录，旧数据继续保留用于回滚。
-- [改进] 历史记录按股票代码删除的代码变体解析、10,000 行分批与无进度保护收敛到 `HistoryService` / `AnalysisRepository`，API endpoint 只负责 HTTP 错误映射；每个级联删除批次保持原子、既有跨批 best-effort 语义不变，并新增 endpoint 事务边界静态守卫与失败回滚回归。
-- [改进] 下沉运行流程与通知上下文契约：API 保留兼容重导出，Bot 在异步边界前生成不可变请求快照，核心服务不再依赖 API Schema 或 Bot DTO；上下文回复目标按平台验证并隔离凭据，拒绝的目标继续抑制静态广播。
-- [chore] 解除 `config` / `provider_catalog` / `config_registry` 的 import 循环：将 provider 静态目录数据与无配置耦合的访问器（`_PROVIDERS`、`get_provider_ids`、新增 `get_static_provider`）下沉到新的叶子模块 `src/llm/provider_catalog_data.py`，`src.config` 改为模块级从叶子读取 provider 元数据、不再反向 import `provider_catalog`；`provider_catalog` 从叶子读取并 re-export `get_provider_ids`，凭据/base URL 富化仍留在 `provider_catalog`；纯结构调整、行为不变，另加 AST 回归守护。
-- [改进] Web 用量页（`TokenUsagePage`）"最近调用"块由原生 `<section>` + 手写 `<h2>` 头部迁移到语义 `Section`（标题/描述/时钟图标走 `title`/`description`/`actions`），与同页其余两块 `Section` 一致；表格容器、数值与交互不变。该页其余部分已使用 `AppPage`/`PageHeader`/`Section`/`SegmentedControl`/`StatePanel`/`StatCard`/`Surface`，本次仅补齐最后一处 ad-hoc 头部容器。
-- [改进] 建立统一的进程内 `TaskExecutionPort` 与不可变 task snapshot/event 契约：现有分析队列统一提供 submit/get/cancel/retry/subscribe、幂等与去重权威、首终态获胜的取消竞态、显式 `interrupted` 关停语义及有界 SSE stream，同时保留既有轮询与 SSE 载荷兼容。
-- [改进] Web 股票行情工作区页（`StockDetailsPage`）的行情与历史加载占位统一走语义 `Loading`：将实时行情与历史 K 线两处 ad-hoc 加载文本 `<p>` 改用共享 `Loading`（compact `StatePanel`），与页内 `ApiErrorAlert` 错误态一致；加载文案、行情/历史数据与交互行为不变。
-- [chore] 下沉 Agent runtime registry、skill prompt 与 executor 装配到 `src/agent/runtime_assembly.py` 叶子模块，`factory` 保留兼容重导出，Native Adapter 不再反向 import `factory`；纯结构调整、行为不变，并新增 AST 回归守护。
-- [改进] Web 自选/工作区面板（`HomeStockWorkspace`）的批量分析状态提示统一走语义 `InlineAlert`：移除手搓的 `variant→className` 映射（`statusClassName`）与 ad-hoc 状态 `<div>`，改用共享 `InlineAlert`（compact，`danger`/`warning`/`success` 语义色并补 `role`/`aria-live`）；加载/空/错误态此前已用 `DashboardStateBlock`。自选头部 5 处 `bg-base/35` 半透明 tile 与共享 `glass-card` 面板属基础层玻璃视觉（跨轨复用），保持 cyan/purple/glow 干净并记 Deferred to UIUX。批量分析行为与文案不变。
-- [改进] Web 历史记录条目（`StockBarItem`）与持仓页（`PortfolioPage`）概览统计按 PR#35 恢复紧凑密度/排版：条目内边距 `p-2`→`p-1.5`、情绪指示由竖条恢复为圆点（`h-7 w-1`→`h-2 w-2`）、标题去 `tracking-tight`、meta 行距与时间戳字号收紧（`mt-1/gap-2`→`mt-0.5/gap-1`、`text-xs`→`text-[0.6875rem]`）；持仓概览三项统计数字 `text-xl`→`text-2xl`、标签 `text-xs`→`text-sm`。仅密度/排版微调，保留 `home-history-item` 卡片载体与 44px 删除触控目标，行为与数据不变。
-- [改进] Web 回测页（`BacktestPage`）结果表从自定义 `backtest-table` `<table>` 迁移到共享 `DataTable`：typed 列/行键、原生 caption/列/行语义与内置横向滚动区取代手搓表格，`backtest-table`/`-head`/`-cell`/`-row`/`-code` 等表内样式收敛到共享组件并同步删除对应 orphaned CSS 规则（保留结果集工具栏与状态 chip 样式）；同步删除 `dataTablePatternGuard` 中 `TRACK-UI2` 的 `UI-BT01` allowlist 例外。股票/日期/阶段/AI 预测（含 Tooltip）/窗口收益或实际表现/方向匹配或准确性/结果/状态各列、涨跌语义色、次日验证的条件表头、加载/空/错误态与筛选分页行为不变；原粘性表头随迁移移除（分页结果表影响有限），未新增 i18n 键。
-- [修复] 美股个股实时行情补齐 PE/PB：从已获取的 yfinance `ticker_info` 读取 `trailingPE`/`priceToBook` 填充 `pe_ratio`/`pb_ratio`，实时行情不再恒报估值缺失；美股指数路径无估值，保持不变。
-- [改进] `get_stock_info` 工具描述标注多市场（A股/美股/港股），使 agent 对美股/港股标的也调用基本面工具，不再退化为纯行情/资讯回答。
-- [修复] MiniMax 等推理模型的补全提取仅取最终文本块，过滤带类型的推理块，避免推理内容与 JSON 拼接导致结果无法解析和持久化。
-- [修复] MiniMax 字符串响应仅剥离开头完整的 `<think>` 推理包装，兼容流式分片并保留 JSON 内容中的同名字面标签；dict 形态的渠道测试响应改用字段无关访问读取，修复填写 MiniMax API 时分析/渠道测试报错。
-- [新功能] Web 对话页（`ChatPage`）会话侧栏按 PR#35 恢复会话搜索过滤：复用共享 `SearchInput`，按会话标题大小写不敏感即时过滤列表，无匹配时用 `DashboardStateBlock` 显示“无匹配项”空态；复用现有 i18n key（`layout.search`/`common.searchPlaceholder`/`common.noMatches`），不新增文案，会话切换/新建/删除行为不变。
-
-- [改进] Bot `/analyze` 迁移到统一任务执行权威：分析提交改走与 API/Web 同源的 `AnalysisTaskQueue`（共享 Task ID、按规范化股票代码去重、统一状态枚举与错误分类），并经闭包透传发起会话的回复上下文（不落入任务快照/SSE/幂等指纹）以保持结果推送目标等价；成功文案与推送行为不变，同一股票分析进行中的重复请求返回“正在分析中”提示而非并发重复触发。旧 `TaskService` 不再被 Bot 调用，其删除与单进程/interrupted 语义固化由后续 PR 收编。
-- [chore] 收编旧 `TaskService`：在 Bot analyze 迁移到统一权威后，删除平行的 `src/services/task_service.py` 单例、`src/services/__init__.py` 中的再导出与 `tests/test_task_service.py`（零生产调用面）；将单进程单一权威（`AnalysisTaskQueue` 为进程内单例，重复实例化返回同一权威、不复位任务状态）与 interrupted 终态判定（优雅关闭把每个非终态任务转 `interrupted`，中断后迟到的 completed/failed 按 first-terminal-wins 拒收、不复活任务）固化为 `docs/task-execution-contract.md` 的显式契约 + `tests/test_task_execution.py` 回归测试，并补充 Bot 语义章节（回复上下文经命令 runner 带外传递、不进入快照/SSE/幂等指纹）。行为不变，无新增用户可见能力。
-- [改进] Pipeline 八个阶段新增统一 typed Result 与线程安全重试 fence：未提交失败可重试，同一 query 下已确认的分析历史、本地报告和逐渠道通知会复用结果而不重复持久化或发送；legacy/Agent 共用持久化边界，公开返回值、报告内容、API、数据库 schema 与配置保持不变。
-- [新功能] 多策略证据契约计算层：新增 `StrategyEngine`（`src/agent/skills/engine.py`）对 skill 观点做确定性分拣、聚合、综合与冲突检测（方向对立/分值离散/高置信异议/调整矛盾），配套 `synthesis.py`、`protocols` 的策略信号标准化与 `aggregator` 的 `calculate`/`AggregationData`；orchestrator 在决策前统一经引擎处理，invalid 观点移入 `ctx.meta["invalid_opinions"]` 诊断、绝不回流证据链，并在 timeout/budget 早退路径保留诊断；`strategy_synthesis` 由引擎确定性写入 dashboard 载荷（覆盖 LLM 输出）。本片仅计算与接线，报告/通知/模板的本地化呈现随后续 PR。
-- [改进] Web 持仓中心页（`PortfolioPage`）持仓明细表从 legacy `<table>` 迁移到共享 `DataTable`：typed 列/行键、原生 caption/列/行语义与内置横向滚动区取代手搓表格，空态改用 DataTable 内建 `emptyState`；账户/代码/数量/均价/最新价（含价格来源与过期提示）/市值/未实现盈亏/收益率/组合信号/操作各列、盈亏语义色（`text-success`/`text-danger`）、右对齐与“分析”按钮不变。同步删除 `dataTablePatternGuard` 中 `TRACK-UI2` 的 `UI-P01` allowlist 例外，并按随表一并移除的 `border-white/10`、`border-white/5` 收敛 `surfaceMigrationGuard` 中本轨对应计数（2→1、4→3）；未新增 i18n 键。
-- [改进] Web 首页运行流程（RunFlow）覆盖层按 PR#35 由侧边 `Drawer` 改为居中 `Modal`：共享 `Modal` 新增向后兼容的 `fullscreen` 尺寸（`max-w-[96vw] max-h-[92dvh]`，经 tailwind-merge 覆盖基础 `max-h-[85dvh]`，现有 compact/default/wide 不变），RunFlow 拓扑面板改为近满屏居中弹窗、窄屏自动底部贴边；同步更新 RunFlow 覆盖层单测与 e2e 契约断言（抽屉→Modal、`关闭抽屉`→`关闭`）。RunFlow 数据与交互不变。
-- [改进] Web 股票行情工作区页（`StockDetailsPage`）的历史 K 线明细表从 legacy `<table>` 迁移到共享 `DataTable`：typed 列/行键、原生 caption/列/行语义取代手搓表格，日期/开/高/低/收/量各列、日期等宽字体与数值格式不变，表格仍包裹在 `max-h-72` 纵向滚动容器内；同步删除 `dataTablePatternGuard` 中 `TRACK-UI2` 的 StockDetailsPage `UI-SCR01` allowlist 例外。原 sticky 表头随迁移移除（与回测页同类，纵向滚动保留），未新增 i18n 键。
-- [改进] Web 首页工作区侧栏（`HomeStockWorkspace`）视图切换器按 PR#35 由 `SegmentedControl` 恢复为单行 `SearchInput`（flex-1）+ 图标 `Select`（Funnel，紧凑 `sm:h-7`）：搜索框与视图切换并列一行，切换器改用共享 `Select`（combobox）下拉选择 历史/自选/今日，面板 role 由 `tabpanel` 改为 `region`；同步更新 `HomeStockWorkspace`/`HomePage` 单测与 smoke e2e 的切换器契约断言（tablist/tab/tabpanel→combobox/option/region，视图切换改经 Select 下拉选择）。视图数据与切换行为不变。
-- [新功能] 多策略证据契约新增呈现层：`strategy_synthesis` 以中英韩三语渲染到 Markdown、微信简报、通知与历史报告，展示综合信号、共识、冲突、支持/反方策略及无效观点计数；历史或外部宽松载荷经共享 helper 安全降级，DecisionAgent prompt 明确隔离 Evidence Chain 与 invalid diagnostics。
-- [改进] Web 决策信号的 `DecisionSignalDisplay`、`DecisionSignalOutcomeRunPanel`、`DecisionSignalTimeline` 与 `DecisionSignalCreateDrawer` 从手搓或兼容卡片边界迁移到共享 `Surface`/`Section` 语义层级：信号条目与独立运行任务使用 interactive、详情和创建预览使用 section、图表提示使用 overlay，并保留 selected 标识、业务 tone、交互和响应式布局；最近分析候选改用共享 `SelectionChip`，同步删除 `productionDesignGuard` 中 `UI-D01` 的 Button 几何覆盖 allowlist，未新增 i18n 键。
-- [修复] Web Router 焦点协调器区分跨路径、完全相同 URL 的新 key PUSH 与同路径 query/hash 状态更新：跨页及同 URL 独立 PUSH 等目标页就绪后聚焦 H1，筛选/分页等 URL 状态更新保留当前控件，同路径 Back 仅恢复唯一稳定触发器；多轮 Back/Forward 不再覆盖已保存 opener，取消及 `useBlocker` proceed/reset 不再污染后续历史项，失效触发器稳定回退 H1。生产守卫覆盖 history 方法的声明/赋值/解构/`bind`/`call`/`apply` 别名，`ResponsiveRail` 复用 `IconButton`，`Toolbar` 类型强制可访问名称。
-- [修复] 多 Agent 新增内部低敏 runtime facts，区分 stage 前后 timeout/budget degradation 与 Pipeline termination；dashboard 改为单次 risk application 后按 post-risk signal 收尾，并清除模型伪造的保留解释字段，不新增公开 schema。
-- [改进] Web 报告输入数据块在现有低敏 overview 上补充三语异常影响、处理建议与安全诊断码，显式呈现缺少来源和无 reason 的降级状态，并区分本次 LLM 新闻输入与报告页独立加载的补充资讯；组件改用语义 `Surface`/`InlineAlert` 与无嵌套卡片的分隔行，输入/API 字段保持兼容。
-- [改进] Web AlphaSift 选股页按 PR#35 恢复紧凑策略配置：策略卡片网格改为共享 `Select`，市场、策略参数和返回数量收纳到共享 `Modal`，策略容器恢复 `p-3` 密度；保留 URL/任务状态、自定义策略与结果清理语义，参数校验或提交失败时保留弹窗和输入，任务受理后关闭弹窗。
-- [改进] Web 应用外壳用 typed descriptor 固化九项一级导航并保留 owner 选定的 framed/floating 全局 `main` 表面；1023px 及以下提供唯一共享导航 `IconButton`、完整品牌与可直接访问的 Profile dialog，主题/语言收进 Profile，导航走 Drawer；1024–1279px 无显式偏好时默认 80px compact rail，保存的 80/240px 展开折叠选择在所有桌面断点保持有效。Drawer 仅在 primary same-window 路由激活时关闭，modifier/new-tab 保留原生行为；移动 route 只声明稳定 opener，由 `RouteFocusCoordinator` 按 history entry 捕获并在多轮 Back/Forward 恢复。icon-only 导航统一 labelled Tooltip，44px Profile/偏好/不收缩路由目标与可滚动短视口导航、双轴触摸可达横向内容、Profile 跨断点关闭/焦点交接、light/dark、reduced-motion 由组件和浏览器回归覆盖。
-- [修复] Web 应用外壳收敛 Router 焦点与响应式基础契约：`RouteFocusCoordinator` 对临时 Drawer route 的空、缺失或重复 persistent opener alias 统一 fail closed，compact 导航 Tooltip wrapper 禁止 flex 压缩以守住 44px 路由目标；同步撤回无生产 consumer 的 `ResponsiveRail` tablet Drawer API、fixture 与文档声明，避免基础层提前扩张。
-- [改进] Web 登录页恢复 24px 背景网格与两处径向主题光层，根画布继续使用专属 `--login-bg-main` token，并移除品牌与认证标题的紧缩字距；认证、传输状态、i18n、响应式和可访问行为不变。
-- [改进] Web UIUX 最终审计完成：共享 `DataTable` 新增受控 detail-row 契约并迁移 AlphaSift 十列结果表，保留默认展开且补齐 `aria-expanded`/`aria-controls`；Backtest、Decision Signals 与 Screening 查询更新统一改走 React Router replace；剩余 `glass-card`、raw white-alpha 和无效 `bg-surface` 消费全部迁到语义 Surface/token 后删除兼容 CSS 与 surface allowlist；raw-table 债改用稳定文件/token/计数及具体移除前提，过期 `removeBy` 清零，NotFound 改用 `primary` Button 并删除 `xl` 兼容档。
-- [新功能] Web 正式构建新增受现有认证保护且不进入产品导航的 `/playground` 组件工作台，覆盖 `src/components` 全部导出可视组件及交互场景，以独立 iframe、四种确定性 fixture profile、禁止透传的内存 Mock API、深链视口/主题/语言控制和无敏感载荷请求日志隔离真实业务数据。
-<!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
-<!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
+- [Changed] Added unified Web page and Router patterns with `AppPage`, `WorkspacePage`, `ResponsiveRail`, `PageHeader`, `Toolbar`, `Tabs`, `TabPanel`, `SummaryStrip`, and `WorkspaceNavigation`, plus focus restoration and guards against duplicate navigation primitives.
+- [Changed] Formalized the shared Surface migration contract around `canvas`, `section`, `interactive`, and `overlay`, removed unused card styles, and added stable token-count guards with dual-theme and nine-viewport fixtures.
+- [Changed] Added fail-open diagnostics for Pipeline `resolve`, `fetch`, `intelligence`, `context`, `analyze`, `persist`, `render`, and `dispatch` stages, including redacted summaries, traces, timing, status, degradation, and retryability.
+- [Changed] Added the shared `SelectionChip` control with native button semantics, loading protection, wrapping labels, 36px visible height, 44px coarse-pointer targets, optional pressed state, and geometry guards.
+- [Changed] Added the shared `DataTable` foundation with typed columns and row keys, accessible table and sorting semantics, canonical states, keyboard row activation, nested-control isolation, and focusable narrow-screen scrolling.
+- [Tests] Added a broad-exception classification guard that fingerprints existing debt, requires explicit cleanup, optional-metadata, or recorded-fallback annotations, and rejects unexplained `BaseException` suppression.
+- [Changed] Added shared Filter and Query patterns with `FilterBar`, `AdvancedFilterSheet`, `AppliedFilterChips`, Router-backed draft/applied state, deep-link recovery, and guards against private duplicates.
+- [Changed] Migrated `StockScreeningPage` panels and states to semantic `Surface`, `InlineAlert`, and `EmptyState` components while preserving screening behavior and removing the `UI-SCR01` design-guard exception.
+- [Changed] Migrated `LLMConfigModeBanner` and `GenerationBackendStatusPanel` from custom bordered panels to semantic interactive `Surface` components without changing behavior.
+- [Changed] Migrated `DeepResearchPanel` result and citation cards to semantic `Surface` components and its running and idle states to compact `StatePanel` variants.
+- [Changed] Removed the unused `home-panel-card` class from `TaskPanel`, narrowed its design-guard allowlist, and retained valid run-flow custom styles and interactions.
+- [Changed] Replaced the remaining ad hoc Alerts rule-loading text with the shared compact `Loading` state while preserving rule-edit behavior.
+- [Changed] Added a lightweight `ApplicationServices` composition root for process-wide Config, DatabaseManager, SearchService, and AnalysisTaskQueue instances, with lazy defaults and injectable test instances.
+- [Changed] Migrated remaining Settings content panels and scheduler/configuration errors to semantic `Surface` and `InlineAlert` components without changing configuration behavior.
+- [Changed] Removed 15 unused `home-panel-card` classes across report components and their design-guard exceptions while retaining intentional report visuals for later QA.
+- [Changed] Migrated `PortfolioPage` controls to semantic `Surface` and shared button contracts, replaced sizing overrides with grid layout, and removed the `UI-P01` guard exception without changing portfolio behavior.
+- [Changed] Removed unused `home-panel-card` classes from `StockHistoryTrendDrawer`, migrated metric cards to semantic `Surface`, and retained unresolved segmented controls and list-panel work for visual QA.
+- [Changed] Migrated three Home analysis buttons to `IconButton` and primary `Button` contracts while preserving 44px targets, loading behavior, strategy menus, and responsive layout.
+- [Changed] Replaced bespoke Backtest loading blocks with the shared compact `Loading` state while preserving result copy, metrics, and semantic colors.
+- [Changed] Migrated FirstRunSetupCard and SchedulerSettingsCard panels to semantic `Surface` and replaced first-run loading text with the shared `Loading` state.
+- [Chore] Broke the `decision_signal_service` and `decision_signal_extractor` import cycle by moving payload construction into `src/services/decision_signal_payload.py`, preserving public imports and adding AST regression coverage.
+- [Changed] Migrated Decision Signals re-evaluation, preview, statistics, alerts, and loading states to semantic `Surface`, `StatCard`, `InlineAlert`, and `Loading` components while preserving financial values and copy.
+- [Chore] Broke the `llm.usage` and `llm.provider_cache` import cycle by moving provider-family inference into `src/llm/provider_family.py`, preserving compatibility imports and adding AST and runtime tests.
+- [Changed] Added shared bottom Sheet and Toast foundations with fixed regions, Dialog-compatible focus and scroll behavior, semantic layering, and persistent live-region accessibility.
+- [Changed] Restored the experimental PydanticAI adapter, toolset, optional dependencies, and installed-state CI gate under ADR-002 while keeping Native permanently default and user-facing configuration unchanged.
+- [Added] Added an explicit Deep Research mode to Web Chat with typed API support, same-page execution, cancellation, error handling, persistence, and history restoration.
+- [Tests] Added a startup DDL guard that permits schema changes only during fresh `metadata.create_all` or registered migration execution and rejects business-layer DDL.
+- [Changed] Standardized Web overlay hierarchy: fixed navigation and detail drawer dimensions, shared Modal/Drawer contracts, top-layer keyboard handling, inert backgrounds, scroll locking, and focus restoration.
+- [Added] Added Portfolio account editing through the existing account form and `PUT /api/v1/portfolio/accounts/{id}`, preserving account identity and validation.
+- [Changed] Converted intelligence scope normalization and composite uniqueness startup compatibility work into formal migrations `202607190004_intelligence_item_scope_values` and `202607190005_intelligence_item_unique_index`.
+- [Added] Added Alerts rule editing with server refresh, concurrent-change protection, partial `PATCH` updates, and existing validation behavior.
+- [Added] Added `/stocks/:stockCode` with independently loaded and retried real-time quotes and historical candles plus daily, weekly, and monthly periods.
+- [Changed] Converted Portfolio idempotency scope columns, indexes, data normalization, and legacy trigger compatibility into migration `202607190003_portfolio_idempotency_scope_schema`.
+- [Changed] Converted DecisionSignal `decision_profile`, profile-aware indexing, and legacy metadata backfill into migration `202607190002_decision_signal_profile_schema`.
+- [Added] Added Run Postmortem to Decision Signals with safe defaults, explicit confirmation, bounded execution, and retryable-result handling.
+- [Added] Added a Create Signal drawer with validated manual-source fields, live preview, confidence controls, and non-forgeable `source_type=manual` and `trigger_source=web_manual` metadata.
+- [Changed] Converted `llm_usage` telemetry-column compatibility work into migration `202607190001_llm_usage_telemetry_columns` and made startup apply pending migrations through the runner.
+- [Changed] Added authoritative `Surface`, `Section`, `StatePanel`, and `Alert` contracts with L0/L1/L2/Overlay semantics, consistent live-region and busy behavior, and compatibility wrappers for existing state components.
+- [Fixed] Tightened Agent Runtime conformance evidence to explicit fixture IDs, removed profile-wide exception expansion, and corrected dependency and ADR claims to match observed dual-environment evidence.
+- [Chore] Completed the Native Only runtime decision by removing dormant PydanticAI adapters, toolsets, optional dependencies, injection points, cross-runtime tests, and dedicated CI while retaining vendor-neutral contracts and Native behavior.
+- [Changed] Migrated 90 shared `Button` calls from legacy `xsm`/`sm`/`md`/`lg` sizes to semantic `compact`/`default`/`comfortable`/`primary` tiers, removed compatibility styles, and added AST guards while preserving 28/32/36/40px dimensions and behavior.
+- [Changed] Established shared, domain-neutral `Button`, `IconButton`, `Input`, `Field`, and `Textarea` contracts with explicit intents, semantic sizing, 44px coarse-pointer targets, and AST enforcement; Chat now waits for the default strategy catalog before allowing submission.
+- [Fixed] Limited PR Review Flake8 checks to Python files that still exist after a change, while retaining deleted files in the full diff and automated review scope.
+- [Fixed] Added a canonical DecisionSignal `presentation` model driven by `action`, centralizing localized labels, confidence, summaries, risks, timestamps, and provenance while preserving legacy fields for compatibility.
+- [Fixed] Standardized administrator passwords, Provider API keys, and sensitive settings on `CredentialInput`, isolating autocomplete identities, keeping autofill changes local until explicit save, and adding localized row-level accessible names.
+- [Fixed] Made login security messaging reflect the actual transport: HTTPS reports encryption, local HTTP is neutral, non-local HTTP warns about password exposure, and the fictional `StockPulse-V3-TLS` claim was removed.
+- [Fixed] Extended `sanitize_diagnostic_text` and `sanitize_sensitive_text` to redact credentials in non-HTTP connection strings such as PostgreSQL, MySQL, Redis, MongoDB, and AMQP while retaining hosts for diagnostics.
+- [Changed] Completed the experimental PydanticAI Single RUN bridge with real tool schemas, lossless multi-turn tool and reasoning traces, canonical prompts, normalized usage recording, deadline and cancellation fences, and explicit unsupported CHAT/RESEARCH results.
+- [Changed] Updated the Agent runtime contract so `AgentRuntime.start()` returns a live `ExecutionHandle`; deeply frozen `ExecutionContext` snapshots and terminal first-wins behavior preserve all 36 replay fixtures.
+- [Docs] Added `docs/financial-terminology-guide.md` as the governance source for approximately 100 financial concepts across ten UI languages, including semantic boundaries, authoritative language columns, translation baselines, drift tracking, and review rules.
+- [Chore] Unified terminal-state writes through `classify_result_terminal_state`, ensuring cancellation wins over success across single-agent, multi-agent, and SSE execution without changing replay output.
+- [Changed] Routed Native Agent tool calls through one `BoundToolSession`, removed the parallel ToolRegistry authority, and discarded late tool results after timeout or completion.
+- [Tests] Added the `pydanticai-installed` CI job and native-isolation assertions so missing or skipped experimental dependencies fail when `STOCKPULSE_REQUIRE_PYDANTIC_AI=1`.
+- [Docs] Adopted dual licensing: upstream code remains MIT, while new and substantially modified StockPulse code uses AGPL-3.0; synchronized LICENSE and all three READMEs.
+- [Changed] Added cooperative backend cancellation for `/api/v1/agent/chat/stream` disconnects, recording cancelled rather than failed results and preserving the byte-compatible SSE fallback path.
+- [Fixed] Corrected translations for new-language Settings labels, financial alert direction, missing-LLM notices, Markdown, and AlphaSift terminology, and replaced unstable navigation keys.
+- [Changed] Aligned shared Button, SegmentedControl, Checkbox, Search, Badge, Notification, and sidebar Profile components with the common Figma specification.
+- [Changed] Consolidated page menus, selectors, buttons, and inputs onto shared Popover, Select, Button, and Input components; settings defaults now come from backend schemas and Portfolio CSV no longer invents broker presets.
+- [Fixed] Reduced oversized controls and empty states across Chat, Portfolio, Decision Signals, Backtest, and Alerts on desktop viewports.
+- [Changed] Reworked the login page into a minimal centered card with a circular brand mark, solid background, and high-contrast primary action while preserving authentication and accessibility.
+- [Changed] Standardized global buttons on soft `rounded-lg` corners, updated design guards, and introduced the `--radius-dot` token for decorative dots.
+- [Fixed] Prevented stale authentication-status responses from overwriting a newer successful login state.
+- [Fixed] Positioned Settings multi-select menus against the viewport, opening upward when necessary and maintaining an 8px narrow-screen margin.
+- [Fixed] Made notification routing depend on complete runtime credential sets so partial channel configurations are not treated as routable.
+- [Fixed] Derived configured notification channels from the live `Config` snapshot and rejected malformed ntfy/Gotify authorities, userinfo, ports, and NFKC URLs without exposing original values.
+- [Fixed] Added latest-request protection to Settings loading, saving, conflict recovery, and external refresh while preserving rolling-upgrade compatibility for missing channel-state fields.
+- [Fixed] Hardened login redirects against ASCII controls, spaces, DEL, backslashes, and URL-normalization bypasses.
+- [Fixed] Removed the misleading `/` shortcut hint from sidebar search because no global shortcut exists.
+- [Fixed] Preserved valid same-origin login deep links while rejecting external, protocol-relative, and backslash variants.
+- [Changed] Aligned remaining button-like controls, including help links, Portfolio CSV selection, and Home notification chips, with the global button shape.
+- [Fixed] Removed nested `main` landmarks from page containers and Backtest, and added an accessible Backtest h1.
+- [Fixed] Expanded text and path settings inputs to the 240px control column while keeping numeric inputs compact.
+- [Fixed] Replaced schedule enablement and date/time inputs with shared switch, time picker, and date picker controls, including explicit confirmation and duplicate-time filtering.
+- [Fixed] Wrapped password inputs in Settings and the model connection editor in forms to eliminate browser warnings.
+- [Fixed] Stabilized the Home History/Watchlist/Today tab bar and added standard tablist semantics with arrow and Home/End navigation.
+- [Changed] Replaced flat Settings checkbox groups with searchable multi-select controls that summarize selections and preserve unknown stored values.
+- [Changed] Limited report, alert, and system-error routing choices to configured notification channels and added a direct empty-state path to channel configuration.
+- [Changed] Converted `REALTIME_SOURCE_PRIORITY` to an order-preserving multi-select while retaining aliases and custom sources.
+- [Tests] Added 36 strict Agent Runtime replay fixtures covering A/HK/US finance scenarios, ModelRef routing, fallbacks, tool scope, timeouts, cancellation races, malformed output, and factory contracts.
+- [Added] Added complete Traditional Chinese, Japanese, Korean, German, Spanish, Malay, French, and Indonesian Web translations, a ten-language selector, language detection, persistence, HTML language updates, Intl formatting, and completeness checks.
+- [Added] Added an ordered database Migration Runner with stable IDs, SHA-256 checksums, single-migration transactions, SQLite write locking, and Desktop/Docker/Actions resource validation.
+- [Fixed] Added release-profile compatibility for legacy databases without a migration registry and made `status` and `verify` strictly read-only.
+- [Changed] Restricted migration SQL execution to a synchronous leased capability with fail-closed transaction controls, immutable statements, driver-path draining, authorizer preservation, and defense-in-depth guards.
+- [Fixed] Rejected coroutine, generator, async-generator, context-manager, and recursive migration callables, requiring an exact `None` result and rolling back invalid executions.
+- [Tests] Added Docker CI coverage that upgrades a legacy SQLite fixture through a real `DatabaseManager` and verifies canaries, checksums, target version, and second-start idempotency.
+- [Fixed] Constrained searchable selectors inside mobile bottom sheets and opened them upward when space is limited.
+- [Changed] Standardized at least 44px touch targets across shared controls and major Web workflows, adopted dynamic viewport units, and unified report h2 typography on a 28px token.
+- [Fixed] Made ambiguous legacy bare model routes shared by multiple Connections fail closed with `ambiguous_legacy_model_route` and require a Connection-aware ModelRef.
+- [Fixed] Removed raw Provider errors from Agent and Bot user responses, histories, traces, and logs; introduced stable sentinels and error codes with bounded, redacted SearchService diagnostics.
+- [Fixed] Treated an analysis 409 as a duplicate task only when `error=duplicate_task`; other conflicts now use shared parsing and retain `params`, `details`, and `trace_id`.
+- [Fixed] Replaced remaining user-visible DSA branding with StockPulse while preserving compatibility identifiers in environment variables, APIs, protocols, modules, and historical payloads.
+- [Tests] Made ReportMarkdown language-matrix tests wait for actual loading completion instead of treating an early disabled copy button as rendered content.
+- [Fixed] Masked all schema-sensitive System Config fields by default and scoped reusable masked Connection credentials to unchanged identity and endpoint attributes.
+- [Fixed] Routed exception logging across API, Agent, Bot, System Config, Backtest, image extraction, and AlphaSift through one bounded redaction path with static fail-closed sink guards.
+- [Fixed] Removed Pydantic `input` and exception context from global 422 envelopes, retaining only safe locations, types, and generic messages.
+- [Tests] Hardened credential-bearing Playwright CI by disabling media artifacts, isolating seeding, scanning raw and staged outputs, validating archives and symlinks, and adding a deliberately failing real-login harness.
+- [Changed] Moved configuration backup import/export from System & Security to Advanced while preserving authentication and conflict protection.
+- [Fixed] Scoped persistent Portfolio operation IDs by operation, account, owner, and client key, added a seven-day replay window and additive SQLite migration, and retained retry IDs in the Web UI.
+- [Changed] Added credential, console, model-list, and documentation URLs to Provider Catalog, restricted quick links to normalized credential-free HTTPS URLs, and removed the frontend Provider-ID link table.
+- [Fixed] Propagated conditional field contracts through the Config Schema API and isolated missing or unknown AI placements and conditions in read-only Advanced diagnostics.
+- [Changed] Standardized Web-facing errors on `error/message/params/details/trace_id`, retained a deprecated read-only `detail` alias, localized task message codes, and deduplicated reconnect payloads by task ID.
+- [Chore] Converted GitHub workflows, templates, reviews, summaries, bot comments, and release notes to English; hardened dynamic output encoding and moved repository ownership and release links to `SiinXu/stock-pulse-ai`.
+- [Fixed] Removed upstream AIHubMix referral header injection and Anspire/AIHubMix/SerpAPI promotional defaults while preserving explicitly configured custom headers.
+- [Changed] Standardized workflow, email sender, HTTP User-Agent, Web fallback, and OpenAPI branding on StockPulse and moved deployment and stock-index targets to the current repository.
+- [Docs] Corrected Docker documentation so upstream or unreleased images are not presented as official StockPulse artifacts and removed the unavailable Discussions link.
+- [Tests] Added English-language guards for GitHub collaboration assets and paginated PR file enumeration for labeling and review reports.
+- [Tests] Made Settings scheduler runtime hydration tests wait for asynchronous API completion in both state directions.
+- [Docs] Clarified in all three READMEs that StockPulse is an independently maintained MIT-licensed fork of `ZhuLinsen/daily_stock_analysis` and updated repository, CI, documentation, and feedback links.
+- [Changed] Completed Chinese and English UI coverage for Chat, Screening, Alerts, Portfolio, Settings, shared selectors, stock search, and report diagnostics while separating UI, report, and dynamic-source language boundaries.
+- [Changed] Split Web translations into typed locale files for alerts, portfolio, screening, settings, stock search, and report chrome.
+- [Tests] Added locale dictionary, interpolation, duplicate, hardcoded-copy, and 30-scenario Playwright i18n gates with precise allowlist validation in `web-gate`.
+- [Docs] Added Chinese and English Web internationalization guidance covering UI/report boundaries, dynamic content, error codes, locale-aware formatting, and validation commands.
+- [Fixed] Standardized the accessible login brand title on `StockPulse` and removed Playwright smoke dependence on legacy branding.
+- [Fixed] Added explicit `LLM_<CONNECTION>_PROVIDER` identity, separating Provider identity from renameable Connection names and preserving multi-connection, rename, discovery, legacy, and Actions behavior.
+- [Fixed] Added transactional replacement for deleting models still referenced by report, Agent, Vision, or fallback routes, with structured `model_in_use/details.referenced_by` enforcement.
+- [Changed] Made Provider Catalog and `connection_fields` the single metadata and field-contract authorities, with strict rolling-upgrade protection, read-only handling for incomplete schemas, display-name validation, and Ollama discovery through `/api/tags`.
+- [Tests] Isolated Playwright `.env`, SQLite, password hash, and session secrets; seeded deterministic Markdown reports and retained backend, Vite, and fake-provider logs without depending on developer state.
+- [Docs] Synchronized Chinese and English contribution, model, Provider, Settings, and `.env.example` documentation for Provider/Connection/Model/Task Assignment, discovery, stale values, and E2E isolation.
+- [Changed] Replaced free-form report, Agent, Vision, and fallback model inputs with accessible `SearchableSelect` controls backed by the available-model catalog while preserving unavailable stored values.
+- [Changed] Added backend `ui_placement` metadata as the sole authority for field ownership and removed the frontend legacy Provider grouping list without changing configuration persistence contracts.
+- [Changed] Simplified Settings terminology, removed environment-variable language from normal paths, and replaced magic typography and radius values with design tokens.
+- [Changed] Unified Modal, Drawer, ConfirmDialog, Settings Help, and mobile history panels on one overlay stack with top-layer keyboard handling, inert backgrounds, scroll locking, and focus restoration.
+- [Changed] Made Home query parameters authoritative for report and Run Flow deep links, refresh, sharing, Back/Forward behavior, invalid-link normalization, and latest-request-wins switching.
+- [Chore] Made `web-gate` block on lint, i18n, Vitest, and build, trigger `web-e2e` for related backend changes, and run deterministic isolated services with credential-safe artifacts.
+- [Docs] Documented `DSA_WEB_DEV_API_PROXY`, reconciled model-provider and Advanced-view descriptions, and standardized Chinese and English LLM guide paths on Settings > AI & Models > Model Access.
+- [Changed] Consolidated AI & Models into Overview, Model Access, Task Routing, and Reliability; removed duplicate Advanced/provider editing paths and moved diagnostics to the top-level Advanced section.
+- [Changed] Replaced model entry with `ModelMultiSelect`, searchable discovery, token-based manual addition, paste splitting, richer search, fallback reordering, and explicit preservation of unavailable routes.
+- [Fixed] Allowed first-time setup for keyless Providers such as Ollama and required users to select discovered models instead of enabling all results automatically.
+- [Changed] Simplified model-access terminology to Primary Model, Fallback Models, Service URL, and API Key, and replaced `KEY=value` examples with plain values.
+- [Changed] Rendered notification-channel and `MARKET_REVIEW_REGION` multi-value fields as checkbox groups that preserve unknown values and display backend defaults.
+- [Changed] Added authoritative Vision model reference validation when Connection structure changes while allowing unrelated saves with historically stale values.
+- [Added] Rendered `MarketStructureCard` in market-review reports when persisted market-structure context is available while silently supporting older reports.
+- [Changed] Expanded Web design guards across production CSS/TSX to block nonstandard button shapes, gradients, shimmer, hardcoded colors, magic dimensions, and raw `100vh` while preserving touch and focus accessibility.
+- [Docs] Corrected model-access documentation and help paths, clarified stale-reference retention and `model_in_use`, and updated `MARKET_REVIEW_REGION` instructions to match checkbox behavior.
+- [Changed] Removed hardcoded model IDs and `placeholder_models` from `src/llm/provider_catalog.py`; new Connections now discover or add models explicitly and remain incomplete without one.
+- [Fixed] Isolated ambient LLM, auth, `ENV_FILE`, and `DATABASE_PATH` state in the full test suite and added Provider Catalog regression coverage without weakening assertions or ordering tests.
+- [Changed] Made Settings > AI & Models > Model Access the single model service, Connection, and model-management entry, using one responsive modal while retaining YAML and Legacy storage compatibility.
+- [Changed] Removed the duplicate `ModelProvidersPanel` and `modelProviders.ts` mapping so Provider metadata comes only from the backend catalog.
+- [Changed] Replaced task model inputs with catalog-backed `SearchableSelect` controls, including empty, error/retry, and unavailable-value states.
+- [Changed] Derived known LLM Providers from Provider Catalog, enriched available-model records with Provider and Connection metadata, and blocked deletion of referenced Connections with `unknown_model`.
+- [Tests] Updated `test_daily_analysis_workflow_llm_env` to derive Provider channels from the backend catalog rather than presentation-only frontend templates.
+- [Changed] Moved LLM Provider business metadata in Settings to `GET /system/config/llm/providers`, retaining only presentation copy, placeholders, and documentation links in the frontend.
+- [Changed] Added authoritative value-source explanations to field help using `raw_value_exists`, distinguishing explicit, defaulted, unset, and sensitive values.
+- [Added] Added Stop Generating to Web Chat, aborting the active stream and restoring input without changing sent messages or history.
+- [Fixed] Prevented Enter from sending Chat messages during IME composition while retaining Shift+Enter for line breaks.
+- [Added] Added `GET /api/v1/system/config/llm/providers` as the authoritative Provider catalog for labels, protocols, endpoints, credential requirements, discovery, and capabilities.
+- [Added] Added Connection-aware `ModelRef` values to `GET /api/v1/system/config/llm/available-models` so same-name models remain independently routable across Connections.
+- [Changed] Made the AI & Models overview derive effective, unavailable, and unconfigured states from authoritative available routes instead of non-empty strings.
+- [Changed] Rendered finite schema `options` as selects and moved external docs and `KEY=value` examples into field help.
+- [Fixed] Made first-run setup persist canonical Connection-aware ModelRefs, respect Provider-specific Base URL and key requirements, merge `LLM_CHANNELS`, select channels mode, retain drafts on errors, and hide internal keys from the summary.
+- [Added] Added a responsive first-run Settings wizard for choosing cloud API or local CLI, configuring a Provider, explicitly selecting or adding models, and saving the minimum runnable configuration.
+- [Changed] Consolidated internal configuration sources, backend selection, tuning, CLI state, and smoke tests under collapsed Advanced > Developer Diagnostics.
+- [Changed] Improved mobile Settings navigation by moving focus and scrolling into the selected section while preserving desktop sidebar behavior.
+- [Added] Added `restart_required` field badges and draft-level notices for settings that require a service restart.
+- [Added] Added a page-level Settings validation summary that navigates across sections, focuses, and scrolls to every invalid field.
+- [Changed] Split Reports, Alerts & Automation, Conversation, and Event Monitoring by field placement so each setting has one visible owner and independent status badges.
+- [Changed] Removed runtime route fields from Connection editing; Task Routing now owns report, Agent, Vision, and temperature settings, while Reliability owns fallback order.
+- [Added] Added AI & Models Overview and Task Routing views with an effective task matrix and centralized primary and fallback model editing.
+- [Changed] Rebuilt Settings navigation as a section/view hierarchy with stable `?section=&view=` deep links, legacy query migration, responsive navigation, and state-only badges.
+- [Added] Added 700ms grouped autosave with serialized backend-category updates, atomic AI model groups, explicit save states, conflict recovery, scoped resets, leave protection, and masked-secret handling.
+- [Added] Added conditional schema contracts for visibility, enablement, and requirements, with authoritative backend validation and fail-safe handling of unknown operators.
+- [Added] Added explicit `LLM_CONFIG_MODE=auto|channels|yaml|legacy` source selection while preserving priority and migration APIs and exposing details only in Developer Diagnostics.
+- [Changed] Enforced complete enabled LLM Connections in backend validation while limiting strict checks to touched or newly enabled channels, preserving masked secrets and YAML exemptions.
+- [Changed] Aligned Web Connection completeness with backend requirements, allowing incomplete disabled drafts and keyless Ollama or approved localhost endpoints.
+- [Changed] Improved Connection card accessibility with one modal, non-nested interactions, delete confirmation, and authoritative reference blocking with a Task Routing link.
+- [Changed] Debounced generated-backend draft previews and moved the runtime status panel into collapsed Developer Diagnostics.
+- [Changed] Synchronized Settings category and subview state to URL query parameters for refreshable and shareable deep links.
+- [Fixed] Displayed the actual Claude Code CLI or OpenCode CLI name in first-run checks instead of always showing Codex CLI.
+- [Changed] Added an internal low-sensitivity disagreement-summary input pipeline for multi-agent DecisionAgent explanation work without changing public APIs or dashboard schemas.
+- [Changed] Added TickFlow environment mappings to the daily analysis workflow and moved data-source stability details from README to the full guide.
+- [Fixed] Ensured explicit WebUI `--host` and `--port` arguments override `.env` values while omitted arguments use resolved runtime configuration.
+- [Changed] Added DingTalk notification environment mappings to `.github/workflows/00-daily-analysis.yml` for scheduled cloud analysis.
+- [Fixed] Made the first Portfolio snapshot use `include_realtime=false` so holdings render before slow external quote prefetches complete.
+- [Fixed] Preserved a valid sentiment score of `0` when task status reconstructs report actions, allowing low scores to resolve to sell recommendations.
+- [Fixed] Reported interrupted Agent streams instead of rendering them as empty content while preserving the user's message.
+- [Fixed] Normalized desktop `WEBUI_HOST=*` and `WEBUI_HOST=[::]` to `0.0.0.0` and `::` before probing and startup.
+- [Changed] Extended `STOCK_LIST` parsing to Chinese punctuation, semicolons, spaces, and newlines across runtime, scheduling, CLI `--stocks`, Web Settings, and watchlist APIs, normalizing writes to commas.
+- [Changed] Added `NEWS_INTEL_AUTO_FETCH_ENABLED` to fail-open initialize and refresh local RSS, Atom, and NewsNow pools for stock, Agent, and market-review analysis.
+- [Changed] Added primary-stock context to Web AI Recommendations using recent analyses and stock-index candidates, and clarified zero-sample performance statistics.
+- [Changed] Promoted DecisionSignal `decision_profile` to a nullable field with consistent same-profile query, deduplication, refresh, invalidation, compatibility, and idempotent SQLite backfill semantics.
+- [Changed] Refined Settings layout with horizontally scrollable mobile categories, immediately visible content, and denser desktop field hierarchy and spacing.
+- [Docs] Documented Tushare and Longbridge market-data configuration in Quick Start, clarified free AkShare/Baostock/YFinance fallbacks, and synchronized both README translations under `docs/`.
+- [Changed] Added the #1743 Phase 6a internal DSA Tool Surface contract for schemas, fail-closed stock scope, structured errors, audit summaries, redacted diagnostics, and wire-level AgentBackend proof.
+- [Fixed] Added explicit `orjson` installation to Desktop and Docker releases and a frozen-runtime import probe for desktop PyInstaller builds.
+- [Changed] Removed the standalone market-theme and stock-position card from stock reports while retaining its data in analysis context, model prompts, and DecisionSignal extraction.
+- [Changed] Removed duplicate AI Decision Signal summaries from notifications and full Markdown/WeChat reports without changing storage, alerts, or Web recommendations.
+- [Changed] Added a Shenwan Level-1 industry ranking fallback to TickFlow and increased fundamental and market-structure capability timeouts from 3 to 8 seconds.
+- [Docs] Added architecture selection, security checks, and temporary Gatekeeper bypass instructions for unsigned and unnotarized macOS DMGs.
+- [Added] Added confirmed persistence of decision-profile signals recomputed from historical report snapshots, with created/existing/refreshed outcomes, profile-aware lifecycle rules, report-time anchoring, and auditable guardrails.
+- [Changed] Standardized desktop branding, executables, installers, and release artifacts on StockPulse while preserving the existing `appId` and NSIS identity, migrating legacy user data once, and retaining rollback compatibility.
+- [Changed] Moved history deletion code-variant resolution, 10,000-row batching, and no-progress protection into `HistoryService` and `AnalysisRepository`, leaving the API endpoint responsible only for HTTP error mapping.
+- [Changed] Moved runtime process and notification request context into core contracts: Bot snapshots immutable context before async boundaries, core services no longer depend on API schemas or Bot DTOs, and reply targets validate platform-scoped credentials.
+- [Chore] Broke the `config`, `provider_catalog`, and `config_registry` import cycle by moving static Provider data and accessors into `src/llm/provider_catalog_data.py`.
+- [Changed] Migrated the Token Usage Recent Calls block from a native section and custom heading to semantic `Section` title, description, and action slots.
+- [Changed] Added a unified in-process `TaskExecutionPort` with immutable task snapshots and events, shared submission, lookup, cancellation, retry, subscription, idempotency, deduplication, and interruption semantics.
+- [Changed] Replaced real-time quote and historical candle loading text on `StockDetailsPage` with shared compact `Loading` states.
+- [Chore] Moved Agent runtime registry, skill prompt, and executor assembly into `src/agent/runtime_assembly.py`, retained factory re-exports, removed the Native Adapter reverse import, and added an AST regression guard.
+- [Changed] Replaced the Home batch-analysis status class mapping and custom state container with semantic compact `InlineAlert` variants.
+- [Changed] Restored compact density and typography for `StockBarItem` and Portfolio overview statistics based on PR #35 without changing behavior.
+- [Changed] Migrated the Backtest result table from custom `backtest-table` markup to shared `DataTable` semantics and scrolling, removing obsolete styles and guard exceptions.
+- [Fixed] Populated US equity real-time `pe_ratio` and `pb_ratio` from yfinance `trailingPE` and `priceToBook` while leaving index quotes unchanged.
+- [Changed] Updated the `get_stock_info` tool description to explicitly support A-share, US, and Hong Kong markets so Agents can use fundamental tools across all three.
+- [Fixed] Made reasoning-model completion extraction select only the final text block and ignore typed reasoning blocks so JSON remains parseable and persistable.
+- [Fixed] Limited MiniMax `<think>` stripping to a complete leading reasoning wrapper, preserved same-named tags inside JSON, supported streamed fragments, and made dict responses field-independent.
+- [Added] Restored case-insensitive Chat session search with shared `SearchInput`, existing i18n keys, and a `DashboardStateBlock` no-match state.
+- [Changed] Migrated Bot `/analyze` submissions to the shared `AnalysisTaskQueue`, preserving normalized-stock deduplication, task IDs, status and error contracts, reply context, success copy, and notification behavior.
+- [Chore] Removed the obsolete `TaskService` singleton, exports, and tests after Bot analysis moved to the unified task authority, and formalized single-process and interrupted-task semantics.
+- [Changed] Added typed Pipeline stage results and a thread-safe retry fence so uncommitted failures can retry without duplicating confirmed history, local reports, or per-channel notifications.
+- [Added] Added the multi-strategy evidence computation layer with deterministic strategy ordering, aggregation, synthesis, conflict detection, confidence handling, and invalid-opinion diagnostics.
+- [Changed] Migrated the Portfolio holdings table from legacy markup to shared `DataTable` semantics, scrolling, and empty states while preserving financial formatting and interactions.
+- [Changed] Replaced the Home Run Flow side drawer with a centered fullscreen `Modal` based on PR #35 while preserving existing modal sizes and run-flow behavior.
+- [Changed] Migrated the Stock Details historical candle table from legacy markup to shared `DataTable` columns, row keys, semantics, and scrolling.
+- [Changed] Restored the Home workspace view switcher to a single-line `SearchInput` plus compact Funnel `Select` based on PR #35.
+- [Added] Added Chinese, English, and Korean rendering of multi-strategy evidence in Markdown, WeChat summaries, notifications, and history, including consensus, conflicts, supporting and opposing strategies, and invalid-opinion counts.
+- [Changed] Migrated DecisionSignal display, outcome, timeline, and creation components from custom card boundaries to shared `Surface` and `Section` semantics.
+- [Fixed] Refined Router focus coordination so cross-page PUSH navigation focuses the destination h1 while same-page query and hash updates retain current focus.
+- [Fixed] Added low-sensitivity runtime facts for multi-Agent timeout, budget degradation, and Pipeline termination, and unified dashboard risk application and post-risk signal ordering.
+- [Changed] Added localized exception impact, remediation guidance, and safe diagnostic codes to report input-data summaries while distinguishing supplemental data loaded after analysis.
+- [Changed] Restored compact AlphaSift strategy configuration based on PR #35 using shared `Select` and `Modal` controls without changing URL, task, or strategy behavior.
+- [Changed] Formalized the application shell around typed navigation descriptors, one shared compact navigation trigger, complete branding and Profile access, and the owner-selected framed main surface.
+- [Fixed] Tightened application-shell Router focus and responsive contracts, including fail-closed opener restoration and stable 44px compact navigation targets.
+- [Changed] Restored the login background grid and radial theme lights, retained the dedicated `--login-bg-main` token, and removed tight brand and authentication-title letter spacing.
+- [Changed] Completed the Web UIUX audit by adding controlled detail rows to `DataTable`, migrating the AlphaSift results table, and unifying Backtest, Decision Signals, and Screening query updates.
+- [Added] Added an authenticated, unlisted `/playground` component workbench to production Web builds with isolated iframes, deterministic fixtures, an in-memory Mock API, deep-linked viewport/theme/language controls, and sensitive-data isolation.
+<!-- New entry format: - [Type] Description (Type: Added/Changed/Fixed/Docs/Tests/Chore) -->
+<!-- Append each entry as one line at the end of this section; do not add category headings. -->
 
 ## [3.26.3] - 2026-07-15
 
