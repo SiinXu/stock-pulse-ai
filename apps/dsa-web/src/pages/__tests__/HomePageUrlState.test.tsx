@@ -8,7 +8,7 @@ import { analysisApi } from '../../api/analysis';
 import { agentApi } from '../../api/agent';
 import { historyApi } from '../../api/history';
 import { systemConfigApi } from '../../api/systemConfig';
-import { useStockPoolStore } from '../../stores';
+import { useStockPoolStore } from '../../stores/stockPoolStore';
 import type { UseTaskStreamOptions } from '../../hooks/useTaskStream';
 import type { AnalysisReport } from '../../types/analysis';
 import type { RunFlowSnapshot } from '../../types/runFlow';

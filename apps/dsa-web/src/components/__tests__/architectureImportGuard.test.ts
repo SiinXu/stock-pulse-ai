@@ -41,41 +41,9 @@ const NON_VIEW_ROOTS = new Set([
   'utils',
 ]);
 const UI_ROOTS = new Set(['components', 'pages', 'playground']);
-const MAX_ARCHITECTURE_IMPORT_ALLOWANCES = 8;
+const MAX_ARCHITECTURE_IMPORT_ALLOWANCES = 4;
 
 const ARCHITECTURE_IMPORT_ALLOWANCES: readonly ArchitectureImportAllowance[] = [
-  {
-    source: 'components/common/index.ts',
-    target: 'components/layout/Shell.tsx',
-    kind: 'export',
-    rule: 'common-to-ui-owner',
-    owner: 'Track W2',
-    removeWhen: 'W2b switches Shell consumers to its layout owner and removes the foreign re-export.',
-  },
-  {
-    source: 'components/common/index.ts',
-    target: 'components/layout/SidebarNav.tsx',
-    kind: 'export',
-    rule: 'common-to-ui-owner',
-    owner: 'Track W2',
-    removeWhen: 'W2b removes the unused foreign SidebarNav re-export.',
-  },
-  {
-    source: 'components/common/index.ts',
-    target: 'components/theme/ThemeProvider.tsx',
-    kind: 'export',
-    rule: 'common-to-ui-owner',
-    owner: 'Track W2',
-    removeWhen: 'W2b removes the unused foreign ThemeProvider re-export.',
-  },
-  {
-    source: 'components/common/index.ts',
-    target: 'components/theme/ThemeToggle.tsx',
-    kind: 'export',
-    rule: 'common-to-ui-owner',
-    owner: 'Track W2',
-    removeWhen: 'W2b switches ThemeToggle consumers to its theme owner and removes the foreign re-export.',
-  },
   {
     source: 'hooks/useRouteFocusTarget.ts',
     target: 'components/routing/routeFocusContext.ts',
