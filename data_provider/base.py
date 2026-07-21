@@ -20,7 +20,7 @@ import random
 import time
 from threading import BoundedSemaphore, RLock, Thread, local
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Callable, Optional, List, Tuple, Dict, Any
 
 import pandas as pd
@@ -30,6 +30,7 @@ from src.data.stock_mapping import STOCK_NAME_MAP, is_meaningful_stock_name
 from src.services.market_symbol_utils import is_suffix_market_symbol
 from src.services.run_diagnostics import record_provider_run, record_provider_run_started
 from src.utils.sanitize import log_safe_exception, sanitize_diagnostic_text
+from .daily_cache import DailyCacheKey, DailyCacheLookup, DailyCacheRead, DailyDataCache
 from .fundamental_adapter import AkshareFundamentalAdapter
 from .yfinance_fundamental_adapter import YfinanceFundamentalAdapter
 from .realtime_types import CircuitBreaker, UnifiedRealtimeQuote
@@ -711,6 +712,7 @@ class DataFetcherManager:
         self._fetcher_call_locks_lock = RLock()
         self._stock_name_cache: Dict[str, str] = {}
         self._stock_name_cache_lock = RLock()
+        self._daily_data_cache: Optional[DailyDataCache] = None
         
         if fetchers:
             # 按优先级排序
@@ -743,6 +745,8 @@ class DataFetcherManager:
             self._stock_name_cache = {}
         if not hasattr(self, "_stock_name_cache_lock") or self._stock_name_cache_lock is None:
             self._stock_name_cache_lock = RLock()
+        if not hasattr(self, "_daily_data_cache"):
+            self._daily_data_cache = None
 
     def _get_fetchers_snapshot(self) -> List[BaseFetcher]:
         self._ensure_concurrency_guards()
@@ -1083,6 +1087,87 @@ class DataFetcherManager:
         """Reset daily source health state for tests/admin diagnostics."""
         cls._daily_source_health.reset()
         cls._daily_health_handoff.pending = {}
+
+    def _get_daily_data_cache(self) -> DailyDataCache:
+        self._ensure_concurrency_guards()
+        with self._fetchers_lock:
+            if self._daily_data_cache is None:
+                self._daily_data_cache = DailyDataCache.from_env()
+            return self._daily_data_cache
+
+    @staticmethod
+    def _daily_cache_key(
+        stock_code: str,
+        start_date: Optional[str],
+        end_date: Optional[str],
+        days: int,
+    ) -> DailyCacheKey:
+        effective_end = end_date or datetime.now().strftime("%Y-%m-%d")
+        effective_start = start_date
+        if effective_start is None:
+            start_dt = datetime.strptime(effective_end, "%Y-%m-%d") - timedelta(days=days * 2)
+            effective_start = start_dt.strftime("%Y-%m-%d")
+        return DailyCacheKey(
+            symbol=canonical_stock_code(stock_code),
+            start_date=effective_start,
+            end_date=effective_end,
+            days=days,
+        )
+
+    @staticmethod
+    def _record_daily_cache_read(
+        cache_read: DailyCacheRead,
+        request_start: float,
+    ) -> None:
+        record_provider_run(
+            data_type="daily_data",
+            provider=cache_read.source_name,
+            operation="get_daily_data",
+            success=True,
+            latency_ms=int((time.time() - request_start) * 1000),
+            cache_hit=True,
+            stale_seconds=int(cache_read.age_seconds),
+            record_count=len(cache_read.frame),
+        )
+
+    def _daily_stale_cache_result(
+        self,
+        cache_lookup: DailyCacheLookup,
+        *,
+        stock_code: str,
+        market: str,
+        request_start: float,
+        provider_failure_count: int,
+    ) -> Optional[Tuple[pd.DataFrame, str]]:
+        if cache_lookup.stale is None:
+            return None
+        cache_read = self._get_daily_data_cache().use_stale(cache_lookup.stale)
+        if cache_read is None:
+            return None
+        self._record_daily_cache_read(cache_read, request_start)
+        logger.warning(
+            "provider_failover event=stale_cache data_type=daily_data symbol=%s "
+            "market=%s source=%s stale_seconds=%d provider_failure_count=%d",
+            sanitize_diagnostic_text(stock_code, max_length=80),
+            market,
+            sanitize_diagnostic_text(cache_read.source_name, max_length=120),
+            int(cache_read.age_seconds),
+            provider_failure_count,
+        )
+        return cache_read.frame, cache_read.source_name
+
+    def get_daily_cache_stats(self) -> Dict[str, int]:
+        """Return manager-local daily cache hit, miss, and lifecycle counters."""
+        return self._get_daily_data_cache().stats_snapshot()
+
+    def invalidate_daily_cache(self, stock_code: Optional[str] = None) -> int:
+        """Invalidate daily cache entries for one symbol, or every symbol when omitted."""
+        normalized = (
+            None
+            if stock_code is None
+            else canonical_stock_code(normalize_stock_code(stock_code))
+        )
+        return self._get_daily_data_cache().invalidate(normalized)
 
     def _get_cached_stock_name(self, stock_code: str) -> Optional[str]:
         self._ensure_concurrency_guards()
@@ -1550,9 +1635,17 @@ class DataFetcherManager:
         # Normalize code (strip SH/SZ prefix etc.)
         stock_code = normalize_stock_code(stock_code)
 
+        request_start = time.time()
+        cache_key = self._daily_cache_key(stock_code, start_date, end_date, days)
+        daily_cache = self._get_daily_data_cache()
+        cache_lookup = daily_cache.lookup(cache_key)
+        if cache_lookup.fresh is not None:
+            self._record_daily_cache_read(cache_lookup.fresh, request_start)
+            return cache_lookup.fresh.frame, cache_lookup.fresh.source_name
+
         fetchers = self._get_fetchers_snapshot()
         errors = []
-        request_start = time.time()
+        provider_failure_count = 0
 
         # 快速路径：美股使用专用数据源路由；港股先过滤不支持港股日线的数据源
         #   - 配置长桥凭据后: Longbridge 为首选, YFinance/AkShare 兜底
@@ -1571,6 +1664,15 @@ class DataFetcherManager:
         total_fetchers = len(fetchers)
 
         if total_fetchers == 0:
+            stale_result = self._daily_stale_cache_result(
+                cache_lookup,
+                stock_code=stock_code,
+                market=market,
+                request_start=request_start,
+                provider_failure_count=0,
+            )
+            if stale_result is not None:
+                return stale_result
             market_label = "美股指数" if is_us_index else "美股" if is_us else "港股" if is_hk else "台股" if is_tw else "A股"
             error_summary = f"{market_label} {stock_code} 获取失败:\n暂无可用数据源"
             logger.error(f"[数据源终止] {stock_code} 获取失败: {error_summary}")
@@ -1601,6 +1703,7 @@ class DataFetcherManager:
                     if fetcher.name != src_name:
                         continue
                     if not self._is_daily_source_available(fetcher, market):
+                        provider_failure_count += 1
                         self._record_daily_source_circuit_skip(
                             fetcher,
                             market,
@@ -1629,6 +1732,7 @@ class DataFetcherManager:
                             days=days,
                         )
                         if df is not None and not df.empty:
+                            df = daily_cache.store(cache_key, df, fetcher.name)
                             duration_ms = int((time.time() - attempt_start) * 1000)
                             record_provider_run(
                                 data_type="daily_data",
@@ -1636,6 +1740,7 @@ class DataFetcherManager:
                                 operation="get_daily_data",
                                 success=True,
                                 latency_ms=duration_ms,
+                                cache_hit=False,
                                 record_count=len(df),
                             )
                             elapsed = time.time() - request_start
@@ -1646,6 +1751,7 @@ class DataFetcherManager:
                             self._record_daily_source_success(fetcher, market)
                             return df, fetcher.name
                         duration_ms = int((time.time() - attempt_start) * 1000)
+                        provider_failure_count += 1
                         record_provider_run(
                             data_type="daily_data",
                             provider=fetcher.name,
@@ -1659,7 +1765,8 @@ class DataFetcherManager:
                         )
                         if df is not None and df.empty:
                             self._record_daily_source_success(fetcher, market)
-                    except Exception as e:
+                    except Exception as e:  # broad-exception: fallback_recorded - safe provider-run and log precede failover
+                        provider_failure_count += 1
                         error_type, error_reason = summarize_exception(e)
                         error_msg = f"[{fetcher.name}] ({error_type}) {error_reason}"
                         duration_ms = int((time.time() - attempt_start) * 1000)
@@ -1694,6 +1801,15 @@ class DataFetcherManager:
                         errors.append(error_msg)
                     break
 
+            stale_result = self._daily_stale_cache_result(
+                cache_lookup,
+                stock_code=stock_code,
+                market=market,
+                request_start=request_start,
+                provider_failure_count=provider_failure_count,
+            )
+            if stale_result is not None:
+                return stale_result
             error_summary = f"{market_label} {stock_code} 获取失败:\n" + "\n".join(errors)
             logger.error(
                 "All eligible data providers failed daily data request symbol=%s market=%s",
@@ -1709,6 +1825,7 @@ class DataFetcherManager:
                 market,
             )
             if not self._is_daily_source_available(fetcher, market):
+                provider_failure_count += 1
                 self._record_daily_source_circuit_skip(
                     fetcher,
                     market,
@@ -1734,6 +1851,7 @@ class DataFetcherManager:
                 )
                 
                 if df is not None and not df.empty:
+                    df = daily_cache.store(cache_key, df, fetcher.name)
                     duration_ms = int((time.time() - attempt_start) * 1000)
                     record_provider_run(
                         data_type="daily_data",
@@ -1741,6 +1859,7 @@ class DataFetcherManager:
                         operation="get_daily_data",
                         success=True,
                         latency_ms=duration_ms,
+                        cache_hit=False,
                         record_count=len(df),
                     )
                     elapsed = time.time() - request_start
@@ -1751,6 +1870,7 @@ class DataFetcherManager:
                     self._record_daily_source_success(fetcher, market)
                     return df, fetcher.name
                 duration_ms = int((time.time() - attempt_start) * 1000)
+                provider_failure_count += 1
                 record_provider_run(
                     data_type="daily_data",
                     provider=fetcher.name,
@@ -1766,6 +1886,7 @@ class DataFetcherManager:
                     self._record_daily_source_success(fetcher, market)
 
             except Exception as e:  # broad-exception: fallback_recorded - safe provider-run and log precede failover
+                provider_failure_count += 1
                 error_type, error_reason = summarize_exception(e)
                 error_msg = f"[{fetcher.name}] ({error_type}) {error_reason}"
                 duration_ms = int((time.time() - attempt_start) * 1000)
@@ -1808,6 +1929,16 @@ class DataFetcherManager:
                 # 继续尝试下一个数据源
                 continue
         
+        stale_result = self._daily_stale_cache_result(
+            cache_lookup,
+            stock_code=stock_code,
+            market=market,
+            request_start=request_start,
+            provider_failure_count=provider_failure_count,
+        )
+        if stale_result is not None:
+            return stale_result
+
         # 所有数据源都失败
         error_summary = f"所有数据源获取 {stock_code} 失败:\n" + "\n".join(errors)
         logger.error(

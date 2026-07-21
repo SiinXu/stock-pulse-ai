@@ -244,6 +244,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Split pipeline analysis, context assembly, and result normalization into a focused stage module while preserving the legacy entry point.
 - [Chore] Split oversized configuration modules into focused packages while preserving public import and runtime compatibility.
 - [Docs] Documented the serialized domain-artifact versioning strategy (version-tag inventory, forward/backward compatibility rules, bump procedure) in the database migrations guide and added a guard test binding the inventory to the real constants.
+- [Added] Added bounded memory and atomic local daily-provider caches with explicit invalidation, hit/miss telemetry, and marked stale-if-error fallback.
 <!-- New entry format: - [Type] Description (Type: Added/Changed/Fixed/Docs/Tests/Chore) -->
 <!-- Append each entry as one line at the end of this section; do not add category headings. -->
 - [Fixed] Made fork pull requests run PR Review static checks with a read-only token while skipping secret- and write-dependent review steps; same-repository pull requests retain the full advisory review flow.

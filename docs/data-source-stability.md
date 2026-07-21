@@ -193,6 +193,46 @@ LONGBRIDGE_APP_SECRET=your_app_secret
 LONGBRIDGE_ACCESS_TOKEN=your_access_token
 ```
 
+## 日线多层缓存与 stale 降级
+
+`DataFetcherManager.get_daily_data()` 在现有 provider fallback 外增加了两层日线缓存，不替换 Pipeline 已有的
+`stock_daily` 数据库缓存：
+
+1. L1 是当前 manager 进程内的有界内存缓存，默认 fresh TTL 为 60 秒。
+2. L2 是本地 JSON-table 持久缓存，默认 fresh TTL 为 3600 秒，默认目录为
+   `data/provider_cache/daily`（相对进程工作目录）。写入使用同目录临时文件和原子替换；不会反序列化 pickle。
+3. key 包含规范化股票代码、实际开始/结束日期和 `days`，不同查询窗口不会互相覆盖。只缓存非空的成功结果。
+4. fresh 命中会直接返回；未命中时仍按原有 provider 优先级、市场能力和熔断策略请求。
+5. provider 链全部失败后，才允许读取超过 L2 fresh TTL 的 last-good 数据。默认额外 stale 窗口为
+   86400 秒；超过该窗口仍按原有方式抛出数据获取错误。
+
+默认配置如下；不配置时缓存已启用。TTL 或 stale 窗口设为 `0` 可分别关闭对应 fresh 层或 stale 降级，
+`PROVIDER_DAILY_CACHE_ENABLED=false` 可整体关闭：
+
+```env
+PROVIDER_DAILY_CACHE_ENABLED=true
+PROVIDER_DAILY_CACHE_DIR=data/provider_cache/daily
+PROVIDER_DAILY_CACHE_MEMORY_TTL_SECONDS=60
+PROVIDER_DAILY_CACHE_PERSISTENT_TTL_SECONDS=3600
+PROVIDER_DAILY_CACHE_STALE_IF_ERROR_SECONDS=86400
+PROVIDER_DAILY_CACHE_MEMORY_MAX_ENTRIES=256
+```
+
+下游可从 `DataFrame.attrs["provider_cache"]` 读取 `cache_hit`、`layer`、`is_stale`、
+`stale_seconds`、`stored_at` 和 `source`。正常 provider 返回会标记 `layer=provider`、
+`cache_hit=false`；stale 降级会明确标记 `is_stale=true`。任务诊断中的 `ProviderRun` 同步记录
+`cache_hit` 与 `stale_seconds`，结构化日志 `provider_cache event=...` 会输出进程内累计
+`hits`、`misses`、`stale_hits`、`writes` 和 `invalidations`，不记录缓存内容。计数作用域为当前
+manager 实例；常规应用运行期使用单例 manager。
+
+运维或测试代码可以显式查询和失效：
+
+```python
+manager.get_daily_cache_stats()
+manager.invalidate_daily_cache("600519")  # 同时失效该代码的 L1/L2 条目
+manager.invalidate_daily_cache()          # 失效全部日线缓存
+```
+
 ## 用户可见提示建议
 
 对外沟通时建议区分三类情况：

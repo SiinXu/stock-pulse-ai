@@ -187,7 +187,6 @@
     {"path":"data_provider/base.py","scope":"<module>.DataFetcherManager.get_belong_boards","caught":["Exception"],"digest":"a0212977c745c2a9832b26da982534cebb9b213c52bc4275729f0a3f81a4f940"},
     {"path":"data_provider/base.py","scope":"<module>.DataFetcherManager.get_chip_distribution","caught":["Exception"],"digest":"dcb0557f5b8377bf20ba42f24e61711937862c6b2e1f9d6859248c94e12ca8a7"},
     {"path":"data_provider/base.py","scope":"<module>.DataFetcherManager.get_concept_rankings","caught":["Exception"],"digest":"9df1ccc17f131ec2f4eb0818bfc03f8448e47c1a6caaa1ec93837ddf2827712c"},
-    {"path":"data_provider/base.py","scope":"<module>.DataFetcherManager.get_daily_data","caught":["Exception"],"digest":"4000ccd1df3a747e89c7564999c5f4ff216e5ef48477d42e83b44a823b20fdd5"},
     {"path":"data_provider/base.py","scope":"<module>.DataFetcherManager.get_hot_stocks","caught":["Exception"],"digest":"571b71f6809678d44db10994961307c15fd95f27346c92478350d8d4787cc85c"},
     {"path":"data_provider/base.py","scope":"<module>.DataFetcherManager.get_limit_up_pool","caught":["Exception"],"digest":"f8a9d0b25a2792fae3111ca367d5abf4e249925709853f13c20192c2dc60f972"},
     {"path":"data_provider/base.py","scope":"<module>.DataFetcherManager.get_main_indices","caught":["Exception"],"digest":"b41d370c7b281b4991e4c5123a5d02a418d249a8d456c6f6b8b1aeeb9a6afdf2"},
