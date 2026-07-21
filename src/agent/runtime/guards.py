@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
+from src.utils.sanitize import sanitize_diagnostic_text
+
 
 DEFAULT_TOOL_TIMEOUT_SECONDS = 120.0
 DEFAULT_MAX_IDENTICAL_TOOL_CALLS = 3
@@ -79,7 +81,7 @@ def log_runtime_guard_event(
     **fields: Any,
 ) -> None:
     """Write one machine-readable guard event containing controlled scalars."""
-    payload = {"event": str(event)}
+    payload = {"event": _safe_log_value(str(event))}
     payload.update(
         {
             str(key): _safe_log_value(value)
@@ -95,6 +97,7 @@ def log_runtime_guard_event(
 
 
 def _read_source(config: Any, attr_name: str, env_name: str) -> Any:
+    """Read one non-empty value from config, then the process environment."""
     if config is not None:
         value = getattr(config, attr_name, None)
         if value is not None and value != "":
@@ -110,6 +113,7 @@ def _read_non_negative_float(
     env_name: str,
     default: float,
 ) -> float:
+    """Read a finite non-negative float or return the documented default."""
     raw_value = _read_source(config, attr_name, env_name)
     if raw_value is None:
         return default
@@ -131,6 +135,7 @@ def _read_non_negative_int(
     env_name: str,
     default: int,
 ) -> int:
+    """Read a non-negative integer or return the documented default."""
     raw_value = _read_source(config, attr_name, env_name)
     if raw_value is None:
         return default
@@ -146,6 +151,7 @@ def _read_non_negative_int(
 
 
 def _read_stage_failure_policy(config: Any) -> StageFailurePolicy:
+    """Resolve the supported stage failure policy without silent fallback."""
     env_name = "AGENT_STAGE_FAILURE_POLICY"
     raw_value = _read_source(config, "agent_stage_failure_policy", env_name)
     if raw_value is None:
@@ -160,6 +166,7 @@ def _read_stage_failure_policy(config: Any) -> StageFailurePolicy:
 
 
 def _log_config_fallback(setting: str, default: Any, reason: str) -> None:
+    """Record why one invalid guard setting fell back to its default."""
     log_runtime_guard_event(
         logging.getLogger(__name__),
         "guard_config_fallback",
@@ -170,10 +177,13 @@ def _log_config_fallback(setting: str, default: Any, reason: str) -> None:
 
 
 def _safe_log_value(value: Any) -> Any:
-    if value is None or isinstance(value, (bool, int, float, str)):
+    """Return a bounded scalar that cannot expose credential-like strings."""
+    if value is None or isinstance(value, (bool, int, float)):
         return value
     if isinstance(value, Enum):
-        return value.value
+        value = value.value
+    if isinstance(value, str):
+        return sanitize_diagnostic_text(value, max_length=120)
     return type(value).__name__
 
 

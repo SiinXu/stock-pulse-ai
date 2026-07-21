@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import threading
 import time
 import uuid
 import contextvars
@@ -40,10 +41,11 @@ from src.agent.tools.execution import (
     _is_stock_scoped_tool,
     _normalize_guard_stock_code,
     _normalize_tool_stock_code,
+    bind_runner_tool_completion_guard,
     execute_runner_tool_call_via_session,
     serialize_tool_result,
 )
-from src.agent.runtime.tool_session import BoundToolSession
+from src.agent.runtime.tool_session import BoundToolSession, ExecutionFenceRejected
 from src.agent.runtime.guards import (
     RuntimeGuardPolicy,
     log_runtime_guard_event,
@@ -327,6 +329,7 @@ def _build_cancelled_result(
     models_used: List[str],
     messages: List[Dict[str, Any]],
 ) -> RunLoopResult:
+    """Build the typed terminal result for cooperative cancellation."""
     return RunLoopResult(
         success=False,
         content="",
@@ -381,6 +384,7 @@ def _build_tool_loop_result(
     models_used: List[str],
     messages: List[Dict[str, Any]],
 ) -> RunLoopResult:
+    """Build the typed terminal result for an identical tool-call loop."""
     return RunLoopResult(
         success=False,
         content="",
@@ -396,6 +400,30 @@ def _build_tool_loop_result(
         failure_reason=StageFailureReason.LOOP_DETECTED,
         messages=messages,
     )
+
+
+class _ToolCompletionFence:
+    """Linearize one runner timeout against BoundToolSession completion."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._timed_out = False
+
+    def mark_timed_out(self) -> None:
+        """Close this dispatch against later completion claims."""
+        with self._lock:
+            self._timed_out = True
+
+    def claim_completion(self, claim: Callable[[], None]) -> None:
+        """Accept completion only when the runner timeout has not won."""
+        with self._lock:
+            if self._timed_out:
+                raise ExecutionFenceRejected(
+                    "tool_timeout",
+                    "Tool result arrived after the runner timeout.",
+                    {"fence": "tool_timeout"},
+                )
+            claim()
 
 
 # ============================================================
@@ -834,8 +862,12 @@ def _execute_tools(
     authority — via the migration mapper.
     """
 
-    def _exec_single(tc_item):
-        return execute_runner_tool_call_via_session(tc_item, tool_session)
+    def _exec_single(tc_item, completion_fence=None):
+        """Execute one tool with an optional per-dispatch completion fence."""
+        if completion_fence is None:
+            return execute_runner_tool_call_via_session(tc_item, tool_session)
+        with bind_runner_tool_completion_guard(completion_fence.claim_completion):
+            return execute_runner_tool_call_via_session(tc_item, tool_session)
 
     results: List[Dict[str, Any]] = []
 
@@ -847,12 +879,14 @@ def _execute_tools(
         if tool_wait_timeout_seconds and tool_wait_timeout_seconds > 0:
             pool = ThreadPoolExecutor(max_workers=1)
             ctx = contextvars.copy_context()
+            completion_fence = _ToolCompletionFence()
             try:
-                future = pool.submit(ctx.run, _exec_single, tc)
+                future = pool.submit(ctx.run, _exec_single, tc, completion_fence)
                 try:
                     _, result_str, success, dur, cached, guard_result = future.result(timeout=tool_wait_timeout_seconds)
                 except FuturesTimeoutError:
                     timeout_triggered = True
+                    completion_fence.mark_timed_out()
                     future.cancel()
                     timeout_label = f"{tool_wait_timeout_seconds:.2f}s"
                     log_runtime_guard_event(
@@ -907,7 +941,16 @@ def _execute_tools(
         pool = ThreadPoolExecutor(max_workers=min(len(tool_calls), 5))
         timeout_triggered = False
         try:
-            futures = {pool.submit(contextvars.copy_context().run, _exec_single, tc): tc for tc in tool_calls}
+            futures = {}
+            for tc in tool_calls:
+                completion_fence = _ToolCompletionFence()
+                future = pool.submit(
+                    contextvars.copy_context().run,
+                    _exec_single,
+                    tc,
+                    completion_fence,
+                )
+                futures[future] = (tc, completion_fence)
             pending = set(futures)
             for future in as_completed(
                 futures,
@@ -938,8 +981,9 @@ def _execute_tools(
                 if tool_wait_timeout_seconds is not None
                 else "the configured limit"
             )
-            for future, tc_item in futures.items():
+            for future, (tc_item, completion_fence) in futures.items():
                 if future in pending:
+                    completion_fence.mark_timed_out()
                     future.cancel()
                     log_runtime_guard_event(
                         logger,

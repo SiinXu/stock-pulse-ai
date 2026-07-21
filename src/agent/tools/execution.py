@@ -12,8 +12,20 @@ import json
 import logging
 import re
 import time
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Protocol
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Protocol,
+)
 
 if TYPE_CHECKING:
     from src.agent.runtime.tool_session import BoundToolSession
@@ -27,6 +39,24 @@ logger = logging.getLogger(__name__)
 class RunnerToolCall(Protocol):
     name: str
     arguments: Dict[str, Any]
+
+
+RunnerToolCompletionGuard = Callable[[Callable[[], None]], None]
+_RUNNER_TOOL_COMPLETION_GUARD: ContextVar[Optional[RunnerToolCompletionGuard]] = (
+    ContextVar("runner_tool_completion_guard", default=None)
+)
+
+
+@contextmanager
+def bind_runner_tool_completion_guard(
+    guard: RunnerToolCompletionGuard,
+) -> Iterator[None]:
+    """Bind one dispatch completion fence without changing the bridge API."""
+    token = _RUNNER_TOOL_COMPLETION_GUARD.set(guard)
+    try:
+        yield
+    finally:
+        _RUNNER_TOOL_COMPLETION_GUARD.reset(token)
 
 
 _SUMMARY_LIMIT = 500
@@ -302,7 +332,15 @@ def execute_runner_tool_call_via_session(
     # memo that already existed *before* this dispatch.
     cached = bool(cache_key) and session.is_non_retriable_cached(cache_key)
 
-    result = session.execute(name, arguments)
+    completion_guard = _RUNNER_TOOL_COMPLETION_GUARD.get()
+    if completion_guard is None:
+        result = session.execute(name, arguments)
+    else:
+        result = session.execute(
+            name,
+            arguments,
+            completion_guard=completion_guard,
+        )
 
     res_str = result["result_text"]
     # A non-retriable cache hit is reported as a non-success skip, exactly like

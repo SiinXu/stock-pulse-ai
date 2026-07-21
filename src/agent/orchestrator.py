@@ -24,12 +24,16 @@ can be a drop-in replacement via the factory.
 
 from __future__ import annotations
 
+import contextvars
+import copy
 import json
 import inspect
 import logging
 import re
+import threading
 import time
-from dataclasses import dataclass, field
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+from dataclasses import dataclass, field, fields as dataclass_fields
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from src.agent.chat_context import build_visible_chat_history
@@ -146,8 +150,8 @@ class AgentOrchestrator:
     def _get_timeout_seconds(self) -> int:
         """Return the pipeline timeout in seconds.
 
-        ``0`` means disabled. The timeout is a cooperative budget for the
-        whole pipeline rather than a hard interruption of an in-flight stage.
+        ``0`` means disabled. In-flight stages stop waiting at the remaining
+        pipeline deadline and cannot commit late context mutations.
         """
         raw_value = getattr(self.config, "agent_orchestrator_timeout_s", 0)
         try:
@@ -173,6 +177,25 @@ class AgentOrchestrator:
             for key, attr in entries
             if (val := getattr(config, attr, None)) is not None and val > 0
         }
+
+    def _resolve_stage_timeout_seconds(
+        self,
+        agent_name: str,
+        timeout_seconds: Optional[float],
+    ) -> Optional[float]:
+        """Clamp the remaining run budget by one configured stage limit."""
+        sub_agent_timeout_map = self._get_sub_agent_timeout_map()
+        agent_limit = sub_agent_timeout_map.get(agent_name)
+        if (
+            agent_limit is None
+            and agent_name in getattr(self, "_skill_agent_names", set())
+        ):
+            agent_limit = sub_agent_timeout_map.get("skill")
+        if agent_limit is None:
+            return timeout_seconds
+        if timeout_seconds is None:
+            return agent_limit
+        return min(timeout_seconds, agent_limit)
 
     def _build_timeout_result(
         self,
@@ -349,6 +372,89 @@ class AgentOrchestrator:
 
         return True
 
+    @staticmethod
+    def _commit_stage_context(target: AgentContext, staged: AgentContext) -> None:
+        """Commit one completed isolated stage while preserving container identity."""
+        for context_field in dataclass_fields(AgentContext):
+            name = context_field.name
+            current_value = getattr(target, name)
+            staged_value = getattr(staged, name)
+            if isinstance(current_value, dict) and isinstance(staged_value, dict):
+                current_value.clear()
+                current_value.update(staged_value)
+            elif isinstance(current_value, list) and isinstance(staged_value, list):
+                current_value[:] = staged_value
+            else:
+                setattr(target, name, staged_value)
+
+    def _execute_isolated_stage(
+        self,
+        agent: Any,
+        ctx: AgentContext,
+        *,
+        stage_name: str,
+        progress_callback: Optional[Callable],
+        timeout_seconds: Optional[float],
+        cancelled_check: Optional[Callable[[], bool]],
+    ) -> tuple[StageResult, AgentContext]:
+        """Run a whole stage against a copy and fence late state or progress."""
+        staged_ctx = copy.deepcopy(ctx)
+        stage_closed = threading.Event()
+
+        def _stage_cancelled() -> bool:
+            """Combine external cancellation with the stage completion fence."""
+            return stage_closed.is_set() or (
+                cancelled_check is not None and cancelled_check()
+            )
+
+        def _stage_progress(event: Dict[str, Any]) -> None:
+            """Drop progress emitted after the stage reached its local deadline."""
+            if not stage_closed.is_set() and progress_callback is not None:
+                progress_callback(event)
+
+        def _execute() -> StageResult:
+            """Execute decision preparation and the agent as one timed stage."""
+            if stage_name == "decision":
+                self._run_strategy_engine(staged_ctx)
+                self._prepare_decision_context(staged_ctx)
+            return self._run_stage_agent(
+                agent,
+                staged_ctx,
+                progress_callback=(
+                    _stage_progress if progress_callback is not None else None
+                ),
+                timeout_seconds=timeout_seconds,
+                cancelled_check=_stage_cancelled,
+            )
+
+        if timeout_seconds is None or timeout_seconds <= 0:
+            return _execute(), staged_ctx
+
+        pool = ThreadPoolExecutor(max_workers=1)
+        timeout_triggered = False
+        try:
+            future = pool.submit(contextvars.copy_context().run, _execute)
+            try:
+                result = future.result(timeout=timeout_seconds)
+            except FuturesTimeoutError:
+                timeout_triggered = True
+                stage_closed.set()
+                future.cancel()
+                result = StageResult(
+                    stage_name=stage_name,
+                    status=StageStatus.FAILED,
+                    error=AGENT_EXECUTION_FAILURE_MESSAGE,
+                    failure_reason=StageFailureReason.TIMEOUT,
+                    meta={"runtime_guard_event": "stage_timeout"},
+                )
+            return result, staged_ctx
+        finally:
+            stage_closed.set()
+            pool.shutdown(
+                wait=not timeout_triggered,
+                cancel_futures=timeout_triggered,
+            )
+
     def _run_stage_agent(
         self,
         agent: Any,
@@ -358,19 +464,10 @@ class AgentOrchestrator:
         cancelled_check: Optional[Callable[[], bool]] = None,
     ) -> StageResult:
         """Run a stage agent while preserving compatibility with older call signatures."""
-        # Clamp by per-agent limit when configured.
-        # When pipeline budget is disabled (timeout_seconds is None),
-        # the sub-agent's own limit still applies as a standalone cap.
-        sub_agent_timeout_map = self._get_sub_agent_timeout_map()
-        if sub_agent_timeout_map:
-            agent_limit = sub_agent_timeout_map.get(agent.agent_name)
-            if agent_limit is None and agent.agent_name in getattr(self, "_skill_agent_names", set()):
-                agent_limit = sub_agent_timeout_map.get("skill")
-            if agent_limit is not None:
-                if timeout_seconds is not None:
-                    timeout_seconds = min(timeout_seconds, agent_limit)
-                else:
-                    timeout_seconds = agent_limit
+        timeout_seconds = self._resolve_stage_timeout_seconds(
+            agent.agent_name,
+            timeout_seconds,
+        )
         run_kwargs = {"progress_callback": progress_callback}
         if (
             timeout_seconds is not None
@@ -723,20 +820,24 @@ class AgentOrchestrator:
                 if timeout_s
                 else None
             )
+            effective_stage_timeout_s = self._resolve_stage_timeout_seconds(
+                stage_name,
+                remaining_timeout_s,
+            )
             stage_started_elapsed_s = elapsed_s
             try:
-                if stage_name == "decision":
-                    self._run_strategy_engine(ctx)
-                    self._prepare_decision_context(ctx)
-                result: StageResult = self._run_stage_agent(
+                result, staged_ctx = self._execute_isolated_stage(
                     agent,
                     ctx,
+                    stage_name=stage_name,
                     progress_callback=progress_callback,
-                    timeout_seconds=remaining_timeout_s,
+                    timeout_seconds=effective_stage_timeout_s,
                     cancelled_check=cancelled_check,
                 )
                 if not isinstance(result, StageResult):
                     raise TypeError("Stage agent returned an invalid result")
+                if result.status == StageStatus.COMPLETED:
+                    self._commit_stage_context(ctx, staged_ctx)
             except TimeoutError as exc:
                 log_safe_exception(
                     logger,
@@ -786,7 +887,10 @@ class AgentOrchestrator:
                     meta={"runtime_guard_event": "stage_exception_captured"},
                 )
             elapsed_s = time.time() - t0
-            if result.meta.get("runtime_guard_event") == "stage_exception_captured":
+            if result.meta.get("runtime_guard_event") in {
+                "stage_exception_captured",
+                "stage_timeout",
+            }:
                 result.duration_s = round(
                     max(0.0, elapsed_s - stage_started_elapsed_s),
                     2,
@@ -826,7 +930,7 @@ class AgentOrchestrator:
                         "stage_timeout",
                         scope="stage",
                         stage=stage_name,
-                        limit_seconds=remaining_timeout_s,
+                        limit_seconds=effective_stage_timeout_s,
                     )
                 should_isolate = (
                     self.runtime_guard_policy.stage_failure_policy

@@ -20,7 +20,11 @@ from src.agent.protocols import (
     StageStatus,
 )
 from src.agent.runner import run_agent_loop
-from src.agent.runtime.guards import RuntimeGuardPolicy, StageFailurePolicy
+from src.agent.runtime.guards import (
+    RuntimeGuardPolicy,
+    StageFailurePolicy,
+    log_runtime_guard_event,
+)
 from src.agent.runtime_facts import DegradationBoundary
 from src.agent.tools.registry import ToolDefinition, ToolParameter, ToolRegistry
 
@@ -79,6 +83,27 @@ def test_runtime_guard_policy_reads_environment(monkeypatch):
         max_stage_entries=2,
         stage_failure_policy=StageFailurePolicy.FAIL_FAST,
     )
+
+
+def test_structured_guard_strings_are_redacted_and_bounded(caplog):
+    unsafe_name = (
+        "Bearer super-secret-token "
+        "https://user:password@private.example/path "
+        + ("x" * 300)
+    )
+
+    with caplog.at_level(logging.WARNING):
+        log_runtime_guard_event(
+            logging.getLogger("test.runtime.guard"),
+            "tool_timeout",
+            tool=unsafe_name,
+        )
+
+    event = _guard_events(caplog.records)[0]
+    assert "super-secret-token" not in event["tool"]
+    assert "password" not in event["tool"]
+    assert "private.example" not in event["tool"]
+    assert len(event["tool"]) <= 120
 
 
 def test_repeated_identical_tool_call_stops_before_extra_dispatch(caplog):
@@ -162,6 +187,60 @@ def test_runtime_policy_tool_timeout_is_enforced_and_logged(caplog):
     )
 
 
+def test_timed_out_late_result_cannot_populate_session_cache():
+    handler_calls = []
+
+    def _handler(message):
+        handler_calls.append(message)
+        if len(handler_calls) == 1:
+            time.sleep(0.04)
+            return {"error": "late failure", "retriable": False}
+        return {"echo": message}
+
+    responses = iter(
+        [
+            LLMResponse(
+                content="first",
+                tool_calls=[
+                    ToolCall(id="first", name="echo", arguments={"message": "same"})
+                ],
+                provider="test",
+            ),
+            LLMResponse(
+                content="second",
+                tool_calls=[
+                    ToolCall(id="second", name="echo", arguments={"message": "same"})
+                ],
+                provider="test",
+            ),
+            LLMResponse(content="done", provider="test"),
+        ]
+    )
+    adapter = MagicMock()
+
+    def _next_response(*_args, **_kwargs):
+        response = next(responses)
+        if response.content == "second":
+            time.sleep(0.06)
+        return response
+
+    adapter.call_with_tools.side_effect = _next_response
+
+    result = run_agent_loop(
+        messages=[],
+        tool_registry=_echo_registry(_handler),
+        llm_adapter=adapter,
+        max_steps=4,
+        runtime_guard_policy=_policy(tool_timeout_seconds=0.01),
+    )
+
+    assert result.success is True
+    assert handler_calls == ["same", "same"]
+    assert result.tool_calls_log[0]["timeout"] is True
+    assert result.tool_calls_log[1]["success"] is True
+    assert result.tool_calls_log[1]["cached"] is False
+
+
 def test_full_run_timeout_emits_structured_guard_event(caplog):
     with caplog.at_level(logging.WARNING), patch(
         "src.agent.runner._remaining_timeout_seconds",
@@ -232,6 +311,62 @@ def test_uncaught_noncritical_stage_exception_isolated_and_pipeline_continues(ca
     assert all("provider payload" not in json.dumps(event) for event in events)
 
 
+def test_stage_timeout_isolates_late_context_and_continues(caplog):
+    orchestrator = AgentOrchestrator(
+        tool_registry=_echo_registry(),
+        llm_adapter=MagicMock(),
+        config=SimpleNamespace(
+            agent_orchestrator_timeout_s=0,
+            agent_intel_agent_timeout_s=0.01,
+        ),
+        runtime_guard_policy=_policy(),
+    )
+    ctx = AgentContext(query="test")
+    ctx.meta["response_mode"] = "chat"
+    agents = [
+        SimpleNamespace(agent_name="intel"),
+        SimpleNamespace(agent_name="decision"),
+    ]
+    calls = []
+
+    def _run_stage(agent, run_ctx, **_kwargs):
+        calls.append(agent.agent_name)
+        if agent.agent_name == "intel":
+            run_ctx.set_data("partial_intel", "must not commit")
+            time.sleep(0.05)
+            run_ctx.set_data("late_intel", "must not commit")
+            return StageResult(
+                stage_name="intel",
+                status=StageStatus.COMPLETED,
+            )
+        return StageResult(
+            stage_name="decision",
+            status=StageStatus.COMPLETED,
+            meta={"raw_text": "done"},
+        )
+
+    with caplog.at_level(logging.WARNING), patch.object(
+        orchestrator,
+        "_build_agent_chain",
+        return_value=agents,
+    ), patch.object(orchestrator, "_run_stage_agent", side_effect=_run_stage):
+        result = orchestrator._execute_pipeline(ctx, parse_dashboard=False)
+
+    time.sleep(0.06)
+    assert result.success is True
+    assert result.content == "done"
+    assert calls == ["intel", "decision"]
+    assert "partial_intel" not in ctx.data
+    assert "late_intel" not in ctx.data
+    assert result.stats.stage_results[0].failure_reason == StageFailureReason.TIMEOUT
+    assert any(
+        event["event"] == "stage_timeout"
+        and event["stage"] == "intel"
+        and event["limit_seconds"] == 0.01
+        for event in _guard_events(caplog.records)
+    )
+
+
 def test_fail_fast_policy_stops_after_noncritical_stage_exception():
     orchestrator = AgentOrchestrator(
         tool_registry=_echo_registry(),
@@ -298,6 +433,47 @@ def test_decision_preparation_exception_becomes_a_failed_stage():
     assert result.success is False
     assert result.error == "Stage 'decision' failed"
     assert result.stats.stage_results[0].failure_reason == StageFailureReason.STAGE_FAILURE
+    run_stage.assert_not_called()
+
+
+def test_decision_preparation_timeout_cannot_commit_late_state(caplog):
+    orchestrator = AgentOrchestrator(
+        tool_registry=_echo_registry(),
+        llm_adapter=MagicMock(),
+        config=SimpleNamespace(
+            agent_orchestrator_timeout_s=0,
+            agent_decision_agent_timeout_s=0.01,
+        ),
+        runtime_guard_policy=_policy(),
+    )
+    ctx = AgentContext(query="test")
+
+    def _slow_preparation(staged_ctx):
+        time.sleep(0.05)
+        staged_ctx.set_data("late_decision", "must not commit")
+
+    with caplog.at_level(logging.WARNING), patch.object(
+        orchestrator,
+        "_build_agent_chain",
+        return_value=[SimpleNamespace(agent_name="decision")],
+    ), patch.object(
+        orchestrator,
+        "_run_strategy_engine",
+        side_effect=_slow_preparation,
+    ), patch.object(orchestrator, "_run_stage_agent") as run_stage:
+        result = orchestrator._execute_pipeline(ctx, parse_dashboard=False)
+
+    time.sleep(0.06)
+    assert result.success is False
+    assert result.error == "Stage 'decision' failed"
+    assert "late_decision" not in ctx.data
+    assert result.stats.stage_results[0].failure_reason == StageFailureReason.TIMEOUT
+    assert any(
+        event["event"] == "stage_timeout"
+        and event["stage"] == "decision"
+        and event["limit_seconds"] == 0.01
+        for event in _guard_events(caplog.records)
+    )
     run_stage.assert_not_called()
 
 
