@@ -253,6 +253,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Docs] Established an ADR registry and template, backfilled four implemented architecture decisions, and added a current component and data-flow overview.
 - [Changed] Split pipeline orchestration and persistence stages into focused modules while preserving the legacy facade and runtime behavior.
 - [Changed] Added bounded adaptive daily-provider ordering and structured health snapshot export without crossing configured priority or market capability boundaries.
+- [Docs] Documented foundation pipeline and product layer boundaries, contribution placement, upstream-compatible fix porting policy, and dual-license provenance.
 
 ## [3.26.3] - 2026-07-15
 
