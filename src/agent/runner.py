@@ -44,6 +44,11 @@ from src.agent.tools.execution import (
     serialize_tool_result,
 )
 from src.agent.runtime.tool_session import BoundToolSession
+from src.agent.runtime.guards import (
+    RuntimeGuardPolicy,
+    log_runtime_guard_event,
+    runtime_guard_fingerprint,
+)
 from src.agent.stock_scope import StockScope
 from src.agent.runtime.lifecycle import UsageRecorder, get_default_usage_recorder
 from src.utils.data_processing import normalize_report_signal_attribution
@@ -348,7 +353,6 @@ def _build_budget_guard_result(
     remaining_timeout_s: float,
     min_step_budget_s: float,
 ) -> RunLoopResult:
-    elapsed = time.time() - start_time
     return RunLoopResult(
         success=False,
         content="",
@@ -362,6 +366,34 @@ def _build_budget_guard_result(
             f"{remaining_timeout_s:.2f}s remaining, minimum {min_step_budget_s:.1f}s required"
         ),
         failure_reason=StageFailureReason.BUDGET_SKIP,
+        messages=messages,
+    )
+
+
+def _build_tool_loop_result(
+    *,
+    step: int,
+    tool_name: str,
+    repeat_limit: int,
+    tool_calls_log: List[Dict[str, Any]],
+    total_tokens: int,
+    provider_used: str,
+    models_used: List[str],
+    messages: List[Dict[str, Any]],
+) -> RunLoopResult:
+    return RunLoopResult(
+        success=False,
+        content="",
+        tool_calls_log=tool_calls_log,
+        total_steps=step,
+        total_tokens=total_tokens,
+        provider=provider_used,
+        models_used=models_used,
+        error=(
+            f"Agent stopped because tool '{tool_name}' exceeded the "
+            f"identical-call limit ({repeat_limit})"
+        ),
+        failure_reason=StageFailureReason.LOOP_DETECTED,
         messages=messages,
     )
 
@@ -384,6 +416,7 @@ def run_agent_loop(
     emit_stage_events: bool = True,
     cancelled_check: Optional[Callable[[], bool]] = None,
     usage_recorder: Optional[UsageRecorder] = None,
+    runtime_guard_policy: Optional[RuntimeGuardPolicy] = None,
 ) -> RunLoopResult:
     """Execute the ReAct LLM ↔ tool loop.
 
@@ -410,6 +443,8 @@ def run_agent_loop(
             dispatching further tools or LLM calls.
         usage_recorder: Optional usage-telemetry sink; defaults to the
             process-wide recorder from the runtime lifecycle layer.
+        runtime_guard_policy: Optional resolved timeout and loop policy. When
+            omitted, the runner resolves the runtime-local environment policy.
 
     Returns:
         A :class:`RunLoopResult` with the final content, stats, and the
@@ -418,6 +453,14 @@ def run_agent_loop(
     labels = thinking_labels or _THINKING_TOOL_LABELS
     tool_decls = tool_registry.to_openai_tools()
     recorder = usage_recorder if usage_recorder is not None else get_default_usage_recorder()
+    guard_policy = runtime_guard_policy or RuntimeGuardPolicy.from_sources()
+    if tool_call_timeout_seconds is None:
+        tool_call_timeout_seconds = guard_policy.tool_timeout_seconds
+    elif tool_call_timeout_seconds > 0 and guard_policy.tool_timeout_seconds > 0:
+        tool_call_timeout_seconds = min(
+            tool_call_timeout_seconds,
+            guard_policy.tool_timeout_seconds,
+        )
 
     start_time = time.time()
     tool_calls_log: List[Dict[str, Any]] = []
@@ -440,6 +483,7 @@ def run_agent_loop(
     total_tokens = 0
     provider_used = ""
     models_used: List[str] = []
+    identical_tool_call_counts: Dict[str, int] = {}
 
     # Minimum seconds needed for a meaningful LLM round-trip.  If the
     # remaining budget is positive but below this threshold, the step will
@@ -513,8 +557,14 @@ def run_agent_loop(
                     min_step_budget_s=_MIN_STEP_BUDGET_S,
                 ))
 
-            if remaining_timeout <= 0:
-                logger.warning("Agent timed out before step %d", step + 1)
+            log_runtime_guard_event(
+                logger,
+                "run_timeout",
+                scope="agent_loop",
+                phase="before_step",
+                step=step + 1,
+                limit_seconds=float(max_wall_clock_seconds),
+            )
             return _finish(_build_timeout_result(
                 start_time=start_time,
                 max_wall_clock_seconds=float(max_wall_clock_seconds),
@@ -566,7 +616,14 @@ def run_agent_loop(
 
         remaining_timeout = _remaining_timeout_seconds(start_time, max_wall_clock_seconds)
         if remaining_timeout is not None and remaining_timeout <= 0:
-            logger.warning("Agent timed out after LLM call at step %d", step + 1)
+            log_runtime_guard_event(
+                logger,
+                "run_timeout",
+                scope="agent_loop",
+                phase="after_llm",
+                step=step + 1,
+                limit_seconds=float(max_wall_clock_seconds),
+            )
             return _finish(_build_timeout_result(
                 start_time=start_time,
                 max_wall_clock_seconds=float(max_wall_clock_seconds),
@@ -591,6 +648,56 @@ def run_agent_loop(
                 len(tool_calls),
                 [tc.name for tc in tool_calls],
             )
+
+            repeat_limit = guard_policy.max_identical_tool_calls
+            pending_counts: Dict[str, int] = {}
+            loop_violation = None
+            if repeat_limit > 0:
+                for tool_call in tool_calls:
+                    signature = _build_tool_cache_key(
+                        tool_call.name,
+                        tool_call.arguments,
+                    )
+                    if signature is None:
+                        continue
+                    observed = (
+                        identical_tool_call_counts.get(signature, 0)
+                        + pending_counts.get(signature, 0)
+                        + 1
+                    )
+                    if observed > repeat_limit:
+                        loop_violation = (tool_call, signature, observed)
+                        break
+                    pending_counts[signature] = pending_counts.get(signature, 0) + 1
+
+            if loop_violation is not None:
+                tool_call, signature, observed = loop_violation
+                log_runtime_guard_event(
+                    logger,
+                    "tool_loop_detected",
+                    scope="tool",
+                    tool=tool_call.name,
+                    signature=runtime_guard_fingerprint(signature),
+                    step=step + 1,
+                    observed=observed,
+                    limit=repeat_limit,
+                    action="stop",
+                )
+                return _finish(_build_tool_loop_result(
+                    step=step + 1,
+                    tool_name=tool_call.name,
+                    repeat_limit=repeat_limit,
+                    tool_calls_log=tool_calls_log,
+                    total_tokens=total_tokens,
+                    provider_used=provider_used,
+                    models_used=models_used,
+                    messages=messages,
+                ))
+
+            for signature, count in pending_counts.items():
+                identical_tool_call_counts[signature] = (
+                    identical_tool_call_counts.get(signature, 0) + count
+                )
 
             # Append assistant message (with tool_calls) to history
             assistant_msg: Dict[str, Any] = {
@@ -646,7 +753,14 @@ def run_agent_loop(
 
             remaining_timeout = _remaining_timeout_seconds(start_time, max_wall_clock_seconds)
             if remaining_timeout is not None and remaining_timeout <= 0:
-                logger.warning("Agent timed out after tool execution at step %d", step + 1)
+                log_runtime_guard_event(
+                    logger,
+                    "run_timeout",
+                    scope="agent_loop",
+                    phase="after_tool",
+                    step=step + 1,
+                    limit_seconds=float(max_wall_clock_seconds),
+                )
                 return _finish(_build_timeout_result(
                     start_time=start_time,
                     max_wall_clock_seconds=float(max_wall_clock_seconds),
@@ -741,7 +855,16 @@ def _execute_tools(
                     timeout_triggered = True
                     future.cancel()
                     timeout_label = f"{tool_wait_timeout_seconds:.2f}s"
-                    logger.warning("Tool '%s' timed out after %s at step %d", tc.name, timeout_label, step)
+                    log_runtime_guard_event(
+                        logger,
+                        "tool_timeout",
+                        scope="tool",
+                        execution_id=tool_session.execution_id,
+                        tool=tc.name,
+                        step=step,
+                        limit_seconds=round(tool_wait_timeout_seconds, 3),
+                        action="result_fenced",
+                    )
                     result_str = json.dumps({
                         "error": f"Tool execution timed out after {timeout_label}",
                         "timeout": True,
@@ -815,10 +938,19 @@ def _execute_tools(
                 if tool_wait_timeout_seconds is not None
                 else "the configured limit"
             )
-            logger.warning("Tool batch timed out after %s at step %d", timeout_label, step)
             for future, tc_item in futures.items():
                 if future in pending:
                     future.cancel()
+                    log_runtime_guard_event(
+                        logger,
+                        "tool_timeout",
+                        scope="tool",
+                        execution_id=tool_session.execution_id,
+                        tool=tc_item.name,
+                        step=step,
+                        limit_seconds=round(tool_wait_timeout_seconds or 0.0, 3),
+                        action="result_fenced",
+                    )
                     result_str = json.dumps({
                         "error": f"Tool execution timed out after {timeout_label}",
                         "timeout": True,

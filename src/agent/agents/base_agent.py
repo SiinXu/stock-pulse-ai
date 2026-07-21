@@ -135,6 +135,7 @@ class BaseAgent(ABC):
                 stock_scope=ctx.meta.get("stock_scope"),
                 emit_stage_events=False,
                 cancelled_check=cancelled_check,
+                runtime_guard_policy=getattr(self, "runtime_guard_policy", None),
             )
 
             result.tokens_used = loop_result.total_tokens

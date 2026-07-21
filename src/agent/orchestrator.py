@@ -49,6 +49,7 @@ from src.agent.skills.engine import StrategyEngine, StrategyResultStatus
 from src.agent.public_contract import (
     AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
     AGENT_CHAT_FAILURE_MESSAGE,
+    AGENT_EXECUTION_FAILURE_MESSAGE,
     sanitize_agent_diagnostic,
 )
 from src.agent.risk_override import (
@@ -66,6 +67,11 @@ from src.agent.runtime_facts import (
     build_agent_runtime_facts,
 )
 from src.agent.runtime.lifecycle import classify_result_terminal_state
+from src.agent.runtime.guards import (
+    RuntimeGuardPolicy,
+    StageFailurePolicy,
+    log_runtime_guard_event,
+)
 from src.agent.stock_scope import resolve_stock_scope
 from src.agent.stream_events import stream_event
 from src.agent.tools.registry import ToolRegistry
@@ -121,6 +127,7 @@ class AgentOrchestrator:
         mode: str = "standard",
         skill_manager=None,
         config=None,
+        runtime_guard_policy: Optional[RuntimeGuardPolicy] = None,
     ):
         self.tool_registry = tool_registry
         self.llm_adapter = llm_adapter
@@ -132,6 +139,9 @@ class AgentOrchestrator:
         self.skill_manager = skill_manager
         self.config = config
         self.strategy_engine = StrategyEngine()
+        self.runtime_guard_policy = (
+            runtime_guard_policy or RuntimeGuardPolicy.from_sources(config)
+        )
 
     def _get_timeout_seconds(self) -> int:
         """Return the pipeline timeout in seconds.
@@ -307,6 +317,7 @@ class AgentOrchestrator:
             else:
                 # Default or lowered — keep per-agent limit as ceiling.
                 agent.max_steps = min(agent.max_steps, self.max_steps)
+        agent.runtime_guard_policy = self.runtime_guard_policy
         return agent
 
     def _callable_accepts_kwarg(self, func: Any, param_name: str) -> Optional[bool]:
@@ -529,6 +540,7 @@ class AgentOrchestrator:
 
         agents = self._build_agent_chain(ctx)
         specialist_agents_inserted = False
+        stage_entry_counts: Dict[str, int] = {}
         index = 0
 
         # Minimum seconds required for a stage to do useful work.  Starting
@@ -567,7 +579,16 @@ class AgentOrchestrator:
                 and remaining_budget < stage_min_budget_s
             )
             if timeout_exhausted:
-                logger.error("[Orchestrator] pipeline timed out before stage '%s'", agent.agent_name)
+                log_runtime_guard_event(
+                    logger,
+                    "run_timeout",
+                    level=logging.ERROR,
+                    scope="orchestrator",
+                    phase="before_stage",
+                    stage=agent.agent_name,
+                    elapsed_seconds=round(elapsed_s, 3),
+                    limit_seconds=timeout_s,
+                )
                 self._record_degraded_event(
                     ctx,
                     stage=agent.agent_name,
@@ -647,12 +668,48 @@ class AgentOrchestrator:
                     agents[index:index] = specialist_agents
                     continue
 
-            # Run the strategy engine (partition + aggregate) before the decision agent.
-            if agent.agent_name == "decision":
-                self._run_strategy_engine(ctx)
-
-            if agent.agent_name == "decision":
-                self._prepare_decision_context(ctx)
+            stage_name = str(agent.agent_name or "")
+            observed_entries = stage_entry_counts.get(stage_name, 0) + 1
+            stage_entry_limit = self.runtime_guard_policy.max_stage_entries
+            if stage_entry_limit > 0 and observed_entries > stage_entry_limit:
+                log_runtime_guard_event(
+                    logger,
+                    "stage_loop_detected",
+                    level=logging.ERROR,
+                    scope="stage",
+                    stage=stage_name,
+                    observed=observed_entries,
+                    limit=stage_entry_limit,
+                    action="stop",
+                )
+                guard_result = StageResult(
+                    stage_name=stage_name,
+                    status=StageStatus.FAILED,
+                    error="Stage re-entry limit exceeded",
+                    failure_reason=StageFailureReason.LOOP_DETECTED,
+                    meta={"runtime_guard_event": "stage_loop_detected"},
+                )
+                stats.record_stage(guard_result)
+                stats.total_duration_s = round(elapsed_s, 2)
+                stats.models_used = list(dict.fromkeys(models_used))
+                self._record_degraded_event(
+                    ctx,
+                    stage=stage_name,
+                    reason=StageFailureReason.LOOP_DETECTED,
+                    boundary=DegradationBoundary.BEFORE_STAGE,
+                )
+                return OrchestratorResult(
+                    success=False,
+                    error=f"Stage '{stage_name}' exceeded the re-entry limit",
+                    stats=stats,
+                    total_steps=stats.total_stages,
+                    total_tokens=stats.total_tokens,
+                    tool_calls_log=all_tool_calls,
+                    provider=stats.models_used[0] if stats.models_used else "",
+                    model=", ".join(stats.models_used),
+                    runtime_facts=build_agent_runtime_facts(ctx),
+                )
+            stage_entry_counts[stage_name] = observed_entries
 
             if progress_callback:
                 progress_callback(stream_event(
@@ -666,20 +723,79 @@ class AgentOrchestrator:
                 if timeout_s
                 else None
             )
-            result: StageResult = self._run_stage_agent(
-                agent,
-                ctx,
-                progress_callback=progress_callback,
-                timeout_seconds=remaining_timeout_s,
-                cancelled_check=cancelled_check,
-            )
+            stage_started_elapsed_s = elapsed_s
+            try:
+                if stage_name == "decision":
+                    self._run_strategy_engine(ctx)
+                    self._prepare_decision_context(ctx)
+                result: StageResult = self._run_stage_agent(
+                    agent,
+                    ctx,
+                    progress_callback=progress_callback,
+                    timeout_seconds=remaining_timeout_s,
+                    cancelled_check=cancelled_check,
+                )
+                if not isinstance(result, StageResult):
+                    raise TypeError("Stage agent returned an invalid result")
+            except TimeoutError as exc:
+                log_safe_exception(
+                    logger,
+                    "[Orchestrator] stage execution timed out",
+                    exc,
+                    error_code="agent_stage_timeout",
+                    level=logging.WARNING,
+                    context={"stage": stage_name},
+                )
+                log_runtime_guard_event(
+                    logger,
+                    "stage_exception_captured",
+                    scope="stage",
+                    stage=stage_name,
+                    exception_type=type(exc).__name__,
+                    reason=StageFailureReason.TIMEOUT.value,
+                )
+                result = StageResult(
+                    stage_name=stage_name,
+                    status=StageStatus.FAILED,
+                    error=AGENT_EXECUTION_FAILURE_MESSAGE,
+                    failure_reason=StageFailureReason.TIMEOUT,
+                    meta={"runtime_guard_event": "stage_exception_captured"},
+                )
+            except Exception as exc:  # broad-exception: fallback_recorded - Escaped stage failures become typed results at the isolation boundary.
+                log_safe_exception(
+                    logger,
+                    "[Orchestrator] stage execution failed",
+                    exc,
+                    error_code="agent_stage_exception",
+                    level=logging.WARNING,
+                    context={"stage": stage_name},
+                )
+                log_runtime_guard_event(
+                    logger,
+                    "stage_exception_captured",
+                    scope="stage",
+                    stage=stage_name,
+                    exception_type=type(exc).__name__,
+                    reason=StageFailureReason.STAGE_FAILURE.value,
+                )
+                result = StageResult(
+                    stage_name=stage_name,
+                    status=StageStatus.FAILED,
+                    error=AGENT_EXECUTION_FAILURE_MESSAGE,
+                    failure_reason=StageFailureReason.STAGE_FAILURE,
+                    meta={"runtime_guard_event": "stage_exception_captured"},
+                )
+            elapsed_s = time.time() - t0
+            if result.meta.get("runtime_guard_event") == "stage_exception_captured":
+                result.duration_s = round(
+                    max(0.0, elapsed_s - stage_started_elapsed_s),
+                    2,
+                )
             stats.record_stage(result)
             all_tool_calls.extend(
                 tc for tc in (result.meta.get("tool_calls_log") or [])
             )
             models_used.extend(result.meta.get("models_used", []))
-
-            elapsed_s = time.time() - t0
             if progress_callback:
                 progress_callback(stream_event(
                     "stage_done",
@@ -701,35 +817,64 @@ class AgentOrchestrator:
                 if isinstance(final_text, str) and final_text.strip():
                     ctx.set_data("final_response_text", final_text.strip())
 
-            # Abort pipeline on critical failure.
-            # Non-critical stages that degrade gracefully:
-            #   - intel / risk (standard support stages)
-            #   - skill agents (specialist evaluation, optional)
+            # Isolate eligible support-stage failures unless fail-fast is explicit.
             if result.status == StageStatus.FAILED:
-                if not self._is_non_critical_stage(agent.agent_name):
-                    logger.error(
-                        "[Orchestrator] critical stage '%s' failed: diagnostic=%s",
-                        agent.agent_name,
-                        sanitize_agent_diagnostic(result.error),
+                failure_reason = normalize_stage_failure_reason(result.failure_reason)
+                if failure_reason == StageFailureReason.TIMEOUT:
+                    log_runtime_guard_event(
+                        logger,
+                        "stage_timeout",
+                        scope="stage",
+                        stage=stage_name,
+                        limit_seconds=remaining_timeout_s,
+                    )
+                should_isolate = (
+                    self.runtime_guard_policy.stage_failure_policy
+                    == StageFailurePolicy.ISOLATE
+                    and self._is_non_critical_stage(stage_name)
+                )
+                if not should_isolate:
+                    log_runtime_guard_event(
+                        logger,
+                        "stage_failure_fail_fast",
+                        level=logging.ERROR,
+                        scope="stage",
+                        stage=stage_name,
+                        reason=failure_reason.value,
+                        policy=self.runtime_guard_policy.stage_failure_policy.value,
+                        action="stop",
                     )
                     return OrchestratorResult(
                         success=False,
-                        error=f"Stage '{agent.agent_name}' failed",
+                        error=f"Stage '{stage_name}' failed",
                         stats=stats,
                         total_tokens=stats.total_tokens,
                         tool_calls_log=all_tool_calls,
                         runtime_facts=build_agent_runtime_facts(ctx),
                     )
                 else:
-                    self._record_degraded_stage(ctx, agent.agent_name, result)
-                    logger.warning(
-                        "[Orchestrator] stage '%s' failed (non-critical, degrading): diagnostic=%s",
-                        agent.agent_name,
-                        sanitize_agent_diagnostic(result.error),
+                    self._record_degraded_stage(ctx, stage_name, result)
+                    log_runtime_guard_event(
+                        logger,
+                        "stage_failure_isolated",
+                        scope="stage",
+                        stage=stage_name,
+                        reason=failure_reason.value,
+                        policy=self.runtime_guard_policy.stage_failure_policy.value,
+                        action="continue",
                     )
 
             if timeout_s and elapsed_s >= timeout_s:
-                logger.error("[Orchestrator] pipeline timed out after stage '%s'", agent.agent_name)
+                log_runtime_guard_event(
+                    logger,
+                    "run_timeout",
+                    level=logging.ERROR,
+                    scope="orchestrator",
+                    phase="after_stage",
+                    stage=stage_name,
+                    elapsed_seconds=round(elapsed_s, 3),
+                    limit_seconds=timeout_s,
+                )
                 last_completed_stage = next(
                     (
                         stage.stage_name

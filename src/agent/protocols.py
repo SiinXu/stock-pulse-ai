@@ -126,6 +126,7 @@ class StageFailureReason(str, Enum):
     STAGE_FAILURE = "stage_failure"
     TIMEOUT = "timeout"
     BUDGET_SKIP = "budget_skip"
+    LOOP_DETECTED = "loop_detected"
 
 
 def normalize_stage_failure_reason(reason: Any) -> StageFailureReason:
@@ -135,6 +136,8 @@ def normalize_stage_failure_reason(reason: Any) -> StageFailureReason:
         return StageFailureReason.TIMEOUT
     if normalized == StageFailureReason.BUDGET_SKIP.value:
         return StageFailureReason.BUDGET_SKIP
+    if normalized == StageFailureReason.LOOP_DETECTED.value:
+        return StageFailureReason.LOOP_DETECTED
     return StageFailureReason.STAGE_FAILURE
 
 
