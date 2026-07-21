@@ -81,7 +81,7 @@ responsive-design guards use that inventory so exclusions cannot drift between t
 The architecture guard parses static imports, re-exports, import types, dynamic imports, and
 `require()` calls with the TypeScript AST. It resolves relative imports to the production inventory
 and compares every violation with an exact allowance ledger. Each allowance records its owner and
-removal condition. The current maximum is eight; a new edge fails even if it resembles existing
+removal condition. The current maximum is four; a new edge fails even if it resembles existing
 debt.
 
 The production design guard separately caps existing caller-specific exceptions:
@@ -98,15 +98,18 @@ another or broaden an exact path/token entry into a directory-wide exclusion.
 
 ## Known Migration Ledger
 
-The executable allowance list is authoritative. At the time this contract was introduced, it
-contains these migration groups:
+The executable allowance list is authoritative. The current ledger contains these migration
+groups:
 
-| Existing edge | Count | Removal path |
+| Current edge | Count | Removal path |
 | --- | ---: | --- |
-| `components/common/index.ts` re-exports layout/theme owners | 4 | Import those owners directly and remove the foreign exports. |
 | `hooks/useRouteFocusTarget.ts` imports and re-exports a routing-owned context contract | 2 | Move the context contract to neutral `contexts/` ownership. |
 | `utils/connectionSchemaAuthority.ts` imports a Settings-owned field-key contract | 1 | Move the pure field-key contract to `utils/`. |
 | `hooks/useSystemConfig.ts` imports Settings subcategory policy | 1 | Extract the cohesive policy in a dedicated Settings contract change. |
+
+W2a introduced the guard with eight allowances. W2b resolved four by removing the foreign
+layout/theme re-exports from `components/common/index.ts`; it also removed the unused stores facade
+and analysis store. Runtime consumers now import their layout, theme, and stock-pool owners directly.
 
 The Settings exception is intentionally deferred. It spans configuration schema grouping, route
 selection, page navigation, and tests; moving it safely requires a focused behavioral slice rather

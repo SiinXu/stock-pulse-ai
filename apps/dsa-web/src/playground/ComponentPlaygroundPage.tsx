@@ -18,9 +18,9 @@ import {
   SegmentedControl,
   Select,
   StatusDot,
-  ThemeToggle,
 } from '../components/common';
 import { UiLanguageToggle } from '../components/i18n/UiLanguageToggle';
+import { ThemeToggle } from '../components/theme/ThemeToggle';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText } from '../i18n/uiText';
 import { PLAYGROUND_TEXT } from '../locales/playground';

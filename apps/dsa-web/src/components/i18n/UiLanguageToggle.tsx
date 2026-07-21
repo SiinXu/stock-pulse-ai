@@ -3,7 +3,7 @@ import { Languages } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { UI_LANGUAGES, UI_LANGUAGE_METADATA, type UiLanguage } from '../../i18n/uiLanguages';
 import { cn } from '../../utils/cn';
-import { Select } from '../common';
+import { Select } from '../common/Select';
 
 type UiLanguageToggleVariant = 'default' | 'nav' | 'rail';
 
