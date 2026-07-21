@@ -167,6 +167,22 @@ curl -X POST {DSA_BASE_URL}/api/v1/agent/chat \
 
 响应包含 `content`（分析结论）和 `session_id`（用于多轮对话）。
 
+Agent Chat 会在首轮消息中直接识别并规范化 A 股、港股和美股代码，例如 `600519`、`hk00700` / `00700.HK`、`AAPL`；调用股票范围工具时分别使用 `600519`、`HK00700`、`AAPL`。同一个 `session_id` 的后续问题会从已持久化的用户消息恢复当前单一标的；使用“改看 / 换成 / analyze”等明确切换语句可更新当前标的，比较语句则允许本轮引用多个规范代码而不把其他市场静默当作 A 股。
+
+每轮 prompt 会提供对应市场的计价货币、交易时区和重点字段：A 股为 CNY / `Asia/Shanghai`，港股为 HKD / `Asia/Hong_Kong`，美股为 USD / `America/New_York`（含常规、盘前和盘后字段）。若 provider 或工具未覆盖某个市场或字段，Agent 必须明确说明限制并基于已有数据继续，不得编造数据或用 A 股默认值补齐。非流式 `/chat` 与流式 `/chat/stream` 共用该后端上下文和工具 scope 契约。
+
+```bash
+# 港股首轮查询；后续请求复用响应中的 session_id
+curl -X POST {DSA_BASE_URL}/api/v1/agent/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"message": "分析 00700.HK", "session_id": "market-demo"}'
+
+# 同一会话切换到美股
+curl -X POST {DSA_BASE_URL}/api/v1/agent/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"message": "改看 AAPL", "session_id": "market-demo"}'
+```
+
 ## 故障排查
 
 | 现象 | 可能原因 | 处理建议 |

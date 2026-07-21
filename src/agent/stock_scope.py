@@ -7,6 +7,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Set
 
+from src.services.stock_code_utils import canonicalize_analysis_stock_code
+
 
 SWITCH_CLEANUP_KEYS = {
     "stock_name",
@@ -31,7 +33,16 @@ _CHOICE_COMPARE_PATTERN = re.compile(r"哪个|哪只|哪一个|谁更|更值得|
 _LINKED_COMPARE_PATTERN = re.compile(
     r"(?:和|与|跟|同)(?P<body>[^，。,.!?！？]{0,40})(?:差异(?!化)|区别|不同|相比|对照|比一比)"
 )
-_SWITCH_PATTERN = re.compile(r"换成|改看|分析|看看|研究|诊断")
+_SWITCH_PATTERN = re.compile(
+    r"换成|改看|分析|看看|研究|诊断|\b(?:analy[sz]e|switch(?:\s+to)?|look\s+at|review)\b",
+    re.IGNORECASE,
+)
+_LOWERCASE_SCAN_HINT_PATTERN = re.compile(r"换成|改看|分析|看看|研究|诊断")
+_ENGLISH_SWITCH_TICKER_PATTERN = re.compile(
+    r"\b(?:analy[sz]e|switch(?:\s+to)?|look\s+at|review)\s+"
+    r"([a-z]{2,5}(?:\.[a-z]{1,2})?)\b",
+    re.IGNORECASE,
+)
 _LOWERCASE_TICKER_PATTERN = re.compile(r"(?<![a-zA-Z.])([a-z]{2,5}(?:\.[a-z]{1,2})?)(?![a-zA-Z0-9])")
 _EXCHANGE_TOKEN_CANDIDATES = {"SH", "SZ", "BJ", "HK", "SS"}
 _CONTEXTUAL_INDICATOR_TOKENS = {"MA"}
@@ -66,19 +77,13 @@ class StockScopeResolution:
 
 
 def _normalize_stock_code(value: Any) -> str:
-    """Normalize a code with the runner's canonical stock-code rules."""
+    """Normalize a code with the shared analysis canonicalizer."""
     if not isinstance(value, str):
         return ""
     text = value.strip()
     if not text:
         return ""
-    try:
-        from src.agent.tools.execution import _normalize_tool_stock_code
-
-        normalized = _normalize_tool_stock_code(text)
-    except Exception:
-        normalized = text.strip().upper()
-    return normalized if isinstance(normalized, str) else str(normalized)
+    return canonicalize_analysis_stock_code(text) or ""
 
 
 def _is_denied_candidate(candidate: str, text: str = "") -> bool:
@@ -114,6 +119,10 @@ def extract_stock_codes(text: str) -> List[str]:
         (r"(?<![a-zA-Z])(?:SH|SZ|BJ)\d{6}(?!\d)", re.IGNORECASE),
         (r"(?<![a-zA-Z])hk\d{4,5}(?!\d)", re.IGNORECASE),
         (r"(?<![a-zA-Z])\d{1,5}\.HK(?![a-zA-Z])", re.IGNORECASE),
+        (
+            r"(?<![a-zA-Z0-9.])\d{4,6}\.(?:T|KS|KQ|TW|TWO)(?![a-zA-Z0-9])",
+            re.IGNORECASE,
+        ),
         (r"(?<!\d)(?:[03648]\d{5}|92\d{4})(?!\d)", 0),
         (r"(?<!\d)\d{5}(?!\d)", 0),
         (r"(?<![a-zA-Z.])([A-Z]{2,5}(?:\.[A-Z]{1,2})?)(?![a-zA-Z0-9])", 0),
@@ -122,11 +131,19 @@ def extract_stock_codes(text: str) -> List[str]:
             raw = match.group(1) if match.lastindex else match.group(0)
             _append_candidate(candidates, raw, text)
 
+    for match in _ENGLISH_SWITCH_TICKER_PATTERN.finditer(text):
+        _append_candidate(candidates, match.group(1), text)
+
+    bare_lowercase_ticker = re.fullmatch(
+        r"[a-z]{2,5}(?:\.[a-z]{1,2})?",
+        text.strip(),
+    )
     if (
-        _SWITCH_PATTERN.search(text)
+        _LOWERCASE_SCAN_HINT_PATTERN.search(text)
         or _STRONG_COMPARE_PATTERN.search(text)
         or _WEAK_COMPARE_HINT_PATTERN.search(text)
         or _CHOICE_COMPARE_PATTERN.search(text)
+        or bare_lowercase_ticker
     ):
         for match in _LOWERCASE_TICKER_PATTERN.finditer(text):
             _append_candidate(candidates, match.group(1), text)
@@ -194,12 +211,12 @@ def resolve_stock_scope(
         current_code = ""
 
     if not current_code:
-        if invalid_context_code:
-            candidates = extract_stock_codes(message_text)
+        candidates = extract_stock_codes(message_text)
+        if candidates:
             allowed = set(candidates)
             expected = candidates[0] if len(candidates) == 1 else ""
             effective_context = dict(original_context)
-            mode = "switch" if expected else ("compare" if len(candidates) > 1 else "maintain")
+            mode = "switch" if expected else "compare"
             if expected:
                 effective_context["stock_code"] = expected
                 effective_context["stock_name"] = ""
@@ -210,6 +227,11 @@ def resolve_stock_scope(
                     allowed_stock_codes=allowed,
                     mode=mode,
                 ),
+            )
+        if invalid_context_code:
+            return StockScopeResolution(
+                effective_context=_with_skills(original_context, skills),
+                stock_scope=StockScope(),
             )
         return StockScopeResolution(
             effective_context=_with_skills(original_context, skills),

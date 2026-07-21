@@ -164,6 +164,8 @@ class BotCommand(ABC):
 
 `/analyze` continues to submit through the shared `AnalysisTaskQueue`; market normalization does not create a separate Bot task lifecycle or change Task IDs, in-flight deduplication, statuses, or notification reply targets.
 
+`/chat` detects A-share, Hong Kong, and US symbols in the first message and canonicalizes `00700.HK` / `hk00700` as `HK00700`. Follow-up questions in the same Bot conversation restore the active symbol; explicit phrases such as `switch to AAPL` change it, while comparison questions scope tools only to the symbols named in that turn. Agent prompts include the applicable market rules, quote currency, timezone, and market-specific fields. Missing provider or tool coverage is reported explicitly instead of being filled with A-share defaults.
+
 ---
 
 ## 5. `/status` and LLM configuration diagnostics

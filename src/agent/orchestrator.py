@@ -36,7 +36,10 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 from dataclasses import dataclass, field, fields as dataclass_fields
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
-from src.agent.chat_context import build_visible_chat_history
+from src.agent.chat_context import (
+    build_agent_chat_market_context,
+    build_visible_chat_history,
+)
 from src.agent.dashboard_payload import sanitize_agent_dashboard_payload
 from src.agent.disagreement import build_agent_disagreement_summary
 from src.agent.llm_adapter import LLMToolAdapter
@@ -564,16 +567,30 @@ class AgentOrchestrator:
         from src.agent.executor import AgentResult
         from src.agent.conversation import conversation_manager
 
-        scope_resolution = resolve_stock_scope(message, context)
+        session = conversation_manager.get_or_create(session_id)
+        stored_context = session.get_market_context()
+        resolution_context = dict(stored_context) if isinstance(stored_context, dict) else {}
+        resolution_context.update(context or {})
+        scope_resolution = resolve_stock_scope(message, resolution_context)
+        session.update_market_context(scope_resolution.effective_context)
         ctx = self._build_context(message, scope_resolution.effective_context)
         ctx.session_id = session_id
         ctx.meta["response_mode"] = "chat"
         if scope_resolution.stock_scope is not None:
             ctx.meta["stock_scope"] = scope_resolution.stock_scope
 
-        conversation_manager.get_or_create(session_id)
         config = self.config or getattr(self.llm_adapter, "_config", None) or get_config()
         history = build_visible_chat_history(session_id, self.llm_adapter, config)
+        market_context = build_agent_chat_market_context(
+            scope_resolution.effective_context,
+            scope_resolution.stock_scope,
+            ctx.meta.get("report_language", "zh"),
+        )
+        if market_context.prompt_section:
+            history.insert(
+                0,
+                {"role": "user", "content": market_context.prompt_section},
+            )
         if history:
             ctx.meta["conversation_history"] = history
 
@@ -588,6 +605,7 @@ class AgentOrchestrator:
                 cancelled_check=cancelled_check,
             )
         except Exception as exc:
+            # broad-exception: fallback_recorded - Safe log and failure sentinel preserve the Chat boundary.
             log_safe_exception(
                 logger,
                 "Agent orchestrator chat raised",

@@ -189,6 +189,8 @@ class CommandDispatcher:
 
 | /ask | 问股 | 使用 Agent 技能分析一只或多只股票 | `/ask HK00700`、`/ask 600519,AAPL trend` |
 
+| /chat | 对话 | 多轮策略问股（保留会话上下文） | `/chat 分析 HK00700`、`/chat analyze AAPL` |
+
 | /market | /m, 大盘 | 大盘复盘 | `/market` |
 
 | /batch | /b, 批量 | 批量分析自选股 | `/batch` |
@@ -200,6 +202,8 @@ class CommandDispatcher:
 股票代码格式：A 股支持 6 位代码及常见交易所形式（如 `600519`、`SH600519`）；港股支持 5 位代码、`HK` 前缀或 `.HK` 后缀（如 `00700`、`HK00700`、`00700.HK`），进入分析队列时统一为 `HK00700`；美股使用 `AAPL`、`BRK.B` 等 ticker。`/analyze` 与 `/ask` 遇到无效代码或当前 Bot 命令暂不支持的市场时，会返回中英双语的可行动格式提示。
 
 `/analyze` 仍统一提交到 `AnalysisTaskQueue`；多市场归一化不会新增 Bot 专属任务生命周期，也不会改变 Task ID、进行中去重、状态枚举或通知回复目标。
+
+`/chat` 会从首轮消息识别 A 股、港股和美股代码，并把 `00700.HK` / `hk00700` 统一为 `HK00700`。同一 Bot 会话的后续问题会恢复当前标的；“改看 AAPL”或“switch to AAPL”等明确语句会切换标的，比较问题则只在本轮开放明确出现的多个代码。Agent prompt 会带入对应市场的交易规则、计价货币、时区和专属字段；工具或数据源缺少覆盖时会明确说明限制，不会用 A 股默认值补齐。
 
 ## 五、`/status` 与模型配置诊断说明
 

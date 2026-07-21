@@ -21,7 +21,10 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from src.config import get_config
-from src.agent.chat_context import build_agent_chat_context_bundle
+from src.agent.chat_context import (
+    build_agent_chat_context_bundle,
+    build_agent_chat_market_context,
+)
 from src.agent.llm_adapter import LLMToolAdapter
 from src.agent.provider_trace import extract_provider_trace_turns
 from src.agent.public_contract import (
@@ -613,8 +616,13 @@ class AgentExecutor:
         """
         from src.agent.conversation import conversation_manager
 
-        scope_resolution = resolve_stock_scope(message, context)
+        session = conversation_manager.get_or_create(session_id)
+        stored_context = session.get_market_context()
+        resolution_context = dict(stored_context) if isinstance(stored_context, dict) else {}
+        resolution_context.update(context or {})
+        scope_resolution = resolve_stock_scope(message, resolution_context)
         context = scope_resolution.effective_context
+        session.update_market_context(context)
 
         # Build system prompt with skills
         skills_section = ""
@@ -624,17 +632,19 @@ class AgentExecutor:
         if self.default_skill_policy:
             default_skill_policy_section = f"\n{self.default_skill_policy}\n"
         report_language = normalize_report_language((context or {}).get("report_language", "zh"))
-        stock_code = (context or {}).get("stock_code", "")
-        market_role = get_market_role(stock_code, report_language)
-        market_guidelines = get_market_guidelines(stock_code, report_language)
+        market_context = build_agent_chat_market_context(
+            context,
+            scope_resolution.stock_scope,
+            report_language,
+        )
         prompt_template = (
             LEGACY_DEFAULT_CHAT_SYSTEM_PROMPT
             if self.use_legacy_default_prompt
             else CHAT_SYSTEM_PROMPT
         )
         system_prompt = prompt_template.format(
-            market_role=market_role,
-            market_guidelines=market_guidelines,
+            market_role=market_context.market_role,
+            market_guidelines=market_context.market_guidelines,
             default_skill_policy_section=default_skill_policy_section,
             skills_section=skills_section,
             language_section=_build_language_section(report_language, chat_mode=True),
@@ -644,7 +654,6 @@ class AgentExecutor:
         tool_decls = self.tool_registry.to_openai_tools()
 
         # Get conversation history
-        conversation_manager.get_or_create(session_id)
         config = getattr(self.llm_adapter, "_config", None) or get_config()
         bundle = build_agent_chat_context_bundle(session_id, self.llm_adapter, config)
 
@@ -655,8 +664,10 @@ class AgentExecutor:
         messages.extend(bundle.context_messages)
 
         # Inject previous analysis context if provided (data reuse from report follow-up)
+        context_parts = []
+        if market_context.prompt_section:
+            context_parts.append(market_context.prompt_section)
         if context:
-            context_parts = []
             if context.get("stock_code"):
                 context_parts.append(f"股票代码: {context['stock_code']}")
             if context.get("stock_name"):
@@ -685,10 +696,10 @@ class AgentExecutor:
             )
             if market_structure_section:
                 context_parts.append(market_structure_section.strip())
-            if context_parts:
-                context_msg = "[系统提供的历史分析上下文，可供参考对比]\n" + "\n".join(context_parts)
-                messages.append({"role": "user", "content": context_msg})
-                messages.append({"role": "assistant", "content": "好的，我已了解该股票的历史分析数据。请告诉我你想了解什么？"})
+        if context_parts:
+            context_msg = "[系统提供的历史分析上下文，可供参考对比]\n" + "\n".join(context_parts)
+            messages.append({"role": "user", "content": context_msg})
+            messages.append({"role": "assistant", "content": "好的，我已了解该股票的历史分析数据。请告诉我你想了解什么？"})
 
         messages.append({"role": "user", "content": message})
         baseline_len = len(messages)
@@ -707,6 +718,7 @@ class AgentExecutor:
                 cancelled_check=cancelled_check,
             )
         except Exception as exc:
+            # broad-exception: fallback_recorded - Safe log and failure sentinel preserve the Chat boundary.
             log_safe_exception(
                 logger,
                 "Agent chat execution raised",
