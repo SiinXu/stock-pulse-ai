@@ -49,9 +49,6 @@ _SWITCH_PATTERN = re.compile(
     r"换成|改看|分析|看看|研究|诊断|\b(?:analy[sz]e|switch(?:\s+to)?|look\s+at|review)\b",
     re.IGNORECASE,
 )
-_LOWERCASE_SCAN_HINT_PATTERN = re.compile(
-    r"换成|改看|分析|看看|研究|诊断|比较|对比|和[^，。,.!?！？]{0,40}比"
-)
 _ENGLISH_EXPLICIT_TICKER_PATTERN = re.compile(
     r"(?i:^\s*(?:analy[sz]e|switch(?:\s+to)?|look\s+at|review)\s+)"
     r"([A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?)(?![A-Za-z0-9._/\\-])"
@@ -60,57 +57,70 @@ _CJK_EXPLICIT_TICKER_PATTERN = re.compile(
     r"^\s*(?:换成|改看|分析|看看|研究|诊断)\s*"
     r"([A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?)(?![A-Za-z0-9._/\\-])"
 )
-_EXPLICIT_COMPARE_PAIR_PATTERN = re.compile(
-    r"(?<![A-Za-z0-9._/\\-])([a-z]{1,5}(?:\.[a-z]{1,2})?)\s*"
-    r"(?:vs\.?|versus|和|与|跟)\s*"
-    r"([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![A-Za-z0-9._/\\-])",
-    re.IGNORECASE,
-)
-_ENGLISH_AND_COMPARE_PAIR_PATTERN = re.compile(
-    r"\bcompare\s+([a-z]{1,5}(?:\.[a-z]{1,2})?)\s+and\s+"
-    r"([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![A-Za-z0-9._/\\-])",
-    re.IGNORECASE,
-)
-_ENGLISH_COMPARISON_LEFT_TOKEN = (
-    r"(?i:(?:[a-z]{1,5}(?:\.[a-z]{1,2})?|"
-    r"(?:sh|sz|ss|bj|hk)\.?\d+|"
-    r"\d+(?:\.(?:sh|sz|ss|bj|hk|us|t|ks|kq|tw|two))?))"
-)
-_EXPLICIT_SINGLE_TICKER_COMPARE_PATTERNS = (
-    re.compile(
-        r"(?<![A-Za-z0-9._/\\-])([A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?)\s*"
-        r"(?:vs\.?|versus|和|与|跟)"
-    ),
-    re.compile(
-        r"(?:vs\.?|versus|和|与|跟)\s*"
-        r"([A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?)(?![A-Za-z0-9._/\\-])"
-    ),
-    re.compile(
-        r"(?i:\bcompar(?:e|ed))\s+"
-        r"([A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?)\s+"
-        r"(?i:and|with)\b"
-    ),
-    re.compile(
-        r"(?i:\bcompar(?:e|ed))\s+"
-        + _ENGLISH_COMPARISON_LEFT_TOKEN
-        + r"\s+(?i:and|with)\s+"
-        r"([A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?)(?![A-Za-z0-9._/\\-])",
-    ),
-    re.compile(
-        r"(?i:\bcompar(?:e|ed))\s+(?:(?i:it)\s+)?"
-        r"(?i:and|with)\s+"
-        r"([A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?)(?![A-Za-z0-9._/\\-])",
-    ),
-)
-_LOWERCASE_TICKER_PATTERN = re.compile(
-    r"(?<![A-Za-z0-9._/\\-])([a-z]{1,5}(?:\.[a-z]{1,2})?)"
-    r"(?![A-Za-z0-9._/\\-])"
-)
 _EXCHANGE_QUALIFIED_TOKEN_PATTERN = re.compile(
-    r"(?<![A-Za-z0-9._/\\-])(?:"
+    r"(?<![A-Za-z0-9._/:\\-])(?:"
     r"(?:SH|SZ|SS|BJ|HK)\.?\d+|"
     r"\d+\.(?:SH|SZ|SS|BJ|HK|US|T|KS|KQ|TW|TWO)"
-    r")(?![A-Za-z0-9._/\\-])",
+    r")(?![A-Za-z0-9._/:\\-])",
+    re.IGNORECASE,
+)
+_RAW_SYMBOL_TOKEN = r"[A-Za-z0-9][A-Za-z0-9._/:\\-]*"
+_EXPLICIT_COMMAND_RAW_SLOT_PATTERNS = (
+    re.compile(
+        r"^\s*(?:analy[sz]e|switch(?:\s+to)?|look\s+at|review)\s+"
+        rf"(?P<slot>{_RAW_SYMBOL_TOKEN})",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"^\s*(?:换成|改看|分析|看看|研究|诊断)\s*"
+        rf"(?P<slot>{_RAW_SYMBOL_TOKEN})",
+    ),
+)
+_EXPLICIT_ENGLISH_RAW_COMPARE_PAIR_PATTERN = re.compile(
+    rf"\bcompare\s+(?P<left>{_RAW_SYMBOL_TOKEN})\s+"
+    rf"(?:and|with)\s+(?P<right>{_RAW_SYMBOL_TOKEN})",
+    re.IGNORECASE,
+)
+_EXPLICIT_RAW_CONNECTOR_PAIR_PATTERN = re.compile(
+    rf"(?<![A-Za-z0-9._/:\\-])(?P<left>{_RAW_SYMBOL_TOKEN})\s*"
+    rf"(?:vs\.?|versus|和|与|跟)\s*(?P<right>{_RAW_SYMBOL_TOKEN})"
+    rf"(?![A-Za-z0-9._/:\\-])",
+    re.IGNORECASE,
+)
+_ACTIVE_COMPARE_RAW_SLOT_PATTERN = re.compile(
+    rf"\bcompar(?:e|ed)\s+(?:(?:it)\s+)?with\s+"
+    rf"(?P<slot>{_RAW_SYMBOL_TOKEN})",
+    re.IGNORECASE,
+)
+_INFIX_ENGLISH_RAW_COMPARE_PAIR_PATTERN = re.compile(
+    rf"(?<![A-Za-z0-9._/:\\-])(?P<left>{_RAW_SYMBOL_TOKEN})\s+"
+    rf"compar(?:e|ed)\s+with\s+(?P<right>{_RAW_SYMBOL_TOKEN})"
+    rf"(?![A-Za-z0-9._/:\\-])",
+    re.IGNORECASE,
+)
+_LEADING_COMPARE_RAW_SLOT_PATTERN = re.compile(
+    rf"^\s*(?:vs\.?|versus)\s+(?P<slot>{_RAW_SYMBOL_TOKEN})",
+    re.IGNORECASE,
+)
+_LETTER_SYMBOL_TOKEN_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9._/:\\-])"
+    r"(?P<slot>[A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?)"
+    r"(?![A-Za-z0-9._/:\\-])"
+)
+_WEAK_STOCK_QUESTION_PATTERN = re.compile(
+    r"\b(?:what\s+about|doing|worth|outlook|buy|sell|hold|earnings?|"
+    r"valuation|fundamentals?|news|comments?|filing|guidance|explain|"
+    r"say|says|said|think|"
+    r"looks?|expensive|cheap|trend)\b|"
+    r"怎么样|怎么走|怎么看|走势|股价|估值|基本面|新闻|能买吗|前景|展望",
+    re.IGNORECASE,
+)
+_WEAK_SINGLE_LETTER_DENY = {"A", "I"}
+_SPACED_EXCHANGE_TOKEN_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9._/:\\-])(?:"
+    r"(?P<prefix>SH|SZ|SS|BJ|HK)\s+(?P<prefix_digits>\d{1,6})|"
+    r"(?P<suffix_digits>\d{1,6})\s+(?P<suffix>SH|SZ|SS|BJ|HK)"
+    r")(?![A-Za-z0-9._/:\\-])",
     re.IGNORECASE,
 )
 _EXCHANGE_TOKEN_CANDIDATES = {"SH", "SZ", "BJ", "HK", "SS"}
@@ -164,6 +174,16 @@ class StockScopeResolution:
 
     effective_context: Dict[str, Any]
     stock_scope: Optional[StockScope]
+
+
+@dataclass(frozen=True)
+class _StockCodeExtraction:
+    """Internal symbol candidates plus the evidence governing scope changes."""
+
+    stock_codes: tuple[str, ...] = ()
+    switch_evidence: bool = False
+    compare_evidence: bool = False
+    malformed_explicit_slot: bool = False
 
 
 def _normalize_stock_code(value: Any) -> str:
@@ -240,9 +260,7 @@ def _append_indexed_slot_candidate(
         candidates,
         candidate,
         text,
-        explicit=(
-            explicit and normalized in _EXPLICIT_TICKER_COLLISIONS
-        ),
+        explicit=explicit,
     )
 
 
@@ -254,7 +272,11 @@ def _append_explicit_slot_candidate(
     explicit: bool,
 ) -> None:
     """Route non-uppercase slots through the index-backed evidence policy."""
-    if candidate.isupper():
+    normalized = _normalize_stock_code(candidate)
+    has_numeric_identity = bool(
+        normalized and any(character.isdigit() for character in candidate)
+    )
+    if candidate.isupper() or has_numeric_identity:
         _append_candidate(
             candidates,
             candidate,
@@ -270,13 +292,122 @@ def _append_explicit_slot_candidate(
     )
 
 
-def _is_explicit_command_slot(text: str, match: re.Match[str]) -> bool:
-    """Keep indicator prose out of otherwise explicit ticker slots."""
-    token = match.group(1).strip().upper()
-    trailing_text = text[match.end(1):]
-    return not (
-        token in _ALWAYS_DENIED_TICKER_CANDIDATES
-        and _INDICATOR_CONTEXT_PATTERN.search(trailing_text)
+def _classify_explicit_slot(candidate: str, text: str) -> str:
+    """Classify a raw explicit slot as valid, ordinary topic, or malformed."""
+    normalized = _normalize_stock_code(candidate)
+    if normalized:
+        accepted: List[str] = []
+        _append_explicit_slot_candidate(
+            accepted,
+            candidate,
+            text,
+            explicit=True,
+        )
+        if accepted:
+            return "valid"
+
+    has_separator_or_digit = any(
+        character.isdigit() or character in ".-_/\\:"
+        for character in candidate
+    )
+    if has_separator_or_digit:
+        return "malformed"
+    if candidate != candidate.lower() and candidate != candidate.upper():
+        return "malformed"
+    return "topic"
+
+
+def _is_indicator_command_topic(text: str, slot: str, slot_end: int) -> bool:
+    return bool(
+        slot.upper() in _ALWAYS_DENIED_TICKER_CANDIDATES
+        and _INDICATOR_CONTEXT_PATTERN.search(text[slot_end:])
+    )
+
+
+def _is_compare_pronoun(slot: str) -> bool:
+    """Keep English pronouns out of explicit comparison symbol slots."""
+    lowered = slot.lower()
+    return lowered == "i" or (lowered == "it" and slot != "IT")
+
+
+def _has_malformed_explicit_stock_request(text: str) -> bool:
+    """Detect explicit malformed slots before stale context can be reused."""
+    for match in _SPACED_EXCHANGE_TOKEN_PATTERN.finditer(text):
+        if match.group("prefix"):
+            candidate = match.group("prefix") + match.group("prefix_digits")
+        else:
+            candidate = match.group("suffix_digits") + "." + match.group("suffix")
+        if not _normalize_stock_code(candidate):
+            return True
+
+    for pattern in _EXPLICIT_COMMAND_RAW_SLOT_PATTERNS:
+        match = pattern.search(text)
+        if match is None:
+            continue
+        slot = match.group("slot")
+        if _is_indicator_command_topic(text, slot, match.end("slot")):
+            return False
+        return _classify_explicit_slot(slot, text) == "malformed"
+
+    pair_matches = list(_EXPLICIT_ENGLISH_RAW_COMPARE_PAIR_PATTERN.finditer(text))
+    pair_matches.extend(_EXPLICIT_RAW_CONNECTOR_PAIR_PATTERN.finditer(text))
+    for match in pair_matches:
+        left = match.group("left")
+        right = match.group("right")
+        if _is_spaced_exchange_affix(
+            text,
+            left,
+            match.start("left"),
+        ) or _is_spaced_exchange_affix(
+            text,
+            right,
+            match.start("right"),
+        ):
+            continue
+        left_is_pronoun = _is_compare_pronoun(left)
+        right_is_pronoun = _is_compare_pronoun(right)
+        if left_is_pronoun or right_is_pronoun:
+            other = right if left_is_pronoun else left
+            if _classify_explicit_slot(other, text) == "malformed":
+                return True
+            continue
+        statuses = {
+            _classify_explicit_slot(left, text),
+            _classify_explicit_slot(right, text),
+        }
+        if "malformed" in statuses:
+            return True
+        if statuses == {"topic", "valid"}:
+            return True
+
+    for match in _ACTIVE_COMPARE_RAW_SLOT_PATTERN.finditer(text):
+        if _classify_explicit_slot(match.group("slot"), text) == "malformed":
+            return True
+    return False
+
+
+def _append_comparison_operand(
+    candidates: List[str],
+    candidate: str,
+    text: str,
+    candidate_start: int,
+) -> None:
+    """Append one explicit operand, folding a spaced exchange affix."""
+    if _is_spaced_exchange_affix(text, candidate, candidate_start):
+        numeric = re.search(r"(?<!\d)(\d{5,6})\s+$", text[:candidate_start])
+        if numeric is not None:
+            _append_explicit_slot_candidate(
+                candidates,
+                numeric.group(1),
+                text,
+                explicit=True,
+            )
+        return
+    _append_explicit_slot_candidate(
+        candidates,
+        candidate,
+        text,
+        explicit=True,
     )
 
 
@@ -319,121 +450,188 @@ def _is_spaced_exchange_affix(
     )
 
 
-def extract_stock_codes(text: str) -> List[str]:
-    """Extract all explicit stock-code candidates from free text."""
+def _extract_stock_code_evidence(text: str) -> _StockCodeExtraction:
+    """Extract candidates while preserving the evidence that authorizes scope."""
     if not text:
-        return []
+        return _StockCodeExtraction()
+    if _has_malformed_explicit_stock_request(text):
+        return _StockCodeExtraction(malformed_explicit_slot=True)
 
-    candidates: List[str] = []
+    weak_candidates: List[str] = []
     qualified_spans = []
     for match in _EXCHANGE_QUALIFIED_TOKEN_PATTERN.finditer(text):
         qualified_spans.append(match.span())
-        _append_candidate(candidates, match.group(0), text)
+        _append_candidate(weak_candidates, match.group(0), text)
 
-    for pattern, flags in (
+    for pattern in (
         (
             r"(?<![A-Za-z0-9._/\\-])(?:[03648]\d{5}|92\d{4})"
-            r"(?![A-Za-z0-9._/\\-])",
-            0,
+            r"(?![A-Za-z0-9._/\\-])"
         ),
         (
-            r"(?<![A-Za-z0-9._/\\-])\d{5}(?![A-Za-z0-9._/\\-])",
-            0,
-        ),
-        (
-            r"(?<![A-Za-z0-9._/\\-])"
-            r"([A-Z]{2,5}(?:\.[A-Z]{1,2})?)"
-            r"(?![A-Za-z0-9._/\\-])",
-            0,
+            r"(?<![A-Za-z0-9._/\\-])\d{5}(?![A-Za-z0-9._/\\-])"
         ),
     ):
-        for match in re.finditer(pattern, text, flags):
+        for match in re.finditer(pattern, text):
+            if (
+                (match.start() > 0 and text[match.start() - 1] == ":")
+                or (match.end() < len(text) and text[match.end()] == ":")
+            ):
+                continue
             if any(
                 match.start() < qualified_end and match.end() > qualified_start
                 for qualified_start, qualified_end in qualified_spans
             ):
                 continue
-            raw = match.group(1) if match.lastindex else match.group(0)
-            if match.lastindex:
-                _append_indexed_slot_candidate(candidates, raw, text)
-            else:
-                _append_candidate(candidates, raw, text)
+            _append_candidate(weak_candidates, match.group(0), text)
 
-    for match in _ENGLISH_EXPLICIT_TICKER_PATTERN.finditer(text):
-        _append_explicit_slot_candidate(
-            candidates,
-            match.group(1),
+    for match in _LETTER_SYMBOL_TOKEN_PATTERN.finditer(text):
+        if any(
+            match.start() < qualified_end and match.end() > qualified_start
+            for qualified_start, qualified_end in qualified_spans
+        ):
+            continue
+        raw = match.group("slot")
+        if len(raw) == 1 and raw.upper() in _WEAK_SINGLE_LETTER_DENY:
+            continue
+        _append_indexed_slot_candidate(weak_candidates, raw, text)
+
+    command_candidates: List[str] = []
+    for pattern in _EXPLICIT_COMMAND_RAW_SLOT_PATTERNS:
+        match = pattern.search(text)
+        if match is None:
+            continue
+        raw = match.group("slot")
+        spaced_match = _SPACED_EXCHANGE_TOKEN_PATTERN.match(
             text,
-            explicit=_is_explicit_command_slot(text, match),
+            match.start("slot"),
         )
-
-    for match in _CJK_EXPLICIT_TICKER_PATTERN.finditer(text):
-        _append_explicit_slot_candidate(
-            candidates,
-            match.group(1),
-            text,
-            explicit=_is_explicit_command_slot(text, match),
-        )
-
-    for pattern in (
-        _EXPLICIT_COMPARE_PAIR_PATTERN,
-        _ENGLISH_AND_COMPARE_PAIR_PATTERN,
-    ):
-        for match in pattern.finditer(text):
-            for group_index, raw in enumerate(match.groups(), start=1):
-                _append_explicit_slot_candidate(
-                    candidates,
-                    raw,
-                    text,
-                    explicit=(
-                        raw.isupper()
-                        and not _is_spaced_exchange_affix(
-                            text,
-                            raw,
-                            match.start(group_index),
-                        )
-                    ),
-                )
-
-    for pattern in _EXPLICIT_SINGLE_TICKER_COMPARE_PATTERNS:
-        for match in pattern.finditer(text):
-            raw = match.group(1)
+        if spaced_match is not None and spaced_match.group("prefix"):
+            raw = (
+                spaced_match.group("prefix")
+                + spaced_match.group("prefix_digits")
+            )
+        if _is_indicator_command_topic(text, raw, match.end("slot")):
+            break
+        if raw.lower() == "it":
+            break
+        if _classify_explicit_slot(raw, text) == "valid":
             _append_explicit_slot_candidate(
-                candidates,
+                command_candidates,
                 raw,
                 text,
-                explicit=not _is_spaced_exchange_affix(
-                    text,
-                    raw,
-                    match.start(1),
-                ),
+                explicit=True,
+            )
+        break
+
+    comparison_candidates: List[str] = []
+    pair_patterns = (
+        _EXPLICIT_ENGLISH_RAW_COMPARE_PAIR_PATTERN,
+        _EXPLICIT_RAW_CONNECTOR_PAIR_PATTERN,
+        _INFIX_ENGLISH_RAW_COMPARE_PAIR_PATTERN,
+    )
+    for pattern in pair_patterns:
+        for match in pattern.finditer(text):
+            left = match.group("left")
+            right = match.group("right")
+            left_is_pronoun = _is_compare_pronoun(left)
+            right_is_pronoun = _is_compare_pronoun(right)
+            if left_is_pronoun or right_is_pronoun:
+                other = right if left_is_pronoun else left
+                other_group = "right" if left_is_pronoun else "left"
+                if _classify_explicit_slot(other, text) == "valid":
+                    _append_comparison_operand(
+                        comparison_candidates,
+                        other,
+                        text,
+                        match.start(other_group),
+                    )
+                continue
+            if {
+                _classify_explicit_slot(left, text),
+                _classify_explicit_slot(right, text),
+            } != {"valid"}:
+                continue
+            _append_comparison_operand(
+                comparison_candidates,
+                left,
+                text,
+                match.start("left"),
+            )
+            _append_comparison_operand(
+                comparison_candidates,
+                right,
+                text,
+                match.start("right"),
             )
 
-    bare_ticker = re.fullmatch(
-        r"[A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?",
-        text.strip(),
-    )
-    if bare_ticker:
+    for pattern in (
+        _ACTIVE_COMPARE_RAW_SLOT_PATTERN,
+        _LEADING_COMPARE_RAW_SLOT_PATTERN,
+    ):
+        for match in pattern.finditer(text):
+            raw = match.group("slot")
+            if _classify_explicit_slot(raw, text) == "valid":
+                _append_comparison_operand(
+                    comparison_candidates,
+                    raw,
+                    text,
+                    match.start("slot"),
+                )
+
+    bare_ticker = re.fullmatch(_RAW_SYMBOL_TOKEN, text.strip())
+    bare_candidates: List[str] = []
+    if bare_ticker and _classify_explicit_slot(bare_ticker.group(0), text) == "valid":
         _append_explicit_slot_candidate(
-            candidates,
+            bare_candidates,
             bare_ticker.group(0),
             text,
             explicit=True,
         )
-    if (
-        _LOWERCASE_SCAN_HINT_PATTERN.search(text)
+
+    if comparison_candidates:
+        return _StockCodeExtraction(
+            stock_codes=tuple(comparison_candidates),
+            compare_evidence=True,
+        )
+    if command_candidates:
+        return _StockCodeExtraction(
+            stock_codes=tuple(command_candidates),
+            switch_evidence=True,
+        )
+    if bare_candidates:
+        return _StockCodeExtraction(
+            stock_codes=tuple(bare_candidates),
+            switch_evidence=True,
+        )
+
+    legacy_compare_evidence = bool(
+        _is_strong_compare_message(text)
+        or _ENGLISH_COMPARE_HINT_PATTERN.search(text)
         or _WEAK_COMPARE_HINT_PATTERN.search(text)
         or _CHOICE_COMPARE_PATTERN.search(text)
-        or (bare_ticker and not bare_ticker.group(0).isupper())
+    )
+    has_linked_compare_operand = bool(
+        weak_candidates and _LINKED_COMPARE_PATTERN.search(text)
+    )
+    if legacy_compare_evidence and (
+        len(weak_candidates) >= 2 or has_linked_compare_operand
     ):
-        for match in _LOWERCASE_TICKER_PATTERN.finditer(text):
-            _append_indexed_slot_candidate(
-                candidates,
-                match.group(1),
-                text,
-            )
+        return _StockCodeExtraction(
+            stock_codes=tuple(weak_candidates),
+            compare_evidence=True,
+        )
+    if len(weak_candidates) == 1 and _WEAK_STOCK_QUESTION_PATTERN.search(text):
+        return _StockCodeExtraction(
+            stock_codes=tuple(weak_candidates),
+            switch_evidence=True,
+        )
+    return _StockCodeExtraction()
 
-    return candidates
+
+def extract_stock_codes(text: str) -> List[str]:
+    """Extract stock codes authorized by explicit or indexed text evidence."""
+    return list(_extract_stock_code_evidence(text).stock_codes)
 
 
 def _is_compare_message(message: str, candidates: List[str], current_code: str) -> bool:
@@ -442,8 +640,6 @@ def _is_compare_message(message: str, candidates: List[str], current_code: str) 
     new_candidates = {code for code in candidates if code != current_code}
     if _ENGLISH_COMPARE_HINT_PATTERN.search(message):
         return len(candidates) >= 2 or bool(current_code and new_candidates)
-    if len(new_candidates) >= 2:
-        return True
     if _CHOICE_COMPARE_PATTERN.search(message) and len(candidates) >= 2:
         return True
     if not _WEAK_COMPARE_HINT_PATTERN.search(message):
@@ -516,8 +712,16 @@ def resolve_stock_scope(
         original_context.pop("stock_name", None)
         current_code = ""
 
+    extraction = _extract_stock_code_evidence(message_text)
+    if extraction.malformed_explicit_slot:
+        effective_context = _clear_stock_context(original_context)
+        return StockScopeResolution(
+            effective_context=_with_skills(effective_context, skills),
+            stock_scope=StockScope() if current_code else None,
+        )
+
     if not current_code:
-        candidates = extract_stock_codes(message_text)
+        candidates = list(extraction.stock_codes)
         if candidates:
             allowed = set(candidates)
             expected = candidates[0] if len(candidates) == 1 else ""
@@ -544,14 +748,18 @@ def resolve_stock_scope(
             stock_scope=None,
         )
 
-    candidates = extract_stock_codes(message_text)
+    candidates = list(extraction.stock_codes)
     new_candidates = [code for code in candidates if code != current_code]
     mode = "maintain"
     effective_context = dict(original_context)
     expected = current_code
     allowed = {current_code}
 
-    if _is_compare_message(message_text, candidates, current_code):
+    if extraction.compare_evidence or _is_compare_message(
+        message_text,
+        candidates,
+        current_code,
+    ):
         mode = "compare"
         explicit_codes = set(candidates)
         if len(explicit_codes) >= 2:
@@ -561,7 +769,9 @@ def resolve_stock_scope(
         else:
             allowed.update(explicit_codes)
         expected = ""
-    elif _SWITCH_PATTERN.search(message_text) and len(new_candidates) == 1:
+    elif (
+        extraction.switch_evidence or _SWITCH_PATTERN.search(message_text)
+    ) and len(new_candidates) == 1:
         mode = "switch"
         expected = new_candidates[0]
         allowed = {expected}
