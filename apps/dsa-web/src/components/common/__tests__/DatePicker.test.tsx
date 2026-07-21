@@ -46,4 +46,26 @@ describe('DatePicker', () => {
     expect(input).toHaveFocus();
     expect(screen.queryByRole('dialog', { name: '日期' })).not.toBeInTheDocument();
   });
+
+  it('applies compact geometry to both the trigger and calendar action', () => {
+    render(
+      <DatePicker
+        value=""
+        onChange={() => undefined}
+        ariaLabel="日期"
+        size="compact"
+      />,
+    );
+
+    const input = screen.getByRole('textbox', { name: '日期' });
+    const trigger = input.parentElement;
+    const action = screen.getByRole('button', { name: '打开 日期 日历' });
+
+    expect(trigger).toHaveAttribute('data-control', 'date-picker');
+    expect(trigger).toHaveAttribute('data-size', 'compact');
+    expect(trigger).toHaveClass('h-8', 'min-h-8', 'min-w-8');
+    expect(trigger).not.toHaveClass('min-h-11');
+    expect(action).toHaveClass('h-8', 'w-8');
+    expect(action).not.toHaveClass('h-11', 'w-11');
+  });
 });

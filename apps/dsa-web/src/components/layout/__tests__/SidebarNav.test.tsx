@@ -166,11 +166,11 @@ describe('SidebarNav', () => {
     const profileDialog = screen.getByRole('dialog', { name: 'StockPulse' });
     expect(mockThemeToggle).toHaveBeenCalledWith(
       expect.objectContaining({
-        menuLayout: 'horizontal',
         wrapperClassName: 'w-full',
         triggerClassName: expect.stringContaining('h-11'),
       }),
     );
+    expect(mockThemeToggle.mock.calls.at(-1)?.[0]).not.toHaveProperty('menuLayout');
     expect(within(profileDialog).getByRole('button', { name: '切换主题' })).toBeInTheDocument();
     const languageControl = within(profileDialog).getByTestId('ui-language-selector');
     expect(within(languageControl).getByRole('combobox', { name: '切换界面语言' })).toBeInTheDocument();

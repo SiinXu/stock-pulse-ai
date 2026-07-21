@@ -73,6 +73,77 @@ describe('DataTable', () => {
     expect(screen.getByRole('columnheader', { name: /Symbol/ })).toBeVisible();
     expect(screen.getByRole('rowheader', { name: 'AAPL' })).toBeVisible();
     expect(screen.getByText('212.48')).toBeVisible();
+    expect(screen.getByRole('table')).toHaveClass('table-auto', 'min-w-[56rem]', 'text-sm');
+    expect(screen.getByRole('table').closest('[data-surface-level="interactive"]')).toBeInTheDocument();
+  });
+
+  it('embeds ready and state content without adding an interactive surface', () => {
+    const { rerender } = render(
+      <DataTable
+        caption="Portfolio positions"
+        columns={COLUMNS}
+        rows={ROWS}
+        getRowKey={(row) => row.id}
+        emptyState={EMPTY_STATE}
+        frame="embedded"
+        density="compact"
+        minWidth="container"
+        separatorTone="inherit"
+      />,
+    );
+
+    const table = screen.getByRole('table', { name: 'Portfolio positions' }) as HTMLTableElement;
+    expect(table).toHaveClass('min-w-full', 'text-xs', 'border-inherit');
+    expect(table.closest('[data-data-table="ready"]')).toHaveAttribute('role', 'region');
+    expect(table.closest('[data-surface-level]')).toBeNull();
+    expect(table.tHead).toHaveClass('border-inherit');
+    expect(table.tBodies[0]).toHaveClass('divide-inherit', 'border-inherit');
+
+    rerender(
+      <DataTable
+        caption="Portfolio positions"
+        columns={COLUMNS}
+        rows={[]}
+        getRowKey={(row) => row.id}
+        emptyState={EMPTY_STATE}
+        frame="embedded"
+      />,
+    );
+
+    const state = screen.getByText('No positions').closest('[data-data-table="state"]');
+    expect(state).toHaveAttribute('data-surface-level', 'canvas');
+    expect(state?.closest('[data-surface-level="interactive"]')).toBeNull();
+  });
+
+  it('owns fixed proportional columns, selected-row presentation, and stable row test IDs', () => {
+    const fixedColumns: DataTableColumn<Row>[] = [
+      { ...COLUMNS[0], widthPercent: 3 },
+      { ...COLUMNS[1], widthPercent: 1 },
+    ];
+    render(
+      <DataTable
+        caption="Portfolio positions"
+        columns={fixedColumns}
+        rows={ROWS}
+        getRowKey={(row) => row.id}
+        emptyState={EMPTY_STATE}
+        layout="fixed"
+        isRowSelected={(row) => row.id === 1}
+        getRowTestId={(row) => `position-${row.id}`}
+      />,
+    );
+
+    const table = screen.getByRole('table', { name: 'Portfolio positions' });
+    const columns = table.querySelectorAll('colgroup col');
+    expect(table).toHaveClass('table-fixed');
+    expect(columns).toHaveLength(2);
+    expect(columns[0]).toHaveStyle({ width: '75%' });
+    expect(columns[1]).toHaveStyle({ width: '25%' });
+    expect(screen.getByTestId('position-1')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('position-1')).toHaveAttribute('data-row-selected', 'true');
+    expect(screen.getByTestId('position-1')).toHaveClass('bg-primary/10', 'ring-primary/35');
+    expect(screen.getByTestId('position-2')).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByTestId('position-2')).not.toHaveAttribute('data-row-selected');
   });
 
   it('owns controlled detail-row geometry, identity, and accessible labels', () => {

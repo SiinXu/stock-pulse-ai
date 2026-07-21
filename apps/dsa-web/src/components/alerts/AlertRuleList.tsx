@@ -252,29 +252,32 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
     <Card
       title={text.title}
       subtitle={formatUiText(text.subtitle, { total })}
+      headerRight={(
+        <div className="grid w-full max-w-full items-end gap-2 sm:flex sm:w-auto sm:flex-wrap sm:justify-end">
+          <Select
+            ariaLabel={text.enabledFilter}
+            value={enabledFilter}
+            options={ALERT_ENABLED_FILTER_OPTIONS[language]}
+            onChange={(value) => {
+              onEnabledFilterChange(value as AlertRuleEnabledFilter);
+            }}
+            className="w-full sm:w-32"
+          />
+          <Select
+            ariaLabel={text.alertTypeFilter}
+            value={alertTypeFilter}
+            options={ALERT_TYPE_FILTER_OPTIONS[language]}
+            onChange={(value) => {
+              onAlertTypeFilterChange(value as AlertTypeFilter);
+            }}
+            className="w-full max-w-full sm:w-44"
+          />
+        </div>
+      )}
       variant="bordered"
       padding="md"
-      className="flex flex-col"
+      className="flex flex-col [&>div:first-child]:flex-col [&>div:first-child]:items-stretch sm:[&>div:first-child]:flex-row sm:[&>div:first-child]:items-start"
     >
-      <div className="mb-4 grid gap-3 md:grid-cols-2">
-        <Select
-          label={text.enabledFilter}
-          value={enabledFilter}
-          options={ALERT_ENABLED_FILTER_OPTIONS[language]}
-          onChange={(value) => {
-            onEnabledFilterChange(value as AlertRuleEnabledFilter);
-          }}
-        />
-        <Select
-          label={text.alertTypeFilter}
-          value={alertTypeFilter}
-          options={ALERT_TYPE_FILTER_OPTIONS[language]}
-          onChange={(value) => {
-            onAlertTypeFilterChange(value as AlertTypeFilter);
-          }}
-        />
-      </div>
-
       <div
         className={`relative min-h-0 flex-1 ${isLoading && rules.length > 0 ? 'pointer-events-none opacity-60' : ''}`}
         aria-busy={isLoading || undefined}

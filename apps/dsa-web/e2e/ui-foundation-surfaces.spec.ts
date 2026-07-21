@@ -148,7 +148,10 @@ test.describe('surface and task-state foundation', () => {
     await page.getByRole('button', { name: '重试' }).click();
 
     await expect(page.getByText('400', { exact: true })).toBeVisible();
-    await expect(page.getByRole('table')).toBeVisible();
+    const recentCallsTable = page.getByRole('table', { name: '最近调用' });
+    await expect(recentCallsTable).toBeVisible();
+    await expect(recentCallsTable.locator('xpath=..')).toHaveAttribute('data-data-table', 'ready');
+    await expect(recentCallsTable.locator('xpath=..')).not.toHaveAttribute('data-surface-level', 'interactive');
     await expect(page.locator('[data-state-panel]')).toHaveCount(0);
 
     responseMode = 'refresh-error';

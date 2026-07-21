@@ -70,6 +70,47 @@ test.describe('shared DataTable foundation', () => {
     await expect(page.getByTestId('row-result')).toHaveText('Opened MSFT');
   });
 
+  test('keeps embedded fixed tables selectable, context-framed, and internally scrollable', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await openFixture(page, 390, 667);
+
+    const table = page.getByRole('table', { name: 'Embedded selected signals' });
+    const scrollRegion = page.getByRole('region', { name: 'Scrollable embedded selected signals' });
+    const frame = page.getByTestId('embedded-table-frame');
+    await expect(table).toHaveAttribute('data-layout', 'fixed');
+    await expect(table.locator('col')).toHaveCount(2);
+    await expect(table.locator('col').nth(0)).toHaveAttribute('style', /width: 35%/);
+    await expect(table.locator('col').nth(1)).toHaveAttribute('style', /width: 65%/);
+    await expect(page.getByTestId('embedded-row-aapl')).toHaveAttribute('aria-selected', 'true');
+
+    const msftRow = page.getByTestId('embedded-row-msft');
+    await msftRow.focus();
+    await page.keyboard.press('Enter');
+    await expect(msftRow).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByTestId('embedded-row-aapl')).toHaveAttribute('aria-selected', 'false');
+    await expect(page.getByTestId('selected-result')).toHaveText('Selected MSFT');
+
+    const separatorColors = await Promise.all([
+      frame.evaluate((element) => getComputedStyle(element).borderTopColor),
+      table.locator('thead').evaluate((element) => getComputedStyle(element).borderBottomColor),
+      table.locator('tbody tr').first().evaluate((element) => getComputedStyle(element).borderBottomColor),
+    ]);
+    expect(new Set(separatorColors).size).toBe(1);
+
+    await scrollRegion.focus();
+    await expect(scrollRegion).toBeFocused();
+    const scrollDimensions = await scrollRegion.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+    }));
+    expect(scrollDimensions.scrollWidth).toBeGreaterThan(scrollDimensions.clientWidth);
+    expect(await scrollRegion.evaluate((element) => {
+      element.scrollLeft = element.scrollWidth;
+      return element.scrollLeft;
+    })).toBeGreaterThan(0);
+    await expectNoDocumentOverflow(page, 'embedded 390x667');
+  });
+
   test('renders one authoritative loading, empty, error, or retrying state', async ({ page }) => {
     await openFixture(page, 390, 667, '?state=loading');
     await expect(page.getByRole('status')).toHaveAttribute('aria-busy', 'true');

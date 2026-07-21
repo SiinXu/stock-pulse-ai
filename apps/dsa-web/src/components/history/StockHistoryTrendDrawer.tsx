@@ -9,7 +9,7 @@ import {
   type DecisionActionLabelMap,
 } from '../../utils/decisionAction';
 import { formatDateTime } from '../../utils/format';
-import { Badge, Button, Card, Surface } from '../common';
+import { Badge, Button, Card, DataTable, type DataTableColumn, Surface, Tooltip } from '../common';
 import { DashboardStateBlock } from '../dashboard';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
@@ -200,6 +200,113 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
     setSelectedRecordId(currentRecordId);
   }, [currentRecordId]);
 
+  const historyColumns: readonly DataTableColumn<HistoryItem>[] = [
+    {
+      id: 'time',
+      header: t('stockTrend.time'),
+      rowHeader: true,
+      nowrap: true,
+      widthPercent: 15,
+      cell: (item) => (
+        <span className="font-mono text-sm text-secondary-text">
+          {formatHistoryTime(item.createdAt, language)}
+        </span>
+      ),
+    },
+    {
+      id: 'result',
+      header: t('stockTrend.result'),
+      nowrap: true,
+      widthPercent: 11,
+      cell: (item) => (
+        <Badge
+          variant={getDecisionActionTone(item.action, item.actionLabel, item.operationAdvice)}
+          size="sm"
+          className="shadow-none"
+        >
+          {formatAdvice(item, actionLabels)}
+        </Badge>
+      ),
+    },
+    {
+      id: 'score',
+      header: t('stockTrend.score'),
+      widthPercent: 7,
+      cell: (item) => {
+        const sentimentColor = isPresent(item.sentimentScore)
+          ? getSentimentColor(item.sentimentScore)
+          : undefined;
+        return (
+          <span
+            className="font-mono text-lg font-semibold"
+            style={sentimentColor ? { color: sentimentColor } : undefined}
+          >
+            {formatNumber(item.sentimentScore, 0)}
+          </span>
+        );
+      },
+    },
+    {
+      id: 'price',
+      header: t('stockTrend.stockPrice'),
+      widthPercent: 9,
+      cell: (item) => <span className="font-mono">{formatNumber(item.currentPrice, 2)}</span>,
+    },
+    {
+      id: 'change',
+      header: t('stockTrend.changePct'),
+      widthPercent: 9,
+      cell: (item) => (
+        <span className="font-mono font-semibold" style={getPriceChangeStyle(item.changePct)}>
+          {formatChangePct(item.changePct)}
+        </span>
+      ),
+    },
+    {
+      id: 'volume-ratio',
+      header: t('stockTrend.volumeRatio'),
+      widthPercent: 7,
+      cell: (item) => <span className="font-mono">{formatNumber(item.volumeRatio, 2)}</span>,
+    },
+    {
+      id: 'turnover-rate',
+      header: t('stockTrend.turnoverRate'),
+      widthPercent: 9,
+      cell: (item) => (
+        <span className="font-mono">
+          {formatNumber(item.turnoverRate, 2)}{isPresent(item.turnoverRate) ? '%' : ''}
+        </span>
+      ),
+    },
+    {
+      id: 'model',
+      header: t('stockTrend.model'),
+      widthPercent: 22,
+      cell: (item) => (
+        <Tooltip content={item.modelUsed || t('stockTrend.noModelTitle')} className="block min-w-0">
+          <span className="block truncate">{formatModelName(item.modelUsed, t)}</span>
+        </Tooltip>
+      ),
+    },
+    {
+      id: 'action',
+      header: t('stockTrend.table.action'),
+      widthPercent: 11,
+      cell: (item) => (
+        <button
+          type="button"
+          className="min-h-11 min-w-11 rounded-lg border border-primary/35 bg-primary/8 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/14"
+          onClick={() => {
+            onSelectRecord(item.id);
+            onClose();
+          }}
+        >
+          {t('stockTrend.report')}
+        </button>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-4 animate-fade-in">
       <Card variant="gradient" padding="md">
@@ -294,96 +401,25 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
             </div>
 
             <div className="mt-4 overflow-hidden rounded-xl border border-border/60 bg-card/30">
-              <table className="w-full table-fixed text-left text-sm">
-                <colgroup>
-                  <col className="w-[15%]" />
-                  <col className="w-[11%]" />
-                  <col className="w-[7%]" />
-                  <col className="w-[9%]" />
-                  <col className="w-[9%]" />
-                  <col className="w-[7%]" />
-                  <col className="w-[9%]" />
-                  <col className="w-[22%]" />
-                  <col className="w-[11%]" />
-                </colgroup>
-                <thead className="border-b border-border/60 bg-background/35 text-xs text-secondary-text">
-                  <tr>
-                    <th className="whitespace-nowrap px-4 py-3 font-medium">{t('stockTrend.time')}</th>
-                    <th className="whitespace-nowrap px-4 py-3 font-medium">{t('stockTrend.result')}</th>
-                    <th className="whitespace-nowrap px-4 py-3 font-medium">{t('stockTrend.score')}</th>
-                    <th className="whitespace-nowrap px-4 py-3 font-medium">{t('stockTrend.stockPrice')}</th>
-                    <th className="whitespace-nowrap px-4 py-3 font-medium">{t('stockTrend.changePct')}</th>
-                    <th className="whitespace-nowrap px-4 py-3 font-medium">{t('stockTrend.volumeRatio')}</th>
-                    <th className="whitespace-nowrap px-4 py-3 font-medium">{t('stockTrend.turnoverRate')}</th>
-                    <th className="whitespace-nowrap px-4 py-3 font-medium">{t('stockTrend.model')}</th>
-                    <th className="whitespace-nowrap px-4 py-3 font-medium">{t('stockTrend.table.action')}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/55">
-                  {items.map((item) => {
-                    const isSelected = item.id === selectedRecordId;
-                    const sentimentColor = isPresent(item.sentimentScore)
-                      ? getSentimentColor(item.sentimentScore)
-                      : undefined;
-                    return (
-                      <tr
-                        key={item.id}
-                        className={`cursor-pointer transition-colors ${
-                          isSelected ? 'bg-primary/10 ring-1 ring-inset ring-primary/35' : 'hover:bg-hover/35'
-                        }`}
-                        onClick={() => setSelectedRecordId(item.id)}
-                      >
-                        <td className="whitespace-nowrap px-3 py-3 font-mono text-sm text-secondary-text">
-                          {formatHistoryTime(item.createdAt, language)}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-3">
-                          <Badge
-                            variant={getDecisionActionTone(item.action, item.actionLabel, item.operationAdvice)}
-                            size="sm"
-                            className="shadow-none"
-                          >
-                            {formatAdvice(item, actionLabels)}
-                          </Badge>
-                        </td>
-                        <td
-                          className="px-3 py-3 font-mono text-lg font-semibold"
-                          style={sentimentColor ? { color: sentimentColor } : undefined}
-                        >
-                          {formatNumber(item.sentimentScore, 0)}
-                        </td>
-                        <td className="px-3 py-3 font-mono text-secondary-text">
-                          {formatNumber(item.currentPrice, 2)}
-                        </td>
-                        <td className="px-3 py-3 font-mono font-semibold" style={getPriceChangeStyle(item.changePct)}>
-                          {formatChangePct(item.changePct)}
-                        </td>
-                        <td className="px-3 py-3 font-mono text-secondary-text">
-                          {formatNumber(item.volumeRatio, 2)}
-                        </td>
-                        <td className="px-3 py-3 font-mono text-secondary-text">
-                          {formatNumber(item.turnoverRate, 2)}{isPresent(item.turnoverRate) ? '%' : ''}
-                        </td>
-                        <td className="truncate px-3 py-3 text-secondary-text" title={item.modelUsed || t('stockTrend.noModelTitle')}>
-                          {formatModelName(item.modelUsed, t)}
-                        </td>
-                        <td className="px-3 py-3">
-                          <button
-                            type="button"
-                            className="min-h-11 min-w-11 rounded-lg border border-primary/35 bg-primary/8 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/14"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onSelectRecord(item.id);
-                              onClose();
-                            }}
-                          >
-                            {t('stockTrend.report')}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <DataTable
+                caption={t('stockTrend.records')}
+                columns={historyColumns}
+                rows={items}
+                getRowKey={(item) => item.id}
+                emptyState={{
+                  title: t('stockTrend.moreEmptyTitle'),
+                  description: t('stockTrend.moreEmptyDescription'),
+                }}
+                frame="embedded"
+                layout="fixed"
+                minWidth="extra-wide"
+                onRowActivate={(item) => setSelectedRecordId(item.id)}
+                getRowAriaLabel={(item) => (
+                  `${t('stockTrend.time')}: ${formatHistoryTime(item.createdAt, language)}; `
+                  + `${t('stockTrend.result')}: ${formatAdvice(item, actionLabels)}`
+                )}
+                isRowSelected={(item) => item.id === selectedRecordId}
+              />
             </div>
           </Card>
         </>

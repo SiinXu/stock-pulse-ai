@@ -216,6 +216,14 @@ describe('MarketReviewReportView', () => {
     expect(screen.getByText('恒生指数')).toBeInTheDocument();
     expect(screen.getByText('3120')).toBeInTheDocument();
     expect(screen.getByText('680')).toBeInTheDocument();
+    const cnTable = screen.getByRole('table', { name: 'A股市场: 指数' });
+    const hkTable = screen.getByRole('table', { name: '港股市场: 指数' });
+    expect(screen.getAllByRole('table')).toHaveLength(2);
+    expect(screen.getByRole('rowheader', { name: '沪深300' })).toBeInTheDocument();
+    expect(screen.getByRole('rowheader', { name: '恒生指数' })).toBeInTheDocument();
+    expect(cnTable.parentElement).toHaveAttribute('data-data-table', 'ready');
+    expect(cnTable.parentElement).not.toHaveAttribute('data-surface-level');
+    expect(hkTable.parentElement).not.toHaveAttribute('data-surface-level');
   });
 
   it('renders industry and concept rankings from structured market review payloads', () => {

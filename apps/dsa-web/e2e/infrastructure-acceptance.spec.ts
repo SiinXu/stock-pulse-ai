@@ -1074,8 +1074,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.goto('/settings?section=ai_models&view=connections');
     await expect(page.getByRole('button', { name: /添加模型服务/ })).toBeDisabled();
     await expect(page.getByLabel('API 密钥')).toHaveCount(0);
-    await page.goto('/settings?section=advanced&view=raw_config');
-    await page.locator('details').filter({ hasText: '开发者诊断' }).locator('summary').click();
+    await page.goto('/settings?section=advanced&view=diagnostics');
     await expect(page.getByText(/schema_ui_placement_missing/).first()).toBeVisible();
   });
 
@@ -2098,7 +2097,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       const fallbackCheckbox = page.getByRole('checkbox', { name: /model-beta/ });
       await expectMinimumTouchTarget(fallbackCheckbox.locator('xpath=ancestor::label'));
 
-      await page.goto('/settings?section=system_security&view=runtime');
+      await page.goto('/settings?section=system_security&view=service');
       const logLevelSelect = page.getByRole('combobox', { name: '日志级别', exact: true });
       await expectMinimumTouchTarget(logLevelSelect);
       await logLevelSelect.click();

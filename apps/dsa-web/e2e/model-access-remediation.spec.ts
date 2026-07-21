@@ -875,14 +875,15 @@ test.describe('model access product convergence', () => {
     await expect(page.getByRole('button', { name: '重试' })).toBeVisible();
   });
 
-  test('28 developer diagnostics is top-level and collapsed by default', async ({ page }) => {
+  test('28 developer diagnostics is a dedicated uncollapsed Advanced tab', async ({ page }) => {
     await openSettings(page);
+    // Backend Status keeps the banner/status panels on the default tab.
     await page.goto('/settings?section=advanced&view=raw_config');
-    const details = page.locator('details').filter({ hasText: '开发者诊断' });
-    await expect(details).not.toHaveAttribute('open', '');
-    await details.locator('summary').click();
-    await expect(details).toHaveAttribute('open', '');
-    await expect(details).toContainText(/模型配置生效来源|执行后端/);
+    await expect(page.getByText(/模型配置生效来源|执行后端/).first()).toBeVisible();
+    // Developer fields moved to their own tab and render without a collapsible.
+    await page.getByRole('tab', { name: '开发者诊断' }).click();
+    await expect(page.getByRole('heading', { name: '开发者诊断' })).toBeVisible();
+    await expect(page.locator('details').filter({ hasText: '开发者诊断' })).toHaveCount(0);
   });
 
   test('29 a real 409 keeps the local draft and surfaces conflict UI', async ({ page }) => {

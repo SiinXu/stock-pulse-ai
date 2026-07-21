@@ -1,6 +1,6 @@
 import type React from 'react';
 import { ChevronDown, ChevronRight, Info, X } from 'lucide-react';
-import { Badge, Button, IconButton, StatusDot } from '../common';
+import { Badge, Button, DataTable, type DataTableColumn, IconButton, StatusDot } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { RunFlowNode, RunFlowStatus } from '../../types/runFlow';
 import {
@@ -144,6 +144,46 @@ export const RunFlowNodeDetails: React.FC<RunFlowNodeDetailsProps> = ({
   const formatDetailStatus = (status: string | undefined) => (
     isRunFlowStatus(status) ? getRunFlowStatusLabel(status, t) : status || t('runFlow.valueUnavailable')
   );
+  const attemptColumns: readonly DataTableColumn<DetailItem>[] = [
+    {
+      id: 'name',
+      header: t('runFlow.nodeDetails.column.name'),
+      rowHeader: true,
+      cell: (attempt) => (
+        <span className="text-foreground">
+          <span className="block font-medium">
+            {attempt.label || attempt.provider || t('runFlow.valueUnavailable')}
+          </span>
+          {attempt.provider ? <span className="mt-0.5 block text-muted-text">{attempt.provider}</span> : null}
+        </span>
+      ),
+    },
+    {
+      id: 'status',
+      header: t('runFlow.nodeDetails.column.status'),
+      cell: (attempt) => formatDetailStatus(attempt.status),
+    },
+    {
+      id: 'duration',
+      header: t('runFlow.nodeDetails.column.duration'),
+      nowrap: true,
+      cell: (attempt) => formatDuration(attempt.durationMs, t),
+    },
+    {
+      id: 'records',
+      header: t('runFlow.nodeDetails.column.records'),
+      nowrap: true,
+      cell: (attempt) => (
+        typeof attempt.recordCount === 'number' ? attempt.recordCount : t('runFlow.valueUnavailable')
+      ),
+    },
+    {
+      id: 'time',
+      header: t('runFlow.nodeDetails.column.time'),
+      nowrap: true,
+      cell: (attempt) => formatDateTime(attempt.startedAt, language, t),
+    },
+  ];
   const detailRows: DetailRow[] = [[t('runFlow.nodeDetails.kind'), getRunFlowNodeKindLabel(node.kind, t)]];
   const addProviderRow = () => {
     if (node.provider) {
@@ -257,34 +297,18 @@ export const RunFlowNodeDetails: React.FC<RunFlowNodeDetailsProps> = ({
       {attempts.length > 0 ? (
         <div className="mt-4">
           <p className="label-uppercase">{t('runFlow.nodeDetails.attemptList')}</p>
-          <div className="mt-2 overflow-x-auto rounded-lg border border-subtle">
-            <table className="min-w-full divide-y divide-subtle text-left text-xs">
-              <thead className="bg-base/45 text-muted-text">
-                <tr>
-                  <th className="px-3 py-2 font-medium">{t('runFlow.nodeDetails.column.name')}</th>
-                  <th className="px-3 py-2 font-medium">{t('runFlow.nodeDetails.column.status')}</th>
-                  <th className="px-3 py-2 font-medium">{t('runFlow.nodeDetails.column.duration')}</th>
-                  <th className="px-3 py-2 font-medium">{t('runFlow.nodeDetails.column.records')}</th>
-                  <th className="px-3 py-2 font-medium">{t('runFlow.nodeDetails.column.time')}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-subtle bg-base/20">
-                {attempts.map((attempt, index) => (
-                  <tr key={attempt.id || `${attempt.label}-${index}`}>
-                    <td className="px-3 py-2 text-foreground">
-                      <span className="block font-medium">{attempt.label || attempt.provider || t('runFlow.valueUnavailable')}</span>
-                      {attempt.provider ? <span className="mt-0.5 block text-muted-text">{attempt.provider}</span> : null}
-                    </td>
-                    <td className="px-3 py-2 text-secondary-text">{formatDetailStatus(attempt.status)}</td>
-                    <td className="px-3 py-2 text-secondary-text">{formatDuration(attempt.durationMs, t)}</td>
-                    <td className="px-3 py-2 text-secondary-text">
-                      {typeof attempt.recordCount === 'number' ? attempt.recordCount : t('runFlow.valueUnavailable')}
-                    </td>
-                    <td className="px-3 py-2 text-secondary-text">{formatDateTime(attempt.startedAt, language, t)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="mt-2">
+            <DataTable
+              caption={t('runFlow.nodeDetails.attemptList')}
+              columns={attemptColumns}
+              rows={attempts}
+              getRowKey={(attempt, index) => attempt.id || `${attempt.label}-${index}`}
+              emptyState={{ title: t('runFlow.valueUnavailable') }}
+              density="compact"
+              frame="embedded"
+              minWidth="container"
+              separatorTone="subtle"
+            />
           </div>
         </div>
       ) : null}

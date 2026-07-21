@@ -1,11 +1,11 @@
 import type React from 'react';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Check, Minus, X } from 'lucide-react';
+import { Check, Inbox, Minus, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { backtestApi } from '../api/backtest';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
-import { ApiErrorAlert, Badge, Button, Card, DataTable, type DataTableColumn, DatePicker, EmptyState, Input, Loading, Pagination, Select, StatusDot, Tooltip } from '../components/common';
+import { ApiErrorAlert, AppPage, Badge, Button, Card, DataTable, type DataTableColumn, DatePicker, EmptyState, Input, Loading, PageHeader, Pagination, SegmentedControl, Select, StatusDot, Switch, Tooltip } from '../components/common';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import {
@@ -28,7 +28,7 @@ import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../utils/de
 import { getMarketPhaseSummaryLabel, stripMarketPhaseSummaryPrefix } from '../utils/marketPhase';
 
 const BACKTEST_COMPACT_INPUT_CLASS =
-  'h-9 rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
+  'h-8 rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
 type BacktestText = (typeof BACKTEST_TEXT)[UiLanguage];
 
 type BacktestFilterSnapshot = {
@@ -346,6 +346,9 @@ const BacktestPage: React.FC = () => {
   const effectiveWindowDays = parseEvalWindowDays(evalDays) ?? overallPerf?.evalWindowDays;
   const isNextDayValidation = effectiveWindowDays === 1;
   const showNextDayActualColumns = isNextDayValidation;
+  const lastRegularWindowRef = useRef(
+    initialFilters.windowDays && initialFilters.windowDays > 1 ? initialFilters.windowDays : 10,
+  );
 
   const validateDraftFilters = (windowOverride?: number): BacktestFilterSnapshot | null => {
     const windowDays = windowOverride ?? parseEvalWindowDays(evalDays);
@@ -468,6 +471,7 @@ const BacktestPage: React.FC = () => {
       const overall = await fetchPerformance(code || undefined, undefined, startDate, endDate, phase);
       if (!overall) return;
       const inferredWindow = overall.evalWindowDays;
+      if (inferredWindow > 1) lastRegularWindowRef.current = inferredWindow;
       setEvalDays(String(inferredWindow));
       setAppliedFilters((current) => ({ ...current, windowDays: inferredWindow }));
       void fetchResults(page, code || undefined, inferredWindow, startDate, endDate, phase);
@@ -512,6 +516,7 @@ const BacktestPage: React.FC = () => {
         ?? parseEvalWindowDays(evalDays)
         ?? overallPerf?.evalWindowDays;
       if (effectiveEvalWindowDays != null) {
+        if (effectiveEvalWindowDays > 1) lastRegularWindowRef.current = effectiveEvalWindowDays;
         setEvalDays(String(effectiveEvalWindowDays));
       }
       syncBacktestFiltersToUrl({
@@ -575,8 +580,26 @@ const BacktestPage: React.FC = () => {
     void fetchPerformance(nextFilters.code || undefined, 1, nextFilters.startDate, nextFilters.endDate, nextFilters.phase);
   };
 
+  const handleValidationModeChange = (mode: 'window' | 'oneDay') => {
+    if (mode === 'oneDay') {
+      handleShowNextDay();
+      return;
+    }
+    const windowDays = lastRegularWindowRef.current;
+    const nextFilters = validateDraftFilters(windowDays);
+    if (!nextFilters) return;
+    setEvalDays(String(windowDays));
+    setEvalDaysError('');
+    setAppliedFilters(nextFilters);
+    setCurrentPage(1);
+    syncBacktestFiltersToUrl(nextFilters);
+    void fetchResults(1, nextFilters.code || undefined, windowDays, nextFilters.startDate, nextFilters.endDate, nextFilters.phase);
+    void fetchPerformance(nextFilters.code || undefined, windowDays, nextFilters.startDate, nextFilters.endDate, nextFilters.phase);
+  };
+
   // Pagination
   const totalPages = Math.ceil(totalResults / pageSize);
+  const hasBacktestData = Boolean(overallPerf || stockPerf || results.length > 0);
   const handlePageChange = (page: number) => {
     const nextFilters = { ...appliedFilters, page };
     setAppliedFilters(nextFilters);
@@ -670,16 +693,14 @@ const BacktestPage: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-full flex flex-col rounded-3xl bg-transparent">
-      {/* Header */}
-      <header className="flex-shrink-0 border-b border-subtle px-3 py-3 sm:px-4">
-        {/* Visually hidden: the header is a dense filter toolbar, but the page
-            still needs an h1 landmark for assistive technology. */}
-        <h1 className="sr-only">{text.pageTitle}</h1>
+    <AppPage className="flex min-h-full flex-col">
+      <PageHeader className="shrink-0" title={text.pageTitle} />
+      <header className="flex-shrink-0 border-b border-border py-3">
         <div className="flex flex-wrap items-end gap-1.5">
           <div className="relative min-w-0 flex-[1_1_220px]">
             <Input
               type="text"
+              size="default"
               value={codeFilter}
               onChange={(e) => setCodeFilter(e.target.value.toUpperCase())}
               onKeyDown={handleKeyDown}
@@ -692,7 +713,7 @@ const BacktestPage: React.FC = () => {
             onClick={handleFilter}
             disabled={isLoadingResults}
             variant="secondary"
-            size="comfortable"
+            size="primary"
             isLoading={isLoadingResults}
             loadingText={text.filter}
             className="whitespace-nowrap text-xs"
@@ -703,11 +724,17 @@ const BacktestPage: React.FC = () => {
             id="backtest-eval-window"
             label={text.evalWindow}
             type="number"
+            size="default"
             min={1}
             max={120}
             value={evalDays}
             onChange={(e) => {
-              setEvalDays(e.target.value);
+              const nextValue = e.target.value;
+              const parsedValue = parseEvalWindowDays(nextValue);
+              if (parsedValue && parsedValue > 1) {
+                lastRegularWindowRef.current = parsedValue;
+              }
+              setEvalDays(nextValue);
               setEvalDaysError('');
             }}
             error={evalDaysError}
@@ -718,6 +745,7 @@ const BacktestPage: React.FC = () => {
           />
           <DatePicker
             id="backtest-date-from"
+            size="compact"
             label={text.startDate}
             ariaLabel={text.startDateAria}
             value={analysisDateFrom}
@@ -732,6 +760,7 @@ const BacktestPage: React.FC = () => {
           />
           <DatePicker
             id="backtest-date-to"
+            size="compact"
             label={text.endDate}
             ariaLabel={text.endDateAria}
             value={analysisDateTo}
@@ -744,33 +773,29 @@ const BacktestPage: React.FC = () => {
             className="w-40 whitespace-nowrap"
             triggerClassName={`${BACKTEST_COMPACT_INPUT_CLASS} w-40 !rounded-xl text-center tabular-nums`}
           />
-          <Button
-            type="button"
-            onClick={handleShowNextDay}
-            disabled={isLoadingResults || isLoadingPerf}
-            variant={isNextDayValidation ? 'primary' : 'secondary'}
-            size="comfortable"
-            aria-pressed={isNextDayValidation}
-            className="text-xs"
-          >
-            {text.oneDayValidation}
-          </Button>
-          <Button
-            type="button"
-            onClick={() => setForceRerun(!forceRerun)}
-            disabled={isRunning}
-            variant={forceRerun ? 'primary' : 'secondary'}
-            size="comfortable"
-            aria-pressed={forceRerun}
-            className="text-xs"
-          >
-            {text.forceRerun}
-          </Button>
+          <SegmentedControl
+            value={isNextDayValidation ? 'oneDay' : 'window'}
+            options={[
+              { value: 'window', label: text.evalWindow, disabled: isRunning || isLoadingResults || isLoadingPerf },
+              { value: 'oneDay', label: text.oneDayValidation, disabled: isRunning || isLoadingResults || isLoadingPerf },
+            ]}
+            onChange={handleValidationModeChange}
+            ariaLabel={text.evalWindow}
+          />
+          <div className="flex h-8 items-center gap-1.5">
+            <span className="whitespace-nowrap text-xs font-medium text-secondary-text">{text.forceRerun}</span>
+            <Switch
+              checked={forceRerun}
+              disabled={isRunning}
+              onCheckedChange={setForceRerun}
+              aria-label={text.forceRerun}
+            />
+          </div>
           <Button
             type="button"
             onClick={handleRun}
             variant="primary"
-            size="comfortable"
+            size="primary"
             isLoading={isRunning}
             loadingText={text.running}
             className="whitespace-nowrap text-xs"
@@ -794,7 +819,23 @@ const BacktestPage: React.FC = () => {
       </header>
 
       {/* Main content; div, not main: the app shell already renders the single <main> landmark. */}
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 lg:flex-row">
+      {isRunning ? (
+        <Loading label={text.running} className="h-64" />
+      ) : !hasBacktestData && (isLoadingPerf || isLoadingResults) ? (
+        <Loading label={text.loadingResults} className="h-64" />
+      ) : !hasBacktestData && performanceError ? (
+        <ApiErrorAlert error={performanceError} />
+      ) : !hasBacktestData && resultsError ? (
+        <ApiErrorAlert error={resultsError} />
+      ) : !hasBacktestData ? (
+        <EmptyState
+          title={text.noResultsTitle}
+          description={text.noResultsDescription}
+          icon={<Inbox className="h-6 w-6" aria-hidden="true" />}
+          className="min-h-40"
+        />
+      ) : (
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-3 lg:flex-row">
         {/* Left sidebar - Performance */}
         <div className="flex max-h-[38vh] flex-col gap-3 overflow-y-auto lg:max-h-none lg:w-60 lg:flex-shrink-0">
           {performanceError ? <ApiErrorAlert error={performanceError} /> : null}
@@ -884,7 +925,8 @@ const BacktestPage: React.FC = () => {
           ) : null}
         </section>
       </div>
-    </div>
+      )}
+    </AppPage>
   );
 };
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type React from 'react';
 import { Trash2 } from 'lucide-react';
-import { Badge, Button, CredentialInput, IconButton, Select } from '../common';
+import { Badge, Button, CredentialInput, IconButton, Input, Select, Textarea, TimePicker } from '../common';
 import type { ConfigValidationIssue, SystemConfigFieldSchema, SystemConfigItem } from '../../types/systemConfig';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getSettingsHelpContent } from '../../locales/settingsHelp';
@@ -13,6 +13,7 @@ import { formatUiNumber, getUiColon } from '../../utils/uiLocale';
 import { SettingsHelpButton } from './SettingsHelpButton';
 import { MultiSelectDropdown } from './MultiSelectDropdown';
 import { SettingsSwitch } from './SettingsSwitch';
+import { SETTINGS_CONTROL_WIDTH_CLASS } from './settingsControlLayout';
 
 function normalizeSelectOptions(key: string, options: SystemConfigFieldSchema['options'] = [], locale: UiLanguage) {
   return options.map((option) => {
@@ -104,7 +105,6 @@ function renderFieldControl(
   enumEmptyState?: React.ReactNode,
 ) {
   const schema = item.schema;
-  const commonClass = 'w-full rounded-lg border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
   const controlType = schema?.uiControl ?? 'text';
   const isMultiValue = isMultiValueField(item);
   const optionValues = (schema?.options ?? []).map((option) => (
@@ -179,32 +179,60 @@ function renderFieldControl(
   // regardless of the backend ui_control hint, so a stray ui_control=text never
   // degrades an enum into a free-text Input.
   if (schema?.options?.length && !isMultiValue) {
+    const options = normalizeSelectOptions(item.key, schema.options, language).map((option) => {
+      if (item.key !== 'MARKET_REVIEW_COLOR_SCHEME') {
+        return option;
+      }
+      return {
+        ...option,
+        swatch: option.value === 'green_up'
+          ? { start: 'success' as const, end: 'danger' as const }
+          : { start: 'danger' as const, end: 'success' as const },
+      };
+    });
     return (
-        <Select
-          id={controlId}
-          value={value}
-          onChange={onChange}
-          options={normalizeSelectOptions(item.key, schema.options, language)}
-          disabled={disabled || !schema.isEditable}
-          placeholder={t('common.selectPlaceholder')}
-          error={hasError}
-          ariaDescribedBy={ariaDescribedBy}
-          className="w-full md:ml-auto"
-          menuAlign="end"
-        />
-      );
+      <Select
+        id={controlId}
+        value={value}
+        onChange={onChange}
+        options={options}
+        disabled={disabled || !schema.isEditable}
+        placeholder={t('common.selectPlaceholder')}
+        error={hasError}
+        ariaDescribedBy={ariaDescribedBy}
+        className={`${SETTINGS_CONTROL_WIDTH_CLASS} md:ml-auto`}
+        menuAlign="end"
+        size="comfortable"
+      />
+    );
   }
 
   if (controlType === 'textarea') {
     return (
-      <textarea
+      <Textarea
         id={controlId}
         aria-invalid={hasError || undefined}
         aria-describedby={ariaDescribedBy}
-        className={cn(commonClass, 'min-h-24 resize-y py-2', hasError && 'border-danger')}
+        fieldClassName={SETTINGS_CONTROL_WIDTH_CLASS}
+        className={cn(hasError && 'border-danger')}
         value={value}
         disabled={disabled || !schema?.isEditable}
         onChange={(event) => onChange(event.target.value)}
+      />
+    );
+  }
+
+  if (controlType === 'time') {
+    return (
+      <TimePicker
+        id={controlId}
+        value={value}
+        onChange={onChange}
+        disabled={disabled || !schema?.isEditable}
+        className={`${SETTINGS_CONTROL_WIDTH_CLASS} md:ml-auto`}
+        size="comfortable"
+        aria-invalid={hasError || undefined}
+        aria-describedby={ariaDescribedBy}
       />
     );
   }
@@ -295,7 +323,7 @@ function renderFieldControl(
     );
   }
 
-  const inputType = controlType === 'number' ? 'number' : controlType === 'time' ? 'time' : 'text';
+  const inputType = controlType === 'number' ? 'number' : 'text';
   const validation = (schema?.validation ?? {}) as Record<string, unknown>;
   const numberProps = controlType === 'number'
     ? {
@@ -306,41 +334,27 @@ function renderFieldControl(
     : {};
 
   const unit = schema?.unit?.trim() || null;
-  const input = (
-    <input
+  return (
+    <Input
       id={controlId}
       type={inputType}
       aria-invalid={hasError || undefined}
       aria-describedby={ariaDescribedBy}
+      fieldClassName={SETTINGS_CONTROL_WIDTH_CLASS}
       className={cn(
-        commonClass,
-        'block h-9 md:ml-auto',
-        // Numbers stay compact; text/path fields fill the 240px control column
-        // so long values (e.g. directory paths) are not clipped to ~170px.
-        inputType === 'number' ? (unit ? 'pr-8 md:w-full' : 'md:w-44') : 'md:w-full',
-        hasError && 'border-danger',
+        'block md:ml-auto md:w-full',
+        hasError && 'border-danger/40 focus:border-danger',
       )}
       value={value}
       disabled={disabled || !schema?.isEditable}
       onChange={(event) => onChange(event.target.value)}
+      trailingAction={unit ? (
+        <span aria-hidden="true" className="pointer-events-none pr-3 text-xs text-muted-text">
+          {unit}
+        </span>
+      ) : undefined}
       {...numberProps}
     />
-  );
-
-  if (!unit) {
-    return input;
-  }
-
-  return (
-    <div className="relative md:ml-auto md:w-44">
-      {input}
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-text"
-      >
-        {unit}
-      </span>
-    </div>
   );
 }
 
@@ -381,6 +395,8 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
 
   return (
     <div
+      data-settings-field-row="true"
+      data-testid={`settings-field-${item.key}`}
       className={cn(
         'grid gap-2 px-2 py-1.5 transition-colors duration-200',
         isTextarea ? 'md:gap-2' : 'md:grid-cols-[minmax(0,1fr)_240px] md:items-center md:gap-4',
@@ -426,7 +442,7 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
         ) : null}
       </div>
 
-      <div className={cn('min-w-0', !isTextarea && 'md:justify-self-end md:w-full')}>
+      <div data-settings-control-column="true" className={cn('min-w-0', !isTextarea && 'md:w-full md:justify-self-end')}>
         {renderFieldControl(
           item,
           title,

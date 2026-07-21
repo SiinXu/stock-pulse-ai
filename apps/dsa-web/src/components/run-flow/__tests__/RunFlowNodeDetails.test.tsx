@@ -26,6 +26,51 @@ describe('RunFlowNodeDetails', () => {
     expect(screen.queryByText('尝试次数')).not.toBeInTheDocument();
     expect(screen.queryByText('记录数')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '关闭节点详情' })).toHaveAttribute('data-size', 'default');
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('renders provider attempts through the compact embedded table contract', () => {
+    const node: RunFlowNode = {
+      id: 'provider_attempts',
+      lane: 'data_source',
+      kind: 'data_source',
+      label: '行情回退链',
+      status: 'fallback',
+      metadata: {
+        attempts: [
+          {
+            id: 'attempt-1',
+            label: '主数据源',
+            provider: 'TushareFetcher',
+            status: 'failed',
+            durationMs: 320,
+            recordCount: 0,
+            startedAt: '2026-06-08T22:14:25',
+          },
+          {
+            id: 'attempt-2',
+            label: '备用数据源',
+            provider: 'AkshareFetcher',
+            status: 'success',
+            durationMs: 410,
+            recordCount: 39,
+            startedAt: '2026-06-08T22:14:26',
+          },
+        ],
+      },
+    };
+
+    render(<RunFlowNodeDetails node={node} />);
+
+    const table = screen.getByRole('table', { name: '运行尝试' });
+    expect(table).toHaveAttribute('data-density', 'compact');
+    expect(table).toHaveClass('min-w-full', 'text-xs');
+    expect(table.parentElement).toHaveAttribute('data-data-table', 'ready');
+    expect(table.parentElement).not.toHaveAttribute('data-surface-level');
+    expect(screen.getByRole('rowheader', { name: /主数据源/ })).toHaveTextContent('TushareFetcher');
+    expect(screen.getByRole('rowheader', { name: /备用数据源/ })).toHaveTextContent('AkshareFetcher');
+    expect(screen.getByText('320 ms')).toBeInTheDocument();
+    expect(screen.getByText('39')).toBeInTheDocument();
   });
 
   it('renders ContextPack quality metadata as structured details instead of raw JSON', () => {

@@ -4,6 +4,7 @@ export * from './IconButton';
 export * from './Field';
 export * from './Textarea';
 export * from './SegmentedControl';
+export * from './ResponsiveFilterPanel';
 export * from './SearchInput';
 export * from './NotificationPanel';
 export * from './Surface';

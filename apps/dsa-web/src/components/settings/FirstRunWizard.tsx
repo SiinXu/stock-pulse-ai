@@ -23,6 +23,7 @@ import { formatUiText } from '../../i18n/uiText';
 import { SETTINGS_WIZARD_TEXT } from '../../locales/settingsWizard';
 import { encodeModelRef } from '../../utils/modelRef';
 import { ProviderQuickLinks } from './ProviderQuickLinks';
+import { SETTINGS_CONTROL_WIDTH_CLASS } from './settingsControlLayout';
 
 export interface WizardDraftItem {
   key: string;
@@ -564,6 +565,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                     label: getProviderDisplayLabel(entry, language),
                   }))}
                   disabled={fieldIsReadOnly('provider_id')}
+                  className={SETTINGS_CONTROL_WIDTH_CLASS}
                 />
               </div>
             ) : null}
@@ -582,6 +584,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                   }}
                   options={protocolOptions}
                   disabled={fieldIsReadOnly('protocol')}
+                  className={SETTINGS_CONTROL_WIDTH_CLASS}
                 />
               </div>
             ) : null}
@@ -627,6 +630,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                     }
                   }}
                   disabled={fieldIsReadOnly('base_url')}
+                  fieldClassName={SETTINGS_CONTROL_WIDTH_CLASS}
                 />
               </div>
             ) : null}
@@ -654,6 +658,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
               onChange={setCliBackend}
               options={CLI_BACKENDS}
               placeholder={text.select}
+              className={SETTINGS_CONTROL_WIDTH_CLASS}
             />
           </div>
         ) : null}
@@ -781,6 +786,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
               value={reportModel || modelOptions[0] || ''}
               onChange={setReportModel}
               options={modelOptions.map((model) => ({ value: model, label: model }))}
+              className={SETTINGS_CONTROL_WIDTH_CLASS}
             />
             <p className="text-xs text-muted-text">
               {text.inheritanceHint}

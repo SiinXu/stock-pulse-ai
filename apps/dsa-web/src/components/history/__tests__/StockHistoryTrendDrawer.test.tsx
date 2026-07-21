@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../../utils/uiLanguage';
@@ -35,6 +35,7 @@ const items: HistoryItem[] = [
     action: 'avoid',
     actionLabel: '回避',
     trendPrediction: '震荡',
+    modelUsed: 'openai/gpt-test',
     createdAt: '2026-03-20T08:00:00Z',
   },
 ];
@@ -68,6 +69,57 @@ describe('StockHistoryTrendDrawer', () => {
       expect(rangeButton).toHaveClass('min-h-11', 'min-w-11');
     }
     expect(screen.getByRole('button', { name: '查看报告' })).toHaveClass('min-h-11', 'min-w-11');
+    const model = within(screen.getByRole('table')).getByText('gpt-test');
+    fireEvent.mouseEnter(model);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('openai/gpt-test');
+  });
+
+  it('keeps fixed proportional columns, keyboard row selection, and nested report actions isolated', () => {
+    const onClose = vi.fn();
+    const onSelectRecord = vi.fn();
+    render(
+      <StockHistoryTrendDrawer
+        report={report}
+        items={[
+          items[0],
+          {
+            ...items[0],
+            id: 2,
+            queryId: 'q-2',
+            createdAt: '2026-03-19T08:00:00Z',
+          },
+        ]}
+        total={2}
+        hasMore={false}
+        isLoading={false}
+        isLoadingMore={false}
+        filters={{ range: 'all', model: 'all', sort: 'desc' }}
+        onClose={onClose}
+        onRangeChange={vi.fn()}
+        onLoadMore={vi.fn()}
+        onSelectRecord={onSelectRecord}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    const table = screen.getByRole('table', { name: '历史分析记录' });
+    const [, firstRow, secondRow] = within(table).getAllByRole('row');
+    expect(table).toHaveAttribute('data-layout', 'fixed');
+    expect(table).toHaveClass('min-w-[64rem]');
+    expect(table.querySelectorAll('colgroup col')).toHaveLength(9);
+    expect(table.parentElement).toHaveAttribute('data-data-table', 'ready');
+    expect(table.parentElement).not.toHaveAttribute('data-surface-level');
+    expect(firstRow).toHaveAttribute('aria-selected', 'true');
+    expect(secondRow).toHaveAttribute('aria-selected', 'false');
+
+    fireEvent.keyDown(secondRow, { key: 'Enter' });
+    expect(firstRow).toHaveAttribute('aria-selected', 'false');
+    expect(secondRow).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.click(within(firstRow).getByRole('button', { name: '查看报告' }));
+    expect(onSelectRecord).toHaveBeenCalledWith(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(secondRow).toHaveAttribute('aria-selected', 'true');
   });
 
   it('keeps full legacy operation advice when structured action is absent', () => {

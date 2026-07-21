@@ -617,6 +617,29 @@ test.describe('Settings Help shared tooltip contract', () => {
 });
 
 test.describe('Home URL-owned report and Run Flow contract', () => {
+  test('390px history trend keeps the fixed table inside its own scroll region', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openFixtureHome(page, '/?recordId=1');
+    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'History trend' }).click();
+
+    const table = page.getByRole('table', { name: 'Historical analysis records' });
+    const scrollRegion = page.getByRole('region', { name: 'Historical analysis records' });
+    await expect(table).toHaveAttribute('data-layout', 'fixed');
+    await expect(table).toHaveClass(/(?:^|\s)min-w-\[64rem\](?:\s|$)/);
+    const dimensions = await scrollRegion.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      left: element.getBoundingClientRect().left,
+      right: element.getBoundingClientRect().right,
+    }));
+    expect(dimensions.scrollWidth).toBeGreaterThan(dimensions.clientWidth);
+    expect(dimensions.left).toBeGreaterThanOrEqual(0);
+    expect(dimensions.right).toBeLessThanOrEqual(391);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth))
+      .toBeLessThanOrEqual(await page.evaluate(() => document.documentElement.clientWidth + 1));
+  });
+
   test('report deep link survives refresh and click, Back, and Forward restore selection', async ({ page }) => {
     const fixture = await openFixtureHome(page, '/?keep=yes&recordId=2');
     await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();

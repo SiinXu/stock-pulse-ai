@@ -198,7 +198,7 @@ export const StockBar: React.FC<StockBarProps> = ({
                       onChange={() => toggleCode(code)}
                       disabled={isDeleting}
                       aria-label={t('history.selectRecordAria', { name: item.stockName || code })}
-                      containerClassName="h-11 w-11 shrink-0 justify-center self-center"
+                      containerClassName="h-11 w-11 shrink-0 self-center"
                     />
                   )}
                   <StockBarItemComponent

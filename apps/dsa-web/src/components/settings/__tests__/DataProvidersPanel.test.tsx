@@ -83,17 +83,35 @@ describe('DataProvidersPanel', () => {
     expect(within(alphasiftCard).getByText('已配置')).toBeInTheDocument();
   });
 
-  it('opens a config dialog with only the provider fields', () => {
+  it('keeps the provider directory inline and mounts fields only in the shared dialog', () => {
     renderPanel([
       buildItem('TUSHARE_TOKEN', ''),
       buildItem('TAVILY_API_KEYS', 'key-1'),
     ]);
 
-    fireEvent.click(screen.getByRole('button', { name: /Tushare/ }));
+    const trigger = screen.getByRole('button', { name: /Tushare/ });
+    expect(screen.getByRole('heading', { name: '行情源' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '搜索源' })).toBeInTheDocument();
+    expect(within(trigger).getByText('未配置')).toBeInTheDocument();
+    expect(within(screen.getByRole('button', { name: /Tavily/ })).getByText('已配置')).toBeInTheDocument();
+    expect(document.querySelector('#setting-TUSHARE_TOKEN')).toBeNull();
 
-    const dialog = screen.getByRole('dialog');
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    const dialog = screen.getByRole('dialog', { name: 'Tushare' });
+    expect(dialog).toHaveAttribute('data-overlay-dialog', 'true');
     // SettingsField renders localized titles; assert on stable control ids.
-    expect(dialog.querySelector('#setting-TUSHARE_TOKEN')).not.toBeNull();
+    const providerField = dialog.querySelector('#setting-TUSHARE_TOKEN');
+    expect(providerField).not.toBeNull();
+    expect(providerField?.closest('[role="dialog"]')).toBe(dialog);
     expect(dialog.querySelector('#setting-TAVILY_API_KEYS')).toBeNull();
+
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+
+    expect(screen.queryByRole('dialog', { name: 'Tushare' })).not.toBeInTheDocument();
+    expect(document.querySelector('#setting-TUSHARE_TOKEN')).toBeNull();
+    expect(trigger).toHaveFocus();
+    expect(within(trigger).getByText('未配置')).toBeInTheDocument();
   });
 });

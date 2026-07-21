@@ -18,52 +18,6 @@ const productionSources = { ...productionTs, ...productionTsx };
 
 const DATA_TABLE_OWNER = '../common/DataTable.tsx';
 
-type LegacyTableAllowance = {
-  file: string;
-  token: 'table';
-  count: number;
-  owner: 'UIUX-HARNESS';
-  removeWhen: string;
-};
-
-const LEGACY_TABLE_ALLOWANCES: readonly LegacyTableAllowance[] = [
-  {
-    file: '../history/StockHistoryTrendDrawer.tsx',
-    token: 'table',
-    count: 1,
-    owner: 'UIUX-HARNESS',
-    removeWhen: 'DataTable supports selected-row presentation and percentage/fixed-layout columns without caller geometry overrides.',
-  },
-  {
-    file: '../report/MarketReviewReportView.tsx',
-    token: 'table',
-    count: 1,
-    owner: 'UIUX-HARNESS',
-    removeWhen: 'DataTable supports an embedded unframed report-table mode without nesting a Surface inside the report Card.',
-  },
-  {
-    file: '../run-flow/RunFlowNodeDetails.tsx',
-    token: 'table',
-    count: 1,
-    owner: 'UIUX-HARNESS',
-    removeWhen: 'DataTable supports an embedded unframed compact mode for overlay detail panels.',
-  },
-  {
-    file: '../settings/AiOverviewMatrix.tsx',
-    token: 'table',
-    count: 1,
-    owner: 'UIUX-HARNESS',
-    removeWhen: 'The settings matrix can preserve settings-border ownership and stable per-task row test IDs through DataTable.',
-  },
-  {
-    file: '../../pages/TokenUsagePage.tsx',
-    token: 'table',
-    count: 1,
-    owner: 'UIUX-HARNESS',
-    removeWhen: 'Recent calls can use an embedded DataTable inside Section without a nested card and preserve the no-calls state.',
-  },
-];
-
 type SourceFinding = {
   file: string;
   line: number;
@@ -236,24 +190,11 @@ describe('DataTable production guard', () => {
       .toEqual(inventory(findRawTables('../../pages/ExamplePage.tsx', legacy)));
   });
 
-  it('keeps legacy raw tables exact, consumable, and assigned to concrete prerequisites', () => {
+  it('keeps the production raw-table inventory empty outside the shared owner', () => {
     const actual = inventory(Object.entries(productionSources)
       .filter(([filename]) => isProductionSource(filename) && filename !== DATA_TABLE_OWNER)
       .flatMap(([filename, source]) => findRawTables(filename, source)));
-    const allowed = LEGACY_TABLE_ALLOWANCES
-      .map(({ file, token, count }) => ({ file, token, count }))
-      .sort((left, right) => left.file.localeCompare(right.file) || left.token.localeCompare(right.token));
 
-    expect(actual).toEqual(allowed);
-    expect(new Set(allowed.map(({ file, token }) => `${file}:${token}`)).size).toBe(allowed.length);
-    for (const allowance of LEGACY_TABLE_ALLOWANCES) {
-      expect(allowance.owner).toBe('UIUX-HARNESS');
-      expect(allowance.removeWhen.trim().length).toBeGreaterThan(0);
-      expect(allowance.count).toBeGreaterThan(0);
-      const source = productionSources[allowance.file];
-      expect(source, `${allowance.file} must remain in the production scan`).toBeDefined();
-      expect(findRawTables(allowance.file, source).filter(({ token }) => token === allowance.token))
-        .toHaveLength(allowance.count);
-    }
+    expect(actual).toEqual([]);
   });
 });

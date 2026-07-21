@@ -88,6 +88,7 @@ function DataTableFixture() {
   });
   const [openedRow, setOpenedRow] = useState('No row opened');
   const [nestedAction, setNestedAction] = useState('No nested action');
+  const [selectedRow, setSelectedRow] = useState('aapl');
 
   const columns: readonly DataTableColumn<SignalRow>[] = [
     {
@@ -169,6 +170,21 @@ function DataTableFixture() {
       return left.symbol.localeCompare(right.symbol) * direction;
     });
   }, [sort]);
+  const embeddedColumns: readonly DataTableColumn<SignalRow>[] = [
+    {
+      id: 'symbol',
+      header: 'Symbol',
+      rowHeader: true,
+      widthPercent: 35,
+      cell: (row) => <span className="font-semibold text-foreground">{row.symbol}</span>,
+    },
+    {
+      id: 'company',
+      header: 'Company',
+      widthPercent: 65,
+      cell: (row) => row.company,
+    },
+  ];
 
   const status: DataTableStatus | undefined = view === 'loading'
     ? { state: 'loading', title: 'Loading tracked signals' }
@@ -225,6 +241,39 @@ function DataTableFixture() {
           onRowActivate={(row) => setOpenedRow(`Opened ${row.symbol}`)}
           getRowAriaLabel={(row) => `Open ${row.symbol} signal`}
         />
+
+        {view === 'ready' ? (
+          <section aria-labelledby="embedded-table-title" className="space-y-2">
+            <h2 id="embedded-table-title" className="text-base font-semibold text-foreground">
+              Embedded selection
+            </h2>
+            <p data-testid="selected-result" aria-live="polite" className="text-xs text-secondary-text">
+              Selected {selectedRow.toUpperCase()}
+            </p>
+            <div
+              data-testid="embedded-table-frame"
+              className="overflow-hidden rounded-xl border border-[var(--settings-border)]"
+            >
+              <DataTable
+                caption="Embedded selected signals"
+                scrollAreaLabel="Scrollable embedded selected signals"
+                columns={embeddedColumns}
+                rows={SIGNALS}
+                getRowKey={(row) => row.id}
+                emptyState={{ title: 'No embedded signals' }}
+                density="compact"
+                frame="embedded"
+                layout="fixed"
+                minWidth="narrow"
+                separatorTone="inherit"
+                onRowActivate={(row) => setSelectedRow(row.id)}
+                getRowAriaLabel={(row) => `Select ${row.symbol} signal`}
+                isRowSelected={(row) => row.id === selectedRow}
+                getRowTestId={(row) => `embedded-row-${row.id}`}
+              />
+            </div>
+          </section>
+        ) : null}
       </div>
     </main>
   );

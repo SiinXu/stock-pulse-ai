@@ -131,7 +131,7 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
               onDelete(item.stockCode);
             }}
             disabled={isDeleting}
-            className="opacity-70 transition-opacity group-hover/item:opacity-100 focus-visible:opacity-100"
+            className="history-delete-btn transition-opacity"
             aria-label={t('history.deleteRecord', { name: item.stockName || item.stockCode })}
           >
             <svg className="h-3.5 w-3.5 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">

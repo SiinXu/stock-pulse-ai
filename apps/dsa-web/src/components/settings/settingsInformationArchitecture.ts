@@ -45,9 +45,10 @@ export interface SettingsSection {
   defaultView: string;
 }
 
-// First-level sections in display order. Only AI & Models is split into
-// multiple second-level views in this phase; other sections carry a single
-// implicit view (`main`) so the two-level shell renders uniformly.
+// First-level sections in display order. Content-heavy sections (AI & Models,
+// Data Sources, Alerts & Automation, System & Security) split into multiple
+// second-level views rendered as horizontal tabs; the rest carry a single
+// implicit view so the two-level shell renders uniformly.
 export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'overview',
@@ -71,6 +72,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.data_sources.label", { zh: '数据源', en: 'Data Sources' }),
     views: [
       { id: 'sources', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.data_sources.views.sources.label", { zh: '行情与资讯', en: 'Sources' }) },
+      { id: 'intelligence', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.data_sources.views.intelligence.label", { zh: '情报源', en: 'Intel Sources' }) },
       { id: 'providers', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.data_sources.views.providers.label", { zh: '数据提供方', en: 'Providers' }) },
     ],
     defaultView: 'sources',
@@ -96,8 +98,12 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'alerts',
     label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.alerts.label", { zh: '告警与自动化', en: 'Alerts & Automation' }),
-    views: [{ id: 'rules', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.alerts.views.rules.label", { zh: '规则', en: 'Rules' }) }],
-    defaultView: 'rules',
+    views: [
+      { id: 'routing', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.alerts.views.routing.label", { zh: '推送路由', en: 'Push Routing' }) },
+      { id: 'behavior', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.alerts.views.behavior.label", { zh: '行为与频控', en: 'Behavior & Limits' }) },
+      { id: 'events', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.alerts.views.events.label", { zh: '事件监控', en: 'Event Monitor' }) },
+    ],
+    defaultView: 'routing',
   },
   {
     id: 'notifications',
@@ -114,13 +120,27 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'system_security',
     label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.system_security.label", { zh: '系统与安全', en: 'System & Security' }),
-    views: [{ id: 'runtime', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.system_security.views.runtime.label", { zh: '运行时', en: 'Runtime' }) }],
+    views: [
+      // Keeps the historical `runtime` id for URL back-compat; the tab hosts the
+      // scheduler card, while plain system fields live on the General tab.
+      { id: 'runtime', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.system_security.views.runtime.label", { zh: '调度', en: 'Scheduling' }) },
+      { id: 'general', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.system_security.views.general.label", { zh: '系统设置', en: 'System Settings' }) },
+      { id: 'service', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.system_security.views.service.label", { zh: '服务与日志', en: 'Web & Logs' }) },
+      { id: 'security', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.system_security.views.security.label", { zh: '认证与安全', en: 'Auth & Security' }) },
+      { id: 'about', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.system_security.views.about.label", { zh: '版本与更新', en: 'Version & Updates' }) },
+    ],
     defaultView: 'runtime',
   },
   {
     id: 'advanced',
     label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.advanced.label", { zh: '高级', en: 'Advanced' }),
-    views: [{ id: 'raw_config', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.advanced.views.raw_config.label", { zh: '原始配置', en: 'Raw Config' }) }],
+    views: [
+      // Keeps the historical `raw_config` id for URL back-compat; the tab now
+      // reads as Backend Status since developer fields moved to `diagnostics`.
+      { id: 'raw_config', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.advanced.views.raw_config.label", { zh: '后端状态', en: 'Backend Status' }) },
+      { id: 'diagnostics', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.advanced.views.diagnostics.label", { zh: '开发者诊断', en: 'Developer Diagnostics' }) },
+      { id: 'backup', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.advanced.views.backup.label", { zh: '配置备份', en: 'Config Backup' }) },
+    ],
     defaultView: 'raw_config',
   },
 ];
@@ -178,7 +198,7 @@ export function legacyToSectionView(category: string, sub: string | null): Secti
       return { section: 'data_sources', view: sub === 'providers' ? 'providers' : 'sources' };
     case 'notification':
       if (sub === 'rules') {
-        return { section: 'alerts', view: 'rules' };
+        return { section: 'alerts', view: 'routing' };
       }
       return { section: 'notifications', view: 'channels' };
     case 'agent':

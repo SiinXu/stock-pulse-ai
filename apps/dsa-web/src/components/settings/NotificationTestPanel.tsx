@@ -9,10 +9,12 @@ import type {
   TestNotificationChannelResponse,
   SystemConfigUpdateItem,
 } from '../../types/systemConfig';
-import { ApiErrorAlert, Badge, Button, InlineAlert, Input, Modal, Select } from '../common';
+import { ApiErrorAlert, Badge, Button, InlineAlert, Input, Modal, Select, Textarea } from '../common';
 import { SettingsSectionCard } from './SettingsSectionCard';
+import { SettingsConfigurationSummary } from './SettingsConfigurationSummary';
 import { getNotificationChannelLabel } from '../../locales/settingsNotifications';
 import type { UiLanguage } from '../../i18n/uiText';
+import { SETTINGS_CONTROL_WIDTH_CLASS } from './settingsControlLayout';
 
 function getChannelOptions(language: UiLanguage): Array<{ value: NotificationTestChannel; label: string }> {
   return [
@@ -93,8 +95,10 @@ export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
       setError(getParsedApiError(requestError));
     } finally {
       setIsTesting(false);
+      setTestModalOpen(false);
     }
   };
+  const selectedChannelLabel = getChannelOptions(language).find((option) => option.value === channel)?.label ?? channel;
 
   return (
     <>
@@ -113,64 +117,26 @@ export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
           </Button>
         )}
       >
-        {null}
+        <SettingsConfigurationSummary
+          entries={[
+            {
+              id: 'notification-test-channel',
+              label: t('settings.notificationTestChannel'),
+              value: selectedChannelLabel,
+            },
+            {
+              id: 'notification-test-timeout',
+              label: t('settings.notificationTestTimeout'),
+              value: `${clampTimeout(timeoutSeconds)} s`,
+            },
+          ]}
+        />
       </SettingsSectionCard>
-
-      <Modal
-        isOpen={testModalOpen}
-        onClose={() => setTestModalOpen(false)}
-        title={t('settings.notificationTest')}
-      >
-        <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_120px]">
-        <Select
-          label={t('settings.notificationTestChannel')}
-          value={channel}
-          options={getChannelOptions(language)}
-          disabled={disabled || isTesting}
-          onChange={(value) => setChannel(value as NotificationTestChannel)}
-        />
-        <Input
-          label={t('settings.notificationTestTitle')}
-          value={title}
-          maxLength={80}
-          disabled={disabled || isTesting}
-          onChange={(event) => {
-            setIsTitleEdited(true);
-            setTitle(event.target.value);
-          }}
-        />
-        <Input
-          label={t('settings.notificationTestTimeout')}
-          type="number"
-          min={1}
-          max={120}
-          value={timeoutSeconds}
-          disabled={disabled || isTesting}
-          onChange={(event) => setTimeoutSeconds(event.target.value)}
-          onBlur={() => setTimeoutSeconds(String(clampTimeout(timeoutSeconds)))}
-        />
-      </div>
-
-      <label className="block">
-        <span className="mb-2 block text-sm font-normal text-foreground">{t('settings.notificationTestBody')}</span>
-        <textarea
-          value={content}
-          maxLength={1000}
-          rows={4}
-          disabled={disabled || isTesting}
-          onChange={(event) => {
-            setIsContentEdited(true);
-            setContent(event.target.value);
-          }}
-          className="min-h-28 w-full resize-y rounded-lg border border-border bg-transparent px-3 py-2 text-xs leading-6 text-foreground placeholder:text-muted-text transition-colors duration-200 outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-50"
-        />
-      </label>
 
       {error ? <ApiErrorAlert error={error} /> : null}
 
       {result ? (
-        <div className="space-y-3">
+        <div className="space-y-3" data-testid="notification-test-result">
           <InlineAlert
             variant={result.success ? 'success' : 'danger'}
             title={result.success ? t('settings.notificationTestSuccess') : t('settings.notificationTestFailure')}
@@ -223,6 +189,59 @@ export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
           ) : null}
         </div>
       ) : null}
+
+      <Modal
+        isOpen={testModalOpen}
+        onClose={() => setTestModalOpen(false)}
+        title={t('settings.notificationTest')}
+      >
+        <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <Select
+          label={t('settings.notificationTestChannel')}
+          value={channel}
+          options={getChannelOptions(language)}
+          disabled={disabled || isTesting}
+          onChange={(value) => setChannel(value as NotificationTestChannel)}
+          className={SETTINGS_CONTROL_WIDTH_CLASS}
+        />
+        <Input
+          label={t('settings.notificationTestTitle')}
+          value={title}
+          fieldClassName={SETTINGS_CONTROL_WIDTH_CLASS}
+          maxLength={80}
+          disabled={disabled || isTesting}
+          onChange={(event) => {
+            setIsTitleEdited(true);
+            setTitle(event.target.value);
+          }}
+        />
+        <Input
+          label={t('settings.notificationTestTimeout')}
+          type="number"
+          fieldClassName={SETTINGS_CONTROL_WIDTH_CLASS}
+          min={1}
+          max={120}
+          value={timeoutSeconds}
+          disabled={disabled || isTesting}
+          onChange={(event) => setTimeoutSeconds(event.target.value)}
+          onBlur={() => setTimeoutSeconds(String(clampTimeout(timeoutSeconds)))}
+        />
+      </div>
+
+        <Textarea
+          label={t('settings.notificationTestBody')}
+          value={content}
+          maxLength={1000}
+          rows={4}
+          fieldClassName={SETTINGS_CONTROL_WIDTH_CLASS}
+          className="leading-6"
+          disabled={disabled || isTesting}
+          onChange={(event) => {
+            setIsContentEdited(true);
+            setContent(event.target.value);
+          }}
+        />
 
           <Button
             type="button"

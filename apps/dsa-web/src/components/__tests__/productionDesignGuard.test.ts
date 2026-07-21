@@ -61,10 +61,16 @@ const FILTER_CHIP_OWNER = '../common/AppliedFilterChips.tsx';
 const FILTER_CHIP_CONTROL_PATTERN = /\bdata-control\s*=\s*["']filter-chip["']/;
 const BUTTON_RADIUS_CLASS_PATTERN = /^rounded(?:-(?:none|sm|md|lg|xl|2xl|3xl|full|\[[^\]]+\]))?$/;
 const BUTTON_CANONICAL_SIZE_HEIGHTS = {
-  compact: 'h-7',
-  default: 'h-8',
-  comfortable: 'h-9',
-  primary: 'h-10',
+  compact: 'h-5',
+  default: 'h-6',
+  comfortable: 'h-7',
+  primary: 'h-8',
+} as const;
+const BUTTON_CANONICAL_SIZE_RADII = {
+  compact: 'rounded-md',
+  default: 'rounded-md',
+  comfortable: 'rounded-md',
+  primary: 'rounded-lg',
 } as const;
 const BUTTON_LEGACY_SIZE_ALIASES = new Set(['xsm', 'sm', 'md', 'lg', 'xl']);
 const BUTTON_HEIGHT_CLASS_PATTERN = /^h-\d+$/;
@@ -2090,9 +2096,12 @@ function appendButtonSizeContractViolations(
   entries: Map<string, ButtonSizeStyleEntry>,
   violations: DesignViolation[],
 ): void {
-  for (const entry of entries.values()) {
+  for (const [size, entry] of entries) {
     const radii = buttonRadiusClasses(entry.fragments);
-    if (radii.length === 1 && radii[0] === 'rounded-lg') continue;
+    const expectedRadius = BUTTON_CANONICAL_SIZE_RADII[
+      size as keyof typeof BUTTON_CANONICAL_SIZE_RADII
+    ] ?? 'rounded-lg';
+    if (radii.length === 1 && radii[0] === expectedRadius) continue;
     violations.push({
       file: filename,
       line: lineNumberAt(source, entry.index),
@@ -2829,10 +2838,10 @@ describe('production design guard', () => {
   it('self-test inspects the shared Button size style map', () => {
     const source = `
       const BUTTON_SIZE_STYLES = {
-        compact: 'h-7 rounded-full px-2',
-        default: 'h-8 rounded-lg px-3',
-        comfortable: 'h-9 rounded-lg px-3',
-        primary: 'h-10 rounded-lg px-4',
+        compact: 'h-5 rounded-full px-2',
+        default: 'h-6 rounded-md px-3',
+        comfortable: 'h-7 rounded-md px-3',
+        primary: 'h-8 rounded-lg px-4',
       } as const;
       export const Button = () => <button className={BUTTON_SIZE_STYLES.compact}>Run</button>;
     `;
@@ -2845,17 +2854,17 @@ describe('production design guard', () => {
   it('self-test enforces canonical Button tiers and rejects out-of-contract heights', () => {
     const source = `
       const BUTTON_SIZE_STYLES = {
-        compact: 'h-8 rounded-lg px-2',
-        default: 'h-8 rounded-lg px-3',
-        comfortable: 'h-9 rounded-lg px-3',
-        primary: 'h-10 rounded-lg px-4',
+        compact: 'h-6 rounded-md px-2',
+        default: 'h-6 rounded-md px-3',
+        comfortable: 'h-7 rounded-md px-3',
+        primary: 'h-8 rounded-lg px-4',
         xsm: 'h-6 rounded-lg px-2',
       } as const;
       export const Button = () => <button className={BUTTON_SIZE_STYLES.compact}>Run</button>;
     `;
 
     expect(findProductionDesignViolations('fixture.tsx', source)).toEqual([
-      expect.objectContaining({ rule: 'button-size-contract', token: 'compact:h-8' }),
+      expect.objectContaining({ rule: 'button-size-contract', token: 'compact:h-6' }),
       expect.objectContaining({ rule: 'button-size-contract', token: 'xsm:legacy' }),
     ]);
   });
@@ -2863,12 +2872,12 @@ describe('production design guard', () => {
   it('rejects legacy Button size aliases in both the style map and shared callers', () => {
     const styleSource = `
       const BUTTON_SIZE_STYLES = {
-        compact: 'h-7 rounded-lg px-2',
-        default: 'h-8 rounded-lg px-3',
-        comfortable: 'h-9 rounded-lg px-3',
-        primary: 'h-10 rounded-lg px-4',
-        xsm: 'h-7 rounded-lg px-2',
-        xl: 'h-10 rounded-lg px-5',
+        compact: 'h-5 rounded-md px-2',
+        default: 'h-6 rounded-md px-3',
+        comfortable: 'h-7 rounded-md px-3',
+        primary: 'h-8 rounded-lg px-4',
+        xsm: 'h-5 rounded-md px-2',
+        xl: 'h-9 rounded-lg px-5',
       } as const;
       export const Button = () => <button className={BUTTON_SIZE_STYLES.compact}>Run</button>;
     `;
