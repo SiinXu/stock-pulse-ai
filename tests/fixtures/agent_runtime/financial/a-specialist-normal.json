@@ -218,6 +218,42 @@
             "is_bullish": true
           }
         },
+        "strategy_synthesis": {
+          "final_signal": "buy",
+          "weighted_score": 4.0,
+          "confidence": 0.7,
+          "original_confidence": 0.7,
+          "conflict_count": 0,
+          "conflict_severity": "none",
+          "conflicts": [],
+          "supporting_skills": [
+            {
+              "skill_id": "bull_trend",
+              "agent_name": "skill_bull_trend",
+              "signal": "buy",
+              "confidence": 0.7,
+              "reasoning": "主升趋势结构成立，量能一般，符合回踩低吸条件。",
+              "score_adjustment": 5.0,
+              "conditions_met": [
+                "MA多头排列",
+                "趋势评分>70"
+              ],
+              "invalid_signal": false
+            }
+          ],
+          "opposing_skills": [],
+          "consensus_level": "insufficient",
+          "summary_key": "strategy_synthesis.no_conflicts",
+          "summary_params": {
+            "opinion_count": 1,
+            "total_opinion_count": 1,
+            "invalid_opinion_count": 0,
+            "final_signal": "buy",
+            "consensus_level": "insufficient",
+            "conflict_severity": "none",
+            "conflict_count": 0
+          }
+        },
         "intelligence": {
           "risk_alerts": []
         }
@@ -228,11 +264,11 @@
         "无重大新闻催化，情绪中性。",
         "无重大风险信号。",
         "主升趋势结构成立，量能一般，符合回踩低吸条件。",
-        "Skill consensus from 1 skills (bull_trend): weighted score 4.00/5.0\n  - bull_trend: buy (70%) weight=0.70"
+        "Skill consensus from 1 skills (bull_trend): weighted score 4.00/5.0, consensus=insufficient, conflicts=none(0)\n  - bull…"
       ],
       "risk_warning": "跌破MA20需止损"
     },
-    "content": "{\n  \"stock_name\": \"贵州茅台\",\n  \"sentiment_score\": 73,\n  \"trend_prediction\": \"震荡上行\",\n  \"operation_advice\": \"回踩MA5轻仓买入\",\n  \"decision_type\": \"buy\",\n  \"confidence_level\": \"中\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"趋势与策略共振，回踩低吸\",\n      \"signal_type\": \"🟢买入信号\",\n      \"position_advice\": {\n        \"no_position\": \"回踩98附近轻仓介入\",\n        \"has_position\": \"持有，跌破95止损\"\n      },\n      \"time_sensitivity\": \"本周内\"\n    },\n    \"battle_plan\": {\n      \"support\": 98.0,\n      \"resistance\": 105.0,\n      \"stop_loss\": 95.0,\n      \"sniper_points\": {\n        \"ideal_buy\": 98.0,\n        \"secondary_buy\": \"N/A\",\n        \"stop_loss\": 95.0,\n        \"take_profit\": 105.0\n      },\n      \"action_checklist\": [],\n      \"position_strategy\": {\n        \"suggested_position\": \"轻仓试仓\",\n        \"entry_plan\": \"回踩98附近轻仓介入\",\n        \"risk_control\": \"止损参考 95.0\"\n      }\n    },\n    \"phase_decision\": {\n      \"phase_context\": \"基于最近收盘数据\",\n      \"action_window\": \"次一交易日\",\n      \"immediate_action\": \"回踩支撑再介入\",\n      \"watch_conditions\": \"是否缩量回踩MA5\",\n      \"next_check_time\": \"次日收盘\",\n      \"confidence_reason\": \"技术面与bull_trend策略结论一致\",\n      \"data_limitations\": \"无\"\n    },\n    \"data_perspective\": {\n      \"trend_status\": {\n        \"ma_alignment\": \"bullish\",\n        \"trend_score\": 78,\n        \"is_bullish\": true\n      }\n    },\n    \"intelligence\": {\n      \"risk_alerts\": []\n    }\n  },\n  \"analysis_summary\": \"技术面多头排列，bull_trend策略确认主升结构，采取回踩低吸策略。\",\n  \"key_points\": [\n    \"均线多头排列且量能配合，趋势延续概率较高。\",\n    \"无重大新闻催化，情绪中性。\",\n    \"无重大风险信号。\",\n    \"主升趋势结构成立，量能一般，符合回踩低吸条件。\",\n    \"Skill consensus from 1 skills (bull_trend): weighted score 4.00/5.0\\n  - bull_trend: buy (70%) weight=0.70\"\n  ],\n  \"risk_warning\": \"跌破MA20需止损\"\n}",
+    "content": "{\n  \"stock_name\": \"贵州茅台\",\n  \"sentiment_score\": 73,\n  \"trend_prediction\": \"震荡上行\",\n  \"operation_advice\": \"回踩MA5轻仓买入\",\n  \"decision_type\": \"buy\",\n  \"confidence_level\": \"中\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"趋势与策略共振，回踩低吸\",\n      \"signal_type\": \"🟢买入信号\",\n      \"position_advice\": {\n        \"no_position\": \"回踩98附近轻仓介入\",\n        \"has_position\": \"持有，跌破95止损\"\n      },\n      \"time_sensitivity\": \"本周内\"\n    },\n    \"battle_plan\": {\n      \"support\": 98.0,\n      \"resistance\": 105.0,\n      \"stop_loss\": 95.0,\n      \"sniper_points\": {\n        \"ideal_buy\": 98.0,\n        \"secondary_buy\": \"N/A\",\n        \"stop_loss\": 95.0,\n        \"take_profit\": 105.0\n      },\n      \"action_checklist\": [],\n      \"position_strategy\": {\n        \"suggested_position\": \"轻仓试仓\",\n        \"entry_plan\": \"回踩98附近轻仓介入\",\n        \"risk_control\": \"止损参考 95.0\"\n      }\n    },\n    \"phase_decision\": {\n      \"phase_context\": \"基于最近收盘数据\",\n      \"action_window\": \"次一交易日\",\n      \"immediate_action\": \"回踩支撑再介入\",\n      \"watch_conditions\": \"是否缩量回踩MA5\",\n      \"next_check_time\": \"次日收盘\",\n      \"confidence_reason\": \"技术面与bull_trend策略结论一致\",\n      \"data_limitations\": \"无\"\n    },\n    \"data_perspective\": {\n      \"trend_status\": {\n        \"ma_alignment\": \"bullish\",\n        \"trend_score\": 78,\n        \"is_bullish\": true\n      }\n    },\n    \"strategy_synthesis\": {\n      \"final_signal\": \"buy\",\n      \"weighted_score\": 4.0,\n      \"confidence\": 0.7,\n      \"original_confidence\": 0.7,\n      \"conflict_count\": 0,\n      \"conflict_severity\": \"none\",\n      \"conflicts\": [],\n      \"supporting_skills\": [\n        {\n          \"skill_id\": \"bull_trend\",\n          \"agent_name\": \"skill_bull_trend\",\n          \"signal\": \"buy\",\n          \"confidence\": 0.7,\n          \"reasoning\": \"主升趋势结构成立，量能一般，符合回踩低吸条件。\",\n          \"score_adjustment\": 5.0,\n          \"conditions_met\": [\n            \"MA多头排列\",\n            \"趋势评分>70\"\n          ],\n          \"invalid_signal\": false\n        }\n      ],\n      \"opposing_skills\": [],\n      \"consensus_level\": \"insufficient\",\n      \"summary_key\": \"strategy_synthesis.no_conflicts\",\n      \"summary_params\": {\n        \"opinion_count\": 1,\n        \"total_opinion_count\": 1,\n        \"invalid_opinion_count\": 0,\n        \"final_signal\": \"buy\",\n        \"consensus_level\": \"insufficient\",\n        \"conflict_severity\": \"none\",\n        \"conflict_count\": 0\n      }\n    },\n    \"intelligence\": {\n      \"risk_alerts\": []\n    }\n  },\n  \"analysis_summary\": \"技术面多头排列，bull_trend策略确认主升结构，采取回踩低吸策略。\",\n  \"key_points\": [\n    \"均线多头排列且量能配合，趋势延续概率较高。\",\n    \"无重大新闻催化，情绪中性。\",\n    \"无重大风险信号。\",\n    \"主升趋势结构成立，量能一般，符合回踩低吸条件。\",\n    \"Skill consensus from 1 skills (bull_trend): weighted score 4.00/5.0, consensus=insufficient, conflicts=none(0)\\n  - bull…\"\n  ],\n  \"risk_warning\": \"跌破MA20需止损\"\n}",
     "error": null
   }
 }

@@ -427,6 +427,46 @@ test.describe('Settings Help shared tooltip contract', () => {
     await expectBodyOverflow(page, '');
   });
 
+  test('Tooltip and sibling Popover preserve topmost Escape and outside-press ownership', async ({ page }) => {
+    await openOverlayFixture(page, 390);
+    await page.getByTestId('open-popover').click();
+    const menu = page.getByRole('menu', { name: 'Fixture actions' });
+    const menuItem = page.getByRole('menuitem', { name: 'Fixture action' });
+    const helpTrigger = page.getByRole('button', { name: 'View Standalone help configuration help' });
+    await expect(menu).toBeVisible();
+    await helpTrigger.hover();
+    await expect(page.getByRole('tooltip')).toBeVisible();
+    await expect(menuItem).toBeFocused();
+
+    await page.keyboard.press('Escape');
+
+    await expect(page.getByRole('tooltip')).toHaveCount(0);
+    await expect(menu).toBeVisible();
+    await page.getByTestId('open-popover').hover();
+    await helpTrigger.hover();
+    await expect(page.getByRole('tooltip')).toBeVisible();
+    await helpTrigger.click();
+    await expect(menu).toHaveCount(0);
+  });
+
+  test('Tooltip interaction inside an owned nested Popover preserves both menus', async ({ page }) => {
+    await openOverlayFixture(page, 390);
+    await page.getByTestId('open-popover').click();
+    const outerMenu = page.getByRole('menu', { name: 'Fixture actions', exact: true });
+    await outerMenu.getByRole('menuitem', { name: 'Open nested actions' }).click();
+    const innerMenu = page.getByRole('menu', { name: 'Nested fixture actions', exact: true });
+    const helpTrigger = innerMenu.getByRole('button', {
+      name: 'View Nested help configuration help',
+    });
+    await helpTrigger.hover();
+    await expect(page.getByRole('tooltip')).toBeVisible();
+
+    await helpTrigger.click();
+
+    await expect(outerMenu).toBeVisible();
+    await expect(innerMenu).toBeVisible();
+  });
+
   test('Help over Modal closes without closing or isolating the modal', async ({ page }) => {
     await openOverlayFixture(page, 390);
     const opener = page.getByTestId('open-modal');
@@ -455,6 +495,28 @@ test.describe('Settings Help shared tooltip contract', () => {
     await expectBodyOverflow(page, '');
   });
 
+  test('hovered Help consumes Escape while another Modal control owns focus', async ({ page }) => {
+    await openOverlayFixture(page, 390);
+    const opener = page.getByTestId('open-modal');
+    await opener.click();
+    const outerDialog = page.getByRole('dialog', { name: 'Outer modal' });
+    const focusedControl = outerDialog.getByTestId('open-confirm');
+    const helpTrigger = outerDialog.getByRole('button', { name: 'View Modal help configuration help' });
+    await focusedControl.focus();
+    await helpTrigger.hover();
+    await expect(page.getByRole('tooltip')).toBeVisible();
+
+    await page.keyboard.press('Escape');
+
+    await expect(page.getByRole('tooltip')).toHaveCount(0);
+    await expect(outerDialog).toBeVisible();
+    await expect(focusedControl).toBeFocused();
+    await expectBodyOverflow(page, 'hidden');
+    await page.keyboard.press('Escape');
+    await expect(outerDialog).toHaveCount(0);
+    await expect(opener).toBeFocused();
+  });
+
   test('Help over Drawer closes without closing or isolating the drawer', async ({ page }) => {
     await openOverlayFixture(page, 390);
     const opener = page.getByTestId('open-drawer');
@@ -479,6 +541,37 @@ test.describe('Settings Help shared tooltip contract', () => {
     await expect(outerDialog).toHaveCount(0);
     await expect(opener).toBeFocused();
     await expectBodyOverflow(page, '');
+  });
+
+  test('Detail Drawer exposes semantic slots and stays within its desktop width tier', async ({ page }) => {
+    await openOverlayFixture(page, 1280);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const opener = page.getByTestId('open-drawer');
+    await opener.click();
+    const drawer = page.getByRole('dialog', { name: 'Outer drawer' });
+    await expect(drawer).toBeVisible();
+    await expect(drawer).toHaveAttribute('data-drawer-variant', 'detail');
+    await expect(drawer).toHaveAttribute('data-drawer-side', 'right');
+    await expect(drawer).toHaveAttribute('data-drawer-size', 'default');
+    await expect(drawer.locator('[data-overlay-slot="header"]')).toContainText('Outer drawer');
+    await expect(drawer.locator('[data-overlay-slot="body"]')).toContainText('Open confirmation');
+    const maxAnimationDuration = await drawer.evaluate((element) => Math.max(
+      0,
+      ...element.getAnimations().map((animation) => {
+        const duration = animation.effect?.getComputedTiming().duration;
+        return typeof duration === 'number' ? duration : Number.POSITIVE_INFINITY;
+      }),
+    ));
+    expect(maxAnimationDuration).toBeLessThanOrEqual(1);
+    await drawer.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    const drawerBox = await drawer.boundingBox();
+    expect(drawerBox).not.toBeNull();
+    expect(Math.round(drawerBox!.width)).toBe(576);
+    await drawer.getByRole('button', { name: 'Close drawer' }).click();
+    await expect(drawer).toHaveCount(0);
+    await expect(opener).toBeFocused();
   });
 
   test('ConfirmDialog above Help remains the only Escape target and restores Help focus', async ({ page }) => {
@@ -524,6 +617,29 @@ test.describe('Settings Help shared tooltip contract', () => {
 });
 
 test.describe('Home URL-owned report and Run Flow contract', () => {
+  test('390px history trend keeps the fixed table inside its own scroll region', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openFixtureHome(page, '/?recordId=1');
+    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'History trend' }).click();
+
+    const table = page.getByRole('table', { name: 'Historical analysis records' });
+    const scrollRegion = page.getByRole('region', { name: 'Historical analysis records' });
+    await expect(table).toHaveAttribute('data-layout', 'fixed');
+    await expect(table).toHaveClass(/(?:^|\s)min-w-\[64rem\](?:\s|$)/);
+    const dimensions = await scrollRegion.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      left: element.getBoundingClientRect().left,
+      right: element.getBoundingClientRect().right,
+    }));
+    expect(dimensions.scrollWidth).toBeGreaterThan(dimensions.clientWidth);
+    expect(dimensions.left).toBeGreaterThanOrEqual(0);
+    expect(dimensions.right).toBeLessThanOrEqual(391);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth))
+      .toBeLessThanOrEqual(await page.evaluate(() => document.documentElement.clientWidth + 1));
+  });
+
   test('report deep link survives refresh and click, Back, and Forward restore selection', async ({ page }) => {
     const fixture = await openFixtureHome(page, '/?keep=yes&recordId=2');
     await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
@@ -659,12 +775,14 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
       '/?recordId=1&keep=yes&runFlow=task&runFlowTaskId=task-2',
     );
     await expect(page.getByTestId('run-flow-panel')).toBeVisible();
+    const runFlowModal = page.getByRole('dialog', { name: 'Run Flow' });
+    await expect(runFlowModal).toHaveAttribute('data-modal-size', 'fullscreen');
     await expect.poll(() => fixture.taskFlowRequests.filter((taskId) => taskId === 'task-2').length).toBeGreaterThanOrEqual(1);
 
     await page.reload();
     await expect(page.getByTestId('run-flow-panel')).toBeVisible();
     await expect.poll(() => fixture.taskFlowRequests.filter((taskId) => taskId === 'task-2').length).toBeGreaterThanOrEqual(2);
-    await page.getByRole('button', { name: 'Close drawer' }).click();
+    await runFlowModal.getByRole('button', { name: 'Close', exact: true }).click();
 
     await expect(page.getByTestId('run-flow-panel')).toHaveCount(0);
     await expectSearchParams(page, {
@@ -697,7 +815,7 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
     await page.reload();
     await expect(page.getByTestId('run-flow-panel')).toBeVisible();
     await expect.poll(() => fixture.historyFlowRequests.filter((recordId) => recordId === 2).length).toBeGreaterThanOrEqual(2);
-    await page.getByRole('button', { name: 'Close drawer' }).click();
+    await page.getByRole('dialog', { name: 'Run Flow' }).getByRole('button', { name: 'Close', exact: true }).click();
 
     await expect(page.getByTestId('run-flow-panel')).toHaveCount(0);
     await expectSearchParams(page, {
@@ -713,7 +831,7 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
     await expect(page.getByTestId('run-flow-panel')).toBeVisible();
   });
 
-  test('320px history Run Flow Drawer traps focus and restores its trigger on close', async ({ page }) => {
+  test('320px history Run Flow Modal traps focus and restores its trigger on close', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 844 });
     await openFixtureHome(page, '/?recordId=2');
     await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
@@ -721,29 +839,29 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
     const trigger = page.getByRole('button', { name: 'View run flow for history record 2' });
     await trigger.click();
 
-    const drawer = page.getByRole('dialog', { name: 'Run Flow' });
-    await expect(drawer).toBeVisible();
-    await expectFocusWithin(drawer);
+    const modal = page.getByRole('dialog', { name: 'Run Flow' });
+    await expect(modal).toBeVisible();
+    await expectFocusWithin(modal);
     await expect(page.locator('#root')).toHaveAttribute('inert', '');
     await expectBodyOverflow(page, 'hidden');
-    await drawer.evaluate(async (element) => {
+    await modal.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
-    const drawerBox = await drawer.boundingBox();
-    expect(drawerBox).not.toBeNull();
-    expect(drawerBox!.x).toBeGreaterThanOrEqual(0);
-    expect(drawerBox!.x + drawerBox!.width).toBeLessThanOrEqual(320);
-    expect(await drawer.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
-    await drawer.getByRole('button', { name: 'Close drawer' }).click();
+    const modalBox = await modal.boundingBox();
+    expect(modalBox).not.toBeNull();
+    expect(modalBox!.x).toBeGreaterThanOrEqual(0);
+    expect(modalBox!.x + modalBox!.width).toBeLessThanOrEqual(320);
+    expect(await modal.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await modal.getByRole('button', { name: 'Close', exact: true }).click();
 
-    await expect(drawer).toHaveCount(0);
+    await expect(modal).toHaveCount(0);
     await expect(trigger).toBeFocused();
     await expectSearchParams(page, { recordId: '2', runFlow: null, runFlowRecordId: null });
     await expect(page.locator('#root')).not.toHaveAttribute('inert', '');
     await expectBodyOverflow(page, '');
   });
 
-  test('390px history Run Flow Drawer closes with Escape and restores its trigger', async ({ page }) => {
+  test('390px history Run Flow Modal closes with Escape and restores its trigger', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openFixtureHome(page, '/?recordId=2');
     await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
@@ -751,12 +869,12 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
     const trigger = page.getByRole('button', { name: 'View run flow for history record 2' });
     await trigger.click();
 
-    const drawer = page.getByRole('dialog', { name: 'Run Flow' });
-    await expect(drawer).toBeVisible();
-    await expectFocusWithin(drawer);
+    const modal = page.getByRole('dialog', { name: 'Run Flow' });
+    await expect(modal).toBeVisible();
+    await expectFocusWithin(modal);
     await page.keyboard.press('Escape');
 
-    await expect(drawer).toHaveCount(0);
+    await expect(modal).toHaveCount(0);
     await expect(trigger).toBeFocused();
     await expectSearchParams(page, { recordId: '2', runFlow: null, runFlowRecordId: null });
     await expectBodyOverflow(page, '');

@@ -1,13 +1,13 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ChevronDown, SlidersHorizontal, X } from 'lucide-react';
+import { ChevronDown, SlidersHorizontal } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { agentApi } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Badge, Button, Checkbox, ConfirmDialog, Drawer, EmptyState, InlineAlert, ScrollArea, Switch, Tooltip, useClipboard } from '../components/common';
-import { OVERLAY_Z } from '../components/common/overlayZ';
+import { ApiErrorAlert, Badge, Button, Checkbox, ConfirmDialog, Drawer, EmptyState, InlineAlert, ScrollArea, SearchInput, SegmentedControl, Surface, Switch, Tooltip, useClipboard } from '../components/common';
+import { DeepResearchPanel } from '../components/chat/DeepResearchPanel';
 import { getParsedApiError } from '../api/error';
 import type { SkillInfo } from '../api/agent';
 import { DashboardStateBlock } from '../components/dashboard';
@@ -186,6 +186,7 @@ const ChatPage: React.FC = () => {
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
   const [showSkillDesc, setShowSkillDesc] = useState<string | null>(null);
   const [mobileSkillPickerOpen, setMobileSkillPickerOpen] = useState(false);
+  const [sessionSearch, setSessionSearch] = useState('');
   const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set());
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -212,6 +213,7 @@ const ChatPage: React.FC = () => {
   const [watchlistMessage, setWatchlistMessage] = useState<string | null>(null);
   const [activeStockCode, setActiveStockCode] = useState<string | null>(null);
   const [activeStockContext, setActiveStockContext] = useState<ActiveStockContext | null>(null);
+  const [chatMode, setChatMode] = useState<'chat' | 'research'>('chat');
   const activeStockContextRef = useRef<ActiveStockContext | null>(null);
   const watchlistMessageTimerRef = useRef<number | null>(null);
   const copyResetTimerRef = useRef<Partial<Record<string, number>>>({});
@@ -913,10 +915,15 @@ const ChatPage: React.FC = () => {
     </div>
   );
 
+  const filteredSessions = useMemo(
+    () => sessions.filter((session) => session.title.toLocaleLowerCase().includes(sessionSearch.trim().toLocaleLowerCase())),
+    [sessions, sessionSearch],
+  );
+
   const sidebarContent = (
     <>
-      <div className="flex items-center justify-between border-b border-white/5 bg-white/2 p-3.5">
-        <h2 className="text-sm font-semibold text-primary uppercase tracking-[0.2em] flex items-center gap-2">
+      <div className="flex items-center justify-between border-b border-subtle bg-subtle-soft p-3.5">
+        <h2 className="hidden text-sm font-semibold text-primary uppercase tracking-[0.2em] md:flex items-center gap-2">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
@@ -926,7 +933,7 @@ const ChatPage: React.FC = () => {
           <button
             type="button"
             onClick={handleStartNewChat}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted-text transition-all hover:bg-white/10 hover:text-foreground"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted-text transition-all hover:bg-subtle-hover hover:text-foreground"
             aria-label={t('chat.newConversation')}
           >
             <svg
@@ -943,15 +950,16 @@ const ChatPage: React.FC = () => {
               />
             </svg>
           </button>
-          <button
-            type="button"
-            onClick={closeSidebar}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted-text transition-all hover:bg-white/10 hover:text-foreground md:hidden"
-            aria-label={t('common.closeDrawer')}
-          >
-            <X className="h-5 w-5" aria-hidden="true" />
-          </button>
         </div>
+      </div>
+      <div className="px-3 pt-3">
+        <SearchInput
+          value={sessionSearch}
+          onChange={(event) => setSessionSearch(event.target.value)}
+          aria-label={t('layout.search')}
+          placeholder={t('common.searchPlaceholder')}
+          wrapperClassName="w-full shadow-none"
+        />
       </div>
       <ScrollArea testId="chat-session-list-scroll" viewportClassName="p-3">
         {sessionsLoading ? (
@@ -959,12 +967,10 @@ const ChatPage: React.FC = () => {
             loading
             compact
             title={t('chat.loadingSessions')}
-            className="rounded-2xl border border-dashed border-border/50 bg-surface/30"
           />
         ) : sessionsError ? (
           <ApiErrorAlert
             error={sessionsError}
-            className="rounded-2xl"
             actionLabel={t('common.retry')}
             onAction={() => void loadSessions()}
           />
@@ -973,11 +979,15 @@ const ChatPage: React.FC = () => {
             compact
             title={t('chat.emptySessionsTitle')}
             description={t('chat.emptySessionsDescription')}
-            className="rounded-2xl border border-dashed border-border/50 bg-surface/30"
+          />
+        ) : filteredSessions.length === 0 ? (
+          <DashboardStateBlock
+            compact
+            title={t('common.noMatches')}
           />
         ) : (
           <div className="space-y-2">
-            {sessions.map((s) => (
+            {filteredSessions.map((s) => (
               <div key={s.session_id} className="session-item-row">
                 <button
                   type="button"
@@ -1047,7 +1057,7 @@ const ChatPage: React.FC = () => {
       className="flex h-[calc(100dvh-5rem)] w-full min-w-0 gap-4 overflow-hidden p-3 sm:h-[calc(100dvh-5.5rem)] lg:h-[calc(100dvh-2rem)]"
     >
       {/* Desktop sidebar */}
-      <div className="hidden h-full w-64 flex-shrink-0 flex-col overflow-hidden rounded-3xl border border-white/8 bg-card/82 shadow-soft-card md:flex">
+      <div className="hidden h-full w-64 flex-shrink-0 flex-col overflow-hidden rounded-3xl border border-subtle bg-card/82 shadow-soft-card md:flex">
         {sidebarContent}
       </div>
 
@@ -1056,13 +1066,7 @@ const ChatPage: React.FC = () => {
         isOpen={sidebarOpen}
         onClose={closeSidebar}
         title={t('chat.history')}
-        width="w-72"
-        zIndex={OVERLAY_Z.pageDrawer}
-        side="left"
-        backdropClassName="page-drawer-overlay"
-        panelClassName="glass-card !rounded-none overflow-hidden border-white/10 bg-card/90 shadow-2xl"
-        contentClassName="overflow-hidden !p-0"
-        showHeader={false}
+        variant="navigation"
       >
         {sidebarContent}
       </Drawer>
@@ -1223,17 +1227,34 @@ const ChatPage: React.FC = () => {
           <p className="text-secondary-text text-sm">
             {t('chat.description')}
           </p>
+          <div className="mt-1">
+            <SegmentedControl
+              value={chatMode}
+              onChange={(value) => setChatMode(value)}
+              ariaLabel={t('research.modeLabel')}
+              options={[
+                { value: 'chat', label: t('research.chatMode') },
+                { value: 'research', label: t('research.mode') },
+              ]}
+            />
+          </div>
           {sendToast ? (
             <InlineAlert
               variant={sendToast.type === 'success' ? 'success' : 'danger'}
+              size="compact"
               title={sendToast.type === 'success' ? t('chat.sendSuccess') : t('chat.sendFailure')}
               message={sendToast.message}
-              className="max-w-md rounded-xl px-3 py-2 text-xs shadow-none"
+              className="max-w-md"
             />
           ) : null}
         </header>
 
-        <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden border border-white/6 bg-card/78 glass-card">
+        {chatMode === 'research' ? (
+          <Surface level="interactive" className="z-10 flex min-h-0 flex-1 flex-col overflow-auto p-4 md:p-6">
+            <DeepResearchPanel key={sessionId} sessionId={sessionId} />
+          </Surface>
+        ) : null}
+        <Surface level="canvas" className={chatMode === 'research' ? 'hidden' : 'z-10 flex min-h-0 flex-1 flex-col overflow-hidden'}>
           {/* Messages */}
           <ScrollArea
             className="relative z-10 flex-1"
@@ -1247,7 +1268,7 @@ const ChatPage: React.FC = () => {
                 <EmptyState
                   title={t('chat.emptyTitle')}
                   description={t('chat.emptyDescription')}
-                  className="max-w-2xl border-dashed bg-card/55"
+                  className="max-w-2xl"
                   icon={(
                     <svg
                       className="h-8 w-8"
@@ -1377,7 +1398,7 @@ const ChatPage: React.FC = () => {
                 <div className="w-8 h-8 rounded-full bg-elevated text-foreground flex items-center justify-center flex-shrink-0 text-xs font-bold">
                   AI
                 </div>
-                <div className="min-w-50 max-w-[min(100%,48rem)] overflow-hidden rounded-2xl rounded-tl-sm border border-white/6 bg-card/72 px-5 py-4">
+                <div className="min-w-50 max-w-[min(100%,48rem)] overflow-hidden rounded-2xl rounded-tl-sm border border-subtle bg-card/72 px-5 py-4">
                   <div className="flex items-center gap-2.5 text-sm text-secondary-text">
                     <div className="relative w-4 h-4 flex-shrink-0">
                       <div className="absolute inset-0 rounded-full border-2 border-primary/20" />
@@ -1424,7 +1445,7 @@ const ChatPage: React.FC = () => {
           )}
 
           {/* Input area */}
-          <div className="border-t border-white/6 bg-card/88 p-4 md:p-6 relative z-20">
+          <div className="relative z-20 border-t border-subtle bg-card/88 p-4 md:p-6">
             <div className="space-y-3">
               {sessionError ? (
                 <ApiErrorAlert error={sessionError} />
@@ -1432,9 +1453,9 @@ const ChatPage: React.FC = () => {
               {sessionLoading ? (
                 <InlineAlert
                   variant="info"
+                  size="compact"
                   title={t('chat.loadingSessions')}
                   message={t('common.loading')}
-                  className="rounded-xl px-3 py-2 text-xs shadow-none"
                 />
               ) : null}
               {chatError ? (
@@ -1447,12 +1468,12 @@ const ChatPage: React.FC = () => {
               {isFollowUpContextLoading ? (
                 <InlineAlert
                   variant="info"
+                  size="compact"
                   title={t('chat.followUpLoadingTitle')}
                   message={t('chat.followUpLoadingMessage')}
-                  className="rounded-xl px-3 py-2 text-xs shadow-none"
                 />
               ) : null}
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/6 bg-surface/25 px-3 py-2">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-subtle bg-subtle-soft px-3 py-2">
                 <div className="min-w-0">
                   <span className="text-sm font-medium text-foreground">{t('chat.contextCompression')}</span>
                   <span className="ml-2 text-xs text-muted-text">{t('chat.contextCompressionDescription')}</span>
@@ -1473,9 +1494,9 @@ const ChatPage: React.FC = () => {
               {contextCompressionError ? (
                 <InlineAlert
                   variant="danger"
+                  size="compact"
                   title={t('chat.contextCompressionUnsaved')}
                   message={contextCompressionError}
-                  className="rounded-xl px-3 py-2 text-xs shadow-none"
                 />
               ) : null}
               {skills.length > 0 && (
@@ -1619,7 +1640,7 @@ const ChatPage: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
+        </Surface>
       </div>
     </div>
   );

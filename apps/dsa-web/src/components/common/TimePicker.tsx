@@ -19,8 +19,16 @@ interface TimePickerProps {
   onOpenChange?: (isOpen: boolean) => void;
   className?: string;
   triggerClassName?: string;
+  size?: 'default' | 'comfortable';
+  'aria-invalid'?: React.AriaAttributes['aria-invalid'];
+  'aria-describedby'?: string;
   'data-testid'?: string;
 }
+
+const TIME_PICKER_SIZE_STYLES = {
+  default: 'h-11 min-h-11 min-w-11',
+  comfortable: 'h-9 min-h-9 min-w-9',
+} as const;
 
 const TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const HOURS = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, '0'));
@@ -38,6 +46,9 @@ export const TimePicker = ({
   onOpenChange,
   className,
   triggerClassName,
+  size = 'default',
+  'aria-invalid': ariaInvalid,
+  'aria-describedby': ariaDescribedBy,
   'data-testid': testId,
 }: TimePickerProps) => {
   const { t } = useUiLanguage();
@@ -158,12 +169,18 @@ export const TimePicker = ({
         data-value={value}
         disabled={disabled}
         aria-label={resolvedAriaLabel}
+        aria-invalid={ariaInvalid}
+        aria-describedby={ariaDescribedBy}
         aria-haspopup="dialog"
         aria-expanded={isOpen}
+        data-control="time-picker"
+        data-size={size}
         onClick={() => (isOpen ? closePicker() : openPicker())}
         className={cn(
-          'flex h-11 min-h-11 min-w-11 w-full items-center justify-between gap-2 rounded-lg border border-border bg-transparent px-3 text-xs text-foreground',
+          'flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-transparent px-3 text-xs text-foreground',
           'transition-colors duration-200 hover:bg-hover focus:outline-none focus-visible:border-muted-text disabled:cursor-not-allowed disabled:opacity-60',
+          TIME_PICKER_SIZE_STYLES[size],
+          ariaInvalid && 'border-danger/40 focus-visible:border-danger',
           triggerClassName,
         )}
       >
@@ -179,8 +196,9 @@ export const TimePicker = ({
           ref={popupRef}
           role="dialog"
           aria-label={resolvedAriaLabel}
+          data-dialog-popup="true"
           style={popupStyle}
-          className="fixed z-[100] w-56 overflow-hidden rounded-xl border border-border bg-elevated p-3 shadow-lg"
+          className="fixed w-56 overflow-hidden rounded-xl border border-border bg-elevated p-3 shadow-lg"
           onKeyDown={(event) => {
             if (event.key === 'Escape') {
               event.preventDefault();

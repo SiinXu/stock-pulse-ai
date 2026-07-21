@@ -9,6 +9,7 @@ import { MARKET_REVIEW_CONTENT_TEXT } from '../../locales/reportContent';
 import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
 import type {
   AnalysisReport,
+  MarketReviewIndex,
   MarketReviewPayload,
   MarketReviewPayloadSection,
   ReportLanguage,
@@ -21,7 +22,7 @@ import {
 } from '../../utils/marketReview';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { getUiLocale } from '../../utils/uiLocale';
-import { ApiErrorAlert, Card, InlineAlert, useClipboard } from '../common';
+import { ApiErrorAlert, Card, DataTable, type DataTableColumn, InlineAlert, useClipboard } from '../common';
 import { Tooltip } from '../common/Tooltip';
 import { MarketStructureCard } from './MarketStructureCard';
 import { ReportMarkdownBody } from './ReportMarkdownBody';
@@ -388,6 +389,32 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
       value: summary?.trendPrediction || marketReviewText.noRiskWatch,
     },
   ], [marketReviewText, reportText.marketSentiment, summary]);
+  const indexColumns: readonly DataTableColumn<MarketReviewIndex>[] = [
+    {
+      id: 'index',
+      header: marketReviewText.index,
+      rowHeader: true,
+      cell: (index) => <span className="font-medium text-foreground">{index.name}</span>,
+    },
+    {
+      id: 'last',
+      header: marketReviewText.last,
+      nowrap: true,
+      cell: (index) => formatMarketNumber(index.current),
+    },
+    {
+      id: 'change',
+      header: marketReviewText.change,
+      nowrap: true,
+      cell: (index) => formatMarketPercent(index.changePct),
+    },
+    {
+      id: 'high-low',
+      header: marketReviewText.highLow,
+      nowrap: true,
+      cell: (index) => formatMarketHighLow(index.high, index.low),
+    },
+  ];
 
   return (
     <div className={`animate-fade-in space-y-4 pb-8 ${className}`}>
@@ -471,7 +498,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
       {summary ? (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {insightCards.map(({ icon: Icon, label, value }) => (
-            <Card key={label} variant="bordered" padding="sm" className="home-panel-card text-left">
+            <Card key={label} variant="bordered" padding="sm" className="text-left">
               <div className="flex items-start gap-3">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <Icon className="h-4 w-4" aria-hidden="true" />
@@ -487,7 +514,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
       ) : null}
 
       {structuredMarketData.length > 0 ? (
-        <Card variant="bordered" padding="md" className="home-panel-card text-left">
+        <Card variant="bordered" padding="md" className="text-left">
           <div className="mb-3 flex items-center gap-2">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <BarChart3 className="h-4 w-4" aria-hidden="true" />
@@ -532,28 +559,17 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
                   <p className="text-sm text-secondary-text">{marketReviewText.noBreadthData}</p>
                 )}
                 {marketData.indices.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead className="text-left text-xs uppercase text-muted-text">
-                        <tr>
-                          <th className="px-2 py-2">{marketReviewText.index}</th>
-                          <th className="px-2 py-2">{marketReviewText.last}</th>
-                          <th className="px-2 py-2">{marketReviewText.change}</th>
-                          <th className="px-2 py-2">{marketReviewText.highLow}</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-subtle">
-                        {marketData.indices.map((index) => (
-                          <tr key={index.code || index.name}>
-                            <td className="px-2 py-2 font-medium text-foreground">{index.name}</td>
-                            <td className="px-2 py-2 text-secondary-text">{formatMarketNumber(index.current)}</td>
-                            <td className="px-2 py-2 text-secondary-text">{formatMarketPercent(index.changePct)}</td>
-                            <td className="px-2 py-2 text-secondary-text">{formatMarketHighLow(index.high, index.low)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <DataTable
+                    caption={`${marketData.title || displayTitle}: ${marketReviewText.index}`}
+                    columns={indexColumns}
+                    rows={marketData.indices}
+                    getRowKey={(index) => index.code || index.name}
+                    emptyState={{ title: marketReviewText.noBreadthData }}
+                    density="compact"
+                    frame="embedded"
+                    minWidth="container"
+                    separatorTone="subtle"
+                  />
                 ) : null}
                 {(() => {
                   const boardTypes = [{
@@ -632,14 +648,14 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
       ) : null}
 
       {isLoading ? (
-        <Card variant="bordered" padding="md" className="home-panel-card text-left">
+        <Card variant="bordered" padding="md" className="text-left">
           <div className="flex h-64 flex-col items-center justify-center">
             <div className="home-spinner h-10 w-10 animate-spin border-[3px]" />
             <p className="mt-4 text-sm text-secondary-text">{chromeText.loadingReport}</p>
           </div>
         </Card>
       ) : error ? (
-        <Card variant="bordered" padding="md" className="home-panel-card text-left">
+        <Card variant="bordered" padding="md" className="text-left">
           <div className="flex h-64 flex-col items-center justify-center">
             <ApiErrorAlert error={error} className="w-full max-w-lg" />
           </div>
@@ -647,7 +663,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
       ) : (
         <div data-testid="market-review-report" className="space-y-4">
           {sections.map(({ id, title, content: sectionContent, icon: Icon }) => (
-            <Card key={id} variant="bordered" padding="md" className="home-panel-card text-left">
+            <Card key={id} variant="bordered" padding="md" className="text-left">
               <div className="mb-3 flex items-center gap-2">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <Icon className="h-4 w-4" aria-hidden="true" />

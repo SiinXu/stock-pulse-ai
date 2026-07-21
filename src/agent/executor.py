@@ -29,9 +29,10 @@ from src.agent.public_contract import (
     AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
     sanitize_agent_diagnostic,
 )
-from src.agent.runner import run_agent_loop, parse_dashboard_json
+from src.agent.runner import parse_dashboard_json_result, run_agent_loop
 from src.agent.runtime.contract import ExecutionState
 from src.agent.runtime.lifecycle import classify_result_terminal_state
+from src.agent.runtime_facts import AgentRuntimeFacts
 from src.agent.stock_scope import StockScope, resolve_stock_scope
 from src.storage import get_db
 from src.agent.tools.registry import ToolRegistry
@@ -62,6 +63,7 @@ class AgentResult:
     model: str = ""                            # comma-separated models used (supports fallback)
     error: Optional[str] = None
     messages: List[Dict[str, Any]] = field(default_factory=list)
+    runtime_facts: Optional[AgentRuntimeFacts] = None
     cancelled: bool = False
     timed_out: bool = False
 
@@ -851,9 +853,9 @@ class AgentExecutor:
     ) -> AgentResult:
         """Delegate to the shared runner and adapt the result.
 
-        This preserves the exact same observable behaviour as the original
-        inline implementation while sharing the single authoritative loop
-        in :mod:`src.agent.runner`.
+        Dashboard mode preserves the raw answer unless deterministic
+        post-processing removes a reserved model-authored field. Free-form
+        mode always preserves the raw text.
         """
         loop_result = run_agent_loop(
             messages=messages,
@@ -869,10 +871,15 @@ class AgentExecutor:
         model_str = loop_result.model
 
         if parse_dashboard and loop_result.success:
-            dashboard = parse_dashboard_json(loop_result.content)
+            parse_result = parse_dashboard_json_result(loop_result.content)
+            dashboard = parse_result.payload if parse_result is not None else None
             return AgentResult(
                 success=dashboard is not None,
-                content=loop_result.content,
+                content=(
+                    json.dumps(dashboard, ensure_ascii=False, indent=2)
+                    if parse_result is not None and parse_result.reserved_field_removed
+                    else loop_result.content
+                ),
                 dashboard=dashboard,
                 tool_calls_log=loop_result.tool_calls_log,
                 total_steps=loop_result.total_steps,

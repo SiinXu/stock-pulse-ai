@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { EmptyState, InlineAlert } from '../common';
+import { EmptyState, InlineAlert, Surface } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
 import type { DecisionSignalItem, DecisionSignalStatus } from '../../types/decisionSignals';
@@ -194,7 +194,7 @@ export const TimelineTooltip: React.FC<TimelineTooltipProps> = ({ active, payloa
   const item = datum.item;
   const presentation = getDecisionSignalPresentation(item, actionLabels);
   return (
-    <div className="rounded-xl border border-border/70 bg-card/95 px-3 py-2 text-xs shadow-card">
+    <Surface level="overlay" className="px-3 py-2 text-xs">
       <div className="font-semibold text-foreground">{item.stockName || item.stockCode}</div>
       <div className="mt-2 grid gap-1 text-secondary-text">
         <span>{t('decisionSignals.createdAt')}: {formatDateTime(presentation.timestamp, language)}</span>
@@ -206,7 +206,7 @@ export const TimelineTooltip: React.FC<TimelineTooltipProps> = ({ active, payloa
         <span>{t('decisionSignals.sourceReport')}: {item.sourceReportId ? `#${item.sourceReportId}` : '-'}</span>
         <span>{t('decisionSignals.profile')}: {getDecisionSignalProfileLabel(item, t)}</span>
       </div>
-    </div>
+    </Surface>
   );
 };
 
@@ -234,7 +234,7 @@ export const DecisionSignalTimeline: React.FC<DecisionSignalTimelineProps> = ({
   if (items.length === 0) {
     return (
       <EmptyState
-        className="border-none bg-transparent py-6 shadow-none"
+        compact
         title={t('decisionSignals.timelineEmptyTitle')}
         description={t('decisionSignals.timelineEmptyDescription')}
         icon={<Activity className="h-6 w-6" />}

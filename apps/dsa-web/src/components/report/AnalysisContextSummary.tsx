@@ -7,7 +7,7 @@ import type {
 } from '../../types/analysis';
 import { ANALYSIS_CONTEXT_CONTENT_TEXT } from '../../locales/reportContent';
 import { normalizeReportLanguage } from '../../utils/reportLanguage';
-import { Badge, Card, StatusDot } from '../common';
+import { Badge, InlineAlert, StatusDot, Surface } from '../common';
 import { DashboardPanelHeader } from '../dashboard';
 
 interface AnalysisContextSummaryProps {
@@ -47,6 +47,8 @@ const STATUS_ORDER: AnalysisContextPackBlockStatus[] = [
   'partial',
 ];
 
+const DIAGNOSTIC_CODE_PATTERN = /^[a-z][a-z0-9_]{0,127}$/;
+
 const getCount = (
   overview: AnalysisContextPackOverview,
   status: AnalysisContextPackBlockStatus,
@@ -81,9 +83,18 @@ const formatLimitation = (
   return language === 'zh' ? `${label}：${statusLabel}` : `${label}: ${statusLabel}`;
 };
 
-const formatMissingReason = (reason: string, language: ReportLanguage): string => {
-  const label = ANALYSIS_CONTEXT_CONTENT_TEXT[language].missingReasonLabels[reason];
-  return label ? `${label} (${reason})` : reason;
+const formatMissingReason = (
+  reason: string,
+  language: ReportLanguage,
+  status: AnalysisContextPackBlockStatus,
+): string => {
+  const text = ANALYSIS_CONTEXT_CONTENT_TEXT[language];
+  const safeCode = DIAGNOSTIC_CODE_PATTERN.test(reason);
+  const detail = (safeCode ? text.missingReasonLabels[reason] : undefined)
+    || text.statusGuidance[status]
+    || text.unknownReasonDetails;
+  const diagnosticCode = safeCode ? reason : text.diagnosticCodeUnavailable;
+  return `${detail} (${text.diagnosticCode}: ${diagnosticCode})`;
 };
 
 export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
@@ -116,9 +127,9 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
   const limitations = quality?.limitations?.map((item) => formatLimitation(item, reportLanguage, text)) || [];
 
   return (
-    <Card variant="bordered" padding="none" className="home-panel-card">
+    <Surface level="interactive" padding="none" className="overflow-hidden">
       <details data-testid="analysis-context-summary" className="group">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+        <summary className="flex cursor-pointer list-none flex-col items-stretch gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <Database className="h-4 w-4" aria-hidden="true" />
@@ -133,7 +144,7 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
               </span>
             </span>
           </div>
-          <span className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+          <span className="flex min-w-0 flex-wrap items-center justify-start gap-2 sm:justify-end">
             {typeof quality?.overallScore === 'number' ? (
               <Badge variant={qualityStyle?.variant || 'default'} className="gap-1.5 shadow-none">
                 {qualityStyle ? <StatusDot tone={qualityStyle.tone} className="h-1.5 w-1.5" /> : null}
@@ -205,32 +216,45 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
           ) : null}
 
           {limitations.length ? (
-            <div className="mb-3 home-subpanel p-3 text-xs leading-5 text-muted-text">
-              <span className="font-medium text-foreground">{text.limitations}: </span>
-              {limitations.join(', ')}
-            </div>
+            <InlineAlert
+              variant="warning"
+              size="compact"
+              title={text.limitations}
+              message={limitations.join(', ')}
+              className="mb-3"
+            />
           ) : null}
 
           {overview.warnings?.length ? (
-            <div className="mb-3 home-subpanel p-3 text-xs leading-5 text-warning">
-              <span className="font-medium">{text.warnings}: </span>
-              {overview.warnings.join(', ')}
-            </div>
+            <InlineAlert
+              variant="warning"
+              size="compact"
+              title={text.warnings}
+              message={overview.warnings.join(', ')}
+              className="mb-3"
+            />
           ) : null}
 
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+          <div className="grid grid-cols-1 md:grid-cols-2">
             {overview.blocks.map((block) => {
               const style = STATUS_STYLE[block.status] || STATUS_STYLE.missing;
+              const detail = block.missingReasons?.length
+                ? block.missingReasons
+                  .map((reason) => formatMissingReason(reason, reportLanguage, block.status))
+                  .join('; ')
+                : text.statusGuidance[block.status];
               return (
-                <div key={block.key} className="home-subpanel p-3">
+                <div
+                  key={block.key}
+                  data-testid={`analysis-context-block-${block.key}`}
+                  className="min-w-0 border-t border-border py-3 md:odd:pr-4 md:even:border-l md:even:pl-4"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-foreground">{block.label}</p>
-                      {block.source ? (
-                        <p className="mt-1 truncate text-xs text-secondary-text">
-                          {text.source}: {block.source}
-                        </p>
-                      ) : null}
+                      <p className="mt-1 break-words text-xs text-secondary-text [overflow-wrap:anywhere]">
+                        {text.source}: {block.source || text.sourceUnavailable}
+                      </p>
                     </div>
                     <Badge variant={style.variant} className="shrink-0 gap-1.5 shadow-none">
                       <StatusDot tone={style.tone} className="h-1.5 w-1.5" />
@@ -239,15 +263,17 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
                   </div>
 
                   {block.warnings?.length ? (
-                    <p className="mt-2 text-xs leading-5 text-warning">
-                      {text.warnings}: {block.warnings.join(', ')}
-                    </p>
+                    <InlineAlert
+                      variant="warning"
+                      size="compact"
+                      title={text.warnings}
+                      message={block.warnings.join(', ')}
+                      className="mt-3"
+                    />
                   ) : null}
-                  {block.missingReasons?.length ? (
-                    <p className="mt-2 text-xs leading-5 text-muted-text">
-                      {text.missingReasons}: {block.missingReasons
-                        .map((reason) => formatMissingReason(reason, reportLanguage))
-                        .join(', ')}
+                  {detail ? (
+                    <p className="mt-3 break-words text-xs leading-5 text-muted-text [overflow-wrap:anywhere]">
+                      {text.details}: {detail}
                     </p>
                   ) : null}
                 </div>
@@ -274,6 +300,6 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
           ) : null}
         </div>
       </details>
-    </Card>
+    </Surface>
   );
 };

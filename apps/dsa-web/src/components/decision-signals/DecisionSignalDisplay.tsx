@@ -1,6 +1,6 @@
 import type React from 'react';
 import { PanelRightOpen } from 'lucide-react';
-import { Badge, Card, JsonViewer } from '../common';
+import { Badge, JsonViewer, Section, Surface } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
 import type {
@@ -204,11 +204,6 @@ export const DecisionSignalCard: React.FC<DecisionSignalCardProps> = ({ item, on
     { label: t('decisionSignals.stopLoss'), value: formatNumber(item.stopLoss), tone: 'danger' as const },
     { label: t('decisionSignals.targetPrice'), value: formatNumber(item.targetPrice), tone: 'success' as const },
   ].filter((entry) => hasDisplayValue(entry.value));
-  const className = cn(
-    'block w-full rounded-2xl border bg-card/75 p-4 text-left',
-    interactive ? 'transition-colors hover:border-primary/40 hover:bg-hover/70' : '',
-    selected ? 'border-primary/50 bg-primary/10' : 'border-border/70',
-  );
   const content = (
     <>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -267,25 +262,32 @@ export const DecisionSignalCard: React.FC<DecisionSignalCardProps> = ({ item, on
     </>
   );
 
-  if (!interactive) {
-    return <div className={className}>{content}</div>;
-  }
-
   return (
-    <div className={className}>
+    <Surface
+      as="article"
+      level={interactive ? 'interactive' : 'section'}
+      hoverable={interactive}
+      className="block w-full p-4 text-left"
+      data-selected={selected ? 'true' : undefined}
+    >
+      {selected ? (
+        <span className="absolute inset-y-3 left-0 w-1 rounded-r-full bg-primary" aria-hidden="true" />
+      ) : null}
       {content}
-      <div className="mt-4 flex justify-end">
-        <button
-          type="button"
-          onClick={() => onSelect?.(item)}
-          className="btn-secondary inline-flex min-h-11 min-w-11 items-center gap-1.5 !px-3 !py-1.5 !text-xs"
-          aria-label={t('decisionSignals.viewDetailsFor', { stock: item.stockName || item.stockCode })}
-        >
-          <PanelRightOpen className="h-3.5 w-3.5" />
-          {t('common.details')}
-        </button>
-      </div>
-    </div>
+      {interactive ? (
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={() => onSelect?.(item)}
+            className="btn-secondary inline-flex min-h-11 min-w-11 items-center gap-1.5 !px-3 !py-1.5 !text-xs"
+            aria-label={t('decisionSignals.viewDetailsFor', { stock: item.stockName || item.stockCode })}
+          >
+            <PanelRightOpen className="h-3.5 w-3.5" />
+            {t('common.details')}
+          </button>
+        </div>
+      ) : null}
+    </Surface>
   );
 };
 
@@ -361,15 +363,15 @@ export const DecisionSignalDetails: React.FC<DecisionSignalDetailsProps> = ({
         <DetailRow label={t('decisionSignals.expiresAt')} value={formatDateTime(item.expiresAt, language)} />
       </div>
 
-      <Card title={t('decisionSignals.pricePlan')} padding="sm" className="rounded-xl">
+      <Section title={t('decisionSignals.pricePlan')} headingAs="h3" level="section" padding="sm">
         <div className="grid gap-3 sm:grid-cols-3">
           <DetailRow label={t('decisionSignals.entryRange')} value={entryRange} />
           <DetailRow label={t('decisionSignals.stopLoss')} value={formatNumber(item.stopLoss)} />
           <DetailRow label={t('decisionSignals.targetPrice')} value={formatNumber(item.targetPrice)} />
         </div>
-      </Card>
+      </Section>
 
-      <Card padding="sm" className="rounded-xl">
+      <Surface level="section" padding="sm">
         <div className="grid gap-3">
           <SignalTextBlock label={t('decisionSignals.reason')} value={formatJsonish(presentation.summary)} clamp={false} />
           <SignalTextBlock label={t('decisionSignals.catalystSummary')} value={formatJsonish(item.catalystSummary)} tone="info" clamp={false} />
@@ -377,9 +379,9 @@ export const DecisionSignalDetails: React.FC<DecisionSignalDetailsProps> = ({
           <SignalTextBlock label={t('decisionSignals.riskSummary')} value={formatJsonish(presentation.risk)} tone="warning" clamp={false} />
           <SignalTextBlock label={t('decisionSignals.invalidation')} value={formatJsonish(item.invalidation)} tone="danger" clamp={false} />
         </div>
-      </Card>
+      </Surface>
 
-      <Card title={t('decisionSignals.outcomes')} padding="sm" className="rounded-xl">
+      <Section title={t('decisionSignals.outcomes')} headingAs="h3" level="section" padding="sm">
         {outcomesLoading ? (
           <p className="text-sm text-secondary-text">{t('common.loading')}...</p>
         ) : outcomesError ? (
@@ -412,9 +414,9 @@ export const DecisionSignalDetails: React.FC<DecisionSignalDetailsProps> = ({
             ))}
           </div>
         )}
-      </Card>
+      </Section>
 
-      <Card title={t('decisionSignals.feedbackTitle')} padding="sm" className="rounded-xl">
+      <Section title={t('decisionSignals.feedbackTitle')} headingAs="h3" level="section" padding="sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm text-foreground">
@@ -446,22 +448,22 @@ export const DecisionSignalDetails: React.FC<DecisionSignalDetailsProps> = ({
             </div>
           ) : null}
         </div>
-      </Card>
+      </Section>
 
       {evidenceData ? (
-        <Card title={t('decisionSignals.evidence')} padding="sm" className="rounded-xl">
+        <Section title={t('decisionSignals.evidence')} headingAs="h3" level="section" padding="sm">
           <JsonViewer data={evidenceData} maxHeight="240px" />
-        </Card>
+        </Section>
       ) : null}
       {qualityData ? (
-        <Card title={t('decisionSignals.dataQuality')} padding="sm" className="rounded-xl">
+        <Section title={t('decisionSignals.dataQuality')} headingAs="h3" level="section" padding="sm">
           <JsonViewer data={qualityData} maxHeight="240px" />
-        </Card>
+        </Section>
       ) : null}
       {metadataData ? (
-        <Card title={t('decisionSignals.metadata')} padding="sm" className="rounded-xl">
+        <Section title={t('decisionSignals.metadata')} headingAs="h3" level="section" padding="sm">
           <JsonViewer data={metadataData} maxHeight="240px" />
-        </Card>
+        </Section>
       ) : null}
     </div>
   );

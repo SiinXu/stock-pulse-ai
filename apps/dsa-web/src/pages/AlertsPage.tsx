@@ -13,7 +13,7 @@ import {
   type AlertTypeFilter,
 } from '../components/alerts/AlertRuleList';
 import { AlertTriggerHistory } from '../components/alerts/AlertTriggerHistory';
-import { ApiErrorAlert, AppPage, Button, Card, EmptyState, InlineAlert, Loading, Modal, PageHeader, Pagination } from '../components/common';
+import { ApiErrorAlert, AppPage, Button, Card, DataTable, type DataTableColumn, InlineAlert, Loading, Modal, PageHeader, Pagination, SegmentedControl, Select, Toolbar } from '../components/common';
 import type {
   AlertNotificationItem,
   AlertRuleCreateRequest,
@@ -28,12 +28,14 @@ import {
   ALERT_NOTIFICATION_CHANNEL_LABELS,
   ALERT_NOTIFICATION_STATUS_LABELS,
   ALERT_HISTORY_CONTROLS_TEXT,
+  ALERT_LIST_TEXT,
   ALERT_PAGE_TEXT,
   ALERT_TRIGGER_TEXT,
 } from '../locales/alerts';
 import { formatUiDateTime } from '../utils/uiLocale';
 
 const PAGE_SIZE = 20;
+type AlertsView = 'rules' | 'history' | 'notifications';
 
 function enabledFilterToQuery(value: AlertRuleEnabledFilter): boolean | undefined {
   if (value === 'enabled') return true;
@@ -107,6 +109,7 @@ const AlertsPage: React.FC = () => {
   }, [text.documentTitle]);
 
   const [createRuleModalOpen, setCreateRuleModalOpen] = useState(false);
+  const [activeView, setActiveView] = useState<AlertsView>('rules');
   const [rules, setRules] = useState<AlertRuleItem[]>([]);
   const [rulesTotal, setRulesTotal] = useState(0);
   const [rulesPage, setRulesPage] = useState(1);
@@ -129,10 +132,18 @@ const AlertsPage: React.FC = () => {
   const [notificationsLastUpdated, setNotificationsLastUpdated] = useState<string | null>(null);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notificationsError, setNotificationsError] = useState<ParsedApiError | null>(null);
+  const [notificationChannelFilter, setNotificationChannelFilter] = useState('all');
+  const [notificationSuccessFilter, setNotificationSuccessFilter] = useState<'all' | 'success' | 'failure'>('all');
 
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState<ParsedApiError | null>(null);
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
+  const [editRule, setEditRule] = useState<AlertRuleItem | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editOpening, setEditOpening] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState<ParsedApiError | null>(null);
+  const [updateSuccess, setUpdateSuccess] = useState<string | null>(null);
   const [busyRules, setBusyRules] = useState<AlertRuleBusyMap>({});
   const [testResult, setTestResult] = useState<{
     ruleId: number;
@@ -142,6 +153,7 @@ const AlertsPage: React.FC = () => {
   const rulesRequestIdRef = useRef(0);
   const triggersRequestIdRef = useRef(0);
   const notificationsRequestIdRef = useRef(0);
+  const editRequestIdRef = useRef(0);
   const busyRulesRef = useRef<Map<number, AlertRuleBusyAction>>(new Map());
   const mountedRef = useRef(true);
 
@@ -224,7 +236,12 @@ const AlertsPage: React.FC = () => {
     setNotificationsLoading(true);
     setNotificationsError(null);
     try {
-      const response = await alertsApi.listNotifications({ page, pageSize: PAGE_SIZE });
+      const response = await alertsApi.listNotifications({
+        ...(notificationChannelFilter === 'all' ? {} : { channel: notificationChannelFilter }),
+        ...(notificationSuccessFilter === 'all' ? {} : { success: notificationSuccessFilter === 'success' }),
+        page,
+        pageSize: PAGE_SIZE,
+      });
       if (!isLatestRequest()) return;
       setNotifications(response.items);
       setNotificationsTotal(response.total);
@@ -236,7 +253,7 @@ const AlertsPage: React.FC = () => {
     } finally {
       if (isLatestRequest()) setNotificationsLoading(false);
     }
-  }, []);
+  }, [notificationChannelFilter, notificationSuccessFilter]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -277,6 +294,48 @@ const AlertsPage: React.FC = () => {
       return false;
     } finally {
       if (mountedRef.current) setCreateLoading(false);
+    }
+  };
+
+  const handleEditOpen = async (rule: AlertRuleItem) => {
+    const requestId = editRequestIdRef.current + 1;
+    editRequestIdRef.current = requestId;
+    setEditError(null);
+    setEditRule(null);
+    setEditModalOpen(true);
+    setEditOpening(true);
+    try {
+      // Load the current server state so the edit starts from the latest
+      // values rather than a possibly stale list row (concurrent-change guard).
+      const fresh = await alertsApi.getRule(rule.id);
+      // Latest-request-wins: opening edit on B after A must not let A's slower
+      // response seed the form with the wrong rule.
+      if (!mountedRef.current || editRequestIdRef.current !== requestId) return;
+      setEditRule(fresh);
+    } catch (error) {
+      if (!mountedRef.current || editRequestIdRef.current !== requestId) return;
+      setEditError(getParsedApiError(error));
+    } finally {
+      if (mountedRef.current && editRequestIdRef.current === requestId) setEditOpening(false);
+    }
+  };
+
+  const handleUpdateRule = async (payload: AlertRuleCreateRequest) => {
+    if (!editRule) return false;
+    setEditLoading(true);
+    setEditError(null);
+    setUpdateSuccess(null);
+    try {
+      const updated = await alertsApi.updateRule(editRule.id, payload);
+      if (!mountedRef.current) return false;
+      setUpdateSuccess(formatUiText(text.updated, { name: updated.name }));
+      await loadRules(rulesPage);
+      return true;
+    } catch (error) {
+      if (mountedRef.current) setEditError(getParsedApiError(error));
+      return false;
+    } finally {
+      if (mountedRef.current) setEditLoading(false);
     }
   };
 
@@ -324,10 +383,42 @@ const AlertsPage: React.FC = () => {
     }
   };
 
+  const notificationColumns: DataTableColumn<AlertNotificationItem>[] = [
+    {
+      id: 'channel',
+      header: text.channel,
+      cell: (notification) => formatNotificationChannel(notification.channel, language),
+    },
+    {
+      id: 'status',
+      header: text.status,
+      cell: (notification) => formatNotificationStatus(notification, language),
+    },
+    {
+      id: 'errorCode',
+      header: text.errorCode,
+      cell: (notification) => notification.errorCode ?? '--',
+    },
+    {
+      id: 'latency',
+      header: text.latency,
+      cell: (notification) => <>{notification.latencyMs == null ? '--' : `${notification.latencyMs}ms`}</>,
+    },
+    {
+      id: 'time',
+      header: text.time,
+      cell: (notification) => formatUiDateTime(notification.createdAt, language, { dateStyle: 'medium', timeStyle: 'short' }),
+    },
+    {
+      id: 'diagnostics',
+      header: text.diagnostics,
+      cell: (notification) => notification.diagnostics ?? '--',
+    },
+  ];
+
   return (
     <AppPage className="max-w-none space-y-5">
       <PageHeader
-        eyebrow={text.eyebrow}
         title={text.title}
         description={text.description}
         actions={(
@@ -357,8 +448,18 @@ const AlertsPage: React.FC = () => {
           )}
         />
       ) : null}
-      {rulesError ? <ApiErrorAlert error={rulesError} onDismiss={() => setRulesError(null)} /> : null}
-
+      {updateSuccess ? (
+        <InlineAlert
+          title={text.updateSuccess}
+          message={updateSuccess}
+          variant="success"
+          action={(
+            <button type="button" className="min-h-11 min-w-11 text-sm underline" onClick={() => setUpdateSuccess(null)}>
+              {t('common.close')}
+            </button>
+          )}
+        />
+      ) : null}
       <Modal
         isOpen={createRuleModalOpen}
         onClose={() => {
@@ -379,9 +480,59 @@ const AlertsPage: React.FC = () => {
         />
       </Modal>
 
-      <div className="flex h-full min-h-0 flex-col gap-4">
+      <Modal
+        isOpen={editModalOpen}
+        onClose={() => {
+          if (!editLoading) {
+            setEditModalOpen(false);
+            setEditRule(null);
+            setEditError(null);
+          }
+        }}
+        title={text.editRule}
+      >
+        {editError ? <ApiErrorAlert error={editError} onDismiss={() => setEditError(null)} className="mb-4" /> : null}
+        {editOpening && !editRule ? (
+          <Loading />
+        ) : editRule ? (
+          <AlertRuleForm
+            key={editRule.id}
+            mode="edit"
+            initialRule={editRule}
+            onSubmit={async (payload) => {
+              const ok = await handleUpdateRule(payload);
+              if (ok) {
+                setEditModalOpen(false);
+                setEditRule(null);
+              }
+              return ok;
+            }}
+            isSubmitting={editLoading}
+          />
+        ) : null}
+      </Modal>
+
+      <SegmentedControl
+        value={activeView}
+        options={[
+          { value: 'rules', label: ALERT_LIST_TEXT[language].title },
+          { value: 'history', label: ALERT_TRIGGER_TEXT[language].title },
+          { value: 'notifications', label: text.notificationAttempts },
+        ]}
+        onChange={setActiveView}
+        ariaLabel={text.title}
+        getPanelId={(view) => `alerts-${view}-panel`}
+      />
+
+      {activeView === 'rules' ? (
+        <section
+          id="alerts-rules-panel"
+          role="tabpanel"
+          aria-label={ALERT_LIST_TEXT[language].title}
+          className="flex h-full min-h-0 flex-col gap-4"
+        >
+          {rulesError ? <ApiErrorAlert error={rulesError} onDismiss={() => setRulesError(null)} /> : null}
           <AlertRuleList
-            className="flex flex-col"
             rules={rules}
             total={rulesTotal}
             page={rulesPage}
@@ -400,6 +551,7 @@ const AlertsPage: React.FC = () => {
             onPageChange={setRulesPage}
             onToggleEnabled={(rule) => void handleToggleEnabled(rule)}
             onDelete={(rule) => void handleDeleteRule(rule)}
+            onEdit={(rule) => void handleEditOpen(rule)}
             onTest={(rule) => void handleTestRule(rule)}
             busyRules={busyRules}
           />
@@ -415,85 +567,138 @@ const AlertsPage: React.FC = () => {
               )}
             />
           ) : null}
-        </div>
+        </section>
+      ) : null}
 
-      {triggersError ? <ApiErrorAlert error={triggersError} onDismiss={() => setTriggersError(null)} /> : null}
-      <AlertTriggerHistory
-        triggers={triggers}
-        isLoading={triggersLoading}
-        page={triggersPage}
-        pageSize={PAGE_SIZE}
-        total={triggersTotal}
-        lastUpdated={triggersLastUpdated}
-        onPageChange={setTriggersPage}
-        onRefresh={() => void loadTriggers(triggersPage)}
-      />
-
-      {notificationsError ? <ApiErrorAlert error={notificationsError} onDismiss={() => setNotificationsError(null)} /> : null}
-      <Card title={text.notificationAttempts} subtitle={text.notificationResults} variant="bordered" padding="md">
-        <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
-          {notificationsLastUpdated ? (
-            <span className="text-xs text-muted-text">
-              {formatUiText(controlsText.lastUpdated, {
-                time: formatUiDateTime(notificationsLastUpdated, language, { dateStyle: 'medium', timeStyle: 'short' }),
-              })}
-            </span>
-          ) : null}
-          <Button
-            type="button"
-            size="default"
-            variant="secondary"
-            onClick={() => void loadNotifications(notificationsPage)}
-            isLoading={notificationsLoading}
-            loadingText={text.loadingNotifications}
-          >
-            <RefreshCw className="h-4 w-4" aria-hidden="true" />
-            {controlsText.refresh}
-          </Button>
-        </div>
-        {notificationsLoading ? <Loading label={text.loadingNotifications} /> : null}
-        {!notificationsLoading && notifications.length === 0 ? (
-          <EmptyState
-            icon={<BellRing className="h-6 w-6" />}
-            title={text.noNotifications}
-            description={text.noNotificationsDescription}
+      {activeView === 'history' ? (
+        <section
+          id="alerts-history-panel"
+          role="tabpanel"
+          aria-label={ALERT_TRIGGER_TEXT[language].title}
+          className="space-y-4"
+        >
+          {triggersError ? <ApiErrorAlert error={triggersError} onDismiss={() => setTriggersError(null)} /> : null}
+          <AlertTriggerHistory
+            triggers={triggers}
+            isLoading={triggersLoading}
+            page={triggersPage}
+            pageSize={PAGE_SIZE}
+            total={triggersTotal}
+            lastUpdated={triggersLastUpdated}
+            onPageChange={setTriggersPage}
+            onRefresh={() => void loadTriggers(triggersPage)}
           />
-        ) : null}
-        {!notificationsLoading && notifications.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-170 text-left text-sm">
-              <thead className="border-b border-border/60 text-xs uppercase text-muted-text">
-                <tr>
-                  <th className="px-3 py-2 font-medium">{text.channel}</th>
-                  <th className="px-3 py-2 font-medium">{text.status}</th>
-                  <th className="px-3 py-2 font-medium">{text.errorCode}</th>
-                  <th className="px-3 py-2 font-medium">{text.latency}</th>
-                  <th className="px-3 py-2 font-medium">{text.time}</th>
-                  <th className="px-3 py-2 font-medium">{text.diagnostics}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/40">
-                {notifications.map((notification) => (
-                  <tr key={notification.id}>
-                    <td className="px-3 py-3">{formatNotificationChannel(notification.channel, language)}</td>
-                    <td className="px-3 py-3">{formatNotificationStatus(notification, language)}</td>
-                    <td className="px-3 py-3">{notification.errorCode ?? '--'}</td>
-                    <td className="px-3 py-3">{notification.latencyMs == null ? '--' : `${notification.latencyMs}ms`}</td>
-                    <td className="px-3 py-3">{formatUiDateTime(notification.createdAt, language, { dateStyle: 'medium', timeStyle: 'short' })}</td>
-                    <td className="px-3 py-3">{notification.diagnostics ?? '--'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : null}
-        <Pagination
-          currentPage={notificationsPage}
-          totalPages={Math.max(1, Math.ceil(notificationsTotal / PAGE_SIZE))}
-          onPageChange={setNotificationsPage}
-          className="mt-4"
-        />
-      </Card>
+        </section>
+      ) : null}
+
+      {activeView === 'notifications' ? (
+        <section
+          id="alerts-notifications-panel"
+          role="tabpanel"
+          aria-label={text.notificationAttempts}
+          className="space-y-4"
+        >
+          {notificationsError ? <ApiErrorAlert error={notificationsError} onDismiss={() => setNotificationsError(null)} /> : null}
+          <Card title={text.notificationAttempts} subtitle={text.notificationResults} variant="bordered" padding="md">
+            <Toolbar
+              aria-label={text.notificationAttempts}
+              className="mb-3"
+              left={(
+                <>
+                  <Select
+                    label={text.channel}
+                    value={notificationChannelFilter}
+                    onChange={(value) => {
+                      setNotificationChannelFilter(value);
+                      setNotificationsPage(1);
+                    }}
+                    options={[
+                      { value: 'all', label: t('usage.period.all') },
+                      ...[
+                        'wechat',
+                        'feishu',
+                        'telegram',
+                        'dingtalk',
+                        'email',
+                        'discord',
+                        'slack',
+                        'pushplus',
+                        'pushover',
+                        'ntfy',
+                        'gotify',
+                        'serverchan3',
+                        'astrbot',
+                        'custom',
+                        '__cooldown__',
+                        '__cooldown_read_failed__',
+                        '__noise_suppressed__',
+                        '__no_channel__',
+                        '__dispatch__',
+                        '__context__',
+                      ].map((channel) => ({ value: channel, label: formatNotificationChannel(channel, language) })),
+                    ]}
+                  />
+                  <Select
+                    label={text.status}
+                    value={notificationSuccessFilter}
+                    onChange={(value) => {
+                      setNotificationSuccessFilter(value as 'all' | 'success' | 'failure');
+                      setNotificationsPage(1);
+                    }}
+                    options={[
+                      { value: 'all', label: t('usage.period.all') },
+                      { value: 'success', label: ALERT_NOTIFICATION_STATUS_LABELS[language].success },
+                      { value: 'failure', label: ALERT_NOTIFICATION_STATUS_LABELS[language].failure },
+                    ]}
+                  />
+                </>
+              )}
+              right={(
+                <>
+                  {notificationsLastUpdated ? (
+                    <span className="text-xs text-muted-text">
+                      {formatUiText(controlsText.lastUpdated, {
+                        time: formatUiDateTime(notificationsLastUpdated, language, { dateStyle: 'medium', timeStyle: 'short' }),
+                      })}
+                    </span>
+                  ) : null}
+                  <Button
+                    type="button"
+                    size="default"
+                    variant="secondary"
+                    onClick={() => void loadNotifications(notificationsPage)}
+                    isLoading={notificationsLoading}
+                    loadingText={text.loadingNotifications}
+                  >
+                    <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                    {controlsText.refresh}
+                  </Button>
+                </>
+              )}
+            />
+            <DataTable<AlertNotificationItem>
+              caption={text.notificationAttempts}
+              columns={notificationColumns}
+              rows={notifications}
+              getRowKey={(notification) => notification.id}
+              status={notificationsLoading ? { state: 'loading', title: text.loadingNotifications } : undefined}
+              emptyState={{
+                icon: <BellRing className="h-6 w-6" />,
+                title: text.noNotifications,
+                description: text.noNotificationsDescription,
+              }}
+              density="compact"
+              minWidth="content"
+            />
+            <Pagination
+              currentPage={notificationsPage}
+              totalPages={Math.max(1, Math.ceil(notificationsTotal / PAGE_SIZE))}
+              onPageChange={setNotificationsPage}
+              className="mt-4"
+            />
+          </Card>
+        </section>
+      ) : null}
     </AppPage>
   );
 };

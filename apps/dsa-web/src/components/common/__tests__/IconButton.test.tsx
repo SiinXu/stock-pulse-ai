@@ -33,6 +33,18 @@ describe('IconButton', () => {
     expect(button).toHaveAttribute('aria-busy', 'true');
   });
 
+  it('provides a stable 44px navigation size without caller geometry overrides', () => {
+    render(
+      <IconButton aria-label="Open navigation" size="navigation" tooltip={false}>
+        <RefreshCw aria-hidden="true" />
+      </IconButton>,
+    );
+
+    const button = screen.getByRole('button', { name: 'Open navigation' });
+    expect(button).toHaveAttribute('data-size', 'navigation');
+    expect(button).toHaveClass('h-11', 'w-11');
+  });
+
   it('associates its visible tooltip with the focused button', async () => {
     render(
       <IconButton aria-label="Refresh analysis">

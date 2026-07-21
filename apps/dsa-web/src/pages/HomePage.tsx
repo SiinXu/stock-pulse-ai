@@ -1,14 +1,13 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BarChart3, Check, SlidersHorizontal, X } from 'lucide-react';
+import { BarChart3, Check, Menu, SlidersHorizontal, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
 import { analysisApi, DuplicateTaskError } from '../api/analysis';
 import { historyApi } from '../api/history';
 import { agentApi, type SkillInfo } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Button, Checkbox, Drawer, EmptyState, IconButton, InlineAlert, Popover } from '../components/common';
-import { OVERLAY_Z } from '../components/common/overlayZ';
+import { ApiErrorAlert, Button, Checkbox, Drawer, EmptyState, IconButton, InlineAlert, Modal, Popover } from '../components/common';
 import { DashboardStateBlock } from '../components/dashboard';
 import { StockAutocomplete } from '../components/StockAutocomplete';
 import { StockHistoryTrendDrawer } from '../components/history';
@@ -1408,16 +1407,6 @@ const HomePage: React.FC = () => {
   const sidebarContent = useMemo(
     () => (
       <div className="flex min-h-0 h-full flex-col gap-3 overflow-hidden">
-        <div className="flex justify-end md:hidden">
-          <button
-            type="button"
-            onClick={closeSidebar}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
-            aria-label={t('common.closeDrawer')}
-          >
-            <X className="h-5 w-5" aria-hidden="true" />
-          </button>
-        </div>
         {/* StockPulse keeps its task-dismiss interaction (onDismiss); the home
             watchlist workspace is the upstream feature, adapted to StockPulse
             design and wired to StockPulse's pending/selected record logic. */}
@@ -1454,7 +1443,6 @@ const HomePage: React.FC = () => {
     [
       activeTasks,
       batchAnalyzeStatus,
-      closeSidebar,
       handleAnalyzeWatchlist,
       handleDeleteStock,
       handleHistoryItemClick,
@@ -1471,7 +1459,6 @@ const HomePage: React.FC = () => {
       selectedReport?.meta.stockCode,
       sidebarWorkspaceTab,
       todayAnalysisItems,
-      t,
       watchlistAnalyzedTodayCount,
       watchlistRows,
       watchlistState.actionMessage,
@@ -1493,16 +1480,15 @@ const HomePage: React.FC = () => {
         <header className="relative z-30 flex min-w-0 flex-shrink-0 items-center overflow-visible px-3 py-3 md:px-4 md:py-4">
           <div className="flex min-w-0 flex-1 flex-col gap-2.5 md:flex-row md:items-center">
             <div className="flex min-w-0 flex-1 items-center gap-2.5">
-              <button
-                type="button"
-                onClick={() => setSidebarOpen(true)}
-                className="-ml-1 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground md:hidden"
+              <IconButton
+                variant="ghost"
+                size="comfortable"
+                className="-ml-1 md:hidden"
                 aria-label={t('home.historyButton')}
+                onClick={() => setSidebarOpen(true)}
               >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </button>
+                <Menu aria-hidden="true" />
+              </IconButton>
               <div className="relative min-w-0 flex-1">
                 <StockAutocomplete
                   id="home-stock-search"
@@ -1526,7 +1512,9 @@ const HomePage: React.FC = () => {
                   ariaLabelledBy="strategy-menu-button"
                   closeOnEscape={false}
                   onContentKeyDown={handleStrategyMenuKeyDown}
-                  contentClassName="right-0 top-10 z-[120] max-h-80 w-[min(18rem,calc(100vw-1.5rem))] overflow-y-auto border-subtle p-1.5 text-sm text-foreground shadow-2xl"
+                  placement="bottom"
+                  align="end"
+                  contentClassName="max-h-80 w-[min(18rem,calc(100vw-1.5rem))] overflow-y-auto border-subtle p-1.5 text-sm text-foreground shadow-2xl"
                   trigger={({ open, toggle }) => (
                     <button
                       ref={strategyButtonRef}
@@ -1577,7 +1565,7 @@ const HomePage: React.FC = () => {
               <Checkbox
                 checked={notify}
                 onChange={(event) => setNotify(event.target.checked)}
-                containerClassName="h-9 flex-shrink-0 gap-1.5 rounded-lg border border-subtle bg-surface/60 px-2 text-xs text-secondary-text transition-colors hover:border-subtle-hover hover:text-foreground"
+                containerClassName="h-9 flex-shrink-0 gap-1.5 rounded-lg border border-subtle bg-subtle px-2 text-xs text-secondary-text transition-colors hover:border-subtle-hover hover:text-foreground"
                 label={<span className="text-xs font-normal text-secondary-text">{t('home.notify')}</span>}
               />
               <Button
@@ -1592,24 +1580,19 @@ const HomePage: React.FC = () => {
                 <BarChart3 className="h-4 w-4" aria-hidden="true" />
                 {t('home.marketReview')}
               </Button>
-              <button
-                type="button"
-                onClick={() => handleSubmitAnalysis()}
-                disabled={!query || isAnalyzing}
-                className="btn-primary flex !min-h-9 !min-w-0 flex-1 basis-32 items-center justify-center gap-1.5 whitespace-nowrap !px-3 !py-1.5 !text-xs md:flex-none md:basis-auto"
-              >
-                {isAnalyzing ? (
-                  <>
-                    <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    {t('home.analyzing')}
-                  </>
-                ) : (
-                  t('home.analyze')
-                )}
-              </button>
+              <div className="grid flex-1 basis-32 md:flex-none md:basis-auto">
+                <Button
+                  variant="primary"
+                  size="comfortable"
+                  className="whitespace-nowrap"
+                  disabled={!query || isAnalyzing}
+                  isLoading={isAnalyzing}
+                  loadingText={t('home.analyzing')}
+                  onClick={() => handleSubmitAnalysis()}
+                >
+                  {t('home.analyze')}
+                </Button>
+              </div>
             </div>
           </div>
         </header>
@@ -1619,29 +1602,29 @@ const HomePage: React.FC = () => {
             {inputError ? (
               <InlineAlert
                 variant="danger"
+                size="compact"
                 title={t('home.inputInvalid')}
                 message={inputError}
-                className="rounded-xl px-3 py-2 text-xs shadow-none"
               />
             ) : null}
             {!inputError && duplicateError && duplicateBannerVisible ? (
               <InlineAlert
                 variant="warning"
+                size="compact"
                 title={t('home.duplicateTask')}
                 message={duplicateTask
                   ? t('home.duplicateTaskMessage', { stock: duplicateTask.stockCode })
                   : getParsedApiError(duplicateError, uiLanguage).message}
                 action={(
-                  <button
-                    type="button"
-                    onClick={dismissDuplicateBanner}
+                  <IconButton
+                    variant="ghost"
+                    size="compact"
                     aria-label={t('common.close')}
-                    className="-my-1 -mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg opacity-70 transition-colors hover:bg-warning/15 hover:opacity-100"
+                    onClick={dismissDuplicateBanner}
                   >
-                    <X className="h-4 w-4" aria-hidden="true" />
-                  </button>
+                    <X aria-hidden="true" />
+                  </IconButton>
                 )}
-                className="rounded-xl px-3 py-2 text-xs shadow-none"
               />
             ) : null}
           </div>
@@ -1651,6 +1634,7 @@ const HomePage: React.FC = () => {
           <div className="px-3 pb-2 md:px-4">
             <InlineAlert
               variant="warning"
+              size="compact"
               title={t('home.setupIncomplete')}
               message={
                 setupMissingLabels
@@ -1667,7 +1651,6 @@ const HomePage: React.FC = () => {
                   {t('home.goSettings')}
                 </Button>
               )}
-              className="rounded-xl px-3 py-2 text-xs shadow-none"
             />
           </div>
         ) : null}
@@ -1681,13 +1664,7 @@ const HomePage: React.FC = () => {
             isOpen={sidebarOpen}
             onClose={closeSidebar}
             title={t('home.historyButton')}
-            width="w-72"
-            zIndex={OVERLAY_Z.pageDrawer}
-            side="left"
-            backdropClassName="page-drawer-overlay"
-            panelClassName="dashboard-card !rounded-none !rounded-r-xl p-3 shadow-2xl"
-            contentClassName="min-h-0 overflow-hidden !p-0"
-            showHeader={false}
+            variant="navigation"
           >
             {sidebarContent}
           </Drawer>
@@ -1701,9 +1678,9 @@ const HomePage: React.FC = () => {
               <div className="mb-3">
                 <InlineAlert
                   variant={marketReviewNotice.variant}
+                  size="compact"
                   title={marketReviewNotice.title}
                   message={marketReviewNotice.message}
-                  className="rounded-xl px-3 py-2 text-xs shadow-none"
                 />
               </div>
             ) : null}
@@ -1875,7 +1852,7 @@ const HomePage: React.FC = () => {
                 <EmptyState
                   title={t('home.startAnalysisTitle')}
                   description={t('home.startAnalysisDescription')}
-                  className="max-w-xl border-dashed"
+                  className="max-w-xl"
                   icon={(
                     <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -1903,12 +1880,11 @@ const HomePage: React.FC = () => {
       ) : null}
 
       {runFlowDrawer.open ? (
-        <Drawer
+        <Modal
           isOpen={runFlowDrawer.open}
           onClose={closeRunFlowDrawer}
           title={t('runFlow.drawerTitle')}
-          width="max-w-[96vw]"
-          zIndex={OVERLAY_Z.runFlowDrawer}
+          size="fullscreen"
         >
           <RunFlowPanel
             key={`${runFlowDrawer.source.type}-${runFlowDrawer.source.type === 'task' ? runFlowDrawer.source.taskId : runFlowDrawer.source.recordId}`}
@@ -1916,7 +1892,7 @@ const HomePage: React.FC = () => {
             title={runFlowDrawer.title}
             onUnavailable={handleUnavailableRunFlow}
           />
-        </Drawer>
+        </Modal>
       ) : null}
 
     </div>

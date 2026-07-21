@@ -13,6 +13,7 @@ import { getNotificationChannelLabel, SETTINGS_NOTIFICATION_TEXT } from '../../l
 
 interface NotificationChannelsPanelProps {
   items: SystemConfigItem[];
+  configuredChannels: readonly string[] | null;
   disabled: boolean;
   onChange: (key: string, value: string) => void;
   issueByKey: Record<string, ConfigValidationIssue[]>;
@@ -24,6 +25,7 @@ function isChannelConfigured(items: SystemConfigItem[]): boolean {
 
 export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps> = ({
   items,
+  configuredChannels,
   disabled,
   onChange,
   issueByKey,
@@ -31,6 +33,10 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
   const { language } = useUiLanguage();
   const text = SETTINGS_NOTIFICATION_TEXT[language];
   const [openChannelId, setOpenChannelId] = useState<string | null>(null);
+  const configuredChannelValues = useMemo(
+    () => configuredChannels === null ? null : new Set(configuredChannels),
+    [configuredChannels],
+  );
 
   const itemsByChannel = useMemo(() => {
     const map = new Map<string, SystemConfigItem[]>();
@@ -54,11 +60,14 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
           if (channelItems.length === 0) {
             return null;
           }
-          const configured = isChannelConfigured(channelItems);
+          const configured = configuredChannelValues === null
+            ? isChannelConfigured(channelItems)
+            : configuredChannelValues.has(channel.routingValue ?? channel.id);
           return (
             <button
               key={channel.id}
               type="button"
+              aria-haspopup="dialog"
               onClick={() => setOpenChannelId(channel.id)}
               className={cn(
                 'flex items-center justify-between gap-2 rounded-lg border settings-border bg-background/35 px-3 py-3 text-left transition-colors hover:bg-[var(--settings-surface-hover)]',
@@ -76,25 +85,27 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
         })}
       </div>
 
-      <Modal
-        isOpen={Boolean(openChannel)}
-        onClose={() => setOpenChannelId(null)}
-        title={openChannel ? getNotificationChannelLabel(openChannel.id, language) : undefined}
-        className="max-w-2xl"
-      >
-        <form className="divide-y divide-transparent" onSubmit={(event) => event.preventDefault()}>
-          {openChannelItems.map((item) => (
-            <SettingsField
-              key={item.key}
-              item={item}
-              value={item.value}
-              disabled={disabled}
-              onChange={onChange}
-              issues={issueByKey[item.key] || []}
-            />
-          ))}
-        </form>
-      </Modal>
+      {openChannel ? (
+        <Modal
+          isOpen
+          onClose={() => setOpenChannelId(null)}
+          title={getNotificationChannelLabel(openChannel.id, language)}
+          size="wide"
+        >
+          <form className="divide-y divide-transparent" onSubmit={(event) => event.preventDefault()}>
+            {openChannelItems.map((item) => (
+              <SettingsField
+                key={item.key}
+                item={item}
+                value={item.value}
+                disabled={disabled}
+                onChange={onChange}
+                issues={issueByKey[item.key] || []}
+              />
+            ))}
+          </form>
+        </Modal>
+      ) : null}
     </>
   );
 };

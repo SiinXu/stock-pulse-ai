@@ -1,44 +1,44 @@
 import React, { useState } from 'react';
-import { Activity, BarChart3, Bell, BriefcaseBusiness, Gauge, Home, LogOut, MessageSquareQuote, PanelLeft, PanelRight, Search, Settings2 } from 'lucide-react';
+import { BarChart3, LogOut, PanelLeft, PanelRight, Search } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAgentChatStore } from '../../stores/agentChatStore';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
-import type { UiTextKey } from '../../i18n/uiText';
 import { cn } from '../../utils/cn';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { StatusDot } from '../common/StatusDot';
+import { Tooltip } from '../common/Tooltip';
 import { SidebarProfile } from './SidebarProfile';
+import {
+  APPLICATION_NAVIGATION_ITEMS,
+  shouldDelegateCurrentDocumentNavigation,
+} from './navigation';
 
 type SidebarNavProps = {
   collapsed?: boolean;
   onNavigate?: () => void;
   onToggleCollapse?: () => void;
   variant?: 'default' | 'rail';
+  focusKeyPrefix?: string;
+  returnFocusKey?: string;
+  profileOpen?: boolean;
+  onProfileOpenChange?: (open: boolean) => void;
+  profileTriggerRef?: React.Ref<HTMLButtonElement>;
+  profilePresentation?: 'mobile' | 'desktop' | 'drawer';
 };
 
-type NavItem = {
-  key: string;
-  labelKey: UiTextKey;
-  to: string;
-  icon: React.ComponentType<{ className?: string }>;
-  exact?: boolean;
-  badge?: 'completion';
-};
-
-const NAV_ITEMS: NavItem[] = [
-  { key: 'home', labelKey: 'layout.nav.home', to: '/', icon: Home, exact: true },
-  { key: 'chat', labelKey: 'layout.nav.chat', to: '/chat', icon: MessageSquareQuote, badge: 'completion' },
-  { key: 'screening', labelKey: 'layout.nav.screening', to: '/screening', icon: Search },
-  { key: 'portfolio', labelKey: 'layout.nav.portfolio', to: '/portfolio', icon: BriefcaseBusiness },
-  { key: 'decision-signals', labelKey: 'layout.nav.decisionSignals', to: '/decision-signals', icon: Activity },
-  { key: 'backtest', labelKey: 'layout.nav.backtest', to: '/backtest', icon: BarChart3 },
-  { key: 'alerts', labelKey: 'layout.nav.alerts', to: '/alerts', icon: Bell },
-  { key: 'usage', labelKey: 'layout.nav.usage', to: '/usage', icon: Gauge },
-  { key: 'settings', labelKey: 'layout.nav.settings', to: '/settings', icon: Settings2 },
-];
-
-export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNavigate, onToggleCollapse, variant = 'default' }) => {
+export const SidebarNav: React.FC<SidebarNavProps> = ({
+  collapsed = false,
+  onNavigate,
+  onToggleCollapse,
+  variant = 'default',
+  focusKeyPrefix = 'shell-nav',
+  returnFocusKey,
+  profileOpen,
+  onProfileOpenChange,
+  profileTriggerRef,
+  profilePresentation,
+}) => {
   const { authEnabled, logout } = useAuth();
   const { t } = useUiLanguage();
   const navigate = useNavigate();
@@ -49,10 +49,10 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
   };
   const completionBadge = useAgentChatStore((state) => state.completionBadge);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const navItems = NAV_ITEMS;
+  const navItems = APPLICATION_NAVIGATION_ITEMS;
   const isRail = variant === 'rail';
   const itemBaseClass = cn(
-    'group relative flex h-[var(--nav-item-height)] w-full items-center overflow-hidden rounded-md border border-transparent text-sm leading-none text-secondary-text transition-all',
+    'group relative flex h-[var(--nav-item-height)] w-full shrink-0 items-center overflow-hidden rounded-md border border-transparent text-sm leading-none text-secondary-text transition-all motion-reduce:transition-none',
     isRail
       ? 'justify-center gap-2.5 px-2'
       : collapsed
@@ -66,24 +66,52 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
   const itemActiveClass = 'border-[var(--nav-active-border)] bg-[var(--nav-active-bg)] font-medium text-foreground shadow-[0_1px_2px_var(--nav-active-shadow)]';
   const itemIconClass = cn('h-5 w-5', 'shrink-0');
   const itemLabelClass = cn('truncate', isRail ? 'text-center' : '');
+  const logoutButton = authEnabled ? (
+    <button
+      type="button"
+      onClick={() => setShowLogoutConfirm(true)}
+      aria-label={collapsed ? t('layout.logout') : undefined}
+      className={cn(
+        itemInteractiveClass,
+        !collapsed && (isRail ? 'mt-1.5' : 'mt-5'),
+      )}
+    >
+      <LogOut className={itemIconClass} />
+      {!collapsed ? <span className={itemLabelClass}>{t('layout.logout')}</span> : null}
+    </button>
+  ) : null;
 
   return (
     <>
       {collapsed ? (
         <div className="mb-4 flex justify-center">
-          <div className="group relative h-11 w-11">
-            <div className="flex h-11 w-11 items-center justify-center rounded-md bg-primary text-primary-foreground transition-opacity group-hover:opacity-0">
+          <div
+            className={cn('relative h-11 w-11', onToggleCollapse && 'group')}
+            data-shell-brand-behavior={onToggleCollapse ? 'replaceable' : 'persistent'}
+          >
+            <div
+              data-shell-brand-mark="true"
+              className={cn(
+                'flex h-11 w-11 items-center justify-center rounded-md bg-primary text-primary-foreground transition-opacity motion-reduce:transition-none',
+                onToggleCollapse && 'group-hover:opacity-0',
+              )}
+            >
               <BarChart3 className="size-4.5" />
             </div>
             {onToggleCollapse ? (
-              <button
-                type="button"
-                onClick={onToggleCollapse}
-                aria-label={t('layout.expandSidebar')}
-                className="absolute inset-0 flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-card text-secondary-text opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
+              <Tooltip
+                content={t('layout.expandSidebar')}
+                className="absolute inset-0"
               >
-                <PanelRight className="size-4.5" />
-              </button>
+                <button
+                  type="button"
+                  onClick={onToggleCollapse}
+                  aria-label={t('layout.expandSidebar')}
+                  className="flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-card text-secondary-text opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100 motion-reduce:transition-none"
+                >
+                  <PanelRight className="size-4.5" />
+                </button>
+              </Tooltip>
             ) : null}
           </div>
         </div>
@@ -94,33 +122,41 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
           </div>
           <p className="min-w-0 flex-1 truncate text-xl font-bold tracking-tight text-foreground">StockPulse</p>
           {onToggleCollapse ? (
-            <button
-              type="button"
-              onClick={onToggleCollapse}
-              aria-label={t('layout.collapseSidebar')}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-transparent text-secondary-text transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-foreground"
-            >
-              <PanelLeft className="size-4.5" />
-            </button>
+            <Tooltip content={t('layout.collapseSidebar')}>
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                aria-label={t('layout.collapseSidebar')}
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-transparent text-secondary-text transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-foreground motion-reduce:transition-none"
+              >
+                <PanelLeft className="size-4.5" />
+              </button>
+            </Tooltip>
           ) : null}
         </div>
       )}
 
       {collapsed ? (
-        <button
-          type="button"
-          onClick={openSearch}
-          aria-label={t('layout.search')}
-          className="mb-3 flex h-11 w-11 items-center justify-center self-center rounded-lg border border-border bg-card text-muted-text transition-colors hover:bg-hover hover:text-foreground"
-        >
-          <Search className="h-4 w-4" />
-        </button>
+        <Tooltip content={t('layout.search')} className="mb-3 self-center">
+          <button
+            type="button"
+            onClick={openSearch}
+            aria-label={t('layout.search')}
+            data-route-focus-key={`${focusKeyPrefix}:search`}
+            data-route-focus-return-key={returnFocusKey}
+            className="flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-card text-muted-text transition-colors hover:bg-hover hover:text-foreground motion-reduce:transition-none"
+          >
+            <Search className="h-4 w-4" />
+          </button>
+        </Tooltip>
       ) : (
         <>
           <button
             type="button"
             onClick={openSearch}
             aria-label={t('layout.search')}
+            data-route-focus-key={`${focusKeyPrefix}:search`}
+            data-route-focus-return-key={returnFocusKey}
             className="mb-3 flex min-h-11 w-full items-center rounded-lg border border-border bg-card px-2.5 py-2 text-left shadow-soft-card transition-colors hover:bg-hover"
           >
             <span className="flex items-center gap-2 text-xs text-muted-text">
@@ -132,62 +168,79 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
         </>
       )}
 
-      <nav className={cn('flex flex-col gap-1', isRail ? '' : 'flex-1')} aria-label={t('layout.mainNav')}>
+      <nav
+        className={cn(
+          'flex flex-col gap-1',
+          isRail ? '' : 'min-h-0 flex-1 overflow-y-auto overscroll-contain',
+        )}
+        aria-label={t('layout.mainNav')}
+      >
         {navItems.map(({ key, labelKey, to, icon: Icon, exact, badge }) => {
           const label = t(labelKey);
+          const link = (
+            <NavLink
+              to={to}
+              end={exact}
+              onClick={(event) => {
+                if (shouldDelegateCurrentDocumentNavigation(event)) {
+                  onNavigate?.();
+                }
+              }}
+              aria-label={label}
+              data-route-focus-key={`${focusKeyPrefix}:${key}`}
+              data-route-focus-return-key={returnFocusKey}
+              className={({ isActive }) =>
+                cn(
+                  itemInteractiveClass,
+                  isActive ? itemActiveClass : ''
+                )
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <Icon className={cn(itemIconClass, isActive ? 'text-[var(--nav-icon-active)]' : 'text-current')} />
+                  {!collapsed ? <span className={itemLabelClass}>{label}</span> : null}
+                  {badge === 'completion' && completionBadge ? (
+                    <StatusDot
+                      tone="info"
+                      data-testid="chat-completion-badge"
+                      className={cn(
+                        'absolute right-3 border-2 border-background shadow-soft-card',
+                        collapsed ? 'right-2 top-2' : ''
+                      )}
+                      aria-label={t('layout.newChatMessage')}
+                    />
+                  ) : null}
+                </>
+              )}
+            </NavLink>
+          );
           return (
-          <NavLink
-            key={key}
-            to={to}
-            end={exact}
-            onClick={onNavigate}
-            aria-label={label}
-            className={({ isActive }) =>
-              cn(
-                itemInteractiveClass,
-                isActive ? itemActiveClass : ''
-              )
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <Icon className={cn(itemIconClass, isActive ? 'text-[var(--nav-icon-active)]' : 'text-current')} />
-                {!collapsed ? <span className={itemLabelClass}>{label}</span> : null}
-                {badge === 'completion' && completionBadge ? (
-                  <StatusDot
-                    tone="info"
-                    data-testid="chat-completion-badge"
-                    className={cn(
-                      'absolute right-3 border-2 border-background shadow-soft-card',
-                      collapsed ? 'right-2 top-2' : ''
-                    )}
-                    aria-label={t('layout.newChatMessage')}
-                  />
-                ) : null}
-              </>
-            )}
-          </NavLink>
-        );
+            <React.Fragment key={key}>
+              {collapsed ? (
+                <Tooltip content={label} className="w-full shrink-0">
+                  {link}
+                </Tooltip>
+              ) : link}
+            </React.Fragment>
+          );
         })}
 
       </nav>
 
-      <SidebarProfile collapsed={collapsed} />
+      <SidebarProfile
+        collapsed={collapsed}
+        open={profileOpen}
+        onOpenChange={onProfileOpenChange}
+        triggerRef={profileTriggerRef}
+        presentation={profilePresentation}
+      />
 
-      {authEnabled ? (
-        <button
-          type="button"
-          onClick={() => setShowLogoutConfirm(true)}
-          aria-label={collapsed ? t('layout.logout') : undefined}
-          className={cn(
-            itemInteractiveClass,
-            isRail ? 'mt-1.5' : 'mt-5'
-          )}
-        >
-          <LogOut className={itemIconClass} />
-          {!collapsed ? <span className={itemLabelClass}>{t('layout.logout')}</span> : null}
-        </button>
-      ) : null}
+      {collapsed && logoutButton ? (
+          <Tooltip content={t('layout.logout')} className={cn('w-full', isRail ? 'mt-1.5' : 'mt-5')}>
+            {logoutButton}
+          </Tooltip>
+      ) : logoutButton}
 
       <ConfirmDialog
         isOpen={showLogoutConfirm}

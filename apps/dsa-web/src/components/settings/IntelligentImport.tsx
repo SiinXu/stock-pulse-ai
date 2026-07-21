@@ -367,8 +367,8 @@ export const IntelligentImport: React.FC<IntelligentImportProps> = ({
       {error && (
         <InlineAlert
           variant="danger"
+          size="compact"
           message={error}
-          className="rounded-xl px-3 py-2 text-sm shadow-none"
         />
       )}
 
@@ -376,8 +376,8 @@ export const IntelligentImport: React.FC<IntelligentImportProps> = ({
         <div className="space-y-2">
           <InlineAlert
             variant="warning"
+            size="compact"
             message={t('settings.intelligentImportReviewWarning')}
-            className="rounded-xl px-3 py-2 text-xs shadow-none"
           />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs text-secondary-text">

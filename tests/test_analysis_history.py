@@ -19,6 +19,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from sqlalchemy import text
+from sqlalchemy.exc import DatabaseError
+
 # Keep this test runnable when optional LLM runtime deps are not installed.
 try:
     import litellm  # noqa: F401
@@ -48,7 +51,7 @@ from src.storage import (
 )
 from src.analyzer import AnalysisResult
 from src.daily_market_context_guardrail import apply_daily_market_context_guardrail
-from src.services.history_service import HistoryService
+from src.services.history_service import HistoryService, HistoryValidationError
 import src.auth as auth
 
 
@@ -187,9 +190,6 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertEqual(getattr(raised.exception, "status_code", None), 500)
 
     def test_delete_history_by_code_deletes_more_than_one_lookup_batch(self) -> None:
-        if delete_history_by_code is None:
-            self.skipTest("fastapi is not installed in this test environment")
-
         remaining = {record_id: SimpleNamespace(id=record_id) for record_id in range(1, 10_002)}
         db = MagicMock()
 
@@ -207,11 +207,50 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         db.get_analysis_history_paginated.side_effect = get_records
         db.delete_analysis_history_records.side_effect = delete_records
 
-        response = delete_history_by_code("600519", db_manager=db)
+        deleted = HistoryService(db).delete_history_by_code("600519")
 
-        self.assertEqual(response.deleted, 10_001)
+        self.assertEqual(deleted, 10_001)
         self.assertEqual(remaining, {})
         self.assertEqual(db.get_analysis_history_paginated.call_count, 2)
+
+    def test_delete_history_by_code_fails_when_a_batch_makes_no_progress(self) -> None:
+        db = MagicMock()
+        db.get_analysis_history_paginated.return_value = ([SimpleNamespace(id=1)], 1)
+        db.delete_analysis_history_records.return_value = 0
+
+        with self.assertRaisesRegex(RuntimeError, "made no progress"):
+            HistoryService(db).delete_history_by_code("600519")
+
+        db.get_analysis_history_paginated.assert_called_once()
+        db.delete_analysis_history_records.assert_called_once_with([1])
+
+    def test_delete_history_by_code_endpoint_maps_repository_failure_to_500(self) -> None:
+        if delete_history_by_code is None:
+            self.skipTest("fastapi is not installed in this test environment")
+
+        db = MagicMock()
+        db.get_analysis_history_paginated.return_value = ([SimpleNamespace(id=1)], 1)
+        db.delete_analysis_history_records.return_value = 0
+
+        with self.assertRaises(Exception) as raised:
+            delete_history_by_code("600519", db_manager=db)
+
+        self.assertEqual(getattr(raised.exception, "status_code", None), 500)
+        self.assertEqual(raised.exception.detail.get("error"), "internal_error")
+
+    def test_delete_history_by_code_endpoint_delegates_to_service(self) -> None:
+        if delete_history_by_code is None:
+            self.skipTest("fastapi is not installed in this test environment")
+
+        db = MagicMock()
+        with patch("api.v1.endpoints.history.HistoryService") as service_class:
+            service_class.return_value.delete_history_by_code.return_value = 3
+
+            response = delete_history_by_code("600519", db_manager=db)
+
+        self.assertEqual(response.deleted, 3)
+        service_class.assert_called_once_with(db)
+        service_class.return_value.delete_history_by_code.assert_called_once_with("600519")
 
     def test_delete_history_by_code_rejects_blank_code_before_query(self) -> None:
         if delete_history_by_code is None:
@@ -238,6 +277,9 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         delete.assert_not_called()
         with self.db.get_session() as session:
             self.assertIsNotNone(session.query(AnalysisHistory).filter(AnalysisHistory.id == record_id).first())
+
+        with self.assertRaisesRegex(HistoryValidationError, "stock_code"):
+            HistoryService(self.db).delete_history_by_code(" ")
 
     def _build_result(self) -> AnalysisResult:
         """构造分析结果"""
@@ -1761,6 +1803,126 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertIn("**🟡 Avoid** | Bullish", markdown)
         self.assertNotIn("Strong Buy", markdown)
 
+    def test_history_markdown_renders_strategy_synthesis_localized(self) -> None:
+        service = HistoryService(self.db)
+        record = MagicMock(created_at=None)
+        result = AnalysisResult(
+            code="600519",
+            name="贵州茅台",
+            sentiment_score=72,
+            trend_prediction="看多",
+            operation_advice="持有",
+            report_language="zh",
+            dashboard={
+                "core_conclusion": {"one_sentence": "测试"},
+                "strategy_synthesis": {
+                    "final_signal": "buy",
+                    "confidence": 0.8,
+                    "conflict_count": 0,
+                    "conflict_severity": "none",
+                    "consensus_level": "high",
+                    "summary_params": {"opinion_count": 2, "invalid_opinion_count": 1},
+                    "supporting_skills": [{"skill_id": "bull_trend", "signal": "buy", "confidence": 0.8}],
+                    "opposing_skills": [],
+                },
+            },
+        )
+
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertIn("多策略综合", markdown)
+        self.assertIn("综合信号: 买入", markdown)
+        self.assertIn("默认多头趋势/买入/80%", markdown)
+        self.assertIn("反方策略: 无", markdown)
+        self.assertIn("另有 1 个策略解析失败", markdown)
+        self.assertNotIn("bull_trend", markdown)
+
+    def test_history_markdown_uses_english_empty_strategy_labels(self) -> None:
+        result = AnalysisResult(
+            code="AAPL",
+            name="Apple",
+            sentiment_score=50,
+            trend_prediction="Sideways",
+            operation_advice="Hold",
+            report_language="en",
+            dashboard={
+                "core_conclusion": {"one_sentence": "Wait for confirmation"},
+                "strategy_synthesis": {
+                    "final_signal": "hold",
+                    "confidence": 0.0,
+                    "conflict_count": 0,
+                    "conflict_severity": "none",
+                    "consensus_level": "insufficient",
+                    "summary_params": {"opinion_count": 0},
+                    "supporting_skills": [],
+                    "opposing_skills": [],
+                    "conflicts": [],
+                },
+            },
+        )
+
+        markdown = HistoryService(self.db)._generate_single_stock_markdown(
+            result,
+            MagicMock(created_at=None),
+        )
+
+        self.assertIn("Supporting Strategies: None", markdown)
+        self.assertIn("Opposing Strategies: None", markdown)
+        self.assertNotIn("支持策略", markdown)
+
+    def test_history_markdown_handles_legacy_strategy_synthesis_shapes(self) -> None:
+        service = HistoryService(self.db)
+        record = MagicMock(created_at=None)
+
+        for malformed in ("bad-shape", ["bad-shape"], 42, True):
+            result = AnalysisResult(
+                code="600519",
+                name="贵州茅台",
+                sentiment_score=50,
+                trend_prediction="震荡",
+                operation_advice="观望",
+                report_language="zh",
+                dashboard={
+                    "core_conclusion": {"one_sentence": "测试"},
+                    "intelligence": {},
+                    "battle_plan": {},
+                    "strategy_synthesis": malformed,
+                },
+            )
+
+            markdown = service._generate_single_stock_markdown(result, record)
+
+            self.assertNotIn("多策略综合", markdown)
+
+        result = AnalysisResult(
+            code="600519",
+            name="贵州茅台",
+            sentiment_score=50,
+            trend_prediction="震荡",
+            operation_advice="观望",
+            report_language="zh",
+            dashboard={
+                "core_conclusion": {"one_sentence": "测试"},
+                "intelligence": {},
+                "battle_plan": {},
+                "strategy_synthesis": {
+                    "final_signal": "hold",
+                    "consensus_level": "insufficient",
+                    "conflict_severity": "none",
+                    "conflict_count": 0,
+                    "supporting_skills": "bad-shape",
+                    "opposing_skills": ["bad-shape"],
+                    "conflicts": "bad-shape",
+                    "summary_params": {"invalid_opinion_count": "3"},
+                },
+            },
+        )
+
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertIn("多策略综合", markdown)
+        self.assertIn("另有 3 个策略解析失败", markdown)
+
     def test_history_markdown_returns_persisted_market_review_report(self) -> None:
         """Market review history should return the saved Markdown without rebuilding a stock report."""
         result = AnalysisResult(
@@ -1979,8 +2141,8 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertIn("✅Safe", markdown)
         self.assertNotIn("🚨Safe", markdown)
 
-    def test_delete_analysis_history_records_also_cleans_backtests_and_decision_signals(self) -> None:
-        """删除历史记录时应一并清理关联回测结果和决策信号。"""
+    def test_delete_history_by_code_commits_backtest_and_decision_signal_cleanup(self) -> None:
+        """Deleting by code commits cleanup of linked backtests and signals."""
         record_id = self._save_history("query_delete_001")
         linked_signal_id = None
 
@@ -2044,7 +2206,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
                 status="active",
             ))
 
-        deleted = self.db.delete_analysis_history_records([record_id])
+        deleted = HistoryService(self.db).delete_history_by_code("600519")
         self.assertEqual(deleted, 1)
 
         with self.db.get_session() as session:
@@ -2071,6 +2233,40 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             )
             self.assertEqual(
                 session.query(DecisionSignalRecord).filter(DecisionSignalRecord.trace_id == "trace-delete-unrelated").count(),
+                1,
+            )
+
+    def test_delete_analysis_history_records_rolls_back_dependent_cleanup(self) -> None:
+        """A parent-delete failure must restore dependent rows in the batch."""
+        record_id = self._save_history("query_delete_rollback")
+
+        with self.db.session_scope() as session:
+            session.add(BacktestResult(
+                analysis_history_id=record_id,
+                code="600519",
+                analysis_date=None,
+                eval_window_days=10,
+                engine_version="v1",
+                eval_status="pending",
+            ))
+            session.execute(text(
+                "CREATE TRIGGER fail_history_delete "
+                "BEFORE DELETE ON analysis_history "
+                f"WHEN OLD.id = {record_id} "
+                "BEGIN SELECT RAISE(ABORT, 'forced history delete failure'); END"
+            ))
+
+        with self.assertRaises(DatabaseError):
+            HistoryService(self.db).delete_history_by_code("600519")
+
+        with self.db.get_session() as session:
+            self.assertIsNotNone(
+                session.query(AnalysisHistory).filter(AnalysisHistory.id == record_id).first()
+            )
+            self.assertEqual(
+                session.query(BacktestResult).filter(
+                    BacktestResult.analysis_history_id == record_id
+                ).count(),
                 1,
             )
 

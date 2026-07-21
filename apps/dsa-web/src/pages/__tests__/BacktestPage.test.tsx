@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { BrowserRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
@@ -114,17 +115,27 @@ beforeEach(() => {
 });
 
 describe('BacktestPage', () => {
+  function renderPage() {
+    return render(
+      <BrowserRouter>
+        <BacktestPage />
+      </BrowserRouter>,
+    );
+  }
+
   function renderEnglishPage() {
     window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
     render(
-      <UiLanguageProvider>
-        <BacktestPage />
-      </UiLanguageProvider>,
+      <BrowserRouter>
+        <UiLanguageProvider>
+          <BacktestPage />
+        </UiLanguageProvider>
+      </BrowserRouter>,
     );
   }
 
   it('renders shared surface inputs and prediction tracking outputs', async () => {
-    render(<BacktestPage />);
+    renderPage();
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
@@ -132,13 +143,17 @@ describe('BacktestPage', () => {
     const endDateInput = screen.getByLabelText('分析结束日期');
 
     expect(filterInput).toHaveAttribute('data-control', 'input');
-    expect(filterInput).toHaveAttribute('data-size', 'comfortable');
+    expect(filterInput).toHaveAttribute('data-size', 'default');
     expect(windowInput).toHaveAttribute('data-control', 'input');
-    expect(windowInput).toHaveAttribute('data-size', 'comfortable');
+    expect(windowInput).toHaveAttribute('data-size', 'default');
+    expect(screen.getByRole('button', { name: '筛选' })).toHaveAttribute('data-size', 'primary');
+    expect(screen.getByRole('button', { name: '运行回测' })).toHaveAttribute('data-size', 'primary');
     expect(startDateInput).toHaveAttribute('aria-haspopup', 'dialog');
     expect(startDateInput).toHaveAttribute('aria-expanded', 'false');
     expect(endDateInput).toHaveAttribute('aria-haspopup', 'dialog');
     expect(endDateInput).toHaveAttribute('aria-expanded', 'false');
+    expect(startDateInput.parentElement).toHaveAttribute('data-size', 'compact');
+    expect(endDateInput.parentElement).toHaveAttribute('data-size', 'compact');
 
     expect(await screen.findByText('盈利')).toBeInTheDocument();
     expect(screen.getByText('已完成')).toBeInTheDocument();
@@ -159,6 +174,23 @@ describe('BacktestPage', () => {
     expect(screen.getByText('平均模拟收益')).toBeInTheDocument();
   });
 
+  it('renders one page-level empty state before any backtest data exists', async () => {
+    mockGetOverallPerformance.mockResolvedValueOnce(null);
+    mockGetResults.mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+
+    renderPage();
+
+    expect(await screen.findByRole('heading', { name: '暂无结果' })).toBeInTheDocument();
+    expect(screen.getAllByText('暂无结果')).toHaveLength(1);
+    expect(screen.queryByLabelText('结果筛选 · 阶段')).not.toBeInTheDocument();
+    expect(screen.queryByText('暂无指标')).not.toBeInTheDocument();
+  });
+
   it('falls back to the taxonomy label when backtest actionLabel is missing', async () => {
     mockGetResults.mockResolvedValueOnce({
       total: 1,
@@ -173,7 +205,7 @@ describe('BacktestPage', () => {
       ],
     });
 
-    render(<BacktestPage />);
+    renderPage();
 
     const codeCell = await screen.findByText('600519');
     const resultRow = codeCell.closest('tr');
@@ -225,7 +257,7 @@ describe('BacktestPage', () => {
       ],
     });
 
-    render(<BacktestPage />);
+    renderPage();
 
     const codeCell = await screen.findByText('600519');
     const resultRow = codeCell.closest('tr');
@@ -252,8 +284,8 @@ describe('BacktestPage', () => {
     renderEnglishPage();
 
     expect(await screen.findByPlaceholderText('Filter by stock code (leave empty for all)'))
-      .toHaveAttribute('data-size', 'comfortable');
-    expect(screen.getByText('Evaluation window')).toBeInTheDocument();
+      .toHaveAttribute('data-size', 'default');
+    expect(screen.getByRole('tab', { name: 'Evaluation window' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByLabelText('Result filters · Phase')).toHaveTextContent('All phases');
     expect(screen.getByRole('button', { name: 'Run backtest' })).toBeInTheDocument();
 
@@ -270,7 +302,8 @@ describe('BacktestPage', () => {
   });
 
   it('filters results with stock code, window, phase, and analysis date range when clicking Filter', async () => {
-    render(<BacktestPage />);
+    window.history.replaceState({}, '', '/backtest?ref=dashboard#results');
+    renderPage();
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
@@ -308,10 +341,12 @@ describe('BacktestPage', () => {
         analysisPhase: 'intraday',
       });
     });
+    expect(new URLSearchParams(window.location.search).get('ref')).toBe('dashboard');
+    expect(window.location.hash).toBe('#results');
   });
 
   it('applies the phase filter immediately without waiting for Filter or Run', async () => {
-    render(<BacktestPage />);
+    renderPage();
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     fireEvent.change(filterInput, { target: { value: 'aapl' } });
@@ -344,7 +379,7 @@ describe('BacktestPage', () => {
       message: '未找到符合条件的历史分析记录',
       diagnostics: { emptyReason: 'no_matching_analysis' },
     });
-    render(<BacktestPage />);
+    renderPage();
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
@@ -392,7 +427,7 @@ describe('BacktestPage', () => {
   });
 
   it('rejects an empty evaluation window before running a backtest', async () => {
-    render(<BacktestPage />);
+    renderPage();
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
@@ -412,12 +447,12 @@ describe('BacktestPage', () => {
   });
 
   it('switches to next-day validation with the 1D shortcut', async () => {
-    render(<BacktestPage />);
+    renderPage();
 
     await screen.findByText('600519');
-    const oneDayButton = screen.getByRole('button', { name: '1 日验证' });
-    expect(oneDayButton).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByRole('button', { name: '强制重跑' })).toHaveAttribute('aria-pressed', 'false');
+    const oneDayButton = screen.getByRole('tab', { name: '1 日验证' });
+    expect(oneDayButton).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByRole('switch', { name: '强制重跑' })).toHaveAttribute('aria-checked', 'false');
     const nextDayResults = createDeferred<{
       total: number;
       page: number;
@@ -463,6 +498,13 @@ describe('BacktestPage', () => {
     expect(screen.queryByText('正在加载结果...')).not.toBeInTheDocument();
     expect(screen.getByText('准确性')).toBeInTheDocument();
     expect(screen.getByText('1 日验证模式会用下一个交易日收盘表现校验 AI 预测。')).toBeInTheDocument();
+    expect(oneDayButton).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.click(screen.getByRole('tab', { name: '评估窗口' }));
+    await waitFor(() => expect(mockGetResults).toHaveBeenLastCalledWith(expect.objectContaining({
+      evalWindowDays: 10,
+    })));
+    expect(screen.getByPlaceholderText('10')).toHaveValue(10);
   });
 
   it('restores applied filters and pagination from the URL', async () => {
@@ -474,7 +516,7 @@ describe('BacktestPage', () => {
       items: [{ ...baseResultItem, code: 'AAPL', stockName: 'Apple' }],
     });
 
-    render(<BacktestPage />);
+    renderPage();
 
     expect(await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）')).toHaveValue('AAPL');
     expect(screen.getByPlaceholderText('10')).toHaveValue(20);
@@ -499,7 +541,7 @@ describe('BacktestPage', () => {
     let resolveOldPerformance!: (value: typeof basePerformance) => void;
     let resolveNewPerformance!: (value: typeof basePerformance) => void;
 
-    render(<BacktestPage />);
+    renderPage();
     await screen.findByText('600519');
     mockGetResults
       .mockImplementationOnce(() => new Promise((resolve) => { resolveOldResults = resolve; }))
@@ -544,7 +586,7 @@ describe('BacktestPage', () => {
     mockGetOverallPerformance.mockImplementationOnce(() => new Promise((resolve) => {
       resolvePerformance = resolve;
     }));
-    const { unmount } = render(<BacktestPage />);
+    const { unmount } = renderPage();
     await waitFor(() => expect(mockGetOverallPerformance).toHaveBeenCalledTimes(1));
     unmount();
 

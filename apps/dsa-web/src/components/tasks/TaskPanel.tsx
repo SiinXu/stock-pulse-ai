@@ -23,11 +23,14 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
   const isCancelled = task.status === 'cancelled';
   const isCompleted = task.status === 'completed';
   const isFailed = task.status === 'failed';
-  const isTerminal = isCompleted || isFailed || isCancelled;
+  const isInterrupted = task.status === 'interrupted';
+  const isTerminal = isCompleted || isFailed || isCancelled || isInterrupted;
   const statusLabel = isCompleted
     ? t('taskPanel.completed')
     : isFailed
       ? t('taskPanel.failed')
+      : isInterrupted
+        ? t('taskPanel.interrupted')
       : isCancelRequested
         ? t('taskPanel.cancelRequested')
         : isCancelled
@@ -37,12 +40,12 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
     ? 'success'
     : isFailed
       ? 'danger'
-      : isCancelRequested ? 'warning' : isProcessing ? 'info' : 'default';
+      : isInterrupted || isCancelRequested ? 'warning' : isProcessing ? 'info' : 'default';
   const statusTone = isCompleted
     ? 'success'
     : isFailed
       ? 'danger'
-      : isCancelRequested ? 'warning' : isProcessing ? 'info' : 'neutral';
+      : isInterrupted || isCancelRequested ? 'warning' : isProcessing ? 'info' : 'neutral';
   const progress = Math.max(0, Math.min(100, task.progress || 0));
   const traceId = (task.traceId || '').trim();
   const requestedPhaseLabel = getRequestedPhaseLabel(task.analysisPhase, language);
@@ -134,7 +137,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
 
       {!isTerminal ? (
         <div className="flex min-w-0 items-center gap-2">
-          <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-white/8">
+          <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-subtle">
             <div
               className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
               style={{ width: `${progress}%` }}
@@ -202,7 +205,10 @@ export const TaskPanel: React.FC<TaskPanelProps> = ({
     (t) => t.status === 'pending' || t.status === 'processing' || t.status === 'cancel_requested'
   );
   const terminalTasks = tasks.filter(
-    (t) => t.status === 'completed' || t.status === 'failed' || t.status === 'cancelled'
+    (t) => t.status === 'completed'
+      || t.status === 'failed'
+      || t.status === 'cancelled'
+      || t.status === 'interrupted'
   );
   const orderedTasks = [...activeTasks, ...terminalTasks];
 
@@ -218,7 +224,7 @@ export const TaskPanel: React.FC<TaskPanelProps> = ({
     <Card
       variant="bordered"
       padding="none"
-      className={`home-panel-card overflow-hidden ${className}`}
+      className={`overflow-hidden ${className}`}
     >
       <div className="border-b border-subtle px-3 py-3">
         <DashboardPanelHeader

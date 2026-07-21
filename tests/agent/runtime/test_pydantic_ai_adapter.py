@@ -15,9 +15,12 @@ Two contracts are asserted:
   ``AgentResult``.
 """
 
+import asyncio
 import os
 import sys
-from unittest.mock import patch
+import threading
+import time
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -27,8 +30,13 @@ from tests.litellm_stub import ensure_litellm_stub
 
 ensure_litellm_stub()
 
-from src.agent.llm_adapter import LLMResponse
-from src.agent.runtime.contract import ExecutionContext, ExecutionMode, ExecutionState
+from src.agent.llm_adapter import LLMResponse, ToolCall
+from src.agent.runtime.contract import (
+    AgentExecution,
+    ExecutionContext,
+    ExecutionMode,
+    ExecutionState,
+)
 from src.agent.runtime.pydantic_ai_adapter import (
     PydanticAIRuntimeAdapter,
     PydanticAIRuntimeUnavailableError,
@@ -111,6 +119,131 @@ def _tool_then_final_model(tool_name: str, tool_args: dict, final_text: str):
     return _ToolCallingModel()
 
 
+def _blocking_model(started: threading.Event, release: threading.Event, output_text: str):
+    """Fake Model that stays inside one request until the test releases it."""
+    from pydantic_ai.messages import ModelResponse, TextPart
+    from pydantic_ai.models import Model
+    from pydantic_ai.usage import RequestUsage
+
+    class _BlockingModel(Model):
+        @property
+        def model_name(self) -> str:
+            return "blocking-fake"
+
+        @property
+        def system(self) -> str:
+            return "stockpulse"
+
+        async def request(self, messages, model_settings, model_request_parameters):
+            started.set()
+            while not release.is_set():
+                await asyncio.sleep(0.001)
+            return ModelResponse(
+                parts=[TextPart(content=output_text)],
+                usage=RequestUsage(input_tokens=1, output_tokens=1),
+                model_name=self.model_name,
+            )
+
+    return _BlockingModel()
+
+
+def _blocking_tool_call_model(
+    started: threading.Event,
+    release: threading.Event,
+):
+    """Direct Model that returns a tool call only after the test releases it."""
+    from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
+    from pydantic_ai.models import Model
+    from pydantic_ai.usage import RequestUsage
+
+    class _BlockingToolCallModel(Model):
+        def __init__(self):
+            self.step = 0
+
+        @property
+        def model_name(self) -> str:
+            return "blocking-tool-call-fake"
+
+        @property
+        def system(self) -> str:
+            return "stockpulse"
+
+        async def request(self, messages, model_settings, model_request_parameters):
+            self.step += 1
+            if self.step == 1:
+                started.set()
+                while not release.is_set():
+                    await asyncio.sleep(0.001)
+                return ModelResponse(
+                    parts=[
+                        ToolCallPart(
+                            tool_name="echo",
+                            args={"message": "must-not-run"},
+                            tool_call_id="direct-call-after-fence",
+                        )
+                    ],
+                    usage=RequestUsage(input_tokens=1, output_tokens=1),
+                    model_name=self.model_name,
+                )
+            return ModelResponse(
+                parts=[TextPart(content='{"signal": "buy"}')],
+                usage=RequestUsage(input_tokens=1, output_tokens=1),
+                model_name=self.model_name,
+            )
+
+    return _BlockingToolCallModel()
+
+
+def _tool_then_blocking_final_model(
+    tool_name: str,
+    tool_args: dict,
+    final_text: str,
+    waiting: threading.Event,
+    release: threading.Event,
+):
+    """Emit one tool call, then block the final model turn."""
+    from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
+    from pydantic_ai.models import Model
+    from pydantic_ai.usage import RequestUsage
+
+    class _ToolThenBlockingModel(Model):
+        def __init__(self):
+            self.step = 0
+
+        @property
+        def model_name(self) -> str:
+            return "tool-blocking-fake"
+
+        @property
+        def system(self) -> str:
+            return "stockpulse"
+
+        async def request(self, messages, model_settings, model_request_parameters):
+            self.step += 1
+            if self.step == 1:
+                return ModelResponse(
+                    parts=[
+                        ToolCallPart(
+                            tool_name=tool_name,
+                            args=tool_args,
+                            tool_call_id="c1",
+                        )
+                    ],
+                    usage=RequestUsage(input_tokens=1, output_tokens=1),
+                    model_name=self.model_name,
+                )
+            waiting.set()
+            while not release.is_set():
+                await asyncio.sleep(0.001)
+            return ModelResponse(
+                parts=[TextPart(content=final_text)],
+                usage=RequestUsage(input_tokens=1, output_tokens=1),
+                model_name=self.model_name,
+            )
+
+    return _ToolThenBlockingModel()
+
+
 def _echo_registry() -> ToolRegistry:
     registry = ToolRegistry()
     registry.register(
@@ -183,6 +316,395 @@ def test_run_without_dashboard_json_fails_closed():
     assert handle.result.success is False
     assert handle.result.dashboard is None
     assert "dashboard" in (handle.result.error or "").lower()
+
+
+def test_execute_reraises_worker_exception():
+    from pydantic_ai.models import Model
+
+    exception = RuntimeError("pydantic runtime boom")
+
+    class _RaisingModel(Model):
+        @property
+        def model_name(self) -> str:
+            return "raising-fake"
+
+        @property
+        def system(self) -> str:
+            return "stockpulse"
+
+        async def request(self, messages, model_settings, model_request_parameters):
+            raise exception
+
+    adapter = PydanticAIRuntimeAdapter(model=_RaisingModel())
+
+    with pytest.raises(RuntimeError, match="pydantic runtime boom") as excinfo:
+        adapter.execute(_run_context("Analyze 600519"))
+
+    assert excinfo.value is exception
+
+
+def test_start_returns_live_running_handle_then_completes():
+    started = threading.Event()
+    release = threading.Event()
+    adapter = PydanticAIRuntimeAdapter(
+        model=_blocking_model(started, release, '{"signal": "buy"}')
+    )
+
+    handle = adapter.start(_run_context("Analyze 600519"))
+    try:
+        assert started.wait(5)
+        assert handle.state is ExecutionState.RUNNING
+        assert handle.is_terminal is False
+        assert handle.wait(timeout=0.01) is False
+    finally:
+        release.set()
+        handle.wait(5)
+        handle.close()
+
+    assert handle.state is ExecutionState.SUCCEEDED
+    assert handle.result.dashboard == {"signal": "buy"}
+
+
+def test_live_handle_cancellation_wins_after_active_request_returns():
+    started = threading.Event()
+    release = threading.Event()
+    adapter = PydanticAIRuntimeAdapter(
+        model=_blocking_model(started, release, '{"signal": "buy"}')
+    )
+
+    handle = adapter.start(_run_context("Analyze 600519"))
+    try:
+        assert started.wait(5)
+        assert handle.request_cancel() is True
+        assert handle.cancel_requested is True
+        assert handle.state is ExecutionState.RUNNING
+    finally:
+        release.set()
+        handle.wait(5)
+        handle.close()
+
+    assert handle.state is ExecutionState.CANCELLED
+    assert handle.result.success is False
+    assert handle.result.cancelled is True
+
+
+def test_live_cancel_fences_wire_response_before_tool_dispatch():
+    started = threading.Event()
+    release = threading.Event()
+
+    class _BlockingToolCallAdapter:
+        primary_model = "blocking-wire-model"
+
+        def call_with_tools(self, messages, tools, provider=None, timeout=None):
+            started.set()
+            assert release.wait(5)
+            return LLMResponse(
+                tool_calls=[
+                    ToolCall(
+                        id="call-after-cancel",
+                        name="echo",
+                        arguments={"message": "must-not-run"},
+                    )
+                ],
+                usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+                model=self.primary_model,
+            )
+
+    session = BoundToolSession(
+        _echo_registry(),
+        execution_id="ex-cancel-fence",
+        allowed_tools=["echo"],
+        granted_permissions=["test:read"],
+    )
+    adapter = PydanticAIRuntimeAdapter(
+        llm_adapter=_BlockingToolCallAdapter(),
+        tool_session=session,
+    )
+
+    handle = adapter.start(_run_context("Analyze 600519"))
+    try:
+        assert started.wait(5)
+        assert handle.request_cancel() is True
+    finally:
+        release.set()
+        handle.wait(5)
+        handle.close()
+
+    assert handle.state is ExecutionState.CANCELLED
+    assert session.dispatched_calls == 0
+    assert "tool_start" not in {event.event_type for event in handle.events}
+
+
+def test_live_cancel_fences_direct_model_tool_call_before_dispatch():
+    started = threading.Event()
+    release = threading.Event()
+    session = BoundToolSession(
+        _echo_registry(),
+        execution_id="ex-direct-cancel-fence",
+        allowed_tools=["echo"],
+        granted_permissions=["test:read"],
+    )
+    adapter = PydanticAIRuntimeAdapter(
+        model=_blocking_tool_call_model(started, release),
+        tool_session=session,
+    )
+
+    handle = adapter.start(_run_context("Analyze 600519"))
+    try:
+        assert started.wait(5)
+        assert handle.request_cancel() is True
+    finally:
+        release.set()
+        handle.wait(5)
+        handle.close()
+
+    assert handle.state is ExecutionState.CANCELLED
+    assert session.dispatched_calls == 0
+
+
+def test_live_deadline_fences_direct_model_tool_call_before_dispatch():
+    started = threading.Event()
+    release = threading.Event()
+    session = BoundToolSession(
+        _echo_registry(),
+        execution_id="ex-direct-deadline-fence",
+        allowed_tools=["echo"],
+        granted_permissions=["test:read"],
+    )
+    adapter = PydanticAIRuntimeAdapter(
+        model=_blocking_tool_call_model(started, release),
+        tool_session=session,
+    )
+    context = ExecutionContext(
+        mode=ExecutionMode.RUN,
+        prompt="Analyze 600519",
+        timeout_seconds=0.05,
+    )
+
+    handle = adapter.start(context)
+    try:
+        assert started.wait(5)
+        time.sleep(0.08)
+    finally:
+        release.set()
+        handle.wait(5)
+        handle.close()
+
+    assert handle.state is ExecutionState.TIMED_OUT
+    assert session.dispatched_calls == 0
+
+
+def test_cancel_accepted_before_atomic_dispatch_claim_prevents_tool_call():
+    claim_entered = threading.Event()
+    release_claim = threading.Event()
+    session = BoundToolSession(
+        _echo_registry(),
+        execution_id="ex-atomic-dispatch-cancel",
+        allowed_tools=["echo"],
+        granted_permissions=["test:read"],
+    )
+    adapter = PydanticAIRuntimeAdapter(
+        model=_tool_then_final_model(
+            "echo", {"message": "must-not-run"}, '{"signal": "buy"}'
+        ),
+        tool_session=session,
+    )
+    original_claim_operation = AgentExecution.claim_operation
+
+    def _pause_before_claim(
+        execution,
+        claim,
+        *,
+        deadline_monotonic=None,
+    ):
+        claim_entered.set()
+        assert release_claim.wait(5)
+        return original_claim_operation(
+            execution,
+            claim,
+            deadline_monotonic=deadline_monotonic,
+        )
+
+    with patch.object(AgentExecution, "claim_operation", _pause_before_claim):
+        handle = adapter.start(_run_context("Analyze 600519"))
+        try:
+            assert claim_entered.wait(5)
+            assert handle.request_cancel() is True
+        finally:
+            release_claim.set()
+            handle.wait(5)
+            handle.close()
+
+    assert handle.state is ExecutionState.CANCELLED
+    assert session.dispatched_calls == 0
+    assert "tool_start" not in {event.event_type for event in handle.events}
+    assert session.audit_trail[-1]["error_code"] == "cancelled"
+
+
+def test_atomic_dispatch_claim_does_not_hold_lock_during_tool_call():
+    tool_started = threading.Event()
+    release_tool = threading.Event()
+
+    def _blocking_echo(message):
+        tool_started.set()
+        assert release_tool.wait(5)
+        return {"echo": message}
+
+    registry = ToolRegistry()
+    registry.register(
+        ToolDefinition(
+            name="echo",
+            description="Echoes after the test releases it",
+            parameters=[
+                ToolParameter(name="message", type="string", description="Message")
+            ],
+            handler=_blocking_echo,
+            policy=ToolPolicy.declared(
+                read_only=True,
+                side_effects=[],
+                permissions=["test:read"],
+            ),
+        )
+    )
+    session = BoundToolSession(
+        registry,
+        execution_id="ex-inflight-dispatch-cancel",
+        allowed_tools=["echo"],
+        granted_permissions=["test:read"],
+    )
+    adapter = PydanticAIRuntimeAdapter(
+        model=_tool_then_final_model(
+            "echo", {"message": "already-in-flight"}, '{"signal": "buy"}'
+        ),
+        tool_session=session,
+    )
+
+    handle = adapter.start(_run_context("Analyze 600519"))
+    cancel_done = threading.Event()
+    cancel_outcome = {}
+
+    def _cancel():
+        cancel_outcome["accepted"] = handle.request_cancel()
+        cancel_done.set()
+
+    cancel_thread = threading.Thread(target=_cancel)
+    try:
+        assert tool_started.wait(5)
+        cancel_thread.start()
+        assert cancel_done.wait(1)
+        assert cancel_outcome == {"accepted": True}
+    finally:
+        release_tool.set()
+        cancel_thread.join(5)
+        handle.wait(5)
+        handle.close()
+
+    assert handle.state is ExecutionState.CANCELLED
+    assert session.dispatched_calls == 1
+    assert session.dropped_results == 1
+    assert session.audit_trail[-1]["error_code"] == "late_result_dropped"
+
+
+def test_cancel_in_pre_terminal_gap_atomically_wins_over_success():
+    entered_gap = threading.Event()
+    release_gap = threading.Event()
+    adapter = PydanticAIRuntimeAdapter(model=_fake_model('{"signal": "buy"}'))
+    original_run_once = adapter._run_once
+
+    def _run_once_then_pause(*args, **kwargs):
+        result = original_run_once(*args, **kwargs)
+        entered_gap.set()
+        assert release_gap.wait(5)
+        return result
+
+    adapter._run_once = _run_once_then_pause  # type: ignore[method-assign]
+    handle = adapter.start(_run_context("Analyze 600519"))
+    try:
+        assert entered_gap.wait(5)
+        assert handle.request_cancel() is True
+    finally:
+        release_gap.set()
+        handle.wait(5)
+        handle.close()
+
+    assert handle.state is ExecutionState.CANCELLED
+    assert handle.result.cancelled is True
+
+
+def test_deadline_expiring_in_pre_terminal_gap_wins_over_success():
+    entered_gap = threading.Event()
+    release_gap = threading.Event()
+    adapter = PydanticAIRuntimeAdapter(model=_fake_model('{"signal": "buy"}'))
+    original_run_once = adapter._run_once
+
+    def _run_once_then_pause(*args, **kwargs):
+        result = original_run_once(*args, **kwargs)
+        entered_gap.set()
+        assert release_gap.wait(5)
+        return result
+
+    adapter._run_once = _run_once_then_pause  # type: ignore[method-assign]
+    context = ExecutionContext(
+        mode=ExecutionMode.RUN,
+        prompt="Analyze 600519",
+        timeout_seconds=0.05,
+    )
+    handle = adapter.start(context)
+    try:
+        assert entered_gap.wait(5)
+        time.sleep(0.08)
+    finally:
+        release_gap.set()
+        handle.wait(5)
+        handle.close()
+
+    assert handle.state is ExecutionState.TIMED_OUT
+    assert handle.result.timed_out is True
+
+
+def test_live_handle_subscribes_to_tool_events_before_terminal():
+    waiting = threading.Event()
+    release = threading.Event()
+    callback = MagicMock()
+    session = BoundToolSession(
+        _echo_registry(),
+        execution_id="ex-live-events",
+        allowed_tools=["echo"],
+        granted_permissions=["test:read"],
+    )
+    adapter = PydanticAIRuntimeAdapter(
+        model=_tool_then_blocking_final_model(
+            "echo",
+            {"message": "hi"},
+            '{"signal": "hold"}',
+            waiting,
+            release,
+        ),
+        tool_session=session,
+    )
+
+    handle = adapter.start(
+        _run_context("Analyze 600519"), progress_callback=callback
+    )
+    try:
+        assert waiting.wait(5)
+        assert handle.state is ExecutionState.RUNNING
+        live_events = list(handle.subscribe(timeout=0.01))
+        assert [event.event_type for event in live_events] == [
+            "tool_start",
+            "tool_done",
+        ]
+    finally:
+        release.set()
+        handle.wait(5)
+        handle.close()
+
+    assert handle.state is ExecutionState.SUCCEEDED
+    assert [event.event_type for event in handle.events] == [
+        "tool_start",
+        "tool_done",
+    ]
+    assert callback.call_count == 2
 
 
 def test_chat_mode_is_unsupported():

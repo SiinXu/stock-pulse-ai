@@ -16,6 +16,7 @@ function loadMainModule(t, options = {}) {
     isPackaged: false,
     getVersion: () => '3.12.0',
     getPath: () => '/tmp/dsa-user-data',
+    requestSingleInstanceLock: () => true,
     whenReady: () => ({ then: () => undefined }),
     on: () => undefined,
     quit: () => undefined,
@@ -123,6 +124,40 @@ test('compareVersions follows semantic version ordering', (t) => {
   assert.equal(mainModule.compareVersions('v3.13.0', '3.13.0'), 0);
   assert.equal(mainModule.compareVersions('3.13.0', '3.13.0-beta.1'), 1);
   assert.equal(mainModule.compareVersions('3.13.0-beta.2', '3.13.0-beta.10'), -1);
+});
+
+test('desktop package exposes StockPulse while retaining the stable upgrade appId', () => {
+  const repositoryRoot = path.resolve(__dirname, '..', '..', '..');
+  const packageMetadata = JSON.parse(
+    fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf-8')
+  );
+  const loadingPage = fs.readFileSync(
+    path.join(__dirname, '..', 'renderer', 'loading.html'),
+    'utf-8'
+  );
+  const releaseWorkflow = fs.readFileSync(
+    path.join(repositoryRoot, '.github', 'workflows', 'desktop-release.yml'),
+    'utf-8'
+  );
+  const updaterVerification = fs.readFileSync(
+    path.join(repositoryRoot, 'scripts', 'verify-desktop-updater-artifacts.ps1'),
+    'utf-8'
+  );
+
+  assert.equal(packageMetadata.name, 'stockpulse-desktop');
+  assert.equal(packageMetadata.build.productName, 'StockPulse');
+  assert.equal(packageMetadata.build.appId, 'com.daily-stock-analysis.desktop');
+  assert.equal(
+    packageMetadata.build.win.artifactName,
+    'stockpulse-windows-installer-v${version}.${ext}'
+  );
+  assert.match(loadingPage, /<title>StockPulse<\/title>/);
+  assert.match(loadingPage, /<h1 class="title">StockPulse<\/h1>/);
+  assert.doesNotMatch(loadingPage, /Daily Stock Analysis/);
+  assert.match(releaseWorkflow, /stockpulse-windows-installer-/);
+  assert.match(releaseWorkflow, /stockpulse-windows-noinstall-/);
+  assert.match(releaseWorkflow, /stockpulse-macos-/);
+  assert.match(updaterVerification, /stockpulse-windows-installer-/);
 });
 
 test('buildMainPageUrl includes desktop version and cache buster', (t) => {
@@ -921,6 +956,326 @@ test('desktop update backup and restore preserve AlphaSift detail directories re
   assert.equal(fs.existsSync(backupRoot), false);
 });
 
+test('StockPulse migration copies legacy user data without overwriting or deleting the rollback source', (t) => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-brand-migrate-'));
+  const legacyUserDataDir = path.join(tempRoot, 'Daily Stock Analysis');
+  const currentUserDataDir = path.join(tempRoot, 'StockPulse');
+  const legacyDatabase = path.join(legacyUserDataDir, 'data', 'stock_analysis.db');
+  const legacyLocalStorage = path.join(legacyUserDataDir, 'Local Storage', 'leveldb', '000003.log');
+  const currentEnv = path.join(currentUserDataDir, '.env');
+
+  fs.mkdirSync(path.dirname(legacyDatabase), { recursive: true });
+  fs.mkdirSync(path.dirname(legacyLocalStorage), { recursive: true });
+  fs.mkdirSync(currentUserDataDir, { recursive: true });
+  fs.writeFileSync(path.join(legacyUserDataDir, '.env'), 'OPENAI_API_KEY=legacy\n', 'utf-8');
+  fs.writeFileSync(legacyDatabase, 'legacy-db');
+  fs.writeFileSync(legacyLocalStorage, 'legacy-browser-state');
+  fs.writeFileSync(currentEnv, 'OPENAI_API_KEY=current\n', 'utf-8');
+
+  const mainModule = loadMainModule(t, {
+    platform: 'darwin',
+    app: {
+      isPackaged: true,
+      getPath: (name) => {
+        if (name === 'exe') {
+          return path.join(tempRoot, 'StockPulse.app', 'Contents', 'MacOS', 'StockPulse');
+        }
+        return currentUserDataDir;
+      },
+    },
+  });
+
+  t.after(() => {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  assert.equal(fs.readFileSync(currentEnv, 'utf-8'), 'OPENAI_API_KEY=current\n');
+  assert.equal(
+    fs.readFileSync(path.join(currentUserDataDir, 'data', 'stock_analysis.db'), 'utf-8'),
+    'legacy-db'
+  );
+  assert.equal(
+    fs.readFileSync(path.join(currentUserDataDir, 'Local Storage', 'leveldb', '000003.log'), 'utf-8'),
+    'legacy-browser-state'
+  );
+  assert.equal(fs.readFileSync(legacyDatabase, 'utf-8'), 'legacy-db');
+  assert.equal(fs.readFileSync(path.join(legacyUserDataDir, '.env'), 'utf-8'), 'OPENAI_API_KEY=legacy\n');
+
+  const recordPath = path.join(currentUserDataDir, '.stockpulse-brand-migration.json');
+  const record = JSON.parse(fs.readFileSync(recordPath, 'utf-8'));
+  assert.equal(record.status, 'completed');
+  assert.equal(record.sourceDir, legacyUserDataDir);
+  assert.equal(record.targetDir, currentUserDataDir);
+  assert.equal(record.sourcePreservedForRollback, true);
+  assert.ok(record.skipped.includes('.env'));
+
+  const secondRun = mainModule.migrateLegacyProductUserData();
+  assert.equal(secondRun.alreadyCompleted, true);
+  assert.deepEqual(secondRun.migrated, []);
+});
+
+test('StockPulse migration falls back to the legacy directory when critical data cannot be copied', (t) => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-brand-fallback-'));
+  const legacyUserDataDir = path.join(tempRoot, 'Daily Stock Analysis');
+  const currentUserDataDir = path.join(tempRoot, 'StockPulse');
+  const legacyEnv = path.join(legacyUserDataDir, '.env');
+  const currentEnv = path.join(currentUserDataDir, '.env');
+  const legacyDatabase = path.join(legacyUserDataDir, 'data', 'stock_analysis.db');
+  const currentDatabase = path.join(currentUserDataDir, 'data', 'stock_analysis.db');
+  const originalCopyFileSync = fs.copyFileSync;
+  let activeUserDataDir = currentUserDataDir;
+
+  fs.mkdirSync(path.dirname(legacyDatabase), { recursive: true });
+  fs.writeFileSync(legacyEnv, 'MIGRATION_VALUE=before-fallback\n', 'utf-8');
+  fs.writeFileSync(legacyDatabase, 'legacy-db');
+  fs.copyFileSync = (source, target, mode) => {
+    if (source === legacyDatabase) {
+      fs.writeFileSync(target, 'interrupted-partial-copy');
+      throw new Error('copy interrupted after destination write');
+    }
+    return originalCopyFileSync(source, target, mode);
+  };
+
+  const mainModule = loadMainModule(t, {
+    platform: 'darwin',
+    app: {
+      isPackaged: true,
+      getPath: (name) => {
+        if (name === 'exe') {
+          return path.join(tempRoot, 'StockPulse.app', 'Contents', 'MacOS', 'StockPulse');
+        }
+        return activeUserDataDir;
+      },
+      setPath: (name, value) => {
+        if (name === 'userData') {
+          activeUserDataDir = value;
+        }
+      },
+    },
+  });
+
+  t.after(() => {
+    fs.copyFileSync = originalCopyFileSync;
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  assert.equal(mainModule.resolveAppDir(), legacyUserDataDir);
+  assert.equal(fs.existsSync(currentEnv), false);
+  assert.equal(fs.readFileSync(legacyDatabase, 'utf-8'), 'legacy-db');
+  assert.equal(fs.existsSync(currentDatabase), false);
+  assert.deepEqual(fs.readdirSync(path.dirname(currentDatabase)), []);
+  const record = JSON.parse(
+    fs.readFileSync(path.join(currentUserDataDir, '.stockpulse-brand-migration.json'), 'utf-8')
+  );
+  assert.equal(record.status, 'incomplete');
+  assert.match(record.failed.join('\n'), /copy interrupted after destination write/);
+  assert.deepEqual(record.rollbackFailed, []);
+
+  fs.copyFileSync = originalCopyFileSync;
+  fs.writeFileSync(legacyEnv, 'MIGRATION_VALUE=after-fallback\n', 'utf-8');
+  fs.writeFileSync(legacyDatabase, 'legacy-db-after-fallback');
+  const retryResult = mainModule.migrateLegacyProductUserData({
+    currentUserDataDir,
+    legacyUserDataDirs: [legacyUserDataDir],
+  });
+  assert.equal(retryResult.completed, true);
+  assert.equal(fs.readFileSync(currentEnv, 'utf-8'), 'MIGRATION_VALUE=after-fallback\n');
+  assert.equal(fs.readFileSync(currentDatabase, 'utf-8'), 'legacy-db-after-fallback');
+});
+
+test('StockPulse migration treats a root data type conflict as a critical fallback', (t) => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-brand-root-conflict-'));
+  const legacyUserDataDir = path.join(tempRoot, 'Daily Stock Analysis');
+  const currentUserDataDir = path.join(tempRoot, 'StockPulse');
+  const legacyDatabase = path.join(legacyUserDataDir, 'data', 'stock_analysis.db');
+  let activeUserDataDir = currentUserDataDir;
+
+  fs.mkdirSync(path.dirname(legacyDatabase), { recursive: true });
+  fs.mkdirSync(currentUserDataDir, { recursive: true });
+  fs.writeFileSync(legacyDatabase, 'legacy-db');
+  fs.writeFileSync(path.join(currentUserDataDir, 'data'), 'not-a-directory');
+
+  const mainModule = loadMainModule(t, {
+    platform: 'darwin',
+    app: {
+      isPackaged: true,
+      getPath: (name) => {
+        if (name === 'exe') {
+          return path.join(tempRoot, 'StockPulse.app', 'Contents', 'MacOS', 'StockPulse');
+        }
+        return activeUserDataDir;
+      },
+      setPath: (name, value) => {
+        if (name === 'userData') {
+          activeUserDataDir = value;
+        }
+      },
+    },
+  });
+
+  t.after(() => {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  assert.equal(mainModule.resolveAppDir(), legacyUserDataDir);
+  const record = JSON.parse(
+    fs.readFileSync(path.join(currentUserDataDir, '.stockpulse-brand-migration.json'), 'utf-8')
+  );
+  assert.equal(record.status, 'incomplete');
+  assert.equal(record.usingLegacyFallback, true);
+  assert.match(record.failed.join('\n'), /data \(target type differs\)/);
+});
+
+test('StockPulse critical fallback preserves pre-existing target state without mixing snapshots', (t) => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-brand-existing-target-'));
+  const legacyUserDataDir = path.join(tempRoot, 'Daily Stock Analysis');
+  const currentUserDataDir = path.join(tempRoot, 'StockPulse');
+  const legacyDatabase = path.join(legacyUserDataDir, 'data', 'stock_analysis.db');
+  const legacyAdditionalData = path.join(legacyUserDataDir, 'data', 'pending-copy.db');
+  const currentDatabase = path.join(currentUserDataDir, 'data', 'stock_analysis.db');
+  const originalCopyFileSync = fs.copyFileSync;
+  let activeUserDataDir = currentUserDataDir;
+
+  fs.mkdirSync(path.dirname(legacyDatabase), { recursive: true });
+  fs.mkdirSync(path.dirname(currentDatabase), { recursive: true });
+  fs.writeFileSync(legacyDatabase, 'legacy-db');
+  fs.writeFileSync(legacyAdditionalData, 'legacy-pending-copy');
+  fs.writeFileSync(currentDatabase, 'newer-stockpulse-db');
+  fs.copyFileSync = (source, target, mode) => {
+    if (source === legacyAdditionalData) {
+      throw new Error('pending data cannot be copied');
+    }
+    return originalCopyFileSync(source, target, mode);
+  };
+
+  loadMainModule(t, {
+    platform: 'darwin',
+    app: {
+      isPackaged: true,
+      getPath: (name) => {
+        if (name === 'exe') {
+          return path.join(tempRoot, 'StockPulse.app', 'Contents', 'MacOS', 'StockPulse');
+        }
+        return activeUserDataDir;
+      },
+      setPath: (name, value) => {
+        if (name === 'userData') {
+          activeUserDataDir = value;
+        }
+      },
+    },
+  });
+
+  t.after(() => {
+    fs.copyFileSync = originalCopyFileSync;
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  assert.equal(activeUserDataDir, legacyUserDataDir);
+  assert.equal(fs.readFileSync(currentDatabase, 'utf-8'), 'newer-stockpulse-db');
+  assert.equal(fs.existsSync(path.join(currentUserDataDir, 'data', 'pending-copy.db')), false);
+  const record = JSON.parse(
+    fs.readFileSync(path.join(currentUserDataDir, '.stockpulse-brand-migration.json'), 'utf-8')
+  );
+  assert.equal(record.usingLegacyFallback, true);
+  assert.match(record.failed.join('\n'), /pending data cannot be copied/);
+});
+
+test('packaged StockPulse exits before migration when another instance owns the lock', (t) => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-brand-instance-lock-'));
+  const legacyUserDataDir = path.join(tempRoot, 'Daily Stock Analysis');
+  const currentUserDataDir = path.join(tempRoot, 'StockPulse');
+  const lifecycle = [];
+
+  fs.mkdirSync(path.join(legacyUserDataDir, 'data'), { recursive: true });
+  fs.writeFileSync(path.join(legacyUserDataDir, 'data', 'stock_analysis.db'), 'legacy-db');
+
+  loadMainModule(t, {
+    platform: 'darwin',
+    app: {
+      isPackaged: true,
+      getPath: (name) => {
+        if (name === 'exe') {
+          return path.join(tempRoot, 'StockPulse.app', 'Contents', 'MacOS', 'StockPulse');
+        }
+        return currentUserDataDir;
+      },
+      requestSingleInstanceLock: () => {
+        lifecycle.push('lock');
+        return false;
+      },
+      whenReady: () => {
+        lifecycle.push('ready');
+        return { then: () => undefined };
+      },
+      quit: () => {
+        lifecycle.push('quit');
+      },
+    },
+  });
+
+  t.after(() => {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  assert.deepEqual(lifecycle, ['lock', 'quit']);
+  assert.equal(fs.existsSync(currentUserDataDir), false);
+});
+
+test('StockPulse upgrade restores a legacy updater backup and recognizes both uninstaller names', (t) => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-upgrade-smoke-'));
+  const appDir = path.join(tempRoot, 'app');
+  const currentUserDataDir = path.join(tempRoot, 'StockPulse');
+  const legacyUserDataDir = path.join(tempRoot, 'Daily Stock Analysis');
+  const legacyBackupRoot = path.join(legacyUserDataDir, '.dsa-desktop-update-backup');
+  const currentUninstaller = path.join(appDir, 'Uninstall StockPulse.exe');
+  const legacyUninstaller = path.join(appDir, 'Uninstall Daily Stock Analysis.exe');
+
+  fs.mkdirSync(legacyBackupRoot, { recursive: true });
+  fs.mkdirSync(appDir, { recursive: true });
+  fs.writeFileSync(currentUninstaller, '');
+  fs.writeFileSync(path.join(legacyBackupRoot, '.env'), 'PRESERVED_DURING_UPDATE=true\n', 'utf-8');
+  fs.writeFileSync(
+    path.join(legacyBackupRoot, 'runtime-state.json'),
+    JSON.stringify({ appVersion: '3.20.0', files: ['.env'] }),
+    'utf-8'
+  );
+
+  const mainModule = loadMainModule(t, {
+    platform: 'win32',
+    app: {
+      isPackaged: true,
+      getVersion: () => '3.21.0',
+      getPath: (name) => {
+        if (name === 'exe') {
+          return path.join(appDir, 'StockPulse.exe');
+        }
+        return currentUserDataDir;
+      },
+    },
+  });
+
+  t.after(() => {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  assert.equal(mainModule.isWindowsNsisInstalledApp(), true);
+  const restoreResult = mainModule.restorePackagedRuntimeStateFromBackup();
+  assert.deepEqual(restoreResult.failed, []);
+  assert.deepEqual(restoreResult.restored, ['.env']);
+  assert.equal(
+    fs.readFileSync(path.join(appDir, '.env'), 'utf-8'),
+    'PRESERVED_DURING_UPDATE=true\n'
+  );
+  assert.equal(fs.existsSync(path.join(currentUserDataDir, '.dsa-desktop-update-backup')), false);
+  assert.equal(fs.existsSync(legacyBackupRoot), true);
+  assert.equal(fs.existsSync(path.join(currentUserDataDir, '.stockpulse-brand-migration.json')), true);
+
+  fs.rmSync(currentUninstaller);
+  fs.writeFileSync(legacyUninstaller, '');
+  assert.equal(mainModule.isWindowsNsisInstalledApp(), true);
+});
+
 test('macOS packaged runtime state uses userData and migrates old app bundle files', (t) => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-desktop-macos-migrate-'));
   const oldAppDir = path.join(tempRoot, 'Daily Stock Analysis.app', 'Contents', 'MacOS');
@@ -1012,6 +1367,55 @@ test('macOS runtime migration does not overwrite existing userData files', (t) =
   assert.deepEqual(migrationResult.failed, []);
   assert.deepEqual(migrationResult.skipped, ['.env']);
   assert.equal(fs.readFileSync(path.join(userDataDir, '.env'), 'utf-8'), 'OPENAI_API_KEY=new-key\n');
+});
+
+test('macOS runtime migration discovers a sibling legacy app bundle after the product rename', (t) => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-macos-legacy-bundle-'));
+  const applicationsDir = path.join(tempRoot, 'Applications');
+  const currentAppDir = path.join(applicationsDir, 'StockPulse.app', 'Contents', 'MacOS');
+  const legacyAppDir = path.join(applicationsDir, 'Daily Stock Analysis.app', 'Contents', 'MacOS');
+  const currentExePath = path.join(currentAppDir, 'StockPulse');
+  const legacyDatabase = path.join(legacyAppDir, 'data', 'stock_analysis.db');
+  const userDataDir = path.join(tempRoot, 'Application Support', 'StockPulse');
+
+  fs.mkdirSync(currentAppDir, { recursive: true });
+  fs.mkdirSync(path.dirname(legacyDatabase), { recursive: true });
+  fs.mkdirSync(userDataDir, { recursive: true });
+  fs.writeFileSync(currentExePath, '');
+  fs.writeFileSync(path.join(legacyAppDir, '.env'), 'OPENAI_API_KEY=legacy-bundle\n', 'utf-8');
+  fs.writeFileSync(legacyDatabase, 'legacy-bundle-db');
+
+  const mainModule = loadMainModule(t, {
+    platform: 'darwin',
+    app: {
+      isPackaged: true,
+      getPath: (name) => {
+        if (name === 'exe') {
+          return currentExePath;
+        }
+        return userDataDir;
+      },
+    },
+  });
+
+  t.after(() => {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  const migrationResult = mainModule.migrateMacPackagedRuntimeState();
+  assert.deepEqual(migrationResult.failed, []);
+  assert.ok(migrationResult.sourceDirs.includes(legacyAppDir));
+  assert.ok(migrationResult.migrated.includes('.env'));
+  assert.ok(migrationResult.migrated.includes(path.join('data', 'stock_analysis.db')));
+  assert.equal(
+    fs.readFileSync(path.join(userDataDir, '.env'), 'utf-8'),
+    'OPENAI_API_KEY=legacy-bundle\n'
+  );
+  assert.equal(
+    fs.readFileSync(path.join(userDataDir, 'data', 'stock_analysis.db'), 'utf-8'),
+    'legacy-bundle-db'
+  );
+  assert.equal(fs.readFileSync(legacyDatabase, 'utf-8'), 'legacy-bundle-db');
 });
 
 test('restorePackagedRuntimeStateFromBackup keeps backup when copy fails', (t) => {

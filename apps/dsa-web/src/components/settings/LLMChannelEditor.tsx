@@ -50,6 +50,7 @@ import {
 import { encodeModelRef, isModelRef } from '../../utils/modelRef';
 import { ProviderQuickLinks } from './ProviderQuickLinks';
 import { getUiColon, getUiListSeparator } from '../../utils/uiLocale';
+import { SETTINGS_CONTROL_WIDTH_CLASS } from './settingsControlLayout';
 
 // Provider *business* metadata comes from the backend catalog (passed as a
 // prop). These helpers resolve an entry by channel/provider id; "known" excludes
@@ -839,7 +840,9 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
           </Button>
           <Popover
             contentRole="menu"
-            contentClassName="right-0 top-full z-20 mt-1 w-36 p-1"
+            placement="bottom"
+            align="end"
+            contentClassName="w-36 p-1"
             trigger={({ open, toggle }) => (
               <IconButton
                 type="button"
@@ -1572,7 +1575,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   }, [focusField, focusModels, focusStep, showManualModelInput, supportsDiscovery]);
 
   return (
-    <Modal isOpen onClose={onClose} title={mode === 'edit' ? text.editService : text.addService} className="max-w-xl">
+    <Modal isOpen onClose={onClose} title={mode === 'edit' ? text.editService : text.addService} size="wide">
       {!draft ? (
         <div className="space-y-3">
           <p className="text-sm text-secondary-text">{text.chooseProviderDescription}</p>
@@ -1652,6 +1655,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 placeholder={text.connectionName}
                 error={nameError}
                 disabled={fieldIsReadOnly('display_name')}
+                fieldClassName={SETTINGS_CONTROL_WIDTH_CLASS}
               />
             </div>
           ) : null}
@@ -1669,6 +1673,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                   options={isCustomService ? protocolOptions : officialProtocolOptions}
                   placeholder={text.chooseProtocol}
                   disabled={fieldIsReadOnly('protocol')}
+                  className={SETTINGS_CONTROL_WIDTH_CLASS}
                 />
                 {!isCustomService && provider ? (
                   <p className="mt-1 text-xs text-muted-text">
@@ -1688,6 +1693,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     placeholder="https://api.example.com/v1"
                     error={baseUrlError}
                     disabled={fieldIsReadOnly('base_url')}
+                    fieldClassName={SETTINGS_CONTROL_WIDTH_CLASS}
                   />
                 </div>
               ) : null}
@@ -1704,6 +1710,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 placeholder={provider?.defaultBaseUrl || 'https://api.example.com/v1'}
                 error={baseUrlError}
                 disabled={fieldIsReadOnly('base_url')}
+                fieldClassName={SETTINGS_CONTROL_WIDTH_CLASS}
               />
               {provider?.defaultBaseUrl ? (
                 <button
@@ -1785,6 +1792,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 onChange={(event) => updateDraft('extraHeaders', event.target.value)}
                 placeholder={text.extraHeadersPlaceholder}
                 disabled={fieldIsReadOnly('extra_headers')}
+                fieldClassName={SETTINGS_CONTROL_WIDTH_CLASS}
               />
             </div>
           ) : null}
@@ -1825,6 +1833,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
             {pendingModelRemoval ? (
               <InlineAlert
                 variant="warning"
+                size="compact"
                 title={text.cannotDeleteModel}
                 message={(
                   <div className="space-y-2">
@@ -1884,7 +1893,6 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     ) : null}
                   </div>
                 )}
-                className="rounded-lg px-3 py-2 text-xs shadow-none"
               />
             ) : null}
             {supportsDiscovery ? (
@@ -2032,6 +2040,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
           {blockingIssues.length > 0 ? (
             <InlineAlert
               variant="warning"
+              size="compact"
               title={draft.enabled ? text.missingBeforeEnable : text.fixName}
               message={(
                 <ul className="ml-4 list-disc space-y-0.5">
@@ -2040,7 +2049,6 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                   ))}
                 </ul>
               )}
-              className="rounded-lg px-3 py-2 text-xs shadow-none"
             />
           ) : null}
           {!draft.enabled && completenessIssues.length > 0 ? (
@@ -3390,9 +3398,9 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
       {schemaUnavailable ? (
         <InlineAlert
           variant="warning"
+          size="compact"
           title={editorText.schemaUnavailableTitle}
           message={editorText.schemaUnavailableMessage}
-          className="rounded-lg px-3 py-2 text-xs shadow-none"
         />
       ) : null}
 
@@ -3473,6 +3481,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
       {!draftValid ? (
         <InlineAlert
           variant="warning"
+          size="compact"
           title={editorText.invalidTitle}
           message={(
             <>
@@ -3489,7 +3498,6 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
               </ul>
             </>
           )}
-          className="rounded-lg px-3 py-2 text-xs shadow-none"
         />
       ) : null}
 

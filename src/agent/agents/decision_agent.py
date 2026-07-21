@@ -172,9 +172,11 @@ should sum to 100; all-zero means no effective signal and must not be faked.
                 "",
             ]
 
-        # Feed prior opinions
+        # StrategyEngine has already partitioned skill opinions. Invalid skill
+        # opinions live in ctx.meta["invalid_opinions"], so this agent consumes
+        # ctx.opinions directly without defining a second filtering rule.
         if ctx.opinions:
-            parts.append("## Agent Opinions")
+            parts.append("## Agent Opinions (Evidence Chain)")
             for op in ctx.opinions:
                 parts.append(f"\n### {op.agent_name}")
                 parts.append(f"Signal: {op.signal} | Confidence: {op.confidence:.2f}")
@@ -183,10 +185,20 @@ should sum to 100; all-zero means no effective signal and must not be faked.
                     parts.append(f"Key levels: {json.dumps(op.key_levels)}")
                 if op.raw_data:
                     extra_keys = {k: v for k, v in op.raw_data.items()
-                                  if k not in ("signal", "confidence", "reasoning", "key_levels")}
+                                  if k not in ("signal", "confidence", "reasoning", "key_levels", "invalid_signal")}
                     if extra_keys:
                         parts.append(f"Extra data: {json.dumps(extra_keys, ensure_ascii=False, default=str)}")
                 parts.append("")
+
+        invalid_opinions = ctx.meta.get("invalid_opinions") or []
+        if invalid_opinions:
+            parts.append("## Invalid Skill Opinions (Diagnostics only; not in evidence chain)")
+            parts.append(
+                f"{len(invalid_opinions)} skill opinion(s) were removed from the evidence chain "
+                f"because their signal was missing or unrecognized; note this only under "
+                f"data_limitations and never use it as a decision basis."
+            )
+            parts.append("")
 
         # Feed risk flags
         if ctx.risk_flags:

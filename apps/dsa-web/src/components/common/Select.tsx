@@ -1,15 +1,22 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Check, ChevronDown } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
 import { useFixedPopup } from './useFixedPopup';
 
-interface SelectOption {
+export interface SelectOption {
   value: string;
   label: string;
+  swatch?: {
+    start: 'success' | 'danger' | 'warning' | 'info' | 'neutral';
+    end?: 'success' | 'danger' | 'warning' | 'info' | 'neutral';
+  };
 }
 
-interface SelectProps {
+export type SelectSize = 'default' | 'comfortable' | 'primary';
+
+export interface SelectProps {
   id?: string;
   value: string;
   onChange: (value: string) => void;
@@ -24,7 +31,41 @@ interface SelectProps {
   error?: boolean;
   menuAlign?: 'start' | 'end';
   menuPlacement?: 'auto' | 'bottom' | 'top';
+  size?: SelectSize;
 }
+
+// min-h-11 keeps the 44px mobile touch target; sm:* restores compact desktop heights.
+const SELECT_SIZE_STYLES: Record<SelectSize, string> = {
+  default: 'min-h-11 sm:h-8 sm:min-h-8',
+  comfortable: 'min-h-11 sm:h-9 sm:min-h-9',
+  primary: 'min-h-11 sm:h-10 sm:min-h-10',
+};
+
+const SELECT_SWATCH_STYLES = {
+  success: 'bg-success',
+  danger: 'bg-danger',
+  warning: 'bg-warning',
+  info: 'bg-info',
+  neutral: 'bg-muted-text',
+} as const;
+
+const SelectOptionContent = ({ option }: { option: SelectOption }) => (
+  <span className="flex min-w-0 items-center gap-2">
+    {option.swatch ? (
+      <span
+        data-select-swatch="true"
+        aria-hidden="true"
+        className="flex h-4 w-4 shrink-0 overflow-hidden rounded-full border border-border"
+      >
+        <span className={cn('h-full flex-1', SELECT_SWATCH_STYLES[option.swatch.start])} />
+        {option.swatch.end ? (
+          <span className={cn('h-full flex-1', SELECT_SWATCH_STYLES[option.swatch.end])} />
+        ) : null}
+      </span>
+    ) : null}
+    <span className="truncate">{option.label}</span>
+  </span>
+);
 
 /**
  * Custom select with a compact trigger and a styled listbox popover
@@ -45,6 +86,7 @@ export const Select: React.FC<SelectProps> = ({
   error = false,
   menuAlign = 'start',
   menuPlacement = 'auto',
+  size = 'comfortable',
 }) => {
   const { t } = useUiLanguage();
   const selectId = useId();
@@ -163,27 +205,26 @@ export const Select: React.FC<SelectProps> = ({
           aria-describedby={ariaDescribedBy}
           aria-activedescendant={isOpen ? `${resolvedId}-option-${activeIndex}` : undefined}
           data-value={value}
+          data-control="select"
+          data-size={size}
           onClick={() => (isOpen ? closeList() : openList())}
           onKeyDown={handleKeyDown}
           className={cn(
-            'flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 text-xs text-foreground',
+            'flex w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 text-xs text-foreground',
             'transition-colors duration-200 hover:bg-hover focus:outline-none focus-visible:border-muted-text',
+            SELECT_SIZE_STYLES[size],
             error ? 'border-danger' : 'border-border',
             disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
             triggerClassName,
           )}
         >
-          <span className={cn('truncate', !selectedOption && 'text-muted-text')}>
-            {selectedOption ? selectedOption.label : resolvedPlaceholder}
+          <span className={cn('min-w-0 truncate', !selectedOption && 'text-muted-text')}>
+            {selectedOption ? <SelectOptionContent option={selectedOption} /> : resolvedPlaceholder}
           </span>
-          <svg
+          <ChevronDown
             className={cn('h-3.5 w-3.5 shrink-0 text-secondary-text transition-transform duration-200', isOpen && 'rotate-180')}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
+            aria-hidden="true"
+          />
         </button>
 
         {isOpen && portalHost ? createPortal(
@@ -192,8 +233,10 @@ export const Select: React.FC<SelectProps> = ({
             ref={listRef}
             role="listbox"
             aria-labelledby={label ? resolvedId : undefined}
+            aria-label={!label ? ariaLabel : undefined}
+            data-dialog-popup="true"
             style={popupStyle}
-            className="fixed z-50 max-h-60 w-max overflow-auto rounded-xl border border-border bg-elevated p-1 shadow-lg"
+            className="fixed max-h-60 w-max overflow-auto rounded-xl border border-border bg-elevated p-1 shadow-lg"
           >
             {options.map((option, index) => (
               <li
@@ -205,15 +248,13 @@ export const Select: React.FC<SelectProps> = ({
                 onMouseEnter={() => setActiveIndex(index)}
                 onClick={() => commitOption(index)}
                 className={cn(
-                  'flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-md px-3 py-1.5 text-xs text-foreground',
+                  'flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-md px-3 py-1.5 text-xs text-foreground sm:min-h-9',
                   index === activeIndex && 'bg-hover',
                 )}
               >
-                <span className="truncate">{option.label}</span>
+                <SelectOptionContent option={option} />
                 {option.value === value && (
-                  <svg className="h-3.5 w-3.5 shrink-0 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
+                  <Check className="h-3.5 w-3.5 shrink-0 text-foreground" aria-hidden="true" />
                 )}
               </li>
             ))}

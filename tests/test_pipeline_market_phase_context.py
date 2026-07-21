@@ -64,7 +64,7 @@ def _make_pipeline(*, agent_mode: bool = False, save_context_snapshot: bool = Tr
         report_integrity_enabled=False,
         fundamental_stage_timeout_seconds=1,
     )
-    pipeline.source_message = None
+    pipeline.request_context = None
     pipeline.query_id = None
     pipeline.query_source = "system"
     pipeline.save_context_snapshot = save_context_snapshot
@@ -411,21 +411,25 @@ class PipelineMarketPhaseContextTestCase(unittest.TestCase):
         pipeline = _make_pipeline(agent_mode=False, save_context_snapshot=True)
         phase_payload = _phase_payload()
         phase_context = SimpleNamespace(to_dict=MagicMock(return_value=phase_payload))
-
-        with (
-            patch("src.core.pipeline.build_market_phase_context", return_value=phase_context),
-            patch(
-                "src.core.pipeline.AnalysisContextBuilder.build",
-                side_effect=RuntimeError("pack builder unavailable"),
-            ),
-            self.assertLogs("src.core.pipeline", level="WARNING") as logs,
-        ):
-            result = pipeline.analyze_stock(
-                "600519",
-                ReportType.SIMPLE,
-                "q-runtime",
-                current_time=datetime(2026, 3, 27, 10, 0),
-            )
+        token = activate_run_diagnostic_context(trace_id="trace-legacy-pack-failure")
+        try:
+            with (
+                patch("src.core.pipeline.build_market_phase_context", return_value=phase_context),
+                patch(
+                    "src.core.pipeline.AnalysisContextBuilder.build",
+                    side_effect=RuntimeError("pack builder unavailable"),
+                ),
+                self.assertLogs("src.core.pipeline", level="WARNING") as logs,
+            ):
+                result = pipeline.analyze_stock(
+                    "600519",
+                    ReportType.SIMPLE,
+                    "q-runtime",
+                    current_time=datetime(2026, 3, 27, 10, 0),
+                )
+            diagnostic_snapshot = current_diagnostic_snapshot()
+        finally:
+            reset_run_diagnostic_context(token)
 
         self.assertIsNotNone(result)
         analyze_kwargs = pipeline.analyzer.analyze.call_args.kwargs
@@ -438,6 +442,19 @@ class PipelineMarketPhaseContextTestCase(unittest.TestCase):
         save_kwargs = pipeline.db.save_analysis_history.call_args.kwargs
         self.assertEqual(save_kwargs["context_snapshot"]["market_phase_summary"]["phase"], "intraday")
         self.assertNotIn("analysis_context_pack_overview", save_kwargs["context_snapshot"])
+        self.assertIsNotNone(diagnostic_snapshot)
+        context_run = next(
+            run
+            for run in diagnostic_snapshot["pipeline_stage_runs"]
+            if run["stage"] == "context"
+        )
+        self.assertEqual(context_run["status"], "degraded")
+        self.assertFalse(context_run["output_summary"]["context_pack_available"])
+        self.assertTrue(context_run["retryable"])
+        self.assertEqual(
+            context_run["degradation_reason"],
+            "ContextPack output generation was unavailable.",
+        )
 
     def test_agent_legacy_context_gets_runtime_key_but_history_snapshot_strips_it(self):
         pipeline = _make_pipeline(agent_mode=True, save_context_snapshot=True)
@@ -639,26 +656,31 @@ class PipelineMarketPhaseContextTestCase(unittest.TestCase):
             provider="test",
         )
 
-        with (
-            patch("src.agent.factory.build_agent_executor", return_value=executor),
-            patch(
-                "src.core.pipeline.AnalysisContextBuilder.build",
-                side_effect=RuntimeError("pack builder unavailable"),
-            ),
-            self.assertLogs("src.core.pipeline", level="WARNING") as logs,
-        ):
-            result = pipeline._analyze_with_agent(
-                code="600519",
-                report_type=ReportType.SIMPLE,
-                query_id="q-agent",
-                stock_name="贵州茅台",
-                realtime_quote=None,
-                chip_data=None,
-                fundamental_context={"market": "cn"},
-                trend_result=None,
-                market_phase_context=phase_payload,
-                market_phase_summary=phase_payload,
-            )
+        token = activate_run_diagnostic_context(trace_id="trace-agent-pack-failure")
+        try:
+            with (
+                patch("src.agent.factory.build_agent_executor", return_value=executor),
+                patch(
+                    "src.core.pipeline.AnalysisContextBuilder.build",
+                    side_effect=RuntimeError("pack builder unavailable"),
+                ),
+                self.assertLogs("src.core.pipeline", level="WARNING") as logs,
+            ):
+                result = pipeline._analyze_with_agent(
+                    code="600519",
+                    report_type=ReportType.SIMPLE,
+                    query_id="q-agent",
+                    stock_name="贵州茅台",
+                    realtime_quote=None,
+                    chip_data=None,
+                    fundamental_context={"market": "cn"},
+                    trend_result=None,
+                    market_phase_context=phase_payload,
+                    market_phase_summary=phase_payload,
+                )
+            diagnostic_snapshot = current_diagnostic_snapshot()
+        finally:
+            reset_run_diagnostic_context(token)
 
         self.assertIsNotNone(result)
         run_context = executor.run.call_args.kwargs["context"]
@@ -671,6 +693,19 @@ class PipelineMarketPhaseContextTestCase(unittest.TestCase):
         save_kwargs = pipeline.db.save_analysis_history.call_args.kwargs
         self.assertEqual(save_kwargs["context_snapshot"]["market_phase_summary"]["phase"], "intraday")
         self.assertNotIn("analysis_context_pack_overview", save_kwargs["context_snapshot"])
+        self.assertIsNotNone(diagnostic_snapshot)
+        context_run = next(
+            run
+            for run in diagnostic_snapshot["pipeline_stage_runs"]
+            if run["stage"] == "context"
+        )
+        self.assertEqual(context_run["status"], "degraded")
+        self.assertFalse(context_run["output_summary"]["context_pack_available"])
+        self.assertTrue(context_run["retryable"])
+        self.assertEqual(
+            context_run["degradation_reason"],
+            "Agent ContextPack output generation was unavailable.",
+        )
 
     def test_agent_history_snapshot_contains_diagnostics_context_when_active(self):
         pipeline = _make_pipeline(agent_mode=True, save_context_snapshot=True)

@@ -38,11 +38,11 @@ const signal: DecisionSignalItem = {
   metadata: { source: 'test', decision_profile: 'balanced' },
 };
 
-function renderCard(onSelect?: (item: DecisionSignalItem) => void) {
+function renderCard(onSelect?: (item: DecisionSignalItem) => void, selected = false) {
   window.localStorage.setItem('dsa.uiLanguage', 'zh');
   render(
     <UiLanguageProvider>
-      <DecisionSignalCard item={signal} onSelect={onSelect} />
+      <DecisionSignalCard item={signal} onSelect={onSelect} selected={selected} />
     </UiLanguageProvider>,
   );
 }
@@ -58,6 +58,8 @@ describe('DecisionSignalCard', () => {
     expect(screen.getByText('1600 - 1620')).toBeInTheDocument();
     expect(screen.getByText('业绩窗口')).toBeInTheDocument();
     expect(screen.getByText('跌破 1550')).toBeInTheDocument();
+    expect(screen.getByText('贵州茅台').closest('[data-surface-level]'))
+      .toHaveAttribute('data-surface-level', 'interactive');
     const detailsButton = screen.getByRole('button', { name: '查看 贵州茅台 AI 建议详情' });
     expect(detailsButton).toHaveClass('min-h-11', 'min-w-11');
     fireEvent.click(detailsButton);
@@ -75,7 +77,16 @@ describe('DecisionSignalCard', () => {
     renderCard();
 
     expect(screen.getByText('贵州茅台')).toBeInTheDocument();
+    expect(screen.getByText('贵州茅台').closest('[data-surface-level]'))
+      .toHaveAttribute('data-surface-level', 'section');
     expect(screen.queryByRole('button', { name: '查看 贵州茅台 AI 建议详情' })).not.toBeInTheDocument();
+  });
+
+  it('keeps selected state explicit on the semantic surface', () => {
+    renderCard(vi.fn(), true);
+
+    expect(screen.getByText('贵州茅台').closest('[data-surface-level]'))
+      .toHaveAttribute('data-selected', 'true');
   });
 
   it('renders top-level action with nested non-direction presentation fields', () => {
@@ -251,6 +262,8 @@ describe('DecisionSignalDetails', () => {
     );
 
     expect(screen.getByText('后验结果')).toBeInTheDocument();
+    expect(screen.getByText('后验结果').closest('[data-pattern="section"]'))
+      .toHaveAttribute('data-surface-level', 'section');
     expect(screen.getAllByText('3 日').length).toBeGreaterThan(1);
     expect(screen.getByText('命中')).toBeInTheDocument();
     expect(screen.getByText('5%')).toBeInTheDocument();

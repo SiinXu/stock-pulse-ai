@@ -17,15 +17,24 @@ from src.analyzer import AnalysisResult
 from src.config import get_config
 from src.market_phase_summary import format_public_market_status_line, format_public_phase_pack_excerpt
 from src.report_language import (
+    format_strategy_skill_items,
     get_localized_stock_name,
     get_report_labels,
     get_signal_level,
     get_chip_unavailable_reason,
     is_chip_structure_unavailable,
     localize_chip_health,
+    localize_conflict_severity,
+    localize_consensus_level,
     localize_operation_advice,
+    localize_strategy_signal,
+    localize_strategy_skill,
+    localize_strategy_conflict_description,
+    localize_strategy_synthesis_summary,
     localize_trend_prediction,
     normalize_report_language,
+    normalize_strategy_synthesis_payload,
+    strategy_invalid_opinion_count,
 )
 from src.schemas.decision_action import (
     display_action_fields_for_result,
@@ -218,6 +227,7 @@ def render(
         "escape_md": _escape_md,
         "clean_sniper": _clean_sniper_value,
         "failed_checks": failed_checks,
+        "format_strategy_skill_items": format_strategy_skill_items,
         "phase_pack_excerpt": phase_pack_excerpt,
         "history_by_code": {},
         "get_chip_unavailable_reason": get_chip_unavailable_reason,
@@ -226,6 +236,14 @@ def render(
         "localize_action_label": localize_action_label,
         "localize_trend_prediction": localize_trend_prediction,
         "localize_chip_health": localize_chip_health,
+        "localize_strategy_signal": localize_strategy_signal,
+        "localize_strategy_skill": localize_strategy_skill,
+        "localize_strategy_conflict_description": localize_strategy_conflict_description,
+        "localize_strategy_synthesis_summary": localize_strategy_synthesis_summary,
+        "localize_consensus_level": localize_consensus_level,
+        "localize_conflict_severity": localize_conflict_severity,
+        "normalize_strategy_synthesis_payload": normalize_strategy_synthesis_payload,
+        "strategy_invalid_opinion_count": strategy_invalid_opinion_count,
         "signal_attribution_has_content": signal_attribution_has_content,
         "signal_attribution_weight_items": signal_attribution_weight_items,
     }

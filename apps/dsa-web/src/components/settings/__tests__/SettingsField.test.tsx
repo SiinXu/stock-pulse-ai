@@ -25,6 +25,103 @@ function openHelpTooltip(title: string | RegExp) {
 }
 
 describe('SettingsField', () => {
+  it('uses the same full control-column width for numeric inputs and selects', () => {
+    const baseSchema = {
+      category: 'data_source',
+      isSensitive: false,
+      isRequired: false,
+      isEditable: true,
+      validation: {},
+      displayOrder: 1,
+    } as const;
+
+    render(
+      <UiLanguageProvider initialLanguage="en">
+        <SettingsField
+          item={{
+            key: 'TEST_NUMBER',
+            value: '3',
+            rawValueExists: true,
+            isMasked: false,
+            schema: {
+              ...baseSchema,
+              key: 'TEST_NUMBER',
+              title: 'Number field',
+              dataType: 'integer',
+              uiControl: 'number',
+              options: [],
+            },
+          }}
+          value="3"
+          onChange={vi.fn()}
+        />
+        <SettingsField
+          item={{
+            key: 'TEST_SELECT',
+            value: 'short',
+            rawValueExists: true,
+            isMasked: false,
+            schema: {
+              ...baseSchema,
+              key: 'TEST_SELECT',
+              title: 'Select field',
+              dataType: 'string',
+              uiControl: 'select',
+              options: ['short', 'long'],
+            },
+          }}
+          value="short"
+          onChange={vi.fn()}
+        />
+      </UiLanguageProvider>,
+    );
+
+    const numberInput = screen.getByRole('spinbutton', { name: 'Number field' });
+    const select = screen.getByRole('combobox', { name: 'Select field' });
+    expect(numberInput).toHaveAttribute('data-control', 'input');
+    expect(select).toHaveAttribute('data-control', 'select');
+    expect(numberInput).toHaveClass('h-9');
+    expect(select).toHaveClass('min-h-11', 'sm:h-9', 'sm:min-h-9');
+    expect(numberInput).toHaveClass('md:w-full');
+    expect(numberInput).not.toHaveClass('md:w-44');
+    expect(select.parentElement?.parentElement).toHaveClass('w-full');
+  });
+
+  it('renders textarea fields through the shared full-width control', () => {
+    render(
+      <SettingsField
+        item={{
+          key: 'TEST_TEXTAREA',
+          value: 'line one',
+          rawValueExists: true,
+          isMasked: false,
+          schema: {
+            key: 'TEST_TEXTAREA',
+            title: 'Textarea field',
+            category: 'agent',
+            dataType: 'string',
+            uiControl: 'textarea',
+            isSensitive: false,
+            isRequired: false,
+            isEditable: true,
+            options: [],
+            validation: {},
+            displayOrder: 1,
+          },
+        }}
+        value="line one"
+        onChange={vi.fn()}
+      />,
+    );
+
+    const textarea = screen.getByRole('textbox', { name: 'Textarea field' });
+    expect(textarea).toHaveAttribute('data-control', 'textarea');
+    expect(textarea).toHaveClass('w-full');
+    expect(textarea.closest('[data-testid="settings-field-TEST_TEXTAREA"]')).not.toHaveClass(
+      'md:grid-cols-[minmax(0,1fr)_240px]',
+    );
+  });
+
   it('forces a schema safety diagnostic into visible read-only mode', () => {
     const onChange = vi.fn();
     render(
@@ -948,7 +1045,7 @@ describe('SettingsField', () => {
     );
 
     const input = screen.getByRole('spinbutton', { name: 'Agent 超时（秒）' });
-    expect(input).toHaveClass('pr-8');
+    expect(input).toHaveClass('pr-9');
     expect(input.parentElement).toHaveTextContent('s');
   });
 

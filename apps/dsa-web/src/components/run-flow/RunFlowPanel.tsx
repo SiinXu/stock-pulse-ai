@@ -137,9 +137,9 @@ export const RunFlowPanel: React.FC<RunFlowPanelProps> = ({ source, title, onUna
       <div className="space-y-4" data-testid="run-flow-panel-error">
         <InlineAlert
           variant="danger"
+          size="compact"
           title={error.title || t('runFlow.errorTitle')}
           message={error.message}
-          className="rounded-xl px-3 py-2 text-sm shadow-none"
         />
         <Button type="button" variant="secondary" size="default" onClick={() => void refetch()}>
           <RefreshCw className="h-4 w-4" aria-hidden="true" />
@@ -155,7 +155,6 @@ export const RunFlowPanel: React.FC<RunFlowPanelProps> = ({ source, title, onUna
         title={t('runFlow.emptyTitle')}
         description={t('runFlow.emptyDescription')}
         icon={<Workflow className="h-6 w-6" aria-hidden="true" />}
-        className="border-dashed"
       />
     );
   }
@@ -191,7 +190,6 @@ export const RunFlowPanel: React.FC<RunFlowPanelProps> = ({ source, title, onUna
           title={t('runFlow.emptySnapshotTitle')}
           description={t('runFlow.emptySnapshotDescription')}
           icon={<AlertCircle className="h-6 w-6" aria-hidden="true" />}
-          className="border-dashed"
         />
       ) : (
         <div className="grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_19.25rem]" data-testid="run-flow-layout">

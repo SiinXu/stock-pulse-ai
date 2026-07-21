@@ -76,6 +76,7 @@ describe('AlertRuleList', () => {
   const onPageChange = vi.fn();
   const onToggleEnabled = vi.fn();
   const onDelete = vi.fn();
+  const onEdit = vi.fn();
   const onTest = vi.fn();
 
   beforeEach(() => {
@@ -97,6 +98,7 @@ describe('AlertRuleList', () => {
         onPageChange={onPageChange}
         onToggleEnabled={onToggleEnabled}
         onDelete={onDelete}
+        onEdit={onEdit}
         onTest={onTest}
         {...overrides}
       />,
@@ -119,6 +121,7 @@ describe('AlertRuleList', () => {
           onPageChange={onPageChange}
           onToggleEnabled={onToggleEnabled}
           onDelete={onDelete}
+          onEdit={onEdit}
           onTest={onTest}
           {...overrides}
         />
@@ -145,6 +148,19 @@ describe('AlertRuleList', () => {
     expect(onEnabledFilterChange).toHaveBeenCalledWith('enabled');
     expect(onAlertTypeFilterChange).toHaveBeenCalledWith('price_cross');
     expect(onPageChange).toHaveBeenCalledWith(2);
+  });
+
+  it('keeps the rule filters in the card header', () => {
+    renderList();
+
+    const heading = screen.getByRole('heading', { name: '告警规则' });
+    const header = heading.parentElement?.parentElement;
+    expect(header).toContainElement(screen.getByLabelText('启停状态'));
+    expect(header).toContainElement(screen.getByLabelText('规则类型'));
+    expect(heading.closest('[data-surface-level]')).toHaveClass(
+      '[&>div:first-child]:flex-col',
+      'sm:[&>div:first-child]:flex-row',
+    );
   });
 
   it('uses backend cooldownActive instead of parsing cooldownUntil locally', () => {
@@ -216,7 +232,7 @@ describe('AlertRuleList', () => {
       ],
     });
 
-    expect(screen.getByText('Alert rules')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Alert rules' })).toBeInTheDocument();
     const statusSelect = screen.getByLabelText('Status');
     const statusListbox = openListbox(statusSelect);
     expect(within(statusListbox).getByRole('option', { name: 'All statuses' })).toBeInTheDocument();

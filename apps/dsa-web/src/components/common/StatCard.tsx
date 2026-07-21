@@ -1,5 +1,6 @@
 import type React from 'react';
 import { cn } from '../../utils/cn';
+import { Surface } from './Surface';
 
 interface StatCardProps {
   /** Metric label, such as "Total Return". */
@@ -33,7 +34,7 @@ export const StatCard: React.FC<StatCardProps> = ({
   className = '',
 }) => {
   return (
-    <div className={cn('rounded-xl border bg-card/75 p-4 shadow-soft-card', toneStyles[tone], className)}>
+    <Surface level="interactive" padding="sm" className={cn(toneStyles[tone], className)}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-[0.22em] text-secondary-text">{label}</p>
@@ -42,6 +43,6 @@ export const StatCard: React.FC<StatCardProps> = ({
         </div>
         {icon ? <div className="text-primary">{icon}</div> : null}
       </div>
-    </div>
+    </Surface>
   );
 };

@@ -405,7 +405,17 @@ async function editConnectionAddModel(page: Page, id: string, model: string) {
   await expect(dialog).toBeHidden();
 }
 
-async function mockScreeningBase(page: Page) {
+async function mockScreeningBase(page: Page, strategies: JsonObject[] = [{
+  id: 'bull_trend',
+  name: '中文原始策略名',
+  name_zh: '多头趋势',
+  name_en: 'Bull Trend',
+  description: 'raw description',
+  description_zh: '捕捉多头趋势',
+  description_en: 'Capture established bullish trends',
+  category_zh: '趋势',
+  category_en: 'Trend',
+}]) {
   await page.route('**/api/v1/alphasift/status', (route) => fulfillJson(route, {
     enabled: true,
     available: true,
@@ -413,18 +423,8 @@ async function mockScreeningBase(page: Page) {
   }));
   await page.route('**/api/v1/alphasift/strategies', (route) => fulfillJson(route, {
     enabled: true,
-    strategy_count: 1,
-    strategies: [{
-      id: 'bull_trend',
-      name: '中文原始策略名',
-      name_zh: '多头趋势',
-      name_en: 'Bull Trend',
-      description: 'raw description',
-      description_zh: '捕捉多头趋势',
-      description_en: 'Capture established bullish trends',
-      category_zh: '趋势',
-      category_en: 'Trend',
-    }],
+    strategy_count: strategies.length,
+    strategies,
   }));
   await page.route('**/api/v1/alphasift/hotspots**', (route) => fulfillJson(route, {
     hotspots: [],
@@ -780,16 +780,59 @@ test.describe('infrastructure interaction acceptance matrix', () => {
   });
 
   test('13 Screening displays a built-in strategy by stable ID in English', async ({ page }) => {
-    await mockScreeningBase(page);
+    await mockScreeningBase(page, [
+      {
+        id: 'bull_trend',
+        name: '中文原始策略名',
+        name_zh: '多头趋势',
+        name_en: 'Bull Trend',
+        description: 'raw description',
+        description_zh: '捕捉多头趋势',
+        description_en: 'Capture established bullish trends',
+        category_zh: '趋势',
+        category_en: 'Trend',
+      },
+      {
+        id: 'dual_low',
+        name: '中文双低原始名',
+        name_en: 'Dual-low selection',
+        description: 'raw dual-low description',
+        description_en: 'Screens for candidates with relatively low price and valuation.',
+        category_en: 'Value',
+      },
+    ]);
     await login(page, 'en');
     await page.goto('/screening');
-    await expect(page.getByRole('button', { name: /Bull Trend/ })).toBeVisible();
+
+    const strategySelect = page.getByRole('combobox', { name: 'Select strategy' });
+    await expect(strategySelect).toHaveAttribute('data-value', 'dual_low');
+    await strategySelect.focus();
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Home');
+    await page.keyboard.press('Enter');
+    await expect(strategySelect).toHaveAttribute('data-value', 'bull_trend');
     await expect(page.getByText('中文原始策略名', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Capture established bullish trends', { exact: true })).toBeVisible();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const parametersTrigger = page.getByRole('button', { name: 'Parameters' });
+    await parametersTrigger.click();
+    const dialog = page.getByRole('dialog', { name: 'Parameters' });
+    await expect(dialog).toBeVisible();
+    const dialogBox = await dialog.boundingBox();
+    expect(dialogBox).not.toBeNull();
+    expect(dialogBox!.x).toBeGreaterThanOrEqual(-1);
+    expect(dialogBox!.x + dialogBox!.width).toBeLessThanOrEqual(391);
+    expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(parametersTrigger).toBeFocused();
   });
 
   test('14 Screening restores a successful task and reports a subsequent failed task through the shared task contract', async ({ page }) => {
     await mockScreeningBase(page);
+    let submissionAttempts = 0;
     await page.route('**/api/v1/alphasift/screen/tasks/restore-success', (route) => fulfillJson(route, {
       task_id: 'restore-success',
       status: 'completed',
@@ -811,6 +854,15 @@ test.describe('infrastructure interaction acceptance matrix', () => {
         await route.fallback();
         return;
       }
+      submissionAttempts += 1;
+      if (submissionAttempts === 1) {
+        await fulfillJson(route, {
+          error: 'alphasift_screen_failed',
+          message: 'raw task submission failure',
+          params: {},
+        }, 503);
+        return;
+      }
       await fulfillJson(route, {
         task_id: 'failing-task',
         status: 'pending',
@@ -830,9 +882,48 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.goto('/screening');
     await expect(page.getByText('RESTORED', { exact: true }).first()).toBeVisible();
     expect(await page.evaluate((key) => sessionStorage.getItem(key), screeningTaskStorageKey)).toBeNull();
-    await page.getByRole('button', { name: '运行选股' }).click();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const resultsRegion = page.getByRole('region', { name: SCREENING_TEXT.zh.results });
+    const collapseCandidate = page.getByRole('button', { name: SCREENING_TEXT.zh.collapse });
+    const detailId = await collapseCandidate.getAttribute('aria-controls');
+    expect(detailId).toBeTruthy();
+    await expect(collapseCandidate).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator(`#${detailId}`)).toHaveAttribute(
+      'aria-label',
+      `RESTORED candidate ${SCREENING_TEXT.zh.details}`,
+    );
+    await collapseCandidate.focus();
+    await page.keyboard.press('Enter');
+    const expandCandidate = page.getByRole('button', { name: SCREENING_TEXT.zh.expand });
+    await expect(expandCandidate).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator(`#${detailId}`)).toHaveCount(0);
+    await expandCandidate.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator(`#${detailId}`)).toBeVisible();
+    const tableDimensions = await resultsRegion.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+    }));
+    expect(tableDimensions.scrollWidth).toBeGreaterThan(tableDimensions.clientWidth);
+    expect(await resultsRegion.evaluate((element) => {
+      element.scrollLeft = element.scrollWidth;
+      return element.scrollLeft;
+    })).toBeGreaterThan(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+
+    await page.getByRole('button', { name: '参数设置' }).click();
+    const dialog = page.getByRole('dialog', { name: '参数设置' });
+    await dialog.getByLabel('返回数量').press('Enter');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(/外部行情或模型服务不可用，请稍后重试。/)).toBeVisible();
+    await expect(dialog.getByText('raw task submission failure', { exact: true })).toHaveCount(0);
+
+    await dialog.getByLabel('返回数量').press('Enter');
+    await expect(dialog).toBeHidden();
     await expect(page.getByText('外部行情或模型服务不可用，请稍后重试。', { exact: true })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('raw backend failure', { exact: true })).toHaveCount(0);
+    expect(submissionAttempts).toBe(2);
     await expect(page.getByText('RESTORED', { exact: true })).toHaveCount(0);
   });
 
@@ -983,8 +1074,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.goto('/settings?section=ai_models&view=connections');
     await expect(page.getByRole('button', { name: /添加模型服务/ })).toBeDisabled();
     await expect(page.getByLabel('API 密钥')).toHaveCount(0);
-    await page.goto('/settings?section=advanced&view=raw_config');
-    await page.locator('details').filter({ hasText: '开发者诊断' }).locator('summary').click();
+    await page.goto('/settings?section=advanced&view=diagnostics');
     await expect(page.getByText(/schema_ui_placement_missing/).first()).toBeVisible();
   });
 
@@ -1620,9 +1710,10 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await login(page, 'en');
     await page.goto('/decision-signals');
     await applyStockContext();
-    await expect(page.getByText('Canonical momentum confirmed', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('Canonical gap risk', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('91%', { exact: true }).first()).toBeVisible();
+    const latestPanel = page.getByRole('tabpanel', { name: 'Current stock' });
+    await expect(latestPanel.getByText('Canonical momentum confirmed', { exact: true }).first()).toBeVisible();
+    await expect(latestPanel.getByText('Canonical gap risk', { exact: true }).first()).toBeVisible();
+    await expect(latestPanel.getByText('91%', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Sell', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Legacy summary must not render', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Legacy risk must not render', { exact: true })).toHaveCount(0);
@@ -1662,6 +1753,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.keyboard.press('Escape');
     await expect(details).toBeHidden();
 
+    await page.getByRole('tab', { name: 'Stock signal timeline' }).click();
     const timelinePoint = page.getByTestId('timeline-hit-target-91');
     await expect(timelinePoint).toBeVisible();
     await timelinePoint.hover();
@@ -1701,6 +1793,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
         },
       });
     });
+    await createPortfolioAccount(page, 'canonical presentation');
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/portfolio');
     await expect(page.getByRole('heading', { name: 'Portfolio management' })).toBeVisible();
@@ -2007,7 +2100,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       const fallbackCheckbox = page.getByRole('checkbox', { name: /model-beta/ });
       await expectMinimumTouchTarget(fallbackCheckbox.locator('xpath=ancestor::label'));
 
-      await page.goto('/settings?section=system_security&view=runtime');
+      await page.goto('/settings?section=system_security&view=service');
       const logLevelSelect = page.getByRole('combobox', { name: '日志级别', exact: true });
       await expectMinimumTouchTarget(logLevelSelect);
       await logLevelSelect.click();

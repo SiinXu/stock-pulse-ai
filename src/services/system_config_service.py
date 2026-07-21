@@ -26,7 +26,6 @@ from src.config import (
     _uses_direct_env_provider,
     canonicalize_llm_channel_protocol,
     channel_allows_empty_api_key,
-    get_configured_llm_models,
     get_config as get_runtime_config,
     normalize_agent_litellm_model,
     normalize_news_strategy_profile,
@@ -48,7 +47,6 @@ from src.llm.hermes import (
     is_reserved_hermes_name,
     open_hermes_no_proxy_client,
     parse_hermes_channel,
-    route_identity_candidates,
 )
 from src.core.config_manager import ConfigManager, ConfigVersionMismatchError
 from src.core.config_registry import (
@@ -71,6 +69,7 @@ from src.llm.backend_registry import (
 )
 from src.llm.generation_params import apply_litellm_generation_params
 from src.llm.local_cli_backend import resolve_local_cli_preset
+from src.llm.response_content import strip_leading_think_wrapper
 from src.llm.provider_catalog import (
     build_connection_contract_values,
     get_connection_field_schema,
@@ -88,6 +87,14 @@ from src.notification_sender.gotify_sender import resolve_gotify_message_endpoin
 from src.notification_sender.ntfy_sender import resolve_ntfy_endpoint
 from src.services.stock_list_parser import split_stock_list
 from src.services.generation_backend_status_service import GenerationBackendStatusService
+from src.services.config import (
+    ConfigConflictService,
+    EffectiveConfigResolver,
+    ModelAssignmentValidator,
+)
+# Re-exported for api.v1.endpoints.system_config and tests.
+from src.services.config import ConfigConflictError  # noqa: F401
+from src.services.config import llm_channel_map
 from src.utils.sanitize import (
     log_safe_exception,
     sanitize_diagnostic_text,
@@ -103,14 +110,6 @@ class ConfigValidationError(Exception):
     def __init__(self, issues: List[Dict[str, Any]]):
         super().__init__("Configuration validation failed")
         self.issues = issues
-
-
-class ConfigConflictError(Exception):
-    """Raised when submitted config_version is stale."""
-
-    def __init__(self, current_version: str):
-        super().__init__("Configuration version conflict")
-        self.current_version = current_version
 
 
 class ConfigImportError(Exception):
@@ -203,17 +202,6 @@ class SystemConfigService:
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
     )
 
-    _DISPLAY_KEY_ALIASES: Dict[str, Tuple[str, ...]] = {
-        "AGENT_SKILL_DIR": ("AGENT_SKILL_DIR", "AGENT_STRATEGY_DIR"),
-        "AGENT_SKILL_AUTOWEIGHT": ("AGENT_SKILL_AUTOWEIGHT", "AGENT_STRATEGY_AUTOWEIGHT"),
-        "AGENT_SKILL_ROUTING": ("AGENT_SKILL_ROUTING", "AGENT_STRATEGY_ROUTING"),
-    }
-    _DISPLAY_VALUE_ALIASES: Dict[str, Dict[str, str]] = {
-        "AGENT_ORCHESTRATOR_MODE": {
-            "strategy": "specialist",
-            "skill": "specialist",
-        }
-    }
     _NOTIFICATION_TEST_CHANNELS: Tuple[str, ...] = (
         "wechat",
         "dingtalk",
@@ -317,6 +305,7 @@ class SystemConfigService:
         runtime_config_provider: Optional[Callable[[], Config]] = None,
     ):
         self._manager = manager or ConfigManager()
+        self._conflict = ConfigConflictService(self._manager)
         self._runtime_scheduler = runtime_scheduler
         # Keep the provider rather than a Config object so Config.reset_instance()
         # is reflected on the next read.
@@ -336,130 +325,12 @@ class SystemConfigService:
         reset_search_service()
 
     @classmethod
-    def _normalize_display_value(cls, key: str, value: str) -> str:
-        alias_map = cls._DISPLAY_VALUE_ALIASES.get(key.upper())
-        if not alias_map:
-            return value
-        return alias_map.get(value.strip().lower(), value)
-
-    @classmethod
     def _build_display_config_map(cls, raw_config_map: Dict[str, str]) -> Dict[str, str]:
-        raw_upper = {key.upper(): value for key, value in raw_config_map.items()}
-        aliased_keys = {
-            alias
-            for candidates in cls._DISPLAY_KEY_ALIASES.values()
-            for alias in candidates
-        }
-        display_map: Dict[str, str] = {}
-
-        for key, value in raw_upper.items():
-            if key in aliased_keys:
-                continue
-            display_map[key] = cls._normalize_display_value(key, value)
-
-        for canonical_key, candidates in cls._DISPLAY_KEY_ALIASES.items():
-            canonical_env_key = candidates[0]
-            if canonical_env_key in raw_upper:
-                display_map[canonical_key] = cls._normalize_display_value(
-                    canonical_key,
-                    raw_upper[canonical_env_key],
-                )
-                continue
-
-            selected_value: Optional[str] = None
-            candidate_seen = False
-            for candidate_key in candidates[1:]:
-                if candidate_key not in raw_upper:
-                    continue
-                candidate_seen = True
-                candidate_value = raw_upper[candidate_key]
-                if candidate_value:
-                    selected_value = candidate_value
-                    break
-            if candidate_seen:
-                if selected_value is None:
-                    for candidate_key in candidates[1:]:
-                        if candidate_key in raw_upper:
-                            selected_value = raw_upper[candidate_key]
-                            break
-                if selected_value is None:
-                    selected_value = ""
-                display_map[canonical_key] = cls._normalize_display_value(
-                    canonical_key,
-                    selected_value,
-                )
-
-        return display_map
-
-    @staticmethod
-    def _resolve_display_value(raw_value: str, field_schema: Dict[str, Any], raw_value_exists: bool) -> str:
-        if raw_value_exists:
-            return raw_value
-
-        if field_schema.get("ui_control") == "switch" and raw_value:
-            return raw_value
-
-        if field_schema.get("ui_control") == "switch":
-            default_value = field_schema.get("default_value")
-            if isinstance(default_value, str) and default_value:
-                return default_value
-
-        return raw_value
-
-    @classmethod
-    def _get_schema_config_keys(cls, config_map: Dict[str, str], registered_keys: Set[str]) -> Set[str]:
-        """Return keys needed by the Web schema payload.
-
-        Ordinary settings must be registry-backed. LLM channel detail keys are
-        kept only as editor support data for channels declared in LLM_CHANNELS.
-        """
-        keys = set(registered_keys)
-        channel_names = {
-            segment.strip().upper()
-            for segment in config_map.get("LLM_CHANNELS", "").split(",")
-            if segment.strip()
-        }
-        if not channel_names:
-            return keys
-
-        for key in config_map:
-            match = cls._WEB_SETTINGS_LLM_CHANNEL_SUPPORT_KEY_RE.match(key)
-            if match and match.group(1) in channel_names:
-                keys.add(key)
-
-        return keys
+        return EffectiveConfigResolver.build_display_config_map(raw_config_map)
 
     @classmethod
     def _build_runtime_display_config_map(cls, saved_config_map: Dict[str, str]) -> Dict[str, str]:
-        """Return Web settings values injected through the process environment.
-
-        Docker ``env_file`` / ``--env-file`` only populate process environment
-        variables; they do not create an active ``.env`` file inside the
-        container. Use these values as display fallbacks so Settings can show
-        startup-injected config without letting it override later WebUI saves.
-        """
-        registered_keys = {key.upper() for key in get_registered_field_keys()}
-        channel_names = {
-            segment.strip().upper()
-            for raw_channels in (
-                saved_config_map.get("LLM_CHANNELS", ""),
-                os.environ.get("LLM_CHANNELS", ""),
-            )
-            for segment in raw_channels.split(",")
-            if segment.strip()
-        }
-        runtime_map: Dict[str, str] = {}
-
-        for raw_key, raw_value in os.environ.items():
-            key = str(raw_key).upper()
-            llm_channel_match = cls._WEB_SETTINGS_LLM_CHANNEL_SUPPORT_KEY_RE.match(key)
-            if (
-                key in registered_keys
-                or (llm_channel_match and llm_channel_match.group(1) in channel_names)
-            ):
-                runtime_map[key] = "" if raw_value is None else str(raw_value)
-
-        return cls._build_display_config_map(runtime_map)
+        return EffectiveConfigResolver.build_runtime_display_config_map(saved_config_map)
 
     def get_config(self, include_schema: bool = True, mask_token: str = "******") -> Dict[str, Any]:
         """Return display config values with mask metadata for server-masked fields."""
@@ -473,7 +344,7 @@ class SystemConfigService:
         registered_keys = set(get_registered_field_keys())
         all_keys = set(config_map.keys()) | registered_keys
         if include_schema:
-            all_keys = self._get_schema_config_keys(config_map, registered_keys)
+            all_keys = EffectiveConfigResolver.get_schema_config_keys(config_map, registered_keys)
 
         category_orders = {
             item["category"]: item["display_order"]
@@ -490,7 +361,9 @@ class SystemConfigService:
             raw_value_exists = key in saved_config_map
             raw_value = config_map.get(key, "")
             field_schema = schema_by_key[key]
-            display_value = self._resolve_display_value(raw_value, field_schema, raw_value_exists)
+            display_value = EffectiveConfigResolver.resolve_display_value(
+                raw_value, field_schema, raw_value_exists
+            )
             is_masked = False
             if field_schema.get("is_sensitive", False) and display_value:
                 display_value = mask_token
@@ -787,51 +660,14 @@ class SystemConfigService:
         effective_map: Dict[str, str],
         connection_name: str,
     ) -> Tuple[Optional[Dict[str, Any]], str, bool]:
-        """Resolve explicit Provider identity, with exact-name legacy fallback."""
-        from src.llm.provider_catalog import get_provider
-
-        prefix = f"LLM_{connection_name.upper()}"
-        explicit_id = (effective_map.get(f"{prefix}_PROVIDER") or "").strip().lower()
-        if explicit_id:
-            return get_provider(explicit_id), explicit_id, True
-
-        inferred_id = connection_name.strip().lower()
-        inferred = get_provider(inferred_id)
-        if inferred is not None and inferred_id != "custom":
-            return inferred, inferred_id, False
-        custom = get_provider("custom")
-        return custom, "custom", False
+        return llm_channel_map.resolve_connection_provider(effective_map, connection_name)
 
     @staticmethod
     def _resolve_connection_transport(
         effective_map: Dict[str, str],
         connection_name: str,
     ) -> Tuple[str, str]:
-        """Resolve a Connection's protocol and endpoint from explicit Provider identity."""
-        prefix = f"LLM_{connection_name.upper()}"
-        protocol = (effective_map.get(f"{prefix}_PROTOCOL") or "").strip()
-        base_url = (effective_map.get(f"{prefix}_BASE_URL") or "").strip()
-        provider, _provider_id, provider_is_explicit = (
-            SystemConfigService._resolve_connection_provider(
-                effective_map,
-                connection_name,
-            )
-        )
-        if (
-            provider_is_explicit
-            and provider is not None
-            and not provider["is_custom"]
-        ):
-            protocol = str(provider["protocol"])
-            if not base_url:
-                base_url = str(provider["default_base_url"])
-        if connection_name.lower() == "anspire":
-            protocol = protocol or "openai"
-            base_url = base_url or str(
-                effective_map.get("ANSPIRE_LLM_BASE_URL")
-                or ANSPIRE_LLM_BASE_URL_DEFAULT
-            ).strip()
-        return protocol, base_url
+        return llm_channel_map.resolve_connection_transport(effective_map, connection_name)
 
     @staticmethod
     def _resolve_request_provider(
@@ -1053,9 +889,7 @@ class SystemConfigService:
         reload_now: bool = True,
     ) -> Dict[str, Any]:
         """Merge imported `.env` assignments into the active config."""
-        current_version = self._manager.get_config_version()
-        if current_version != config_version:
-            raise ConfigConflictError(current_version=current_version)
+        self._conflict.guard_version(config_version)
 
         updates = self._parse_imported_env_content(content)
         return self.update(
@@ -2453,9 +2287,7 @@ class SystemConfigService:
         reload_now: bool = True,
     ) -> Dict[str, Any]:
         """Validate and persist updates into `.env`, then reload runtime config."""
-        current_version = self._manager.get_config_version()
-        if current_version != config_version:
-            raise ConfigConflictError(current_version=current_version)
+        self._conflict.guard_version(config_version)
 
         issues = self._collect_issues(items=items, mask_token=mask_token)
         errors = [issue for issue in issues if issue["severity"] == "error"]
@@ -2484,7 +2316,7 @@ class SystemConfigService:
                 expected_version=config_version,
             )
         except ConfigVersionMismatchError as exc:
-            raise ConfigConflictError(current_version=exc.current_version) from exc
+            raise self._conflict.as_conflict(exc) from exc
 
         warnings: List[str] = []
         reload_triggered = False
@@ -4036,16 +3868,7 @@ class SystemConfigService:
 
     @classmethod
     def _anspire_legacy_llm_enabled(cls, effective_map: Dict[str, str]) -> bool:
-        if not parse_env_bool(effective_map.get("ANSPIRE_LLM_ENABLED"), default=True):
-            return False
-        for name in cls._split_csv(effective_map.get("LLM_CHANNELS") or ""):
-            if name.strip().lower() != "anspire":
-                continue
-            enabled_raw = effective_map.get("LLM_ANSPIRE_ENABLED")
-            if not (enabled_raw or "").strip():
-                enabled_raw = effective_map.get("ANSPIRE_LLM_ENABLED")
-            return parse_env_bool(enabled_raw, default=True)
-        return True
+        return llm_channel_map.anspire_legacy_llm_enabled(effective_map)
 
     @classmethod
     def _provider_has_setup_credentials(cls, provider: str, effective_map: Dict[str, str]) -> bool:
@@ -5009,41 +4832,62 @@ class SystemConfigService:
 
     @staticmethod
     def _extract_llm_completion_content(response: Any) -> Tuple[str, Optional[str], Optional[str], Optional[str]]:
+        def _field(obj: Any, key: str) -> Any:
+            if isinstance(obj, dict):
+                return obj.get(key)
+            return getattr(obj, key, None)
+
+        def _text_from_blocks(blocks: Any) -> str:
+            if not isinstance(blocks, list):
+                return ""
+            text_parts: List[str] = []
+            for block in blocks:
+                if isinstance(block, str):
+                    text_parts.append(block)
+                    continue
+                block_type = str(_field(block, "type") or "").strip().lower()
+                if block_type and block_type not in {"text", "output_text"}:
+                    continue
+                text = _field(block, "text")
+                if text is None:
+                    text = _field(block, "content")
+                if isinstance(text, str) and text:
+                    text_parts.append(text)
+            return strip_leading_think_wrapper("".join(text_parts))
+
         if response is None:
             return "", "empty_response", "Completion returned no response object", "null_response"
 
-        choices = getattr(response, "choices", None)
+        choices = _field(response, "choices")
         if not choices:
             return "", "format_error", "Completion response did not include choices", "malformed_choices"
 
         choice = choices[0]
-        content_blocks = getattr(choice, "content_blocks", None)
-        if content_blocks is None:
-            message = getattr(choice, "message", None)
-            if message is not None:
-                content_blocks = getattr(message, "content_blocks", None)
-        message = getattr(choice, "message", None)
+        message = _field(choice, "message")
+        content_blocks = _field(choice, "content_blocks")
+        if content_blocks is None and message is not None:
+            content_blocks = _field(message, "content_blocks")
         if content_blocks is not None:
-            text_parts: List[str] = []
-            for block in content_blocks:
-                if getattr(block, "type", None) == "text":
-                    text = getattr(block, "text", "") or ""
-                    if text:
-                        text_parts.append(str(text))
-                elif hasattr(block, "content") and block.content:
-                    text_parts.append(str(block.content))
-            content = "".join(text_parts).strip()
+            content = _text_from_blocks(content_blocks)
             if content:
                 return content, None, None, None
 
         if message is None:
             return "", "format_error", "Completion response did not include a message object", "malformed_choices"
-        if not hasattr(message, "content"):
+        if isinstance(message, dict):
+            has_content = "content" in message
+        else:
+            has_content = hasattr(message, "content")
+        if not has_content:
             return "", "format_error", "Completion message did not include a content field", "malformed_choices"
-        raw_content = message.content
+        raw_content = _field(message, "content")
         if raw_content is None:
             return "", "empty_response", "Completion returned null message content", "null_content"
-        content = str(raw_content).strip()
+        content = (
+            _text_from_blocks(raw_content)
+            if isinstance(raw_content, list)
+            else strip_leading_think_wrapper(str(raw_content))
+        )
         if not content:
             return "", "empty_response", "Completion returned an empty message content", "empty_content"
         return content, None, None, None
@@ -5420,409 +5264,76 @@ class SystemConfigService:
 
     @staticmethod
     def _collect_llm_channel_models_from_map(effective_map: Dict[str, str]) -> List[str]:
-        """Collect normalized model names from channel-style env values."""
-        raw_channels = (effective_map.get("LLM_CHANNELS") or "").strip()
-        if not raw_channels:
-            return []
-
-        models: List[str] = []
-        seen: Set[str] = set()
-        for raw_name in raw_channels.split(","):
-            name = raw_name.strip()
-            if not name:
-                continue
-
-            prefix = f"LLM_{name.upper()}"
-            enabled_raw = effective_map.get(f"{prefix}_ENABLED")
-            if name.lower() == "anspire" and not (enabled_raw or "").strip():
-                enabled_raw = effective_map.get("ANSPIRE_LLM_ENABLED")
-            enabled = parse_env_bool(enabled_raw, default=True)
-            if not enabled:
-                continue
-
-            protocol_value, base_url_value = (
-                SystemConfigService._resolve_connection_transport(
-                    effective_map,
-                    name,
-                )
-            )
-            raw_models = [
-                model.strip()
-                for model in (effective_map.get(f"{prefix}_MODELS") or "").split(",")
-                if model.strip()
-            ]
-            if name.lower() == "anspire" and not raw_models:
-                raw_models = [
-                    (
-                        effective_map.get("ANSPIRE_LLM_MODEL")
-                        or ANSPIRE_LLM_MODEL_DEFAULT
-                    ).strip()
-                ]
-            if is_reserved_hermes_name(name):
-                result = parse_hermes_channel(
-                    enabled=True,
-                    protocol=protocol_value or HERMES_DEFAULT_PROTOCOL,
-                    base_url=base_url_value or HERMES_DEFAULT_BASE_URL,
-                    api_key=(effective_map.get(f"{prefix}_API_KEY") or "").strip(),
-                    api_keys_raw=(effective_map.get(f"{prefix}_API_KEYS") or "").strip(),
-                    extra_headers_raw=(effective_map.get(f"{prefix}_EXTRA_HEADERS") or "").strip(),
-                    models=raw_models or [HERMES_DEFAULT_MODEL],
-                )
-                channel = result.channel or {}
-                for model in channel.get("models") or []:
-                    if model and model not in seen:
-                        seen.add(model)
-                        models.append(model)
-                continue
-            resolved_protocol = resolve_llm_channel_protocol(protocol_value, base_url=base_url_value, models=raw_models, channel_name=name)
-            for model in raw_models:
-                normalized_model = normalize_llm_channel_model(model, resolved_protocol, base_url_value)
-                if not normalized_model or normalized_model in seen:
-                    continue
-                seen.add(normalized_model)
-                models.append(normalized_model)
-
-        return models
+        return llm_channel_map.collect_llm_channel_models_from_map(effective_map)
 
     @staticmethod
     def _collect_hermes_channel_models_from_map(effective_map: Dict[str, str]) -> List[str]:
-        """Collect valid reserved Hermes route aliases from channel-style env values."""
-        raw_channels = (effective_map.get("LLM_CHANNELS") or "").strip()
-        if not raw_channels:
-            return []
-
-        models: List[str] = []
-        seen: Set[str] = set()
-        for raw_name in raw_channels.split(","):
-            name = raw_name.strip()
-            if not is_reserved_hermes_name(name):
-                continue
-
-            prefix = f"LLM_{name.upper()}"
-            enabled = parse_env_bool(effective_map.get(f"{prefix}_ENABLED"), default=True)
-            if not enabled:
-                continue
-
-            raw_models = SystemConfigService._split_csv(effective_map.get(f"{prefix}_MODELS") or "")
-            result = parse_hermes_channel(
-                enabled=True,
-                protocol=(effective_map.get(f"{prefix}_PROTOCOL") or HERMES_DEFAULT_PROTOCOL).strip(),
-                base_url=(effective_map.get(f"{prefix}_BASE_URL") or HERMES_DEFAULT_BASE_URL).strip(),
-                api_key=(effective_map.get(f"{prefix}_API_KEY") or "").strip(),
-                api_keys_raw=(effective_map.get(f"{prefix}_API_KEYS") or "").strip(),
-                extra_headers_raw=(effective_map.get(f"{prefix}_EXTRA_HEADERS") or "").strip(),
-                models=raw_models or [HERMES_DEFAULT_MODEL],
-            )
-            channel = result.channel or {}
-            for model in channel.get("models") or []:
-                if model and model not in seen:
-                    seen.add(model)
-                    models.append(model)
-        return models
+        return llm_channel_map.collect_hermes_channel_models_from_map(effective_map)
 
     @staticmethod
     def _collect_non_hermes_channel_models_from_map(effective_map: Dict[str, str]) -> List[str]:
-        """Collect enabled non-Hermes channel route aliases from channel-style env values."""
-        raw_channels = (effective_map.get("LLM_CHANNELS") or "").strip()
-        if not raw_channels:
-            return []
-        models: List[str] = []
-        seen: Set[str] = set()
-        for raw_name in raw_channels.split(","):
-            name = raw_name.strip()
-            if not name or is_reserved_hermes_name(name):
-                continue
-            prefix = f"LLM_{name.upper()}"
-            enabled_raw = effective_map.get(f"{prefix}_ENABLED")
-            if name.lower() == "anspire" and not (enabled_raw or "").strip():
-                enabled_raw = effective_map.get("ANSPIRE_LLM_ENABLED")
-            if not parse_env_bool(enabled_raw, default=True):
-                continue
-            protocol_value, base_url_value = (
-                SystemConfigService._resolve_connection_transport(
-                    effective_map,
-                    name,
-                )
-            )
-            raw_models = SystemConfigService._split_csv(effective_map.get(f"{prefix}_MODELS") or "")
-            if name.lower() == "anspire" and not raw_models:
-                raw_models = [
-                    (
-                        effective_map.get("ANSPIRE_LLM_MODEL")
-                        or ANSPIRE_LLM_MODEL_DEFAULT
-                    ).strip()
-                ]
-            resolved_protocol = resolve_llm_channel_protocol(
-                protocol_value,
-                base_url=base_url_value,
-                models=raw_models,
-                channel_name=name,
-            )
-            for raw_model in raw_models:
-                model = normalize_llm_channel_model(raw_model, resolved_protocol, base_url_value)
-                if model and model not in seen:
-                    seen.add(model)
-                    models.append(model)
-        return models
+        return llm_channel_map.collect_non_hermes_channel_models_from_map(effective_map)
 
     @staticmethod
     def _collect_mixed_hermes_routes_from_map(effective_map: Dict[str, str]) -> Set[str]:
-        hermes_routes = set(SystemConfigService._collect_hermes_channel_models_from_map(effective_map))
-        non_hermes_routes = set(SystemConfigService._collect_non_hermes_channel_models_from_map(effective_map))
-        return hermes_routes & non_hermes_routes
+        return llm_channel_map.collect_mixed_hermes_routes_from_map(effective_map)
 
     @staticmethod
     def _matches_route_set(model: str, routes: Set[str]) -> bool:
-        """Loose safety match for Hermes/provenance checks, not normal route availability."""
-        return bool(route_identity_candidates(model) & set(routes or set()))
+        return llm_channel_map.matches_route_set(model, routes)
 
     @staticmethod
     def _matches_exact_route(model: str, routes: Set[str]) -> bool:
-        """Match the Router's top-level model_name exactly for normal availability checks."""
-        normalized_model = str(model or "").strip()
-        return bool(normalized_model) and normalized_model in set(routes or set())
+        return llm_channel_map.matches_exact_route(model, routes)
 
     @staticmethod
     def _uses_litellm_yaml(effective_map: Dict[str, str]) -> bool:
-        """Return True when a valid LiteLLM YAML config takes precedence over channels."""
-        config_path = (effective_map.get("LITELLM_CONFIG") or "").strip()
-        if not config_path:
-            return False
-        return bool(Config._parse_litellm_yaml(config_path))
+        return llm_channel_map.uses_litellm_yaml(effective_map)
 
     @staticmethod
     def _collect_yaml_models_from_map(effective_map: Dict[str, str]) -> List[str]:
-        """Collect declared router model names from LiteLLM YAML config."""
-        config_path = (effective_map.get("LITELLM_CONFIG") or "").strip()
-        if not config_path:
-            return []
-        return get_configured_llm_models(Config._parse_litellm_yaml(config_path))
+        return llm_channel_map.collect_yaml_models_from_map(effective_map)
 
     @staticmethod
     def _has_legacy_key_for_provider(provider: str, effective_map: Dict[str, str]) -> bool:
-        """Return True when legacy env config can still back the provider."""
-        normalized_provider = canonicalize_llm_channel_protocol(provider)
-        if normalized_provider in {"gemini", "vertex_ai"}:
-            return bool(
-                (effective_map.get("GEMINI_API_KEYS") or "").strip()
-                or (effective_map.get("GEMINI_API_KEY") or "").strip()
-            )
-        if normalized_provider == "anthropic":
-            return bool(
-                (effective_map.get("ANTHROPIC_API_KEYS") or "").strip()
-                or (effective_map.get("ANTHROPIC_API_KEY") or "").strip()
-            )
-        if normalized_provider == "deepseek":
-            return bool(
-                (effective_map.get("DEEPSEEK_API_KEYS") or "").strip()
-                or (effective_map.get("DEEPSEEK_API_KEY") or "").strip()
-            )
-        if normalized_provider == "openai":
-            return bool(
-                (effective_map.get("OPENAI_API_KEYS") or "").strip()
-                or (effective_map.get("AIHUBMIX_KEY") or "").strip()
-                or (effective_map.get("OPENAI_API_KEY") or "").strip()
-                or (
-                    SystemConfigService._anspire_legacy_llm_enabled(effective_map)
-                    and (effective_map.get("ANSPIRE_API_KEYS") or "").strip()
-                )
-            )
-        return False
+        return llm_channel_map.has_legacy_key_for_provider(provider, effective_map)
 
     @staticmethod
     def _has_runtime_source_for_model(model: str, effective_map: Dict[str, str]) -> bool:
-        """Whether the selected model still has a backing runtime source."""
-        if not model or _uses_direct_env_provider(model):
-            return True
-        provider = _get_litellm_provider(model)
-        return SystemConfigService._has_legacy_key_for_provider(provider, effective_map)
+        return llm_channel_map.has_runtime_source_for_model(model, effective_map)
 
     @staticmethod
     def _collect_llm_route_references(
         effective_map: Dict[str, str],
         known_routes: Set[str],
     ) -> Dict[str, List[Dict[str, str]]]:
-        """Collect explicit task assignments by exact model route."""
-        from src.llm.model_ref import normalize_model_ref
-
-        references: Dict[str, List[Dict[str, str]]] = {}
-
-        def add(route: str, task: str, key: str) -> None:
-            normalized = normalize_model_ref(route)
-            if not normalized:
-                return
-            entry = {"task": task, "key": key}
-            route_references = references.setdefault(normalized, [])
-            if entry not in route_references:
-                route_references.append(entry)
-
-        add(effective_map.get("LITELLM_MODEL", ""), "report", "LITELLM_MODEL")
-        raw_agent_model = (effective_map.get("AGENT_LITELLM_MODEL") or "").strip()
-        if raw_agent_model:
-            add(
-                normalize_agent_litellm_model(
-                    raw_agent_model,
-                    configured_models=known_routes,
-                ),
-                "agent",
-                "AGENT_LITELLM_MODEL",
-            )
-        add(effective_map.get("VISION_MODEL", ""), "vision", "VISION_MODEL")
-        for fallback in SystemConfigService._split_csv(
-            effective_map.get("LITELLM_FALLBACK_MODELS") or ""
-        ):
-            add(fallback, "fallback", "LITELLM_FALLBACK_MODELS")
-        return references
+        return ModelAssignmentValidator.collect_llm_route_references(effective_map, known_routes)
 
     @staticmethod
     def _collect_llm_route_connection_ids(
         effective_map: Dict[str, str],
     ) -> Dict[str, List[str]]:
-        """Map each enabled channel route to its owning Connection ids."""
-        from src.llm.model_ref import canonicalize_connection_id
-
-        owners: Dict[str, List[str]] = {}
-        for raw_name in (effective_map.get("LLM_CHANNELS") or "").split(","):
-            connection_id = canonicalize_connection_id(raw_name)
-            if not connection_id:
-                continue
-            connection_map = dict(effective_map)
-            connection_map["LLM_CHANNELS"] = connection_id
-            for route in SystemConfigService._collect_llm_channel_models_from_map(
-                connection_map
-            ):
-                route_owners = owners.setdefault(route, [])
-                if connection_id not in route_owners:
-                    route_owners.append(connection_id)
-        return owners
+        return ModelAssignmentValidator.collect_llm_route_connection_ids(effective_map)
 
     @staticmethod
     def _collect_llm_channel_model_refs_from_map(
         effective_map: Dict[str, str],
     ) -> List[str]:
-        """Collect connection-aware aliases for all enabled channel models."""
-        from src.llm.model_ref import encode_model_ref
-
-        refs: List[str] = []
-        for route, connection_ids in (
-            SystemConfigService._collect_llm_route_connection_ids(effective_map).items()
-        ):
-            refs.extend(
-                encode_model_ref(connection_id, route)
-                for connection_id in connection_ids
-            )
-        return refs
+        return ModelAssignmentValidator.collect_llm_channel_model_refs_from_map(effective_map)
 
     @staticmethod
     def _collect_model_ref_assignment_issues(
         effective_map: Dict[str, str],
         updated_keys: Set[str],
     ) -> List[Dict[str, Any]]:
-        """Validate ModelRefs and require confirmation for ambiguous legacy routes."""
-        from src.llm.model_ref import (
-            decode_model_ref,
-            encode_model_ref,
-            is_model_ref,
-            normalize_model_ref,
-        )
-
-        owners = SystemConfigService._collect_llm_route_connection_ids(effective_map)
-        known_routes = set(owners)
-        assignments: List[Tuple[str, str]] = [
-            ("LITELLM_MODEL", (effective_map.get("LITELLM_MODEL") or "").strip()),
-            (
-                "AGENT_LITELLM_MODEL",
-                normalize_agent_litellm_model(
-                    (effective_map.get("AGENT_LITELLM_MODEL") or "").strip(),
-                    configured_models=known_routes,
-                ),
-            ),
-            ("VISION_MODEL", (effective_map.get("VISION_MODEL") or "").strip()),
-        ]
-        assignments.extend(
-            ("LITELLM_FALLBACK_MODELS", value)
-            for value in SystemConfigService._split_csv(
-                effective_map.get("LITELLM_FALLBACK_MODELS") or ""
-            )
-        )
-
-        valid_refs = set(
-            SystemConfigService._collect_llm_channel_model_refs_from_map(effective_map)
-        )
-        issues: List[Dict[str, Any]] = []
-        seen: Set[Tuple[str, str, str]] = set()
-        for key, value in assignments:
-            if not value:
-                continue
-            if is_model_ref(value):
-                normalized_value = normalize_model_ref(value)
-                try:
-                    decoded = decode_model_ref(value)
-                except ValueError:
-                    decoded = None
-                    code = "invalid_model_ref"
-                else:
-                    code = "unknown_model_ref" if normalized_value not in valid_refs else ""
-                if code and (key, value, code) not in seen:
-                    seen.add((key, value, code))
-                    issues.append({
-                        "key": key,
-                        "code": code,
-                        "message": (
-                            "The selected model reference is malformed"
-                            if code == "invalid_model_ref"
-                            else "The selected model reference no longer resolves to an enabled Connection"
-                        ),
-                        "severity": "error" if key in updated_keys else "warning",
-                        "expected": "enabled connection-aware model_ref",
-                        "actual": value,
-                        "details": {
-                            "model_ref": value,
-                            "connection_id": decoded.connection_id if decoded else None,
-                            "route": decoded.runtime_route if decoded else None,
-                        },
-                    })
-                continue
-
-            connection_ids = owners.get(value, [])
-            if len(connection_ids) < 2 or (key, value, "ambiguous_model_route") in seen:
-                continue
-            seen.add((key, value, "ambiguous_model_route"))
-            issues.append({
-                "key": key,
-                "code": "ambiguous_model_route",
-                "message": (
-                    f"Model route '{value}' exists on multiple Connections. "
-                    "Choose the intended Connection before saving this assignment."
-                ),
-                "severity": "error" if key in updated_keys else "warning",
-                "expected": "connection-aware model_ref",
-                "actual": value,
-                "details": {
-                    "route": value,
-                    "connection_ids": connection_ids,
-                    "model_refs": [
-                        encode_model_ref(connection_id, value)
-                        for connection_id in connection_ids
-                    ],
-                },
-            })
-        return issues
+        return ModelAssignmentValidator.collect_model_ref_assignment_issues(effective_map, updated_keys)
 
     @staticmethod
     def _model_removal_issue_key(
         connection_ids: Sequence[str],
         updated_keys: Set[str],
     ) -> str:
-        """Choose the submitted Connection field that removed a model route."""
-        for suffix in ("MODELS", "ENABLED"):
-            for connection_id in connection_ids:
-                key = f"LLM_{connection_id.upper()}_{suffix}"
-                if key in updated_keys:
-                    return key
-        if "LITELLM_CONFIG" in updated_keys:
-            return "LITELLM_CONFIG"
-        return "LLM_CHANNELS"
+        return ModelAssignmentValidator.model_removal_issue_key(connection_ids, updated_keys)
 
     @staticmethod
     def _collect_removed_model_in_use_issues(
@@ -5830,135 +5341,11 @@ class SystemConfigService:
         previous_effective_map: Optional[Dict[str, str]],
         updated_keys: Set[str],
     ) -> List[Dict[str, Any]]:
-        """Reject routes removed by this draft while task assignments still use them."""
-        if previous_effective_map is None or not updated_keys:
-            return []
-
-        from src.llm.model_ref import decode_model_ref, encode_model_ref
-
-        previous_models = (
-            SystemConfigService._collect_yaml_models_from_map(previous_effective_map)
-            or SystemConfigService._collect_llm_channel_models_from_map(previous_effective_map)
-        )
-        current_models = (
-            SystemConfigService._collect_yaml_models_from_map(effective_map)
-            or SystemConfigService._collect_llm_channel_models_from_map(effective_map)
-        )
-        current_model_set = set(current_models)
-        previous_connection_owners = (
-            SystemConfigService._collect_llm_route_connection_ids(previous_effective_map)
-        )
-        current_connection_owners = (
-            SystemConfigService._collect_llm_route_connection_ids(effective_map)
-        )
-        previous_model_refs = {
-            encode_model_ref(connection_id, route)
-            for route, connection_ids in previous_connection_owners.items()
-            for connection_id in connection_ids
-        }
-        current_model_refs = {
-            encode_model_ref(connection_id, route)
-            for route, connection_ids in current_connection_owners.items()
-            for connection_id in connection_ids
-        }
-        removed_models = [
-            route for route in previous_models if route not in current_model_set
-        ]
-
-        known_routes = set(previous_models) | current_model_set
-        references = SystemConfigService._collect_llm_route_references(
+        return ModelAssignmentValidator.collect_removed_model_in_use_issues(
             effective_map,
-            known_routes,
+            previous_effective_map,
+            updated_keys,
         )
-        issues: List[Dict[str, Any]] = []
-        for model_ref in sorted(previous_model_refs - current_model_refs):
-            referenced_by = references.get(model_ref, [])
-            if not referenced_by:
-                continue
-            decoded = decode_model_ref(model_ref)
-            if decoded is None:
-                continue
-            issues.append({
-                "key": SystemConfigService._model_removal_issue_key(
-                    [decoded.connection_id],
-                    updated_keys,
-                ),
-                "code": "model_in_use",
-                "message": (
-                    "The selected Connection model is still assigned to one or more tasks. "
-                    "Replace or clear those assignments in the same update before removing it."
-                ),
-                "severity": "error",
-                "expected": "all task references replaced or cleared atomically",
-                "actual": model_ref,
-                "details": {
-                    "model_ref": model_ref,
-                    "route": decoded.runtime_route,
-                    "connection_ids": [decoded.connection_id],
-                    "referenced_by": referenced_by,
-                },
-            })
-
-        # A legacy route that used to have multiple owners is ambiguous even if
-        # one owner remains after this update. Require the assignment itself to be
-        # migrated to a ModelRef instead of silently selecting the survivor.
-        for route, previous_connection_ids in previous_connection_owners.items():
-            current_connection_ids = current_connection_owners.get(route, [])
-            if (
-                len(previous_connection_ids) < 2
-                or set(current_connection_ids) == set(previous_connection_ids)
-                or not references.get(route)
-            ):
-                continue
-            for reference in references[route]:
-                issues.append({
-                    "key": reference["key"],
-                    "code": "ambiguous_model_route",
-                    "message": (
-                        f"Legacy model route '{route}' was shared by multiple Connections. "
-                        "Choose a specific Connection before changing either source."
-                    ),
-                    "severity": "error",
-                    "expected": "connection-aware model_ref",
-                    "actual": route,
-                    "details": {
-                        "route": route,
-                        "connection_ids": previous_connection_ids,
-                        "model_refs": [
-                            encode_model_ref(connection_id, route)
-                            for connection_id in previous_connection_ids
-                        ],
-                        "referenced_by": references[route],
-                    },
-                })
-
-        for route in removed_models:
-            referenced_by = references.get(route, [])
-            if not referenced_by:
-                continue
-            connection_ids = previous_connection_owners.get(route, [])
-            issues.append(
-                {
-                    "key": SystemConfigService._model_removal_issue_key(
-                        connection_ids,
-                        updated_keys,
-                    ),
-                    "code": "model_in_use",
-                    "message": (
-                        f"Model route '{route}' is still assigned to one or more tasks. "
-                        "Replace or clear those assignments in the same update before removing it."
-                    ),
-                    "severity": "error",
-                    "expected": "all task references replaced or cleared atomically",
-                    "actual": route,
-                    "details": {
-                        "route": route,
-                        "connection_ids": connection_ids,
-                        "referenced_by": referenced_by,
-                    },
-                }
-            )
-        return issues
 
     @staticmethod
     def _validate_llm_runtime_selection(
@@ -5966,351 +5353,11 @@ class SystemConfigService:
         updated_keys: Optional[Set[str]] = None,
         previous_effective_map: Optional[Dict[str, str]] = None,
     ) -> List[Dict[str, Any]]:
-        """Validate selected primary/fallback/vision models against configured channels."""
-        from src.llm.model_ref import normalize_model_ref
-
-        removal_issues = SystemConfigService._collect_removed_model_in_use_issues(
-            effective_map=effective_map,
-            previous_effective_map=previous_effective_map,
-            updated_keys=updated_keys or set(),
+        return ModelAssignmentValidator.validate_llm_runtime_selection(
+            effective_map,
+            updated_keys,
+            previous_effective_map,
         )
-        issues: List[Dict[str, Any]] = list(removal_issues)
-        issues.extend(
-            SystemConfigService._collect_model_ref_assignment_issues(
-                effective_map,
-                updated_keys or set(),
-            )
-        )
-        removed_routes_in_use = {
-            issue["details"]["route"] for issue in removal_issues
-        }
-
-        # Vision references normally degrade to warnings so historical breakage
-        # never blocks unrelated saves; but when this very update reshapes the
-        # channel map (delete/disable/model-list changes), removing the Vision
-        # model's declared source must block like other task references.
-        channel_shape_touched = False
-        if updated_keys:
-            if "LLM_CHANNELS" in updated_keys:
-                channel_shape_touched = True
-            else:
-                declared_channel_prefixes = tuple(
-                    f"LLM_{name.strip().upper()}_"
-                    for name in (effective_map.get("LLM_CHANNELS") or "").split(",")
-                    if name.strip()
-                )
-                channel_shape_touched = bool(declared_channel_prefixes) and any(
-                    key.startswith(declared_channel_prefixes) for key in updated_keys
-                )
-        vision_reference_severity = "error" if channel_shape_touched else "warning"
-
-        available_models = (
-            SystemConfigService._collect_yaml_models_from_map(effective_map)
-            or SystemConfigService._collect_llm_channel_models_from_map(effective_map)
-        )
-        available_model_set = set(available_models)
-        if not SystemConfigService._collect_yaml_models_from_map(effective_map):
-            available_model_set.update(
-                SystemConfigService._collect_llm_channel_model_refs_from_map(effective_map)
-            )
-        hermes_route_set = set(SystemConfigService._collect_hermes_channel_models_from_map(effective_map))
-        mixed_hermes_routes = SystemConfigService._collect_mixed_hermes_routes_from_map(effective_map)
-        if not available_model_set:
-            raw_channels = (effective_map.get("LLM_CHANNELS") or "").strip()
-            if not raw_channels:
-                return issues
-
-            configured_agent_model_raw = (effective_map.get("AGENT_LITELLM_MODEL") or "").strip()
-            configured_agent_model = normalize_agent_litellm_model(
-                configured_agent_model_raw,
-                configured_models=available_model_set,
-            )
-            primary_model = normalize_model_ref(effective_map.get("LITELLM_MODEL") or "")
-            if (
-                primary_model
-                and primary_model not in removed_routes_in_use
-                and not SystemConfigService._has_runtime_source_for_model(primary_model, effective_map)
-            ):
-                issues.append(
-                    {
-                        "key": "LITELLM_MODEL",
-                        "code": "missing_runtime_source",
-                        "message": (
-                            "A primary model is selected, but no usable runtime source was found. "
-                            "Enable at least one channel with available models, or provide the "
-                            "matching provider API key so the model can be resolved."
-                        ),
-                        "severity": "error",
-                        "expected": "enabled channel model or matching legacy API key",
-                        "actual": primary_model,
-                    }
-                )
-
-            if (
-                configured_agent_model_raw
-                and configured_agent_model
-                and configured_agent_model not in removed_routes_in_use
-                and not SystemConfigService._has_runtime_source_for_model(
-                    configured_agent_model,
-                    effective_map,
-                )
-            ):
-                issues.append(
-                    {
-                        "key": "AGENT_LITELLM_MODEL",
-                        "code": "missing_runtime_source",
-                        "message": (
-                            "An Agent primary model is selected, but no usable runtime source was found. "
-                            "Enable at least one channel with available models, or provide the "
-                            "matching provider API key so the model can be resolved."
-                        ),
-                        "severity": "error",
-                        "expected": "enabled channel model or matching legacy API key",
-                        "actual": configured_agent_model,
-                    }
-                )
-            elif (
-                configured_agent_model_raw
-                and configured_agent_model
-                and SystemConfigService._matches_route_set(configured_agent_model, hermes_route_set)
-                and not SystemConfigService._matches_route_set(configured_agent_model, mixed_hermes_routes)
-            ):
-                issues.append(
-                    {
-                        "key": "AGENT_LITELLM_MODEL",
-                        "code": "explicit_agent_model_no_safe_deployment",
-                        "message": (
-                            "Hermes-only routes are not valid Agent models in Phase 3. "
-                            "Choose a route with at least one non-Hermes deployment."
-                        ),
-                        "severity": "error",
-                        "expected": "Agent-safe route with non-Hermes deployment",
-                        "actual": configured_agent_model,
-                    }
-                )
-
-            fallback_models = [
-                normalize_model_ref(model)
-                for model in (effective_map.get("LITELLM_FALLBACK_MODELS") or "").split(",")
-                if model.strip()
-            ]
-            invalid_fallbacks = [
-                model for model in fallback_models
-                if model not in removed_routes_in_use
-                if not SystemConfigService._has_runtime_source_for_model(model, effective_map)
-            ]
-            if invalid_fallbacks:
-                issues.append(
-                    {
-                        "key": "LITELLM_FALLBACK_MODELS",
-                        "code": "missing_runtime_source",
-                        "message": (
-                            "Some fallback models do not have an enabled channel "
-                            "or matching API key available"
-                        ),
-                        "severity": "error",
-                        "expected": "enabled channel models or matching legacy API keys",
-                        "actual": ", ".join(invalid_fallbacks[:3]),
-                    }
-                )
-
-            vision_model = normalize_model_ref(effective_map.get("VISION_MODEL") or "")
-            if vision_model and SystemConfigService._matches_route_set(vision_model, hermes_route_set):
-                issues.append(
-                    {
-                        "key": "VISION_MODEL",
-                        "code": "hermes_vision_unsupported",
-                        "message": (
-                            "Hermes routes are not valid Vision models in Phase 3. "
-                            "Choose a pure non-Hermes Vision-capable route."
-                        ),
-                        "severity": "error",
-                        "expected": "pure non-Hermes Vision route",
-                        "actual": vision_model,
-                    }
-                )
-            elif (
-                vision_model
-                and vision_model not in removed_routes_in_use
-                and not SystemConfigService._has_runtime_source_for_model(vision_model, effective_map)
-            ):
-                issues.append(
-                    {
-                        "key": "VISION_MODEL",
-                        "code": "missing_runtime_source",
-                        "message": (
-                            "A Vision model is selected, but there is no enabled channel "
-                            "or matching API key available for it"
-                        ),
-                        "severity": vision_reference_severity,
-                        "expected": "enabled channel model or matching legacy API key",
-                        "actual": vision_model,
-                    }
-                )
-
-            return issues
-
-        primary_model = normalize_model_ref(effective_map.get("LITELLM_MODEL") or "")
-        if SystemConfigService._matches_route_set(primary_model, mixed_hermes_routes):
-            issues.append(
-                {
-                    "key": "LITELLM_MODEL",
-                    "code": "mixed_hermes_route_unsupported",
-                    "message": (
-                        "Mixed Hermes/non-Hermes generation routes are not supported in Phase 3. "
-                        "Choose a pure Hermes or pure non-Hermes route."
-                    ),
-                    "severity": "error",
-                    "expected": "pure generation route",
-                    "actual": primary_model,
-                }
-            )
-        if (
-            primary_model
-            and primary_model not in removed_routes_in_use
-            and not SystemConfigService._matches_exact_route(primary_model, available_model_set)
-            and not _uses_direct_env_provider(primary_model)
-        ):
-            issues.append(
-                {
-                    "key": "LITELLM_MODEL",
-                    "code": "unknown_model",
-                    "message": (
-                        "The selected primary model is not declared by the current enabled channels "
-                        "or advanced model routing config. "
-                        f"Available models: {', '.join(available_models[:6])}"
-                    ),
-                    "severity": "error",
-                    "expected": "one configured channel model",
-                    "actual": primary_model,
-                }
-            )
-
-        configured_agent_model_raw = (effective_map.get("AGENT_LITELLM_MODEL") or "").strip()
-        configured_agent_model = normalize_agent_litellm_model(
-            configured_agent_model_raw,
-            configured_models=available_model_set,
-        )
-        if (
-            configured_agent_model_raw
-            and configured_agent_model
-            and configured_agent_model not in removed_routes_in_use
-            and not SystemConfigService._matches_exact_route(configured_agent_model, available_model_set)
-            and not _uses_direct_env_provider(configured_agent_model)
-        ):
-            issues.append(
-                {
-                    "key": "AGENT_LITELLM_MODEL",
-                    "code": "unknown_model",
-                    "message": (
-                        "The selected Agent primary model is not declared by the current enabled channels "
-                        "or advanced model routing config. "
-                        f"Available models: {', '.join(available_models[:6])}"
-                    ),
-                    "severity": "error",
-                    "expected": "one configured channel model",
-                    "actual": configured_agent_model,
-                }
-            )
-        elif (
-                configured_agent_model_raw
-                and configured_agent_model
-                and SystemConfigService._matches_route_set(configured_agent_model, hermes_route_set)
-                and not SystemConfigService._matches_route_set(configured_agent_model, mixed_hermes_routes)
-            ):
-            issues.append(
-                {
-                    "key": "AGENT_LITELLM_MODEL",
-                    "code": "explicit_agent_model_no_safe_deployment",
-                    "message": (
-                        "Hermes-only routes are not valid Agent models in Phase 3. "
-                        "Choose a route with at least one non-Hermes deployment."
-                    ),
-                    "severity": "error",
-                    "expected": "Agent-safe route with non-Hermes deployment",
-                    "actual": configured_agent_model,
-                }
-            )
-
-        fallback_models = [
-            normalize_model_ref(model)
-            for model in (effective_map.get("LITELLM_FALLBACK_MODELS") or "").split(",")
-            if model.strip()
-        ]
-        mixed_fallbacks = [
-            model for model in fallback_models
-            if SystemConfigService._matches_route_set(model, mixed_hermes_routes)
-        ]
-        if mixed_fallbacks:
-            issues.append(
-                {
-                    "key": "LITELLM_FALLBACK_MODELS",
-                    "code": "mixed_hermes_route_unsupported",
-                    "message": (
-                        "Mixed Hermes/non-Hermes generation routes are not supported as fallback models in Phase 3."
-                    ),
-                    "severity": "error",
-                    "expected": "pure generation fallback routes",
-                    "actual": ", ".join(mixed_fallbacks[:3]),
-                }
-            )
-        invalid_fallbacks = [
-            model for model in fallback_models
-            if model not in removed_routes_in_use
-            if not SystemConfigService._matches_exact_route(model, available_model_set)
-            and not _uses_direct_env_provider(model)
-        ]
-        if invalid_fallbacks:
-            issues.append(
-                {
-                    "key": "LITELLM_FALLBACK_MODELS",
-                    "code": "unknown_model",
-                    "message": (
-                        "Fallback models include entries that are not declared by the current enabled channels "
-                        "or advanced model routing config"
-                    ),
-                    "severity": "error",
-                    "expected": ",".join(available_models[:6]),
-                    "actual": ", ".join(invalid_fallbacks[:3]),
-                }
-            )
-
-        vision_model = normalize_model_ref(effective_map.get("VISION_MODEL") or "")
-        if vision_model and SystemConfigService._matches_route_set(vision_model, hermes_route_set):
-            issues.append(
-                {
-                    "key": "VISION_MODEL",
-                    "code": "hermes_vision_unsupported",
-                    "message": (
-                        "Hermes routes are not valid Vision models in Phase 3. "
-                        "Choose a pure non-Hermes Vision-capable route."
-                    ),
-                    "severity": "error",
-                    "expected": "pure non-Hermes Vision route",
-                    "actual": vision_model,
-                }
-            )
-        elif (
-            vision_model
-            and vision_model not in removed_routes_in_use
-            and not SystemConfigService._matches_exact_route(vision_model, available_model_set)
-            and not _uses_direct_env_provider(vision_model)
-        ):
-            issues.append(
-                {
-                    "key": "VISION_MODEL",
-                    "code": "unknown_model",
-                    "message": (
-                        "The selected Vision model is not declared by the current enabled channels "
-                        "or advanced model routing config"
-                    ),
-                    "severity": vision_reference_severity,
-                    "expected": ",".join(available_models[:6]),
-                    "actual": vision_model,
-                }
-            )
-
-        return issues
 
     @staticmethod
     def _unknown_connection_contract_issues(

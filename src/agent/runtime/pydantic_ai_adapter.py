@@ -3,9 +3,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """Experimental PydanticAI runtime adapter (AR-PY-04 / RF-05, 方案 B).
 
-An **isolated, opt-in** ``AgentRuntime`` backed by PydanticAI. It is never
-wired into the default product path: Native remains the permanent default
-(see ``docs/architecture/ADR-001-agent-runtime.md``). PydanticAI is an
+An **isolated, test/evidence-only** ``AgentRuntime`` backed by PydanticAI,
+reinstated as an executable POC by ADR-002. It has no factory, config,
+environment, API or product selector: tests and evidence harnesses must
+construct it directly with explicit dependencies. Native remains the only
+product assembly path (see
+``docs/architecture/ADR-002-pydanticai-runtime-reinstatement.md``).
+PydanticAI is an
 *optional* dependency; every import is lazy so a StockPulse install
 without ``pydantic-ai-slim`` starts and runs Native unaffected, and asking
 for this runtime without the dependency raises one explicit error rather
@@ -43,6 +47,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import threading
 import time
 from typing import Any, Callable, List, Optional, Tuple
 
@@ -53,6 +58,7 @@ from src.agent.runtime.contract import (
     ExecutionMode,
     ExecutionState,
     ProgressCallback,
+    _EventStream,
     deep_thaw,
 )
 from src.agent.runtime.lifecycle import classify_terminal_state, get_default_usage_recorder
@@ -75,6 +81,20 @@ class _ExecutionTimedOut(Exception):
 
 class _ProviderBridgeError(Exception):
     """The StockPulse backend returned a sanitized provider failure."""
+
+
+class _PublishingEventEmitter:
+    """Publish accepted runtime events to an execution handle and callback."""
+
+    def __init__(self, delegate: Any, publish: Callable[[Any], None]) -> None:
+        self._delegate = delegate
+        self._publish = publish
+
+    def emit(self, event_type: str, **fields: Any) -> Any:
+        event = self._delegate.emit(event_type, **fields)
+        if event is not None:
+            self._publish(event)
+        return event
 
 
 def is_pydantic_ai_available() -> bool:
@@ -321,13 +341,6 @@ def build_stockpulse_backed_model(
                 llm_adapter.call_with_tools, sp_messages, tools, timeout=timeout
             )
 
-            if getattr(response, "provider", "") == "error":
-                # A sanitized public failure message: surface it as a bridge
-                # error so it never masquerades as a final dashboard answer.
-                raise _ProviderBridgeError(
-                    sanitize_agent_diagnostic(response.content or "LLM provider error")
-                )
-
             model_used = getattr(response, "model", "") or getattr(response, "provider", "")
             usage = response.usage or {}
             if recorder is not None and model_used and model_used != "error":
@@ -335,6 +348,22 @@ def build_stockpulse_backed_model(
             if model_used and model_used != "error":
                 self.models_used.append(model_used)
             self.total_tokens += int(usage.get("total_tokens", 0) or 0)
+
+            # A cancellation or deadline that arrived during the billed wire
+            # call must fence its response before PydanticAI can dispatch a
+            # returned tool call. The call's usage above is still accounted.
+            if cancelled_check is not None and cancelled_check():
+                raise _ExecutionCancelled()
+            timeout = remaining_timeout() if remaining_timeout is not None else None
+            if timeout is not None and timeout <= 0:
+                raise _ExecutionTimedOut()
+
+            if getattr(response, "provider", "") == "error":
+                # A sanitized public failure message: surface it as a bridge
+                # error so it never masquerades as a final dashboard answer.
+                raise _ProviderBridgeError(
+                    sanitize_agent_diagnostic(response.content or "LLM provider error")
+                )
 
             parts: List[Any] = []
             # RF-05 #4: carry the assistant-level provider trace (reasoning /
@@ -379,13 +408,14 @@ def build_stockpulse_backed_model(
 
 
 class PydanticAIRuntimeAdapter:
-    """Opt-in experimental runtime backed by PydanticAI (方案 B, RF-05).
+    """Test/evidence POC runtime backed by PydanticAI (方案 B, RF-05).
 
     Injection points keep this off the product default: ``model`` is a
     deterministic test double or the StockPulse-backed model, ``executor`` is
     the native ``AgentExecutor`` whose ``build_run_messages`` supplies the
     single resolved prompt authority, and ``tool_session`` is the RF-03
-    ``BoundToolSession``. There is no default construction from global config.
+    ``BoundToolSession``. There is no product construction from global config,
+    the runtime factory or an environment selector.
     """
 
     def __init__(
@@ -409,32 +439,30 @@ class PydanticAIRuntimeAdapter:
         self._tool_session = tool_session
         self._usage_recorder = usage_recorder
         self._event_emitter = event_emitter
-        self._deadline_monotonic: Optional[float] = None
-        self._execution: Optional[AgentExecution] = None
 
     @property
     def name(self) -> str:
         return "pydantic_ai_experimental"
 
-    def _remaining_timeout(self) -> Optional[float]:
-        """Remaining wall-clock budget for the model/tool call (RF-05 #6)."""
-        if self._deadline_monotonic is None:
-            return None
-        return max(0.0, self._deadline_monotonic - time.monotonic())
+    def _resolve_model(
+        self,
+        execution: AgentExecution,
+        deadline_monotonic: Optional[float],
+    ) -> Any:
+        if self._model is not None:
+            return self._model
 
-    def _cancel_requested(self) -> bool:
-        """Cooperative cancellation probe bound to the live execution."""
-        return self._execution is not None and self._execution.cancel_requested
+        def _remaining_timeout() -> Optional[float]:
+            if deadline_monotonic is None:
+                return None
+            return max(0.0, deadline_monotonic - time.monotonic())
 
-    def _resolve_model(self) -> Any:
-        if self._model is None:
-            self._model = build_stockpulse_backed_model(
-                self._llm_adapter,
-                remaining_timeout=self._remaining_timeout,
-                cancelled_check=self._cancel_requested,
-                usage_recorder=self._usage_recorder or get_default_usage_recorder(),
-            )
-        return self._model
+        return build_stockpulse_backed_model(
+            self._llm_adapter,
+            remaining_timeout=_remaining_timeout,
+            cancelled_check=lambda: execution.cancel_requested,
+            usage_recorder=self._usage_recorder or get_default_usage_recorder(),
+        )
 
     def start(
         self,
@@ -442,13 +470,99 @@ class PydanticAIRuntimeAdapter:
         *,
         progress_callback: Optional[ProgressCallback] = None,
     ) -> ExecutionHandle:
-        """Synchronous start: run to terminal and return the handle.
+        """Launch PydanticAI on a worker thread and return a live handle."""
+        self._validate_context(context)
 
-        The experimental adapter drives PydanticAI's synchronous ``run_sync``
-        loop, so ``start`` and ``execute`` share one implementation and return
-        an already-terminal handle.
-        """
-        return self.execute(context, progress_callback=progress_callback)
+        execution = AgentExecution(context)
+        event_stream = _EventStream()
+        done_event = threading.Event()
+        handle = ExecutionHandle(
+            execution, event_stream=event_stream, done_event=done_event
+        )
+        execution.start()
+        deadline_monotonic = (
+            time.monotonic() + context.timeout_seconds
+            if context.timeout_seconds
+            else None
+        )
+
+        def _publish(event: Any) -> None:
+            event_stream.publish(event)
+            if progress_callback is not None:
+                progress_callback(event)
+
+        event_emitter = self._build_execution_event_emitter(execution, _publish)
+
+        def _worker() -> None:
+            try:
+                result = None
+                worker_exception: Optional[BaseException] = None
+                try:
+                    result = self._run_once(
+                        context,
+                        execution=execution,
+                        deadline_monotonic=deadline_monotonic,
+                        event_emitter=event_emitter,
+                    )
+                except Exception as exc:
+                    worker_exception = exc
+
+                cancelled_result = self._cancelled_result()
+                timed_out_result = self._timed_out_result()
+                failure_error = (
+                    sanitize_agent_diagnostic(
+                        str(worker_exception) or worker_exception.__class__.__name__
+                    )
+                    if worker_exception is not None
+                    else None
+                )
+
+                def _resolve_terminal(
+                    cancel_requested: bool,
+                ) -> Tuple[ExecutionState, Any, Optional[str]]:
+                    if cancel_requested:
+                        selected_result = cancelled_result
+                    elif (
+                        deadline_monotonic is not None
+                        and time.monotonic() >= deadline_monotonic
+                    ):
+                        selected_result = timed_out_result
+                    elif worker_exception is not None:
+                        return ExecutionState.FAILED, None, failure_error
+                    else:
+                        selected_result = result
+                    return (
+                        classify_terminal_state(
+                            success=bool(getattr(selected_result, "success", False)),
+                            cancelled=bool(
+                                getattr(selected_result, "cancelled", False)
+                            ),
+                            timed_out=bool(
+                                getattr(selected_result, "timed_out", False)
+                            ),
+                        ),
+                        selected_result,
+                        getattr(selected_result, "error", None),
+                    )
+
+                execution.finish_resolved(_resolve_terminal)
+                if (
+                    worker_exception is not None
+                    and execution.state is ExecutionState.FAILED
+                ):
+                    handle._set_worker_exception(worker_exception)
+            finally:
+                event_stream.close()
+                done_event.set()
+
+        worker = threading.Thread(
+            target=_worker,
+            name=f"agent-runtime-{context.execution_id}",
+            daemon=True,
+        )
+        handle._attach_worker(worker)
+        worker.start()
+        return handle
 
     def execute(
         self,
@@ -456,12 +570,16 @@ class PydanticAIRuntimeAdapter:
         *,
         progress_callback: Optional[ProgressCallback] = None,
     ) -> ExecutionHandle:
-        """Run one Single-Agent RUN execution; return a terminal handle.
+        """Start one Single-Agent RUN execution and wait for its terminal state."""
+        handle = self.start(context, progress_callback=progress_callback)
+        handle.wait()
+        worker_exception = handle.worker_exception
+        if worker_exception is not None:
+            raise worker_exception
+        return handle
 
-        Only ``ExecutionMode.RUN`` is supported. ``CHAT`` and ``RESEARCH``
-        raise a stable ``unsupported_capability`` error rather than degrading:
-        CHAT is frozen until the RF-06 conformance decision.
-        """
+    @staticmethod
+    def _validate_context(context: ExecutionContext) -> None:
         _require_pydantic_ai()
         if context.mode is not ExecutionMode.RUN:
             raise NotImplementedError(
@@ -470,59 +588,127 @@ class PydanticAIRuntimeAdapter:
                 "until the RF-06 conformance decision."
             )
 
-        self._deadline_monotonic = (
-            time.monotonic() + context.timeout_seconds
-            if context.timeout_seconds
-            else None
-        )
-        execution = AgentExecution(context)
-        self._execution = execution
-        handle = ExecutionHandle(execution)
-        execution.start()
+    def _build_execution_event_emitter(
+        self,
+        execution: AgentExecution,
+        publish: Callable[[Any], None],
+    ) -> _PublishingEventEmitter:
+        delegate = self._event_emitter
+        if delegate is None:
+            from src.agent.runtime.events import RuntimeEventEmitter
 
+            delegate = RuntimeEventEmitter(
+                execution_id=execution.context.execution_id,
+                terminal_check=lambda: execution.is_terminal,
+            )
+        return _PublishingEventEmitter(delegate, publish)
+
+    def _run_once(
+        self,
+        context: ExecutionContext,
+        *,
+        execution: AgentExecution,
+        deadline_monotonic: Optional[float],
+        event_emitter: Any,
+    ) -> Any:
         from src.agent.executor import AgentResult
 
         try:
-            result = self._dispatch(context)
+            self._check_execution_fence(execution, deadline_monotonic)
+            result = self._dispatch(
+                context,
+                execution=execution,
+                deadline_monotonic=deadline_monotonic,
+                event_emitter=event_emitter,
+            )
+            self._check_execution_fence(execution, deadline_monotonic)
         except _ExecutionCancelled:
-            result = AgentResult(
-                success=False, content="", dashboard=None,
-                error="Agent execution cancelled", cancelled=True,
-            )
+            result = self._cancelled_result()
         except _ExecutionTimedOut:
-            result = AgentResult(
-                success=False, content="", dashboard=None,
-                error="Agent execution timed out", timed_out=True,
-            )
+            result = self._timed_out_result()
         except _ProviderBridgeError as exc:
             result = AgentResult(
                 success=False, content="", dashboard=None, error=str(exc)
             )
-        except Exception as exc:
-            execution.finish(
-                ExecutionState.FAILED,
-                error=sanitize_agent_diagnostic(str(exc) or exc.__class__.__name__),
-            )
-            raise
+        return result
 
-        execution.finish(
-            classify_terminal_state(
-                success=bool(getattr(result, "success", False)),
-                cancelled=bool(getattr(result, "cancelled", False)),
-                timed_out=bool(getattr(result, "timed_out", False)),
-            ),
-            result=result,
-            error=getattr(result, "error", None),
+    @staticmethod
+    def _cancelled_result() -> Any:
+        from src.agent.executor import AgentResult
+
+        return AgentResult(
+            success=False,
+            content="",
+            dashboard=None,
+            error="Agent execution cancelled",
+            cancelled=True,
         )
-        return handle
 
-    def _dispatch(self, context: ExecutionContext) -> Any:
+    @staticmethod
+    def _timed_out_result() -> Any:
+        from src.agent.executor import AgentResult
+
+        return AgentResult(
+            success=False,
+            content="",
+            dashboard=None,
+            error="Agent execution timed out",
+            timed_out=True,
+        )
+
+    @staticmethod
+    def _check_execution_fence(
+        execution: AgentExecution,
+        deadline_monotonic: Optional[float],
+    ) -> None:
+        if execution.cancel_requested:
+            raise _ExecutionCancelled()
+        if deadline_monotonic is not None and time.monotonic() >= deadline_monotonic:
+            raise _ExecutionTimedOut()
+
+    @staticmethod
+    def _claim_execution_operation(
+        execution: AgentExecution,
+        deadline_monotonic: Optional[float],
+        claim: Callable[[], None],
+    ) -> None:
+        from src.agent.runtime.tool_session import ExecutionFenceRejected
+
+        blocked_by = execution.claim_operation(
+            claim,
+            deadline_monotonic=deadline_monotonic,
+        )
+        if blocked_by is ExecutionState.CANCELLED:
+            raise ExecutionFenceRejected(
+                "cancelled",
+                "Execution cancellation was requested; tool call rejected.",
+            )
+        if blocked_by is ExecutionState.TIMED_OUT:
+            raise ExecutionFenceRejected(
+                "deadline_exceeded",
+                "Session deadline exceeded.",
+            )
+        if blocked_by is not None:
+            raise ExecutionFenceRejected(
+                "execution_not_running",
+                "Agent execution stopped before the tool operation claim.",
+                {"state": blocked_by.value},
+            )
+
+    def _dispatch(
+        self,
+        context: ExecutionContext,
+        *,
+        execution: AgentExecution,
+        deadline_monotonic: Optional[float],
+        event_emitter: Any,
+    ) -> Any:
         from pydantic_ai import Agent
 
         from src.agent.executor import AgentResult
         from src.agent.runner import parse_dashboard_json
 
-        model = self._resolve_model()
+        model = self._resolve_model(execution, deadline_monotonic)
 
         toolsets: List[Any] = []
         if self._tool_session is not None:
@@ -530,7 +716,21 @@ class PydanticAIRuntimeAdapter:
 
             toolsets.append(
                 build_bound_session_toolset(
-                    self._tool_session, event_emitter=self._event_emitter
+                    self._tool_session,
+                    event_emitter=event_emitter,
+                    execution_fence=lambda: self._check_execution_fence(
+                        execution, deadline_monotonic
+                    ),
+                    dispatch_guard=lambda claim: self._claim_execution_operation(
+                        execution,
+                        deadline_monotonic,
+                        claim,
+                    ),
+                    completion_guard=lambda claim: self._claim_execution_operation(
+                        execution,
+                        deadline_monotonic,
+                        claim,
+                    ),
                 )
             )
 

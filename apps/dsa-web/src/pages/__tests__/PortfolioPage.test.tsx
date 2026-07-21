@@ -40,6 +40,7 @@ const {
   parseCsvImport,
   commitCsvImport,
   createAccount,
+  updateAccount,
   deleteAccount,
   analyzePosition,
   listDecisionSignals,
@@ -62,6 +63,7 @@ const {
   parseCsvImport: vi.fn(),
   commitCsvImport: vi.fn(),
   createAccount: vi.fn(),
+  updateAccount: vi.fn(),
   deleteAccount: vi.fn(),
   analyzePosition: vi.fn(),
   listDecisionSignals: vi.fn(),
@@ -94,6 +96,7 @@ vi.mock('../../api/portfolio', () => ({
     parseCsvImport,
     commitCsvImport,
     createAccount,
+    updateAccount,
     deleteAccount,
     analyzePosition,
   },
@@ -365,6 +368,69 @@ describe('PortfolioPage FX refresh', () => {
       </UiLanguageProvider>,
     );
   }
+
+  it('uses the shared page shell and keeps the overview separate from positions', async () => {
+    render(<PortfolioPage />);
+    await waitForInitialLoad();
+
+    const heading = screen.getByRole('heading', { name: '持仓管理' });
+    const page = heading.closest('[data-pattern="app-page"]');
+    expect(page).toHaveClass('portfolio-page');
+    expect(heading.closest('[data-pattern="page-header"]')).not.toBeNull();
+
+    const overview = Array.from(page!.querySelectorAll('section')).find((section) => (
+      section.className.includes('xl:grid-cols-3')
+    ));
+    expect(overview).toBeDefined();
+    expect(within(overview as HTMLElement).getByText('总权益')).toBeInTheDocument();
+    expect(within(overview as HTMLElement).getByText('行业数据暂不可用，当前展示个股集中度')).toBeInTheDocument();
+
+    const positionsSection = screen.getByRole('heading', { name: '持仓明细' }).closest('section');
+    expect(positionsSection).not.toBe(overview);
+  });
+
+  it('shows only the account onboarding state when no portfolio account exists', async () => {
+    getAccounts.mockResolvedValueOnce(makeAccounts([]));
+
+    render(<PortfolioPage />);
+
+    expect(await screen.findByText('还没有可用账户，请先创建账户后再录入交易或导入 CSV。')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '添加账户' })).toBeInTheDocument();
+    expect(screen.queryByText('总权益')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '持仓明细' })).not.toBeInTheDocument();
+  });
+
+  it('edits the selected account via a PUT that preserves the account id', async () => {
+    updateAccount.mockResolvedValue({ id: 1, name: 'Renamed', broker: 'Demo', market: 'us', baseCurrency: 'CNY', isActive: true });
+    getSnapshot.mockImplementation(async ({ accountId }: { accountId?: number } = {}) => {
+      if (accountId === 1) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+      return makeSnapshot({ accountId, fxStale: true });
+    });
+    render(<PortfolioPage />);
+    await waitForInitialLoad();
+
+    chooseOption(screen.getAllByRole('combobox')[0], '1');
+    await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({
+      accountId: 1,
+      costMethod: 'fifo',
+      includeRealtime: false,
+    }));
+    const editButton = screen.getByRole('button', { name: '编辑账户' });
+    await waitFor(() => expect(editButton).toBeEnabled());
+    fireEvent.click(editButton);
+
+    const nameInput = await screen.findByDisplayValue('Main');
+    fireEvent.change(nameInput, { target: { value: 'Renamed' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存修改' }));
+
+    await waitFor(() => expect(updateAccount).toHaveBeenCalledWith(1, expect.objectContaining({
+      name: 'Renamed',
+      market: 'us',
+      baseCurrency: 'CNY',
+    })));
+  });
 
   it('uses fast portfolio valuation for page snapshot and risk loads', async () => {
     render(<PortfolioPage />);
@@ -660,8 +726,8 @@ describe('PortfolioPage FX refresh', () => {
 
     const hkRowCells = within(hkRow as HTMLTableRowElement).getAllByRole('cell');
     const aaplRowCells = within(aaplRow as HTMLTableRowElement).getAllByRole('cell');
-    expect(hkRowCells.at(-3)).toHaveClass('text-success');
-    expect(aaplRowCells.at(-3)).toHaveClass('text-secondary');
+    expect(hkRowCells.at(-3)?.querySelector('span')).toHaveClass('text-success');
+    expect(aaplRowCells.at(-3)?.querySelector('span')).toHaveClass('text-secondary');
   });
 
   it('loads latest active signals for holdings without scanning paginated signal lists', async () => {

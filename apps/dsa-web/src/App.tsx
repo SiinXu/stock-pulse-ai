@@ -7,12 +7,13 @@ import {
   RouterProvider,
   useLocation,
 } from 'react-router-dom';
-import { ApiErrorAlert, Shell } from './components/common';
+import { ApiErrorAlert, Shell, ToastProvider } from './components/common';
 import {
   PageLoadingFallback,
   RouteOutletBoundary,
   StandaloneRouteBoundary,
 } from './components/layout/RouteBoundary';
+import { RouteFocusCoordinator } from './components/routing';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { UiLanguageProvider, useUiLanguage } from './contexts/UiLanguageContext';
 import type { UiLanguage } from './i18n/uiLanguages';
@@ -31,6 +32,9 @@ const DecisionSignalsPage = lazy(() => import('./pages/DecisionSignalsPage'));
 const AlertsPage = lazy(() => import('./pages/AlertsPage'));
 const TokenUsagePage = lazy(() => import('./pages/TokenUsagePage'));
 const StockScreeningPage = lazy(() => import('./pages/StockScreeningPage'));
+const StockDetailsPage = lazy(() => import('./pages/StockDetailsPage'));
+const ComponentPlaygroundPage = lazy(() => import('./playground/ComponentPlaygroundPage'));
+const PlaygroundRenderPage = lazy(() => import('./playground/PlaygroundRenderPage'));
 
 const AppLayout: React.FC = () => {
   const location = useLocation();
@@ -87,7 +91,9 @@ const routes = [
   {
     element: (
       <AuthProvider>
-        <AppLayout />
+        <RouteFocusCoordinator>
+          <AppLayout />
+        </RouteFocusCoordinator>
       </AuthProvider>
     ),
     children: [
@@ -96,6 +102,22 @@ const routes = [
         element: (
           <StandaloneRouteBoundary>
             <LoginPage />
+          </StandaloneRouteBoundary>
+        ),
+      },
+      {
+        path: '/playground',
+        element: (
+          <StandaloneRouteBoundary>
+            <ComponentPlaygroundPage />
+          </StandaloneRouteBoundary>
+        ),
+      },
+      {
+        path: '/playground/render/:componentId/:scenarioId',
+        element: (
+          <StandaloneRouteBoundary>
+            <PlaygroundRenderPage />
           </StandaloneRouteBoundary>
         ),
       },
@@ -110,6 +132,7 @@ const routes = [
           { path: '/chat', element: <ChatPage /> },
           { path: '/portfolio', element: <PortfolioPage /> },
           { path: '/decision-signals', element: <DecisionSignalsPage /> },
+          { path: '/stocks/:stockCode', element: <StockDetailsPage /> },
           { path: '/screening', element: <StockScreeningPage /> },
           { path: '/backtest', element: <BacktestPage /> },
           { path: '/alerts', element: <AlertsPage /> },
@@ -129,7 +152,9 @@ const App: React.FC<{ initialUiLanguage?: UiLanguage }> = ({ initialUiLanguage }
 
   return (
     <UiLanguageProvider initialLanguage={initialUiLanguage}>
-      <RouterProvider router={router} />
+      <ToastProvider>
+        <RouterProvider router={router} />
+      </ToastProvider>
     </UiLanguageProvider>
   );
 };

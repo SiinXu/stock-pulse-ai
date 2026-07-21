@@ -76,6 +76,7 @@ from src.llm.provider_cache import (
     build_provider_cache_route_context,
     filter_prompt_cache_telemetry,
 )
+from src.llm.response_content import strip_leading_think_wrapper
 from src.storage import persist_llm_usage
 from src.data.stock_mapping import STOCK_NAME_MAP
 from src.report_language import (
@@ -2898,7 +2899,14 @@ class GeminiAnalyzer:
         return getattr(obj, key, None)
 
     def _extract_text_blocks(self, blocks: Any) -> str:
-        """Extract text from OpenAI-compatible content block lists."""
+        """Extract final-answer text from OpenAI-compatible content blocks.
+
+        Reasoning models (including MiniMax) can emit thinking and final-answer
+        blocks in a single list, and thinking blocks may still carry a ``text``
+        field. Concatenating every block would prefix structured output with
+        chain-of-thought text, so typed blocks must explicitly represent final
+        output while untyped legacy blocks stay supported for compatibility.
+        """
         if not blocks:
             return ""
 
@@ -2908,15 +2916,13 @@ class GeminiAnalyzer:
                 parts.append(block)
                 continue
 
-            text = None
-            if isinstance(block, dict):
-                text = block.get("text")
-                if text is None:
-                    text = block.get("content")
-            else:
-                text = getattr(block, "text", None)
-                if text is None:
-                    text = getattr(block, "content", None)
+            block_type = str(self._get_response_field(block, "type") or "").strip().lower()
+            if block_type and block_type not in {"text", "output_text"}:
+                continue
+
+            text = self._get_response_field(block, "text")
+            if text is None:
+                text = self._get_response_field(block, "content")
 
             if isinstance(text, str) and text:
                 parts.append(text)
@@ -2937,7 +2943,7 @@ class GeminiAnalyzer:
             content_blocks = self._get_response_field(message, "content_blocks")
         block_text = self._extract_text_blocks(content_blocks)
         if block_text:
-            return block_text
+            return strip_leading_think_wrapper(block_text)
 
         content = None
         if message is not None:
@@ -2946,9 +2952,9 @@ class GeminiAnalyzer:
             content = self._get_response_field(choice, "content")
 
         if isinstance(content, list):
-            return self._extract_text_blocks(content)
+            return strip_leading_think_wrapper(self._extract_text_blocks(content))
         if isinstance(content, str):
-            return content.strip()
+            return strip_leading_think_wrapper(content)
         return str(content).strip() if content is not None else ""
 
     def _extract_stream_text(self, chunk: Any) -> str:
@@ -3029,7 +3035,7 @@ class GeminiAnalyzer:
                 partial_received=chars_received > 0,
             ) from exc
 
-        response_text = "".join(chunks).strip()
+        response_text = strip_leading_think_wrapper("".join(chunks))
         if not response_text:
             raise _LiteLLMStreamError(
                 f"{model} stream returned empty response",

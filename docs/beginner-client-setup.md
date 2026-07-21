@@ -24,10 +24,10 @@
 
 | 电脑 | 下载哪个 |
 | --- | --- |
-| Windows | `daily-stock-analysis-windows-installer-<版本号>.exe` |
-| Windows 不想安装 | `daily-stock-analysis-windows-noinstall-<版本号>.zip` |
-| macOS Apple 芯片 | `daily-stock-analysis-macos-arm64-<版本号>.dmg` |
-| macOS Intel 芯片 | `daily-stock-analysis-macos-x64-<版本号>.dmg` |
+| Windows | `stockpulse-windows-installer-<版本号>.exe` |
+| Windows 不想安装 | `stockpulse-windows-noinstall-<版本号>.zip` |
+| macOS Apple 芯片 | `stockpulse-macos-arm64-<版本号>.dmg` |
+| macOS Intel 芯片 | `stockpulse-macos-x64-<版本号>.dmg` |
 
 不用下载 `latest.yml`、`*.blockmap`，它们不是客户端安装包。
 
@@ -36,7 +36,7 @@
 ## 2. 安装并打开
 
 - Windows 安装包：双击 `.exe`，按提示安装，安装目录用默认位置即可。
-- Windows 免安装包：解压 `.zip`，双击 `Daily Stock Analysis.exe`。
+- Windows 免安装包：解压 `.zip`，双击 `StockPulse.exe`。
 - macOS：双击 `.dmg`，把应用拖到 `Applications`。如果提示来自未验证开发者，在系统设置的隐私与安全性里允许打开。
 
 macOS 用户升级前建议先在客户端设置里导出一次配置备份。

@@ -35,6 +35,7 @@ from src.notification_noise import reset_notification_noise_state
 from src.notification_sender.gotify_sender import resolve_gotify_message_endpoint
 from src.notification_sender.ntfy_sender import resolve_ntfy_endpoint
 from src.analyzer import AnalysisResult
+from bot.application_context import to_analysis_request_context
 from bot.models import BotMessage, ChatType
 import requests
 
@@ -358,7 +359,9 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
             feishu_app_secret="app-secret",
         )
         mock_get_config.return_value = cfg
-        service = NotificationService(source_message=_make_feishu_message())
+        service = NotificationService(
+            request_context=to_analysis_request_context(_make_feishu_message())
+        )
 
         with mock.patch.object(service, "_send_feishu_stream_reply", return_value=True) as mock_reply, \
              mock.patch.object(service, "send_to_feishu", return_value=True) as mock_webhook:
@@ -379,7 +382,9 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
             feishu_app_secret="app-secret",
         )
         mock_get_config.return_value = cfg
-        service = NotificationService(source_message=_make_feishu_message())
+        service = NotificationService(
+            request_context=to_analysis_request_context(_make_feishu_message())
+        )
 
         with mock.patch.object(service, "_send_feishu_stream_reply", return_value=False), \
              mock.patch.object(service, "send_to_feishu", return_value=True) as mock_webhook:
@@ -400,9 +405,11 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
             wechat_webhook_url="https://wechat.example/hook",
         )
         mock_get_config.return_value = cfg
-        service = NotificationService(source_message=_make_dingtalk_message())
+        service = NotificationService(
+            request_context=to_analysis_request_context(_make_dingtalk_message())
+        )
 
-        with mock.patch.object(service, "_send_dingtalk_chunked", return_value=True) as mock_dingtalk, \
+        with mock.patch.object(service, "_send_dingtalk_session_chunked", return_value=True) as mock_dingtalk, \
              mock.patch.object(service, "send_to_wechat", return_value=True) as mock_wechat:
             result = service.send_with_results("content", route_type="report")
 
@@ -413,6 +420,78 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
         mock_wechat.assert_not_called()
 
     @mock.patch("src.notification.get_config")
+    def test_rejected_dingtalk_context_never_falls_back_to_static_channels(
+        self,
+        mock_get_config: mock.MagicMock,
+    ):
+        cfg = _make_config(wechat_webhook_url="https://wechat.example/hook")
+        mock_get_config.return_value = cfg
+        message = _make_dingtalk_message()
+        message.raw_data["sessionWebhook"] = (
+            "https://attacker.example/robot/sendBySession?session=secret"
+        )
+        service = NotificationService(
+            request_context=to_analysis_request_context(message)
+        )
+
+        with mock.patch.object(service, "send_to_wechat", return_value=True) as mock_wechat:
+            result = service.send_with_results("content", route_type="report")
+
+        self.assertTrue(result.dispatched)
+        self.assertFalse(result.success)
+        self.assertEqual(result.status, "all_failed")
+        self.assertEqual([item.channel for item in result.channel_results], ["__context__"])
+        mock_wechat.assert_not_called()
+
+    @mock.patch("src.notification.get_config")
+    def test_missing_dingtalk_context_preserves_static_channel_routing(
+        self,
+        mock_get_config: mock.MagicMock,
+    ):
+        cfg = _make_config(wechat_webhook_url="https://wechat.example/hook")
+        mock_get_config.return_value = cfg
+        message = _make_dingtalk_message()
+        message.raw_data = {}
+        service = NotificationService(
+            request_context=to_analysis_request_context(message)
+        )
+
+        with mock.patch.object(service, "send_to_wechat", return_value=True) as mock_wechat:
+            result = service.send_with_results("content", route_type="report")
+
+        self.assertTrue(result.dispatched)
+        self.assertTrue(result.success)
+        self.assertEqual([item.channel for item in result.channel_results], ["wechat"])
+        mock_wechat.assert_called_once_with("content")
+
+    @mock.patch("src.notification.get_config")
+    @mock.patch("requests.post")
+    def test_dingtalk_context_never_sends_custom_bearer_token(
+        self,
+        mock_post: mock.MagicMock,
+        mock_get_config: mock.MagicMock,
+    ):
+        mock_get_config.return_value = _make_config(
+            custom_webhook_bearer_token="global-custom-secret",
+        )
+        mock_post.return_value = _make_response(200)
+        service = NotificationService(
+            request_context=to_analysis_request_context(_make_dingtalk_message())
+        )
+
+        result = service.send_with_results("content", route_type="report")
+
+        self.assertTrue(result.success)
+        self.assertNotIn("Authorization", mock_post.call_args.kwargs["headers"])
+        self.assertFalse(
+            service._send_dingtalk_session_chunked(
+                "https://attacker.example/robot/sendBySession?session=secret",
+                "content",
+            )
+        )
+        self.assertEqual(mock_post.call_count, 1)
+
+    @mock.patch("src.notification.get_config")
     def test_telegram_context_response_skips_static_webhook(self, mock_get_config: mock.MagicMock):
         cfg = _make_config(
             telegram_bot_token="TOKEN",
@@ -420,7 +499,9 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
             wechat_webhook_url="https://wechat.example/hook",
         )
         mock_get_config.return_value = cfg
-        service = NotificationService(source_message=_make_telegram_message())
+        service = NotificationService(
+            request_context=to_analysis_request_context(_make_telegram_message())
+        )
 
         with mock.patch.object(service, "send_to_telegram", return_value=True) as mock_telegram, \
              mock.patch.object(service, "send_to_wechat", return_value=True) as mock_wechat:
@@ -886,6 +967,165 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         self.assertIn("等待确认", out)
         self.assertIn("放量突破", out)
         self.assertIn("quote: stale", out)
+
+    @mock.patch("src.notification.get_config")
+    def test_strategy_synthesis_renders_localized_text_in_fallback_reports(
+        self, mock_get_config: mock.MagicMock
+    ):
+        mock_get_config.return_value = _make_config(report_renderer_enabled=False)
+        service = NotificationService()
+        result = AnalysisResult(
+            code="600519",
+            name="贵州茅台",
+            sentiment_score=72,
+            trend_prediction="看多",
+            operation_advice="持有",
+            report_language="zh",
+            dashboard={
+                "core_conclusion": {"one_sentence": "等待确认"},
+                "strategy_synthesis": {
+                    "final_signal": "buy",
+                    "confidence": 0.8,
+                    "conflict_count": 1,
+                    "conflict_severity": "medium",
+                    "consensus_level": "medium",
+                    "summary_params": {
+                        "opinion_count": 2,
+                        "invalid_opinion_count": 1,
+                    },
+                    "supporting_skills": [{"skill_id": "bull_trend", "signal": "buy", "confidence": 0.8}],
+                    "opposing_skills": [{"skill_id": "hot_theme", "signal": "sell", "confidence": 0.75}],
+                    "conflicts": [
+                        {
+                            "conflict_type": "directional_opposition",
+                            "severity": "medium",
+                            "participants": ["bull_trend", "hot_theme"],
+                        }
+                    ],
+                },
+            },
+        )
+
+        markdown = service.generate_dashboard_report([result], report_date="2026-07-19")
+        wechat = service.generate_wechat_dashboard([result])
+
+        self.assertIn("多策略综合", markdown)
+        self.assertIn("综合信号: 买入", markdown)
+        self.assertIn("默认多头趋势/买入/80%", markdown)
+        self.assertIn("另有 1 个策略解析失败", markdown)
+        self.assertNotIn("bull_trend", markdown)
+        self.assertIn("多策略综合", wechat)
+        self.assertIn("另有 1 个策略解析失败", wechat)
+
+    @mock.patch("src.notification.get_config")
+    def test_strategy_synthesis_uses_english_empty_labels_in_fallback_reports(
+        self, mock_get_config: mock.MagicMock
+    ):
+        mock_get_config.return_value = _make_config(report_renderer_enabled=False)
+        service = NotificationService()
+        result = AnalysisResult(
+            code="AAPL",
+            name="Apple",
+            sentiment_score=50,
+            trend_prediction="Sideways",
+            operation_advice="Hold",
+            report_language="en",
+            dashboard={
+                "core_conclusion": {"one_sentence": "Wait for confirmation"},
+                "strategy_synthesis": {
+                    "final_signal": "hold",
+                    "confidence": 0.0,
+                    "conflict_count": 0,
+                    "conflict_severity": "none",
+                    "consensus_level": "insufficient",
+                    "summary_params": {"opinion_count": 0},
+                    "supporting_skills": [],
+                    "opposing_skills": [],
+                    "conflicts": [],
+                },
+            },
+        )
+
+        markdown = service.generate_dashboard_report([result], report_date="2026-07-20")
+        wechat = service.generate_wechat_dashboard([result])
+
+        self.assertIn("Supporting Strategies: None", markdown)
+        self.assertIn("Opposing Strategies: None", markdown)
+        self.assertIn("Strategy Synthesis", wechat)
+        self.assertIn("Consensus Insufficient", wechat)
+        self.assertIn(
+            "Strategy synthesis from 0 strategies: final signal is Hold, "
+            "consensus level is Insufficient, with no detected conflicts.",
+            wechat,
+        )
+        self.assertNotIn("支持策略", markdown)
+        self.assertNotIn("多策略综合", wechat)
+
+    @mock.patch("src.notification.get_config")
+    def test_strategy_synthesis_legacy_shapes_are_safe_in_fallback_reports(
+        self, mock_get_config: mock.MagicMock
+    ):
+        mock_get_config.return_value = _make_config(report_renderer_enabled=False)
+        service = NotificationService()
+
+        for malformed in ("bad-shape", ["bad-shape"], 42, True):
+            result = AnalysisResult(
+                code="600519",
+                name="贵州茅台",
+                sentiment_score=50,
+                trend_prediction="震荡",
+                operation_advice="观望",
+                report_language="zh",
+                dashboard={
+                    "core_conclusion": {"one_sentence": "测试"},
+                    "intelligence": {},
+                    "battle_plan": {},
+                    "strategy_synthesis": malformed,
+                },
+            )
+
+            markdown = service.generate_dashboard_report([result], report_date="2026-07-19")
+            wechat = service.generate_wechat_dashboard([result])
+
+            self.assertNotIn("多策略综合", markdown)
+            self.assertNotIn("多策略综合", wechat)
+
+        result = AnalysisResult(
+            code="600519",
+            name="贵州茅台",
+            sentiment_score=50,
+            trend_prediction="震荡",
+            operation_advice="观望",
+            report_language="zh",
+            dashboard={
+                "core_conclusion": {"one_sentence": "测试"},
+                "intelligence": {},
+                "battle_plan": {},
+                "strategy_synthesis": {
+                    "final_signal": "hold",
+                    "consensus_level": "insufficient",
+                    "conflict_severity": "none",
+                    "conflict_count": 0,
+                    "supporting_skills": "bad-shape",
+                    "opposing_skills": ["bad-shape"],
+                    "conflicts": [
+                        {
+                            "conflict_type": "directional_opposition",
+                            "severity": "medium",
+                            "participants": 7,
+                        }
+                    ],
+                    "summary_params": {"invalid_opinion_count": "3"},
+                },
+            },
+        )
+
+        markdown = service.generate_dashboard_report([result], report_date="2026-07-19")
+        wechat = service.generate_wechat_dashboard([result])
+
+        self.assertIn("另有 3 个策略解析失败", markdown)
+        self.assertIn("另有 3 个策略解析失败", wechat)
+        self.assertIn("策略方向出现对立", markdown)
 
     @mock.patch("src.notification.get_config")
     def test_generate_dashboard_report_skips_context_only_phase_decision_default_renderer(

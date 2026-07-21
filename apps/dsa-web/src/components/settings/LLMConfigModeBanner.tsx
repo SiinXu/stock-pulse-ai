@@ -9,7 +9,7 @@ import type {
   LLMConfigModeStatus,
 } from '../../types/systemConfig';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
-import { ApiErrorAlert, Badge, Button, InlineAlert, Modal } from '../common';
+import { ApiErrorAlert, Badge, Button, InlineAlert, Modal, Surface } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText } from '../../i18n/uiText';
 import { SETTINGS_CONTROLS_TEXT, SETTINGS_SOURCE_LABELS } from '../../locales/settingsControls';
@@ -76,7 +76,7 @@ export const LLMConfigModeBanner: React.FC<LLMConfigModeBannerProps> = ({ status
   };
 
   return (
-    <div className="rounded-xl border settings-border bg-card/70 px-4 py-3">
+    <Surface level="interactive" className="px-4 py-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold text-foreground">
           {text.effectiveSource}
@@ -113,10 +113,10 @@ export const LLMConfigModeBanner: React.FC<LLMConfigModeBannerProps> = ({ status
             <InlineAlert
               key={`${issue.code}-${issue.key}`}
               variant="warning"
+              size="compact"
               message={issue.code === 'forced_mode_no_config'
                 ? formatUiText(text.configModeIssue, { mode: status.requestedMode })
                 : text.unknownConfigIssue}
-              className="rounded-lg px-3 py-2 text-xs shadow-none"
             />
           ))}
         </div>
@@ -160,6 +160,6 @@ export const LLMConfigModeBanner: React.FC<LLMConfigModeBannerProps> = ({ status
           </div>
         </div>
       </Modal>
-    </div>
+    </Surface>
   );
 };

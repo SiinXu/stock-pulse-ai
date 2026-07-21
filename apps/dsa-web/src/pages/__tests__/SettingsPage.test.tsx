@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveWebBuildInfo } from '../../utils/constants';
@@ -198,13 +199,14 @@ vi.mock('../../utils/constants', async () => {
   };
 });
 
-vi.mock('../../components/settings', async () => ({
+vi.mock('../../components/settings', async () => {
+  return {
   ...(await import('../../components/settings/notificationFieldGroups')),
   ...(await import('../../components/settings/categoryFieldGroups')),
   ...(await import('../../components/settings/settingsSubCategories')),
   ...(await import('../../components/settings/notificationChannels')),
   NotificationChannelsPanel: ({ items }: { items: Array<{ key: string }> }) => (
-    <div>
+    <div data-testid="notification-channels-panel">
       {items.map((item) => (
         <div key={item.key}>{item.key}</div>
       ))}
@@ -445,7 +447,7 @@ vi.mock('../../components/settings', async () => ({
   }: {
     onComplete: (items: Array<{ key: string; value: string }>) => void;
     onClose: () => void;
-  }) => (
+  }) => createPortal((
     <div role="dialog" aria-label="first-run-wizard">
       <button
         type="button"
@@ -480,7 +482,7 @@ vi.mock('../../components/settings', async () => ({
       </button>
       <button type="button" onClick={onClose}>wizard close</button>
     </div>
-  ),
+  ), document.body),
   SettingsErrorSummary: ({
     entries,
     onJump,
@@ -504,7 +506,8 @@ vi.mock('../../components/settings', async () => ({
       </div>
     ) : null
   ),
-}));
+  };
+});
 
 function createDesktopRuntime(overrides: Record<string, unknown> = {}) {
   return {
@@ -723,7 +726,8 @@ function buildSystemConfigState(overrides: ConfigOverride = {}) {
 function useAdvancedConfigState(overrides: ConfigOverride = {}) {
   const state = buildSystemConfigState({ ...overrides, activeCategory: 'ai_model' });
   useSystemConfigMock.mockReturnValue(state);
-  routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced', view: 'raw_config' });
+  // Env backup lives on the Advanced Config Backup tab.
+  routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced', view: 'backup' });
   return state;
 }
 
@@ -749,15 +753,22 @@ async function expectConnectionDraftAutosaveBlockedBySchema(
   save.mockResolvedValue({ success: true });
   useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
 
-  render(<SettingsPage />);
-  await waitFor(() => expect(screen.getByTestId('llm-channel-editor-items'))
-    .toHaveAttribute('data-disabled', 'true'));
-  fireEvent.click(screen.getByRole('button', { name: 'emit connection draft' }));
+  vi.useFakeTimers();
+  try {
+    render(<SettingsPage />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByTestId('llm-channel-editor-items')).toHaveAttribute('data-disabled', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'emit connection draft' }));
 
-  await act(async () => {
-    await new Promise((resolve) => window.setTimeout(resolve, 850));
-  });
-  expect(save).not.toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(850);
+    });
+    expect(save).not.toHaveBeenCalled();
+  } finally {
+    vi.useRealTimers();
+  }
 }
 
 describe('SettingsPage', () => {
@@ -899,9 +910,13 @@ describe('SettingsPage', () => {
   });
 
   it('renders category navigation and auth settings modules', async () => {
+    // Auth cards live on the Auth & Security tab.
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'system_security', view: 'security' });
     render(<SettingsPage />);
 
-    expect(await screen.findByRole('heading', { name: '系统设置' })).toBeInTheDocument();
+    const heading = await screen.findByRole('heading', { name: '系统设置' });
+    expect(heading.closest('[data-pattern="page-header"]')).not.toBeNull();
+    expect(heading.closest('[data-pattern="app-page"]')).toHaveClass('settings-page');
     expect(screen.getByText('认证与登录保护')).toBeInTheDocument();
     expect(screen.getByText('修改密码')).toBeInTheDocument();
     expect(load).toHaveBeenCalled();
@@ -1149,6 +1164,8 @@ describe('SettingsPage', () => {
   });
 
   it('renders web build info in system settings', async () => {
+    // The version card lives on the Version & Updates tab.
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'system_security', view: 'about' });
     render(<SettingsPage />);
 
     expect(await screen.findByRole('heading', { name: '版本信息' })).toBeInTheDocument();
@@ -1160,6 +1177,7 @@ describe('SettingsPage', () => {
   it('renders desktop app version in system settings during desktop runtime', async () => {
     (window as { dsaDesktop?: unknown }).dsaDesktop = { version: '3.12.0' };
 
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'system_security', view: 'about' });
     render(<SettingsPage />);
 
     expect(await screen.findByRole('heading', { name: '版本信息' })).toBeInTheDocument();
@@ -1170,6 +1188,7 @@ describe('SettingsPage', () => {
   it('keeps version grid at three columns when desktop runtime has no usable version', async () => {
     (window as { dsaDesktop?: unknown }).dsaDesktop = { version: '   ' };
 
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'system_security', view: 'about' });
     render(<SettingsPage />);
 
     const section = (await screen.findByRole('heading', { name: '版本信息' })).closest('section');
@@ -1183,6 +1202,7 @@ describe('SettingsPage', () => {
   it('ignores non-string desktop runtime version values without breaking render', async () => {
     (window as { dsaDesktop?: unknown }).dsaDesktop = { version: 3120 };
 
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'system_security', view: 'about' });
     render(<SettingsPage />);
 
     const section = (await screen.findByRole('heading', { name: '版本信息' })).closest('section');
@@ -1205,6 +1225,7 @@ describe('SettingsPage', () => {
     });
     (window as { dsaDesktop?: unknown }).dsaDesktop = createDesktopRuntime();
 
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'system_security', view: 'about' });
     render(<SettingsPage />);
 
     await waitFor(() => {
@@ -1237,6 +1258,7 @@ describe('SettingsPage', () => {
       isFallbackVersion: true,
     });
 
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'system_security', view: 'about' });
     render(<SettingsPage />);
 
     expect(await screen.findByRole('heading', { name: '版本信息' })).toBeInTheDocument();
@@ -1384,11 +1406,12 @@ describe('SettingsPage', () => {
     expect(screen.queryByText('AGENT_EVENT_MONITOR_ENABLED')).not.toBeInTheDocument();
     expect(settingsPanelErrorBoundary).toHaveBeenCalledWith('Agent 设置');
 
-    // Alerts section: the Event Monitor card renders the agent-category event keys.
+    // Alerts Event Monitor tab: the dedicated card renders the agent-category event keys.
     useSystemConfigMock.mockReturnValue(agentItems());
-    routerSearchParamsMock.params = new URLSearchParams({ section: 'alerts', view: 'rules' });
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'alerts', view: 'events' });
     rerender(<SettingsPage />);
-    expect(screen.getByText('事件监控')).toBeInTheDocument();
+    // The Events view tab shares the card title, so scope to the heading.
+    expect(screen.getByRole('heading', { name: '事件监控' })).toBeInTheDocument();
     expect(screen.getByText('AGENT_EVENT_MONITOR_ENABLED')).toBeInTheDocument();
     expect(screen.queryByText('AGENT_ORCHESTRATOR_TIMEOUT_S')).not.toBeInTheDocument();
   });
@@ -1479,6 +1502,189 @@ describe('SettingsPage', () => {
     expect(screen.getByText(/压缩时最近 N 个用户轮次及其后的回复保持原文/)).toHaveTextContent('留空则跟随当前上下文压缩策略 profile 默认值');
   });
 
+  it('keeps Agent and Conversation fields inline in their own PR #35 groups', () => {
+    const configState = buildSystemConfigState();
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'agent',
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        agent: [
+          {
+            key: 'AGENT_ORCHESTRATOR_TIMEOUT_S',
+            value: '600',
+            rawValueExists: true,
+            isMasked: false,
+            schema: {
+              key: 'AGENT_ORCHESTRATOR_TIMEOUT_S',
+              category: 'agent',
+              dataType: 'integer',
+              uiControl: 'number',
+              isSensitive: false,
+              isRequired: false,
+              isEditable: true,
+              options: [],
+              validation: {},
+              displayOrder: 1,
+            },
+          },
+          {
+            key: 'AGENT_CONTEXT_COMPRESSION_PROFILE',
+            value: 'balanced',
+            rawValueExists: true,
+            isMasked: false,
+            schema: {
+              key: 'AGENT_CONTEXT_COMPRESSION_PROFILE',
+              category: 'agent',
+              dataType: 'string',
+              uiControl: 'select',
+              isSensitive: false,
+              isRequired: false,
+              isEditable: true,
+              options: [{ label: '均衡推荐', value: 'balanced' }],
+              validation: { enum: ['balanced'] },
+              displayOrder: 2,
+            },
+          },
+        ],
+      },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'agent_behavior', view: 'execution' });
+
+    const { rerender } = render(<SettingsPage />);
+
+    expect(screen.getByText('运行模式')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-field-AGENT_ORCHESTRATOR_TIMEOUT_S')).toBeInTheDocument();
+    expect(screen.queryByTestId('settings-field-AGENT_CONTEXT_COMPRESSION_PROFILE')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /配置.*Agent 设置/ })).not.toBeInTheDocument();
+
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'conversation', view: 'context' });
+    rerender(<SettingsPage />);
+
+    expect(screen.getByText('记忆与上下文')).toBeInTheDocument();
+    expect(screen.queryByTestId('settings-field-AGENT_ORCHESTRATOR_TIMEOUT_S')).not.toBeInTheDocument();
+    expect(screen.getByTestId('settings-field-AGENT_CONTEXT_COMPRESSION_PROFILE')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /配置.*对话/ })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['agent_behavior', 'agent', 'AGENT_CONTEXT_COMPRESSION_PROFILE'],
+    ['conversation', 'agent', 'AGENT_ORCHESTRATOR_TIMEOUT_S'],
+    ['reports', 'notification', 'NOTIFICATION_ALERT_CHANNELS'],
+    ['alerts', 'notification', 'REPORT_TYPE'],
+  ] as const)(
+    'shows an explicit empty state for %s when the backend category only contains sibling fields',
+    (section, category, siblingKey) => {
+      const configState = buildSystemConfigState();
+      useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+        activeCategory: category,
+        itemsByCategory: {
+          ...configState.itemsByCategory,
+          [category]: [{
+            key: siblingKey,
+            value: 'configured',
+            rawValueExists: true,
+            isMasked: false,
+            schema: {
+              key: siblingKey,
+              category,
+              dataType: 'string',
+              uiControl: 'text',
+              isSensitive: false,
+              isRequired: false,
+              isEditable: true,
+              options: [],
+              validation: {},
+              displayOrder: 1,
+            },
+          }],
+        },
+      }));
+      routerSearchParamsMock.params = new URLSearchParams({ section });
+
+      render(<SettingsPage />);
+
+      expect(screen.getByText('当前分类下暂无配置项')).toBeInTheDocument();
+    },
+  );
+
+  it('keeps Advanced operational status and raw configuration in page flow', () => {
+    const configState = buildSystemConfigState();
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'ai_model',
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        ai_model: [{
+          key: 'UNPLACED_AI_FIELD',
+          value: 'diagnostic-value',
+          rawValueExists: true,
+          isMasked: false,
+          schema: {
+            key: 'UNPLACED_AI_FIELD',
+            category: 'ai_model',
+            dataType: 'string',
+            uiControl: 'text',
+            isSensitive: false,
+            isRequired: false,
+            isEditable: true,
+            options: [],
+            validation: {},
+            displayOrder: 1,
+          },
+        }],
+      },
+    }));
+    // Backend Status tab: mode banner + backend status panel, no raw fields.
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced', view: 'raw_config' });
+
+    const { rerender } = render(<SettingsPage />);
+
+    expect(screen.getByTestId('llm-config-mode-banner')).toBeInTheDocument();
+    expect(screen.getByTestId('generation-backend-status-items')).toBeInTheDocument();
+    expect(screen.queryByTestId('settings-field-UNPLACED_AI_FIELD')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /配置.*高级/ })).not.toBeInTheDocument();
+
+    // Developer Diagnostics tab: the aggregated fields render directly, uncollapsed.
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced', view: 'diagnostics' });
+    rerender(<SettingsPage />);
+    expect(screen.getByTestId('settings-field-UNPLACED_AI_FIELD')).toBeInTheDocument();
+    expect(screen.queryByTestId('llm-config-mode-banner')).not.toBeInTheDocument();
+  });
+
+  it('keeps regular system configuration visible and editable on the page', () => {
+    const configState = buildSystemConfigState();
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'system',
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        system: [{
+          key: 'WEBUI_PORT',
+          value: '8000',
+          rawValueExists: true,
+          isMasked: false,
+          schema: {
+            key: 'WEBUI_PORT',
+            category: 'system',
+            dataType: 'integer',
+            uiControl: 'number',
+            isSensitive: false,
+            isRequired: false,
+            isEditable: true,
+            options: [],
+            validation: { min: 1, max: 65535 },
+            displayOrder: 1,
+          },
+        }],
+      },
+    }));
+    // WEBUI_PORT is a web-group field and renders on the Web & Logs tab.
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'system_security', view: 'service' });
+
+    render(<SettingsPage />);
+
+    expect(screen.getByTestId('settings-field-WEBUI_PORT')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /配置.*系统设置/ })).not.toBeInTheDocument();
+  });
+
   it('group reset discards local changes without a network request', () => {
     // Simulate user has unsaved drafts
     const dirtyState = buildSystemConfigState({
@@ -1541,24 +1747,32 @@ describe('SettingsPage', () => {
     save.mockResolvedValue({ success: true });
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
 
-    render(<SettingsPage />);
-    fireEvent.click(screen.getByRole('button', { name: 'emit connection draft' }));
+    vi.useFakeTimers();
+    try {
+      render(<SettingsPage />);
+      fireEvent.click(screen.getByRole('button', { name: 'emit connection draft' }));
 
-    expect(screen.getByTestId('llm-channel-editor-items')).toHaveAttribute('data-disabled', 'true');
-    await act(async () => {
-      await new Promise((resolve) => window.setTimeout(resolve, 850));
-    });
-    expect(save).not.toHaveBeenCalled();
-
-    await act(async () => {
-      catalog.resolve({
-        providers: [
-          { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek' },
-        ],
+      expect(screen.getByTestId('llm-channel-editor-items')).toHaveAttribute('data-disabled', 'true');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(850);
       });
-      await catalog.promise;
-    });
-    await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 2500 });
+      expect(save).not.toHaveBeenCalled();
+
+      await act(async () => {
+        catalog.resolve({
+          providers: [
+            { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek' },
+          ],
+        });
+        await catalog.promise;
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(700);
+      });
+      expect(save).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('does not autosave a Connection draft under a present empty schema', async () => {
@@ -1624,13 +1838,18 @@ describe('SettingsPage', () => {
     save.mockResolvedValue({ success: true });
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
 
-    render(<SettingsPage />);
-    fireEvent.click(screen.getByRole('button', { name: 'emit schema-valid connection draft' }));
+    vi.useFakeTimers();
+    try {
+      render(<SettingsPage />);
+      fireEvent.click(screen.getByRole('button', { name: 'emit schema-valid connection draft' }));
 
-    await act(async () => {
-      await new Promise((resolve) => window.setTimeout(resolve, 850));
-    });
-    expect(save).not.toHaveBeenCalled();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(850);
+      });
+      expect(save).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('autosaves when an unknown required field stays hidden for the draft provider', async () => {
@@ -1766,19 +1985,27 @@ describe('SettingsPage', () => {
       },
     }));
 
-    render(<SettingsPage />);
+    vi.useFakeTimers();
+    try {
+      render(<SettingsPage />);
 
-    const inspect = await screen.findByRole('button', { name: 'inspect existing connection' });
-    await waitFor(() => expect(inspect).toBeEnabled());
-    expect(screen.getByRole('button', { name: /添加模型服务/ })).toBeDisabled();
-    fireEvent.click(inspect);
-    expect(screen.getByRole('dialog', { name: 'existing connection inspection' })).toBeInTheDocument();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      const inspect = screen.getByRole('button', { name: 'inspect existing connection' });
+      expect(inspect).toBeEnabled();
+      expect(screen.getByRole('button', { name: /添加模型服务/ })).toBeDisabled();
+      fireEvent.click(inspect);
+      expect(screen.getByRole('dialog', { name: 'existing connection inspection' })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'emit connection draft' }));
-    await act(async () => {
-      await new Promise((resolve) => window.setTimeout(resolve, 850));
-    });
-    expect(save).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole('button', { name: 'emit connection draft' }));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(850);
+      });
+      expect(save).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('keeps AI autosave and the editor blocked after a Catalog failure', async () => {
@@ -1786,16 +2013,23 @@ describe('SettingsPage', () => {
     save.mockResolvedValue({ success: true });
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
 
-    render(<SettingsPage />);
-    await waitFor(() => expect(screen.getByTestId('llm-channel-editor-items'))
-      .toHaveAttribute('data-catalog-unavailable', 'true'));
-    fireEvent.click(screen.getByRole('button', { name: 'emit connection draft' }));
+    vi.useFakeTimers();
+    try {
+      render(<SettingsPage />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.getByTestId('llm-channel-editor-items')).toHaveAttribute('data-catalog-unavailable', 'true');
+      fireEvent.click(screen.getByRole('button', { name: 'emit connection draft' }));
 
-    await act(async () => {
-      await new Promise((resolve) => window.setTimeout(resolve, 850));
-    });
-    expect(save).not.toHaveBeenCalled();
-    expect(screen.getByTestId('llm-channel-editor-items')).toHaveAttribute('data-disabled', 'true');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(850);
+      });
+      expect(save).not.toHaveBeenCalled();
+      expect(screen.getByTestId('llm-channel-editor-items')).toHaveAttribute('data-disabled', 'true');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('passes merged generation backend draft items to the backend status panel', async () => {
@@ -1815,7 +2049,7 @@ describe('SettingsPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'emit llm draft' }));
 
-    // The status panel now lives in the top-level Advanced diagnostics area.
+    // The status panel lives on the Advanced Backend Status tab (default view).
     routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced' });
     rerender(<SettingsPage />);
 
@@ -1840,7 +2074,7 @@ describe('SettingsPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'emit llm draft' }));
 
-    // The status panel now lives in the top-level Advanced diagnostics area.
+    // The status panel lives on the Advanced Backend Status tab (default view).
     routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced' });
     rerender(<SettingsPage />);
     expect(await screen.findByTestId('generation-backend-status-items')).toHaveTextContent('LLM_CHANNELS=draft,backup');
@@ -1968,7 +2202,7 @@ describe('SettingsPage', () => {
 
   it('runs the unified post-save effects after a legacy migration applies', async () => {
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
-    // The migration banner lives in the top-level Advanced diagnostics area.
+    // The migration banner lives on the Advanced Backend Status tab (default view).
     routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced' });
 
     render(<SettingsPage />);
@@ -2491,13 +2725,20 @@ describe('SettingsPage', () => {
     expect(screen.queryByTestId('settings-field-NOTIFICATION_ALERT_CHANNELS')).not.toBeInTheDocument();
     expect(screen.queryByTestId('settings-field-WECHAT_WEBHOOK_URL')).not.toBeInTheDocument();
 
-    // Alerts section: delivery-rule fields; no report-output fields.
+    // Alerts Push Routing tab: routing fields only; no report-output fields.
+    // The retired `rules` view id keeps back-compat by normalizing to routing.
     routerSearchParamsMock.params = new URLSearchParams({ section: 'alerts', view: 'rules' });
     rerender(<SettingsPage />);
     expect(screen.getByTestId('settings-field-NOTIFICATION_ALERT_CHANNELS')).toBeInTheDocument();
-    expect(screen.getByTestId('settings-field-NOTIFICATION_QUIET_HOURS')).toBeInTheDocument();
+    expect(screen.queryByTestId('settings-field-NOTIFICATION_QUIET_HOURS')).not.toBeInTheDocument();
     expect(screen.queryByTestId('settings-field-REPORT_TYPE')).not.toBeInTheDocument();
     expect(screen.queryByTestId('settings-field-WECHAT_WEBHOOK_URL')).not.toBeInTheDocument();
+
+    // Alerts Behavior & Limits tab: rate/quiet-hour fields move here.
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'alerts', view: 'behavior' });
+    rerender(<SettingsPage />);
+    expect(screen.getByTestId('settings-field-NOTIFICATION_QUIET_HOURS')).toBeInTheDocument();
+    expect(screen.queryByTestId('settings-field-NOTIFICATION_ALERT_CHANNELS')).not.toBeInTheDocument();
   });
 
   it('limits channel routing options to configured channels and guides setup when none exist', () => {
@@ -2576,8 +2817,10 @@ describe('SettingsPage', () => {
     routerSearchParamsMock.params = new URLSearchParams({ section: 'alerts', view: 'rules' });
     rerender(<SettingsPage />);
     const emptyField = screen.getByTestId('settings-field-NOTIFICATION_ALERT_CHANNELS');
-    expect(within(emptyField).getByText('尚未配置任何通知渠道，配置成功后才能在这里选择接收渠道。')).toBeInTheDocument();
-    fireEvent.click(within(emptyField).getByRole('button', { name: '去配置通知渠道' }));
+    expect(within(emptyField).getByText('—')).toBeInTheDocument();
+    const emptyBanner = screen.getByTestId('channel-routing-empty-banner');
+    expect(within(emptyBanner).getByText('尚未配置任何通知渠道，配置成功后才能在这里选择接收渠道。')).toBeInTheDocument();
+    fireEvent.click(within(emptyBanner).getByRole('button', { name: '去配置通知渠道' }));
     const [nextParams] = routerSearchParamsMock.setParams.mock.calls.at(-1) ?? [];
     expect(nextParams?.get('section')).toBe('notifications');
     expect(nextParams?.get('view')).toBe('channels');
@@ -2600,7 +2843,8 @@ describe('SettingsPage', () => {
     rerender(<SettingsPage />);
     const unknownField = screen.getByTestId('settings-field-NOTIFICATION_ALERT_CHANNELS');
     expect(within(unknownField).getByText('feishu')).toBeInTheDocument();
-    expect(within(unknownField).queryByText('尚未配置任何通知渠道，配置成功后才能在这里选择接收渠道。')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('channel-routing-empty-banner')).not.toBeInTheDocument();
+    expect(screen.queryByText('尚未配置任何通知渠道，配置成功后才能在这里选择接收渠道。')).not.toBeInTheDocument();
     expect(within(unknownField).getByText('wechat')).toBeInTheDocument();
     expect(within(unknownField).getByText('custom')).toBeInTheDocument();
     unmount();
@@ -2881,9 +3125,9 @@ describe('SettingsPage', () => {
     const { rerender } = render(<SettingsPage />);
     expect(screen.queryByTestId('settings-field-LLM_USAGE_HMAC_SECRET')).not.toBeInTheDocument();
 
-    // Top-level Advanced section: renders the aggregated internal keys.
+    // Advanced Developer Diagnostics tab: renders the aggregated internal keys.
     useSystemConfigMock.mockReturnValue(withAiItems());
-    routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced', view: 'raw_config' });
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced', view: 'diagnostics' });
     rerender(<SettingsPage />);
     expect(screen.getByTestId('settings-field-LLM_USAGE_HMAC_SECRET')).toBeInTheDocument();
     expect(screen.getByTestId('settings-field-LLM_USAGE_HMAC_KEY_VERSION')).toBeInTheDocument();
@@ -3068,7 +3312,7 @@ describe('SettingsPage', () => {
     const { rerender } = render(<SettingsPage />);
     expect(screen.queryByTestId('settings-field-LLM_PROMPT_CACHE_TELEMETRY_ENABLED')).not.toBeInTheDocument();
 
-    routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced', view: 'raw_config' });
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced', view: 'diagnostics' });
     rerender(<SettingsPage />);
     expect(screen.getByTestId('settings-field-LLM_PROMPT_CACHE_TELEMETRY_ENABLED')).toBeInTheDocument();
     expect(screen.getByTestId('settings-field-LLM_PROMPT_CACHE_HINTS_ENABLED')).toBeInTheDocument();
@@ -3299,6 +3543,90 @@ describe('SettingsPage', () => {
     expect(within(providersPanel).queryByText('ALPHASIFT_ENABLED')).not.toBeInTheDocument();
   });
 
+  it('keeps data-source configuration visible on the page instead of behind a configuration dialog', () => {
+    const configState = buildSystemConfigState();
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'data_source',
+      activeSubCategory: 'source',
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        data_source: [
+          {
+            key: 'NEWS_MAX_AGE_DAYS',
+            value: '3',
+            rawValueExists: true,
+            isMasked: false,
+            schema: {
+              key: 'NEWS_MAX_AGE_DAYS',
+              category: 'data_source',
+              dataType: 'integer',
+              uiControl: 'number',
+              isSensitive: false,
+              isRequired: false,
+              isEditable: true,
+              options: [],
+              validation: {},
+              displayOrder: 1,
+            },
+          },
+        ],
+      },
+    }));
+
+    render(<SettingsPage />);
+
+    expect(screen.getByTestId('settings-field-NEWS_MAX_AGE_DAYS')).toBeInTheDocument();
+    expect(screen.queryByTestId('settings-configuration-card-数据源')).not.toBeInTheDocument();
+  });
+
+  it('keeps the provider directory on the page instead of behind a category-wide configuration dialog', () => {
+    const configState = buildSystemConfigState();
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'data_source',
+      activeSubCategory: 'providers',
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        data_source: [
+          {
+            key: 'TUSHARE_TOKEN',
+            value: '',
+            rawValueExists: false,
+            isMasked: false,
+            schema: {
+              key: 'TUSHARE_TOKEN',
+              category: 'data_source',
+              dataType: 'string',
+              uiControl: 'password',
+              isSensitive: true,
+              isRequired: false,
+              isEditable: true,
+              options: [],
+              validation: {},
+              displayOrder: 1,
+            },
+          },
+        ],
+      },
+    }));
+
+    render(<SettingsPage />);
+
+    expect(screen.getByTestId('data-providers-panel')).toBeInTheDocument();
+    expect(document.querySelector('[data-testid^="settings-configuration-card-"]')).toBeNull();
+  });
+
+  it('keeps the notification channel directory inline and delegates each channel editor to its own dialog', () => {
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'notification',
+      activeSubCategory: 'channels',
+    }));
+
+    render(<SettingsPage />);
+
+    expect(screen.getByTestId('notification-channels-panel')).toBeInTheDocument();
+    expect(document.querySelector('[data-testid^="settings-configuration-card-"]')).toBeNull();
+  });
+
   it('scopes setup and AlphaSift helper cards to their related categories', async () => {
     const configState = buildSystemConfigState();
     const dataSourceItems = [
@@ -3501,7 +3829,9 @@ describe('SettingsPage', () => {
     expect(screen.queryByTestId('settings-field-SCHEDULE_TIME')).not.toBeInTheDocument();
     expect(screen.queryByTestId('settings-field-SCHEDULE_TIMES')).not.toBeInTheDocument();
     expect(screen.queryByTestId('settings-field-SCHEDULE_RUN_IMMEDIATELY')).not.toBeInTheDocument();
-    expect(screen.getByTestId('settings-field-LOG_LEVEL')).toBeInTheDocument();
+    // LOG_LEVEL lives on the Web & Logs tab now, so the Scheduling tab only
+    // hosts the scheduler card (WEBUI_PORT coverage renders the service view).
+    expect(screen.queryByTestId('settings-field-LOG_LEVEL')).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: '删除时间' })[0]).toHaveAttribute('data-size', 'default');
     const enabledSwitch = screen.getByTestId('scheduler-enabled-switch');
     expect(enabledSwitch).toHaveAttribute('role', 'switch');
@@ -3651,14 +3981,17 @@ describe('SettingsPage', () => {
 
   it('does not show a failed run as the last successful scheduler run', async () => {
     const configState = buildSystemConfigState();
-    getSchedulerStatus.mockResolvedValueOnce({
-      enabled: true,
-      running: false,
-      scheduleTimes: ['18:00'],
-      nextRunAt: null,
-      lastRunAt: '2026-06-21T17:00:00+08:00',
-      lastSuccessAt: null,
-      lastError: 'analysis failed',
+    getSchedulerStatus.mockImplementationOnce(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      return {
+        enabled: true,
+        running: false,
+        scheduleTimes: ['18:00'],
+        nextRunAt: null,
+        lastRunAt: '2026-06-21T17:00:00+08:00',
+        lastSuccessAt: null,
+        lastError: 'analysis failed',
+      };
     });
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
       activeCategory: 'system',
@@ -3708,20 +4041,25 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    expect(await screen.findByTestId('scheduler-last-success')).toHaveTextContent('-');
-    expect(screen.getByTestId('scheduler-last-error')).toHaveTextContent('analysis failed');
+    await waitFor(() => {
+      expect(screen.getByTestId('scheduler-last-success')).toHaveTextContent('-');
+      expect(screen.getByTestId('scheduler-last-error')).toHaveTextContent('analysis failed');
+    });
   });
 
   it('shows active runtime scheduler state even when saved schedule flag is false', async () => {
     const configState = buildSystemConfigState();
-    getSchedulerStatus.mockResolvedValueOnce({
-      enabled: true,
-      running: false,
-      scheduleTimes: ['18:00'],
-      nextRunAt: null,
-      lastRunAt: null,
-      lastSuccessAt: null,
-      lastError: null,
+    getSchedulerStatus.mockImplementationOnce(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      return {
+        enabled: true,
+        running: false,
+        scheduleTimes: ['18:00'],
+        nextRunAt: null,
+        lastRunAt: null,
+        lastSuccessAt: null,
+        lastError: null,
+      };
     });
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
       activeCategory: 'system',
@@ -3772,7 +4110,7 @@ describe('SettingsPage', () => {
     render(<SettingsPage />);
 
     const enabledSwitch = await screen.findByTestId('scheduler-enabled-switch');
-    expect(enabledSwitch).toBeChecked();
+    await waitFor(() => expect(enabledSwitch).toBeChecked());
 
     fireEvent.click(enabledSwitch);
 
@@ -4300,7 +4638,7 @@ describe('SettingsPage', () => {
     expect(screen.queryByTestId('settings-field-OPENAI_API_KEY')).not.toBeInTheDocument();
     expect(screen.getByTestId('llm-channel-editor-items')).toHaveAttribute('data-disabled', 'true');
 
-    routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced', view: 'raw_config' });
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced', view: 'diagnostics' });
     rerender(<SettingsPage />);
     const field = screen.getByTestId('settings-field-OPENAI_API_KEY');
     expect(field).toHaveAttribute('data-readonly', 'true');
@@ -4335,6 +4673,8 @@ describe('SettingsPage', () => {
       activeCategory: 'system',
       itemsByCategory: { ...configState.itemsByCategory, system: [conditionalItem] },
     }));
+    // LOG_LEVEL is a log-group field and renders on the Web & Logs tab.
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'system_security', view: 'service' });
 
     render(<SettingsPage />);
     const field = screen.getByTestId('settings-field-LOG_LEVEL');
@@ -4503,11 +4843,11 @@ describe('SettingsPage', () => {
     (window as { dsaDesktop?: unknown }).dsaDesktop = { version: '3.12.0' };
     useAdvancedConfigState();
 
-    const { container } = render(<SettingsPage />);
+    render(<SettingsPage />);
 
     vi.clearAllMocks();
 
-    const input = container.querySelector('input[type="file"]');
+    const input = document.querySelector('input[type="file"]');
     expect(input).not.toBeNull();
 
     fireEvent.change(input as HTMLInputElement, {
@@ -4577,11 +4917,11 @@ describe('SettingsPage', () => {
       },
     });
 
-    const { container } = render(<SettingsPage />);
+    render(<SettingsPage />);
 
     vi.clearAllMocks();
 
-    const input = container.querySelector('input[type="file"]');
+    const input = document.querySelector('input[type="file"]');
     expect(input).not.toBeNull();
 
     fireEvent.change(input as HTMLInputElement, {
@@ -4600,12 +4940,12 @@ describe('SettingsPage', () => {
     load.mockResolvedValue(false);
     useAdvancedConfigState();
 
-    const { container } = render(<SettingsPage />);
+    render(<SettingsPage />);
 
     vi.clearAllMocks();
     load.mockResolvedValue(false);
 
-    const input = container.querySelector('input[type="file"]');
+    const input = document.querySelector('input[type="file"]');
     expect(input).not.toBeNull();
 
     fireEvent.change(input as HTMLInputElement, {
@@ -4631,6 +4971,7 @@ describe('SettingsPage', () => {
     });
     (window as { dsaDesktop?: unknown }).dsaDesktop = createDesktopRuntime();
 
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'system_security', view: 'about' });
     render(<SettingsPage />);
 
     expect(await screen.findByText('发现新版本')).toBeInTheDocument();
@@ -4641,6 +4982,7 @@ describe('SettingsPage', () => {
   it('checks desktop updates on demand and renders the latest-version state', async () => {
     (window as { dsaDesktop?: unknown }).dsaDesktop = createDesktopRuntime();
 
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'system_security', view: 'about' });
     render(<SettingsPage />);
 
     fireEvent.click(await screen.findByRole('button', { name: '检查更新' }));
@@ -4660,6 +5002,7 @@ describe('SettingsPage', () => {
     });
     (window as { dsaDesktop?: unknown }).dsaDesktop = createDesktopRuntime();
 
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'system_security', view: 'about' });
     render(<SettingsPage />);
 
     fireEvent.click(await screen.findByRole('button', { name: '前往下载' }));
@@ -4683,6 +5026,7 @@ describe('SettingsPage', () => {
     });
     (window as { dsaDesktop?: unknown }).dsaDesktop = createDesktopRuntime();
 
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'system_security', view: 'about' });
     render(<SettingsPage />);
 
     expect(await screen.findByText('更新已下载')).toBeInTheDocument();

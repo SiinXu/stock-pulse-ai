@@ -17,6 +17,33 @@ GET /api/v1/history/{record_id}/diagnostics
 - 分析链路在保存历史后会补齐任务/Provider/LLM/通知诊断到 `context_snapshot.diagnostics`，历史诊断接口统一聚合为用户可读摘要。
 - 首页运行流面板复用同一 RunFlowSnapshot 契约展示 active task、completed report 与大盘复盘；active task 通过任务 SSE 的可选增量事件实时追加事件流，完成或断线后再 refetch 快照保证最终一致。
 
+## Pipeline 阶段观测
+
+运行诊断快照可选追加 `pipeline_stage_runs`，用于记录 Pipeline 的固定阶段边界：`resolve`、`fetch`、`intelligence`、`context`、`analyze`、`persist`、`render`、`dispatch`。同一阶段可以有多条记录，例如日线准备与市场输入组装分别属于 `fetch`，本地报告与通知报告分别属于 `render`。
+
+每条阶段记录包含同一运行的 `trace_id`、脱敏后的 `input_summary` / `output_summary`、`started_at` / `ended_at`、`duration_ms`、`status`、`degraded`、`degradation_reason`、`retryable`，以及失败时可获得的 `error_type` / `error_message_sanitized`。状态固定为 `success`、`degraded`、`failed`、`skipped`；`degraded=true` 只对应 `status=degraded`。仅使用已落库情报等 fallback 会明确标为 degraded，不会伪装成新鲜证据成功。
+
+兼容与安全边界：
+
+- 阶段观测复用现有运行诊断上下文；无诊断上下文时为 no-op，记录或脱敏失败时 fail-open，不改变分析、持久化、渲染或通知控制流。
+- 摘要沿用诊断元数据的深度、数量与长度限制，并脱敏 credential、token、cookie、webhook、prompt、raw response、代理头和本地绝对路径；不保存原始行情、新闻、Prompt 或模型响应。
+- 批量入口为汇总报告建立独立 delivery trace，并把真实 `render` / `dispatch` 终态合并回每个结果的既有分析诊断；不会把批量延后执行误记为 skipped，也不会覆盖分析阶段记录。
+- 通知失败只把 `dispatch` 标为 failed/degraded，不会把已成功的 `AnalysisResult` 改为失败；部分渠道成功时为 degraded，全部失败时为 failed。部分渠道已经送达时，在 PIPE-02 提供幂等 fence 前 `retryable=false`，避免重试复制已成功通知。
+- 本地报告的 `render` 终态包含文件输出结果；报告内容生成成功但文件写入失败时仍记录为 failed。
+- `pipeline_stage_runs` 是 `context_snapshot.diagnostics` 的可选追加字段，不修改数据库 schema、API 必填字段、配置项或既有 Run Flow 事件。
+
+### Pipeline 阶段 Result 与重试 fence
+
+PIPE-02 在观测契约之下增加内部 `PipelineStageResult[T]`。八个固定阶段统一返回 `stage / status / value / retryable / side_effect_committed / attempt / reused / error`，由 Pipeline 实例内、按 query/effect key 隔离的 stage runner 决定继续、重试或复用已提交副作用。该 Result 只用于后端编排，不新增 API 字段、数据库 schema 或配置项；`process_single_stock()`、`run()`、本地报告和通知入口的既有返回值保持不变。
+
+- `resolve`、`fetch`、`intelligence`、`context`、`analyze` 的未提交失败可以按 Result 的 `retryable` 重试；keyed stage 只在实际执行时递增 attempt，缓存复用保留已提交结果的 attempt 并标记 `reused=true`。
+- legacy 与 Agent 路径共用一次性 `persist` stage。fence key 由 `query_id + code + report_type` 组成；未写入时仍可重试，一旦历史 ID 已确认，后续同 key 重入只返回 `reused=true`，不会再次写历史或再次提取 DecisionSignal。
+- `render` 与 `dispatch` 使用报告 route、report type、query/code identity 及 channel 组成 delivery key。同一 Pipeline 执行中，已确认成功的本地输出或通知渠道只执行一次；aggregate scope lock 串行化首次 noise-control gate 与整次静态发送。全部失败且没有确认副作用时仅由首次进入该 scope 的调用释放 scope，重试时重新执行 gate；已有部分送达的重入即使在遍历缓存渠道前失败也保留 scope。部分送达后 Result 同时标记 committed 与 retryable，同 scope 重入跳过已通过的首次 gate，由逐渠道 fence 复用已确认渠道并只重试未提交渠道。结构化单股 partial 仍按整次 notifier 调用复用且不可重试。缓存复用不会新增物理 notification attempt 或 `notification_run`。
+- 同 key 的并发副作用由独立 key lock 串行化，不同股票或渠道仍可并发。异常保留在 Result 中并继续写入既有脱敏诊断，调用方需要维持原传播或 fail-open 语义。
+- 此处的 retry 指同一 Pipeline 执行/query 内的阶段重入。TaskExecution 的 parent/child retry 仍遵循 `docs/task-execution-contract.md`，拥有新的 task/query identity；Pipeline 不把跨任务重跑伪装成同一次 stage attempt。
+
+定向回归覆盖：可重试纯阶段第二次成功、keyed attempt 递增、同 key 并发只提交一次、persist 首次未写入后成功且后续不重复写、启用 noise-control 时 partial dispatch 只重试未提交渠道、重入预处理失败不清除已提交 scope、缓存通知不伪造新 attempt，以及真实 Markdown 在本地保存与通知路径的内容等价。
+
 ## 运行流实时增量
 
 运行流增量不新增独立 SSE endpoint，继续复用：
@@ -78,6 +105,7 @@ GET /api/v1/history/{record_id}/flow
 ```
 
 - 两个接口返回同一 `RunFlowSnapshot` 契约。
+- 中立契约由 `src/schemas/run_flow.py` 持有；`api/v1/schemas/run_flow.py` 保留兼容导出，API 继续按原有字段与 OpenAPI schema 序列化。
 - active task 缺少 diagnostics 时返回 skeleton flow，不伪造 provider / LLM 事件。
 - active task 若已有 recent `flow_event`，snapshot 会返回这些真实事件，并可根据事件中的节点元数据补出临时节点。
 - completed history 优先从 `context_snapshot.diagnostics` 与 `analysis_context_pack_overview` 构建完整拓扑。

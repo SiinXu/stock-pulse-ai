@@ -38,21 +38,30 @@ from src.notification_noise import (
     release_notification_noise,
 )
 from src.report_language import (
+    format_strategy_skill_items,
     get_localized_stock_name,
     get_report_labels,
     get_signal_level,
     get_chip_unavailable_reason,
     is_chip_structure_unavailable,
     localize_chip_health,
+    localize_conflict_severity,
+    localize_consensus_level,
+    localize_strategy_signal,
+    localize_strategy_skill,
+    localize_strategy_conflict_description,
+    localize_strategy_synthesis_summary,
     localize_trend_prediction,
     normalize_report_language,
+    normalize_strategy_synthesis_payload,
+    strategy_invalid_opinion_count,
 )
 from src.schemas.decision_action import (
     display_action_fields_for_result,
     display_decision_type_for_result,
     display_operation_advice_for_result,
 )
-from bot.models import BotMessage
+from src.schemas.request_context import AnalysisRequestContext
 from src.utils.sanitize import (
     log_safe_exception,
     sanitize_diagnostic_text,
@@ -104,6 +113,56 @@ def _safe_float(value: Any) -> Optional[float]:
         return float(text)
     except (TypeError, ValueError):
         return None
+
+
+def _append_strategy_synthesis_block(lines: List[str], strategy_synthesis: Any, labels: Dict[str, str], report_language: str) -> None:
+    """Append the full localized strategy synthesis block when present."""
+    strategy_synthesis = normalize_strategy_synthesis_payload(strategy_synthesis)
+    if not strategy_synthesis:
+        return
+    confidence = strategy_synthesis.get("confidence")
+    confidence_text = f"{confidence:.0%}" if isinstance(confidence, (int, float)) else "N/A"
+    lines.extend([
+        f"### 🧩 {labels['strategy_synthesis_heading']}",
+        "",
+        (
+            f"- {labels['strategy_final_signal_label']}: "
+            f"{localize_strategy_signal(strategy_synthesis.get('final_signal', 'N/A'), report_language)} | "
+            f"{labels['strategy_consensus_level_label']}: "
+            f"{localize_consensus_level(strategy_synthesis.get('consensus_level', 'N/A'), report_language)} | "
+            f"{labels['strategy_conflict_label']}: "
+            f"{localize_conflict_severity(strategy_synthesis.get('conflict_severity', 'none'), report_language)} "
+            f"({strategy_synthesis.get('conflict_count', 0)}) | "
+            f"{labels['strategy_confidence_label']}: {confidence_text}"
+        ),
+    ])
+    summary = localize_strategy_synthesis_summary(strategy_synthesis, report_language)
+    if summary:
+        lines.append(f"- {labels['strategy_summary_label']}: {summary}")
+    lines.append(
+        f"- {labels['strategy_supporting_skills_label']}: "
+        f"{format_strategy_skill_items(strategy_synthesis.get('supporting_skills'), report_language)}"
+    )
+    lines.append(
+        f"- {labels['strategy_opposing_skills_label']}: "
+        f"{format_strategy_skill_items(strategy_synthesis.get('opposing_skills'), report_language)}"
+    )
+    invalid_opinion_count = strategy_invalid_opinion_count(strategy_synthesis)
+    if invalid_opinion_count:
+        invalid_label = labels.get("strategy_invalid_opinions_label", "")
+        if invalid_label:
+            lines.append(f"- {invalid_label.format(count=invalid_opinion_count)}")
+    for conflict in (strategy_synthesis.get("conflicts") or [])[:3]:
+        if isinstance(conflict, dict) and conflict.get("conflict_type"):
+            participants = conflict.get("participants") or []
+            participant_text = "、".join(localize_strategy_skill(participant, report_language) for participant in participants)
+            suffix = f"（{participant_text}）" if participant_text else ""
+            lines.append(
+                f"- {localize_conflict_severity(conflict.get('severity', 'medium'), report_language)}: "
+                f"{localize_strategy_conflict_description(conflict.get('conflict_type'), report_language)}{suffix}"
+            )
+    lines.append("")
+
 
 if TYPE_CHECKING:
     from src.analyzer import AnalysisResult
@@ -215,15 +274,11 @@ class NotificationService(
     注意：所有已配置的渠道都会收到推送
     """
 
-    def __init__(self, source_message: Optional[BotMessage] = None):
-        """
-        初始化通知服务
-
-        检测所有已配置的渠道，推送时会向所有渠道发送
-        """
+    def __init__(self, request_context: Optional[AnalysisRequestContext] = None):
+        """Initialize configured channels and an optional contextual reply route."""
         config = get_config()
         self._config = config
-        self._source_message = source_message
+        self._request_context = request_context
         self._context_channels: List[str] = []
 
         # Markdown 转图片（Issue #289）
@@ -570,53 +625,24 @@ class NotificationService(
             or self._extract_telegram_context_chat_id() is not None
         )
 
-    def _source_platform(self) -> str:
-        """Return normalized platform from the source bot message."""
-        platform = getattr(self._source_message, "platform", "")
-        if hasattr(platform, "value"):
-            platform = platform.value
-        return str(platform or "").lower()
-
     def _extract_telegram_context_chat_id(self) -> Optional[str]:
         """从来源消息中提取 Telegram 上下文 chat_id（用于异步回复）。"""
-        if not isinstance(self._source_message, BotMessage):
+        if self._request_context is None:
             return None
-        if self._source_platform() != "telegram":
-            return None
-        raw_data = getattr(self._source_message, "raw_data", {}) or {}
-        for candidate in (
-            getattr(self._source_message, "chat_id", ""),
-            raw_data.get("chat_id"),
-            raw_data.get("message", {}).get("chat", {}).get("id") if isinstance(raw_data.get("message"), dict) else None,
-        ):
-            if isinstance(candidate, str) and candidate.strip():
-                return candidate.strip()
-            if candidate is not None and not isinstance(candidate, str):
-                candidate_text = str(candidate).strip()
-                if candidate_text:
-                    return candidate_text
-        return None
+        return self._request_context.reply_address("telegram")
 
     def should_broadcast_static_channels(self) -> bool:
         """Whether static notification channels should receive this dispatch."""
-        return not self._has_context_channel()
+        return not (
+            self._request_context is not None
+            and self._request_context.contextual_reply_only
+        )
 
     def _extract_dingtalk_session_webhook(self) -> Optional[str]:
         """从来源消息中提取钉钉会话 Webhook（用于 Stream 模式回复）"""
-        if not isinstance(self._source_message, BotMessage):
+        if self._request_context is None:
             return None
-        raw_data = getattr(self._source_message, "raw_data", {}) or {}
-        if not isinstance(raw_data, dict):
-            return None
-        session_webhook = (
-            raw_data.get("_session_webhook")
-            or raw_data.get("sessionWebhook")
-            or raw_data.get("session_webhook")
-            or raw_data.get("session_webhook_url")
-        )
-        if not session_webhook and isinstance(raw_data.get("headers"), dict):
-            session_webhook = raw_data["headers"].get("sessionWebhook")
-        return session_webhook
+        return self._request_context.reply_address("dingtalk")
 
     def _extract_feishu_reply_info(self) -> Optional[Dict[str, str]]:
         """
@@ -625,11 +651,9 @@ class NotificationService(
         Returns:
             包含 chat_id 的字典，或 None
         """
-        if not isinstance(self._source_message, BotMessage):
+        if self._request_context is None:
             return None
-        if getattr(self._source_message, "platform", "") != "feishu":
-            return None
-        chat_id = getattr(self._source_message, "chat_id", "")
+        chat_id = self._request_context.reply_address("feishu")
         if not chat_id:
             return None
         return {"chat_id": chat_id}
@@ -655,7 +679,7 @@ class NotificationService(
         session_webhook = self._extract_dingtalk_session_webhook()
         if session_webhook:
             try:
-                if self._send_dingtalk_chunked(session_webhook, content, max_bytes=20000):
+                if self._send_dingtalk_session_chunked(session_webhook, content, max_bytes=20000):
                     logger.info("已通过钉钉会话（Stream）推送报告")
                     success = True
                 else:
@@ -1480,6 +1504,12 @@ class NotificationService(
                         report_lines.append(f"**🐻 {labels['strongest_bearish_signal_label']}**: {signal_attr['strongest_bearish_signal']}")
                     report_lines.append("")
 
+                # ========== Strategy synthesis ==========
+                strategy_synthesis = normalize_strategy_synthesis_payload(
+                    dashboard.get('strategy_synthesis') if dashboard else None
+                )
+                _append_strategy_synthesis_block(report_lines, strategy_synthesis, labels, report_language)
+
                 # 财务摘要 / 股东回报 / 关联板块（数据缺失时自动隐藏对应小节）
                 self._append_fundamental_blocks(report_lines, result)
 
@@ -1667,6 +1697,32 @@ class NotificationService(
                         lines.append(f"🆕 {labels['no_position_label']}: {no_pos[:50]}")
                     if has_pos:
                         lines.append(f"💼 {labels['has_position_label']}: {has_pos[:50]}")
+                    lines.append("")
+
+                # Strategy synthesis
+                strategy_synthesis = normalize_strategy_synthesis_payload(
+                    dashboard.get('strategy_synthesis') if dashboard else None
+                )
+                if strategy_synthesis:
+                    lines.append(
+                        f"🧩 **{labels['strategy_synthesis_heading']}**: "
+                        f"{localize_strategy_signal(strategy_synthesis.get('final_signal', 'N/A'), report_language)} | "
+                        f"{labels['strategy_consensus_level_label']} "
+                        f"{localize_consensus_level(strategy_synthesis.get('consensus_level', 'N/A'), report_language)} | "
+                        f"{labels['strategy_conflict_label']} "
+                        f"{localize_conflict_severity(strategy_synthesis.get('conflict_severity', 'none'), report_language)}"
+                        f"({strategy_synthesis.get('conflict_count', 0)})"
+                    )
+                    invalid_count = strategy_invalid_opinion_count(strategy_synthesis)
+                    if invalid_count:
+                        lines.append(
+                            labels.get(
+                                'strategy_invalid_opinions_label', ''
+                            ).format(count=invalid_count)
+                        )
+                    summary = localize_strategy_synthesis_summary(strategy_synthesis, report_language)
+                    if summary:
+                        lines.append(summary)
                     lines.append("")
 
                 # 检查清单简化版
@@ -1957,6 +2013,12 @@ class NotificationService(
             if bearish:
                 lines.append(f"**🐻 {labels.get('strongest_bearish_signal_label', '最强看空信号')}**: {bearish}")
             lines.append("")
+
+        # ========== Strategy synthesis ==========
+        strategy_synthesis = normalize_strategy_synthesis_payload(
+            dashboard.get('strategy_synthesis') if dashboard else None
+        )
+        _append_strategy_synthesis_block(lines, strategy_synthesis, labels, report_language)
 
         # 持仓建议
         pos_advice = core.get('position_advice', {}) if core else {}

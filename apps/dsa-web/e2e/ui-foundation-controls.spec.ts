@@ -4,21 +4,17 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { loginAsE2eAdmin } from './auth-fixture';
 
 const buttonHeights: Record<string, number> = {
-  compact: 28,
-  default: 32,
-  comfortable: 36,
-  primary: 40,
-  xsm: 28,
-  sm: 32,
-  md: 36,
-  lg: 40,
-  xl: 40,
+  compact: 20,
+  default: 24,
+  comfortable: 28,
+  primary: 32,
 };
 
 const iconButtonHeights: Record<string, number> = {
   compact: 28,
   default: 32,
   comfortable: 36,
+  navigation: 44,
 };
 
 const inputHeights: Record<string, number> = {

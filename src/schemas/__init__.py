@@ -17,6 +17,12 @@ from src.schemas.analysis_context_pack import (
     DataQuality,
 )
 from src.schemas.report_schema import AnalysisReportSchema
+from src.schemas.request_context import (
+    AnalysisRequestContext,
+    NotificationReplyTarget,
+    ReplyTargetKind,
+)
+from src.schemas.run_flow import RunFlowSnapshot
 
 __all__ = [
     "AnalysisReportSchema",
@@ -27,4 +33,8 @@ __all__ = [
     "AnalysisSubject",
     "ContextFieldStatus",
     "DataQuality",
+    "AnalysisRequestContext",
+    "NotificationReplyTarget",
+    "ReplyTargetKind",
+    "RunFlowSnapshot",
 ]

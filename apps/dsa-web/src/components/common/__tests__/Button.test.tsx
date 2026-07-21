@@ -15,9 +15,9 @@ describe('Button', () => {
     >();
   });
 
-  it('exposes only semantic sizes plus the exact xl compatibility tier', () => {
+  it('exposes only semantic size tiers', () => {
     expectTypeOf<ButtonSize>().toEqualTypeOf<
-      'compact' | 'default' | 'comfortable' | 'primary' | 'xl'
+      'compact' | 'default' | 'comfortable' | 'primary'
     >();
   });
 
@@ -38,28 +38,28 @@ describe('Button', () => {
   });
 
   it.each([
-    'compact',
-    'default',
-    'comfortable',
-    'primary',
-    'xl',
+    ['compact', 'h-5', 'rounded-md'],
+    ['default', 'h-6', 'rounded-md'],
+    ['comfortable', 'h-7', 'rounded-md'],
+    ['primary', 'h-8', 'rounded-lg'],
   ] as const)(
-    'exposes the selected %s size without changing its accessible name',
-    (size) => {
+    'exposes the selected %s geometry without changing its accessible name',
+    (size, height, radius) => {
       render(<Button variant="secondary" size={size}>Action</Button>);
 
       const button = screen.getByRole('button', { name: 'Action' });
       expect(button).toHaveAttribute('data-size', size);
+      expect(button).toHaveClass(height, radius);
     },
   );
 
   it('renders children under the requested intent', () => {
     render(<Button variant="secondary">Click me</Button>);
 
-    expect(screen.getByRole('button', { name: 'Click me' })).toHaveAttribute(
-      'data-variant',
-      'secondary',
-    );
+    const button = screen.getByRole('button', { name: 'Click me' });
+    expect(button).toHaveAttribute('data-variant', 'secondary');
+    expect(button).toHaveAttribute('data-size', 'comfortable');
+    expect(button).toHaveClass('h-7', 'rounded-md');
   });
 
   it('uses button type by default and exposes the selected variant', () => {

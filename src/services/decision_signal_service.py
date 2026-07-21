@@ -36,6 +36,7 @@ from src.schemas.decision_profile import (
 )
 from src.schemas.decision_scale import action_for_score, score_action_conflicts_without_guardrail
 from src.schemas.decision_signal_presentation import build_decision_signal_presentation
+from src.services.decision_signal_payload import build_decision_signal_payload_from_report
 from src.services.portfolio_service import VALID_MARKETS
 from src.storage import (
     AnalysisHistory,
@@ -480,7 +481,6 @@ class DecisionSignalService:
                 return
 
             from src.analyzer import AnalysisResult
-            from src.services.decision_signal_extractor import build_decision_signal_payload_from_report
 
             result = AnalysisResult(
                 code=getattr(record, "code", "") or "",

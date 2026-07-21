@@ -71,7 +71,7 @@ class TestMarketReviewRuntimeCompatibility(unittest.TestCase):
              patch("src.search_service.SearchService") as search_cls:
             runtime_notifier, runtime_analyzer, runtime_search = build_market_review_runtime(config)
 
-        notifier_cls.assert_called_once_with(source_message=None)
+        notifier_cls.assert_called_once_with(request_context=None)
         analyzer_cls.assert_called_once_with(config=config)
         search_cls.assert_not_called()
         self.assertIs(runtime_notifier, notifier)
@@ -100,7 +100,7 @@ class TestMarketReviewRuntimeCompatibility(unittest.TestCase):
              patch("src.search_service.SearchService") as search_cls:
             runtime_notifier, runtime_analyzer, runtime_search = build_market_review_runtime(config)
 
-        notifier_cls.assert_called_once_with(source_message=None)
+        notifier_cls.assert_called_once_with(request_context=None)
         analyzer_cls.assert_called_once_with(config=config)
         search_cls.assert_not_called()
         self.assertIs(runtime_notifier, notifier)
@@ -120,7 +120,7 @@ class TestMarketReviewRuntimeCompatibility(unittest.TestCase):
              patch("src.search_service.SearchService") as search_cls:
             runtime_notifier, runtime_analyzer, runtime_search = build_market_review_runtime(config)
 
-        notifier_cls.assert_called_once_with(source_message=None)
+        notifier_cls.assert_called_once_with(request_context=None)
         analyzer_cls.assert_called_once_with(config=config)
         search_cls.assert_not_called()
         self.assertIs(runtime_notifier, notifier)

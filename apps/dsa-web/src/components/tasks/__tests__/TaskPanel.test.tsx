@@ -68,7 +68,7 @@ describe('TaskPanel', () => {
     expect(screen.getByText('运行诊断')).toBeInTheDocument();
     expect(screen.getAllByText('trace-task-1')).toHaveLength(2);
     expect(screen.queryByText(/请求阶段:/)).not.toBeInTheDocument();
-    expect(container.querySelector('.home-panel-card')).toBeTruthy();
+    expect(container.querySelector('[data-surface-level="interactive"]')).toBeTruthy();
     expect(container.querySelector('.home-subpanel')).toBeTruthy();
   });
 
@@ -176,6 +176,31 @@ describe('TaskPanel', () => {
 
     expect(screen.getByText('贵州茅台')).toBeInTheDocument();
     expect(screen.getByLabelText('任务状态：失败')).toBeInTheDocument();
+  });
+
+  it('renders an interrupted task as a dismissible warning terminal state', () => {
+    const onDismiss = vi.fn();
+    render(
+      <TaskPanel
+        tasks={[
+          {
+            ...baseTask,
+            status: 'interrupted',
+            progress: 100,
+            messageCode: 'task.interrupted',
+          },
+        ]}
+        onDismiss={onDismiss}
+      />,
+    );
+
+    const statusBadge = screen.getByLabelText('任务状态：已中断');
+    expect(statusBadge).toHaveClass('text-warning');
+    expect(screen.getByText('任务已中断')).toBeInTheDocument();
+    expect(screen.queryByText('100%')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '关闭 贵州茅台 任务' }));
+    expect(onDismiss).toHaveBeenCalledWith('task-1');
   });
 
   it('does not render when there are no tasks at all', () => {

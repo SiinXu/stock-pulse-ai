@@ -119,6 +119,11 @@ function createDeferred<T>() {
   return { promise, resolve, reject };
 }
 
+const openScreeningConfiguration = () => {
+  fireEvent.click(screen.getByRole('button', { name: '参数设置' }));
+  return screen.getByRole('dialog', { name: '参数设置' });
+};
+
 describe('StockScreeningPage', () => {
   beforeEach(() => {
     enableAlphaSift.mockReset();
@@ -179,12 +184,15 @@ describe('StockScreeningPage', () => {
     render(<StockScreeningPage />);
 
     expect(await screen.findByText('选股未开启')).toBeInTheDocument();
+    openScreeningConfiguration();
     expect(screen.getByRole('button', { name: /运行选股/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
 
     fireEvent.click(screen.getByRole('button', { name: '开启 AlphaSift' }));
 
     await waitFor(() => expect(getAlphaSiftStatus).toHaveBeenCalledTimes(2));
     expect(screen.getByText('选股未开启')).toBeInTheDocument();
+    openScreeningConfiguration();
     expect(screen.getByRole('button', { name: /运行选股/ })).toBeDisabled();
     expect(screen.getByText(/适配层当前不可用/)).toBeInTheDocument();
     expect(screen.getByText('请求未能完成，请稍后重试。')).toBeInTheDocument();
@@ -735,6 +743,8 @@ describe('StockScreeningPage', () => {
     render(<StockScreeningPage />);
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    expect(screen.queryByLabelText('策略参数')).not.toBeInTheDocument();
+    openScreeningConfiguration();
     fireEvent.change(screen.getByLabelText('策略参数'), {
       target: { value: 'custom_strategy_alpha' },
     });
@@ -743,6 +753,7 @@ describe('StockScreeningPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
     await waitFor(() => expect(screenStocks).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '参数设置' })).not.toBeInTheDocument());
     await waitFor(() => expect(screen.getByText(/自定义策略 \(custom_strategy_alpha\)/)).toBeInTheDocument());
   });
 
@@ -773,6 +784,19 @@ describe('StockScreeningPage', () => {
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
 
+    [
+      ['平衡选股', 'balanced_alpha'],
+      ['资金热度', 'capital_heat'],
+      ['超跌', 'oversold_reversal'],
+      ['缩量回踩', 'shrink_pullback'],
+    ].forEach(([label, id]) => {
+      fireEvent.click(screen.getByRole('combobox', { name: '选择策略' }));
+      fireEvent.click(screen.getByRole('option', { name: new RegExp(label) }));
+      expect(screen.getByRole('combobox', { name: '选择策略' })).toHaveAttribute('data-value', id);
+    });
+
+    openScreeningConfiguration();
+    expect(screen.getByDisplayValue('shrink_pullback')).toBeInTheDocument();
     const marketSelect = screen.getByLabelText('市场');
     fireEvent.click(marketSelect);
     const marketListbox = document.getElementById(marketSelect.getAttribute('aria-controls')!)!;
@@ -780,16 +804,6 @@ describe('StockScreeningPage', () => {
       within(marketListbox).getAllByRole('option').map((option) => option.getAttribute('data-value')),
     ).toEqual(['cn']);
     fireEvent.click(marketSelect);
-
-    [
-      ['平衡选股', 'balanced_alpha'],
-      ['资金热度', 'capital_heat'],
-      ['超跌', 'oversold_reversal'],
-      ['缩量回踩', 'shrink_pullback'],
-    ].forEach(([label, id]) => {
-      fireEvent.click(screen.getByRole('button', { name: new RegExp(label) }));
-      expect(screen.getByDisplayValue(id)).toBeInTheDocument();
-    });
 
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
     await waitFor(() => expect(screenStocks).toHaveBeenCalledTimes(1));
@@ -801,7 +815,7 @@ describe('StockScreeningPage', () => {
   });
 
   it('restores strategy, market, and result count run parameters from the URL', async () => {
-    window.history.pushState({}, '', '/screening?strategy=shrink_pullback&market=cn&count=25');
+    window.history.pushState({}, '', '/screening?strategy=shrink_pullback&market=cn&count=25&source=report#details');
     getStrategies.mockResolvedValueOnce({
       enabled: true,
       strategies: [
@@ -824,6 +838,10 @@ describe('StockScreeningPage', () => {
     render(<StockScreeningPage />);
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    expect(screen.queryByLabelText('市场')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('策略参数')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('返回数量')).not.toBeInTheDocument();
+    openScreeningConfiguration();
     expect(screen.getByLabelText('市场')).toHaveAttribute('data-value', 'cn');
     expect(screen.getByLabelText('策略参数')).toHaveValue('shrink_pullback');
     expect(screen.getByLabelText('返回数量')).toHaveValue(25);
@@ -836,7 +854,56 @@ describe('StockScreeningPage', () => {
         maxResults: 25,
       });
     });
-    expect(window.location.search).toBe('?strategy=shrink_pullback&count=25');
+    expect(navigate).toHaveBeenLastCalledWith(
+      '/screening?strategy=shrink_pullback&count=25&source=report#details',
+      { replace: true },
+    );
+  });
+
+  it('keeps the parameter modal open and focuses an invalid result count', async () => {
+    getAlphaSiftStatus.mockResolvedValueOnce({
+      enabled: true,
+      available: true,
+      installSpecIsDefault: true,
+    });
+
+    render(<StockScreeningPage />);
+
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    openScreeningConfiguration();
+    const resultCount = screen.getByLabelText('返回数量');
+    fireEvent.change(resultCount, { target: { value: '101' } });
+    fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
+
+    expect(startScreenTask).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: '参数设置' })).toBeInTheDocument();
+    expect(screen.getByText('返回数量必须是 1 到 100 之间的整数')).toBeInTheDocument();
+    expect(resultCount).toHaveFocus();
+  });
+
+  it('keeps the parameter modal open when task submission fails', async () => {
+    getAlphaSiftStatus.mockResolvedValueOnce({
+      enabled: true,
+      available: true,
+      installSpecIsDefault: true,
+    });
+    startScreenTask.mockRejectedValueOnce(new Error('raw task submission failure'));
+
+    render(<StockScreeningPage />);
+
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    openScreeningConfiguration();
+    fireEvent.change(screen.getByLabelText('策略参数'), {
+      target: { value: 'custom_strategy_alpha' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
+
+    await waitFor(() => expect(startScreenTask).toHaveBeenCalledTimes(1));
+    const dialog = screen.getByRole('dialog', { name: '参数设置' });
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('策略参数')).toHaveValue('custom_strategy_alpha');
+    expect(within(dialog).getByText(/请求未能完成，请稍后重试。/)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/raw task submission failure/)).not.toBeInTheDocument();
   });
 
   it('localizes built-in strategy copy by stable id in English UI mode', async () => {
@@ -892,12 +959,14 @@ describe('StockScreeningPage', () => {
     render(<StockScreeningPage />);
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    openScreeningConfiguration();
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
 
     expect(await screen.findByText('旧策略股票')).toBeInTheDocument();
     expect(screen.getByText('选股完成')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /资金热度/ }));
+    fireEvent.click(screen.getByRole('combobox', { name: '选择策略' }));
+    fireEvent.click(screen.getByRole('option', { name: /资金热度/ }));
 
     expect(screen.queryByText('旧策略股票')).not.toBeInTheDocument();
     expect(screen.getByText('等待运行')).toBeInTheDocument();
@@ -958,6 +1027,7 @@ describe('StockScreeningPage', () => {
     const firstRender = render(<StockScreeningPage />);
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    openScreeningConfiguration();
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
 
     await waitFor(() => {
@@ -1040,6 +1110,7 @@ describe('StockScreeningPage', () => {
     render(<StockScreeningPage />);
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    openScreeningConfiguration();
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
 
     expect(await screen.findByText('LLM 已降级')).toBeInTheDocument();
@@ -1049,7 +1120,23 @@ describe('StockScreeningPage', () => {
     expect(screen.getByText('本次 LLM 重排失败或未返回判断，当前展示的是本地因子评分结果。')).toBeInTheDocument();
     expect(screen.getByText('LLM 元数据未返回')).toBeInTheDocument();
     expect(screen.getAllByText('未返回（LLM 已降级）')).toHaveLength(2);
-    expect(screen.getByRole('button', { name: /^(展开|收起)$/ })).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByRole('table', { name: '选股结果' })).toBeVisible();
+    expect(screen.getByRole('region', { name: '选股结果' })).toHaveAttribute('tabindex', '0');
+    const collapseButton = screen.getByRole('button', { name: '收起' });
+    const detailId = collapseButton.getAttribute('aria-controls');
+    expect(collapseButton).toHaveAttribute('data-control', 'button');
+    expect(collapseButton).toHaveAttribute('aria-expanded', 'true');
+    expect(detailId).toBeTruthy();
+    expect(screen.getByRole('row', { name: '平安银行 详情' })).toHaveAttribute('id', detailId);
+
+    fireEvent.click(collapseButton);
+    const expandButton = screen.getByRole('button', { name: '展开查看' });
+    expect(expandButton).toHaveAttribute('aria-expanded', 'false');
+    expect(document.getElementById(detailId!)).not.toBeInTheDocument();
+
+    fireEvent.click(expandButton);
+    expect(screen.getByRole('button', { name: '收起' })).toHaveAttribute('aria-expanded', 'true');
+    expect(document.getElementById(detailId!)).toBeVisible();
   });
 
   it('localizes stable AlphaSift diagnostic codes without exposing internal codes', async () => {
@@ -1070,6 +1157,7 @@ describe('StockScreeningPage', () => {
     render(<StockScreeningPage />);
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    openScreeningConfiguration();
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
 
     expect(await screen.findByText('AlphaSift 已降级运行')).toBeInTheDocument();
@@ -1106,6 +1194,7 @@ describe('StockScreeningPage', () => {
     render(<StockScreeningPage />);
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    openScreeningConfiguration();
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
 
     expect(await screen.findByText('AlphaSift 提示')).toBeInTheDocument();
@@ -1141,6 +1230,7 @@ describe('StockScreeningPage', () => {
     render(<StockScreeningPage />);
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    openScreeningConfiguration();
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
 
     const efinanceWarning = await screen.findByText('数据源降级：efinance（网络连接中断）');
@@ -1188,6 +1278,7 @@ describe('StockScreeningPage', () => {
     render(<StockScreeningPage />);
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    openScreeningConfiguration();
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
 
     expect(await screen.findByText('StockPulse 增强：1 / 1')).toBeInTheDocument();

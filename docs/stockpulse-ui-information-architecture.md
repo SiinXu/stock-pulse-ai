@@ -148,7 +148,7 @@ Tab/Escape、`320px` 窄布局和 `prefers-reduced-motion` 作为替代证据。
 | Backtest | 无 | 无 | Recharts Tooltip | 结果和 filter 属页面/URL，不放 Drawer |
 | Alerts | 无 | create rule Modal、delete Confirm | table row actions | 规则、触发、投递未来用 page tabs；不嵌套 Modal |
 | Usage | 无 | 无 | chart Tooltip（如有数据） | error/retry 保持页面区块，不用 blocking Modal |
-| Settings | 无 page Drawer | FirstRunWizard 与 connection 相关 Modal；leave/import/reset 等 Confirm | Select/SearchableSelect、LLM more menu | 保留统一 z-index/focus；UI-06E/F 不另建 overlay system |
+| Settings | 无 page Drawer | 新增/编辑单个情报源、provider 或通知渠道，认证/密码、通知测试及同类离散提交表单使用共享 Modal；FirstRunWizard 与 connection 相关 Modal；leave/import/reset 等 Confirm | Select/SearchableSelect、LLM more menu | Agent 行为、对话、报告、告警、回测、系统、任务路由、可靠性、高级、调度与事件监控等常规配置在 page flow 内直接展示并编辑，不收进整区 Configure 弹框；Data Sources 配置以及 provider/通知渠道目录保持内联，只有单项新增/编辑表单进入 Modal；概览、就绪/运行状态、版本、导入/备份和结果同样留在页面；字段统一使用共享控件和 240px 控制列，Input/Select 等宽等高；切换 section/view 时关闭旧的离散提交弹框；敏感目录状态只显示已配置/未配置；保留统一 z-index/focus，不另建 overlay system |
 | Login / 404 | 无 | 无 | password visibility / language controls | 独立页面；不把 auth redirect error 放 transient overlay |
 
 ### 3.4 当前页面状态覆盖与缺口
@@ -671,7 +671,7 @@ H1、H2、H8 必须作为一个联合决定记录：
 - Provider Catalog 是 Provider identity、capability 和 field contract 的唯一权威。
 - Connection、Available Models、Report/Agent/Vision task routing 和 fallback 使用稳定 ModelRef；历史 stale selection 保留并显式标记。
 - 首次向导复用同一 Connection contract 与保存事务；不新增页面内自由文本 Provider 凭据表。
-- 正常 AI views 不暴露 raw config key；developer diagnostics 保持折叠和二级。
+- 正常 AI views 不暴露 raw config key；developer diagnostics 收敛在顶层「高级」section 的独立视图中，不进入普通配置路径。
 - Modal/Drawer、主题和语言继续复用公共实现。
 
 `KEEP` 只表示上述信息架构、配置权威和保存/冲突契约不可回退，不代表当前 responsive implementation

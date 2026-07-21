@@ -19,6 +19,8 @@ function chooseOption(trigger: HTMLElement, value: string) {
 const {
   listRules,
   createRule,
+  getRule,
+  updateRule,
   deleteRule,
   enableRule,
   disableRule,
@@ -28,6 +30,8 @@ const {
 } = vi.hoisted(() => ({
   listRules: vi.fn(),
   createRule: vi.fn(),
+  getRule: vi.fn(),
+  updateRule: vi.fn(),
   deleteRule: vi.fn(),
   enableRule: vi.fn(),
   disableRule: vi.fn(),
@@ -40,6 +44,8 @@ vi.mock('../../api/alerts', () => ({
   alertsApi: {
     listRules,
     createRule,
+    getRule,
+    updateRule,
     deleteRule,
     enableRule,
     disableRule,
@@ -116,9 +122,59 @@ beforeEach(() => {
     message: '600519 price above 1800',
   });
   createRule.mockResolvedValue(rule);
+  getRule.mockResolvedValue(rule);
+  updateRule.mockResolvedValue({ ...rule, parameters: { direction: 'above', price: 1900 } });
   disableRule.mockResolvedValue({ ...rule, enabled: false });
   enableRule.mockResolvedValue(rule);
   deleteRule.mockResolvedValue({ deleted: 1 });
+});
+
+describe('AlertsPage rule editing', () => {
+  it('loads the current rule on edit and PATCHes an updated payload', async () => {
+    render(<AlertsPage />);
+    await waitFor(() => expect(listRules).toHaveBeenCalled());
+
+    fireEvent.click(await screen.findByRole('button', { name: '编辑 茅台价格突破' }));
+    await waitFor(() => expect(getRule).toHaveBeenCalledWith(1));
+
+    // The edit modal seeds the current threshold; change it and save.
+    const priceInput = await screen.findByDisplayValue('1800');
+    fireEvent.change(priceInput, { target: { value: '1900' } });
+    fireEvent.click(screen.getByRole('button', { name: '更新规则' }));
+
+    await waitFor(() => expect(updateRule).toHaveBeenCalledWith(1, expect.objectContaining({
+      alertType: 'price_cross',
+      parameters: { direction: 'above', price: 1900 },
+    })));
+    await waitFor(() => expect(screen.getByText('更新成功')).toBeTruthy());
+  });
+
+  it('does not let a slower edit-load overwrite a newer one', async () => {
+    const ruleB = { ...rule, id: 2, name: 'B 规则', parameters: { direction: 'above' as const, price: 2000 } };
+    listRules.mockResolvedValue({ items: [rule, ruleB], total: 2, page: 1, pageSize: 20 });
+    const deferredA = createDeferred<typeof rule>();
+    getRule.mockImplementation((id: number) => (id === 1 ? deferredA.promise : Promise.resolve(ruleB)));
+
+    render(<AlertsPage />);
+    await waitFor(() => expect(listRules).toHaveBeenCalled());
+
+    fireEvent.click(await screen.findByRole('button', { name: '编辑 茅台价格突破' }));
+    await waitFor(() => expect(getRule).toHaveBeenCalledWith(1));
+    // Close rule A's modal (its load stays pending) so the list is reachable,
+    // then open rule B.
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    fireEvent.click(await screen.findByRole('button', { name: '编辑 B 规则' }));
+    await waitFor(() => expect(screen.getByDisplayValue('2000')).toBeTruthy());
+
+    await act(async () => {
+      deferredA.resolve(rule);
+      await Promise.resolve();
+    });
+
+    // The late rule-A response must not replace the newer rule-B form.
+    expect(screen.getByDisplayValue('2000')).toBeTruthy();
+    expect(screen.queryByDisplayValue('1800')).toBeNull();
+  });
 });
 
 describe('AlertsPage', () => {
@@ -127,7 +183,9 @@ describe('AlertsPage', () => {
 
     expect(screen.getByText('管理事件告警、日线技术指标、自选股、持仓/账户联动和大盘红绿灯规则，执行一次性测试，并查看后台评估任务记录的触发历史。')).toBeInTheDocument();
     expect(await screen.findByText('茅台价格突破')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '触发历史' }));
     expect(await screen.findByText('600519 price above 1800')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '通知尝试记录' }));
     expect(await screen.findByText('暂无通知尝试记录')).toBeInTheDocument();
     expect(listRules).toHaveBeenCalledWith({
       enabled: undefined,
@@ -137,6 +195,27 @@ describe('AlertsPage', () => {
     });
     expect(listTriggers).toHaveBeenCalledWith({ page: 1, pageSize: 20 });
     expect(listNotifications).toHaveBeenCalledWith({ page: 1, pageSize: 20 });
+  });
+
+  it('filters notification attempts by channel and delivery status', async () => {
+    render(<AlertsPage />);
+
+    await screen.findByText('茅台价格突破');
+    fireEvent.click(screen.getByRole('tab', { name: '通知尝试记录' }));
+    chooseOption(screen.getByLabelText('渠道'), 'email');
+    await waitFor(() => expect(listNotifications).toHaveBeenLastCalledWith({
+      channel: 'email',
+      page: 1,
+      pageSize: 20,
+    }));
+
+    chooseOption(screen.getByLabelText('状态'), 'failure');
+    await waitFor(() => expect(listNotifications).toHaveBeenLastCalledWith({
+      channel: 'email',
+      success: false,
+      page: 1,
+      pageSize: 20,
+    }));
   });
 
   it('runs a dry-run test and renders only declared response fields', async () => {

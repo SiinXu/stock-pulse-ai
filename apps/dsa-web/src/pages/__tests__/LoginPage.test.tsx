@@ -90,6 +90,33 @@ describe('LoginPage', () => {
     expect(pageRoot?.getAttribute('style') ?? '').not.toContain('--login-bg-main');
   });
 
+  it('renders the tokenized grid and radial background treatment without tight heading tracking', () => {
+    useAuthMock.mockReturnValue({
+      login: vi.fn(),
+      passwordSet: true,
+      setupState: 'enabled',
+    });
+
+    render(<LoginPage />);
+
+    const pageRoot = screen.getByTestId('login-page');
+    const grid = screen.getByTestId('login-grid-background');
+    const accents = screen.getByTestId('login-accent-background');
+
+    expect(pageRoot).toHaveClass('bg-[var(--login-bg-main)]');
+    expect(pageRoot).not.toHaveClass('bg-background');
+    expect(grid).toHaveAttribute('aria-hidden', 'true');
+    expect(grid).toHaveClass('pointer-events-none', 'bg-[size:24px_24px]');
+    expect(grid.className).toContain('linear-gradient(to_right');
+    expect(grid.className).toContain('linear-gradient(to_bottom');
+    expect(grid.className).toContain('mask-image:radial-gradient');
+    expect(accents).toHaveAttribute('aria-hidden', 'true');
+    expect(accents).toHaveClass('pointer-events-none');
+    expect(accents.className.match(/radial-gradient/g)).toHaveLength(2);
+    expect(screen.getByRole('heading', { name: 'StockPulse' })).not.toHaveClass('tracking-tight');
+    expect(screen.getByRole('heading', { name: '管理员登录' })).not.toHaveClass('tracking-tight');
+  });
+
   it('presents the current StockPulse brand as an accessible heading', () => {
     useAuthMock.mockReturnValue({
       login: vi.fn(),

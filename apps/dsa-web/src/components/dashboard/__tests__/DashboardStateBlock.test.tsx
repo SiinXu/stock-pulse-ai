@@ -17,6 +17,20 @@ describe('DashboardStateBlock', () => {
     expect(screen.getByRole('heading', { name: '开始分析', level: 3 })).toBeInTheDocument();
   });
 
+  it('preserves the public title and description class overrides', () => {
+    render(
+      <DashboardStateBlock
+        title="开始分析"
+        description="查看提示文案"
+        titleClassName="tracking-wide"
+        descriptionClassName="max-w-lg"
+      />,
+    );
+
+    expect(screen.getByText('开始分析')).toHaveClass('tracking-wide');
+    expect(screen.getByText('查看提示文案')).toHaveClass('max-w-lg');
+  });
+
   it('keeps icon, description, action, and loading behaviors intact', () => {
     const { rerender } = render(
       <DashboardStateBlock
@@ -42,7 +56,8 @@ describe('DashboardStateBlock', () => {
 
     expect(screen.getByRole('heading', { name: '开始分析', level: 3 })).toBeInTheDocument();
     expect(screen.getByText('输入股票代码进行分析')).toBeInTheDocument();
-    expect(document.querySelector('.home-spinner')).not.toBeNull();
+    expect(screen.getByRole('status')).toHaveAttribute('data-state-panel', 'loading');
+    expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
     expect(screen.queryByTestId('icon')).not.toBeInTheDocument();
   });
 });

@@ -24,10 +24,21 @@ interface DatePickerProps {
   ariaDescribedBy?: string;
   className?: string;
   triggerClassName?: string;
+  size?: 'compact' | 'default';
   'data-testid'?: string;
 }
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const DATE_PICKER_SIZE_STYLES = {
+  compact: {
+    trigger: 'h-8 min-h-8 min-w-8',
+    action: 'h-8 w-8',
+  },
+  default: {
+    trigger: 'h-11 min-h-11 min-w-11',
+    action: 'h-11 w-11',
+  },
+} as const;
 
 function parseIsoDate(value: string): Date | null {
   if (!ISO_DATE_PATTERN.test(value)) return null;
@@ -62,6 +73,7 @@ export const DatePicker = ({
   ariaDescribedBy,
   className,
   triggerClassName,
+  size = 'default',
   'data-testid': testId,
 }: DatePickerProps) => {
   const { language, t } = useUiLanguage();
@@ -230,9 +242,12 @@ export const DatePicker = ({
       ) : null}
       <div
         ref={triggerRef}
+        data-control="date-picker"
+        data-size={size}
         className={cn(
-          'flex h-11 min-h-11 min-w-11 w-full cursor-text items-center justify-between gap-2 rounded-lg border border-border bg-transparent px-3 text-xs text-foreground',
+          'flex w-full cursor-text items-center justify-between gap-2 rounded-lg border border-border bg-transparent px-3 text-xs text-foreground',
           'transition-colors duration-200 hover:bg-hover focus:outline-none focus-visible:border-muted-text disabled:cursor-not-allowed disabled:opacity-60',
+          DATE_PICKER_SIZE_STYLES[size].trigger,
           triggerClassName,
         )}
       >
@@ -273,7 +288,10 @@ export const DatePicker = ({
           aria-haspopup="dialog"
           aria-expanded={isOpen}
           onClick={() => (isOpen ? closePicker() : openPicker())}
-          className="flex h-11 w-11 shrink-0 items-center justify-center gap-1 rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed disabled:opacity-60"
+          className={cn(
+            'flex shrink-0 items-center justify-center gap-1 rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed disabled:opacity-60',
+            DATE_PICKER_SIZE_STYLES[size].action,
+          )}
         >
           <CalendarDays className="h-4 w-4" aria-hidden="true" />
           <ChevronDown className={cn('h-3.5 w-3.5 transition-transform duration-200', isOpen && 'rotate-180')} aria-hidden="true" />
@@ -285,8 +303,9 @@ export const DatePicker = ({
           ref={popupRef}
           role="dialog"
           aria-label={resolvedAriaLabel}
+          data-dialog-popup="true"
           style={popupStyle}
-          className="fixed z-[100] w-72 overflow-hidden rounded-xl border border-border bg-elevated p-3 shadow-lg"
+          className="fixed w-72 overflow-hidden rounded-xl border border-border bg-elevated p-3 shadow-lg"
           onKeyDown={(event) => {
             if (event.key === 'Escape') {
               event.preventDefault();

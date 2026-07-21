@@ -1,13 +1,32 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, Clock3, Cpu, Database, Gauge, RefreshCw } from 'lucide-react';
-import { usageApi, type UsageDashboard, type UsageModelBreakdown, type UsagePeriod } from '../api/usage';
-import type { ParsedApiError } from '../api/error';
-import { ApiErrorAlert, AppPage, Button, Card, EmptyState, PageHeader, SegmentedControl, StatCard } from '../components/common';
+import {
+  usageApi,
+  type UsageCallRecord,
+  type UsageDashboard,
+  type UsageModelBreakdown,
+  type UsagePeriod,
+} from '../api/usage';
+import { localizeParsedApiError, type ParsedApiError } from '../api/error';
+import {
+  ApiErrorAlert,
+  AppPage,
+  Button,
+  DataTable,
+  type DataTableColumn,
+  PageHeader,
+  Section,
+  SegmentedControl,
+  StatePanel,
+  StatCard,
+  Surface,
+} from '../components/common';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import type { UiLanguage, UiTextKey, UiTextParams } from '../i18n/uiText';
 import { getUiLocale } from '../utils/uiLocale';
 
 type Translate = (key: UiTextKey, params?: UiTextParams) => string;
+type UsageDashboardSnapshot = { period: UsagePeriod; dashboard: UsageDashboard };
 
 const PERIOD_OPTIONS: UsagePeriod[] = ['today', 'month', 'all'];
 
@@ -67,7 +86,7 @@ function buildParsedError(error: unknown, t: Translate): ParsedApiError {
 
 const ModelUsageCard: React.FC<{ model: UsageModelBreakdown; language: UiLanguage; t: Translate }> = ({ model, language, t }) => {
   return (
-    <Card padding="sm" className="rounded-lg">
+    <Surface as="article" level="section" padding="sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="truncate text-base font-semibold text-foreground">{model.model}</h3>
@@ -91,7 +110,7 @@ const ModelUsageCard: React.FC<{ model: UsageModelBreakdown; language: UiLanguag
           <p className="mt-1 font-medium text-foreground">{formatNumber(model.maxTotalTokens, language)}</p>
         </div>
       </div>
-    </Card>
+    </Surface>
   );
 };
 
@@ -101,10 +120,11 @@ const TokenUsagePage: React.FC = () => {
     document.title = t('usage.documentTitle');
   }, [t]);
   const [period, setPeriod] = useState<UsagePeriod>('month');
-  const [dashboard, setDashboard] = useState<UsageDashboard | null>(null);
+  const [snapshot, setSnapshot] = useState<UsageDashboardSnapshot | null>(null);
   const [error, setError] = useState<ParsedApiError | null>(null);
   const [loading, setLoading] = useState(true);
   const requestSeqRef = useRef(0);
+  const dashboard = snapshot?.period === period ? snapshot.dashboard : null;
 
   const loadDashboard = useCallback(async () => {
     const requestSeq = requestSeqRef.current + 1;
@@ -116,7 +136,7 @@ const TokenUsagePage: React.FC = () => {
       if (requestSeq !== requestSeqRef.current) {
         return;
       }
-      setDashboard(data);
+      setSnapshot({ period, dashboard: data });
     } catch (err) {
       if (requestSeq !== requestSeqRef.current) {
         return;
@@ -136,9 +156,67 @@ const TokenUsagePage: React.FC = () => {
     };
   }, [loadDashboard]);
 
+  const handlePeriodChange = useCallback((nextPeriod: UsagePeriod) => {
+    if (nextPeriod === period) return;
+    setError(null);
+    setLoading(true);
+    setPeriod(nextPeriod);
+  }, [period]);
+
   const largestCallTypeTotal = useMemo(() => {
     return Math.max(...(dashboard?.byCallType.map((item) => item.totalTokens) ?? [0]), 1);
   }, [dashboard]);
+  const localizedError = useMemo(
+    () => error ? localizeParsedApiError(error, language) : null,
+    [error, language],
+  );
+  const recentCallColumns = useMemo<readonly DataTableColumn<UsageCallRecord>[]>(() => [
+    {
+      id: 'time',
+      header: t('usage.table.time'),
+      rowHeader: true,
+      nowrap: true,
+      cell: (item) => formatDateTime(item.calledAt, language),
+    },
+    {
+      id: 'type',
+      header: t('usage.table.type'),
+      nowrap: true,
+      cell: (item) => <span className="text-foreground">{getCallTypeLabel(item.callType, t)}</span>,
+    },
+    {
+      id: 'model',
+      header: t('usage.table.model'),
+      width: 'wide',
+      cell: (item) => (
+        <>
+          <div className="max-w-[18rem] truncate font-medium text-foreground">{item.model}</div>
+          {item.stockCode ? <div className="text-xs text-secondary-text">{item.stockCode}</div> : null}
+        </>
+      ),
+    },
+    {
+      id: 'prompt',
+      header: t('usage.promptLabel'),
+      align: 'end',
+      nowrap: true,
+      cell: (item) => formatNumber(item.promptTokens, language),
+    },
+    {
+      id: 'completion',
+      header: t('usage.completionLabel'),
+      align: 'end',
+      nowrap: true,
+      cell: (item) => formatNumber(item.completionTokens, language),
+    },
+    {
+      id: 'total',
+      header: t('usage.totalLabel'),
+      align: 'end',
+      nowrap: true,
+      cell: (item) => <span className="font-medium text-foreground">{formatNumber(item.totalTokens, language)}</span>,
+    },
+  ], [language, t]);
 
   return (
     <AppPage className="max-w-none">
@@ -152,7 +230,7 @@ const TokenUsagePage: React.FC = () => {
               <SegmentedControl
                 value={period}
                 options={PERIOD_OPTIONS.map((option) => ({ value: option, label: t(PERIOD_LABEL_KEYS[option]) }))}
-                onChange={setPeriod}
+                onChange={handlePeriodChange}
                 ariaLabel={t('usage.title')}
               />
               <Button
@@ -171,17 +249,42 @@ const TokenUsagePage: React.FC = () => {
           )}
         />
 
-        {error ? <ApiErrorAlert error={error} actionLabel={t('common.retry')} onAction={() => void loadDashboard()} /> : null}
-
-        {loading && !dashboard ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="h-28 animate-pulse rounded-2xl border border-border/70 bg-card/60" />
-            ))}
-          </div>
+        {error && dashboard ? (
+          <ApiErrorAlert error={error} actionLabel={t('common.retry')} onAction={() => void loadDashboard()} />
         ) : null}
 
-        {dashboard ? (
+        {loading && !dashboard ? (
+          <StatePanel
+            state="loading"
+            title={t('common.loading')}
+            surfaceLevel="section"
+          />
+        ) : null}
+
+        {error && !dashboard && !loading && localizedError ? (
+          <StatePanel
+            state="error"
+            title={localizedError.title}
+            description={localizedError.message}
+            surfaceLevel="section"
+            action={(
+              <Button type="button" variant="secondary" size="default" onClick={() => void loadDashboard()}>
+                {t('common.retry')}
+              </Button>
+            )}
+          />
+        ) : null}
+
+        {dashboard && dashboard.totalCalls === 0 ? (
+          <StatePanel
+            state="empty"
+            title={t('usage.emptyTitle')}
+            description={t('usage.emptyDescription')}
+            surfaceLevel="section"
+          />
+        ) : null}
+
+        {dashboard && dashboard.totalCalls > 0 ? (
           <>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <StatCard label={t('usage.totalTokens')} value={formatNumber(dashboard.totalTokens, language)} hint={t('usage.dateRange', { from: dashboard.fromDate, to: dashboard.toDate })} icon={<Database className="h-5 w-5" />} tone="primary" />
@@ -190,24 +293,23 @@ const TokenUsagePage: React.FC = () => {
               <StatCard label={t('usage.completionTokens')} value={formatNumber(dashboard.totalCompletionTokens, language)} hint={t('usage.completionTokensHint')} icon={<Gauge className="h-5 w-5" />} />
             </div>
 
-            {dashboard.totalCalls === 0 ? (
-              <EmptyState title={t('usage.emptyTitle')} description={t('usage.emptyDescription')} />
-            ) : (
-              <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
-                <section className="space-y-4">
-                  <div>
-                    <h2 className="text-lg font-semibold text-foreground">{t('usage.modelUsage')}</h2>
-                    <p className="mt-1 text-sm text-secondary-text">{t('usage.modelUsageDescription')}</p>
-                  </div>
-                  <div className="grid gap-4">
-                    {dashboard.byModel.map((model) => (
-                      <ModelUsageCard key={model.model} model={model} language={language} t={t} />
-                    ))}
-                  </div>
-                </section>
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
+              <Section
+                title={t('usage.modelUsage')}
+                description={t('usage.modelUsageDescription')}
+                contentClassName="grid gap-4"
+              >
+                {dashboard.byModel.map((model) => (
+                  <ModelUsageCard key={model.model} model={model} language={language} t={t} />
+                ))}
+              </Section>
 
-                <section className="space-y-4">
-                  <Card title={t('usage.callTypeTitle')} subtitle={t('usage.breakdown')} className="rounded-lg">
+              <Section
+                title={t('usage.callTypeTitle')}
+                eyebrow={t('usage.breakdown')}
+                level="section"
+                padding="sm"
+              >
                     <div className="space-y-4">
                       {dashboard.byCallType.map((item) => (
                         <div key={item.callType}>
@@ -231,55 +333,25 @@ const TokenUsagePage: React.FC = () => {
                         </div>
                       ))}
                     </div>
-                  </Card>
-                </section>
-              </div>
-            )}
+              </Section>
+            </div>
 
-            <section className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold text-foreground">{t('usage.recentCalls')}</h2>
-                  <p className="mt-1 text-sm text-secondary-text">{t('usage.recentCallsDescription')}</p>
-                </div>
-                <Clock3 className="h-5 w-5 text-secondary-text" />
-              </div>
-              <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/75 shadow-soft-card">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-border/70 text-sm">
-                    <thead className="bg-surface-2/70 text-left text-xs uppercase tracking-[0.16em] text-secondary-text">
-                      <tr>
-                        <th className="px-4 py-3 font-medium">{t('usage.table.time')}</th>
-                        <th className="px-4 py-3 font-medium">{t('usage.table.type')}</th>
-                        <th className="px-4 py-3 font-medium">{t('usage.table.model')}</th>
-                        <th className="px-4 py-3 text-right font-medium">{t('usage.promptLabel')}</th>
-                        <th className="px-4 py-3 text-right font-medium">{t('usage.completionLabel')}</th>
-                        <th className="px-4 py-3 text-right font-medium">{t('usage.totalLabel')}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/60">
-                      {dashboard.recentCalls.length ? dashboard.recentCalls.map((item) => (
-                        <tr key={item.id} className="hover:bg-hover/60">
-                          <td className="whitespace-nowrap px-4 py-3 text-secondary-text">{formatDateTime(item.calledAt, language)}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-foreground">{getCallTypeLabel(item.callType, t)}</td>
-                          <td className="min-w-56 px-4 py-3">
-                            <div className="max-w-[18rem] truncate font-medium text-foreground">{item.model}</div>
-                            {item.stockCode ? <div className="text-xs text-secondary-text">{item.stockCode}</div> : null}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right text-secondary-text">{formatNumber(item.promptTokens, language)}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right text-secondary-text">{formatNumber(item.completionTokens, language)}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-foreground">{formatNumber(item.totalTokens, language)}</td>
-                        </tr>
-                      )) : (
-                        <tr>
-                          <td colSpan={6} className="px-4 py-8 text-center text-secondary-text">{t('usage.noRecentCalls')}</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </section>
+            <Section
+              title={t('usage.recentCalls')}
+              description={t('usage.recentCallsDescription')}
+              actions={<Clock3 className="h-5 w-5 text-secondary-text" aria-hidden="true" />}
+            >
+              <DataTable
+                caption={t('usage.recentCalls')}
+                scrollAreaLabel={t('usage.recentCallsDescription')}
+                columns={recentCallColumns}
+                rows={dashboard.recentCalls}
+                getRowKey={(item) => item.id}
+                emptyState={{ title: t('usage.noRecentCalls') }}
+                frame="embedded"
+                minWidth="container"
+              />
+            </Section>
           </>
         ) : null}
       </div>

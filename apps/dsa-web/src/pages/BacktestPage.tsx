@@ -1,10 +1,11 @@
 import type React from 'react';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Check, Minus, X } from 'lucide-react';
+import { Check, Inbox, Minus, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { backtestApi } from '../api/backtest';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
-import { ApiErrorAlert, Badge, Button, Card, DatePicker, EmptyState, Input, Pagination, Select, StatusDot, Tooltip } from '../components/common';
+import { ApiErrorAlert, AppPage, Badge, Button, Card, DataTable, type DataTableColumn, DatePicker, EmptyState, Input, Loading, PageHeader, Pagination, SegmentedControl, Select, StatusDot, Switch, Tooltip } from '../components/common';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import {
@@ -27,7 +28,7 @@ import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../utils/de
 import { getMarketPhaseSummaryLabel, stripMarketPhaseSummaryPrefix } from '../utils/marketPhase';
 
 const BACKTEST_COMPACT_INPUT_CLASS =
-  'h-9 rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
+  'h-8 rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
 type BacktestText = (typeof BACKTEST_TEXT)[UiLanguage];
 
 type BacktestFilterSnapshot = {
@@ -57,8 +58,8 @@ function getInitialBacktestFilters(search = typeof window === 'undefined' ? '' :
   };
 }
 
-function syncBacktestFiltersToUrl(filters: BacktestFilterSnapshot): void {
-  if (typeof window === 'undefined') return;
+function getBacktestFiltersLocation(filters: BacktestFilterSnapshot): string | null {
+  if (typeof window === 'undefined') return null;
   const url = new URL(window.location.href);
   const values: Record<string, string | undefined> = {
     code: normalizeBacktestCode(filters.code),
@@ -72,7 +73,7 @@ function syncBacktestFiltersToUrl(filters: BacktestFilterSnapshot): void {
     if (value) url.searchParams.set(key, value);
     else url.searchParams.delete(key);
   });
-  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 // ============ Helpers ============
@@ -263,7 +264,7 @@ const PerformanceCard: React.FC<{ metrics: PerformanceMetrics; title: string; la
         </span>
       </div>
       {phaseText ? (
-        <div className="mt-3 border-t border-white/10 pt-2 text-xs text-muted-text">
+        <div className="mt-3 border-t border-subtle pt-2 text-xs text-muted-text">
           {formatUiText(text.phaseDistribution, { text: phaseText })}
         </div>
       ) : null}
@@ -294,12 +295,17 @@ const RunSummary: React.FC<{ data: BacktestRunResponse; language: UiLanguage }> 
 // ============ Main Page ============
 
 const BacktestPage: React.FC = () => {
+  const navigate = useNavigate();
   const { language, t } = useUiLanguage();
   const text = BACKTEST_TEXT[language];
   const validationText = BACKTEST_VALIDATION_TEXT[language];
   const phaseFilterOptions = BACKTEST_PHASE_FILTER_OPTIONS[language];
   const actionLabels = buildDecisionActionLabelMap(t);
   const [initialFilters] = useState(() => getInitialBacktestFilters());
+  const syncBacktestFiltersToUrl = useCallback((filters: BacktestFilterSnapshot) => {
+    const location = getBacktestFiltersLocation(filters);
+    if (location) navigate(location, { replace: true });
+  }, [navigate]);
 
   // Set page title
   useEffect(() => {
@@ -340,6 +346,9 @@ const BacktestPage: React.FC = () => {
   const effectiveWindowDays = parseEvalWindowDays(evalDays) ?? overallPerf?.evalWindowDays;
   const isNextDayValidation = effectiveWindowDays === 1;
   const showNextDayActualColumns = isNextDayValidation;
+  const lastRegularWindowRef = useRef(
+    initialFilters.windowDays && initialFilters.windowDays > 1 ? initialFilters.windowDays : 10,
+  );
 
   const validateDraftFilters = (windowOverride?: number): BacktestFilterSnapshot | null => {
     const windowDays = windowOverride ?? parseEvalWindowDays(evalDays);
@@ -462,6 +471,7 @@ const BacktestPage: React.FC = () => {
       const overall = await fetchPerformance(code || undefined, undefined, startDate, endDate, phase);
       if (!overall) return;
       const inferredWindow = overall.evalWindowDays;
+      if (inferredWindow > 1) lastRegularWindowRef.current = inferredWindow;
       setEvalDays(String(inferredWindow));
       setAppliedFilters((current) => ({ ...current, windowDays: inferredWindow }));
       void fetchResults(page, code || undefined, inferredWindow, startDate, endDate, phase);
@@ -506,6 +516,7 @@ const BacktestPage: React.FC = () => {
         ?? parseEvalWindowDays(evalDays)
         ?? overallPerf?.evalWindowDays;
       if (effectiveEvalWindowDays != null) {
+        if (effectiveEvalWindowDays > 1) lastRegularWindowRef.current = effectiveEvalWindowDays;
         setEvalDays(String(effectiveEvalWindowDays));
       }
       syncBacktestFiltersToUrl({
@@ -569,8 +580,26 @@ const BacktestPage: React.FC = () => {
     void fetchPerformance(nextFilters.code || undefined, 1, nextFilters.startDate, nextFilters.endDate, nextFilters.phase);
   };
 
+  const handleValidationModeChange = (mode: 'window' | 'oneDay') => {
+    if (mode === 'oneDay') {
+      handleShowNextDay();
+      return;
+    }
+    const windowDays = lastRegularWindowRef.current;
+    const nextFilters = validateDraftFilters(windowDays);
+    if (!nextFilters) return;
+    setEvalDays(String(windowDays));
+    setEvalDaysError('');
+    setAppliedFilters(nextFilters);
+    setCurrentPage(1);
+    syncBacktestFiltersToUrl(nextFilters);
+    void fetchResults(1, nextFilters.code || undefined, windowDays, nextFilters.startDate, nextFilters.endDate, nextFilters.phase);
+    void fetchPerformance(nextFilters.code || undefined, windowDays, nextFilters.startDate, nextFilters.endDate, nextFilters.phase);
+  };
+
   // Pagination
   const totalPages = Math.ceil(totalResults / pageSize);
+  const hasBacktestData = Boolean(overallPerf || stockPerf || results.length > 0);
   const handlePageChange = (page: number) => {
     const nextFilters = { ...appliedFilters, page };
     setAppliedFilters(nextFilters);
@@ -578,17 +607,100 @@ const BacktestPage: React.FC = () => {
     void fetchResults(page, nextFilters.code || undefined, nextFilters.windowDays, nextFilters.startDate, nextFilters.endDate, nextFilters.phase);
   };
 
+  const resultColumns: DataTableColumn<BacktestResultItem>[] = [
+    {
+      id: 'stock',
+      header: text.stock,
+      cell: (row) => (
+        <div className="flex flex-col">
+          <span className="font-mono text-primary">{row.code}</span>
+          <span className="text-xs text-muted-text">{row.stockName || '--'}</span>
+        </div>
+      ),
+    },
+    {
+      id: 'analysisDate',
+      header: text.analysisDate,
+      cell: (row) => row.analysisDate || '--',
+    },
+    {
+      id: 'phase',
+      header: text.phase,
+      cell: (row) => phaseLabel(row, language),
+    },
+    {
+      id: 'aiPrediction',
+      header: text.aiPrediction,
+      cell: (row) => {
+        const actionLabel = getDecisionActionLabel(row.action, row.actionLabel, null, null, actionLabels);
+        const predictionParts = [actionLabel, row.trendPrediction, row.operationAdvice]
+          .filter((part): part is string => Boolean(part));
+        return predictionParts.length ? (
+          <Tooltip content={predictionParts.join(' / ')} focusable>
+            <div className="flex max-w-56 flex-col gap-1">
+              <span className="block truncate text-foreground">{actionLabel || row.trendPrediction || '--'}</span>
+              {actionLabel && row.trendPrediction && (
+                <span className="block truncate text-xs text-secondary-text">{row.trendPrediction}</span>
+              )}
+              {row.operationAdvice && (
+                <span className="block truncate text-xs text-secondary-text">{row.operationAdvice}</span>
+              )}
+            </div>
+          </Tooltip>
+        ) : (
+          '--'
+        );
+      },
+    },
+    {
+      id: 'return',
+      header: showNextDayActualColumns ? text.actualPerformance : text.windowReturn,
+      cell: (row) => (
+        <div className="flex items-center gap-2">
+          {actualMovementBadge(row.actualMovement, language)}
+          <span className={
+            row.actualReturnPct != null
+              ? row.actualReturnPct > 0 ? 'text-success' : row.actualReturnPct < 0 ? 'text-danger' : 'text-secondary-text'
+              : 'text-muted-text'
+          }>
+            {pct(row.actualReturnPct)}
+          </span>
+        </div>
+      ),
+    },
+    {
+      id: 'direction',
+      header: showNextDayActualColumns ? text.accuracy : text.directionMatch,
+      cell: (row) => (
+        <span className="flex items-center gap-2">
+          {boolIcon(row.directionCorrect, text)}
+          <span className="text-muted-text">
+            {row.directionExpected ? labelFromMap(row.directionExpected, BACKTEST_DIRECTION_EXPECTED_LABELS[language]) : ''}
+          </span>
+        </span>
+      ),
+    },
+    {
+      id: 'result',
+      header: text.result,
+      cell: (row) => outcomeBadge(row.outcome, language),
+    },
+    {
+      id: 'status',
+      header: text.status,
+      cell: (row) => statusBadge(row.evalStatus, language),
+    },
+  ];
+
   return (
-    <div className="min-h-full flex flex-col rounded-3xl bg-transparent">
-      {/* Header */}
-      <header className="flex-shrink-0 border-b border-white/5 px-3 py-3 sm:px-4">
-        {/* Visually hidden: the header is a dense filter toolbar, but the page
-            still needs an h1 landmark for assistive technology. */}
-        <h1 className="sr-only">{text.pageTitle}</h1>
+    <AppPage className="flex min-h-full flex-col">
+      <PageHeader className="shrink-0" title={text.pageTitle} />
+      <header className="flex-shrink-0 border-b border-border py-3">
         <div className="flex flex-wrap items-end gap-1.5">
           <div className="relative min-w-0 flex-[1_1_220px]">
             <Input
               type="text"
+              size="default"
               value={codeFilter}
               onChange={(e) => setCodeFilter(e.target.value.toUpperCase())}
               onKeyDown={handleKeyDown}
@@ -601,7 +713,7 @@ const BacktestPage: React.FC = () => {
             onClick={handleFilter}
             disabled={isLoadingResults}
             variant="secondary"
-            size="comfortable"
+            size="primary"
             isLoading={isLoadingResults}
             loadingText={text.filter}
             className="whitespace-nowrap text-xs"
@@ -612,11 +724,17 @@ const BacktestPage: React.FC = () => {
             id="backtest-eval-window"
             label={text.evalWindow}
             type="number"
+            size="default"
             min={1}
             max={120}
             value={evalDays}
             onChange={(e) => {
-              setEvalDays(e.target.value);
+              const nextValue = e.target.value;
+              const parsedValue = parseEvalWindowDays(nextValue);
+              if (parsedValue && parsedValue > 1) {
+                lastRegularWindowRef.current = parsedValue;
+              }
+              setEvalDays(nextValue);
               setEvalDaysError('');
             }}
             error={evalDaysError}
@@ -627,6 +745,7 @@ const BacktestPage: React.FC = () => {
           />
           <DatePicker
             id="backtest-date-from"
+            size="compact"
             label={text.startDate}
             ariaLabel={text.startDateAria}
             value={analysisDateFrom}
@@ -641,6 +760,7 @@ const BacktestPage: React.FC = () => {
           />
           <DatePicker
             id="backtest-date-to"
+            size="compact"
             label={text.endDate}
             ariaLabel={text.endDateAria}
             value={analysisDateTo}
@@ -653,33 +773,29 @@ const BacktestPage: React.FC = () => {
             className="w-40 whitespace-nowrap"
             triggerClassName={`${BACKTEST_COMPACT_INPUT_CLASS} w-40 !rounded-xl text-center tabular-nums`}
           />
-          <Button
-            type="button"
-            onClick={handleShowNextDay}
-            disabled={isLoadingResults || isLoadingPerf}
-            variant={isNextDayValidation ? 'primary' : 'secondary'}
-            size="comfortable"
-            aria-pressed={isNextDayValidation}
-            className="text-xs"
-          >
-            {text.oneDayValidation}
-          </Button>
-          <Button
-            type="button"
-            onClick={() => setForceRerun(!forceRerun)}
-            disabled={isRunning}
-            variant={forceRerun ? 'primary' : 'secondary'}
-            size="comfortable"
-            aria-pressed={forceRerun}
-            className="text-xs"
-          >
-            {text.forceRerun}
-          </Button>
+          <SegmentedControl
+            value={isNextDayValidation ? 'oneDay' : 'window'}
+            options={[
+              { value: 'window', label: text.evalWindow, disabled: isRunning || isLoadingResults || isLoadingPerf },
+              { value: 'oneDay', label: text.oneDayValidation, disabled: isRunning || isLoadingResults || isLoadingPerf },
+            ]}
+            onChange={handleValidationModeChange}
+            ariaLabel={text.evalWindow}
+          />
+          <div className="flex h-8 items-center gap-1.5">
+            <span className="whitespace-nowrap text-xs font-medium text-secondary-text">{text.forceRerun}</span>
+            <Switch
+              checked={forceRerun}
+              disabled={isRunning}
+              onCheckedChange={setForceRerun}
+              aria-label={text.forceRerun}
+            />
+          </div>
           <Button
             type="button"
             onClick={handleRun}
             variant="primary"
-            size="comfortable"
+            size="primary"
             isLoading={isRunning}
             loadingText={text.running}
             className="whitespace-nowrap text-xs"
@@ -703,21 +819,35 @@ const BacktestPage: React.FC = () => {
       </header>
 
       {/* Main content; div, not main: the app shell already renders the single <main> landmark. */}
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 lg:flex-row">
+      {isRunning ? (
+        <Loading label={text.running} className="h-64" />
+      ) : !hasBacktestData && (isLoadingPerf || isLoadingResults) ? (
+        <Loading label={text.loadingResults} className="h-64" />
+      ) : !hasBacktestData && performanceError ? (
+        <ApiErrorAlert error={performanceError} />
+      ) : !hasBacktestData && resultsError ? (
+        <ApiErrorAlert error={resultsError} />
+      ) : !hasBacktestData ? (
+        <EmptyState
+          title={text.noResultsTitle}
+          description={text.noResultsDescription}
+          icon={<Inbox className="h-6 w-6" aria-hidden="true" />}
+          className="min-h-40"
+        />
+      ) : (
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-3 lg:flex-row">
         {/* Left sidebar - Performance */}
         <div className="flex max-h-[38vh] flex-col gap-3 overflow-y-auto lg:max-h-none lg:w-60 lg:flex-shrink-0">
           {performanceError ? <ApiErrorAlert error={performanceError} /> : null}
           {isLoadingPerf ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="backtest-spinner sm" />
-            </div>
+            <Loading />
           ) : overallPerf ? (
             <PerformanceCard metrics={overallPerf} title={text.overallPerformance} language={language} />
           ) : performanceError ? null : (
             <EmptyState
               title={text.noMetricsTitle}
               description={text.noMetricsDescription}
-              className="h-full min-h-[12rem] border-dashed bg-card/45 shadow-none"
+              className="h-full min-h-[12rem]"
             />
           )}
 
@@ -743,15 +873,11 @@ const BacktestPage: React.FC = () => {
             <ApiErrorAlert error={resultsError} className="mb-3" />
           ) : null}
           {isLoadingResults ? (
-            <div className="flex flex-col items-center justify-center h-64">
-              <div className="backtest-spinner md" />
-              <p className="mt-3 text-secondary-text text-sm">{text.loadingResults}</p>
-            </div>
+            <Loading label={text.loadingResults} className="h-64" />
           ) : results.length === 0 && !resultsError ? (
             <EmptyState
               title={text.noResultsTitle}
               description={text.noResultsDescription}
-              className="backtest-empty-state border-dashed"
               icon={(
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -773,91 +899,15 @@ const BacktestPage: React.FC = () => {
                 </div>
                 <span className="backtest-table-scroll-hint">{text.scrollHint}</span>
               </div>
-              <div className="backtest-table-wrapper">
-                <table className="backtest-table min-w-224 w-full text-sm">
-                  <thead className="backtest-table-head">
-                    <tr className="text-left">
-                      <th className="backtest-table-head-cell">{text.stock}</th>
-                      <th className="backtest-table-head-cell">{text.analysisDate}</th>
-                      <th className="backtest-table-head-cell">{text.phase}</th>
-                      <th className="backtest-table-head-cell">{text.aiPrediction}</th>
-                      <th className="backtest-table-head-cell">
-                        {showNextDayActualColumns ? text.actualPerformance : text.windowReturn}
-                      </th>
-                      <th className="backtest-table-head-cell">
-                        {showNextDayActualColumns ? text.accuracy : text.directionMatch}
-                      </th>
-                      <th className="backtest-table-head-cell">{text.result}</th>
-                      <th className="backtest-table-head-cell">{text.status}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {results.map((row) => {
-                      const actionLabel = getDecisionActionLabel(row.action, row.actionLabel, null, null, actionLabels);
-                      const predictionParts = [actionLabel, row.trendPrediction, row.operationAdvice]
-                        .filter((part): part is string => Boolean(part));
-
-                      return (
-                        <tr
-                          key={row.analysisHistoryId}
-                          className="backtest-table-row"
-                        >
-                          <td className="backtest-table-cell backtest-table-code">
-                            <div className="flex flex-col">
-                              <span>{row.code}</span>
-                              <span className="text-xs text-muted-text">{row.stockName || '--'}</span>
-                            </div>
-                          </td>
-                          <td className="backtest-table-cell text-secondary-text">{row.analysisDate || '--'}</td>
-                          <td className="backtest-table-cell text-secondary-text">{phaseLabel(row, language)}</td>
-                          <td className="backtest-table-cell max-w-56 text-foreground">
-                            {predictionParts.length ? (
-                              <Tooltip
-                                content={predictionParts.join(' / ')}
-                                focusable
-                              >
-                                <div className="flex flex-col gap-1">
-                                  <span className="block truncate">{actionLabel || row.trendPrediction || '--'}</span>
-                                  {actionLabel && row.trendPrediction && (
-                                    <span className="block truncate text-xs text-secondary-text">{row.trendPrediction}</span>
-                                  )}
-                                  {row.operationAdvice && (
-                                    <span className="block truncate text-xs text-secondary-text">{row.operationAdvice}</span>
-                                  )}
-                                </div>
-                              </Tooltip>
-                            ) : (
-                              '--'
-                            )}
-                          </td>
-                          <td className="backtest-table-cell">
-                            <div className="flex items-center gap-2">
-                              {actualMovementBadge(row.actualMovement, language)}
-                              <span className={
-                                row.actualReturnPct != null
-                                  ? row.actualReturnPct > 0 ? 'text-success' : row.actualReturnPct < 0 ? 'text-danger' : 'text-secondary-text'
-                                  : 'text-muted-text'
-                              }>
-                                {pct(row.actualReturnPct)}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="backtest-table-cell">
-                            <span className="flex items-center gap-2">
-                              {boolIcon(row.directionCorrect, text)}
-                              <span className="text-muted-text">
-                                {row.directionExpected ? labelFromMap(row.directionExpected, BACKTEST_DIRECTION_EXPECTED_LABELS[language]) : ''}
-                              </span>
-                            </span>
-                          </td>
-                          <td className="backtest-table-cell">{outcomeBadge(row.outcome, language)}</td>
-                          <td className="backtest-table-cell">{statusBadge(row.evalStatus, language)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable<BacktestResultItem>
+                caption={text.resultSet}
+                columns={resultColumns}
+                rows={results}
+                getRowKey={(row) => row.analysisHistoryId}
+                emptyState={{ title: text.noResultsTitle, description: text.noResultsDescription }}
+                density="compact"
+                minWidth="wide"
+              />
 
               {/* Pagination */}
               <div className="mt-4">
@@ -875,7 +925,8 @@ const BacktestPage: React.FC = () => {
           ) : null}
         </section>
       </div>
-    </div>
+      )}
+    </AppPage>
   );
 };
 

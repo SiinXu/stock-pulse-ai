@@ -11,7 +11,7 @@ describe('Drawer overlay behavior', () => {
     document.body.style.overflow = 'clip';
     const { container, unmount } = render(
       <UiLanguageProvider>
-        <Drawer isOpen onClose={() => undefined} title="History">
+        <Drawer isOpen onClose={() => undefined} title="History" variant="detail">
           <p>Reports</p>
         </Drawer>
       </UiLanguageProvider>,
@@ -39,6 +39,7 @@ describe('Drawer overlay behavior', () => {
             onClose={() => setIsOpen(false)}
             title="History"
             description="Recent reports"
+            variant="detail"
           >
             <button type="button">Choose report</button>
           </Drawer>
@@ -63,5 +64,34 @@ describe('Drawer overlay behavior', () => {
     expect(screen.queryByRole('dialog', { name: 'History' })).not.toBeInTheDocument();
     expect(container).not.toHaveAttribute('inert');
     expect(trigger).toHaveFocus();
+  });
+
+  it('derives side and width from semantic navigation and detail variants', () => {
+    const { rerender } = render(
+      <UiLanguageProvider>
+        <Drawer isOpen onClose={() => undefined} title="Navigation" variant="navigation">
+          <p>Routes</p>
+        </Drawer>
+      </UiLanguageProvider>,
+    );
+
+    let dialog = screen.getByRole('dialog', { name: 'Navigation' });
+    expect(dialog).toHaveAttribute('data-drawer-variant', 'navigation');
+    expect(dialog).toHaveAttribute('data-drawer-side', 'left');
+    expect(dialog.parentElement).toHaveClass('max-w-xs');
+
+    rerender(
+      <UiLanguageProvider>
+        <Drawer isOpen onClose={() => undefined} title="Details" variant="detail" size="wide">
+          <p>Details</p>
+        </Drawer>
+      </UiLanguageProvider>,
+    );
+
+    dialog = screen.getByRole('dialog', { name: 'Details' });
+    expect(dialog).toHaveAttribute('data-drawer-variant', 'detail');
+    expect(dialog).toHaveAttribute('data-drawer-side', 'right');
+    expect(dialog).toHaveAttribute('data-drawer-size', 'wide');
+    expect(dialog.parentElement).toHaveClass('max-w-[40rem]');
   });
 });

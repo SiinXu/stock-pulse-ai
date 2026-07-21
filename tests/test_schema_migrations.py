@@ -17,10 +17,11 @@ import sqlite3
 import threading
 import time
 from typing import Callable, Iterable
+from unittest.mock import patch
 import warnings
 
 import pytest
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.pool import NullPool
 
@@ -31,7 +32,12 @@ from src.migrations.legacy_profiles import (
     match_legacy_schema_profile,
 )
 from src.migrations.registry import (
+    DECISION_SIGNAL_PROFILE_MIGRATION,
+    INTELLIGENCE_ITEM_SCOPE_MIGRATION,
+    INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION,
     LEGACY_BASELINE_MIGRATION,
+    LLM_USAGE_TELEMETRY_MIGRATION,
+    PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION,
     REGISTRY_METADATA_MIGRATION,
     TARGET_VERSION,
     get_migrations,
@@ -48,7 +54,19 @@ from src.migrations.types import (
     read_checksum_source,
     validate_registry,
 )
-from src.storage import Base, DatabaseManager
+from src.migrations.versions.v202607190001_llm_usage_telemetry_columns import (
+    _TELEMETRY_COLUMNS as LLM_USAGE_TELEMETRY_COLUMNS,
+)
+from src.migrations.versions.v202607190002_decision_signal_profile_schema import (
+    _PROFILE_INDEXES as DECISION_SIGNAL_PROFILE_INDEXES,
+)
+from src.storage import (
+    Base,
+    DatabaseManager,
+    DecisionSignalRecord,
+    LLMUsage,
+    _LLM_USAGE_TELEMETRY_COLUMN_SQL,
+)
 
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "schema_migrations"
@@ -395,7 +413,15 @@ def test_production_registry_is_stable_unique_and_strictly_ordered_across_import
     assert before == after
     assert ids == tuple(sorted(ids))
     assert len(ids) == len(set(ids))
-    assert ids == (LEGACY_BASELINE_MIGRATION.id, REGISTRY_METADATA_MIGRATION.id)
+    assert ids == (
+        LEGACY_BASELINE_MIGRATION.id,
+        REGISTRY_METADATA_MIGRATION.id,
+        LLM_USAGE_TELEMETRY_MIGRATION.id,
+        DECISION_SIGNAL_PROFILE_MIGRATION.id,
+        PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION.id,
+        INTELLIGENCE_ITEM_SCOPE_MIGRATION.id,
+        INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION.id,
+    )
     assert reloaded.TARGET_VERSION == ids[-1]
     assert all(len(checksum) == 64 for _, _, checksum in after)
 
@@ -823,7 +849,7 @@ def test_source_guard_respects_nested_parameter_shadowing(tmp_path: Path) -> Non
     assert migration.source_bound is True
 
 
-def test_fresh_memory_database_has_core_tables_and_two_applied_migrations() -> None:
+def test_fresh_memory_database_has_core_tables_and_all_applied_migrations() -> None:
     database = DatabaseManager(db_url="sqlite:///:memory:")
 
     assert CORE_TABLES.issubset(set(inspect(database._engine).get_table_names()))
@@ -863,7 +889,7 @@ def test_fresh_file_database_restart_is_idempotent(tmp_path: Path) -> None:
     assert CORE_TABLES.issubset(set(inspect(second._engine).get_table_names()))
     assert _applied_rows(second._engine) == first_rows
     assert second_applied_at == first_applied_at
-    assert len(first_rows) == 2
+    assert len(first_rows) == len(get_migrations())
 
 
 @pytest.mark.parametrize(
@@ -2861,3 +2887,1056 @@ def test_cli_preserves_checksum_mismatch_state_and_failure_exit_code(
     assert payload["failure_code"] == "migration_checksum_mismatch"
     assert payload["failed_migration_id"] == REGISTRY_METADATA_MIGRATION.id
     assert payload["checksum_mismatches"] == [REGISTRY_METADATA_MIGRATION.id]
+
+
+_LEGACY_LLM_USAGE_DDL = (
+    "CREATE TABLE llm_usage ("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+    "call_type VARCHAR(32) NOT NULL, "
+    "model VARCHAR(128) NOT NULL, "
+    "stock_code VARCHAR(16), "
+    "prompt_tokens INTEGER NOT NULL DEFAULT 0, "
+    "completion_tokens INTEGER NOT NULL DEFAULT 0, "
+    "total_tokens INTEGER NOT NULL DEFAULT 0, "
+    "called_at DATETIME)"
+)
+_LEGACY_LLM_USAGE_ROW = (
+    "INSERT INTO llm_usage "
+    "(call_type, model, stock_code, prompt_tokens, completion_tokens, total_tokens) "
+    "VALUES ('analysis', 'gpt-legacy', '600519', 3, 5, 8)"
+)
+
+
+# Fixed registry subset ending at the llm_usage migration. Using an explicit
+# subset (instead of the live registry) keeps these llm_usage-specific tests
+# stable as later migrations are appended.
+_LLM_USAGE_REGISTRY = (
+    LEGACY_BASELINE_MIGRATION,
+    REGISTRY_METADATA_MIGRATION,
+    LLM_USAGE_TELEMETRY_MIGRATION,
+)
+
+
+def _engine_with_registry_before_llm_usage_migration(path: Path) -> Engine:
+    """Stamp the migrations before the pending llm_usage backfill."""
+    engine = create_engine(_database_url(path))
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE schema_migrations ("
+            "version VARCHAR(64) NOT NULL PRIMARY KEY, "
+            "description VARCHAR(255) NOT NULL, "
+            "applied_at DATETIME NOT NULL, "
+            "checksum VARCHAR(64))"
+        )
+        for migration in _LLM_USAGE_REGISTRY:
+            if migration.id == LLM_USAGE_TELEMETRY_MIGRATION.id:
+                continue
+            connection.exec_driver_sql(
+                "INSERT INTO schema_migrations "
+                "(version, description, applied_at, checksum) VALUES (?, ?, ?, ?)",
+                (
+                    migration.id,
+                    migration.description,
+                    "2099-01-01 00:00:00",
+                    migration.checksum,
+                ),
+            )
+    return engine
+
+
+def _llm_usage_columns(db_path: Path) -> set[str]:
+    with sqlite3.connect(db_path) as connection:
+        return {
+            str(row[1])
+            for row in connection.execute("PRAGMA table_info(llm_usage)").fetchall()
+        }
+
+
+def test_llm_usage_telemetry_migration_reproduces_model_backfill_columns() -> None:
+    migration_columns = tuple(name for name, _ in LLM_USAGE_TELEMETRY_COLUMNS)
+
+    # Every migrated column is a real, correctly-typed telemetry column on the
+    # model, so the frozen migration cannot drift into adding unknown columns.
+    model_columns = {column.name for column in LLMUsage.__table__.columns}
+    assert set(migration_columns).issubset(model_columns)
+    assert all(
+        _LLM_USAGE_TELEMETRY_COLUMN_SQL.get(name) == column_type
+        for name, column_type in LLM_USAGE_TELEMETRY_COLUMNS
+    )
+    assert len(migration_columns) == len(set(migration_columns))
+
+
+def test_llm_usage_telemetry_migration_backfills_legacy_columns_and_is_idempotent(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "legacy-llm-usage.sqlite"
+    engine = _engine_with_registry_before_llm_usage_migration(db_path)
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(_LEGACY_LLM_USAGE_DDL)
+            connection.exec_driver_sql(_LEGACY_LLM_USAGE_ROW)
+        assert LLM_USAGE_TELEMETRY_MIGRATION.id not in _applied_ids(engine)
+
+        result = MigrationRunner(_LLM_USAGE_REGISTRY).apply_pending(engine)
+        assert result.success is True
+        assert result.executed_ids == (LLM_USAGE_TELEMETRY_MIGRATION.id,)
+
+        migration_columns = {name for name, _ in LLM_USAGE_TELEMETRY_COLUMNS}
+        assert migration_columns.issubset(_llm_usage_columns(db_path))
+        with sqlite3.connect(db_path) as connection:
+            preserved = connection.execute(
+                "SELECT call_type, model, stock_code, prompt_tokens, "
+                "completion_tokens, total_tokens FROM llm_usage"
+            ).fetchall()
+        assert preserved == [("analysis", "gpt-legacy", "600519", 3, 5, 8)]
+
+        first_schema = _sqlite_master_snapshot(db_path)
+        assert MigrationRunner(_LLM_USAGE_REGISTRY).verify(engine).success is True
+
+        rerun = MigrationRunner(_LLM_USAGE_REGISTRY).apply_pending(engine)
+        assert rerun.success is True
+        assert rerun.executed_ids == ()
+        assert _sqlite_master_snapshot(db_path) == first_schema
+    finally:
+        engine.dispose()
+
+
+def test_llm_usage_telemetry_migration_is_noop_when_columns_already_present(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "modern-llm-usage.sqlite"
+    engine = _engine_with_registry_before_llm_usage_migration(db_path)
+    try:
+        extra_columns = "".join(
+            f", {name} {column_type}"
+            for name, column_type in LLM_USAGE_TELEMETRY_COLUMNS
+        )
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                _LEGACY_LLM_USAGE_DDL[:-1] + extra_columns + ")"
+            )
+        before_schema = _sqlite_master_snapshot(db_path)
+
+        result = MigrationRunner(_LLM_USAGE_REGISTRY).apply_pending(engine)
+        assert result.success is True
+        assert result.executed_ids == (LLM_USAGE_TELEMETRY_MIGRATION.id,)
+        assert _sqlite_master_snapshot(db_path) == before_schema
+    finally:
+        engine.dispose()
+
+
+def test_llm_usage_telemetry_migration_rolls_back_added_columns_on_registry_write_failure(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "rollback-llm-usage.sqlite"
+    engine = _engine_with_registry_before_llm_usage_migration(db_path)
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(_LEGACY_LLM_USAGE_DDL)
+        before_columns = _llm_usage_columns(db_path)
+
+        class AppliedInsertFailureRunner(MigrationRunner):
+            def _insert_applied(self, connection: Connection, migration: Migration) -> None:
+                if migration.id == LLM_USAGE_TELEMETRY_MIGRATION.id:
+                    raise RuntimeError("injected applied insert failure")
+                super()._insert_applied(connection, migration)
+
+        result = AppliedInsertFailureRunner(_LLM_USAGE_REGISTRY).apply_pending(engine)
+
+        assert result.success is False
+        assert result.failure_code == "applied_registry_write_failed"
+        assert result.failed_migration_id == LLM_USAGE_TELEMETRY_MIGRATION.id
+        assert _llm_usage_columns(db_path) == before_columns
+        assert LLM_USAGE_TELEMETRY_MIGRATION.id not in _applied_ids(engine)
+    finally:
+        engine.dispose()
+
+
+def test_llm_usage_telemetry_migration_applies_once_under_two_engines(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "concurrent-llm-usage.sqlite"
+    url = _database_url(db_path)
+    setup_engine = _engine_with_registry_before_llm_usage_migration(db_path)
+    with setup_engine.begin() as connection:
+        connection.exec_driver_sql(_LEGACY_LLM_USAGE_DDL)
+        connection.exec_driver_sql(_LEGACY_LLM_USAGE_ROW)
+    setup_engine.dispose()
+
+    engines = (
+        create_engine(url, connect_args={"timeout": 2.0}, poolclass=NullPool),
+        create_engine(url, connect_args={"timeout": 2.0}, poolclass=NullPool),
+    )
+    barrier = threading.Barrier(2)
+
+    def apply(engine: Engine):
+        barrier.wait(timeout=5)
+        return MigrationRunner(_LLM_USAGE_REGISTRY).apply_pending(engine)
+
+    try:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(apply, engines))
+    finally:
+        for engine in engines:
+            engine.dispose()
+
+    assert all(result.success for result in results)
+    assert sorted(len(result.executed_ids) for result in results) == [0, 1]
+    migration_columns = {name for name, _ in LLM_USAGE_TELEMETRY_COLUMNS}
+    assert migration_columns.issubset(_llm_usage_columns(db_path))
+    with sqlite3.connect(db_path) as connection:
+        applied_count = connection.execute(
+            "SELECT COUNT(*) FROM schema_migrations WHERE version = ?",
+            (LLM_USAGE_TELEMETRY_MIGRATION.id,),
+        ).fetchone()[0]
+        preserved = connection.execute(
+            "SELECT call_type, model, prompt_tokens FROM llm_usage"
+        ).fetchall()
+    assert applied_count == 1
+    assert preserved == [("analysis", "gpt-legacy", 3)]
+
+
+_LEGACY_DECISION_SIGNALS_DDL = (
+    "CREATE TABLE decision_signals ("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+    "stock_code VARCHAR(16) NOT NULL, "
+    "market VARCHAR(8) NOT NULL, "
+    "source_type VARCHAR(32) NOT NULL, "
+    "source_report_id INTEGER, "
+    "trace_id VARCHAR(64), "
+    "trigger_source VARCHAR(64) NOT NULL, "
+    "action VARCHAR(16) NOT NULL, "
+    "horizon VARCHAR(16), "
+    "market_phase VARCHAR(24), "
+    "plan_quality VARCHAR(16) NOT NULL, "
+    "status VARCHAR(16) NOT NULL, "
+    "created_at DATETIME, "
+    "metadata_json TEXT)"
+)
+_LEGACY_DECISION_SIGNAL_ROWS = (
+    "INSERT INTO decision_signals "
+    "(stock_code, market, source_type, trigger_source, action, plan_quality, "
+    "status, created_at, metadata_json) VALUES "
+    "('600519', 'cn', 'analysis', 't', 'buy', 'unknown', 'active', "
+    "'2026-01-01', '{\"decision_profile\":\"balanced\"}'), "
+    "('600519', 'cn', 'analysis', 't', 'buy', 'unknown', 'active', "
+    "'2026-01-01', '{\"decision_profile\":\"reckless\"}')"
+)
+
+# Fixed registry subset ending at the decision_signal migration keeps these
+# decision-signal-specific tests stable as later migrations are appended.
+_DECISION_SIGNAL_REGISTRY = (
+    LEGACY_BASELINE_MIGRATION,
+    REGISTRY_METADATA_MIGRATION,
+    LLM_USAGE_TELEMETRY_MIGRATION,
+    DECISION_SIGNAL_PROFILE_MIGRATION,
+)
+
+
+def _engine_with_registry_before_decision_signal_migration(path: Path) -> Engine:
+    """Stamp the migrations before the pending decision_signal profile migration."""
+    engine = create_engine(_database_url(path))
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE schema_migrations ("
+            "version VARCHAR(64) NOT NULL PRIMARY KEY, "
+            "description VARCHAR(255) NOT NULL, "
+            "applied_at DATETIME NOT NULL, "
+            "checksum VARCHAR(64))"
+        )
+        for migration in _DECISION_SIGNAL_REGISTRY:
+            if migration.id == DECISION_SIGNAL_PROFILE_MIGRATION.id:
+                continue
+            connection.exec_driver_sql(
+                "INSERT INTO schema_migrations "
+                "(version, description, applied_at, checksum) VALUES (?, ?, ?, ?)",
+                (
+                    migration.id,
+                    migration.description,
+                    "2099-01-01 00:00:00",
+                    migration.checksum,
+                ),
+            )
+    return engine
+
+
+def _decision_signal_columns(db_path: Path) -> set[str]:
+    with sqlite3.connect(db_path) as connection:
+        return {
+            str(row[1])
+            for row in connection.execute(
+                "PRAGMA table_info(decision_signals)"
+            ).fetchall()
+        }
+
+
+def _decision_signal_index_columns(db_path: Path, index_name: str) -> tuple:
+    with sqlite3.connect(db_path) as connection:
+        return tuple(
+            str(row[2])
+            for row in connection.execute(
+                f'PRAGMA index_info("{index_name}")'
+            ).fetchall()
+        )
+
+
+def test_decision_signal_profile_migration_matches_model_indexes() -> None:
+    model_indexes = {
+        index.name: tuple(column.name for column in index.columns)
+        for index in DecisionSignalRecord.__table__.indexes
+    }
+    for index_name, index_columns in DECISION_SIGNAL_PROFILE_INDEXES:
+        assert model_indexes.get(index_name) == index_columns
+
+
+def test_decision_signal_profile_migration_backfills_and_is_idempotent(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "legacy-decision-signals.sqlite"
+    engine = _engine_with_registry_before_decision_signal_migration(db_path)
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(_LEGACY_DECISION_SIGNALS_DDL)
+            connection.exec_driver_sql(_LEGACY_DECISION_SIGNAL_ROWS)
+        assert "decision_profile" not in _decision_signal_columns(db_path)
+
+        result = MigrationRunner(_DECISION_SIGNAL_REGISTRY).apply_pending(engine)
+        assert result.success is True
+        assert result.executed_ids == (DECISION_SIGNAL_PROFILE_MIGRATION.id,)
+
+        assert "decision_profile" in _decision_signal_columns(db_path)
+        for index_name, index_columns in DECISION_SIGNAL_PROFILE_INDEXES:
+            assert (
+                _decision_signal_index_columns(db_path, index_name) == index_columns
+            )
+        with sqlite3.connect(db_path) as connection:
+            profiles = connection.execute(
+                "SELECT id, decision_profile FROM decision_signals ORDER BY id"
+            ).fetchall()
+        # Only the valid legacy profile is backfilled; the unknown label is left
+        # NULL.
+        assert profiles == [(1, "balanced"), (2, None)]
+
+        first_schema = _sqlite_master_snapshot(db_path)
+        assert MigrationRunner(_DECISION_SIGNAL_REGISTRY).verify(engine).success is True
+
+        rerun = MigrationRunner(_DECISION_SIGNAL_REGISTRY).apply_pending(engine)
+        assert rerun.success is True
+        assert rerun.executed_ids == ()
+        assert _sqlite_master_snapshot(db_path) == first_schema
+    finally:
+        engine.dispose()
+
+
+def test_decision_signal_profile_migration_rolls_back_on_registry_write_failure(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "rollback-decision-signals.sqlite"
+    engine = _engine_with_registry_before_decision_signal_migration(db_path)
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(_LEGACY_DECISION_SIGNALS_DDL)
+            connection.exec_driver_sql(_LEGACY_DECISION_SIGNAL_ROWS)
+        before_columns = _decision_signal_columns(db_path)
+
+        class AppliedInsertFailureRunner(MigrationRunner):
+            def _insert_applied(self, connection: Connection, migration: Migration) -> None:
+                if migration.id == DECISION_SIGNAL_PROFILE_MIGRATION.id:
+                    raise RuntimeError("injected applied insert failure")
+                super()._insert_applied(connection, migration)
+
+        result = AppliedInsertFailureRunner(_DECISION_SIGNAL_REGISTRY).apply_pending(engine)
+
+        assert result.success is False
+        assert result.failure_code == "applied_registry_write_failed"
+        assert result.failed_migration_id == DECISION_SIGNAL_PROFILE_MIGRATION.id
+        # Column, indexes, and backfill all roll back with the applied row.
+        assert _decision_signal_columns(db_path) == before_columns
+        with sqlite3.connect(db_path) as connection:
+            index_rows = connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'index' "
+                "AND name = 'ix_decision_signals_decision_profile'"
+            ).fetchall()
+        assert index_rows == []
+        assert DECISION_SIGNAL_PROFILE_MIGRATION.id not in _applied_ids(engine)
+    finally:
+        engine.dispose()
+
+
+def test_decision_signal_profile_migration_applies_once_under_two_engines(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "concurrent-decision-signals.sqlite"
+    url = _database_url(db_path)
+    setup_engine = _engine_with_registry_before_decision_signal_migration(db_path)
+    with setup_engine.begin() as connection:
+        connection.exec_driver_sql(_LEGACY_DECISION_SIGNALS_DDL)
+        connection.exec_driver_sql(_LEGACY_DECISION_SIGNAL_ROWS)
+    setup_engine.dispose()
+
+    engines = (
+        create_engine(url, connect_args={"timeout": 2.0}, poolclass=NullPool),
+        create_engine(url, connect_args={"timeout": 2.0}, poolclass=NullPool),
+    )
+    barrier = threading.Barrier(2)
+
+    def apply(engine: Engine):
+        barrier.wait(timeout=5)
+        return MigrationRunner(_DECISION_SIGNAL_REGISTRY).apply_pending(engine)
+
+    try:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(apply, engines))
+    finally:
+        for engine in engines:
+            engine.dispose()
+
+    assert all(result.success for result in results)
+    assert sorted(len(result.executed_ids) for result in results) == [0, 1]
+    with sqlite3.connect(db_path) as connection:
+        applied_count = connection.execute(
+            "SELECT COUNT(*) FROM schema_migrations WHERE version = ?",
+            (DECISION_SIGNAL_PROFILE_MIGRATION.id,),
+        ).fetchone()[0]
+        profiles = connection.execute(
+            "SELECT id, decision_profile FROM decision_signals ORDER BY id"
+        ).fetchall()
+    assert applied_count == 1
+    assert profiles == [(1, "balanced"), (2, None)]
+
+
+_LEGACY_PORTFOLIO_IDEMPOTENCY_DDL = (
+    "CREATE TABLE portfolio_idempotency_records ("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+    "operation_id VARCHAR(128) NOT NULL UNIQUE, "
+    "operation_type VARCHAR(32) NOT NULL, "
+    "request_hash VARCHAR(64) NOT NULL, "
+    "response_json TEXT NOT NULL, "
+    "created_at DATETIME NOT NULL)"
+)
+_LEGACY_PORTFOLIO_IDEMPOTENCY_ROW = (
+    "INSERT INTO portfolio_idempotency_records "
+    "(operation_id, operation_type, request_hash, response_json, created_at) "
+    "VALUES ('raw-legacy-key', 'cash', 'h', '{}', '2026-01-01')"
+)
+
+# Fixed registry subset ending at the portfolio idempotency scope migration.
+_PORTFOLIO_REGISTRY = (
+    LEGACY_BASELINE_MIGRATION,
+    REGISTRY_METADATA_MIGRATION,
+    LLM_USAGE_TELEMETRY_MIGRATION,
+    DECISION_SIGNAL_PROFILE_MIGRATION,
+    PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION,
+)
+_PORTFOLIO_SCOPE_COLUMNS = {
+    "client_operation_id",
+    "scope_key",
+    "scope_account_id",
+    "scope_owner_id",
+}
+_PORTFOLIO_SCOPE_UNIQUE_INDEX = "uix_portfolio_idempotency_scope_operation"
+_PORTFOLIO_GUARD_TRIGGER = "trg_portfolio_idempotency_legacy_key_guard"
+
+
+def _engine_with_registry_before_portfolio_migration(path: Path) -> Engine:
+    """Stamp the migrations before the pending portfolio idempotency migration."""
+    engine = create_engine(_database_url(path))
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE schema_migrations ("
+            "version VARCHAR(64) NOT NULL PRIMARY KEY, "
+            "description VARCHAR(255) NOT NULL, "
+            "applied_at DATETIME NOT NULL, "
+            "checksum VARCHAR(64))"
+        )
+        for migration in _PORTFOLIO_REGISTRY:
+            if migration.id == PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION.id:
+                continue
+            connection.exec_driver_sql(
+                "INSERT INTO schema_migrations "
+                "(version, description, applied_at, checksum) VALUES (?, ?, ?, ?)",
+                (
+                    migration.id,
+                    migration.description,
+                    "2099-01-01 00:00:00",
+                    migration.checksum,
+                ),
+            )
+    return engine
+
+
+def _portfolio_columns(db_path: Path) -> set[str]:
+    with sqlite3.connect(db_path) as connection:
+        return {
+            str(row[1])
+            for row in connection.execute(
+                "PRAGMA table_info(portfolio_idempotency_records)"
+            ).fetchall()
+        }
+
+
+def _portfolio_objects(db_path: Path) -> dict:
+    with sqlite3.connect(db_path) as connection:
+        indexes = {
+            str(row[1]): bool(row[2])
+            for row in connection.execute(
+                "PRAGMA index_list(portfolio_idempotency_records)"
+            ).fetchall()
+        }
+        triggers = {
+            str(row[0])
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'trigger'"
+            ).fetchall()
+        }
+    return {"indexes": indexes, "triggers": triggers}
+
+
+def test_portfolio_idempotency_migration_backfills_scope_index_trigger_idempotently(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "legacy-portfolio.sqlite"
+    engine = _engine_with_registry_before_portfolio_migration(db_path)
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(_LEGACY_PORTFOLIO_IDEMPOTENCY_DDL)
+            connection.exec_driver_sql(_LEGACY_PORTFOLIO_IDEMPOTENCY_ROW)
+        assert not _PORTFOLIO_SCOPE_COLUMNS.issubset(_portfolio_columns(db_path))
+
+        result = MigrationRunner(_PORTFOLIO_REGISTRY).apply_pending(engine)
+        assert result.success is True
+        assert result.executed_ids == (PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION.id,)
+
+        assert _PORTFOLIO_SCOPE_COLUMNS.issubset(_portfolio_columns(db_path))
+        objects = _portfolio_objects(db_path)
+        assert objects["indexes"].get(_PORTFOLIO_SCOPE_UNIQUE_INDEX) is True
+        assert _PORTFOLIO_GUARD_TRIGGER in objects["triggers"]
+        with sqlite3.connect(db_path) as connection:
+            row = connection.execute(
+                "SELECT operation_id, client_operation_id, scope_key, "
+                "scope_account_id, scope_owner_id "
+                "FROM portfolio_idempotency_records"
+            ).fetchall()
+        # The raw legacy row is kept but converted to a legacy-scoped shape that
+        # can never cross owner boundaries.
+        assert row == [("raw-legacy-key", "raw-legacy-key", None, None, None)]
+
+        first_schema = _sqlite_master_snapshot(db_path)
+        assert MigrationRunner(_PORTFOLIO_REGISTRY).verify(engine).success is True
+
+        rerun = MigrationRunner(_PORTFOLIO_REGISTRY).apply_pending(engine)
+        assert rerun.success is True
+        assert rerun.executed_ids == ()
+        assert _sqlite_master_snapshot(db_path) == first_schema
+    finally:
+        engine.dispose()
+
+
+def test_portfolio_idempotency_migration_rolls_back_on_registry_write_failure(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "rollback-portfolio.sqlite"
+    engine = _engine_with_registry_before_portfolio_migration(db_path)
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(_LEGACY_PORTFOLIO_IDEMPOTENCY_DDL)
+            connection.exec_driver_sql(_LEGACY_PORTFOLIO_IDEMPOTENCY_ROW)
+        before_columns = _portfolio_columns(db_path)
+
+        class AppliedInsertFailureRunner(MigrationRunner):
+            def _insert_applied(self, connection: Connection, migration: Migration) -> None:
+                if migration.id == PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION.id:
+                    raise RuntimeError("injected applied insert failure")
+                super()._insert_applied(connection, migration)
+
+        result = AppliedInsertFailureRunner(_PORTFOLIO_REGISTRY).apply_pending(engine)
+
+        assert result.success is False
+        assert result.failure_code == "applied_registry_write_failed"
+        assert result.failed_migration_id == PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION.id
+        # Columns, unique index, and guard trigger all roll back together.
+        assert _portfolio_columns(db_path) == before_columns
+        objects = _portfolio_objects(db_path)
+        assert _PORTFOLIO_SCOPE_UNIQUE_INDEX not in objects["indexes"]
+        assert _PORTFOLIO_GUARD_TRIGGER not in objects["triggers"]
+        assert PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION.id not in _applied_ids(engine)
+    finally:
+        engine.dispose()
+
+
+def test_portfolio_idempotency_migration_applies_once_under_two_engines(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "concurrent-portfolio.sqlite"
+    url = _database_url(db_path)
+    setup_engine = _engine_with_registry_before_portfolio_migration(db_path)
+    with setup_engine.begin() as connection:
+        connection.exec_driver_sql(_LEGACY_PORTFOLIO_IDEMPOTENCY_DDL)
+        connection.exec_driver_sql(_LEGACY_PORTFOLIO_IDEMPOTENCY_ROW)
+    setup_engine.dispose()
+
+    engines = (
+        create_engine(url, connect_args={"timeout": 2.0}, poolclass=NullPool),
+        create_engine(url, connect_args={"timeout": 2.0}, poolclass=NullPool),
+    )
+    barrier = threading.Barrier(2)
+
+    def apply(engine: Engine):
+        barrier.wait(timeout=5)
+        return MigrationRunner(_PORTFOLIO_REGISTRY).apply_pending(engine)
+
+    try:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(apply, engines))
+    finally:
+        for engine in engines:
+            engine.dispose()
+
+    assert all(result.success for result in results)
+    assert sorted(len(result.executed_ids) for result in results) == [0, 1]
+    objects = _portfolio_objects(db_path)
+    assert objects["indexes"].get(_PORTFOLIO_SCOPE_UNIQUE_INDEX) is True
+    assert _PORTFOLIO_GUARD_TRIGGER in objects["triggers"]
+    with sqlite3.connect(db_path) as connection:
+        applied_count = connection.execute(
+            "SELECT COUNT(*) FROM schema_migrations WHERE version = ?",
+            (PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION.id,),
+        ).fetchone()[0]
+    assert applied_count == 1
+
+
+_INTELLIGENCE_REGISTRY = (
+    LEGACY_BASELINE_MIGRATION,
+    REGISTRY_METADATA_MIGRATION,
+    LLM_USAGE_TELEMETRY_MIGRATION,
+    DECISION_SIGNAL_PROFILE_MIGRATION,
+    PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION,
+    INTELLIGENCE_ITEM_SCOPE_MIGRATION,
+    INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION,
+)
+_INTEL_SCOPED_UNIQUE_COLUMNS = ["source_id", "url", "scope_type", "scope_value", "market"]
+_LEGACY_INTELLIGENCE_SOURCES_DDL = (
+    "CREATE TABLE intelligence_sources ("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, url TEXT NOT NULL)"
+)
+_LEGACY_INTELLIGENCE_ITEMS_DDL = (
+    "CREATE TABLE intelligence_items ("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT, source_id INTEGER, source_name TEXT, "
+    "source_type TEXT NOT NULL DEFAULT 'rss', title TEXT NOT NULL, summary TEXT, "
+    "url TEXT NOT NULL, source TEXT, published_at DATETIME, fetched_at DATETIME, "
+    "scope_type TEXT NOT NULL DEFAULT 'market', scope_value TEXT, "
+    "market TEXT NOT NULL DEFAULT 'cn', raw_payload TEXT)"
+)
+
+
+def _engine_with_registry_before_intelligence_migrations(path: Path) -> Engine:
+    """Stamp the migrations before the pending intelligence scope migrations."""
+    engine = create_engine(_database_url(path))
+    stamped = {
+        INTELLIGENCE_ITEM_SCOPE_MIGRATION.id,
+        INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION.id,
+    }
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE schema_migrations ("
+            "version VARCHAR(64) NOT NULL PRIMARY KEY, "
+            "description VARCHAR(255) NOT NULL, "
+            "applied_at DATETIME NOT NULL, "
+            "checksum VARCHAR(64))"
+        )
+        for migration in _INTELLIGENCE_REGISTRY:
+            if migration.id in stamped:
+                continue
+            connection.exec_driver_sql(
+                "INSERT INTO schema_migrations "
+                "(version, description, applied_at, checksum) VALUES (?, ?, ?, ?)",
+                (
+                    migration.id,
+                    migration.description,
+                    "2099-01-01 00:00:00",
+                    migration.checksum,
+                ),
+            )
+    return engine
+
+
+def _seed_legacy_intelligence(connection) -> None:
+    connection.exec_driver_sql(_LEGACY_INTELLIGENCE_SOURCES_DDL)
+    connection.exec_driver_sql(_LEGACY_INTELLIGENCE_ITEMS_DDL)
+    connection.exec_driver_sql(
+        "CREATE UNIQUE INDEX uix_intelligence_item_url_legacy ON intelligence_items(url)"
+    )
+    connection.exec_driver_sql(
+        "INSERT INTO intelligence_sources (name, url) VALUES ('legacy', 'https://x/rss')"
+    )
+    connection.exec_driver_sql(
+        "INSERT INTO intelligence_items "
+        "(source_id, source_type, title, url, scope_type, scope_value, market) VALUES "
+        "(1, 'rss', 'A', 'https://x/a', 'market', NULL, 'cn'), "
+        "(1, 'rss', 'B', 'https://x/b', 'market', '', 'cn')"
+    )
+
+
+def _intel_unique_index_columns(db_path: Path) -> dict:
+    with sqlite3.connect(db_path) as connection:
+        result = {}
+        for row in connection.execute(
+            "PRAGMA index_list(intelligence_items)"
+        ).fetchall():
+            if int(row[2]) != 1:
+                continue
+            columns = [
+                str(info[2])
+                for info in connection.execute(
+                    f'PRAGMA index_xinfo("{row[1]}")'
+                ).fetchall()
+                if info[2] is not None
+            ]
+            result[str(row[1])] = columns
+    return result
+
+
+def test_intelligence_migrations_backfill_scope_and_rebuild_unique_index(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "legacy-intelligence.sqlite"
+    engine = _engine_with_registry_before_intelligence_migrations(db_path)
+    try:
+        with engine.begin() as connection:
+            _seed_legacy_intelligence(connection)
+
+        result = MigrationRunner(_INTELLIGENCE_REGISTRY).apply_pending(engine)
+        assert result.success is True
+        assert result.executed_ids == (
+            INTELLIGENCE_ITEM_SCOPE_MIGRATION.id,
+            INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION.id,
+        )
+
+        with sqlite3.connect(db_path) as connection:
+            scopes = connection.execute(
+                "SELECT scope_value FROM intelligence_items ORDER BY id"
+            ).fetchall()
+            count = connection.execute(
+                "SELECT COUNT(*) FROM intelligence_items"
+            ).fetchone()[0]
+            temp_tables = connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' "
+                "AND name LIKE 'intelligence_items%tmp%'"
+            ).fetchall()
+        # Null and blank scopes are normalized before the rebuild copies rows.
+        assert scopes == [("__dsa_null_scope__",), ("__dsa_null_scope__",)]
+        assert count == 2
+        assert temp_tables == []
+
+        unique_indexes = _intel_unique_index_columns(db_path)
+        assert "uix_intelligence_item_url_legacy" not in unique_indexes
+        assert unique_indexes.get("uix_intel_item_scope") == _INTEL_SCOPED_UNIQUE_COLUMNS
+
+        first_schema = _sqlite_master_snapshot(db_path)
+        assert MigrationRunner(_INTELLIGENCE_REGISTRY).verify(engine).success is True
+        rerun = MigrationRunner(_INTELLIGENCE_REGISTRY).apply_pending(engine)
+        assert rerun.success is True
+        assert rerun.executed_ids == ()
+        assert _sqlite_master_snapshot(db_path) == first_schema
+    finally:
+        engine.dispose()
+
+
+def test_intelligence_unique_index_migration_rolls_back_rebuild_on_write_failure(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "rollback-intelligence.sqlite"
+    engine = _engine_with_registry_before_intelligence_migrations(db_path)
+    try:
+        with engine.begin() as connection:
+            _seed_legacy_intelligence(connection)
+        before_unique = _intel_unique_index_columns(db_path)
+
+        class AppliedInsertFailureRunner(MigrationRunner):
+            def _insert_applied(self, connection: Connection, migration: Migration) -> None:
+                if migration.id == INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION.id:
+                    raise RuntimeError("injected applied insert failure")
+                super()._insert_applied(connection, migration)
+
+        result = AppliedInsertFailureRunner(_INTELLIGENCE_REGISTRY).apply_pending(engine)
+
+        assert result.success is False
+        assert result.failure_code == "applied_registry_write_failed"
+        assert result.failed_migration_id == INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION.id
+        # The rebuild rolls back with the applied row: the legacy url uniqueness
+        # is still present and no scoped index leaked.
+        after_unique = _intel_unique_index_columns(db_path)
+        assert "uix_intelligence_item_url_legacy" in after_unique
+        assert "uix_intel_item_scope" not in after_unique
+        assert after_unique == before_unique
+        assert INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION.id not in _applied_ids(engine)
+        with sqlite3.connect(db_path) as connection:
+            temp_tables = connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' "
+                "AND name LIKE 'intelligence_items%tmp%'"
+            ).fetchall()
+        assert temp_tables == []
+    finally:
+        engine.dispose()
+
+
+def test_intelligence_unique_index_migration_is_noop_when_scoped_index_present(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "modern-intelligence.sqlite"
+    engine = _engine_with_registry_before_intelligence_migrations(db_path)
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(_LEGACY_INTELLIGENCE_SOURCES_DDL)
+            connection.exec_driver_sql(_LEGACY_INTELLIGENCE_ITEMS_DDL)
+            connection.exec_driver_sql(
+                "CREATE UNIQUE INDEX uix_intel_item_scope ON intelligence_items "
+                "(source_id, url, scope_type, scope_value, market)"
+            )
+        before_schema = _sqlite_master_snapshot(db_path)
+
+        result = MigrationRunner(_INTELLIGENCE_REGISTRY).apply_pending(engine)
+        assert result.success is True
+        assert result.executed_ids == (
+            INTELLIGENCE_ITEM_SCOPE_MIGRATION.id,
+            INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION.id,
+        )
+        # The unique-index migration finds the scoped index already present and
+        # does not rebuild the table.
+        assert _sqlite_master_snapshot(db_path) == before_schema
+    finally:
+        engine.dispose()
+
+
+_STARTUP_DDL_KEYWORDS = frozenset({"CREATE", "ALTER", "DROP"})
+_HISTORICAL_STARTUP_FIXTURES = (
+    "v3_0_0.sql",
+    "v3_4_0.sql",
+    "v3_20_0.sql",
+    "v3_21_0.sql",
+    "v3_26_3.sql",
+)
+
+
+def _leading_sql_word(statement: str) -> str:
+    index = 0
+    while index < len(statement):
+        while index < len(statement) and statement[index].isspace():
+            index += 1
+        if statement.startswith("--", index):
+            newline = statement.find("\n", index + 2)
+            index = len(statement) if newline < 0 else newline + 1
+            continue
+        if statement.startswith("/*", index):
+            closing = statement.find("*/", index + 2)
+            index = len(statement) if closing < 0 else closing + 2
+            continue
+        break
+
+    end = index
+    while end < len(statement) and (
+        statement[end].isalnum() or statement[end] == "_"
+    ):
+        end += 1
+    return statement[index:end].upper()
+
+
+@contextmanager
+def _capture_startup_ddl_outside_migration_phases():
+    """Capture CREATE/ALTER/DROP statements executed during DatabaseManager
+    initialization, tracking whether each runs inside metadata create_all or a
+    registered migration's upgrade callable.
+
+    Startup may run DDL only inside `Base.metadata.create_all` (the fresh
+    baseline) and a migration listed in the production registry. Any DDL outside
+    those phases means a runtime compatibility step was re-introduced outside the
+    registry. The yielded object also records every DDL statement so a restart
+    can be asserted to run none at all.
+    """
+    import src.storage as storage_module
+
+    phase = {"name": "startup"}
+    captured = {"stray": [], "all_ddl": []}
+    traced_connections = []
+    registered_migration_phases = {
+        f"migration:{migration.id}" for migration in get_migrations()
+    }
+    original_upgrades = tuple(
+        (migration, migration.upgrade) for migration in get_migrations()
+    )
+    original_create_all = storage_module.Base.metadata.create_all
+
+    def _record(statement) -> None:
+        keyword = _leading_sql_word(str(statement))
+        if keyword not in _STARTUP_DDL_KEYWORDS:
+            return
+        captured["all_ddl"].append((phase["name"], keyword))
+        if (
+            phase["name"] != "create_all"
+            and phase["name"] not in registered_migration_phases
+        ):
+            captured["stray"].append(
+                (phase["name"], keyword, str(statement).strip()[:120])
+            )
+
+    def install_sqlite_trace(dbapi_connection, _connection_record):
+        if isinstance(dbapi_connection, sqlite3.Connection):
+            dbapi_connection.set_trace_callback(_record)
+            traced_connections.append(dbapi_connection)
+
+    def wrapped_create_all(*args, **kwargs):
+        previous_phase = phase["name"]
+        phase["name"] = "create_all"
+        try:
+            return original_create_all(*args, **kwargs)
+        finally:
+            phase["name"] = previous_phase
+
+    def instrument_upgrade(migration, upgrade):
+        @wraps(upgrade)
+        def wrapped_upgrade(execution):
+            previous_phase = phase["name"]
+            phase["name"] = f"migration:{migration.id}"
+            try:
+                return upgrade(execution)
+            finally:
+                phase["name"] = previous_phase
+
+        return wrapped_upgrade
+
+    listener_installed = False
+    try:
+        for migration, upgrade in original_upgrades:
+            object.__setattr__(
+                migration,
+                "upgrade",
+                instrument_upgrade(migration, upgrade),
+            )
+        event.listen(Engine, "connect", install_sqlite_trace)
+        listener_installed = True
+        with patch.object(
+            storage_module.Base.metadata, "create_all", wrapped_create_all
+        ):
+            yield captured
+    finally:
+        if listener_installed:
+            event.remove(Engine, "connect", install_sqlite_trace)
+        for migration, upgrade in original_upgrades:
+            object.__setattr__(migration, "upgrade", upgrade)
+        for connection in traced_connections:
+            try:
+                connection.set_trace_callback(None)
+            except sqlite3.ProgrammingError:
+                pass
+
+
+def test_fresh_startup_runs_no_schema_ddl_outside_registered_phases() -> None:
+    with _capture_startup_ddl_outside_migration_phases() as captured:
+        DatabaseManager(db_url="sqlite:///:memory:")
+    assert captured["stray"] == []
+    # The capture is active and create_all runs real DDL, so an empty stray list
+    # is a genuine result rather than a broken instrumentation.
+    assert any(phase == "create_all" for phase, _ in captured["all_ddl"])
+    assert any(
+        phase.startswith("migration:") for phase, _ in captured["all_ddl"]
+    )
+
+
+@pytest.mark.parametrize("fixture_name", _HISTORICAL_STARTUP_FIXTURES)
+def test_legacy_startup_runs_no_schema_ddl_outside_registered_phases(
+    tmp_path: Path,
+    fixture_name: str,
+) -> None:
+    db_path = tmp_path / fixture_name.replace(".sql", "-startup-ddl.sqlite")
+    _load_sql_fixture(db_path, fixture_name)
+    with _capture_startup_ddl_outside_migration_phases() as captured:
+        DatabaseManager(db_url=_database_url(db_path))
+    assert captured["stray"] == []
+
+
+def test_restart_runs_no_schema_ddl_at_all(tmp_path: Path) -> None:
+    db_path = tmp_path / "restart-startup-ddl.sqlite"
+    DatabaseManager(db_url=_database_url(db_path))
+    DatabaseManager.reset_instance()
+
+    with _capture_startup_ddl_outside_migration_phases() as captured:
+        DatabaseManager(db_url=_database_url(db_path))
+    # An already-migrated database performs no CREATE/ALTER/DROP on restart:
+    # create_all and every registered migration are no-ops.
+    assert captured["stray"] == []
+    assert captured["all_ddl"] == []
+
+
+def test_startup_ddl_guard_detects_unregistered_runner_ddl() -> None:
+    original_apply = MigrationRunner.apply_pending_within_transaction
+
+    def apply_with_unregistered_ddl(self, connection):
+        connection.connection.driver_connection.execute(
+            "/* unregistered startup compatibility step */\n"
+            "CREATE TABLE startup_ddl_guard_probe (id INTEGER PRIMARY KEY)"
+        )
+        return original_apply(self, connection)
+
+    with patch.object(
+        MigrationRunner,
+        "apply_pending_within_transaction",
+        apply_with_unregistered_ddl,
+    ), _capture_startup_ddl_outside_migration_phases() as captured:
+        DatabaseManager(db_url="sqlite:///:memory:")
+
+    assert len(captured["stray"]) == 1
+    assert captured["stray"][0][:2] == ("startup", "CREATE")
+    assert "startup_ddl_guard_probe" in captured["stray"][0][2]
+
+
+def test_startup_ddl_guard_detects_unregistered_applied_row_ddl() -> None:
+    original_insert_applied = MigrationRunner._insert_applied
+    injected = False
+
+    def insert_applied_with_unregistered_ddl(connection, migration):
+        nonlocal injected
+        if not injected:
+            injected = True
+            connection.exec_driver_sql(
+                "/* unregistered applied-row orchestration */\n"
+                "CREATE TABLE startup_ddl_inner_guard_probe "
+                "(id INTEGER PRIMARY KEY)"
+            )
+        return original_insert_applied(connection, migration)
+
+    with patch.object(
+        MigrationRunner,
+        "_insert_applied",
+        staticmethod(insert_applied_with_unregistered_ddl),
+    ), _capture_startup_ddl_outside_migration_phases() as captured:
+        DatabaseManager(db_url="sqlite:///:memory:")
+
+    assert len(captured["stray"]) == 1
+    assert captured["stray"][0][:2] == ("startup", "CREATE")
+    assert "startup_ddl_inner_guard_probe" in captured["stray"][0][2]
+
+
+def test_migration_verify_explains_fresh_database() -> None:
+    fresh = DatabaseManager(db_url="sqlite:///:memory:")
+    fresh_verification = MigrationRunner().verify(fresh._engine)
+    assert fresh_verification.success is True
+    assert fresh_verification.current_version == TARGET_VERSION
+    assert fresh_verification.pending_ids == ()
+    assert fresh_verification.unknown_ids == ()
+    assert fresh_verification.checksum_mismatches == ()
+
+
+@pytest.mark.parametrize("fixture_name", _HISTORICAL_STARTUP_FIXTURES)
+def test_migration_verify_explains_legacy_database(
+    tmp_path: Path,
+    fixture_name: str,
+) -> None:
+    db_path = tmp_path / fixture_name.replace(".sql", "-verify.sqlite")
+    _load_sql_fixture(db_path, fixture_name)
+    legacy = DatabaseManager(db_url=_database_url(db_path))
+    legacy_verification = MigrationRunner().verify(legacy._engine)
+    assert legacy_verification.success is True
+    assert legacy_verification.current_version == TARGET_VERSION
+    assert legacy_verification.pending_ids == ()
+    assert legacy_verification.unknown_ids == ()
+    assert legacy_verification.checksum_mismatches == ()

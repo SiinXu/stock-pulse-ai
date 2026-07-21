@@ -4,7 +4,7 @@ import { LoaderCircle } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { Tooltip } from './Tooltip';
 
-export type IconButtonSize = 'compact' | 'default' | 'comfortable';
+export type IconButtonSize = 'compact' | 'default' | 'comfortable' | 'navigation';
 export type IconButtonVariant = 'ghost' | 'outline' | 'danger';
 
 export interface IconButtonProps extends Omit<
@@ -24,6 +24,7 @@ const ICON_BUTTON_SIZE_STYLES: Record<IconButtonSize, string> = {
   compact: 'h-7 w-7',
   default: 'h-8 w-8',
   comfortable: 'h-9 w-9',
+  navigation: 'h-11 w-11',
 };
 
 const ICON_BUTTON_VARIANT_STYLES: Record<IconButtonVariant, string> = {

@@ -1,11 +1,15 @@
 # -*- coding: utf-8 -*-
 # Copyright (c) 2026 SiinXu / StockPulse contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Cross-runtime replay conformance for the Single RUN path (RF-06a / AR-RF-08).
+"""Cross-runtime replay conformance for the Single RUN path (ADR-002).
 
-Every ``mode=single_run`` manifest fixture is driven through BOTH runtimes over
-the *same* strict ``ReplayLLMAdapter`` transcript and the deterministic replay
-tool registry, and the two runtimes are asserted to honor one shared Contract:
+The double-run scope is the explicit fixture-ID allowlist below, never derived
+from ``mode``/``profile`` filters: an unknown ``mode=single_run`` fixture fails
+the support-matrix gate (fail closed) instead of silently joining a category,
+and expanding the allowlist requires a new ADR per the evidence-governance
+rules. Each allowlisted fixture is driven through BOTH runtimes over the *same*
+strict ``ReplayLLMAdapter`` transcript and the deterministic replay tool
+registry, and the two runtimes are asserted to honor one shared Contract:
 
 * **Equivalent** (normal / partial / modelref / fallback / toolscope /
   malformed): identical terminal verdict, dashboard, LLM-call count and tool
@@ -14,12 +18,12 @@ tool registry, and the two runtimes are asserted to honor one shared Contract:
 * **Intentional difference** (timeout / cancelrace): terminal *classification*
   equivalence only. The experimental runtime fences timeout/cancel after the
   current step's tools while native fences before, so tool logs may differ.
-  Recorded in ``docs/architecture/ADR-001-agent-runtime.md`` D5; neither
-  runtime ever fakes success and the dashboard stays absent on both. The native
-  side is read from the frozen ``expected`` baseline (already gated by the
-  compatibility suite) rather than re-run, so these fixtures' real per-step
-  sleeps are exercised once, not twice; the experimental side reaches the same
-  non-success terminal via each fixture's bounded budget versus its
+  Recorded in ``docs/architecture/ADR-002-pydanticai-runtime-reinstatement.md``;
+  neither runtime ever fakes success and the dashboard stays absent on both.
+  The native side is read from the frozen ``expected`` baseline (already gated
+  by the compatibility suite) rather than re-run, so these fixtures' real
+  per-step sleeps are exercised once, not twice; the experimental side reaches
+  the same non-success terminal via each fixture's bounded budget versus its
   fixed-margin over-budget sleep — a deterministic outcome, not a concurrency
   race on ordering.
 * **Unsupported**: CHAT / RESEARCH (and every orchestrator mode) return a
@@ -67,17 +71,34 @@ require_pydantic_ai()
 from src.agent.runtime.pydantic_ai_adapter import PydanticAIRuntimeAdapter
 
 # ---------------------------------------------------------------------------
-# First-phase support matrix, derived from the manifest (never hand-listed):
-# only mode=single_run fixtures are double-run; timeout/cancelrace are the
-# ADR-001 D5 intentional-difference set; every other mode is unsupported.
+# First-phase support matrix (ADR-002): an explicit fixture-ID allowlist.
+# Never derived from mode/profile filters — a future fixture with the same
+# profile must NOT silently expand either category. Any mode=single_run
+# fixture missing from the allowlist fails the matrix gate below (fail
+# closed); expanding the allowlist requires a new ADR.
 # ---------------------------------------------------------------------------
+
+_FULL_EQUIVALENCE_IDS = (
+    "a-single-run-normal",
+    "hk-single-run-normal",
+    "us-single-run-normal",
+    "a-single-run-partial",
+    "contract-modelref-single-mismatch",
+    "contract-fallback-provider-error",
+    "contract-toolscope-unknown-tool",
+    "contract-malformed-dashboard-repaired",
+)
+_TERMINAL_ONLY_EQUIVALENCE_IDS = (
+    "contract-timeout-agent-wallclock",
+    "contract-cancelrace-single-slow-tool",
+    "contract-cancelrace-parallel-late-tool",
+)
 
 _MANIFEST = load_manifest()
 _SINGLE_RUN = [c for c in _MANIFEST["cases"] if c["mode"] == "single_run"]
-_INTENTIONAL_DIFF_PROFILES = {"timeout", "cancelrace"}
 
-_EQUIVALENT = [c for c in _SINGLE_RUN if c["profile"] not in _INTENTIONAL_DIFF_PROFILES]
-_TERMINAL_ONLY = [c for c in _SINGLE_RUN if c["profile"] in _INTENTIONAL_DIFF_PROFILES]
+_EQUIVALENT = [c for c in _SINGLE_RUN if c["id"] in _FULL_EQUIVALENCE_IDS]
+_TERMINAL_ONLY = [c for c in _SINGLE_RUN if c["id"] in _TERMINAL_ONLY_EQUIVALENCE_IDS]
 
 _EQUIVALENT_IDS = [c["id"] for c in _EQUIVALENT]
 _TERMINAL_ONLY_IDS = [c["id"] for c in _TERMINAL_ONLY]
@@ -162,18 +183,20 @@ def _run_case_pydantic(case):
 
 
 # ---------------------------------------------------------------------------
-# Support-matrix integrity (the three-category report)
+# Support-matrix integrity (fail closed on unknown fixtures, ADR-002)
 # ---------------------------------------------------------------------------
 
 
-def test_support_matrix_partitions_single_run_fixtures():
-    # First phase: 4 financial + 7 contract single_run fixtures, split into
-    # 8 equivalent + 3 intentional-difference. Guards against silently
-    # dropping a fixture from the double-run.
-    assert len(_SINGLE_RUN) == 11
-    assert len(_EQUIVALENT) == 8
-    assert len(_TERMINAL_ONLY) == 3
-    assert {c["profile"] for c in _TERMINAL_ONLY} == {"timeout", "cancelrace"}
+def test_support_matrix_is_the_exact_allowlist():
+    # The manifest's single_run fixtures must be exactly the two hand-listed
+    # allowlists: a new single_run fixture cannot silently join either
+    # category (fail closed), and a dropped fixture cannot silently shrink
+    # the double-run. Expanding the allowlist requires a new ADR.
+    single_run_ids = sorted(c["id"] for c in _SINGLE_RUN)
+    allowlisted = sorted(_FULL_EQUIVALENCE_IDS + _TERMINAL_ONLY_EQUIVALENCE_IDS)
+    assert single_run_ids == allowlisted
+    assert len(_EQUIVALENT) == len(_FULL_EQUIVALENCE_IDS) == 8
+    assert len(_TERMINAL_ONLY) == len(_TERMINAL_ONLY_EQUIVALENCE_IDS) == 3
 
 
 # ---------------------------------------------------------------------------
@@ -207,7 +230,7 @@ def test_single_run_is_contract_equivalent(case_entry):
 
 
 # ---------------------------------------------------------------------------
-# Timeout / cancelrace: terminal-classification equivalence only (ADR-001 D5)
+# Timeout / cancelrace: terminal-classification equivalence only (ADR-002)
 # ---------------------------------------------------------------------------
 
 
@@ -224,7 +247,7 @@ def test_timeout_cancel_is_terminal_equivalent(case_entry):
     pyd_result = handle.result
 
     # Native fences timeout/cancel before the step's tools; the experimental
-    # runtime after (ADR-001 D5), so tool logs may differ. What must hold: the
+    # runtime after (ADR-002), so tool logs may differ. What must hold: the
     # experimental runtime reaches the SAME terminal classification as the
     # frozen native verdict — not merely some non-success terminal, so an
     # unrelated FAILED on a timeout fixture cannot pass silently — and writes

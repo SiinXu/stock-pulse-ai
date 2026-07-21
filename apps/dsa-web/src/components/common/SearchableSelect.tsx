@@ -300,7 +300,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
             ref={popoverRef}
             data-dialog-popup="true"
             style={popupStyle}
-            className="fixed z-50 flex w-max max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-elevated shadow-lg"
+            className="fixed flex w-max max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-elevated shadow-lg"
           >
             <div className="border-b border-border p-1.5">
               <input

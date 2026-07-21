@@ -170,7 +170,7 @@ test.describe('web smoke', () => {
     await expect(stockInput).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('link', { name: '首页' })).toBeVisible();
     await expect(page.getByRole('link', { name: '问股' })).toBeVisible();
-    await expect(page.getByRole('tab', { name: '历史', exact: true })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: '工作台视图切换' })).toBeVisible();
     await expect(page.getByRole('heading', { name: '个股栏' })).toBeVisible();
 
     await stockInput.fill('600519');

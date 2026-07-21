@@ -11,7 +11,7 @@ import { createParsedApiError, getParsedApiError, type ParsedApiError } from '..
 import { analysisApi } from '../api/analysis';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Button, ConfirmDialog, EmptyState, IconButton, SearchableSelect, TimePicker, type SearchableSelectOption } from '../components/common';
+import { ApiErrorAlert, AppPage, Button, ConfirmDialog, EmptyState, IconButton, InlineAlert, Loading, PageHeader, SearchableSelect, Surface, TimePicker, ToastViewport, type SearchableSelectOption } from '../components/common';
 import {
   AuthSettingsCard,
   ChangePasswordCard,
@@ -72,7 +72,16 @@ import {
   type SettingsSectionId,
 } from '../components/settings/settingsInformationArchitecture';
 import { computeSectionStatus } from '../components/settings/settingsSectionStatus';
-import { keyBelongsToSection, placementForKey } from '../components/settings/settingsFieldPlacement';
+import { keyBelongsToSection, placementForKey, SCHEDULER_SETTING_KEYS } from '../components/settings/settingsFieldPlacement';
+import {
+  type SettingsGroupSaveState,
+  type SettingsSaveStatus,
+  SETTINGS_AUTOSAVE_DEBOUNCE_MS,
+  classifyAiModelGate,
+  computeGroupFingerprint,
+  shouldMarkDirtyOnConflict,
+} from '../components/settings/autosaveMachine';
+import { IntelligenceSourcesPanel } from '../components/settings/IntelligenceSourcesPanel';
 import { WEB_BUILD_INFO } from '../utils/constants';
 import { decodeModelRef } from '../utils/modelRef';
 import { parseStockListValue } from '../utils/stockList';
@@ -110,15 +119,6 @@ type DesktopWindow = Window & {
     onUpdateStateChange?: (listener: (state: RawDesktopUpdateState) => void) => (() => void) | void;
   };
 };
-
-type SettingsSaveStatus = 'idle' | 'scheduled' | 'saving' | 'saved' | 'failed' | 'conflicted';
-
-interface SettingsGroupSaveState {
-  status: SettingsSaveStatus;
-  fingerprint: string;
-}
-
-const SETTINGS_AUTOSAVE_DEBOUNCE_MS = 700;
 
 // Routing fields whose options must be limited to channels the user has
 // actually configured (values follow ROUTABLE_NOTIFICATION_CHANNELS).
@@ -530,12 +530,6 @@ function formatEnvBackupFilename(isDesktopRuntime: boolean) {
 }
 
 const SCHEDULE_TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
-const SCHEDULER_SETTING_KEYS = new Set([
-  'SCHEDULE_ENABLED',
-  'SCHEDULE_TIME',
-  'SCHEDULE_TIMES',
-  'SCHEDULE_RUN_IMMEDIATELY',
-]);
 
 function getConfigItem(items: SystemConfigItem[], key: string) {
   return items.find((item) => item.key === key);
@@ -624,7 +618,7 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
 
   if (isHidden) {
     return (
-      <div className="rounded-2xl border settings-border bg-card/90 px-4 py-3 shadow-soft-card">
+      <Surface level="interactive" className="px-4 py-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-semibold text-foreground">{t('settings.setupGuideHiddenTitle')}</p>
@@ -634,7 +628,7 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
             {t('settings.setupGuideOpen')}
           </Button>
         </div>
-      </div>
+      </Surface>
     );
   }
 
@@ -645,7 +639,7 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
       contentBordered
     >
       <div data-testid="first-run-setup-card" className="space-y-4">
-        <div className="flex flex-col gap-3 rounded-2xl border settings-border bg-background/35 px-4 py-4 md:flex-row md:items-start md:justify-between">
+        <Surface level="interactive" className="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground">
               {summaryTitle}
@@ -671,20 +665,19 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
               {t('settings.setupGuideHide')}
             </Button>
           </div>
-        </div>
+        </Surface>
 
         {error ? <ApiErrorAlert error={error} /> : null}
 
-        {isLoading && !status ? (
-          <p className="text-sm text-muted-text">{t('common.loading')}</p>
-        ) : null}
+        {isLoading && !status ? <Loading /> : null}
 
         {status ? (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {status.checks.map((check) => (
-              <div
+              <Surface
                 key={check.key}
-                className="rounded-2xl border settings-border bg-card/65 px-4 py-3"
+                level="interactive"
+                className="px-4 py-3"
               >
                 <div className="flex items-start gap-3">
                   {getSetupCheckIcon(check)}
@@ -701,7 +694,7 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
                     ) : null}
                   </div>
                 </div>
-              </div>
+              </Surface>
             ))}
           </div>
         ) : null}
@@ -903,11 +896,10 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
     <SettingsSectionCard
       title={t('settings.schedulerTitle')}
       description={t('settings.schedulerDescription')}
-      contentBordered
     >
       <div data-testid="scheduler-settings-card" className="space-y-4">
         <div className="grid grid-cols-1 gap-3">
-          <div className="space-y-4 rounded-2xl border settings-border bg-background/35 px-4 py-4">
+          <Surface level="interactive" className="space-y-4 px-4 py-4">
             <div className="flex min-h-11 items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-foreground">{t('settings.schedulerEnable')}</p>
@@ -1006,9 +998,9 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                 ) : null}
               </div>
             </div>
-          </div>
+          </Surface>
 
-          <div className="space-y-3 rounded-2xl border settings-border bg-background/35 px-4 py-4">
+          <Surface level="interactive" className="space-y-3 px-4 py-4">
             <div>
               <p className="text-sm font-semibold text-foreground">{t('settings.schedulerStatus')}</p>
               <p className="mt-1 text-xs leading-6 text-muted-text">
@@ -1020,29 +1012,31 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
               </p>
             </div>
             <dl className="grid grid-cols-1 gap-2 text-xs">
-              <div className="rounded-xl border settings-border bg-card/60 px-3 py-2">
+              <Surface as="div" level="interactive" className="px-3 py-2">
                 <dt className="text-muted-text">{t('settings.schedulerEffectiveTimes')}</dt>
                 <dd className="mt-1 font-medium text-foreground">{effectiveStatusTimes.join(', ') || '-'}</dd>
-              </div>
-              <div className="rounded-xl border settings-border bg-card/60 px-3 py-2">
+              </Surface>
+              <Surface as="div" level="interactive" className="px-3 py-2">
                 <dt className="text-muted-text">{t('settings.schedulerNextRun')}</dt>
                 <dd className="mt-1 font-medium text-foreground">
                   {formatSchedulerTimestamp(status?.nextRunAt, language)}
                 </dd>
-              </div>
-              <div className="rounded-xl border settings-border bg-card/60 px-3 py-2">
+              </Surface>
+              <Surface as="div" level="interactive" className="px-3 py-2">
                 <dt className="text-muted-text">{t('settings.schedulerLastSuccess')}</dt>
                 <dd data-testid="scheduler-last-success" className="mt-1 font-medium text-foreground">
                   {formatSchedulerTimestamp(status?.lastSuccessAt, language)}
                 </dd>
-              </div>
-              {status?.lastError ? (
-                <div className="rounded-xl border border-danger/40 bg-danger/10 px-3 py-2">
-                  <dt className="text-danger">{t('settings.schedulerLastError')}</dt>
-                  <dd data-testid="scheduler-last-error" className="mt-1 break-words text-danger">{status.lastError}</dd>
-                </div>
-              ) : null}
+              </Surface>
             </dl>
+            {status?.lastError ? (
+              <InlineAlert
+                variant="danger"
+                title={t('settings.schedulerLastError')}
+                message={status.lastError}
+                data-testid="scheduler-last-error"
+              />
+            ) : null}
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
@@ -1071,15 +1065,20 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                 {t('settings.schedulerRunNow')}
               </Button>
             </div>
-          </div>
+          </Surface>
         </div>
 
         {validationIssues.length ? (
-          <div className="space-y-1 text-xs text-danger">
-            {validationIssues.map((issue) => (
-              <p key={`${issue.key}-${issue.code}`}>{issue.message}</p>
-            ))}
-          </div>
+          <InlineAlert
+            variant="danger"
+            message={(
+              <ul className="space-y-1">
+                {validationIssues.map((issue) => (
+                  <li key={`${issue.key}-${issue.code}`}>{issue.message}</li>
+                ))}
+              </ul>
+            )}
+          />
         ) : null}
         {statusError ? <ApiErrorAlert error={statusError} /> : null}
         {runNowError ? <ApiErrorAlert error={runNowError} /> : null}
@@ -1650,8 +1649,16 @@ const SettingsPage: React.FC = () => {
     [configuredRoutingValues],
   );
   const notificationText = SETTINGS_NOTIFICATION_TEXT[uiLanguage];
+  // One group-level banner carries the "no channels yet" guidance so the three
+  // routing rows don't each repeat a bulky empty-state card.
   const channelRoutingEmptyState = (
-    <div className="space-y-2 rounded-lg border border-border bg-background/35 p-3">
+    <p className="text-xs leading-6 text-muted-text md:text-right">—</p>
+  );
+  const channelRoutingEmptyBanner = (
+    <div
+      data-testid="channel-routing-empty-banner"
+      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-background/35 px-3 py-2"
+    >
       <p className="text-xs text-muted-text">{notificationText.noRoutableChannels}</p>
       <Button
         type="button"
@@ -1955,7 +1962,14 @@ const SettingsPage: React.FC = () => {
       .filter((item) => getSubCategoryOfKey(activeCategory, item.key) === activeSubCategory)
       .sort((a, b) => getSubCategoryFieldOrder(activeCategory, a.key) - getSubCategoryFieldOrder(activeCategory, b.key))
     : visibleActiveItems
-  ).filter((item) => belongsToActiveSection(item.key));
+  ).filter((item) => belongsToActiveSection(item.key))
+    // Alerts, System & Security and Data Sources split their fields into
+    // per-view tabs; the placement map is the same authority that drives
+    // error-summary jumps.
+    .filter((item) => (
+      !(isAlertsSection || activeSection === 'system_security' || activeSection === 'data_sources')
+      || placementForKey(activeCategory, item.key).view === activeView
+    ));
   const activeSubPromptCacheItems =
     activeCategory === 'ai_model' ? promptCacheAdvancedItems : [];
   const isNotificationChannelsSub = activeCategory === 'notification' && activeSubCategory === 'channels';
@@ -2153,36 +2167,36 @@ const SettingsPage: React.FC = () => {
       setGroupSaveState(group, { status: 'idle', fingerprint: '' });
       return;
     }
-    const fingerprint = JSON.stringify(items);
-    if (group === 'ai_model' && (isProviderCatalogLoading || providerCatalogError)) {
-      setGroupSaveState(group, { status: 'scheduled', fingerprint });
-      return;
-    }
-    if (group === 'ai_model' && providerConnectionSchemaUnavailable) {
-      setGroupSaveState(group, { status: 'failed', fingerprint });
-      return;
-    }
-    if (group === 'ai_model' && !llmChannelDraftValid) {
-      setGroupSaveState(group, { status: 'failed', fingerprint });
-      return;
-    }
-    const changesConnection = group === 'ai_model' && items.some((item) => (
-      item.key.toUpperCase() === 'LLM_CHANNELS'
-      || parseModelAccessFieldKey(item.key) !== null
-    ));
-    if (
-      changesConnection
-      && !connectionItemsRespectSchema(
-        items,
-        allValuesByKey,
-        rawValueKeys,
-        providerCatalog,
-        providerConnectionFields,
-        providerEmptyApiKeyHosts,
-      )
-    ) {
-      setGroupSaveState(group, { status: 'failed', fingerprint });
-      return;
+    const fingerprint = computeGroupFingerprint(items);
+    if (group === 'ai_model') {
+      const changesConnection = items.some((item) => (
+        item.key.toUpperCase() === 'LLM_CHANNELS'
+        || parseModelAccessFieldKey(item.key) !== null
+      ));
+      const blocked = classifyAiModelGate(
+        {
+          catalogLoading: isProviderCatalogLoading,
+          catalogError: Boolean(providerCatalogError),
+          schemaUnavailable: providerConnectionSchemaUnavailable,
+          channelDraftValid: llmChannelDraftValid,
+          changesConnection,
+          connectionRespectsSchema: changesConnection
+            ? connectionItemsRespectSchema(
+                items,
+                allValuesByKey,
+                rawValueKeys,
+                providerCatalog,
+                providerConnectionFields,
+                providerEmptyApiKeyHosts,
+              )
+            : true,
+        },
+        { checkConnection: true },
+      );
+      if (blocked) {
+        setGroupSaveState(group, { status: blocked, fingerprint });
+        return;
+      }
     }
 
     autosaveInFlightRef.current = group;
@@ -2222,25 +2236,46 @@ const SettingsPage: React.FC = () => {
     }
     const currentPendingGroups = pendingGroupsRef.current;
     if (isLoading || autosaveInFlightRef.current || conflictState || currentPendingGroups.size === 0) {
+      // Autosave is paused (initial load, another group in flight, or an
+      // unresolved version conflict). While a conflict blocks the write, groups
+      // with pending edits are explicitly `dirty` rather than left on a stale
+      // status; they return to `scheduled` once the conflict is resolved.
+      if (conflictState) {
+        for (const [group, items] of currentPendingGroups) {
+          const previous = groupSaveStatesRef.current[group];
+          if (!shouldMarkDirtyOnConflict(previous?.status)) {
+            continue;
+          }
+          const fingerprint = computeGroupFingerprint(items);
+          if (previous?.status !== 'dirty' || previous.fingerprint !== fingerprint) {
+            setGroupSaveState(group, { status: 'dirty', fingerprint });
+          }
+        }
+      }
       return undefined;
     }
 
     let nextGroup: string | null = null;
     for (const [group, items] of currentPendingGroups) {
-      const fingerprint = JSON.stringify(items);
-      if (group === 'ai_model' && (isProviderCatalogLoading || providerCatalogError)) {
-        setGroupSaveState(group, { status: 'scheduled', fingerprint });
-        continue;
-      }
-      if (group === 'ai_model' && providerConnectionSchemaUnavailable) {
-        setGroupSaveState(group, { status: 'failed', fingerprint });
-        continue;
+      const fingerprint = computeGroupFingerprint(items);
+      if (group === 'ai_model') {
+        const blocked = classifyAiModelGate(
+          {
+            catalogLoading: isProviderCatalogLoading,
+            catalogError: Boolean(providerCatalogError),
+            schemaUnavailable: providerConnectionSchemaUnavailable,
+            channelDraftValid: llmChannelDraftValid,
+            changesConnection: false,
+            connectionRespectsSchema: true,
+          },
+          { checkConnection: false },
+        );
+        if (blocked) {
+          setGroupSaveState(group, { status: blocked, fingerprint });
+          continue;
+        }
       }
       const previous = groupSaveStatesRef.current[group];
-      if (group === 'ai_model' && !llmChannelDraftValid) {
-        setGroupSaveState(group, { status: 'failed', fingerprint });
-        continue;
-      }
       if (
         previous
         && (previous.status === 'failed' || previous.status === 'conflicted')
@@ -2278,7 +2313,7 @@ const SettingsPage: React.FC = () => {
 
   const retryAutosaveGroup = useCallback((group: string) => {
     const items = pendingGroupsRef.current.get(group) ?? [];
-    setGroupSaveState(group, { status: 'scheduled', fingerprint: JSON.stringify(items) });
+    setGroupSaveState(group, { status: 'scheduled', fingerprint: computeGroupFingerprint(items) });
     void runGroupAutosave(group);
   }, [runGroupAutosave, setGroupSaveState]);
 
@@ -2463,15 +2498,15 @@ const SettingsPage: React.FC = () => {
     && !isAiOverview
     && !isAiTaskRouting
     && !isAiReliability
-    && !isTopLevelAdvanced;
-  const activeConfigPanel = shouldRenderFieldPanel ? (
-    <SettingsSectionCard
-      title={activeConfigPanelTitle}
-      description={activeConfigPanelDescription || t('settings.activePanelDescription')}
-    >
+    && !isTopLevelAdvanced
+    && !(isAlertsSection && activeView === 'events')
+    && !(activeSection === 'system_security' && (activeView === 'security' || activeView === 'about'));
+  const activeConfigPanelContent = (
+    <>
       {isNotificationChannelsSub ? (
         <NotificationChannelsPanel
           items={visibleActiveItems.filter((item) => isNotificationChannelKey(item.key))}
+          configuredChannels={configuredNotificationChannels}
           disabled={isSaving}
           onChange={setDraftValue}
           issueByKey={issueByKey}
@@ -2493,9 +2528,13 @@ const SettingsPage: React.FC = () => {
             if (!groupItems.length) {
               return null;
             }
+            const showChannelRoutingEmptyBanner = hasConfiguredNotificationChannelStatus
+              && configuredRoutingValues.size === 0
+              && groupItems.some((item) => CHANNEL_ROUTING_FIELD_KEYS.has(item.key));
             return (
               <div key={group.id} className="space-y-2">
                 <h3 className="px-1 text-sm font-medium text-secondary-text">{t(group.titleKey)}</h3>
+                {showChannelRoutingEmptyBanner ? channelRoutingEmptyBanner : null}
                 <form
                   className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-1"
                   onSubmit={(event) => event.preventDefault()}
@@ -2581,18 +2620,32 @@ const SettingsPage: React.FC = () => {
           </form>
         </details>
       ) : null}
+    </>
+  );
+  const activeConfigPanel = shouldRenderFieldPanel ? (
+    <SettingsSectionCard
+      key={`${activeSection}:${activeView}`}
+      title={activeConfigPanelTitle}
+      description={activeConfigPanelDescription || t('settings.activePanelDescription')}
+    >
+      {activeConfigPanelContent}
     </SettingsSectionCard>
-  ) : hasSubNav || hasActiveConfigItems || activeSection === 'ai_models' || isTopLevelAdvanced ? null : (
+  ) : activeSection === 'overview'
+    || activeSection === 'ai_models'
+    || activeSection === 'advanced'
+    || activeCategory === 'system'
+    || (isAlertsSection && activeView === 'events' && eventMonitorItems.length > 0)
+    || (activeCategory === 'data_source' && activeSubCategory !== 'providers') ? null : (
     <EmptyState
       title={t('settings.currentCategoryEmptyTitle')}
       description={t('settings.currentCategoryEmptyDescription')}
-      className="settings-surface-panel settings-border-strong border-none bg-transparent shadow-none"
     />
   );
   const activeSaveGroup = activeCategory;
   const activeGroupDirtyCount = pendingGroups.get(activeSaveGroup)?.length ?? 0;
   const saveStatusLabel = (status: SettingsSaveStatus): string => {
     switch (status) {
+      case 'dirty': return settingsText.autosaveScheduled;
       case 'scheduled': return settingsText.autosaveScheduled;
       case 'saving': return settingsText.autosaveSaving;
       case 'saved': return settingsText.autosaveSaved;
@@ -2603,58 +2656,56 @@ const SettingsPage: React.FC = () => {
   };
   const visibleGroupSaveStates = Object.entries(groupSaveStates)
     .filter(([, state]) => state.status !== 'idle');
+  const settingsSaveActions = visibleGroupSaveStates.length > 0 || activeGroupDirtyCount > 0 ? (
+    <div className="flex flex-wrap items-center justify-end gap-2" aria-live="polite">
+      {visibleGroupSaveStates.map(([group, state]) => (
+        <span
+          key={group}
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-[var(--settings-border)] px-2.5 text-xs text-secondary-text"
+        >
+          {state.status === 'saved' ? (
+            <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
+          ) : state.status === 'failed' || state.status === 'conflicted' ? (
+            <CircleAlert className="h-4 w-4 text-danger" aria-hidden="true" />
+          ) : (
+            <Clock className="h-4 w-4 text-warning" aria-hidden="true" />
+          )}
+          <span>{getCategoryTitle(group as SystemConfigCategory, group, uiLanguage)}: {saveStatusLabel(state.status)}</span>
+          {state.status === 'failed' ? (
+            <button type="button" className="settings-accent-text inline-flex min-h-11 min-w-11 items-center justify-center px-1 underline" onClick={() => retryAutosaveGroup(group)}>
+              {settingsText.autosaveRetry}
+            </button>
+          ) : null}
+          {state.status === 'failed' || state.status === 'conflicted' ? (
+            <button type="button" className="inline-flex min-h-11 min-w-11 items-center justify-center px-1 text-danger underline" onClick={() => restoreAutosaveGroup(group)}>
+              {settingsText.autosaveRestore}
+            </button>
+          ) : null}
+        </span>
+      ))}
+      {activeGroupDirtyCount > 0 ? (
+        <Button
+          type="button"
+          variant="secondary"
+          size="default"
+          onClick={() => setShowResetConfirm(true)}
+          disabled={isLoading || groupSaveStates[activeSaveGroup]?.status === 'saving'}
+        >
+          <RefreshCw className="h-4 w-4" aria-hidden="true" />
+          {settingsText.autosaveResetGroup}
+        </Button>
+      ) : null}
+    </div>
+  ) : null;
 
   return (
-    <div className="settings-page min-h-full px-4 pb-6 pt-4 md:px-6">
-      <div className="mb-4 px-1 py-1">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="min-w-0">
-            <h1 className="text-xl font-semibold tracking-tight text-foreground">{t('settings.pageTitle')}</h1>
-            <p className="max-w-3xl text-xs leading-5 text-secondary-text sm:text-sm sm:leading-6">
-              {t('settings.pageDescription')}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-end gap-2" aria-live="polite">
-            {visibleGroupSaveStates.map(([group, state]) => (
-              <span
-                key={group}
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-[var(--settings-border)] px-2.5 text-xs text-secondary-text"
-              >
-                {state.status === 'saved' ? (
-                  <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
-                ) : state.status === 'failed' || state.status === 'conflicted' ? (
-                  <CircleAlert className="h-4 w-4 text-danger" aria-hidden="true" />
-                ) : (
-                  <Clock className="h-4 w-4 text-warning" aria-hidden="true" />
-                )}
-                <span>{getCategoryTitle(group as SystemConfigCategory, group, uiLanguage)}: {saveStatusLabel(state.status)}</span>
-                {state.status === 'failed' ? (
-                  <button type="button" className="settings-accent-text inline-flex min-h-11 min-w-11 items-center justify-center px-1 underline" onClick={() => retryAutosaveGroup(group)}>
-                    {settingsText.autosaveRetry}
-                  </button>
-                ) : null}
-                {state.status === 'failed' || state.status === 'conflicted' ? (
-                  <button type="button" className="inline-flex min-h-11 min-w-11 items-center justify-center px-1 text-danger underline" onClick={() => restoreAutosaveGroup(group)}>
-                    {settingsText.autosaveRestore}
-                  </button>
-                ) : null}
-              </span>
-            ))}
-            {activeGroupDirtyCount > 0 ? (
-              <Button
-                type="button"
-                variant="secondary"
-                size="default"
-                onClick={() => setShowResetConfirm(true)}
-                disabled={isLoading || groupSaveStates[activeSaveGroup]?.status === 'saving'}
-              >
-                <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                {settingsText.autosaveResetGroup}
-              </Button>
-            ) : null}
-          </div>
-        </div>
+    <AppPage className="settings-page pb-6">
+      <div className="mb-4">
+        <PageHeader
+          title={t('settings.pageTitle')}
+          description={t('settings.pageDescription')}
+          actions={settingsSaveActions}
+        />
 
         {saveError ? (
           <ApiErrorAlert
@@ -2800,7 +2851,7 @@ const SettingsPage: React.FC = () => {
               />
             ) : null}
             {shouldShowFirstRunSetup && !setupStatus?.isComplete ? (
-              <div className="flex flex-col gap-2 rounded-2xl border settings-border bg-card/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <Surface level="interactive" className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-foreground">
                     {settingsText.quickSetup}
@@ -2819,7 +2870,7 @@ const SettingsPage: React.FC = () => {
                 >
                   {settingsText.startWizard}
                 </Button>
-              </div>
+              </Surface>
             ) : null}
             {shouldShowFirstRunSetup ? (
               <FirstRunSetupCard
@@ -2846,7 +2897,7 @@ const SettingsPage: React.FC = () => {
                 title={t('settings.alphaSift')}
                 description={t('settings.alphaSiftDescription')}
               >
-                <div className="flex flex-col gap-4 rounded-2xl border settings-border bg-background/35 px-4 py-4 md:flex-row md:items-center md:justify-between">
+                <Surface level="interactive" className="flex flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-foreground">
                       {alphasiftEnabled ? t('settings.alphaSiftEnabled') : t('settings.alphaSiftDisabled')}
@@ -2877,7 +2928,7 @@ const SettingsPage: React.FC = () => {
                       {alphasiftEnabled ? t('settings.disableAlphaSift') : t('settings.enableAlphaSift')}
                     </Button>
                   </div>
-                </div>
+                </Surface>
                 {alphaSiftActionError ? (
                   <div className="mt-3">
                     <ApiErrorAlert error={alphaSiftActionError} />
@@ -2890,8 +2941,8 @@ const SettingsPage: React.FC = () => {
                 ) : null}
               </SettingsSectionCard>
             ) : null}
-            {activeCategory === 'system' ? <AuthSettingsCard /> : null}
-            {activeCategory === 'system' ? (
+            {activeCategory === 'system' && activeView === 'security' ? <AuthSettingsCard /> : null}
+            {activeCategory === 'system' && activeView === 'runtime' ? (
               <SchedulerSettingsCard
                 items={rawActiveItems}
                 disabled={isSaving || isLoading}
@@ -2903,7 +2954,7 @@ const SettingsPage: React.FC = () => {
                 language={uiLanguage}
               />
             ) : null}
-            {activeCategory === 'system' ? (
+            {activeCategory === 'system' && activeView === 'about' ? (
               <SettingsSectionCard
                 title={t('settings.versionInfo')}
                 description={t('settings.versionInfoDescription')}
@@ -2912,46 +2963,46 @@ const SettingsPage: React.FC = () => {
                 <div
                   className={`grid grid-cols-1 gap-3 ${shouldShowDesktopVersionCard ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}
                 >
-                  <div className="rounded-2xl border settings-border bg-background/40 px-4 py-3">
+                  <Surface level="interactive" className="px-4 py-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-text">
                       {t('settings.versionWebui')}
                     </p>
                     <p className="mt-2 break-all font-mono text-sm text-foreground">
                       {WEB_BUILD_INFO.version}
                     </p>
-                  </div>
-                  <div className="rounded-2xl border settings-border bg-background/40 px-4 py-3">
+                  </Surface>
+                  <Surface level="interactive" className="px-4 py-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-text">
                       {t('settings.versionBuildId')}
                     </p>
                     <p className="mt-2 break-all font-mono text-sm text-foreground">
                       {WEB_BUILD_INFO.buildId}
                     </p>
-                  </div>
-                  <div className="rounded-2xl border settings-border bg-background/40 px-4 py-3">
+                  </Surface>
+                  <Surface level="interactive" className="px-4 py-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-text">
                       {t('settings.versionBuildTime')}
                     </p>
                     <p className="mt-2 break-all font-mono text-sm text-foreground">
                       {WEB_BUILD_INFO.buildTime}
                     </p>
-                  </div>
+                  </Surface>
                   {shouldShowDesktopVersionCard ? (
-                    <div className="rounded-2xl border settings-border bg-background/40 px-4 py-3">
+                    <Surface level="interactive" className="px-4 py-3">
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-text">
                         {t('settings.versionDesktop')}
                       </p>
                       <p className="mt-2 break-all font-mono text-sm text-foreground">
                         {desktopAppVersion}
                       </p>
-                    </div>
+                    </Surface>
                   ) : null}
                 </div>
                 <p className="text-xs leading-6 text-muted-text">
                   {t('settings.updateBuildDescription')}
                 </p>
                 {canCheckDesktopUpdate ? (
-                  <div className="mt-4 space-y-3 rounded-2xl border settings-border bg-background/30 px-4 py-4">
+                  <Surface level="interactive" className="mt-4 space-y-3 px-4 py-4">
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <div>
                         <p className="text-sm font-medium text-foreground">{t('settings.desktopUpdate')}</p>
@@ -2989,7 +3040,7 @@ const SettingsPage: React.FC = () => {
                         {t('settings.desktopCurrentNoStatus')}
                       </p>
                     )}
-                  </div>
+                  </Surface>
                 ) : null}
                 {WEB_BUILD_INFO.isFallbackVersion ? (
                   <p className="text-xs leading-6 text-amber-700 dark:text-amber-300">
@@ -2998,12 +3049,12 @@ const SettingsPage: React.FC = () => {
                 ) : null}
               </SettingsSectionCard>
             ) : null}
-            {isTopLevelAdvanced ? (
+            {isTopLevelAdvanced && activeView === 'backup' ? (
               <SettingsSectionCard
                 title={t('settings.configBackup')}
                 description={t('settings.configBackupDescription')}
               >
-                <div className="space-y-4 rounded-xl border settings-border p-4">
+                <Surface level="interactive" className="space-y-4 p-4">
                   {!isEnvBackupAllowed ? (
                     <p className="text-xs leading-6 text-amber-700 dark:text-amber-300">
                       {t('settings.disabledAuthBackupWarning')}
@@ -3056,7 +3107,7 @@ const SettingsPage: React.FC = () => {
                   {!envBackupActionError && envBackupActionSuccess ? (
                     <SettingsAlert title={t('settings.actionSuccess')} message={envBackupActionSuccess} variant="success" />
                   ) : null}
-                </div>
+                </Surface>
               </SettingsSectionCard>
             ) : null}
             {activeCategory === 'base' ? (
@@ -3269,61 +3320,50 @@ const SettingsPage: React.FC = () => {
                 ))}
               </SettingsSectionCard>
             ) : null}
-            {isTopLevelAdvanced ? (
+            {isTopLevelAdvanced && activeView === 'raw_config' ? (
+              <>
+                <LLMConfigModeBanner
+                  status={llmModeStatus}
+                  configVersion={configVersion}
+                  onMigrated={() => {
+                    void (async () => {
+                      await load();
+                      applyPostSaveEffects();
+                    })();
+                  }}
+                />
+                <GenerationBackendStatusPanel
+                  items={generationBackendDraftItems}
+                  maskToken={maskToken}
+                  disabled={isSaving || isLoading}
+                />
+              </>
+            ) : null}
+            {isTopLevelAdvanced && activeView === 'diagnostics' ? (
               <SettingsSectionCard
-                title={sectionLabel('advanced', uiLanguage)}
+                title={settingsText.diagnostics}
                 description={settingsText.advancedDescription}
               >
-                <details className="group/backend-diagnostics overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] transition-colors duration-200 hover:bg-[var(--settings-surface-hover)]">
-                  <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-4 [&::-webkit-details-marker]:hidden">
-                    <div className="min-w-0 space-y-1">
-                      <p className="text-sm font-semibold text-foreground">
-                        {settingsText.diagnostics}
-                      </p>
-                      <p className="text-xs leading-5 text-muted-text">
-                        {settingsText.diagnosticsDescription}
-                      </p>
-                    </div>
-                    <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-text transition-transform group-open/backend-diagnostics:rotate-180" aria-hidden="true" />
-                  </summary>
-                  <div className="space-y-3 border-t border-[var(--settings-border-soft)] p-3">
-                    {advancedSectionItems.length > 0 ? (
-                      <form
-                        className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
-                        onSubmit={(event) => event.preventDefault()}
-                      >
-                        {advancedSectionItems.map((item) => (
-                          <SettingsField
-                            key={item.key}
-                            item={item}
-                            value={item.value}
-                            disabled={isSaving}
-                            onChange={setDraftValue}
-                            issues={issueByKey[item.key] || []}
-                            requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
-                            dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
-                            readOnlyDiagnostic={readOnlyDiagnosticForItem(item, categoryByKey[item.key])}
-                          />
-                        ))}
-                      </form>
-                    ) : null}
-                    <LLMConfigModeBanner
-                      status={llmModeStatus}
-                      configVersion={configVersion}
-                      onMigrated={() => {
-                        void (async () => {
-                          await load();
-                          applyPostSaveEffects();
-                        })();
-                      }}
-                    />
-                    <GenerationBackendStatusPanel
-                      items={generationBackendDraftItems}
-                      maskToken={maskToken}
-                      disabled={isSaving || isLoading}
-                    />
-                  </div>
-                </details>
+                {advancedSectionItems.length > 0 ? (
+                  <form
+                    className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+                    onSubmit={(event) => event.preventDefault()}
+                  >
+                    {advancedSectionItems.map((item) => (
+                      <SettingsField
+                        key={item.key}
+                        item={item}
+                        value={item.value}
+                        disabled={isSaving}
+                        onChange={setDraftValue}
+                        issues={issueByKey[item.key] || []}
+                        requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
+                        dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
+                        readOnlyDiagnostic={readOnlyDiagnosticForItem(item, categoryByKey[item.key])}
+                      />
+                    ))}
+                  </form>
+                ) : null}
               </SettingsSectionCard>
             ) : null}
             {activeCategory === 'ai_model' && !isAiOverview && !isAiTaskRouting && !isAiReliability && !isTopLevelAdvanced ? (
@@ -3380,7 +3420,7 @@ const SettingsPage: React.FC = () => {
                 />
               </section>
             ) : null}
-            {activeCategory === 'system' && passwordChangeable ? (
+            {activeCategory === 'system' && activeView === 'security' && passwordChangeable ? (
               <ChangePasswordCard />
             ) : null}
             {activeCategory === 'notification' && activeSubCategory === 'channels' ? (
@@ -3405,7 +3445,18 @@ const SettingsPage: React.FC = () => {
                 {activeConfigPanel}
               </SettingsPanelErrorBoundary>
             ) : activeConfigPanel}
-            {isAlertsSection && eventMonitorItems.length > 0 ? (
+            {activeCategory === 'data_source' && activeView === 'intelligence' ? (
+              <SettingsPanelErrorBoundary
+                title={t('settings.pageTitle')}
+                resetKey={`intelligence:${configVersion}`}
+                diagnosticHint={settingsPanelDiagnosticHint}
+              >
+                <div className="mt-2">
+                  <IntelligenceSourcesPanel />
+                </div>
+              </SettingsPanelErrorBoundary>
+            ) : null}
+            {isAlertsSection && activeView === 'events' && eventMonitorItems.length > 0 ? (
               <SettingsSectionCard
                 title={settingsText.eventMonitor}
                 description={settingsText.eventMonitorDescription}
@@ -3435,28 +3486,29 @@ const SettingsPage: React.FC = () => {
       )}
 
       {toast ? (
-        <div
-          className="fixed bottom-5 right-5 z-50 w-80 max-w-[calc(100vw-1.5rem)]"
-          onMouseEnter={() => setIsToastPaused(true)}
-          onMouseLeave={() => setIsToastPaused(false)}
-          onFocusCapture={() => setIsToastPaused(true)}
-          onBlurCapture={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-              setIsToastPaused(false);
-            }
-          }}
-        >
-          {toast.type === 'success'
-            ? (
-                <SettingsAlert
-                  title={t('settings.actionSuccess')}
-                  message={toast.message}
-                  variant="success"
-                  presentation="toast"
-                />
-              )
-            : <ApiErrorAlert error={toast.error} />}
-        </div>
+        <ToastViewport>
+          <div
+            className="pointer-events-auto"
+            onMouseEnter={() => setIsToastPaused(true)}
+            onMouseLeave={() => setIsToastPaused(false)}
+            onFocusCapture={() => setIsToastPaused(true)}
+            onBlurCapture={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                setIsToastPaused(false);
+              }
+            }}
+          >
+            {toast.type === 'success'
+              ? (
+                  <SettingsAlert
+                    title={t('settings.actionSuccess')}
+                    message={toast.message}
+                    variant="success"
+                  />
+                )
+              : <ApiErrorAlert error={toast.error} />}
+          </div>
+        </ToastViewport>
       ) : null}
       <ConfirmDialog
         isOpen={showImportConfirm}
@@ -3511,7 +3563,7 @@ const SettingsPage: React.FC = () => {
           emptyApiKeyHosts={providerEmptyApiKeyHosts}
         />
       ) : null}
-    </div>
+    </AppPage>
   );
 };
 

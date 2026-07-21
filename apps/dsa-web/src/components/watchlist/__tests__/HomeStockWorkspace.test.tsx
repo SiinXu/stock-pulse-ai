@@ -1,6 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { HomeStockWorkspace } from '../HomeStockWorkspace';
 import type { HomeWorkspaceTab } from '../HomeStockWorkspace';
@@ -53,7 +53,7 @@ describe('HomeStockWorkspace', () => {
       />,
     );
 
-    expect(screen.getByRole('tablist', { name: '工作台视图切换' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: '工作台视图切换' })).toBeInTheDocument();
     expect(screen.getByRole('searchbox', { name: '搜索' })).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: '添加代码，如 600519' })).toHaveAttribute('data-size', 'comfortable');
     expect(screen.getByRole('button', { name: '添加自选股' })).toHaveAttribute('data-size', 'comfortable');
@@ -92,28 +92,38 @@ describe('HomeStockWorkspace', () => {
     expect(addButton.querySelector('svg.animate-spin')).toBeInTheDocument();
   });
 
-  it.each<HomeWorkspaceTab>(['history', 'watchlist', 'today'])(
-    'keeps the segmented tabs outside the switching panel on the %s view',
-    (activeTab) => {
+  it.each<[HomeWorkspaceTab, string]>([
+    ['history', '历史'],
+    ['watchlist', '自选'],
+    ['today', '今日'],
+  ])(
+    'keeps the workspace view switcher outside the switching panel on the %s view',
+    (activeTab, activeLabel) => {
       render(<HomeStockWorkspace {...buildProps(activeTab)} />);
 
-      const tablist = screen.getByRole('tablist', { name: '工作台视图切换' });
-      const options = screen.getAllByRole('tab');
-      expect(options).toHaveLength(3);
-      const selected = options.find((option) => option.getAttribute('aria-selected') === 'true');
-      const panel = screen.getByRole('tabpanel');
-      expect(panel).toHaveAccessibleName(selected?.textContent ?? '');
+      const switcher = screen.getByRole('combobox', { name: '工作台视图切换' });
+      const panel = screen.getByRole('region', { name: activeLabel });
+      expect(panel.contains(switcher)).toBe(false);
 
-      expect(panel.contains(tablist)).toBe(false);
+      fireEvent.click(switcher);
+      const listbox = document.getElementById(switcher.getAttribute('aria-controls')!)!;
+      expect(within(listbox).getAllByRole('option')).toHaveLength(3);
     },
   );
 
-  it('selects a workspace view from the segmented control', () => {
+  it('selects a workspace view from the view switcher', () => {
     const onTabChange = vi.fn();
     render(<HomeStockWorkspace {...buildProps('history', onTabChange)} />);
 
-    expect(screen.getByRole('tab', { name: '历史' })).toHaveAttribute('aria-selected', 'true');
-    fireEvent.click(screen.getByRole('tab', { name: '自选' }));
+    const switcher = screen.getByRole('combobox', { name: '工作台视图切换' });
+    expect(switcher).toHaveTextContent('历史');
+
+    fireEvent.click(switcher);
+    const listbox = document.getElementById(switcher.getAttribute('aria-controls')!)!;
+    const watchlistOption = within(listbox)
+      .getAllByRole('option')
+      .find((option) => option.getAttribute('data-value') === 'watchlist')!;
+    fireEvent.click(watchlistOption);
 
     expect(onTabChange).toHaveBeenCalledWith('watchlist');
   });

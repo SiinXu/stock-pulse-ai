@@ -137,6 +137,7 @@ jobs:
             echo "Dependency install attempt ${attempt} failed, retrying in 15s..." >&2
             sleep 15
           done
+          python -m pip check
       - name: 🔎 Assert PydanticAI import and version
         run: |
           python -c "
@@ -156,6 +157,7 @@ jobs:
           DATABASE_PATH="${test_data_dir}/stockpulse-ci.sqlite" \
             python -m pytest -m "not network" -rs \
             tests/agent/runtime/test_pydantic_ai_adapter.py \
+            tests/agent/runtime/test_native_default.py \
             tests/agent/runtime/test_tool_session.py \
             tests/agent/runtime/test_conformance.py \
             tests/agent/runtime/test_conformance_replay.py \
