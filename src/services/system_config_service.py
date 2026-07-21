@@ -149,6 +149,7 @@ class _LLMDiagnostic:
 class SystemConfigService:
     """Service layer for reading, validating, and updating runtime configuration."""
 
+    _ENV_KEY_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
     _GENERATION_BACKEND_STATUS_EXACT_KEYS = {
         "GENERATION_BACKEND",
         "GENERATION_FALLBACK_BACKEND",
@@ -2646,8 +2647,21 @@ class SystemConfigService:
         submitted_map: Dict[str, str] = {}
 
         for item in items:
-            key = item["key"].upper()
+            raw_key = item["key"]
+            key = raw_key.upper()
             value = item["value"]
+            if self._ENV_KEY_PATTERN.fullmatch(raw_key) is None:
+                issues.append(
+                    {
+                        "key": key,
+                        "code": "invalid_key",
+                        "severity": "error",
+                        "message": "Configuration keys must use canonical environment-variable syntax.",
+                        "expected": "[A-Za-z_][A-Za-z0-9_]*",
+                        "actual": "invalid format",
+                    }
+                )
+                continue
             submitted_map[key] = value
             field_schema = get_field_definition(key, value)
             if key == "ADMIN_AUTH_ENABLED":

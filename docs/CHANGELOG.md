@@ -238,7 +238,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Split the Alerts & Automation, System & Security, and Data Sources settings sections and the new top-level Advanced section into horizontal tab views (push routing/behavior & limits/event monitor, scheduling/system settings/web & logs/auth & security/version & updates, sources/intel sources/providers, backend status/developer diagnostics/config backup) with `?section=&view=` deep links and cross-view validation-error jumps; Developer Diagnostics is now a flat tab instead of a collapsed panel, and the push-routing channel empty state collapses into a single compact hint with a configure-channels entry.
 - [Fixed] Aligned the home stock-bar and history-list row checkboxes with the select-all column (removing the centered offset and negative margin) and reveal the per-item delete button only on hover or keyboard focus, staying always visible on touch devices without hover, matching the Chat session list.
 - [Fixed] Removed the `max-w-6xl` cap on the AlphaSift screening page content so it fills the viewport like the other workspace pages.
-- [Fixed] Required current-password reauthentication before disabling administrator authentication and blocked generic configuration paths from changing the auth toggle.
+- [Fixed] Required current-password reauthentication before disabling administrator authentication and blocked generic configuration or non-canonical key aliases from changing the auth toggle.
 <!-- New entry format: - [Type] Description (Type: Added/Changed/Fixed/Docs/Tests/Chore) -->
 <!-- Append each entry as one line at the end of this section; do not add category headings. -->
 

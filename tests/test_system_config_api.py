@@ -799,6 +799,29 @@ class SystemConfigApiTestCase(unittest.TestCase):
         )
         self.assertEqual(self.manager.read_config_map()["ADMIN_AUTH_ENABLED"], "true")
 
+    def test_put_config_rejects_noncanonical_admin_auth_key_aliases(self) -> None:
+        for key in ("ADMIN_AUTH_ENABLED ", "export ADMIN_AUTH_ENABLED"):
+            with self.subTest(key=key):
+                current = system_config.get_system_config(
+                    include_schema=False,
+                    service=self.service,
+                ).model_dump()
+
+                with self.assertRaises(HTTPException) as context:
+                    system_config.update_system_config(
+                        request=UpdateSystemConfigRequest(
+                            config_version=current["config_version"],
+                            reload_now=False,
+                            items=[{"key": key, "value": "false"}],
+                        ),
+                        service=self.service,
+                    )
+
+                self.assertEqual(context.exception.status_code, 400)
+                self.assertEqual(context.exception.detail["error"], "validation_failed")
+                self.assertEqual(context.exception.detail["issues"][0]["code"], "invalid_key")
+                self.assertEqual(self.manager.read_config_map()["ADMIN_AUTH_ENABLED"], "true")
+
     def test_put_config_escapes_custom_webhook_template_placeholders(self) -> None:
         template = '{"title":$title_json,"content":$content_json}'
         current = system_config.get_system_config(
