@@ -1,0 +1,133 @@
+"""Compatibility guards for the public ``src.config`` facade."""
+
+import src.config as config_module
+from src.config import Config
+
+
+EXPECTED_PUBLIC_EXPORTS = {
+    "AGENT_CONTEXT_COMPRESSION_DEFAULT_PROFILE",
+    "AGENT_CONTEXT_COMPRESSION_PROFILES",
+    "AGENT_MAX_STEPS_DEFAULT",
+    "ANSPIRE_LLM_BASE_URL_DEFAULT",
+    "ANSPIRE_LLM_MODEL_DEFAULT",
+    "AUTO_AGENT_BACKEND_ID",
+    "AgentContextCompressionPreset",
+    "Any",
+    "Config",
+    "ConfigIssue",
+    "DEFAULT_ALPHASIFT_INSTALL_SPEC",
+    "DEFAULT_GENERATION_BACKEND_MAX_CONCURRENCY",
+    "DEFAULT_LOCAL_CLI_BACKEND_MAX_CONCURRENCY",
+    "DEFAULT_LOCAL_CLI_MAX_OUTPUT_BYTES",
+    "DEFAULT_LOCAL_CLI_TIMEOUT_SECONDS",
+    "Dict",
+    "FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT",
+    "GENERATION_ONLY_BACKEND_IDS",
+    "HERMES_DEFAULT_BASE_URL",
+    "HERMES_DEFAULT_MODEL",
+    "HERMES_DEFAULT_PROTOCOL",
+    "HermesConfigIssue",
+    "LITELLM_BACKEND_ID",
+    "LLM_EMPTY_API_KEY_HOSTNAMES",
+    "LOCAL_CLI_GENERATION_BACKEND_IDS",
+    "List",
+    "Literal",
+    "MAX_GENERATION_BACKEND_MAX_CONCURRENCY",
+    "MAX_LOCAL_CLI_BACKEND_MAX_CONCURRENCY",
+    "MAX_LOCAL_CLI_OUTPUT_BYTES",
+    "MAX_LOCAL_CLI_TIMEOUT_SECONDS",
+    "NEWS_STRATEGY_WINDOWS",
+    "NOTIFICATION_SEVERITIES",
+    "OPENCODE_CLI_BACKEND_ID",
+    "Optional",
+    "PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS_DEFAULT",
+    "PROMPT_CACHE_DIAGNOSTICS_LEVELS",
+    "Path",
+    "SUPPORTED_AGENT_GENERATION_BACKENDS",
+    "SUPPORTED_AGENT_UI_BACKENDS",
+    "SUPPORTED_GENERATION_BACKENDS",
+    "SUPPORTED_LLM_CHANNEL_PROTOCOLS",
+    "TICKFLOW_KLINE_ADJUST_VALUES",
+    "Tuple",
+    "canonicalize_llm_channel_protocol",
+    "channel_allows_empty_api_key",
+    "dataclass",
+    "dotenv_values",
+    "extra_litellm_params",
+    "field",
+    "get_agent_context_compression_preset",
+    "get_api_keys_for_model",
+    "get_config",
+    "get_configured_llm_models",
+    "get_effective_agent_models_to_try",
+    "get_effective_agent_primary_model",
+    "get_fixed_litellm_temperature",
+    "get_provider_ids",
+    "get_static_provider",
+    "hermes_model_info",
+    "is_feishu_app_bot_configured",
+    "is_feishu_static_configured",
+    "is_reserved_hermes_name",
+    "is_supported_notification_severity",
+    "is_supported_report_language_value",
+    "json",
+    "llm_generation_params",
+    "load_dotenv",
+    "log_safe_exception",
+    "logger",
+    "logging",
+    "normalize_agent_context_compression_profile",
+    "normalize_agent_litellm_model",
+    "normalize_litellm_temperature",
+    "normalize_llm_channel_model",
+    "normalize_news_strategy_profile",
+    "normalize_report_language",
+    "normalize_schedule_times",
+    "normalize_tickflow_kline_adjust",
+    "os",
+    "parse_agent_context_compression_int",
+    "parse_env_bool",
+    "parse_env_float",
+    "parse_env_int",
+    "parse_hermes_channel",
+    "parse_notification_quiet_hours",
+    "parse_notification_route_channels",
+    "parse_prompt_cache_diagnostics_level",
+    "re",
+    "resolve_litellm_thinking_enabled",
+    "resolve_litellm_wire_model",
+    "resolve_llm_channel_protocol",
+    "resolve_news_window_days",
+    "resolve_unified_llm_temperature",
+    "route_deployment_origins",
+    "route_has_hermes",
+    "route_identity_candidates",
+    "setup_env",
+    "split_stock_list",
+    "unescape_compose_sensitive_env_value",
+    "unquote",
+    "urlparse",
+    "validate_notification_timezone",
+}
+
+
+def test_config_public_export_surface_is_stable():
+    public_exports = {name for name in dir(config_module) if not name.startswith("_")}
+
+    assert public_exports == EXPECTED_PUBLIC_EXPORTS
+
+
+def test_config_class_identity_and_method_ownership_are_stable():
+    assert Config.__module__ == "src.config"
+    assert Config.__mro__ == (Config, object)
+
+    for method_name in (
+        "_load_from_env",
+        "_parse_litellm_yaml",
+        "refresh_stock_list",
+        "validate_structured",
+        "get_db_url",
+    ):
+        method = getattr(Config, method_name)
+        assert method.__module__ == "src.config"
+        assert method.__qualname__ == f"Config.{method_name}"

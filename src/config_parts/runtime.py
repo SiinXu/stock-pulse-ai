@@ -1,0 +1,126 @@
+"""Runtime helper methods for :class:`src.config.Config`."""
+
+import os
+from pathlib import Path
+
+from dotenv import dotenv_values
+
+from src.config_parts.parsers import get_effective_agent_primary_model
+from src.llm.backend_registry import (
+    AUTO_AGENT_BACKEND_ID,
+    GENERATION_ONLY_BACKEND_IDS,
+)
+from src.llm.hermes import route_deployment_origins
+from src.services.stock_list_parser import split_stock_list
+
+
+class _ConfigRuntimeMethods:
+    @classmethod
+    def reset_instance(cls) -> None:
+        """重置单例（主要用于测试）"""
+        cls._instance = None
+        cls._BOOTSTRAP_RUNTIME_ENV_OVERRIDES_CAPTURED = False
+        cls._BOOTSTRAP_RUNTIME_ENV_OVERRIDES = frozenset()
+        cls._BOOTSTRAP_RUNTIME_ENV_PRESENT_KEYS = frozenset()
+
+    def has_searxng_enabled(self) -> bool:
+        """Whether SearXNG fallback is enabled via self-hosted or public mode."""
+        return bool(self.searxng_base_urls) or bool(self.searxng_public_instances_enabled)
+
+    def has_search_capability_enabled(self) -> bool:
+        """Whether any search provider is configured or SearXNG fallback is enabled."""
+        return bool(
+            self.anspire_api_keys
+            or self.bocha_api_keys
+            or self.minimax_api_keys
+            or self.tavily_api_keys
+            or self.brave_api_keys
+            or self.serpapi_keys
+            or self.has_searxng_enabled()
+        )
+
+    def is_agent_available(self) -> bool:
+        """Check whether agent capabilities are usable.
+
+        Decision table:
+
+        +-----------------------+----------------------------+-----------------+
+        | AGENT_MODE env        | Agent-safe route available | Result          |
+        +-----------------------+----------------------------+-----------------+
+        | ``false`` (explicit)  | any                        | False           |
+        | ``true``              | yes                        | True            |
+        | ``true``              | no                         | False           |
+        | not set (default)     | yes                        | True            |
+        | not set (default)     | no                         | False           |
+        +-----------------------+----------------------------+-----------------+
+
+        ``AGENT_MODE=true`` expresses user intent, but Phase 3 Hermes safety
+        still requires a non-Hermes Agent route. Hermes-only deployments cannot
+        satisfy Agent tool roundtrip support; mixed routes are usable only via
+        their non-Hermes deployments. ``AGENT_MODE=false`` remains an explicit
+        kill-switch. Explicit local CLI Agent backends are unavailable because
+        they are text generation backends, not Agent tool-calling runtimes.
+        """
+        if (self.agent_generation_backend or AUTO_AGENT_BACKEND_ID).strip().lower() in GENERATION_ONLY_BACKEND_IDS:
+            return False
+        # Phase 3 no longer lets AGENT_MODE=true bypass tool-route safety.
+        if self._agent_mode_explicit and not self.agent_mode:
+            return False
+        # Auto-detect inherits the global model when AGENT_LITELLM_MODEL is empty.
+        primary_model = get_effective_agent_primary_model(self)
+        if not primary_model:
+            return False
+        origins = route_deployment_origins(self.llm_model_list, primary_model)
+        from src.llm.model_ref import decode_model_ref, is_model_ref
+
+        if primary_model.startswith("modelref:"):
+            if not is_model_ref(primary_model):
+                return False
+            try:
+                decode_model_ref(primary_model)
+            except ValueError:
+                return False
+            if not origins.has_hermes and not origins.has_non_hermes:
+                return False
+        return (
+            not origins.is_hermes_only
+            and not origins.requires_connection_confirmation
+        )
+
+    def refresh_stock_list(self) -> None:
+        """
+        热读取 STOCK_LIST 环境变量并更新配置中的自选股列表
+
+        支持两种配置方式：
+        1. .env 文件（本地开发、定时任务模式） - 修改后下次执行自动生效
+        2. 系统环境变量（GitHub Actions、Docker） - 启动时固定，运行中不变
+        """
+        # 优先从 .env 文件读取最新配置，这样即使在容器环境中修改了 .env 文件，
+        # 也能获取到最新的股票列表配置
+        env_file = os.getenv("ENV_FILE")
+        env_path = Path(env_file) if env_file else (Path(__file__).parent.parent.parent / '.env')
+        stock_list_str = ''
+        if env_path.exists():
+            # 直接从 .env 文件读取最新的配置
+            env_values = dotenv_values(env_path)
+            stock_list_str = (env_values.get('STOCK_LIST') or '').strip()
+
+        # 如果 .env 文件不存在或未配置，才尝试从系统环境变量读取
+        if not stock_list_str:
+            stock_list_str = os.getenv('STOCK_LIST', '')
+
+        stock_list = [
+            (c or "").strip().upper()
+            for c in split_stock_list(stock_list_str)
+            if (c or "").strip()
+        ]
+
+        self.stock_list = stock_list
+
+
+    def get_db_url(self, *, create_parent: bool = True) -> str:
+        """Return the configured SQLAlchemy URL, optionally creating its parent."""
+        db_path = Path(self.database_path)
+        if create_parent:
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+        return f"sqlite:///{db_path.absolute()}"
