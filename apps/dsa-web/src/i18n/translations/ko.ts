@@ -3023,7 +3023,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsPage.SETTINGS_PAGE_TEXT.desktopDiagnosticPrefix": "데스크톱 로그를 검토하고 제공해 주세요",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.desktopDiagnosticSuffix": ", 그리고 출시 버전도 포함해서,Windows 버전 및 트리거 경로.",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.diagnostics": "개발자 진단",
-  "locales.settingsPage.SETTINGS_PAGE_TEXT.diagnosticsDescription": "모델 구성은 효과적인 소스이며, 백엔드 상태 및 스모크 테스트가 수행됩니다. 일일 구성은 확장할 필요가 없습니다.",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.editReliability": "신뢰성 → 수정 →",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.emptyValue": "(비어 있음)",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.eventMonitor": "이벤트 모니터",

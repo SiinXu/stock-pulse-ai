@@ -3023,7 +3023,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsPage.SETTINGS_PAGE_TEXT.desktopDiagnosticPrefix": "Sila semak dan berikan log desktop",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.desktopDiagnosticSuffix": ", ditambah dengan versi keluaran,Windows versi, dan laluan pencetus.",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.diagnostics": "Diagnostik pembangun",
-  "locales.settingsPage.SETTINGS_PAGE_TEXT.diagnosticsDescription": "Konfigurasi model adalah sumber yang berkesan, status kesihatan bahagian belakang dan ujian ujian ringkas dilakukan. Konfigurasi harian tidak perlu dikembangkan.",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.editReliability": "Edit dalam Kebolehpercayaan →",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.emptyValue": "(kosong)",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.eventMonitor": "Pemantau Acara",

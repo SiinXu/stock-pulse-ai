@@ -3023,7 +3023,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsPage.SETTINGS_PAGE_TEXT.desktopDiagnosticPrefix": "Bitte überprüfen Sie und stellen Sie die Desktop-Protokolle bereit",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.desktopDiagnosticSuffix": ", plus die Release-Version,Windows Version und Auslöserpfad.",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.diagnostics": "Entwicklerdiagnostik",
-  "locales.settingsPage.SETTINGS_PAGE_TEXT.diagnosticsDescription": "Die Modellkonfiguration ist eine effektive Quelle, der Backend-Gesundheitszustand und Smoke-Tests werden durchgeführt. Die tägliche Konfiguration muss nicht erweitert werden.",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.editReliability": "Bearbeitung bei Zuverlässigkeit →",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.emptyValue": "(leer)",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.eventMonitor": "Ereignismonitor",

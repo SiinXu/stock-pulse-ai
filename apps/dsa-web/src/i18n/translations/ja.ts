@@ -3023,7 +3023,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsPage.SETTINGS_PAGE_TEXT.desktopDiagnosticPrefix": "デスクトップログを確認し、提供してください",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.desktopDiagnosticSuffix": ", 、およびリリース版、 Windows バージョンとトリガーパス。",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.diagnostics": "開発者診断",
-  "locales.settingsPage.SETTINGS_PAGE_TEXT.diagnosticsDescription": "有効なモデル設定ソース、実行バックエンドの状態、スモークテストを確認します。通常の設定では開く必要はありません。",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.editReliability": "信頼性→で編集 →",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.emptyValue": "(空)",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.eventMonitor": "イベントモニター",

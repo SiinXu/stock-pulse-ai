@@ -3023,7 +3023,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsPage.SETTINGS_PAGE_TEXT.desktopDiagnosticPrefix": "請檢視並提供桌面端日誌",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.desktopDiagnosticSuffix": "，同時補充 release 版本、Windows 版本和觸發入口。",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.diagnostics": "開發者診斷",
-  "locales.settingsPage.SETTINGS_PAGE_TEXT.diagnosticsDescription": "模型配置生效來源、執行後端健康狀態與冒煙測試。日常配置無需展開。",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.editReliability": "前往可靠性設定 →",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.emptyValue": "（空）",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.eventMonitor": "事件監控",

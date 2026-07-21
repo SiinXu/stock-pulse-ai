@@ -18,6 +18,7 @@ import { NotificationChannelsPanel } from '../../components/settings/Notificatio
 import { NotificationTestPanel } from '../../components/settings/NotificationTestPanel';
 import { ProviderQuickLinks } from '../../components/settings/ProviderQuickLinks';
 import { SettingsAlert } from '../../components/settings/SettingsAlert';
+import { SettingsConfigurationSummary, SystemConfigSummary } from '../../components/settings/SettingsConfigurationSummary';
 import { SettingsErrorSummary } from '../../components/settings/SettingsErrorSummary';
 import { SettingsField } from '../../components/settings/SettingsField';
 import { SettingsHelpButton } from '../../components/settings/SettingsHelpButton';
@@ -288,6 +289,7 @@ const NotificationChannelsPanelStory = () => {
   return (
     <NotificationChannelsPanel
       items={items}
+      configuredChannels={scenario === 'empty' ? [] : ['email', 'custom_webhook']}
       disabled={false}
       issueByKey={{}}
       onChange={(key, value) => setItems((current) => current.map((item) => item.key === key ? { ...item, value } : item))}
@@ -433,6 +435,23 @@ const SettingsSectionCardStory = () => {
   );
 };
 
+const SettingsConfigurationSummaryStory = () => {
+  const { text } = useStoryText();
+  return (
+    <SettingsConfigurationSummary
+      ariaLabel={text.details}
+      entries={[
+        { id: 'first', label: text.optionOne, value: text.optionTwo },
+        { id: 'second', label: text.optionTwo, value: text.preview },
+      ]}
+    />
+  );
+};
+
+const SystemConfigSummaryStory = () => (
+  <SystemConfigSummary items={NOTIFICATION_ITEMS} maskToken={MASK_TOKEN} />
+);
+
 export const SETTINGS_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'ai-overview-matrix': AiOverviewMatrixStory,
   'auth-settings-card': AuthSettingsCard,
@@ -451,6 +470,7 @@ export const SETTINGS_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'notification-test-panel': NotificationTestPanelStory,
   'provider-quick-links': ProviderQuickLinksStory,
   'settings-alert': SettingsAlertStory,
+  'settings-configuration-summary': SettingsConfigurationSummaryStory,
   'settings-error-summary': SettingsErrorSummaryStory,
   'settings-field': SettingsFieldStory,
   'settings-help-button': SettingsHelpButtonStory,
@@ -459,4 +479,5 @@ export const SETTINGS_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'settings-view-tabs': SettingsViewTabsStory,
   'settings-panel-error-boundary': SettingsPanelErrorBoundaryStory,
   'settings-section-card': SettingsSectionCardStory,
+  'system-config-summary': SystemConfigSummaryStory,
 };

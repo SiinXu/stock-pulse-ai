@@ -3023,7 +3023,6 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsPage.SETTINGS_PAGE_TEXT.desktopDiagnosticPrefix": "Veuillez consulter et fournir les journaux de bureau",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.desktopDiagnosticSuffix": ", plus la version de sortie,Windows et le chemin du déclencheur.",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.diagnostics": "Diagnostic des développeurs",
-  "locales.settingsPage.SETTINGS_PAGE_TEXT.diagnosticsDescription": "Source effective de la configuration du modèle, état du backend d’exécution et tests de bon fonctionnement. La configuration courante ne nécessite pas d’ouvrir cette section.",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.editReliability": "Édition dans la fiabilité →",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.emptyValue": "(vide)",
   "locales.settingsPage.SETTINGS_PAGE_TEXT.eventMonitor": "Moniteur d’événements",
