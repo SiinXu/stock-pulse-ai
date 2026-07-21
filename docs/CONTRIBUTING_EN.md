@@ -44,6 +44,12 @@ cp .env.example .env
 4. Push the branch: `git push origin feature/your-feature`
 5. Open a Pull Request against `main`.
 
+### Claiming An Issue
+
+For an open, unassigned issue, create a new comment containing only `/claim`. The automation assigns only the human commenter who sent the command, and each account may hold at most one open issue assignment at a time. It ignores pull request comments, bot comments, non-exact commands, and closed issues, and it never overwrites an existing assignee; when an issue is already assigned, it keeps that assignment and replies politely.
+
+Post a draft pull request or progress update within 3 days of claiming. Maintainers enforce this activity window manually; claims do not expire automatically. `/unclaim` is not currently supported, so ask a maintainer when a claim needs to be released.
+
 ### Architecture Decisions
 
 If a PR changes component boundaries, a cross-module source of truth, the runtime/persistence/deployment model, security or failure policy, or a reusable large-migration method, its description must record ADR consideration: link a new or existing ADR, or explain why the change stays within accepted decisions and needs no new record. See the [ADR registry](adr/README.md) for numbering, statuses, process, and the template.
