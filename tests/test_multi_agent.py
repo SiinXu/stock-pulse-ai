@@ -276,9 +276,9 @@ class TestStockScopeResolution(unittest.TestCase):
         )
 
         self.assertEqual(result.stock_scope.mode, "compare")
-        self.assertEqual(result.effective_context["stock_code"], "600519")
-        self.assertEqual(result.effective_context["stock_name"], "匿名标的")
-        self.assertEqual(result.stock_scope.allowed_stock_codes, {"600519", "HK01810", "AAPL"})
+        self.assertNotIn("stock_code", result.effective_context)
+        self.assertNotIn("stock_name", result.effective_context)
+        self.assertEqual(result.stock_scope.allowed_stock_codes, {"HK01810", "AAPL"})
 
     def test_compare_hints_allow_multiple_codes_without_switching_context(self):
         cases = [
@@ -301,9 +301,9 @@ class TestStockScopeResolution(unittest.TestCase):
 
     def test_multiple_explicit_codes_are_compare_scope(self):
         cases = [
-            ("AAPL 和 TSLA 哪个更值得买", {"600519", "AAPL", "TSLA"}),
-            ("AAPL 和 TSLA 谁更适合", {"600519", "AAPL", "TSLA"}),
-            ("分析 AAPL 和 TSLA", {"600519", "AAPL", "TSLA"}),
+            ("AAPL 和 TSLA 哪个更值得买", {"AAPL", "TSLA"}),
+            ("AAPL 和 TSLA 谁更适合", {"AAPL", "TSLA"}),
+            ("分析 AAPL 和 TSLA", {"AAPL", "TSLA"}),
         ]
 
         for message, expected_allowed in cases:
@@ -314,8 +314,8 @@ class TestStockScopeResolution(unittest.TestCase):
                 )
 
                 self.assertEqual(result.stock_scope.mode, "compare")
-                self.assertEqual(result.effective_context["stock_code"], "600519")
-                self.assertEqual(result.effective_context["stock_name"], "匿名标的")
+                self.assertNotIn("stock_code", result.effective_context)
+                self.assertNotIn("stock_name", result.effective_context)
                 self.assertEqual(result.stock_scope.allowed_stock_codes, expected_allowed)
 
     def test_multiple_lowercase_explicit_codes_are_compare_scope_with_choice_hint(self):
@@ -325,8 +325,8 @@ class TestStockScopeResolution(unittest.TestCase):
         )
 
         self.assertEqual(result.stock_scope.mode, "compare")
-        self.assertEqual(result.effective_context["stock_code"], "600519")
-        self.assertEqual(result.stock_scope.allowed_stock_codes, {"600519", "AAPL", "TSLA"})
+        self.assertNotIn("stock_code", result.effective_context)
+        self.assertEqual(result.stock_scope.allowed_stock_codes, {"AAPL", "TSLA"})
 
     def test_single_stock_difference_phrase_still_switches_context(self):
         result = resolve_stock_scope(
@@ -366,8 +366,8 @@ class TestStockScopeResolution(unittest.TestCase):
         )
 
         self.assertEqual(result.stock_scope.mode, "compare")
-        self.assertEqual(result.stock_scope.allowed_stock_codes, {"600519", "BRK.B", "AAPL"})
-        self.assertEqual(result.effective_context["stock_code"], "600519")
+        self.assertEqual(result.stock_scope.allowed_stock_codes, {"BRK.B", "AAPL"})
+        self.assertNotIn("stock_code", result.effective_context)
 
     def test_invalid_context_exchange_token_is_not_trusted_as_current_stock(self):
         result = resolve_stock_scope(
@@ -383,22 +383,22 @@ class TestStockScopeResolution(unittest.TestCase):
 
     def test_compare_does_not_treat_exchange_affixes_as_standalone_tickers(self):
         cases = [
-            ("比较 01810 和 AAPL", {"600519", "HK01810", "AAPL"}, set()),
-            ("比较 1810.HK 和 AAPL", {"600519", "HK01810", "AAPL"}, {"HK"}),
+            ("比较 01810 和 AAPL", {"HK01810", "AAPL"}, set()),
+            ("比较 1810.HK 和 AAPL", {"HK01810", "AAPL"}, {"HK"}),
             ("比较 0700.HK 和 600519", {"600519", "HK00700"}, {"HK"}),
             ("比较 600519.SH 和 AAPL", {"600519", "AAPL"}, {"SH"}),
-            ("比较 000001.SZ 和 AAPL", {"600519", "000001", "AAPL"}, {"SZ"}),
+            ("比较 000001.SZ 和 AAPL", {"000001", "AAPL"}, {"SZ"}),
             ("比较 600519.SS 和 AAPL", {"600519", "AAPL"}, {"SS"}),
-            ("比较 1810.hk 和 tsla", {"600519", "HK01810", "TSLA"}, {"HK"}),
+            ("比较 1810.hk 和 tsla", {"HK01810", "TSLA"}, {"HK"}),
             ("比较 SH600519 和 AAPL", {"600519", "AAPL"}, {"SH"}),
-            ("比较 SZ000001 和 AAPL", {"600519", "000001", "AAPL"}, {"SZ"}),
-            ("比较 BJ920748 和 AAPL", {"600519", "920748", "AAPL"}, {"BJ"}),
-            ("比较 HK01810 和 AAPL", {"600519", "HK01810", "AAPL"}, {"HK"}),
-            ("比较 hk01810 和 tsla", {"600519", "HK01810", "TSLA"}, {"HK"}),
+            ("比较 SZ000001 和 AAPL", {"000001", "AAPL"}, {"SZ"}),
+            ("比较 BJ920748 和 AAPL", {"920748", "AAPL"}, {"BJ"}),
+            ("比较 HK01810 和 AAPL", {"HK01810", "AAPL"}, {"HK"}),
+            ("比较 hk01810 和 tsla", {"HK01810", "TSLA"}, {"HK"}),
             ("比较 600519 SH 和 AAPL", {"600519", "AAPL"}, {"SH"}),
-            ("比较 000001 SZ 和 AAPL", {"600519", "000001", "AAPL"}, {"SZ"}),
-            ("比较 920748 BJ 和 AAPL", {"600519", "920748", "AAPL"}, {"BJ"}),
-            ("比较 01810 HK 和 AAPL", {"600519", "HK01810", "AAPL"}, {"HK"}),
+            ("比较 000001 SZ 和 AAPL", {"000001", "AAPL"}, {"SZ"}),
+            ("比较 920748 BJ 和 AAPL", {"920748", "AAPL"}, {"BJ"}),
+            ("比较 01810 HK 和 AAPL", {"HK01810", "AAPL"}, {"HK"}),
             ("比较 600519 SS 和 AAPL", {"600519", "AAPL"}, {"SS"}),
         ]
 

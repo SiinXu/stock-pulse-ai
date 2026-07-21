@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Sequence,
 
 if TYPE_CHECKING:
     from src.agent.llm_adapter import LLMToolAdapter
+    from src.agent.tools.registry import ToolRegistry
     from src.config import Config
 
 from src.config import (
@@ -38,6 +39,10 @@ logger = logging.getLogger(__name__)
 VISIBLE_ROLES = {"user", "assistant"}
 SUMMARY_USER_PREFIX = "[系统生成的历史对话摘要，仅供延续本会话]"
 SUMMARY_LLM_TIMEOUT_SECONDS = 20
+A_SHARE_ONLY_CHAT_TOOLS = frozenset({
+    "get_capital_flow",
+    "get_chip_distribution",
+})
 
 SUMMARY_SYSTEM_PROMPT = """你是股票问答系统的会话压缩器，只能总结已经出现过的用户可见对话内容。
 
@@ -90,6 +95,7 @@ class AgentChatMarketContext:
     market_role: str
     market_guidelines: str
     prompt_section: str
+    disabled_tool_names: Tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -144,6 +150,8 @@ def build_agent_chat_market_context(
     context: Optional[Dict[str, Any]],
     stock_scope: Any = None,
     report_language: str = "zh",
+    *,
+    per_symbol_tool_scopes: bool = False,
 ) -> AgentChatMarketContext:
     """Build market-aware role, rules, and model-visible current-turn facts."""
     stock_codes: List[str] = []
@@ -166,9 +174,15 @@ def build_agent_chat_market_context(
             market_role=get_market_role(None, report_language),
             market_guidelines=get_market_guidelines(None, report_language),
             prompt_section="",
+            disabled_tool_names=(),
         )
 
     markets = tuple(dict.fromkeys(detect_market(code) for code in stock_codes))
+    disabled_tool_names = (
+        tuple(sorted(A_SHARE_ONLY_CHAT_TOOLS))
+        if not per_symbol_tool_scopes and any(market != "cn" for market in markets)
+        else ()
+    )
     language = normalize_report_language(report_language)
     language_key = "en" if language in {"en", "ko"} else "zh"
 
@@ -188,8 +202,43 @@ def build_agent_chat_market_context(
         markets=markets,
         market_role=market_role,
         market_guidelines=market_guidelines,
-        prompt_section=_build_market_prompt_section(stock_codes, language_key),
+        prompt_section=_build_market_prompt_section(
+            stock_codes,
+            language_key,
+            disabled_tool_names,
+        ),
+        disabled_tool_names=disabled_tool_names,
     )
+
+
+def build_agent_chat_tool_registry(
+    tool_registry: "ToolRegistry",
+    market_context: AgentChatMarketContext,
+) -> "ToolRegistry":
+    """Return the deterministic market-compatible tool surface for Chat."""
+    disabled = set(market_context.disabled_tool_names)
+    if not disabled:
+        return tool_registry
+
+    from src.agent.tools.registry import ToolRegistry
+
+    filtered = ToolRegistry()
+    for tool_def in tool_registry.list_tools():
+        if tool_def.name not in disabled:
+            filtered.register(tool_def)
+    return filtered
+
+
+def build_agent_chat_chip_instruction(
+    market_context: AgentChatMarketContext,
+) -> str:
+    """Build the market-conditional chip-distribution workflow step."""
+    if "get_chip_distribution" in market_context.disabled_tool_names:
+        return (
+            "当前市场不支持 `get_chip_distribution`；本轮不暴露该工具，"
+            "不得调用或用 A 股筹码数据替代"
+        )
+    return "调用 `get_chip_distribution` 获取筹码分布结构"
 
 
 def _market_facts(market: str) -> _MarketPromptFacts:
@@ -238,6 +287,7 @@ def _build_cross_market_guidelines(
 def _build_market_prompt_section(
     stock_codes: Sequence[str],
     language_key: str,
+    disabled_tool_names: Sequence[str],
 ) -> str:
     if language_key == "en":
         lines = ["## Current-Turn Market Context (System Generated)"]
@@ -255,6 +305,11 @@ def _build_market_prompt_section(
                 "- If a provider or tool omits a market or field, state that limitation and continue with available evidence; never fabricate or fill it with A-share defaults.",
             ]
         )
+        if disabled_tool_names:
+            rendered = " and ".join(f"`{name}`" for name in disabled_tool_names)
+            lines.append(
+                f"- Market capability boundary: {rendered} are unavailable and are not exposed for this turn."
+            )
         return "\n".join(lines)
 
     lines = ["## 本轮市场上下文（系统生成）"]
@@ -272,6 +327,9 @@ def _build_market_prompt_section(
             "- 若 provider 或工具缺少某市场/字段，必须明确说明限制并基于已有证据继续；不得编造或用 A 股默认值补齐。",
         ]
     )
+    if disabled_tool_names:
+        rendered = "、".join(f"`{name}`" for name in disabled_tool_names)
+        lines.append(f"- 市场能力边界：{rendered} 当前不可用，本轮不暴露这些工具。")
     return "\n".join(lines)
 
 

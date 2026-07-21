@@ -11,6 +11,7 @@ import pytest
 from src.agent.chat_context import (
     AgentChatContextBundle,
     build_agent_chat_market_context,
+    build_agent_chat_tool_registry,
 )
 from src.agent.conversation import ConversationSession
 from src.agent.executor import AgentExecutor, AgentResult
@@ -66,6 +67,9 @@ def test_shared_canonicalizer_records_format_only_fallback(caplog) -> None:
         ("分析 600519", "600519", "cn"),
         ("分析 00700.HK", "HK00700", "hk"),
         ("analyze AAPL", "AAPL", "us"),
+        ("analyze F", "F", "us"),
+        ("switch to T", "T", "us"),
+        ("analyze ON", "ON", "us"),
         ("aapl", "AAPL", "us"),
     ],
 )
@@ -92,6 +96,41 @@ def test_first_chat_turn_builds_cross_market_compare_scope() -> None:
     assert resolution.stock_scope.allowed_stock_codes == {"AAPL", "HK00700"}
 
 
+@pytest.mark.parametrize(
+    ("message", "expected_codes"),
+    [
+        ("compare AAPL vs TSLA", {"AAPL", "TSLA"}),
+        ("compare F vs T", {"F", "T"}),
+    ],
+)
+def test_english_compare_connector_is_not_treated_as_a_ticker(
+    message: str,
+    expected_codes: set[str],
+) -> None:
+    resolution = resolve_stock_scope(message, None)
+
+    assert resolution.effective_context == {}
+    assert resolution.stock_scope.mode == "compare"
+    assert resolution.stock_scope.allowed_stock_codes == expected_codes
+
+
+def test_explicit_compare_replaces_a_stale_active_symbol_scope() -> None:
+    resolution = resolve_stock_scope(
+        "AAPL 和 TSLA 哪个更值得买",
+        {
+            "stock_code": "600519",
+            "stock_name": "Kweichow Moutai",
+            "previous_analysis_summary": "stale summary",
+            "report_language": "zh",
+        },
+    )
+
+    assert resolution.effective_context == {"report_language": "zh"}
+    assert resolution.stock_scope.mode == "compare"
+    assert resolution.stock_scope.expected_stock_code == ""
+    assert resolution.stock_scope.allowed_stock_codes == {"AAPL", "TSLA"}
+
+
 @pytest.mark.parametrize("message", ["analyze AAPL", "switch to aapl"])
 def test_explicit_english_switch_changes_the_active_symbol(message: str) -> None:
     resolution = resolve_stock_scope(
@@ -116,6 +155,14 @@ def test_english_analysis_topic_keeps_the_active_symbol() -> None:
     }
     assert resolution.stock_scope.mode == "maintain"
     assert resolution.stock_scope.allowed_stock_codes == {"600519"}
+
+
+def test_english_first_person_pronoun_is_not_treated_as_a_ticker() -> None:
+    resolution = resolve_stock_scope("I think AAPL looks expensive", None)
+
+    assert resolution.effective_context["stock_code"] == "AAPL"
+    assert resolution.stock_scope.mode == "switch"
+    assert resolution.stock_scope.allowed_stock_codes == {"AAPL"}
 
 
 @pytest.mark.parametrize(
@@ -206,6 +253,98 @@ def _stock_registry(executed: list[str]) -> ToolRegistry:
         )
     )
     return registry
+
+
+def _market_capability_registry() -> ToolRegistry:
+    registry = ToolRegistry()
+    for name in (
+        "get_realtime_quote",
+        "get_chip_distribution",
+        "get_capital_flow",
+    ):
+        registry.register(
+            ToolDefinition(
+                name=name,
+                description=name,
+                parameters=[
+                    ToolParameter(
+                        name="stock_code",
+                        type="string",
+                        description="Canonical stock code",
+                    )
+                ],
+                handler=lambda stock_code: {"stock_code": stock_code},
+            )
+        )
+    return registry
+
+
+@pytest.mark.parametrize(
+    ("message", "context", "expected_names"),
+    [
+        (
+            "分析 600519",
+            {"stock_code": "600519"},
+            {
+                "get_realtime_quote",
+                "get_chip_distribution",
+                "get_capital_flow",
+            },
+        ),
+        ("analyze AAPL", {"stock_code": "AAPL"}, {"get_realtime_quote"}),
+        ("分析 00700.HK", {"stock_code": "HK00700"}, {"get_realtime_quote"}),
+        ("比较 600519 和 AAPL", {}, {"get_realtime_quote"}),
+    ],
+)
+def test_chat_tool_registry_applies_market_capability_matrix(
+    message: str,
+    context: dict,
+    expected_names: set[str],
+) -> None:
+    scope = resolve_stock_scope(message, context or None).stock_scope
+    market_context = build_agent_chat_market_context(context, scope, "zh")
+
+    registry = build_agent_chat_tool_registry(
+        _market_capability_registry(),
+        market_context,
+    )
+
+    assert set(registry.list_names()) == expected_names
+
+
+def test_single_agent_us_chat_hides_a_share_only_tools() -> None:
+    adapter = MagicMock()
+    adapter._config = MagicMock()
+    adapter.call_with_tools.return_value = LLMResponse(
+        content="deterministic answer",
+        tool_calls=[],
+        usage={},
+        provider="openai",
+        model="test-model",
+    )
+    executor = AgentExecutor(_market_capability_registry(), adapter, max_steps=2)
+    session = MagicMock()
+    session.get_market_context.return_value = {}
+
+    with patch(
+        "src.agent.executor.build_agent_chat_context_bundle",
+        return_value=AgentChatContextBundle(context_messages=[], diagnostics={}),
+    ), patch(
+        "src.agent.conversation.conversation_manager.get_or_create",
+        return_value=session,
+    ), patch(
+        "src.agent.conversation.conversation_manager.add_message",
+        side_effect=[1, 2],
+    ), patch.object(executor, "_persist_provider_trace"):
+        result = executor.chat("analyze AAPL", "us-capability")
+
+    assert result.success is True
+    first_messages, first_tools = adapter.call_with_tools.call_args_list[0].args[:2]
+    exposed_names = {tool["function"]["name"] for tool in first_tools}
+    rendered = "\n".join(str(item.get("content") or "") for item in first_messages)
+    assert exposed_names == {"get_realtime_quote"}
+    assert "本轮不暴露这些工具" in rendered
+    assert "调用 `get_chip_distribution`" not in rendered
 
 
 @pytest.mark.parametrize(
@@ -352,22 +491,30 @@ def test_single_agent_chat_prefers_explicit_context_over_restored_symbol() -> No
     assert scope.allowed_stock_codes == {"AAPL"}
 
 
-def test_multi_agent_chat_injects_cross_market_context_into_each_stage() -> None:
+def test_multi_agent_chat_runs_each_comparison_symbol_in_its_own_scope() -> None:
     adapter = MagicMock()
     config = SimpleNamespace(agent_orchestrator_timeout_s=0)
     orchestrator = AgentOrchestrator(
-        tool_registry=MagicMock(),
+        tool_registry=_market_capability_registry(),
         llm_adapter=adapter,
         config=config,
         runtime_guard_policy=RuntimeGuardPolicy(),
     )
     session = MagicMock()
     session.get_market_context.return_value = {}
-    captured = {}
+    captured = []
 
     def fake_execute(ctx, **_kwargs):
-        captured["context"] = ctx
-        return OrchestratorResult(success=True, content="cross-market answer")
+        captured.append(ctx)
+        return OrchestratorResult(success=True, content=f"analysis for {ctx.stock_code}")
+
+    adapter.call_with_tools.return_value = LLMResponse(
+        content="cross-market synthesis",
+        tool_calls=[],
+        usage={},
+        provider="openai",
+        model="test-model",
+    )
 
     with patch.object(orchestrator, "_execute_pipeline", side_effect=fake_execute), patch(
         "src.agent.orchestrator.build_visible_chat_history",
@@ -384,9 +531,74 @@ def test_multi_agent_chat_injects_cross_market_context_into_each_stage() -> None
         )
 
     assert result.success is True
-    stock_scope = captured["context"].meta["stock_scope"]
-    assert stock_scope.allowed_stock_codes == {"AAPL", "HK00700"}
-    history = captured["context"].meta["conversation_history"]
-    assert history[0]["role"] == "user"
-    assert "USD" in history[0]["content"]
-    assert "HKD" in history[0]["content"]
+    assert result.content == "cross-market synthesis"
+    assert [ctx.stock_code for ctx in captured] == ["AAPL", "HK00700"]
+    for ctx in captured:
+        stock_scope = ctx.meta["stock_scope"]
+        assert stock_scope.mode == "switch"
+        assert stock_scope.expected_stock_code == ctx.stock_code
+        assert stock_scope.allowed_stock_codes == {ctx.stock_code}
+        history = ctx.meta["conversation_history"]
+        assert history[0]["role"] == "user"
+        assert f"`{ctx.stock_code}`" in history[0]["content"]
+        chat_registry = orchestrator._tool_registry_for_context(ctx)
+        assert set(chat_registry.list_names()) == {"get_realtime_quote"}
+        technical_agent = orchestrator._build_agent_chain(ctx)[0]
+        assert technical_agent.tool_names == ["get_realtime_quote"]
+        assert "chip distribution is unavailable" in technical_agent.system_prompt(ctx)
+    synthesis_messages, synthesis_tools = adapter.call_with_tools.call_args.args[:2]
+    synthesis_text = "\n".join(
+        str(message.get("content") or "") for message in synthesis_messages
+    )
+    assert synthesis_tools == []
+    assert "AAPL" in synthesis_text
+    assert "HK00700" in synthesis_text
+    session.update_market_context.assert_called_once_with({})
+
+
+def test_multi_agent_compare_shares_one_runtime_budget() -> None:
+    adapter = MagicMock()
+    config = SimpleNamespace(agent_orchestrator_timeout_s=1)
+    orchestrator = AgentOrchestrator(
+        tool_registry=_market_capability_registry(),
+        llm_adapter=adapter,
+        config=config,
+        runtime_guard_policy=RuntimeGuardPolicy(),
+    )
+    scope = resolve_stock_scope("比较 AAPL 和 00700.HK", None).stock_scope
+    market_context = build_agent_chat_market_context({}, scope, "zh")
+    executed: list[str] = []
+
+    def fake_execute(ctx, **_kwargs):
+        executed.append(ctx.stock_code)
+        return OrchestratorResult(
+            success=True,
+            content=f"analysis for {ctx.stock_code}",
+        )
+
+    with patch.object(
+        orchestrator,
+        "_execute_pipeline",
+        side_effect=fake_execute,
+    ), patch(
+        "src.agent.orchestrator.time.monotonic",
+        side_effect=[0.0, 0.0, 2.0],
+    ):
+        result = orchestrator._execute_multi_symbol_chat(
+            message="比较 AAPL 和 00700.HK",
+            session_id="shared-budget",
+            context={},
+            stock_scope=scope,
+            history=[],
+            market_context=market_context,
+            report_language="zh",
+            progress_callback=None,
+            cancelled_check=None,
+        )
+
+    assert executed == ["AAPL"]
+    assert result.success is True
+    assert result.timed_out is True
+    assert "逐标的分析" in result.content
+    assert "AAPL" in result.content
+    adapter.call_with_tools.assert_not_called()

@@ -753,7 +753,7 @@ class TestAgentExecutor(unittest.TestCase):
 
         self.assertTrue(result.success)
         self.assertEqual(scope.mode, "compare")
-        self.assertEqual(scope.allowed_stock_codes, {"600519", "HK01810", "AAPL"})
+        self.assertEqual(scope.allowed_stock_codes, {"HK01810", "AAPL"})
         self.assertEqual(executed_calls, [("quote", "01810")])
         self.assertFalse(result.tool_calls_log[0].get("guarded", False))
 
@@ -794,7 +794,7 @@ class TestAgentExecutor(unittest.TestCase):
 
         self.assertTrue(result.success)
         self.assertEqual(scope.mode, "compare")
-        self.assertEqual(scope.allowed_stock_codes, {"600519", "AAPL", "TSLA"})
+        self.assertEqual(scope.allowed_stock_codes, {"AAPL", "TSLA"})
         self.assertEqual(executed_calls, [("quote", "AAPL"), ("quote", "TSLA")])
         self.assertFalse(result.tool_calls_log[0].get("guarded", False))
         self.assertFalse(result.tool_calls_log[1].get("guarded", False))
