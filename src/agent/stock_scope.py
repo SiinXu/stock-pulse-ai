@@ -113,6 +113,13 @@ _EXPLICIT_LOWERCASE_COMPARE_TICKER_PATTERNS = (
     ),
 )
 _LOWERCASE_TICKER_PATTERN = re.compile(r"(?<![a-zA-Z.])([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![a-zA-Z0-9])")
+_EXCHANGE_QUALIFIED_TOKEN_PATTERN = re.compile(
+    r"(?<![a-zA-Z0-9.])(?:"
+    r"(?:SH|SZ|SS|BJ|HK)\.?\d+|"
+    r"\d+\.(?:SH|SZ|SS|BJ|HK|US|T|KS|KQ|TW|TWO)"
+    r")(?![a-zA-Z0-9.])",
+    re.IGNORECASE,
+)
 _EXCHANGE_TOKEN_CANDIDATES = {"SH", "SZ", "BJ", "HK", "SS"}
 _COMPARISON_TOKEN_CANDIDATES = {"VS"}
 _ALWAYS_DENIED_TICKER_CANDIDATES = {
@@ -266,20 +273,22 @@ def extract_stock_codes(text: str) -> List[str]:
         return []
 
     candidates: List[str] = []
+    qualified_spans = []
+    for match in _EXCHANGE_QUALIFIED_TOKEN_PATTERN.finditer(text):
+        qualified_spans.append(match.span())
+        _append_candidate(candidates, match.group(0), text)
 
     for pattern, flags in (
-        (r"(?<![a-zA-Z])(?:SH|SZ|BJ)\d{6}(?!\d)", re.IGNORECASE),
-        (r"(?<![a-zA-Z])hk\.?\d{1,5}(?!\d)", re.IGNORECASE),
-        (r"(?<![a-zA-Z])\d{1,5}\.HK(?![a-zA-Z])", re.IGNORECASE),
-        (
-            r"(?<![a-zA-Z0-9.])\d{4,6}\.(?:T|KS|KQ|TW|TWO)(?![a-zA-Z0-9])",
-            re.IGNORECASE,
-        ),
         (r"(?<!\d)(?:[03648]\d{5}|92\d{4})(?!\d)", 0),
         (r"(?<!\d)\d{5}(?!\d)", 0),
         (r"(?<![a-zA-Z.])([A-Z]{2,5}(?:\.[A-Z]{1,2})?)(?![a-zA-Z0-9])", 0),
     ):
         for match in re.finditer(pattern, text, flags):
+            if any(
+                match.start() < qualified_end and match.end() > qualified_start
+                for qualified_start, qualified_end in qualified_spans
+            ):
+                continue
             raw = match.group(1) if match.lastindex else match.group(0)
             _append_candidate(candidates, raw, text)
 

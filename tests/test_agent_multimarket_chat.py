@@ -69,6 +69,11 @@ def test_shared_canonicalizer_records_format_only_fallback(caplog) -> None:
     ("message", "expected_code", "expected_market"),
     [
         ("分析 600519", "600519", "cn"),
+        ("analyze SH600519", "600519", "cn"),
+        ("analyze SZ000001", "000001", "cn"),
+        ("analyze BJ920748", "920748", "cn"),
+        ("analyze 600519.SH", "600519", "cn"),
+        ("analyze 000001.SZ", "000001", "cn"),
         ("分析 00700.HK", "HK00700", "hk"),
         ("analyze HK700", "HK00700", "hk"),
         ("analyze hk700", "HK00700", "hk"),
@@ -102,6 +107,26 @@ def test_first_chat_turn_creates_canonical_stock_scope_without_context(
     assert resolution.stock_scope.expected_stock_code == expected_code
     assert resolution.stock_scope.allowed_stock_codes == {expected_code}
     assert detect_market(expected_code) == expected_market
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "analyze SH000001",
+        "analyze SZ600519",
+        "analyze BJ600519",
+        "analyze HK600519",
+        "analyze 00700.SH",
+        "analyze 600519.HK",
+    ],
+)
+def test_invalid_exchange_qualified_token_is_not_reinterpreted(
+    message: str,
+) -> None:
+    resolution = resolve_stock_scope(message, None)
+
+    assert resolution.effective_context == {}
+    assert resolution.stock_scope is None
 
 
 @pytest.mark.parametrize("stock_code", _COLLISION_TICKERS)
