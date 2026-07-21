@@ -251,6 +251,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Added configurable Agent tool, stage, and full-run guards with loop detection, stage failure isolation, and structured runtime events.
 - [Changed] Normalized A-share, Hong Kong, and US symbols across Bot analysis commands with explicit market labels and actionable unsupported-market guidance.
 - [Docs] Established an ADR registry and template, backfilled four implemented architecture decisions, and added a current component and data-flow overview.
+- [Changed] Split pipeline orchestration and persistence stages into focused modules while preserving the legacy facade and runtime behavior.
 
 ## [3.26.3] - 2026-07-15
 
