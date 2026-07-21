@@ -240,7 +240,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Removed the `max-w-6xl` cap on the AlphaSift screening page content so it fills the viewport like the other workspace pages.
 - [Fixed] Required current-password reauthentication before disabling administrator authentication and blocked generic configuration or non-canonical key aliases from changing the auth toggle.
 - [Changed] Split pipeline delivery, rendering, and dispatch stages into a focused module while preserving the `src.core.pipeline` compatibility surface.
-- [Changed] Added configurable daily-provider health scoring, circuit cooldown diagnostics, failover metadata, and half-open recovery without changing market capability boundaries.
 - [Changed] Added configurable daily-provider health scoring, serialized circuit admission, redacted failover metadata, and half-open recovery without changing market capability boundaries.
 <!-- New entry format: - [Type] Description (Type: Added/Changed/Fixed/Docs/Tests/Chore) -->
 <!-- Append each entry as one line at the end of this section; do not add category headings. -->
