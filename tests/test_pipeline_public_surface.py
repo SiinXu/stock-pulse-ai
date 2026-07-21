@@ -55,6 +55,8 @@ EXPECTED_DELIVERY_METHODS = (
 
 
 def test_pipeline_public_exports_match_pre_split_snapshot():
+    """Assert that the facade exports exactly the pre-split public names."""
+
     pipeline_module = importlib.import_module("src.core.pipeline")
 
     actual_exports = {
@@ -65,6 +67,8 @@ def test_pipeline_public_exports_match_pre_split_snapshot():
 
 
 def test_pipeline_legacy_entry_point_exposes_delivery_methods():
+    """Assert that delivery methods remain available from the legacy class."""
+
     pipeline_module = importlib.import_module("src.core.pipeline")
     pipeline_class = pipeline_module.StockAnalysisPipeline
 
