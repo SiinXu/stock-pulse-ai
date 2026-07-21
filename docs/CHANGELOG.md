@@ -258,6 +258,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Split the oversized system configuration service into focused private modules while preserving its public facade.
 - [Changed] Split analyzer result-processing helpers into a focused internal module while preserving the legacy facade and runtime behavior.
 - [Changed] Added canonical A-share/HK/US Chat scope, market-specific tool filtering, session continuity, and per-symbol Multi-Agent comparison with currency/timezone/field context.
+- [Changed] Split GeminiAnalyzer generation, analysis, and response methods into focused internal modules while preserving the legacy class facade and runtime behavior.
 
 ## [3.26.3] - 2026-07-15
 
