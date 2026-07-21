@@ -1,5 +1,6 @@
 """Compatibility guards for the public ``src.config`` facade."""
 
+import inspect
 import subprocess
 import sys
 from typing import get_type_hints
@@ -191,6 +192,27 @@ def test_exported_dataclass_method_metadata_is_stable():
     for value, method_names in facade_owned_methods.items():
         for method_name in method_names:
             assert getattr(value, method_name).__globals__ is config_module.__dict__
+
+    for value in (
+        Config,
+        config_module.ConfigIssue,
+        config_module.AgentContextCompressionPreset,
+    ):
+        repr_function = inspect.unwrap(value.__repr__)
+        assert repr_function.__module__ == "src.config"
+        assert repr_function.__globals__ is config_module.__dict__
+
+
+def test_config_default_factory_metadata_is_stable():
+    schedule_factory = Config.__dataclass_fields__["schedule_times"].default_factory
+
+    assert schedule_factory.__module__ == "src.config"
+    assert schedule_factory.__qualname__ == "Config.<lambda>"
+    assert schedule_factory.__globals__ is config_module.__dict__
+    assert schedule_factory in tuple(
+        cell.cell_contents for cell in Config.__init__.__closure__ or ()
+    )
+    assert schedule_factory() == ["18:00"]
 
 
 def test_config_reload_recreates_public_definitions_and_singleton():

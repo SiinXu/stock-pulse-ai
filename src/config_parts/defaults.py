@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Literal, Optional
 from urllib.parse import unquote, urlparse
 
-from src.config_parts.binding import clone_descriptor
+from src.config_parts.binding import bind_wrapped_function, clone_descriptor
 
 logger = logging.getLogger("src.config")
 
@@ -179,6 +179,7 @@ def _bind_config_facade(facade_globals: Dict[str, object]) -> None:
                 function = descriptor
             else:
                 continue
+            bind_wrapped_function(function, facade_globals)
             if getattr(function, "__globals__", None) is not globals():
                 continue
             cloned_descriptor = clone_descriptor(descriptor, facade_globals)

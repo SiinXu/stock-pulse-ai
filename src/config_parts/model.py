@@ -6,7 +6,12 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from src.config_parts import loading as _loading_module
 from src.config_parts import parsers as _parsers_module
-from src.config_parts.binding import clone_descriptor
+from src.config_parts.binding import (
+    bind_wrapped_function,
+    clone_descriptor,
+    clone_function,
+    replace_closure_reference,
+)
 from src.config_parts.defaults import (
     AGENT_CONTEXT_COMPRESSION_DEFAULT_PROFILE,
     AGENT_MAX_STEPS_DEFAULT,
@@ -606,6 +611,17 @@ del _descriptor, _function, _method_name
 
 def _bind_config_facade(facade_globals: Dict[str, Any]) -> None:
     """Bind public Config methods to the original facade global namespace."""
+    init_function = vars(Config)["__init__"]
+    for config_field in Config.__dataclass_fields__.values():
+        default_factory = config_field.default_factory
+        if getattr(default_factory, "__globals__", None) is not globals():
+            continue
+        cloned_factory = clone_function(default_factory, facade_globals)
+        replace_closure_reference(init_function, default_factory, cloned_factory)
+        config_field.default_factory = cloned_factory
+
+    bind_wrapped_function(vars(Config)["__repr__"], facade_globals)
+
     for method_group, method_names in _CONFIG_METHOD_GROUPS:
         for method_name in method_names:
             descriptor = clone_descriptor(vars(method_group)[method_name], facade_globals)
