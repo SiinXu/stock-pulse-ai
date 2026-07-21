@@ -434,7 +434,6 @@
     {"path":"src/core/pipeline.py","scope":"<module>.StockAnalysisPipeline._load_persisted_intelligence_context","caught":["Exception"],"digest":"414f5d80078642a37a110c69fafa6b3c2ec3cf982a28508caefe458fe835ec9f"},
     {"path":"src/core/pipeline.py","scope":"<module>.StockAnalysisPipeline._safe_to_dict","caught":["Exception"],"digest":"0a2a40fbc07f69984ca63478d5b21f2a7342f9ed704199c1e24bebe0f2f7cfa9"},
     {"path":"src/core/pipeline.py","scope":"<module>.StockAnalysisPipeline._safe_to_dict","caught":["Exception"],"digest":"559d4f722bf9127924c3ebf2d68f83c2f99bad60f636eff56f60b14a93384776"},
-    {"path":"src/core/pipeline.py","scope":"<module>.StockAnalysisPipeline._send_notifications._get_md2img_hint","caught":["Exception"],"digest":"d9384c973a83ea3825ebb876d9b612109f9a33667b8d310e1740a72e9ede9859"},
     {"path":"src/core/pipeline.py","scope":"<module>.StockAnalysisPipeline.fetch_and_save_stock_data","caught":["Exception"],"digest":"1b2ef3974e1dded844bd29ad32451e037f33741c9fbef51799df400a33e3c667"},
     {"path":"src/core/trading_calendar.py","scope":"<module>._phase_minutes","caught":["Exception"],"digest":"4bb2cb3fe92cfc77176dca0a29debb75b7492d36ed7ce1dcddc98ea1c06e4d8c"},
     {"path":"src/core/trading_calendar.py","scope":"<module>.get_effective_trading_date","caught":["Exception"],"digest":"d02a26da3942cd15ef056653df5be364c9cb472eceb37ecf8d6a60c61ff6195b"},
