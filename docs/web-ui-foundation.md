@@ -420,6 +420,40 @@ exceptions are limited to shared compatibility adapters plus the audited
 report/task consumers; each records exact tokens, owner `UIUX-HARNESS`, and a
 concrete `removeWhen` condition. No page-track `removeBy` entry remains.
 
+## Component Playground
+
+The production build includes an authenticated, intentionally hidden component
+workbench at `/playground`. It is not part of `SidebarNav`. The route uses the
+same `AuthProvider` boundary as the rest of the Web application, so a signed-out
+request preserves the complete playground deep link through `/login?redirect=`.
+
+The catalog covers every exported visual component under `src/components`,
+including shared primitives, layout patterns, and business components. Pages,
+hooks, utilities, non-visual providers, and duplicate export aliases are out of
+scope. When a visual component is added or removed, update the catalog and its
+real-component scenario renderer together; the catalog completeness test must
+remain exact. Stories may add local state wrappers but must not replace the
+component with a visual approximation or introduce a generic props editor.
+
+Each preview renders through the same-origin
+`/playground/render/:componentId/:scenarioId` route in a dedicated iframe. This
+keeps portals, focus traps, viewport media queries, drawers, modals, and
+full-screen layouts inside the preview boundary. The selected `component`,
+`scenario`, fixture `profile`, and `viewport` live in the parent URL query so a
+refresh or shared link restores the same deterministic view. Invalid values are
+replaced with the catalog default.
+
+The renderer waits for the real application authentication check to finish,
+then installs its Axios mock before mounting the selected story. The mock is
+limited to that iframe's JavaScript realm, uses synthetic fixtures only, and is
+restored on unmount. It provides deterministic `ready`, `empty`, `error`, and
+`slow` profiles; switching a profile or scenario rebuilds the iframe and its
+in-memory state. Registered writes update in-memory fixtures, while every
+unregistered request is rejected with `501 playground_mock_not_registered`.
+Passthrough is prohibited. Request-log messages contain only method, path
+without query or hash, status, duration, and a local request id; payloads,
+headers, credentials, and response bodies must never cross the iframe boundary.
+
 ## Migration And Deletion
 
 - `UI-F01A` establishes the primitives, removes business-named Button variants,

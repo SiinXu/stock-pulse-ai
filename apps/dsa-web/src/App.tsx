@@ -33,6 +33,8 @@ const AlertsPage = lazy(() => import('./pages/AlertsPage'));
 const TokenUsagePage = lazy(() => import('./pages/TokenUsagePage'));
 const StockScreeningPage = lazy(() => import('./pages/StockScreeningPage'));
 const StockDetailsPage = lazy(() => import('./pages/StockDetailsPage'));
+const ComponentPlaygroundPage = lazy(() => import('./playground/ComponentPlaygroundPage'));
+const PlaygroundRenderPage = lazy(() => import('./playground/PlaygroundRenderPage'));
 
 const AppLayout: React.FC = () => {
   const location = useLocation();
@@ -100,6 +102,22 @@ const routes = [
         element: (
           <StandaloneRouteBoundary>
             <LoginPage />
+          </StandaloneRouteBoundary>
+        ),
+      },
+      {
+        path: '/playground',
+        element: (
+          <StandaloneRouteBoundary>
+            <ComponentPlaygroundPage />
+          </StandaloneRouteBoundary>
+        ),
+      },
+      {
+        path: '/playground/render/:componentId/:scenarioId',
+        element: (
+          <StandaloneRouteBoundary>
+            <PlaygroundRenderPage />
           </StandaloneRouteBoundary>
         ),
       },

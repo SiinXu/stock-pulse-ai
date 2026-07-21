@@ -23,6 +23,7 @@
     "@fontsource-variable/geist": "^5.2.9",
     "@remixicon/react": "^4.9.0",
     "axios": "^1.13.4",
+    "axios-mock-adapter": "^2.1.0",
     "camelcase-keys": "^10.0.2",
     "clsx": "^2.1.1",
     "lucide-react": "^0.555.0",

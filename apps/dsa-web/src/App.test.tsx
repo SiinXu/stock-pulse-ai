@@ -72,6 +72,14 @@ vi.mock('./pages/LoginPage', () => ({
   default: () => <div data-testid="login-page">Login</div>,
 }));
 
+vi.mock('./playground/ComponentPlaygroundPage', () => ({
+  default: () => <div data-testid="playground-page">Playground</div>,
+}));
+
+vi.mock('./playground/PlaygroundRenderPage', () => ({
+  default: () => <div data-testid="playground-render-page">Playground render</div>,
+}));
+
 function makeAuthState(overrides: Partial<AuthState> = {}): AuthState {
   return {
     authEnabled: false,
@@ -119,6 +127,36 @@ describe('App routing behavior', () => {
     expect(await screen.findByTestId('login-page')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/login');
     expect(window.location.search).toBe('?redirect=%2Fportfolio');
+  });
+
+  it('keeps the hidden playground behind the existing authentication boundary', async () => {
+    vi.mocked(AuthContext.useAuth).mockReturnValue(makeAuthState({
+      authEnabled: true,
+      loggedIn: false,
+      setupState: 'enabled',
+    }));
+    window.history.pushState({}, '', '/playground?component=modal&scenario=interactive');
+
+    render(<App />);
+
+    expect(await screen.findByTestId('login-page')).toBeInTheDocument();
+    expect(window.location.search).toContain('redirect=');
+    expect(decodeURIComponent(new URLSearchParams(window.location.search).get('redirect') || ''))
+      .toBe('/playground?component=modal&scenario=interactive');
+  });
+
+  it('renders the hidden playground without the product shell after authentication', async () => {
+    vi.mocked(AuthContext.useAuth).mockReturnValue(makeAuthState({
+      authEnabled: true,
+      loggedIn: true,
+      setupState: 'enabled',
+    }));
+    window.history.pushState({}, '', '/playground');
+
+    render(<App />);
+
+    expect(await screen.findByTestId('playground-page')).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: '主导航' })).not.toBeInTheDocument();
   });
 
   it('renders the current route page after auth is ready', async () => {
