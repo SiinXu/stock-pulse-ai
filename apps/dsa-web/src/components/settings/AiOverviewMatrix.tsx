@@ -3,7 +3,8 @@
 import type React from 'react';
 import { getUiListSeparator } from '../../utils/uiLocale';
 import { cn } from '../../utils/cn';
-import { resolveAiTaskMatrix, type AiTaskStatus, type UiLang } from './aiTaskMatrix';
+import { DataTable, type DataTableColumn } from '../common';
+import { resolveAiTaskMatrix, type AiTaskRow, type AiTaskStatus, type UiLang } from './aiTaskMatrix';
 import { SETTINGS_MISC_TEXT, SETTINGS_OVERVIEW_STATUS } from '../../locales/settingsMisc';
 
 interface AiOverviewMatrixProps {
@@ -34,6 +35,67 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({
   const rows = resolveAiTaskMatrix(getValue, { availableRoutes });
   const tx = (entry: Record<UiLang, string>) => entry[language];
   const text = SETTINGS_MISC_TEXT[language];
+  const columns: readonly DataTableColumn<AiTaskRow>[] = [
+    {
+      id: 'task',
+      header: text.colTask,
+      rowHeader: true,
+      cell: (row) => <span className="font-medium text-foreground">{tx(row.label)}</span>,
+    },
+    {
+      id: 'backend',
+      header: text.colBackend,
+      cell: (row) => (
+        <>
+          {tx(row.backendLabel)}
+          {row.fallbackBackendId ? (
+            <span className="ml-1 text-xs text-muted-text">
+              · {text.failover}: {row.fallbackBackendId}
+            </span>
+          ) : null}
+        </>
+      ),
+    },
+    {
+      id: 'primary',
+      header: text.colPrimary,
+      cell: (row) => (
+        <>
+          {row.primaryModel ? (
+            <span className="break-all text-foreground">{formatModel(row.primaryModel)}</span>
+          ) : (
+            <span className="text-muted-text">{text.none}</span>
+          )}
+          {row.primaryInherited && row.primaryModel ? (
+            <span className="ml-1 text-xs text-muted-text">({text.inherited})</span>
+          ) : null}
+        </>
+      ),
+    },
+    {
+      id: 'fallback',
+      header: text.colFallback,
+      cell: (row) => row.fallbackModels.length > 0 ? (
+        <span className="break-all">
+          {row.fallbackModels.map(formatModel).join(getUiListSeparator(language))}
+        </span>
+      ) : (
+        <span className="text-muted-text">—</span>
+      ),
+    },
+    {
+      id: 'status',
+      header: text.colStatus,
+      cell: (row) => (
+        <span className="inline-flex items-center gap-1.5">
+          <span className={cn('h-2 w-2 rounded-full', STATUS_META[row.status].dot)} aria-hidden="true" />
+          <span className={STATUS_META[row.status].text}>
+            {SETTINGS_OVERVIEW_STATUS[language][row.status]}
+          </span>
+        </span>
+      ),
+    },
+  ];
 
   return (
     <section aria-labelledby="ai-overview-title" className="space-y-3">
@@ -53,60 +115,19 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({
         ) : null}
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-[var(--settings-border)]">
-        <table className="w-full min-w-140 border-collapse text-left text-xs">
-          <thead>
-            <tr className="border-b border-[var(--settings-border)] text-xs uppercase tracking-wide text-muted-text">
-              <th scope="col" className="px-3 py-2 font-medium">{text.colTask}</th>
-              <th scope="col" className="px-3 py-2 font-medium">{text.colBackend}</th>
-              <th scope="col" className="px-3 py-2 font-medium">{text.colPrimary}</th>
-              <th scope="col" className="px-3 py-2 font-medium">{text.colFallback}</th>
-              <th scope="col" className="px-3 py-2 font-medium">{text.colStatus}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id} className="border-b border-[var(--settings-border)] last:border-b-0" data-testid={`ai-task-${row.id}`}>
-                <th scope="row" className="px-3 py-2.5 font-medium text-foreground">{tx(row.label)}</th>
-                <td className="px-3 py-2.5 text-secondary-text">
-                  {tx(row.backendLabel)}
-                  {row.fallbackBackendId ? (
-                    <span className="ml-1 text-xs text-muted-text">
-                      · {text.failover}: {row.fallbackBackendId}
-                    </span>
-                  ) : null}
-                </td>
-                <td className="px-3 py-2.5">
-                  {row.primaryModel ? (
-                    <span className="break-all text-foreground">{formatModel(row.primaryModel)}</span>
-                  ) : (
-                    <span className="text-muted-text">{text.none}</span>
-                  )}
-                  {row.primaryInherited && row.primaryModel ? (
-                    <span className="ml-1 text-xs text-muted-text">({text.inherited})</span>
-                  ) : null}
-                </td>
-                <td className="px-3 py-2.5 text-secondary-text">
-                  {row.fallbackModels.length > 0 ? (
-                    <span className="break-all">
-                      {row.fallbackModels.map(formatModel).join(getUiListSeparator(language))}
-                    </span>
-                  ) : (
-                    <span className="text-muted-text">—</span>
-                  )}
-                </td>
-                <td className="px-3 py-2.5">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className={cn('h-2 w-2 rounded-full', STATUS_META[row.status].dot)} aria-hidden="true" />
-                    <span className={STATUS_META[row.status].text}>
-                      {SETTINGS_OVERVIEW_STATUS[language][row.status]}
-                    </span>
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="overflow-hidden rounded-xl border border-[var(--settings-border)]">
+        <DataTable
+          caption={text.overviewTitle}
+          columns={columns}
+          rows={rows}
+          getRowKey={(row) => row.id}
+          emptyState={{ title: text.none }}
+          density="compact"
+          frame="embedded"
+          minWidth="narrow"
+          separatorTone="inherit"
+          getRowTestId={(row) => `ai-task-${row.id}`}
+        />
       </div>
     </section>
   );

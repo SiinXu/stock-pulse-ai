@@ -50,6 +50,7 @@ import {
 import { encodeModelRef, isModelRef } from '../../utils/modelRef';
 import { ProviderQuickLinks } from './ProviderQuickLinks';
 import { getUiColon, getUiListSeparator } from '../../utils/uiLocale';
+import { SETTINGS_CONTROL_WIDTH_CLASS } from './settingsControlLayout';
 
 // Provider *business* metadata comes from the backend catalog (passed as a
 // prop). These helpers resolve an entry by channel/provider id; "known" excludes
@@ -1654,6 +1655,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 placeholder={text.connectionName}
                 error={nameError}
                 disabled={fieldIsReadOnly('display_name')}
+                fieldClassName={SETTINGS_CONTROL_WIDTH_CLASS}
               />
             </div>
           ) : null}
@@ -1671,6 +1673,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                   options={isCustomService ? protocolOptions : officialProtocolOptions}
                   placeholder={text.chooseProtocol}
                   disabled={fieldIsReadOnly('protocol')}
+                  className={SETTINGS_CONTROL_WIDTH_CLASS}
                 />
                 {!isCustomService && provider ? (
                   <p className="mt-1 text-xs text-muted-text">
@@ -1690,6 +1693,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     placeholder="https://api.example.com/v1"
                     error={baseUrlError}
                     disabled={fieldIsReadOnly('base_url')}
+                    fieldClassName={SETTINGS_CONTROL_WIDTH_CLASS}
                   />
                 </div>
               ) : null}
@@ -1706,6 +1710,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 placeholder={provider?.defaultBaseUrl || 'https://api.example.com/v1'}
                 error={baseUrlError}
                 disabled={fieldIsReadOnly('base_url')}
+                fieldClassName={SETTINGS_CONTROL_WIDTH_CLASS}
               />
               {provider?.defaultBaseUrl ? (
                 <button
@@ -1787,6 +1792,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 onChange={(event) => updateDraft('extraHeaders', event.target.value)}
                 placeholder={text.extraHeadersPlaceholder}
                 disabled={fieldIsReadOnly('extra_headers')}
+                fieldClassName={SETTINGS_CONTROL_WIDTH_CLASS}
               />
             </div>
           ) : null}

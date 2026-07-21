@@ -34,9 +34,10 @@ Shared patterns compose these primitives:
 | `StatePanel` | Represents one typed task state and owns its live-region, busy, icon, density, description, and action semantics. |
 | `FilterBar` | Owns the compact primary-filter form, Apply command, advanced-filter slot, and applied-filter summary slot. |
 | `AdvancedFilterSheet` | Uses a non-modal dialog Popover at 768px and wider, a bottom Sheet below 768px, and one fixed reset/apply footer. |
+| `ResponsiveFilterPanel` | Keeps basic filters visible, exposes advanced filters inline at desktop, and moves those advanced filters plus Apply into a Drawer below 1024px. |
 | `AppliedFilterChips` | Presents applied filters as individually removable tokens with one clear-all command. |
 | `useFilterQueryState` | Keeps applied filters in Router search params, preserves unrelated params, keeps drafts local, and restores both after Back/Forward navigation. |
-| `DataTable` | Renders typed columns and native table semantics, controlled sorting, one task state, contained narrow-screen scrolling, and isolated row activation. |
+| `DataTable` | Renders typed columns and native table semantics, framed or embedded presentation, controlled sorting/selection, fixed or automatic layout, one task state, contained narrow-screen scrolling, and isolated row activation. |
 | `AppPage` / `WorkspacePage` | Provide the full-width page canvas and optional main/rail workspace grid beneath the Shell's single `main`. |
 | `PageHeader` / `Toolbar` | Provide one programmatically focusable H1 and one semantic command group without adding a decorative page surface. |
 | `ResponsiveRail` | Keeps contextual content visible at wide desktop and exposes one labelled disclosure at narrower breakpoints. |
@@ -75,6 +76,14 @@ the other container can be opened. The caller owns all visible
 and accessible strings; the Pattern owns no business copy or API request.
 Both advanced-filter forms contain their submit event so a portalled form
 composed inside `FilterBar` cannot also submit the outer primary-filter form.
+
+`ResponsiveFilterPanel` remains the narrower PR #35 contract used by Decision
+Signals. Basic filters stay visible at every width; advanced filters and Apply
+stay inline from 1024px upward and move into one focus-managed Drawer below
+that breakpoint. The mobile trigger reports the active-filter count, Apply is
+blocked while unchanged or in flight, and a loading Apply cannot close the
+Drawer early. New filter surfaces should prefer `FilterBar` plus
+`AdvancedFilterSheet` unless they need this existing split-filter contract.
 
 ## Selection Control Semantics
 
@@ -120,19 +129,26 @@ business schema, or sort data internally. Optional sort controls emit the next
 ordering. Every sortable column supplies its own localized accessible label,
 and the native column header exposes `aria-sort`.
 
-The Pattern renders one framed table surface. Empty rows use the required
-`emptyState`; loading, error, and retrying use one explicit `status` and hide
-the table so duplicate state blocks cannot appear. State content reuses
-`StatePanel` roles, live regions, busy state, and actions. Callers cannot pass
-`className`, `style`, or Surface attributes through `DataTable`; contextual
-layout belongs on a wrapper and cell typography belongs inside the cell
-renderer.
+The default `surface` frame renders one interactive table Surface. The explicit
+`embedded` frame omits that Surface so a report Card, settings frame, overlay,
+or Section remains the sole contextual Surface; its state path is likewise an
+unframed canvas `StatePanel`. Empty rows use the required `emptyState`; loading,
+error, and retrying use one explicit `status` and hide the table so duplicate
+state blocks cannot appear. State content reuses `StatePanel` roles, live
+regions, busy state, and actions. Callers cannot pass `className`, `style`, or
+Surface attributes through `DataTable`; contextual layout belongs on a wrapper
+and cell typography belongs inside the cell renderer. `default`, `subtle`, and
+`inherit` separator tones cover shared tokens and a caller-owned contextual
+frame without introducing domain-specific variants.
 
 On narrow screens the native table remains a table inside a named, keyboard-
-focusable horizontal scroll region. `content`, `wide`, and `extra-wide` are
-stable minimum-width contracts; scrolling is contained within the Pattern and
-must never increase document width. This preserves dense financial columns and
-their headers instead of duplicating rows into a second card DOM.
+focusable horizontal scroll region. `container`, `narrow`, `content`, `wide`,
+and `extra-wide` are stable minimum-width contracts; scrolling is contained
+within the Pattern and must never increase document width. `fixed` layout owns
+the native `colgroup` and normalizes a complete set of positive percentage
+widths, while the default `auto` layout leaves sizing to table content. This
+preserves dense financial columns and their headers instead of duplicating rows
+into a second card DOM.
 
 An activatable row requires both `onRowActivate` and a localized
 `getRowAriaLabel`. Click, Enter, and Space invoke the same command. Events from
@@ -140,6 +156,10 @@ nested `button`, link, input, label, select, textarea, summary,
 `contenteditable`, focusable element, or interactive ARIA role are ignored, so
 row navigation cannot fire together with an edit, menu, link, or form control.
 Disabled rows leave the activation tab sequence and expose `aria-disabled`.
+Optional `isRowSelected` keeps controlled row selection, `aria-selected`, and
+the selected visual treatment in the Pattern. `getRowTestId` provides a narrow
+stable identity hook where product tests must address a business row; arbitrary
+row attributes remain private to the implementation.
 
 Optional controlled detail rows require both `isRowDetailVisible` and
 `renderRowDetail`. `DataTable` owns the sibling row, full-column span, density,
@@ -148,17 +168,10 @@ the caller owns business content and the command that controls visibility.
 That command must expose `aria-expanded` and `aria-controls` when it targets a
 stable detail-row ID.
 
-Five embedded raw tables remain tracked by stable file/token/count inventory.
-They are owned by `UIUX-HARNESS` and may be removed only when their concrete
-shared-Pattern prerequisite is available:
-
-| Current table source | Removal prerequisite |
-| --- | --- |
-| Stock history trend | Selected-row presentation and percentage/fixed-layout columns without caller geometry overrides. |
-| Market Review report | Embedded unframed report-table mode without a nested Surface inside the report Card. |
-| Run Flow node details | Embedded unframed compact mode for an overlay detail panel. |
-| Settings AI overview matrix | Settings-border ownership and stable per-task row test IDs through `DataTable`. |
-| Token Usage recent calls | Embedded `DataTable` inside the existing `Section` without a nested card, preserving the no-calls state. |
+Stock history trend, Market Review indices, Run Flow attempts, the Settings AI
+overview matrix, and Token Usage recent calls now consume these shared
+contracts. The production raw-table allowance inventory is empty; the guard
+continues to reject any raw table outside the shared owner.
 
 ## Page And Router Semantics
 
@@ -190,6 +203,44 @@ routes use `WorkspaceNavigation` instead: desktop renders real Router Links
 with one `aria-current="page"`, while compact layouts render a labelled native
 select that hands the selected item back to the caller. Route item IDs, not
 translated labels or array indexes, provide stable focus markers.
+
+The owner-selected PR #35 page restoration keeps Settings, Portfolio,
+Decision Signals, Backtest, and Alerts on the full-width `AppPage` canvas.
+Settings, Portfolio, Backtest, and Alerts expose the shared visible
+`PageHeader`; Decision Signals keeps the same H1 programmatically available
+while visually prioritizing its action row. Decision Signals and Alerts use
+four and three mutually exclusive tabs respectively. Portfolio renders one
+page-level onboarding state when no account exists, and Backtest renders one
+page-level loading, error, or empty state before results exist. Alert-rule
+filters belong to the Card header at `sm` and wider and stack full-width below
+`sm`; Decision Signals uses `ResponsiveFilterPanel` for its basic/advanced
+split. Later account editing, manual signal creation, URL state, shared
+`DataTable`, alert-rule editing, and notification-attempt filtering remain
+available inside those restored structures.
+
+Settings keeps regular configuration visible and editable in page flow; it
+must never collapse those fields to a heading, summary, and Configure command.
+This applies to Agent Behavior, Conversation, Reports, Alerts, Backtesting,
+System & Security, task routing, reliability, raw advanced configuration,
+scheduler, and event monitor settings. Their field groups use the shared
+`Input`, `Select`, `Textarea`, and `TimePicker` controls directly in the active
+section, alongside operational status and related page actions.
+
+The shared `Modal` is reserved for discrete submission flows: adding or editing
+one intelligence source, provider, or notification channel; authentication or
+password changes; notification tests; and comparable single-entity forms. It
+owns focus lifecycle, Escape handling, and the action footer for those flows,
+but is not a blanket wrapper for regular configuration. Data Sources keeps its
+quote/news configuration, source directories, status, and results inline.
+Provider and notification-channel directories likewise remain inline for
+scanning, with only an individual add/edit form opening a `Modal`. Readiness,
+runtime status, version, import/backup, and result-oriented content stay in
+page flow. Sensitive directory state exposes only configured or not configured,
+never a credential or masked value. Settings field rows reserve one 240px
+desktop control column, and every shared field control fills that same column;
+`Input` and `Select` use the same control height. The sidebar profile consumes
+`ThemeToggle`'s default vertical menu; it must not override the shared menu into
+a horizontal segmented row.
 
 `RouteFocusCoordinator` is mounted once inside the data Router. A page may
 only call `useRouteFocusTarget({ routeId, headingRef, ready })`; it cannot pass
@@ -355,14 +406,16 @@ The canonical visible tiers are:
 
 | Size | Height | Typical use |
 | --- | ---: | --- |
-| `compact` | 28px | Dense toolbars and low-frequency filters |
-| `default` | 32px | Ordinary commands |
-| `comfortable` | 36px | Forms and regular submissions |
-| `primary` | 40px | The unique task CTA |
+| `compact` | 20px | Dense toolbars and low-frequency filters |
+| `default` | 24px | Ordinary compact commands |
+| `comfortable` | 28px | Forms, regular submissions, and the implicit default |
+| `primary` | 32px | The unique task CTA |
 | `navigation` | 44px | Shell, rail, and overlay navigation controls |
 
-`Button` defaults to `default`; `Input` defaults to `comfortable`; login inputs
-resolve to `primary`. `IconButton` supports `compact`, `default`, and
+`Button` defaults to `comfortable`; `Input` defaults to `comfortable`; login inputs
+resolve to `primary`. `DatePicker` preserves its 44px default touch control and
+offers an explicit 32px `compact` control for dense aligned toolbars such as
+Backtest. `IconButton` supports `compact`, `default`, and
 `comfortable` visible squares plus the 44px `navigation` square. The
 `navigation` tier is reserved for shell, rail, and overlay navigation controls
 whose visible target must remain 44px; it is not a general replacement for the
@@ -385,7 +438,7 @@ do not replace the primitive contract.
 
 The AST-backed production design guard checks:
 
-- Button style-map soft rounding and the 28/32/36/40px tiers.
+- Button style-map PR #35 rounding and the 20/24/28/32px tiers.
 - Legacy `xsm`/`sm`/`md`/`lg`/`xl` Button sizes in both the shared style map
   and aliased or namespaced callers; no legacy-size allowlist remains.
 - Icon- or symbol-only shared `Button` callers that must use `IconButton`.
@@ -409,8 +462,7 @@ The AST-backed production design guard checks:
   destructured access; the production allowance list is empty.
 - Shared `DataTable` implementations outside its declared common owner, plus
   any new JSX / `createElement` raw table or page-local `role="table|grid"`
-  substitute. Five retained raw tables use stable file/token/count inventory
-  and the concrete shared-Pattern prerequisites listed above.
+  substitute. The production raw-table allowance inventory is empty.
 - Every `glass-card` / `dashboard-card`, raw white-alpha
   background/border/ring utility, and undefined `bg-surface` alias; the
   production allowance list is empty.
@@ -475,8 +527,10 @@ headers, credentials, and response bodies must never cross the iframe boundary.
   deleted the direct-history allowance list.
 - `UI-F04B` established the typed `DataTable`, state, sorting, row-event, and
   contained-scroll contracts. Page tracks adopted the shared Pattern;
-  `UI-QA01` added controlled detail rows for Stock Screening and retained only
-  the five embedded-table prerequisites listed above.
+  `UI-QA01` added controlled detail rows for Stock Screening. The final debt
+  cleanup added embedded framing, fixed percentage columns, controlled selected
+  rows, contextual separators, and stable row test IDs, migrated the five
+  retained tables, and deleted the raw-table allowance inventory.
 - `UI-DEF-01` establishes `SelectionChip` from the explicit TRACK-UI2 deferred
   input. `UI-D01` subsequently migrated Decision Signals to the shared control
   and deleted its exact Button geometry allowance.

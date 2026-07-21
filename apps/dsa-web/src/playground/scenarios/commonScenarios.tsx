@@ -34,6 +34,7 @@ import {
   PageHeader,
   Pagination,
   Popover,
+  ResponsiveFilterPanel,
   ResponsiveRail,
   ScoreGauge,
   ScrollArea,
@@ -367,6 +368,26 @@ const WorkspacePageStory = () => {
         <p className="text-sm text-secondary-text">{text.preview}</p>
       </CommonSurface>
     </WorkspacePage>
+  );
+};
+
+const ResponsiveFilterPanelStory = () => {
+  const text = useSampleText();
+  const { scenario } = usePlaygroundScenario();
+  return (
+    <ResponsiveFilterPanel
+      filterLabel={text.filter}
+      drawerTitle={text.details}
+      applyLabel={text.primaryAction}
+      loadingLabel={text.loadingAction}
+      resetLabel={text.quietAction}
+      onReset={() => undefined}
+      onApply={() => undefined}
+      isApplying={scenario === 'states'}
+      activeCount={2}
+      basic={<Input label={text.optionOne} placeholder={text.searchPlaceholder} />}
+      advanced={<Select label={text.optionTwo} value="one" onChange={() => undefined} options={[{ value: 'one', label: text.optionOne }, { value: 'two', label: text.optionTwo }]} />}
+    />
   );
 };
 
@@ -918,6 +939,7 @@ export const COMMON_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   checkbox: CheckboxStory,
   'app-page': AppPageStory,
   'workspace-page': WorkspacePageStory,
+  'responsive-filter-panel': ResponsiveFilterPanelStory,
   'responsive-rail': ResponsiveRailStory,
   'workspace-navigation': WorkspaceNavigationStory,
   tabs: TabsStory,

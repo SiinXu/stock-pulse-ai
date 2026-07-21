@@ -150,6 +150,19 @@ describe('AlertRuleList', () => {
     expect(onPageChange).toHaveBeenCalledWith(2);
   });
 
+  it('keeps the rule filters in the card header', () => {
+    renderList();
+
+    const heading = screen.getByRole('heading', { name: '告警规则' });
+    const header = heading.parentElement?.parentElement;
+    expect(header).toContainElement(screen.getByLabelText('启停状态'));
+    expect(header).toContainElement(screen.getByLabelText('规则类型'));
+    expect(heading.closest('[data-surface-level]')).toHaveClass(
+      '[&>div:first-child]:flex-col',
+      'sm:[&>div:first-child]:flex-row',
+    );
+  });
+
   it('uses backend cooldownActive instead of parsing cooldownUntil locally', () => {
     renderList({
       rules: [

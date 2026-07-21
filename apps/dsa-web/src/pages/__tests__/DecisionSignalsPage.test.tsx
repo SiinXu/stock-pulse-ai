@@ -366,13 +366,17 @@ function deferredPromise<T>() {
 }
 
 function openStockContextModal() {
-  // The modal title and the input share the label "当前股票"; the modal's
-  // aria-labelledby means a screen-level query matches both, so count matches
-  // (0 = closed) instead of asserting a single element.
-  if (screen.queryAllByLabelText('当前股票').length > 0) {
+  const openModal = screen.queryAllByRole('dialog').find((dialog) => (
+    within(dialog).queryByLabelText('当前股票')
+  ));
+  if (openModal) {
     return;
   }
   fireEvent.click(screen.getByRole('button', { name: /^(当前股票$|当前查看：)/ }));
+}
+
+function openSignalsView(name: '全部信号' | '当前股票' | '股票信号时间线' | '信号表现统计') {
+  fireEvent.click(screen.getByRole('tab', { name }));
 }
 
 function getStockContextModal() {
@@ -454,16 +458,17 @@ describe('DecisionSignalsPage', () => {
       }));
     });
     expect(screen.getByText('贵州茅台')).toBeInTheDocument();
-    expect(await screen.findByText('信号表现统计')).toBeInTheDocument();
+    openSignalsView('信号表现统计');
+    expect(screen.getByRole('tabpanel', { name: '信号表现统计' })).toBeVisible();
     expect(screen.getByText('50%')).toBeInTheDocument();
+    expect(screen.getByText('当前统计为全局已复盘 outcome 口径，不等于当前可见信号数量，也不随当前股票过滤。')).toBeInTheDocument();
+    expect(screen.getByText('全局')).toBeInTheDocument();
+    openSignalsView('全部信号');
     expect(screen.getByRole('button', { name: '查看 贵州茅台 AI 建议详情' })).toBeInTheDocument();
     expect(screen.getByText('贵州茅台').closest('button')).toBeNull();
     expect(screen.getByText('放量下跌风险')).toBeInTheDocument();
     expect(screen.getByText(formattedCreatedAt)).toBeInTheDocument();
-    expect(screen.getByText('当前统计为全局已复盘 outcome 口径，不等于当前可见信号数量，也不随当前股票过滤。')).toBeInTheDocument();
-    // Scope badges make each module's data range explicit.
-    expect(screen.getByText('全局')).toBeInTheDocument();
-    expect(screen.getByText('全部信号')).toBeInTheDocument();
+    expect(screen.getAllByText('全部信号').length).toBeGreaterThan(0);
   });
 
   it('shows a zero-sample outcome stats state instead of misleading zero metrics', async () => {
@@ -481,6 +486,7 @@ describe('DecisionSignalsPage', () => {
 
     renderPage();
 
+    openSignalsView('信号表现统计');
     expect(await screen.findByText('暂无已复盘样本')).toBeInTheDocument();
     expect(screen.getByText('当前统计为全局已复盘 outcome 口径，不等于当前可见信号数量，也不随当前股票过滤。')).toBeInTheDocument();
     expect(screen.queryByText('0%')).not.toBeInTheDocument();
@@ -1324,6 +1330,7 @@ describe('DecisionSignalsPage', () => {
     renderPage();
 
     await screen.findByText('贵州茅台');
+    openSignalsView('股票信号时间线');
     expect(screen.getAllByText('选择股票查看 AI 建议').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: '查询时间线' })).toBeDisabled();
     expect(decisionSignalsApi.list).toHaveBeenCalledTimes(1);
@@ -1343,6 +1350,7 @@ describe('DecisionSignalsPage', () => {
 
     submitCurrentStock('600519');
     await waitFor(() => expect(decisionSignalsApi.list).toHaveBeenCalledTimes(2));
+    openSignalsView('股票信号时间线');
 
     chooseOption(screen.getByLabelText('时间线市场'), 'cn');
     chooseOption(screen.getByLabelText('时间范围'), '30d');
@@ -1470,6 +1478,7 @@ describe('DecisionSignalsPage', () => {
 
     submitCurrentStock('AAPL');
     await waitFor(() => expect(decisionSignalsApi.list).toHaveBeenCalledTimes(2));
+    openSignalsView('股票信号时间线');
 
     chooseOption(screen.getByLabelText('时间线市场'), 'us');
     chooseOption(screen.getByLabelText('时间范围'), '30d');
@@ -1538,6 +1547,7 @@ describe('DecisionSignalsPage', () => {
     await screen.findByText('贵州茅台');
 
     submitCurrentStock('AAPL');
+    openSignalsView('股票信号时间线');
     fireEvent.click(await screen.findByTestId('timeline-click-8'));
     expect(within(await screen.findByRole('dialog')).getByText('Timeline stale risk')).toBeInTheDocument();
 
@@ -1562,8 +1572,8 @@ describe('DecisionSignalsPage', () => {
     submitCurrentStock('AAPL');
     expect(await screen.findByText('当前查看：AAPL')).toBeInTheDocument();
 
-    // Latest and list can contain the same signal; the list section renders last.
-    fireEvent.click(screen.getAllByRole('button', { name: '查看 贵州茅台 AI 建议详情' }).at(-1)!);
+    openSignalsView('全部信号');
+    fireEvent.click(screen.getByRole('button', { name: '查看 贵州茅台 AI 建议详情' }));
     expect(within(await screen.findByRole('dialog')).getByText('趋势保持')).toBeInTheDocument();
     closeSignalDetailsDrawer();
     openStockContextModal();
@@ -1572,7 +1582,9 @@ describe('DecisionSignalsPage', () => {
     expect(getStockContextInput()).toHaveValue('');
     closeStockContextModal();
     expect(screen.getAllByText('选择股票查看 AI 建议').length).toBeGreaterThan(0);
+    openSignalsView('股票信号时间线');
     expect(screen.getByRole('button', { name: '查询时间线' })).toBeDisabled();
+    openSignalsView('全部信号');
     fireEvent.click(screen.getByRole('button', { name: '查看 贵州茅台 AI 建议详情' }));
     expect(within(await screen.findByRole('dialog')).getByText('趋势保持')).toBeInTheDocument();
   });
@@ -1792,9 +1804,11 @@ describe('DecisionSignalsPage', () => {
     expect(within(dialog).getByText('Latest risk')).toBeInTheDocument();
     closeSignalDetailsDrawer();
 
+    openSignalsView('全部信号');
     fireEvent.change(screen.getByLabelText('股票代码'), { target: { value: '600519' } });
     fireEvent.click(screen.getByRole('button', { name: '筛选' }));
 
+    openSignalsView('当前股票');
     fireEvent.click(await screen.findByRole('button', { name: '查看 Apple AI 建议详情' }));
     expect(within(await screen.findByRole('dialog')).getByText('Latest risk')).toBeInTheDocument();
   });
@@ -1874,7 +1888,8 @@ describe('DecisionSignalsPage', () => {
     submitCurrentStock('AAPL');
 
     expect(await screen.findByText('Latest lookup risk')).toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole('button', { name: '查看 贵州茅台 AI 建议详情' }).at(-1)!);
+    openSignalsView('全部信号');
+    fireEvent.click(screen.getByRole('button', { name: '查看 贵州茅台 AI 建议详情' }));
     expect(within(await screen.findByRole('dialog')).getByText('趋势保持')).toBeInTheDocument();
   });
 

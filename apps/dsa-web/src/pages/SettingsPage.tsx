@@ -11,7 +11,7 @@ import { createParsedApiError, getParsedApiError, type ParsedApiError } from '..
 import { analysisApi } from '../api/analysis';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Button, ConfirmDialog, EmptyState, IconButton, InlineAlert, Loading, SearchableSelect, Surface, TimePicker, ToastViewport, type SearchableSelectOption } from '../components/common';
+import { ApiErrorAlert, AppPage, Button, ConfirmDialog, EmptyState, IconButton, InlineAlert, Loading, PageHeader, SearchableSelect, Surface, TimePicker, ToastViewport, type SearchableSelectOption } from '../components/common';
 import {
   AuthSettingsCard,
   ChangePasswordCard,
@@ -72,7 +72,7 @@ import {
   type SettingsSectionId,
 } from '../components/settings/settingsInformationArchitecture';
 import { computeSectionStatus } from '../components/settings/settingsSectionStatus';
-import { keyBelongsToSection, placementForKey } from '../components/settings/settingsFieldPlacement';
+import { keyBelongsToSection, placementForKey, SCHEDULER_SETTING_KEYS } from '../components/settings/settingsFieldPlacement';
 import {
   type SettingsGroupSaveState,
   type SettingsSaveStatus,
@@ -530,12 +530,6 @@ function formatEnvBackupFilename(isDesktopRuntime: boolean) {
 }
 
 const SCHEDULE_TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
-const SCHEDULER_SETTING_KEYS = new Set([
-  'SCHEDULE_ENABLED',
-  'SCHEDULE_TIME',
-  'SCHEDULE_TIMES',
-  'SCHEDULE_RUN_IMMEDIATELY',
-]);
 
 function getConfigItem(items: SystemConfigItem[], key: string) {
   return items.find((item) => item.key === key);
@@ -902,7 +896,6 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
     <SettingsSectionCard
       title={t('settings.schedulerTitle')}
       description={t('settings.schedulerDescription')}
-      contentBordered
     >
       <div data-testid="scheduler-settings-card" className="space-y-4">
         <div className="grid grid-cols-1 gap-3">
@@ -1656,8 +1649,16 @@ const SettingsPage: React.FC = () => {
     [configuredRoutingValues],
   );
   const notificationText = SETTINGS_NOTIFICATION_TEXT[uiLanguage];
+  // One group-level banner carries the "no channels yet" guidance so the three
+  // routing rows don't each repeat a bulky empty-state card.
   const channelRoutingEmptyState = (
-    <div className="space-y-2 rounded-lg border border-border bg-background/35 p-3">
+    <p className="text-xs leading-6 text-muted-text md:text-right">—</p>
+  );
+  const channelRoutingEmptyBanner = (
+    <div
+      data-testid="channel-routing-empty-banner"
+      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-background/35 px-3 py-2"
+    >
       <p className="text-xs text-muted-text">{notificationText.noRoutableChannels}</p>
       <Button
         type="button"
@@ -1961,7 +1962,14 @@ const SettingsPage: React.FC = () => {
       .filter((item) => getSubCategoryOfKey(activeCategory, item.key) === activeSubCategory)
       .sort((a, b) => getSubCategoryFieldOrder(activeCategory, a.key) - getSubCategoryFieldOrder(activeCategory, b.key))
     : visibleActiveItems
-  ).filter((item) => belongsToActiveSection(item.key));
+  ).filter((item) => belongsToActiveSection(item.key))
+    // Alerts, System & Security and Data Sources split their fields into
+    // per-view tabs; the placement map is the same authority that drives
+    // error-summary jumps.
+    .filter((item) => (
+      !(isAlertsSection || activeSection === 'system_security' || activeSection === 'data_sources')
+      || placementForKey(activeCategory, item.key).view === activeView
+    ));
   const activeSubPromptCacheItems =
     activeCategory === 'ai_model' ? promptCacheAdvancedItems : [];
   const isNotificationChannelsSub = activeCategory === 'notification' && activeSubCategory === 'channels';
@@ -2490,15 +2498,15 @@ const SettingsPage: React.FC = () => {
     && !isAiOverview
     && !isAiTaskRouting
     && !isAiReliability
-    && !isTopLevelAdvanced;
-  const activeConfigPanel = shouldRenderFieldPanel ? (
-    <SettingsSectionCard
-      title={activeConfigPanelTitle}
-      description={activeConfigPanelDescription || t('settings.activePanelDescription')}
-    >
+    && !isTopLevelAdvanced
+    && !(isAlertsSection && activeView === 'events')
+    && !(activeSection === 'system_security' && (activeView === 'security' || activeView === 'about'));
+  const activeConfigPanelContent = (
+    <>
       {isNotificationChannelsSub ? (
         <NotificationChannelsPanel
           items={visibleActiveItems.filter((item) => isNotificationChannelKey(item.key))}
+          configuredChannels={configuredNotificationChannels}
           disabled={isSaving}
           onChange={setDraftValue}
           issueByKey={issueByKey}
@@ -2520,9 +2528,13 @@ const SettingsPage: React.FC = () => {
             if (!groupItems.length) {
               return null;
             }
+            const showChannelRoutingEmptyBanner = hasConfiguredNotificationChannelStatus
+              && configuredRoutingValues.size === 0
+              && groupItems.some((item) => CHANNEL_ROUTING_FIELD_KEYS.has(item.key));
             return (
               <div key={group.id} className="space-y-2">
                 <h3 className="px-1 text-sm font-medium text-secondary-text">{t(group.titleKey)}</h3>
+                {showChannelRoutingEmptyBanner ? channelRoutingEmptyBanner : null}
                 <form
                   className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-1"
                   onSubmit={(event) => event.preventDefault()}
@@ -2608,8 +2620,22 @@ const SettingsPage: React.FC = () => {
           </form>
         </details>
       ) : null}
+    </>
+  );
+  const activeConfigPanel = shouldRenderFieldPanel ? (
+    <SettingsSectionCard
+      key={`${activeSection}:${activeView}`}
+      title={activeConfigPanelTitle}
+      description={activeConfigPanelDescription || t('settings.activePanelDescription')}
+    >
+      {activeConfigPanelContent}
     </SettingsSectionCard>
-  ) : hasSubNav || hasActiveConfigItems || activeSection === 'ai_models' || isTopLevelAdvanced ? null : (
+  ) : activeSection === 'overview'
+    || activeSection === 'ai_models'
+    || activeSection === 'advanced'
+    || activeCategory === 'system'
+    || (isAlertsSection && activeView === 'events' && eventMonitorItems.length > 0)
+    || (activeCategory === 'data_source' && activeSubCategory !== 'providers') ? null : (
     <EmptyState
       title={t('settings.currentCategoryEmptyTitle')}
       description={t('settings.currentCategoryEmptyDescription')}
@@ -2630,58 +2656,56 @@ const SettingsPage: React.FC = () => {
   };
   const visibleGroupSaveStates = Object.entries(groupSaveStates)
     .filter(([, state]) => state.status !== 'idle');
+  const settingsSaveActions = visibleGroupSaveStates.length > 0 || activeGroupDirtyCount > 0 ? (
+    <div className="flex flex-wrap items-center justify-end gap-2" aria-live="polite">
+      {visibleGroupSaveStates.map(([group, state]) => (
+        <span
+          key={group}
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-[var(--settings-border)] px-2.5 text-xs text-secondary-text"
+        >
+          {state.status === 'saved' ? (
+            <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
+          ) : state.status === 'failed' || state.status === 'conflicted' ? (
+            <CircleAlert className="h-4 w-4 text-danger" aria-hidden="true" />
+          ) : (
+            <Clock className="h-4 w-4 text-warning" aria-hidden="true" />
+          )}
+          <span>{getCategoryTitle(group as SystemConfigCategory, group, uiLanguage)}: {saveStatusLabel(state.status)}</span>
+          {state.status === 'failed' ? (
+            <button type="button" className="settings-accent-text inline-flex min-h-11 min-w-11 items-center justify-center px-1 underline" onClick={() => retryAutosaveGroup(group)}>
+              {settingsText.autosaveRetry}
+            </button>
+          ) : null}
+          {state.status === 'failed' || state.status === 'conflicted' ? (
+            <button type="button" className="inline-flex min-h-11 min-w-11 items-center justify-center px-1 text-danger underline" onClick={() => restoreAutosaveGroup(group)}>
+              {settingsText.autosaveRestore}
+            </button>
+          ) : null}
+        </span>
+      ))}
+      {activeGroupDirtyCount > 0 ? (
+        <Button
+          type="button"
+          variant="secondary"
+          size="default"
+          onClick={() => setShowResetConfirm(true)}
+          disabled={isLoading || groupSaveStates[activeSaveGroup]?.status === 'saving'}
+        >
+          <RefreshCw className="h-4 w-4" aria-hidden="true" />
+          {settingsText.autosaveResetGroup}
+        </Button>
+      ) : null}
+    </div>
+  ) : null;
 
   return (
-    <div className="settings-page min-h-full px-4 pb-6 pt-4 md:px-6">
-      <div className="mb-4 px-1 py-1">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="min-w-0">
-            <h1 className="text-xl font-semibold tracking-tight text-foreground">{t('settings.pageTitle')}</h1>
-            <p className="max-w-3xl text-xs leading-5 text-secondary-text sm:text-sm sm:leading-6">
-              {t('settings.pageDescription')}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-end gap-2" aria-live="polite">
-            {visibleGroupSaveStates.map(([group, state]) => (
-              <span
-                key={group}
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-[var(--settings-border)] px-2.5 text-xs text-secondary-text"
-              >
-                {state.status === 'saved' ? (
-                  <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
-                ) : state.status === 'failed' || state.status === 'conflicted' ? (
-                  <CircleAlert className="h-4 w-4 text-danger" aria-hidden="true" />
-                ) : (
-                  <Clock className="h-4 w-4 text-warning" aria-hidden="true" />
-                )}
-                <span>{getCategoryTitle(group as SystemConfigCategory, group, uiLanguage)}: {saveStatusLabel(state.status)}</span>
-                {state.status === 'failed' ? (
-                  <button type="button" className="settings-accent-text inline-flex min-h-11 min-w-11 items-center justify-center px-1 underline" onClick={() => retryAutosaveGroup(group)}>
-                    {settingsText.autosaveRetry}
-                  </button>
-                ) : null}
-                {state.status === 'failed' || state.status === 'conflicted' ? (
-                  <button type="button" className="inline-flex min-h-11 min-w-11 items-center justify-center px-1 text-danger underline" onClick={() => restoreAutosaveGroup(group)}>
-                    {settingsText.autosaveRestore}
-                  </button>
-                ) : null}
-              </span>
-            ))}
-            {activeGroupDirtyCount > 0 ? (
-              <Button
-                type="button"
-                variant="secondary"
-                size="default"
-                onClick={() => setShowResetConfirm(true)}
-                disabled={isLoading || groupSaveStates[activeSaveGroup]?.status === 'saving'}
-              >
-                <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                {settingsText.autosaveResetGroup}
-              </Button>
-            ) : null}
-          </div>
-        </div>
+    <AppPage className="settings-page pb-6">
+      <div className="mb-4">
+        <PageHeader
+          title={t('settings.pageTitle')}
+          description={t('settings.pageDescription')}
+          actions={settingsSaveActions}
+        />
 
         {saveError ? (
           <ApiErrorAlert
@@ -2917,8 +2941,8 @@ const SettingsPage: React.FC = () => {
                 ) : null}
               </SettingsSectionCard>
             ) : null}
-            {activeCategory === 'system' ? <AuthSettingsCard /> : null}
-            {activeCategory === 'system' ? (
+            {activeCategory === 'system' && activeView === 'security' ? <AuthSettingsCard /> : null}
+            {activeCategory === 'system' && activeView === 'runtime' ? (
               <SchedulerSettingsCard
                 items={rawActiveItems}
                 disabled={isSaving || isLoading}
@@ -2930,7 +2954,7 @@ const SettingsPage: React.FC = () => {
                 language={uiLanguage}
               />
             ) : null}
-            {activeCategory === 'system' ? (
+            {activeCategory === 'system' && activeView === 'about' ? (
               <SettingsSectionCard
                 title={t('settings.versionInfo')}
                 description={t('settings.versionInfoDescription')}
@@ -3025,7 +3049,7 @@ const SettingsPage: React.FC = () => {
                 ) : null}
               </SettingsSectionCard>
             ) : null}
-            {isTopLevelAdvanced ? (
+            {isTopLevelAdvanced && activeView === 'backup' ? (
               <SettingsSectionCard
                 title={t('settings.configBackup')}
                 description={t('settings.configBackupDescription')}
@@ -3296,61 +3320,50 @@ const SettingsPage: React.FC = () => {
                 ))}
               </SettingsSectionCard>
             ) : null}
-            {isTopLevelAdvanced ? (
+            {isTopLevelAdvanced && activeView === 'raw_config' ? (
+              <>
+                <LLMConfigModeBanner
+                  status={llmModeStatus}
+                  configVersion={configVersion}
+                  onMigrated={() => {
+                    void (async () => {
+                      await load();
+                      applyPostSaveEffects();
+                    })();
+                  }}
+                />
+                <GenerationBackendStatusPanel
+                  items={generationBackendDraftItems}
+                  maskToken={maskToken}
+                  disabled={isSaving || isLoading}
+                />
+              </>
+            ) : null}
+            {isTopLevelAdvanced && activeView === 'diagnostics' ? (
               <SettingsSectionCard
-                title={sectionLabel('advanced', uiLanguage)}
+                title={settingsText.diagnostics}
                 description={settingsText.advancedDescription}
               >
-                <details className="group/backend-diagnostics overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] transition-colors duration-200 hover:bg-[var(--settings-surface-hover)]">
-                  <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-4 [&::-webkit-details-marker]:hidden">
-                    <div className="min-w-0 space-y-1">
-                      <p className="text-sm font-semibold text-foreground">
-                        {settingsText.diagnostics}
-                      </p>
-                      <p className="text-xs leading-5 text-muted-text">
-                        {settingsText.diagnosticsDescription}
-                      </p>
-                    </div>
-                    <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-text transition-transform group-open/backend-diagnostics:rotate-180" aria-hidden="true" />
-                  </summary>
-                  <div className="space-y-3 border-t border-[var(--settings-border-soft)] p-3">
-                    {advancedSectionItems.length > 0 ? (
-                      <form
-                        className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
-                        onSubmit={(event) => event.preventDefault()}
-                      >
-                        {advancedSectionItems.map((item) => (
-                          <SettingsField
-                            key={item.key}
-                            item={item}
-                            value={item.value}
-                            disabled={isSaving}
-                            onChange={setDraftValue}
-                            issues={issueByKey[item.key] || []}
-                            requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
-                            dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
-                            readOnlyDiagnostic={readOnlyDiagnosticForItem(item, categoryByKey[item.key])}
-                          />
-                        ))}
-                      </form>
-                    ) : null}
-                    <LLMConfigModeBanner
-                      status={llmModeStatus}
-                      configVersion={configVersion}
-                      onMigrated={() => {
-                        void (async () => {
-                          await load();
-                          applyPostSaveEffects();
-                        })();
-                      }}
-                    />
-                    <GenerationBackendStatusPanel
-                      items={generationBackendDraftItems}
-                      maskToken={maskToken}
-                      disabled={isSaving || isLoading}
-                    />
-                  </div>
-                </details>
+                {advancedSectionItems.length > 0 ? (
+                  <form
+                    className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+                    onSubmit={(event) => event.preventDefault()}
+                  >
+                    {advancedSectionItems.map((item) => (
+                      <SettingsField
+                        key={item.key}
+                        item={item}
+                        value={item.value}
+                        disabled={isSaving}
+                        onChange={setDraftValue}
+                        issues={issueByKey[item.key] || []}
+                        requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
+                        dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
+                        readOnlyDiagnostic={readOnlyDiagnosticForItem(item, categoryByKey[item.key])}
+                      />
+                    ))}
+                  </form>
+                ) : null}
               </SettingsSectionCard>
             ) : null}
             {activeCategory === 'ai_model' && !isAiOverview && !isAiTaskRouting && !isAiReliability && !isTopLevelAdvanced ? (
@@ -3407,7 +3420,7 @@ const SettingsPage: React.FC = () => {
                 />
               </section>
             ) : null}
-            {activeCategory === 'system' && passwordChangeable ? (
+            {activeCategory === 'system' && activeView === 'security' && passwordChangeable ? (
               <ChangePasswordCard />
             ) : null}
             {activeCategory === 'notification' && activeSubCategory === 'channels' ? (
@@ -3432,7 +3445,7 @@ const SettingsPage: React.FC = () => {
                 {activeConfigPanel}
               </SettingsPanelErrorBoundary>
             ) : activeConfigPanel}
-            {activeCategory === 'data_source' && activeSubCategory !== 'providers' ? (
+            {activeCategory === 'data_source' && activeView === 'intelligence' ? (
               <SettingsPanelErrorBoundary
                 title={t('settings.pageTitle')}
                 resetKey={`intelligence:${configVersion}`}
@@ -3443,7 +3456,7 @@ const SettingsPage: React.FC = () => {
                 </div>
               </SettingsPanelErrorBoundary>
             ) : null}
-            {isAlertsSection && eventMonitorItems.length > 0 ? (
+            {isAlertsSection && activeView === 'events' && eventMonitorItems.length > 0 ? (
               <SettingsSectionCard
                 title={settingsText.eventMonitor}
                 description={settingsText.eventMonitorDescription}
@@ -3550,7 +3563,7 @@ const SettingsPage: React.FC = () => {
           emptyApiKeyHosts={providerEmptyApiKeyHosts}
         />
       ) : null}
-    </div>
+    </AppPage>
   );
 };
 

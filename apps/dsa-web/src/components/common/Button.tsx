@@ -16,10 +16,10 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 }
 
 const BUTTON_SIZE_STYLES = {
-  compact: 'h-7 min-w-7 rounded-lg px-2.5 text-xs',
-  default: 'h-8 min-w-8 rounded-lg px-3 text-xs',
-  comfortable: 'h-9 min-w-9 rounded-lg px-3.5 text-sm',
-  primary: 'h-10 min-w-10 rounded-lg px-4 text-sm',
+  compact: 'h-5 min-w-5 rounded-md px-2 text-xs',
+  default: 'h-6 min-w-6 rounded-md px-2.5 text-xs',
+  comfortable: 'h-7 min-w-7 rounded-md px-3 text-sm',
+  primary: 'h-8 min-w-8 rounded-lg px-3.5 text-sm',
 } as const;
 
 const PRIMARY_BUTTON_STYLES = 'border border-transparent bg-foreground text-background shadow-soft-card hover:brightness-110';
@@ -39,7 +39,7 @@ const BUTTON_VARIANT_STYLES = {
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
   children,
   variant,
-  size = 'default',
+  size = 'comfortable',
   isLoading = false,
   loadingText,
   glow = false,
@@ -61,9 +61,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
       data-variant={variant}
       data-size={size}
       className={cn(
-        'control-hit-target relative inline-flex cursor-pointer items-center justify-center gap-2 font-medium',
-        'transition-[color,background-color,border-color,box-shadow,filter,opacity,transform] duration-150 active:translate-y-px motion-reduce:transition-none motion-reduce:active:transform-none',
-        'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25 focus-visible:ring-offset-0',
+        'control-hit-target relative inline-flex cursor-pointer items-center justify-center gap-1.5 font-medium',
+        'transition-[color,background-color,border-color,box-shadow,filter,opacity] duration-200 motion-reduce:transition-none',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 focus-visible:ring-offset-0',
         'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:transform-none',
         BUTTON_SIZE_STYLES[size],
         BUTTON_VARIANT_STYLES[variant],

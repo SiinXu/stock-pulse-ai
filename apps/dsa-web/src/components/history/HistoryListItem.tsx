@@ -47,7 +47,7 @@ export const HistoryListItem: React.FC<HistoryListItemProps> = ({
         onChange={() => onToggleChecked(item.id)}
         disabled={isDeleting}
         aria-label={t('history.selectRecordAria', { name: stockName })}
-        containerClassName="-ml-2 h-11 w-11 shrink-0 justify-center self-center"
+        containerClassName="h-11 w-11 shrink-0 self-center"
       />
       <button
         type="button"

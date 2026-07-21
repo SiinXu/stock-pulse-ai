@@ -1,6 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { IntelligenceSourcesPanel } from '../IntelligenceSourcesPanel';
 
@@ -73,13 +73,76 @@ describe('IntelligenceSourcesPanel', () => {
     await waitFor(() => expect(api.fetchSource).toHaveBeenCalledWith(3, false));
   });
 
+  it('mounts the manual source form only after opening the shared dialog', async () => {
+    api.listSources.mockResolvedValue(emptyList);
+    render(<IntelligenceSourcesPanel />);
+
+    const trigger = await screen.findByRole('button', { name: '新增情报源' });
+    expect(screen.queryByRole('textbox', { name: '名称' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: '新增情报源' })).not.toBeInTheDocument();
+
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    const dialog = screen.getByRole('dialog', { name: '新增情报源' });
+    expect(within(dialog).getByRole('textbox', { name: '名称' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('textbox', { name: '来源地址' })).toBeInTheDocument();
+
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: '新增情报源' })).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+
   it('validates required fields before creating', async () => {
     api.listSources.mockResolvedValue(emptyList);
     render(<IntelligenceSourcesPanel />);
     await screen.findByText('还没有情报源');
 
-    fireEvent.click(screen.getByRole('button', { name: '添加' }));
+    fireEvent.click(screen.getByRole('button', { name: '新增情报源' }));
+    const dialog = screen.getByRole('dialog', { name: '新增情报源' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '添加' }));
     await screen.findByText('请填写名称和来源地址');
     expect(api.createSource).not.toHaveBeenCalled();
+  });
+
+  it('closes a successful create and reports a subsequent list refresh failure on the page', async () => {
+    api.listSources
+      .mockResolvedValueOnce(emptyList)
+      .mockRejectedValueOnce(new Error('refresh failed'))
+      .mockResolvedValueOnce(emptyList);
+    api.createSource.mockResolvedValueOnce({});
+    render(<IntelligenceSourcesPanel />);
+
+    await screen.findByText('还没有情报源');
+    fireEvent.click(screen.getByRole('button', { name: '新增情报源' }));
+
+    const dialog = screen.getByRole('dialog', { name: '新增情报源' });
+    fireEvent.change(within(dialog).getByRole('textbox', { name: '名称' }), {
+      target: { value: '财经 RSS' },
+    });
+    fireEvent.change(within(dialog).getByRole('textbox', { name: '来源地址' }), {
+      target: { value: 'https://example.com/feed.xml' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: '添加' }));
+
+    await waitFor(() => expect(api.createSource).toHaveBeenCalledWith({
+      name: '财经 RSS',
+      url: 'https://example.com/feed.xml',
+      sourceType: 'rss',
+      scopeType: 'market',
+      market: 'cn',
+      description: undefined,
+      enabled: true,
+    }));
+    expect(await screen.findByText('情报源加载失败')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: '新增情报源' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+    await screen.findByText('还没有情报源');
+    fireEvent.click(screen.getByRole('button', { name: '新增情报源' }));
+
+    const reopenedDialog = screen.getByRole('dialog', { name: '新增情报源' });
+    expect(within(reopenedDialog).getByRole('textbox', { name: '名称' })).toHaveValue('');
+    expect(within(reopenedDialog).getByRole('textbox', { name: '来源地址' })).toHaveValue('');
   });
 });

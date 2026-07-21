@@ -1,8 +1,26 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, Clock3, Cpu, Database, Gauge, RefreshCw } from 'lucide-react';
-import { usageApi, type UsageDashboard, type UsageModelBreakdown, type UsagePeriod } from '../api/usage';
+import {
+  usageApi,
+  type UsageCallRecord,
+  type UsageDashboard,
+  type UsageModelBreakdown,
+  type UsagePeriod,
+} from '../api/usage';
 import { localizeParsedApiError, type ParsedApiError } from '../api/error';
-import { ApiErrorAlert, AppPage, Button, PageHeader, Section, SegmentedControl, StatePanel, StatCard, Surface } from '../components/common';
+import {
+  ApiErrorAlert,
+  AppPage,
+  Button,
+  DataTable,
+  type DataTableColumn,
+  PageHeader,
+  Section,
+  SegmentedControl,
+  StatePanel,
+  StatCard,
+  Surface,
+} from '../components/common';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import type { UiLanguage, UiTextKey, UiTextParams } from '../i18n/uiText';
 import { getUiLocale } from '../utils/uiLocale';
@@ -152,6 +170,53 @@ const TokenUsagePage: React.FC = () => {
     () => error ? localizeParsedApiError(error, language) : null,
     [error, language],
   );
+  const recentCallColumns = useMemo<readonly DataTableColumn<UsageCallRecord>[]>(() => [
+    {
+      id: 'time',
+      header: t('usage.table.time'),
+      rowHeader: true,
+      nowrap: true,
+      cell: (item) => formatDateTime(item.calledAt, language),
+    },
+    {
+      id: 'type',
+      header: t('usage.table.type'),
+      nowrap: true,
+      cell: (item) => <span className="text-foreground">{getCallTypeLabel(item.callType, t)}</span>,
+    },
+    {
+      id: 'model',
+      header: t('usage.table.model'),
+      width: 'wide',
+      cell: (item) => (
+        <>
+          <div className="max-w-[18rem] truncate font-medium text-foreground">{item.model}</div>
+          {item.stockCode ? <div className="text-xs text-secondary-text">{item.stockCode}</div> : null}
+        </>
+      ),
+    },
+    {
+      id: 'prompt',
+      header: t('usage.promptLabel'),
+      align: 'end',
+      nowrap: true,
+      cell: (item) => formatNumber(item.promptTokens, language),
+    },
+    {
+      id: 'completion',
+      header: t('usage.completionLabel'),
+      align: 'end',
+      nowrap: true,
+      cell: (item) => formatNumber(item.completionTokens, language),
+    },
+    {
+      id: 'total',
+      header: t('usage.totalLabel'),
+      align: 'end',
+      nowrap: true,
+      cell: (item) => <span className="font-medium text-foreground">{formatNumber(item.totalTokens, language)}</span>,
+    },
+  ], [language, t]);
 
   return (
     <AppPage className="max-w-none">
@@ -276,41 +341,16 @@ const TokenUsagePage: React.FC = () => {
               description={t('usage.recentCallsDescription')}
               actions={<Clock3 className="h-5 w-5 text-secondary-text" aria-hidden="true" />}
             >
-              <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/75 shadow-soft-card">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-border/70 text-sm">
-                    <thead className="bg-surface-2/70 text-left text-xs uppercase tracking-[0.16em] text-secondary-text">
-                      <tr>
-                        <th className="px-4 py-3 font-medium">{t('usage.table.time')}</th>
-                        <th className="px-4 py-3 font-medium">{t('usage.table.type')}</th>
-                        <th className="px-4 py-3 font-medium">{t('usage.table.model')}</th>
-                        <th className="px-4 py-3 text-right font-medium">{t('usage.promptLabel')}</th>
-                        <th className="px-4 py-3 text-right font-medium">{t('usage.completionLabel')}</th>
-                        <th className="px-4 py-3 text-right font-medium">{t('usage.totalLabel')}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/60">
-                      {dashboard.recentCalls.length ? dashboard.recentCalls.map((item) => (
-                        <tr key={item.id} className="hover:bg-hover/60">
-                          <td className="whitespace-nowrap px-4 py-3 text-secondary-text">{formatDateTime(item.calledAt, language)}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-foreground">{getCallTypeLabel(item.callType, t)}</td>
-                          <td className="min-w-56 px-4 py-3">
-                            <div className="max-w-[18rem] truncate font-medium text-foreground">{item.model}</div>
-                            {item.stockCode ? <div className="text-xs text-secondary-text">{item.stockCode}</div> : null}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right text-secondary-text">{formatNumber(item.promptTokens, language)}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right text-secondary-text">{formatNumber(item.completionTokens, language)}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-foreground">{formatNumber(item.totalTokens, language)}</td>
-                        </tr>
-                      )) : (
-                        <tr>
-                          <td colSpan={6} className="px-4 py-8 text-center text-secondary-text">{t('usage.noRecentCalls')}</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <DataTable
+                caption={t('usage.recentCalls')}
+                scrollAreaLabel={t('usage.recentCallsDescription')}
+                columns={recentCallColumns}
+                rows={dashboard.recentCalls}
+                getRowKey={(item) => item.id}
+                emptyState={{ title: t('usage.noRecentCalls') }}
+                frame="embedded"
+                minWidth="container"
+              />
             </Section>
           </>
         ) : null}

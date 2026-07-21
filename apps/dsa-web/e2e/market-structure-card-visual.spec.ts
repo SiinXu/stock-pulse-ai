@@ -142,6 +142,22 @@ const historyDetailMock = {
             markdown: '两市成交额约 1.9 万亿元，题材热度集中在机器人与 AI 算力方向。',
           },
         ],
+        breadth: {
+          up_count: 3120,
+          down_count: 1420,
+          limit_up_count: 72,
+          limit_down_count: 4,
+          total_amount: 9600,
+          turnover_unit: '亿元',
+        },
+        indices: [{
+          code: '000300',
+          name: '沪深300',
+          current: 3920.2,
+          change_pct: 1.2,
+          high: 3940.5,
+          low: 3860.1,
+        }],
         markdown_report: marketReviewMarkdownMock,
       },
     },
@@ -318,6 +334,20 @@ test.describe('MarketStructureCard on the real market review page', () => {
         await expect(card.getByText('个股位置层')).toBeVisible();
         await expect(card.getByText(/机器人概念/).first()).toBeVisible();
         await expect(card.getByText('题材主线数据不完整')).toBeVisible();
+        const indexTable = page.getByRole('table', { name: 'A股市场复盘: 指数' });
+        await expect(indexTable).toBeVisible();
+        await expect(indexTable.getByRole('rowheader', { name: '沪深300' })).toBeVisible();
+        await expect(indexTable.locator('xpath=..')).toHaveAttribute('data-data-table', 'ready');
+        const tableRegion = indexTable.locator('xpath=..');
+        const tableBounds = await tableRegion.boundingBox();
+        expect(tableBounds).not.toBeNull();
+        expect(tableBounds!.x).toBeGreaterThanOrEqual(0);
+        expect(tableBounds!.x + tableBounds!.width).toBeLessThanOrEqual(scenario.viewport.width + 1);
+        const documentWidths = await page.evaluate(() => ({
+          client: document.documentElement.clientWidth,
+          scroll: document.documentElement.scrollWidth,
+        }));
+        expect(documentWidths.scroll).toBeLessThanOrEqual(documentWidths.client + 1);
 
         // Theme really applied by next-themes (class strategy on <html>).
         const isDark = await page.evaluate(() => document.documentElement.classList.contains('dark'));

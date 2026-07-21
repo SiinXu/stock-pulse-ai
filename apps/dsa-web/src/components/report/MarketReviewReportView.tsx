@@ -9,6 +9,7 @@ import { MARKET_REVIEW_CONTENT_TEXT } from '../../locales/reportContent';
 import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
 import type {
   AnalysisReport,
+  MarketReviewIndex,
   MarketReviewPayload,
   MarketReviewPayloadSection,
   ReportLanguage,
@@ -21,7 +22,7 @@ import {
 } from '../../utils/marketReview';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { getUiLocale } from '../../utils/uiLocale';
-import { ApiErrorAlert, Card, InlineAlert, useClipboard } from '../common';
+import { ApiErrorAlert, Card, DataTable, type DataTableColumn, InlineAlert, useClipboard } from '../common';
 import { Tooltip } from '../common/Tooltip';
 import { MarketStructureCard } from './MarketStructureCard';
 import { ReportMarkdownBody } from './ReportMarkdownBody';
@@ -388,6 +389,32 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
       value: summary?.trendPrediction || marketReviewText.noRiskWatch,
     },
   ], [marketReviewText, reportText.marketSentiment, summary]);
+  const indexColumns: readonly DataTableColumn<MarketReviewIndex>[] = [
+    {
+      id: 'index',
+      header: marketReviewText.index,
+      rowHeader: true,
+      cell: (index) => <span className="font-medium text-foreground">{index.name}</span>,
+    },
+    {
+      id: 'last',
+      header: marketReviewText.last,
+      nowrap: true,
+      cell: (index) => formatMarketNumber(index.current),
+    },
+    {
+      id: 'change',
+      header: marketReviewText.change,
+      nowrap: true,
+      cell: (index) => formatMarketPercent(index.changePct),
+    },
+    {
+      id: 'high-low',
+      header: marketReviewText.highLow,
+      nowrap: true,
+      cell: (index) => formatMarketHighLow(index.high, index.low),
+    },
+  ];
 
   return (
     <div className={`animate-fade-in space-y-4 pb-8 ${className}`}>
@@ -532,28 +559,17 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
                   <p className="text-sm text-secondary-text">{marketReviewText.noBreadthData}</p>
                 )}
                 {marketData.indices.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead className="text-left text-xs uppercase text-muted-text">
-                        <tr>
-                          <th className="px-2 py-2">{marketReviewText.index}</th>
-                          <th className="px-2 py-2">{marketReviewText.last}</th>
-                          <th className="px-2 py-2">{marketReviewText.change}</th>
-                          <th className="px-2 py-2">{marketReviewText.highLow}</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-subtle">
-                        {marketData.indices.map((index) => (
-                          <tr key={index.code || index.name}>
-                            <td className="px-2 py-2 font-medium text-foreground">{index.name}</td>
-                            <td className="px-2 py-2 text-secondary-text">{formatMarketNumber(index.current)}</td>
-                            <td className="px-2 py-2 text-secondary-text">{formatMarketPercent(index.changePct)}</td>
-                            <td className="px-2 py-2 text-secondary-text">{formatMarketHighLow(index.high, index.low)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <DataTable
+                    caption={`${marketData.title || displayTitle}: ${marketReviewText.index}`}
+                    columns={indexColumns}
+                    rows={marketData.indices}
+                    getRowKey={(index) => index.code || index.name}
+                    emptyState={{ title: marketReviewText.noBreadthData }}
+                    density="compact"
+                    frame="embedded"
+                    minWidth="container"
+                    separatorTone="subtle"
+                  />
                 ) : null}
                 {(() => {
                   const boardTypes = [{

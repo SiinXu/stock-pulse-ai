@@ -65,8 +65,14 @@ describe('NotificationTestPanel', () => {
       />,
     );
 
+    expect(screen.getByTestId('settings-summary-notification-test-channel')).toHaveTextContent('企业微信');
+    expect(screen.getByTestId('settings-summary-notification-test-timeout')).toHaveTextContent('20 s');
+    expect(screen.queryByLabelText('渠道')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '配置' }));
     const channelSelect = screen.getByLabelText('渠道');
+    const titleInput = screen.getByLabelText('标题');
+    expect(channelSelect.parentElement?.parentElement).toHaveClass('w-full');
+    expect(titleInput.parentElement?.parentElement).toHaveClass('w-full');
     const channelListbox = openListbox(channelSelect);
     expect(within(channelListbox).getByRole('option', { name: 'ntfy' })).toBeInTheDocument();
     expect(within(channelListbox).getByRole('option', { name: 'Gotify' })).toBeInTheDocument();
@@ -80,6 +86,7 @@ describe('NotificationTestPanel', () => {
       maskToken: '******',
       timeoutSeconds: 20,
     })));
+    expect(screen.queryByRole('dialog', { name: '通知测试' })).not.toBeInTheDocument();
     expect(await screen.findByText('测试成功')).toBeInTheDocument();
     expect(screen.getByText('HTTP 200')).toBeInTheDocument();
     expect(screen.getByText('https://example.com/hook?token=***')).toBeInTheDocument();

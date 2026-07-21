@@ -143,13 +143,17 @@ describe('BacktestPage', () => {
     const endDateInput = screen.getByLabelText('分析结束日期');
 
     expect(filterInput).toHaveAttribute('data-control', 'input');
-    expect(filterInput).toHaveAttribute('data-size', 'comfortable');
+    expect(filterInput).toHaveAttribute('data-size', 'default');
     expect(windowInput).toHaveAttribute('data-control', 'input');
-    expect(windowInput).toHaveAttribute('data-size', 'comfortable');
+    expect(windowInput).toHaveAttribute('data-size', 'default');
+    expect(screen.getByRole('button', { name: '筛选' })).toHaveAttribute('data-size', 'primary');
+    expect(screen.getByRole('button', { name: '运行回测' })).toHaveAttribute('data-size', 'primary');
     expect(startDateInput).toHaveAttribute('aria-haspopup', 'dialog');
     expect(startDateInput).toHaveAttribute('aria-expanded', 'false');
     expect(endDateInput).toHaveAttribute('aria-haspopup', 'dialog');
     expect(endDateInput).toHaveAttribute('aria-expanded', 'false');
+    expect(startDateInput.parentElement).toHaveAttribute('data-size', 'compact');
+    expect(endDateInput.parentElement).toHaveAttribute('data-size', 'compact');
 
     expect(await screen.findByText('盈利')).toBeInTheDocument();
     expect(screen.getByText('已完成')).toBeInTheDocument();
@@ -168,6 +172,23 @@ describe('BacktestPage', () => {
     expect(screen.getAllByLabelText('是').length).toBeGreaterThan(0);
     expect(screen.getByText('方向准确率')).toBeInTheDocument();
     expect(screen.getByText('平均模拟收益')).toBeInTheDocument();
+  });
+
+  it('renders one page-level empty state before any backtest data exists', async () => {
+    mockGetOverallPerformance.mockResolvedValueOnce(null);
+    mockGetResults.mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+
+    renderPage();
+
+    expect(await screen.findByRole('heading', { name: '暂无结果' })).toBeInTheDocument();
+    expect(screen.getAllByText('暂无结果')).toHaveLength(1);
+    expect(screen.queryByLabelText('结果筛选 · 阶段')).not.toBeInTheDocument();
+    expect(screen.queryByText('暂无指标')).not.toBeInTheDocument();
   });
 
   it('falls back to the taxonomy label when backtest actionLabel is missing', async () => {
@@ -263,8 +284,8 @@ describe('BacktestPage', () => {
     renderEnglishPage();
 
     expect(await screen.findByPlaceholderText('Filter by stock code (leave empty for all)'))
-      .toHaveAttribute('data-size', 'comfortable');
-    expect(screen.getByText('Evaluation window')).toBeInTheDocument();
+      .toHaveAttribute('data-size', 'default');
+    expect(screen.getByRole('tab', { name: 'Evaluation window' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByLabelText('Result filters · Phase')).toHaveTextContent('All phases');
     expect(screen.getByRole('button', { name: 'Run backtest' })).toBeInTheDocument();
 
@@ -429,9 +450,9 @@ describe('BacktestPage', () => {
     renderPage();
 
     await screen.findByText('600519');
-    const oneDayButton = screen.getByRole('button', { name: '1 日验证' });
-    expect(oneDayButton).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByRole('button', { name: '强制重跑' })).toHaveAttribute('aria-pressed', 'false');
+    const oneDayButton = screen.getByRole('tab', { name: '1 日验证' });
+    expect(oneDayButton).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByRole('switch', { name: '强制重跑' })).toHaveAttribute('aria-checked', 'false');
     const nextDayResults = createDeferred<{
       total: number;
       page: number;
@@ -477,6 +498,13 @@ describe('BacktestPage', () => {
     expect(screen.queryByText('正在加载结果...')).not.toBeInTheDocument();
     expect(screen.getByText('准确性')).toBeInTheDocument();
     expect(screen.getByText('1 日验证模式会用下一个交易日收盘表现校验 AI 预测。')).toBeInTheDocument();
+    expect(oneDayButton).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.click(screen.getByRole('tab', { name: '评估窗口' }));
+    await waitFor(() => expect(mockGetResults).toHaveBeenLastCalledWith(expect.objectContaining({
+      evalWindowDays: 10,
+    })));
+    expect(screen.getByPlaceholderText('10')).toHaveValue(10);
   });
 
   it('restores applied filters and pagination from the URL', async () => {

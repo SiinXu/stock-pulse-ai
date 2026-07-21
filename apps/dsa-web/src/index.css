@@ -1126,6 +1126,19 @@ a {
   opacity: 1;
 }
 
+/* Hide the per-item delete action until hover/focus on devices with a fine pointer;
+   touch devices keep it always visible. */
+@media (hover: hover) and (pointer: fine) {
+  .home-history-item .history-delete-btn {
+    opacity: 0;
+  }
+
+  .home-history-item:hover .history-delete-btn,
+  .home-history-item:focus-within .history-delete-btn {
+    opacity: 1;
+  }
+}
+
 .home-surface-button {
   border: 1px solid var(--home-surface-button-border);
   background: var(--home-surface-button-bg);

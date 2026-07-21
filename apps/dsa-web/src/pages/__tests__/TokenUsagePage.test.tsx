@@ -214,9 +214,27 @@ describe('TokenUsagePage', () => {
       .toHaveAttribute('data-surface-level', 'section');
     expect(screen.getAllByText('个股分析')).toHaveLength(2);
     expect(screen.getByText(/600519/)).toBeInTheDocument();
+    const recentCallsTable = screen.getByRole('table', { name: '最近调用' });
+    expect(recentCallsTable.parentElement).toHaveAttribute('data-data-table', 'ready');
+    expect(recentCallsTable.parentElement).not.toHaveAttribute('data-surface-level');
+    expect(screen.getByRole('rowheader')).toBeInTheDocument();
     expect(get).toHaveBeenCalledWith('/api/v1/usage/dashboard', {
       params: { period: 'month', limit: 50 },
     });
+  });
+
+  it('shows an embedded no-recent-calls state when aggregate usage is non-zero', async () => {
+    get.mockResolvedValue({
+      data: makeDashboardResponse({ recent_calls: [] }),
+    });
+
+    renderPage();
+
+    const state = await screen.findByText('暂无最近调用记录');
+    expect(state.closest('[data-data-table="state"]')).toHaveAttribute('data-surface-level', 'canvas');
+    expect(state.closest('[data-surface-level="interactive"]')).toBeNull();
+    expect(screen.queryByRole('table', { name: '最近调用' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '最近调用' })).toBeInTheDocument();
   });
 
   it('renders English copy when the UI language is English', async () => {

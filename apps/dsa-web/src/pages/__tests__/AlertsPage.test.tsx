@@ -183,7 +183,9 @@ describe('AlertsPage', () => {
 
     expect(screen.getByText('管理事件告警、日线技术指标、自选股、持仓/账户联动和大盘红绿灯规则，执行一次性测试，并查看后台评估任务记录的触发历史。')).toBeInTheDocument();
     expect(await screen.findByText('茅台价格突破')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '触发历史' }));
     expect(await screen.findByText('600519 price above 1800')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '通知尝试记录' }));
     expect(await screen.findByText('暂无通知尝试记录')).toBeInTheDocument();
     expect(listRules).toHaveBeenCalledWith({
       enabled: undefined,
@@ -193,6 +195,27 @@ describe('AlertsPage', () => {
     });
     expect(listTriggers).toHaveBeenCalledWith({ page: 1, pageSize: 20 });
     expect(listNotifications).toHaveBeenCalledWith({ page: 1, pageSize: 20 });
+  });
+
+  it('filters notification attempts by channel and delivery status', async () => {
+    render(<AlertsPage />);
+
+    await screen.findByText('茅台价格突破');
+    fireEvent.click(screen.getByRole('tab', { name: '通知尝试记录' }));
+    chooseOption(screen.getByLabelText('渠道'), 'email');
+    await waitFor(() => expect(listNotifications).toHaveBeenLastCalledWith({
+      channel: 'email',
+      page: 1,
+      pageSize: 20,
+    }));
+
+    chooseOption(screen.getByLabelText('状态'), 'failure');
+    await waitFor(() => expect(listNotifications).toHaveBeenLastCalledWith({
+      channel: 'email',
+      success: false,
+      page: 1,
+      pageSize: 20,
+    }));
   });
 
   it('runs a dry-run test and renders only declared response fields', async () => {

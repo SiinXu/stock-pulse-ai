@@ -1074,8 +1074,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.goto('/settings?section=ai_models&view=connections');
     await expect(page.getByRole('button', { name: /添加模型服务/ })).toBeDisabled();
     await expect(page.getByLabel('API 密钥')).toHaveCount(0);
-    await page.goto('/settings?section=advanced&view=raw_config');
-    await page.locator('details').filter({ hasText: '开发者诊断' }).locator('summary').click();
+    await page.goto('/settings?section=advanced&view=diagnostics');
     await expect(page.getByText(/schema_ui_placement_missing/).first()).toBeVisible();
   });
 
@@ -1711,9 +1710,10 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await login(page, 'en');
     await page.goto('/decision-signals');
     await applyStockContext();
-    await expect(page.getByText('Canonical momentum confirmed', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('Canonical gap risk', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('91%', { exact: true }).first()).toBeVisible();
+    const latestPanel = page.getByRole('tabpanel', { name: 'Current stock' });
+    await expect(latestPanel.getByText('Canonical momentum confirmed', { exact: true }).first()).toBeVisible();
+    await expect(latestPanel.getByText('Canonical gap risk', { exact: true }).first()).toBeVisible();
+    await expect(latestPanel.getByText('91%', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Sell', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Legacy summary must not render', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Legacy risk must not render', { exact: true })).toHaveCount(0);
@@ -1753,6 +1753,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.keyboard.press('Escape');
     await expect(details).toBeHidden();
 
+    await page.getByRole('tab', { name: 'Stock signal timeline' }).click();
     const timelinePoint = page.getByTestId('timeline-hit-target-91');
     await expect(timelinePoint).toBeVisible();
     await timelinePoint.hover();
@@ -1792,6 +1793,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
         },
       });
     });
+    await createPortfolioAccount(page, 'canonical presentation');
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/portfolio');
     await expect(page.getByRole('heading', { name: 'Portfolio management' })).toBeVisible();
@@ -2098,7 +2100,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       const fallbackCheckbox = page.getByRole('checkbox', { name: /model-beta/ });
       await expectMinimumTouchTarget(fallbackCheckbox.locator('xpath=ancestor::label'));
 
-      await page.goto('/settings?section=system_security&view=runtime');
+      await page.goto('/settings?section=system_security&view=service');
       const logLevelSelect = page.getByRole('combobox', { name: '日志级别', exact: true });
       await expectMinimumTouchTarget(logLevelSelect);
       await logLevelSelect.click();

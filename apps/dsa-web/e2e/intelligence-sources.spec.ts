@@ -3,11 +3,11 @@
 import { expect, test } from '@playwright/test';
 import { loginAsE2eAdmin } from './auth-fixture';
 
-// Smoke coverage for the Intelligence sources subsection only. The
+// Smoke coverage for the Intel Sources tab only. The
 // `/api/v1/intelligence/*` endpoints are mocked so the panel renders
 // deterministically without depending on live feeds or seeded data.
 test.describe('intelligence sources settings', () => {
-  test('renders mocked intelligence sources in the Data Sources view', async ({ page }) => {
+  test('renders mocked intelligence sources on the Intel Sources tab', async ({ page }) => {
     await page.route(/\/api\/v1\/intelligence\/sources\/templates/, async (route) => {
       await route.fulfill({
         contentType: 'application/json',
@@ -48,7 +48,7 @@ test.describe('intelligence sources settings', () => {
     });
 
     await loginAsE2eAdmin(page);
-    await page.goto('/settings?section=data_sources&view=sources');
+    await page.goto('/settings?section=data_sources&view=intelligence');
 
     await expect(page.getByText('E2E Intelligence Feed')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('A-share market RSS')).toBeVisible();

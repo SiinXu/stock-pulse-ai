@@ -1,6 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { useCallback, useEffect, useState } from 'react';
+import { Plus } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { SETTINGS_INTELLIGENCE_TEXT } from '../../locales/settingsIntelligence';
 import { createParsedApiError, getParsedApiError, type ParsedApiError } from '../../api/error';
@@ -15,12 +16,15 @@ import { Input } from '../common/Input';
 import { Textarea } from '../common/Textarea';
 import { StatePanel } from '../common/StatePanel';
 import { InlineAlert } from '../common/InlineAlert';
+import { Modal } from '../common/Modal';
+import { Select } from '../common/Select';
 
 type LoadPhase = 'loading' | 'error' | 'ready';
 
 const SOURCE_TYPE_OPTIONS = ['rss', 'atom', 'json'];
 const SCOPE_TYPE_OPTIONS = ['market', 'stock'];
 const MARKET_OPTIONS = ['cn', 'hk', 'us'];
+const toSelectOptions = (options: string[]) => options.map((value) => ({ value, label: value }));
 
 function format(template: string, params: Record<string, string | number>): string {
   return template.replace(/\{(\w+)\}/g, (_, key: string) => String(params[key] ?? ''));
@@ -45,7 +49,7 @@ const EMPTY_DRAFT: DraftState = {
 };
 
 export function IntelligenceSourcesPanel() {
-  const { language } = useUiLanguage();
+  const { language, t } = useUiLanguage();
   const text = SETTINGS_INTELLIGENCE_TEXT[language];
 
   const [phase, setPhase] = useState<LoadPhase>('loading');
@@ -55,6 +59,7 @@ export function IntelligenceSourcesPanel() {
   const [items, setItems] = useState<IntelligenceItem[] | null>(null);
 
   const [draft, setDraft] = useState<DraftState>(EMPTY_DRAFT);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<ParsedApiError | null>(null);
@@ -92,11 +97,18 @@ export function IntelligenceSourcesPanel() {
       const message = await action();
       setNotice(message);
       if (reload) {
-        const sourceList = await intelligenceApi.listSources({ pageSize: 100 });
-        setSources(sourceList.items);
+        try {
+          const sourceList = await intelligenceApi.listSources({ pageSize: 100 });
+          setSources(sourceList.items);
+        } catch (error: unknown) {
+          setLoadError(getParsedApiError(error, language));
+          setPhase('error');
+        }
       }
+      return true;
     } catch (error: unknown) {
       setActionError(getParsedApiError(error, language));
+      return false;
     } finally {
       setBusy(null);
     }
@@ -109,19 +121,24 @@ export function IntelligenceSourcesPanel() {
       setActionError(createParsedApiError({ title: text.actionFailed, message: text.requiredFields }));
       return;
     }
-    void runAction('create', async () => {
-      await intelligenceApi.createSource({
-        name: draft.name.trim(),
-        url: draft.url.trim(),
-        sourceType: draft.sourceType,
-        scopeType: draft.scopeType,
-        market: draft.market,
-        description: draft.description.trim() || undefined,
-        enabled: true,
+    void (async () => {
+      const succeeded = await runAction('create', async () => {
+        await intelligenceApi.createSource({
+          name: draft.name.trim(),
+          url: draft.url.trim(),
+          sourceType: draft.sourceType,
+          scopeType: draft.scopeType,
+          market: draft.market,
+          description: draft.description.trim() || undefined,
+          enabled: true,
+        });
+        setDraft(EMPTY_DRAFT);
+        return text.create;
       });
-      setDraft(EMPTY_DRAFT);
-      return text.create;
-    });
+      if (succeeded) {
+        setIsCreateOpen(false);
+      }
+    })();
   }, [draft, runAction, text]);
 
   const handleTest = useCallback(() => {
@@ -198,32 +215,50 @@ export function IntelligenceSourcesPanel() {
   }
 
   const inputClass = 'w-full';
+  const feedback = notice ? (
+    <div role="status" aria-live="polite">
+      <InlineAlert variant="success" message={notice} />
+    </div>
+  ) : actionError ? (
+    <div role="alert">
+      <InlineAlert
+        variant="danger"
+        message={(
+          <>
+            {actionError.message}
+            {actionError.traceId ? <span className="ml-1 opacity-70">{format(text.traceId, { id: actionError.traceId })}</span> : null}
+          </>
+        )}
+      />
+    </div>
+  ) : null;
+
+  const openCreateDialog = () => {
+    setNotice(null);
+    setActionError(null);
+    setIsCreateOpen(true);
+  };
+
+  const closeCreateDialog = () => {
+    setNotice(null);
+    setActionError(null);
+    setIsCreateOpen(false);
+  };
 
   return (
     <div className="space-y-6">
-      <header className="space-y-1">
-        <h2 className="text-base font-semibold text-foreground">{text.title}</h2>
-        <p className="max-w-2xl text-xs leading-6 text-secondary-text sm:text-sm">{text.description}</p>
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-1">
+          <h2 className="text-base font-semibold text-foreground">{text.title}</h2>
+          <p className="max-w-2xl text-xs leading-6 text-secondary-text sm:text-sm">{text.description}</p>
+        </div>
+        <Button type="button" variant="primary" size="default" className="shrink-0" onClick={openCreateDialog}>
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          {text.addSourceTitle}
+        </Button>
       </header>
 
-      {notice ? (
-        <div role="status" aria-live="polite">
-          <InlineAlert variant="success" message={notice} />
-        </div>
-      ) : null}
-      {actionError ? (
-        <div role="alert">
-          <InlineAlert
-            variant="danger"
-            message={(
-              <>
-                {actionError.message}
-                {actionError.traceId ? <span className="ml-1 opacity-70">{format(text.traceId, { id: actionError.traceId })}</span> : null}
-              </>
-            )}
-          />
-        </div>
-      ) : null}
+      {!isCreateOpen ? feedback : null}
 
       {sources.length === 0 ? (
         <StatePanel
@@ -295,42 +330,6 @@ export function IntelligenceSourcesPanel() {
         </section>
       ) : null}
 
-      <section aria-label={text.addSourceTitle} className="space-y-3 rounded-md border border-[var(--settings-border)] p-3">
-        <h3 className="text-sm font-semibold text-foreground">{text.addSourceTitle}</h3>
-        <p className="text-xs text-secondary-text">{text.unsupportedNote}</p>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Input label={text.name} value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} fieldClassName={inputClass} />
-          <Input label={text.url} value={draft.url} onChange={(e) => setDraft((d) => ({ ...d, url: e.target.value }))} fieldClassName={inputClass} inputMode="url" />
-          <label className="flex flex-col gap-1 text-xs text-secondary-text">
-            {text.sourceType}
-            <select className="min-h-11 rounded-md border border-[var(--settings-border)] bg-transparent px-2 text-sm text-foreground" value={draft.sourceType} onChange={(e) => setDraft((d) => ({ ...d, sourceType: e.target.value }))}>
-              {SOURCE_TYPE_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-secondary-text">
-            {text.scopeType}
-            <select className="min-h-11 rounded-md border border-[var(--settings-border)] bg-transparent px-2 text-sm text-foreground" value={draft.scopeType} onChange={(e) => setDraft((d) => ({ ...d, scopeType: e.target.value }))}>
-              {SCOPE_TYPE_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-secondary-text">
-            {text.market}
-            <select className="min-h-11 rounded-md border border-[var(--settings-border)] bg-transparent px-2 text-sm text-foreground" value={draft.market} onChange={(e) => setDraft((d) => ({ ...d, market: e.target.value }))}>
-              {MARKET_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-            </select>
-          </label>
-        </div>
-        <Textarea label={text.sourceDescription} value={draft.description} onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))} rows={2} />
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={handleTest} isLoading={busy === 'test'} loadingText={text.testing}>
-            {text.test}
-          </Button>
-          <Button variant="primary" onClick={handleCreate} isLoading={busy === 'create'} loadingText={text.creating}>
-            {text.create}
-          </Button>
-        </div>
-      </section>
-
       <section aria-label={text.itemsTitle} className="space-y-2">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-sm font-semibold text-foreground">{text.itemsTitle}</h3>
@@ -353,6 +352,46 @@ export function IntelligenceSourcesPanel() {
           </ul>
         )}
       </section>
+
+      <Modal
+        isOpen={isCreateOpen}
+        onClose={closeCreateDialog}
+        title={text.addSourceTitle}
+        description={text.unsupportedNote}
+        size="wide"
+        footer={(
+          <div className="flex w-full flex-wrap justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={closeCreateDialog}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="button" variant="outline" onClick={handleTest} isLoading={busy === 'test'} loadingText={text.testing}>
+              {text.test}
+            </Button>
+            <Button type="submit" form="intelligence-source-create-form" variant="primary" isLoading={busy === 'create'} loadingText={text.creating}>
+              {text.create}
+            </Button>
+          </div>
+        )}
+      >
+        <form
+          id="intelligence-source-create-form"
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            handleCreate();
+          }}
+        >
+          {isCreateOpen ? feedback : null}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Input label={text.name} value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} fieldClassName={inputClass} />
+            <Input label={text.url} value={draft.url} onChange={(event) => setDraft((current) => ({ ...current, url: event.target.value }))} fieldClassName={inputClass} inputMode="url" />
+            <Select label={text.sourceType} value={draft.sourceType} onChange={(value) => setDraft((current) => ({ ...current, sourceType: value }))} options={toSelectOptions(SOURCE_TYPE_OPTIONS)} className="w-full" />
+            <Select label={text.scopeType} value={draft.scopeType} onChange={(value) => setDraft((current) => ({ ...current, scopeType: value }))} options={toSelectOptions(SCOPE_TYPE_OPTIONS)} className="w-full" />
+            <Select label={text.market} value={draft.market} onChange={(value) => setDraft((current) => ({ ...current, market: value }))} options={toSelectOptions(MARKET_OPTIONS)} className="w-full" />
+          </div>
+          <Textarea label={text.sourceDescription} value={draft.description} onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))} rows={2} />
+        </form>
+      </Modal>
     </div>
   );
 }
