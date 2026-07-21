@@ -629,7 +629,6 @@ class AgentExecutor:
         resolution_context.update(context or {})
         scope_resolution = resolve_stock_scope(message, resolution_context)
         context = scope_resolution.effective_context
-        session.update_market_context(context)
 
         # Build system prompt with skills
         skills_section = ""
@@ -737,6 +736,10 @@ class AgentExecutor:
 
         # Persist the user turn immediately so the session appears in history during processing
         user_message_id = conversation_manager.add_message(session_id, "user", message)
+        session.update_market_context(
+            context,
+            anchor_user_message_id=user_message_id,
+        )
 
         try:
             registry_token = _CHAT_TOOL_REGISTRY.set(chat_tool_registry)

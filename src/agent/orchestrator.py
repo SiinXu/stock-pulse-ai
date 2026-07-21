@@ -573,7 +573,6 @@ class AgentOrchestrator:
         resolution_context = dict(stored_context) if isinstance(stored_context, dict) else {}
         resolution_context.update(context or {})
         scope_resolution = resolve_stock_scope(message, resolution_context)
-        session.update_market_context(scope_resolution.effective_context)
 
         config = self.config or getattr(self.llm_adapter, "_config", None) or get_config()
         history = build_visible_chat_history(session_id, self.llm_adapter, config)
@@ -592,7 +591,15 @@ class AgentOrchestrator:
         )
 
         # Persist user turn
-        conversation_manager.add_message(session_id, "user", message)
+        user_message_id = conversation_manager.add_message(
+            session_id,
+            "user",
+            message,
+        )
+        session.update_market_context(
+            scope_resolution.effective_context,
+            anchor_user_message_id=user_message_id,
+        )
 
         try:
             stock_scope = scope_resolution.stock_scope

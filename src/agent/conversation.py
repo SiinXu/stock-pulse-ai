@@ -40,6 +40,11 @@ class ConversationSession:
         repr=False,
         compare=False,
     )
+    _market_context_user_message_id: Optional[int] = field(
+        default=None,
+        repr=False,
+        compare=False,
+    )
 
     def add_message(self, role: str, content: str) -> int:
         """Add a message to the session history."""
@@ -54,13 +59,34 @@ class ConversationSession:
             self.context[key] = value
             self.last_active = datetime.now()
 
-    def update_market_context(self, context: Optional[Dict[str, Any]]) -> None:
-        """Replace cached stock identity fields for the next chat turn."""
+    def update_market_context(
+        self,
+        context: Optional[Dict[str, Any]],
+        *,
+        anchor_user_message_id: Optional[int] = None,
+    ) -> None:
+        """Replace cached market fields and optionally anchor them to a user turn."""
         selected = _select_market_context(context)
         with self._context_lock:
             for key in MARKET_CONTEXT_KEYS:
                 self.context.pop(key, None)
             self.context.update(selected)
+            if anchor_user_message_id is not None:
+                self._market_context_user_message_id = anchor_user_message_id
+            self.last_active = datetime.now()
+
+    def _replace_recovered_market_context(
+        self,
+        context: Optional[Dict[str, Any]],
+        anchor_user_message_id: Optional[int],
+    ) -> None:
+        """Atomically replace replayed market fields and their persistence anchor."""
+        selected = _select_market_context(context)
+        with self._context_lock:
+            for key in MARKET_CONTEXT_KEYS:
+                self.context.pop(key, None)
+            self.context.update(selected)
+            self._market_context_user_message_id = anchor_user_message_id
             self.last_active = datetime.now()
 
     def get_market_context(self) -> Dict[str, Any]:
@@ -73,19 +99,49 @@ class ConversationSession:
         """
         messages = get_db().get_visible_conversation_messages(self.session_id)
         if not messages:
-            self.update_market_context({})
+            self._replace_recovered_market_context({}, None)
             return {}
 
         from src.agent.stock_scope import resolve_stock_scope
 
-        replayed: Dict[str, Any] = {}
+        user_messages = [
+            message
+            for message in messages
+            if isinstance(message, dict)
+            and message.get("role") == "user"
+            and isinstance(message.get("content"), str)
+            and bool(message.get("content"))
+        ]
+        with self._context_lock:
+            cached = _select_market_context(self.context)
+            cached_anchor = self._market_context_user_message_id
+
+        user_message_ids = [
+            message.get("id")
+            for message in user_messages
+            if isinstance(message.get("id"), int)
+        ]
+        all_user_messages_are_versioned = (
+            len(user_message_ids) == len(user_messages)
+        )
+        anchor_is_visible = bool(
+            all_user_messages_are_versioned
+            and cached_anchor is not None
+            and cached_anchor in user_message_ids
+        )
+        replayed: Dict[str, Any] = dict(cached) if anchor_is_visible else {}
+        messages_to_replay = (
+            [
+                message
+                for message in user_messages
+                if message["id"] > cached_anchor
+            ]
+            if anchor_is_visible
+            else user_messages
+        )
         history_has_stock_scope = False
-        for message in messages:
-            if not isinstance(message, dict) or message.get("role") != "user":
-                continue
-            content = message.get("content")
-            if not isinstance(content, str) or not content:
-                continue
+        for message in messages_to_replay:
+            content = message["content"]
             resolution = resolve_stock_scope(content, replayed)
             replayed = _select_market_context(resolution.effective_context)
             scope = resolution.stock_scope
@@ -94,20 +150,25 @@ class ConversationSession:
             ):
                 history_has_stock_scope = True
 
-        with self._context_lock:
-            cached = _select_market_context(self.context)
-        replayed_code = replayed.get("stock_code")
-        cached_code = cached.get("stock_code")
-        if replayed_code:
-            if cached_code == replayed_code and cached.get("stock_name"):
-                replayed["stock_name"] = cached["stock_name"]
-            if cached.get("report_language"):
+        if not anchor_is_visible:
+            replayed_code = replayed.get("stock_code")
+            cached_code = cached.get("stock_code")
+            if replayed_code:
+                if cached_code == replayed_code and cached.get("stock_name"):
+                    replayed["stock_name"] = cached["stock_name"]
+                if cached.get("report_language"):
+                    replayed["report_language"] = cached["report_language"]
+            elif not history_has_stock_scope:
+                replayed.update(cached)
+            elif cached.get("report_language"):
                 replayed["report_language"] = cached["report_language"]
-        elif not history_has_stock_scope:
-            replayed.update(cached)
-        elif cached.get("report_language"):
-            replayed["report_language"] = cached["report_language"]
-        self.update_market_context(replayed)
+
+        recovered_anchor = (
+            user_message_ids[-1]
+            if all_user_messages_are_versioned and user_message_ids
+            else None
+        )
+        self._replace_recovered_market_context(replayed, recovered_anchor)
         return dict(replayed)
 
     def get_history(self) -> List[Dict[str, Any]]:
