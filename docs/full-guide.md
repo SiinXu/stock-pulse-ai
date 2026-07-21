@@ -1725,7 +1725,7 @@ A: 检查是否启用了 Actions，以及 cron 表达式是否正确（注意是
 
 ## Agent 运行时护栏
 
-Agent 的超时分为三层：`AGENT_TOOL_TIMEOUT_S` 默认以 120 秒限制单次工具调用；`AGENT_TECHNICAL_AGENT_TIMEOUT_S`、`AGENT_INTEL_AGENT_TIMEOUT_S`、`AGENT_RISK_AGENT_TIMEOUT_S`、`AGENT_DECISION_AGENT_TIMEOUT_S`、`AGENT_PORTFOLIO_AGENT_TIMEOUT_S` 和 `AGENT_SKILL_AGENT_TIMEOUT_S` 可为对应 Stage 设置独立上限；`AGENT_ORCHESTRATOR_TIMEOUT_S` 默认以 600 秒限制 single-agent 整体循环或 multi-agent Pipeline。多个预算同时生效时使用剩余时间最短的一项，超时后的工具结果会被运行时 fence 丢弃，不会回写为成功结果。Multi-agent Stage 会在隔离的上下文副本中执行，只有按时返回 `COMPLETED` 才提交状态；超时后的 late state 和 progress 不会进入后续 Stage。Python 无法强制终止已经运行的原生线程，因此自定义 Stage 或工具 handler 仍可能在后台结束并产生自身的外部副作用，但不能回写已接受的 Agent 上下文或 tool-session 缓存。
+Agent 的超时分为三层：`AGENT_TOOL_TIMEOUT_S` 默认以 120 秒限制单次工具调用；`AGENT_TECHNICAL_AGENT_TIMEOUT_S`、`AGENT_INTEL_AGENT_TIMEOUT_S`、`AGENT_RISK_AGENT_TIMEOUT_S`、`AGENT_DECISION_AGENT_TIMEOUT_S`、`AGENT_PORTFOLIO_AGENT_TIMEOUT_S` 和 `AGENT_SKILL_AGENT_TIMEOUT_S` 可为对应 Stage 设置独立上限；`AGENT_ORCHESTRATOR_TIMEOUT_S` 默认以 600 秒限制 single-agent 整体循环或 multi-agent Pipeline。多个预算同时生效时使用剩余时间最短的一项，超时后的工具结果会被运行时 fence 丢弃，不会回写为成功结果。Multi-agent Stage 会在隔离的上下文副本中执行，只有按时返回 `COMPLETED` 才提交状态；超时后的 late state 和 progress 不会进入后续 Stage。Python 无法强制终止已经运行的原生线程，因此自定义 Stage 或工具 handler 仍可能在后台结束并产生自身的外部副作用，但不能回写已接受的 Agent 上下文或 tool-session 缓存。Progress callback 是同步 hook，必须及时返回；仓库支持的 SSE 与 runtime adapter 只负责入队或发布，不会同步等待下游。Stage fence 会保证已接受的 callback 排在关闭之前，但不会尝试抢占已经进入任意调用方 callback 的代码。
 
 `AGENT_MAX_IDENTICAL_TOOL_CALLS=3` 允许同一运行中相同工具名与规范化参数最多执行三次，第 4 次会在 dispatch 前停止当前 Agent；`AGENT_MAX_STAGE_ENTRIES=1` 允许同名 Stage 每条 Pipeline 进入一次，再次进入会直接硬停。数值项设为 `0` 可单独关闭对应护栏。循环日志只记录工具名和参数签名的短哈希，不记录参数原文。
 

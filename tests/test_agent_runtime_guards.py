@@ -100,6 +100,32 @@ class _InlineExecutor:
         return None
 
 
+class _ImmediateFuture:
+    """Publish an inline execution result without a caller-side wait timeout."""
+
+    def __init__(self, result):
+        self._result = result
+
+    def result(self, timeout=None):
+        return self._result
+
+    def cancel(self):
+        return False
+
+
+class _ImmediateExecutor:
+    """Run submitted work inline and publish it immediately."""
+
+    def __init__(self, max_workers):
+        self.max_workers = max_workers
+
+    def submit(self, callback, *args):
+        return _ImmediateFuture(callback(*args))
+
+    def shutdown(self, wait=True, cancel_futures=False):
+        return None
+
+
 def test_runtime_guard_policy_reads_environment(monkeypatch):
     monkeypatch.setenv("AGENT_TOOL_TIMEOUT_S", "45.5")
     monkeypatch.setenv("AGENT_MAX_IDENTICAL_TOOL_CALLS", "4")
@@ -281,6 +307,84 @@ def test_parallel_completion_claims_win_before_batch_publication(monkeypatch):
     assert len(result.tool_calls_log) == 2
     assert all(entry["success"] is True for entry in result.tool_calls_log)
     assert all("timeout" not in entry for entry in result.tool_calls_log)
+
+
+def test_fence_deadline_timeout_is_logged_when_future_publishes(caplog, monkeypatch):
+    adapter = MagicMock()
+    adapter.call_with_tools.side_effect = [
+        LLMResponse(
+            content="use tool",
+            tool_calls=[
+                ToolCall(id="late", name="echo", arguments={"message": "late"})
+            ],
+            provider="test",
+        ),
+        LLMResponse(content="done", provider="test"),
+    ]
+    monkeypatch.setattr("src.agent.runner.ThreadPoolExecutor", _ImmediateExecutor)
+
+    with caplog.at_level(logging.WARNING), patch(
+        "src.agent.runner.time.monotonic",
+        side_effect=[0.0, 2.0],
+    ):
+        result = run_agent_loop(
+            messages=[],
+            tool_registry=_echo_registry(),
+            llm_adapter=adapter,
+            max_steps=3,
+            runtime_guard_policy=_policy(tool_timeout_seconds=1.0),
+        )
+
+    assert result.success is True
+    assert result.tool_calls_log[0]["timeout"] is True
+    assert result.tool_calls_log[0]["success"] is False
+    assert any(
+        event["event"] == "tool_timeout"
+        and event["tool"] == "echo"
+        for event in _guard_events(caplog.records)
+    )
+
+
+def test_parallel_fence_deadline_timeouts_are_logged(caplog, monkeypatch):
+    adapter = MagicMock()
+    adapter.call_with_tools.side_effect = [
+        LLMResponse(
+            content="use tools",
+            tool_calls=[
+                ToolCall(
+                    id=f"late-{index}",
+                    name="echo",
+                    arguments={"message": f"late-{index}"},
+                )
+                for index in range(2)
+            ],
+            provider="test",
+        ),
+        LLMResponse(content="done", provider="test"),
+    ]
+    monkeypatch.setattr("src.agent.runner.ThreadPoolExecutor", _ImmediateExecutor)
+    monkeypatch.setattr(
+        "src.agent.runner.as_completed",
+        lambda futures, timeout=None: list(futures),
+    )
+
+    with caplog.at_level(logging.WARNING), patch(
+        "src.agent.runner.time.monotonic",
+        side_effect=[0.0, 2.0, 0.0, 2.0],
+    ):
+        result = run_agent_loop(
+            messages=[],
+            tool_registry=_echo_registry(),
+            llm_adapter=adapter,
+            max_steps=3,
+            runtime_guard_policy=_policy(tool_timeout_seconds=1.0),
+        )
+
+    assert result.success is True
+    assert len(result.tool_calls_log) == 2
+    assert all(entry["timeout"] is True for entry in result.tool_calls_log)
+    events = _guard_events(caplog.records)
+    assert sum(event["event"] == "tool_timeout" for event in events) == 2
 
 
 def test_timed_out_late_result_cannot_populate_session_cache():
