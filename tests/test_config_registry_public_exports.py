@@ -3,6 +3,7 @@
 import hashlib
 import importlib
 import json
+from typing import Any, Dict, List, get_type_hints
 
 import src.core.config_registry as registry
 
@@ -31,6 +32,32 @@ EXPECTED_PUBLIC_EXPORTS = {
     "get_registered_field_keys",
     "re",
 }
+EXPECTED_PRIVATE_EXPORTS = {
+    "_CATEGORY_DEFINITIONS",
+    "_DOC_CUSTOM_WEBHOOK",
+    "_DOC_FULL_GUIDE_DATA_SOURCE",
+    "_DOC_FULL_GUIDE_ENV",
+    "_DOC_FULL_GUIDE_NOTIFICATION",
+    "_DOC_FULL_GUIDE_SEARCH",
+    "_DOC_LLM_CONFIG",
+    "_FIELD_DEFINITIONS",
+    "_FIELD_HELP_METADATA",
+    "_UI_PLACEMENT_DIAGNOSTICS_KEYS",
+    "_UI_PLACEMENT_DIAGNOSTICS_PREFIXES",
+    "_UI_PLACEMENT_HIDDEN_LEGACY_KEYS",
+    "_UI_PLACEMENT_HIDDEN_LEGACY_PREFIXES",
+    "_UI_PLACEMENT_TASK_ROUTING_KEYS",
+    "_extract_option_values",
+    "_infer_category",
+    "_infer_data_type",
+    "_infer_ui_control",
+    "_is_sensitive_key",
+}
+EXPECTED_MODULE_ANNOTATIONS = {
+    "_CATEGORY_DEFINITIONS": "List[Dict[str, Any]]",
+    "_FIELD_DEFINITIONS": "Dict[str, Dict[str, Any]]",
+    "_FIELD_HELP_METADATA": "Dict[str, Dict[str, Any]]",
+}
 EXPECTED_REGISTERED_KEYS_SHA256 = (
     "751d590d2bd2a75f322ad4e14888118371a4d66931235779f1e71ad0d963a24d"
 )
@@ -52,6 +79,23 @@ def test_config_registry_public_export_surface_is_stable():
     public_exports = {name for name in dir(registry) if not name.startswith("_")}
 
     assert public_exports == EXPECTED_PUBLIC_EXPORTS
+
+
+def test_config_registry_private_export_surface_is_stable():
+    compatibility_exports = {
+        name for name in dir(registry) if not name.startswith("__")
+    }
+
+    assert compatibility_exports == EXPECTED_PUBLIC_EXPORTS | EXPECTED_PRIVATE_EXPORTS
+
+
+def test_config_registry_module_annotations_are_stable():
+    assert registry.__annotations__ == EXPECTED_MODULE_ANNOTATIONS
+    assert get_type_hints(registry) == {
+        "_CATEGORY_DEFINITIONS": List[Dict[str, Any]],
+        "_FIELD_DEFINITIONS": Dict[str, Dict[str, Any]],
+        "_FIELD_HELP_METADATA": Dict[str, Dict[str, Any]],
+    }
 
 
 def test_config_registry_contract_snapshot_is_stable():

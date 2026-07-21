@@ -23,14 +23,6 @@ from src.notification_routing import ROUTABLE_NOTIFICATION_CHANNELS
 
 SCHEMA_VERSION = "2026-07-16-config-contract"
 
-
-def _load_or_reload_registry_part(module_name: str):
-    module = _sys.modules.get(module_name)
-    if module is None:
-        return _importlib.import_module(module_name)
-    return _importlib.reload(module)
-
-
 _REGISTRY_PART_MODULES = (
     "src.core.config_registry_parts.catalog",
     "src.core.config_registry_parts.base",
@@ -43,13 +35,20 @@ _REGISTRY_PART_MODULES = (
     "src.core.config_registry_parts.help_metadata",
 )
 for _registry_part_name in _REGISTRY_PART_MODULES:
-    _load_or_reload_registry_part(_registry_part_name)
+    _registry_part_module = _sys.modules.get(_registry_part_name)
+    if _registry_part_module is None:
+        _importlib.import_module(_registry_part_name)
+    else:
+        _importlib.reload(_registry_part_module)
 del _registry_part_name
+del _registry_part_module
 
 from src.core.config_registry_parts.catalog import (
     WEB_SETTINGS_HIDDEN_FROM_UI,
     _CATEGORY_DEFINITIONS,
 )
+_CATEGORY_DEFINITIONS: List[Dict[str, Any]]
+
 from src.core.config_registry_parts.base import (
     BASE_FIELD_DEFINITIONS as _BASE_FIELD_DEFINITIONS,
 )
@@ -92,6 +91,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     **_BACKTEST_FIELD_DEFINITIONS,
     **_AGENT_FIELD_DEFINITIONS,
 }
+_FIELD_HELP_METADATA: Dict[str, Dict[str, Any]]
 
 del _BASE_FIELD_DEFINITIONS
 del _AI_MODEL_FIELD_DEFINITIONS
@@ -101,6 +101,9 @@ del _NOTIFICATION_FIELD_DEFINITIONS
 del _SYSTEM_FIELD_DEFINITIONS
 del _BACKTEST_FIELD_DEFINITIONS
 del _AGENT_FIELD_DEFINITIONS
+del _REGISTRY_PART_MODULES
+del _importlib
+del _sys
 
 
 def get_category_definitions() -> List[Dict[str, Any]]:
