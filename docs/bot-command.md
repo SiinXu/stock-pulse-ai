@@ -185,7 +185,9 @@ class CommandDispatcher:
 
 |------|------|------|------|
 
-| /analyze | /a, 分析 | 分析指定股票 | `/analyze 600519` |
+| /analyze | /a, 分析 | 分析 A 股、港股或美股 | `/analyze 600519`、`/analyze HK00700`、`/analyze AAPL` |
+
+| /ask | 问股 | 使用 Agent 技能分析一只或多只股票 | `/ask HK00700`、`/ask 600519,AAPL trend` |
 
 | /market | /m, 大盘 | 大盘复盘 | `/market` |
 
@@ -194,6 +196,10 @@ class CommandDispatcher:
 | /help | /h, 帮助 | 显示帮助信息 | `/help` |
 
 | /status | /s, 状态 | 系统状态 | `/status` |
+
+股票代码格式：A 股支持 6 位代码及常见交易所形式（如 `600519`、`SH600519`）；港股支持 5 位代码、`HK` 前缀或 `.HK` 后缀（如 `00700`、`HK00700`、`00700.HK`），进入分析队列时统一为 `HK00700`；美股使用 `AAPL`、`BRK.B` 等 ticker。`/analyze` 与 `/ask` 遇到无效代码或当前 Bot 命令暂不支持的市场时，会返回中英双语的可行动格式提示。
+
+`/analyze` 仍统一提交到 `AnalysisTaskQueue`；多市场归一化不会新增 Bot 专属任务生命周期，也不会改变 Task ID、进行中去重、状态枚举或通知回复目标。
 
 ## 五、`/status` 与模型配置诊断说明
 

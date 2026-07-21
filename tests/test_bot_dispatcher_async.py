@@ -15,6 +15,7 @@ except ModuleNotFoundError:
     ensure_litellm_stub()
 
 from bot.commands.base import BotCommand
+from bot.commands.ask import AskCommand
 from bot.dispatcher import CommandDispatcher
 from bot.models import BotMessage, BotResponse, ChatType
 
@@ -76,6 +77,14 @@ class TestCommandDispatcherAsync(unittest.IsolatedAsyncioTestCase):
 
     def test_nl_prefilter_accepts_bare_lowercase_us_ticker(self):
         self.assertTrue(CommandDispatcher._passes_nl_prefilter("tsla"))
+
+    def test_nl_prefilter_accepts_shared_hk_symbol_forms(self):
+        for symbol in ("00700", "00700.HK", "hk00700"):
+            with self.subTest(symbol=symbol):
+                self.assertTrue(CommandDispatcher._passes_nl_prefilter(symbol))
+
+    def test_nl_prefilter_accepts_known_unsupported_suffix_market(self):
+        self.assertTrue(CommandDispatcher._passes_nl_prefilter("7203.T"))
 
     def test_nl_prefilter_rejects_common_lowercase_word(self):
         self.assertFalse(CommandDispatcher._passes_nl_prefilter("hello"))
@@ -173,6 +182,37 @@ class TestCommandDispatcherAsync(unittest.IsolatedAsyncioTestCase):
         mock_akshare.assert_not_called()
         _, args = ask_command.execute_async.await_args.args
         self.assertEqual(args, ["600519"])
+
+    async def test_try_nl_routing_returns_market_guidance_for_unsupported_symbol(self):
+        dispatcher = CommandDispatcher()
+        dispatcher.register(AskCommand())
+        config = SimpleNamespace(
+            agent_nl_routing=True,
+            agent_mode=True,
+            litellm_model="gemini/test-model",
+        )
+
+        with patch("src.config.get_config", return_value=config), patch(
+            "bot.commands.ask.get_config",
+            return_value=config,
+        ), patch.object(
+            dispatcher,
+            "_parse_intent_via_llm",
+            new=AsyncMock(
+                return_value={
+                    "intent": "analysis",
+                    "codes": ["7203.T"],
+                    "strategy": None,
+                }
+            ),
+        ):
+            result = await dispatcher._try_nl_routing(
+                _make_message("7203.T", mentioned=True)
+            )
+
+        self.assertIsNotNone(result)
+        self.assertIn("暂不支持日股", result.text)
+        self.assertIn("does not currently support Japan stocks", result.text)
 
 
 class TestCommandDispatcherSyncCompatibility(unittest.TestCase):
