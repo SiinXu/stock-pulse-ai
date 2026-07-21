@@ -247,6 +247,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 <!-- New entry format: - [Type] Description (Type: Added/Changed/Fixed/Docs/Tests/Chore) -->
 <!-- Append each entry as one line at the end of this section; do not add category headings. -->
 - [Fixed] Made fork pull requests run PR Review static checks with a read-only token while skipping secret- and write-dependent review steps; same-repository pull requests retain the full advisory review flow.
+- [Added] Added configurable Agent tool, stage, and full-run guards with loop detection, stage failure isolation, and structured runtime events.
 
 ## [3.26.3] - 2026-07-15
 
