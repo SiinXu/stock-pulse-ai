@@ -20,7 +20,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import ExitStack
 from contextvars import ContextVar
 from datetime import date, datetime, timedelta, timezone
-from types import SimpleNamespace
+from types import FunctionType as _FunctionType, SimpleNamespace
 from typing import List, Dict, Any, Optional, Tuple, Callable
 
 import pandas as pd
@@ -146,6 +146,7 @@ _PIPELINE_COMPAT_EXPORTS = (
 
 # 防御性 guard：当实例绕过 __init__（如测试中 __new__）构造时，
 # double-check 初始化 _single_stock_notify_lock 仍然线程安全。
+_DAILY_MARKET_CONTEXT_SERVICE_LOCK_INIT_GUARD = threading.Lock()
 _PIPELINE_STAGE_RUNNER_INIT_GUARD = threading.Lock()
 _DEFER_PIPELINE_DELIVERY_OBSERVATION: ContextVar[bool] = ContextVar(
     "defer_pipeline_delivery_observation",
@@ -218,7 +219,7 @@ def _symbol_scope_lookup_values(code: str, market: str) -> List[str]:
     return values
 
 
-class StockAnalysisPipeline(_AnalysisStageMixin, _DeliveryStageMixin):
+class StockAnalysisPipeline(_DeliveryStageMixin):
     """
     股票分析主流程调度器
     
@@ -1740,3 +1741,63 @@ class StockAnalysisPipeline(_AnalysisStageMixin, _DeliveryStageMixin):
             reset_run_diagnostic_context(delivery_diag_token)
         
         return results
+
+
+def _clone_analysis_stage_descriptor(descriptor: Any) -> Any:
+    """Clone a stage descriptor with the legacy facade as its globals."""
+
+    descriptor_type = None
+    function = descriptor
+    if isinstance(descriptor, staticmethod):
+        descriptor_type = staticmethod
+        function = descriptor.__func__
+    elif isinstance(descriptor, classmethod):
+        descriptor_type = classmethod
+        function = descriptor.__func__
+
+    if not isinstance(function, _FunctionType):
+        raise TypeError("Analysis stage descriptor must wrap a Python function")
+
+    rebound = _FunctionType(
+        function.__code__,
+        globals(),
+        function.__name__,
+        function.__defaults__,
+        function.__closure__,
+    )
+    rebound.__kwdefaults__ = (
+        dict(function.__kwdefaults__) if function.__kwdefaults__ else None
+    )
+    rebound.__annotations__ = dict(function.__annotations__)
+    rebound.__dict__.update(function.__dict__)
+    rebound.__doc__ = function.__doc__
+    rebound.__module__ = __name__
+    rebound.__qualname__ = f"{StockAnalysisPipeline.__qualname__}.{function.__name__}"
+
+    if descriptor_type is not None:
+        return descriptor_type(rebound)
+    return rebound
+
+
+def _bind_analysis_stage_methods() -> Tuple[str, ...]:
+    """Bind every extracted analysis method back onto the legacy facade."""
+
+    bound_names: List[str] = []
+    for name, descriptor in vars(_AnalysisStageMixin).items():
+        function = (
+            descriptor.__func__
+            if isinstance(descriptor, (staticmethod, classmethod))
+            else descriptor
+        )
+        if name.startswith("__") or not isinstance(function, _FunctionType):
+            continue
+        setattr(
+            StockAnalysisPipeline,
+            name,
+            _clone_analysis_stage_descriptor(descriptor),
+        )
+        bound_names.append(name)
+    return tuple(bound_names)
+
+
+_ANALYSIS_STAGE_METHOD_NAMES = _bind_analysis_stage_methods()

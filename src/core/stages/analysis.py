@@ -2,7 +2,6 @@
 """Analysis and context stages for the stock analysis pipeline."""
 
 import logging
-import sys
 import threading
 import time
 from datetime import date, datetime, timedelta
@@ -16,10 +15,10 @@ from data_provider.realtime_types import ChipDistribution
 from data_provider.us_index_mapping import is_us_stock_code
 from src.analyzer import (
     AnalysisResult,
-    fill_price_position_if_needed as _fill_price_position_if_needed_impl,
+    fill_price_position_if_needed,
     normalize_chip_structure_availability,
     populate_decision_action_fields,
-    stabilize_decision_with_structure as _stabilize_decision_with_structure_impl,
+    stabilize_decision_with_structure,
 )
 from src.config import FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT
 from src.core.pipeline_stage_results import (
@@ -27,11 +26,11 @@ from src.core.pipeline_stage_results import (
     PipelineStageResult,
 )
 from src.core.trading_calendar import (
-    build_market_phase_context as _build_market_phase_context_impl,
-    get_effective_trading_date as _get_effective_trading_date_impl,
-    get_market_for_stock as _get_market_for_stock_impl,
-    get_market_now as _get_market_now_impl,
-    is_market_open as _is_market_open_impl,
+    build_market_phase_context,
+    get_effective_trading_date,
+    get_market_for_stock,
+    get_market_now,
+    is_market_open,
 )
 from src.daily_market_context_guardrail import apply_daily_market_context_guardrail
 from src.enums import ReportType
@@ -46,17 +45,17 @@ from src.report_language import (
     localize_trend_prediction,
     normalize_report_language,
 )
-from src.search_service import SearchService as _SearchServiceImpl
+from src.search_service import SearchService
 from src.services.daily_market_context import (
     DailyMarketContext,
-    DailyMarketContextService as _DailyMarketContextServiceImpl,
+    DailyMarketContextService,
     format_daily_market_context_prompt_section,
 )
 from src.services.market_hotspot_service import MarketHotspotService
 from src.services.market_structure_service import MarketStructureService
 from src.services.run_diagnostics import (
     PipelineStageObservation,
-    current_diagnostic_snapshot as _current_diagnostic_snapshot_impl,
+    current_diagnostic_snapshot,
     observe_pipeline_stage,
     record_llm_run,
     record_llm_run_started,
@@ -67,119 +66,6 @@ from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger("src.core.pipeline")
 _DAILY_MARKET_CONTEXT_SERVICE_LOCK_INIT_GUARD = threading.Lock()
-
-
-def _resolve_legacy_symbol(name: str, fallback: Any) -> Any:
-    """Resolve a symbol through the legacy pipeline patch surface."""
-
-    pipeline_module = sys.modules.get("src.core.pipeline")
-    return getattr(pipeline_module, name, fallback)
-
-
-class _LegacySymbolProxy:
-    """Forward calls and attributes through the legacy pipeline module."""
-
-    def __init__(self, name: str, fallback: Any):
-        """Store the legacy symbol name and its production fallback."""
-
-        self._name = name
-        self._fallback = fallback
-
-    def _resolve(self) -> Any:
-        """Return the currently active legacy symbol."""
-
-        return _resolve_legacy_symbol(self._name, self._fallback)
-
-    def __call__(self, *args, **kwargs):
-        """Invoke the currently active legacy symbol."""
-
-        return self._resolve()(*args, **kwargs)
-
-    def __getattr__(self, name: str) -> Any:
-        """Read an attribute from the currently active legacy symbol."""
-
-        return getattr(self._resolve(), name)
-
-
-def build_market_phase_context(*args, **kwargs):
-    """Call the legacy market-phase builder patch seam."""
-
-    resolver = _resolve_legacy_symbol(
-        "build_market_phase_context",
-        _build_market_phase_context_impl,
-    )
-    return resolver(*args, **kwargs)
-
-
-def current_diagnostic_snapshot(*args, **kwargs):
-    """Call the legacy diagnostic snapshot patch seam."""
-
-    resolver = _resolve_legacy_symbol(
-        "current_diagnostic_snapshot",
-        _current_diagnostic_snapshot_impl,
-    )
-    return resolver(*args, **kwargs)
-
-
-def fill_price_position_if_needed(*args, **kwargs):
-    """Call the legacy price-position patch seam."""
-
-    resolver = _resolve_legacy_symbol(
-        "fill_price_position_if_needed",
-        _fill_price_position_if_needed_impl,
-    )
-    return resolver(*args, **kwargs)
-
-
-def get_effective_trading_date(*args, **kwargs):
-    """Call the legacy effective-date patch seam."""
-
-    resolver = _resolve_legacy_symbol(
-        "get_effective_trading_date",
-        _get_effective_trading_date_impl,
-    )
-    return resolver(*args, **kwargs)
-
-
-def get_market_for_stock(*args, **kwargs):
-    """Call the legacy market-resolution patch seam."""
-
-    resolver = _resolve_legacy_symbol(
-        "get_market_for_stock",
-        _get_market_for_stock_impl,
-    )
-    return resolver(*args, **kwargs)
-
-
-def get_market_now(*args, **kwargs):
-    """Call the legacy market-clock patch seam."""
-
-    resolver = _resolve_legacy_symbol("get_market_now", _get_market_now_impl)
-    return resolver(*args, **kwargs)
-
-
-def is_market_open(*args, **kwargs):
-    """Call the legacy market-open patch seam."""
-
-    resolver = _resolve_legacy_symbol("is_market_open", _is_market_open_impl)
-    return resolver(*args, **kwargs)
-
-
-def stabilize_decision_with_structure(*args, **kwargs):
-    """Call the legacy decision-stabilization patch seam."""
-
-    resolver = _resolve_legacy_symbol(
-        "stabilize_decision_with_structure",
-        _stabilize_decision_with_structure_impl,
-    )
-    return resolver(*args, **kwargs)
-
-
-DailyMarketContextService = _LegacySymbolProxy(
-    "DailyMarketContextService",
-    _DailyMarketContextServiceImpl,
-)
-SearchService = _LegacySymbolProxy("SearchService", _SearchServiceImpl)
 
 
 class _AnalysisStageMixin:
@@ -2914,7 +2800,6 @@ class _AnalysisStageMixin:
         return df
 
 
-StockAnalysisPipeline = _LegacySymbolProxy(
-    "StockAnalysisPipeline",
-    _AnalysisStageMixin,
-)
+# Keep AST-preserved static self-references valid when the private source
+# container is inspected or invoked directly.
+StockAnalysisPipeline = _AnalysisStageMixin

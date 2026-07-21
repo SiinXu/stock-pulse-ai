@@ -123,3 +123,36 @@ def test_pipeline_legacy_entry_point_exposes_analysis_methods():
 
     assert pipeline_class.__module__ == "src.core.pipeline"
     assert all(callable(getattr(pipeline_class, name)) for name in EXPECTED_ANALYSIS_METHODS)
+
+
+def test_pipeline_analysis_methods_resolve_legacy_facade_globals(monkeypatch):
+    """Assert that every extracted method retains legacy global lookup semantics."""
+
+    pipeline_module = importlib.import_module("src.core.pipeline")
+    pipeline_class = pipeline_module.StockAnalysisPipeline
+    pipeline_globals = vars(pipeline_module)
+
+    assert pipeline_module._ANALYSIS_STAGE_METHOD_NAMES == EXPECTED_ANALYSIS_METHODS
+    for name in EXPECTED_ANALYSIS_METHODS:
+        descriptor = pipeline_class.__dict__[name]
+        function = (
+            descriptor.__func__
+            if isinstance(descriptor, (staticmethod, classmethod))
+            else descriptor
+        )
+        assert function.__globals__ is pipeline_globals
+        assert function.__module__ == "src.core.pipeline"
+        assert function.__qualname__ == f"StockAnalysisPipeline.{name}"
+
+    sentinel = object()
+    monkeypatch.setattr(
+        pipeline_module,
+        "populate_decision_action_fields",
+        lambda *args, **kwargs: sentinel,
+    )
+
+    assert pipeline_class._refresh_decision_action_for_final_result(
+        object(),
+        report_type="simple",
+        previous_operation_advice=None,
+    ) is sentinel
