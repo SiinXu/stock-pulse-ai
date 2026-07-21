@@ -75,6 +75,11 @@ _ENGLISH_AND_COMPARE_PAIR_PATTERN = re.compile(
     r"([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![a-zA-Z0-9])",
     re.IGNORECASE,
 )
+_ENGLISH_COMPARISON_LEFT_TOKEN = (
+    r"(?i:(?:[a-z]{1,5}(?:\.[a-z]{1,2})?|"
+    r"(?:sh|sz|ss|bj|hk)\.?\d+|"
+    r"\d+(?:\.(?:sh|sz|ss|bj|hk|us|t|ks|kq|tw|two))?))"
+)
 _EXPLICIT_SINGLE_TICKER_COMPARE_PATTERNS = (
     re.compile(
         r"(?<![a-zA-Z.])([A-Z]{1,5}(?:\.[A-Z]{1,2})?)\s*"
@@ -90,8 +95,14 @@ _EXPLICIT_SINGLE_TICKER_COMPARE_PATTERNS = (
         r"(?i:and|with)\b"
     ),
     re.compile(
-        r"(?i:\bcompar(?:e|ed))\b[^,.!?！？]{0,40}"
-        r"(?i:\b(?:and|with))\s+"
+        r"(?i:\bcompar(?:e|ed))\s+"
+        + _ENGLISH_COMPARISON_LEFT_TOKEN
+        + r"\s+(?i:and|with)\s+"
+        r"([A-Z]{1,5}(?:\.[A-Z]{1,2})?)(?![a-zA-Z0-9])",
+    ),
+    re.compile(
+        r"(?i:\bcompar(?:e|ed))\s+(?:(?i:it)\s+)?"
+        r"(?i:and|with)\s+"
         r"([A-Z]{1,5}(?:\.[A-Z]{1,2})?)(?![a-zA-Z0-9])",
     ),
 )
@@ -110,8 +121,14 @@ _EXPLICIT_LOWERCASE_COMPARE_TICKER_PATTERNS = (
         r"(?i:and|with)\b"
     ),
     re.compile(
-        r"(?i:\bcompar(?:e|ed))\b[^,.!?！？]{0,40}"
-        r"(?i:\b(?:and|with))\s+"
+        r"(?i:\bcompar(?:e|ed))\s+"
+        + _ENGLISH_COMPARISON_LEFT_TOKEN
+        + r"\s+(?i:and|with)\s+"
+        r"([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![a-zA-Z0-9])",
+    ),
+    re.compile(
+        r"(?i:\bcompar(?:e|ed))\s+(?:(?i:it)\s+)?"
+        r"(?i:and|with)\s+"
         r"([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![a-zA-Z0-9])",
     ),
 )

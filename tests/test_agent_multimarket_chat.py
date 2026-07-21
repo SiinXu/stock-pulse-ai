@@ -255,6 +255,11 @@ def test_uppercase_ticker_in_letter_comparison_slot(stock_code: str) -> None:
         ("compare 600519 and ON", {"600519", "ON"}),
         ("compare ON and 600519", {"600519", "ON"}),
         ("compare 600519 and pltr", {"600519", "PLTR"}),
+        ("compare 00700.HK and F", {"HK00700", "F"}),
+        ("compare 00700.HK with F", {"HK00700", "F"}),
+        ("compare 00700.HK and T", {"HK00700", "T"}),
+        ("compare 00700.HK and ON", {"HK00700", "ON"}),
+        ("compare 00700.HK and pltr", {"HK00700", "PLTR"}),
         ("compare AAPL with RSI", {"AAPL", "RSI"}),
     ],
 )
@@ -267,6 +272,17 @@ def test_uppercase_ticker_in_mixed_comparison_slot(
     assert resolution.effective_context == {}
     assert resolution.stock_scope.mode == "compare"
     assert resolution.stock_scope.allowed_stock_codes == expected_codes
+
+
+def test_dotted_hk_comparison_replaces_stale_active_symbol() -> None:
+    resolution = resolve_stock_scope(
+        "compare 00700.HK and F",
+        {"stock_code": "AAPL", "stock_name": "Apple"},
+    )
+
+    assert resolution.effective_context == {}
+    assert resolution.stock_scope.mode == "compare"
+    assert resolution.stock_scope.allowed_stock_codes == {"HK00700", "F"}
 
 
 def test_comparison_prose_does_not_authorize_lowercase_nouns() -> None:
