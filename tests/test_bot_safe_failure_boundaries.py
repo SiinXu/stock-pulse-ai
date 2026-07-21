@@ -219,6 +219,7 @@ def test_command_failures_return_only_stable_public_messages(caplog) -> None:
     assert analysis_duplicate_response.text == (
         "⏳ **该股票正在分析中**\n\n"
         "• 股票代码: `600519`\n\n"
+        "• 市场 / Market: A 股 (CN) / A-share\n\n"
         "请等待当前分析完成后再试。"
     )
     assert analysis_exception_response.text == "❌ 错误：分析失败，请稍后重试"

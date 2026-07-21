@@ -152,15 +152,17 @@ class BotCommand(ABC):
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `/analyze` | Analyze a specific stock | `/analyze AAPL` or `/analyze 600519` |
-| `/ask` | Single-turn question about a stock or the market | `/ask what is RSI for AAPL` |
+| `/analyze` | Analyze an A-share, Hong Kong, or US stock | `/analyze 600519`, `/analyze HK00700`, or `/analyze AAPL` |
+| `/ask` | Analyze one or more stocks with Agent skills | `/ask HK00700` or `/ask 600519,AAPL trend` |
 | `/batch` | Batch-analyze your configured watchlist | `/batch` |
 | `/chat` | Multi-turn strategy chat (maintains conversation context) | `/chat` |
 | `/market` | Market review (A-shares / US stocks) | `/market` |
 | `/help` | Show help text | `/help` |
 | `/status` | Show system status | `/status` |
 
-> **Stock code formats:** A-shares use 6-digit codes (e.g. `600519`); HK stocks prefix `hk` (e.g. `hk00700`); US stocks use ticker symbols (e.g. `AAPL`, `TSLA`).
+> **Stock code formats:** A-shares accept 6-digit codes and common exchange forms (for example `600519` or `SH600519`). Hong Kong stocks accept a 5-digit code, an `HK` prefix, or a `.HK` suffix (for example `00700`, `HK00700`, or `00700.HK`) and are routed as canonical `HK00700`. US stocks use ticker symbols such as `AAPL` or `BRK.B`. `/analyze` and `/ask` return bilingual, actionable format guidance when a symbol is invalid or belongs to a market that these Bot commands do not currently support.
+
+`/analyze` continues to submit through the shared `AnalysisTaskQueue`; market normalization does not create a separate Bot task lifecycle or change Task IDs, in-flight deduplication, statuses, or notification reply targets.
 
 ---
 

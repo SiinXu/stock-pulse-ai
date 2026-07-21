@@ -10,14 +10,18 @@ Usage:
 """
 
 import logging
-import re
 import time
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
 from bot.commands.base import BotCommand
 from bot.models import BotMessage, BotResponse
-from data_provider.base import canonical_stock_code
+from bot.stock_symbols import (
+    BotStockSymbolError,
+    is_recognized_stock_symbol,
+    parse_bot_stock_symbol,
+    supported_stock_formats_message,
+)
 from src.agent.public_contract import (
     AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
     AGENT_CHAT_FAILURE_MESSAGE,
@@ -50,17 +54,13 @@ class AskCommand(BotCommand):
 
     @property
     def usage(self) -> str:
-        return "/ask <股票代码[,代码2,...]> [技能名称]"
+        return "/ask <600519|HK00700|AAPL>[,代码2,...] [技能名称]"
 
     def _merge_code_args(self, args: List[str]) -> tuple[str, List[str]]:
         """Merge stock code arguments separated by commas or explicit ``vs`` markers."""
         if not args:
             return "", []
 
-        code_like = re.compile(
-            r"^,?(\d{6}|hk\d{5}|[A-Za-z]{1,5}(\.[A-Za-z]{1,2})?),?$",
-            re.IGNORECASE,
-        )
         raw_codes_parts = [args[0]]
         rest_args = list(args[1:])
 
@@ -68,7 +68,11 @@ class AskCommand(BotCommand):
             token = rest_args[0]
             prev = raw_codes_parts[-1].rstrip()
 
-            if token.lower() == "vs" and len(rest_args) > 1 and code_like.match(rest_args[1]):
+            if (
+                token.lower() == "vs"
+                and len(rest_args) > 1
+                and is_recognized_stock_symbol(rest_args[1])
+            ):
                 raw_codes_parts.append(rest_args[1])
                 rest_args = rest_args[2:]
                 continue
@@ -79,7 +83,7 @@ class AskCommand(BotCommand):
                 or token.lstrip().startswith(",")
                 or token.lstrip().startswith("，")
             )
-            if code_like.match(token) and has_comma_separator:
+            if is_recognized_stock_symbol(token) and has_comma_separator:
                 raw_codes_parts.append(token)
                 rest_args = rest_args[1:]
                 continue
@@ -92,34 +96,24 @@ class AskCommand(BotCommand):
 
     def _parse_stock_codes(self, raw: str) -> List[str]:
         """Parse one or more stock codes from the first argument."""
-        parts = [p.strip().upper() for p in raw.replace("，", ",").split(",") if p.strip()]
-        return [canonical_stock_code(part) for part in parts]
-
-    def _validate_single_code(self, code: str) -> Optional[str]:
-        """Validate a single stock code format."""
-        normalized = code.upper()
-        is_a_stock = re.match(r"^\d{6}$", normalized)
-        is_hk_stock = re.match(r"^HK\d{5}$", normalized)
-        is_us_stock = re.match(r"^[A-Z]{1,5}(\.[A-Z]{1,2})?$", normalized)
-
-        if not (is_a_stock or is_hk_stock or is_us_stock):
-            return f"无效的股票代码: {normalized}（A股6位数字 / 港股HK+5位数字 / 美股1-5个字母）"
-        return None
+        parts = [p.strip() for p in raw.replace("，", ",").split(",") if p.strip()]
+        return [parse_bot_stock_symbol(part).code for part in parts]
 
     def validate_args(self, args: List[str]) -> Optional[str]:
         """Validate arguments."""
         if not args:
-            return "请输入股票代码。用法: /ask <股票代码[,代码2,...]> [技能名称]"
+            return (
+                "请输入股票代码 / Please provide at least one stock symbol.\n"
+                f"{supported_stock_formats_message()}"
+            )
 
         raw_code_str, _ = self._merge_code_args(args)
-        codes = self._parse_stock_codes(raw_code_str)
+        try:
+            codes = self._parse_stock_codes(raw_code_str)
+        except BotStockSymbolError as exc:
+            return str(exc)
         if not codes:
             return "请输入至少一个有效的股票代码"
-
-        for code in codes:
-            error = self._validate_single_code(code)
-            if error:
-                return error
 
         if len(codes) > 5:
             return "一次最多分析 5 只股票"
@@ -234,7 +228,10 @@ class AskCommand(BotCommand):
             )
 
         raw_code_str, remaining_args = self._merge_code_args(args)
-        codes = self._parse_stock_codes(raw_code_str)
+        try:
+            codes = self._parse_stock_codes(raw_code_str)
+        except BotStockSymbolError as exc:
+            return BotResponse.error_response(str(exc))
         skill_id = self._parse_skill(["placeholder"] + remaining_args) if remaining_args else self._get_default_skill_id()
         skill_text = " ".join(remaining_args).strip()
 

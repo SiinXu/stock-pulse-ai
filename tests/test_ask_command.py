@@ -156,6 +156,30 @@ class TestAskCommandMultiStock(unittest.TestCase):
         self.assertEqual(raw_code_str, "600519,000858")
         self.assertEqual(remaining_args, ["波浪理论"])
 
+    def test_parse_stock_codes_canonicalizes_hk_and_us_symbols(self):
+        command = AskCommand()
+
+        codes = command._parse_stock_codes("00700.HK,aapl")
+
+        self.assertEqual(codes, ["HK00700", "AAPL"])
+
+    def test_merge_code_args_recognizes_hk_suffix_after_vs(self):
+        command = AskCommand()
+
+        raw_code_str, remaining_args = command._merge_code_args(
+            ["600519", "vs", "00700.HK", "趋势"]
+        )
+
+        self.assertEqual(raw_code_str, "600519,00700.HK")
+        self.assertEqual(remaining_args, ["趋势"])
+
+    def test_validate_args_rejects_known_unsupported_market(self):
+        message = AskCommand().validate_args(["7203.T"])
+
+        self.assertIsNotNone(message)
+        self.assertIn("暂不支持日股", message)
+        self.assertIn("does not currently support Japan stocks", message)
+
     def test_build_portfolio_section_reads_assessment(self):
         command = AskCommand()
         results = {
