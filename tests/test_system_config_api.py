@@ -778,6 +778,50 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.assertIn("STOCK_LIST=600519,300750", env_content)
         self.assertIn("GEMINI_API_KEY=new-secret-value", env_content)
 
+    def test_put_config_rejects_admin_auth_toggle(self) -> None:
+        current = system_config.get_system_config(include_schema=False, service=self.service).model_dump()
+
+        with self.assertRaises(HTTPException) as context:
+            system_config.update_system_config(
+                request=UpdateSystemConfigRequest(
+                    config_version=current["config_version"],
+                    reload_now=False,
+                    items=[{"key": "ADMIN_AUTH_ENABLED", "value": "false"}],
+                ),
+                service=self.service,
+            )
+
+        self.assertEqual(context.exception.status_code, 400)
+        self.assertEqual(context.exception.detail["error"], "validation_failed")
+        self.assertEqual(
+            context.exception.detail["issues"][0]["code"],
+            "auth_settings_endpoint_required",
+        )
+        self.assertEqual(self.manager.read_config_map()["ADMIN_AUTH_ENABLED"], "true")
+
+    def test_put_config_rejects_noncanonical_admin_auth_key_aliases(self) -> None:
+        for key in ("ADMIN_AUTH_ENABLED ", "export ADMIN_AUTH_ENABLED"):
+            with self.subTest(key=key):
+                current = system_config.get_system_config(
+                    include_schema=False,
+                    service=self.service,
+                ).model_dump()
+
+                with self.assertRaises(HTTPException) as context:
+                    system_config.update_system_config(
+                        request=UpdateSystemConfigRequest(
+                            config_version=current["config_version"],
+                            reload_now=False,
+                            items=[{"key": key, "value": "false"}],
+                        ),
+                        service=self.service,
+                    )
+
+                self.assertEqual(context.exception.status_code, 400)
+                self.assertEqual(context.exception.detail["error"], "validation_failed")
+                self.assertEqual(context.exception.detail["issues"][0]["code"], "invalid_key")
+                self.assertEqual(self.manager.read_config_map()["ADMIN_AUTH_ENABLED"], "true")
+
     def test_put_config_escapes_custom_webhook_template_placeholders(self) -> None:
         template = '{"title":$title_json,"content":$content_json}'
         current = system_config.get_system_config(
@@ -986,6 +1030,45 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.assertIn("STOCK_LIST=300750\n", env_content)
         self.assertIn("CUSTOM_NOTE=config backup\n", env_content)
         self.assertIn("GEMINI_API_KEY=secret-key-value\n", env_content)
+
+    def test_import_system_config_rejects_admin_auth_toggle(self) -> None:
+        current = system_config.get_system_config(include_schema=False, service=self.service).model_dump()
+
+        with self.assertRaises(HTTPException) as context:
+            system_config.import_system_config(
+                request_obj=self._build_request(),
+                request=ImportSystemConfigRequest(
+                    config_version=current["config_version"],
+                    content="ADMIN_AUTH_ENABLED=false\n",
+                    reload_now=False,
+                ),
+                service=self.service,
+            )
+
+        self.assertEqual(context.exception.status_code, 400)
+        self.assertEqual(context.exception.detail["error"], "validation_failed")
+        self.assertEqual(
+            context.exception.detail["issues"][0]["code"],
+            "auth_settings_endpoint_required",
+        )
+        self.assertEqual(self.manager.read_config_map()["ADMIN_AUTH_ENABLED"], "true")
+
+    def test_import_system_config_allows_unchanged_admin_auth_setting(self) -> None:
+        current = system_config.get_system_config(include_schema=False, service=self.service).model_dump()
+
+        payload = system_config.import_system_config(
+            request_obj=self._build_request(),
+            request=ImportSystemConfigRequest(
+                config_version=current["config_version"],
+                content="ADMIN_AUTH_ENABLED=true\nSTOCK_LIST=300750\n",
+                reload_now=False,
+            ),
+            service=self.service,
+        ).model_dump()
+
+        self.assertTrue(payload["success"])
+        self.assertEqual(self.manager.read_config_map()["ADMIN_AUTH_ENABLED"], "true")
+        self.assertEqual(self.manager.read_config_map()["STOCK_LIST"], "300750")
 
     def test_import_export_system_config_preserves_generation_backend_keys(self) -> None:
         current = system_config.get_system_config(include_schema=False, service=self.service).model_dump()

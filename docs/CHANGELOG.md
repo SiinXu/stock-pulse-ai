@@ -239,6 +239,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Aligned the home stock-bar and history-list row checkboxes with the select-all column (removing the centered offset and negative margin) and reveal the per-item delete button only on hover or keyboard focus, staying always visible on touch devices without hover, matching the Chat session list.
 - [Fixed] Removed the `max-w-6xl` cap on the AlphaSift screening page content so it fills the viewport like the other workspace pages.
 - [Fixed] Corrected dark-mode Chat controls, deep-research layout, screening parameter rows, portfolio error details, and Decision Signals action and filter alignment.
+- [Fixed] Required current-password reauthentication before disabling administrator authentication and blocked generic configuration or non-canonical key aliases from changing the auth toggle.
+- [Changed] Split pipeline delivery, rendering, and dispatch stages into a focused module while preserving the `src.core.pipeline` compatibility surface.
+- [Changed] Added configurable daily-provider health scoring, serialized circuit admission, redacted failover metadata, and half-open recovery without changing market capability boundaries.
+- [Changed] Split pipeline analysis, context assembly, and result normalization into a focused stage module while preserving the legacy entry point.
 <!-- New entry format: - [Type] Description (Type: Added/Changed/Fixed/Docs/Tests/Chore) -->
 <!-- Append each entry as one line at the end of this section; do not add category headings. -->
 

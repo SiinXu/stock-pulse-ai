@@ -215,7 +215,8 @@ async def auth_status(request: Request):
     description=(
         "Enable or disable password login. When enabling without an existing password, "
         "password + passwordConfirm are required. When re-enabling with a stored password, "
-        "currentPassword is required."
+        "currentPassword is required. Disabling authentication always requires currentPassword, "
+        "even when the request has a valid session cookie."
     ),
 )
 async def auth_update_settings(request: Request, body: AuthSettingsRequest):
@@ -272,19 +273,15 @@ async def auth_update_settings(request: Request, body: AuthSettingsRequest):
                 clear_rate_limit(ip)
     else:
         if current_enabled:
-            cookie_val = request.cookies.get(COOKIE_NAME)
-            is_valid_session = cookie_val and verify_session(cookie_val)
-
-            if not is_valid_session:
-                if not current_password:
-                    return _auth_error(400, "current_required", "关闭认证前请输入当前密码")
-                ip = get_client_ip(request)
-                if not check_rate_limit(ip):
-                    return _auth_error(429, "rate_limited", "Too many failed attempts. Please try again later.")
-                if not verify_stored_password(current_password):
-                    record_login_failure(ip)
-                    return _auth_error(401, "invalid_password", "当前密码错误")
-                clear_rate_limit(ip)
+            if not current_password:
+                return _auth_error(400, "current_required", "关闭认证前请输入当前密码")
+            ip = get_client_ip(request)
+            if not check_rate_limit(ip):
+                return _auth_error(429, "rate_limited", "Too many failed attempts. Please try again later.")
+            if not verify_stored_password(current_password):
+                record_login_failure(ip)
+                return _auth_error(401, "invalid_password", "当前密码错误")
+            clear_rate_limit(ip)
 
     if target_enabled != current_enabled:
         if not _apply_auth_enabled(target_enabled, request=request):
