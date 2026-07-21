@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import threading
 import time
@@ -292,7 +293,51 @@ def test_empty_and_none_are_health_failures_without_opening_circuit() -> None:
         assert recovered["error_rate"] == pytest.approx(2 / 3, abs=0.0001)
 
 
-def test_fallback_metadata_skips_open_intermediate_provider() -> None:
+@pytest.mark.parametrize("probe_outcome", [pd.DataFrame(), None], ids=["empty", "none"])
+def test_unusable_half_open_probe_returns_to_cooldown(probe_outcome: object) -> None:
+    clock = _Clock()
+    breaker = CircuitBreaker(
+        failure_threshold=1,
+        cooldown_seconds=30.0,
+        clock=clock,
+    )
+    primary = _SequencedProvider(
+        "EfinanceFetcher",
+        0,
+        [TimeoutError("down"), probe_outcome, _daily_frame()],
+    )
+    backup = _SequencedProvider(
+        "TencentFetcher",
+        1,
+        [_daily_frame(), _daily_frame(), _daily_frame()],
+    )
+    manager = DataFetcherManager(fetchers=[primary, backup])
+
+    with patch.object(DataFetcherManager, "_daily_source_health", breaker):
+        _, source = manager.get_daily_data("600519")
+        assert source == "TencentFetcher"
+
+        clock.advance(30.0)
+        _, source = manager.get_daily_data("600519")
+        assert source == "TencentFetcher"
+
+        key = DataFetcherManager._daily_health_key(primary, "cn")
+        degraded = breaker.get_snapshot(key)[key]
+        assert degraded["state"] == CircuitBreaker.OPEN
+        assert degraded["consecutive_failures"] == 1
+        assert degraded["error_rate"] == 1.0
+
+        _, source = manager.get_daily_data("600519")
+        assert source == "TencentFetcher"
+        assert primary.calls == 2
+
+        clock.advance(30.0)
+        _, source = manager.get_daily_data("600519")
+        assert source == "EfinanceFetcher"
+        assert breaker.get_status()[key] == CircuitBreaker.CLOSED
+
+
+def test_fallback_metadata_and_log_skip_open_intermediate_provider(caplog) -> None:
     breaker = CircuitBreaker(failure_threshold=1, cooldown_seconds=60.0)
     primary = _SequencedProvider("EfinanceFetcher", 0, [TimeoutError("down")])
     intermediate = _SequencedProvider("TencentFetcher", 1, [_daily_frame()])
@@ -301,6 +346,7 @@ def test_fallback_metadata_skips_open_intermediate_provider() -> None:
     intermediate_key = DataFetcherManager._daily_health_key(intermediate, "cn")
     breaker.record_failure(intermediate_key, error="already_open")
 
+    caplog.set_level(logging.INFO, logger="data_provider.base")
     with patch.object(DataFetcherManager, "_daily_source_health", breaker):
         token = activate_run_diagnostic_context(trace_id="trace-open-intermediate")
         try:
@@ -315,6 +361,8 @@ def test_fallback_metadata_skips_open_intermediate_provider() -> None:
         "AkshareFetcher",
         "AkshareFetcher",
     ]
+    assert "[EfinanceFetcher] -> [AkshareFetcher]" in caplog.text
+    assert "[EfinanceFetcher] -> [TencentFetcher]" not in caplog.text
 
 
 def test_us_fallback_metadata_skips_unconfigured_route_tokens() -> None:
@@ -363,3 +411,19 @@ def test_environment_policy_can_disable_circuit_without_disabling_health() -> No
         assert snapshot["circuit_enabled"] is False
         assert snapshot["average_latency_ms"] == 500.0
         assert "must-not-be-stored" not in str(snapshot)
+
+
+@pytest.mark.parametrize("configured_value", ["nan", "inf", "-inf"])
+def test_non_finite_cooldown_configuration_uses_default(configured_value: str) -> None:
+    breaker = CircuitBreaker(cooldown_seconds=12.5)
+    provider = _SequencedProvider("EfinanceFetcher", 0, [_daily_frame()])
+
+    with patch.object(DataFetcherManager, "_daily_source_health", breaker):
+        with patch.dict(
+            os.environ,
+            {"PROVIDER_CIRCUIT_COOLDOWN_SECONDS": configured_value},
+            clear=False,
+        ):
+            DataFetcherManager(fetchers=[provider])
+
+    assert breaker.cooldown_seconds == 300.0

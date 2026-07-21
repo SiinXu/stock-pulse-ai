@@ -537,6 +537,16 @@ class CircuitBreaker:
             state = self._get_state_locked(source)
             self._record_observation_locked(state, success=False, latency_ms=latency_ms)
             state["last_failure_time"] = self._clock()
+
+            if self.enabled and state["state"] == self.HALF_OPEN:
+                state["state"] = self.OPEN
+                state["half_open_calls"] = 0
+                logger.info(
+                    "provider_circuit event=half_open_quality_failed source=%s",
+                    source,
+                )
+                return
+
             state["state"] = self.CLOSED
             state["failures"] = 0
             state["half_open_calls"] = 0

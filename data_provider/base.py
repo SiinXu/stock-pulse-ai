@@ -81,7 +81,7 @@ def _read_non_negative_float_env(name: str, default: float) -> float:
     except ValueError:
         logger.warning("Invalid numeric configuration name=%s; using default", name)
         return default
-    if value < 0:
+    if not np.isfinite(value) or value < 0:
         logger.warning("Out-of-range numeric configuration name=%s; using default", name)
         return default
     return value
@@ -822,10 +822,8 @@ class DataFetcherManager:
             if not self._daily_source_health.is_available(health_key):
                 self._mark_daily_health_recorded(health_key)
                 logger.info(
-                    "provider_health event=circuit_skip_after_queue data_type=daily_data "
-                    "market=%s provider=%s",
-                    market,
-                    fetcher.name,
+                    "provider_health event=circuit_skip_after_queue data_type=daily_data provider=%s",
+                    sanitize_diagnostic_text(fetcher.name, max_length=120),
                 )
                 raise CircuitOpenError(
                     f"[{fetcher.name}] provider circuit is in cooldown"
@@ -1767,7 +1765,7 @@ class DataFetcherManager:
                 if df is not None and df.empty:
                     self._record_daily_source_success(fetcher, market)
 
-            except Exception as e:
+            except Exception as e:  # broad-exception: fallback_recorded - safe provider-run and log precede failover
                 error_type, error_reason = summarize_exception(e)
                 error_msg = f"[{fetcher.name}] ({error_type}) {error_reason}"
                 duration_ms = int((time.time() - attempt_start) * 1000)
@@ -1800,9 +1798,13 @@ class DataFetcherManager:
                     "data_provider_daily_data_attempt_failed",
                 )
                 errors.append(error_msg)
-                if attempt < total_fetchers:
-                    next_fetcher = fetchers[attempt]
-                    logger.info(f"[数据源切换] {stock_code}: [{fetcher.name}] -> [{next_fetcher.name}]")
+                if fallback_to is not None:
+                    logger.info(
+                        "[数据源切换] %s: [%s] -> [%s]",
+                        stock_code,
+                        fetcher.name,
+                        fallback_to,
+                    )
                 # 继续尝试下一个数据源
                 continue
         
