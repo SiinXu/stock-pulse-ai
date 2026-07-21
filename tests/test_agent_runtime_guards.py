@@ -20,12 +20,13 @@ from src.agent.protocols import (
     StageResult,
     StageStatus,
 )
-from src.agent.runner import run_agent_loop
+from src.agent.runner import _execute_tools, run_agent_loop
 from src.agent.runtime.guards import (
     RuntimeGuardPolicy,
     StageFailurePolicy,
     log_runtime_guard_event,
 )
+from src.agent.runtime.tool_session import BoundToolSession
 from src.agent.runtime_facts import DegradationBoundary
 from src.agent.tools.registry import ToolDefinition, ToolParameter, ToolRegistry
 
@@ -311,6 +312,37 @@ def test_cached_completion_claim_wins_before_future_publication(monkeypatch):
     assert result.tool_calls_log[0]["cached"] is False
     assert result.tool_calls_log[1]["cached"] is True
     assert "timeout" not in result.tool_calls_log[1]
+
+
+def test_rejected_completion_claim_wins_before_future_publication(monkeypatch):
+    handler_calls = []
+    registry = _echo_registry(
+        lambda message: handler_calls.append(message) or {"echo": message}
+    )
+    session = BoundToolSession(
+        registry,
+        execution_id="rejected-completion",
+        allowed_tools=["echo"],
+        max_tool_calls=0,
+        enforce_access_policy=False,
+    )
+    tool_calls_log = []
+    monkeypatch.setattr("src.agent.runner.ThreadPoolExecutor", _InlineExecutor)
+
+    results = _execute_tools(
+        [ToolCall(id="rejected", name="echo", arguments={"message": "blocked"})],
+        session,
+        step=1,
+        progress_callback=None,
+        tool_calls_log=tool_calls_log,
+        tool_wait_timeout_seconds=1.0,
+    )
+
+    assert handler_calls == []
+    assert len(results) == 1
+    assert tool_calls_log[0]["success"] is False
+    assert "timeout" not in tool_calls_log[0]
+    assert "budget_exhausted" in results[0]["result_str"]
 
 
 def test_parallel_completion_claims_win_before_batch_publication(monkeypatch):

@@ -298,6 +298,17 @@ class BoundToolSession:
                                 "dispatch_guard returned without claiming the tool call"
                             )
             if rejection is not None:
+                completion_rejection = self._claim_completion_locked(
+                    completion_guard,
+                )
+                if completion_rejection is not None:
+                    return self._drop_late_result_locked(
+                        tool_name=tool_name,
+                        arguments=arguments,
+                        started_at=started_at,
+                        call_context=call_context,
+                        completion_rejection=completion_rejection,
+                    )
                 return self._reject_locked(
                     tool_name=tool_name,
                     arguments=arguments,
