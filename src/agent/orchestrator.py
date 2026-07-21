@@ -782,6 +782,17 @@ class AgentOrchestrator:
                 else None
             )
             if remaining_timeout is not None and remaining_timeout <= 0:
+                per_symbol_results.extend(
+                    (
+                        pending_code,
+                        OrchestratorResult(
+                            success=False,
+                            error="Comparison timeout exhausted before analysis.",
+                            timed_out=True,
+                        ),
+                    )
+                    for pending_code in stock_codes[len(per_symbol_results):]
+                )
                 return self._synthesize_multi_symbol_chat(
                     message=message,
                     market_context=market_context,

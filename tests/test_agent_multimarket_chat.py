@@ -118,6 +118,13 @@ def test_first_chat_turn_creates_canonical_stock_scope_without_context(
         "analyze HK600519",
         "analyze 00700.SH",
         "analyze 600519.HK",
+        "analyze SH600519X",
+        "analyze 600519HK",
+        "analyze 600519.HKX",
+        "analyze A600519",
+        "analyze order600519x",
+        "analyze HK00700X",
+        "analyze 00700SH",
     ],
 )
 def test_invalid_exchange_qualified_token_is_not_reinterpreted(
@@ -141,6 +148,19 @@ def test_bare_collision_ticker_creates_explicit_scope(stock_code: str) -> None:
     assert resolution.stock_scope.allowed_stock_codes == {stock_code}
 
 
+@pytest.mark.parametrize("stock_code", ["pltr", "shop", "uber", "crm"])
+def test_bare_indexed_lowercase_ticker_creates_scope(stock_code: str) -> None:
+    resolution = resolve_stock_scope(stock_code, None)
+    expected_code = stock_code.upper()
+
+    assert resolution.effective_context == {
+        "stock_code": expected_code,
+        "stock_name": "",
+    }
+    assert resolution.stock_scope.mode == "switch"
+    assert resolution.stock_scope.allowed_stock_codes == {expected_code}
+
+
 @pytest.mark.parametrize(
     ("message", "expected_code"),
     [
@@ -155,6 +175,9 @@ def test_bare_collision_ticker_creates_explicit_scope(stock_code: str) -> None:
         ("look at aapl", "AAPL"),
         ("review brk.b", "BRK.B"),
         ("look at aapl.us", "AAPL.US"),
+        ("analyze pltr", "PLTR"),
+        ("review shop earnings", "SHOP"),
+        ("look at uber valuation", "UBER"),
     ],
 )
 def test_explicit_command_slot_allows_trailing_analysis_prose(
@@ -166,6 +189,17 @@ def test_explicit_command_slot_allows_trailing_analysis_prose(
     assert resolution.effective_context["stock_code"] == expected_code
     assert resolution.stock_scope.mode == "switch"
     assert resolution.stock_scope.allowed_stock_codes == {expected_code}
+
+
+def test_lowercase_command_slot_fails_closed_without_stock_index() -> None:
+    with patch(
+        "src.agent.stock_scope.get_stock_name_index_map",
+        return_value={},
+    ):
+        resolution = resolve_stock_scope("analyze pltr", None)
+
+    assert resolution.effective_context == {}
+    assert resolution.stock_scope is None
 
 
 def test_first_chat_turn_builds_cross_market_compare_scope() -> None:
@@ -186,6 +220,7 @@ def test_first_chat_turn_builds_cross_market_compare_scope() -> None:
         ("比较 F 和 00700.HK", {"F", "HK00700"}),
         ("compare 600519 and T", {"600519", "T"}),
         ("compare 600519 and t", {"600519", "T"}),
+        ("compare pltr and aapl", {"PLTR", "AAPL"}),
         ("compare SH and AAPL", {"SH", "AAPL"}),
         ("比较 BJ 和 AAPL", {"BJ", "AAPL"}),
     ],
@@ -219,6 +254,7 @@ def test_uppercase_ticker_in_letter_comparison_slot(stock_code: str) -> None:
         ("compare HK00700 and BJ", {"HK00700", "BJ"}),
         ("compare 600519 and ON", {"600519", "ON"}),
         ("compare ON and 600519", {"600519", "ON"}),
+        ("compare 600519 and pltr", {"600519", "PLTR"}),
         ("compare AAPL with RSI", {"AAPL", "RSI"}),
     ],
 )
@@ -317,6 +353,7 @@ def test_english_compare_with_adds_to_the_active_symbol_scope() -> None:
         ("compare it with VS", "VS"),
         ("compare with ON", "ON"),
         ("compare it with ON", "ON"),
+        ("compare with crm", "CRM"),
     ],
 )
 def test_active_compare_with_accepts_uppercase_ticker_slot(
@@ -363,14 +400,17 @@ def test_active_explicit_vs_ticker_switches_instead_of_comparing(
 
 
 @pytest.mark.parametrize(
-    "message",
+    ("message", "expected_code"),
     [
-        "AAPL versus MSFT",
-        "compared with MSFT",
+        ("AAPL versus MSFT", "MSFT"),
+        ("compared with MSFT", "MSFT"),
+        ("AAPL VS TSLA", "TSLA"),
+        ("AAPL Vs TSLA", "TSLA"),
     ],
 )
 def test_english_comparison_variants_use_active_symbol(
     message: str,
+    expected_code: str,
 ) -> None:
     resolution = resolve_stock_scope(
         message,
@@ -382,7 +422,7 @@ def test_english_comparison_variants_use_active_symbol(
         "stock_name": "Apple",
     }
     assert resolution.stock_scope.mode == "compare"
-    assert resolution.stock_scope.allowed_stock_codes == {"AAPL", "MSFT"}
+    assert resolution.stock_scope.allowed_stock_codes == {"AAPL", expected_code}
 
 
 @pytest.mark.parametrize("message", ["analyze AAPL", "switch to aapl"])
@@ -1068,6 +1108,9 @@ def test_multi_agent_compare_shares_one_runtime_budget() -> None:
     assert result.timed_out is True
     assert "逐标的分析" in result.content
     assert "AAPL" in result.content
+    assert "## HK00700" in result.content
+    assert "不可用" in result.content
+    assert "Comparison timeout exhausted before analysis." in result.content
     adapter.call_with_tools.assert_not_called()
 
 

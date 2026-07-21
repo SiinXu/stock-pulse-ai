@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Set
 
-from src.data.stock_mapping import STOCK_NAME_MAP
+from src.data.stock_index_loader import get_stock_name_index_map
 from src.services.stock_code_utils import canonicalize_analysis_stock_code
 
 
@@ -30,8 +30,11 @@ SWITCH_CLEANUP_KEYS = {
 }
 
 _STRONG_COMPARE_PATTERN = re.compile(
-    r"比较|对比|和[^，。,.!?！？]{0,40}比|"
-    r"(?<=\S)\s+(?:vs\.?|(?i:versus))\s+(?=\S)",
+    r"比较|对比|和[^，。,.!?！？]{0,40}比"
+)
+_VS_COMPARE_PATTERN = re.compile(
+    r"(?<=\S)\s+(?P<operator>vs\.?|versus)\s+(?=\S)",
+    re.IGNORECASE,
 )
 _ENGLISH_COMPARE_HINT_PATTERN = re.compile(
     r"\bcompar(?:e|ed)\b|\bversus\b",
@@ -235,8 +238,7 @@ def _append_lowercase_slot_candidate(
     normalized = _normalize_stock_code(candidate)
     if not normalized:
         return
-    base = candidate.split(".", 1)[0]
-    if "." not in candidate and len(base) > 1 and normalized not in STOCK_NAME_MAP:
+    if "." not in candidate and normalized not in get_stock_name_index_map():
         return
     _append_candidate(candidates, candidate, text)
 
@@ -249,6 +251,30 @@ def _is_explicit_command_slot(text: str, match: re.Match[str]) -> bool:
         token in _ALWAYS_DENIED_TICKER_CANDIDATES
         and _INDICATOR_CONTEXT_PATTERN.search(trailing_text)
     )
+
+
+def _is_strong_compare_message(text: str) -> bool:
+    """Distinguish comparison operators from an explicit ``VS`` ticker slot."""
+    if _STRONG_COMPARE_PATTERN.search(text):
+        return True
+
+    command_spans = {
+        match.span(1)
+        for pattern in (
+            _ENGLISH_EXPLICIT_TICKER_PATTERN,
+            _ENGLISH_LOWERCASE_COMMAND_TICKER_PATTERN,
+            _CJK_EXPLICIT_TICKER_PATTERN,
+        )
+        for match in pattern.finditer(text)
+    }
+    for match in _VS_COMPARE_PATTERN.finditer(text):
+        if (
+            match.group("operator").rstrip(".").upper() == "VS"
+            and match.span("operator") in command_spans
+        ):
+            continue
+        return True
+    return False
 
 
 def _is_spaced_exchange_affix(
@@ -279,8 +305,11 @@ def extract_stock_codes(text: str) -> List[str]:
         _append_candidate(candidates, match.group(0), text)
 
     for pattern, flags in (
-        (r"(?<!\d)(?:[03648]\d{5}|92\d{4})(?!\d)", 0),
-        (r"(?<!\d)\d{5}(?!\d)", 0),
+        (
+            r"(?<![a-zA-Z0-9.])(?:[03648]\d{5}|92\d{4})(?![a-zA-Z0-9.])",
+            0,
+        ),
+        (r"(?<![a-zA-Z0-9.])\d{5}(?![a-zA-Z0-9.])", 0),
         (r"(?<![a-zA-Z.])([A-Z]{2,5}(?:\.[A-Z]{1,2})?)(?![a-zA-Z0-9])", 0),
     ):
         for match in re.finditer(pattern, text, flags):
@@ -392,7 +421,7 @@ def extract_stock_codes(text: str) -> List[str]:
 
 
 def _is_compare_message(message: str, candidates: List[str], current_code: str) -> bool:
-    if _STRONG_COMPARE_PATTERN.search(message):
+    if _is_strong_compare_message(message):
         return True
     new_candidates = {code for code in candidates if code != current_code}
     if _ENGLISH_COMPARE_HINT_PATTERN.search(message):
