@@ -10,6 +10,7 @@ A股自选股智能分析系统 - AI分析层
 3. 解析 LLM 响应为结构化 AnalysisResult
 """
 
+import importlib as __importlib
 import json
 import logging
 import math
@@ -105,7 +106,12 @@ from src.market_context import detect_market, get_market_role, get_market_guidel
 from src.services.daily_market_context import format_daily_market_context_prompt_section
 from src.market_phase_prompt import format_market_phase_prompt_section
 from src.market_structure_prompt import format_market_structure_prompt_section
-from src.analyzer_parts import result_processing as __result_processing
+
+# A facade reload must recreate moved mutable constants, as the monolith did.
+if "__result_processing" in globals():
+    __result_processing = __importlib.reload(globals()["__result_processing"])
+else:
+    from src.analyzer_parts import result_processing as __result_processing
 
 if __TYPE_CHECKING:
     from src.analyzer_parts.result_processing import (
@@ -3498,12 +3504,29 @@ def __clone_result_function(function: __FunctionType) -> __FunctionType:
     return rebound
 
 
-for __name_to_bind, __value_to_bind in vars(__result_processing).items():
-    if __name_to_bind.startswith("__") or __name_to_bind in globals():
-        continue
-    if isinstance(__value_to_bind, __FunctionType):
-        continue
-    globals()[__name_to_bind] = __value_to_bind
+_CHIP_KEYS: tuple = __result_processing._CHIP_KEYS
+_RISK_WARNING_PLACEHOLDER_TEXTS = __result_processing._RISK_WARNING_PLACEHOLDER_TEXTS
+_STRUCTURAL_RISK_PHRASE_HINTS = __result_processing._STRUCTURAL_RISK_PHRASE_HINTS
+_CAPITAL_FLOW_UNAVAILABLE_STATUS = __result_processing._CAPITAL_FLOW_UNAVAILABLE_STATUS
+_BULLISH_TREND_HINTS: Tuple[str, ...] = __result_processing._BULLISH_TREND_HINTS
+_WEAK_BULLISH_TREND_HINTS: Tuple[str, ...] = (
+    __result_processing._WEAK_BULLISH_TREND_HINTS
+)
+_BEARISH_TREND_HINTS: Tuple[str, ...] = __result_processing._BEARISH_TREND_HINTS
+_WEAK_BEARISH_TREND_HINTS: Tuple[str, ...] = (
+    __result_processing._WEAK_BEARISH_TREND_HINTS
+)
+_NEGATION_TOKENS: Tuple[str, ...] = __result_processing._NEGATION_TOKENS
+_NEGATION_BREAK_CHARS: Tuple[str, ...] = __result_processing._NEGATION_BREAK_CHARS
+_NEGATION_LOOKBACK_CHARS = __result_processing._NEGATION_LOOKBACK_CHARS
+_NEGATION_MAX_GAP_CHARS = __result_processing._NEGATION_MAX_GAP_CHARS
+_NEGATION_SCOPE_BREAK_TOKENS: Tuple[str, ...] = (
+    __result_processing._NEGATION_SCOPE_BREAK_TOKENS
+)
+_SINGLE_CHAR_NEGATION_GAP_PREFIXES: Tuple[str, ...] = (
+    __result_processing._SINGLE_CHAR_NEGATION_GAP_PREFIXES
+)
+_PRICE_POS_KEYS = __result_processing._PRICE_POS_KEYS
 
 for __name_to_bind, __value_to_bind in vars(__result_processing).items():
     if (

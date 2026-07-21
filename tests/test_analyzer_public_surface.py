@@ -1,7 +1,11 @@
 """Guard the compatibility surface of :mod:`src.analyzer`."""
 
 import importlib
+import subprocess
+import sys
+import textwrap
 from types import CodeType, FunctionType
+from typing import get_type_hints
 
 
 EXPECTED_PUBLIC_EXPORTS = frozenset(
@@ -126,6 +130,18 @@ EXPECTED_RESULT_CONSTANTS = (
     "_PRICE_POS_KEYS",
 )
 
+EXPECTED_RESULT_ANNOTATIONS = (
+    "_CHIP_KEYS",
+    "_BULLISH_TREND_HINTS",
+    "_WEAK_BULLISH_TREND_HINTS",
+    "_BEARISH_TREND_HINTS",
+    "_WEAK_BEARISH_TREND_HINTS",
+    "_NEGATION_TOKENS",
+    "_NEGATION_BREAK_CHARS",
+    "_NEGATION_SCOPE_BREAK_TOKENS",
+    "_SINGLE_CHAR_NEGATION_GAP_PREFIXES",
+)
+
 
 def _referenced_global_names(code: CodeType):
     """Return global-name candidates from a function and nested code."""
@@ -205,6 +221,17 @@ def test_result_processing_constants_preserve_identity():
         assert vars(analyzer)[name] is vars(source)[name]
 
 
+def test_result_processing_annotations_preserve_reflection():
+    """Keep moved module annotations visible from the legacy facade."""
+
+    analyzer = importlib.import_module("src.analyzer")
+    source = importlib.import_module("src.analyzer_parts.result_processing")
+
+    assert tuple(analyzer.__annotations__) == EXPECTED_RESULT_ANNOTATIONS
+    assert analyzer.__annotations__ == source.__annotations__
+    assert get_type_hints(analyzer) == get_type_hints(source)
+
+
 def test_result_helpers_resolve_legacy_facade_patches(monkeypatch):
     """Keep patch targets under :mod:`src.analyzer` behaviorally effective."""
 
@@ -213,3 +240,60 @@ def test_result_helpers_resolve_legacy_facade_patches(monkeypatch):
     monkeypatch.setattr(analyzer, "is_chip_placeholder_value", lambda _value: sentinel)
 
     assert analyzer._is_value_placeholder("raw") is sentinel
+
+
+def test_result_processing_constants_restore_on_facade_reload():
+    """Recreate moved constants and helper bindings when reloading the facade."""
+
+    probe = textwrap.dedent(
+        f"""
+        import importlib
+        from typing import get_type_hints
+
+        constant_names = {EXPECTED_RESULT_CONSTANTS!r}
+        annotation_names = {EXPECTED_RESULT_ANNOTATIONS!r}
+        analyzer = importlib.import_module("src.analyzer")
+        source = importlib.import_module("src.analyzer_parts.result_processing")
+        expected_values = {{}}
+        for name in constant_names:
+            value = vars(source)[name]
+            expected_values[name] = value.copy() if isinstance(value, set) else value
+
+        for name in constant_names:
+            setattr(analyzer, name, object())
+        for name in annotation_names:
+            analyzer.__annotations__[name] = object()
+
+        analyzer = importlib.reload(analyzer)
+        source = importlib.import_module("src.analyzer_parts.result_processing")
+        for name, expected_value in expected_values.items():
+            assert vars(analyzer)[name] is vars(source)[name]
+            assert vars(analyzer)[name] == expected_value
+        assert tuple(analyzer.__annotations__) == annotation_names
+        assert analyzer.__annotations__ == source.__annotations__
+        assert get_type_hints(analyzer) == get_type_hints(source)
+
+        for name in constant_names:
+            value = vars(analyzer)[name]
+            if isinstance(value, set):
+                value.add("__analyzer_reload_mutation__")
+
+        analyzer = importlib.reload(analyzer)
+        source = importlib.import_module("src.analyzer_parts.result_processing")
+        for name, expected_value in expected_values.items():
+            assert vars(analyzer)[name] is vars(source)[name]
+            assert vars(analyzer)[name] == expected_value
+
+        helper_marker = "__analyzer_facade_helper__"
+        analyzer._RISK_WARNING_PLACEHOLDER_TEXTS = {{helper_marker}}
+        assert analyzer._is_meaningful_text(helper_marker) is False
+        """
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", probe],
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
