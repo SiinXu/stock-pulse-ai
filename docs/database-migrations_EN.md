@@ -6,6 +6,8 @@ StockPulse uses an in-repository Python Migration Runner to manage SQLite schema
 
 The current production registry target is `202607190005_intelligence_item_unique_index`. `202607160001_migration_runner_registry` establishes additive metadata required by the ordered registry; `202607190001`–`202607190005` convert the startup `_ensure_*` steps that previously backfilled the `llm_usage` telemetry columns, the `decision_signals` `decision_profile` column/indexes/backfill, the `portfolio_idempotency_records` scope columns/unique-index/normalization/guard-trigger, the `intelligence_items` legacy scope-value normalization, and the `intelligence_items` rebuild from legacy url uniqueness to the scoped composite unique key into formal migrations that repair legacy databases idempotently and are no-ops on fresh databases. Startup no longer runs any business schema DDL compatibility step.
 
+Data model versioning has two orthogonal layers in this repository: the **DB schema layer** is managed by the ordered migration runner described below (table/column/index shape evolution), and the **serialized domain artifact layer** is managed by embedded version tags (the internal contract of persisted or cross-module payloads); see "Serialized Artifact Versioning" at the end.
+
 ## Core Contract
 
 Each migration has these stable properties:
@@ -168,3 +170,40 @@ In addition to importing `src.migrations.registry`, calling `get_migrations()`, 
 6. Pass the Desktop package probe, Docker legacy-volume startup and restart smoke, and complete backend gate before release.
 
 Never edit the original migration after release. Every correction moves forward under a new ID.
+
+## Serialized Artifact Versioning
+
+The ordered migration registry above governs the **DB schema layer**. In addition, the repository embeds explicit version tags in a set of **serialized domain artifacts** (Pydantic / dataclass payloads that are persisted or passed across modules) so that historical payloads stay interpretable after the models evolve. This layer is orthogonal to DB migrations: DB migrations govern table/column/index shape, while serialized versions govern the internal contract of a payload.
+
+### Current version-tag inventory
+
+| Artifact | Version constant | Current value | Field | Persistence surface |
+| --- | --- | --- | --- | --- |
+| `AnalysisContextPack` | `PACK_VERSION` | `1.0` | `pack_version` (`Literal["1.0"]`) | `analysis_history.context_snapshot`, prompt summary, overview |
+| `MarketThemeContext` | `MARKET_THEME_SCHEMA_VERSION` | `market-theme-v1` | `schema_version` | market structure snapshot |
+| `StockMarketPosition` | `STOCK_MARKET_POSITION_SCHEMA_VERSION` | `stock-market-position-v1` | `schema_version` | market structure snapshot |
+| `MarketStructureContext` | `MARKET_STRUCTURE_SCHEMA_VERSION` | `market-structure-v1` | `schema_version` | market structure snapshot, prompt section |
+| Canonical decision scale | `CANONICAL_DECISION_SCALE_VERSION` | `decision-scale-v1` | `scale_version` (`score_band_metadata`) | DecisionSignal / report scoring convention |
+| Runtime event | `RUNTIME_EVENT_SCHEMA_VERSION` | `1` | `schema_version` | Agent runtime events |
+| Provider usage | `PROVIDER_USAGE_SCHEMA_VERSION` (+ `PROVIDER_USAGE_SCHEMA_NAME`) | `2026-06-10` (`provider_usage_v1`) | `provider_usage_schema_version` | `llm_usage.provider_usage_schema_version` column |
+
+The inventory is bound to the actual constants by the guard test `tests/test_data_model_versioning_guard.py`; any constant drift or dropping a version field during serialization is caught.
+
+### Backward / forward compatibility rules
+
+- **Add fields within a version.** Adding an optional field with a safe default does not bump the version constant. A consumer reading an older payload that lacks the field falls back to the default, and historical reads are unaffected.
+- **Bump the version only for breaking changes.** Renaming, removing, retyping, or changing the meaning of a field is a breaking change and must bump the version constant to a new value (for example `market-structure-v2`) while keeping read handling for the old value. Released version values are never reused or recycled.
+- **Producers always emit the current version tag.** Serialization must carry the version field; it must never be dropped during a dump (the guard test covers this regression).
+- **Consumers degrade gracefully on an unrecognized version.** Skip the block, return empty, or fall back to defaults; never hard-fail a historical read because its version does not match. Existing behavior: `src/market_structure_prompt.py` and `src/utils/data_processing.py` skip on a `schema_version` mismatch, and `AnalysisContextPack.pack_version` rejects unknown values via `Literal`.
+- **Never rewrite historical payloads in place.** Interpret historical records by their embedded version rather than bulk "upgrading" them. If the persistence surface (column/table) itself must change shape, use a DB migration above; the in-payload version and DB migrations have separate responsibilities.
+
+### Bumping a serialized version
+
+1. Raise the corresponding version constant to a new value and keep a read/degrade branch for the old value.
+2. Update this inventory table and the guard test `tests/test_data_model_versioning_guard.py`.
+3. If the artifact's persisted column/table shape changes at the same time, add a higher-ID DB migration as well (see "Adding a Migration" above).
+4. Go through the normal source review and complete backend gate.
+
+### Artifacts not yet versioned (follow-up)
+
+`Report` (`src/schemas/report_schema.py`), `RunFlowSnapshot` (`src/schemas/run_flow.py`), and `DecisionSignalPresentation` (`src/schemas/decision_signal_presentation.py`) do not yet embed an explicit version field. They can adopt the "add fields within a version / bump only for breaking changes" pattern above the next time their persisted shape changes, at low cost — which is exactly the low-migration-cost evolution this strategy is meant to guarantee.
