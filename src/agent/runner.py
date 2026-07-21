@@ -408,12 +408,16 @@ class _ToolCompletionFence:
     def __init__(self, timeout_seconds: float) -> None:
         self._lock = threading.Lock()
         self._timed_out = False
+        self._completed = False
         self._deadline_monotonic = time.monotonic() + timeout_seconds
 
-    def mark_timed_out(self) -> None:
-        """Close this dispatch against later completion claims."""
+    def mark_timed_out(self) -> bool:
+        """Claim timeout ownership unless completion already won."""
         with self._lock:
+            if self._completed:
+                return False
             self._timed_out = True
+            return True
 
     def claim_completion(self, claim: Callable[[], None]) -> None:
         """Accept completion only when the runner timeout has not won."""
@@ -425,6 +429,7 @@ class _ToolCompletionFence:
                     {"fence": "tool_timeout"},
                 )
             claim()
+            self._completed = True
 
 
 # ============================================================
@@ -886,28 +891,37 @@ def _execute_tools(
                 try:
                     _, result_str, success, dur, cached, guard_result = future.result(timeout=tool_wait_timeout_seconds)
                 except FuturesTimeoutError:
-                    timeout_triggered = True
-                    completion_fence.mark_timed_out()
-                    future.cancel()
-                    timeout_label = f"{tool_wait_timeout_seconds:.2f}s"
-                    log_runtime_guard_event(
-                        logger,
-                        "tool_timeout",
-                        scope="tool",
-                        execution_id=tool_session.execution_id,
-                        tool=tc.name,
-                        step=step,
-                        limit_seconds=round(tool_wait_timeout_seconds, 3),
-                        action="result_fenced",
-                    )
-                    result_str = json.dumps({
-                        "error": f"Tool execution timed out after {timeout_label}",
-                        "timeout": True,
-                    })
-                    success = False
-                    dur = round(tool_wait_timeout_seconds, 2)
-                    cached = False
-                    guard_result = None
+                    timeout_triggered = completion_fence.mark_timed_out()
+                    if timeout_triggered:
+                        future.cancel()
+                        timeout_label = f"{tool_wait_timeout_seconds:.2f}s"
+                        log_runtime_guard_event(
+                            logger,
+                            "tool_timeout",
+                            scope="tool",
+                            execution_id=tool_session.execution_id,
+                            tool=tc.name,
+                            step=step,
+                            limit_seconds=round(tool_wait_timeout_seconds, 3),
+                            action="result_fenced",
+                        )
+                        result_str = json.dumps({
+                            "error": f"Tool execution timed out after {timeout_label}",
+                            "timeout": True,
+                        })
+                        success = False
+                        dur = round(tool_wait_timeout_seconds, 2)
+                        cached = False
+                        guard_result = None
+                    else:
+                        (
+                            _,
+                            result_str,
+                            success,
+                            dur,
+                            cached,
+                            guard_result,
+                        ) = future.result()
             finally:
                 pool.shutdown(wait=not timeout_triggered, cancel_futures=timeout_triggered)
         else:
@@ -935,6 +949,36 @@ def _execute_tools(
         tool_calls_log.append(log_entry)
         results.append({"tc": tc, "result_str": result_str})
     else:
+        def _record_parallel_result(execution_result):
+            """Record one accepted parallel result in the existing output shape."""
+            tc_item, result_str, success, dur, cached, guard_result = execution_result
+            if progress_callback:
+                progress_callback(stream_event(
+                    "tool_done",
+                    step=step,
+                    tool=tc_item.name,
+                    success=success,
+                    duration=dur,
+                ))
+            log_entry = {
+                "step": step,
+                "tool": tc_item.name,
+                "arguments": tc_item.arguments,
+                "success": success,
+                "duration": dur,
+                "result_length": len(result_str),
+                "cached": cached,
+            }
+            if guard_result is not None:
+                log_entry.update({
+                    "guarded": True,
+                    "expected_stock_code": guard_result.get("expected_stock_code"),
+                    "requested_stock_code": guard_result.get("requested_stock_code"),
+                    "allowed_stock_codes": guard_result.get("allowed_stock_codes", []),
+                })
+            tool_calls_log.append(log_entry)
+            results.append({"tc": tc_item, "result_str": result_str})
+
         for tc in tool_calls:
             if progress_callback:
                 progress_callback(stream_event("tool_start", step=step, tool=tc.name))
@@ -962,25 +1006,8 @@ def _execute_tools(
                 timeout=tool_wait_timeout_seconds if tool_wait_timeout_seconds and tool_wait_timeout_seconds > 0 else None,
             ):
                 pending.discard(future)
-                tc_item, result_str, success, dur, cached, guard_result = future.result()
-                if progress_callback:
-                    progress_callback(stream_event("tool_done", step=step, tool=tc_item.name, success=success, duration=dur))
-                log_entry = {
-                    "step": step, "tool": tc_item.name, "arguments": tc_item.arguments,
-                    "success": success, "duration": dur, "result_length": len(result_str),
-                    "cached": cached,
-                }
-                if guard_result is not None:
-                    log_entry.update({
-                        "guarded": True,
-                        "expected_stock_code": guard_result.get("expected_stock_code"),
-                        "requested_stock_code": guard_result.get("requested_stock_code"),
-                        "allowed_stock_codes": guard_result.get("allowed_stock_codes", []),
-                    })
-                tool_calls_log.append(log_entry)
-                results.append({"tc": tc_item, "result_str": result_str})
+                _record_parallel_result(future.result())
         except FuturesTimeoutError:
-            timeout_triggered = True
             timeout_label = (
                 f"{tool_wait_timeout_seconds:.2f}s"
                 if tool_wait_timeout_seconds is not None
@@ -988,8 +1015,13 @@ def _execute_tools(
             )
             for future, (tc_item, completion_fence) in futures.items():
                 if future in pending:
-                    if completion_fence is not None:
-                        completion_fence.mark_timed_out()
+                    if (
+                        completion_fence is not None
+                        and not completion_fence.mark_timed_out()
+                    ):
+                        _record_parallel_result(future.result())
+                        continue
+                    timeout_triggered = True
                     future.cancel()
                     log_runtime_guard_event(
                         logger,

@@ -1,6 +1,7 @@
 import json
 import logging
 import sys
+import threading
 import time
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -12,7 +13,7 @@ except ModuleNotFoundError:
     sys.modules["litellm"] = MagicMock()
 
 from src.agent.llm_adapter import LLMResponse, ToolCall
-from src.agent.orchestrator import AgentOrchestrator
+from src.agent.orchestrator import AgentOrchestrator, _StageProgressFence
 from src.agent.protocols import (
     AgentContext,
     StageFailureReason,
@@ -67,6 +68,36 @@ def _guard_events(records):
         if message.startswith(prefix):
             events.append(json.loads(message[len(prefix):]))
     return events
+
+
+class _CompletedFuture:
+    """Expose a completed result only after one simulated wait timeout."""
+
+    def __init__(self, result):
+        self._result = result
+        self._wait_attempted = False
+
+    def result(self, timeout=None):
+        if timeout is not None and not self._wait_attempted:
+            self._wait_attempted = True
+            raise TimeoutError
+        return self._result
+
+    def cancel(self):
+        return False
+
+
+class _InlineExecutor:
+    """Complete submitted work before publishing its future result."""
+
+    def __init__(self, max_workers):
+        self.max_workers = max_workers
+
+    def submit(self, callback, *args):
+        return _CompletedFuture(callback(*args))
+
+    def shutdown(self, wait=True, cancel_futures=False):
+        return None
 
 
 def test_runtime_guard_policy_reads_environment(monkeypatch):
@@ -187,6 +218,71 @@ def test_runtime_policy_tool_timeout_is_enforced_and_logged(caplog):
     )
 
 
+def test_tool_completion_claim_wins_before_future_publication(monkeypatch):
+    adapter = MagicMock()
+    adapter.call_with_tools.side_effect = [
+        LLMResponse(
+            content="use tool",
+            tool_calls=[
+                ToolCall(id="echo", name="echo", arguments={"message": "ready"})
+            ],
+            provider="test",
+        ),
+        LLMResponse(content="done", provider="test"),
+    ]
+    monkeypatch.setattr("src.agent.runner.ThreadPoolExecutor", _InlineExecutor)
+
+    result = run_agent_loop(
+        messages=[],
+        tool_registry=_echo_registry(),
+        llm_adapter=adapter,
+        max_steps=3,
+        runtime_guard_policy=_policy(tool_timeout_seconds=1.0),
+    )
+
+    assert result.success is True
+    assert result.tool_calls_log[0]["success"] is True
+    assert "timeout" not in result.tool_calls_log[0]
+
+
+def test_parallel_completion_claims_win_before_batch_publication(monkeypatch):
+    adapter = MagicMock()
+    adapter.call_with_tools.side_effect = [
+        LLMResponse(
+            content="use tools",
+            tool_calls=[
+                ToolCall(
+                    id=f"echo-{index}",
+                    name="echo",
+                    arguments={"message": f"ready-{index}"},
+                )
+                for index in range(2)
+            ],
+            provider="test",
+        ),
+        LLMResponse(content="done", provider="test"),
+    ]
+
+    def _raise_batch_timeout(*_args, **_kwargs):
+        raise TimeoutError
+
+    monkeypatch.setattr("src.agent.runner.ThreadPoolExecutor", _InlineExecutor)
+    monkeypatch.setattr("src.agent.runner.as_completed", _raise_batch_timeout)
+
+    result = run_agent_loop(
+        messages=[],
+        tool_registry=_echo_registry(),
+        llm_adapter=adapter,
+        max_steps=3,
+        runtime_guard_policy=_policy(tool_timeout_seconds=1.0),
+    )
+
+    assert result.success is True
+    assert len(result.tool_calls_log) == 2
+    assert all(entry["success"] is True for entry in result.tool_calls_log)
+    assert all("timeout" not in entry for entry in result.tool_calls_log)
+
+
 def test_timed_out_late_result_cannot_populate_session_cache():
     handler_calls = []
 
@@ -261,6 +357,94 @@ def test_full_run_timeout_emits_structured_guard_event(caplog):
         and event["scope"] == "agent_loop"
         for event in _guard_events(caplog.records)
     )
+
+
+def test_stage_progress_close_orders_callbacks_before_terminal_events():
+    fence = _StageProgressFence()
+    callback_entered = threading.Event()
+    release_callback = threading.Event()
+    close_finished = threading.Event()
+    delivered = []
+
+    def _callback(event):
+        callback_entered.set()
+        release_callback.wait(timeout=1)
+        delivered.append(event)
+
+    emitter = threading.Thread(
+        target=fence.emit,
+        args=(_callback, {"event": "before_timeout"}),
+    )
+    emitter.start()
+    assert callback_entered.wait(timeout=1)
+
+    closer = threading.Thread(
+        target=lambda: (fence.close(), close_finished.set()),
+    )
+    closer.start()
+    assert close_finished.wait(timeout=0.01) is False
+
+    release_callback.set()
+    emitter.join(timeout=1)
+    closer.join(timeout=1)
+    assert close_finished.is_set()
+
+    fence.emit(_callback, {"event": "after_timeout"})
+    assert delivered == [{"event": "before_timeout"}]
+
+
+def test_full_run_deadline_wins_over_critical_stage_timeout(caplog):
+    orchestrator = AgentOrchestrator(
+        tool_registry=_echo_registry(),
+        llm_adapter=MagicMock(),
+        config=SimpleNamespace(agent_orchestrator_timeout_s=1),
+        runtime_guard_policy=_policy(),
+    )
+    stage_finished = threading.Event()
+
+    def _slow_stage(agent, _ctx, **_kwargs):
+        time.sleep(0.05)
+        stage_finished.set()
+        return StageResult(
+            stage_name=agent.agent_name,
+            status=StageStatus.COMPLETED,
+        )
+
+    with caplog.at_level(logging.WARNING), patch.object(
+        orchestrator,
+        "_get_timeout_seconds",
+        return_value=0.01,
+    ), patch.object(
+        orchestrator,
+        "_build_agent_chain",
+        return_value=[SimpleNamespace(agent_name="technical")],
+    ), patch.object(orchestrator, "_run_stage_agent", side_effect=_slow_stage):
+        result = orchestrator._execute_pipeline(
+            AgentContext(query="test"),
+            parse_dashboard=False,
+        )
+
+    assert result.timed_out is True
+    assert "Pipeline timed out" in result.error
+    events = _guard_events(caplog.records)
+    assert any(
+        event["event"] == "stage_timeout"
+        and event["stage"] == "technical"
+        for event in events
+    )
+    assert any(
+        event["event"] == "run_timeout"
+        and event["scope"] == "orchestrator"
+        and event["stage"] == "technical"
+        for event in events
+    )
+    assert not any(event["event"] == "stage_failure_fail_fast" for event in events)
+    assert result.runtime_facts.degraded_events[0].stage == "technical"
+    assert (
+        result.runtime_facts.degraded_events[0].reason
+        == StageFailureReason.TIMEOUT
+    )
+    assert stage_finished.wait(timeout=1)
 
 
 def test_uncaught_noncritical_stage_exception_isolated_and_pipeline_continues(caplog):

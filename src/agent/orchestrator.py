@@ -113,6 +113,34 @@ class OrchestratorResult:
     timed_out: bool = False
 
 
+class _StageProgressFence:
+    """Serialize stage progress delivery with terminal closure."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._closed = False
+
+    def close(self) -> None:
+        """Wait for an in-flight callback, then reject later progress."""
+        with self._lock:
+            self._closed = True
+
+    def is_closed(self) -> bool:
+        """Return whether the owning stage has reached a terminal boundary."""
+        with self._lock:
+            return self._closed
+
+    def emit(
+        self,
+        callback: Callable[[Dict[str, Any]], None],
+        event: Dict[str, Any],
+    ) -> None:
+        """Deliver progress only while the stage owns the emission fence."""
+        with self._lock:
+            if not self._closed:
+                callback(event)
+
+
 class AgentOrchestrator:
     """Multi-agent pipeline coordinator.
 
@@ -399,18 +427,18 @@ class AgentOrchestrator:
     ) -> tuple[StageResult, AgentContext]:
         """Run a whole stage against a copy and fence late state or progress."""
         staged_ctx = copy.deepcopy(ctx)
-        stage_closed = threading.Event()
+        progress_fence = _StageProgressFence()
 
         def _stage_cancelled() -> bool:
             """Combine external cancellation with the stage completion fence."""
-            return stage_closed.is_set() or (
+            return progress_fence.is_closed() or (
                 cancelled_check is not None and cancelled_check()
             )
 
         def _stage_progress(event: Dict[str, Any]) -> None:
             """Drop progress emitted after the stage reached its local deadline."""
-            if not stage_closed.is_set() and progress_callback is not None:
-                progress_callback(event)
+            if progress_callback is not None:
+                progress_fence.emit(progress_callback, event)
 
         def _execute() -> StageResult:
             """Execute decision preparation and the agent as one timed stage."""
@@ -438,7 +466,7 @@ class AgentOrchestrator:
                 result = future.result(timeout=timeout_seconds)
             except FuturesTimeoutError:
                 timeout_triggered = True
-                stage_closed.set()
+                progress_fence.close()
                 future.cancel()
                 result = StageResult(
                     stage_name=stage_name,
@@ -449,7 +477,7 @@ class AgentOrchestrator:
                 )
             return result, staged_ctx
         finally:
-            stage_closed.set()
+            progress_fence.close()
             pool.shutdown(
                 wait=not timeout_triggered,
                 cancel_futures=timeout_triggered,
@@ -921,7 +949,7 @@ class AgentOrchestrator:
                 if isinstance(final_text, str) and final_text.strip():
                     ctx.set_data("final_response_text", final_text.strip())
 
-            # Isolate eligible support-stage failures unless fail-fast is explicit.
+            failure_reason = None
             if result.status == StageStatus.FAILED:
                 failure_reason = normalize_stage_failure_reason(result.failure_reason)
                 if failure_reason == StageFailureReason.TIMEOUT:
@@ -932,43 +960,10 @@ class AgentOrchestrator:
                         stage=stage_name,
                         limit_seconds=effective_stage_timeout_s,
                     )
-                should_isolate = (
-                    self.runtime_guard_policy.stage_failure_policy
-                    == StageFailurePolicy.ISOLATE
-                    and self._is_non_critical_stage(stage_name)
-                )
-                if not should_isolate:
-                    log_runtime_guard_event(
-                        logger,
-                        "stage_failure_fail_fast",
-                        level=logging.ERROR,
-                        scope="stage",
-                        stage=stage_name,
-                        reason=failure_reason.value,
-                        policy=self.runtime_guard_policy.stage_failure_policy.value,
-                        action="stop",
-                    )
-                    return OrchestratorResult(
-                        success=False,
-                        error=f"Stage '{stage_name}' failed",
-                        stats=stats,
-                        total_tokens=stats.total_tokens,
-                        tool_calls_log=all_tool_calls,
-                        runtime_facts=build_agent_runtime_facts(ctx),
-                    )
-                else:
-                    self._record_degraded_stage(ctx, stage_name, result)
-                    log_runtime_guard_event(
-                        logger,
-                        "stage_failure_isolated",
-                        scope="stage",
-                        stage=stage_name,
-                        reason=failure_reason.value,
-                        policy=self.runtime_guard_policy.stage_failure_policy.value,
-                        action="continue",
-                    )
 
             if timeout_s and elapsed_s >= timeout_s:
+                if result.status == StageStatus.FAILED:
+                    self._record_degraded_stage(ctx, stage_name, result)
                 log_runtime_guard_event(
                     logger,
                     "run_timeout",
@@ -1008,6 +1003,44 @@ class AgentOrchestrator:
                     ctx=ctx,
                     parse_dashboard=parse_dashboard,
                 )
+
+            # Isolate eligible support-stage failures unless fail-fast is explicit.
+            if result.status == StageStatus.FAILED:
+                should_isolate = (
+                    self.runtime_guard_policy.stage_failure_policy
+                    == StageFailurePolicy.ISOLATE
+                    and self._is_non_critical_stage(stage_name)
+                )
+                if not should_isolate:
+                    log_runtime_guard_event(
+                        logger,
+                        "stage_failure_fail_fast",
+                        level=logging.ERROR,
+                        scope="stage",
+                        stage=stage_name,
+                        reason=failure_reason.value,
+                        policy=self.runtime_guard_policy.stage_failure_policy.value,
+                        action="stop",
+                    )
+                    return OrchestratorResult(
+                        success=False,
+                        error=f"Stage '{stage_name}' failed",
+                        stats=stats,
+                        total_tokens=stats.total_tokens,
+                        tool_calls_log=all_tool_calls,
+                        runtime_facts=build_agent_runtime_facts(ctx),
+                    )
+                else:
+                    self._record_degraded_stage(ctx, stage_name, result)
+                    log_runtime_guard_event(
+                        logger,
+                        "stage_failure_isolated",
+                        scope="stage",
+                        stage=stage_name,
+                        reason=failure_reason.value,
+                        policy=self.runtime_guard_policy.stage_failure_policy.value,
+                        action="continue",
+                    )
 
             index += 1
 
