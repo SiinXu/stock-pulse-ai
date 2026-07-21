@@ -21,6 +21,7 @@ from src.agent.runtime.events import RUNTIME_EVENT_SCHEMA_VERSION, RuntimeEvent
 from src.llm.usage import (
     PROVIDER_USAGE_SCHEMA_NAME,
     PROVIDER_USAGE_SCHEMA_VERSION,
+    normalize_litellm_usage,
 )
 from src.schemas.analysis_context_pack import (
     PACK_VERSION,
@@ -92,3 +93,12 @@ def test_runtime_event_carries_version_field() -> None:
 def test_decision_scale_metadata_emits_version() -> None:
     metadata = score_band_metadata(85)
     assert metadata["scale_version"] == CANONICAL_DECISION_SCALE_VERSION
+
+
+def test_provider_usage_record_emits_schema_version() -> None:
+    record = normalize_litellm_usage(
+        {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
+        model="openai/gpt-4o",
+    )
+    assert record["provider_usage_schema_name"] == PROVIDER_USAGE_SCHEMA_NAME
+    assert record["provider_usage_schema_version"] == PROVIDER_USAGE_SCHEMA_VERSION
