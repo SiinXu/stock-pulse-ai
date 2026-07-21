@@ -934,7 +934,7 @@ class AgentOrchestrator:
         content = (
             loop_result.content
             if synthesis_succeeded
-            else self._build_multi_symbol_fallback(successful, language)
+            else self._build_multi_symbol_fallback(per_symbol_results, language)
         )
         if not synthesis_succeeded:
             logger.warning(
@@ -987,11 +987,11 @@ class AgentOrchestrator:
 
     @staticmethod
     def _build_multi_symbol_fallback(
-        successful: List[tuple[str, OrchestratorResult]],
+        per_symbol_results: List[tuple[str, OrchestratorResult]],
         report_language: str,
     ) -> str:
         """Return an explicit per-symbol fallback when synthesis is unavailable."""
-        if not successful:
+        if not per_symbol_results:
             return ""
         heading = (
             "Cross-market synthesis was unavailable; per-symbol analyses follow."
@@ -999,8 +999,23 @@ class AgentOrchestrator:
             else "跨市场综合暂不可用，以下为逐标的分析。"
         )
         sections = [heading]
-        for stock_code, result in successful:
-            sections.append(f"## {stock_code}\n{result.content}")
+        for stock_code, result in per_symbol_results:
+            if result.success and result.content:
+                body = result.content
+            else:
+                diagnostic = sanitize_agent_diagnostic(result.error)
+                if not diagnostic:
+                    diagnostic = (
+                        "No analysis was available."
+                        if report_language in {"en", "ko"}
+                        else "未获得可用分析。"
+                    )
+                body = (
+                    f"Unavailable: {diagnostic}"
+                    if report_language in {"en", "ko"}
+                    else f"不可用：{diagnostic}"
+                )
+            sections.append(f"## {stock_code}\n{body}")
         return "\n\n".join(sections)
 
     # -----------------------------------------------------------------
@@ -2508,7 +2523,7 @@ _COMMON_WORDS: set[str] = {
     "UP", "US", "WE",
     "THE", "AND", "FOR", "ARE", "BUT", "NOT", "YOU", "ALL",
     "CAN", "HAD", "HER", "WAS", "ONE", "OUR", "OUT", "HAS",
-    "HIS", "HOW", "ITS", "LET", "MAY", "NEW", "NOW", "OLD",
+    "HIS", "HOW", "ITS", "LET", "MAY", "NEW", "NOW", "OLD", "DOES",
     "SEE", "WAY", "WHO", "DID", "GET", "HIM", "USE", "SAY",
     "SHE", "TOO", "ANY", "WITH", "FROM", "THAT", "THAN",
     "THIS", "WHAT", "WHEN", "WILL", "JUST", "ALSO",
@@ -2521,9 +2536,10 @@ _COMMON_WORDS: set[str] = {
     "BUY", "SELL", "HOLD", "LONG", "PUT", "CALL",
     "ETF", "IPO", "RSI", "EPS", "PEG", "ROE", "ROA",
     "USA", "USD", "CNY", "HKD", "EUR", "GBP",
-    "STOCK", "TRADE", "PRICE", "INDEX", "FUND",
+    "STOCK", "TRADE", "PRICE", "INDEX", "FUND", "VALUE", "VALUATION",
     "HIGH", "LOW", "OPEN", "CLOSE", "STOP", "LOSS",
-    "TREND", "BULL", "BEAR", "RISK", "CASH", "BOND",
+    "TREND", "BULL", "BEAR", "RISK", "CASH", "BOND", "BONDS",
+    "DEBT", "YIELD", "RATES", "PEERS",
     "MACD", "VWAP", "BOLL", "KDJ",
     "TTM", "LTM", "NTM", "FWD", "YOY", "QOQ", "YTD",
     "EBIT", "EBITDA", "DCF", "CAGR", "FCF", "NAV", "AUM",

@@ -25,10 +25,18 @@ SWITCH_CLEANUP_KEYS = {
     "market_structure_context",
     "analysis_context_pack_summary",
     "market_phase_context",
+    "daily_market_context",
 }
 
-_STRONG_COMPARE_PATTERN = re.compile(r"比较|对比|vs\b|和[^，。,.!?！？]{0,40}比", re.IGNORECASE)
-_ENGLISH_COMPARE_HINT_PATTERN = re.compile(r"\bcompare\b", re.IGNORECASE)
+_STRONG_COMPARE_PATTERN = re.compile(
+    r"比较|对比|和[^，。,.!?！？]{0,40}比|"
+    r"(?<=\S)\s+(?:vs\.?|versus)\s+(?=\S)",
+    re.IGNORECASE,
+)
+_ENGLISH_COMPARE_HINT_PATTERN = re.compile(
+    r"\bcompar(?:e|ed)\b|\bversus\b",
+    re.IGNORECASE,
+)
 _WEAK_COMPARE_HINT_PATTERN = re.compile(r"差异(?!化)|区别|不同|相比|对照|比一比")
 _CHOICE_COMPARE_PATTERN = re.compile(r"哪个|哪只|哪一个|谁更|更值得|更适合|怎么选|选哪|二选一")
 _LINKED_COMPARE_PATTERN = re.compile(
@@ -38,14 +46,16 @@ _SWITCH_PATTERN = re.compile(
     r"换成|改看|分析|看看|研究|诊断|\b(?:analy[sz]e|switch(?:\s+to)?|look\s+at|review)\b",
     re.IGNORECASE,
 )
-_LOWERCASE_SCAN_HINT_PATTERN = re.compile(r"换成|改看|分析|看看|研究|诊断")
+_LOWERCASE_SCAN_HINT_PATTERN = re.compile(
+    r"换成|改看|分析|看看|研究|诊断|比较|对比|和[^，。,.!?！？]{0,40}比"
+)
 _ENGLISH_EXPLICIT_TICKER_PATTERN = re.compile(
     r"(?i:^\s*(?:analy[sz]e|switch(?:\s+to)?|look\s+at|review)\s+)"
     r"([A-Z]{1,5}(?:\.[A-Z]{1,2})?)(?![a-zA-Z0-9.])"
 )
-_ENGLISH_LOWERCASE_SWITCH_TICKER_PATTERN = re.compile(
-    r"(?i:^\s*switch\s+to\s+)"
-    r"([a-z]{1,5}(?:\.[a-z]{1,2})?)\s*[.!?]?\s*$"
+_ENGLISH_LOWERCASE_COMMAND_TICKER_PATTERN = re.compile(
+    r"(?i:^\s*(?:analy[sz]e|switch(?:\s+to)?|look\s+at|review)\s+)"
+    r"([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![a-zA-Z0-9.])"
 )
 _CJK_EXPLICIT_TICKER_PATTERN = re.compile(
     r"^\s*(?:换成|改看|分析|看看|研究|诊断)\s*"
@@ -72,13 +82,34 @@ _EXPLICIT_SINGLE_TICKER_COMPARE_PATTERNS = (
         r"([A-Z]{1,5}(?:\.[A-Z]{1,2})?)(?![a-zA-Z0-9])"
     ),
     re.compile(
-        r"(?i:\bcompare)\s+([A-Z]{1,5}(?:\.[A-Z]{1,2})?)\s+"
+        r"(?i:\bcompar(?:e|ed))\s+"
+        r"([A-Z]{1,5}(?:\.[A-Z]{1,2})?)\s+"
         r"(?i:and|with)\b"
     ),
     re.compile(
-        r"(?i:\bcompare)\b[^,.!?！？]{0,40}"
+        r"(?i:\bcompar(?:e|ed))\b[^,.!?！？]{0,40}"
         r"(?i:\b(?:and|with))\s+"
         r"([A-Z]{1,5}(?:\.[A-Z]{1,2})?)(?![a-zA-Z0-9])",
+    ),
+)
+_EXPLICIT_LOWERCASE_COMPARE_TICKER_PATTERNS = (
+    re.compile(
+        r"(?<![a-zA-Z.])([a-z]{1,5}(?:\.[a-z]{1,2})?)\s*"
+        r"(?i:vs\.?|versus|和|与|跟)"
+    ),
+    re.compile(
+        r"(?i:vs\.?|versus|和|与|跟)\s*"
+        r"([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![a-zA-Z0-9])"
+    ),
+    re.compile(
+        r"(?i:\bcompar(?:e|ed))\s+"
+        r"([a-z]{1,5}(?:\.[a-z]{1,2})?)\s+"
+        r"(?i:and|with)\b"
+    ),
+    re.compile(
+        r"(?i:\bcompar(?:e|ed))\b[^,.!?！？]{0,40}"
+        r"(?i:\b(?:and|with))\s+"
+        r"([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![a-zA-Z0-9])",
     ),
 )
 _LOWERCASE_TICKER_PATTERN = re.compile(r"(?<![a-zA-Z.])([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![a-zA-Z0-9])")
@@ -245,7 +276,7 @@ def extract_stock_codes(text: str) -> List[str]:
             explicit=_is_explicit_command_slot(text, match),
         )
 
-    for match in _ENGLISH_LOWERCASE_SWITCH_TICKER_PATTERN.finditer(text):
+    for match in _ENGLISH_LOWERCASE_COMMAND_TICKER_PATTERN.finditer(text):
         _append_candidate(
             candidates,
             match.group(1),
@@ -294,6 +325,10 @@ def extract_stock_codes(text: str) -> List[str]:
                 ),
             )
 
+    for pattern in _EXPLICIT_LOWERCASE_COMPARE_TICKER_PATTERNS:
+        for match in pattern.finditer(text):
+            _append_candidate(candidates, match.group(1), text)
+
     bare_lowercase_ticker = re.fullmatch(
         r"[a-z]{1,5}(?:\.[a-z]{1,2})?",
         text.strip(),
@@ -311,8 +346,6 @@ def extract_stock_codes(text: str) -> List[str]:
         )
     if (
         _LOWERCASE_SCAN_HINT_PATTERN.search(text)
-        or _STRONG_COMPARE_PATTERN.search(text)
-        or _ENGLISH_COMPARE_HINT_PATTERN.search(text)
         or _WEAK_COMPARE_HINT_PATTERN.search(text)
         or _CHOICE_COMPARE_PATTERN.search(text)
         or bare_lowercase_ticker

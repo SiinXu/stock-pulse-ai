@@ -120,6 +120,10 @@ def test_bare_collision_ticker_creates_explicit_scope(stock_code: str) -> None:
         ("look at VS valuation", "VS"),
         ("分析 RSI 的走势", "RSI"),
         ("switch to ON for earnings", "ON"),
+        ("analyze aapl fundamentals", "AAPL"),
+        ("analyse aapl", "AAPL"),
+        ("review aapl", "AAPL"),
+        ("look at aapl", "AAPL"),
     ],
 )
 def test_explicit_command_slot_allows_trailing_analysis_prose(
@@ -198,6 +202,47 @@ def test_uppercase_ticker_in_mixed_comparison_slot(
     assert resolution.stock_scope.allowed_stock_codes == expected_codes
 
 
+def test_comparison_prose_does_not_authorize_lowercase_nouns() -> None:
+    messages = [
+        "compare it with value",
+        "compare its debt with peers",
+        "compare yield with debt",
+        "compare rates with bonds",
+        "compare valuation with peers",
+    ]
+
+    for message in messages:
+        resolution = resolve_stock_scope(
+            message,
+            {"stock_code": "AAPL", "stock_name": "Apple"},
+        )
+
+        assert resolution.effective_context == {
+            "stock_code": "AAPL",
+            "stock_name": "Apple",
+        }
+        assert resolution.stock_scope.mode == "maintain"
+        assert resolution.stock_scope.allowed_stock_codes == {"AAPL"}
+
+
+def test_english_compare_prose_keeps_only_explicit_uppercase_symbols() -> None:
+    resolution = resolve_stock_scope(
+        "how does AAPL compare with MSFT?",
+        None,
+    )
+
+    assert resolution.effective_context == {}
+    assert resolution.stock_scope.mode == "compare"
+    assert resolution.stock_scope.allowed_stock_codes == {"AAPL", "MSFT"}
+
+
+def test_lowercase_prose_in_switch_slot_is_not_a_ticker() -> None:
+    resolution = resolve_stock_scope("switch to rates", None)
+
+    assert resolution.effective_context == {}
+    assert resolution.stock_scope is None
+
+
 def test_explicit_compare_replaces_a_stale_active_symbol_scope() -> None:
     resolution = resolve_stock_scope(
         "AAPL 和 TSLA 哪个更值得买",
@@ -205,6 +250,10 @@ def test_explicit_compare_replaces_a_stale_active_symbol_scope() -> None:
             "stock_code": "600519",
             "stock_name": "Kweichow Moutai",
             "previous_analysis_summary": "stale summary",
+            "daily_market_context": {
+                "region": "cn",
+                "summary": "A-share market risk-off",
+            },
             "report_language": "zh",
         },
     )
@@ -256,6 +305,54 @@ def test_active_compare_with_accepts_uppercase_ticker_slot(
     assert resolution.stock_scope.allowed_stock_codes == {"AAPL", expected_code}
 
 
+@pytest.mark.parametrize(
+    "message",
+    [
+        "analyze VS",
+        "switch to VS",
+        "review VS",
+        "look at VS",
+    ],
+)
+def test_active_explicit_vs_ticker_switches_instead_of_comparing(
+    message: str,
+) -> None:
+    resolution = resolve_stock_scope(
+        message,
+        {"stock_code": "AAPL", "stock_name": "Apple"},
+    )
+
+    assert resolution.effective_context == {
+        "stock_code": "VS",
+        "stock_name": "",
+    }
+    assert resolution.stock_scope.mode == "switch"
+    assert resolution.stock_scope.allowed_stock_codes == {"VS"}
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "AAPL versus MSFT",
+        "compared with MSFT",
+    ],
+)
+def test_english_comparison_variants_use_active_symbol(
+    message: str,
+) -> None:
+    resolution = resolve_stock_scope(
+        message,
+        {"stock_code": "AAPL", "stock_name": "Apple"},
+    )
+
+    assert resolution.effective_context == {
+        "stock_code": "AAPL",
+        "stock_name": "Apple",
+    }
+    assert resolution.stock_scope.mode == "compare"
+    assert resolution.stock_scope.allowed_stock_codes == {"AAPL", "MSFT"}
+
+
 @pytest.mark.parametrize("message", ["analyze AAPL", "switch to aapl"])
 def test_explicit_english_switch_changes_the_active_symbol(message: str) -> None:
     resolution = resolve_stock_scope(
@@ -266,6 +363,28 @@ def test_explicit_english_switch_changes_the_active_symbol(message: str) -> None
     assert resolution.effective_context == {"stock_code": "AAPL", "stock_name": ""}
     assert resolution.stock_scope.mode == "switch"
     assert resolution.stock_scope.allowed_stock_codes == {"AAPL"}
+
+
+def test_switch_clears_stale_daily_market_context() -> None:
+    resolution = resolve_stock_scope(
+        "analyze AAPL",
+        {
+            "stock_code": "600519",
+            "stock_name": "Kweichow Moutai",
+            "daily_market_context": {
+                "region": "cn",
+                "summary": "A-share market risk-off",
+            },
+            "report_language": "en",
+        },
+    )
+
+    assert resolution.effective_context == {
+        "stock_code": "AAPL",
+        "stock_name": "",
+        "report_language": "en",
+    }
+    assert resolution.stock_scope.mode == "switch"
 
 
 def test_english_analysis_topic_keeps_the_active_symbol() -> None:
@@ -971,6 +1090,60 @@ def test_multi_agent_compare_preserves_leg_timeout_after_synthesis() -> None:
     assert result.success is True
     assert result.content == "cross-market synthesis"
     assert result.timed_out is True
+
+
+def test_multi_agent_fallback_preserves_unavailable_symbol_diagnostic() -> None:
+    adapter = MagicMock()
+    orchestrator = AgentOrchestrator(
+        tool_registry=_market_capability_registry(),
+        llm_adapter=adapter,
+        config=SimpleNamespace(agent_orchestrator_timeout_s=60),
+        runtime_guard_policy=RuntimeGuardPolicy(),
+    )
+    scope = resolve_stock_scope("compare AAPL and HK00700", None).stock_scope
+    market_context = build_agent_chat_market_context(
+        {},
+        scope,
+        "en",
+        per_symbol_tool_scopes=True,
+    )
+
+    with patch(
+        "src.agent.orchestrator.run_agent_loop",
+        return_value=RunLoopResult(
+            success=False,
+            error="comparison synthesis unavailable",
+            timed_out=True,
+        ),
+    ):
+        result = orchestrator._synthesize_multi_symbol_chat(
+            message="compare AAPL and HK00700",
+            market_context=market_context,
+            report_language="en",
+            per_symbol_results=[
+                (
+                    "AAPL",
+                    OrchestratorResult(success=True, content="AAPL analysis"),
+                ),
+                (
+                    "HK00700",
+                    OrchestratorResult(
+                        success=False,
+                        error="HK quote unavailable",
+                    ),
+                ),
+            ],
+            cancelled_check=None,
+            timeout_seconds=30,
+        )
+
+    assert result.success is True
+    assert result.error is None
+    assert result.timed_out is True
+    assert "AAPL analysis" in result.content
+    assert "## HK00700" in result.content
+    assert "Unavailable" in result.content
+    assert "HK quote unavailable" in result.content
 
 
 def test_multi_agent_compare_cancellation_wins_before_fallback() -> None:
