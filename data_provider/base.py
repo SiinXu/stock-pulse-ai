@@ -15,6 +15,7 @@
 """
 
 import logging
+import os
 import random
 import time
 from threading import BoundedSemaphore, RLock, Thread
@@ -35,6 +36,55 @@ from .realtime_types import CircuitBreaker, UnifiedRealtimeQuote
 
 # 配置日志
 logger = logging.getLogger(__name__)
+
+
+_PROVIDER_CIRCUIT_ENABLED_DEFAULT = True
+_PROVIDER_CIRCUIT_FAILURE_THRESHOLD_DEFAULT = 3
+_PROVIDER_CIRCUIT_COOLDOWN_SECONDS_DEFAULT = 300.0
+_PROVIDER_HEALTH_WINDOW_SIZE_DEFAULT = 20
+
+
+def _read_bool_env(name: str, default: bool) -> bool:
+    raw_value = os.getenv(name)
+    if raw_value is None or not raw_value.strip():
+        return default
+    normalized = raw_value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    logger.warning("Invalid boolean configuration name=%s; using default", name)
+    return default
+
+
+def _read_positive_int_env(name: str, default: int) -> int:
+    raw_value = os.getenv(name)
+    if raw_value is None or not raw_value.strip():
+        return default
+    try:
+        value = int(raw_value)
+    except ValueError:
+        logger.warning("Invalid integer configuration name=%s; using default", name)
+        return default
+    if value < 1:
+        logger.warning("Out-of-range integer configuration name=%s; using default", name)
+        return default
+    return value
+
+
+def _read_non_negative_float_env(name: str, default: float) -> float:
+    raw_value = os.getenv(name)
+    if raw_value is None or not raw_value.strip():
+        return default
+    try:
+        value = float(raw_value)
+    except ValueError:
+        logger.warning("Invalid numeric configuration name=%s; using default", name)
+        return default
+    if value < 0:
+        logger.warning("Out-of-range numeric configuration name=%s; using default", name)
+        return default
+    return value
 
 
 # === 标准化列名定义 ===
@@ -629,7 +679,12 @@ class DataFetcherManager:
         "FinnhubFetcher": {"us"},
         "AlphaVantageFetcher": {"us"},
     }
-    _daily_source_health = CircuitBreaker(failure_threshold=3, cooldown_seconds=300.0)
+    _daily_source_health = CircuitBreaker(
+        failure_threshold=_PROVIDER_CIRCUIT_FAILURE_THRESHOLD_DEFAULT,
+        cooldown_seconds=_PROVIDER_CIRCUIT_COOLDOWN_SECONDS_DEFAULT,
+        health_window_size=_PROVIDER_HEALTH_WINDOW_SIZE_DEFAULT,
+        enabled=_PROVIDER_CIRCUIT_ENABLED_DEFAULT,
+    )
     _CONCEPT_RANKINGS_CACHE_TTL_SECONDS = 300.0
     _CONCEPT_RANKINGS_EMPTY_CACHE_TTL_SECONDS = 30.0
     _concept_rankings_cache_lock = RLock()
@@ -642,6 +697,7 @@ class DataFetcherManager:
         Args:
             fetchers: 数据源列表（可选，默认按优先级自动创建）
         """
+        self._configure_daily_source_health()
         self._fetchers: List[BaseFetcher] = []
         self._fetchers_lock = RLock()
         self._fetchers_by_name: Dict[str, BaseFetcher] = {}
@@ -750,8 +806,18 @@ class DataFetcherManager:
     def _call_fetcher_method(self, fetcher: BaseFetcher, method_name: str, *args, **kwargs):
         """Serialize shared fetcher state access through manager-owned per-instance locks."""
         method = getattr(fetcher, method_name)
-        with self._get_fetcher_call_lock(fetcher):
-            return method(*args, **kwargs)
+        started_at = time.monotonic()
+        try:
+            with self._get_fetcher_call_lock(fetcher):
+                return method(*args, **kwargs)
+        finally:
+            if method_name == "get_daily_data":
+                stock_code = kwargs.get("stock_code") or (args[0] if args else "")
+                market = _market_tag(normalize_stock_code(str(stock_code)))
+                self._daily_source_health.record_latency(
+                    self._daily_health_key(fetcher, market),
+                    latency_ms=(time.monotonic() - started_at) * 1000.0,
+                )
 
     @classmethod
     def _filter_daily_fetchers_for_market(
@@ -808,6 +874,27 @@ class DataFetcherManager:
         return f"daily_data:{market}:{fetcher.name}"
 
     @classmethod
+    def _configure_daily_source_health(cls) -> None:
+        cls._daily_source_health.configure(
+            enabled=_read_bool_env(
+                "PROVIDER_CIRCUIT_BREAKER_ENABLED",
+                _PROVIDER_CIRCUIT_ENABLED_DEFAULT,
+            ),
+            failure_threshold=_read_positive_int_env(
+                "PROVIDER_CIRCUIT_FAILURE_THRESHOLD",
+                _PROVIDER_CIRCUIT_FAILURE_THRESHOLD_DEFAULT,
+            ),
+            cooldown_seconds=_read_non_negative_float_env(
+                "PROVIDER_CIRCUIT_COOLDOWN_SECONDS",
+                _PROVIDER_CIRCUIT_COOLDOWN_SECONDS_DEFAULT,
+            ),
+            health_window_size=_read_positive_int_env(
+                "PROVIDER_HEALTH_WINDOW_SIZE",
+                _PROVIDER_HEALTH_WINDOW_SIZE_DEFAULT,
+            ),
+        )
+
+    @classmethod
     def _is_daily_source_available(
         cls,
         fetcher: BaseFetcher,
@@ -816,10 +903,14 @@ class DataFetcherManager:
         key = cls._daily_health_key(fetcher, market)
         if cls._daily_source_health.is_available(key):
             return True
+        snapshot = cls._daily_source_health.get_snapshot(key)[key]
         logger.info(
-            "[数据源健康度] %s 日线跳过短期熔断的数据源: %s",
+            "provider_health event=circuit_skip data_type=daily_data market=%s "
+            "provider=%s cooldown_remaining_seconds=%.3f health_score=%.2f",
             market,
             fetcher.name,
+            snapshot["cooldown_remaining_seconds"],
+            snapshot["health_score"],
         )
         return False
 
@@ -828,12 +919,64 @@ class DataFetcherManager:
         return f"[{fetcher.name}] (CircuitOpen) 数据源短期熔断"
 
     @classmethod
-    def _record_daily_source_success(cls, fetcher: BaseFetcher, market: str) -> None:
-        cls._daily_source_health.record_success(cls._daily_health_key(fetcher, market))
+    def _record_daily_source_success(
+        cls,
+        fetcher: BaseFetcher,
+        market: str,
+        latency_ms: Optional[int] = None,
+    ) -> None:
+        cls._daily_source_health.record_success(
+            cls._daily_health_key(fetcher, market),
+            latency_ms=latency_ms,
+        )
 
     @classmethod
-    def _record_daily_source_failure(cls, fetcher: BaseFetcher, market: str, error: str) -> None:
-        cls._daily_source_health.record_failure(cls._daily_health_key(fetcher, market), error=error)
+    def _record_daily_source_failure(
+        cls,
+        fetcher: BaseFetcher,
+        market: str,
+        error: str,
+        latency_ms: Optional[int] = None,
+    ) -> None:
+        cls._daily_source_health.record_failure(
+            cls._daily_health_key(fetcher, market),
+            error=error,
+            latency_ms=latency_ms,
+        )
+
+    @classmethod
+    def _record_daily_source_circuit_skip(
+        cls,
+        fetcher: BaseFetcher,
+        market: str,
+        fallback_to: Optional[str],
+    ) -> None:
+        key = cls._daily_health_key(fetcher, market)
+        snapshot = cls._daily_source_health.get_snapshot(key)[key]
+        record_provider_run(
+            data_type="daily_data",
+            provider=fetcher.name,
+            operation="get_daily_data",
+            success=False,
+            latency_ms=0,
+            error_type="CircuitOpen",
+            error_message="provider cooldown active",
+            fallback_to=fallback_to,
+            record_count=0,
+        )
+        logger.info(
+            "provider_failover event=skip_open data_type=daily_data market=%s "
+            "provider=%s fallback_to=%s health_score=%.2f",
+            market,
+            fetcher.name,
+            fallback_to or "none",
+            snapshot["health_score"],
+        )
+
+    @classmethod
+    def get_daily_source_health_snapshot(cls) -> Dict[str, Dict[str, Any]]:
+        """Return the current process-local daily provider health snapshot."""
+        return cls._daily_source_health.get_snapshot()
 
     @classmethod
     def reset_daily_source_health(cls) -> None:
@@ -1356,6 +1499,11 @@ class DataFetcherManager:
                     if fetcher.name != src_name:
                         continue
                     if not self._is_daily_source_available(fetcher, market):
+                        self._record_daily_source_circuit_skip(
+                            fetcher,
+                            market,
+                            fallback_to,
+                        )
                         errors.append(self._daily_source_unavailable_error(fetcher))
                         break
                     attempt_start = time.time()
@@ -1453,11 +1601,16 @@ class DataFetcherManager:
             raise DataFetchError(error_summary)
 
         for attempt, fetcher in enumerate(fetchers, start=1):
+            fallback_to = fetchers[attempt].name if attempt < total_fetchers else None
             if not self._is_daily_source_available(fetcher, market):
+                self._record_daily_source_circuit_skip(
+                    fetcher,
+                    market,
+                    fallback_to,
+                )
                 errors.append(self._daily_source_unavailable_error(fetcher))
                 continue
             attempt_start = time.time()
-            fallback_to = fetchers[attempt].name if attempt < total_fetchers else None
             try:
                 logger.info(f"[数据源尝试 {attempt}/{total_fetchers}] [{fetcher.name}] 获取 {stock_code}...")
                 record_provider_run_started(

@@ -89,7 +89,32 @@ flowchart LR
     SKIP --> RECOVER[冷却后半开探测恢复]
 ```
 
-当前日线源熔断策略为连续失败 3 次后短期冷却约 5 分钟。它的目的不是永久禁用数据源，而是避免一个短时间不可用的源拖慢整批分析。
+当前日线源熔断策略默认在连续失败 3 次后冷却 300 秒。冷却结束后只允许一个半开探测；探测成功会恢复正常，失败则重新进入冷却。它的目的不是永久禁用数据源，而是避免一个短时间不可用的源拖慢整批分析。
+
+### 日线 provider 健康与熔断配置
+
+所有配置均有默认值，不配置即可运行。配置从进程环境读取，因此本地、Docker 和 GitHub Actions 可使用同一组语义：
+
+| 配置 | 默认值 | 说明 |
+| --- | ---: | --- |
+| `PROVIDER_CIRCUIT_BREAKER_ENABLED` | `true` | 是否根据连续失败跳过处于冷却期的日线源；关闭后仍记录健康采样 |
+| `PROVIDER_CIRCUIT_FAILURE_THRESHOLD` | `3` | 打开熔断前允许的连续异常次数，最小为 1 |
+| `PROVIDER_CIRCUIT_COOLDOWN_SECONDS` | `300` | 打开熔断后的冷却秒数；可设为 0 以立即进入半开探测 |
+| `PROVIDER_HEALTH_WINDOW_SIZE` | `20` | 每个 `数据类型 + 市场 + provider` 保留的近期结果数量，最小为 1 |
+
+非法或越界值会回退到默认值，不会阻止应用启动。市场能力过滤仍先于健康策略执行，熔断不会让 provider 越过其确定的市场支持边界。
+
+### 健康分数与诊断元数据
+
+日线 provider 健康按 `daily_data:<market>:<provider>` 隔离，避免一个市场的失败污染另一个市场。进程内快照包含：
+
+- `success_rate` / `error_rate`：近期有界窗口内的成功和失败比例；
+- `average_latency_ms`：窗口内有延迟记录的平均值；
+- `recent_failure_count` / `consecutive_failures`：近期失败总数和当前连续失败数；
+- `state` / `cooldown_remaining_seconds`：`closed`、`open`、`half_open` 与剩余冷却时间；
+- `health_score`：成功率占 70%、延迟占 20%、连续失败恢复度占 10% 的 0-100 分。
+
+维护者可在进程内调用 `DataFetcherManager.get_daily_source_health_snapshot()` 读取脱敏快照。单源异常、`fallback_to`、熔断跳过和最终成功源同时写入既有 `provider_runs` 诊断；报告摘要因此会把“前置源失败但替代源成功”标为 degraded，而不会中断整轮分析。快照和 circuit 日志只记录稳定 provider/market/error code，不保存第三方异常原文、token 或连接凭据。
 
 ## AlphaSift 选股与热点链路
 
