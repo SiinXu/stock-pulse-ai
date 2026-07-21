@@ -437,16 +437,16 @@ def test_analysis_context_pack_doc_updates_indexes_and_changelog() -> None:
     ) in index_en
     assert "P1/P2 internal contracts, P3 prompt-summary consumption, P4 history/API/Web low-sensitivity visibility, P5 data-quality scoring, and P6 migration/rollback notes" in index_en
     assert "#1386 market-phase analysis, migration, and rollback entry points" in index_en
-    assert "新增 AnalysisContextPack P0 上下文盘点" in changelog
-    assert "新增 AnalysisContextPack P1 内部契约与脱敏序列化测试" in changelog
-    assert "新增 AnalysisContextPack P2 builder" in changelog
-    assert "普通分析与 Agent 运行时 Prompt 接入 AnalysisContextPack 低敏摘要" in changelog
-    assert "AnalysisContextPack P4 低敏 overview 接入历史详情" in changelog
-    assert "AnalysisContextPack P5 增加数据质量评分" in changelog
-    assert "明确 AnalysisContextPack P6 文档、迁移与回滚边界" in changelog
-    assert "#1386 P7 盘前/盘中/盘后分析的入口、迁移、回滚和用户可见说明" in changelog
-    assert "#1386 P5 为个股分析报告新增 `dashboard.phase_decision`" in changelog
-    assert "优化 Web 报告详情页信息层级" in changelog
+    assert "Added an AnalysisContextPack P0 context inventory" in changelog
+    assert "Added AnalysisContextPack P1 internal contract and data redaction serialization testing" in changelog
+    assert "Added AnalysisContextPack P2 builder" in changelog
+    assert "Standard Analysis and Agent runtime Prompt access AnalysisContextPack low-sensitivity summary" in changelog
+    assert "AnalysisContextPack P4 low sensitivity overview access historical details" in changelog
+    assert "AnalysisContextPack P5 added data quality scoring" in changelog
+    assert "Updated AnalysisContextPack P6 documentation, migration, and rollback boundaries" in changelog
+    assert "#1386 entry points for pre-market/during-market/post-market analysis, migration, rollback, and user-visible explanations" in changelog
+    assert "#1386 P5 for individual stock analysis report adds `dashboard.phase_decision`" in changelog
+    assert "Optimized Web report detail page information hierarchy" in changelog
 
 
 def test_full_guides_cover_issue_1386_p7_user_migration_closeout() -> None:
