@@ -1,10 +1,10 @@
 # Automated pull request review with syntax checks and AI-assisted semantic review.
-# Trigger when a pull request is opened or updated.
+# Fork pull requests run only read-only static checks; trusted pull requests retain the full review flow.
 
 name: PR Review
 
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, synchronize, reopened]
     paths:
       - '**.py'
@@ -34,23 +34,36 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: write
-  issues: write
 
 jobs:
   # ==================== Security check for sensitive file changes ====================
   security-check:
     name: 🔒 Security Check
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       safe_to_run: ${{ steps.check_sensitive.outputs.safe_to_run }}
       sensitive_files_changed: ${{ steps.check_sensitive.outputs.sensitive_files_changed }}
+      is_fork: ${{ steps.trust.outputs.is_fork }}
     
     steps:
+      - name: 🔐 Classify Pull Request Trust
+        id: trust
+        env:
+          IS_FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.id != github.event.repository.id }}
+        run: |
+          echo "is_fork=$IS_FORK" >> "$GITHUB_OUTPUT"
+          if [ "$IS_FORK" = "true" ]; then
+            echo "## Fork Pull Request Policy" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "This run is limited to read-only static checks." >> "$GITHUB_STEP_SUMMARY"
+            echo "AI review, automatic labels, and review comments are skipped because fork workflows do not receive repository secrets or write permissions." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: 📥 Checkout Code
         uses: actions/checkout@v5
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       
       - name: 🔄 Fetch Base Branch
@@ -88,6 +101,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [security-check]
     if: needs.security-check.outputs.safe_to_run == 'true'
+    permissions:
+      contents: read
     outputs:
       syntax_ok: ${{ steps.syntax.outputs.syntax_ok }}
       has_py_changes: ${{ steps.check_files.outputs.has_py_changes }}
@@ -97,7 +112,6 @@ jobs:
       - name: 📥 Checkout Code
         uses: actions/checkout@v5
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       
       - name: 🔄 Fetch Base Branch
@@ -206,9 +220,12 @@ jobs:
     needs: [security-check, auto-check]
     if: |
       needs.security-check.outputs.safe_to_run == 'true' &&
+      needs.security-check.outputs.is_fork != 'true' &&
       needs.auto-check.result == 'success' &&
       needs.auto-check.outputs.has_reviewable_changes == 'true' &&
       vars.ENABLE_AI_REVIEW != 'false'
+    permissions:
+      contents: read
     
     steps:
       # Check out the default branch first to use its trusted review scripts.
@@ -244,7 +261,6 @@ jobs:
       - name: 🤖 Review Changes with AI
         working-directory: pr-code
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_BASE_REF: ${{ github.base_ref || 'main' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
@@ -270,13 +286,14 @@ jobs:
   labeler:
     name: 🏷️ Automatic Labels
     runs-on: ubuntu-latest
+    needs: [security-check]
+    if: github.event_name == 'pull_request' && needs.security-check.outputs.is_fork != 'true'
+    permissions:
+      pull-requests: read
+      issues: write
     
     steps:
-      - name: 📥 Checkout Code
-        uses: actions/checkout@v5
-      
       - name: 🏷️ Add Labels
-        if: github.event_name == 'pull_request_target'
         uses: actions/github-script@v8
         with:
           script: |
@@ -351,14 +368,17 @@ jobs:
     name: 💬 Review Report
     runs-on: ubuntu-latest
     needs: [security-check, auto-check, ai-review]
-    if: always() && github.event_name == 'pull_request_target' && needs.security-check.outputs.safe_to_run == 'true'
+    if: |
+      always() &&
+      github.event_name == 'pull_request' &&
+      needs.security-check.outputs.safe_to_run == 'true' &&
+      needs.security-check.outputs.is_fork != 'true'
+    permissions:
+      actions: read
+      pull-requests: read
+      issues: write
     
     steps:
-      - name: 📥 Checkout Code
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-      
       - name: 📥 Download AI Review Result
         uses: actions/download-artifact@v7
         if: needs.ai-review.result == 'success'
