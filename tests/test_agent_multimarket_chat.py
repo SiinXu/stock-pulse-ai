@@ -68,6 +68,7 @@ def test_shared_canonicalizer_records_format_only_fallback(caplog) -> None:
         ("分析 00700.HK", "HK00700", "hk"),
         ("analyze AAPL", "AAPL", "us"),
         ("analyze F", "F", "us"),
+        ("分析 F", "F", "us"),
         ("switch to T", "T", "us"),
         ("analyze ON", "ON", "us"),
         ("aapl", "AAPL", "us"),
@@ -101,6 +102,9 @@ def test_first_chat_turn_builds_cross_market_compare_scope() -> None:
     [
         ("compare AAPL vs TSLA", {"AAPL", "TSLA"}),
         ("compare F vs T", {"F", "T"}),
+        ("compare aapl and tsla", {"AAPL", "TSLA"}),
+        ("比较 F 和 00700.HK", {"F", "HK00700"}),
+        ("compare 600519 and T", {"600519", "T"}),
     ],
 )
 def test_english_compare_connector_is_not_treated_as_a_ticker(
@@ -155,6 +159,31 @@ def test_english_analysis_topic_keeps_the_active_symbol() -> None:
     }
     assert resolution.stock_scope.mode == "maintain"
     assert resolution.stock_scope.allowed_stock_codes == {"600519"}
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "analyze it",
+        "review the valuation",
+        "look at this",
+        "switch to it",
+    ],
+)
+def test_lowercase_switch_slot_common_words_do_not_become_tickers(
+    message: str,
+) -> None:
+    resolution = resolve_stock_scope(
+        message,
+        {"stock_code": "AAPL", "stock_name": "Apple"},
+    )
+
+    assert resolution.effective_context == {
+        "stock_code": "AAPL",
+        "stock_name": "Apple",
+    }
+    assert resolution.stock_scope.mode == "maintain"
+    assert resolution.stock_scope.allowed_stock_codes == {"AAPL"}
 
 
 def test_english_first_person_pronoun_is_not_treated_as_a_ticker() -> None:
@@ -601,4 +630,93 @@ def test_multi_agent_compare_shares_one_runtime_budget() -> None:
     assert result.timed_out is True
     assert "逐标的分析" in result.content
     assert "AAPL" in result.content
+    adapter.call_with_tools.assert_not_called()
+
+
+def test_multi_agent_compare_preserves_leg_timeout_after_synthesis() -> None:
+    adapter = MagicMock()
+    adapter.call_with_tools.return_value = LLMResponse(
+        content="cross-market synthesis",
+        tool_calls=[],
+        usage={},
+        provider="openai",
+        model="test-model",
+    )
+    orchestrator = AgentOrchestrator(
+        tool_registry=_market_capability_registry(),
+        llm_adapter=adapter,
+        config=SimpleNamespace(agent_orchestrator_timeout_s=60),
+        runtime_guard_policy=RuntimeGuardPolicy(),
+    )
+    scope = resolve_stock_scope("比较 AAPL 和 00700.HK", None).stock_scope
+    market_context = build_agent_chat_market_context(
+        {},
+        scope,
+        "zh",
+        per_symbol_tool_scopes=True,
+    )
+
+    result = orchestrator._synthesize_multi_symbol_chat(
+        message="比较 AAPL 和 00700.HK",
+        market_context=market_context,
+        report_language="zh",
+        per_symbol_results=[
+            (
+                "AAPL",
+                OrchestratorResult(
+                    success=True,
+                    content="AAPL analysis",
+                    timed_out=True,
+                ),
+            ),
+            (
+                "HK00700",
+                OrchestratorResult(
+                    success=True,
+                    content="HK00700 analysis",
+                ),
+            ),
+        ],
+        cancelled_check=None,
+        timeout_seconds=30,
+    )
+
+    assert result.success is True
+    assert result.content == "cross-market synthesis"
+    assert result.timed_out is True
+
+
+def test_multi_agent_compare_cancellation_wins_before_fallback() -> None:
+    adapter = MagicMock()
+    orchestrator = AgentOrchestrator(
+        tool_registry=_market_capability_registry(),
+        llm_adapter=adapter,
+        config=SimpleNamespace(agent_orchestrator_timeout_s=1),
+        runtime_guard_policy=RuntimeGuardPolicy(),
+    )
+    scope = resolve_stock_scope("比较 AAPL 和 00700.HK", None).stock_scope
+    market_context = build_agent_chat_market_context(
+        {},
+        scope,
+        "zh",
+        per_symbol_tool_scopes=True,
+    )
+
+    result = orchestrator._synthesize_multi_symbol_chat(
+        message="比较 AAPL 和 00700.HK",
+        market_context=market_context,
+        report_language="zh",
+        per_symbol_results=[
+            (
+                "AAPL",
+                OrchestratorResult(success=True, content="AAPL analysis"),
+            ),
+        ],
+        cancelled_check=lambda: True,
+        timeout_seconds=0,
+    )
+
+    assert result.success is False
+    assert result.cancelled is True
+    assert result.content == ""
     adapter.call_with_tools.assert_not_called()

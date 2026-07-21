@@ -43,11 +43,32 @@ _ENGLISH_SWITCH_TICKER_PATTERN = re.compile(
     r"([a-z]{1,5}(?:\.[a-z]{1,2})?)\b",
     re.IGNORECASE,
 )
+_CJK_SWITCH_SINGLE_TICKER_PATTERN = re.compile(
+    r"(?:换成|改看|分析|看看|研究|诊断)\s*([A-Z])(?![a-zA-Z0-9])"
+)
 _EXPLICIT_COMPARE_PAIR_PATTERN = re.compile(
     r"(?<![a-zA-Z.])([a-z]{1,5}(?:\.[a-z]{1,2})?)\s*"
     r"(?:vs\.?|versus|和|与|跟)\s*"
     r"([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![a-zA-Z0-9])",
     re.IGNORECASE,
+)
+_ENGLISH_AND_COMPARE_PAIR_PATTERN = re.compile(
+    r"\bcompare\s+([a-z]{1,5}(?:\.[a-z]{1,2})?)\s+and\s+"
+    r"([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![a-zA-Z0-9])",
+    re.IGNORECASE,
+)
+_EXPLICIT_SINGLE_TICKER_COMPARE_PATTERNS = (
+    re.compile(
+        r"(?<![a-zA-Z.])([A-Z])\s*(?:vs\.?|versus|和|与|跟)"
+    ),
+    re.compile(
+        r"(?:vs\.?|versus|和|与|跟)\s*([A-Z])(?![a-zA-Z0-9])"
+    ),
+    re.compile(r"\bcompare\s+([A-Z])\s+and\b", re.IGNORECASE),
+    re.compile(
+        r"\bcompare\b[^,.!?！？]{0,40}\band\s+([A-Z])(?![a-zA-Z0-9])",
+        re.IGNORECASE,
+    ),
 )
 _LOWERCASE_TICKER_PATTERN = re.compile(r"(?<![a-zA-Z.])([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![a-zA-Z0-9])")
 _EXCHANGE_TOKEN_CANDIDATES = {"SH", "SZ", "BJ", "HK", "SS"}
@@ -169,16 +190,28 @@ def extract_stock_codes(text: str) -> List[str]:
             _append_candidate(candidates, raw, text)
 
     for match in _ENGLISH_SWITCH_TICKER_PATTERN.finditer(text):
+        raw = match.group(1)
+        _append_candidate(candidates, raw, text, explicit=raw.isupper())
+
+    for match in _CJK_SWITCH_SINGLE_TICKER_PATTERN.finditer(text):
         _append_candidate(candidates, match.group(1), text, explicit=True)
 
-    for match in _EXPLICIT_COMPARE_PAIR_PATTERN.finditer(text):
-        for raw in match.groups():
-            _append_candidate(
-                candidates,
-                raw,
-                text,
-                explicit=raw.isupper(),
-            )
+    for pattern in (
+        _EXPLICIT_COMPARE_PAIR_PATTERN,
+        _ENGLISH_AND_COMPARE_PAIR_PATTERN,
+    ):
+        for match in pattern.finditer(text):
+            for raw in match.groups():
+                _append_candidate(
+                    candidates,
+                    raw,
+                    text,
+                    explicit=raw.isupper(),
+                )
+
+    for pattern in _EXPLICIT_SINGLE_TICKER_COMPARE_PATTERNS:
+        for match in pattern.finditer(text):
+            _append_candidate(candidates, match.group(1), text, explicit=True)
 
     bare_lowercase_ticker = re.fullmatch(
         r"[a-z]{1,5}(?:\.[a-z]{1,2})?",

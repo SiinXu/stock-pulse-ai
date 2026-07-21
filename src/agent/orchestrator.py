@@ -817,6 +817,14 @@ class AgentOrchestrator:
         timeout_seconds: Optional[float],
     ) -> OrchestratorResult:
         """Synthesize isolated per-symbol evidence without exposing tools."""
+        if cancelled_check is not None and cancelled_check():
+            return OrchestratorResult(
+                success=False,
+                content="",
+                error="Pipeline cancelled",
+                cancelled=True,
+            )
+
         language = normalize_report_language(report_language)
         if language in {"en", "ko"}:
             system_prompt = (
@@ -929,7 +937,8 @@ class AgentOrchestrator:
             model=", ".join(dict.fromkeys(models)),
             error=None if successful and content else AGENT_CHAT_FAILURE_MESSAGE,
             timed_out=(
-                loop_result is None
+                any(result.timed_out for _, result in per_symbol_results)
+                or loop_result is None
                 or bool(loop_result is not None and loop_result.timed_out)
             ),
         )
