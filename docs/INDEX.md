@@ -65,6 +65,7 @@
 | 文档 | 内容 |
 | --- | --- |
 | [高层架构总览](architecture-overview.md) | 当前组件、入口、所有权边界、进程模式与八阶段分析数据流 |
+| [Foundation Pipeline 与 Product Layer](foundation-product-architecture.md) | 双轨职责、交互边界、贡献归属、上游移植与许可证来源规则 |
 | [ADR 注册表与流程](adr/README.md) | 架构决策编号、状态、模板、重大 PR 考量规则与历史决策入口 |
 | [API 规格](architecture/api_spec.json) | FastAPI OpenAPI 规格产物 |
 | [贡献指南](CONTRIBUTING.md) | Issue、PR、测试、文档同步和协作要求 |

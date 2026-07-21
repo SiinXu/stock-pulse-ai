@@ -50,6 +50,10 @@ If a PR changes component boundaries, a cross-module source of truth, the runtim
 
 Accepted ADRs remain as history. Record a material reversal in a new ADR with reciprocal links instead of rewriting the earlier decision.
 
+### Change Placement
+
+Shared data-source, analysis-pipeline, domain, persistence, and domain-report semantics belong in the foundation pipeline first. API DTOs and projections, Web, Desktop, Bot, interactive Agent experiences, and repository governance belong in the product layer and consume foundation contracts. A cross-track change must identify one authority and preserve compatibility across domain schemas, API projections, task state, and report views; product entrypoints must not duplicate provider fallback, pipeline orchestration, or task lifecycle. See [Foundation Pipeline And Product Layer](foundation-product-architecture.md) for routing, upstream porting, and license-provenance rules. Architectural track does not determine license.
+
 ### Commit Message Convention
 
 This project follows [Conventional Commits](https://www.conventionalcommits.org/):

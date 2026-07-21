@@ -131,6 +131,7 @@ is used for background analysis lifecycle, not as a universal service bus.
 
 ## Focused Documentation
 
+- [Foundation pipeline and product layer](foundation-product-architecture.md)
 - [ADR registry and process](adr/README.md)
 - [Task execution contract](task-execution-contract.md)
 - [Data-source stability and fallback](data-source-stability.md)
