@@ -52,6 +52,8 @@ def record_notification_run(*args, **kwargs):
 
 
 class _DeliveryStageMixin:
+    """Provide rendering and notification delivery stages for the pipeline."""
+
     @staticmethod
     def _delivery_stage_key(
         *,
