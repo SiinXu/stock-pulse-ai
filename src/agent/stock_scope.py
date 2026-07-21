@@ -87,6 +87,7 @@ _ALWAYS_DENIED_TICKER_CANDIDATES = {
     "SMA",
     "VWAP",
 }
+_EXPLICIT_TICKER_COLLISIONS = {"BJ", "RSI", "SH", "VS"}
 _CONTEXTUAL_INDICATOR_TOKENS = {"MA"}
 _INDICATOR_CONTEXT_PATTERN = re.compile(
     r"指标|均线|移动平均|排列|多头|空头|金叉|死叉|支撑|压力|MA\d|SMA|EMA",
@@ -132,19 +133,25 @@ def _is_denied_candidate(
     candidate: str,
     text: str = "",
     *,
-    allow_common_word: bool = False,
+    explicit_or_established: bool = False,
 ) -> bool:
     token = candidate.strip().upper()
-    if allow_common_word:
-        return False
     if (
         token in _EXCHANGE_TOKEN_CANDIDATES
         or token in _COMPARISON_TOKEN_CANDIDATES
         or token in _ALWAYS_DENIED_TICKER_CANDIDATES
     ):
+        return not (
+            explicit_or_established and token in _EXPLICIT_TICKER_COLLISIONS
+        )
+    if (
+        not explicit_or_established
+        and token in _CONTEXTUAL_INDICATOR_TOKENS
+        and _INDICATOR_CONTEXT_PATTERN.search(text or "")
+    ):
         return True
-    if token in _CONTEXTUAL_INDICATOR_TOKENS and _INDICATOR_CONTEXT_PATTERN.search(text or ""):
-        return True
+    if explicit_or_established:
+        return False
     try:
         from src.agent.orchestrator import _COMMON_WORDS
 
@@ -164,7 +171,7 @@ def _append_candidate(
     if not normalized or _is_denied_candidate(
         normalized,
         text,
-        allow_common_word=explicit,
+        explicit_or_established=explicit,
     ):
         return
     if normalized not in candidates:
@@ -349,13 +356,22 @@ def resolve_stock_scope(
     """Resolve the effective context and stock tool scope for one chat turn."""
     original_context = dict(context or {})
     message_text = message or ""
+    has_context_code = "stock_code" in original_context
     raw_context_code = original_context.get("stock_code")
     current_code = _normalize_stock_code(raw_context_code)
-    invalid_context_code = bool(raw_context_code) and not current_code
+    invalid_context_code = has_context_code and (
+        not current_code
+        or _is_denied_candidate(
+            current_code,
+            message_text,
+            explicit_or_established=True,
+        )
+    )
     original_context.pop("allowed_stock_codes", None)
-    if not current_code and "stock_code" in original_context:
+    if invalid_context_code:
         original_context.pop("stock_code", None)
         original_context.pop("stock_name", None)
+        current_code = ""
 
     if not current_code:
         candidates = extract_stock_codes(message_text)

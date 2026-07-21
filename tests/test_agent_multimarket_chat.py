@@ -241,6 +241,30 @@ def test_trusted_active_ticker_is_preserved(
     assert resolution.stock_scope.allowed_stock_codes == {stock_code}
 
 
+@pytest.mark.parametrize(
+    "stock_code",
+    ["HK", "KDJ", "NOT-A-SYMBOL", "", None, 0, ["AAPL"]],
+)
+def test_public_context_reserved_token_is_not_trusted(stock_code: object) -> None:
+    resolution = resolve_stock_scope(
+        "continue with the valuation",
+        {"stock_code": stock_code, "stock_name": "untrusted"},
+    )
+
+    assert resolution.effective_context == {}
+    assert resolution.stock_scope.mode == "maintain"
+    assert resolution.stock_scope.expected_stock_code == ""
+    assert resolution.stock_scope.allowed_stock_codes == set()
+
+
+@pytest.mark.parametrize("message", ["analyze HK", "analyze KDJ", "KDJ"])
+def test_reserved_token_is_not_an_explicit_ticker(message: str) -> None:
+    resolution = resolve_stock_scope(message, None)
+
+    assert resolution.effective_context == {}
+    assert resolution.stock_scope is None
+
+
 def test_indicator_token_in_free_text_does_not_switch_the_active_symbol() -> None:
     resolution = resolve_stock_scope(
         "what is RSI telling us?",

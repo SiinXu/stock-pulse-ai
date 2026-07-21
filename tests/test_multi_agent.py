@@ -370,16 +370,18 @@ class TestStockScopeResolution(unittest.TestCase):
         self.assertNotIn("stock_code", result.effective_context)
 
     def test_invalid_context_code_is_not_trusted_as_current_stock(self):
-        result = resolve_stock_scope(
-            "继续看",
-            {"stock_code": "NOT-A-SYMBOL", "stock_name": "invalid"},
-        )
+        for stock_code in ("HK", "KDJ", "NOT-A-SYMBOL", "", None, 0, ["AAPL"]):
+            with self.subTest(stock_code=stock_code):
+                result = resolve_stock_scope(
+                    "继续看",
+                    {"stock_code": stock_code, "stock_name": "invalid"},
+                )
 
-        self.assertEqual(result.stock_scope.mode, "maintain")
-        self.assertEqual(result.stock_scope.expected_stock_code, "")
-        self.assertEqual(result.stock_scope.allowed_stock_codes, set())
-        self.assertNotIn("stock_code", result.effective_context)
-        self.assertNotIn("stock_name", result.effective_context)
+                self.assertEqual(result.stock_scope.mode, "maintain")
+                self.assertEqual(result.stock_scope.expected_stock_code, "")
+                self.assertEqual(result.stock_scope.allowed_stock_codes, set())
+                self.assertNotIn("stock_code", result.effective_context)
+                self.assertNotIn("stock_name", result.effective_context)
 
     def test_compare_does_not_treat_exchange_affixes_as_standalone_tickers(self):
         cases = [
