@@ -103,6 +103,8 @@ flowchart LR
 | `PROVIDER_CIRCUIT_FAILURE_THRESHOLD` | `3` | 打开熔断前允许的连续异常次数，最小为 1 |
 | `PROVIDER_CIRCUIT_COOLDOWN_SECONDS` | `300` | 打开熔断后的冷却秒数；可设为 0 以立即进入半开探测 |
 | `PROVIDER_HEALTH_WINDOW_SIZE` | `20` | 每个 `数据类型 + 市场 + provider` 保留的近期结果数量，最小为 1 |
+| `PROVIDER_ADAPTIVE_PRIORITY_ENABLED` | `true` | 是否依据近期健康在同一静态优先级内重排日线源；关闭后严格恢复静态顺序 |
+| `PROVIDER_ADAPTIVE_PRIORITY_MIN_SAMPLES` | `3` | 每个 provider 参与自适应重排前所需的最小近期样本数，最小为 1 |
 
 非法或越界值会回退到默认值，不会阻止应用启动。市场能力过滤仍先于健康策略执行，熔断不会让 provider 越过其确定的市场支持边界。
 
@@ -119,6 +121,25 @@ flowchart LR
 provider 在 `closed` 状态返回空表或 `None` 时，本次结果会计入健康窗口的质量失败，确保 `error_rate` 与 fallback 诊断一致；它会清零连续异常次数且不会打开熔断，保持既有“空结果仍可在下一请求重试”的语义。如果半开探测返回空表或 `None`，则不视为恢复：provider 会保留此前的连续异常次数并重新进入 `open` 冷却，只有成功探测才恢复正常。延迟只统计拿到 provider 专属锁后的真实调用时间，不把本地并发排队时间误算为上游耗时。
 
 维护者可在进程内调用 `DataFetcherManager.get_daily_source_health_snapshot()` 读取脱敏快照。单源异常、下一实际可尝试的 `fallback_to`、熔断跳过和最终成功源同时写入既有 `provider_runs` 诊断；报告摘要因此会把“前置源失败但替代源成功”标为 degraded，而不会中断整轮分析。快照和 circuit 日志只记录稳定 provider/market/error code，不保存第三方异常原文、token 或连接凭据；provider 异常摘要在写日志、聚合错误和运行诊断前统一经过中央脱敏工具。
+
+### 自适应优先级与健康导出
+
+日线自适应排序默认启用，并直接复用上述进程内健康窗口，不维护第二份学习状态。排序边界如下：
+
+1. 先应用确定的市场支持矩阵和 request-time capability 过滤，不支持当前市场或当前请求不可用的 provider 不参与排序。
+2. 数值 `priority` 是人工配置的硬边界；只有相同 `priority` 的 provider 才可能互换位置。美股指数固定首选、Longbridge 配置偏好及美股显式 fallback 链不会被跨越。
+3. 同一优先级内，参与互换的 provider 必须处于 `closed`，且都至少达到 `PROVIDER_ADAPTIVE_PRIORITY_MIN_SAMPLES`，然后才按近期 `health_score`、成功率和平均延迟排序。样本不足或正在 `open` / `half_open` 的 provider 固定在原位置，既避免冷启动振荡，也保留冷却结束后的静态位置恢复探测。
+4. 分数相同会回到原静态顺序。设置 `PROVIDER_ADAPTIVE_PRIORITY_ENABLED=false` 可一键恢复完全静态的 provider 顺序，健康采样与熔断仍继续工作。
+
+发生实际重排时，日志会写入 `provider_priority event=adaptive_reorder`，包含 market、静态顺序、选中顺序、最小样本数及脱敏健康摘要。运维可通过以下进程内入口查询或导出完整快照：
+
+```python
+manager.get_daily_provider_health_report("cn")
+manager.log_daily_provider_health_report("cn")  # 写 provider_health event=snapshot 结构化日志
+DataFetcherManager.reset_daily_source_health()   # 重置学习、熔断和近期健康状态
+```
+
+报告 schema 为 `provider_daily_health_v1`，包含静态优先级、声明的市场能力、成功率、错误率、平均延迟、样本数、健康分数、熔断状态和冷却剩余时间。`provider_count=0` 表示当前进程尚无该市场的观测，不表示 provider 永久不可用。时间戳是当前进程的观测时间；状态不会跨进程或重启持久化。
 
 ## AlphaSift 选股与热点链路
 
