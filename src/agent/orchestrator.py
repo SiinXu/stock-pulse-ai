@@ -714,6 +714,37 @@ class AgentOrchestrator:
             ctx.meta["conversation_history"] = scoped_history
         return ctx
 
+    @staticmethod
+    def _build_multi_symbol_cancelled_result(
+        per_symbol_results: List[tuple[str, OrchestratorResult]],
+        *,
+        error: Optional[str] = None,
+    ) -> OrchestratorResult:
+        """Discard partial comparison content while retaining audit metadata."""
+        models = [result.model for _, result in per_symbol_results if result.model]
+        return OrchestratorResult(
+            success=False,
+            content="",
+            tool_calls_log=[
+                call
+                for _, result in per_symbol_results
+                for call in result.tool_calls_log
+            ],
+            total_steps=sum(
+                result.total_steps for _, result in per_symbol_results
+            ),
+            total_tokens=sum(
+                result.total_tokens for _, result in per_symbol_results
+            ),
+            provider=next(
+                (result.provider for _, result in per_symbol_results if result.provider),
+                "",
+            ),
+            model=", ".join(dict.fromkeys(models)),
+            error=error or "Pipeline cancelled",
+            cancelled=True,
+        )
+
     def _execute_multi_symbol_chat(
         self,
         *,
@@ -741,6 +772,10 @@ class AgentOrchestrator:
         )
 
         for stock_code in stock_codes:
+            if cancelled_check is not None and cancelled_check():
+                return self._build_multi_symbol_cancelled_result(
+                    per_symbol_results
+                )
             remaining_timeout = (
                 max(0.0, deadline - time.monotonic())
                 if deadline is not None
@@ -790,7 +825,14 @@ class AgentOrchestrator:
             )
             per_symbol_results.append((stock_code, result))
             if result.cancelled:
-                return result
+                return self._build_multi_symbol_cancelled_result(
+                    per_symbol_results,
+                    error=result.error,
+                )
+            if cancelled_check is not None and cancelled_check():
+                return self._build_multi_symbol_cancelled_result(
+                    per_symbol_results
+                )
 
         remaining_timeout = (
             max(0.0, deadline - time.monotonic())
@@ -818,11 +860,8 @@ class AgentOrchestrator:
     ) -> OrchestratorResult:
         """Synthesize isolated per-symbol evidence without exposing tools."""
         if cancelled_check is not None and cancelled_check():
-            return OrchestratorResult(
-                success=False,
-                content="",
-                error="Pipeline cancelled",
-                cancelled=True,
+            return self._build_multi_symbol_cancelled_result(
+                per_symbol_results
             )
 
         language = normalize_report_language(report_language)
@@ -873,10 +912,13 @@ class AgentOrchestrator:
                 runtime_guard_policy=self.runtime_guard_policy,
             )
         if loop_result is not None and loop_result.cancelled:
-            return OrchestratorResult(
-                success=False,
-                cancelled=True,
+            return self._build_multi_symbol_cancelled_result(
+                per_symbol_results,
                 error=loop_result.error,
+            )
+        if cancelled_check is not None and cancelled_check():
+            return self._build_multi_symbol_cancelled_result(
+                per_symbol_results
             )
 
         successful = [
@@ -2461,7 +2503,7 @@ class AgentOrchestrator:
 # be kept at module level to avoid re-creating it on every call.
 _COMMON_WORDS: set[str] = {
     # Pronouns / articles / prepositions / conjunctions
-    "AM", "AS", "AT", "BE", "BY", "DO", "GO", "HE", "IF", "IN",
+    "I", "AM", "AS", "AT", "BE", "BY", "DO", "GO", "HE", "IF", "IN",
     "IS", "IT", "ME", "MY", "NO", "OF", "ON", "OR", "SO", "TO",
     "UP", "US", "WE",
     "THE", "AND", "FOR", "ARE", "BUT", "NOT", "YOU", "ALL",
@@ -2479,7 +2521,7 @@ _COMMON_WORDS: set[str] = {
     "BUY", "SELL", "HOLD", "LONG", "PUT", "CALL",
     "ETF", "IPO", "RSI", "EPS", "PEG", "ROE", "ROA",
     "USA", "USD", "CNY", "HKD", "EUR", "GBP",
-    "STOCK", "TRADE", "PRICE", "INDEX", "FUND",
+    "STOCK", "TRADE", "PRICE", "INDEX", "FUND", "RATES",
     "HIGH", "LOW", "OPEN", "CLOSE", "STOP", "LOSS",
     "TREND", "BULL", "BEAR", "RISK", "CASH", "BOND",
     "MACD", "VWAP", "BOLL", "KDJ",

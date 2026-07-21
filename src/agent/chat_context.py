@@ -42,6 +42,7 @@ SUMMARY_LLM_TIMEOUT_SECONDS = 20
 A_SHARE_ONLY_CHAT_TOOLS = frozenset({
     "get_capital_flow",
     "get_chip_distribution",
+    "get_sector_rankings",
 })
 
 SUMMARY_SYSTEM_PROMPT = """你是股票问答系统的会话压缩器，只能总结已经出现过的用户可见对话内容。

@@ -28,6 +28,7 @@ SWITCH_CLEANUP_KEYS = {
 }
 
 _STRONG_COMPARE_PATTERN = re.compile(r"比较|对比|vs\b|和[^，。,.!?！？]{0,40}比", re.IGNORECASE)
+_ENGLISH_COMPARE_HINT_PATTERN = re.compile(r"\bcompare\b", re.IGNORECASE)
 _WEAK_COMPARE_HINT_PATTERN = re.compile(r"差异(?!化)|区别|不同|相比|对照|比一比")
 _CHOICE_COMPARE_PATTERN = re.compile(r"哪个|哪只|哪一个|谁更|更值得|更适合|怎么选|选哪|二选一")
 _LINKED_COMPARE_PATTERN = re.compile(
@@ -43,8 +44,10 @@ _ENGLISH_SWITCH_TICKER_PATTERN = re.compile(
     r"([a-z]{1,5}(?:\.[a-z]{1,2})?)\b",
     re.IGNORECASE,
 )
-_CJK_SWITCH_SINGLE_TICKER_PATTERN = re.compile(
-    r"(?:换成|改看|分析|看看|研究|诊断)\s*([A-Z])(?![a-zA-Z0-9])"
+_CJK_SWITCH_TICKER_PATTERN = re.compile(
+    r"(?:换成|改看|分析|看看|研究|诊断)\s*"
+    r"([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![a-zA-Z0-9])",
+    re.IGNORECASE,
 )
 _EXPLICIT_COMPARE_PAIR_PATTERN = re.compile(
     r"(?<![a-zA-Z.])([a-z]{1,5}(?:\.[a-z]{1,2})?)\s*"
@@ -64,10 +67,10 @@ _EXPLICIT_SINGLE_TICKER_COMPARE_PATTERNS = (
     re.compile(
         r"(?:vs\.?|versus|和|与|跟)\s*([A-Z])(?![a-zA-Z0-9])"
     ),
-    re.compile(r"\bcompare\s+([A-Z])\s+and\b", re.IGNORECASE),
+    re.compile(r"(?i:\bcompare)\s+([A-Z])\s+(?i:and)\b"),
     re.compile(
-        r"\bcompare\b[^,.!?！？]{0,40}\band\s+([A-Z])(?![a-zA-Z0-9])",
-        re.IGNORECASE,
+        r"(?i:\bcompare)\b[^,.!?！？]{0,40}(?i:\band)\s+"
+        r"([A-Z])(?![a-zA-Z0-9])",
     ),
 )
 _LOWERCASE_TICKER_PATTERN = re.compile(r"(?<![a-zA-Z.])([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![a-zA-Z0-9])")
@@ -128,15 +131,20 @@ def _is_denied_candidate(
     text: str = "",
     *,
     allow_common_word: bool = False,
+    allow_reserved_token: bool = False,
 ) -> bool:
     token = candidate.strip().upper()
-    if (
-        token in _EXCHANGE_TOKEN_CANDIDATES
-        or token in _COMPARISON_TOKEN_CANDIDATES
-        or token in _ALWAYS_DENIED_TICKER_CANDIDATES
-    ):
+    if token in _ALWAYS_DENIED_TICKER_CANDIDATES:
         return True
     if token in _CONTEXTUAL_INDICATOR_TOKENS and _INDICATOR_CONTEXT_PATTERN.search(text or ""):
+        return True
+    if (
+        not allow_reserved_token
+        and (
+            token in _EXCHANGE_TOKEN_CANDIDATES
+            or token in _COMPARISON_TOKEN_CANDIDATES
+        )
+    ):
         return True
     if allow_common_word:
         return False
@@ -154,12 +162,14 @@ def _append_candidate(
     text: str = "",
     *,
     explicit: bool = False,
+    allow_reserved_token: bool = False,
 ) -> None:
     normalized = _normalize_stock_code(candidate)
     if not normalized or _is_denied_candidate(
         normalized,
         text,
         allow_common_word=explicit,
+        allow_reserved_token=allow_reserved_token,
     ):
         return
     if normalized not in candidates:
@@ -191,10 +201,23 @@ def extract_stock_codes(text: str) -> List[str]:
 
     for match in _ENGLISH_SWITCH_TICKER_PATTERN.finditer(text):
         raw = match.group(1)
-        _append_candidate(candidates, raw, text, explicit=raw.isupper())
+        _append_candidate(
+            candidates,
+            raw,
+            text,
+            explicit=raw.isupper(),
+            allow_reserved_token=True,
+        )
 
-    for match in _CJK_SWITCH_SINGLE_TICKER_PATTERN.finditer(text):
-        _append_candidate(candidates, match.group(1), text, explicit=True)
+    for match in _CJK_SWITCH_TICKER_PATTERN.finditer(text):
+        raw = match.group(1)
+        _append_candidate(
+            candidates,
+            raw,
+            text,
+            explicit=raw.isupper(),
+            allow_reserved_token=True,
+        )
 
     for pattern in (
         _EXPLICIT_COMPARE_PAIR_PATTERN,
@@ -227,10 +250,12 @@ def extract_stock_codes(text: str) -> List[str]:
             bare_uppercase_ticker.group(0),
             text,
             explicit=True,
+            allow_reserved_token=True,
         )
     if (
         _LOWERCASE_SCAN_HINT_PATTERN.search(text)
         or _STRONG_COMPARE_PATTERN.search(text)
+        or _ENGLISH_COMPARE_HINT_PATTERN.search(text)
         or _WEAK_COMPARE_HINT_PATTERN.search(text)
         or _CHOICE_COMPARE_PATTERN.search(text)
         or bare_lowercase_ticker
@@ -245,6 +270,8 @@ def _is_compare_message(message: str, candidates: List[str], current_code: str) 
     if _STRONG_COMPARE_PATTERN.search(message):
         return True
     new_candidates = {code for code in candidates if code != current_code}
+    if _ENGLISH_COMPARE_HINT_PATTERN.search(message):
+        return len(candidates) >= 2 or bool(current_code and new_candidates)
     if len(new_candidates) >= 2:
         return True
     if _CHOICE_COMPARE_PATTERN.search(message) and len(candidates) >= 2:

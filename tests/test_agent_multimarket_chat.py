@@ -17,6 +17,7 @@ from src.agent.conversation import ConversationSession
 from src.agent.executor import AgentExecutor, AgentResult
 from src.agent.llm_adapter import LLMResponse, ToolCall
 from src.agent.orchestrator import AgentOrchestrator, OrchestratorResult
+from src.agent.runner import RunLoopResult
 from src.agent.runtime.guards import RuntimeGuardPolicy
 from src.agent.stock_scope import resolve_stock_scope
 from src.agent.tools.registry import ToolDefinition, ToolParameter, ToolRegistry
@@ -71,6 +72,9 @@ def test_shared_canonicalizer_records_format_only_fallback(caplog) -> None:
         ("分析 F", "F", "us"),
         ("switch to T", "T", "us"),
         ("analyze ON", "ON", "us"),
+        ("analyze SH", "SH", "us"),
+        ("analyze BJ", "BJ", "us"),
+        ("analyze VS", "VS", "us"),
         ("aapl", "AAPL", "us"),
     ],
 )
@@ -105,6 +109,7 @@ def test_first_chat_turn_builds_cross_market_compare_scope() -> None:
         ("compare aapl and tsla", {"AAPL", "TSLA"}),
         ("比较 F 和 00700.HK", {"F", "HK00700"}),
         ("compare 600519 and T", {"600519", "T"}),
+        ("compare 600519 and t", {"600519", "T"}),
     ],
 )
 def test_english_compare_connector_is_not_treated_as_a_ticker(
@@ -130,6 +135,21 @@ def test_explicit_compare_replaces_a_stale_active_symbol_scope() -> None:
     )
 
     assert resolution.effective_context == {"report_language": "zh"}
+    assert resolution.stock_scope.mode == "compare"
+    assert resolution.stock_scope.expected_stock_code == ""
+    assert resolution.stock_scope.allowed_stock_codes == {"AAPL", "TSLA"}
+
+
+def test_english_compare_with_adds_to_the_active_symbol_scope() -> None:
+    resolution = resolve_stock_scope(
+        "compare with tsla",
+        {"stock_code": "AAPL", "stock_name": "Apple"},
+    )
+
+    assert resolution.effective_context == {
+        "stock_code": "AAPL",
+        "stock_name": "Apple",
+    }
     assert resolution.stock_scope.mode == "compare"
     assert resolution.stock_scope.expected_stock_code == ""
     assert resolution.stock_scope.allowed_stock_codes == {"AAPL", "TSLA"}
@@ -168,6 +188,7 @@ def test_english_analysis_topic_keeps_the_active_symbol() -> None:
         "review the valuation",
         "look at this",
         "switch to it",
+        "Review rates",
     ],
 )
 def test_lowercase_switch_slot_common_words_do_not_become_tickers(
@@ -192,6 +213,13 @@ def test_english_first_person_pronoun_is_not_treated_as_a_ticker() -> None:
     assert resolution.effective_context["stock_code"] == "AAPL"
     assert resolution.stock_scope.mode == "switch"
     assert resolution.stock_scope.allowed_stock_codes == {"AAPL"}
+
+
+def test_lowercase_first_person_pronoun_is_not_a_compare_ticker() -> None:
+    resolution = resolve_stock_scope("compare i and 600519", None)
+
+    assert resolution.effective_context["stock_code"] == "600519"
+    assert resolution.stock_scope.allowed_stock_codes == {"600519"}
 
 
 @pytest.mark.parametrize(
@@ -290,6 +318,7 @@ def _market_capability_registry() -> ToolRegistry:
         "get_realtime_quote",
         "get_chip_distribution",
         "get_capital_flow",
+        "get_sector_rankings",
     ):
         registry.register(
             ToolDefinition(
@@ -318,6 +347,7 @@ def _market_capability_registry() -> ToolRegistry:
                 "get_realtime_quote",
                 "get_chip_distribution",
                 "get_capital_flow",
+                "get_sector_rankings",
             },
         ),
         ("analyze AAPL", {"stock_code": "AAPL"}, {"get_realtime_quote"}),
@@ -374,6 +404,70 @@ def test_single_agent_us_chat_hides_a_share_only_tools() -> None:
     assert exposed_names == {"get_realtime_quote"}
     assert "本轮不暴露这些工具" in rendered
     assert "调用 `get_chip_distribution`" not in rendered
+
+
+@pytest.mark.parametrize(
+    "message",
+    ["analyze AAPL", "分析 00700.HK"],
+)
+def test_single_agent_non_cn_chat_cannot_dispatch_fully_filtered_tool(
+    message: str,
+) -> None:
+    executed: list[str] = []
+    registry = ToolRegistry()
+    registry.register(
+        ToolDefinition(
+            name="get_sector_rankings",
+            description="A-share sector rankings",
+            parameters=[],
+            handler=lambda: executed.append("get_sector_rankings") or {"sectors": []},
+        )
+    )
+    adapter = MagicMock()
+    adapter._config = MagicMock()
+    adapter.call_with_tools.side_effect = [
+        LLMResponse(
+            content=None,
+            tool_calls=[
+                ToolCall(
+                    id="sector-1",
+                    name="get_sector_rankings",
+                    arguments={},
+                )
+            ],
+            usage={},
+            provider="openai",
+            model="test-model",
+        ),
+        LLMResponse(
+            content="continued without A-share sector data",
+            tool_calls=[],
+            usage={},
+            provider="openai",
+            model="test-model",
+        ),
+    ]
+    executor = AgentExecutor(registry, adapter, max_steps=3)
+    session = MagicMock()
+    session.get_market_context.return_value = {}
+
+    with patch(
+        "src.agent.executor.build_agent_chat_context_bundle",
+        return_value=AgentChatContextBundle(context_messages=[], diagnostics={}),
+    ), patch(
+        "src.agent.conversation.conversation_manager.get_or_create",
+        return_value=session,
+    ), patch(
+        "src.agent.conversation.conversation_manager.add_message",
+        side_effect=[1, 2],
+    ), patch.object(executor, "_persist_provider_trace"):
+        result = executor.chat(message, f"fully-filtered-{message}")
+
+    assert result.success is True
+    assert adapter.call_with_tools.call_args_list[0].args[1] == []
+    assert executed == []
+    assert result.tool_calls_log[0]["tool"] == "get_sector_rankings"
+    assert result.tool_calls_log[0]["success"] is False
 
 
 @pytest.mark.parametrize(
@@ -720,3 +814,117 @@ def test_multi_agent_compare_cancellation_wins_before_fallback() -> None:
     assert result.cancelled is True
     assert result.content == ""
     adapter.call_with_tools.assert_not_called()
+
+
+def test_multi_agent_compare_preflight_cancellation_prevents_first_leg() -> None:
+    adapter = MagicMock()
+    orchestrator = AgentOrchestrator(
+        tool_registry=_market_capability_registry(),
+        llm_adapter=adapter,
+        config=SimpleNamespace(agent_orchestrator_timeout_s=0),
+        runtime_guard_policy=RuntimeGuardPolicy(),
+    )
+    scope = resolve_stock_scope("比较 AAPL 和 00700.HK", None).stock_scope
+    market_context = build_agent_chat_market_context({}, scope, "zh")
+
+    with patch.object(orchestrator, "_execute_pipeline") as execute_pipeline:
+        result = orchestrator._execute_multi_symbol_chat(
+            message="比较 AAPL 和 00700.HK",
+            session_id="cancel-before-first-leg",
+            context={},
+            stock_scope=scope,
+            history=[],
+            market_context=market_context,
+            report_language="zh",
+            progress_callback=None,
+            cancelled_check=lambda: True,
+        )
+
+    assert result.success is False
+    assert result.cancelled is True
+    assert result.timed_out is False
+    execute_pipeline.assert_not_called()
+    adapter.call_with_tools.assert_not_called()
+
+
+def test_multi_agent_compare_cancellation_wins_after_completed_leg() -> None:
+    adapter = MagicMock()
+    orchestrator = AgentOrchestrator(
+        tool_registry=_market_capability_registry(),
+        llm_adapter=adapter,
+        config=SimpleNamespace(agent_orchestrator_timeout_s=0),
+        runtime_guard_policy=RuntimeGuardPolicy(),
+    )
+    scope = resolve_stock_scope("比较 AAPL 和 00700.HK", None).stock_scope
+    market_context = build_agent_chat_market_context({}, scope, "zh")
+    executed: list[str] = []
+
+    def fake_execute(ctx, **_kwargs):
+        executed.append(ctx.stock_code)
+        return OrchestratorResult(
+            success=True,
+            content=f"analysis for {ctx.stock_code}",
+        )
+
+    with patch.object(
+        orchestrator,
+        "_execute_pipeline",
+        side_effect=fake_execute,
+    ):
+        result = orchestrator._execute_multi_symbol_chat(
+            message="比较 AAPL 和 00700.HK",
+            session_id="cancel-after-leg",
+            context={},
+            stock_scope=scope,
+            history=[],
+            market_context=market_context,
+            report_language="zh",
+            progress_callback=None,
+            cancelled_check=lambda: bool(executed),
+        )
+
+    assert executed == ["AAPL"]
+    assert result.success is False
+    assert result.cancelled is True
+    assert result.timed_out is False
+    assert result.content == ""
+    adapter.call_with_tools.assert_not_called()
+
+
+def test_multi_agent_synthesis_propagates_runner_cancellation() -> None:
+    adapter = MagicMock()
+    orchestrator = AgentOrchestrator(
+        tool_registry=_market_capability_registry(),
+        llm_adapter=adapter,
+        config=SimpleNamespace(agent_orchestrator_timeout_s=60),
+        runtime_guard_policy=RuntimeGuardPolicy(),
+    )
+    scope = resolve_stock_scope("比较 AAPL 和 00700.HK", None).stock_scope
+    market_context = build_agent_chat_market_context({}, scope, "zh")
+
+    with patch(
+        "src.agent.orchestrator.run_agent_loop",
+        return_value=RunLoopResult(
+            success=False,
+            cancelled=True,
+            error="Agent execution cancelled",
+        ),
+    ):
+        result = orchestrator._synthesize_multi_symbol_chat(
+            message="比较 AAPL 和 00700.HK",
+            market_context=market_context,
+            report_language="zh",
+            per_symbol_results=[
+                (
+                    "AAPL",
+                    OrchestratorResult(success=True, content="AAPL analysis"),
+                ),
+            ],
+            cancelled_check=lambda: False,
+            timeout_seconds=30,
+        )
+
+    assert result.success is False
+    assert result.cancelled is True
+    assert result.timed_out is False
+    assert result.content == ""

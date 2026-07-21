@@ -903,9 +903,14 @@ class AgentExecutor:
         post-processing removes a reserved model-authored field. Free-form
         mode always preserves the raw text.
         """
+        chat_tool_registry = _CHAT_TOOL_REGISTRY.get()
         loop_result = run_agent_loop(
             messages=messages,
-            tool_registry=_CHAT_TOOL_REGISTRY.get() or self.tool_registry,
+            tool_registry=(
+                chat_tool_registry
+                if chat_tool_registry is not None
+                else self.tool_registry
+            ),
             llm_adapter=self.llm_adapter,
             max_steps=self.max_steps,
             progress_callback=progress_callback,
