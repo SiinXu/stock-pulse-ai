@@ -1,0 +1,136 @@
+"""Backtest configuration field definitions."""
+
+from typing import Any, Dict
+
+BACKTEST_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
+    "BACKTEST_ENABLED": {
+        "title": "Backtest Enabled",
+        "description": "Whether backtest is enabled.",
+        "category": "backtest",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 10,
+        "help_key": "settings.backtest.BACKTEST_ENABLED",
+        "examples": [
+            "BACKTEST_ENABLED=true",
+            "BACKTEST_ENABLED=false",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：回测配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#回测功能",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "BACKTEST_EVAL_WINDOW_DAYS": {
+        "title": "Backtest Eval Window Days",
+        "description": "Backtest evaluation window in trading days.",
+        "category": "backtest",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "10",
+        "options": [],
+        "validation": {"min": 1, "max": 365},
+        "display_order": 20,
+        "help_key": "settings.backtest.eval_params",
+        "examples": [
+            "BACKTEST_EVAL_WINDOW_DAYS=10",
+            "BACKTEST_MIN_AGE_DAYS=14",
+            "BACKTEST_NEUTRAL_BAND_PCT=2.0",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：回测配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#回测功能",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "BACKTEST_MIN_AGE_DAYS": {
+        "title": "Backtest Min Age Days",
+        "description": "Only evaluate analysis records older than this threshold.",
+        "category": "backtest",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "14",
+        "options": [],
+        "validation": {"min": 0, "max": 3650},
+        "display_order": 30,
+        "help_key": "settings.backtest.eval_params",
+        "examples": [
+            "BACKTEST_MIN_AGE_DAYS=14",
+            "BACKTEST_EVAL_WINDOW_DAYS=10",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：回测配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#回测功能",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "BACKTEST_ENGINE_VERSION": {
+        "title": "Backtest Engine Version",
+        "description": "Backtest engine version label.",
+        "category": "backtest",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "v1",
+        "options": [],
+        "validation": {},
+        "display_order": 40,
+        "help_key": "settings.backtest.BACKTEST_ENGINE_VERSION",
+        "examples": [
+            "BACKTEST_ENGINE_VERSION=v1",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：回测配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#回测功能",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "BACKTEST_NEUTRAL_BAND_PCT": {
+        "title": "Backtest Neutral Band Pct",
+        "description": "Neutral return band percentage for outcome labeling.",
+        "category": "backtest",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "2.0",
+        "options": [],
+        "validation": {"min": 0.0, "max": 100.0},
+        "display_order": 50,
+        "help_key": "settings.backtest.eval_params",
+        "examples": [
+            "BACKTEST_NEUTRAL_BAND_PCT=2.0",
+            "BACKTEST_EVAL_WINDOW_DAYS=10",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：回测配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#回测功能",
+            },
+        ],
+        "warning_codes": [],
+    },
+}
