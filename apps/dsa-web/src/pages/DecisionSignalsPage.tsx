@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, BarChart3, PlusCircle, RefreshCw, Search, ShieldCheck } from 'lucide-react';
+import { Activity, BarChart3, PlusCircle, RefreshCw, Search, ShieldCheck, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
   decisionSignalsApi,
@@ -17,6 +17,7 @@ import {
   ConfirmDialog,
   Drawer,
   EmptyState,
+  IconButton,
   InlineAlert,
   Input,
   Loading,
@@ -1504,15 +1505,15 @@ const DecisionSignalsPage: React.FC = () => {
               <Search className="h-4 w-4" />
               {t('decisionSignals.stockContextApply')}
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
+            <IconButton
+              variant="ghost"
               size="comfortable"
+              aria-label={t('decisionSignals.stockContextClear')}
               onClick={handleClearStockContext}
               disabled={!activeStockContext && !stockDraft}
             >
-              {t('decisionSignals.stockContextClear')}
-            </Button>
+              <X aria-hidden="true" />
+            </IconButton>
           </form>
 
           {activeStockLabel ? (
@@ -1572,7 +1573,7 @@ const DecisionSignalsPage: React.FC = () => {
         >
           <Card padding="sm" variant="bordered">
             <ResponsiveFilterPanel
-              className="xl:grid xl:grid-cols-[minmax(0,3fr)_minmax(0,5fr)] xl:items-end xl:gap-2 xl:space-y-0"
+              className="xl:grid xl:grid-cols-[minmax(0,3fr)_minmax(0,5fr)] xl:items-end xl:gap-2 xl:space-y-0 [&>div.hidden]:justify-center [&>div.hidden>div]:flex-none"
               filterLabel={t('decisionSignals.filter')}
               drawerTitle={t('decisionSignals.filter')}
               applyLabel={t('decisionSignals.filter')}

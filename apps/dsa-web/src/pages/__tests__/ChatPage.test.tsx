@@ -85,6 +85,7 @@ const mockStoreState = {
     },
   ],
   sessionsLoading: false,
+  sessionsError: null as ReturnType<typeof createParsedApiError> | null,
   hasInitialLoad: true,
   chatError: null as ReturnType<typeof createParsedApiError> | null,
   lastFailedRequest: null as { payload: { message: string; session_id: string } } | null,
@@ -177,6 +178,7 @@ beforeEach(() => {
   mockStoreState.chatError = null;
   mockStoreState.lastFailedRequest = null;
   mockStoreState.sessionsLoading = false;
+  mockStoreState.sessionsError = null;
   mockStoreState.hasInitialLoad = true;
   mockStoreState.sessionId = 'session-1';
   mockStoreState.sessions = [
@@ -268,6 +270,46 @@ describe('ChatPage', () => {
     expect(screen.getByTestId('chat-message-scroll')).toBeInTheDocument();
     expect(mockLoadInitialSession).toHaveBeenCalled();
     expect(mockClearCompletionBadge).toHaveBeenCalled();
+  });
+
+  it('keeps the chat mode legible in dark mode and removes the research panel border', async () => {
+    render(
+      <MemoryRouter initialEntries={['/chat']}>
+        <ChatPage />
+      </MemoryRouter>,
+    );
+
+    const modeControl = await screen.findByRole('tablist', { name: '对话模式' });
+    expect(modeControl).toHaveClass(
+      'dark:[&_.segmented-control-tab[aria-selected=true]]:!bg-foreground',
+      'dark:[&_.segmented-control-tab[aria-selected=true]]:text-background',
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: '深度研究' }));
+    const researchSurface = screen.getByRole('heading', { name: '深度研究' }).closest('[data-surface-level="section"]');
+    expect(researchSurface).not.toHaveClass('border');
+  });
+
+  it('renders the session retry as an overlaid icon and removes the details divider', async () => {
+    mockStoreState.sessionsError = createParsedApiError({
+      title: '历史记录加载失败',
+      message: '无法加载历史记录',
+      rawMessage: 'GET /api/agent/sessions returned 404',
+      category: 'http_error',
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/chat']}>
+        <ChatPage />
+      </MemoryRouter>,
+    );
+
+    const retry = await screen.findByRole('button', { name: '重试' });
+    const alert = screen.getByText('历史记录加载失败').closest('[role="alert"]');
+
+    expect(retry).toHaveAttribute('data-control', 'icon-button');
+    expect(retry.parentElement).toHaveClass('absolute', 'right-2', 'top-2');
+    expect(alert?.parentElement).toHaveClass('[&_details]:border-t-0', '[&_details]:pt-0');
   });
 
   it('uses the shared mobile history drawer and restores focus after Escape', async () => {

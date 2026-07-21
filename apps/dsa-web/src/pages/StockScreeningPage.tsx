@@ -1577,6 +1577,7 @@ const StockScreeningPage: React.FC = () => {
               disabled={loading}
               onChange={handleMarketChange}
               options={markets.map((item) => ({ value: item.id, label: item.label }))}
+              className="w-full flex-row items-center gap-3 [&>label]:mb-0 [&>label]:shrink-0 [&>div]:min-w-0 [&>div]:flex-1"
             />
 
             <Input
@@ -1584,6 +1585,7 @@ const StockScreeningPage: React.FC = () => {
               value={strategy}
               disabled={loading}
               onChange={(event) => handleStrategyChange(event.target.value)}
+              fieldClassName="w-full flex-row flex-wrap items-center gap-x-3 gap-y-1 [&>label]:mb-0 [&>label]:shrink-0 [&>.control-input-target]:min-w-0 [&>.control-input-target]:flex-1 [&>p]:basis-full"
             />
 
             <Input
@@ -1597,6 +1599,7 @@ const StockScreeningPage: React.FC = () => {
               error={maxResultsError}
               disabled={loading}
               onChange={(event) => handleMaxResultsChange(event.target.value)}
+              fieldClassName="w-full flex-row flex-wrap items-center gap-x-3 gap-y-1 [&>label]:mb-0 [&>label]:shrink-0 [&>.control-input-target]:min-w-0 [&>.control-input-target]:flex-1 [&>p]:basis-full"
             />
           </div>
         </form>

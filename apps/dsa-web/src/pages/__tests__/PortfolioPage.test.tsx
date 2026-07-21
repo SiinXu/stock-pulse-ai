@@ -389,6 +389,24 @@ describe('PortfolioPage FX refresh', () => {
     expect(positionsSection).not.toBe(overview);
   });
 
+  it('removes the details divider from the page-level portfolio error', async () => {
+    getSnapshot.mockRejectedValueOnce(
+      createApiError(
+        createParsedApiError({
+          title: '持仓加载失败',
+          message: '无法加载持仓',
+          rawMessage: 'GET /api/portfolio/snapshot returned 404',
+          category: 'http_error',
+        }),
+      ),
+    );
+
+    render(<PortfolioPage />);
+
+    const alert = (await screen.findByText('持仓加载失败')).closest('[role="alert"]');
+    expect(alert?.parentElement).toHaveClass('[&_details]:border-t-0', '[&_details]:pt-0');
+  });
+
   it('shows only the account onboarding state when no portfolio account exists', async () => {
     getAccounts.mockResolvedValueOnce(makeAccounts([]));
 

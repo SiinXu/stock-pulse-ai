@@ -814,6 +814,26 @@ describe('StockScreeningPage', () => {
     });
   });
 
+  it('lays out every screening parameter label beside its control', async () => {
+    getAlphaSiftStatus.mockResolvedValueOnce({
+      enabled: true,
+      available: true,
+      installSpecIsDefault: true,
+    });
+
+    render(<StockScreeningPage />);
+
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    const dialog = openScreeningConfiguration();
+    const marketField = within(dialog).getByLabelText('市场').parentElement?.parentElement;
+    const strategyField = within(dialog).getByLabelText('策略参数').parentElement?.parentElement;
+    const resultCountField = within(dialog).getByLabelText('返回数量').parentElement?.parentElement;
+
+    expect(marketField).toHaveClass('flex-row', 'items-center');
+    expect(strategyField).toHaveClass('flex-row', 'items-center');
+    expect(resultCountField).toHaveClass('flex-row', 'items-center');
+  });
+
   it('restores strategy, market, and result count run parameters from the URL', async () => {
     window.history.pushState({}, '', '/screening?strategy=shrink_pullback&market=cn&count=25&source=report#details');
     getStrategies.mockResolvedValueOnce({
