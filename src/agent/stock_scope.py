@@ -761,7 +761,7 @@ def resolve_stock_scope(
         effective_context = _clear_stock_context(original_context)
         return StockScopeResolution(
             effective_context=_with_skills(effective_context, skills),
-            stock_scope=StockScope() if current_code else None,
+            stock_scope=StockScope(),
         )
 
     if not current_code:

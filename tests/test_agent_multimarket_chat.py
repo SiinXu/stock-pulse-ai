@@ -17,7 +17,7 @@ from src.agent.conversation import ConversationSession
 from src.agent.executor import AgentExecutor, AgentResult
 from src.agent.llm_adapter import LLMResponse, ToolCall
 from src.agent.orchestrator import AgentOrchestrator, OrchestratorResult
-from src.agent.runner import RunLoopResult
+from src.agent.runner import RunLoopResult, run_agent_loop
 from src.agent.runtime.guards import RuntimeGuardPolicy
 from src.agent.stock_scope import resolve_stock_scope
 from src.agent.tools.data_tools import (
@@ -165,7 +165,8 @@ def test_invalid_exchange_qualified_token_is_not_reinterpreted(
     resolution = resolve_stock_scope(message, None)
 
     assert resolution.effective_context == {}
-    assert resolution.stock_scope is None
+    assert resolution.stock_scope.expected_stock_code == ""
+    assert resolution.stock_scope.allowed_stock_codes == set()
 
 
 @pytest.mark.parametrize(
@@ -402,7 +403,8 @@ def test_mixed_case_symbol_fails_closed_without_stock_index(message: str) -> Non
         resolution = resolve_stock_scope(message, None)
 
     assert resolution.effective_context == {}
-    assert resolution.stock_scope is None
+    assert resolution.stock_scope.expected_stock_code == ""
+    assert resolution.stock_scope.allowed_stock_codes == set()
 
 
 def test_code_named_lowercase_symbol_uses_code_index_instead_of_name_map() -> None:
@@ -1535,6 +1537,139 @@ def test_single_agent_chat_prefers_explicit_context_over_restored_symbol() -> No
     assert scope.mode == "maintain"
     assert scope.expected_stock_code == "AAPL"
     assert scope.allowed_stock_codes == {"AAPL"}
+
+
+def test_single_agent_malformed_contextless_symbol_blocks_fragment_dispatch() -> None:
+    executed: list[str] = []
+    adapter = MagicMock()
+    adapter._config = MagicMock()
+    adapter.call_with_tools.side_effect = [
+        LLMResponse(
+            content=None,
+            tool_calls=[
+                ToolCall(
+                    id="quote-1",
+                    name="get_realtime_quote",
+                    arguments={"stock_code": "AAPL"},
+                )
+            ],
+            usage={},
+            provider="openai",
+            model="test-model",
+        ),
+        LLMResponse(
+            content="The malformed symbol was not analyzed.",
+            tool_calls=[],
+            usage={},
+            provider="openai",
+            model="test-model",
+        ),
+    ]
+    executor = AgentExecutor(_stock_registry(executed), adapter, max_steps=3)
+    session = MagicMock()
+    session.get_market_context.return_value = {}
+
+    with patch(
+        "src.agent.executor.build_agent_chat_context_bundle",
+        return_value=AgentChatContextBundle(context_messages=[], diagnostics={}),
+    ), patch(
+        "src.agent.conversation.conversation_manager.get_or_create",
+        return_value=session,
+    ), patch(
+        "src.agent.conversation.conversation_manager.add_message",
+        side_effect=[1, 2],
+    ), patch.object(executor, "_persist_provider_trace"):
+        result = executor.chat("analyze AAPL-TSLA", "malformed-single")
+
+    assert result.success is True
+    assert executed == []
+    assert result.tool_calls_log[0]["guarded"] is True
+    assert result.tool_calls_log[0]["requested_stock_code"] == "AAPL"
+    session.update_market_context.assert_called_once_with(
+        {},
+        anchor_user_message_id=1,
+    )
+
+
+def test_multi_agent_malformed_contextless_symbol_blocks_fragment_dispatch() -> None:
+    executed: list[str] = []
+    adapter = MagicMock()
+    adapter.call_with_tools.side_effect = [
+        LLMResponse(
+            content=None,
+            tool_calls=[
+                ToolCall(
+                    id="quote-1",
+                    name="get_realtime_quote",
+                    arguments={"stock_code": "000001"},
+                )
+            ],
+            usage={},
+            provider="openai",
+            model="test-model",
+        ),
+        LLMResponse(
+            content="The malformed symbol was not analyzed.",
+            tool_calls=[],
+            usage={},
+            provider="openai",
+            model="test-model",
+        ),
+    ]
+    config = SimpleNamespace(agent_orchestrator_timeout_s=0)
+    orchestrator = AgentOrchestrator(
+        tool_registry=_stock_registry(executed),
+        llm_adapter=adapter,
+        config=config,
+        runtime_guard_policy=RuntimeGuardPolicy(),
+    )
+    session = MagicMock()
+    session.get_market_context.return_value = {}
+    captured = {}
+
+    def execute_with_real_guard(ctx, **_kwargs):
+        captured["context"] = ctx
+        loop_result = run_agent_loop(
+            messages=[{"role": "user", "content": ctx.query}],
+            tool_registry=orchestrator._tool_registry_for_context(ctx),
+            llm_adapter=adapter,
+            max_steps=3,
+            stock_scope=ctx.meta.get("stock_scope"),
+            runtime_guard_policy=RuntimeGuardPolicy(),
+        )
+        return OrchestratorResult(
+            success=loop_result.success,
+            content=loop_result.content,
+            tool_calls_log=loop_result.tool_calls_log,
+        )
+
+    with patch.object(
+        orchestrator,
+        "_execute_pipeline",
+        side_effect=execute_with_real_guard,
+    ), patch(
+        "src.agent.orchestrator.build_visible_chat_history",
+        return_value=[],
+    ), patch(
+        "src.agent.conversation.conversation_manager.get_or_create",
+        return_value=session,
+    ), patch(
+        "src.agent.conversation.conversation_manager.add_message",
+        side_effect=[11, 12],
+    ):
+        result = orchestrator.chat("analyze SH000001", "malformed-multi")
+
+    ctx = captured["context"]
+    assert result.success is True
+    assert ctx.stock_code == ""
+    assert ctx.meta["stock_scope"].allowed_stock_codes == set()
+    assert executed == []
+    assert result.tool_calls_log[0]["guarded"] is True
+    assert result.tool_calls_log[0]["requested_stock_code"] == "000001"
+    session.update_market_context.assert_called_once_with(
+        {},
+        anchor_user_message_id=11,
+    )
 
 
 def test_multi_agent_chat_runs_each_comparison_symbol_in_its_own_scope() -> None:

@@ -705,6 +705,11 @@ class AgentOrchestrator:
     ) -> AgentContext:
         """Build one Chat-only pipeline context with an isolated market surface."""
         ctx = self._build_context(message, context)
+        if stock_scope is not None:
+            # Chat scope resolution is authoritative; legacy dashboard extraction
+            # must not reinterpret a rejected token from the original message.
+            ctx.stock_code = context.get("stock_code", "")
+            ctx.stock_name = context.get("stock_name", "")
         ctx.session_id = session_id
         ctx.meta["response_mode"] = "chat"
         ctx.meta["agent_chat_market_context"] = market_context
