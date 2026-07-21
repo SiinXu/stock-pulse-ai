@@ -2,5 +2,7 @@
 -r ../requirements.txt
 
 # Test and lint tooling used by backend-gate.
-flake8
-pytest
+# Bounded to the majors CI currently resolves so tool releases cannot
+# break CI without a code change.
+flake8>=7,<8
+pytest>=8,<9
