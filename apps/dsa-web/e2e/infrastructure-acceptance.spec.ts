@@ -1710,9 +1710,10 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await login(page, 'en');
     await page.goto('/decision-signals');
     await applyStockContext();
-    await expect(page.getByText('Canonical momentum confirmed', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('Canonical gap risk', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('91%', { exact: true }).first()).toBeVisible();
+    const latestPanel = page.getByRole('tabpanel', { name: 'Current stock' });
+    await expect(latestPanel.getByText('Canonical momentum confirmed', { exact: true }).first()).toBeVisible();
+    await expect(latestPanel.getByText('Canonical gap risk', { exact: true }).first()).toBeVisible();
+    await expect(latestPanel.getByText('91%', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Sell', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Legacy summary must not render', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Legacy risk must not render', { exact: true })).toHaveCount(0);
@@ -1752,6 +1753,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.keyboard.press('Escape');
     await expect(details).toBeHidden();
 
+    await page.getByRole('tab', { name: 'Stock signal timeline' }).click();
     const timelinePoint = page.getByTestId('timeline-hit-target-91');
     await expect(timelinePoint).toBeVisible();
     await timelinePoint.hover();
@@ -1791,6 +1793,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
         },
       });
     });
+    await createPortfolioAccount(page, 'canonical presentation');
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/portfolio');
     await expect(page.getByRole('heading', { name: 'Portfolio management' })).toBeVisible();

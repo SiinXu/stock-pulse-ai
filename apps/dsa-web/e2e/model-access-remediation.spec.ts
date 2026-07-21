@@ -879,7 +879,7 @@ test.describe('model access product convergence', () => {
     await openSettings(page);
     // Backend Status keeps the banner/status panels on the default tab.
     await page.goto('/settings?section=advanced&view=raw_config');
-    await expect(page.getByText(/模型配置生效来源|执行后端/).first()).toBeVisible();
+    await expect(page.getByTestId('generation-backend-status-panel')).toBeVisible();
     // Developer fields moved to their own tab and render without a collapsible.
     await page.getByRole('tab', { name: '开发者诊断' }).click();
     await expect(page.getByRole('heading', { name: '开发者诊断' })).toBeVisible();
