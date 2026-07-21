@@ -25,6 +25,9 @@ from src.market_context import detect_market
 from src.services.stock_code_utils import canonicalize_analysis_stock_code
 
 
+_COLLISION_TICKERS = ("BJ", "BOLL", "EMA", "MA", "RSI", "SH", "SMA", "VS")
+
+
 @pytest.mark.parametrize(
     ("raw", "expected_code", "expected_market"),
     [
@@ -74,6 +77,10 @@ def test_shared_canonicalizer_records_format_only_fallback(caplog) -> None:
         ("analyze ON", "ON", "us"),
         ("analyze SH", "SH", "us"),
         ("analyze BJ", "BJ", "us"),
+        ("analyze BOLL", "BOLL", "us"),
+        ("analyze EMA", "EMA", "us"),
+        ("analyze MA", "MA", "us"),
+        ("analyze SMA", "SMA", "us"),
         ("analyze VS", "VS", "us"),
         ("analyze RSI", "RSI", "us"),
         ("aapl", "AAPL", "us"),
@@ -91,6 +98,39 @@ def test_first_chat_turn_creates_canonical_stock_scope_without_context(
     assert resolution.stock_scope.expected_stock_code == expected_code
     assert resolution.stock_scope.allowed_stock_codes == {expected_code}
     assert detect_market(expected_code) == expected_market
+
+
+@pytest.mark.parametrize("stock_code", _COLLISION_TICKERS)
+def test_bare_collision_ticker_creates_explicit_scope(stock_code: str) -> None:
+    resolution = resolve_stock_scope(stock_code, None)
+
+    assert resolution.effective_context == {
+        "stock_code": stock_code,
+        "stock_name": "",
+    }
+    assert resolution.stock_scope.mode == "switch"
+    assert resolution.stock_scope.allowed_stock_codes == {stock_code}
+
+
+@pytest.mark.parametrize(
+    ("message", "expected_code"),
+    [
+        ("analyze SH fundamentals", "SH"),
+        ("review BJ earnings", "BJ"),
+        ("look at VS valuation", "VS"),
+        ("分析 RSI 的走势", "RSI"),
+        ("switch to ON for earnings", "ON"),
+    ],
+)
+def test_explicit_command_slot_allows_trailing_analysis_prose(
+    message: str,
+    expected_code: str,
+) -> None:
+    resolution = resolve_stock_scope(message, None)
+
+    assert resolution.effective_context["stock_code"] == expected_code
+    assert resolution.stock_scope.mode == "switch"
+    assert resolution.stock_scope.allowed_stock_codes == {expected_code}
 
 
 def test_first_chat_turn_builds_cross_market_compare_scope() -> None:
@@ -116,6 +156,38 @@ def test_first_chat_turn_builds_cross_market_compare_scope() -> None:
     ],
 )
 def test_english_compare_connector_is_not_treated_as_a_ticker(
+    message: str,
+    expected_codes: set[str],
+) -> None:
+    resolution = resolve_stock_scope(message, None)
+
+    assert resolution.effective_context == {}
+    assert resolution.stock_scope.mode == "compare"
+    assert resolution.stock_scope.allowed_stock_codes == expected_codes
+
+
+@pytest.mark.parametrize("stock_code", _COLLISION_TICKERS + ("ON",))
+def test_uppercase_ticker_in_letter_comparison_slot(stock_code: str) -> None:
+    resolution = resolve_stock_scope(f"compare {stock_code} and AAPL", None)
+
+    assert resolution.effective_context == {}
+    assert resolution.stock_scope.mode == "compare"
+    assert resolution.stock_scope.allowed_stock_codes == {stock_code, "AAPL"}
+
+
+@pytest.mark.parametrize(
+    ("message", "expected_codes"),
+    [
+        ("compare 600519 and SH", {"600519", "SH"}),
+        ("compare SH and 600519", {"600519", "SH"}),
+        ("600519 vs SH", {"600519", "SH"}),
+        ("compare HK00700 and BJ", {"HK00700", "BJ"}),
+        ("compare 600519 and ON", {"600519", "ON"}),
+        ("compare ON and 600519", {"600519", "ON"}),
+        ("compare AAPL with RSI", {"AAPL", "RSI"}),
+    ],
+)
+def test_uppercase_ticker_in_mixed_comparison_slot(
     message: str,
     expected_codes: set[str],
 ) -> None:
@@ -156,6 +228,32 @@ def test_english_compare_with_adds_to_the_active_symbol_scope() -> None:
     assert resolution.stock_scope.mode == "compare"
     assert resolution.stock_scope.expected_stock_code == ""
     assert resolution.stock_scope.allowed_stock_codes == {"AAPL", "TSLA"}
+
+
+@pytest.mark.parametrize(
+    ("message", "expected_code"),
+    [
+        ("compare with RSI", "RSI"),
+        ("compare it with VS", "VS"),
+        ("compare with ON", "ON"),
+        ("compare it with ON", "ON"),
+    ],
+)
+def test_active_compare_with_accepts_uppercase_ticker_slot(
+    message: str,
+    expected_code: str,
+) -> None:
+    resolution = resolve_stock_scope(
+        message,
+        {"stock_code": "AAPL", "stock_name": "Apple"},
+    )
+
+    assert resolution.effective_context == {
+        "stock_code": "AAPL",
+        "stock_name": "Apple",
+    }
+    assert resolution.stock_scope.mode == "compare"
+    assert resolution.stock_scope.allowed_stock_codes == {"AAPL", expected_code}
 
 
 @pytest.mark.parametrize("message", ["analyze AAPL", "switch to aapl"])
@@ -216,10 +314,14 @@ def test_lowercase_switch_slot_common_words_do_not_become_tickers(
 @pytest.mark.parametrize(
     ("message", "stock_code", "stock_name"),
     [
+        ("continue with the valuation", "BOLL", "Established symbol"),
+        ("continue with the valuation", "EMA", "Established symbol"),
+        ("continue with the valuation", "MA", "Mastercard"),
         ("continue with the valuation", "RSI", "Rush Street Interactive"),
         ("RSI 指标怎么样", "RSI", "Rush Street Interactive"),
         ("continue with the valuation", "SH", "ProShares Short S&P 500"),
         ("continue with the valuation", "BJ", "BJ's Wholesale Club"),
+        ("continue with the valuation", "SMA", "Established symbol"),
         ("continue with the valuation", "VS", "Versus Systems"),
     ],
 )
@@ -259,6 +361,25 @@ def test_public_context_reserved_token_is_not_trusted(stock_code: object) -> Non
 
 @pytest.mark.parametrize("message", ["analyze HK", "analyze KDJ", "KDJ"])
 def test_reserved_token_is_not_an_explicit_ticker(message: str) -> None:
+    resolution = resolve_stock_scope(message, None)
+
+    assert resolution.effective_context == {}
+    assert resolution.stock_scope is None
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "what is MA telling us?",
+        "explain the MA indicator",
+        "MA crossover",
+        "analyze MA indicator",
+        "分析 MA 均线",
+    ],
+)
+def test_indicator_prose_does_not_create_contextless_ticker_scope(
+    message: str,
+) -> None:
     resolution = resolve_stock_scope(message, None)
 
     assert resolution.effective_context == {}

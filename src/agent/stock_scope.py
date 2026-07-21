@@ -41,7 +41,7 @@ _SWITCH_PATTERN = re.compile(
 _LOWERCASE_SCAN_HINT_PATTERN = re.compile(r"换成|改看|分析|看看|研究|诊断")
 _ENGLISH_EXPLICIT_TICKER_PATTERN = re.compile(
     r"(?i:^\s*(?:analy[sz]e|switch(?:\s+to)?|look\s+at|review)\s+)"
-    r"([A-Z]{1,5}(?:\.[A-Z]{1,2})?)\s*[.!?]?\s*$"
+    r"([A-Z]{1,5}(?:\.[A-Z]{1,2})?)(?![a-zA-Z0-9.])"
 )
 _ENGLISH_LOWERCASE_SWITCH_TICKER_PATTERN = re.compile(
     r"(?i:^\s*switch\s+to\s+)"
@@ -49,7 +49,7 @@ _ENGLISH_LOWERCASE_SWITCH_TICKER_PATTERN = re.compile(
 )
 _CJK_EXPLICIT_TICKER_PATTERN = re.compile(
     r"^\s*(?:换成|改看|分析|看看|研究|诊断)\s*"
-    r"([A-Z]{1,5}(?:\.[A-Z]{1,2})?)\s*[，。!?！？]?\s*$"
+    r"([A-Z]{1,5}(?:\.[A-Z]{1,2})?)(?![a-zA-Z0-9.])"
 )
 _EXPLICIT_COMPARE_PAIR_PATTERN = re.compile(
     r"(?<![a-zA-Z.])([a-z]{1,5}(?:\.[a-z]{1,2})?)\s*"
@@ -64,15 +64,21 @@ _ENGLISH_AND_COMPARE_PAIR_PATTERN = re.compile(
 )
 _EXPLICIT_SINGLE_TICKER_COMPARE_PATTERNS = (
     re.compile(
-        r"(?<![a-zA-Z.])([A-Z])\s*(?:vs\.?|versus|和|与|跟)"
+        r"(?<![a-zA-Z.])([A-Z]{1,5}(?:\.[A-Z]{1,2})?)\s*"
+        r"(?:vs\.?|versus|和|与|跟)"
     ),
     re.compile(
-        r"(?:vs\.?|versus|和|与|跟)\s*([A-Z])(?![a-zA-Z0-9])"
+        r"(?:vs\.?|versus|和|与|跟)\s*"
+        r"([A-Z]{1,5}(?:\.[A-Z]{1,2})?)(?![a-zA-Z0-9])"
     ),
-    re.compile(r"(?i:\bcompare)\s+([A-Z])\s+(?i:and)\b"),
     re.compile(
-        r"(?i:\bcompare)\b[^,.!?！？]{0,40}(?i:\band)\s+"
-        r"([A-Z])(?![a-zA-Z0-9])",
+        r"(?i:\bcompare)\s+([A-Z]{1,5}(?:\.[A-Z]{1,2})?)\s+"
+        r"(?i:and|with)\b"
+    ),
+    re.compile(
+        r"(?i:\bcompare)\b[^,.!?！？]{0,40}"
+        r"(?i:\b(?:and|with))\s+"
+        r"([A-Z]{1,5}(?:\.[A-Z]{1,2})?)(?![a-zA-Z0-9])",
     ),
 )
 _LOWERCASE_TICKER_PATTERN = re.compile(r"(?<![a-zA-Z.])([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![a-zA-Z0-9])")
@@ -82,15 +88,25 @@ _ALWAYS_DENIED_TICKER_CANDIDATES = {
     "BOLL",
     "EMA",
     "KDJ",
+    "MA",
     "MACD",
     "RSI",
     "SMA",
     "VWAP",
 }
-_EXPLICIT_TICKER_COLLISIONS = {"BJ", "RSI", "SH", "VS"}
-_CONTEXTUAL_INDICATOR_TOKENS = {"MA"}
+_EXPLICIT_TICKER_COLLISIONS = {
+    "BJ",
+    "BOLL",
+    "EMA",
+    "MA",
+    "RSI",
+    "SH",
+    "SMA",
+    "VS",
+}
 _INDICATOR_CONTEXT_PATTERN = re.compile(
-    r"指标|均线|移动平均|排列|多头|空头|金叉|死叉|支撑|压力|MA\d|SMA|EMA",
+    r"指标|均线|移动平均|排列|多头|空头|金叉|死叉|支撑|压力|"
+    r"\b(?:indicator|crossover)\b|MA\d|SMA|EMA",
     re.IGNORECASE,
 )
 
@@ -144,12 +160,6 @@ def _is_denied_candidate(
         return not (
             explicit_or_established and token in _EXPLICIT_TICKER_COLLISIONS
         )
-    if (
-        not explicit_or_established
-        and token in _CONTEXTUAL_INDICATOR_TOKENS
-        and _INDICATOR_CONTEXT_PATTERN.search(text or "")
-    ):
-        return True
     if explicit_or_established:
         return False
     try:
@@ -176,6 +186,16 @@ def _append_candidate(
         return
     if normalized not in candidates:
         candidates.append(normalized)
+
+
+def _is_explicit_command_slot(text: str, match: re.Match[str]) -> bool:
+    """Keep indicator prose out of otherwise explicit ticker slots."""
+    token = match.group(1).strip().upper()
+    trailing_text = text[match.end(1):]
+    return not (
+        token in _ALWAYS_DENIED_TICKER_CANDIDATES
+        and _INDICATOR_CONTEXT_PATTERN.search(trailing_text)
+    )
 
 
 def _is_spaced_exchange_affix(
@@ -222,7 +242,7 @@ def extract_stock_codes(text: str) -> List[str]:
             candidates,
             match.group(1),
             text,
-            explicit=True,
+            explicit=_is_explicit_command_slot(text, match),
         )
 
     for match in _ENGLISH_LOWERCASE_SWITCH_TICKER_PATTERN.finditer(text):
@@ -237,7 +257,7 @@ def extract_stock_codes(text: str) -> List[str]:
             candidates,
             match.group(1),
             text,
-            explicit=True,
+            explicit=_is_explicit_command_slot(text, match),
         )
 
     for pattern in (
@@ -262,7 +282,17 @@ def extract_stock_codes(text: str) -> List[str]:
 
     for pattern in _EXPLICIT_SINGLE_TICKER_COMPARE_PATTERNS:
         for match in pattern.finditer(text):
-            _append_candidate(candidates, match.group(1), text, explicit=True)
+            raw = match.group(1)
+            _append_candidate(
+                candidates,
+                raw,
+                text,
+                explicit=not _is_spaced_exchange_affix(
+                    text,
+                    raw,
+                    match.start(1),
+                ),
+            )
 
     bare_lowercase_ticker = re.fullmatch(
         r"[a-z]{1,5}(?:\.[a-z]{1,2})?",
