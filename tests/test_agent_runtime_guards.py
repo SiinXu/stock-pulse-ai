@@ -271,6 +271,48 @@ def test_tool_completion_claim_wins_before_future_publication(monkeypatch):
     assert "timeout" not in result.tool_calls_log[0]
 
 
+def test_cached_completion_claim_wins_before_future_publication(monkeypatch):
+    handler_calls = []
+
+    def _permanent_failure(message):
+        handler_calls.append(message)
+        return {"error": "permanent", "retriable": False}
+
+    adapter = MagicMock()
+    adapter.call_with_tools.side_effect = [
+        LLMResponse(
+            content="first",
+            tool_calls=[
+                ToolCall(id="first", name="echo", arguments={"message": "same"})
+            ],
+            provider="test",
+        ),
+        LLMResponse(
+            content="second",
+            tool_calls=[
+                ToolCall(id="second", name="echo", arguments={"message": "same"})
+            ],
+            provider="test",
+        ),
+        LLMResponse(content="done", provider="test"),
+    ]
+    monkeypatch.setattr("src.agent.runner.ThreadPoolExecutor", _InlineExecutor)
+
+    result = run_agent_loop(
+        messages=[],
+        tool_registry=_echo_registry(_permanent_failure),
+        llm_adapter=adapter,
+        max_steps=4,
+        runtime_guard_policy=_policy(tool_timeout_seconds=1.0),
+    )
+
+    assert result.success is True
+    assert handler_calls == ["same"]
+    assert result.tool_calls_log[0]["cached"] is False
+    assert result.tool_calls_log[1]["cached"] is True
+    assert "timeout" not in result.tool_calls_log[1]
+
+
 def test_parallel_completion_claims_win_before_batch_publication(monkeypatch):
     adapter = MagicMock()
     adapter.call_with_tools.side_effect = [

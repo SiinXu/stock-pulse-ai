@@ -237,6 +237,17 @@ class BoundToolSession:
             if rejection is None and cache_key is not None:
                 cached = self._non_retriable_results.get(cache_key)
                 if cached is not None:
+                    completion_rejection = self._claim_completion_locked(
+                        completion_guard,
+                    )
+                    if completion_rejection is not None:
+                        return self._drop_late_result_locked(
+                            tool_name=tool_name,
+                            arguments=arguments,
+                            started_at=started_at,
+                            call_context=self._build_call_context(),
+                            completion_rejection=completion_rejection,
+                        )
                     self._audit_trail.append(cached["audit"])
                     return cached
             call_context = self._build_call_context()
@@ -299,63 +310,90 @@ class BoundToolSession:
         result = self._surface.execute_tool(tool_name, arguments, call_context)
 
         with self._lock:
-            completion_rejection = None
-            if completion_guard is not None:
-                completion_claimed = False
-
-                def _claim_completion() -> None:
-                    nonlocal completion_claimed
-                    if completion_claimed:
-                        raise RuntimeError(
-                            "completion_guard claimed one tool result more than once"
-                        )
-                    completion_claimed = True
-
-                try:
-                    completion_guard(_claim_completion)
-                except ExecutionFenceRejected as exc:
-                    completion_rejection = exc
-                if completion_rejection is None and not completion_claimed:
-                    raise RuntimeError(
-                        "completion_guard returned without claiming the tool result"
-                    )
+            completion_rejection = self._claim_completion_locked(completion_guard)
 
             if (
                 self._closed
                 or self._cancel_requested()
                 or completion_rejection is not None
             ):
-                self._dropped_results += 1
-                fenced = build_tool_error_result(
+                return self._drop_late_result_locked(
                     tool_name=tool_name,
-                    code="late_result_dropped",
-                    message="Tool result arrived after the session terminal state and was dropped.",
-                    started_at=started_at,
-                    context=call_context,
-                    retriable=False,
-                    details={
-                        "fence": "session_terminal",
-                        "reason": (
-                            completion_rejection.code
-                            if completion_rejection is not None
-                            else "session_terminal"
-                        ),
-                    },
                     arguments=arguments,
+                    started_at=started_at,
+                    call_context=call_context,
+                    completion_rejection=completion_rejection,
                 )
-                self._audit_trail.append(fenced["audit"])
-                logger.warning(
-                    "[ToolSession] dropped late tool result: execution_id=%s tool=%s",
-                    self._execution_id,
-                    tool_name,
-                )
-                return fenced
             if cache_key is not None and self._is_cacheable_non_retriable(result):
                 self._non_retriable_results[cache_key] = result
             self._audit_trail.append(result["audit"])
             return result
 
     # ----- Gates (called with lock held) -----
+
+    @staticmethod
+    def _claim_completion_locked(
+        completion_guard: Optional[Callable[[Callable[[], None]], None]],
+    ) -> Optional[ExecutionFenceRejected]:
+        """Claim one terminal result through the caller's completion fence."""
+        if completion_guard is None:
+            return None
+
+        completion_claimed = False
+
+        def _claim_completion() -> None:
+            nonlocal completion_claimed
+            if completion_claimed:
+                raise RuntimeError(
+                    "completion_guard claimed one tool result more than once"
+                )
+            completion_claimed = True
+
+        try:
+            completion_guard(_claim_completion)
+        except ExecutionFenceRejected as exc:
+            return exc
+        if not completion_claimed:
+            raise RuntimeError(
+                "completion_guard returned without claiming the tool result"
+            )
+        return None
+
+    def _drop_late_result_locked(
+        self,
+        *,
+        tool_name: str,
+        arguments: Any,
+        started_at: float,
+        call_context: ToolAccessContext,
+        completion_rejection: Optional[ExecutionFenceRejected],
+    ) -> Dict[str, Any]:
+        """Audit and return one result rejected at its terminal fence."""
+        self._dropped_results += 1
+        fenced = build_tool_error_result(
+            tool_name=tool_name,
+            code="late_result_dropped",
+            message="Tool result arrived after the session terminal state and was dropped.",
+            started_at=started_at,
+            context=call_context,
+            retriable=False,
+            details={
+                "fence": "session_terminal",
+                "reason": (
+                    completion_rejection.code
+                    if completion_rejection is not None
+                    else "session_terminal"
+                ),
+            },
+            arguments=arguments,
+        )
+        self._audit_trail.append(fenced["audit"])
+        logger.warning(
+            "[ToolSession] dropped late tool result: execution_id=%s tool=%s",
+            self._execution_id,
+            tool_name,
+        )
+        return fenced
 
     def _gate_locked(
         self, tool_name: str
