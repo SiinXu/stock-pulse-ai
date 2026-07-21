@@ -49,14 +49,6 @@ _SWITCH_PATTERN = re.compile(
     r"换成|改看|分析|看看|研究|诊断|\b(?:analy[sz]e|switch(?:\s+to)?|look\s+at|review)\b",
     re.IGNORECASE,
 )
-_ENGLISH_EXPLICIT_TICKER_PATTERN = re.compile(
-    r"(?i:^\s*(?:analy[sz]e|switch(?:\s+to)?|look\s+at|review)\s+)"
-    r"([A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?)(?![A-Za-z0-9._/\\-])"
-)
-_CJK_EXPLICIT_TICKER_PATTERN = re.compile(
-    r"^\s*(?:换成|改看|分析|看看|研究|诊断)\s*"
-    r"([A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?)(?![A-Za-z0-9._/\\-])"
-)
 _EXCHANGE_QUALIFIED_TOKEN_PATTERN = re.compile(
     r"(?<![A-Za-z0-9._/:\\-])(?:"
     r"(?:SH|SZ|SS|BJ|HK)\.?\d+|"
@@ -64,15 +56,17 @@ _EXCHANGE_QUALIFIED_TOKEN_PATTERN = re.compile(
     r")(?![A-Za-z0-9._/:\\-])",
     re.IGNORECASE,
 )
-_RAW_SYMBOL_TOKEN = r"[A-Za-z0-9][A-Za-z0-9._/:\\-]*"
+_RAW_SYMBOL_TOKEN = (
+    r"[A-Za-z0-9](?:[A-Za-z0-9._/:\\-]*[A-Za-z0-9])?"
+)
 _EXPLICIT_COMMAND_RAW_SLOT_PATTERNS = (
     re.compile(
-        r"^\s*(?:analy[sz]e|switch(?:\s+to)?|look\s+at|review)\s+"
+        r"\b(?:analy[sz]e|switch(?:\s+to)?|look\s+at|review)\s+"
         rf"(?P<slot>{_RAW_SYMBOL_TOKEN})",
         re.IGNORECASE,
     ),
     re.compile(
-        r"^\s*(?:换成|改看|分析|看看|研究|诊断)\s*"
+        r"(?:换成|改看|分析|看看|研究|诊断)\s*"
         rf"(?P<slot>{_RAW_SYMBOL_TOKEN})",
     ),
 )
@@ -101,6 +95,14 @@ _INFIX_ENGLISH_RAW_COMPARE_PAIR_PATTERN = re.compile(
 _LEADING_COMPARE_RAW_SLOT_PATTERN = re.compile(
     rf"^\s*(?:vs\.?|versus)\s+(?P<slot>{_RAW_SYMBOL_TOKEN})",
     re.IGNORECASE,
+)
+_NATURAL_TARGET_RAW_SLOT_PATTERNS = (
+    re.compile(
+        rf"\b(?:what\s+about|how\s+is|"
+        rf"(?:say|says|said|think|thinks)\s+about|"
+        rf"comments?\s+(?:on|about))\s+(?P<slot>{_RAW_SYMBOL_TOKEN})",
+        re.IGNORECASE,
+    ),
 )
 _LETTER_SYMBOL_TOKEN_PATTERN = re.compile(
     r"(?<![A-Za-z0-9._/:\\-])"
@@ -380,9 +382,20 @@ def _has_malformed_explicit_stock_request(text: str) -> bool:
         if statuses == {"topic", "valid"}:
             return True
 
-    for match in _ACTIVE_COMPARE_RAW_SLOT_PATTERN.finditer(text):
-        if _classify_explicit_slot(match.group("slot"), text) == "malformed":
-            return True
+    for pattern in (
+        _ACTIVE_COMPARE_RAW_SLOT_PATTERN,
+        _LEADING_COMPARE_RAW_SLOT_PATTERN,
+    ):
+        for match in pattern.finditer(text):
+            if _classify_explicit_slot(match.group("slot"), text) == "malformed":
+                return True
+
+    bare_slot = re.fullmatch(_RAW_SYMBOL_TOKEN, text.strip())
+    if (
+        bare_slot is not None
+        and _classify_explicit_slot(bare_slot.group(0), text) == "malformed"
+    ):
+        return True
     return False
 
 
@@ -417,11 +430,8 @@ def _is_strong_compare_message(text: str) -> bool:
         return True
 
     command_spans = {
-        match.span(1)
-        for pattern in (
-            _ENGLISH_EXPLICIT_TICKER_PATTERN,
-            _CJK_EXPLICIT_TICKER_PATTERN,
-        )
+        match.span("slot")
+        for pattern in _EXPLICIT_COMMAND_RAW_SLOT_PATTERNS
         for match in pattern.finditer(text)
     }
     for match in _VS_COMPARE_PATTERN.finditer(text):
@@ -447,6 +457,26 @@ def _is_spaced_exchange_affix(
             r"(?<!\d)\d{5,6}\s+$",
             text[:candidate_start],
         )
+    )
+
+
+def _append_natural_target_candidate(
+    candidates: List[str],
+    candidate: str,
+    text: str,
+) -> None:
+    """Accept direct natural-language targets with format or index evidence."""
+    normalized = _normalize_stock_code(candidate)
+    if not normalized or _is_compare_pronoun(candidate):
+        return
+    if any(character.isdigit() for character in candidate):
+        _append_candidate(candidates, candidate, text, explicit=True)
+        return
+    _append_indexed_slot_candidate(
+        candidates,
+        candidate,
+        text,
+        explicit=True,
     )
 
 
@@ -513,7 +543,7 @@ def _extract_stock_code_evidence(text: str) -> _StockCodeExtraction:
             )
         if _is_indicator_command_topic(text, raw, match.end("slot")):
             break
-        if raw.lower() == "it":
+        if raw.lower() == "it" and raw != "IT":
             break
         if _classify_explicit_slot(raw, text) == "valid":
             _append_explicit_slot_candidate(
@@ -589,6 +619,15 @@ def _extract_stock_code_evidence(text: str) -> _StockCodeExtraction:
             explicit=True,
         )
 
+    natural_target_candidates: List[str] = []
+    for pattern in _NATURAL_TARGET_RAW_SLOT_PATTERNS:
+        for match in pattern.finditer(text):
+            _append_natural_target_candidate(
+                natural_target_candidates,
+                match.group("slot"),
+                text,
+            )
+
     if comparison_candidates:
         return _StockCodeExtraction(
             stock_codes=tuple(comparison_candidates),
@@ -602,6 +641,11 @@ def _extract_stock_code_evidence(text: str) -> _StockCodeExtraction:
     if bare_candidates:
         return _StockCodeExtraction(
             stock_codes=tuple(bare_candidates),
+            switch_evidence=True,
+        )
+    if natural_target_candidates:
+        return _StockCodeExtraction(
+            stock_codes=tuple(natural_target_candidates),
             switch_evidence=True,
         )
 

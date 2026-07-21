@@ -10,6 +10,7 @@ from bot.commands.base import BotCommand
 from bot.models import BotMessage, BotResponse, ChatType
 from src.agent.public_contract import (
     AGENT_CHAT_FAILURE_MESSAGE,
+    get_agent_public_degraded_content,
     sanitize_agent_diagnostic,
 )
 from src.config import get_config
@@ -115,14 +116,17 @@ class ChatCommand(BotCommand):
             if result.success:
                 return BotResponse.text_response(result.content)
             else:
+                public_degraded_content = get_agent_public_degraded_content(result)
                 logger.error(
                     "Chat command Agent result failed: session_id=%s diagnostic=%s",
                     session_id,
                     sanitize_agent_diagnostic(result.error),
                 )
+                if public_degraded_content:
+                    return BotResponse.text_response(public_degraded_content)
                 return BotResponse.text_response(f"⚠️ {AGENT_CHAT_FAILURE_MESSAGE}")
                 
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Bot returns the stable public Chat failure.
             logger.error(
                 "Chat command failed: session_id=%s exception_type=%s diagnostic=%s",
                 session_id,

@@ -349,6 +349,35 @@ class TestChatCommandCompatibility(unittest.TestCase):
         self.assertNotIn("private.example", "\n".join(logs.output))
         self.assertIn("[REDACTED]", "\n".join(logs.output))
 
+    def test_chat_command_exposes_only_trusted_degraded_content(self):
+        from bot.commands.chat import ChatCommand
+
+        config = SimpleNamespace(agent_mode=True)
+        executor = MagicMock()
+        executor.chat.return_value = SimpleNamespace(
+            success=False,
+            content="provider secret must stay hidden",
+            error="provider secret must stay hidden",
+            public_degraded_content=(
+                "Cross-market synthesis was unavailable.\n\n"
+                "## AAPL\nUnavailable: quote unavailable"
+            ),
+        )
+        db = MagicMock()
+        db.conversation_session_exists.return_value = False
+
+        with patch("bot.commands.chat.get_config", return_value=config), \
+             patch("src.storage.get_db", return_value=db), \
+             patch("src.agent.factory.build_agent_executor", return_value=executor):
+            response = ChatCommand().execute(
+                _make_message("/chat compare AAPL and TSLA"),
+                ["compare", "AAPL", "and", "TSLA"],
+            )
+
+        self.assertIn("## AAPL", response.text)
+        self.assertIn("quote unavailable", response.text)
+        self.assertNotIn("provider secret", response.text)
+
     def test_chat_command_exception_returns_only_public_message(self):
         from bot.commands.chat import ChatCommand
         from src.agent.public_contract import AGENT_CHAT_FAILURE_MESSAGE

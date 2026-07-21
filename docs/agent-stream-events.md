@@ -53,6 +53,11 @@ Unknown event types should be ignored or displayed with a generic fallback.
 | `done` | SSE endpoint | The request completed. | `success`, `content`, `error`, `total_steps`, `session_id` |
 | `error` | SSE endpoint | The request failed before normal completion. | `message` |
 
+A `done` event with `success=false` normally keeps `content` empty. The only
+Chat exception is an all-unavailable multi-symbol comparison: it remains a
+failed execution but may carry the orchestrator's sanitized, per-symbol
+limitation text. Arbitrary provider or tool failure content is never forwarded.
+
 ## Web Behavior
 
 The Web chat UI now recognizes `stage_start`, `stage_done`,

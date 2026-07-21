@@ -58,6 +58,7 @@ from src.agent.public_contract import (
     AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
     AGENT_CHAT_FAILURE_MESSAGE,
     AGENT_EXECUTION_FAILURE_MESSAGE,
+    encode_agent_degraded_history_content,
     sanitize_agent_diagnostic,
 )
 from src.agent.risk_override import (
@@ -115,6 +116,7 @@ class OrchestratorResult:
     runtime_facts: Optional[AgentRuntimeFacts] = None
     cancelled: bool = False
     timed_out: bool = False
+    public_degraded_content: str = ""
 
 
 class _StageProgressFence:
@@ -549,6 +551,7 @@ class AgentOrchestrator:
             runtime_facts=orch_result.runtime_facts,
             cancelled=orch_result.cancelled,
             timed_out=orch_result.timed_out,
+            public_degraded_content=orch_result.public_degraded_content,
         )
 
     def chat(
@@ -573,7 +576,6 @@ class AgentOrchestrator:
         resolution_context = dict(stored_context) if isinstance(stored_context, dict) else {}
         resolution_context.update(context or {})
         scope_resolution = resolve_stock_scope(message, resolution_context)
-        session.update_market_context(scope_resolution.effective_context)
 
         config = self.config or getattr(self.llm_adapter, "_config", None) or get_config()
         history = build_visible_chat_history(session_id, self.llm_adapter, config)
@@ -592,7 +594,15 @@ class AgentOrchestrator:
         )
 
         # Persist user turn
-        conversation_manager.add_message(session_id, "user", message)
+        user_message_id = conversation_manager.add_message(
+            session_id,
+            "user",
+            message,
+        )
+        session.update_market_context(
+            scope_resolution.effective_context,
+            anchor_user_message_id=user_message_id,
+        )
 
         try:
             stock_scope = scope_resolution.stock_scope
@@ -665,11 +675,20 @@ class AgentOrchestrator:
                 session_id,
                 sanitize_agent_diagnostic(orch_result.error),
             )
-            conversation_manager.add_message(
-                session_id,
-                "assistant",
-                AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
-            )
+            if orch_result.public_degraded_content:
+                conversation_manager.add_message(
+                    session_id,
+                    "assistant",
+                    encode_agent_degraded_history_content(
+                        orch_result.public_degraded_content
+                    ),
+                )
+            else:
+                conversation_manager.add_message(
+                    session_id,
+                    "assistant",
+                    AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
+                )
 
         return AgentResult(
             success=orch_result.success,
@@ -684,6 +703,7 @@ class AgentOrchestrator:
             runtime_facts=orch_result.runtime_facts,
             cancelled=orch_result.cancelled,
             timed_out=orch_result.timed_out,
+            public_degraded_content=orch_result.public_degraded_content,
         )
 
     def _build_chat_pipeline_context(
@@ -910,8 +930,14 @@ class AgentOrchestrator:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ]
+        has_usable_evidence = any(
+            result.success and bool(result.content)
+            for _, result in per_symbol_results
+        )
         loop_result = None
-        if timeout_seconds is None or timeout_seconds > 0:
+        if has_usable_evidence and (
+            timeout_seconds is None or timeout_seconds > 0
+        ):
             loop_result = run_agent_loop(
                 messages=synthesis_messages,
                 tool_registry=ToolRegistry(),
@@ -937,19 +963,28 @@ class AgentOrchestrator:
             and loop_result.success
             and loop_result.content
         )
+        fallback_content = self._build_multi_symbol_fallback(
+            per_symbol_results,
+            language,
+        )
         content = (
             loop_result.content
             if synthesis_succeeded
-            else self._build_multi_symbol_fallback(per_symbol_results, language)
+            else fallback_content if has_usable_evidence else ""
+        )
+        public_degraded_content = (
+            "" if has_usable_evidence else fallback_content
         )
         if not synthesis_succeeded:
+            if not has_usable_evidence:
+                diagnostic = "no_usable_comparison_evidence"
+            elif loop_result is None:
+                diagnostic = "comparison_timeout"
+            else:
+                diagnostic = sanitize_agent_diagnostic(loop_result.error)
             logger.warning(
                 "Multi-symbol Chat synthesis degraded: diagnostic=%s",
-                (
-                    "comparison_timeout"
-                    if loop_result is None
-                    else sanitize_agent_diagnostic(loop_result.error)
-                ),
+                diagnostic,
             )
 
         models = [
@@ -960,7 +995,7 @@ class AgentOrchestrator:
         if loop_result is not None and loop_result.model:
             models.append(loop_result.model)
         return OrchestratorResult(
-            success=bool(content),
+            success=bool(content) and has_usable_evidence,
             content=content,
             tool_calls_log=[
                 call
@@ -983,12 +1018,22 @@ class AgentOrchestrator:
                 )
             ),
             model=", ".join(dict.fromkeys(models)),
-            error=None if content else AGENT_CHAT_FAILURE_MESSAGE,
+            error=(
+                None
+                if content and has_usable_evidence
+                else AGENT_CHAT_FAILURE_MESSAGE
+            ),
             timed_out=(
                 any(result.timed_out for _, result in per_symbol_results)
-                or loop_result is None
-                or bool(loop_result is not None and loop_result.timed_out)
+                or bool(
+                    has_usable_evidence
+                    and (
+                        loop_result is None
+                        or bool(loop_result.timed_out)
+                    )
+                )
             ),
+            public_degraded_content=public_degraded_content,
         )
 
     @staticmethod

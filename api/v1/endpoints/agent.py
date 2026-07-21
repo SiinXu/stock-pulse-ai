@@ -23,6 +23,7 @@ from src.agent.public_contract import (
     AGENT_STREAM_FAILURE_MESSAGE,
     AGENT_STREAM_TIMEOUT,
     AGENT_STREAM_TIMEOUT_MESSAGE,
+    get_agent_public_degraded_content,
     sanitize_agent_diagnostic,
     sanitize_stream_event,
 )
@@ -196,6 +197,7 @@ async def agent_chat(request: ChatRequest):
         )
 
         if not result.success:
+            public_degraded_content = get_agent_public_degraded_content(result)
             logger.error(
                 "Agent chat failed: session_id=%s diagnostic=%s",
                 session_id,
@@ -203,7 +205,7 @@ async def agent_chat(request: ChatRequest):
             )
             return ChatResponse(
                 success=False,
-                content="",
+                content=public_degraded_content,
                 session_id=session_id,
                 error=AGENT_CHAT_FAILED,
             )
@@ -512,6 +514,7 @@ async def agent_chat_stream(request: ChatRequest):
                 cancelled_check=lifecycle.cancelled_check,
             )
             lifecycle.finish_from_result(result)
+            public_degraded_content = get_agent_public_degraded_content(result)
             if not result.success and not getattr(result, "cancelled", False):
                 logger.error(
                     "Agent stream chat failed: session_id=%s diagnostic=%s",
@@ -522,7 +525,11 @@ async def agent_chat_stream(request: ChatRequest):
                 queue.put({
                     "type": "done",
                     "success": result.success,
-                    "content": result.content if result.success else "",
+                    "content": (
+                        result.content
+                        if result.success
+                        else public_degraded_content
+                    ),
                     "error": None if result.success else AGENT_CHAT_FAILED,
                     "message": None if result.success else AGENT_CHAT_FAILURE_MESSAGE,
                     "params": {},
@@ -533,7 +540,7 @@ async def agent_chat_stream(request: ChatRequest):
                 }),
                 loop,
             )
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - SSE emits a sanitized terminal error envelope.
             lifecycle.fail(sanitize_agent_diagnostic(exc))
             logger.error(
                 "Agent stream error: session_id=%s exception_type=%s diagnostic=%s",

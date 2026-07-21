@@ -15,6 +15,7 @@ from src.agent.public_contract import (
     AGENT_CHAT_FAILED,
     AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
     AGENT_CHAT_FAILURE_MESSAGE,
+    encode_agent_degraded_history_content,
 )
 from src.agent.runtime.guards import RuntimeGuardPolicy
 from src.agent.stock_scope import resolve_stock_scope
@@ -91,6 +92,13 @@ def test_chat_session_messages_api_does_not_expose_provider_trace(tmp_path: Path
         "assistant",
         AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
     )
+    db.save_conversation_message(
+        session_id,
+        "assistant",
+        encode_agent_degraded_history_content(
+            "## AAPL\nUnavailable: quote unavailable"
+        ),
+    )
     db.save_agent_provider_turn(
         session_id=session_id,
         run_id="run-hidden",
@@ -114,11 +122,13 @@ def test_chat_session_messages_api_does_not_expose_provider_trace(tmp_path: Path
         estimated_tokens=10,
     )
 
-    assert db.get_conversation_history(session_id)[-1] == {
+    assert db.get_conversation_history(session_id)[-2] == {
         "role": "assistant",
         "content": AGENT_CHAT_FAILURE_MESSAGE,
     }
-    assert db.get_visible_conversation_messages(session_id)[-1]["content"] == AGENT_CHAT_FAILURE_MESSAGE
+    assert db.get_visible_conversation_messages(session_id)[-1]["content"] == (
+        "## AAPL\nUnavailable: quote unavailable"
+    )
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
         client = TestClient(create_app(static_dir=tmp_path / "static"))
@@ -132,6 +142,7 @@ def test_chat_session_messages_api_does_not_expose_provider_trace(tmp_path: Path
         ("assistant", "visible answer"),
         ("assistant", AGENT_CHAT_FAILURE_MESSAGE),
         ("assistant", AGENT_CHAT_FAILURE_MESSAGE),
+        ("assistant", "## AAPL\nUnavailable: quote unavailable"),
     ]
     assert "error" not in payload["messages"][0]
     assert "params" not in payload["messages"][0]
@@ -141,6 +152,8 @@ def test_chat_session_messages_api_does_not_expose_provider_trace(tmp_path: Path
     assert payload["messages"][2]["params"] == {}
     assert payload["messages"][3]["error"] == AGENT_CHAT_FAILED
     assert payload["messages"][3]["params"] == {}
+    assert payload["messages"][4]["error"] == AGENT_CHAT_FAILED
+    assert payload["messages"][4]["params"] == {"degraded": True}
     assert "SECRET_REASONING" not in response.text
     assert "SECRET_TOOL_RESULT" not in response.text
     assert "tool_calls" not in response.text
@@ -211,7 +224,7 @@ def test_agent_chat_failure_does_not_expose_executor_details(tmp_path: Path, cap
     assert "private.example" not in caplog.text
 
 
-def test_agent_chat_returns_actual_all_unavailable_comparison_fallback(
+def test_agent_chat_returns_trusted_all_unavailable_comparison_fallback(
     tmp_path: Path,
 ) -> None:
     executor = MagicMock()
@@ -232,8 +245,8 @@ def test_agent_chat_returns_actual_all_unavailable_comparison_fallback(
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["success"] is True
-    assert payload["error"] is None
+    assert payload["success"] is False
+    assert payload["error"] == AGENT_CHAT_FAILED
     assert "## AAPL" in payload["content"]
     assert "US quote unavailable" in payload["content"]
     assert "## HK00700" in payload["content"]
@@ -384,7 +397,7 @@ def test_agent_chat_stream_failure_does_not_expose_executor_details(tmp_path: Pa
     assert "private.example" not in caplog.text
 
 
-def test_agent_chat_stream_returns_actual_all_unavailable_comparison_fallback(
+def test_agent_chat_stream_returns_trusted_all_unavailable_comparison_fallback(
     tmp_path: Path,
 ) -> None:
     executor = MagicMock()
@@ -405,7 +418,8 @@ def test_agent_chat_stream_returns_actual_all_unavailable_comparison_fallback(
 
     assert response.status_code == 200
     assert '"type": "done"' in response.text
-    assert '"success": true' in response.text
+    assert '"success": false' in response.text
+    assert '"error": "agent_chat_failed"' in response.text
     assert "## AAPL" in response.text
     assert "US quote unavailable" in response.text
     assert "## HK00700" in response.text

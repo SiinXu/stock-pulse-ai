@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 if TYPE_CHECKING:
@@ -44,6 +44,7 @@ A_SHARE_ONLY_CHAT_TOOLS = frozenset({
     "get_chip_distribution",
     "get_sector_rankings",
 })
+MARKET_INDEX_CHAT_REGIONS = frozenset({"cn", "hk", "us"})
 
 SUMMARY_SYSTEM_PROMPT = """你是股票问答系统的会话压缩器，只能总结已经出现过的用户可见对话内容。
 
@@ -218,16 +219,43 @@ def build_agent_chat_tool_registry(
 ) -> "ToolRegistry":
     """Return the deterministic market-compatible tool surface for Chat."""
     disabled = set(market_context.disabled_tool_names)
-    if not disabled:
+    markets = tuple(market_context.markets)
+    if not disabled and not markets:
         return tool_registry
 
     from src.agent.tools.registry import ToolRegistry
 
     filtered = ToolRegistry()
     for tool_def in tool_registry.list_tools():
-        if tool_def.name not in disabled:
-            filtered.register(tool_def)
+        if tool_def.name in disabled:
+            continue
+        if tool_def.name == "get_market_indices" and markets:
+            if len(markets) != 1 or markets[0] not in MARKET_INDEX_CHAT_REGIONS:
+                continue
+            tool_def = _bind_market_indices_tool(tool_def, markets[0])
+        filtered.register(tool_def)
     return filtered
+
+
+def _bind_market_indices_tool(tool_def: Any, market: str) -> Any:
+    """Bind market-index declarations and dispatch to the current Chat market."""
+    parameters = [
+        replace(parameter, default=market, enum=[market])
+        if parameter.name == "region"
+        else parameter
+        for parameter in tool_def.parameters
+    ]
+    original_handler = tool_def.handler
+
+    def bound_handler(region: str = market) -> Any:
+        del region
+        return original_handler(region=market)
+
+    return replace(
+        tool_def,
+        parameters=parameters,
+        handler=bound_handler,
+    )
 
 
 def build_agent_chat_chip_instruction(

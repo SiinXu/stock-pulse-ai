@@ -156,7 +156,18 @@ def canonicalize_analysis_stock_code(raw: str) -> Optional[str]:
     if normalized is None:
         return None
 
-    analysis_input = f"HK{normalized}" if detect_market(normalized) == "hk" else raw
+    # Downstream provider routing treats bare letter tickers as US symbols.
+    # The public ``.US`` alias is accepted at the boundary but must not leak
+    # through as a provider-facing identity, where it is otherwise classified
+    # as an A-share code.
+    if normalized.endswith(".US"):
+        normalized = normalized[:-3]
+
+    analysis_input = (
+        f"HK{normalized}"
+        if detect_market(normalized) == "hk"
+        else normalized
+    )
     try:
         resolved = resolve_index_stock_code_for_analysis(analysis_input)
     except Exception as exc:  # broad-exception: fallback_recorded - Index failures retain canonical A/HK/US chat routing.
