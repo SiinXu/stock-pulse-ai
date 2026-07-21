@@ -245,7 +245,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Split oversized configuration modules into focused packages while preserving public import and runtime compatibility.
 - [Docs] Documented the serialized domain-artifact versioning strategy (version-tag inventory, forward/backward compatibility rules, bump procedure) in the database migrations guide and added a guard test binding the inventory to the real constants.
 - [Added] Added bounded memory and atomic local daily-provider caches with explicit invalidation, hit/miss telemetry, and marked stale-if-error fallback.
-- [Chore] Split the oversized system configuration service into focused private modules while preserving its public facade.
 <!-- New entry format: - [Type] Description (Type: Added/Changed/Fixed/Docs/Tests/Chore) -->
 <!-- Append each entry as one line at the end of this section; do not add category headings. -->
 - [Fixed] Made fork pull requests run PR Review static checks with a read-only token while skipping secret- and write-dependent review steps; same-repository pull requests retain the full advisory review flow.
@@ -256,6 +255,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Added bounded adaptive daily-provider ordering and structured health snapshot export without crossing configured priority or market capability boundaries.
 - [Docs] Documented foundation pipeline and product layer boundaries, contribution placement, upstream-compatible fix porting policy, and dual-license provenance.
 - [Added] Added a least-privilege `/claim` workflow with a one-open-issue limit and existing-assignment protection.
+- [Chore] Split the oversized system configuration service into focused private modules while preserving its public facade.
 
 ## [3.26.3] - 2026-07-15
 

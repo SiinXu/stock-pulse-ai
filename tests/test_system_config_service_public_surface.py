@@ -363,6 +363,13 @@ EXPECTED_CLASS_ANNOTATIONS = {'_LLM_CAPABILITY_ORDER': 'Tuple[str, ...]',
  '_NOTIFICATION_TEST_KEY_MAP': 'Dict[str, Tuple[str, str]]',
  '_NOTIFICATION_REQUIRED_KEY_GROUPS': 'Dict[str, Tuple[Tuple[str, ...], ...]]',
  '_NOTIFICATION_TEST_TARGET_KEYS': 'Dict[str, Tuple[str, ...]]'}
+EXPECTED_CLASS_FIRSTLINENO = 149
+EXPECTED_CLASS_STATIC_ATTRIBUTES = (
+    "_conflict",
+    "_manager",
+    "_runtime_config_provider",
+    "_runtime_scheduler",
+)
 EXPECTED_METHOD_METADATA_SHA256 = 'ed19ece76229f722b259bd9c887de114ab1ac857319ca9c45a77a6c5e69941cf'
 
 
@@ -372,6 +379,14 @@ def _descriptor_function(descriptor):
     if inspect.isfunction(descriptor):
         return descriptor
     return None
+
+
+def _iter_code_objects(code):
+    yield code
+    code_type = type(code)
+    for constant in code.co_consts:
+        if isinstance(constant, code_type):
+            yield from _iter_code_objects(constant)
 
 
 def test_system_config_service_module_surface_is_stable():
@@ -386,12 +401,23 @@ def test_system_config_service_module_surface_is_stable():
 
 def test_system_config_service_class_surface_and_metadata_are_stable():
     service = service_module.SystemConfigService
-    metadata = {"__module__", "__doc__", "__dict__", "__weakref__"}
+    metadata = {
+        "__module__",
+        "__doc__",
+        "__dict__",
+        "__weakref__",
+        "__firstlineno__",
+        "__static_attributes__",
+    }
 
     assert service.__module__ == "src.services.system_config_service"
     assert service.__mro__ == (service, object)
     assert tuple(name for name in vars(service) if name not in metadata) == EXPECTED_CLASS_SURFACE
     assert service.__annotations__ == EXPECTED_CLASS_ANNOTATIONS
+    if hasattr(service, "__firstlineno__"):
+        assert service.__firstlineno__ == EXPECTED_CLASS_FIRSTLINENO
+    if hasattr(service, "__static_attributes__"):
+        assert service.__static_attributes__ == EXPECTED_CLASS_STATIC_ATTRIBUTES
 
     method_metadata = {}
     for name, descriptor in vars(service).items():
@@ -401,6 +427,16 @@ def test_system_config_service_class_surface_and_metadata_are_stable():
         assert function.__module__ == "src.services.system_config_service"
         assert function.__qualname__ == f"SystemConfigService.{name}"
         assert function.__globals__ is service_module.__dict__
+        if hasattr(function.__code__, "co_qualname"):
+            code_qualnames = tuple(
+                code.co_qualname for code in _iter_code_objects(function.__code__)
+            )
+            assert code_qualnames[0] == function.__qualname__
+            assert all(
+                code_qualname == function.__qualname__
+                or code_qualname.startswith(f"{function.__qualname__}.")
+                for code_qualname in code_qualnames
+            )
         get_type_hints(function)
         method_metadata[name] = {
             "kind": type(descriptor).__name__,

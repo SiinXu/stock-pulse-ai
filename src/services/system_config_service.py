@@ -303,6 +303,7 @@ class SystemConfigService:
 
 _service_part_modules = __import__("sys").modules
 _service_binding_module_name = "src.services.system_config_service_parts.binding"
+_service_static_attributes = []
 if _service_binding_module_name in _service_part_modules:
     _service_binding_module = __import__("importlib").reload(
         _service_part_modules[_service_binding_module_name]
@@ -332,6 +333,13 @@ for _service_part_module_name, _service_part_class_name in (
         )
     _service_part_class = getattr(_service_part_module, _service_part_class_name)
     for _service_member_name, _service_member in vars(_service_part_class).items():
+        if _service_member_name == "__static_attributes__":
+            _service_static_attributes = list(
+                dict.fromkeys((*_service_static_attributes, *_service_member))
+            )
+            continue
+        if _service_member_name == "__firstlineno__":
+            continue
         if _service_member_name in {
             "__module__",
             "__qualname__",
@@ -352,6 +360,9 @@ for _service_part_module_name, _service_part_class_name in (
         )
         setattr(SystemConfigService, _service_member_name, _service_member)
 
+if hasattr(SystemConfigService, "__static_attributes__"):
+    SystemConfigService.__static_attributes__ = tuple(_service_static_attributes)
+
 del (
     _service_binding_module,
     _service_binding_module_name,
@@ -362,4 +373,5 @@ del (
     _service_part_module,
     _service_part_module_name,
     _service_part_modules,
+    _service_static_attributes,
 )
