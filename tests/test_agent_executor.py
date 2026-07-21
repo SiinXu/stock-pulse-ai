@@ -449,12 +449,13 @@ class TestAgentExecutor(unittest.TestCase):
         self.assertEqual(result.effective_context["stock_name"], "贵州茅台")
         self.assertEqual(result.stock_scope.allowed_stock_codes, {"600519", "AAPL"})
 
-    def test_resolve_stock_scope_keeps_ambiguous_bare_code_on_current_stock(self):
+    def test_resolve_stock_scope_switches_bare_code_from_current_stock(self):
         result = resolve_stock_scope("AAPL", {"stock_code": "600519", "stock_name": "贵州茅台"})
 
-        self.assertEqual(result.stock_scope.mode, "maintain")
-        self.assertEqual(result.effective_context["stock_code"], "600519")
-        self.assertEqual(result.stock_scope.allowed_stock_codes, {"600519"})
+        self.assertEqual(result.stock_scope.mode, "switch")
+        self.assertEqual(result.effective_context["stock_code"], "AAPL")
+        self.assertEqual(result.effective_context["stock_name"], "")
+        self.assertEqual(result.stock_scope.allowed_stock_codes, {"AAPL"})
 
     def test_run_agent_loop_does_not_persist_agent_usage_without_provider_usage(self):
         registry = _make_registry_with_echo()
