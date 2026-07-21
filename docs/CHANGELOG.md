@@ -257,7 +257,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Added a least-privilege `/claim` workflow with a one-open-issue limit and existing-assignment protection.
 - [Chore] Split the oversized system configuration service into focused private modules while preserving its public facade.
 - [Changed] Split analyzer result-processing helpers into a focused internal module while preserving the legacy facade and runtime behavior.
-- [Changed] Added canonical multi-market symbol scope, session continuity, and currency/timezone/field context to single- and multi-agent Chat flows.
 - [Changed] Added canonical A-share/HK/US Chat scope, market-specific tool filtering, session continuity, and per-symbol Multi-Agent comparison with currency/timezone/field context.
 
 ## [3.26.3] - 2026-07-15
