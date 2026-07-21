@@ -268,6 +268,10 @@ def test_single_agent_chat_routes_canonical_symbol_through_real_tool_guard(
     rendered = "\n".join(str(item.get("content") or "") for item in first_messages)
     assert f"`{canonical_code}`" in rendered
     assert market_marker in rendered
+    assert "[系统提供的本轮股票与市场上下文]" in rendered
+    assert "[系统提供的历史分析上下文" not in rendered
+    assert "好的，我会按本轮股票与市场上下文回答。" in rendered
+    assert "已了解该股票的历史分析数据" not in rendered
     session.update_market_context.assert_called_once()
 
 

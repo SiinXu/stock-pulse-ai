@@ -667,6 +667,17 @@ class AgentExecutor:
         context_parts = []
         if market_context.prompt_section:
             context_parts.append(market_context.prompt_section)
+        has_historical_context = any(
+            (context or {}).get(key)
+            for key in (
+                "previous_price",
+                "previous_change_pct",
+                "previous_analysis_summary",
+                "previous_strategy",
+                "daily_market_context",
+                "market_structure_context",
+            )
+        )
         if context:
             if context.get("stock_code"):
                 context_parts.append(f"股票代码: {context['stock_code']}")
@@ -697,9 +708,15 @@ class AgentExecutor:
             if market_structure_section:
                 context_parts.append(market_structure_section.strip())
         if context_parts:
-            context_msg = "[系统提供的历史分析上下文，可供参考对比]\n" + "\n".join(context_parts)
+            if has_historical_context:
+                context_label = "[系统提供的历史分析上下文，可供参考对比]"
+                acknowledgement = "好的，我已了解该股票的历史分析数据。请告诉我你想了解什么？"
+            else:
+                context_label = "[系统提供的本轮股票与市场上下文]"
+                acknowledgement = "好的，我会按本轮股票与市场上下文回答。"
+            context_msg = context_label + "\n" + "\n".join(context_parts)
             messages.append({"role": "user", "content": context_msg})
-            messages.append({"role": "assistant", "content": "好的，我已了解该股票的历史分析数据。请告诉我你想了解什么？"})
+            messages.append({"role": "assistant", "content": acknowledgement})
 
         messages.append({"role": "user", "content": message})
         baseline_len = len(messages)
