@@ -9,7 +9,7 @@ from typing import Optional
 import pandas as pd
 import pytest
 
-from data_provider.base import DataFetcherManager
+from data_provider.base import DataFetchError, DataFetcherManager
 from data_provider.daily_cache import DailyCacheConfig, DailyDataCache
 from src.services.run_diagnostics import (
     activate_run_diagnostic_context,
@@ -47,6 +47,8 @@ class _Provider:
         if not self.outcomes:
             raise AssertionError("provider should not have been called")
         outcome = self.outcomes.pop(0)
+        if callable(outcome):
+            outcome = outcome()
         if isinstance(outcome, BaseException):
             raise outcome
         if outcome is None:
@@ -211,8 +213,13 @@ def test_stale_data_is_used_only_after_provider_failure(
     priority: int,
 ) -> None:
     clock = _Clock()
+
+    def delayed_failure() -> None:
+        clock.advance(2.0)
+        raise TimeoutError("upstream unavailable")
+
     provider = _Provider(
-        [_frame(), TimeoutError("upstream unavailable")],
+        [_frame(), delayed_failure],
         name=provider_name,
         priority=priority,
     )
@@ -242,12 +249,45 @@ def test_stale_data_is_used_only_after_provider_failure(
     assert provider.calls == 2
     assert metadata["cache_hit"] is True
     assert metadata["is_stale"] is True
-    assert metadata["stale_seconds"] == 11
+    assert metadata["stale_seconds"] == 13
     assert diagnostics["provider_runs"][-1]["cache_hit"] is True
-    assert diagnostics["provider_runs"][-1]["stale_seconds"] == 11
+    assert diagnostics["provider_runs"][-1]["stale_seconds"] == 13
     assert manager.get_daily_cache_stats()["stale_hits"] == 1
     assert "provider_cache event=stale_hit" in caplog.text
     assert "provider_failover event=stale_cache" in caplog.text
+
+
+def test_stale_candidate_expiring_during_provider_failure_is_rejected(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    clock = _Clock()
+
+    def failure_crossing_stale_limit() -> None:
+        clock.advance(2.0)
+        raise TimeoutError("slow upstream failure")
+
+    provider = _Provider([_frame(), failure_crossing_stale_limit])
+    manager = _manager(
+        provider,
+        _cache(
+            tmp_path,
+            clock,
+            memory_ttl=5.0,
+            persistent_ttl=10.0,
+            stale_if_error=10.0,
+        ),
+    )
+    manager.get_daily_data("600519")
+    clock.advance(19.0)
+
+    caplog.set_level(logging.INFO)
+    with pytest.raises(DataFetchError):
+        manager.get_daily_data("600519")
+
+    assert provider.calls == 2
+    assert manager.get_daily_cache_stats()["stale_hits"] == 0
+    assert "provider_cache event=stale_expired" in caplog.text
 
 
 def test_corrupt_persistent_entry_fails_open_to_provider(tmp_path: Path) -> None:

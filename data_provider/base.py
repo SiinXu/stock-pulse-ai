@@ -1142,6 +1142,8 @@ class DataFetcherManager:
         if cache_lookup.stale is None:
             return None
         cache_read = self._get_daily_data_cache().use_stale(cache_lookup.stale)
+        if cache_read is None:
+            return None
         self._record_daily_cache_read(cache_read, request_start)
         logger.warning(
             "provider_failover event=stale_cache data_type=daily_data symbol=%s "

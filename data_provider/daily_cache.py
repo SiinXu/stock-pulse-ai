@@ -149,6 +149,7 @@ class DailyCacheKey:
 class DailyCacheRead:
     """One immutable cache read candidate."""
 
+    key: DailyCacheKey
     frame: pd.DataFrame
     source_name: str
     layer: str
@@ -255,6 +256,7 @@ class DailyDataCache:
     ) -> DailyCacheRead:
         age_seconds = self._age_seconds(now, entry.stored_at)
         return DailyCacheRead(
+            key=entry.key,
             frame=self._annotated_copy(
                 entry,
                 cache_hit=True,
@@ -485,12 +487,28 @@ class DailyDataCache:
             is_stale=False,
         )
 
-    def use_stale(self, read: DailyCacheRead) -> DailyCacheRead:
-        """Record that providers failed and the retained last-good value was used."""
+    def use_stale(self, read: DailyCacheRead) -> Optional[DailyCacheRead]:
+        """Revalidate and record a last-good value after the provider chain fails."""
         with self._lock:
+            now = self._clock()
+            current_age = self._age_seconds(now, read.stored_at)
+            if not self._is_stale_eligible(current_age):
+                self._record_event("stale_expired", read.layer)
+                return None
+            refreshed = self._build_read(
+                _DailyCacheEntry(
+                    key=read.key,
+                    frame=read.frame,
+                    source_name=read.source_name,
+                    stored_at=read.stored_at,
+                ),
+                layer=read.layer,
+                now=now,
+                is_stale=True,
+            )
             self._stats["stale_hits"] += 1
             self._record_event("stale_hit", read.layer)
-        return read
+        return refreshed
 
     def invalidate(self, symbol: Optional[str] = None) -> int:
         """Remove all layer entries, optionally limited to one normalized symbol."""
