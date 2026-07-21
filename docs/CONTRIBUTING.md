@@ -43,6 +43,12 @@ cp .env.example .env
 4. 推送分支：`git push origin feature/your-feature`
 5. 创建 Pull Request
 
+### 架构决策
+
+如果 PR 会改变组件边界、跨模块单一权威、运行时/持久化/部署模型、安全或故障策略，或建立可复用的大型迁移方法，PR 正文必须完成 ADR 考量：链接一个新的或既有的 ADR，或者说明为什么改动仍受现有决策约束且不需要新 ADR。编号、状态、流程和模板见 [ADR 注册表](adr/README.md)。
+
+已接受的 ADR 保留为历史记录。重大改判应新增 ADR 并互相链接，不要直接重写旧记录来隐藏原决策。
+
 ### Commit 规范
 
 使用 [Conventional Commits](https://www.conventionalcommits.org/) 规范：

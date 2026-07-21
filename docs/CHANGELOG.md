@@ -250,6 +250,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Made fork pull requests run PR Review static checks with a read-only token while skipping secret- and write-dependent review steps; same-repository pull requests retain the full advisory review flow.
 - [Added] Added configurable Agent tool, stage, and full-run guards with loop detection, stage failure isolation, and structured runtime events.
 - [Changed] Normalized A-share, Hong Kong, and US symbols across Bot analysis commands with explicit market labels and actionable unsupported-market guidance.
+- [Docs] Established an ADR registry and template, backfilled four implemented architecture decisions, and added a current component and data-flow overview.
 
 ## [3.26.3] - 2026-07-15
 
