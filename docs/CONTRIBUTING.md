@@ -43,6 +43,12 @@ cp .env.example .env
 4. 推送分支：`git push origin feature/your-feature`
 5. 创建 Pull Request
 
+### 认领 Issue
+
+对于开放且尚未分配的 Issue，请发送一条内容仅为 `/claim` 的新评论。自动化只会把 Issue 分配给发出命令的真人评论者，每个账号同时最多持有一个开放 Issue 分配。它不处理 Pull Request 评论、Bot 评论、非精确命令或已关闭 Issue，也不会覆盖已有 assignee；如果 Issue 已分配，它会保留原状态并礼貌回复。
+
+认领后请在 3 天内发布 draft Pull Request 或进展更新。这个活动窗口由维护者手动执行，不会自动过期；当前不支持 `/unclaim`，需要释放认领时请联系维护者。
+
 ### 架构决策
 
 如果 PR 会改变组件边界、跨模块单一权威、运行时/持久化/部署模型、安全或故障策略，或建立可复用的大型迁移方法，PR 正文必须完成 ADR 考量：链接一个新的或既有的 ADR，或者说明为什么改动仍受现有决策约束且不需要新 ADR。编号、状态、流程和模板见 [ADR 注册表](adr/README.md)。

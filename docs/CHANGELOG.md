@@ -254,6 +254,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Split pipeline orchestration and persistence stages into focused modules while preserving the legacy facade and runtime behavior.
 - [Changed] Added bounded adaptive daily-provider ordering and structured health snapshot export without crossing configured priority or market capability boundaries.
 - [Docs] Documented foundation pipeline and product layer boundaries, contribution placement, upstream-compatible fix porting policy, and dual-license provenance.
+- [Added] Added a least-privilege `/claim` workflow with a one-open-issue limit and existing-assignment protection.
 
 ## [3.26.3] - 2026-07-15
 
