@@ -203,9 +203,9 @@ class CommandDispatcher:
 
 `/analyze` 仍统一提交到 `AnalysisTaskQueue`；多市场归一化不会新增 Bot 专属任务生命周期，也不会改变 Task ID、进行中去重、状态枚举或通知回复目标。
 
-`/chat` 会从首轮消息识别 A 股、港股和 1–5 字母美股代码（包括 `F`、`T` 等单字母代码），并把 `00700.HK` / `hk00700` 统一为 `HK00700`。同一 Bot 会话的后续问题会恢复当前标的；“改看 AAPL”或“switch to AAPL”等明确语句会切换标的。比较问题只授权本轮明确出现的多个代码：若用户点名两个新标的，先前会话的 active symbol 与单标的历史不会进入本轮工具 scope。
+`/chat` 会从首轮消息识别 A 股、港股和 1–5 字母美股代码（包括 `F`、`T` 等单字母代码），并把 `00700.HK` / `hk00700` 统一为 `HK00700`。裸代码加问号、`AAPL price?`、`Tell me about AAPL` 等常见问法也会建立同一规范 scope；全角或半角连接符拼接的无效代码会整体拒绝，不会把片段当成股票。同一 Bot 会话的持久化恢复以明确点名标的的用户消息为准；“改看 AAPL”或“switch to AAPL”等明确语句会切换标的。比较问题只授权本轮明确出现的多个代码：若用户点名两个新标的，先前会话的 active symbol 与单标的历史不会进入本轮工具 scope。
 
-Agent prompt 会带入对应市场的交易规则、计价货币、时区和专属字段。`get_chip_distribution`、`get_capital_flow` 与 `get_sector_rankings` 仅适用于 A 股；港股、美股 Chat 不会暴露或要求调用这些工具。Single-Agent 混合市场轮次采用保守过滤，同样不暴露这三项；Multi-Agent 比较则按标的隔离能力，只在 A 股 pipeline 暴露，非 A 股 pipeline 不暴露。Multi-Agent 随后用无工具综合步骤生成跨市场结论，所有逐标的阶段与综合步骤共享同一个总超时预算。工具或数据源缺少其他覆盖时会明确说明限制，不会用 A 股默认值补齐。
+Agent prompt 会带入对应市场的交易规则、计价货币、时区和专属字段。`get_chip_distribution`、`get_capital_flow` 与 `get_sector_rankings` 仅适用于 A 股；港股、美股 Chat 不会暴露或要求调用这些工具。Single-Agent 混合市场轮次采用保守过滤，同样不暴露这三项；Multi-Agent 比较则按标的隔离能力，只在 A 股 pipeline 暴露，非 A 股 pipeline 不暴露。Multi-Agent 随后用无工具综合步骤生成跨市场结论，所有逐标的阶段与综合步骤共享同一个总超时预算。若某个标的失败或超时，代码会在成功综合后确定性追加该标的的数据限制，不能由模型省略；若全部标的均不可用，则执行保持失败并沿用统一错误与空内容。工具或数据源缺少其他覆盖时不会用 A 股默认值补齐。
 
 ## 五、`/status` 与模型配置诊断说明
 

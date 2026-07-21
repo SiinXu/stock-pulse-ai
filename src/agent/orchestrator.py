@@ -902,12 +902,28 @@ class AgentOrchestrator:
 
         evidence = []
         for stock_code, result in per_symbol_results:
+            status = (
+                "partial"
+                if result.success and result.content and result.timed_out
+                else "available"
+                if result.success and result.content
+                else "unavailable"
+            )
             evidence.append({
                 "stock_code": stock_code,
-                "status": "available" if result.success and result.content else "unavailable",
+                "status": status,
                 "analysis": result.content if result.success else "",
                 "diagnostic": (
-                    "" if result.success else sanitize_agent_diagnostic(result.error)
+                    ""
+                    if status == "available"
+                    else sanitize_agent_diagnostic(
+                        result.error
+                        or (
+                            "Analysis timed out before all stages completed."
+                            if result.timed_out
+                            else AGENT_CHAT_FAILURE_MESSAGE
+                        )
+                    )
                 ),
             })
         user_prompt = "\n\n".join(
@@ -922,8 +938,14 @@ class AgentOrchestrator:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ]
+        has_usable_evidence = any(
+            result.success and bool(result.content)
+            for _, result in per_symbol_results
+        )
         loop_result = None
-        if timeout_seconds is None or timeout_seconds > 0:
+        if has_usable_evidence and (
+            timeout_seconds is None or timeout_seconds > 0
+        ):
             loop_result = run_agent_loop(
                 messages=synthesis_messages,
                 tool_registry=ToolRegistry(),
@@ -949,19 +971,30 @@ class AgentOrchestrator:
             and loop_result.success
             and loop_result.content
         )
-        content = (
-            loop_result.content
-            if synthesis_succeeded
-            else self._build_multi_symbol_fallback(per_symbol_results, language)
+        fallback_content = self._build_multi_symbol_fallback(
+            per_symbol_results,
+            language,
         )
+        if synthesis_succeeded:
+            content = loop_result.content
+            limitations = self._build_multi_symbol_limitations(
+                per_symbol_results,
+                language,
+            )
+            if limitations:
+                content = f"{content}\n\n{limitations}"
+        else:
+            content = fallback_content if has_usable_evidence else ""
         if not synthesis_succeeded:
+            if not has_usable_evidence:
+                diagnostic = "no_usable_comparison_evidence"
+            elif loop_result is None:
+                diagnostic = "comparison_timeout"
+            else:
+                diagnostic = sanitize_agent_diagnostic(loop_result.error)
             logger.warning(
                 "Multi-symbol Chat synthesis degraded: diagnostic=%s",
-                (
-                    "comparison_timeout"
-                    if loop_result is None
-                    else sanitize_agent_diagnostic(loop_result.error)
-                ),
+                diagnostic,
             )
 
         models = [
@@ -972,7 +1005,7 @@ class AgentOrchestrator:
         if loop_result is not None and loop_result.model:
             models.append(loop_result.model)
         return OrchestratorResult(
-            success=bool(content),
+            success=bool(content) and has_usable_evidence,
             content=content,
             tool_calls_log=[
                 call
@@ -995,13 +1028,51 @@ class AgentOrchestrator:
                 )
             ),
             model=", ".join(dict.fromkeys(models)),
-            error=None if content else AGENT_CHAT_FAILURE_MESSAGE,
+            error=(
+                None
+                if content and has_usable_evidence
+                else AGENT_CHAT_FAILURE_MESSAGE
+            ),
             timed_out=(
                 any(result.timed_out for _, result in per_symbol_results)
-                or loop_result is None
-                or bool(loop_result is not None and loop_result.timed_out)
+                or bool(
+                    has_usable_evidence
+                    and (
+                        loop_result is None
+                        or bool(loop_result.timed_out)
+                    )
+                )
             ),
         )
+
+    @staticmethod
+    def _build_multi_symbol_limitations(
+        per_symbol_results: List[tuple[str, OrchestratorResult]],
+        report_language: str,
+    ) -> str:
+        """Build deterministic missing/partial-leg disclosure for synthesis."""
+        english = report_language in {"en", "ko"}
+        entries = []
+        for stock_code, result in per_symbol_results:
+            if result.success and result.content and not result.timed_out:
+                continue
+            diagnostic = sanitize_agent_diagnostic(
+                result.error
+                or (
+                    "Analysis timed out before all stages completed."
+                    if result.timed_out
+                    else AGENT_CHAT_FAILURE_MESSAGE
+                )
+            )
+            if result.timed_out:
+                label = "Timed out or partial" if english else "超时或仅部分完成"
+            else:
+                label = "Unavailable" if english else "不可用"
+            entries.append(f"- `{stock_code}`: {label}: {diagnostic}")
+        if not entries:
+            return ""
+        heading = "### Data limitations" if english else "### 数据限制"
+        return "\n".join([heading, *entries])
 
     @staticmethod
     def _build_multi_symbol_fallback(
@@ -1020,6 +1091,17 @@ class AgentOrchestrator:
         for stock_code, result in per_symbol_results:
             if result.success and result.content:
                 body = result.content
+                if result.timed_out:
+                    diagnostic = sanitize_agent_diagnostic(
+                        result.error
+                        or "Analysis timed out before all stages completed."
+                    )
+                    limitation = (
+                        f"Limitation: timed out or partial: {diagnostic}"
+                        if report_language in {"en", "ko"}
+                        else f"限制：超时或仅部分完成：{diagnostic}"
+                    )
+                    body = f"{body}\n\n{limitation}"
             else:
                 diagnostic = sanitize_agent_diagnostic(
                     result.error

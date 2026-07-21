@@ -259,6 +259,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Split analyzer result-processing helpers into a focused internal module while preserving the legacy facade and runtime behavior.
 - [Changed] Added canonical A-share/HK/US Chat scope, market-specific tool filtering, session continuity, and per-symbol Multi-Agent comparison with currency/timezone/field context.
 - [Changed] Split GeminiAnalyzer generation, analysis, and response methods into focused internal modules while preserving the legacy class facade and runtime behavior.
+- [Changed] Added atomic natural-language A-share/HK/US Chat scope, market-specific tool filtering, monotonic session continuity, and per-symbol Multi-Agent comparison with deterministic partial-support limitations.
 
 ## [3.26.3] - 2026-07-15
 

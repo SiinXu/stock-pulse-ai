@@ -211,7 +211,7 @@ def test_agent_chat_failure_does_not_expose_executor_details(tmp_path: Path, cap
     assert "private.example" not in caplog.text
 
 
-def test_agent_chat_returns_actual_all_unavailable_comparison_fallback(
+def test_agent_chat_keeps_all_unavailable_comparison_failure_content_empty(
     tmp_path: Path,
 ) -> None:
     executor = MagicMock()
@@ -232,12 +232,12 @@ def test_agent_chat_returns_actual_all_unavailable_comparison_fallback(
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["success"] is True
-    assert payload["error"] is None
-    assert "## AAPL" in payload["content"]
-    assert "US quote unavailable" in payload["content"]
-    assert "## HK00700" in payload["content"]
-    assert "HK quote unavailable" in payload["content"]
+    assert payload == {
+        "success": False,
+        "content": "",
+        "session_id": "all-unavailable-rest",
+        "error": AGENT_CHAT_FAILED,
+    }
 
 
 def test_agent_research_failure_does_not_expose_internal_result(tmp_path: Path) -> None:
@@ -384,7 +384,7 @@ def test_agent_chat_stream_failure_does_not_expose_executor_details(tmp_path: Pa
     assert "private.example" not in caplog.text
 
 
-def test_agent_chat_stream_returns_actual_all_unavailable_comparison_fallback(
+def test_agent_chat_stream_keeps_all_unavailable_failure_content_empty(
     tmp_path: Path,
 ) -> None:
     executor = MagicMock()
@@ -405,11 +405,11 @@ def test_agent_chat_stream_returns_actual_all_unavailable_comparison_fallback(
 
     assert response.status_code == 200
     assert '"type": "done"' in response.text
-    assert '"success": true' in response.text
-    assert "## AAPL" in response.text
-    assert "US quote unavailable" in response.text
-    assert "## HK00700" in response.text
-    assert "HK quote unavailable" in response.text
+    assert '"success": false' in response.text
+    assert '"content": ""' in response.text
+    assert '"error": "agent_chat_failed"' in response.text
+    assert "US quote unavailable" not in response.text
+    assert "HK quote unavailable" not in response.text
 
 
 def test_agent_chat_stream_callback_error_is_replaced_with_safe_event(tmp_path: Path) -> None:

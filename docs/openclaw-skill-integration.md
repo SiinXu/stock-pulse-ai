@@ -167,9 +167,9 @@ curl -X POST {DSA_BASE_URL}/api/v1/agent/chat \
 
 响应包含 `content`（分析结论）和 `session_id`（用于多轮对话）。
 
-Agent Chat 会在首轮消息中直接识别并规范化 A 股、港股和 1–5 字母美股代码，例如 `600519`、`hk00700` / `00700.HK`、`AAPL`、`F`；调用股票范围工具时分别使用 `600519`、`HK00700`、`AAPL`、`F`。同一个 `session_id` 的后续问题会从已持久化的用户消息恢复当前单一标的；使用“改看 / 换成 / analyze”等明确切换语句可更新当前标的。比较语句只授权本轮明确出现的多个规范代码；点名两个新标的时，旧 active symbol 与旧单标的分析字段不会进入本轮 scope。
+Agent Chat 会在首轮消息中直接识别并规范化 A 股、港股和 1–5 字母美股代码，例如 `600519`、`hk00700` / `00700.HK`、`AAPL`、`F`；裸代码问号、`AAPL price?` 与 `Tell me about AAPL` 等常见问法会建立相同 scope，全角或半角连接符拼接的无效代码则整体拒绝。调用股票范围工具时分别使用 `600519`、`HK00700`、`AAPL`、`F`。同一个 `session_id` 的后续问题会从已持久化且明确点名标的的用户消息恢复当前单一标的；使用“改看 / 换成 / analyze”等明确切换语句可更新当前标的。若调用方只通过请求体 `context.stock_code` 指定标的而消息正文没有点名，该上下文会保留在当前进程缓存，但不会写入用户消息；若要在进程重启或缓存失效后继续，后续请求必须再次发送。比较语句只授权本轮明确出现的多个规范代码；点名两个新标的时，旧 active symbol 与旧单标的分析字段不会进入本轮 scope。
 
-每轮 prompt 会提供对应市场的计价货币、交易时区和重点字段：A 股为 CNY / `Asia/Shanghai`，港股为 HKD / `Asia/Hong_Kong`，美股为 USD / `America/New_York`（含常规、盘前和盘后字段）。`get_chip_distribution`、`get_capital_flow` 与 `get_sector_rankings` 仅支持 A 股，港股和美股轮次不会暴露或要求调用这三个工具；Single-Agent 混合轮次保守移除三项，Multi-Agent 比较则按标的隔离，只在 A 股 pipeline 暴露。Multi-Agent 随后执行无工具综合，所有逐标的阶段与综合步骤共享同一个总超时预算。若 provider 或其他工具未覆盖某个市场或字段，Agent 必须明确说明限制并基于已有数据继续，不得编造数据或用 A 股默认值补齐。非流式 `/chat` 与流式 `/chat/stream` 共用该后端上下文和工具 scope 契约。
+每轮 prompt 会提供对应市场的计价货币、交易时区和重点字段：A 股为 CNY / `Asia/Shanghai`，港股为 HKD / `Asia/Hong_Kong`，美股为 USD / `America/New_York`（含常规、盘前和盘后字段）。`get_chip_distribution`、`get_capital_flow` 与 `get_sector_rankings` 仅支持 A 股，港股和美股轮次不会暴露或要求调用这三个工具；Single-Agent 混合轮次保守移除三项，Multi-Agent 比较则按标的隔离，只在 A 股 pipeline 暴露。Multi-Agent 随后执行无工具综合，所有逐标的阶段与综合步骤共享同一个总超时预算。成功综合后，后端会确定性追加所有失败或超时标的的数据限制；若全部标的不可用，REST 与 SSE 保持 `success=false`、统一错误码和空 `content`。不得编造缺失数据或用 A 股默认值补齐。非流式 `/chat` 与流式 `/chat/stream` 共用该后端上下文、工具 scope 与失败契约。
 
 ```bash
 # 港股首轮查询；后续请求复用响应中的 session_id

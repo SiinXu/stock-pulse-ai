@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Set
 
@@ -50,14 +51,28 @@ _SWITCH_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _EXCHANGE_QUALIFIED_TOKEN_PATTERN = re.compile(
-    r"(?<![A-Za-z0-9._/:\\-])(?:"
+    r"(?<![-A-Za-z0-9._/:\\+|&,;=])(?:"
     r"(?:SH|SZ|SS|BJ|HK)\.?\d+|"
     r"\d+\.(?:SH|SZ|SS|BJ|HK|US|T|KS|KQ|TW|TWO)"
-    r")(?![A-Za-z0-9._/:\\-])",
+    r")(?![-A-Za-z0-9._/:\\+|&,;=])",
     re.IGNORECASE,
 )
 _RAW_SYMBOL_TOKEN = (
-    r"[A-Za-z0-9](?:[A-Za-z0-9._/:\\-]*[A-Za-z0-9])?"
+    r"[A-Za-z0-9](?:[-A-Za-z0-9._/:\\+|&,;=]*[A-Za-z0-9])?"
+)
+_SPACED_EXCHANGE_RAW_SLOT = (
+    r"(?:(?:SH|SZ|SS|BJ|HK)\s+\d{1,6}|"
+    r"\d{1,6}\s+(?:SH|SZ|SS|BJ|HK))"
+)
+_COMPARISON_RAW_SLOT = rf"(?:{_SPACED_EXCHANGE_RAW_SLOT}|{_RAW_SYMBOL_TOKEN})"
+_JOINED_SLOT_WHITESPACE_PATTERN = re.compile(
+    r"(?<=[A-Za-z0-9])\s*([:/\\+|&_;=\-])\s*(?=[A-Za-z0-9])"
+)
+_JOINED_COMMA_WHITESPACE_PATTERN = re.compile(
+    r"(?<=[A-Za-z0-9])\s*,\s*"
+    r"(?!(?:and|with|to|vs\.?|versus|和|与|跟)\b)"
+    r"(?=[A-Za-z0-9])",
+    re.IGNORECASE,
 )
 _EXPLICIT_COMMAND_RAW_SLOT_PATTERNS = (
     re.compile(
@@ -66,48 +81,108 @@ _EXPLICIT_COMMAND_RAW_SLOT_PATTERNS = (
         re.IGNORECASE,
     ),
     re.compile(
-        r"(?:换成|改看|分析|看看|研究|诊断)\s*"
+        r"(?:换成|改看|分析|看看|看一下|查看|查一下|评估|研究|诊断)\s*"
         rf"(?P<slot>{_RAW_SYMBOL_TOKEN})",
     ),
 )
 _EXPLICIT_ENGLISH_RAW_COMPARE_PAIR_PATTERN = re.compile(
-    rf"\bcompare\s+(?P<left>{_RAW_SYMBOL_TOKEN})\s+"
-    rf"(?:and|with)\s+(?P<right>{_RAW_SYMBOL_TOKEN})",
+    rf"\bcompare\s+(?P<left>{_COMPARISON_RAW_SLOT})(?:\s+|\s*,\s*)"
+    rf"(?:and|with|to)\s+(?P<right>{_COMPARISON_RAW_SLOT})",
+    re.IGNORECASE,
+)
+_EXPLICIT_CHINESE_RAW_COMPARE_PAIR_PATTERN = re.compile(
+    rf"(?P<left>{_COMPARISON_RAW_SLOT})\s*"
+    rf"(?:相比|对比|比较)\s*(?P<right>{_COMPARISON_RAW_SLOT})",
     re.IGNORECASE,
 )
 _EXPLICIT_RAW_CONNECTOR_PAIR_PATTERN = re.compile(
-    rf"(?<![A-Za-z0-9._/:\\-])(?P<left>{_RAW_SYMBOL_TOKEN})\s*"
-    rf"(?:vs\.?|versus|和|与|跟)\s*(?P<right>{_RAW_SYMBOL_TOKEN})"
-    rf"(?![A-Za-z0-9._/:\\-])",
+    rf"(?<![-A-Za-z0-9._/:\\+|&,;=])"
+    rf"(?P<left>{_COMPARISON_RAW_SLOT})\s*"
+    rf"(?:vs\.?|versus|和|与|跟)\s*"
+    rf"(?P<right>{_COMPARISON_RAW_SLOT})"
+    rf"(?![-A-Za-z0-9._/:\\+|&,;=])",
     re.IGNORECASE,
 )
-_ACTIVE_COMPARE_RAW_SLOT_PATTERN = re.compile(
-    rf"\bcompar(?:e|ed)\s+(?:(?:it)\s+)?with\s+"
-    rf"(?P<slot>{_RAW_SYMBOL_TOKEN})",
-    re.IGNORECASE,
+_ACTIVE_COMPARE_RAW_SLOT_PATTERNS = (
+    re.compile(
+        rf"\bcompar(?:e|ed)\s+(?:(?:it|this|that)\s+)?(?:with|to)\s+"
+        rf"(?P<slot>{_COMPARISON_RAW_SLOT})",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        rf"(?:再\s*)?(?:和|与|跟|同)\s*"
+        rf"(?P<slot>{_COMPARISON_RAW_SLOT})\s*"
+        r"(?:比(?:较|一比|一下)?|对比|相比)",
+    ),
+    re.compile(
+        rf"(?:对比|比较)\s*(?P<slot>{_COMPARISON_RAW_SLOT})",
+    ),
+    re.compile(
+        rf"拿\s*(?P<slot>{_COMPARISON_RAW_SLOT})\s*"
+        r"(?:对比|比较|相比)",
+    ),
+    re.compile(
+        rf"(?:和|与|跟|同)\s*(?P<slot>{_COMPARISON_RAW_SLOT})\s*"
+        r"(?:的\s*)?(?:差异(?!化)|区别|不同|对照)",
+    ),
 )
 _INFIX_ENGLISH_RAW_COMPARE_PAIR_PATTERN = re.compile(
-    rf"(?<![A-Za-z0-9._/:\\-])(?P<left>{_RAW_SYMBOL_TOKEN})\s+"
-    rf"compar(?:e|ed)\s+with\s+(?P<right>{_RAW_SYMBOL_TOKEN})"
-    rf"(?![A-Za-z0-9._/:\\-])",
+    rf"(?<![-A-Za-z0-9._/:\\+|&,;=])"
+    rf"(?P<left>{_COMPARISON_RAW_SLOT})\s+"
+    rf"compar(?:e|ed)\s+(?:with|to)\s+"
+    rf"(?P<right>{_COMPARISON_RAW_SLOT})"
+    rf"(?![-A-Za-z0-9._/:\\+|&,;=])",
     re.IGNORECASE,
 )
 _LEADING_COMPARE_RAW_SLOT_PATTERN = re.compile(
-    rf"^\s*(?:vs\.?|versus)\s+(?P<slot>{_RAW_SYMBOL_TOKEN})",
+    rf"^\s*(?:vs\.?|versus)\s+(?P<slot>{_COMPARISON_RAW_SLOT})",
     re.IGNORECASE,
 )
 _NATURAL_TARGET_RAW_SLOT_PATTERNS = (
     re.compile(
         rf"\b(?:what\s+about|how\s+is|"
         rf"(?:say|says|said|think|thinks)\s+about|"
-        rf"comments?\s+(?:on|about))\s+(?P<slot>{_RAW_SYMBOL_TOKEN})",
+        rf"tell\s+(?:me|us)\s+about|"
+        rf"(?:comments?|thoughts?|opinions?|views?)\s+(?:on|about))\s+"
+        rf"(?P<slot>{_RAW_SYMBOL_TOKEN})",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        rf"\bwhat\s+is\s+(?P<slot>{_RAW_SYMBOL_TOKEN})\s+"
+        r"(?:worth|doing|trading\s+at)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        rf"\bshould\s+(?:i|we)\s+(?:buy|sell|hold)\s+"
+        rf"(?P<slot>{_RAW_SYMBOL_TOKEN})",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        rf"\bi\s+think\s+(?P<slot>{_RAW_SYMBOL_TOKEN})\s+"
+        r"(?:looks?|seems?)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        rf"\bexplain\s+(?P<slot>{_RAW_SYMBOL_TOKEN})\s+"
+        r"(?:GAAP|EPS|valuation|earnings?|filings?|guidance)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:assess|evaluate|check(?:\s+out)?)\s+"
+        rf"(?P<slot>{_RAW_SYMBOL_TOKEN})(?=\s*[?.!。！？]*\s*$)",
         re.IGNORECASE,
     ),
 )
-_LETTER_SYMBOL_TOKEN_PATTERN = re.compile(
-    r"(?<![A-Za-z0-9._/:\\-])"
-    r"(?P<slot>[A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?)"
-    r"(?![A-Za-z0-9._/:\\-])"
+_NATURAL_SUFFIX_RAW_SLOT_PATTERN = re.compile(
+    rf"^\s*(?P<slot>{_RAW_SYMBOL_TOKEN})\s*"
+    r"(?:的\s*)?(?:stock\s+|share\s+)?"
+    r"(?:price|performance|outlook|quote|valuation|fundamentals?|"
+    r"earnings?|news|trend|走势|怎么样|股价|估值|基本面|新闻|前景|展望)"
+    r"(?:\s+(?:today|now))?\s*[?.!。！？]*\s*$",
+    re.IGNORECASE,
+)
+_BARE_SYMBOL_RAW_SLOT_PATTERN = re.compile(
+    rf"^\s*(?P<slot>{_RAW_SYMBOL_TOKEN})\s*[?.!。！？]*\s*$"
 )
 _WEAK_STOCK_QUESTION_PATTERN = re.compile(
     r"\b(?:what\s+about|doing|worth|outlook|buy|sell|hold|earnings?|"
@@ -117,12 +192,18 @@ _WEAK_STOCK_QUESTION_PATTERN = re.compile(
     r"怎么样|怎么走|怎么看|走势|股价|估值|基本面|新闻|能买吗|前景|展望",
     re.IGNORECASE,
 )
-_WEAK_SINGLE_LETTER_DENY = {"A", "I"}
 _SPACED_EXCHANGE_TOKEN_PATTERN = re.compile(
-    r"(?<![A-Za-z0-9._/:\\-])(?:"
+    r"(?<![-A-Za-z0-9._/:\\+|&,;=])(?:"
     r"(?P<prefix>SH|SZ|SS|BJ|HK)\s+(?P<prefix_digits>\d{1,6})|"
     r"(?P<suffix_digits>\d{1,6})\s+(?P<suffix>SH|SZ|SS|BJ|HK)"
-    r")(?![A-Za-z0-9._/:\\-])",
+    r")(?![-A-Za-z0-9._/:\\+|&,;=])",
+    re.IGNORECASE,
+)
+_SPACED_EXCHANGE_SLOT_PATTERN = re.compile(
+    r"(?:"
+    r"(?P<prefix>SH|SZ|SS|BJ|HK)\s+(?P<prefix_digits>\d{1,6})|"
+    r"(?P<suffix_digits>\d{1,6})\s+(?P<suffix>SH|SZ|SS|BJ|HK)"
+    r")",
     re.IGNORECASE,
 )
 _EXCHANGE_TOKEN_CANDIDATES = {"SH", "SZ", "BJ", "HK", "SS"}
@@ -152,6 +233,24 @@ _INDICATOR_CONTEXT_PATTERN = re.compile(
     r"\b(?:indicator|crossover)\b|MA\d|SMA|EMA",
     re.IGNORECASE,
 )
+
+
+def _normalize_evidence_text(text: str) -> str:
+    """Normalize compatibility punctuation before applying atomic slot grammar."""
+    normalized = unicodedata.normalize("NFKC", text).replace("、", ",")
+    normalized = _JOINED_SLOT_WHITESPACE_PATTERN.sub(r"\1", normalized)
+    return _JOINED_COMMA_WHITESPACE_PATTERN.sub(",", normalized)
+
+
+def _normalize_comparison_slot(candidate: str) -> str:
+    """Fold a spaced exchange-qualified comparison operand into one token."""
+    stripped = candidate.strip()
+    match = _SPACED_EXCHANGE_SLOT_PATTERN.fullmatch(stripped)
+    if match is None:
+        return stripped
+    if match.group("prefix"):
+        return match.group("prefix") + match.group("prefix_digits")
+    return match.group("suffix_digits") + "." + match.group("suffix")
 
 
 @dataclass(frozen=True)
@@ -309,7 +408,7 @@ def _classify_explicit_slot(candidate: str, text: str) -> str:
             return "valid"
 
     has_separator_or_digit = any(
-        character.isdigit() or character in ".-_/\\:"
+        character.isdigit() or character in ".-_/\\:+|&,;="
         for character in candidate
     )
     if has_separator_or_digit:
@@ -329,11 +428,14 @@ def _is_indicator_command_topic(text: str, slot: str, slot_end: int) -> bool:
 def _is_compare_pronoun(slot: str) -> bool:
     """Keep English pronouns out of explicit comparison symbol slots."""
     lowered = slot.lower()
-    return lowered == "i" or (lowered == "it" and slot != "IT")
+    return lowered in {"i", "this", "that"} or (
+        lowered == "it" and slot != "IT"
+    )
 
 
 def _has_malformed_explicit_stock_request(text: str) -> bool:
     """Detect explicit malformed slots before stale context can be reused."""
+    text = _normalize_evidence_text(text)
     for match in _SPACED_EXCHANGE_TOKEN_PATTERN.finditer(text):
         if match.group("prefix"):
             candidate = match.group("prefix") + match.group("prefix_digits")
@@ -352,20 +454,12 @@ def _has_malformed_explicit_stock_request(text: str) -> bool:
         return _classify_explicit_slot(slot, text) == "malformed"
 
     pair_matches = list(_EXPLICIT_ENGLISH_RAW_COMPARE_PAIR_PATTERN.finditer(text))
+    pair_matches.extend(_EXPLICIT_CHINESE_RAW_COMPARE_PAIR_PATTERN.finditer(text))
     pair_matches.extend(_EXPLICIT_RAW_CONNECTOR_PAIR_PATTERN.finditer(text))
+    pair_matches.extend(_INFIX_ENGLISH_RAW_COMPARE_PAIR_PATTERN.finditer(text))
     for match in pair_matches:
-        left = match.group("left")
-        right = match.group("right")
-        if _is_spaced_exchange_affix(
-            text,
-            left,
-            match.start("left"),
-        ) or _is_spaced_exchange_affix(
-            text,
-            right,
-            match.start("right"),
-        ):
-            continue
+        left = _normalize_comparison_slot(match.group("left"))
+        right = _normalize_comparison_slot(match.group("right"))
         left_is_pronoun = _is_compare_pronoun(left)
         right_is_pronoun = _is_compare_pronoun(right)
         if left_is_pronoun or right_is_pronoun:
@@ -383,17 +477,20 @@ def _has_malformed_explicit_stock_request(text: str) -> bool:
             return True
 
     for pattern in (
-        _ACTIVE_COMPARE_RAW_SLOT_PATTERN,
+        *_ACTIVE_COMPARE_RAW_SLOT_PATTERNS,
         _LEADING_COMPARE_RAW_SLOT_PATTERN,
+        *_NATURAL_TARGET_RAW_SLOT_PATTERNS,
+        _NATURAL_SUFFIX_RAW_SLOT_PATTERN,
     ):
         for match in pattern.finditer(text):
-            if _classify_explicit_slot(match.group("slot"), text) == "malformed":
+            slot = _normalize_comparison_slot(match.group("slot"))
+            if _classify_explicit_slot(slot, text) == "malformed":
                 return True
 
-    bare_slot = re.fullmatch(_RAW_SYMBOL_TOKEN, text.strip())
+    bare_slot = _BARE_SYMBOL_RAW_SLOT_PATTERN.fullmatch(text)
     if (
         bare_slot is not None
-        and _classify_explicit_slot(bare_slot.group(0), text) == "malformed"
+        and _classify_explicit_slot(bare_slot.group("slot"), text) == "malformed"
     ):
         return True
     return False
@@ -476,7 +573,7 @@ def _append_natural_target_candidate(
         candidates,
         candidate,
         text,
-        explicit=True,
+        explicit=False,
     )
 
 
@@ -484,6 +581,7 @@ def _extract_stock_code_evidence(text: str) -> _StockCodeExtraction:
     """Extract candidates while preserving the evidence that authorizes scope."""
     if not text:
         return _StockCodeExtraction()
+    text = _normalize_evidence_text(text)
     if _has_malformed_explicit_stock_request(text):
         return _StockCodeExtraction(malformed_explicit_slot=True)
 
@@ -495,11 +593,12 @@ def _extract_stock_code_evidence(text: str) -> _StockCodeExtraction:
 
     for pattern in (
         (
-            r"(?<![A-Za-z0-9._/\\-])(?:[03648]\d{5}|92\d{4})"
-            r"(?![A-Za-z0-9._/\\-])"
+            r"(?<![-A-Za-z0-9._/:\\+|&,;=])(?:[03648]\d{5}|92\d{4})"
+            r"(?![-A-Za-z0-9._/:\\+|&,;=])"
         ),
         (
-            r"(?<![A-Za-z0-9._/\\-])\d{5}(?![A-Za-z0-9._/\\-])"
+            r"(?<![-A-Za-z0-9._/:\\+|&,;=])\d{5}"
+            r"(?![-A-Za-z0-9._/:\\+|&,;=])"
         ),
     ):
         for match in re.finditer(pattern, text):
@@ -514,17 +613,6 @@ def _extract_stock_code_evidence(text: str) -> _StockCodeExtraction:
             ):
                 continue
             _append_candidate(weak_candidates, match.group(0), text)
-
-    for match in _LETTER_SYMBOL_TOKEN_PATTERN.finditer(text):
-        if any(
-            match.start() < qualified_end and match.end() > qualified_start
-            for qualified_start, qualified_end in qualified_spans
-        ):
-            continue
-        raw = match.group("slot")
-        if len(raw) == 1 and raw.upper() in _WEAK_SINGLE_LETTER_DENY:
-            continue
-        _append_indexed_slot_candidate(weak_candidates, raw, text)
 
     command_candidates: List[str] = []
     for pattern in _EXPLICIT_COMMAND_RAW_SLOT_PATTERNS:
@@ -557,13 +645,14 @@ def _extract_stock_code_evidence(text: str) -> _StockCodeExtraction:
     comparison_candidates: List[str] = []
     pair_patterns = (
         _EXPLICIT_ENGLISH_RAW_COMPARE_PAIR_PATTERN,
+        _EXPLICIT_CHINESE_RAW_COMPARE_PAIR_PATTERN,
         _EXPLICIT_RAW_CONNECTOR_PAIR_PATTERN,
         _INFIX_ENGLISH_RAW_COMPARE_PAIR_PATTERN,
     )
     for pattern in pair_patterns:
         for match in pattern.finditer(text):
-            left = match.group("left")
-            right = match.group("right")
+            left = _normalize_comparison_slot(match.group("left"))
+            right = _normalize_comparison_slot(match.group("right"))
             left_is_pronoun = _is_compare_pronoun(left)
             right_is_pronoun = _is_compare_pronoun(right)
             if left_is_pronoun or right_is_pronoun:
@@ -596,11 +685,11 @@ def _extract_stock_code_evidence(text: str) -> _StockCodeExtraction:
             )
 
     for pattern in (
-        _ACTIVE_COMPARE_RAW_SLOT_PATTERN,
+        *_ACTIVE_COMPARE_RAW_SLOT_PATTERNS,
         _LEADING_COMPARE_RAW_SLOT_PATTERN,
     ):
         for match in pattern.finditer(text):
-            raw = match.group("slot")
+            raw = _normalize_comparison_slot(match.group("slot"))
             if _classify_explicit_slot(raw, text) == "valid":
                 _append_comparison_operand(
                     comparison_candidates,
@@ -609,12 +698,15 @@ def _extract_stock_code_evidence(text: str) -> _StockCodeExtraction:
                     match.start("slot"),
                 )
 
-    bare_ticker = re.fullmatch(_RAW_SYMBOL_TOKEN, text.strip())
+    bare_ticker = _BARE_SYMBOL_RAW_SLOT_PATTERN.fullmatch(text)
     bare_candidates: List[str] = []
-    if bare_ticker and _classify_explicit_slot(bare_ticker.group(0), text) == "valid":
+    if (
+        bare_ticker
+        and _classify_explicit_slot(bare_ticker.group("slot"), text) == "valid"
+    ):
         _append_explicit_slot_candidate(
             bare_candidates,
-            bare_ticker.group(0),
+            bare_ticker.group("slot"),
             text,
             explicit=True,
         )
@@ -627,6 +719,13 @@ def _extract_stock_code_evidence(text: str) -> _StockCodeExtraction:
                 match.group("slot"),
                 text,
             )
+    suffix_match = _NATURAL_SUFFIX_RAW_SLOT_PATTERN.fullmatch(text)
+    if suffix_match is not None:
+        _append_natural_target_candidate(
+            natural_target_candidates,
+            suffix_match.group("slot"),
+            text,
+        )
 
     if comparison_candidates:
         return _StockCodeExtraction(
@@ -738,7 +837,7 @@ def resolve_stock_scope(
 ) -> StockScopeResolution:
     """Resolve the effective context and stock tool scope for one chat turn."""
     original_context = dict(context or {})
-    message_text = message or ""
+    message_text = _normalize_evidence_text(message or "")
     has_context_code = "stock_code" in original_context
     raw_context_code = original_context.get("stock_code")
     current_code = _normalize_stock_code(raw_context_code)
