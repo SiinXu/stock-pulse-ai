@@ -241,8 +241,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Required current-password reauthentication before disabling administrator authentication and blocked generic configuration or non-canonical key aliases from changing the auth toggle.
 - [Changed] Split pipeline delivery, rendering, and dispatch stages into a focused module while preserving the `src.core.pipeline` compatibility surface.
 - [Changed] Added configurable daily-provider health scoring, serialized circuit admission, redacted failover metadata, and half-open recovery without changing market capability boundaries.
+- [Changed] Split pipeline analysis, context assembly, and result normalization into a focused stage module while preserving the legacy entry point.
+- [Chore] Split oversized configuration modules into focused packages while preserving public import and runtime compatibility.
 <!-- New entry format: - [Type] Description (Type: Added/Changed/Fixed/Docs/Tests/Chore) -->
 <!-- Append each entry as one line at the end of this section; do not add category headings. -->
+- [Fixed] Made fork pull requests run PR Review static checks with a read-only token while skipping secret- and write-dependent review steps; same-repository pull requests retain the full advisory review flow.
 - [Added] Added configurable Agent tool, stage, and full-run guards with loop detection, stage failure isolation, and structured runtime events.
 
 ## [3.26.3] - 2026-07-15
