@@ -7,6 +7,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Set
 
+from src.data.stock_mapping import STOCK_NAME_MAP
 from src.services.stock_code_utils import canonicalize_analysis_stock_code
 
 
@@ -30,8 +31,7 @@ SWITCH_CLEANUP_KEYS = {
 
 _STRONG_COMPARE_PATTERN = re.compile(
     r"比较|对比|和[^，。,.!?！？]{0,40}比|"
-    r"(?<=\S)\s+(?:vs\.?|versus)\s+(?=\S)",
-    re.IGNORECASE,
+    r"(?<=\S)\s+(?:vs\.?|(?i:versus))\s+(?=\S)",
 )
 _ENGLISH_COMPARE_HINT_PATTERN = re.compile(
     r"\bcompar(?:e|ed)\b|\bversus\b",
@@ -219,6 +219,21 @@ def _append_candidate(
         candidates.append(normalized)
 
 
+def _append_lowercase_slot_candidate(
+    candidates: List[str],
+    candidate: str,
+    text: str,
+) -> None:
+    """Accept lowercase symbols only with positive, reusable symbol evidence."""
+    normalized = _normalize_stock_code(candidate)
+    if not normalized:
+        return
+    base = candidate.split(".", 1)[0]
+    if "." not in candidate and len(base) > 1 and normalized not in STOCK_NAME_MAP:
+        return
+    _append_candidate(candidates, candidate, text)
+
+
 def _is_explicit_command_slot(text: str, match: re.Match[str]) -> bool:
     """Keep indicator prose out of otherwise explicit ticker slots."""
     token = match.group(1).strip().upper()
@@ -254,7 +269,7 @@ def extract_stock_codes(text: str) -> List[str]:
 
     for pattern, flags in (
         (r"(?<![a-zA-Z])(?:SH|SZ|BJ)\d{6}(?!\d)", re.IGNORECASE),
-        (r"(?<![a-zA-Z])hk\d{4,5}(?!\d)", re.IGNORECASE),
+        (r"(?<![a-zA-Z])hk\.?\d{1,5}(?!\d)", re.IGNORECASE),
         (r"(?<![a-zA-Z])\d{1,5}\.HK(?![a-zA-Z])", re.IGNORECASE),
         (
             r"(?<![a-zA-Z0-9.])\d{4,6}\.(?:T|KS|KQ|TW|TWO)(?![a-zA-Z0-9])",
@@ -277,7 +292,7 @@ def extract_stock_codes(text: str) -> List[str]:
         )
 
     for match in _ENGLISH_LOWERCASE_COMMAND_TICKER_PATTERN.finditer(text):
-        _append_candidate(
+        _append_lowercase_slot_candidate(
             candidates,
             match.group(1),
             text,
@@ -297,6 +312,9 @@ def extract_stock_codes(text: str) -> List[str]:
     ):
         for match in pattern.finditer(text):
             for group_index, raw in enumerate(match.groups(), start=1):
+                if not raw.isupper():
+                    _append_lowercase_slot_candidate(candidates, raw, text)
+                    continue
                 _append_candidate(
                     candidates,
                     raw,
@@ -327,7 +345,11 @@ def extract_stock_codes(text: str) -> List[str]:
 
     for pattern in _EXPLICIT_LOWERCASE_COMPARE_TICKER_PATTERNS:
         for match in pattern.finditer(text):
-            _append_candidate(candidates, match.group(1), text)
+            _append_lowercase_slot_candidate(
+                candidates,
+                match.group(1),
+                text,
+            )
 
     bare_lowercase_ticker = re.fullmatch(
         r"[a-z]{1,5}(?:\.[a-z]{1,2})?",
@@ -351,7 +373,11 @@ def extract_stock_codes(text: str) -> List[str]:
         or bare_lowercase_ticker
     ):
         for match in _LOWERCASE_TICKER_PATTERN.finditer(text):
-            _append_candidate(candidates, match.group(1), text)
+            _append_lowercase_slot_candidate(
+                candidates,
+                match.group(1),
+                text,
+            )
 
     return candidates
 

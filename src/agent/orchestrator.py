@@ -1003,13 +1003,14 @@ class AgentOrchestrator:
             if result.success and result.content:
                 body = result.content
             else:
-                diagnostic = sanitize_agent_diagnostic(result.error)
-                if not diagnostic:
-                    diagnostic = (
-                        "No analysis was available."
-                        if report_language in {"en", "ko"}
-                        else "未获得可用分析。"
+                diagnostic = sanitize_agent_diagnostic(
+                    result.error
+                    or (
+                        "Analysis timed out."
+                        if result.timed_out
+                        else AGENT_CHAT_FAILURE_MESSAGE
                     )
+                )
                 body = (
                     f"Unavailable: {diagnostic}"
                     if report_language in {"en", "ko"}

@@ -70,6 +70,10 @@ def test_shared_canonicalizer_records_format_only_fallback(caplog) -> None:
     [
         ("分析 600519", "600519", "cn"),
         ("分析 00700.HK", "HK00700", "hk"),
+        ("analyze HK700", "HK00700", "hk"),
+        ("analyze hk700", "HK00700", "hk"),
+        ("analyze HK.700", "HK00700", "hk"),
+        ("analyze hk.700", "HK00700", "hk"),
         ("analyze AAPL", "AAPL", "us"),
         ("analyze F", "F", "us"),
         ("分析 F", "F", "us"),
@@ -124,6 +128,8 @@ def test_bare_collision_ticker_creates_explicit_scope(stock_code: str) -> None:
         ("analyse aapl", "AAPL"),
         ("review aapl", "AAPL"),
         ("look at aapl", "AAPL"),
+        ("review brk.b", "BRK.B"),
+        ("look at aapl.us", "AAPL.US"),
     ],
 )
 def test_explicit_command_slot_allows_trailing_analysis_prose(
@@ -309,9 +315,10 @@ def test_active_compare_with_accepts_uppercase_ticker_slot(
     "message",
     [
         "analyze VS",
+        "analyze VS fundamentals",
         "switch to VS",
         "review VS",
-        "look at VS",
+        "look at VS valuation",
     ],
 )
 def test_active_explicit_vs_ticker_switches_instead_of_comparing(
