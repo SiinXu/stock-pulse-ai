@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from src.agent.stock_scope import StockScope
 
 from src.agent.tools.registry import ToolRegistry
+from src.utils.sanitize import redact_sensitive_data, redact_sensitive_text
 
 logger = logging.getLogger(__name__)
 
@@ -60,37 +61,7 @@ def bind_runner_tool_completion_guard(
 
 
 _SUMMARY_LIMIT = 500
-_TOKEN_PATTERN = re.compile(
-    r"(?i)\b(?:sk|pk|ghp|gho|github_pat|xox[baprs]?|bearer)[-_a-z0-9]{12,}\b"
-)
-_AUTH_PATTERN = re.compile(
-    r"(?i)\b((?:proxy[-_]?authorization|authorization)\s*[:=]\s*)"
-    r"[^\s,;\"']+(?:\s+[^\s,;\"']+)?"
-)
-_URL_CREDENTIAL_PATTERN = re.compile(r"([a-z][a-z0-9+.-]*://)([^/\s:@]+):([^/\s@]+)@", re.IGNORECASE)
-_HEADER_SECRET_PATTERN = re.compile(r"(?i)\b(api[-_]?key|token|secret|cookie|set-cookie)\b\s*[:=]\s*[^\s,;]+")
-_QUOTED_SECRET_FIELD_PATTERN = re.compile(
-    r"(?i)([\"']?(?:authorization|proxy-authorization|api[-_]?key|x-api-key|token|access[-_]?token|"
-    r"refresh[-_]?token|secret|client[-_]?secret|password|passwd|cookie|set-cookie)[\"']?\s*[:=]\s*)([\"']).*?(\2)"
-)
 _HOME_PATH_PATTERN = re.compile(r"(/Users/[^/\s]+|/home/[^/\s]+)(/[^\s,;]*)?")
-_SECRET_KEY_NAMES = {
-    "authorization",
-    "proxy_authorization",
-    "api_key",
-    "apikey",
-    "x_api_key",
-    "token",
-    "access_token",
-    "refresh_token",
-    "secret",
-    "client_secret",
-    "password",
-    "passwd",
-    "cookie",
-    "set_cookie",
-}
-_SECRET_KEY_MARKERS = ("api_key", "apikey", "token", "secret", "password", "passwd", "cookie")
 
 
 @dataclass
@@ -256,51 +227,6 @@ def _guard_tool_stock_scope(
     }
 
 
-def _normalize_secret_key(key: Any) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", str(key).strip().lower()).strip("_")
-
-
-def _is_secret_key(key: Any) -> bool:
-    normalized = _normalize_secret_key(key)
-    if not normalized:
-        return False
-    if normalized in _SECRET_KEY_NAMES:
-        return True
-    return any(marker in normalized for marker in _SECRET_KEY_MARKERS)
-
-
-def _redact_structured_secrets(value: Any, *, _depth: int = 0) -> Any:
-    if _depth > 12:
-        return "<redacted_depth_limit>"
-    if isinstance(value, dict):
-        redacted: Dict[Any, Any] = {}
-        for key, item in value.items():
-            if _is_secret_key(key):
-                redacted[key] = "[REDACTED]"
-            else:
-                redacted[key] = _redact_structured_secrets(item, _depth=_depth + 1)
-        return redacted
-    if isinstance(value, list):
-        return [_redact_structured_secrets(item, _depth=_depth + 1) for item in value]
-    if isinstance(value, tuple):
-        return [_redact_structured_secrets(item, _depth=_depth + 1) for item in value]
-    return value
-
-
-def _redact_json_string_if_possible(text: str) -> str:
-    stripped = text.strip()
-    if not stripped or stripped[0] not in "[{":
-        return text
-    try:
-        parsed = json.loads(text)
-    except (TypeError, ValueError, json.JSONDecodeError):
-        return text
-    try:
-        return json.dumps(_redact_structured_secrets(parsed), ensure_ascii=False, default=str)
-    except (TypeError, ValueError):
-        return text
-
-
 def execute_runner_tool_call_via_session(
     tool_call: RunnerToolCall,
     session: "BoundToolSession",
@@ -320,6 +246,10 @@ def execute_runner_tool_call_via_session(
     t0 = time.time()
     name = tool_call.name
     arguments = tool_call.arguments
+    safe_arguments = redact_sensitive_data(arguments)
+    tool_call.arguments = (
+        safe_arguments if isinstance(safe_arguments, dict) else {}
+    )
     # Coerce exactly like the session/surface so a non-string name never leaks
     # its ``__str__`` into a cache key or log line.
     tool_name = name if isinstance(name, str) else ""
@@ -373,21 +303,22 @@ def execute_runner_tool_call_via_session(
 def redact_diagnostic_value(value: Any, *, limit: int = _SUMMARY_LIMIT) -> str:
     """Return a redacted and truncated diagnostic preview."""
     try:
-        if isinstance(value, str):
-            text = _redact_json_string_if_possible(value)
-        else:
-            text = json.dumps(_redact_structured_secrets(value), ensure_ascii=False, default=str)
-    except Exception:
+        redacted = redact_sensitive_data(value, redact_opaque_tokens=True)
+        text = (
+            redacted
+            if isinstance(redacted, str)
+            else json.dumps(redacted, ensure_ascii=False, default=str)
+        )
+    except Exception:  # broad-exception: optional_metadata - Audit preview degrades to a fixed marker.
         try:
-            text = str(value)
-        except Exception:
+            text = redact_sensitive_text(
+                value,
+                redact_opaque_tokens=True,
+            )
+        except Exception:  # broad-exception: optional_metadata - Hostile audit values use a fixed marker.
             text = "<unserializable>"
 
-    text = _AUTH_PATTERN.sub(r"\1[REDACTED]", text)
-    text = _URL_CREDENTIAL_PATTERN.sub(r"\1[REDACTED]@", text)
-    text = _QUOTED_SECRET_FIELD_PATTERN.sub(lambda m: f"{m.group(1)}{m.group(2)}[REDACTED]{m.group(3)}", text)
-    text = _HEADER_SECRET_PATTERN.sub(lambda m: f"{m.group(1)}=[REDACTED]", text)
-    text = _TOKEN_PATTERN.sub("[REDACTED_TOKEN]", text)
+    text = redact_sensitive_text(text, redact_opaque_tokens=True)
     text = _HOME_PATH_PATTERN.sub(lambda m: f"{m.group(1).rsplit('/', 1)[0] if '/' in m.group(1) else m.group(1)}/[REDACTED_PATH]", text)
     if len(text) > limit:
         return f"{text[:limit]}...<truncated {len(text) - limit} chars>"

@@ -188,20 +188,11 @@ class _SystemConfigLLMValidationMethods:
             pattern = cls._comma_flexible_secret_pattern(secret)
             if pattern is not None:
                 sanitized = pattern.sub("[REDACTED]", sanitized)
-        for secret in sorted((redaction_values or set()), key=len, reverse=True):
-            if secret:
-                sanitized = sanitized.replace(secret, "[REDACTED]")
-
-        patterns = [
-            (r"(?i)(authorization\s*[:=]\s*)(bearer\s+)?([^\s,;]+)", r"\1[REDACTED]"),
-            (r"(?i)(api[_-]?key\s*[:=]\s*)([^\s,;]+)", r"\1[REDACTED]"),
-            (r"(?i)(cookie\s*[:=]\s*)([^\s,;]+)", r"\1[REDACTED]"),
-            (r"(?i)bearer\s+[a-z0-9._\-]+", "Bearer [REDACTED]"),
-            (r"(?i)sk-[a-z0-9_\-]+", "[REDACTED]"),
-        ]
-        for pattern, replacement in patterns:
-            sanitized = re.sub(pattern, replacement, sanitized)
-        return sanitize_diagnostic_text(sanitized, max_length=300)
+        return sanitize_diagnostic_text(
+            sanitized,
+            max_length=300,
+            redaction_values=redaction_values,
+        )
 
     @classmethod
     def _sanitize_llm_details(
@@ -220,12 +211,20 @@ class _SystemConfigLLMValidationMethods:
         if isinstance(value, str):
             return cls._sanitize_llm_error_text(value, redaction_values=redaction_values)
         if isinstance(value, dict):
+            from src.utils.sanitize import redact_sensitive_data
+
+            redacted = redact_sensitive_data(
+                value,
+                redaction_values=redaction_values,
+            )
+            if not isinstance(redacted, dict):
+                return {}
             return {
                 cls._sanitize_llm_error_text(key, redaction_values=redaction_values): cls._sanitize_llm_value(
                     item,
                     redaction_values=redaction_values,
                 )
-                for key, item in value.items()
+                for key, item in redacted.items()
             }
         if isinstance(value, list):
             return [
