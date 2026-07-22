@@ -329,7 +329,6 @@
     {"path":"src/agent/events.py","scope":"<module>.EventMonitor.from_dict_list","caught":["Exception"],"digest":"87facf4b03004eb6bccea101bc272a22e3d4ee0fe229acf0e5d7ba6a29e1f400"},
     {"path":"src/agent/events.py","scope":"<module>._read_quote_float","caught":["Exception"],"digest":"e8ac41e2bb0a0ffd7483cee2cab4dd514f63ef85f43ec63be9ce91badea17728"},
     {"path":"src/agent/events.py","scope":"<module>.build_event_monitor_from_config","caught":["Exception"],"digest":"74f3f0ad1e7a9a3fcfebdc1ccde8d8780e51d7a95f3eba48daf450d230972ae6"},
-    {"path":"src/agent/llm_adapter.py","scope":"<module>.LLMToolAdapter._register_custom_model_pricing","caught":["Exception"],"digest":"b7550f2441f9c1d34d9d2bbf4407f776c8a7e5306a6683acb1cffe7bbb8e6a83"},
     {"path":"src/agent/llm_adapter.py","scope":"<module>.LLMToolAdapter.call_completion","caught":["Exception"],"digest":"9dd2145bbc45fa3575ed5ca14edeb66af804e017a52aee0ef6d34f6c4050b51b"},
     {"path":"src/agent/llm_adapter.py","scope":"<module>._object_to_dict","caught":["Exception"],"digest":"10d3242f857e368d9c74b812b40f81540e844c1b71893502d8201342595ddb19"},
     {"path":"src/agent/llm_adapter.py","scope":"<module>._object_to_dict","caught":["Exception"],"digest":"c9a4287874dc3b634caacca6ecb69f2cdb8a2680464f664132d5dc5afe7ef0d0"},
