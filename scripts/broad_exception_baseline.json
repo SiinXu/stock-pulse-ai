@@ -346,7 +346,6 @@
     {"path":"src/agent/memory.py","scope":"<module>.AgentMemory.get_calibration","caught":["Exception"],"digest":"37e74f4a4206996c94a91c9696fa8eb08d3dde3e7b90ba98eac8918e5c7777db"},
     {"path":"src/agent/memory.py","scope":"<module>.AgentMemory.get_skill_performance","caught":["Exception"],"digest":"41f48f415d524a076d430f4bd83515dad49b9dd7b45a0f2666702cc70b0f6074"},
     {"path":"src/agent/memory.py","scope":"<module>.AgentMemory.get_stock_history","caught":["Exception"],"digest":"c117a1705e8898ee81596027c354f25bc16bec26e2e7b037392f737121ecdb45"},
-    {"path":"src/agent/orchestrator.py","scope":"<module>.AgentOrchestrator._aggregate_skill_opinions","caught":["Exception"],"digest":"736f54c730746ca6848a52526fab249a8f268f345b8b5525879b3822518fe8e7"},
     {"path":"src/agent/research.py","scope":"<module>.ResearchAgent._decompose_query","caught":["Exception"],"digest":"bc11a3ba104e9e7d2fa375bd5c8520026b4347ae6e1c56411097feff055b319d"},
     {"path":"src/agent/research.py","scope":"<module>.ResearchAgent._research_sub_question","caught":["Exception"],"digest":"74fa36aa7cc6e1d8ad723b7930e8925cc914dd2158486587604fb452f5a4a6e1"},
     {"path":"src/agent/research.py","scope":"<module>.ResearchAgent._synthesise_report","caught":["Exception"],"digest":"cc2b6aef5c875cbe20887be05dd3ae6e2fff44f463640fef3f8eb49be44ed677"},
