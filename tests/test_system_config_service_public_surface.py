@@ -96,12 +96,19 @@ EXPECTED_MODULE_NAMES = ('annotations',
  'ModelAssignmentValidator',
  'ConfigConflictError',
  'llm_channel_map',
+ '_LastGoodConfigUnavailableError',
+ '_RuntimeConfigActivationError',
+ '_RuntimeConfigTransaction',
+ '_build_auth_rollback_issue',
+ '_build_connectivity_failure_issue',
+ '_log_config_audit',
  'log_safe_exception',
  'sanitize_diagnostic_text',
  'sanitize_exception_chain',
  'logger',
  'ConfigValidationError',
  'ConfigImportError',
+ 'ConfigRollbackError',
  'known_llm_provider_channel_names',
  '_LLMDiagnostic',
  'SystemConfigService')
@@ -195,6 +202,7 @@ EXPECTED_PUBLIC_NAMES = ('annotations',
  'logger',
  'ConfigValidationError',
  'ConfigImportError',
+ 'ConfigRollbackError',
  'known_llm_provider_channel_names',
  'SystemConfigService')
 EXPECTED_MODULE_ANNOTATIONS = {}
@@ -259,6 +267,7 @@ EXPECTED_CLASS_SURFACE = ('__annotations__',
  '_extract_llm_stream_chunk_content',
  '_classify_llm_capability_exception',
  'update',
+ 'restore_last_good_config',
  '_build_explainability_warnings',
  '_build_runtime_model_cleanup_warnings',
  '_build_hermes_unsupported_key_cleanup_warnings',
@@ -369,8 +378,9 @@ EXPECTED_CLASS_STATIC_ATTRIBUTES = (
     "_manager",
     "_runtime_config_provider",
     "_runtime_scheduler",
+    "_runtime_config_transaction",
 )
-EXPECTED_METHOD_METADATA_SHA256 = 'ed19ece76229f722b259bd9c887de114ab1ac857319ca9c45a77a6c5e69941cf'
+EXPECTED_METHOD_METADATA_SHA256 = '1b963e531964e74c80775db832fc2497f41c9d9059f955c6a354f5da0d0681b4'
 
 
 def _descriptor_function(descriptor):
