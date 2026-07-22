@@ -129,7 +129,7 @@ pycodestyle==2.14.0
 pycparser==3.0 ; implementation_name != 'PyPy'
 pycryptodome==3.23.0
 pydantic==2.13.4
-pydantic-ai-slim==2.12.0
+pydantic-ai-slim==2.15.0
 pydantic-core==2.46.4
 pydantic-graph==2.12.0
 pyflakes==3.4.0
