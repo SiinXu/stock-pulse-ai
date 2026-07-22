@@ -14,10 +14,10 @@ import src.services.alphasift_service as service_module
 
 
 EXPECTED_MODULE_SURFACE_SHA256 = (
-    "ba1fa896f144aaa859df3aca372caf0f759f53b0e0099e10eba1ccd76175ed29"
+    "1c16832aa5f830786eb3283af9d30ce4caf4fccbab65187a8e7685aef9b58e04"
 )
 EXPECTED_PUBLIC_SURFACE_SHA256 = (
-    "204d9062412c7b49a779df555ecdb680a7f02fb7fa52b23b182b572ac0b68a9a"
+    "b7dad5b936167792f32db7d3ce553c0e59cf729ba19388d29c7c8b3157d0cdb5"
 )
 EXPECTED_TOP_LEVEL_FUNCTION_NAMES_SHA256 = (
     "9e1d3ca12377f3655df4ae3663000a93b5f9d94066ef8349f1e7c83bf88c7f08"
@@ -153,8 +153,8 @@ def test_alphasift_service_module_surface_is_stable():
     public_names = tuple(
         name for name in vars(service_module) if not name.startswith("_")
     )
-    assert len(module_names) == 218
-    assert len(public_names) == 84
+    assert len(module_names) == 219
+    assert len(public_names) == 85
     assert _digest(module_names) == EXPECTED_MODULE_SURFACE_SHA256
     assert _digest(public_names) == EXPECTED_PUBLIC_SURFACE_SHA256
     assert service_module.__annotations__ == EXPECTED_MODULE_ANNOTATIONS
