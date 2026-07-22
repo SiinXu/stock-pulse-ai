@@ -164,7 +164,8 @@ manager 会固定工厂校验时的运行时名称，用于路由、健康状态
 修改 provider 对象的 `name` 不会重命名有效注册，也不能冒充 built-in 固定路由。
 路由选中符合条件的 provider adapter 快照后，本次尝试会调用该精确 adapter；并发的
 disable、enable 或同名替换只影响下一次路由选择，不能把当前请求重绑定到其他市场能力的
-provider。
+provider。adapter 也会固定不可变的市场和能力声明；清理 live registry 状态不会放宽
+in-flight 快照的资格边界；registry priority 同样固定，不会在卸载后回退或重排。
 卸载不会改写仍在有效期内的日线缓存或进程内健康观测；它们继续遵循原有 TTL、stale 和
 reset 语义。
 

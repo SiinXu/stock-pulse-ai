@@ -533,6 +533,27 @@ def test_unload_uses_captured_runtime_name_and_retains_call_guard() -> None:
     assert manager.available_fetchers == ["MutableFetcher", "FallbackFetcher"]
 
 
+def test_unloaded_snapshot_retains_registration_priority() -> None:
+    fallback = _DailyProvider("FallbackFetcher", 50, _daily_frame())
+    provider = _DailyProvider("PinnedPriorityFetcher", -100, _daily_frame())
+    manager = DataFetcherManager(fetchers=[fallback])
+    plugins = _plugin_manager(manager)
+    plugin = _ProviderPlugin(
+        "pinned-priority-provider",
+        _registration("pinned-priority-provider", lambda: provider),
+        priority=25,
+    )
+    assert plugins.register(plugin, source="external").success is True
+    assert plugins.load(plugin.manifest.id).success is True
+    adapter = manager._get_fetcher_by_name("PinnedPriorityFetcher")
+
+    assert adapter is not None
+    assert manager._provider_priority(adapter) == 25
+    assert plugins.disable(plugin.manifest.id).success is True
+    assert manager.available_fetchers == ["FallbackFetcher"]
+    assert manager._provider_priority(adapter) == 25
+
+
 def test_reenabled_plugin_reuses_call_guard_for_same_factory_instance() -> None:
     fallback = _DailyProvider("FallbackFetcher", 50, _daily_frame())
     shared_provider = _DailyProvider("SharedProvider", 10, _daily_frame())
@@ -695,6 +716,115 @@ def test_realtime_route_calls_selected_market_eligible_snapshot_after_reload() -
     assert provider_name == "SharedRealtimeFetcher"
     assert us_calls == 1
     assert cn_calls == 0
+
+
+def _route_while_unload_precedes_eligibility_filter(
+    manager: DataFetcherManager,
+    plugins: PluginManager,
+    plugin_id: str,
+    route: Callable[[], object],
+) -> object:
+    captured = Event()
+    resume = Event()
+    result: dict[str, object] = {}
+    original_snapshot = manager._get_fetchers_snapshot
+
+    def delayed_snapshot():
+        snapshot = original_snapshot()
+        captured.set()
+        assert resume.wait(timeout=2)
+        return snapshot
+
+    def invoke_route() -> None:
+        try:
+            result["value"] = route()
+        except BaseException as exc:
+            result["error"] = exc
+
+    with patch.object(
+        manager,
+        "_get_fetchers_snapshot",
+        side_effect=delayed_snapshot,
+    ):
+        route_thread = Thread(target=invoke_route)
+        route_thread.start()
+        try:
+            assert captured.wait(timeout=2)
+            assert plugins.disable(plugin_id).success is True
+            manager._sync_registered_data_providers()
+        finally:
+            resume.set()
+            route_thread.join(timeout=2)
+
+    assert route_thread.is_alive() is False
+    assert "error" not in result
+    return result["value"]
+
+
+def test_provider_snapshot_retains_market_eligibility_during_unload() -> None:
+    fallback = _DailyProvider("FallbackFetcher", 50, _daily_frame(9.0))
+    cn_provider = _DailyProvider("CnOnlyFetcher", 10, _daily_frame(33.0))
+    manager = DataFetcherManager(fetchers=[fallback])
+    plugins = _plugin_manager(manager)
+    plugin = _ProviderPlugin(
+        "cn-only-snapshot",
+        _registration(
+            "cn-only-snapshot",
+            lambda: cn_provider,
+            markets={"cn"},
+        ),
+        priority=10,
+    )
+    assert plugins.register(plugin, source="external").success is True
+    assert plugins.load(plugin.manifest.id).success is True
+
+    _, source = _route_while_unload_precedes_eligibility_filter(
+        manager,
+        plugins,
+        plugin.manifest.id,
+        lambda: manager.get_daily_data("HK00700"),
+    )
+
+    assert source == "FallbackFetcher"
+    assert cn_provider.calls == 0
+    assert fallback.calls == 1
+
+
+def test_provider_snapshot_retains_capability_eligibility_during_unload() -> None:
+    fallback = _DailyProvider("FallbackFetcher", 50, _daily_frame())
+    plugin_provider = _DailyProvider("DailyOnlyFetcher", 10, _daily_frame())
+    hot_stock_calls = 0
+
+    def plugin_hot_stocks(n: int):
+        nonlocal hot_stock_calls
+        hot_stock_calls += 1
+        return [{"code": "600519", "rank": 1}][:n]
+
+    fallback.get_hot_stocks = lambda n: []  # type: ignore[attr-defined]
+    plugin_provider.get_hot_stocks = plugin_hot_stocks  # type: ignore[attr-defined]
+    manager = DataFetcherManager(fetchers=[fallback])
+    plugins = _plugin_manager(manager)
+    plugin = _ProviderPlugin(
+        "daily-only-snapshot",
+        _registration(
+            "daily-only-snapshot",
+            lambda: plugin_provider,
+            capabilities={"daily_data"},
+        ),
+        priority=10,
+    )
+    assert plugins.register(plugin, source="external").success is True
+    assert plugins.load(plugin.manifest.id).success is True
+
+    rows = _route_while_unload_precedes_eligibility_filter(
+        manager,
+        plugins,
+        plugin.manifest.id,
+        lambda: manager.get_hot_stocks(5),
+    )
+
+    assert rows == []
+    assert hot_stock_calls == 0
 
 
 def test_stock_list_plugin_enforces_market_before_call_and_result_acceptance() -> None:

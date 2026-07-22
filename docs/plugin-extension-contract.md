@@ -295,7 +295,9 @@ route.
 Once routing selects an eligible provider adapter snapshot, that attempt calls
 the exact selected adapter. A concurrent disable, enable, or same-name
 replacement affects the next route selection; it cannot rebind the current
-attempt to a provider with different market eligibility.
+attempt to a provider with different market eligibility. The adapter also pins
+the immutable declared markets, capabilities, and registration priority, so
+removing live registry state cannot broaden or reorder the in-flight snapshot.
 
 Built-ins use stable IDs `efinance`, `tencent`, `akshare`, `tushare`, `tickflow`,
 `pytdx`, `baostock`, `yfinance`, `longbridge`, `finnhub`, and `alphavantage`.
