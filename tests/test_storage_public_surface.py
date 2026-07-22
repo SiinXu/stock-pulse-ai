@@ -43,6 +43,127 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     """.split()
 )
 
+EXPECTED_SCHEMA_DEFINITIONS = (
+    "utc_naive_now",
+    "to_utc_naive_datetime",
+    "DatabaseSchemaMigration",
+    "StockDaily",
+    "NewsIntel",
+    "IntelligenceSource",
+    "IntelligenceItem",
+    "FundamentalSnapshot",
+    "AnalysisHistory",
+    "BacktestResult",
+    "BacktestSummary",
+    "PortfolioAccount",
+    "PortfolioIdempotencyRecord",
+    "PortfolioTrade",
+    "PortfolioCashLedger",
+    "PortfolioCorporateAction",
+    "PortfolioPosition",
+    "PortfolioPositionLot",
+    "PortfolioDailySnapshot",
+    "PortfolioFxRate",
+    "ConversationMessage",
+    "ConversationSummary",
+    "AgentProviderTurn",
+    "LLMUsage",
+    "_LLM_USAGE_TELEMETRY_COLUMN_SQL",
+    "_LLM_USAGE_INTEGER_TELEMETRY_COLUMNS",
+    "_LLM_USAGE_DROPPED_FREE_TEXT_COLUMNS",
+    "_LLM_PROMPT_CACHE_TELEMETRY_DISABLED_ATTR",
+    "_LLM_PROMPT_CACHE_TELEMETRY_COLUMNS",
+    "AlertRuleRecord",
+    "AlertTriggerRecord",
+    "AlertNotificationRecord",
+    "AlertCooldownRecord",
+    "DecisionSignalRecord",
+    "DecisionSignalOutcomeRecord",
+    "DecisionSignalFeedbackRecord",
+)
+EXPECTED_SCHEMA_AST_HASH = (
+    "fed25c613b0de7f606f56ad353e5c83bc400d972a899d2f31c2bd587ced17754"
+)
+EXPECTED_SCHEMA_MODELS = (
+    "DatabaseSchemaMigration",
+    "StockDaily",
+    "NewsIntel",
+    "IntelligenceSource",
+    "IntelligenceItem",
+    "FundamentalSnapshot",
+    "AnalysisHistory",
+    "BacktestResult",
+    "BacktestSummary",
+    "PortfolioAccount",
+    "PortfolioIdempotencyRecord",
+    "PortfolioTrade",
+    "PortfolioCashLedger",
+    "PortfolioCorporateAction",
+    "PortfolioPosition",
+    "PortfolioPositionLot",
+    "PortfolioDailySnapshot",
+    "PortfolioFxRate",
+    "ConversationMessage",
+    "ConversationSummary",
+    "AgentProviderTurn",
+    "LLMUsage",
+    "AlertRuleRecord",
+    "AlertTriggerRecord",
+    "AlertNotificationRecord",
+    "AlertCooldownRecord",
+    "DecisionSignalRecord",
+    "DecisionSignalOutcomeRecord",
+    "DecisionSignalFeedbackRecord",
+)
+EXPECTED_SCHEMA_TABLES = (
+    "schema_migrations",
+    "stock_daily",
+    "news_intel",
+    "intelligence_sources",
+    "intelligence_items",
+    "fundamental_snapshot",
+    "analysis_history",
+    "backtest_results",
+    "backtest_summaries",
+    "portfolio_accounts",
+    "portfolio_idempotency_records",
+    "portfolio_trades",
+    "portfolio_cash_ledger",
+    "portfolio_corporate_actions",
+    "portfolio_positions",
+    "portfolio_position_lots",
+    "portfolio_daily_snapshots",
+    "portfolio_fx_rates",
+    "conversation_messages",
+    "conversation_summaries",
+    "agent_provider_turns",
+    "llm_usage",
+    "alert_rules",
+    "alert_triggers",
+    "alert_notifications",
+    "alert_cooldowns",
+    "decision_signals",
+    "decision_signal_outcomes",
+    "decision_signal_feedback",
+)
+EXPECTED_SCHEMA_METHODS = {
+    "StockDaily": ("__repr__", "to_dict"),
+    "NewsIntel": ("__repr__",),
+    "FundamentalSnapshot": ("__repr__",),
+    "AnalysisHistory": ("to_dict",),
+}
+EXPECTED_UTC_COLUMN_CALLBACKS = (
+    ("decision_signals", "created_at", "default"),
+    ("decision_signals", "updated_at", "default"),
+    ("decision_signals", "updated_at", "onupdate"),
+    ("decision_signal_outcomes", "created_at", "default"),
+    ("decision_signal_outcomes", "updated_at", "default"),
+    ("decision_signal_outcomes", "updated_at", "onupdate"),
+    ("decision_signal_feedback", "created_at", "default"),
+    ("decision_signal_feedback", "updated_at", "default"),
+    ("decision_signal_feedback", "updated_at", "onupdate"),
+)
+
 EXPECTED_GROUPS = (
     (
         "_LifecycleMethods",
@@ -192,6 +313,35 @@ def _container_ast_hash(container) -> str:
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
+def _top_level_definition_name(node):
+    if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+        return node.name
+    if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+        return node.target.id
+    if isinstance(node, ast.Assign):
+        names = [target.id for target in node.targets if isinstance(target, ast.Name)]
+        if len(names) == 1:
+            return names[0]
+    return None
+
+
+def _schema_ast_hash(source_path: Path) -> str:
+    tree = ast.parse(source_path.read_text(encoding="utf-8"))
+    records = [
+        (_top_level_definition_name(node), _canonical_ast(node))
+        for node in tree.body
+        if _top_level_definition_name(node) in EXPECTED_SCHEMA_DEFINITIONS
+    ]
+    assert tuple(name for name, _ in records) == EXPECTED_SCHEMA_DEFINITIONS
+    payload = json.dumps(
+        records,
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
 def _descriptor_function(descriptor):
     if isinstance(descriptor, (staticmethod, classmethod)):
         return descriptor.__func__
@@ -233,6 +383,61 @@ def test_storage_public_exports_match_pre_split_snapshot():
     assert {name for name in vars(module) if not name.startswith("_")} == (
         EXPECTED_PUBLIC_EXPORTS
     )
+
+
+def test_storage_schema_asts_match_pre_split_snapshot():
+    module = importlib.import_module("src.storage")
+    schema_path = Path(module.__file__).with_name("storage_parts") / "schema.py"
+
+    assert _schema_ast_hash(schema_path) == EXPECTED_SCHEMA_AST_HASH
+
+
+def test_storage_schema_exec_preserves_facade_contract():
+    module = importlib.import_module("src.storage")
+    facade_globals = vars(module)
+
+    assert tuple(module.Base.metadata.tables) == EXPECTED_SCHEMA_TABLES
+    for helper_name in ("utc_naive_now", "to_utc_naive_datetime"):
+        helper = getattr(module, helper_name)
+        assert helper.__module__ == "src.storage"
+        assert helper.__qualname__ == helper_name
+        assert helper.__globals__ is facade_globals
+        assert not helper.__code__.co_flags & __future__.annotations.compiler_flag
+
+    for model_name in EXPECTED_SCHEMA_MODELS:
+        model = getattr(module, model_name)
+        assert model.__module__ == "src.storage"
+        assert model.__qualname__ == model_name
+        assert model.__table__.metadata is module.Base.metadata
+        for method_name in EXPECTED_SCHEMA_METHODS.get(model_name, ()):
+            method = vars(model)[method_name]
+            assert method.__module__ == "src.storage"
+            assert method.__qualname__ == f"{model_name}.{method_name}"
+            assert method.__globals__ is facade_globals
+            assert not method.__code__.co_flags & __future__.annotations.compiler_flag
+
+    utc_callbacks = []
+    for table in module.Base.metadata.tables.values():
+        for column in table.columns:
+            for callback_kind in ("default", "onupdate"):
+                callback = getattr(column, callback_kind)
+                if getattr(getattr(callback, "arg", None), "__wrapped__", None) is (
+                    module.utc_naive_now
+                ):
+                    utc_callbacks.append((table.name, column.name, callback_kind))
+    assert tuple(utc_callbacks) == EXPECTED_UTC_COLUMN_CALLBACKS
+
+
+def test_storage_private_schema_import_is_isolated_from_facade_registry():
+    module = importlib.import_module("src.storage")
+    source = importlib.import_module("src.storage_parts.schema")
+
+    assert source.Base is not module.Base
+    assert tuple(source.Base.metadata.tables) == EXPECTED_SCHEMA_TABLES
+    for model_name in EXPECTED_SCHEMA_MODELS:
+        assert getattr(source, model_name) is not getattr(module, model_name)
+        assert getattr(source, model_name).__module__ == "src.storage_parts.schema"
+    assert tuple(module.Base.metadata.tables) == EXPECTED_SCHEMA_TABLES
 
 
 def test_storage_manager_method_asts_match_pre_split_snapshot():
@@ -390,6 +595,8 @@ old_class = module.DatabaseManager
 old_meta = module._DatabaseManagerMeta
 old_base = module.Base
 old_stock_daily = module.StockDaily
+old_utc_naive_now = module.utc_naive_now
+old_telemetry_columns = module._LLM_USAGE_TELEMETRY_COLUMN_SQL
 old_lock = old_class._init_lock
 old_method = old_class.save_daily_data
 old_class._instance = object()
@@ -402,6 +609,8 @@ assert first_class is not old_class
 assert first._DatabaseManagerMeta is not old_meta
 assert first.Base is not old_base
 assert first.StockDaily is not old_stock_daily
+assert first.utc_naive_now is not old_utc_naive_now
+assert first._LLM_USAGE_TELEMETRY_COLUMN_SQL is not old_telemetry_columns
 assert first_class._instance is None
 assert first_class._init_lock is not old_lock
 assert first_method is not old_method
@@ -412,6 +621,9 @@ assert first_class.get_latest_data.__annotations__["return"] == typing.List[
 ]
 assert first_class.__new__.__closure__[0].cell_contents is first_class
 assert inspect.unwrap(first_class.session_scope).__globals__ is vars(first)
+assert first.StockDaily.to_dict.__globals__ is vars(first)
+assert first.StockDaily.__table__.metadata is first.Base.metadata
+assert first.DecisionSignalRecord.created_at.default.arg.__wrapped__ is first.utc_naive_now
 
 second = importlib.reload(first)
 assert second.DatabaseManager is not first_class
@@ -420,6 +632,9 @@ assert second.DatabaseManager._instance is None
 assert second.DatabaseManager.save_daily_data.__globals__ is vars(second)
 assert second.DatabaseManager.__new__.__closure__[0].cell_contents is second.DatabaseManager
 assert inspect.unwrap(second.DatabaseManager.session_scope).__globals__ is vars(second)
+assert second.StockDaily.to_dict.__globals__ is vars(second)
+assert second.StockDaily.__table__.metadata is second.Base.metadata
+assert second.DecisionSignalRecord.created_at.default.arg.__wrapped__ is second.utc_naive_now
 """
     completed = subprocess.run(
         [sys.executable, "-c", code],
