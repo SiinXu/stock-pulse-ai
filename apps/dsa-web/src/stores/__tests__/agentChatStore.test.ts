@@ -40,6 +40,7 @@ function createDeferred<T>() {
 
 beforeEach(() => {
   localStorage.clear();
+  sessionStorage.clear();
   useAgentChatStore.setState({
     messages: [],
     loading: false,
@@ -91,14 +92,44 @@ describe('agentChatStore session lifecycle', () => {
     expect(state.messages).toEqual([
       { id: 'url-message', role: 'assistant', content: 'URL session reply' },
     ]);
-    expect(localStorage.getItem('dsa_chat_session_id')).toBe('session-url');
+    expect(sessionStorage.getItem('dsa_chat_session_id')).toBe('session-url');
+    expect(localStorage.getItem('dsa_chat_session_id')).toBeNull();
   });
 
   it('returns the new session ID so the router can persist it', () => {
     const sessionId = useAgentChatStore.getState().startNewChat();
 
     expect(sessionId).toBe(useAgentChatStore.getState().sessionId);
-    expect(sessionId).toBe(localStorage.getItem('dsa_chat_session_id'));
+    expect(sessionId).toBe(sessionStorage.getItem('dsa_chat_session_id'));
+  });
+
+  it('clears persisted and in-memory chat state for logout', () => {
+    const abortController = new AbortController();
+    sessionStorage.setItem('dsa_chat_session_id', 'session-private');
+    useAgentChatStore.setState({
+      sessionId: 'session-private',
+      messages: [{ id: 'message-1', role: 'user', content: 'Private draft' }],
+      sessions: [{
+        session_id: 'session-private',
+        title: 'Private session',
+        message_count: 1,
+        created_at: '2026-07-15T00:00:00Z',
+        last_active: '2026-07-15T00:00:00Z',
+      }],
+      loading: true,
+      abortController,
+    });
+
+    useAgentChatStore.getState().resetSessionState();
+
+    const state = useAgentChatStore.getState();
+    expect(abortController.signal.aborted).toBe(true);
+    expect(state.messages).toEqual([]);
+    expect(state.sessions).toEqual([]);
+    expect(state.loading).toBe(false);
+    expect(state.hasInitialLoad).toBe(false);
+    expect(state.sessionId).not.toBe('session-private');
+    expect(sessionStorage.getItem('dsa_chat_session_id')).toBeNull();
   });
 });
 

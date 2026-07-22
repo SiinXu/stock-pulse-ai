@@ -19,7 +19,7 @@ from data_provider.tw_institutional_fetcher import (  # noqa: E402
     _to_int,
 )
 
-# --- real TWSE T86 row for 2330 台積電 @ 20260626 (西元 date, comma-grouped values) ---
+# --- real TWSE T86 row for 2330 `台積電` @ 20260626 (`西元` date, comma-grouped values) ---
 T86_FIXTURE = {
     "stat": "OK",
     "date": "20260626",
@@ -45,7 +45,7 @@ T86_FIXTURE = {
     ],
 }
 
-# --- real TPEx OpenAPI row for 3105 穩懋 @ 民國 1150626 (plain ints, messy keys) ---
+# --- real TPEx OpenAPI row for 3105 `穩懋` @ `民國` 1150626 (plain ints, messy keys) ---
 TPEX_FIXTURE = [
     {
         "Date": "1150626",
@@ -87,10 +87,10 @@ def _fetcher():
 
 class TestPureHelpers(unittest.TestCase):
     def test_minguo_to_ad(self):
-        self.assertEqual(minguo_to_ad("1150626"), "20260626")  # 民國115 -> 西元2026
-        self.assertEqual(minguo_to_ad("1010101"), "20120101")  # 民國101 -> 西元2012
-        self.assertEqual(minguo_to_ad("0010101"), "19120101")  # 民國1   -> 西元1912
-        self.assertEqual(minguo_to_ad("0990101"), "20100101")  # 民國99  -> 西元2010
+        self.assertEqual(minguo_to_ad("1150626"), "20260626")  # `民國` 115 -> `西元` 2026
+        self.assertEqual(minguo_to_ad("1010101"), "20120101")  # `民國` 101 -> `西元` 2012
+        self.assertEqual(minguo_to_ad("0010101"), "19120101")  # `民國` 1 -> `西元` 1912
+        self.assertEqual(minguo_to_ad("0990101"), "20100101")  # `民國` 99 -> `西元` 2010
         for bad in ("", "115062", "20260626", "abcdefg", None):
             self.assertIsNone(minguo_to_ad(bad), bad)
 
@@ -113,7 +113,7 @@ class TestT86Parsing(unittest.TestCase):
         self.assertEqual(rec["source"], "TWSE-T86")
         self.assertEqual(rec["unit"], "shares")
         self.assertEqual(rec["date"], "20260626")
-        # foreign = 外陸資 (不含外資自營商) = -14,281,155
+        # foreign = `外陸資` (excluding `外資自營商`) = -14,281,155
         self.assertEqual(rec["foreign_net"], -14281155)
         self.assertEqual(rec["trust_net"], 734398)
         self.assertEqual(rec["dealer_net"], 1009368)
@@ -145,7 +145,7 @@ class TestTpexParsing(unittest.TestCase):
         self.assertEqual(rec["stock_code"], "3105")
         self.assertEqual(rec["market"], "上櫃")
         self.assertEqual(rec["source"], "TPEx-OpenAPI")
-        self.assertEqual(rec["date"], "20260626")        # 民國 1150626 -> 西元
+        self.assertEqual(rec["date"], "20260626")        # `民國` 1150626 -> `西元`
         self.assertEqual(rec["foreign_net"], -982953)
         self.assertEqual(rec["trust_net"], -2894263)
         self.assertEqual(rec["dealer_net"], -497774)
@@ -196,7 +196,7 @@ class TestMissingFieldAndEmptyCacheFailOpen(unittest.TestCase):
     def test_tpex_genuine_zero_is_kept(self):
         import copy
         row = copy.deepcopy(TPEX_FIXTURE[0])
-        row["SecuritiesInvestmentTrustCompanies-Difference"] = "0"  # 投信 truly net-zero today
+        row["SecuritiesInvestmentTrustCompanies-Difference"] = "0"  # `投信` is genuinely net-zero today
         with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp([row])):
             rec = _fetcher().get_institutional_net("3105.TWO")
         self.assertIsNotNone(rec)
@@ -207,7 +207,7 @@ class TestMissingFieldAndEmptyCacheFailOpen(unittest.TestCase):
         import copy
         fix = copy.deepcopy(T86_FIXTURE)
         trust_idx = fix["fields"].index("投信買賣超股數")
-        fix["data"][0][trust_idx] = ""   # 投信買賣超 cell blank -> missing -> drop 2330, not 0
+        fix["data"][0][trust_idx] = ""   # Blank `投信買賣超` cell -> missing -> drop 2330, not 0
         with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(fix)):
             self.assertIsNone(_fetcher().get_institutional_net("2330.TW", "20260626"))
 
@@ -241,7 +241,7 @@ class TestStructureRobustness(unittest.TestCase):
     def test_twse_renamed_core_field_fails_open(self):
         import copy
         fix = copy.deepcopy(T86_FIXTURE)
-        fix["fields"][10] = "投信買賣超股數_v2"          # 投信 column renamed
+        fix["fields"][10] = "投信買賣超股數_v2"          # `投信` column renamed
         with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(fix)):
             self.assertIsNone(_fetcher().get_institutional_net("2330.TW", "20260626"))
 
@@ -253,7 +253,7 @@ class TestStructureRobustness(unittest.TestCase):
     def test_tpex_unconvertible_date_drops_row(self):
         import copy
         row = copy.deepcopy(TPEX_FIXTURE[0])
-        row["Date"] = "bad-date"                        # not a 7-digit 民國 -> drop
+        row["Date"] = "bad-date"                        # Not a 7-digit `民國` date -> drop
         with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp([row])):
             self.assertIsNone(_fetcher().get_institutional_net("3105.TWO"))
 

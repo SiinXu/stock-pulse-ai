@@ -20,7 +20,7 @@ import type {
 import type { StockIndexItem } from '../../types/stockIndex';
 import DecisionSignalsPage from '../DecisionSignalsPage';
 
-// jsdom 未实现 scrollIntoView，而 Select 打开下拉时会调用它保持活动项可见。
+// jsdom does not implement scrollIntoView, while Select calls it to keep the active item visible when opening a dropdown.
 if (!HTMLElement.prototype.scrollIntoView) {
   HTMLElement.prototype.scrollIntoView = () => {};
 }
@@ -471,6 +471,27 @@ describe('DecisionSignalsPage', () => {
     expect(screen.getAllByText('全部信号').length).toBeGreaterThan(0);
   });
 
+  it('centers the advanced signal filters and exposes clear stock as a tooltip icon', async () => {
+    renderPage();
+
+    expect(await screen.findByText('贵州茅台')).toBeInTheDocument();
+    const signalsPanel = screen.getByRole('tabpanel', { name: '全部信号' });
+    const filterForm = within(signalsPanel).getByRole('button', { name: '筛选' }).closest('form');
+    expect(filterForm).toHaveClass(
+      '[&>div.hidden]:justify-center',
+      '[&>div.hidden>div]:flex-none',
+    );
+
+    openStockContextModal();
+    fireEvent.change(getStockContextInput(), { target: { value: 'AAPL' } });
+    const clearButton = within(getStockContextModal()).getByRole('button', { name: '清空当前股票' });
+    expect(clearButton).toHaveAttribute('data-control', 'icon-button');
+    expect(clearButton).toHaveTextContent('');
+
+    fireEvent.mouseEnter(clearButton.parentElement!);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('清空当前股票');
+  });
+
   it('shows a zero-sample outcome stats state instead of misleading zero metrics', async () => {
     vi.mocked(decisionSignalsApi.getOutcomeStats).mockResolvedValueOnce({
       ...outcomeStats,
@@ -635,6 +656,27 @@ describe('DecisionSignalsPage', () => {
     expect(await screen.findByText('actionable_signal_blocked_by_guardrail')).toBeInTheDocument();
     expect(screen.getByText('buy -> watch')).toBeInTheDocument();
     expect(screen.getByText('action_blocked_by_guardrail')).toBeInTheDocument();
+  });
+
+  it('opens the selected signal source report and history Run Flow in one click', async () => {
+    renderPage();
+    await screen.findByText('贵州茅台');
+
+    fireEvent.click(screen.getByRole('button', { name: '查看 贵州茅台 AI 建议详情' }));
+    const sourceLink = await screen.findByRole('link', { name: '来源报告 #3001' });
+    expect(sourceLink).toHaveAttribute(
+      'href',
+      '/?recordId=3001&stock=600519&runFlow=history&runFlowRecordId=3001',
+    );
+    fireEvent.click(sourceLink);
+
+    await waitFor(() => expect(window.location.pathname).toBe('/'));
+    expect(Object.fromEntries(new URLSearchParams(window.location.search))).toEqual({
+      recordId: '3001',
+      stock: '600519',
+      runFlow: 'history',
+      runFlowRecordId: '3001',
+    });
   });
 
   it('reassesses from an existing source report id filter without a selected signal', async () => {

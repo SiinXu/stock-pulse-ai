@@ -78,7 +78,7 @@ class AnalyzeCommand(BotCommand):
 
         code = symbol.code
         
-        # 检查是否需要完整报告（默认精简，传 full/完整/详细 切换）
+        # Check whether a full report is required (brief by default; pass `full`, `完整`, or `详细` to switch)
         report_type = "simple"
         if len(args) > 1 and args[1].lower() in ["full", "完整", "详细"]:
             report_type = "full"
@@ -90,8 +90,8 @@ class AnalyzeCommand(BotCommand):
         )
         
         try:
-            # 提交到统一任务执行权威：与 API/Web 共用同一 queue、Task ID、
-            # 去重键、状态枚举与错误分类，Bot 不再维护平行的任务生命周期。
+            # Submit to the unified task execution authority: same queue, Task ID with API/Web
+            # Deduplication keys, status enumeration and error classification, Bot no longer maintains parallel task lifecycles.
             from src.services.task_queue import get_task_queue, DuplicateTaskError
             from src.enums import ReportType
 
@@ -102,7 +102,7 @@ class AnalyzeCommand(BotCommand):
                 request_context=to_analysis_request_context(message),
             )
         except DuplicateTaskError:
-            # 统一权威按规范化股票代码去重；旧路径无去重，会重复触发并发分析。
+            # Unified authoritative deduplication by normalized stock code; old path without deduplication will trigger concurrent analysis.
             return BotResponse.markdown_response(
                 f"⏳ **该股票正在分析中**\n\n"
                 f"• 股票代码: `{code}`\n\n"

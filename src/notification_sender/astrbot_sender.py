@@ -40,7 +40,7 @@ class AstrbotSender:
         
     def _is_astrbot_configured(self) -> bool:
         """检查 AstrBot 配置是否完整（支持 Bot 或 Webhook）"""
-        # 只要配置了 URL，即视为可用
+        # If the URL is configured, it's considered available.
         url_ok = bool(self._astrbot_config['astrbot_url'])
         return url_ok
 

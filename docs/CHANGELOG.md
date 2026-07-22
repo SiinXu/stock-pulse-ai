@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Corrected English developer comments to preserve financial terminology and localized fixture literals without changing runtime behavior.
 - [Chore] Added a dev-only Web API mock switch (`?mock=ready|empty|error|slow` or `VITE_MOCK_API`) with larger deterministic fixtures for UI walkthroughs; gated behind `import.meta.env.DEV` and tree-shaken from production builds.
 - [Changed] Added unified Web page and Router patterns with `AppPage`, `WorkspacePage`, `ResponsiveRail`, `PageHeader`, `Toolbar`, `Tabs`, `TabPanel`, `SummaryStrip`, and `WorkspaceNavigation`, plus focus restoration and guards against duplicate navigation primitives.
 - [Changed] Formalized the shared Surface migration contract around `canvas`, `section`, `interactive`, and `overlay`, removed unused card styles, and added stable token-count guards with dual-theme and nine-viewport fixtures.
@@ -239,6 +240,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Split the Alerts & Automation, System & Security, and Data Sources settings sections and the new top-level Advanced section into horizontal tab views (push routing/behavior & limits/event monitor, scheduling/system settings/web & logs/auth & security/version & updates, sources/intel sources/providers, backend status/developer diagnostics/config backup) with `?section=&view=` deep links and cross-view validation-error jumps; Developer Diagnostics is now a flat tab instead of a collapsed panel, and the push-routing channel empty state collapses into a single compact hint with a configure-channels entry.
 - [Fixed] Aligned the home stock-bar and history-list row checkboxes with the select-all column (removing the centered offset and negative margin) and reveal the per-item delete button only on hover or keyboard focus, staying always visible on touch devices without hover, matching the Chat session list.
 - [Fixed] Removed the `max-w-6xl` cap on the AlphaSift screening page content so it fills the viewport like the other workspace pages.
+- [Fixed] Corrected dark-mode Chat controls, deep-research layout, screening parameter rows, portfolio error details, and Decision Signals action and filter alignment.
 - [Fixed] Required current-password reauthentication before disabling administrator authentication and blocked generic configuration or non-canonical key aliases from changing the auth toggle.
 - [Changed] Split pipeline delivery, rendering, and dispatch stages into a focused module while preserving the `src.core.pipeline` compatibility surface.
 - [Changed] Added configurable daily-provider health scoring, serialized circuit admission, redacted failover metadata, and half-open recovery without changing market capability boundaries.
@@ -277,6 +279,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Added the validated plugin manifest, isolated lifecycle manager, ownership-aware extension registry, and explicit trusted-directory plugin loader without startup wiring.
 - [Fixed] Enforced a shared fail-closed outbound HTTP policy for search, intelligence, custom model endpoints, webhooks, and notification tests with connection-time DNS checks, bounded redirects and responses, credential stripping, and an explicit self-host allowlist.
 - [Docs] Documented analysis-execution and business-capability responsibility layers plus the product Skill/Strategy loading, routing, evidence, and compatibility boundaries.
+- [Chore] Translated historical developer comments across source, configuration, scripts, and tests into English while preserving runtime-consumed docstrings and localized content.
+- [Fixed] Kept the existing persistent daily-provider cache in Desktop runtime data and Windows update backups while preserving explicit cache paths.
+- [Changed] Split DatabaseManager lifecycle and storage operations into focused private modules while preserving the `src.storage` facade and migration behavior.
+- [Added] Added A-share sector-index analysis with session trend, broad-index relative strength, risk labels, explicit provider data limits, and unavailable-ranking fallbacks to market-review reports and structured payloads.
+- [Changed] Split scheduling and service startup coordination into a focused application runtime module while preserving the legacy main entrypoint and startup behavior.
+
+- [Added] Added tab-scoped Web session continuity for stock context, active Run Flow, route filters, consumed Chat report context, Chat/Research/Screening workflows, source-report handoff, bare-route reload restoration, context-aware navigation, legacy local-storage migration, and redirect-free logout cleanup.
+- [Changed] Extracted the storage ORM schema into a focused private module while preserving the `src.storage` model, metadata, reload, and migration contracts.
 
 ## [3.26.3] - 2026-07-15
 

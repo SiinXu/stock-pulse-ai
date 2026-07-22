@@ -671,7 +671,7 @@ class _DeliveryStageMixin:
                 retryable=True,
             )
 
-            # 跳过推送（单股推送模式 / 合并模式：报告已由 _save_local_report 保存）
+            # Skip push notifications (single stock mode / merged mode: report saved by _save_local_report)
             if skip_push:
                 self._finish_pipeline_stage(
                     dispatch_stage,
@@ -699,7 +699,7 @@ class _DeliveryStageMixin:
                 )
                 return
 
-            # 推送通知
+            # Send notifications
             if self.notifier.is_available():
                 channels = self.notifier.get_available_channels()
                 channels = self.notifier.get_channels_for_route("report", channels=channels)
@@ -974,7 +974,7 @@ class _DeliveryStageMixin:
                         "noise gate; per-channel fences remain authoritative"
                     )
 
-                # Issue #455: Markdown 转图片（与 notification.send 逻辑一致）
+                # Issue #455: Markdown to image conversion (consistent with notification.send logic).
                 from src.md2img import markdown_to_image
 
                 channels_needing_image = {
@@ -1013,7 +1013,7 @@ class _DeliveryStageMixin:
                             _get_md2img_hint(),
                         )
 
-                # 企业微信：只发精简版（平台限制）
+                # WeCom accepts only the condensed report because of platform limits.
                 wechat_success = False
                 if NotificationChannel.WECHAT in channels:
                     def _send_wechat_report() -> bool:
@@ -1054,7 +1054,7 @@ class _DeliveryStageMixin:
                         wechat_error,
                     )
 
-                # 其他渠道：发完整报告（避免自定义 Webhook 被 wechat 截断逻辑污染）
+                # Other channels: send complete report (to avoid custom Webhooks being polluted by WeChat logic).
                 non_wechat_success = False
                 stock_email_groups = getattr(self.config, 'stock_email_groups', []) or []
                 for channel in channels:

@@ -41,7 +41,7 @@ class StockService:
             实时行情数据字典
         """
         try:
-            # 调用数据获取器获取实时行情
+            # Call the data retriever to get real-time quotes
             from data_provider.base import DataFetcherManager
             
             manager = DataFetcherManager()
@@ -51,8 +51,8 @@ class StockService:
                 logger.warning(f"获取 {stock_code} 实时行情失败")
                 return None
             
-            # UnifiedRealtimeQuote 是 dataclass，使用 getattr 安全访问字段
-            # 字段映射: UnifiedRealtimeQuote -> API 响应
+            # UnifiedRealtimeQuote is a dataclass, uses getattr for safe field access
+            # Field mapping: UnifiedRealtimeQuote -> API response
             # - code -> stock_code
             # - name -> stock_name
             # - price -> current_price
@@ -112,7 +112,7 @@ class StockService:
         Raises:
             ValueError: 当 period 不是 daily 时抛出（weekly/monthly 暂未实现）
         """
-        # 验证 period 参数，只支持 daily
+        # Validate period parameter, only supports daily
         if period != "daily":
             raise ValueError(
                 f"暂不支持 '{period}' 周期，目前仅支持 'daily'。"
@@ -120,7 +120,7 @@ class StockService:
             )
         
         try:
-            # 调用数据获取器获取历史数据
+            # Call the data retriever to get historical data
             from data_provider.base import DataFetcherManager
             
             manager = DataFetcherManager()
@@ -130,10 +130,10 @@ class StockService:
                 logger.warning(f"获取 {stock_code} 历史数据失败")
                 return {"stock_code": stock_code, "period": period, "data": []}
             
-            # 获取股票名称
+            # Get stock name
             stock_name = manager.get_stock_name(stock_code)
             
-            # 转换为响应格式
+            # Convert to Response Format
             data = []
             for _, row in df.iterrows():
                 date_val = row.get("date")

@@ -4,7 +4,7 @@ import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
 import StockScreeningPage from '../StockScreeningPage';
 
-// jsdom 未实现 scrollIntoView，而 Select 打开下拉时会调用它保持活动项可见。
+// jsdom does not implement scrollIntoView, while Select calls it to keep the active item visible when opening a dropdown.
 if (!HTMLElement.prototype.scrollIntoView) {
   HTMLElement.prototype.scrollIntoView = () => {};
 }
@@ -812,6 +812,26 @@ describe('StockScreeningPage', () => {
       strategy: 'shrink_pullback',
       maxResults: 3,
     });
+  });
+
+  it('lays out every screening parameter label beside its control', async () => {
+    getAlphaSiftStatus.mockResolvedValueOnce({
+      enabled: true,
+      available: true,
+      installSpecIsDefault: true,
+    });
+
+    render(<StockScreeningPage />);
+
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    const dialog = openScreeningConfiguration();
+    const marketField = within(dialog).getByLabelText('市场').parentElement?.parentElement;
+    const strategyField = within(dialog).getByLabelText('策略参数').parentElement?.parentElement;
+    const resultCountField = within(dialog).getByLabelText('返回数量').parentElement?.parentElement;
+
+    expect(marketField).toHaveClass('flex-row', 'items-center');
+    expect(strategyField).toHaveClass('flex-row', 'items-center');
+    expect(resultCountField).toHaveClass('flex-row', 'items-center');
   });
 
   it('restores strategy, market, and result count run parameters from the URL', async () => {

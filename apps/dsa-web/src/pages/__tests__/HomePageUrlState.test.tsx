@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { StrictMode } from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { createMemoryRouter, RouterProvider } from 'react-router-dom';
+import { createMemoryRouter, RouterProvider, type InitialEntry } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { analysisApi } from '../../api/analysis';
 import { agentApi } from '../../api/agent';
@@ -205,7 +205,7 @@ function createDeferred<T>() {
   return { promise, reject, resolve };
 }
 
-function renderHome(initialEntry: string | string[], strictMode = false) {
+function renderHome(initialEntry: InitialEntry | InitialEntry[], strictMode = false) {
   const initialEntries = Array.isArray(initialEntry) ? initialEntry : [initialEntry];
   const router = createMemoryRouter(
     [
@@ -273,6 +273,19 @@ describe('HomePage URL state', () => {
       checks: [],
     });
     vi.mocked(agentApi.getSkills).mockResolvedValue({ skills: [], default_skill_id: '' });
+  });
+
+  it('preserves URL-owned stock context while consuming a search-focus navigation state', async () => {
+    const router = renderHome({
+      pathname: '/',
+      search: '?stock=AAPL',
+      state: { focusStockSearch: true, focusToken: 1 },
+    });
+
+    const searchInput = await screen.findByPlaceholderText(/600519/);
+    await waitFor(() => expect(searchInput).toHaveFocus());
+    expect(new URLSearchParams(router.state.location.search).get('stock')).toBe('AAPL');
+    expect(router.state.location.state).toBeNull();
   });
 
   it('restores a shared report deep link instead of auto-selecting the first record', async () => {

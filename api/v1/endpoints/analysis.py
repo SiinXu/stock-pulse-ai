@@ -267,7 +267,7 @@ def _resolve_and_normalize_input(raw_value: str) -> str:
 
 
 # ============================================================
-# POST /analyze - 触发股票分析
+# POST /analyze - triggers stock analysis
 # ============================================================
 
 @router.post(
@@ -313,7 +313,7 @@ def trigger_analysis(
         HTTPException: 409 - 股票正在分析中
         HTTPException: 500 - 分析失败
     """
-    # 校验请求参数
+    # Validate request parameters
     stock_codes = []
     if request.stock_code:
         stock_codes.append(request.stock_code)
@@ -423,7 +423,7 @@ def _handle_async_analysis_batch(
         for dup in duplicate_errors
     ]
     
-    # 单只股票且被拒绝：保持 409 兼容性
+    # Single stock and rejected: maintain 409 compatibility
     if len(stock_codes) == 1 and duplicates:
         dup = duplicates[0]
         error_response = DuplicateTaskErrorResponse(
@@ -444,7 +444,7 @@ def _handle_async_analysis_batch(
             ),
         )
     
-    # 单只股票成功：保持原有响应格式兼容性
+    # Single stock successful: maintain original response format compatibility
     if len(stock_codes) == 1 and accepted:
         task_accepted = TaskAccepted(
             task_id=accepted[0].task_id,
@@ -460,7 +460,7 @@ def _handle_async_analysis_batch(
             content=task_accepted.model_dump()
         )
     
-    # 批量：返回汇总结果
+    # Batch: Return aggregated results
     batch_response = BatchTaskAcceptedResponse(
         accepted=accepted,
         duplicates=duplicates,
@@ -503,7 +503,7 @@ def _handle_sync_analysis(
             error_message = service.last_error or f"分析股票 {stock_code} 失败"
             raise api_error(500, "analysis_failed", error_message)
 
-        # 构建报告结构
+        # Build report structure
         report_data = result.get("report", {})
         context_snapshot, fundamental_snapshot, raw_result_snapshot = _load_sync_fundamental_sources(
             query_id=query_id,
@@ -543,7 +543,7 @@ def _handle_sync_analysis(
 
 
 # ============================================================
-# POST /market-review - 触发大盘复盘
+# POST /market-review - trigger market review
 # ============================================================
 
 @router.post(
@@ -613,7 +613,7 @@ def trigger_market_review(
 
 
 # ============================================================
-# GET /tasks - 获取任务列表
+# GET /tasks - Get the list of tasks
 # ============================================================
 
 @router.get(
@@ -647,18 +647,18 @@ def get_task_list(
     """
     task_queue = get_task_queue()
     
-    # 获取所有任务
+    # Get all tasks
     all_tasks = task_queue.list_all_tasks(limit=limit)
     
-    # 状态筛选
+    # Status filter
     if status:
         status_list = [s.strip().lower() for s in status.split(",")]
         all_tasks = [t for t in all_tasks if t.status.value in status_list]
     
-    # 统计信息
+    # Statistical information
     stats = task_queue.get_task_stats()
     
-    # 转换为 Schema
+    # Convert to Schema
     task_infos = [
         TaskInfo(
             task_id=t.task_id,
@@ -692,7 +692,7 @@ def get_task_list(
 
 
 # ============================================================
-# GET /tasks/stream - SSE 实时推送
+# GET /tasks/stream - SSE real-time push
 # ============================================================
 
 @router.get(
@@ -757,7 +757,7 @@ async def task_stream():
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # 禁用 Nginx 缓冲
+            "X-Accel-Buffering": "no",  # Disable Nginx caching
         }
     )
 
@@ -1064,7 +1064,7 @@ def _build_task_analysis_result(task: Any) -> AnalysisResultResponse:
 
 
 # ============================================================
-# GET /status/{task_id} - 查询单个任务状态
+# GET /status/{task_id} - Query the status of a single task
 # ============================================================
 
 @router.get(
@@ -1092,7 +1092,7 @@ def get_analysis_status(task_id: str) -> TaskStatus:
     Raises:
         HTTPException: 404 - 任务不存在
     """
-    # 1. 先从任务队列查询
+    # 1. Query from task queue first
     task_queue = get_task_queue()
     task = task_queue.get_task(task_id)
     
@@ -1141,7 +1141,7 @@ def get_analysis_status(task_id: str) -> TaskStatus:
             skills=getattr(task, "skills", None),
         )
     
-    # 2. 从数据库查询已完成的记录
+    # 2. Query completed records from database.
     try:
         from src.storage import DatabaseManager
         db = DatabaseManager.get_instance()
@@ -1317,12 +1317,12 @@ def get_analysis_status(task_id: str) -> TaskStatus:
         )
         raise api_error(500, "internal_error", f"查询任务状态失败: {str(e)}")
 
-    # 3. 任务不存在
+    # 3. Task does not exist
     raise api_error(404, "not_found", f"任务 {task_id} 不存在或已过期")
 
 
 # ============================================================
-# 辅助函数
+# Helper function
 # ============================================================
 
 def _load_sync_fundamental_sources(

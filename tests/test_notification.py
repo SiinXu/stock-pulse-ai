@@ -1508,7 +1508,7 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
                 "data": {
                     "financial_report": {
                         "report_date": "2024-09-30",
-                        "revenue": 1_236_000_000_000.0,  # 1.236 万亿 -> 12360.00 亿元
+                        "revenue": 1_236_000_000_000.0,  # 1.236 trillion -> 12360.00 CNY 100 million
                         "net_profit_parent": 60_800_000_000.0,
                         "operating_cash_flow": 72_500_000_000.0,
                         "roe": 22.45,
@@ -1582,19 +1582,19 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
 
         out = service.generate_single_stock_report(result)
 
-        # 财务摘要
+        # Financial summary
         self.assertIn("财务摘要", out)
         self.assertIn("2024-09-30", out)
         self.assertIn("12360.00 亿元", out)
         self.assertIn("22.45%", out)
         self.assertIn("15.23%", out)
         self.assertIn("91.55%", out)
-        # 股东回报
+        # Shareholder returns
         self.assertIn("股东回报", out)
         self.assertIn("30.8760 元", out)
         self.assertIn("1.85%", out)
         self.assertIn("2024-06-26", out)
-        # 关联板块（白酒带行业信号；MSCI中国 带概念信号）
+        # Related sectors (Baijiu industry signal; MSCI China with concept signal)
         self.assertIn("关联板块", out)
         self.assertIn("白酒", out)
         self.assertIn("领涨", out)
@@ -1999,7 +1999,7 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
 
         out = service.generate_single_stock_report(result)
 
-        # Without explicit dividend currency, default to 元 (matches AkShare A-share semantics).
+        # Without explicit dividend currency, default to yuan (matches AkShare A-share semantics).
         self.assertIn("27.6000 元", out)
 
     @mock.patch("src.notification.get_config")

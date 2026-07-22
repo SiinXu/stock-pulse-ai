@@ -614,7 +614,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
                       </div>
                     );
                   });
-                  // 两类板块都存在时按 行业|概念 左右并列，节省纵向空间；只有一类时保留 领涨|领跌 横向布局。
+                  // When both types of sectors exist, align them by industry | concept horizontally to save vertical space; when only one type exists, retain lead | lag layout horizontally.
                   if (boardTypes.length >= 2) {
                     return (
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">

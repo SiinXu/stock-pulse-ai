@@ -36,6 +36,13 @@ class _SystemConfigServiceTestCaseBase(unittest.TestCase):
         }
         for key in SystemConfigService._NOTIFICATION_TEST_KEY_MAP:
             os.environ.pop(key, None)
+        self._saved_runtime_priority_env = {
+            key: os.environ[key]
+            for key in Config._WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS
+            if key in os.environ
+        }
+        for key in Config._WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS:
+            os.environ.pop(key, None)
         # A developer .env leaked into os.environ (e.g. litellm's load_dotenv at
         # import) must not bleed LLM config into these tests; the temp .env below
         # is the authoritative source. Restored in tearDown.
@@ -74,6 +81,9 @@ class _SystemConfigServiceTestCaseBase(unittest.TestCase):
         for key in SystemConfigService._NOTIFICATION_TEST_KEY_MAP:
             os.environ.pop(key, None)
         os.environ.update(self._saved_notification_env)
+        for key in Config._WEBUI_RUNTIME_ENV_FILE_PRIORITY_KEYS:
+            os.environ.pop(key, None)
+        os.environ.update(self._saved_runtime_priority_env)
         restore_ambient_llm_env(self._saved_llm_env)
         self.temp_dir.cleanup()
 

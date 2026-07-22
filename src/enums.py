@@ -17,9 +17,9 @@ class ReportType(str, Enum):
     用于 API 触发分析时选择推送的报告格式。
     继承 str 使其可以直接与字符串比较和序列化。
     """
-    SIMPLE = "simple"  # 精简报告：使用 generate_single_stock_report
-    FULL = "full"      # 完整报告：使用 generate_dashboard_report
-    BRIEF = "brief"    # 简洁模式：3-5 句话概括，适合移动端/推送
+    SIMPLE = "simple"  # Simplified report: using generate_single_stock_report
+    FULL = "full"      # Full report: using generate_dashboard_report
+    BRIEF = "brief"    # Concise mode: 3-5 sentences summary, suitable for mobile/push
 
     @classmethod
     def from_str(cls, value: str) -> "ReportType":

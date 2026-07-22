@@ -91,12 +91,12 @@ class AnalysisService:
         """
         try:
             self.last_error = None
-            # 导入分析相关模块
+            # Import analysis related modules
             from src.config import get_config
             from src.core.pipeline import StockAnalysisPipeline
             from src.enums import ReportType
             
-            # 生成 query_id
+            # Generate query_id
             if query_id is None:
                 query_id = uuid.uuid4().hex
             effective_trace_id = trace_id or query_id
@@ -109,14 +109,14 @@ class AnalysisService:
                     trigger_source=query_source or "api",
                 )
             
-            # 获取配置
+            # Get configuration
             config = get_config()
             normalized_report_language = normalize_report_language(report_language, default="")
             if normalized_report_language:
                 config = copy.copy(config)
                 config.report_language = normalized_report_language
             
-            # 创建分析流水线
+            # Create an analysis pipeline
             pipeline = StockAnalysisPipeline(
                 config=config,
                 request_context=request_context,
@@ -129,10 +129,10 @@ class AnalysisService:
                 portfolio_context=portfolio_context,
             )
             
-            # 确定报告类型 (API: simple/detailed/full/brief -> ReportType)
+            # Determine report type (API: simple/detailed/full/brief -> ReportType)
             rt = ReportType.from_str(report_type)
             
-            # 执行分析
+            # Execute analysis
             result = pipeline.process_single_stock(
                 code=stock_code,
                 skip_analysis=False,
@@ -153,7 +153,7 @@ class AnalysisService:
                 logger.warning(f"分析股票 {stock_code} 未成功完成: {self.last_error}")
                 return None
             
-            # 构建响应
+            # Build the response
             return self._build_analysis_response(result, query_id, report_type=rt.value)
             
         except Exception as exc:
@@ -187,12 +187,12 @@ class AnalysisService:
         Returns:
             格式化的响应字典
         """
-        # 获取狙击点位
+        # Get target price levels
         sniper_points = {}
         if hasattr(result, 'get_sniper_points'):
             sniper_points = result.get_sniper_points() or {}
         
-        # 计算情绪标签
+        # Calculate Sentiment Labels
         report_language = normalize_report_language(getattr(result, "report_language", "zh"))
         sentiment_label = get_sentiment_label(result.sentiment_score, report_language)
         stock_name = get_localized_stock_name(getattr(result, "name", None), result.code, report_language)
@@ -226,7 +226,7 @@ class AnalysisService:
             stock_code=result.code,
         )
         
-        # 构建报告结构
+        # Build report structure
         report = {
             "meta": {
                 "query_id": query_id,

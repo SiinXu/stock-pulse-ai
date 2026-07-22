@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { BarChart3, LogOut, PanelLeft, PanelRight, Search } from 'lucide-react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAgentChatStore } from '../../stores/agentChatStore';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
+import { resolveContextAwareNavigationTarget } from '../../utils/sessionContinuity';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { StatusDot } from '../common/StatusDot';
 import { Tooltip } from '../common/Tooltip';
@@ -42,9 +43,13 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
   const { authEnabled, logout } = useAuth();
   const { t } = useUiLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
+  const currentHref = `${location.pathname}${location.search}${location.hash}`;
 
   const openSearch = () => {
-    navigate('/', { state: { focusStockSearch: true, focusToken: Date.now() } });
+    navigate(resolveContextAwareNavigationTarget('/', currentHref), {
+      state: { focusStockSearch: true, focusToken: Date.now() },
+    });
     onNavigate?.();
   };
   const completionBadge = useAgentChatStore((state) => state.completionBadge);
@@ -177,9 +182,10 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
       >
         {navItems.map(({ key, labelKey, to, icon: Icon, exact, badge }) => {
           const label = t(labelKey);
+          const navigationTarget = resolveContextAwareNavigationTarget(to, currentHref);
           const link = (
             <NavLink
-              to={to}
+              to={navigationTarget}
               end={exact}
               onClick={(event) => {
                 if (shouldDelegateCurrentDocumentNavigation(event)) {

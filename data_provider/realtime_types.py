@@ -27,11 +27,11 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================
-# 通用类型转换工具函数
+# Generic Type Conversion Utility Function
 # ============================================
-# 设计说明：
-# 各数据源返回的原始数据类型不一致（str/float/int/NaN），
-# 使用这些函数统一转换，避免在各 Fetcher 中重复定义。
+# Design specifications:
+# The raw data types returned by each data source are inconsistent (str/float/int/NaN),
+# Use these functions to unify the conversion, avoiding duplication in each Fetcher.
 
 def safe_float(val: Any, default: Optional[float] = None) -> Optional[float]:
     """
@@ -54,14 +54,14 @@ def safe_float(val: Any, default: Optional[float] = None) -> Optional[float]:
         if val is None:
             return default
         
-        # 处理字符串
+        # Process string
         if isinstance(val, str):
             val = val.strip()
             if val == "" or val == "-" or val == "--":
                 return default
         
-        # 处理 pandas/numpy NaN
-        # 使用 math.isnan 而不是 pd.isna，避免强制依赖 pandas
+        # Handle pandas/numpy NaN values
+        # Use math.isnan instead of pd.isna, avoid forced dependency on pandas
         import math
         try:
             if math.isnan(float(val)):
@@ -95,17 +95,17 @@ def safe_int(val: Any, default: Optional[int] = None) -> Optional[int]:
 
 class RealtimeSource(Enum):
     """实时行情数据源"""
-    EFINANCE = "efinance"           # 东方财富（efinance库）
-    AKSHARE_EM = "akshare_em"       # 东方财富（akshare库）
-    AKSHARE_SINA = "akshare_sina"   # 新浪财经
-    AKSHARE_QQ = "akshare_qq"       # 腾讯财经
+    EFINANCE = "efinance"           # Eastmoney via the efinance library
+    AKSHARE_EM = "akshare_em"       # Eastmoney via the AkShare library
+    AKSHARE_SINA = "akshare_sina"   # Sina Finance
+    AKSHARE_QQ = "akshare_qq"       # Tencent Finance.
     TUSHARE = "tushare"             # Tushare Pro
     TICKFLOW = "tickflow"           # TickFlow
-    TENCENT = "tencent"             # 腾讯直连
-    SINA = "sina"                   # 新浪直连
-    STOOQ = "stooq"                 # Stooq 美股兜底
-    LONGBRIDGE = "longbridge"       # 长桥（美股/港股兜底）
-    FALLBACK = "fallback"           # 降级兜底
+    TENCENT = "tencent"             # Direct connection to Tencent.
+    SINA = "sina"                   # Sina direct connection
+    STOOQ = "stooq"                 # Stooq U.S. stock fallback
+    LONGBRIDGE = "longbridge"       # Longbridge U.S./Hong Kong stock fallback
+    FALLBACK = "fallback"           # Fallback to degraded mode.
 
 
 @dataclass
@@ -122,45 +122,45 @@ class UnifiedRealtimeQuote:
     name: str = ""
     source: RealtimeSource = RealtimeSource.FALLBACK
 
-    # === 数据质量元数据（由 DataFetcherManager 统一补齐）===
-    fetched_at: Optional[str] = None             # 本系统获取时间（ISO 8601 datetime）
-    provider_timestamp: Optional[str] = None     # Provider 真实行情时间（ISO 8601 datetime）
-    is_stale: Optional[bool] = None              # provider_timestamp 超过最小 TTL 阈值时为 True
-    stale_seconds: Optional[int] = None          # provider_timestamp 距 fetched_at 的秒数
-    fallback_from: Optional[str] = None          # 整源 fallback 的失败首选源 token
-    market: Optional[str] = None                 # 市场标签（cn/hk/us/jp/kr/tw）
-    currency: Optional[str] = None               # 报价币种（JPY/KRW/TWD/USD/HKD/CNY 等）
+    # === Data-quality metadata (normalized by DataFetcherManager) ===
+    fetched_at: Optional[str] = None             # Timestamp captured by this system (ISO 8601 datetime)
+    provider_timestamp: Optional[str] = None     # Provider's actual quote timestamp (ISO 8601 datetime)
+    is_stale: Optional[bool] = None              # True when provider_timestamp exceeds the minimum TTL threshold
+    stale_seconds: Optional[int] = None          # Seconds between provider_timestamp and fetched_at
+    fallback_from: Optional[str] = None          # Failed preferred-source token for whole-source fallback
+    market: Optional[str] = None                 # Market identifier (cn/hk/us/jp/kr/tw)
+    currency: Optional[str] = None               # Quote currency (JPY/KRW/TWD/USD/HKD/CNY etc.)
     data_quality: Optional[str] = None           # ok/partial/unavailable
-    missing_fields: Optional[list[str]] = None   # provider 缺失的关键字段
+    missing_fields: Optional[list[str]] = None   # Key fields missing from the provider response
     
-    # === 核心价格数据（几乎所有源都有）===
-    price: Optional[float] = None           # 最新价
-    change_pct: Optional[float] = None      # 涨跌幅(%)
-    change_amount: Optional[float] = None   # 涨跌额
+    # Core price data (available from nearly all sources)
+    price: Optional[float] = None           # Latest price
+    change_pct: Optional[float] = None      # Percentage change
+    change_amount: Optional[float] = None   # Change in value
     
-    # === 量价指标（部分源可能缺失）===
-    volume: Optional[int] = None            # 成交量（股，与历史日线口径一致）
-    amount: Optional[float] = None          # 成交额（元）
-    volume_ratio: Optional[float] = None    # 量比
-    turnover_rate: Optional[float] = None   # 换手率(%)
-    amplitude: Optional[float] = None       # 振幅(%)
+    # === Quantitative and Price Indicators (Some sources may be missing) ===
+    volume: Optional[int] = None            # Volume (shares, consistent with historical daily line scale)
+    amount: Optional[float] = None          # Value (yuan)
+    volume_ratio: Optional[float] = None    # Relative Volume
+    turnover_rate: Optional[float] = None   # Turnover Rate (%)
+    amplitude: Optional[float] = None       # Amplitude (%)
     
-    # === 价格区间 ===
-    open_price: Optional[float] = None      # 开盘价
-    high: Optional[float] = None            # 最高价
-    low: Optional[float] = None             # 最低价
-    pre_close: Optional[float] = None       # 昨收价
+    # === Price Range ===
+    open_price: Optional[float] = None      # Opening price
+    high: Optional[float] = None            # Highest price
+    low: Optional[float] = None             # Lowest price
+    pre_close: Optional[float] = None       # Yesterday's closing price
     
-    # === 估值指标（仅东财等全量接口有）===
-    pe_ratio: Optional[float] = None        # 市盈率(动态)
-    pb_ratio: Optional[float] = None        # 市净率
-    total_mv: Optional[float] = None        # 总市值(元)
-    circ_mv: Optional[float] = None         # 流通市值(元)
+    # === Valuation metrics (available only from full-data providers such as Eastmoney) ===
+    pe_ratio: Optional[float] = None        # Dynamic Price-to-Earnings Ratio
+    pb_ratio: Optional[float] = None        # Price-to-Book Ratio
+    total_mv: Optional[float] = None        # Total market capitalization (yuan)
+    circ_mv: Optional[float] = None         # Circulating market capitalization (yuan)
     
-    # === 其他指标 ===
-    change_60d: Optional[float] = None      # 60日涨跌幅(%)
-    high_52w: Optional[float] = None        # 52周最高
-    low_52w: Optional[float] = None         # 52周最低
+    # === Other Indicators ===
+    change_60d: Optional[float] = None      # 60-day percentage change (%)
+    high_52w: Optional[float] = None        # Highest price in 52 weeks
+    low_52w: Optional[float] = None         # 52 weeks low
     
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典（过滤 None 值）"""
@@ -169,7 +169,7 @@ class UnifiedRealtimeQuote:
             'name': self.name,
             'source': self.source.value,
         }
-        # 只添加非 None 的字段
+        # Add only non-null fields.
         optional_fields = [
             'fetched_at', 'provider_timestamp', 'is_stale', 'stale_seconds',
             'fallback_from', 'market', 'currency', 'data_quality', 'missing_fields',
@@ -205,18 +205,18 @@ class ChipDistribution:
     date: str = ""
     source: str = "akshare"
     
-    # 获利情况
-    profit_ratio: float = 0.0     # 获利比例(0-1)
-    avg_cost: float = 0.0         # 平均成本
+    # Profit situation
+    profit_ratio: float = 0.0     # Profit ratio (0-1)
+    avg_cost: float = 0.0         # Average Cost
     
-    # 筹码集中度
-    cost_90_low: float = 0.0      # 90%筹码成本下限
-    cost_90_high: float = 0.0     # 90%筹码成本上限
-    concentration_90: float = 0.0  # 90%筹码集中度（越小越集中）
+    # Chip concentration
+    cost_90_low: float = 0.0      # 90% chip cost lower limit
+    cost_90_high: float = 0.0     # 90% chip cost upper limit
+    concentration_90: float = 0.0  # 90% chip concentration (smaller is more concentrated)
     
-    cost_70_low: float = 0.0      # 70%筹码成本下限
-    cost_70_high: float = 0.0     # 70%筹码成本上限
-    concentration_70: float = 0.0  # 70%筹码集中度
+    cost_70_low: float = 0.0      # 70% chip cost lower limit
+    cost_70_high: float = 0.0     # 70% chip cost upper limit
+    concentration_70: float = 0.0  # 70% chip concentration
     
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
@@ -244,7 +244,7 @@ class ChipDistribution:
         """
         status_parts = []
         
-        # 获利比例分析
+        # Profit ratio analysis
         if self.profit_ratio >= 0.9:
             status_parts.append("获利盘极高(获利盘>90%)")
         elif self.profit_ratio >= 0.7:
@@ -258,7 +258,7 @@ class ChipDistribution:
         else:
             status_parts.append("套牢盘极高(套牢盘>90%)")
         
-        # 筹码集中度分析 (90%集中度 < 10% 表示集中)
+        # Chip concentration analysis (90% concentration < 10% indicates concentration)
         if self.concentration_90 < 0.08:
             status_parts.append("筹码高度集中")
         elif self.concentration_90 < 0.15:
@@ -268,7 +268,7 @@ class ChipDistribution:
         else:
             status_parts.append("筹码较分散")
         
-        # 成本与现价关系
+        # Relationship between cost and current price
         if current_price > 0 and self.avg_cost > 0:
             cost_diff = (current_price - self.avg_cost) / self.avg_cost * 100
             if cost_diff > 20:
@@ -620,17 +620,17 @@ class CircuitBreaker:
                 self._states.clear()
 
 
-# 全局熔断器实例（实时行情专用）
+# Global circuit breaker instance(Real-time quote dedicated)
 _realtime_circuit_breaker = CircuitBreaker(
-    failure_threshold=3,      # 连续失败3次熔断
-    cooldown_seconds=300.0,   # 冷却5分钟
+    failure_threshold=3,      # Enter a circuit break state after 3 consecutive failures
+    cooldown_seconds=300.0,   # Cooling for 5 minutes
     half_open_max_calls=1
 )
 
-# 筹码接口熔断器（更保守的策略，因为该接口更不稳定）
+# Chip interface circuit breaker (more conservative strategy because this interface is more unstable)
 _chip_circuit_breaker = CircuitBreaker(
-    failure_threshold=2,      # 连续失败2次熔断
-    cooldown_seconds=600.0,   # 冷却10分钟
+    failure_threshold=2,      # Enter a circuit break state after 2 consecutive failures.
+    cooldown_seconds=600.0,   # Cooling for 10 minutes
     half_open_max_calls=1
 )
 

@@ -191,7 +191,7 @@ class RelativePathFormatter(logging.Formatter):
             return "Log record formatting failed"
 
 
-# 默认需要降低日志级别的第三方库
+# Defaults to lowering the log level of third-party libraries
 DEFAULT_QUIET_LOGGERS = [
     'urllib3',
     'sqlalchemy',
@@ -244,40 +244,40 @@ def setup_logging(
         debug: 是否启用调试模式（控制台输出 DEBUG 级别）
         extra_quiet_loggers: 额外需要降低日志级别的第三方库列表
     """
-    # 确定控制台日志级别
+    # Determine console log level
     if console_level is not None:
         level = console_level
     else:
         level = logging.DEBUG if debug else logging.INFO
 
-    # 创建日志目录
+    # Create log directory
     log_path = Path(log_dir)
     log_path.mkdir(parents=True, exist_ok=True)
 
-    # 日志文件路径（按日期分文件）
+    # Log file path (split by date)
     today_str = datetime.now().strftime('%Y%m%d')
     log_file = log_path / f"{log_prefix}_{today_str}.log"
     debug_log_file = log_path / f"{log_prefix}_debug_{today_str}.log"
 
-    # 配置根 logger
+    # Configure root logger
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.DEBUG)  # 根 logger 设为 DEBUG，由 handler 控制输出级别
+    root_logger.setLevel(logging.DEBUG)  # Set logger to DEBUG, let handler control output level
 
-    # 清除已有 handler，避免重复添加
+    # Clear existing handlers to avoid adding duplicates
     if root_logger.handlers:
         root_logger.handlers.clear()
-    # 创建相对路径 Formatter（相对于项目根目录）
+    # Create relative path Formatter (relative to project root)
     project_root = Path.cwd()
     rel_formatter = RelativePathFormatter(
         LOG_FORMAT, LOG_DATE_FORMAT, relative_to=project_root
     )
-    # Handler 1: 控制台输出
+    # Handler 1: Console output
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(level)
     console_handler.setFormatter(rel_formatter)
     root_logger.addHandler(console_handler)
 
-    # Handler 2: 常规日志文件（INFO 级别，10MB 轮转）
+    # Handler 2: Regular log file (INFO level, 10MB rotation)
     file_handler = RotatingFileHandler(
         log_file,
         maxBytes=10 * 1024 * 1024,  # 10MB
@@ -288,7 +288,7 @@ def setup_logging(
     file_handler.setFormatter(rel_formatter)
     root_logger.addHandler(file_handler)
 
-    # Handler 3: 调试日志文件（DEBUG 级别，包含所有详细信息）
+    # Handler 3: Debug log file (DEBUG level, includes all detailed information)
     debug_handler = RotatingFileHandler(
         debug_log_file,
         maxBytes=50 * 1024 * 1024,  # 50MB
@@ -299,7 +299,7 @@ def setup_logging(
     debug_handler.setFormatter(rel_formatter)
     root_logger.addHandler(debug_handler)
 
-    # 降低第三方库的日志级别
+    # Reduce the logging level of third-party libraries.
     quiet_loggers = DEFAULT_QUIET_LOGGERS.copy()
     if extra_quiet_loggers:
         quiet_loggers.extend(extra_quiet_loggers)
@@ -311,7 +311,7 @@ def setup_logging(
     for logger_name in LITELLM_LOGGERS:
         logging.getLogger(logger_name).setLevel(litellm_level)
 
-    # 输出初始化完成信息（使用相对路径）
+    # Output initialization completion information (using relative path)
     try:
         rel_log_path = log_path.resolve().relative_to(project_root)
     except ValueError:

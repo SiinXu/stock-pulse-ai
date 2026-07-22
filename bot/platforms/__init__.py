@@ -14,12 +14,12 @@
 from bot.platforms.base import BotPlatform
 from bot.platforms.dingtalk import DingtalkPlatform
 
-# 所有可用平台（Webhook 模式）
+# All available platforms (Webhook mode)
 ALL_PLATFORMS = {
     'dingtalk': DingtalkPlatform,
 }
 
-# 钉钉 Stream 模式（可选）
+# DingTalk Stream mode (optional)
 try:
     from bot.platforms.dingtalk_stream import (
         DingtalkStreamClient,
@@ -35,7 +35,7 @@ except ImportError:
     get_dingtalk_stream_client = lambda: None
     start_dingtalk_stream_background = lambda: False
 
-# 飞书 Stream 模式（可选）
+# Feishu Stream mode (optional)
 try:
     from bot.platforms.feishu_stream import (
         FeishuStreamClient,
@@ -57,13 +57,13 @@ __all__ = [
     'BotPlatform',
     'DingtalkPlatform',
     'ALL_PLATFORMS',
-    # 钉钉 Stream 模式
+    # DingTalk Stream mode
     'DingtalkStreamClient',
     'DingtalkStreamHandler',
     'get_dingtalk_stream_client',
     'start_dingtalk_stream_background',
     'DINGTALK_STREAM_AVAILABLE',
-    # 飞书 Stream 模式
+    # Feishu Stream mode
     'FeishuStreamClient',
     'FeishuStreamHandler',
     'FeishuReplyClient',

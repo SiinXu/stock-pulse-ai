@@ -85,12 +85,12 @@ def test_signed_interaction_request_returns_deferred_ack():
         payload,
     )
 
-    # 应返回 type 5 延迟 ACK
+    # Should return type 5 delay ACK
     assert response is not None
     assert response.status_code == 200
     assert response.body == {"type": 5}
 
-    # 同时仍解析出消息
+    # Still parse out the message
     assert message is not None
     assert message.platform == "discord"
     assert message.chat_id == "channel-1"
@@ -98,7 +98,7 @@ def test_signed_interaction_request_returns_deferred_ack():
     assert message.user_id == "user-1"
     assert message.user_name == "tester"
     assert message.content == "/analyze 600519"
-    # follow-up 需要的字段存在于 raw_data
+    # follow-up: Required fields are in raw_data
     assert message.raw_data.get("application_id") == "app-123"
     assert message.raw_data.get("token") == "interaction-token"
 
@@ -167,7 +167,7 @@ def test_expired_timestamp_is_rejected():
     platform = _make_platform(signing_key.verify_key.encode().hex())
     payload = {"type": 1}
     body = json.dumps(payload).encode("utf-8")
-    # 10 分钟前的 timestamp
+    # Timestamp 10 minutes ago
     stale_ts = str(int(time.time()) - 600)
 
     message, response = platform.handle_webhook(
@@ -259,7 +259,7 @@ def test_send_followup_chunks_long_content():
             "token": "interaction-token",
         },
     )
-    # 生成超过 2000 字符的内容
+    # Generate content exceeding 2000 characters
     long_content = "A" * 3500
     response = BotResponse.text_response(long_content)
 
@@ -270,11 +270,11 @@ def test_send_followup_chunks_long_content():
         result = platform.send_followup(response, message)
 
     assert result is True
-    # 首块使用 PATCH
+    # Use PATCH first
     mock_requests.patch.assert_called_once()
     patch_url = mock_requests.patch.call_args[0][0]
     assert "/messages/@original" in patch_url
-    # 后续块使用 POST
+    # Use POST for subsequent blocks.
     assert mock_requests.post.call_count >= 1
     post_url = mock_requests.post.call_args[0][0]
     assert post_url.endswith("/app-123/interaction-token")

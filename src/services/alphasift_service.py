@@ -2125,8 +2125,8 @@ def _ensure_supported_strategy(strategy: str) -> None:
     if strategy in ids:
         return
 
-    # 兼容“策略列表为空时手动输入”以及“用户手动覆盖策略参数”场景，
-    # 策略由适配层进行最终校验，因此在列表外仍保持透传。
+    # Compatible with scenarios such as 'empty strategy list manual input' and 'user manually overwrites strategy parameters'.
+    # The strategy is finally validated by the adapter layer, so it remains transparent outside the list.
 
 
 def _call_alphasift_screen(screen: Any, strategy: str, market: str, max_results: int, config: Config) -> Any:
@@ -2260,8 +2260,8 @@ def _resolve_alphasift_snapshot_source_priority(config: Config) -> str:
 def _build_alphasift_runtime_env(config: Config, *, max_results: Optional[int] = None) -> Dict[str, str]:
     # Bridge runtime only: only inject resolved DSA values for this request/process scope.
     # User .env/config is never rewritten here; unset channels/models are not silently migrated.
-    # 与 LiteLLM provider/model、openai-compatible `api_base` 与 headers 注入语义保持一致，
-    # 参见 https://docs.litellm.ai/docs/providers 与
+    # Consistent with LiteLLM provider/model, openai-compatible `api_base` and headers injection of semantics,
+    # See https://docs.litellm.ai/docs/providers
     # https://docs.litellm.ai/docs/proxy/configs#the-model_list-key
     env: Dict[str, str] = {}
 
@@ -3246,8 +3246,8 @@ class DsaEastMoneyHotspotProvider:
 
 
 def _build_alphasift_context(config: Config, *, max_results: Optional[int] = None) -> Dict[str, Any]:
-    # context.llm.model/fallback/model_list 与 LiteLLM 路由语义保持一致，
-    # 参见 https://docs.litellm.ai/docs/proxy/configs#the-model_list-key
+    # context.llm.model/fallback/model_list And LiteLLM Route semantics remain consistent,
+    # See https://docs.litellm.ai/docs/proxy/configs#the-model_list-key
     channels = _normalize_dsa_llm_channels(config)
     litellm_model, fallback_models = _resolve_alphasift_llm_models(config)
     return {

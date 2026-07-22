@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createParsedApiError } from '../../api/error';
@@ -85,6 +86,7 @@ const mockStoreState = {
     },
   ],
   sessionsLoading: false,
+  sessionsError: null as ReturnType<typeof createParsedApiError> | null,
   hasInitialLoad: true,
   chatError: null as ReturnType<typeof createParsedApiError> | null,
   lastFailedRequest: null as { payload: { message: string; session_id: string } } | null,
@@ -177,6 +179,7 @@ beforeEach(() => {
   mockStoreState.chatError = null;
   mockStoreState.lastFailedRequest = null;
   mockStoreState.sessionsLoading = false;
+  mockStoreState.sessionsError = null;
   mockStoreState.hasInitialLoad = true;
   mockStoreState.sessionId = 'session-1';
   mockStoreState.sessions = [
@@ -260,7 +263,7 @@ describe('ChatPage', () => {
     render(
       <MemoryRouter initialEntries={['/chat']}>
         <ChatPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(await screen.findByTestId('chat-workspace')).toBeInTheDocument();
@@ -268,6 +271,46 @@ describe('ChatPage', () => {
     expect(screen.getByTestId('chat-message-scroll')).toBeInTheDocument();
     expect(mockLoadInitialSession).toHaveBeenCalled();
     expect(mockClearCompletionBadge).toHaveBeenCalled();
+  });
+
+  it('keeps the chat mode legible in dark mode and removes the research panel border', async () => {
+    render(
+      <MemoryRouter initialEntries={['/chat']}>
+        <ChatPage />
+      </MemoryRouter>,
+    );
+
+    const modeControl = await screen.findByRole('tablist', { name: '对话模式' });
+    expect(modeControl).toHaveClass(
+      'dark:[&_.segmented-control-tab[aria-selected=true]]:!bg-foreground',
+      'dark:[&_.segmented-control-tab[aria-selected=true]]:text-background',
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: '深度研究' }));
+    const researchSurface = screen.getByRole('heading', { name: '深度研究' }).closest('[data-surface-level="section"]');
+    expect(researchSurface).not.toHaveClass('border');
+  });
+
+  it('renders the session retry as an overlaid icon and removes the details divider', async () => {
+    mockStoreState.sessionsError = createParsedApiError({
+      title: '历史记录加载失败',
+      message: '无法加载历史记录',
+      rawMessage: 'GET /api/agent/sessions returned 404',
+      category: 'http_error',
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/chat']}>
+        <ChatPage />
+      </MemoryRouter>,
+    );
+
+    const retry = await screen.findByRole('button', { name: '重试' });
+    const alert = screen.getByText('历史记录加载失败').closest('[role="alert"]');
+
+    expect(retry).toHaveAttribute('data-control', 'icon-button');
+    expect(retry.parentElement).toHaveClass('absolute', 'right-2', 'top-2');
+    expect(alert?.parentElement).toHaveClass('[&_details]:border-t-0', '[&_details]:pt-0');
   });
 
   it('uses the shared mobile history drawer and restores focus after Escape', async () => {
@@ -1087,7 +1130,7 @@ describe('ChatPage', () => {
     });
   });
 
-  it('restores unsent report context after refresh and removes it only after sending', async () => {
+  it('restores unsent report context, then keeps consumed context shareable without recreating the draft', async () => {
     vi.mocked(historyApi.getDetail).mockResolvedValue({
       meta: {
         id: 2,
@@ -1130,7 +1173,7 @@ describe('ChatPage', () => {
       [{ path: '/chat', element: <ChatPage /> }],
       { initialEntries: [refreshEntry] },
     );
-    render(<RouterProvider router={refreshedRouter} />);
+    const refreshedRender = render(<RouterProvider router={refreshedRouter} />);
 
     expect(await screen.findByDisplayValue('请深入分析 Apple(AAPL)')).toBeInTheDocument();
     await waitFor(() => expect(historyApi.getDetail).toHaveBeenCalledTimes(2));
@@ -1147,7 +1190,67 @@ describe('ChatPage', () => {
         }),
         expect.any(Object),
       );
-      expect(refreshedRouter.state.location.search).toBe('?session=session-1');
+      expect(Object.fromEntries(new URLSearchParams(refreshedRouter.state.location.search))).toEqual({
+        stock: 'AAPL',
+        name: 'Apple',
+        recordId: '2',
+        session: 'session-1',
+        context: 'active',
+      });
+    });
+
+    const activeEntry = `${refreshedRouter.state.location.pathname}${refreshedRouter.state.location.search}`;
+    refreshedRender.unmount();
+    const activeRouter = createMemoryRouter(
+      [{ path: '/chat', element: <ChatPage /> }],
+      { initialEntries: [activeEntry] },
+    );
+    render(<RouterProvider router={activeRouter} />);
+
+    await screen.findByRole('heading', { name: '问股' });
+    expect(screen.getByPlaceholderText(/分析 600519/)).toHaveValue('');
+    expect(historyApi.getDetail).toHaveBeenCalledTimes(2);
+  });
+
+  it('finishes report context hydration after StrictMode replays mount effects', async () => {
+    const report = createDeferred<Awaited<ReturnType<typeof historyApi.getDetail>>>();
+    vi.mocked(historyApi.getDetail).mockReturnValue(report.promise);
+    const router = createMemoryRouter(
+      [{ path: '/chat', element: <ChatPage /> }],
+      { initialEntries: ['/chat?stock=AAPL&name=Apple&recordId=2'] },
+    );
+
+    render(
+      <StrictMode>
+        <RouterProvider router={router} />
+      </StrictMode>,
+    );
+
+    expect(await screen.findByDisplayValue('请深入分析 Apple(AAPL)')).toBeInTheDocument();
+    await act(async () => {
+      report.resolve({
+        meta: {
+          id: 2,
+          queryId: 'q-2',
+          stockCode: 'AAPL',
+          stockName: 'Apple',
+          reportType: 'detailed',
+          createdAt: '2026-03-18T09:00:00Z',
+          currentPrice: 211.5,
+          changePct: 2.4,
+        },
+        summary: {
+          analysisSummary: 'Momentum remains constructive',
+          operationAdvice: 'Continue monitoring',
+          trendPrediction: 'Short-term strength',
+          sentimentScore: 81,
+        },
+      });
+      await report.promise;
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '发送' })).toBeEnabled();
     });
   });
 
@@ -1258,11 +1361,15 @@ describe('ChatPage', () => {
   });
 
   it('switches active stock context for explicit switch messages', async () => {
-    render(
-      <MemoryRouter initialEntries={['/chat?stock=600519&name=%E8%B4%B5%E5%B7%9E%E8%8C%85%E5%8F%B0']}>
-        <ChatPage />
-      </MemoryRouter>
+    const router = createMemoryRouter(
+      [{ path: '/chat', element: <ChatPage /> }],
+      {
+        initialEntries: [
+          '/chat?stock=600519&name=%E8%B4%B5%E5%B7%9E%E8%8C%85%E5%8F%B0&recordId=9',
+        ],
+      },
     );
+    render(<RouterProvider router={router} />);
 
     expect(await screen.findByDisplayValue('请深入分析 贵州茅台(600519)')).toBeInTheDocument();
 
@@ -1284,6 +1391,11 @@ describe('ChatPage', () => {
           skillName: '趋势分析',
         }),
       );
+      expect(Object.fromEntries(new URLSearchParams(router.state.location.search))).toEqual({
+        session: 'session-1',
+        stock: 'AAPL',
+        context: 'active',
+      });
     });
   });
 
@@ -1557,13 +1669,20 @@ describe('ChatPage', () => {
       { id: 'm-4', role: 'assistant', content: 'AAPL 分析结果' },
     ];
 
-    render(
-      <MemoryRouter initialEntries={['/chat']}>
-        <ChatPage />
-      </MemoryRouter>
+    const router = createMemoryRouter(
+      [{ path: '/chat', element: <ChatPage /> }],
+      { initialEntries: ['/chat'] },
     );
+    render(<RouterProvider router={router} />);
 
     expect(await screen.findByTestId('chat-workspace')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(Object.fromEntries(new URLSearchParams(router.state.location.search))).toEqual({
+        session: 'session-1',
+        stock: 'AAPL',
+        context: 'active',
+      });
+    });
 
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
       target: { value: '继续看支撑位' },

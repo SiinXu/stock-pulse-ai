@@ -4,7 +4,7 @@
 import sys
 import os
 
-# 确保项目根目录在 sys.path
+# Ensure the project root directory is in sys.path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
@@ -12,7 +12,7 @@ if PROJECT_ROOT not in sys.path:
 from src.utils.data_processing import normalize_signal_attribution_values, normalize_dashboard_signal_attribution
 from src.schemas.report_schema import Dashboard, SignalAttribution
 
-# AnalysisResult 在 analyzer.py 中定义
+# AnalysisResult In analyzer.py Define
 from src.analyzer import AnalysisResult
 
 
@@ -45,7 +45,7 @@ class TestNormalizeSignalAttribution:
     def test_partial_none_no_normalization(self):
         d = {"technical_indicators": 70, "news_sentiment": None, "fundamentals": 30, "market_conditions": None}
         normalize_signal_attribution_values(d)
-        # 只有两个有效值，不归一化
+        # Only two valid values, no normalization.
         assert d["technical_indicators"] == 70
         assert d["news_sentiment"] is None
 
@@ -68,12 +68,12 @@ class TestNormalizeDashboardSignalAttribution:
 
     def test_no_signal_attribution_key(self):
         dashboard = {"core_conclusion": {}}
-        normalize_dashboard_signal_attribution(dashboard)  # 不应报错
+        normalize_dashboard_signal_attribution(dashboard)  # Should not error
         assert "signal_attribution" not in dashboard
 
     def test_signal_attribution_none(self):
         dashboard = {"signal_attribution": None}
-        normalize_dashboard_signal_attribution(dashboard)  # 不应报错
+        normalize_dashboard_signal_attribution(dashboard)  # Should not error
 
 
 class TestParseResponseIntegration:
@@ -87,7 +87,7 @@ class TestParseResponseIntegration:
         验证：如果 LLM 返回字符串百分比，归一化后变成 int。
         通过直接测试 _parse_response 的归一化调用来验证。
         """
-        # 模拟 LLM 返回的 data dict
+        # Simulate LLM returned data dict
         data = {
             "sentiment_score": 50,
             "trend_prediction": "震荡",
@@ -106,7 +106,7 @@ class TestParseResponseIntegration:
                 }
             },
         }
-        # 手动调用归一化（模拟 _parse_response 的行为）
+        # Manually call normalization (simulates the behavior of _parse_response)
         normalize_dashboard_signal_attribution(data.get("dashboard"))
         sa = data["dashboard"]["signal_attribution"]
         assert sa["technical_indicators"] == 70
@@ -138,7 +138,7 @@ class TestHistoryServiceDisplay:
             },
         )
 
-        # 创建一个 mock record
+        # Create a mock record
         class MockRecord:
             created_at = None
 

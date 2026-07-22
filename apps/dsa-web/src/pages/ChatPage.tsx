@@ -2,11 +2,11 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ChevronDown, SlidersHorizontal } from 'lucide-react';
+import { ChevronDown, SlidersHorizontal, RefreshCw } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { agentApi } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Badge, Button, Checkbox, ConfirmDialog, Drawer, EmptyState, InlineAlert, ScrollArea, SearchInput, SegmentedControl, Surface, Switch, Tooltip, useClipboard } from '../components/common';
+import { ApiErrorAlert, Badge, Button, Checkbox, ConfirmDialog, Drawer, EmptyState, IconButton, InlineAlert, ScrollArea, SearchInput, SegmentedControl, Surface, Switch, Tooltip, useClipboard } from '../components/common';
 import { DeepResearchPanel } from '../components/chat/DeepResearchPanel';
 import { getParsedApiError } from '../api/error';
 import type { SkillInfo } from '../api/agent';
@@ -48,6 +48,8 @@ const QUICK_QUESTION_DEFINITIONS: Array<{ labelKey: UiTextKey; skill: string }> 
 const MAX_SELECTED_SKILLS = 3;
 const CONTEXT_COMPRESSION_CONFIG_KEY = 'AGENT_CONTEXT_COMPRESSION_ENABLED';
 const CHAT_SESSION_QUERY_KEY = 'session';
+const CHAT_CONTEXT_STATE_QUERY_KEY = 'context';
+const CHAT_ACTIVE_CONTEXT_STATE = 'active';
 const STRONG_COMPARE_STOCK_MESSAGE_RE = /比较|对比|\bvs\b|和[^，。,.!?！？]{0,40}比/i;
 const WEAK_COMPARE_STOCK_MESSAGE_RE = /差异(?!化)|区别|不同|相比|对照|比一比/;
 const CHOICE_COMPARE_STOCK_MESSAGE_RE = /哪个|哪只|哪一个|谁更|更值得|更适合|怎么选|选哪|二选一/;
@@ -263,8 +265,11 @@ const ChatPage: React.FC = () => {
     document.title = t('chat.pageTitle');
   }, [t]);
 
-  useEffect(() => () => {
-    isMountedRef.current = false;
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
   const loadWatchlist = useCallback(async () => {
@@ -350,8 +355,64 @@ const ChatPage: React.FC = () => {
     clearCompletionBadge,
   } = useAgentChatStore();
 
+  const setSessionInUrl = useCallback((targetSessionId: string, clearFollowUpContext = false) => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set(CHAT_SESSION_QUERY_KEY, targetSessionId);
+      if (clearFollowUpContext) {
+        next.delete('stock');
+        next.delete('name');
+        next.delete('recordId');
+        next.delete(CHAT_CONTEXT_STATE_QUERY_KEY);
+      }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const persistActiveContextInUrl = useCallback((context: ActiveStockContext | null) => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (!next.get(CHAT_SESSION_QUERY_KEY)) {
+        next.set(CHAT_SESSION_QUERY_KEY, sessionId);
+      }
+      if (!context) {
+        next.delete('stock');
+        next.delete('name');
+        next.delete('recordId');
+        next.delete(CHAT_CONTEXT_STATE_QUERY_KEY);
+        return next;
+      }
+
+      const previousStock = sanitizeFollowUpStockCode(next.get('stock'));
+      next.set('stock', context.stock_code);
+      if (context.stock_name) next.set('name', context.stock_name);
+      else next.delete('name');
+      if (previousStock !== context.stock_code) next.delete('recordId');
+      next.set(CHAT_CONTEXT_STATE_QUERY_KEY, CHAT_ACTIVE_CONTEXT_STATE);
+      return next;
+    }, { replace: true });
+  }, [sessionId, setSearchParams]);
+
   useEffect(() => {
-    if (activeStockContext || messages.length === 0) {
+    if (!hasInitialLoad) {
+      return;
+    }
+    const urlSessionId = searchParams.get(CHAT_SESSION_QUERY_KEY)?.trim();
+    if (!urlSessionId) {
+      setSessionInUrl(sessionId);
+      return;
+    }
+    if (urlSessionId !== sessionId) {
+      void switchSession(urlSessionId);
+    }
+  }, [hasInitialLoad, searchParams, sessionId, setSessionInUrl, switchSession]);
+
+  useEffect(() => {
+    if (
+      activeStockContext
+      || messages.length === 0
+      || sanitizeFollowUpStockCode(searchParams.get('stock'))
+    ) {
       return;
     }
     const restoredContext = restoreActiveStockContextFromMessages(messages);
@@ -361,7 +422,8 @@ const ChatPage: React.FC = () => {
     setActiveStockContext(restoredContext);
     activeStockContextRef.current = restoredContext;
     setActiveStockCode(restoredContext.stock_code);
-  }, [activeStockContext, messages, sessionId]);
+    persistActiveContextInUrl(restoredContext);
+  }, [activeStockContext, messages, persistActiveContextInUrl, searchParams, sessionId]);
 
   const syncScrollState = useCallback(() => {
     const viewport = messagesViewportRef.current;
@@ -424,46 +486,6 @@ const ChatPage: React.FC = () => {
   useEffect(() => {
     void loadInitialSession(initialUrlSessionIdRef.current);
   }, [loadInitialSession]);
-
-  const setSessionInUrl = useCallback((targetSessionId: string, clearFollowUpContext = false) => {
-    setSearchParams((current) => {
-      const next = new URLSearchParams(current);
-      next.set(CHAT_SESSION_QUERY_KEY, targetSessionId);
-      if (clearFollowUpContext) {
-        next.delete('stock');
-        next.delete('name');
-        next.delete('recordId');
-      }
-      return next;
-    }, { replace: true });
-  }, [setSearchParams]);
-
-  const clearFollowUpContextFromUrl = useCallback(() => {
-    setSearchParams((current) => {
-      const next = new URLSearchParams(current);
-      next.delete('stock');
-      next.delete('name');
-      next.delete('recordId');
-      if (!next.get(CHAT_SESSION_QUERY_KEY)) {
-        next.set(CHAT_SESSION_QUERY_KEY, sessionId);
-      }
-      return next;
-    }, { replace: true });
-  }, [sessionId, setSearchParams]);
-
-  useEffect(() => {
-    if (!hasInitialLoad) {
-      return;
-    }
-    const urlSessionId = searchParams.get(CHAT_SESSION_QUERY_KEY)?.trim();
-    if (!urlSessionId) {
-      setSessionInUrl(sessionId);
-      return;
-    }
-    if (urlSessionId !== sessionId) {
-      void switchSession(urlSessionId);
-    }
-  }, [hasInitialLoad, searchParams, sessionId, setSessionInUrl, switchSession]);
 
   useEffect(() => {
     let active = true;
@@ -652,11 +674,12 @@ const ChatPage: React.FC = () => {
     }
   }, [deleteConfirmId, deleteLoading, handleStartNewChat, language, loadSessions, sessionId]);
 
-  // Handle follow-up from report page: ?stock=600519&name=贵州茅台&recordId=xxx
+  // Handle report-page follow-up URLs such as `?stock=600519&name=贵州茅台&recordId=xxx`.
   useEffect(() => {
     const stock = sanitizeFollowUpStockCode(searchParams.get('stock'));
     const name = sanitizeFollowUpStockName(searchParams.get('name'));
     const recordId = parseFollowUpRecordId(searchParams.get('recordId'));
+    const contextIsActive = searchParams.get(CHAT_CONTEXT_STATE_QUERY_KEY) === CHAT_ACTIVE_CONTEXT_STATE;
 
     if (!stock) {
       lastHydratedFollowUpKeyRef.current = null;
@@ -671,7 +694,6 @@ const ChatPage: React.FC = () => {
     lastHydratedFollowUpKeyRef.current = followUpKey;
 
     const hydrationToken = ++followUpHydrationTokenRef.current;
-    setInput(buildFollowUpPrompt(stock, name));
     setActiveStockCode(stock);
     const stockContext = {
       stock_code: stock,
@@ -679,6 +701,13 @@ const ChatPage: React.FC = () => {
     };
     activeStockContextRef.current = stockContext;
     setActiveStockContext(stockContext);
+    if (contextIsActive) {
+      followUpContextRef.current = stockContext;
+      setIsFollowUpContextLoading(false);
+      return;
+    }
+
+    setInput(buildFollowUpPrompt(stock, name));
     followUpContextRef.current = {
       stock_code: stock,
       stock_name: name,
@@ -732,7 +761,7 @@ const ChatPage: React.FC = () => {
       followUpHydrationTokenRef.current += 1;
       followUpContextRef.current = null;
       setIsFollowUpContextLoading(false);
-      clearFollowUpContextFromUrl();
+      persistActiveContextInUrl(nextActiveStockContext);
 
       setInput('');
       setMobileSkillPickerOpen(false);
@@ -742,7 +771,7 @@ const ChatPage: React.FC = () => {
         skillName: usedSkillNames.join(getUiListSeparator(language)),
       });
     },
-    [clearFollowUpContextFromUrl, getSkillNames, input, isFollowUpContextLoading, isSkillsLoading, language, loading, normalizeSelectedSkillIds, requestScrollToBottom, selectedSkillIds, sessionId, sessionLoading, startStream, t],
+    [getSkillNames, input, isFollowUpContextLoading, isSkillsLoading, language, loading, normalizeSelectedSkillIds, persistActiveContextInUrl, requestScrollToBottom, selectedSkillIds, sessionId, sessionLoading, startStream, t],
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -987,11 +1016,23 @@ const ChatPage: React.FC = () => {
             title={t('chat.loadingSessions')}
           />
         ) : sessionsError ? (
-          <ApiErrorAlert
-            error={sessionsError}
-            actionLabel={t('common.retry')}
-            onAction={() => void loadSessions()}
-          />
+          <div className="relative [&_details]:border-t-0 [&_details]:pt-0">
+            <ApiErrorAlert
+              error={sessionsError}
+              className="pr-10"
+            />
+            <Tooltip content={t('common.retry')} className="absolute right-2 top-2 z-10">
+              <IconButton
+                variant="danger"
+                size="compact"
+                tooltip={false}
+                aria-label={t('common.retry')}
+                onClick={() => void loadSessions()}
+              >
+                <RefreshCw aria-hidden="true" />
+              </IconButton>
+            </Tooltip>
+          </div>
         ) : sessions.length === 0 ? (
           <DashboardStateBlock
             compact
@@ -1250,6 +1291,7 @@ const ChatPage: React.FC = () => {
               value={chatMode}
               onChange={(value) => setChatMode(value)}
               ariaLabel={t('research.modeLabel')}
+              className="dark:!bg-foreground/10 dark:[&_.segmented-control-tab[aria-selected=true]]:!bg-foreground dark:[&_.segmented-control-tab[aria-selected=true]]:text-background dark:[&_.segmented-control-tab[aria-selected=false]]:text-foreground/70"
               options={[
                 { value: 'chat', label: t('research.chatMode') },
                 { value: 'research', label: t('research.mode') },
@@ -1268,7 +1310,7 @@ const ChatPage: React.FC = () => {
         </header>
 
         {chatMode === 'research' ? (
-          <Surface level="interactive" className="z-10 flex min-h-0 flex-1 flex-col overflow-auto p-4 md:p-6">
+          <Surface level="section" className="z-10 flex min-h-0 flex-1 flex-col overflow-auto p-4 md:p-6">
             <DeepResearchPanel key={sessionId} sessionId={sessionId} />
           </Surface>
         ) : null}

@@ -1,34 +1,34 @@
 # ===================================
-# 高级模型路由 YAML 模板（底层兼容 LiteLLM Router）
+# Advanced Model Routing YAML Template (compatible with LiteLLM Router at the bottom layer)
 # ===================================
-# 配套文档：docs/LLM_CONFIG_GUIDE.md 第 3.2 节
+# Supporting documentation: docs/LLM_CONFIG_GUIDE.md section 3.2
 #
-# 用法：
-# 1. 复制此文件为 litellm_config.yaml
-# 2. 在 .env 中设置 LITELLM_CONFIG=./litellm_config.yaml
-# 3. 按需配置下面的 model_list
+# Usage:
+# 1. Copy this file as litellm_config.yaml
+# 2. In .env Set up LITELLM_CONFIG=./litellm_config.yaml
+# 3. Configure the model_list below according to needs.
 #
-# 密钥引用格式：
-#   api_key: "os.environ/ENV_VAR_NAME"  → 从环境变量读取，避免明文写入文件
-#   api_key: "sk-xxxxxxxx"              → 直接写入（不推荐）
+# Key reference format:
+#   api_key: "os.environ/ENV_VAR_NAME" → Read from environment variable, avoid writing to files
+#   api_key: "sk-xxxxxxxx"              → Write directly(Not Recommended)
 #
-# 更多文档: https://docs.litellm.ai/docs/proxy/configs
+# More documentation: https://docs.litellm.ai/docs/proxy/configs
 # ===================================
 
 model_list:
-  # --- siliconflow (OpenAI 兼容，一个 Key 使用多种模型) ---
-  # 这是一个自定义 OpenAI 兼容模型渠道的示例
+  # --- siliconflow (OpenAI Compatible, Single Key Using Multiple Models) ---
+  # This is an example channel for a custom OpenAI-compatible model
   - model_name: openai/Qwen/Qwen3.5-397B-A17B
     litellm_params:
       model: openai/Qwen/Qwen3.5-397B-A17B
-      api_key: "os.environ/LITELLM_API_KEY" # 从环境变量读取 Key，安全防泄漏
+      api_key: "os.environ/LITELLM_API_KEY" # Read Key from environment variables for security and leak prevention.
       api_base: https://api.siliconflow.cn/v1
-      # 以下配置是表示如何启用Qwen模型的enable_thinking开关
+      # The following configurations represent how to enable the enable_thinking switch for the Qwen model
       extra_body:
         chat_template_kwargs:
           enable_thinking: true
 
-  # --- AIHubmix (OpenAI 兼容，一个 Key 使用多种模型) ---
+  # --- AIHubmix (OpenAI compatible, a key uses multiple models) ---
   - model_name: openai/gpt-4o-mini
     litellm_params:
       model: openai/gpt-4o-mini
@@ -41,7 +41,7 @@ model_list:
       api_key: "os.environ/AIHUBMIX_KEY"
       api_base: https://aihubmix.com/v1
 
-  # --- DeepSeek 官方 API (原生 provider，自动解析 base_url) ---
+  # --- DeepSeek Official API (native provider, automatically parses base_url) ---
   - model_name: deepseek/deepseek-chat
     litellm_params:
       model: deepseek/deepseek-chat
@@ -52,7 +52,7 @@ model_list:
       model: deepseek/deepseek-reasoner
       api_key: "os.environ/DEEPSEEK_API_KEY"
 
-  # --- Google Gemini (原生，多 Key 负载均衡) ---
+  # --- Google Gemini (Native, Multi-Key Load Balancing) ---
   - model_name: gemini/gemini-2.5-flash
     litellm_params:
       model: gemini/gemini-2.5-flash
@@ -63,31 +63,31 @@ model_list:
       model: gemini/gemini-2.5-flash
       api_key: "os.environ/GEMINI_API_KEY_2"
 
-  # --- Anthropic Claude (原生) ---
+  # --- Anthropic Claude (Native) ---
   # - model_name: anthropic/claude-3-5-sonnet-20241022
   #   litellm_params:
   #     model: anthropic/claude-3-5-sonnet-20241022
   #     api_key: "os.environ/ANTHROPIC_API_KEY"
 
-  # --- OpenRouter (聚合平台) ---
+  # --- OpenRouter (Aggregated Platform) ---
   # - model_name: openai/meta-llama/llama-3-70b-instruct
   #   litellm_params:
   #     model: openai/meta-llama/llama-3-70b-instruct
   #     api_key: "os.environ/OPENROUTER_API_KEY"
   #     api_base: https://openrouter.ai/api/v1
 
-  # --- Ollama 本地模型 ---
+  # --- Ollama Local Model ---
   # - model_name: ollama/qwen3:8b
   #   litellm_params:
   #     model: ollama/qwen3:8b
   #     api_base: http://localhost:11434
 
 # ===================================
-# Router 设置（可选）
+# Router Configuration (Optional)
 # ===================================
 router_settings:
   routing_strategy: simple-shuffle    # simple-shuffle / least-busy / latency-based
-  num_retries: 2                      # 单个 deployment 失败后重试次数
-  # timeout: 30                       # 请求超时（秒）
-  # allowed_fails: 3                  # deployment 被冷却前允许的失败次数
-  # cooldown_time: 60                 # deployment 冷却时间（秒）
+  num_retries: 2                      # Retry count after a single deployment fails
+  # timeout: 30                       # Request timeout (seconds)
+  # allowed_fails: 3                  # deployment number of failed attempts allowed before cooling down
+  # cooldown_time: 60                 # deployment cooling time(Seconds)

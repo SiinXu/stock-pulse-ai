@@ -38,6 +38,8 @@ const DESKTOP_UPDATE_BACKUP_DIR = '.dsa-desktop-update-backup';
 const DESKTOP_UPDATE_BACKUP_MANIFEST_FILE = 'runtime-state.json';
 const DESKTOP_BRAND_MIGRATION_RECORD_FILE = '.stockpulse-brand-migration.json';
 const DESKTOP_BRAND_MIGRATION_TEMP_SUFFIX = '.stockpulse-migration.tmp';
+const PROVIDER_DAILY_CACHE_DIR_ENV_KEY = 'PROVIDER_DAILY_CACHE_DIR';
+const DESKTOP_PROVIDER_DAILY_CACHE_RELATIVE_PATH = path.join('data', 'provider_cache', 'daily');
 const LEGACY_DESKTOP_PRODUCT_NAMES = Object.freeze(['Daily Stock Analysis']);
 const WINDOWS_NSIS_UNINSTALLER_NAMES = Object.freeze([
   'Uninstall StockPulse.exe',
@@ -78,6 +80,7 @@ const DESKTOP_UPDATE_RUNTIME_RELATIVE_FILES = Object.freeze([
   path.join('data', 'stock_analysis.db'),
   path.join('data', 'stock_analysis.db-wal'),
   path.join('data', 'stock_analysis.db-shm'),
+  DESKTOP_PROVIDER_DAILY_CACHE_RELATIVE_PATH,
   path.join('data', 'alphasift', 'hotspots.json'),
   path.join('data', 'alphasift', 'hotspot.history.jsonl'),
   path.join('data', 'alphasift', 'hotspot_details'),
@@ -1271,6 +1274,28 @@ function readEnvFileValue(envFile, key, sourceEnv = process.env) {
   return hasOwnValue(values, key) ? values[key] : null;
 }
 
+function resolveDesktopProviderDailyCacheDir({
+  envFile,
+  dbPath,
+  sourceEnv = process.env,
+} = {}) {
+  const sourceValue = hasOwnValue(sourceEnv, PROVIDER_DAILY_CACHE_DIR_ENV_KEY)
+    ? String(sourceEnv[PROVIDER_DAILY_CACHE_DIR_ENV_KEY] || '').trim()
+    : '';
+  if (sourceValue) {
+    return sourceValue;
+  }
+
+  const envFileValue = String(
+    readEnvFileValue(envFile, PROVIDER_DAILY_CACHE_DIR_ENV_KEY, sourceEnv) || ''
+  ).trim();
+  if (envFileValue) {
+    return envFileValue;
+  }
+
+  return path.join(path.dirname(dbPath), 'provider_cache', 'daily');
+}
+
 function resolveBackendBindHost({
   envFile,
   sourceEnv = process.env,
@@ -1336,6 +1361,11 @@ function buildBackendEnvironment({
     ENV_FILE: envFile,
     DATABASE_PATH: dbPath,
     LOG_DIR: logDir,
+    PROVIDER_DAILY_CACHE_DIR: resolveDesktopProviderDailyCacheDir({
+      envFile,
+      dbPath,
+      sourceEnv,
+    }),
     PYTHONUTF8: '1',
     PYTHONIOENCODING: 'utf-8',
     WEBUI_HOST: selectedHost,
@@ -1372,7 +1402,7 @@ function initLogging() {
   const appDir = resolveAppDir();
   logFilePath = path.join(appDir, 'logs', 'desktop.log');
   
-  // 确保日志目录存在
+  // Ensure the log directory exists
   const logDir = path.dirname(logFilePath);
   ensureDirectory(logDir);
   
@@ -1402,7 +1432,7 @@ function decodeBackendOutput(data, decoder) {
 
   let decoded = decoder.decode(data, { stream: true });
 
-  // Windows 控制台 / 子进程有时仍会吐出本地代码页字节，优先在明显乱码时回退到 GBK。
+  // Windows consoles and subprocesses may emit local-code-page bytes; fall back to GBK when replacement characters indicate a decode failure.
   if (isWindows && decoded.includes('\uFFFD')) {
     try {
       decoded = new TextDecoder('gbk', { fatal: false }).decode(data, { stream: true });
@@ -2560,6 +2590,7 @@ module.exports = {
   resolveLegacyProductUserDataDirs,
   resolveBackendBindHost,
   resolveDesktopConnectHost,
+  resolveDesktopProviderDailyCacheDir,
   restorePackagedRuntimeStateFromBackup,
   sanitizeReleaseUrl,
   startBackend,

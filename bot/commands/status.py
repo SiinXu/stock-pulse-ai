@@ -48,10 +48,10 @@ class StatusCommand(BotCommand):
         
         config = get_config()
         
-        # 收集状态信息
+        # Collect status information
         status_info = self._collect_status(config)
         
-        # 格式化输出
+        # Formatted output
         text = self._format_status(status_info, message.platform)
         
         return BotResponse.markdown_response(text)
@@ -65,10 +65,10 @@ class StatusCommand(BotCommand):
             "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
             "platform": platform.system(),
             "stock_count": len(config.stock_list),
-            "stock_list": config.stock_list[:5],  # 只显示前5个
+            "stock_list": config.stock_list[:5],  # Display the top 5 results.
         }
         
-        # AI 配置状态
+        # AI configuration status
         llm_channels = getattr(config, "llm_channels", []) or []
         llm_model_list = getattr(config, "llm_model_list", []) or []
         llm_model = (getattr(config, "litellm_model", "") or "").strip()
@@ -103,7 +103,7 @@ class StatusCommand(BotCommand):
             and (has_direct_env_model or (llm_model_list and primary_model_reachable))
         )
         
-        # 搜索服务状态
+        # Search service status.
         status["search_bocha"] = len(config.bocha_api_keys) > 0
         status["search_tavily"] = len(config.tavily_api_keys) > 0
         status["search_brave"] = len(config.brave_api_keys) > 0
@@ -111,7 +111,7 @@ class StatusCommand(BotCommand):
         status["search_minimax"] = len(config.minimax_api_keys) > 0
         status["search_searxng"] = config.has_searxng_enabled()
         
-        # 通知渠道状态
+        # Notification Channel Status
         status["notify_wechat"] = bool(config.wechat_webhook_url)
         status["notify_feishu"] = bool(config.feishu_webhook_url)
         status["notify_telegram"] = bool(config.telegram_bot_token and config.telegram_chat_id)
@@ -144,7 +144,7 @@ class StatusCommand(BotCommand):
     
     def _format_status(self, status: dict, platform: str) -> str:
         """格式化状态信息"""
-        # 状态图标
+        # Status icon
         def icon(enabled: bool) -> str:
             return "✅" if enabled else "❌"
         
@@ -199,7 +199,7 @@ class StatusCommand(BotCommand):
             f"• PushPlus/Pushover/Server酱3: {icon(status['notify_push'])}",
         ])
         
-        # AI 服务总体状态
+        # AI service overall status
         if status["ai_available"]:
             lines.extend([
                 "",

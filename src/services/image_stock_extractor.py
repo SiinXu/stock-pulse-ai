@@ -102,7 +102,7 @@ def _normalize_code(raw: str) -> Optional[str]:
     # US stocks: 1-5 letters, optionally with . (e.g. BRK.B)
     if re.match(r"^[A-Z]{1,5}(\.[A-Z])?$", s):
         return s
-    # 尝试去除 SH/SZ 后缀
+    # Attempt to remove SH/SZ suffixes
     for suffix in (".SH", ".SZ", ".SS"):
         if s.endswith(suffix):
             base = s[: -len(suffix)].strip()
@@ -116,7 +116,7 @@ def _parse_codes_from_text(text: str) -> List[str]:
     seen: set[str] = set()
     result: List[str] = []
 
-    # 优先尝试 JSON 数组；只移除开头的 markdown 围栏，避免 find("```") 误删结尾导致清空
+    # Try to remove first JSON arrays; Remove only the leading markdown braces, avoid find("```") deletion at the end leads to clearing
     cleaned = text.strip()
     for start in ("```json", "```"):
         if cleaned.startswith(start):
@@ -139,7 +139,7 @@ def _parse_codes_from_text(text: str) -> List[str]:
     except json.JSONDecodeError:
         pass
 
-    # 兜底：查找 5-6 位数字及美股代码
+    # fallback: Find 5-6 digit numbers and US stock code
     for m in re.finditer(r"\b([0-9]{5,6}|[A-Z]{1,5}(\.[A-Z])?)\b", text, re.IGNORECASE):
         c = _normalize_code(m.group(1))
         if c and c not in seen and c not in _FAKE_CODES:

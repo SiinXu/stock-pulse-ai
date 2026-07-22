@@ -180,7 +180,7 @@ def get_history_list(
     try:
         service = HistoryService(db_manager)
         
-        # 使用 def 而非 async def，FastAPI 自动在线程池中执行
+        # Use `def` instead of `async def`; FastAPI automatically executes in a thread pool.
         result = service.get_history_list(
             stock_code=stock_code,
             report_type=report_type,
@@ -190,7 +190,7 @@ def get_history_list(
             limit=limit
         )
         
-        # 转换为响应模型
+        # Convert to Response Model
         items = [
             HistoryItem(
                 id=item.get("id"),
@@ -485,9 +485,9 @@ def get_history_detail(
                 }
             )
         
-        # 从 context_snapshot 中提取价格信息
-        # 注意：使用 `is None` 而非 `or`，避免把 0.0（平盘）误判为缺失值；
-        # 同时不混用 `change_60d`（60 日累计涨跌幅）作为日内 change_pct 的兜底。
+        # Extract price information from context_snapshot
+        # Note: Use `is None` instead of `or` to avoid misinterpreting 0.0 (flat) as a missing value.
+        # Do not mix `change_60d` (60-day cumulative percentage change) as a fallback for daily change_pct.
         context_snapshot = result.get("context_snapshot")
         analysis_context_pack_overview = extract_analysis_context_pack_overview(context_snapshot)
         market_phase_summary = result.get("market_phase_summary")
@@ -516,7 +516,7 @@ def get_history_detail(
             report_language,
         )
 
-        # 构建响应模型
+        # Build the response model
         meta = ReportMeta(
             id=result.get("id"),
             query_id=result.get("query_id", ""),

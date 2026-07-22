@@ -131,8 +131,8 @@ export default defineConfig({
     }),
   ],
   server: {
-    host: '0.0.0.0',  // 允许公网访问
-    port: 5173,       // 默认端口
+    host: '0.0.0.0',  // Allow public access
+    port: 5173,       // Default port
     proxy: {
       '/api': {
         target: process.env.DSA_WEB_DEV_API_PROXY || 'http://127.0.0.1:8000',
@@ -141,7 +141,7 @@ export default defineConfig({
     },
   },
   build: {
-    // 打包输出到项目根目录的 static 文件夹
+    // Package output to the static folder in the project root directory
     outDir: path.resolve(__dirname, '../../static'),
     emptyOutDir: true,
     rollupOptions: {

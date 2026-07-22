@@ -837,7 +837,7 @@ NOTIFICATION_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "display_order": 41,
     },
     # ------------------------------------------------------------------
-    # Notification – Server酱 / misc
+    # Notification – Server Soy sauce / misc
     # ------------------------------------------------------------------
     "SERVERCHAN3_SENDKEY": {
         "title": "ServerChan3 SendKey",

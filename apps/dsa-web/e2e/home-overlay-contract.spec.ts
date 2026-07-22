@@ -683,6 +683,65 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
     await expect(page.locator('#home-stock-search')).toHaveValue('HK00700');
   });
 
+  test('a bare reload restores the last tab-scoped Home context', async ({ page }) => {
+    await openFixtureHome(page, '/?recordId=1&stock=00700.HK&workspace=watchlist');
+    await expect(page.getByRole('region', { name: 'Watchlist' })).toBeVisible();
+    await expect.poll(() => page.evaluate(() => (
+      window.sessionStorage.getItem('dsa.web.sessionContinuity.v1') ?? ''
+    ))).toContain('HK00700');
+
+    await page.goto('/');
+
+    await expect(page.getByRole('region', { name: 'Watchlist' })).toBeVisible();
+    await expect(page.locator('#home-stock-search')).toHaveValue('HK00700');
+    await expectSearchParams(page, {
+      recordId: '1',
+      stock: 'HK00700',
+      workspace: 'watchlist',
+    });
+  });
+
+  test('logout clears persisted workflow traces but retains UI preferences', async ({ page }) => {
+    await openFixtureHome(page, '/?stock=AAPL&workspace=watchlist');
+    await page.goto('/chat?session=session-private&stock=AAPL&recordId=1');
+    await expect(page.getByRole('heading', { name: 'Ask Stock' })).toBeVisible();
+    await page.evaluate(() => {
+      window.sessionStorage.setItem('dsa_chat_session_id', 'session-private');
+      window.sessionStorage.setItem('dsa_research_run:session-private', '{"question":"private"}');
+      window.sessionStorage.setItem('dsa.alphasift.activeScreenTask.v1', '{"taskId":"private"}');
+      window.localStorage.setItem('dsa_chat_session_id', 'legacy-private');
+      window.localStorage.setItem('dsa_research_run:legacy-private', '{"question":"legacy"}');
+    });
+
+    await page.getByRole('button', { name: 'Log out' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Log out' });
+    await dialog.getByRole('button', { name: 'Log out' }).click();
+
+    await expect.poll(() => {
+      const url = new URL(page.url());
+      return { pathname: url.pathname, search: url.search };
+    }).toEqual({ pathname: '/login', search: '' });
+    expect(await page.evaluate(() => ({
+      sessionKeys: Object.keys(window.sessionStorage).filter((key) => (
+        key === 'dsa.web.sessionContinuity.v1'
+        || key === 'dsa_chat_session_id'
+        || key === 'dsa.alphasift.activeScreenTask.v1'
+        || key.startsWith('dsa_research_run:')
+      )),
+      legacyChat: window.localStorage.getItem('dsa_chat_session_id'),
+      legacyResearch: window.localStorage.getItem('dsa_research_run:legacy-private'),
+      language: window.localStorage.getItem('dsa.uiLanguage'),
+    }))).toEqual({
+      sessionKeys: [],
+      legacyChat: null,
+      legacyResearch: null,
+      language: 'en',
+    });
+
+    await loginAsE2eAdmin(page);
+    await expect(page).toHaveURL('/');
+  });
+
   test('a slow report response cannot replace the newer URL selection', async ({ page }) => {
     const fixture = await openFixtureHome(page, '/?recordId=1', { delayFirstRecord: true });
     await expect.poll(() => fixture.detailRequests.includes(1)).toBe(true);
@@ -845,6 +904,28 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
     await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
 
     await page.goBack();
+    await expect(page.getByTestId('run-flow-panel')).toBeVisible();
+  });
+
+  test('active Home Run Flow survives a major-view round trip in the current tab', async ({ page }) => {
+    await openFixtureHome(
+      page,
+      '/?recordId=2&stock=AAPL&workspace=watchlist&runFlow=history&runFlowRecordId=2',
+    );
+    await expect(page.getByTestId('run-flow-panel')).toBeVisible();
+
+    await page.goto('/chat?stock=AAPL');
+    const homeLink = page.locator('nav a[href*="runFlow=history"]');
+    await expect(homeLink).toHaveCount(1);
+    await homeLink.click();
+
+    await expectSearchParams(page, {
+      recordId: '2',
+      stock: 'AAPL',
+      workspace: 'watchlist',
+      runFlow: 'history',
+      runFlowRecordId: '2',
+    });
     await expect(page.getByTestId('run-flow-panel')).toBeVisible();
   });
 

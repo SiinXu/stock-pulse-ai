@@ -427,6 +427,57 @@ test('buildBackendEnvironment keeps non-macOS PATH unchanged', (t) => {
   assert.equal(env.PATH, '/custom/bin:/usr/bin');
 });
 
+test('buildBackendEnvironment keeps the daily provider cache in Desktop runtime data by default', (t) => {
+  const mainModule = loadMainModule(t, { platform: 'darwin' });
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-desktop-provider-cache-'));
+  t.after(() => fs.rmSync(tempRoot, { recursive: true, force: true }));
+  const envFile = path.join(tempRoot, '.env');
+  const dbPath = path.join(tempRoot, 'data', 'stock_analysis.db');
+
+  const env = mainModule.buildBackendEnvironment({
+    envFile,
+    dbPath,
+    logDir: path.join(tempRoot, 'logs'),
+    sourceEnv: {},
+  });
+
+  assert.equal(
+    env.PROVIDER_DAILY_CACHE_DIR,
+    path.join(tempRoot, 'data', 'provider_cache', 'daily')
+  );
+});
+
+test('buildBackendEnvironment preserves explicit daily provider cache paths', (t) => {
+  const mainModule = loadMainModule(t, { platform: 'darwin' });
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-desktop-provider-cache-'));
+  t.after(() => fs.rmSync(tempRoot, { recursive: true, force: true }));
+  const envFile = path.join(tempRoot, '.env');
+  const dbPath = path.join(tempRoot, 'data', 'stock_analysis.db');
+  fs.writeFileSync(
+    envFile,
+    'CACHE_ROOT=/tmp/file-cache\nPROVIDER_DAILY_CACHE_DIR=${CACHE_ROOT}/daily\n',
+    'utf-8'
+  );
+
+  const envFileOverride = mainModule.buildBackendEnvironment({
+    envFile,
+    dbPath,
+    logDir: path.join(tempRoot, 'logs'),
+    sourceEnv: {},
+  });
+  const processOverride = mainModule.buildBackendEnvironment({
+    envFile,
+    dbPath,
+    logDir: path.join(tempRoot, 'logs'),
+    sourceEnv: {
+      PROVIDER_DAILY_CACHE_DIR: '/tmp/process-cache/daily',
+    },
+  });
+
+  assert.equal(envFileOverride.PROVIDER_DAILY_CACHE_DIR, '/tmp/file-cache/daily');
+  assert.equal(processOverride.PROVIDER_DAILY_CACHE_DIR, '/tmp/process-cache/daily');
+});
+
 test('buildBackendEnvironment pins WEBUI_PORT to the Electron-selected backend port', (t) => {
   const mainModule = loadMainModule(t, { platform: 'win32' });
 
@@ -665,12 +716,19 @@ test('findAvailablePort normalizes wildcard bind hosts before listening', async 
 
 test('startBackend passes WEBUI_HOST from env file to backend args and env', (t) => {
   const previousWebuiHost = process.env.WEBUI_HOST;
+  const previousProviderDailyCacheDir = process.env.PROVIDER_DAILY_CACHE_DIR;
   delete process.env.WEBUI_HOST;
+  delete process.env.PROVIDER_DAILY_CACHE_DIR;
   t.after(() => {
     if (previousWebuiHost === undefined) {
       delete process.env.WEBUI_HOST;
     } else {
       process.env.WEBUI_HOST = previousWebuiHost;
+    }
+    if (previousProviderDailyCacheDir === undefined) {
+      delete process.env.PROVIDER_DAILY_CACHE_DIR;
+    } else {
+      process.env.PROVIDER_DAILY_CACHE_DIR = previousProviderDailyCacheDir;
     }
   });
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-desktop-host-'));
@@ -711,6 +769,10 @@ test('startBackend passes WEBUI_HOST from env file to backend args and env', (t)
     '8123',
   ]);
   assert.equal(spawned[0].options.env.WEBUI_HOST, '0.0.0.0');
+  assert.equal(
+    spawned[0].options.env.PROVIDER_DAILY_CACHE_DIR,
+    path.join(tmpDir, 'provider_cache', 'daily')
+  );
 });
 
 test('extendMacDesktopBackendPath preserves existing order and avoids duplicates', (t) => {
@@ -1039,6 +1101,12 @@ test('desktop update backup list preserves AlphaSift caches', (t) => {
   assert.ok(files.includes(path.join('data', 'alphasift', 'hotspot.history.jsonl')));
   assert.ok(files.includes(path.join('data', 'alphasift', 'hotspot_details')));
   assert.ok(files.includes(path.join('data', 'alphasift', 'snapshot.last_good.json')));
+});
+
+test('desktop update backup list preserves the daily provider cache', (t) => {
+  const mainModule = loadMainModule(t);
+  const files = mainModule.DESKTOP_UPDATE_RUNTIME_RELATIVE_FILES || [];
+  assert.ok(files.includes(path.join('data', 'provider_cache', 'daily')));
 });
 
 test('desktop update backup and restore preserve generation backend env keys', (t) => {

@@ -38,10 +38,10 @@ from src.config import setup_env
 _INITIAL_PROCESS_ENV = dict(os.environ)
 setup_env()
 
-# 代理配置 - 通过 USE_PROXY 环境变量控制，默认关闭
-# GitHub Actions 环境自动跳过代理配置
+# Proxy configuration - Controlled by the USE_PROXY environment variable, default is disabled
+# GitHub Actions automatically skips proxy configuration
 if os.getenv("GITHUB_ACTIONS") != "true" and os.getenv("USE_PROXY", "false").lower() == "true":
-    # 本地开发环境，启用代理（可在 .env 中配置 PROXY_HOST 和 PROXY_PORT）
+    # Local development environment, enable proxy (can be configured in .env with PROXY_HOST and PROXY_PORT).
     proxy_host = os.getenv("PROXY_HOST", "127.0.0.1")
     proxy_port = os.getenv("PROXY_PORT", "10809")
     proxy_url = f"http://{proxy_host}:{proxy_port}"
@@ -105,33 +105,6 @@ def _get_active_env_path() -> Path:
     if env_file:
         return Path(env_file)
     return Path(__file__).resolve().parent / ".env"
-
-
-def _is_public_bind_host(host: str) -> bool:
-    return (host or "").strip().lower() in _PUBLIC_BIND_HOSTS
-
-
-def _warn_if_public_webui_without_auth(host: str) -> None:
-    if not _is_public_bind_host(host):
-        return
-
-    from src.auth import is_auth_enabled
-
-    if is_auth_enabled():
-        return
-    logger.warning(
-        "WEBUI_HOST=%s binds the Web UI to a public interface while "
-        "ADMIN_AUTH_ENABLED=false. Keep this service behind a trusted network "
-        "boundary or enable admin authentication before exposing it.",
-        host,
-    )
-
-
-def _resolve_web_service_bind(args: argparse.Namespace, config: Config) -> Tuple[str, int]:
-    """Resolve the effective Web/API bind address from CLI first, then config."""
-    host = args.host if args.host is not None else (config.webui_host or "127.0.0.1")
-    port = args.port if args.port is not None else config.webui_port
-    return host, port
 
 
 def _read_active_env_values() -> Optional[Dict[str, str]]:
@@ -294,10 +267,112 @@ def _reload_env_file_values_preserving_overrides() -> None:
     _RUNTIME_ENV_FILE_KEYS = managed_keys
 
 
+if "__runtime_source" in globals():
+    __runtime_source = __importlib.reload(globals()["__runtime_source"])
+else:
+    from src.app import runtime as __runtime_source
+
 if "__cli_source" in globals():
     __cli_source = __importlib.reload(globals()["__cli_source"])
 else:
     from src.app import cli as __cli_source
+
+_is_public_bind_host = __cli_source.clone_facade_function(
+    __runtime_source._is_public_bind_host,
+    globals(),
+    module_name=__name__,
+    qualname="_is_public_bind_host",
+)
+_warn_if_public_webui_without_auth = __cli_source.clone_facade_function(
+    __runtime_source._warn_if_public_webui_without_auth,
+    globals(),
+    module_name=__name__,
+    qualname="_warn_if_public_webui_without_auth",
+)
+_resolve_web_service_bind = __cli_source.clone_facade_function(
+    __runtime_source._resolve_web_service_bind,
+    globals(),
+    module_name=__name__,
+    qualname="_resolve_web_service_bind",
+)
+run_scheduled_analysis = __cli_source.clone_facade_function(
+    __runtime_source.run_scheduled_analysis,
+    globals(),
+    module_name=__name__,
+    qualname="run_scheduled_analysis",
+)
+_run_analysis_with_runtime_scheduler_lock = __cli_source.clone_facade_function(
+    __runtime_source._run_analysis_with_runtime_scheduler_lock,
+    globals(),
+    module_name=__name__,
+    qualname="_run_analysis_with_runtime_scheduler_lock",
+)
+start_api_server = __cli_source.clone_facade_function(
+    __runtime_source.start_api_server,
+    globals(),
+    module_name=__name__,
+    qualname="start_api_server",
+)
+_is_truthy_env = __cli_source.clone_facade_function(
+    __runtime_source._is_truthy_env,
+    globals(),
+    module_name=__name__,
+    qualname="_is_truthy_env",
+)
+start_bot_stream_clients = __cli_source.clone_facade_function(
+    __runtime_source.start_bot_stream_clients,
+    globals(),
+    module_name=__name__,
+    qualname="start_bot_stream_clients",
+)
+_resolve_scheduled_stock_codes = __cli_source.clone_facade_function(
+    __runtime_source._resolve_scheduled_stock_codes,
+    globals(),
+    module_name=__name__,
+    qualname="_resolve_scheduled_stock_codes",
+)
+_reload_runtime_config = __cli_source.clone_facade_function(
+    __runtime_source._reload_runtime_config,
+    globals(),
+    module_name=__name__,
+    qualname="_reload_runtime_config",
+)
+_build_schedule_time_provider = __cli_source.clone_facade_function(
+    __runtime_source._build_schedule_time_provider,
+    globals(),
+    module_name=__name__,
+    qualname="_build_schedule_time_provider",
+)
+_build_schedule_times_provider = __cli_source.clone_facade_function(
+    __runtime_source._build_schedule_times_provider,
+    globals(),
+    module_name=__name__,
+    qualname="_build_schedule_times_provider",
+)
+__coordinate_service_runtime = __cli_source.clone_facade_function(
+    __runtime_source._coordinate_service_runtime,
+    globals(),
+    module_name=__name__,
+    qualname="_coordinate_service_runtime",
+)
+__run_service_only_mode = __cli_source.clone_facade_function(
+    __runtime_source._run_service_only_mode,
+    globals(),
+    module_name=__name__,
+    qualname="_run_service_only_mode",
+)
+__run_schedule_mode = __cli_source.clone_facade_function(
+    __runtime_source._run_schedule_mode,
+    globals(),
+    module_name=__name__,
+    qualname="_run_schedule_mode",
+)
+__keep_service_runtime_alive = __cli_source.clone_facade_function(
+    __runtime_source._keep_service_runtime_alive,
+    globals(),
+    module_name=__name__,
+    qualname="_keep_service_runtime_alive",
+)
 
 parse_arguments = __cli_source.clone_facade_function(
     __cli_source.parse_arguments,
@@ -597,11 +672,11 @@ def run_full_analysis(
             logger.info("Skipped stocks whose markets are closed today: %s", skipped)
         stock_codes = filtered_codes
 
-        # 命令行参数 --single-notify 覆盖配置（#55）
+        # Command line argument --single-notify overrides configuration (#55)
         if getattr(args, 'single_notify', False):
             config.single_stock_notify = True
 
-        # Issue #190: 个股与大盘复盘合并推送
+        # Issue #190: Merge push for individual stocks and market reviews
         merge_notification = (
             getattr(config, 'merge_email_notification', False)
             and config.market_review_enabled
@@ -609,7 +684,7 @@ def run_full_analysis(
             and not config.single_stock_notify
         )
 
-        # 创建调度器
+        # Create scheduler
         save_context_snapshot = None
         if getattr(args, 'no_context_snapshot', False):
             save_context_snapshot = False
@@ -674,7 +749,7 @@ def run_full_analysis(
                 require_current_query_match=True,
             )
 
-        # 1. 运行个股分析
+        # 1. Run individual stock analysis
         results = pipeline.run(
             stock_codes=stock_codes,
             dry_run=args.dry_run,
@@ -699,10 +774,10 @@ def run_full_analysis(
             )
             market_context_generated_during_stock = bool(market_context_summary)
 
-        # Issue #128: 分析间隔 - 在个股分析和大盘分析之间添加延迟
+        # Issue #128: Analysis interval - Add delay between individual stock and market review analysis
         analysis_delay = getattr(config, 'analysis_delay', 0)
 
-        # 2. 运行大盘复盘（如果启用且不是仅个股模式）
+        # 2. Run market review (if enabled and not in individual stock mode)
         if should_run_market_review:
             schedule_mode = bool(
                 getattr(args, 'schedule', False)
@@ -771,7 +846,7 @@ def run_full_analysis(
                     query_id=query_id,
                     trigger_source=review_trigger_source,
                 )
-                # 如果复盘仍未执行成功，再做一次复用历史/缓存读取（防止与并发运行竞态）。
+                # If replay is still not executed successfully, perform a second read from history/cache (to prevent race conditions with concurrent execution).
                 if not review_result and should_use_daily_market_context:
                     (
                         market_context_summary,
@@ -793,13 +868,13 @@ def run_full_analysis(
                 elif not review_result:
                     can_reuse_market_context = False
 
-            # 如果有结果，赋值给 market_report 用于后续飞书文档生成
+            # If there is a result, assign it to market_report for subsequent Feishu document generation
             if review_result:
                 market_report = _market_review_report_text(review_result)
             elif can_reuse_market_context:
                 market_report = market_context_full_report or market_context_summary
 
-        # Issue #190: 合并推送（个股+大盘复盘）
+        # Issue #190: Merge push (individual stocks + market review)
         if merge_notification and (results or market_report) and not args.no_notify:
             parts = []
             if market_report:
@@ -818,7 +893,7 @@ def run_full_analysis(
                     else:
                         logger.warning("Failed to deliver the combined analysis report")
 
-        # 输出摘要
+        # Output summary
         if results:
             logger.info("\n===== Analysis result summary =====")
             for r in sorted(results, key=lambda x: x.sentiment_score, reverse=True):
@@ -830,7 +905,7 @@ def run_full_analysis(
 
         logger.info("\nAnalysis run completed")
 
-        # === 新增：生成飞书云文档 ===
+        # New: Generate Feishu Cloud Documents
         try:
             from src.feishu_doc import FeishuDocManager
 
@@ -838,19 +913,19 @@ def run_full_analysis(
             if feishu_doc.is_configured() and (results or market_report):
                 logger.info("Creating a Feishu document")
 
-                # 1. 准备标题 "01-01 13:01大盘复盘"
+                # 1. Prepare title "01-01 13:01大盘复盘"
                 tz_cn = timezone(timedelta(hours=8))
                 now = datetime.now(tz_cn)
                 doc_title = f"{now.strftime('%Y-%m-%d %H:%M')} 大盘复盘"
 
-                # 2. 准备内容 (拼接个股分析和大盘复盘)
+                # 2. Prepare content (concatenate individual stock analysis and market review)
                 full_content = ""
 
-                # 添加大盘复盘内容（如果有）
+                # Add market-review content when available.
                 if market_report:
                     full_content += f"# 📈 大盘复盘\n\n{market_report}\n\n---\n\n"
 
-                # 添加个股决策仪表盘（使用 NotificationService 生成，按 report_type 分支）
+                # Add individual stock decision dashboard (generated using NotificationService, branched by report_type)
                 if results:
                     dashboard_content = pipeline.notifier.generate_aggregate_report(
                         results,
@@ -858,11 +933,11 @@ def run_full_analysis(
                     )
                     full_content += f"# 🚀 个股决策仪表盘\n\n{dashboard_content}"
 
-                # 3. 创建文档
+                # 3. Create document
                 doc_url = feishu_doc.create_daily_doc(doc_title, full_content)
                 if doc_url:
                     logger.info("Feishu document created: %s", doc_url)
-                    # 可选：将文档链接也推送到群里
+                    # Optional: Also push the document link to the group
                     if not args.no_notify:
                         pipeline.notifier.send(
                             f"[{now.strftime('%Y-%m-%d %H:%M')}] 复盘文档创建成功: {doc_url}",
@@ -917,252 +992,6 @@ def run_full_analysis(
         return False
 
 
-def run_scheduled_analysis(
-    config: Config,
-    args: argparse.Namespace,
-    stock_codes: Optional[List[str]] = None,
-) -> bool:
-    """Run scheduled analysis with failures propagated to the scheduler."""
-    return run_full_analysis(config, args, stock_codes, raise_errors=True)
-
-
-def _run_analysis_with_runtime_scheduler_lock(
-    config: Config,
-    args: argparse.Namespace,
-    stock_codes: Optional[List[str]] = None,
-) -> None:
-    from src.services.runtime_scheduler import run_with_global_analysis_lock
-
-    # Keep startup/triggered analysis in sync with API runtime scheduler and
-    # run-now entrypoint. Blocking is expected here because startup paths should
-    # wait for an in-flight job before returning a response.
-    run_with_global_analysis_lock(
-        task_runner=run_full_analysis,
-        config=config,
-        args=args,
-        stock_codes=stock_codes,
-        blocking=True,
-    )
-
-
-def start_api_server(host: str, port: int, config: Config) -> None:
-    """
-    在后台线程启动 FastAPI 服务
-
-    Args:
-        host: 监听地址
-        port: 监听端口
-        config: 配置对象
-    """
-    import socket
-    import threading
-    import uvicorn
-
-    probe = socket.socket(socket.AF_INET6 if ":" in host else socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        probe.bind((host, port))
-    except OSError as exc:
-        raise RuntimeError(f"FastAPI port is not available: {host}:{port}") from exc
-    finally:
-        probe.close()
-
-    level_name = (config.log_level or "INFO").lower()
-    use_config_signal_handlers = True
-    uvicorn_kwargs = {
-        "host": host,
-        "port": port,
-        "log_level": level_name,
-        "log_config": None,
-    }
-    # Import the ASGI app object in the calling thread instead of handing uvicorn
-    # the "api.app:app" import string. With the string, uvicorn imports the app
-    # lazily inside the server thread, and that import (litellm + the full app
-    # tree, ~10s+ on constrained hosts) runs inside the startup probe window
-    # below, tripping the 3.0s timeout and causing a restart loop on slower
-    # machines. Importing first keeps the heavy work out of the probe window;
-    # genuine import failures still surface immediately to the caller.
-    from api.app import app as fastapi_app
-
-    try:
-        uvicorn_config = uvicorn.Config(
-            fastapi_app,
-            install_signal_handlers=False,
-            **uvicorn_kwargs,
-        )
-    except TypeError:
-        # Older uvicorn versions do not accept install_signal_handlers in
-        # Config; fall back and only disable signal handling via Server attribute
-        # when it's a boolean flag.
-        use_config_signal_handlers = False
-        uvicorn_config = uvicorn.Config(
-            fastapi_app,
-            **uvicorn_kwargs,
-        )
-    uvicorn_server = uvicorn.Server(config=uvicorn_config)
-    if not use_config_signal_handlers:
-        install_signal_handlers = getattr(uvicorn_server, "install_signal_handlers", None)
-        if isinstance(install_signal_handlers, bool):
-            uvicorn_server.install_signal_handlers = False
-
-    startup_error: list[BaseException] = []
-
-    def run_server():
-        try:
-            uvicorn_server.run()
-        except Exception as exc:  # noqa: BLE001 - surface startup issues to caller promptly
-            startup_error.append(exc)
-
-    thread = threading.Thread(target=run_server, daemon=True)
-    thread.start()
-
-    timeout_seconds = 3.0
-    wait_deadline = time.time() + timeout_seconds
-    while time.time() < wait_deadline:
-        if startup_error:
-            raise RuntimeError(
-                f"FastAPI server failed to start: {host}:{port}; {startup_error[0]}"
-            )
-        if uvicorn_server.started:
-            logger.info("FastAPI server started: http://%s:%s", host, port)
-            return
-        if not thread.is_alive():
-            break
-        time.sleep(0.05)
-
-    if startup_error:
-        raise RuntimeError(f"FastAPI server failed to start: {host}:{port}; {startup_error[0]}")
-    if uvicorn_server.started:
-        logger.info("FastAPI server started: http://%s:%s", host, port)
-        return
-    if not thread.is_alive():
-        raise RuntimeError(f"FastAPI 服务器启动后立即退出: {host}:{port}")
-
-    raise RuntimeError(f"FastAPI 服务在 {timeout_seconds:.1f}s 内未完成启动: {host}:{port}")
-
-
-def _is_truthy_env(var_name: str, default: str = "true") -> bool:
-    """Parse common truthy / falsy environment values."""
-    value = os.getenv(var_name, default).strip().lower()
-    return value not in {"0", "false", "no", "off"}
-
-
-def start_bot_stream_clients(config: Config) -> None:
-    """Start bot stream clients when enabled in config."""
-    # 启动钉钉 Stream 客户端
-    if config.dingtalk_stream_enabled:
-        try:
-            from bot.platforms import start_dingtalk_stream_background, DINGTALK_STREAM_AVAILABLE
-            if DINGTALK_STREAM_AVAILABLE:
-                if start_dingtalk_stream_background():
-                    logger.info("[Main] Dingtalk Stream client started in background.")
-                else:
-                    logger.warning("[Main] Dingtalk Stream client failed to start.")
-            else:
-                logger.warning("[Main] Dingtalk Stream enabled but SDK is missing.")
-                logger.warning("[Main] Run: pip install dingtalk-stream")
-        except Exception as exc:
-            log_safe_exception(
-                logger,
-                "DingTalk Stream client failed to start",
-                exc,
-                error_code="main_dingtalk_stream_start_failed",
-            )
-
-    # 启动飞书 Stream 客户端
-    if getattr(config, 'feishu_stream_enabled', False):
-        try:
-            from bot.platforms import start_feishu_stream_background, FEISHU_SDK_AVAILABLE
-            if FEISHU_SDK_AVAILABLE:
-                if start_feishu_stream_background():
-                    logger.info("[Main] Feishu Stream client started in background.")
-                else:
-                    logger.warning("[Main] Feishu Stream client failed to start.")
-            else:
-                logger.warning("[Main] Feishu Stream enabled but SDK is missing.")
-                logger.warning("[Main] Run: pip install lark-oapi")
-        except Exception as exc:
-            log_safe_exception(
-                logger,
-                "Feishu Stream client failed to start",
-                exc,
-                error_code="main_feishu_stream_start_failed",
-            )
-
-
-def _resolve_scheduled_stock_codes(stock_codes: Optional[List[str]]) -> Optional[List[str]]:
-    """Scheduled runs should always read the latest persisted watchlist."""
-    if stock_codes is not None:
-        logger.warning(
-            "Scheduled mode received --stocks; scheduled runs ignore the startup snapshot "
-            "and reload the latest STOCK_LIST before each run"
-        )
-    return None
-
-
-def _reload_runtime_config() -> Config:
-    """Reload config from the latest persisted `.env` values for scheduled runs."""
-    _reload_env_file_values_preserving_overrides()
-    Config.reset_instance()
-    return get_config()
-
-
-def _build_schedule_time_provider(default_schedule_time: str):
-    """Read the latest schedule time directly from the active config file.
-
-    Fallback order:
-    1. Process-level env override (set before launch) → honour it.
-    2. Persisted config file value (written by WebUI) → use it.
-    3. Documented system default ``"18:00"`` → always fall back here so
-       that clearing SCHEDULE_TIME in WebUI correctly resets the schedule.
-    """
-    from src.core.config_manager import ConfigManager
-
-    _SYSTEM_DEFAULT_SCHEDULE_TIME = "18:00"
-    manager = ConfigManager()
-
-    def _provider() -> str:
-        if "SCHEDULE_TIME" in _INITIAL_PROCESS_ENV:
-            return os.getenv("SCHEDULE_TIME", default_schedule_time)
-
-        config_map = manager.read_config_map()
-        schedule_time = (config_map.get("SCHEDULE_TIME", "") or "").strip()
-        if schedule_time:
-            return schedule_time
-        return _SYSTEM_DEFAULT_SCHEDULE_TIME
-
-    return _provider
-
-
-def _build_schedule_times_provider(default_schedule_time: str):
-    """Read the latest SCHEDULE_TIMES with SCHEDULE_TIME fallback."""
-    from src.core.config_manager import ConfigManager
-    from src.scheduler import normalize_schedule_times
-
-    _SYSTEM_DEFAULT_SCHEDULE_TIME = "18:00"
-    manager = ConfigManager()
-
-    def _provider():
-        if "SCHEDULE_TIMES" in _INITIAL_PROCESS_ENV:
-            return normalize_schedule_times(
-                os.getenv("SCHEDULE_TIMES", ""),
-                fallback_time=os.getenv("SCHEDULE_TIME", default_schedule_time),
-            )
-        if "SCHEDULE_TIME" in _INITIAL_PROCESS_ENV:
-            return normalize_schedule_times(
-                os.getenv("SCHEDULE_TIMES", ""),
-                fallback_time=os.getenv("SCHEDULE_TIME", default_schedule_time),
-            )
-
-        config_map = manager.read_config_map()
-        schedule_time = (config_map.get("SCHEDULE_TIME", "") or "").strip() or _SYSTEM_DEFAULT_SCHEDULE_TIME
-        return normalize_schedule_times(
-            config_map.get("SCHEDULE_TIMES", ""),
-            fallback_time=schedule_time,
-        )
-
-    return _provider
-
-
 def main() -> int:
     """
     主入口函数
@@ -1170,10 +999,10 @@ def main() -> int:
     Returns:
         退出码（0 表示成功）
     """
-    # 解析命令行参数
+    # Parse command-line arguments
     args = parse_arguments()
 
-    # 在配置加载前先初始化 bootstrap 日志，确保早期失败也能落盘
+    # Initialize bootstrap logs before loading, ensuring early failures are logged.
     try:
         _setup_bootstrap_logging(debug=args.debug)
     except Exception as exc:
@@ -1196,7 +1025,7 @@ def main() -> int:
             level=logging.WARNING,
         )
 
-    # 加载配置（在 bootstrap logging 之后执行，确保异常有日志）
+    # Load configuration (execute after bootstrap logging, ensure exceptions are logged)
     try:
         config = get_config()
     except Exception as exc:
@@ -1212,7 +1041,7 @@ def main() -> int:
     # config is available and before config-dependent services are used.
     set_application_services(ApplicationServices())
 
-    # 配置日志（输出到控制台和文件）
+    # Configure logging (output to console and file)
     try:
         _setup_runtime_logging(config.log_dir, debug=args.debug)
     except Exception as exc:

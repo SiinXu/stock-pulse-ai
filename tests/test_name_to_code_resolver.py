@@ -134,8 +134,7 @@ class TestResolveNameToCode:
     @patch("src.services.name_to_code_resolver._get_akshare_name_to_code")
     def test_akshare_fallback_when_not_in_local(self, mock_akshare):
         mock_akshare.return_value = {"平安银行": "000001"}
-        # 000001 is in local map as 平安银行, so we use a name that's only in akshare
-        # Actually local has 000001 -> 平安银行. So "平安银行" would hit local first.
+        # `000001` is locally mapped to `平安银行`, so use the AkShare-only `浦发银行` fixture below.
         # Use a name not in STOCK_NAME_MAP - e.g. some A-share only in AkShare
         mock_akshare.return_value = {"浦发银行": "600000"}
         result = resolve_name_to_code("浦发银行")
@@ -145,7 +144,7 @@ class TestResolveNameToCode:
     @patch("src.services.name_to_code_resolver._get_akshare_name_to_code")
     def test_fuzzy_match_fallback(self, mock_akshare):
         mock_akshare.return_value = {"贵州茅台": "600519"}
-        # Typo: 贵州茅苔 -> should fuzzy match 贵州茅台
+        # The typo `贵州茅苔` should fuzzy-match `贵州茅台`.
         result = resolve_name_to_code("贵州茅苔")
         assert result == "600519"
 

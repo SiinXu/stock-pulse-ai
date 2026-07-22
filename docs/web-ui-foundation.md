@@ -125,6 +125,54 @@ local Web origin. External custom-protocol registration and OS `open-url` or
 second-instance URL forwarding are not part of the Web contract and require a
 separate desktop-owned change.
 
+## Session Continuity And Privacy
+
+The Router URL remains the primary state owner. A tab-scoped continuity layer
+stores only allowlisted, normalized route snapshots for Home, Chat, Portfolio,
+Decision Signals, Screening, Backtest, and stock details. On a fresh document
+load, a bare major-route URL may replace itself once with the last snapshot for
+that route. Explicit URL state always wins, and later in-app navigation is not
+overridden by the initial restore guard.
+
+Home continuity includes the validated task/history Run Flow identity owned by
+the Home URL. A same-stock return restores the active process drawer; carrying a
+different stock drops report and Run Flow identities whose affinity cannot be
+proven. The current explicit route also wins immediately over a stale snapshot,
+so clearing a destination filter cannot be undone by its own Sidebar link.
+
+Application navigation carries the current validated stock context into Home,
+Chat, Decision Signals, and Backtest. Destination-specific state such as a
+Chat session, Portfolio account, Decision Signals tab/filter set, Screening
+parameters, or Backtest range remains scoped to that destination. Clearing a
+route's URL-owned state overwrites its snapshot, so the persistence layer
+cannot resurrect filters or selections the user intentionally removed.
+Decision Signal details with a source report provide a one-click handoff to the
+canonical Home report and history Run Flow URL for the same stock.
+
+Chat distinguishes an unconsumed report handoff from an active conversation
+context. The first form preloads the follow-up draft. After that draft is sent,
+the normalized stock, optional name, and report ID remain in the URL with
+`context=active`, so shared navigation can carry the same identity without
+recreating the consumed draft on refresh. An explicit in-chat stock switch
+updates the URL to the new stock and drops the previous report identity.
+
+Workflow continuity uses `sessionStorage`, not `localStorage`. This keeps route
+snapshots, opaque Chat session IDs, Deep Research questions/results, and active
+Screening task IDs within the current browser tab and browser session. Existing
+Chat and Deep Research values written by older versions are migrated out of
+`localStorage` on first read. Draft Chat text, unsaved forms, credentials,
+authorization values, provider keys, and arbitrary query parameters are never
+persisted by this layer.
+
+Logout and authenticated-session expiry clear all StockPulse workflow traces
+from both current `sessionStorage` and the known legacy `localStorage` keys,
+abort and reset in-memory Chat state, and reset the Home dashboard store.
+Durable non-sensitive preferences such as UI language, theme, and sidebar
+presentation remain intact. A completed logout replaces the active route with a
+plain `/login`, without a redirect containing the prior workflow identity.
+Browser history and explicitly shared deep-link URLs remain browser-owned and
+are not rewritten retroactively.
+
 ## Selection Control Semantics
 
 `SelectionChip` is the shared compact choice for text-led candidates whose

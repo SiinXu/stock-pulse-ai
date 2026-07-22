@@ -1,16 +1,16 @@
-# 环境变量文件（包含敏感信息，禁止提交）
+# Environment variable file (contains sensitive information, do not submit)
 .env
 .env.*
 *.env
 *.env.local
 .env.*.local
 
-# 测试文件（可能包含敏感配置）
-# 仅忽略仓库根目录下的临时 test_*.py 脚本；tests/ 目录下的单元测试需要纳入版本控制。
+# Testing file (may contain sensitive configuration)
+# Only ignore temporary test_*.py scripts in the repository root directory; unit tests in the tests/ directory need to be under version control.
 /test_*.py
 /test.sh
 
-# 本地评审与高级路由配置（可能包含敏感信息或临时分析产物）
+# Local review and advanced routing configuration (may contain sensitive information or temporary analysis outputs).
 /.codex
 /.tmp
 /review.md
@@ -39,7 +39,7 @@ wheels/
 .installed.cfg
 *.egg
 
-# 虚拟环境
+# Virtual environment.
 venv/
 ENV/
 env/
@@ -53,7 +53,7 @@ env/
 *~
 .cursorrules
 
-# 数据和日志
+# Data and logs
 /data/
 /.llm_usage_hmac_secret
 **/.llm_usage_hmac_secret
@@ -63,11 +63,11 @@ reports/
 *.sqlite
 *.sqlite3
 
-# 系统文件
+# System file
 .DS_Store
 Thumbs.db
 
-# 测试
+# Test
 .pytest_cache/
 .coverage
 htmlcov/
@@ -92,6 +92,9 @@ docs/specs/
 # ignore root-level node modules and Playwright MCP artifacts
 /node_modules/
 .playwright-mcp/
+
+# ignore local git worktrees used for parallel agent work
+/.worktrees/
 
 # ignore local screenshots / one-off visual evidence
 /*.png

@@ -1,4 +1,4 @@
-# Box Range Trading Strategy / 箱体震荡战法
+# Box Range Trading Strategy
 # Buy at box support, sell at box resistance, profit from range-bound oscillation.
 
 name: box_oscillation

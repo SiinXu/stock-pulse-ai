@@ -1,9 +1,9 @@
 import camelcaseKeys from 'camelcase-keys';
 
 /**
- * 将 snake_case 对象键转换为 camelCase
- * @param data API 响应数据 (snake_case)
- * @returns 转换后的 camelCase 对象
+ * Convert snake_case object keys to camelCase
+ * @param data API Response Data (snake_case)
+ * @returns The converted camelCase object
  */
 export function toCamelCase<T>(data: unknown): T {
     if (data === null || data === undefined) {

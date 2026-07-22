@@ -757,7 +757,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     expect(streamAttempts).toBe(2);
   });
 
-  test('12 Chat restores the URL session ahead of stale local storage and keeps it shareable', async ({ page }) => {
+  test('12 Chat restores the URL session ahead of stale legacy storage and keeps it shareable', async ({ page }) => {
     await page.route('**/api/v1/agent/chat/sessions?**', (route) => fulfillJson(route, {
       sessions: [
         { session_id: 'url-session', title: 'URL session', message_count: 1, created_at: '2026-07-15T10:00:00Z', last_active: '2026-07-15T10:00:00Z' },
@@ -776,7 +776,44 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page).toHaveURL(/session=url-session/);
     await expect(page.getByText('URL session restored', { exact: true })).toBeVisible();
     await expect(page.getByText('stale local message', { exact: true })).toHaveCount(0);
-    expect(await page.evaluate(() => localStorage.getItem('dsa_chat_session_id'))).toBe('url-session');
+    expect(await page.evaluate(() => sessionStorage.getItem('dsa_chat_session_id'))).toBe('url-session');
+    expect(await page.evaluate(() => localStorage.getItem('dsa_chat_session_id'))).toBeNull();
+  });
+
+  test('12b Chat keeps consumed report context in shared navigation without recreating the draft', async ({ page }) => {
+    await page.route('**/api/v1/history/1', (route) => fulfillJson(
+      route,
+      historyDetail(1, 'AAPL', 'Apple'),
+    ));
+    await page.route('**/api/v1/agent/chat/stream', (route) => route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: 'data: {"type":"done","success":true,"content":"context preserved"}\n\n',
+    }));
+    await login(page);
+    await page.goto('/chat?stock=AAPL&name=Apple&recordId=1');
+
+    const composer = page.getByRole('textbox', { name: '消息输入框' });
+    await expect(composer).toHaveValue('请深入分析 Apple(AAPL)');
+    const sendButton = page.getByRole('button', { name: '发送' });
+    await expect(sendButton).toBeEnabled();
+    await sendButton.click();
+    await expect(page.getByText('context preserved', { exact: true })).toBeVisible();
+    await expect.poll(() => {
+      const url = new URL(page.url());
+      return Object.fromEntries(['stock', 'name', 'recordId', 'context'].map((key) => [
+        key,
+        url.searchParams.get(key),
+      ]));
+    }).toEqual({ stock: 'AAPL', name: 'Apple', recordId: '1', context: 'active' });
+
+    const homeLink = page.getByRole('link', { name: '首页' });
+    await expect(homeLink).toHaveAttribute('href', /recordId=1/);
+    await homeLink.click();
+    await expect.poll(() => {
+      const url = new URL(page.url());
+      return { pathname: url.pathname, stock: url.searchParams.get('stock'), recordId: url.searchParams.get('recordId') };
+    }).toEqual({ pathname: '/', stock: 'AAPL', recordId: '1' });
   });
 
   test('13 Screening displays a built-in strategy by stable ID in English', async ({ page }) => {

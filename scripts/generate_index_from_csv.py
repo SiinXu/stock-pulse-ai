@@ -126,7 +126,7 @@ def load_tushare_data(data_dir: Path) -> List[Dict[str, Any]]:
                 reader = csv.DictReader(f)
 
                 for row in reader:
-                    # 传入市场参数以优化判断（对于特殊格式如 DUMMY）
+                    # Pass in market parameters to optimize judgment (for special formats such as DUMMY)
                     parsed = parse_stock_row(row, market_name)
                     if not parsed:
                         continue
@@ -201,7 +201,7 @@ def load_akshare_data(logs_dir: Path) -> List[Dict[str, Any]]:
         print("[Error] 未找到 CSV 文件：logs/stock_basic_*.csv")
         return []
 
-    # 使用最新的 CSV 文件
+    # Use the latest CSV file.
     csv_file = sorted(csv_files)[-1]
     print(f"  正在读取 AkShare 数据：{csv_file.name}")
 
@@ -316,11 +316,11 @@ def extract_symbol_from_ts_code(ts_code: str, market: str) -> Optional[str]:
         return None
 
     if market in {'US', 'JP', 'KR'}:
-        # 美股常见 class/share 后缀、日韩 Yahoo 后缀都是代码身份的一部分。
+        # Common U.S. class/share suffixes and Korean/Japanese Yahoo suffixes are part of the code identity.
         return ts_code
 
     if '.' in ts_code:
-        # A股和港股：去除后缀
+        # A-shares and Hong Kong stocks: remove suffixes
         return ts_code.split('.')[0]
 
     return ts_code
@@ -341,11 +341,11 @@ def get_stock_name(row: Dict[str, str], market: str) -> Optional[str]:
         股票名称或 None
     """
     if market == 'US':
-        # 美股使用英文名称
+        # U.S. stocks use English names
         name = row.get('enname', '').strip()
         return name if name else None
     else:
-        # A股和港股使用中文名称
+        # A-shares and Hong Kong stocks use Chinese names
         name = row.get('name', '').strip()
         name = normalize_stock_name_for_index(name, market)
         return name if name else None
@@ -386,26 +386,26 @@ def parse_stock_row(row: Dict[str, str], preferred_market: Optional[str] = None)
     if not ts_code:
         return None
 
-    # 自动判断市场类型
+    # Automatically determine market type.
     market = determine_market(ts_code)
 
-    # 如果 ts_code 没有后缀（无法准确判断），且提供了 preferred_market，则使用它
-    # 这主要用于处理美股的特殊格式（如 DUMMY 记录）
+    # If ts_code has no suffix (cannot accurately determine), and preferred_market is provided, use it
+    # This is mainly used to handle special formats for US stocks (such as DUMMY records)
     if '.' not in ts_code and preferred_market:
         market = preferred_market
 
-    # 美股特殊处理：严格过滤 DUMMY 记录
+    # Special handling for U.S. stocks: strictly filters DUMMY records
     if market == 'US':
         enname = row.get('enname', '').strip()
         if not enname or 'DUMMY' in enname.upper():
             return None
 
-    # 获取股票名称
+    # Get stock name
     name = get_stock_name(row, market)
     if not name:
         return None
 
-    # 提取 displayCode
+    # Extracts displayCode
     display_code = extract_symbol_from_ts_code(ts_code, market)
     if not display_code:
         return None
@@ -430,9 +430,9 @@ def determine_market(ts_code: str) -> str:
         Market code (CN, HK, US, BSE, JP, KR)
     """
     if '.' in ts_code:
-        # 有后缀的情况
+        # Handle cases with suffixes.
         suffix = ts_code.split('.')[1]
-        # 检查是否为中国市场后缀
+        # Check if it's a Chinese market suffix
         if suffix in ['SH', 'SZ']:
             return 'CN'
         elif suffix == 'HK':
@@ -443,18 +443,18 @@ def determine_market(ts_code: str) -> str:
             return 'JP'
         elif suffix in ['KS', 'KQ']:
             return 'KR'
-        # 有后缀但不是中国市场后缀，检查是否为美股
-        # 美股可能有点号后缀（如 BRK.B, GOOG.A, AAPL.U）
+        # If the suffix is not a Chinese-market suffix, check whether this is a U.S. stock.
+        # U.S. stocks may have suffixes like (BRK.B, GOOG.A, AAPL.U)
         prefix = ts_code.split('.')[0]
         if prefix.isalpha():
             return 'US'
     else:
-        # 无后缀的情况
-        # 纯字母代码为美股
+        # Cases without suffix
+        # Pure alphabetic code for US stocks
         if ts_code.isalpha():
             return 'US'
 
-    # 默认为 A股
+    # Defaults to A-shares
     return 'CN'
 
 
@@ -471,7 +471,7 @@ def generate_aliases(name: str, market: str) -> List[str]:
     """
     aliases = []
 
-    # A股常见别名
+    # Common aliases for A-shares
     cn_alias_map = {
         '贵州茅台': ['茅台'],
         '中国平安': ['平安'],
@@ -498,7 +498,7 @@ def generate_aliases(name: str, market: str) -> List[str]:
         '中国石油': ['石油'],
     }
 
-    # 港股常见别名
+    # Common aliases for Hong Kong stocks.
     hk_alias_map = {
         '腾讯控股': ['腾讯', 'Tencent'],
         '阿里巴巴-SW': ['阿里', '阿里巴巴', 'Alibaba'],
@@ -512,7 +512,7 @@ def generate_aliases(name: str, market: str) -> List[str]:
         '中国海洋石油': ['中海油', 'CNOOC'],
     }
 
-    # 美股常见别名
+    # Common aliases for U.S. stocks
     us_alias_map = {
         'Apple Inc.': ['Apple', 'AAPL'],
         'Microsoft Corporation': ['Microsoft', 'MSFT'],
@@ -526,7 +526,7 @@ def generate_aliases(name: str, market: str) -> List[str]:
         'Advanced Micro Devices': ['AMD', 'AMD'],
     }
 
-    # 根据市场选择映射表
+    # Select mapping table based on market selection:
     if market == 'CN':
         alias_map = cn_alias_map
     elif market == 'HK':
@@ -558,9 +558,9 @@ def build_stock_index(stocks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         ts_code = stock['ts_code']
         symbol = stock['symbol']
         name = stock['name']
-        market = stock.get('market', 'CN')  # 优先使用已解析的市场，否则从 ts_code 判断
+        market = stock.get('market', 'CN')  # Prefer parsed market data, otherwise use ts_code to determine.
 
-        # 如果没有 market 字段，从 ts_code 判断
+        # If no 'market' field is present, determine from ts_code.
         if market == 'CN' and '.' not in ts_code:
             market = determine_market(ts_code)
 
@@ -640,7 +640,7 @@ def main():
     if not require_pypinyin():
         return 1
 
-    # 加载数据
+    # Load data
     print("\n[1/5] 读取 CSV 数据...")
     if args.source == 'tushare':
         data_dir = Path(__file__).parent.parent / 'data'
@@ -661,7 +661,7 @@ def main():
     print("\n[2/5] 生成索引数据...")
     index = build_stock_index(stocks)
 
-    # 输出路径
+    # Output path
     output_path = (
         Path(__file__).parent.parent / "apps" / "dsa-web" / "public" / "stocks.index.json"
     )
@@ -674,12 +674,12 @@ def main():
         print("\n[4/5] 测试模式：跳过写入文件")
         print(f"      输出路径：{output_path}")
 
-        # 验证数据
+        # Data validation
         print("\n[5/5] 验证数据...")
         print(f"      压缩前：{len(index)} 条记录")
         print(f"      压缩后：{len(compressed)} 条记录")
 
-        # 显示前5条示例
+        # Display the top 5 examples.
         if compressed:
             print("\n      前5条示例：")
             for i, item in enumerate(compressed[:5]):
@@ -699,13 +699,13 @@ def main():
         file_size = output_path.stat().st_size
         print(f"      文件大小：{file_size / 1024:.2f} KB")
 
-        # 验证文件
+        # File validation
         print("\n[5/5] 验证文件...")
         with open(output_path, 'r', encoding='utf-8') as f:
             test_data = json.load(f)
             print(f"      验证通过：{len(test_data)} 条记录")
 
-    # 统计信息
+    # Statistical information
     market_stats = {}
     for item in index:
         market = item['market']

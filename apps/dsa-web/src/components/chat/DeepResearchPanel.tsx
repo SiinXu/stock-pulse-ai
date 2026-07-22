@@ -7,6 +7,12 @@ import { agentApi } from '../../api/agent';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { ApiErrorAlert, Button, Field, InlineAlert, Input, StatePanel, Surface, Textarea } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import {
+  DEEP_RESEARCH_SESSION_STORAGE_PREFIX,
+  readSessionItemWithLegacyLocal,
+  removeSessionItem,
+  writeSessionItem,
+} from '../../utils/sessionPersistence';
 
 type ResearchStatus = 'idle' | 'running' | 'done' | 'error';
 
@@ -20,13 +26,13 @@ interface ResearchRun {
 }
 
 function storageKey(sessionId: string): string {
-  return `dsa_research_run:${sessionId}`;
+  return `${DEEP_RESEARCH_SESSION_STORAGE_PREFIX}${sessionId}`;
 }
 
 function loadRun(sessionId: string): ResearchRun | null {
   if (typeof window === 'undefined' || !sessionId) return null;
   try {
-    const raw = window.localStorage.getItem(storageKey(sessionId));
+    const raw = readSessionItemWithLegacyLocal(storageKey(sessionId));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<ResearchRun>;
     if (!parsed || typeof parsed.question !== 'string') return null;
@@ -50,8 +56,8 @@ function loadRun(sessionId: string): ResearchRun | null {
 function saveRun(sessionId: string, run: ResearchRun | null): void {
   if (typeof window === 'undefined' || !sessionId) return;
   try {
-    if (run) window.localStorage.setItem(storageKey(sessionId), JSON.stringify(run));
-    else window.localStorage.removeItem(storageKey(sessionId));
+    if (run) writeSessionItem(storageKey(sessionId), JSON.stringify(run));
+    else removeSessionItem(storageKey(sessionId));
   } catch {
     // Ignore storage failures (private mode / quota); persistence is best-effort.
   }
@@ -128,44 +134,11 @@ export const DeepResearchPanel: React.FC<DeepResearchPanelProps> = ({ sessionId 
   }, []);
 
   return (
-    <section className="space-y-4" aria-labelledby="deep-research-title">
+    <section className="flex min-h-full flex-col gap-4" aria-labelledby="deep-research-title">
       <div>
         <h2 id="deep-research-title" className="text-base font-semibold text-foreground">{t('research.title')}</h2>
         <p className="mt-1 text-sm text-secondary-text">{t('research.description')}</p>
       </div>
-
-      <form className="space-y-3" onSubmit={handleRun}>
-        <Textarea
-          label={t('research.questionLabel')}
-          value={question}
-          onChange={(event) => setQuestion(event.target.value)}
-          placeholder={t('research.questionPlaceholder')}
-          rows={3}
-          disabled={running}
-        />
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <Field controlId="deep-research-stock" label={t('research.stockCodeLabel')} hint={t('research.stockCodeHint')} className="sm:w-64">
-            <Input
-              id="deep-research-stock"
-              value={stockCode}
-              onChange={(event) => setStockCode(event.target.value)}
-              disabled={running}
-              autoComplete="off"
-            />
-          </Field>
-          {running ? (
-            <Button type="button" variant="secondary" size="comfortable" onClick={handleCancel}>
-              <StopCircle className="h-4 w-4" aria-hidden="true" />
-              {t('research.cancel')}
-            </Button>
-          ) : (
-            <Button type="submit" variant="primary" size="primary" disabled={!question.trim()}>
-              <Search className="h-4 w-4" aria-hidden="true" />
-              {t('research.run')}
-            </Button>
-          )}
-        </div>
-      </form>
 
       {running ? (
         <StatePanel state="loading" title={t('research.running')} titleAs="p" size="compact" />
@@ -199,8 +172,41 @@ export const DeepResearchPanel: React.FC<DeepResearchPanelProps> = ({ sessionId 
       ) : null}
 
       {!run || run.status === 'idle' ? (
-        <StatePanel state="empty" title={t('research.emptyHint')} titleAs="p" size="compact" />
+        <p className="text-sm text-muted-text">{t('research.emptyHint')}</p>
       ) : null}
+
+      <form className="mt-auto space-y-3" onSubmit={handleRun}>
+        <Textarea
+          label={t('research.questionLabel')}
+          value={question}
+          onChange={(event) => setQuestion(event.target.value)}
+          placeholder={t('research.questionPlaceholder')}
+          rows={3}
+          disabled={running}
+        />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <Field controlId="deep-research-stock" label={t('research.stockCodeLabel')} hint={t('research.stockCodeHint')} className="sm:w-64">
+            <Input
+              id="deep-research-stock"
+              value={stockCode}
+              onChange={(event) => setStockCode(event.target.value)}
+              disabled={running}
+              autoComplete="off"
+            />
+          </Field>
+          {running ? (
+            <Button type="button" variant="secondary" size="comfortable" onClick={handleCancel}>
+              <StopCircle className="h-4 w-4" aria-hidden="true" />
+              {t('research.cancel')}
+            </Button>
+          ) : (
+            <Button type="submit" variant="primary" size="primary" disabled={!question.trim()}>
+              <Search className="h-4 w-4" aria-hidden="true" />
+              {t('research.run')}
+            </Button>
+          )}
+        </div>
+      </form>
     </section>
   );
 };

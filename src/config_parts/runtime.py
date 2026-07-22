@@ -95,17 +95,17 @@ class _ConfigRuntimeMethods:
         1. .env 文件（本地开发、定时任务模式） - 修改后下次执行自动生效
         2. 系统环境变量（GitHub Actions、Docker） - 启动时固定，运行中不变
         """
-        # 优先从 .env 文件读取最新配置，这样即使在容器环境中修改了 .env 文件，
-        # 也能获取到最新的股票列表配置
+        # Prioritize reading the latest configuration from .env file, so even in container environments, if you modify the .env file,
+        # It can also obtain the latest stock list configuration
         env_file = os.getenv("ENV_FILE")
         env_path = Path(env_file) if env_file else (Path(__file__).parent.parent / '.env')
         stock_list_str = ''
         if env_path.exists():
-            # 直接从 .env 文件读取最新的配置
+            # Read the latest configuration directly from .env file
             env_values = dotenv_values(env_path)
             stock_list_str = (env_values.get('STOCK_LIST') or '').strip()
 
-        # 如果 .env 文件不存在或未配置，才尝试从系统环境变量读取
+        # If .env file does not exist or is not configured, try reading from system environment variables.
         if not stock_list_str:
             stock_list_str = os.getenv('STOCK_LIST', '')
 

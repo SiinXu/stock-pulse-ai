@@ -81,16 +81,16 @@ class TelegramSender:
         message_thread_id = target_message_thread_id
 
         try:
-            # Telegram API 端点
+            # Telegram API Endpoint
             api_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
 
-            # Telegram 消息最大长度 4096 字符
+            # Telegram message maximum length 4096 characters
             max_length = 4096
 
             telegram_content = self._convert_to_telegram_markdown(content)
 
             if len(telegram_content) <= max_length:
-                # 单条消息发送
+                # Single message sending
                 return self._send_telegram_message(
                     api_url,
                     chat_id,
@@ -99,7 +99,7 @@ class TelegramSender:
                     timeout_seconds=timeout_seconds,
                 )
             else:
-                # 按 Markdown 转义后的最终 payload 分段，避免转义字符使请求超限
+                # Segment based on the final payload after Markdown escaping to avoid exceeding limits due to escape characters
                 return self._send_telegram_chunked(
                     api_url,
                     chat_id,
@@ -295,7 +295,7 @@ class TelegramSender:
         timeout_seconds: Optional[float] = None,
     ) -> bool:
         """按已转换的 Telegram Markdown payload 分段发送长消息。"""
-        # 按段落分割
+        # Segment by paragraph.
         sections = content.split("\n---\n")
         delimiter = "\n---\n"
         delimiter_length = len(delimiter)
@@ -336,7 +336,7 @@ class TelegramSender:
 
         for section in sections:
             if len(section) > max_length:
-                # 单段超限时强制切片，避免依赖“\\n---\\n”边界导致的整段超长发送
+                # Force segment cut based on single-segment breach, Avoid dependency"\\n---\\n"Long send caused by boundary
                 if not _flush_chunk():
                     return False
                 for long_chunk in _split_long_section(section, max_length):
@@ -366,7 +366,7 @@ class TelegramSender:
             current_chunk.append(section)
             current_length += additional_length
 
-        # 发送最后一块
+        # Send the last piece
         if not _flush_chunk():
             return False
 
@@ -417,10 +417,10 @@ class TelegramSender:
         """
         result = text
 
-        # 移除 # 标题标记（Telegram 不支持）
+        # Remove # header tags (Telegram does not support)
         result = re.sub(r'^#{1,6}\s+', '', result, flags=re.MULTILINE)
 
-        # 转换 **bold** 为 *bold*
+        # Convert **bold** to *bold*
         result = re.sub(r'\*\*(.+?)\*\*', r'*\1*', result)
 
         # Escape special characters for Telegram Markdown, but preserve link syntax [text](url)

@@ -9,7 +9,7 @@ import type { DecisionSignalItem } from '../../types/decisionSignals';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
 import PortfolioPage from '../PortfolioPage';
 
-// jsdom 未实现 scrollIntoView，而 Select 打开下拉时会调用它保持活动项可见。
+// jsdom does not implement scrollIntoView, while Select calls it to keep the active item visible when opening a dropdown.
 if (!HTMLElement.prototype.scrollIntoView) {
   HTMLElement.prototype.scrollIntoView = () => {};
 }
@@ -401,6 +401,24 @@ describe('PortfolioPage FX refresh', () => {
 
     const positionsSection = screen.getByRole('heading', { name: '持仓明细' }).closest('section');
     expect(positionsSection).not.toBe(overview);
+  });
+
+  it('removes the details divider from the page-level portfolio error', async () => {
+    getSnapshot.mockRejectedValueOnce(
+      createApiError(
+        createParsedApiError({
+          title: '持仓加载失败',
+          message: '无法加载持仓',
+          rawMessage: 'GET /api/portfolio/snapshot returned 404',
+          category: 'http_error',
+        }),
+      ),
+    );
+
+    renderPortfolioPage();
+
+    const alert = (await screen.findByText('持仓加载失败')).closest('[role="alert"]');
+    expect(alert?.parentElement).toHaveClass('[&_details]:border-t-0', '[&_details]:pt-0');
   });
 
   it('restores selected account from the URL and keeps Back navigation in sync', async () => {

@@ -72,7 +72,7 @@ class DiscordPlatform(BotPlatform):
             logger.warning("[Discord] Signature headers are missing; rejecting request")
             return False
 
-        # 校验 timestamp 格式与时效性，防止重放攻击
+        # Validate timestamp format and timeliness to prevent replay attacks
         try:
             ts_int = int(timestamp)
         except (TypeError, ValueError):
@@ -93,7 +93,7 @@ class DiscordPlatform(BotPlatform):
             )
             return False
 
-        # 允许的时间窗口：±5 分钟
+        # Time window: ±5 minutes
         if abs(now_ts - ts_int) > 300:
             logger.warning(
                 "[Discord] Request timestamp is outside the allowed window: timestamp=%s now=%s",
@@ -238,7 +238,7 @@ class DiscordPlatform(BotPlatform):
             },
         }
 
-        # Interaction（slash-command）需要 Interaction Response 回调格式
+        # Interaction(slash-command)Need Interaction Response Callback Format
         if message.raw_data.get("type") == 2:
             discord_response = {
                 "type": 4,  # CHANNEL_MESSAGE_WITH_SOURCE
@@ -347,13 +347,13 @@ class DiscordPlatform(BotPlatform):
         Returns:
             验证响应，或 None（不是验证请求）
         """
-        # Discord Webhook 验证请求类型是 1
+        # Discord Webhook validation requests use type 1
         if data.get("type") == 1:
             return WebhookResponse.success({
                 "type": 1
             })
         
-        # Discord 命令交互验证
+        # Discord command interaction validation
         if "challenge" in data:
             return WebhookResponse.success({
                 "challenge": data["challenge"]
