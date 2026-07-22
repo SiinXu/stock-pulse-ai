@@ -2311,7 +2311,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_ENABLED.notes.0": "AlphaSift が候補銘柄を生成し、StockPulse が価格情報、ファンダメンタルズ、ニュースの文脈を補完します。無効にしても既存の分析、レポート、通知には影響しません。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_ENABLED.summary": "組み込みの AlphaSift 銘柄スクリーニングページを制御します。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_ENABLED.title": "AlphaSift スクリーニング",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_ENABLED.usage": "既定では無効です。true にすると、Web アプリはバックエンドの依存関係としてインストールされた alphasift.dsa_adapter を確認します。見つからない場合は、pip install -r requirements.txt を実行するか、バックエンド成果物を再ビルドしてください。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_ENABLED.usage": "既定では無効です。true にすると、Web アプリはバックエンドの依存関係としてインストールされた alphasift.dsa_adapter を確認します。見つからない場合は、リポジトリのルートで python -m pip install --upgrade --constraint constraints.txt pip、python -m pip install --build-constraint build-constraints.txt -r requirements.txt、python -m pip check の順に実行するか、バックエンド成果物を再ビルドしてください。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_ENABLED.valueNotes.0": "AlphaSift は StockPulse のバックエンド依存関係としてインストールされます。/install は明示的な修復操作としてのみ残されています。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_ENABLED.valueNotes.1": "株式選択結果は調査目的のみであり、投資助言を構成するものではありません。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_INSTALL_SPEC.impact.0": "AlphaSift アダプターのソース検証と明示的な修復インストールに影響します。",

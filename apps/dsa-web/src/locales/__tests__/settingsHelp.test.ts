@@ -12,6 +12,21 @@ describe('fallback model settings help', () => {
     expect(content?.valueNotes?.length).toBeGreaterThan(0);
   });
 
+  it.each(UI_LANGUAGES)('documents the constrained AlphaSift install sequence for %s', (language) => {
+    const content = getSettingsHelpContent(
+      'settings.data_source.ALPHASIFT_ENABLED',
+      undefined,
+      language,
+    );
+    const usage = content?.usage ?? '';
+
+    expect(usage).toContain('python -m pip install --upgrade --constraint constraints.txt pip');
+    expect(usage).toContain(
+      'python -m pip install --build-constraint build-constraints.txt -r requirements.txt',
+    );
+    expect(usage).toContain('python -m pip check');
+  });
+
   it('uses the selected language for unknown-key fallback help', () => {
     const content = getSettingsHelpContent('settings.future.UNKNOWN', 'Backend-provided summary', 'ja');
 

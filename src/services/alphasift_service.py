@@ -1381,7 +1381,13 @@ def _ensure_alphasift_available_for_use() -> None:
     normalized_diagnostics = _include_alphasift_diagnostic_suffix(diagnostics)
     if _is_missing_alphasift_module(diagnostics):
         raise _alphasift_unavailable_exception(
-            "AlphaSift 是 StockPulse 的项目依赖，但当前运行环境未安装适配层。请先执行 `pip install -r requirements.txt`，或重建 Docker/桌面后端产物。",
+            "AlphaSift 是 StockPulse 的项目依赖，但当前运行环境未安装适配层。"
+            "请在仓库根目录运行受约束的安装流程:\n"
+            "python -m pip install --upgrade --constraint constraints.txt pip\n"
+            "python -m pip install --build-constraint build-constraints.txt "
+            "-r requirements.txt\n"
+            "python -m pip check\n"
+            "或重建 Docker/桌面后端产物。",
             diagnostics=normalized_diagnostics,
         )
     raise _alphasift_unavailable_exception(

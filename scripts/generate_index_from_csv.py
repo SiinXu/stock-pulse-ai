@@ -43,7 +43,13 @@ def require_pypinyin() -> bool:
         return True
 
     print("[Error] pypinyin not available; cannot generate stock autocomplete index.")
-    print("[Info] Install dependencies with: pip install -r requirements.txt")
+    print("[Info] From the repository root, run:")
+    print("  python -m pip install --upgrade --constraint constraints.txt pip")
+    print(
+        "  python -m pip install --build-constraint build-constraints.txt "
+        "-r requirements.txt"
+    )
+    print("  python -m pip check")
     return False
 
 

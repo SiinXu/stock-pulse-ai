@@ -191,7 +191,11 @@ class FeishuSender:
                 return self._app_client
             if not FEISHU_SDK_AVAILABLE:
                 logger.warning(
-                    "飞书 App Bot 需要 lark-oapi 库；标准安装请运行: pip install -r requirements.txt"
+                    "飞书 App Bot 需要 lark-oapi 库；请在仓库根目录运行受约束的安装流程:\n"
+                    "python -m pip install --upgrade --constraint constraints.txt pip\n"
+                    "python -m pip install --build-constraint build-constraints.txt "
+                    "-r requirements.txt\n"
+                    "python -m pip check"
                 )
                 self._app_client = None
                 return None

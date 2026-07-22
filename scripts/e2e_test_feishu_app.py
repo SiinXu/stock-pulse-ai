@@ -77,7 +77,10 @@ try:
 except ImportError:
     logger.error(
         "lark-oapi is NOT installed. Standard project setup installs it via:\n"
-        "    pip install -r requirements.txt"
+        "    python -m pip install --upgrade --constraint constraints.txt pip\n"
+        "    python -m pip install --build-constraint build-constraints.txt "
+        "-r requirements.txt\n"
+        "    python -m pip check"
     )
     sys.exit(1)
 

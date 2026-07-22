@@ -484,8 +484,8 @@ class TestFeishuSender(unittest.TestCase):
         self.assertTrue(result)
         mock_webhook_post.assert_called_once()
 
-    def test_app_bot_missing_sdk_logs_standard_requirements_install(self):
-        """App Bot SDK absence fails closed with the standard project install hint."""
+    def test_app_bot_missing_sdk_logs_constrained_requirements_install(self):
+        """App Bot SDK absence reports the complete constrained install sequence."""
         cfg = _config(
             feishu_app_id="cli_app",
             feishu_app_secret="secret",
@@ -498,13 +498,13 @@ class TestFeishuSender(unittest.TestCase):
             result = sender.send_to_feishu("hello")
 
         self.assertFalse(result)
-        install_hints = [
-            line
-            for line in logs.output
-            if "pip install -r requirements.txt" in line
-        ]
-        self.assertEqual(install_hints, logs.output)
-        self.assertEqual(len(install_hints), 1)
+        self.assertEqual(len(logs.output), 1)
+        for expected in (
+            "python -m pip install --upgrade --constraint constraints.txt pip",
+            "python -m pip install --build-constraint build-constraints.txt -r requirements.txt",
+            "python -m pip check",
+        ):
+            self.assertIn(expected, logs.output[0])
 
     def test_app_bot_chunking_long_content(self):
         """Long content is chunked for App Bot."""

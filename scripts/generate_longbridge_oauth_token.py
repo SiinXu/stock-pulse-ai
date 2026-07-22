@@ -47,7 +47,11 @@ def main() -> int:
         from longbridge.openapi import Config, OAuthBuilder, QuoteContext
     except Exception as exc:
         raise SystemExit(
-            "longbridge SDK is not installed. Run `pip install -r requirements.txt` first."
+            "longbridge SDK is not installed. From the repository root, run:\n"
+            "python -m pip install --upgrade --constraint constraints.txt pip\n"
+            "python -m pip install --build-constraint build-constraints.txt "
+            "-r requirements.txt\n"
+            "python -m pip check"
         ) from exc
 
     def show_url(url: str) -> None:
