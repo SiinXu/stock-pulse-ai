@@ -54,6 +54,26 @@ def clone_facade_function(
     return cloned
 
 
+def bind_facade_functions(
+    source_namespace: Dict[str, Any],
+    target_namespace: Dict[str, Any],
+    names: Tuple[str, ...],
+) -> Tuple[str, ...]:
+    """Bind selected source functions into a facade namespace in order."""
+    for name in names:
+        function = source_namespace.get(name)
+        if not isinstance(function, FunctionType):
+            raise TypeError(
+                f"AlphaSift facade binding requires a Python function: {name}"
+            )
+        target_namespace[name] = clone_facade_function(
+            function,
+            target_namespace,
+            qualname=name,
+        )
+    return names
+
+
 def _descriptor_function(descriptor: Any) -> Optional[FunctionType]:
     if isinstance(descriptor, (staticmethod, classmethod)):
         return descriptor.__func__
