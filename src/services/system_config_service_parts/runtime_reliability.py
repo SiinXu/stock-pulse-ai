@@ -345,6 +345,19 @@ class RuntimeConfigTransaction:
         self._atomic_write_text(path, snapshot.content)
 
     @staticmethod
+    def _restrict_open_file_permissions(file_obj: Any) -> None:
+        """Apply POSIX owner-only permissions when descriptor chmod is available."""
+        fchmod = getattr(os, "fchmod", None)
+        if not callable(fchmod):
+            return
+        try:
+            fchmod(file_obj.fileno(), 0o600)
+        except NotImplementedError:
+            # Windows relies on access control inherited from the containing
+            # directory and supports only limited chmod semantics.
+            return
+
+    @staticmethod
     def _atomic_write_text(path: Path, content: str) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path_digest = hashlib.sha256(
@@ -358,7 +371,7 @@ class RuntimeConfigTransaction:
                 0o600,
             )
             with os.fdopen(temp_fd, "w", encoding="utf-8", newline="\n") as file_obj:
-                os.fchmod(file_obj.fileno(), 0o600)
+                RuntimeConfigTransaction._restrict_open_file_permissions(file_obj)
                 file_obj.write(content)
                 file_obj.flush()
                 os.fsync(file_obj.fileno())
@@ -373,7 +386,7 @@ class RuntimeConfigTransaction:
                     0o600,
                 )
                 with os.fdopen(path_fd, "w", encoding="utf-8", newline="\n") as file_obj:
-                    os.fchmod(file_obj.fileno(), 0o600)
+                    RuntimeConfigTransaction._restrict_open_file_permissions(file_obj)
                     file_obj.write(content)
                     file_obj.flush()
                     os.fsync(file_obj.fileno())

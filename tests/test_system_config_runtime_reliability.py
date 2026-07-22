@@ -145,10 +145,10 @@ class SystemConfigRuntimeReliabilityTestCase(unittest.TestCase):
         self.assertEqual(observed_singletons, [previous_config])
         self.assertIs(Config.get_instance(), candidate_config)
         self.assertEqual(previous_config.stock_list, ["600519"])
-        self.assertEqual(
-            stat.S_IMODE(self.service._runtime_config_transaction.last_good_path.stat().st_mode),
-            0o600,
-        )
+        snapshot_path = self.service._runtime_config_transaction.last_good_path
+        self.assertTrue(snapshot_path.exists())
+        if os.name != "nt":
+            self.assertEqual(stat.S_IMODE(snapshot_path.stat().st_mode), 0o600)
 
     def test_secret_snapshot_temp_file_stays_in_env_ignore_namespace(self) -> None:
         snapshot_path = self.service._runtime_config_transaction.last_good_path
@@ -195,6 +195,37 @@ class SystemConfigRuntimeReliabilityTestCase(unittest.TestCase):
         self.assertEqual(self.env_path.read_bytes(), previous_bytes)
         self.assertIs(Config.get_instance(), previous_config)
         self.assertEqual(os.environ.get("OPENAI_API_KEY"), previous_openai_key)
+
+    def test_activation_and_exact_restoration_when_fchmod_is_unavailable(self) -> None:
+        with patch(
+            "src.services.system_config_service_parts.runtime_reliability.os.fchmod",
+            new=None,
+            create=True,
+        ), patch.object(self.service, "_reload_runtime_singletons"):
+            updated = self.service.update(
+                config_version=self.manager.get_config_version(),
+                items=[{"key": "STOCK_LIST", "value": "300750"}],
+            )
+            activated_bytes = self.env_path.read_bytes()
+            activated_config = Config.get_instance()
+
+            with patch.object(
+                Config,
+                "_load_from_env",
+                side_effect=RuntimeError("candidate build failed"),
+            ):
+                with self.assertRaises(ConfigValidationError) as raised:
+                    self.service.update(
+                        config_version=updated["config_version"],
+                        items=[{"key": "STOCK_LIST", "value": "000001"}],
+                    )
+
+        self.assertTrue(updated["reload_triggered"])
+        self.assertTrue(self.service._runtime_config_transaction.last_good_path.exists())
+        self.assertEqual(raised.exception.issues[0]["code"], "runtime_activation_failed")
+        self.assertEqual(self.env_path.read_bytes(), activated_bytes)
+        self.assertIs(Config.get_instance(), activated_config)
+        self.assertEqual(Config.get_instance().stock_list, ["300750"])
 
     def test_failed_activation_preserves_existing_rollback_target(self) -> None:
         with patch.object(self.service, "_reload_runtime_singletons"):

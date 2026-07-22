@@ -165,7 +165,7 @@ LITELLM_MODEL=ollama/qwen3:8b
 
 `PUT /api/v1/system/config` 会在持久化前校验完整候选配置，并且只在新的 `Config` 对象成功构建后才发布到运行时。旧客户端 payload 行为不变：`reload_now` 默认 `true`，`validate_connectivity` 默认 `false`，因此普通保存不会新增外部请求。调用方显式开启连通性探测时，会复用固定 prompt/schema 的 generation-backend smoke test；`connectivity_timeout_seconds` 可设为 1 到 120 秒。失败返回 `connectivity_probe_failed`，其 `details.error_code` 区分认证、额度、模型不可用、网络或后端契约错误，且不会回显凭据。
 
-持久化写入与运行时激活由同一事务锁串行化。候选构建或运行时重置失败时，服务会恢复原始 `.env` 内容、受影响的进程环境变量和旧的全局 `Config` 对象，并以 `runtime_activation_failed` 拒绝本次更新。激活成功后，会在 `ENV_FILE` 同目录生成权限为 `0600` 的 `.env.last-good-*` 本地快照。该文件含上一版原始配置与 secret，受仓库 `.env.*` ignore 规则保护，严禁上传、附到 issue 或提交到 Git。
+持久化写入与运行时激活由同一事务锁串行化。候选构建或运行时重置失败时，服务会恢复原始 `.env` 内容、受影响的进程环境变量和旧的全局 `Config` 对象，并以 `runtime_activation_failed` 拒绝本次更新。激活成功后，会在 `ENV_FILE` 同目录生成 `.env.last-good-*` 本地快照；POSIX 系统强制仅文件所有者可读写的 `0600` 权限，Windows 则继承所在目录的访问控制列表（ACL）。该文件含上一版原始配置与 secret，受仓库 `.env.*` ignore 规则保护，严禁上传、附到 issue 或提交到 Git。
 
 调用 `POST /api/v1/system/config/rollback` 并提交当前 `config_version`，即可原子激活该快照。它复用普通配置写入的 optimistic conflict 和应用级认证中间件，且绝不会修改 `ADMIN_AUTH_ENABLED`；如果快照中的该字段不同，会返回 `auth_settings_endpoint_required`，仍必须通过 `/api/v1/auth/settings` 完成再认证。回退成功后，被替换的有效版本会成为下一份 last-known-good，因此再回退一次可以撤销本次操作。`reload_now=false` 继续作为只持久化兼容模式：不发布运行时状态，也不替换 last-known-good。
 
