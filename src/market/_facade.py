@@ -179,12 +179,18 @@ def _bind_class(
             )
 
 
-def _load_implementation(module_name: str) -> ModuleType:
-    """Import or reload an implementation so legacy reload semantics remain intact."""
+def _load_implementation(
+    module_name: str,
+    *,
+    reload_existing: bool,
+) -> ModuleType:
+    """Import an implementation, reloading it only for a facade reload."""
     module = sys.modules.get(module_name)
     if module is None:
         return importlib.import_module(module_name)
-    return importlib.reload(module)
+    if reload_existing:
+        return importlib.reload(module)
+    return module
 
 
 def load_legacy_module(
@@ -193,7 +199,11 @@ def load_legacy_module(
     public_exports: Iterable[str],
 ) -> ModuleType:
     """Populate a legacy module with facade-bound implementation objects."""
-    implementation = _load_implementation(implementation_name)
+    reload_existing = bool(facade_globals.get("_market_facade_initialized"))
+    implementation = _load_implementation(
+        implementation_name,
+        reload_existing=reload_existing,
+    )
     implementation_globals = vars(implementation)
     legacy_name = str(facade_globals["__name__"])
 
@@ -222,7 +232,6 @@ def load_legacy_module(
             memo,
         )
         facade_globals[name] = rebound
-        implementation_globals[name] = rebound
 
     for name, cls in owned_classes.items():
         _bind_class(
@@ -250,6 +259,7 @@ def load_legacy_module(
         )
     facade_globals["__all__"] = exports
     implementation_globals["__all__"] = exports
+    facade_globals["_market_facade_initialized"] = True
     return implementation
 
 

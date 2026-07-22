@@ -149,8 +149,14 @@ def test_market_facades_preserve_public_exports(legacy_name: str) -> None:
     assert public_names == expected_exports
     assert legacy.__all__ == expected_exports
     assert implementation.__all__ == expected_exports
+    owned_names = set(_source_definitions(implementation))
     for name in expected_exports:
-        assert getattr(legacy, name) is getattr(implementation, name)
+        legacy_value = getattr(legacy, name)
+        implementation_value = getattr(implementation, name)
+        if name in owned_names and isinstance(legacy_value, FunctionType):
+            assert legacy_value is not implementation_value
+        else:
+            assert legacy_value is implementation_value
 
 
 @pytest.mark.parametrize("legacy_name", MODULES)
@@ -161,9 +167,10 @@ def test_market_facades_preserve_callable_ownership(legacy_name: str) -> None:
 
     for name, node in _source_definitions(implementation).items():
         value = getattr(legacy, name)
-        assert value is getattr(implementation, name)
         assert value.__module__ == legacy_name
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            assert value is not getattr(implementation, name)
+            assert getattr(implementation, name).__module__ == implementation_name
             assert value.__globals__ is vars(legacy)
             assert inspect.unwrap(value).__globals__ is vars(legacy)
             get_type_hints(value, globalns=vars(legacy), localns=vars(legacy))
@@ -282,12 +289,49 @@ def test_market_facade_reload_contract_in_subprocess() -> None:
                 implementation = importlib.import_module(implementation_name)
                 for name in owned_names:
                     value = getattr(legacy, name)
-                    assert value is getattr(implementation, name)
                     assert value is not previous[name]
                     assert value.__module__ == legacy_name
                     if isinstance(value, FunctionType):
+                        assert value is not getattr(implementation, name)
+                        assert getattr(implementation, name).__module__ == implementation_name
                         assert value.__globals__ is vars(legacy)
+                    else:
+                        assert value is getattr(implementation, name)
                     previous[name] = value
+        """
+    )
+    subprocess.run([sys.executable, "-c", code], check=True)
+
+
+@pytest.mark.parametrize("legacy_name", MODULES)
+def test_new_path_first_import_preserves_existing_objects(legacy_name: str) -> None:
+    implementation_name, _ = MODULES[legacy_name]
+    code = textwrap.dedent(
+        f"""
+        import ast
+        import importlib
+        from pathlib import Path
+        from types import FunctionType
+
+        implementation = importlib.import_module({implementation_name!r})
+        tree = ast.parse(Path(implementation.__file__).read_text(encoding="utf-8"))
+        owned_names = [
+            node.name
+            for node in tree.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+        ]
+        before = {{name: getattr(implementation, name) for name in owned_names}}
+        legacy = importlib.import_module({legacy_name!r})
+        for name in owned_names:
+            implementation_value = getattr(implementation, name)
+            legacy_value = getattr(legacy, name)
+            assert implementation_value is before[name]
+            if isinstance(implementation_value, FunctionType):
+                assert legacy_value is not implementation_value
+                assert implementation_value.__module__ == {implementation_name!r}
+                assert implementation_value.__globals__ is vars(implementation)
+            else:
+                assert legacy_value is implementation_value
         """
     )
     subprocess.run([sys.executable, "-c", code], check=True)
