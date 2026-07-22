@@ -6,6 +6,8 @@ import hashlib
 import importlib
 import inspect
 import json
+import subprocess
+import sys
 import typing
 from pathlib import Path
 from types import CodeType, FunctionType, SimpleNamespace
@@ -448,33 +450,47 @@ def test_notification_moved_methods_use_facade_patch_seams(monkeypatch):
 
 
 def test_notification_reload_recreates_facade_class_and_methods():
-    module = importlib.import_module("src.notification")
-    first_class = module.NotificationService
-    first_method = first_class.send_with_results
-    first_source_names = first_class._SOURCE_DISPLAY_NAMES
-    first_currency_suffix = first_class._CURRENCY_SUFFIX
+    code = """
+import importlib
+import src.notification as module
 
-    first_reload = importlib.reload(module)
-    second_class = first_reload.NotificationService
-    second_method = second_class.send_with_results
+old_class = module.NotificationService
+old_channel = module.NotificationChannel
+old_method = old_class.send_with_results
+old_source_names = old_class._SOURCE_DISPLAY_NAMES
+old_currency_suffix = old_class._CURRENCY_SUFFIX
+old_member_order = tuple(vars(old_class))
 
-    assert second_class is not first_class
-    assert second_method is not first_method
-    assert second_class._SOURCE_DISPLAY_NAMES is not first_source_names
-    assert second_class._CURRENCY_SUFFIX is not first_currency_suffix
-    assert tuple(
-        (source, tuple(labels.items()))
-        for source, labels in second_class._SOURCE_DISPLAY_NAMES.items()
-    ) == EXPECTED_SOURCE_DISPLAY_NAMES
-    assert tuple(second_class._CURRENCY_SUFFIX.items()) == EXPECTED_CURRENCY_SUFFIX
-    assert second_method.__globals__ is vars(first_reload)
-    assert second_method.__module__ == "src.notification"
-    assert second_method.__qualname__ == "NotificationService.send_with_results"
+first = importlib.reload(module)
+first_class = first.NotificationService
+first_channel = first.NotificationChannel
+first_method = first_class.send_with_results
 
-    second_reload = importlib.reload(first_reload)
+assert first_class is not old_class
+assert first.NotificationChannel is not old_channel
+assert first_method is not old_method
+assert first_class._SOURCE_DISPLAY_NAMES is not old_source_names
+assert first_class._CURRENCY_SUFFIX is not old_currency_suffix
+assert first_class._SOURCE_DISPLAY_NAMES == old_source_names
+assert first_class._CURRENCY_SUFFIX == old_currency_suffix
+assert tuple(vars(first_class)) == old_member_order
+assert first_method.__globals__ is vars(first)
+assert first_method.__module__ == "src.notification"
+assert first_method.__qualname__ == "NotificationService.send_with_results"
 
-    assert second_reload.NotificationService is not second_class
-    assert second_reload.NotificationService.send_with_results is not second_method
-    assert second_reload.NotificationService.send_with_results.__globals__ is vars(
-        second_reload
+second = importlib.reload(first)
+
+assert second.NotificationService is not first_class
+assert second.NotificationChannel is not first_channel
+assert second.NotificationService.send_with_results is not first_method
+assert tuple(vars(second.NotificationService)) == old_member_order
+assert second.NotificationService.send_with_results.__globals__ is vars(second)
+"""
+    completed = subprocess.run(
+        [sys.executable, "-c", code],
+        check=False,
+        capture_output=True,
+        text=True,
     )
+
+    assert completed.returncode == 0, completed.stderr
