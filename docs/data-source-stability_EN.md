@@ -12,7 +12,7 @@ StockPulse has separate priority systems. Changing one does not silently rewrite
 
 | Path | Configuration authority | Ordering rule |
 | --- | --- | --- |
-| Daily bars and general provider fallback | Fetcher numeric `priority`, including `EFINANCE_PRIORITY`, `AKSHARE_PRIORITY`, `TICKFLOW_PRIORITY`, `PYTDX_PRIORITY`, `BAOSTOCK_PRIORITY`, `YFINANCE_PRIORITY`, and `LONGBRIDGE_PRIORITY` | Lower numeric values are attempted earlier after market and capability filtering. A successfully initialized Tushare provider is promoted ahead of the default free-provider group. |
+| Non-U.S. daily bars and general provider fallback | Fetcher numeric `priority`, including `EFINANCE_PRIORITY`, `AKSHARE_PRIORITY`, `TICKFLOW_PRIORITY`, `PYTDX_PRIORITY`, `BAOSTOCK_PRIORITY`, `YFINANCE_PRIORITY`, and `LONGBRIDGE_PRIORITY` | Lower numeric values are attempted earlier after market and capability filtering. A successfully initialized Tushare provider is forced to priority `-1`, ahead of the default free-provider group. U.S. daily bars use the dedicated named routes below instead of numeric priority. |
 | A-share realtime quotes | `REALTIME_SOURCE_PRIORITY` | Provider aliases are attempted from left to right. This list is independent of daily numeric priorities and daily adaptive ordering. |
 | AlphaSift screening snapshots | `SNAPSHOT_SOURCE_PRIORITY` or its token-aware default | When no explicit value is set, Tushare is prepended only when `TUSHARE_TOKEN` is available; the remaining chain uses Sina, Efinance, AkShare EM, and EastMoney Datacenter. |
 
@@ -30,7 +30,7 @@ When `TUSHARE_TOKEN` is set and `REALTIME_SOURCE_PRIORITY` is not explicitly set
 6. Skip a provider whose per-market daily circuit is in cooldown, and try the next eligible provider after an exception, empty result, or unusable response.
 7. After every eligible provider fails, use an eligible stale daily-cache entry. If no stale entry is eligible, raise the existing data-fetch error.
 
-The default A-share group contains Efinance and Tencent at priority 0, AkShare at 1, optional TickFlow and Pytdx at 2, Baostock at 3, and YFinance at 4. Optional providers are instantiated only when their required credentials are configured. Treat these values as static boundaries, not a guarantee that every provider supports every symbol or data type.
+The default A-share group contains Efinance and Tencent at priority 0, AkShare at 1, the credential-gated TickFlow provider and always-initialized Pytdx provider at 2, Baostock at 3, and YFinance at 4. Tushare, TickFlow, Longbridge, Finnhub, and Alpha Vantage are instantiated only when their required credentials are configured; Pytdx does not require credentials. Treat numeric values as non-U.S. static boundaries, not a guarantee that every provider supports every symbol or data type.
 
 ## Market-aware Routes
 
@@ -39,8 +39,8 @@ The default A-share group contains Efinance and Tencent at priority 0, AkShare a
 | A-share daily bars | A configured and initialized Tushare provider is preferred; otherwise the filtered numeric-priority chain is used | Continue through free providers, then use eligible stale daily cache |
 | A-share realtime quote | Left-to-right `REALTIME_SOURCE_PRIORITY`; default is `tencent,akshare_sina,efinance,akshare_em` | Continue through the list; provider-run diagnostics record the failed and successful source |
 | U.S. index daily bars | YFinance, then configured Finnhub | Stale daily cache after eligible providers fail |
-| U.S. stock daily bars | Longbridge first when configured and available; otherwise Finnhub, Alpha Vantage, YFinance, then Longbridge | Unsupported or unavailable providers are skipped; stale daily cache is last |
-| Hong Kong daily bars | The market filter retains HK-capable providers in numeric-priority order: AkShare, configured Tushare, YFinance, and optional Longbridge | Optional Longbridge participates at its configured daily priority; it is not automatically promoted for HK daily bars |
+| U.S. stock daily bars | Longbridge, Finnhub, Alpha Vantage, then YFinance when Longbridge is configured and available; otherwise Finnhub, Alpha Vantage, then YFinance | Any available but non-preferred Longbridge route is last; unsupported or unavailable providers are skipped; stale daily cache is last |
+| Hong Kong daily bars | The market filter retains HK-capable providers in numeric-priority order: configured and initialized Tushare (`-1`), AkShare (`1`), YFinance (`4`), then optional Longbridge (`5`) | `LONGBRIDGE_PRIORITY` can change Longbridge's HK daily position, but credentials alone do not promote it |
 | Hong Kong and U.S. realtime quote | Configured and available Longbridge is preferred for the supported non-A-share quote route | YFinance or AkShare remains the market-specific fallback |
 | Japan, Korea, and Taiwan daily bars | Market capability filtering retains supported providers, primarily YFinance for current coverage | Market-specific intelligence fields may be `not_supported` even when daily bars succeed |
 | AlphaSift hotspot refresh | DSA EastMoney provider by default | Fall back to the last-good hotspot cache; without cache, return a stable empty state with a readable error code |
