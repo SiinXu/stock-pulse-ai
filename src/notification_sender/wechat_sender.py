@@ -76,13 +76,13 @@ class WechatSender:
             logger.warning("企业微信 Webhook 未配置，跳过推送")
             return False
         
-        # 根据消息类型动态限制上限，避免 text 类型超过企业微信 2048 字节限制
+        # Dynamically limit the upper bound based on message type to avoid text exceeding the WeCom Enterprise 2048-byte limit.
         if self._wechat_msg_type == 'text':
-            max_bytes = min(self._wechat_max_bytes, 2000)  # 预留一定字节给系统/分页标记
+            max_bytes = min(self._wechat_max_bytes, 2000)  # Reserve some bytes for system/pagination marker
         else:
-            max_bytes = self._wechat_max_bytes  # markdown 默认 4000 字节
+            max_bytes = self._wechat_max_bytes  # markdown default 4000 bytes
         
-        # 检查字节长度，超长则分批发送
+        # Check byte length, split if too long
         content_bytes = len(content.encode('utf-8'))
         if content_bytes > max_bytes:
             logger.info(f"消息内容超长({content_bytes}字节/{len(content)}字符)，将分批发送")

@@ -13,31 +13,31 @@
 
 import re
 
-# 美股代码正则：1-5 个大写字母，可选 .X 后缀（如 BRK.B）
+# U.S. Stock code regex: 1-5 uppercase letters, optional .X suffix (e.g., BRK.B)
 _US_STOCK_PATTERN = re.compile(r'^[A-Z]{1,5}(\.[A-Z])?$')
 
 
-# 用户输入 -> (Yahoo Finance 符号, 中文名称)
+# User input -> (Yahoo Finance symbol, Chinese name)
 US_INDEX_MAPPING = {
-    # 标普 500
+    # S&P 500
     'SPX': ('^GSPC', '标普500指数'),
     '^GSPC': ('^GSPC', '标普500指数'),
     'GSPC': ('^GSPC', '标普500指数'),
-    # 道琼斯工业平均指数
+    # Dow Jones Industrial Average.
     'DJI': ('^DJI', '道琼斯工业指数'),
     '^DJI': ('^DJI', '道琼斯工业指数'),
     'DJIA': ('^DJI', '道琼斯工业指数'),
-    # 纳斯达克综合指数
+    # NASDAQ Composite Index
     'IXIC': ('^IXIC', '纳斯达克综合指数'),
     '^IXIC': ('^IXIC', '纳斯达克综合指数'),
     'NASDAQ': ('^IXIC', '纳斯达克综合指数'),
-    # 纳斯达克 100
+    # NASDAQ 100
     'NDX': ('^NDX', '纳斯达克100指数'),
     '^NDX': ('^NDX', '纳斯达克100指数'),
-    # VIX 波动率指数
+    # VIX volatility index
     'VIX': ('^VIX', 'VIX恐慌指数'),
     '^VIX': ('^VIX', 'VIX恐慌指数'),
-    # 罗素 2000
+    # Dow Jones 2000
     'RUT': ('^RUT', '罗素2000指数'),
     '^RUT': ('^RUT', '罗素2000指数'),
 }
@@ -88,7 +88,7 @@ def is_us_stock_code(code: str) -> bool:
         False
     """
     normalized = (code or '').strip().upper()
-    # 美股指数不是股票
+    # U.S. stock indices are not stocks
     if normalized in US_INDEX_MAPPING:
         return False
     return bool(_US_STOCK_PATTERN.match(normalized))

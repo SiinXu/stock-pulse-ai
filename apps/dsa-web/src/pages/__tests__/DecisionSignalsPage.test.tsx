@@ -20,7 +20,7 @@ import type {
 import type { StockIndexItem } from '../../types/stockIndex';
 import DecisionSignalsPage from '../DecisionSignalsPage';
 
-// jsdom 未实现 scrollIntoView，而 Select 打开下拉时会调用它保持活动项可见。
+// jsdom does not implement scrollIntoView, while Select calls it to keep the active item visible when opening a dropdown.
 if (!HTMLElement.prototype.scrollIntoView) {
   HTMLElement.prototype.scrollIntoView = () => {};
 }

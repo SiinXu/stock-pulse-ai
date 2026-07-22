@@ -639,7 +639,7 @@ class _AnalysisResultStageMixin:
         if price is None or not (isinstance(price, (int, float)) and price > 0):
             return df
 
-        # 非交易日可跳过实时补齐；异常情况下保持失败开放。
+        # Skip real-time fill on non-trading days; maintain failure open in case of exceptions.
         enable_realtime_tech = getattr(
             self.config, 'enable_realtime_technical_indicators', True
         )
@@ -666,7 +666,7 @@ class _AnalysisResultStageMixin:
         pct = getattr(realtime_quote, 'change_pct', None)
 
         if last_date >= market_today:
-            # 使用实时收盘价更新最后一行；先复制，避免修改调用方传入的 df。
+            # Update the last row with real-time closing prices; first copy, to avoid modifying the df passed in by the caller.
             df = df.copy()
             idx = df.index[-1]
             df.loc[idx, 'close'] = price
@@ -683,7 +683,7 @@ class _AnalysisResultStageMixin:
             if pct is not None:
                 df.loc[idx, 'pct_chg'] = pct
         else:
-            # 追加一行虚拟的当日实时 K 线。
+            # Append an additional virtual daily real-time K-line.
             new_row = {
                 'code': code,
                 'date': market_today,

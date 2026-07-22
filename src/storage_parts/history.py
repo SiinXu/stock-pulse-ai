@@ -289,17 +289,17 @@ class _HistoryMethods:
                 # created_at >= start_date 00:00:00
                 conditions.append(AnalysisHistory.created_at >= datetime.combine(start_date, datetime.min.time()))
             if end_date:
-                # created_at < end_date+1 00:00:00 (即 <= end_date 23:59:59)
+                # created_at < end_date + 1 day at 00:00:00 (equivalent to <= end_date 23:59:59)
                 conditions.append(AnalysisHistory.created_at < datetime.combine(end_date + timedelta(days=1), datetime.min.time()))
             
-            # 构建 where 子句
+            # Build the WHERE clause
             where_clause = and_(*conditions) if conditions else True
             
-            # 查询总数
+            # Query the total count
             total_query = select(func.count(AnalysisHistory.id)).where(where_clause)
             total = session.execute(total_query).scalar() or 0
             
-            # 查询分页数据
+            # Query the paginated rows
             data_query = (
                 select(AnalysisHistory)
                 .where(where_clause)
@@ -697,12 +697,12 @@ class _HistoryMethods:
         """
         if target_date is None:
             target_date = date.today()
-        # 注意：尽管入参提供了 target_date，但当前实现实际使用的是“最新两天数据”（get_latest_data），
-        # 并不会按 target_date 精确取当日/前一交易日的上下文。
-        # 因此若未来需要支持“按历史某天复盘/重算”的可解释性，这里需要调整。
-        # 该行为目前保留（按需求不改逻辑）。
+        # Note: Although target_date is provided, the current implementation uses the latest two days from get_latest_data.
+        # It does not retrieve the target date and previous trading day's context precisely.
+        # Supporting explainable replay or recalculation for a historical date will require changes here.
+        # This behavior is intentionally preserved; no logic change is required here.
         
-        # 获取最近2天数据
+        # Load the two most recent days
         recent_data = self.get_latest_data(code, days=2)
         
         if not recent_data:
@@ -721,7 +721,7 @@ class _HistoryMethods:
         if yesterday_data:
             context['yesterday'] = yesterday_data.to_dict()
             
-            # 计算相比昨日的变化
+            # Calculate the change from the previous day
             if yesterday_data.volume and yesterday_data.volume > 0:
                 context['volume_change_ratio'] = round(
                     today_data.volume / yesterday_data.volume, 2
@@ -732,7 +732,7 @@ class _HistoryMethods:
                     (today_data.close - yesterday_data.close) / yesterday_data.close * 100, 2
                 )
             
-            # 均线形态判断
+            # Determine the moving-average pattern
             context['ma_status'] = self._analyze_ma_status(today_data)
         
         return context
@@ -746,9 +746,9 @@ class _HistoryMethods:
         - 空头排列：close < ma5 < ma10 < ma20
         - 震荡整理：其他情况
         """
-        # 注意：这里的均线形态判断基于“close/ma5/ma10/ma20”静态比较，
-        # 未考虑均线拐点、斜率、或不同数据源复权口径差异。
-        # 该行为目前保留（按需求不改逻辑）。
+        # Note: This moving-average pattern uses a static comparison of close, ma5, ma10, and ma20.
+        # It does not account for turning points, slopes, or adjustment-convention differences between data sources.
+        # This behavior is intentionally preserved; no logic change is required here.
         close = data.close or 0
         ma5 = data.ma5 or 0
         ma10 = data.ma10 or 0
@@ -780,7 +780,7 @@ class _HistoryMethods:
         if not text:
             return None
 
-        # 优先尝试 ISO 格式
+        # Try ISO format first
         try:
             return datetime.fromisoformat(text)
         except ValueError:

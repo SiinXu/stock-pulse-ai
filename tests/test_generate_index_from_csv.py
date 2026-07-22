@@ -395,7 +395,7 @@ class TestOutputFormat:
         assert len(compressed) == 1
         item = compressed[0]
 
-        # 验证字段顺序
+        # Validate field order
         assert item[0] == "000001.SZ"      # canonicalCode
         assert item[1] == "000001"         # displayCode
         assert item[2] == "平安银行"       # nameZh
@@ -423,7 +423,7 @@ class TestOutputFormat:
         }]
 
         compressed = compress_index(index)
-        assert len(compressed[0]) == 10  # 10个字段
+        assert len(compressed[0]) == 10  # 10 fields
 
     def test_json_serialization(self):
         """测试 JSON 序列化"""
@@ -442,11 +442,11 @@ class TestOutputFormat:
 
         compressed = compress_index(index)
 
-        # 应该能成功序列化为 JSON
+        # Should successfully serialize to JSON
         json_str = json.dumps(compressed, ensure_ascii=False)
         assert json_str is not None
 
-        # 应该能成功反序列化
+        # Should successfully deserialize
         loaded = json.loads(json_str)
         assert len(loaded) == 1
 
@@ -456,7 +456,7 @@ class TestIntegration:
 
     def test_full_workflow_tushare(self, tmp_path):
         """测试完整的 Tushare 工作流"""
-        # 创建测试 CSV 文件
+        # Create test CSV file
         a_csv = tmp_path / 'stock_list_a.csv'
         with open(a_csv, 'w', encoding='utf-8-sig', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=['ts_code', 'symbol', 'name'])
@@ -509,33 +509,33 @@ class TestIntegration:
                 'aliases': 'Samsung|三星'
             })
 
-        # 加载数据
+        # Load data
         stocks = load_tushare_data(tmp_path)
 
-        # 验证数据
+        # Data validation
         assert len(stocks) == 5
 
-        # 构建索引
+        # Build index
         index = build_stock_index(stocks)
 
-        # 验证索引
+        # Validate index
         assert len(index) == 5
         assert next(item for item in index if item['canonicalCode'] == '7203.T')['aliases'] == ['Toyota', '丰田']
         assert next(item for item in index if item['canonicalCode'] == '005930.KS')['aliases'] == ['Samsung', '三星']
 
-        # 压缩索引
+        # Index compression
         compressed = compress_index(index)
 
-        # 验证压缩
+        # Validate compression
         assert len(compressed) == 5
 
-        # 验证字段数量
+        # Validate the number of fields
         for item in compressed:
             assert len(item) == 10
 
     def test_market_distribution(self, tmp_path):
         """测试市场分布统计"""
-        # 创建测试数据
+        # Create test data
         csv_file = tmp_path / 'stock_list_a.csv'
         with open(csv_file, 'w', encoding='utf-8-sig', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=['ts_code', 'symbol', 'name'])
@@ -547,13 +547,13 @@ class TestIntegration:
         stocks = load_tushare_data(tmp_path)
         index = build_stock_index(stocks)
 
-        # 统计市场分布
+        # Statistics market distribution
         market_stats = {}
         for item in index:
             market = item['market']
             market_stats[market] = market_stats.get(market, 0) + 1
 
-        # 验证统计
+        # Verification Statistics
         assert market_stats.get('CN', 0) == 2  # SZ, SH
         assert market_stats.get('BSE', 0) == 1  # BJ
 
@@ -623,11 +623,11 @@ class TestPinyin:
 
     def test_normalize_name(self):
         """测试名称标准化"""
-        # 测试 ST 前缀去除
+        # Test ST prefix removal
         result = normalize_name_for_pinyin('*ST平安')
         assert 'ST' not in result
 
-        # 测试 N 前缀去除
+        # Test removing N prefixes
         result = normalize_name_for_pinyin('N平安银行')
         assert 'N' not in result
 

@@ -43,12 +43,12 @@ class HelpCommand(BotCommand):
     
     def execute(self, message: BotMessage, args: List[str]) -> BotResponse:
         """执行帮助命令"""
-        # 延迟导入避免循环依赖
+        # Delayed import to avoid circular dependency
         from bot.dispatcher import get_dispatcher
         
         dispatcher = get_dispatcher()
         
-        # 如果指定了命令名，显示该命令的详细帮助
+        # If a command name is specified, display detailed help for that command.
         if args:
             cmd_name = args[0]
             command = dispatcher.get_command(cmd_name)
@@ -56,11 +56,11 @@ class HelpCommand(BotCommand):
             if command is None:
                 return BotResponse.error_response(f"未知命令: {cmd_name}")
             
-            # 构建详细帮助
+            # Build detailed help
             help_text = self._format_command_help(command, dispatcher.command_prefix)
             return BotResponse.markdown_response(help_text)
         
-        # 显示所有命令列表
+        # Displays the list of all commands
         commands = dispatcher.list_commands(include_hidden=False)
         prefix = dispatcher.command_prefix
         
@@ -77,10 +77,10 @@ class HelpCommand(BotCommand):
         ]
         
         for cmd in commands:
-            # 命令名和别名
+            # Command name and alias
             aliases_str = ""
             if cmd.aliases:
-                # 过滤掉中文别名，只显示英文别名
+                # Filter out Chinese aliases, only display English aliases
                 en_aliases = [a for a in cmd.aliases if a.isascii()]
                 if en_aliases:
                     aliases_str = f" ({', '.join(prefix + a for a in en_aliases[:2])})"
@@ -117,13 +117,13 @@ class HelpCommand(BotCommand):
             "",
         ]
         
-        # 别名
+        # Alias.
         if command.aliases:
             aliases = [f"`{prefix}{a}`" if a.isascii() else f"`{a}`" for a in command.aliases]
             lines.append(f"**别名：** {', '.join(aliases)}")
             lines.append("")
         
-        # 权限
+        # Permissions
         if command.admin_only:
             lines.append("⚠️ **需要管理员权限**")
             lines.append("")

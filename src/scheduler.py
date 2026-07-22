@@ -63,7 +63,7 @@ class GracefulShutdown:
         if not register_signals:
             return
 
-        # 注册信号处理器
+        # Register Signal Processor
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
 
@@ -415,9 +415,9 @@ class Scheduler:
             self._refresh_daily_schedule_if_needed()
             self.schedule.run_pending()
             self._run_background_tasks()
-            time.sleep(30)  # 每30秒检查一次
+            time.sleep(30)  # Check every 30 seconds
 
-            # 每小时打印一次心跳
+            # Print heartbeat hourly
             if datetime.now().minute == 0 and datetime.now().second < 30:
                 logger.info(f"调度器运行中... 下次执行: {self._get_next_run_time()}")
 
@@ -480,7 +480,7 @@ def run_with_schedule(
 
 
 if __name__ == "__main__":
-    # 测试定时调度
+    # Test scheduled scheduling
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s | %(levelname)-8s | %(name)-20s | %(message)s',

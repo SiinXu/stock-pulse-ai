@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# 平台实例缓存
+# Platform instance cache
 _platform_instances: Dict[str, 'BotPlatform'] = {}
 
 
@@ -72,7 +72,7 @@ def handle_webhook(
     """
     logger.info("[BotHandler] Received webhook request: platform=%s", platform_name)
 
-    # 检查机器人功能是否启用
+    # Check if the robot function is enabled
     from src.config import get_config
     config = get_config()
 
@@ -80,12 +80,12 @@ def handle_webhook(
         logger.info("[BotHandler] Bot integration is disabled")
         return WebhookResponse.success()
 
-    # 获取平台适配器
+    # Get platform adapter
     platform = get_platform(platform_name)
     if not platform:
         return WebhookResponse.error(f"Unknown platform: {platform_name}", 400)
 
-    # 解析 JSON 数据
+    # Parse JSON data
     try:
         data = json.loads(body.decode('utf-8')) if body else {}
     except json.JSONDecodeError as exc:
@@ -101,15 +101,15 @@ def handle_webhook(
 
     logger.debug("[BotHandler] Parsed webhook payload: body_bytes=%d", len(body))
 
-    # 处理 Webhook
+    # Handle webhooks
     message, immediate_response = platform.handle_webhook(headers, body, data)
 
-    # 如果是验证/错误响应且没有消息需要处理，直接返回
+    # If it's a validation/error response and there is no message to process, return directly
     if immediate_response and not message:
         logger.info("[BotHandler] Returning immediate verification response")
         return immediate_response
 
-    # 延迟响应（如 Discord type 5）：立即返回 ACK，后台处理命令
+    # Delayed response (like Discord type 5): Immediately return ACK and handle command in the background
     if immediate_response and message:
         logger.info(
             "[BotHandler] Returning deferred acknowledgement and dispatching in background"
@@ -133,7 +133,7 @@ def handle_webhook(
         threading.Thread(target=_deferred_dispatch, daemon=True).start()
         return immediate_response
 
-    # 如果没有消息需要处理，返回空响应
+    # If no messages need to be processed, return an empty response.
     if not message:
         logger.debug("[BotHandler] Webhook did not contain a processable message")
         return WebhookResponse.success()
@@ -144,11 +144,11 @@ def handle_webhook(
         len(message.content),
     )
 
-    # 分发到命令处理器
+    # Forward to command processor
     dispatcher = get_dispatcher()
     response = dispatcher.dispatch(message)
 
-    # 格式化响应
+    # Format the response
     if response.text:
         webhook_response = platform.format_response(response, message)
         return webhook_response

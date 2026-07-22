@@ -277,6 +277,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Registered a guarded `stockpulse://` desktop protocol with allowlisted private-origin routing, macOS `open-url`, second-instance forwarding, packaging metadata, and lifecycle regression coverage.
 - [Added] Added the validated plugin manifest, isolated lifecycle manager, ownership-aware extension registry, and explicit trusted-directory plugin loader without startup wiring.
 - [Fixed] Enforced a shared fail-closed outbound HTTP policy for search, intelligence, custom model endpoints, webhooks, and notification tests with connection-time DNS checks, bounded redirects and responses, credential stripping, and an explicit self-host allowlist.
+- [Chore] Translated historical developer comments across source, configuration, scripts, and tests into English while preserving runtime-consumed docstrings and localized content.
 - [Fixed] Kept the existing persistent daily-provider cache in Desktop runtime data and Windows update backups while preserving explicit cache paths.
 - [Changed] Split DatabaseManager lifecycle and storage operations into focused private modules while preserving the `src.storage` facade and migration behavior.
 

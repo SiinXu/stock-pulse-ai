@@ -26,7 +26,7 @@ from src.notification import NotificationService
 from src.report_language import get_report_labels
 from src.analyzer import GeminiAnalyzer
 
-# real 2330.TW 三大法人 net figures (shares)
+# real 2330.TW institutional investors net figures (shares)
 _INST_REC = {
     "foreign_net": -1912490, "trust_net": -89595, "dealer_net": 652455,
     "total_net": -862914, "unit": "shares", "date": "20260630", "source": "TWSE-T86",
@@ -51,7 +51,7 @@ class TestTwCurrencyLabel(unittest.TestCase):
         self.assertEqual(NotificationService._format_amount_cn(1e8, "CNY"), "1.00 亿元")
         self.assertIn("美元", NotificationService._format_amount_cn(1e8, "USD"))
         self.assertIn("港元", NotificationService._format_amount_cn(1e8, "HKD"))
-        # unknown currency still falls back to 元 (unchanged behaviour)
+        # unknown currency still falls back to yuan (unchanged behaviour)
         self.assertIn("元", NotificationService._format_amount_cn(1e8, "ZZZ"))
 
 

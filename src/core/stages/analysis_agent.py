@@ -350,7 +350,7 @@ class _AgentAnalysisStageMixin:
             )
             active_stage = None
 
-            # 运行 Agent
+            # Run Agent
             if report_language in ("en", "ko"):
                 message = f"Analyze stock {code} ({stock_name}) and return the full decision dashboard JSON."
             else:
@@ -383,7 +383,7 @@ class _AgentAnalysisStageMixin:
                 )
                 raise
 
-            # 转换为 AnalysisResult
+            # Convert to AnalysisResult
             result = self._agent_result_to_analysis_result(
                 agent_result,
                 code,
@@ -506,8 +506,8 @@ class _AgentAnalysisStageMixin:
 
             resolved_stock_name = result.name if result and result.name else stock_name
 
-            # 保存新闻情报到数据库（Agent 工具结果仅用于 LLM 上下文，未持久化，Fixes #396）
-            # 使用 search_stock_news（与 Agent 工具调用逻辑一致），仅 1 次 API 调用，无额外延迟
+            # Save news intelligence to database (Agent tool results are only for LLM context, not persisted, Fixes #396)
+            # Use search_stock_news (consistent with Agent tool call logic), only 1 API call, no extra delay
             if self.search_service is not None and self.search_service.is_available:
                 try:
                     news_response = self.search_service.search_stock_news(
@@ -540,7 +540,7 @@ class _AgentAnalysisStageMixin:
                         context={"stock_code": code},
                     )
 
-            # 保存分析历史记录
+            # Save an analysis history record
             if result and result.success:
                 active_stage = observe_pipeline_stage(
                     "persist",

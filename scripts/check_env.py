@@ -64,7 +64,7 @@ def configure_console_encoding():
         _reconfigure_output_stream(stream)
 
 
-# 配置日志
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s | %(levelname)-8s | %(message)s',
@@ -134,10 +134,10 @@ def view_database():
     print_section("数据库连接")
     print(f"  ✓ 连接成功")
     
-    # 使用独立的 session 查询
+    # Query using an independent session
     session = db.get_session()
     try:
-        # 统计信息
+        # Statistical information
         result = session.execute(text("""
             SELECT 
                 code,
@@ -160,7 +160,7 @@ def view_database():
         else:
             print("  暂无数据")
         
-        # 查询今日数据
+        # Query today's data
         today = date.today()
         result = session.execute(text("""
             SELECT code, date, open, high, low, close, pct_chg, volume, ma5, ma10, ma20, volume_ratio
@@ -181,7 +181,7 @@ def view_database():
         else:
             print("  今日暂无数据")
         
-        # 查询最近10条数据
+        # Query the most recent 10 records
         result = session.execute(text("""
             SELECT code, date, close, pct_chg, volume, data_source
             FROM stock_daily 
@@ -252,7 +252,7 @@ def check_llm():
     print(f"  主模型: {config.gemini_model}")
     print(f"  备选模型: {config.gemini_model_fallback}")
     
-    # 检查网络连接
+    # Check network connection
     print_section("网络连接检查")
     try:
         import socket
@@ -274,7 +274,7 @@ def check_llm():
         print(f"  ✗ 模型初始化失败（请检查 API Key）")
         return False
     
-    # 构造测试上下文
+    # Construct test context
     test_context = {
         'code': '600519',
         'date': date.today().isoformat(),
@@ -326,7 +326,7 @@ def check_llm():
         print(f"\n  ✗ API 调用失败 (耗时: {elapsed:.2f}秒)")
         print(f"  错误: {e}")
         
-        # 提供更详细的错误提示
+        # Provides more detailed error prompts
         error_str = str(e).lower()
         if 'timeout' in error_str or 'unavailable' in error_str:
             print(f"\n  诊断: 网络超时，可能原因:")
@@ -397,27 +397,27 @@ def run_all_tests():
     
     results = {}
     
-    # 1. 配置测试
+    # 1. Configuration test
     try:
         results['配置加载'] = check_config()
     except Exception as e:
         print(f"  ✗ 配置测试失败: {e}")
         results['配置加载'] = False
     
-    # 2. 数据库查看
+    # 2. Database viewing
     try:
         results['数据库'] = view_database()
     except Exception as e:
         print(f"  ✗ 数据库测试失败: {e}")
         results['数据库'] = False
     
-    # 3. 数据获取（跳过，避免太慢）
+    # 3. Data fetching (skip to avoid being too slow)
     # results['数据获取'] = check_data_fetch()
     
-    # 4. LLM 测试（可选）
+    # 4. LLM testing (optional).
     # results['LLM调用'] = check_llm()
     
-    # 汇总
+    # Aggregate
     print_header("测试结果汇总")
     for name, passed in results.items():
         status = "✓ 通过" if passed else "✗ 失败"
@@ -480,12 +480,12 @@ def main():
     
     args = parser.parse_args()
     
-    # 如果没有指定任何参数，运行基础测试
+    # If no parameters are specified, run basic tests.
     if not any([args.db, args.llm, args.fetch, args.notify, args.config, args.stock, args.all]):
         run_all_tests()
         return 0
     
-    # 根据参数运行指定测试
+    # Run specified test based on parameters:
     if args.config:
         check_config()
     

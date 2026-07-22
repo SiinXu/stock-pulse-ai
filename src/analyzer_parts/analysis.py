@@ -93,21 +93,21 @@ class GeminiAnalyzer:
         system_prompt = self._get_analysis_system_prompt(report_language, stock_code=code)
         skill_instructions, default_skill_policy, use_legacy_default_prompt = self._get_skill_prompt_sections()
 
-        # 请求前增加延时（防止连续请求触发限流）
+        # Add delay before request (to prevent consecutive requests triggering rate limits)
         request_delay = config.gemini_request_delay
         if request_delay > 0:
             logger.debug(f"[LLM] 请求前等待 {request_delay:.1f} 秒...")
             _emit_progress(65, f"{code}：LLM 请求前等待 {request_delay:.1f} 秒")
             time.sleep(request_delay)
 
-        # 优先从上下文获取股票名称（由 main.py 传入）
+        # Prioritize fetching stock name from context (passed in by main.py)
         name = context.get('stock_name')
         if not name or name.startswith('股票'):
-            # 备选：从 realtime 中获取
+            # Fallback: get from realtime
             if 'realtime' in context and context['realtime'].get('name'):
                 name = context['realtime']['name']
             else:
-                # 最后从映射表获取
+                # Retrieve from mapping table
                 name = STOCK_NAME_MAP.get(code, f'股票{code}')
 
         backend_error = self.get_generation_backend_config_error()
@@ -160,7 +160,7 @@ class GeminiAnalyzer:
                 report_language=report_language,
             )
 
-        # 如果模型不可用，返回默认结果
+        # If the model is unavailable, return the default result
         if not self.is_available():
             return AnalysisResult(
                 code=code,
@@ -193,7 +193,7 @@ class GeminiAnalyzer:
             )
 
         try:
-            # 格式化输入（包含技术面数据和新闻）
+            # Formatted input (including technical face data and news)
             prompt = self._format_prompt(
                 context,
                 name,
@@ -233,7 +233,7 @@ class GeminiAnalyzer:
             logger.info(f"[LLM配置] Prompt 长度: {len(prompt)} 字符")
             logger.info(f"[LLM配置] 是否包含新闻: {'是' if news_context else '否'}")
 
-            # 本地 CLI backend 是进程执行能力，不记录完整 prompt。
+            # Local CLI backend is process execution capability, does not record complete prompt.
             if backend_id in LOCAL_CLI_GENERATION_BACKEND_IDS:
                 prompt_preview = redact_diagnostic_text(prompt, limit=500)
             else:
@@ -242,7 +242,7 @@ class GeminiAnalyzer:
             if backend_id not in LOCAL_CLI_GENERATION_BACKEND_IDS:
                 logger.debug(f"=== 完整 Prompt ({len(prompt)}字符) ===\n{prompt}\n=== End Prompt ===")
 
-            # 设置生成配置
+            # Configure generation
             generation_config = {
                 "temperature": config.llm_temperature,
                 "max_output_tokens": 8192,
@@ -251,7 +251,7 @@ class GeminiAnalyzer:
             logger.info(f"[LLM调用] 开始调用 {model_name}...")
             _emit_progress(68, f"{name}：LLM 已接收请求，等待响应")
 
-            # 使用 litellm 调用（支持完整性校验重试）
+            # Use litellm to call (supports integrity check retry)
             current_prompt = prompt
             retry_count = 0
             max_retries = config.report_integrity_retry if config.report_integrity_enabled else 0
@@ -282,7 +282,7 @@ class GeminiAnalyzer:
                         raise
                 elapsed = time.time() - start_time
 
-                # 记录响应信息
+                # Record response information
                 logger.info(
                     f"[LLM返回] {model_name} 响应成功, 耗时 {elapsed:.2f}s, 响应长度 {len(response_text)} 字符"
                 )
@@ -299,7 +299,7 @@ class GeminiAnalyzer:
                 parse_progress = min(99, 93 + retry_count * 2)
                 _emit_progress(parse_progress, f"{name}：LLM 返回完成，正在解析 JSON")
 
-                # 解析响应
+                # Parse response
                 result = self._parse_response(response_text, code, name)
                 result.raw_response = response_text
                 result.search_performed = bool(news_context)
@@ -308,7 +308,7 @@ class GeminiAnalyzer:
                 result.report_language = report_language
                 normalize_chip_structure_availability(result, context.get("chip"))
 
-                # 内容完整性校验（可选）
+                # Content integrity check (optional)
                 if not config.report_integrity_enabled:
                     break
                 require_phase_decision = isinstance(context.get("market_phase_context"), dict)
@@ -401,7 +401,7 @@ class GeminiAnalyzer:
         report_language = normalize_report_language(report_language)
         _, _, use_legacy_default_prompt = self._get_skill_prompt_sections()
 
-        # 优先使用上下文中的股票名称（从 realtime_quote 获取）
+        # Prioritize using stock name from context (from realtime_quote)
         stock_name = context.get('stock_name', name)
         if not stock_name or stock_name == f'股票{code}':
             stock_name = STOCK_NAME_MAP.get(code, f'股票{code}')
@@ -435,7 +435,7 @@ class GeminiAnalyzer:
         )
         quote_rows_text = "\n".join(quote_rows)
 
-        # ========== 构建决策仪表盘格式的输入 ==========
+        # ========== Input for Building Decision Dashboard Format ==========
         prompt = f"""# 决策仪表盘分析请求
 
 ## 📊 股票基础信息
@@ -483,7 +483,7 @@ class GeminiAnalyzer:
 | 均线形态 | {context.get('ma_status', unknown_text)} | 多头/空头/缠绕 |
 """
 
-        # 添加实时行情数据（量比、换手率等）
+        # Add real-time market data (volume ratio, turnover rate, etc.)
         if 'realtime' in context:
             rt = context['realtime']
             prompt += f"""
@@ -500,7 +500,7 @@ class GeminiAnalyzer:
 | 60日涨跌幅 | {rt.get('change_60d', 'N/A')}% | 中期表现 |
 """
 
-        # 添加财报与分红（价值投资口径）
+        # Add financial reports and dividends (value investment perspective)
         fundamental_context = context.get("fundamental_context") if isinstance(context, dict) else None
         earnings_block = (
             fundamental_context.get("earnings", {})
@@ -598,8 +598,8 @@ class GeminiAnalyzer:
 > 资金流向只能作为价格位置的过滤器：接近压力且主力流出时不得追买；接近支撑且未放量跌破时，优先判断为持有观察、震荡或洗盘观察。
 """
 
-        # 添加三大法人动向（台股筹码过滤器）— tw-only；仅当 institution 区块 status='ok'
-        # 且有净额时注入，其他市场 status='not_supported' 会跳过，严格 additive。
+        # Add Taiwan institutional-investor activity as a chip filter only when the institution block is ok
+        # and all net-flow values exist. Other markets remain not_supported; this input is strictly additive.
         institution_block = (
             fundamental_context.get("institution", {})
             if isinstance(fundamental_context, dict)
@@ -632,7 +632,7 @@ class GeminiAnalyzer:
 > 三大法人是台股的筹码过滤器（相当于 A 股主力资金/龙虎榜的角色，但口径不同、不可混用）：外资与投信同向净买支持价格、同向净卖压制价格。请据此判断台股筹码结构，不要在有本数据时写“筹码结构：数据缺失”。
 """
 
-        # 添加筹码分布数据
+        # Add chip-distribution data.
         if 'chip' in context:
             chip = context['chip']
             profit_ratio = chip.get('profit_ratio', 0)
@@ -660,7 +660,7 @@ class GeminiAnalyzer:
 > {chip_instruction}
 """
 
-        # 添加趋势分析结果（仅隐式内建 bull_trend 默认回退保留旧口径）
+        # Add trend analysis; only the implicit built-in bull_trend fallback preserves the legacy behavior.
         if 'trend_analysis' in context:
             trend = _sanitize_trend_analysis_for_prompt(
                 context['trend_analysis'],
@@ -728,7 +728,7 @@ class GeminiAnalyzer:
 {chr(10).join('- ' + note for note in consistency_notes)}
 """
 
-        # 添加昨日对比数据
+        # Add yesterday's comparison data
         if 'yesterday' in context:
             volume_change = context.get('volume_change_ratio', 'N/A')
             prompt += f"""
@@ -742,7 +742,7 @@ class GeminiAnalyzer:
 - ⚠️ 量能异常提示：成交量较昨日放大超过10倍，可能受异常数据或一次性冲量影响，必须降权解读，不能机械视为强确认信号
 """
 
-        # 添加新闻搜索结果（重点区域）
+        # Add news search results (key regions)
         news_window_days: Optional[int] = None
         context_window = context.get("news_window_days")
         try:
@@ -784,7 +784,7 @@ class GeminiAnalyzer:
 未搜索到该股票近期的相关新闻。请主要依据技术面数据进行分析。
 """
 
-        # 注入缺失数据警告
+        # Warning for missing data injection
         if context.get('data_missing'):
             prompt += """
 ⚠️ **数据缺失警告**
@@ -793,7 +793,7 @@ class GeminiAnalyzer:
 在回答技术面问题（如均线、乖离率）时，请直接说明“数据缺失，无法判断”，**严禁编造数据**。
 """
 
-        # 明确的输出要求
+        # Clear output requirements
         prompt += f"""
 ---
 

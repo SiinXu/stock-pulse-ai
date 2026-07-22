@@ -69,9 +69,9 @@ describe('normalizeQuery', () => {
     });
 
     test('boundary characters: CJK range', () => {
-      // 一  (\u4e00)
+      // One  (\u4e00)
       expect(isChineseChar('\u4e00')).toBe(true);
-      // 龥  (\u9fa5)
+      // Silence  (\u9fa5)
       expect(isChineseChar('\u9fa5')).toBe(true);
       // Out of range
       expect(isChineseChar('\u9fa6')).toBe(false);

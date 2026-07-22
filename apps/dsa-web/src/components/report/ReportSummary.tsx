@@ -12,7 +12,7 @@ import { getReportText, normalizeReportLanguage } from '../../utils/reportLangua
 interface ReportSummaryProps {
   data: AnalysisResult | AnalysisReport;
   isHistory?: boolean;
-  /** 自选相关 */
+  /** Selected related items */
   watchlist?: {
     isInWatchlist: (code: string) => boolean;
     onToggle: (code: string) => void;
@@ -23,8 +23,8 @@ interface ReportSummaryProps {
 }
 
 /**
- * 完整报告展示组件
- * 按主体内容优先、透明度信息后置的顺序展示报告。
+ * Full report display component
+ * Display reports in the order of priority, with content first and transparency information after.
  */
 export const ReportSummary: React.FC<ReportSummaryProps> = ({
   data,
@@ -32,9 +32,9 @@ export const ReportSummary: React.FC<ReportSummaryProps> = ({
   watchlist,
   onOpenRunFlow,
 }) => {
-  // 兼容 AnalysisResult 和 AnalysisReport 两种数据格式
+  // Compatible with both AnalysisResult and AnalysisReport data formats.
   const report: AnalysisReport = 'report' in data ? data.report : data;
-  // 使用 report id，因为 queryId 在批量分析时可能重复，且历史报告详情接口需要 recordId 来获取关联资讯和详情数据
+  // Use report id, because queryId may be repeated when batch analysis and the historical report details interface needs recordId to retrieve related information and details data
   const recordId = report.meta.id;
   const diagnosticSummary = 'diagnosticSummary' in data ? data.diagnosticSummary : undefined;
 
@@ -59,7 +59,7 @@ export const ReportSummary: React.FC<ReportSummaryProps> = ({
 
   return (
     <div className="space-y-5 pb-8 animate-fade-in">
-      {/* 概览区（首屏） */}
+      {/* Overview area (first screen) */}
       <ReportOverview
         meta={meta}
         summary={summary}
@@ -68,19 +68,19 @@ export const ReportSummary: React.FC<ReportSummaryProps> = ({
         watchlist={watchlist}
       />
 
-      {/* 策略点位区 */}
+      {/* Strategy target zone. */}
       <ReportStrategy strategy={strategy} language={reportLanguage} />
 
-      {/* 资讯区 */}
+      {/* News section */}
       <ReportNews recordId={recordId} limit={8} language={reportLanguage} />
 
-      {/* 输入数据块低敏摘要 */}
+      {/* Input data block low sensitivity summary */}
       <AnalysisContextSummary
         overview={details?.analysisContextPackOverview}
         language={reportLanguage}
       />
 
-      {/* 运行诊断摘要 */}
+      {/* Run diagnostic summary */}
       <ReportDiagnostics
         recordId={recordId}
         summary={diagnosticSummary}
@@ -88,10 +88,10 @@ export const ReportSummary: React.FC<ReportSummaryProps> = ({
         onOpenRunFlow={onOpenRunFlow}
       />
 
-      {/* 透明度与追溯区 */}
+      {/* Transparency and traceability area. */}
       <ReportDetails details={details} recordId={recordId} language={reportLanguage} />
 
-      {/* 分析模型标记（Issue #528）— 报告末尾 */}
+      {/* Analysis model tag (Issue #528) – at the end of the report. */}
       {shouldShowModel && (
         <p className="px-1 text-xs text-muted-text">
           {text.analysisModel}: {modelUsed}

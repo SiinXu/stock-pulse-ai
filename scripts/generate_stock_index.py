@@ -127,7 +127,7 @@ def determine_market_and_type(code: str) -> tuple:
             # Four digits: likely a US symbol or special market code.
             return 'US', 'stock'
 
-    # 字母代码，美股或其他
+    # Letter code, U.S. stocks or other
     return 'US', 'stock'
 
 
@@ -142,7 +142,7 @@ def market_to_suffix(market: str) -> str:
         Market suffix
     """
     suffix_map = {
-        'CN': 'SH',  # 简化处理，默认上海
+        'CN': 'SH',  # Simplified processing, default Shanghai
         'HK': 'HK',
         'US': 'US',
         'INDEX': 'SH',
@@ -194,7 +194,7 @@ def generate_aliases(name: str) -> List[str]:
     """
     aliases = []
 
-    # 常见简称映射
+    # Common abbreviation mapping
     alias_map = {
         '贵州茅台': ['茅台'],
         '中国平安': ['平安'],
@@ -256,7 +256,7 @@ def compress_index(index: List[Dict[str, Any]]) -> List[List]:
 
 def main():
     """Main function"""
-    # 解析命令行参数
+    # Parse command-line arguments
     parser = argparse.ArgumentParser(
         description='生成股票自动补全索引文件',
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -281,21 +281,21 @@ def main():
 
     print("开始生成股票索引...")
 
-    # 生成索引（MVP：使用现有映射）
+    # Generate an index (MVP: using existing mapping)
     index = generate_stock_index_from_map()
     print(f"共生成 {len(index)} 条索引")
 
-    # 按市场统计
+    # According to market statistics.
     market_stats = {}
     for item in index:
         market = item['market']
         market_stats[market] = market_stats.get(market, 0) + 1
     print(f"市场分布：{market_stats}")
 
-    # 压缩格式（减少文件大小）
+    # Compression format (reduce file size)
     compressed = compress_index(index)
 
-    # 测试模式：不写入文件
+    # Test mode: do not write to file
     if args.test:
         print("\n[测试模式] 不会写入文件")
         print(f"预计文件大小：{len(json.dumps(compressed, ensure_ascii=False, separators=(',', ':'))) / 1024:.2f} KB")
@@ -308,11 +308,11 @@ def main():
         print("\n✓ 测试通过，数据格式正确")
         return 0
 
-    # 输出路径
+    # Output path
     output_path = Path(__file__).parent.parent / "apps" / "dsa-web" / "public" / "stocks.index.json"
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # 写入文件
+    # Write to file
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write('[\n')
         for i, item in enumerate(compressed):
@@ -327,7 +327,7 @@ def main():
     print(f"索引已生成：{output_path}")
     print(f"文件大小：{file_size / 1024:.2f} KB")
 
-    # 验证文件可读
+    # File is readable
     with open(output_path, 'r', encoding='utf-8') as f:
         test_data = json.load(f)
         print(f"验证通过：{len(test_data)} 条记录")

@@ -118,16 +118,16 @@ class PytdxFetcher(BaseFetcher):
     name = "PytdxFetcher"
     priority = int(os.getenv("PYTDX_PRIORITY", "2"))
     
-    # 默认通达信行情服务器列表
+    # Default TDX quote-server list.
     DEFAULT_HOSTS = [
-        ("119.147.212.81", 7709),  # 深圳
-        ("112.74.214.43", 7727),   # 深圳
-        ("221.231.141.60", 7709),  # 上海
-        ("101.227.73.20", 7709),   # 上海
-        ("101.227.77.254", 7709),  # 上海
-        ("14.215.128.18", 7709),   # 广州
-        ("59.173.18.140", 7709),   # 武汉
-        ("180.153.39.51", 7709),   # 杭州
+        ("119.147.212.81", 7709),  # Shenzhen
+        ("112.74.214.43", 7727),   # Shenzhen
+        ("221.231.141.60", 7709),  # Shanghai
+        ("101.227.73.20", 7709),   # Shanghai
+        ("101.227.77.254", 7709),  # Shanghai
+        ("14.215.128.18", 7709),   # Guangzhou
+        ("59.173.18.140", 7709),   # Wuhan
+        ("180.153.39.51", 7709),   # Hangzhou
     ]
     # Pytdx get_security_list returns at most 1000 items per page
     SECURITY_LIST_PAGE_SIZE = 1000
@@ -149,8 +149,8 @@ class PytdxFetcher(BaseFetcher):
         self._api = None
         self._connected = False
         self._current_host_idx = 0
-        self._stock_list_cache = None  # 股票列表缓存
-        self._stock_name_cache = {}    # 股票名称缓存 {code: name}
+        self._stock_list_cache = None  # Stock List Cache
+        self._stock_name_cache = {}    # Stock Name Cache {code: name}
         self._unavailable_until = 0.0
         self._last_unavailable_reason = ""
 
@@ -209,7 +209,7 @@ class PytdxFetcher(BaseFetcher):
         connected = False
         
         try:
-            # 尝试连接服务器（自动选择最优）
+            # Attempt to connect to the server (automatically selects the optimal one)
             for i in range(len(self._hosts)):
                 host_idx = (self._current_host_idx + i) % len(self._hosts)
                 host, port = self._hosts[host_idx]
@@ -238,7 +238,7 @@ class PytdxFetcher(BaseFetcher):
             yield api
             
         finally:
-            # 确保断开连接
+            # Ensure connection is broken
             try:
                 api.disconnect()
                 logger.debug("Pytdx 连接已断开")
@@ -286,13 +286,13 @@ class PytdxFetcher(BaseFetcher):
         if upper.startswith('SZ') or upper.endswith('.SZ'):
             return 0, code
         
-        # 根据代码前缀判断市场
-        # 上海：60xxxx, 68xxxx（科创板）
-        # 深圳：00xxxx, 30xxxx（创业板）, 002xxx（中小板）
+        # Determine the market based on code prefix
+        # Shanghai: 60xxxx, 68xxxx (STAR Market)
+        # Shenzhen: 00xxxx, 30xxxx (ChiNext), 002xxx (SME Board)
         if code.startswith(('60', '68')):
-            return 1, code  # 上海
+            return 1, code  # Shanghai
         else:
-            return 0, code  # 深圳
+            return 0, code  # Shenzhen
 
     def _build_stock_list_cache(self, api) -> None:
         """
@@ -338,15 +338,15 @@ class PytdxFetcher(BaseFetcher):
         3. 判断市场代码
         4. 调用 API 获取 K 线数据
         """
-        # 美股不支持，抛出异常让 DataFetcherManager 切换到其他数据源
+        # U.S. stocks are not supported, Throw an exception to allow DataFetcherManager Switch to another data source
         if _is_us_code(stock_code):
             raise DataFetchError(f"PytdxFetcher 不支持美股 {stock_code}，请使用 AkshareFetcher 或 YfinanceFetcher")
 
-        # 港股不支持，抛出异常让 DataFetcherManager 切换到其他数据源
+        # Hong Kong stocks are not supported, Raise an exception to allow DataFetcherManager Switch to another data source
         if _is_hk_market(stock_code):
             raise DataFetchError(f"PytdxFetcher 不支持港股 {stock_code}，请使用 AkshareFetcher")
 
-        # 北交所不支持，抛出异常让 DataFetcherManager 切换到其他数据源
+        # Beijing Stock Exchange is not supported, throwing an exception to switch DataFetcherManager to other data sources
         if is_bse_code(stock_code):
             raise DataFetchError(
                 f"PytdxFetcher 不支持北交所 {stock_code}，将自动切换其他数据源"
@@ -354,34 +354,34 @@ class PytdxFetcher(BaseFetcher):
         
         market, code = self._get_market_code(stock_code)
         
-        # 计算需要获取的交易日数量（估算）
+        # Calculate the estimated number of trading days to obtain
         from datetime import datetime as dt
         start_dt = dt.strptime(start_date, '%Y-%m-%d')
         end_dt = dt.strptime(end_date, '%Y-%m-%d')
         days = (end_dt - start_dt).days
-        count = min(max(days * 5 // 7 + 10, 30), 800)  # 估算交易日，最大 800 条
+        count = min(max(days * 5 // 7 + 10, 30), 800)  # Estimate the trading day, up to 800 entries
         
         logger.debug(f"调用 Pytdx get_security_bars(market={market}, code={code}, count={count})")
         
         with self._pytdx_session() as api:
             try:
-                # 获取日 K 线数据
-                # category: 9-日线, 0-5分钟, 1-15分钟, 2-30分钟, 3-1小时
+                # Get daily K-line data
+                # category: 9-day line, 0-5 minutes, 1-15 minutes, 2-30 minutes, 3-1 hour
                 data = api.get_security_bars(
-                    category=9,  # 日线
+                    category=9,  # Daily line
                     market=market,
                     code=code,
-                    start=0,  # 从最新开始
+                    start=0,  # From latest.
                     count=count
                 )
                 
                 if data is None or len(data) == 0:
                     raise DataFetchError(f"Pytdx 未查询到 {stock_code} 的数据")
                 
-                # 转换为 DataFrame
+                # Convert to DataFrame
                 df = api.to_df(data)
                 
-                # 过滤日期范围
+                # Filter date range
                 df['datetime'] = pd.to_datetime(df['datetime'])
                 df = df[(df['datetime'] >= start_date) & (df['datetime'] <= end_date)]
                 
@@ -404,7 +404,7 @@ class PytdxFetcher(BaseFetcher):
         """
         df = df.copy()
         
-        # 列名映射
+        # Column name mapping
         column_mapping = {
             'datetime': 'date',
             'vol': 'volume',
@@ -412,15 +412,15 @@ class PytdxFetcher(BaseFetcher):
         
         df = df.rename(columns=column_mapping)
         
-        # 计算涨跌幅（pytdx 不返回涨跌幅，需要自己计算）
+        # Calculate Percentage Change (pytdx does not return percentage change, need to calculate it yourself)
         if 'pct_chg' not in df.columns and 'close' in df.columns:
             df['pct_chg'] = df['close'].pct_change() * 100
             df['pct_chg'] = df['pct_chg'].fillna(0).round(2)
         
-        # 添加股票代码列
+        # Add stock code column
         df['code'] = stock_code
         
-        # 只保留需要的列
+        # Keep only required columns.
         keep_cols = ['code'] + STANDARD_COLUMNS
         existing_cols = [col for col in keep_cols if col in df.columns]
         df = df[existing_cols]
@@ -437,11 +437,11 @@ class PytdxFetcher(BaseFetcher):
         Returns:
             股票名称，失败返回 None
         """
-        # 港股不支持（pytdx 不含港股数据）
+        # Hong Kong stocks are not supported (pytdx does not include Hong Kong stock data)
         if _is_hk_market(stock_code):
             return None
 
-        # 先检查缓存
+        # Check cache
         if stock_code in self._stock_name_cache:
             return self._stock_name_cache[stock_code]
         
@@ -449,17 +449,17 @@ class PytdxFetcher(BaseFetcher):
             market, code = self._get_market_code(stock_code)
             
             with self._pytdx_session() as api:
-                # 获取股票列表（缓存）
+                # Get stock list (caching)
                 if self._stock_list_cache is None:
                     self._build_stock_list_cache(api)
                 
-                # 查找股票名称
+                # Search for stock name
                 name = self._stock_list_cache.get(code)
                 if name:
                     self._stock_name_cache[stock_code] = name
                     return name
                 
-                # 尝试使用 get_finance_info
+                # Attempt to use get_finance_info
                 finance_info = api.get_finance_info(market, code)
                 if finance_info and 'name' in finance_info:
                     name = finance_info['name']
@@ -527,22 +527,22 @@ class PytdxFetcher(BaseFetcher):
 
 
 if __name__ == "__main__":
-    # 测试代码
+    # Test code
     logging.basicConfig(level=logging.DEBUG)
     
     fetcher = PytdxFetcher()
     
     try:
-        # 测试历史数据
-        df = fetcher.get_daily_data('600519')  # 茅台
+        # Test historical data
+        df = fetcher.get_daily_data('600519')  # Maotai
         print(f"获取成功，共 {len(df)} 条数据")
         print(df.tail())
         
-        # 测试股票名称
+        # Test stock name
         name = fetcher.get_stock_name('600519')
         print(f"股票名称: {name}")
         
-        # 测试实时行情
+        # Test real-time quotes
         quote = fetcher.get_realtime_quote('600519')
         print(f"实时行情: {quote}")
         

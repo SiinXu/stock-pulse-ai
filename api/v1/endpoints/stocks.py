@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# 须在 /{stock_code} 路由之前定义
+# Must be defined before /{stock_code}
 ALLOWED_MIME_STR = ", ".join(ALLOWED_MIME)
 
 
@@ -156,7 +156,7 @@ def extract_from_image(
         )
 
     try:
-        # 先读取限定大小，再检查是否还有剩余（语义清晰：超出则拒绝）
+        # Read limited size, then check if there is still remaining (semantic clarity: reject if exceeded)
         data = file.file.read(MAX_SIZE_BYTES)
         if file.file.read(1):
             raise HTTPException(
@@ -477,7 +477,7 @@ def get_stock_quote(stock_code: str) -> StockQuote:
     try:
         service = StockService()
         
-        # 使用 def 而非 async def，FastAPI 自动在线程池中执行
+        # Use `def` instead of `async def`; FastAPI automatically executes in a thread pool.
         result = service.get_realtime_quote(stock_code)
         
         if result is None:
@@ -555,14 +555,14 @@ def get_stock_history(
     try:
         service = StockService()
         
-        # 使用 def 而非 async def，FastAPI 自动在线程池中执行
+        # Use `def` instead of `async def`; FastAPI automatically executes in a thread pool.
         result = service.get_history_data(
             stock_code=stock_code,
             period=period,
             days=days
         )
         
-        # 转换为响应模型
+        # Convert to Response Model
         data = [
             KLineData(
                 date=item.get("date"),
@@ -585,7 +585,7 @@ def get_stock_history(
         )
     
     except ValueError as e:
-        # period 参数不支持的错误（如 weekly/monthly）
+        # period Parameter not supported error(If weekly/monthly)
         raise HTTPException(
             status_code=422,
             detail={

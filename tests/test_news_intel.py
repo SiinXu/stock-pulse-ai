@@ -33,7 +33,7 @@ class NewsIntelStorageTestCase(unittest.TestCase):
         self._db_path = os.path.join(self._temp_dir.name, "test_news_intel.db")
         os.environ["DATABASE_PATH"] = self._db_path
 
-        # 重置配置与数据库单例，确保使用临时库
+        # Reset configuration and database singleton, ensure using temporary library
         Config._instance = None
         DatabaseManager.reset_instance()
         self.db = DatabaseManager.get_instance()

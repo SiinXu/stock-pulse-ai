@@ -38,9 +38,9 @@ class _MarketDataMethods:
         """
         if target_date is None:
             target_date = date.today()
-        # 注意：这里的 target_date 语义是“自然日”，而不是“最新交易日”。
-        # 在周末/节假日/非交易日运行时，即使数据库已有最新交易日数据，这里也会返回 False。
-        # 该行为目前保留（按需求不改逻辑）。
+        # Note: target_date means a calendar day here, not the latest trading day.
+        # On weekends, holidays, or other non-trading days, this returns False even when the database has data for the latest trading day.
+        # This behavior is intentionally preserved; no logic change is required here.
         
         with self.get_session() as session:
             result = session.execute(

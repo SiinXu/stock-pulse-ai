@@ -15,18 +15,18 @@ from typing import Dict, Any, Optional, List
 
 class ChatType(str, Enum):
     """会话类型"""
-    GROUP = "group"      # 群聊
-    PRIVATE = "private"  # 私聊
-    UNKNOWN = "unknown"  # 未知
+    GROUP = "group"      # Chat room
+    PRIVATE = "private"  # Private chat
+    UNKNOWN = "unknown"  # Unknown.
 
 
 class Platform(str, Enum):
     """平台类型"""
-    FEISHU = "feishu"        # 飞书
-    DINGTALK = "dingtalk"    # 钉钉
-    WECOM = "wecom"          # 企业微信
+    FEISHU = "feishu"        # Feishu
+    DINGTALK = "dingtalk"    # DingTalk
+    WECOM = "wecom"          # WeCom
     TELEGRAM = "telegram"    # Telegram
-    UNKNOWN = "unknown"      # 未知
+    UNKNOWN = "unknown"      # Unknown.
 
 
 @dataclass
@@ -76,9 +76,9 @@ class BotMessage:
         """
         text = self.content.strip()
         
-        # 检查是否以命令前缀开头
+        # Check if it starts with a command prefix
         if not text.startswith(prefix):
-            # 尝试匹配中文命令（无前缀）
+            # Attempt to match Chinese commands (no prefix)
             chinese_commands = {
                 '分析': 'analyze',
                 '大盘': 'market',
@@ -92,10 +92,10 @@ class BotMessage:
                     return en_cmd, args
             return None, []
         
-        # 去除前缀
+        # Remove prefix
         text = text[len(prefix):]
         
-        # 分割命令和参数
+        # Splitting command and parameters
         parts = text.split()
         if not parts:
             return None, []

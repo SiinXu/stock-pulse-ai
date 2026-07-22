@@ -159,14 +159,14 @@ class _OrchestrationStageMixin:
         """
         stock_name = code
         try:
-            # 首先获取股票名称
+            # First get the stock name
             stock_name = self.fetcher_manager.get_stock_name(code, allow_realtime=False)
 
             target_date = self._resolve_resume_target_date(
                 code, current_time=current_time
             )
 
-            # 断点续传检查：如果最新可复用交易日的数据已存在，则跳过
+            # Checkpoint resumption check: If the latest reusable data for a trading day already exists, skip it.
             if not force_refresh and self.db.has_today_data(code, target_date):
                 logger.info(
                     "%s(%s) already has data for %s; skipping fetch for resumability",
@@ -176,14 +176,14 @@ class _OrchestrationStageMixin:
                 )
                 return True, None
 
-            # 从数据源获取数据
+            # Get data from data source.
             logger.info("%s(%s) fetching market data", stock_name, code)
             df, source_name = self.fetcher_manager.get_daily_data(code, days=30)
 
             if df is None or df.empty:
                 return False, "获取数据为空"
 
-            # 保存到数据库
+            # Save to the database
             saved_count = self.db.save_daily_data(df, code, source_name)
             logger.info(
                 "%s(%s) market data saved: source=%s rows_added=%s",
@@ -324,7 +324,7 @@ class _OrchestrationStageMixin:
 
         try:
             self._emit_progress(12, f"{code}：正在准备分析任务")
-            # Step 1: 获取并保存数据
+            # Step 1: Get and save data
             with observe_pipeline_stage(
                 "fetch",
                 input_summary={
@@ -369,11 +369,11 @@ class _OrchestrationStageMixin:
 
             if not success:
                 logger.warning("[%s] Market data preparation failed", code)
-                # 即使获取失败，也尝试用已有数据分析
+                # Even if the retrieval fails, try to analyze with existing data
             else:
                 self._emit_progress(16, f"{code}：行情数据准备完成")
 
-            # Step 2: AI 分析
+            # Step 2: AI Analysis
             if skip_analysis:
                 logger.info("[%s] Skipping AI analysis in dry-run mode", code)
                 for stage_name in (
@@ -409,7 +409,7 @@ class _OrchestrationStageMixin:
                     result.sentiment_score,
                 )
 
-                # 单股推送模式（#55）：每分析完一只股票立即推送
+                # Single stock push mode (#55): Pushes immediately after analyzing each stock
                 if single_stock_notify:
                     self._send_single_stock_notification(
                         result,
@@ -452,7 +452,7 @@ class _OrchestrationStageMixin:
             return result
 
         except Exception as e:  # broad-exception: fallback_recorded - Per-stock failures are safely logged so the batch can continue.
-            # 捕获所有异常，确保单股失败不影响整体
+            # Capture all exceptions to ensure individual stock failure does not affect the overall result
             record_missing_pipeline_stages_as_skipped(
                 PIPELINE_STAGE_NAMES,
                 input_summary={"stock_code": code},
@@ -512,7 +512,7 @@ class _OrchestrationStageMixin:
         """
         start_time = time.time()
 
-        # 使用配置中的股票列表
+        # Use the stock list in configuration
         if stock_codes is None:
             self.config.refresh_stock_list()
             stock_codes = self.config.stock_list
@@ -529,11 +529,11 @@ class _OrchestrationStageMixin:
             "data-only" if dry_run else "full-analysis",
         )
 
-        # 冻结本轮运行的统一参考时间，避免跨市场收盘边界时同批股票使用不同目标交易日。
+        # Freeze the unified reference time for this round of running to avoid using the same stocks across market closing boundaries with different target trading days.
         resume_reference_time = current_time or datetime.now(timezone.utc)
 
-        # === 批量预取实时行情（优化：避免每只股票都触发全量拉取）===
-        # 只有股票数量 >= 5 时才进行预取，少量股票直接逐个查询更高效
+        # === Batch Pre-fetch Real-Time Quotes (Optimization: Avoid triggering full pull for each stock) ===
+        # Pre-fetch only when the number of stocks is >= 5; query small amounts of stocks individually for efficiency.
         if len(stock_codes) >= 5:
             daily_prefetch_count = self.fetcher_manager.prefetch_daily_klines(stock_codes, days=30)
             if daily_prefetch_count > 0:
@@ -552,14 +552,14 @@ class _OrchestrationStageMixin:
                     prefetch_count,
                 )
 
-        # Issue #455: 预取股票名称，避免并发分析时显示「股票xxxxx」
-        # dry_run 仅做数据拉取，不需要名称预取，避免额外网络开销
+        # Issue #455: Pre-fetch stock names to avoid displaying "stockxxxxx" during concurrent analysis.
+        # dry_run Just perform data retrieval, Do not fetch names, Avoid additional network overhead
         if not dry_run:
             self.fetcher_manager.prefetch_stock_names(stock_codes, use_bulk=False)
 
-        # 单股推送模式（#55）：从配置读取
+        # Single stock push mode (#55): Reads configuration
         single_stock_notify = getattr(self.config, 'single_stock_notify', False)
-        # Issue #119: 从配置读取报告类型
+        # Issue #119: Read report type from configuration
         report_type_str = getattr(self.config, 'report_type', 'simple').lower()
         if report_type_str == 'brief':
             report_type = ReportType.BRIEF
@@ -567,7 +567,7 @@ class _OrchestrationStageMixin:
             report_type = ReportType.FULL
         else:
             report_type = ReportType.SIMPLE
-        # Issue #128: 从配置读取分析间隔
+        # Issue #128: Read analysis interval from configuration
         analysis_delay = getattr(self.config, 'analysis_delay', 0)
 
         if single_stock_notify:
@@ -579,24 +579,24 @@ class _OrchestrationStageMixin:
 
         results: List[AnalysisResult] = []
 
-        # 使用线程池并发处理
-        # 注意：max_workers 设置较低（默认3）以避免触发反爬
+        # Use thread pool for concurrent processing
+        # Note: Set `max_workers` to a lower value (default 3) to avoid triggering anti-crawling.
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            # 提交任务
+            # Submit task
             future_to_code = {
                 executor.submit(
                     self._process_single_stock_for_batch,
                     code,
                     skip_analysis=dry_run,
                     single_stock_notify=False,
-                    report_type=report_type,  # Issue #119: 传递报告类型
+                    report_type=report_type,  # Issue #119: Pass report type
                     analysis_query_id=uuid.uuid4().hex,
                     current_time=resume_reference_time,
                 ): code
                 for code in stock_codes
             }
 
-            # 收集结果
+            # Collect results
             for idx, future in enumerate(as_completed(future_to_code)):
                 code = future_to_code[future]
                 try:
@@ -621,12 +621,12 @@ class _OrchestrationStageMixin:
                             code,
                         )
 
-                    # Issue #128: 分析间隔 - 在个股分析和大盘分析之间添加延迟
+                    # Issue #128: Analysis interval - Add delay between individual stock and market review analysis
                     if idx < len(stock_codes) - 1 and analysis_delay > 0:
-                        # 注意：此 sleep 发生在“主线程收集 future 的循环”中，
-                        # 并不会阻止线程池中的任务同时发起网络请求。
-                        # 因此它对降低并发请求峰值的效果有限；真正的峰值主要由 max_workers 决定。
-                        # 该行为目前保留（按需求不改逻辑）。
+                        # Note: This sleep occurs within the 'main thread collecting future loop'.
+                        # Will not prevent tasks in the thread pool from simultaneously initiating network requests.
+                        # It has limited effect on reducing peak concurrent request values; the true peak is mainly determined by max_workers.
+                        # This behavior is currently retained (logic will not be modified based on demand).
                         logger.debug(
                             "Waiting %s seconds before collecting the next stock result",
                             analysis_delay,
@@ -642,12 +642,12 @@ class _OrchestrationStageMixin:
                         context={"stock_code": code},
                     )
 
-        # 统计
+        # Statistics
         elapsed_time = time.time() - start_time
 
-        # dry-run 模式下，数据获取成功即视为成功
+        # In dry-run mode, successful data retrieval is considered a success.
         if dry_run:
-            # 检查哪些股票的最新可复用交易日数据已存在
+            # Check if any stocks have existing reusable trading day data
             success_count = sum(
                 1
                 for code in stock_codes

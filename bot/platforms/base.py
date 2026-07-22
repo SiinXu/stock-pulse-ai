@@ -154,16 +154,16 @@ class BotPlatform(ABC):
             - 如果是普通消息：(message, None) - 响应将在命令处理后生成
             - 如果验证失败或无需处理：(None, error_response 或 None)
         """
-        # 1. 检查是否是验证请求
+        # 1. Check if it's a validation request.
         challenge_response = self.handle_challenge(data)
         if challenge_response:
             return None, challenge_response
         
-        # 2. 验证请求签名
+        # 2. Verification Request Signature
         if not self.verify_request(headers, body):
             return None, WebhookResponse.error("Invalid signature", 403)
         
-        # 3. 解析消息
+        # 3. Parse message
         message = self.parse_message(data)
         
         return message, None

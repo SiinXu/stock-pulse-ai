@@ -297,65 +297,65 @@ class AnalysisResult:
     code: str
     name: str
 
-    # ========== 核心指标 ==========
-    sentiment_score: int  # 综合评分 0-100 (>70强烈看多, >60看多, 40-60震荡, <40看空)
-    trend_prediction: str  # 趋势预测：强烈看多/看多/震荡/看空/强烈看空
-    operation_advice: str  # 操作建议：买入/加仓/持有/减仓/卖出/观望
-    decision_type: str = "hold"  # 决策类型：buy/hold/sell（用于统计）
-    confidence_level: str = "中"  # 置信度：高/中/低
-    report_language: str = "zh"  # 报告输出语言：zh/en
-    action: Optional[str] = None  # 建议动作 taxonomy：buy/add/hold/reduce/sell/watch/avoid/alert
-    action_label: Optional[str] = None  # 本地化建议动作标签
+    # ========== Core Metrics ==========
+    sentiment_score: int  # Overall score 0-100 (>70 strongly bullish, >60 bullish, 40-60 range bound, <40 bearish)
+    trend_prediction: str  # Trend prediction: Strongly bullish/bullish/sideways/bearish/strongly bearish
+    operation_advice: str  # Trading Recommendations: Buy/Add to Position/Hold/Reduce Position/Sell/Watch
+    decision_type: str = "hold"  # Decision type: buy/hold/sell (for statistics)
+    confidence_level: str = "中"  # Confidence: High/Medium/Low
+    report_language: str = "zh"  # Report output language: zh/en
+    action: Optional[str] = None  # Recommendation taxonomy: buy/add/hold/reduce/sell/watch/avoid/alert
+    action_label: Optional[str] = None  # Localized action tag suggestions
 
-    # ========== 决策仪表盘 (新增) ==========
-    dashboard: Optional[Dict[str, Any]] = None  # 完整的决策仪表盘数据
+    # ========== Decision Dashboard (New) ==========
+    dashboard: Optional[Dict[str, Any]] = None  # Complete decision dashboard data
 
-    # ========== 走势分析 ==========
-    trend_analysis: str = ""  # 走势形态分析（支撑位、压力位、趋势线等）
-    short_term_outlook: str = ""  # 短期展望（1-3日）
-    medium_term_outlook: str = ""  # 中期展望（1-2周）
+    # ========== Trend Analysis ==========
+    trend_analysis: str = ""  # Trend pattern analysis (support levels, resistance levels, trend lines, etc.)
+    short_term_outlook: str = ""  # Short-term Outlook (1-3 days)
+    medium_term_outlook: str = ""  # Mid-term outlook (1-2 weeks)
 
-    # ========== 技术面分析 ==========
-    technical_analysis: str = ""  # 技术指标综合分析
-    ma_analysis: str = ""  # 均线分析（多头/空头排列，金叉/死叉等）
-    volume_analysis: str = ""  # 量能分析（放量/缩量，主力动向等）
-    pattern_analysis: str = ""  # K线形态分析
+    # ========== Technical Context Analysis ==========
+    technical_analysis: str = ""  # Comprehensive technical indicator analysis
+    ma_analysis: str = ""  # Moving Average analysis (bullish/bearish patterns, golden cross/death cross, etc.)
+    volume_analysis: str = ""  # Volume analysis (expansion/contraction and major-fund activity)
+    pattern_analysis: str = ""  # Candlestick pattern analysis.
 
-    # ========== 基本面分析 ==========
-    fundamental_analysis: str = ""  # 基本面综合分析
-    sector_position: str = ""  # 板块地位和行业趋势
-    company_highlights: str = ""  # 公司亮点/风险点
+    # ========== Fundamental Analysis ==========
+    fundamental_analysis: str = ""  # Comprehensive fundamental analysis
+    sector_position: str = ""  # Sector status and industry trends
+    company_highlights: str = ""  # Company highlights/risks
 
-    # ========== 情绪面/消息面分析 ==========
-    news_summary: str = ""  # 近期重要新闻/公告摘要
-    market_sentiment: str = ""  # 市场情绪分析
-    hot_topics: str = ""  # 相关热点话题
+    # ========== Sentiment/News Context Analysis ==========
+    news_summary: str = ""  # Recent important news/announcements summary
+    market_sentiment: str = ""  # Market Sentiment Analysis
+    hot_topics: str = ""  # Relevant hot topics
 
-    # ========== 综合分析 ==========
-    analysis_summary: str = ""  # 综合分析摘要
-    key_points: str = ""  # 核心看点（3-5个要点）
-    risk_warning: str = ""  # 风险提示
-    buy_reason: str = ""  # 买入/卖出理由
+    # ========== Comprehensive Analysis ==========
+    analysis_summary: str = ""  # Comprehensive analysis summary
+    key_points: str = ""  # Key Highlights (3-5 Points)
+    risk_warning: str = ""  # Risk prompt
+    buy_reason: str = ""  # Buy/Sell Reason
 
-    # ========== 元数据 ==========
-    market_snapshot: Optional[Dict[str, Any]] = None  # 当日行情快照（展示用）
-    raw_response: Optional[str] = None  # 原始响应（调试用）
-    search_performed: bool = False  # 是否执行了联网搜索
-    data_sources: str = ""  # 数据来源说明
+    # ========== Metadata =========
+    market_snapshot: Optional[Dict[str, Any]] = None  # Daily market snapshot (for display)
+    raw_response: Optional[str] = None  # Original response (for debugging)
+    search_performed: bool = False  # Did it execute a web search?
+    data_sources: str = ""  # Data source explanation
     success: bool = True
     error_message: Optional[str] = None
 
-    # ========== 价格数据（分析时快照）==========
-    current_price: Optional[float] = None  # 分析时的股价
-    change_pct: Optional[float] = None     # 分析时的涨跌幅(%)
+    # ========== Price Data (Snapshot for analysis) ===========
+    current_price: Optional[float] = None  # The price of the stock during the analysis.
+    change_pct: Optional[float] = None     # The percentage change in price during the analysis (%).
 
-    # ========== 模型标记（Issue #528）==========
-    model_used: Optional[str] = None  # 分析使用的 LLM 模型（完整名，如 gemini/gemini-2.0-flash）
+    # ========== Model Tag (Issue #528)==========
+    model_used: Optional[str] = None  # Analyze the used LLM model (full name, such as gemini/gemini-2.0-flash)
 
-    # ========== 历史对比（Report Engine P0）==========
-    query_id: Optional[str] = None  # 本次分析 query_id，用于历史对比时排除本次记录
+    # ========== Historical comparison(Report Engine P0)==========
+    query_id: Optional[str] = None  # This analysis query_id, exclude this record when performing historical comparisons
 
-    # ========== 基本面上下文（仅运行时，用于通知拼装；不持久化到 to_dict）==========
+    # ========== Fundamentals Context (Runtime only, used for notification assembly; not persisted to to_dict)==========
     fundamental_context: Optional[Dict[str, Any]] = None
     market_structure_context: Optional[Dict[str, Any]] = None
 
@@ -372,7 +372,7 @@ class AnalysisResult:
             'report_language': self.report_language,
             'action': self.action,
             'action_label': self.action_label,
-            'dashboard': self.dashboard,  # 决策仪表盘数据
+            'dashboard': self.dashboard,  # Decision dashboard data
             'trend_analysis': self.trend_analysis,
             'short_term_outlook': self.short_term_outlook,
             'medium_term_outlook': self.medium_term_outlook,
@@ -597,10 +597,10 @@ class GeminiAnalyzer:
     """
 
     # ========================================
-    # 系统提示词 - 决策仪表盘 v2.0
+    # System prompt - Decision Dashboard v2.0
     # ========================================
-    # 输出格式升级：从简单信号升级为决策仪表盘
-    # 核心模块：核心结论 + 数据透视 + 舆情情报 + 作战计划
+    # Output format upgrade: from simple signal to decision dashboard
+    # Core Modules: Core Conclusion + Data Insights + Sentiment Intelligence + Operational Plan
     # ========================================
 
     LEGACY_DEFAULT_SYSTEM_PROMPT = """你是一位专注于趋势交易的{market_placeholder}投资分析师，负责生成专业的【决策仪表盘】分析报告。
@@ -1000,7 +1000,7 @@ class GeminiAnalyzer:
     del _method_module, _method_name, _method_descriptor, _method_function
 
 
-# 便捷函数
+# Convenient function
 def get_analyzer() -> GeminiAnalyzer:
     """获取 LLM 分析器实例"""
     return GeminiAnalyzer()
@@ -1042,10 +1042,10 @@ for __name_to_bind, __value_to_bind in vars(__result_processing).items():
 
 
 if __name__ == "__main__":
-    # 测试代码
+    # Test code
     logging.basicConfig(level=logging.DEBUG)
     
-    # 模拟上下文数据
+    # Simulate context data
     test_context = {
         'code': '600519',
         'date': '2026-01-09',

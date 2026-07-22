@@ -652,7 +652,7 @@ const ChatPage: React.FC = () => {
     }
   }, [deleteConfirmId, deleteLoading, handleStartNewChat, language, loadSessions, sessionId]);
 
-  // Handle follow-up from report page: ?stock=600519&name=贵州茅台&recordId=xxx
+  // Handle report-page follow-up URLs such as `?stock=600519&name=贵州茅台&recordId=xxx`.
   useEffect(() => {
     const stock = sanitizeFollowUpStockCode(searchParams.get('stock'));
     const name = sanitizeFollowUpStockName(searchParams.get('name'));

@@ -409,7 +409,7 @@ class BacktestEngineTestCase(unittest.TestCase):
         self.assertNotEqual(BacktestEngine.infer_direction_expected("不要卖出"), "down")
 
     def test_conditional_support_phrase_not_negating_hold(self):
-        # "不跌破支撑继续持有" means conditional support hold, not explicit negation of hold.
+        # "不跌破支撑继续持有" is a conditional hold, not an explicit non-hold signal.
         self.assertEqual(
             BacktestEngine.infer_position_recommendation("不跌破支撑继续持有"),
             "long",

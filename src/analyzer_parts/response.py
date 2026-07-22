@@ -201,7 +201,7 @@ class GeminiAnalyzer:
                 )
                 return self._parse_text_response(response_text, code, name)
 
-            # 提取 dashboard 数据
+            # Extracts dashboard data
             dashboard = data.get('dashboard', None)
             guardrail_reason = data.get("guardrail_reason") or data.get("downgrade_reason")
             if guardrail_reason and isinstance(dashboard, dict):
@@ -210,16 +210,16 @@ class GeminiAnalyzer:
                     score_calibration = {}
                     dashboard["decision_score_calibration"] = score_calibration
                 score_calibration.setdefault("guardrail_reason", str(guardrail_reason).strip())
-            # 归一化 signal_attribution（LLM 可能返回字符串/负数/总和≠100）
+            # Normalize signal_attribution (LLM may return strings/negative numbers/sums ≠ 100)
             normalize_report_signal_attribution(dashboard)
 
-            # 优先使用 AI 返回的股票名称（如果原名称无效或包含代码）
+            # Prioritize using AI-returned stock name (if original name is invalid or contains code)
             ai_stock_name = data.get('stock_name')
             if ai_stock_name and (name.startswith('股票') or name == code or 'Unknown' in name):
                 name = ai_stock_name
 
-            # 解析所有字段，使用默认值防止缺失
-            # 解析 decision_type，如果没有则根据 operation_advice 推断
+            # Parse all fields, use default values to prevent missing data
+            # Infer decision_type if not present, based on operation_advice
             decision_type = data.get('decision_type', '')
             if not decision_type:
                 op = data.get('operation_advice', localize_operation_advice('持有', report_language))
@@ -232,7 +232,7 @@ class GeminiAnalyzer:
             result = AnalysisResult(
                 code=code,
                 name=name,
-                # 核心指标
+                # Key Indicators
                 sentiment_score=int(data.get('sentiment_score', 50)),
                 trend_prediction=data.get('trend_prediction', localize_trend_prediction('震荡', report_language)),
                 operation_advice=data.get('operation_advice', localize_operation_advice('持有', report_language)),
@@ -242,32 +242,32 @@ class GeminiAnalyzer:
                     report_language,
                 ),
                 report_language=report_language,
-                # 决策仪表盘
+                # Decision dashboard
                 dashboard=dashboard,
-                # 走势分析
+                # Trend analysis
                 trend_analysis=data.get('trend_analysis', ''),
                 short_term_outlook=data.get('short_term_outlook', ''),
                 medium_term_outlook=data.get('medium_term_outlook', ''),
-                # 技术面
+                # Technical view
                 technical_analysis=data.get('technical_analysis', ''),
                 ma_analysis=data.get('ma_analysis', ''),
                 volume_analysis=data.get('volume_analysis', ''),
                 pattern_analysis=data.get('pattern_analysis', ''),
-                # 基本面
+                # Fundamentals
                 fundamental_analysis=data.get('fundamental_analysis', ''),
                 sector_position=data.get('sector_position', ''),
                 company_highlights=data.get('company_highlights', ''),
-                # 情绪面/消息面
+                # Sentiment/News sentiment
                 news_summary=data.get('news_summary', ''),
                 market_sentiment=data.get('market_sentiment', ''),
                 hot_topics=data.get('hot_topics', ''),
-                # 综合
+                # Comprehensive
                 analysis_summary=data.get('analysis_summary', _localized_text(
                     report_language, en='Analysis completed', zh='分析完成', ko='분석 완료')),
                 key_points=data.get('key_points', ''),
                 risk_warning=data.get('risk_warning', ''),
                 buy_reason=data.get('buy_reason', ''),
-                # 元数据
+                # Metadata
                 search_performed=data.get('search_performed', False),
                 data_sources=data.get('data_sources', _localized_text(
                     report_language, en='Technical data', zh='技术面数据', ko='기술적 데이터')),
@@ -297,15 +297,15 @@ class GeminiAnalyzer:
         """修复常见的 JSON 格式问题"""
         import re
 
-        # 移除注释
+        # Remove comment
         json_str = re.sub(r'//.*?\n', '\n', json_str)
         json_str = re.sub(r'/\*.*?\*/', '', json_str, flags=re.DOTALL)
 
-        # 修复尾随逗号
+        # Fix trailing comma
         json_str = re.sub(r',\s*}', '}', json_str)
         json_str = re.sub(r',\s*]', ']', json_str)
 
-        # 确保布尔值是小写
+        # Ensure boolean values are lowercase
         json_str = json_str.replace('True', 'true').replace('False', 'false')
 
         # fix by json-repair
@@ -363,14 +363,14 @@ class GeminiAnalyzer:
         report_language = normalize_report_language(
             getattr(self._get_runtime_config(), "report_language", "zh")
         )
-        # 尝试识别关键词来判断情绪
+        # Attempt to recognize keywords to determine sentiment
         sentiment_score = 50
         trend = localize_trend_prediction('震荡', report_language)
         advice = localize_operation_advice('持有', report_language)
 
         text_lower = response_text.lower()
 
-        # 简单的情绪识别
+        # Simple sentiment recognition
         positive_keywords = ['看多', '买入', '上涨', '突破', '强势', '利好', '加仓', 'bullish', 'buy']
         negative_keywords = ['看空', '卖出', '下跌', '跌破', '弱势', '利空', '减仓', 'bearish', 'sell']
 
@@ -390,7 +390,7 @@ class GeminiAnalyzer:
         else:
             decision_type = 'hold'
 
-        # 截取前500字符作为摘要
+        # Truncate top 500 characters as a summary
         summary = response_text[:500] if response_text else _localized_text(
             report_language, en='No analysis result', zh='无分析结果', ko='분석 결과 없음')
 

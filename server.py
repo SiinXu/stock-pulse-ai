@@ -24,7 +24,7 @@ from src.application_services import ApplicationServices, set_application_servic
 from src.config import setup_env, get_config
 from src.logging_config import setup_logging
 
-# 初始化环境变量与日志
+# Initialize environment variables and logging
 setup_env()
 
 config = get_config()
@@ -41,10 +41,10 @@ setup_logging(
 # process-wide service singletons have a single owner before the app loads.
 set_application_services(ApplicationServices())
 
-# 从 api.app 导入应用实例
+# Import application instance from api.app
 from api.app import app  # noqa: E402
 
-# 导出 app 供 uvicorn 使用
+# Export app for uvicorn usage
 __all__ = ['app']
 
 

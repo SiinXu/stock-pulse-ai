@@ -20,9 +20,9 @@ from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
-# Slack Block Kit 中单个 section block 的 text 字段上限为 3000 字符
+# Slack Block Kit single section block text field limit is 3000 characters
 _BLOCK_TEXT_LIMIT = 3000
-# Slack chat.postMessage / Webhook 的 text 字段上限约 40000 字符，保守取 39000
+# Slack chat.postMessage / Webhook text field limit is approximately 40000 characters, conservatively set to 39000
 _TEXT_LIMIT = 39000
 
 
@@ -62,7 +62,7 @@ class SlackSender:
         Returns:
             是否发送成功
         """
-        # 按字节分块，避免单条消息超限
+        # Divide bytes into blocks to avoid single messages exceeding the limit.
         try:
             chunks = chunk_content_by_max_bytes(content, _TEXT_LIMIT, add_page_marker=True)
         except Exception as exc:  # broad-exception: fallback_recorded - Chunking failure is logged before whole-message fallback.
@@ -74,11 +74,11 @@ class SlackSender:
             )
             chunks = [content]
 
-        # 优先使用 Bot API（与 _send_slack_image 保持一致）
+        # Prioritize using Bot API (_send_slack_image consistent)
         if self._use_bot:
             return all(self._send_slack_bot(chunk, timeout_seconds=timeout_seconds) for chunk in chunks)
 
-        # 其次使用 Webhook
+        # Then use Webhook.
         if self._slack_webhook_url:
             return all(self._send_slack_webhook(chunk, timeout_seconds=timeout_seconds) for chunk in chunks)
 
@@ -92,7 +92,7 @@ class SlackSender:
         如果内容超过单个 section block 限制，会自动拆分为多个 block。
         """
         blocks = []
-        # 按 block text 上限拆分
+        # Shard by block text limit.
         pos = 0
         while pos < len(content):
             segment = content[pos:pos + _BLOCK_TEXT_LIMIT]
@@ -199,11 +199,11 @@ class SlackSender:
         Returns:
             是否发送成功
         """
-        # Bot 模式：使用新版文件上传 API
+        # Bot mode: Using the new file upload API
         if self._use_bot:
             headers = {'Authorization': f'Bearer {self._slack_bot_token}'}
             try:
-                # Step 1: 获取上传 URL
+                # Step 1: Get the upload URL through the outbound safety policy.
                 resp1 = safe_post(
                     'https://slack.com/api/files.getUploadURLExternal',
                     headers=headers,
@@ -222,7 +222,7 @@ class SlackSender:
                 upload_url = result1['upload_url']
                 file_id = result1['file_id']
 
-                # Step 2: 上传文件内容（raw body，不能用 multipart）
+                # Step 2: Upload the raw file body; multipart is not supported.
                 resp2 = safe_post(
                     upload_url,
                     data=image_bytes,
@@ -234,7 +234,7 @@ class SlackSender:
                     logger.error("Slack 文件上传失败: HTTP %s", resp2.status_code)
                     raise RuntimeError(f"HTTP {resp2.status_code}")
 
-                # Step 3: 完成上传并分享到频道
+                # Step 3: Complete the upload and share it with the channel.
                 resp3 = safe_post(
                     'https://slack.com/api/files.completeUploadExternal',
                     headers={**headers, 'Content-Type': 'application/json'},
@@ -258,7 +258,7 @@ class SlackSender:
                     error_code="slack_bot_image_delivery_failed",
                 )
 
-        # Webhook 模式或 Bot 上传失败：回退为文本
+        # Webhook Mode or Bot Upload Failed: Fallback to Text
         if fallback_content:
             logger.info("Slack 图片不支持或失败，回退为文本发送")
             return self.send_to_slack(fallback_content)

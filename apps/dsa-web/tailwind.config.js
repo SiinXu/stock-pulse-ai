@@ -80,7 +80,7 @@ export default {
         'muted-bg': 'hsl(var(--muted))',
         'secondary-text': 'hsl(var(--secondary-text))',
         'muted-text': 'hsl(var(--muted-text))',
-        // 设计令牌 (Design Tokens)
+        // Design Tokens
         dim: 'hsl(var(--border-dim-raw) / 0.06)',
         subtle: 'hsl(var(--bg-subtle-raw) / 0.05)',
         'subtle-hover': 'hsl(var(--bg-subtle-raw) / 0.1)',
