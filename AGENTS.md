@@ -99,8 +99,9 @@ uvicorn server:app --reload --host 0.0.0.0 --port 8000
 ### Backend validation
 
 ```bash
-pip install -r requirements.txt
-pip install flake8 pytest
+python -m pip install --upgrade --constraint constraints.txt pip
+python -m pip install --build-constraint build-constraints.txt -r .github/requirements-ci.txt
+python -m pip check
 ./scripts/ci_gate.sh
 python -m pytest -m "not network"
 python -m py_compile <changed_python_files>

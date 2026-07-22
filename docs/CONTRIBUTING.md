@@ -29,7 +29,9 @@ source venv/bin/activate  # Linux/Mac
 # venv\Scripts\activate   # Windows
 
 # 安装依赖
-pip install -r requirements.txt
+python -m pip install --upgrade --constraint constraints.txt pip
+python -m pip install --build-constraint build-constraints.txt -r requirements.txt
+python -m pip check
 
 # 配置环境变量
 cp .env.example .env
@@ -109,8 +111,9 @@ docs: update the README deployment guide
 
 ```bash
 # backend gate（推荐）
-pip install -r requirements.txt
-pip install flake8 pytest
+python -m pip install --upgrade --constraint constraints.txt pip
+python -m pip install --build-constraint build-constraints.txt -r .github/requirements-ci.txt
+python -m pip check
 ./scripts/ci_gate.sh
 
 # 前端 gate（如修改了 apps/dsa-web）

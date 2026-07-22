@@ -291,6 +291,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Added stable Data Provider plugin contracts and priority-aware dynamic registration while preserving existing routing, fallback, health, cache, and diagnostics policies.
 - [Fixed] Anchored coarse-pointer Web hit-target expansions to their owning controls so compact links cannot intercept taps across a surrounding drawer.
 - [Fixed] Applied one recursive sensitive-data redaction policy to logs, API errors, Agent traces and audits, diagnostics exports, and provider errors, with debug-safe defaults and fail-closed protocol-trace handling.
+- [Docs] Aligned maintained Markdown source-install guidance with the constrained pip bootstrap, PEP 517 build constraint, and pip check required by the reproducible dependency contract.
 
 ## [3.26.3] - 2026-07-15
 
