@@ -262,6 +262,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Hardened multi-market Agent Chat symbol evidence, concurrent session continuity, and deterministic partial/all-unavailable comparison outcomes.
 - [Docs] Defined the core security and compliance baseline for access, secrets, egress, auditability, supply chain, and investment disclosures.
 - [Changed] Split CLI parsing and mode dispatch into a focused application module while preserving the legacy main entrypoint and runtime behavior.
+- [Added] Added typed Web deep links with canonical stock, report, Home workspace, Chat, Portfolio account, and Decision Signal context restoration plus safe invalid-parameter fallback.
 
 - [Fixed] Preserved per-stock analysis history and decision signals in GitHub Actions artifacts for full and stocks-only runs.
 - [Docs] Added a business architecture view and directional technical data flow that separate stakeholder capabilities from implementation and resilience details.

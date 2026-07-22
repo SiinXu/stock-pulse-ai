@@ -571,6 +571,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.historyButton": "Historische Aufzeichnungen",
   "i18n.uiText.UI_TEXT.home.historyTrend": "Historischer Trend",
   "i18n.uiText.UI_TEXT.home.inputInvalid": "Ungültige Eingabe",
+  "i18n.uiText.UI_TEXT.home.invalidDeepLinkMessage": "Der Link enthielt ungültige oder vertrauliche Statusparameter. Sie wurden sicher entfernt und die Standardwerte wiederhergestellt.",
+  "i18n.uiText.UI_TEXT.home.invalidDeepLinkTitle": "Ungültiger Link",
   "i18n.uiText.UI_TEXT.home.invalidRecordLinkMessage": "Der Bericht-Link enthält eine ungültige Eintrags-ID. Sie wurde von der Adresse entfernt.",
   "i18n.uiText.UI_TEXT.home.invalidRecordLinkTitle": "Link zum ungültigen Bericht",
   "i18n.uiText.UI_TEXT.home.invalidRunFlowLinkMessage": "Der Link zum Laufzeitstrom besitzt keine gültige Task- oder Datensatzkennung und wurde von der Adresse entfernt.",

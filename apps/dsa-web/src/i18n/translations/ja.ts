@@ -571,6 +571,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.historyButton": "歴史的記録",
   "i18n.uiText.UI_TEXT.home.historyTrend": "過去の傾向",
   "i18n.uiText.UI_TEXT.home.inputInvalid": "無効な入力",
+  "i18n.uiText.UI_TEXT.home.invalidDeepLinkMessage": "リンクに無効または機密性の高い状態パラメータが含まれていたため、安全に削除して既定値を復元しました。",
+  "i18n.uiText.UI_TEXT.home.invalidDeepLinkTitle": "無効なリンク",
   "i18n.uiText.UI_TEXT.home.invalidRecordLinkMessage": "レポートリンクには無効なレコードIDが含まれています。住所から削除されました。",
   "i18n.uiText.UI_TEXT.home.invalidRecordLinkTitle": "無効な報告リンク",
   "i18n.uiText.UI_TEXT.home.invalidRunFlowLinkMessage": "ランタイムストリームリンクには有効なタスクまたはレコード識別子がなく、アドレスから削除されています。",

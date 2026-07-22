@@ -571,6 +571,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.historyButton": "Registros históricos",
   "i18n.uiText.UI_TEXT.home.historyTrend": "Tendencia histórica",
   "i18n.uiText.UI_TEXT.home.inputInvalid": "Entrada inválida",
+  "i18n.uiText.UI_TEXT.home.invalidDeepLinkMessage": "El enlace contenía parámetros de estado no válidos o confidenciales. Se eliminaron de forma segura y se restauraron los valores predeterminados.",
+  "i18n.uiText.UI_TEXT.home.invalidDeepLinkTitle": "Enlace no válido",
   "i18n.uiText.UI_TEXT.home.invalidRecordLinkMessage": "El enlace del informe contiene un ID de registro inválido. Fue eliminado de la dirección.",
   "i18n.uiText.UI_TEXT.home.invalidRecordLinkTitle": "Enlace de informe inválido",
   "i18n.uiText.UI_TEXT.home.invalidRunFlowLinkMessage": "El enlace de flujo en tiempo de ejecución carece de un identificador válido de tarea o registro y ha sido eliminado de la dirección.",

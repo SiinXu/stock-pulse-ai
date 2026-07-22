@@ -18,7 +18,6 @@ import { TaskPanel } from '../components/tasks';
 import {
   HomeStockWorkspace,
   type HomeWatchlistRow,
-  type HomeWorkspaceTab,
   type WatchlistAnalyzeMode,
 } from '../components/watchlist/HomeStockWorkspace';
 import { useDashboardLifecycle, useHomeDashboardState, useHomeUrlState } from '../hooks';
@@ -34,6 +33,7 @@ import type {
 } from '../types/analysis';
 import type { RunFlowSnapshotSource } from '../types/runFlow';
 import { getTodayInShanghai } from '../utils/format';
+import { buildDeepLink } from '../utils/deepLink';
 import { normalizeStockCode } from '../utils/stockCode';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
 import { getUiListSeparator } from '../utils/uiLocale';
@@ -201,7 +201,6 @@ const HomePage: React.FC = () => {
   const [strategyMenuOpen, setStrategyMenuOpen] = useState(false);
   const [runFlowRestoreError, setRunFlowRestoreError] = useState<ParsedApiError | null>(null);
   const [duplicateBannerVisible, setDuplicateBannerVisible] = useState(false);
-  const [sidebarWorkspaceTab, setSidebarWorkspaceTab] = useState<HomeWorkspaceTab>('history');
   const [isBatchAnalyzingWatchlist, setIsBatchAnalyzingWatchlist] = useState(false);
   const [batchAnalyzeStatus, setBatchAnalyzeStatus] = useState<BatchAnalyzeStatus>(null);
   const [watchlistHistoryItemsByCode, setWatchlistHistoryItemsByCode] = useState<Map<string, StockBarItem>>(new Map());
@@ -327,6 +326,8 @@ const HomePage: React.FC = () => {
     selectHistoryItem,
     clearSelectedRecord,
   });
+  const sidebarWorkspaceTab = homeUrlState.workspace;
+  const setSidebarWorkspaceTab = homeUrlState.setWorkspace;
   const homeRecordIdRef = useRef(homeUrlState.recordId);
   homeRecordIdRef.current = homeUrlState.recordId;
   const homeUrlStateRef = useRef(homeUrlState);
@@ -418,10 +419,14 @@ const HomePage: React.FC = () => {
   const isHistoryTrendUnavailable = !selectedReport || !selectedReport.meta.stockCode;
   const homeUrlIssueTitle = homeUrlState.urlIssue === 'invalid_record'
     ? t('home.invalidRecordLinkTitle')
-    : t('home.invalidRunFlowLinkTitle');
+    : homeUrlState.urlIssue === 'invalid_run_flow'
+      ? t('home.invalidRunFlowLinkTitle')
+      : t('home.invalidDeepLinkTitle');
   const homeUrlIssueMessage = homeUrlState.urlIssue === 'invalid_record'
     ? t('home.invalidRecordLinkMessage')
-    : t('home.invalidRunFlowLinkMessage');
+    : homeUrlState.urlIssue === 'invalid_run_flow'
+      ? t('home.invalidRunFlowLinkMessage')
+      : t('home.invalidDeepLinkMessage');
   const hasUnresolvedReportIntent = homeUrlState.recordId !== null
     && selectedRecordId === homeUrlState.recordId
     && selectedReport?.meta.id !== homeUrlState.recordId
@@ -894,6 +899,12 @@ const HomePage: React.FC = () => {
     }
   }, [handleSubmitAnalysis, location.pathname, location.state, navigate, setQuery]);
 
+  useEffect(() => {
+    if (homeUrlState.stockCode) {
+      setQuery(homeUrlState.stockCode);
+    }
+  }, [homeUrlState.stockCode, setQuery]);
+
   const handleAskFollowUp = useCallback(() => {
     if (selectedReport?.meta.id === undefined || selectedReport.meta.reportType === 'market_review') {
       return;
@@ -902,7 +913,12 @@ const HomePage: React.FC = () => {
     const code = selectedReport.meta.stockCode;
     const name = selectedReport.meta.stockName;
     const rid = selectedReport.meta.id;
-    navigate(`/chat?stock=${encodeURIComponent(code)}&name=${encodeURIComponent(name)}&recordId=${rid}`);
+    navigate(buildDeepLink({
+      page: 'chat',
+      stockCode: code,
+      stockName: name,
+      recordId: rid,
+    }));
   }, [navigate, selectedReport]);
 
   const handleReanalyze = useCallback(() => {
@@ -1372,6 +1388,7 @@ const HomePage: React.FC = () => {
     pendingWatchlistCodes,
     refreshActiveTasks,
     selectedAnalysisSkills,
+    setSidebarWorkspaceTab,
     t,
     watchlistTodayStatusBlocked,
     watchlistState.watchlistCodes,
@@ -1457,6 +1474,7 @@ const HomePage: React.FC = () => {
       selectedRecordId,
       selectedReport?.meta.id,
       selectedReport?.meta.stockCode,
+      setSidebarWorkspaceTab,
       sidebarWorkspaceTab,
       todayAnalysisItems,
       watchlistAnalyzedTodayCount,

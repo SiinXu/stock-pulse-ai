@@ -1,6 +1,7 @@
 import type React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { decisionSignalsApi } from '../../api/decisionSignals';
 import { createApiError, createParsedApiError } from '../../api/error';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
@@ -360,17 +361,30 @@ describe('PortfolioPage FX refresh', () => {
     getLatestDecisionSignals.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 1 });
   });
 
+  function renderPortfolioPage(initialEntry = '/portfolio') {
+    const router = createMemoryRouter(
+      [{ path: '/portfolio', element: <PortfolioPage /> }],
+      { initialEntries: [initialEntry] },
+    );
+    render(<RouterProvider router={router} />);
+    return router;
+  }
+
   function renderEnglishPage() {
     window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
+    const router = createMemoryRouter(
+      [{ path: '/portfolio', element: <PortfolioPage /> }],
+      { initialEntries: ['/portfolio'] },
+    );
     render(
       <UiLanguageProvider>
-        <PortfolioPage />
+        <RouterProvider router={router} />
       </UiLanguageProvider>,
     );
   }
 
   it('uses the shared page shell and keeps the overview separate from positions', async () => {
-    render(<PortfolioPage />);
+    renderPortfolioPage();
     await waitForInitialLoad();
 
     const heading = screen.getByRole('heading', { name: '持仓管理' });
@@ -389,10 +403,53 @@ describe('PortfolioPage FX refresh', () => {
     expect(positionsSection).not.toBe(overview);
   });
 
+  it('restores selected account from the URL and keeps Back navigation in sync', async () => {
+    getAccounts.mockResolvedValueOnce(makeAccounts([
+      { id: 1, name: 'Main' },
+      { id: 2, name: 'Growth' },
+    ]));
+    getSnapshot.mockImplementation(async ({ accountId }: { accountId?: number } = {}) => makeSnapshot({
+      accountId,
+      accountCount: accountId ? 1 : 2,
+    }));
+    const router = renderPortfolioPage('/portfolio?account=2&ref=notification');
+
+    await waitFor(() => expect(getSnapshot).toHaveBeenCalledWith({
+      accountId: 2,
+      costMethod: 'fifo',
+      includeRealtime: false,
+    }));
+    expect(router.state.location.search).toBe('?account=2&ref=notification');
+
+    chooseOption(screen.getAllByRole('combobox')[0], '1');
+    await waitFor(() => expect(router.state.location.search).toBe('?account=1&ref=notification'));
+
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    await waitFor(() => expect(router.state.location.search).toBe('?account=2&ref=notification'));
+    await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({
+      accountId: 2,
+      costMethod: 'fifo',
+      includeRealtime: false,
+    }));
+  });
+
+  it('replaces an unavailable account deep link with the first active account', async () => {
+    getAccounts.mockResolvedValueOnce(makeAccounts([
+      { id: 1, name: 'Main' },
+      { id: 2, name: 'Growth' },
+    ]));
+    const router = renderPortfolioPage('/portfolio?account=999&keep=yes');
+
+    await waitFor(() => expect(router.state.location.search).toBe('?account=1&keep=yes'));
+    expect(screen.getAllByRole('combobox')[0]).toHaveTextContent('Main (#1)');
+  });
+
   it('shows only the account onboarding state when no portfolio account exists', async () => {
     getAccounts.mockResolvedValueOnce(makeAccounts([]));
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     expect(await screen.findByText('还没有可用账户，请先创建账户后再录入交易或导入 CSV。')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '添加账户' })).toBeInTheDocument();
@@ -408,7 +465,7 @@ describe('PortfolioPage FX refresh', () => {
       }
       return makeSnapshot({ accountId, fxStale: true });
     });
-    render(<PortfolioPage />);
+    renderPortfolioPage();
     await waitForInitialLoad();
 
     chooseOption(screen.getAllByRole('combobox')[0], '1');
@@ -433,7 +490,7 @@ describe('PortfolioPage FX refresh', () => {
   });
 
   it('uses fast portfolio valuation for page snapshot and risk loads', async () => {
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     await waitForInitialLoad();
 
@@ -444,7 +501,7 @@ describe('PortfolioPage FX refresh', () => {
   it('does not synthesize broker options when the broker catalog is empty', async () => {
     listImportBrokers.mockResolvedValueOnce({ brokers: [] });
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
     await waitForInitialLoad();
     await waitFor(() => expect(listImportBrokers).toHaveBeenCalledTimes(1));
 
@@ -457,7 +514,7 @@ describe('PortfolioPage FX refresh', () => {
   });
 
   it('renders stale FX status with a manual refresh button', async () => {
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     await waitForInitialLoad();
 
@@ -471,7 +528,7 @@ describe('PortfolioPage FX refresh', () => {
       limitations: ['realtime_quote_best_effort', 'fx_and_cost_basis_partial'],
     }));
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     await waitForInitialLoad();
 
@@ -519,7 +576,7 @@ describe('PortfolioPage FX refresh', () => {
       },
     }));
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     await waitForInitialLoad();
 
@@ -588,7 +645,7 @@ describe('PortfolioPage FX refresh', () => {
       },
     }));
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     await waitForInitialLoad();
 
@@ -608,7 +665,7 @@ describe('PortfolioPage FX refresh', () => {
       },
     }));
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     await waitForInitialLoad();
 
@@ -625,7 +682,7 @@ describe('PortfolioPage FX refresh', () => {
       .mockResolvedValueOnce(makeRisk())
       .mockReturnValueOnce(selectedAccountRisk.promise);
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     await waitForInitialLoad();
 
@@ -671,7 +728,7 @@ describe('PortfolioPage FX refresh', () => {
       errorCount: 0,
     });
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     await waitForInitialLoad();
 
@@ -692,7 +749,7 @@ describe('PortfolioPage FX refresh', () => {
       errorCount: 0,
     });
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     await waitForInitialLoad();
 
@@ -707,7 +764,7 @@ describe('PortfolioPage FX refresh', () => {
       { symbol: 'AAPL', market: 'us', currency: 'USD', quantity: 5, avgCost: 100, totalCost: 500, lastPrice: 0, marketValueBase: 0, unrealizedPnlBase: 0, unrealizedPnlPct: null, valuationCurrency: 'USD', priceSource: 'missing', priceDate: null, priceStale: true, priceAvailable: false },
     ] }));
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     await waitForInitialLoad();
 
@@ -742,7 +799,7 @@ describe('PortfolioPage FX refresh', () => {
     });
     getLatestDecisionSignals.mockResolvedValueOnce({ items: [latestSignal], total: 1, page: 1, pageSize: 1 });
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     expect(await screen.findByText('600519')).toBeInTheDocument();
     expect(await screen.findByText('分页后的风险摘要')).toBeInTheDocument();
@@ -790,7 +847,7 @@ describe('PortfolioPage FX refresh', () => {
       pageSize: 1,
     });
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     expect(await screen.findByText('Canonical timestamp winner')).toBeInTheDocument();
     expect(screen.queryByText('Canonical older risk')).not.toBeInTheDocument();
@@ -814,7 +871,7 @@ describe('PortfolioPage FX refresh', () => {
         pageSize: 1,
       });
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     expect(await screen.findByText('旧 AI 风险')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '刷新数据' }));
@@ -845,7 +902,7 @@ describe('PortfolioPage FX refresh', () => {
       pageSize: 1,
     });
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     expect(await screen.findByText('账号信号')).toBeInTheDocument();
     const signalCallsBeforeSwitch = getLatestDecisionSignals.mock.calls.length;
@@ -910,7 +967,7 @@ describe('PortfolioPage FX refresh', () => {
         pageSize: 1,
       });
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     expect(await screen.findByText('600519')).toBeInTheDocument();
 
@@ -960,7 +1017,7 @@ describe('PortfolioPage FX refresh', () => {
       return { items: [], total: 0, page: 1, pageSize: 1 };
     });
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     expect(await screen.findAllByText('A 股风险')).toHaveLength(2);
     expect(screen.getByText('港股风险')).toBeInTheDocument();
@@ -990,7 +1047,7 @@ describe('PortfolioPage FX refresh', () => {
       })
       .mockRejectedValueOnce(new Error('latest AAPL failed'));
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     expect(await screen.findByText('已加载风险')).toBeInTheDocument();
     expect(await screen.findByText('AI 建议降级')).toBeInTheDocument();
@@ -1010,7 +1067,7 @@ describe('PortfolioPage FX refresh', () => {
       pageSize: 1,
     });
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     expect(await screen.findAllByText('唯一 latest 风险')).toHaveLength(2);
     expect(getLatestDecisionSignals).toHaveBeenCalledTimes(1);
@@ -1036,7 +1093,7 @@ describe('PortfolioPage FX refresh', () => {
       return { items: [], total: 0, page: 1, pageSize: 1 };
     });
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     expect(await screen.findByText('AAPL0')).toBeInTheDocument();
     await waitFor(() => expect(getLatestDecisionSignals).toHaveBeenCalledTimes(10));
@@ -1049,7 +1106,7 @@ describe('PortfolioPage FX refresh', () => {
       { symbol: 'HK00700', market: 'hk', currency: 'HKD', quantity: 10, avgCost: 400, totalCost: 4000, lastPrice: 420, marketValueBase: 4200, unrealizedPnlBase: 200, unrealizedPnlPct: 5, valuationCurrency: 'HKD', priceSource: 'history_close', priceDate: '2026-03-18', priceStale: true, priceAvailable: true },
     ] }));
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     await waitForInitialLoad();
 
@@ -1081,7 +1138,7 @@ describe('PortfolioPage FX refresh', () => {
       errorCount: 0,
     });
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     await waitForInitialLoad();
 
@@ -1101,7 +1158,7 @@ describe('PortfolioPage FX refresh', () => {
       errorCount: 0,
     });
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     await waitForInitialLoad();
 
@@ -1120,7 +1177,7 @@ describe('PortfolioPage FX refresh', () => {
       errorCount: 1,
     });
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     await waitForInitialLoad();
 
@@ -1148,7 +1205,7 @@ describe('PortfolioPage FX refresh', () => {
       ),
     );
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     await waitForInitialLoad();
 
@@ -1172,7 +1229,7 @@ describe('PortfolioPage FX refresh', () => {
         ),
       );
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     await waitForInitialLoad();
 
@@ -1203,7 +1260,7 @@ describe('PortfolioPage FX refresh', () => {
     }>();
     refreshFx.mockImplementationOnce(() => pendingRefresh.promise);
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     await waitForInitialLoad();
 
@@ -1253,7 +1310,7 @@ describe('PortfolioPage FX refresh', () => {
     }>();
     refreshFx.mockImplementationOnce(() => pendingRefresh.promise);
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     await waitForInitialLoad();
 
@@ -1298,7 +1355,7 @@ describe('PortfolioPage FX refresh', () => {
       .mockResolvedValueOnce(makeRisk())
       .mockReturnValueOnce(selectedAccountRisk.promise);
 
-    render(<PortfolioPage />);
+    renderPortfolioPage();
 
     await waitForInitialLoad();
 
@@ -1336,7 +1393,7 @@ describe('PortfolioPage FX refresh', () => {
         createApiError(createParsedApiError({ title: '提交失败', message: '响应超时' })),
       )
       .mockResolvedValueOnce({ id: 91 });
-    render(<PortfolioPage />);
+    renderPortfolioPage();
     await waitForInitialLoad();
 
     chooseOption(screen.getAllByRole('combobox')[0], '1');
@@ -1358,7 +1415,7 @@ describe('PortfolioPage FX refresh', () => {
   it('locks trade fields and close behavior while a mutation is pending', async () => {
     const pendingTrade = deferredPromise<{ id: number }>();
     createTrade.mockReturnValueOnce(pendingTrade.promise);
-    render(<PortfolioPage />);
+    renderPortfolioPage();
     await waitForInitialLoad();
 
     chooseOption(screen.getAllByRole('combobox')[0], '1');
@@ -1405,7 +1462,7 @@ describe('PortfolioPage FX refresh', () => {
         dryRun: false,
         errors: [],
       });
-    render(<PortfolioPage />);
+    renderPortfolioPage();
     await waitForInitialLoad();
 
     chooseOption(screen.getAllByRole('combobox')[0], '1');
@@ -1450,7 +1507,7 @@ describe('PortfolioPage FX refresh', () => {
         dryRun: false,
         errors: [],
       });
-    render(<PortfolioPage />);
+    renderPortfolioPage();
     await waitForInitialLoad();
 
     chooseOption(screen.getAllByRole('combobox')[0], '1');

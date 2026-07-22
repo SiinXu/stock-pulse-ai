@@ -85,6 +85,35 @@ blocked while unchanged or in flight, and a loading Apply cannot close the
 Drawer early. New filter surfaces should prefer `FilterBar` plus
 `AdvancedFilterSheet` unless they need this existing split-filter contract.
 
+## Deep Link And URL State Semantics
+
+`utils/deepLink.ts` is the neutral authority for links that move stock,
+report, chat, portfolio, or decision-signal context between major views.
+Callers use the typed `buildDeepLink()` target union instead of interpolating
+query strings. `parseDeepLink()` accepts only same-origin stable routes,
+canonicalizes stock codes and positive numeric identities, removes invalid
+owned values, and preserves unrelated non-sensitive query parameters.
+
+The current shareable state contract includes Home report and Run Flow
+identity, Home stock prefill and workspace view, Chat session/report context,
+Portfolio account scope, stock-details period/range, Decision Signals stock and
+signal context, and the existing page-owned filter codecs. User choices create
+history entries when Back/Forward should restore them. Canonicalization,
+missing-resource fallback, and default-value removal use Router replace
+navigation so they do not create dead history entries.
+
+Credentials, authorization values, passwords, private keys, and secret-like
+parameters never belong in a deep link. The parser removes recognized
+sensitive keys before state restoration; Home presents a localized warning
+when its URL state is cleaned. Draft text, unsaved forms, notification payloads, and other
+potentially sensitive state stay out of URLs. A valid stock prefill never
+auto-submits analysis.
+
+Electron currently consumes the same browser routes after loading its private
+local Web origin. External custom-protocol registration and OS `open-url` or
+second-instance URL forwarding are not part of the Web contract and require a
+separate desktop-owned change.
+
 ## Selection Control Semantics
 
 `SelectionChip` is the shared compact choice for text-led candidates whose

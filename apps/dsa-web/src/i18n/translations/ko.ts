@@ -571,6 +571,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.historyButton": "역사 기록",
   "i18n.uiText.UI_TEXT.home.historyTrend": "역사적 경향",
   "i18n.uiText.UI_TEXT.home.inputInvalid": "잘못된 입력",
+  "i18n.uiText.UI_TEXT.home.invalidDeepLinkMessage": "링크에 유효하지 않거나 민감한 상태 매개변수가 포함되어 있어 안전하게 제거하고 기본값을 복원했습니다.",
+  "i18n.uiText.UI_TEXT.home.invalidDeepLinkTitle": "유효하지 않은 링크",
   "i18n.uiText.UI_TEXT.home.invalidRecordLinkMessage": "보고서 링크에는 잘못된 기록 ID가 포함되어 있습니다. 주소에서 삭제되었습니다.",
   "i18n.uiText.UI_TEXT.home.invalidRecordLinkTitle": "유효하지 않은 신고 링크",
   "i18n.uiText.UI_TEXT.home.invalidRunFlowLinkMessage": "런타임 스트림 링크는 유효한 작업 또는 레코드 식별자가 없으며 주소에서 제거되었습니다.",

@@ -571,6 +571,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.historyButton": "Catatan sejarah",
   "i18n.uiText.UI_TEXT.home.historyTrend": "Tren sejarah",
   "i18n.uiText.UI_TEXT.home.inputInvalid": "Masukan tidak valid",
+  "i18n.uiText.UI_TEXT.home.invalidDeepLinkMessage": "Tautan berisi parameter status yang tidak valid atau sensitif. Parameter tersebut dihapus dengan aman dan nilai default dipulihkan.",
+  "i18n.uiText.UI_TEXT.home.invalidDeepLinkTitle": "Tautan tidak valid",
   "i18n.uiText.UI_TEXT.home.invalidRecordLinkMessage": "Tautan laporan berisi ID rekaman yang tidak valid. Itu dihapus dari alamat.",
   "i18n.uiText.UI_TEXT.home.invalidRecordLinkTitle": "Tautan laporan tidak valid",
   "i18n.uiText.UI_TEXT.home.invalidRunFlowLinkMessage": "Tautan aliran runtime tidak memiliki tugas yang valid atau pengidentifikasi rekaman dan telah dihapus dari alamat.",

@@ -571,6 +571,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.historyButton": "Rekod sejarah",
   "i18n.uiText.UI_TEXT.home.historyTrend": "Trend sejarah",
   "i18n.uiText.UI_TEXT.home.inputInvalid": "Input tidak sah",
+  "i18n.uiText.UI_TEXT.home.invalidDeepLinkMessage": "Pautan mengandungi parameter keadaan yang tidak sah atau sensitif. Parameter tersebut telah dialih keluar dengan selamat dan nilai lalai dipulihkan.",
+  "i18n.uiText.UI_TEXT.home.invalidDeepLinkTitle": "Pautan tidak sah",
   "i18n.uiText.UI_TEXT.home.invalidRecordLinkMessage": "Pautan laporan mengandungi ID rekod yang tidak sah. Ia telah dikeluarkan daripada alamat.",
   "i18n.uiText.UI_TEXT.home.invalidRecordLinkTitle": "Pautan laporan tidak sah",
   "i18n.uiText.UI_TEXT.home.invalidRunFlowLinkMessage": "Pautan strim masa jalan tidak mempunyai pengecam tugas atau rekod yang sah dan telah dialih keluar daripada alamat.",

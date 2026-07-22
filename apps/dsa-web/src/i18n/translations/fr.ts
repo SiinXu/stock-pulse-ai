@@ -571,6 +571,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.historyButton": "Archives historiques",
   "i18n.uiText.UI_TEXT.home.historyTrend": "Tendance historique",
   "i18n.uiText.UI_TEXT.home.inputInvalid": "Entrée invalide",
+  "i18n.uiText.UI_TEXT.home.invalidDeepLinkMessage": "Le lien contenait des paramètres d’état invalides ou sensibles. Ils ont été supprimés en toute sécurité et les valeurs par défaut ont été restaurées.",
+  "i18n.uiText.UI_TEXT.home.invalidDeepLinkTitle": "Lien invalide",
   "i18n.uiText.UI_TEXT.home.invalidRecordLinkMessage": "Le lien du rapport contient un identifiant d’enregistrement invalide. Il a été retiré de l’adresse.",
   "i18n.uiText.UI_TEXT.home.invalidRecordLinkTitle": "Lien de signalement invalide",
   "i18n.uiText.UI_TEXT.home.invalidRunFlowLinkMessage": "Le lien du flux d’exécution n’a pas d’identifiant de tâche ou d’enregistrement valide et a été retiré de l’adresse.",

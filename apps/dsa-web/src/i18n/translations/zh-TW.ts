@@ -571,6 +571,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.historyButton": "歷史記錄",
   "i18n.uiText.UI_TEXT.home.historyTrend": "歷史趨勢",
   "i18n.uiText.UI_TEXT.home.inputInvalid": "輸入有誤",
+  "i18n.uiText.UI_TEXT.home.invalidDeepLinkMessage": "連結包含無效或敏感的狀態參數，已安全移除並恢復預設值。",
+  "i18n.uiText.UI_TEXT.home.invalidDeepLinkTitle": "連結無效",
   "i18n.uiText.UI_TEXT.home.invalidRecordLinkMessage": "報告連結中的記錄 ID 無效，已從地址中移除。",
   "i18n.uiText.UI_TEXT.home.invalidRecordLinkTitle": "報告連結無效",
   "i18n.uiText.UI_TEXT.home.invalidRunFlowLinkMessage": "執行流連結缺少有效的任務或記錄標識，已從地址中移除。",
