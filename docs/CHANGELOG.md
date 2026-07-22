@@ -293,8 +293,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Anchored coarse-pointer Web hit-target expansions to their owning controls so compact links cannot intercept taps across a surrounding drawer.
 - [Changed] Split notification routing, rendering, report setup, and dispatch methods into focused private modules while preserving the `src.notification` facade and delivery behavior.
 - [Fixed] Applied one recursive sensitive-data redaction policy to logs, API errors, Agent traces and audits, diagnostics exports, and provider errors, with debug-safe defaults and fail-closed protocol-trace handling.
-- [Fixed] Preserved Data Provider plugin market, capability, and priority eligibility in in-flight snapshots during concurrent unload.
 - [Docs] Aligned maintained Markdown source-install guidance with the constrained pip bootstrap, PEP 517 build constraint, and pip check required by the reproducible dependency contract.
+- [Fixed] Preserved Data Provider plugin market, capability, and priority eligibility in in-flight snapshots during concurrent unload.
 
 ## [3.26.3] - 2026-07-15
 
