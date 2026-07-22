@@ -3,6 +3,12 @@ import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import * as AuthContext from './contexts/AuthContext';
+import {
+  APP_ROUTE_PATHS,
+  LEGACY_ROUTE_PATHS,
+  SETTINGS_ROUTE_QUERY_KEYS,
+  SETTINGS_SECTION_IDS,
+} from './routing/routes';
 import { recordSessionLocation } from './utils/sessionContinuity';
 import { UI_LANGUAGE_STORAGE_KEY } from './utils/uiLanguage';
 
@@ -55,10 +61,6 @@ vi.mock('./pages/BacktestPage', () => ({
 
 vi.mock('./pages/AlertsPage', () => ({
   default: () => <div data-testid="alerts-page">Alerts</div>,
-}));
-
-vi.mock('./pages/TokenUsagePage', () => ({
-  default: () => <div data-testid="token-usage-page">Usage</div>,
 }));
 
 vi.mock('./pages/SettingsPage', () => ({
@@ -210,13 +212,23 @@ describe('App routing behavior', () => {
     expect(window.location.search).toBe('');
   });
 
-  it('routes /usage to the token usage page after auth is ready', async () => {
-    window.history.pushState({}, '', '/usage');
+  it('redirects the legacy usage route into Settings with query and hash preserved', async () => {
+    window.history.pushState(
+      {},
+      '',
+      `${LEGACY_ROUTE_PATHS.usage}?period=today&section=legacy#breakdown`,
+    );
 
     render(<App />);
 
-    expect(await screen.findByTestId('token-usage-page')).toBeInTheDocument();
-    expect(setCurrentRoute).toHaveBeenCalledWith('/usage');
+    expect(await screen.findByTestId('settings-page')).toBeInTheDocument();
+    expect(window.location.pathname).toBe(APP_ROUTE_PATHS.settings);
+    expect(window.location.hash).toBe('#breakdown');
+    const searchParams = new URLSearchParams(window.location.search);
+    expect(searchParams.get('period')).toBe('today');
+    expect(searchParams.get(SETTINGS_ROUTE_QUERY_KEYS.section))
+      .toBe(SETTINGS_SECTION_IDS.usage);
+    expect(setCurrentRoute).toHaveBeenLastCalledWith(APP_ROUTE_PATHS.settings);
     expect(screen.queryByTestId('home-page')).not.toBeInTheDocument();
   });
 

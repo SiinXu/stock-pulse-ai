@@ -8,6 +8,11 @@ import { PORTFOLIO_TEXT } from '../src/locales/portfolio';
 import { SCREENING_TEXT } from '../src/locales/screening';
 import { loginAsE2eAdmin, getE2eAuthStatus } from './auth-fixture';
 import { UI_LANGUAGE_METADATA, type UiLanguage } from '../src/i18n/uiLanguages';
+import {
+  APP_ROUTE_PATHS,
+  SETTINGS_SECTION_IDS,
+  buildSettingsSectionHref,
+} from '../src/routing/routes';
 
 const fakeProviderPort = Number(process.env.DSA_WEB_SMOKE_PROVIDER_PORT || 18101);
 const BUILT_IN_PROVIDER_LABELS = {
@@ -17,6 +22,7 @@ const BUILT_IN_PROVIDER_LABELS = {
   custom: { zh: '自定义兼容服务', en: 'Custom compatible service' },
 } as const;
 const CHINESE_SCRIPT = /[\u3400-\u9fff]/;
+const usageSettingsHref = buildSettingsSectionHref(SETTINGS_SECTION_IDS.usage);
 const HOME_NAV_LABELS: Record<UiLanguage, string> = {
   zh: '首页',
   'zh-TW': '首頁',
@@ -200,8 +206,8 @@ test.describe('complete UI i18n acceptance', () => {
       { path: '/decision-signals', text: UI_TEXT.en['decisionSignals.title'], title: UI_TEXT.en['decisionSignals.pageTitle'] },
       { path: '/backtest', text: BACKTEST_TEXT.en.runBacktest, title: BACKTEST_TEXT.en.documentTitle },
       { path: '/alerts', text: ALERT_PAGE_TEXT.en.title, title: ALERT_PAGE_TEXT.en.documentTitle },
-      { path: '/usage', text: UI_TEXT.en['usage.title'], title: UI_TEXT.en['usage.title'] },
-      { path: '/settings', text: UI_TEXT.en['settings.pageTitle'], title: UI_TEXT.en['settings.pageTitle'] },
+      { path: usageSettingsHref, text: UI_TEXT.en['usage.title'], title: UI_TEXT.en['usage.title'] },
+      { path: APP_ROUTE_PATHS.settings, text: UI_TEXT.en['settings.pageTitle'], title: UI_TEXT.en['settings.pageTitle'] },
       { path: '/missing-i18n-route', text: UI_TEXT.en['notFound.title'], title: UI_TEXT.en['notFound.pageTitle'] },
     ];
 

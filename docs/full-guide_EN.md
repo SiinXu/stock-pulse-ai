@@ -1406,7 +1406,7 @@ For this feature, the product behavior is:
 | `/api/v1/decision-signals/{signal_id}/status` | PATCH | Update a decision signal status and optional metadata |
 | `/api/v1/decision-signals/latest/{stock_code}` | GET | Query the latest active decision signals for a stock |
 | `/api/v1/usage/summary?period=today|month|all` | GET | Query LLM call counts and token usage grouped by call type and model |
-| `/api/v1/usage/dashboard?period=today|month|all&limit=50` | GET | Return token-usage dashboard data: totals, prompt/completion split, model usage, call-type breakdown, and recent call records; the Web entry is the sidebar Usage page |
+| `/api/v1/usage/dashboard?period=today|month|all&limit=50` | GET | Return token-usage dashboard data: totals, prompt/completion split, model usage, call-type breakdown, and recent call records; the Web entry is Settings > Usage & cost, with legacy `/usage` links redirected for compatibility |
 | `/api/v1/backtest/run` | POST | Trigger backtest |
 | `/api/v1/backtest/results` | GET | Query backtest results (paginated) |
 | `/api/v1/backtest/performance` | GET | Get overall backtest performance |

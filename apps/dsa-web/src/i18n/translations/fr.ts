@@ -150,6 +150,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.system_security.views.runtime.label": "Planification",
   "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.system_security.views.security.label": "Authentification et sécurité",
   "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.system_security.views.service.label": "Web et journaux",
+  "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.usage.label": "Utilisation et coûts",
   "i18n.uiText.UI_TEXT.chat.actionFailed": "Action échouée. Essaie encore.",
   "i18n.uiText.UI_TEXT.chat.addWatchlist": "Ajouter à la liste de visionnage",
   "i18n.uiText.UI_TEXT.chat.aiReplyHeading": "Réponse IA",
