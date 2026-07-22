@@ -158,6 +158,8 @@ OpenAI-compatible Base URL 只填到服务商兼容入口，不额外拼接 `/ch
 
 Ollama 默认 Base URL `http://127.0.0.1:11434` 主要面向本地、Docker 或能访问该服务的 self-hosted runner。GitHub-hosted runner 通常没有本地 Ollama 服务，直接配置 `LLM_CHANNELS=ollama` 大概率会连接失败。
 
+loopback 与私网出站目标默认拒绝；本地 Ollama 还需配置 `OUTBOUND_HTTP_ALLOWLIST=127.0.0.1:11434`（使用 `localhost` 时保持同名精确匹配）。Hermes 与其他私有兼容服务也必须加入各自的精确 `host:port`。详见 [出站 HTTP 安全策略](security-outbound-policy.md)。
+
 ### Hermes 本地 HTTP generation（Phase 3）
 
 Hermes 是 reserved 本地 HTTP generation preset，只通过 `LLM_CHANNELS=hermes` 启用。默认协议为 `openai`，默认地址为 `http://127.0.0.1:8642/v1`，默认模型为 `hermes-agent`：
@@ -167,6 +169,7 @@ LLM_CHANNELS=hermes
 LLM_HERMES_PROVIDER=custom
 LLM_HERMES_PROTOCOL=openai
 LLM_HERMES_BASE_URL=http://127.0.0.1:8642/v1
+OUTBOUND_HTTP_ALLOWLIST=127.0.0.1:8642
 LLM_HERMES_API_KEY=sk-local-hermes
 LLM_HERMES_MODELS=hermes-agent
 LITELLM_MODEL=openai/hermes-agent

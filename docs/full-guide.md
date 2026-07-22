@@ -247,7 +247,7 @@ stock-pulse-ai/
 | `LITELLM_FALLBACK_MODELS` | 备选模型，逗号分隔 | - | 否 |
 | `LLM_CHANNELS` | 渠道名称列表（逗号分隔），配合 `LLM_{NAME}_*` 使用，详见 [LLM 配置指南](LLM_CONFIG_GUIDE.md) | - | 否 |
 | `LLM_HERMES_API_KEY` | Hermes reserved 本地 HTTP generation 的单一 API Key；只应来自 `.env`、运行时配置或 Secrets | - | Hermes 使用时必填 |
-| `LLM_HERMES_BASE_URL` | Hermes 本地 loopback `/v1` 地址；默认 `http://127.0.0.1:8642/v1`，不支持远程地址 | `http://127.0.0.1:8642/v1` | 否 |
+| `LLM_HERMES_BASE_URL` | Hermes 本地 loopback `/v1` 地址；默认 `http://127.0.0.1:8642/v1`，不支持远程地址；同时需设置 `OUTBOUND_HTTP_ALLOWLIST=127.0.0.1:8642` | `http://127.0.0.1:8642/v1` | 否 |
 | `LLM_HERMES_MODELS` | Hermes 原始模型列表；Phase 3 默认 `hermes-agent`，运行时 route 为 `openai/hermes-agent`，不支持 Vision / stream / tools / Agent tools | `hermes-agent` | 否 |
 | `LITELLM_CONFIG` | 高级模型路由 YAML 配置文件路径（高级） | - | 否 |
 | `LLM_PROMPT_CACHE_TELEMETRY_ENABLED` | Provider prompt cache usage / diagnostics 遥测；不控制 provider implicit cache | `true` | 否 |
@@ -262,7 +262,7 @@ stock-pulse-ai/
 | `GEMINI_MODEL_FALLBACK` | 备选模型（legacy） | `gemini-3-flash-preview` | 否 |
 | `OPENAI_API_KEY` | OpenAI 兼容 API Key | - | 可选 |
 | `OPENAI_BASE_URL` | OpenAI 兼容 API 地址 | - | 可选 |
-| `OLLAMA_API_BASE` | Ollama 本地服务地址（如 `http://localhost:11434`），详见 [LLM 配置指南](LLM_CONFIG_GUIDE.md) | - | 可选 |
+| `OLLAMA_API_BASE` | Ollama 本地服务地址（如 `http://localhost:11434`）；私网/loopback 目标需同步加入 `OUTBOUND_HTTP_ALLOWLIST`，详见 [LLM 配置指南](LLM_CONFIG_GUIDE.md) 与 [出站 HTTP 安全策略](security-outbound-policy.md) | - | 可选 |
 | `OPENAI_MODEL` | OpenAI 模型名称（legacy，AIHubmix 用户可填如 `gemini-3.1-pro-preview`、`gpt-5.5`） | `gpt-5.5` | 可选 |
 | `ANTHROPIC_API_KEY` | Anthropic Claude API Key | - | 可选 |
 | `ANTHROPIC_MODEL` | Claude 模型名称 | `claude-sonnet-4-6` | 可选 |

@@ -13,6 +13,8 @@ from typing import Optional
 
 import requests
 
+from src.security.outbound_policy import safe_post
+
 from src.config import Config
 from src.utils.sanitize import log_safe_exception
 from src.formatters import markdown_to_html_document
@@ -90,14 +92,15 @@ class AstrbotSender:
                     hashlib.sha256
                 ).hexdigest()
             url = self._astrbot_config['astrbot_url']
-            response = requests.post(
+            response = safe_post(
                 url, json=payload, timeout=timeout_seconds or 10,
                 headers={
                     "Content-Type": "application/json",
                     "X-Signature": signature,
                     "X-Timestamp": timestamp
                 },
-                verify=self._webhook_verify_ssl
+                verify=self._webhook_verify_ssl,
+                transport=requests,
             )
 
             if response.status_code == 200:
@@ -106,7 +109,7 @@ class AstrbotSender:
             else:
                 logger.error(f"AstrBot 发送失败: {response.status_code} {response.text}")
                 return False
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Channel failure is safely logged and isolated.
             log_safe_exception(
                 logger,
                 "AstrBot message delivery failed",

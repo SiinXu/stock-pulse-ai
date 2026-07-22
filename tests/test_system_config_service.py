@@ -1675,7 +1675,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertNotIn("tok123", str(payload))
 
     @patch("src.notification_sender.wechat_sender.requests.post")
-    def test_test_notification_channel_strips_url_userinfo_from_target(self, mock_post) -> None:
+    def test_test_notification_channel_rejects_url_userinfo(self, mock_post) -> None:
         mock_post.return_value = self._mock_http_response(200, {"errcode": 0})
 
         with self._notification_test_env():
@@ -1692,11 +1692,11 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
                 timeout_seconds=3,
             )
 
-        self.assertTrue(payload["success"])
-        target = payload["attempts"][0]["target"]
-        self.assertIn("https://example.com/cgi-bin/webhook/send?key=***", target)
-        self.assertNotIn("user", target)
-        self.assertNotIn("password", target)
+        self.assertFalse(payload["success"])
+        mock_post.assert_not_called()
+        self.assertNotIn("user", str(payload))
+        self.assertNotIn("password", str(payload))
+        self.assertNotIn("key=secret", str(payload))
 
     @patch("src.notification_sender.discord_sender.requests.post")
     def test_test_notification_channel_prefers_discord_main_channel_alias(self, mock_post) -> None:
@@ -3122,15 +3122,29 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
                     f"Expected ssrf_blocked for base_url={bad_url!r}, got: {validation['issues']}",
                 )
 
-    def test_validate_allows_localhost_base_url(self) -> None:
-        """localhost/LAN base_url must not be blocked (legitimate Ollama endpoints)."""
-        validation = self.service.validate(
-            items=[
-                {"key": "LLM_CHANNELS", "value": "local"},
-                {"key": "LLM_LOCAL_PROTOCOL", "value": "ollama"},
-                {"key": "LLM_LOCAL_MODELS", "value": "llama3"},
-                {"key": "LLM_LOCAL_API_KEY", "value": ""},
-                {"key": "LLM_LOCAL_BASE_URL", "value": "http://localhost:11434"},
-            ]
-        )
+    def test_validate_rejects_localhost_base_url_by_default(self) -> None:
+        """Local LLM targets require an explicit outbound allowlist entry."""
+        with patch.dict(os.environ, {"OUTBOUND_HTTP_ALLOWLIST": ""}, clear=False):
+            validation = self.service.validate(
+                items=[
+                    {"key": "LLM_CHANNELS", "value": "local"},
+                    {"key": "LLM_LOCAL_PROTOCOL", "value": "ollama"},
+                    {"key": "LLM_LOCAL_MODELS", "value": "llama3"},
+                    {"key": "LLM_LOCAL_API_KEY", "value": ""},
+                    {"key": "LLM_LOCAL_BASE_URL", "value": "http://localhost:11434"},
+                ]
+            )
+        self.assertTrue(any(issue["code"] == "ssrf_blocked" for issue in validation["issues"]))
+
+    def test_validate_allows_allowlisted_localhost_base_url(self) -> None:
+        with patch.dict(os.environ, {"OUTBOUND_HTTP_ALLOWLIST": "localhost:11434"}, clear=False):
+            validation = self.service.validate(
+                items=[
+                    {"key": "LLM_CHANNELS", "value": "local"},
+                    {"key": "LLM_LOCAL_PROTOCOL", "value": "ollama"},
+                    {"key": "LLM_LOCAL_MODELS", "value": "llama3"},
+                    {"key": "LLM_LOCAL_API_KEY", "value": ""},
+                    {"key": "LLM_LOCAL_BASE_URL", "value": "http://localhost:11434"},
+                ]
+            )
         self.assertFalse(any(issue["code"] == "ssrf_blocked" for issue in validation["issues"]))

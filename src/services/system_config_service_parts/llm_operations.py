@@ -204,26 +204,15 @@ class _SystemConfigLLMOperationsMethods:
             )
 
         try:
+            from src.security.outbound_policy import safe_get
+
             started_at = time.perf_counter()
-            if is_reserved_hermes_name(channel_name):
-                session = requests.Session()
-                session.trust_env = False
-                try:
-                    response = session.get(
-                        models_url,
-                        headers=request_headers,
-                        timeout=max(5.0, float(timeout_seconds)),
-                        allow_redirects=False,
-                    )
-                finally:
-                    session.close()
-            else:
-                response = requests.get(
-                    models_url,
-                    headers=request_headers,
-                    timeout=max(5.0, float(timeout_seconds)),
-                    allow_redirects=False,
-                )
+            response = safe_get(
+                models_url,
+                headers=request_headers,
+                timeout=max(5.0, float(timeout_seconds)),
+                allow_redirects=False,
+            )
             latency_ms = int((time.perf_counter() - started_at) * 1000)
         except requests.RequestException as exc:
             log_safe_exception(

@@ -27,6 +27,8 @@ from src.services.system_config_service import ConfigConflictError, ConfigImport
 
 class _SystemConfigServiceTestCaseBase(unittest.TestCase):
     def setUp(self) -> None:
+        self._original_outbound_allowlist = os.environ.get("OUTBOUND_HTTP_ALLOWLIST")
+        os.environ["OUTBOUND_HTTP_ALLOWLIST"] = "localhost,127.0.0.1"
         self._saved_notification_env = {
             key: os.environ[key]
             for key in SystemConfigService._NOTIFICATION_TEST_KEY_MAP
@@ -61,6 +63,10 @@ class _SystemConfigServiceTestCaseBase(unittest.TestCase):
 
     def tearDown(self) -> None:
         Config.reset_instance()
+        if self._original_outbound_allowlist is None:
+            os.environ.pop("OUTBOUND_HTTP_ALLOWLIST", None)
+        else:
+            os.environ["OUTBOUND_HTTP_ALLOWLIST"] = self._original_outbound_allowlist
         if self._orig_env_file is None:
             os.environ.pop("ENV_FILE", None)
         else:

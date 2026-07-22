@@ -27,6 +27,7 @@ from pydantic import BaseModel, Field
 
 from src.auth import COOKIE_NAME, is_auth_enabled, refresh_auth_state, verify_session
 from src.config import Config, DEFAULT_ALPHASIFT_INSTALL_SPEC, get_configured_llm_models
+from src.security.outbound_policy import guard_outbound_urls
 from src.utils.sanitize import log_safe_exception, sanitize_sensitive_text
 
 logger = logging.getLogger(__name__)
@@ -3022,13 +3023,13 @@ class DsaEastMoneyHotspotProvider:
 
     def _fetch_ths_constituents(self, topic: str) -> Any:
         import pandas as pd
-        import requests
+        from src.security.outbound_policy import safe_get
 
         code = self._resolve_ths_concept_code(topic)
         if not code:
             return pd.DataFrame()
         url = f"http://q.10jqka.com.cn/gn/detail/code/{code}/"
-        response = requests.get(
+        response = safe_get(
             url,
             headers={"User-Agent": "Mozilla/5.0", "Referer": "http://q.10jqka.com.cn/gn/"},
             timeout=self._HTTP_TIMEOUT_SECONDS,
@@ -3313,8 +3314,20 @@ def _alphasift_litellm_headers(config: Config) -> Iterator[None]:
 
     def completion_with_dsa_headers(*args: Any, **kwargs: Any) -> Any:
         routes = _ALPHASIFT_LITELLM_COMPLETION_ROUTES.get()
+        outbound_urls: List[str] = []
         if routes:
-            headers = _match_alphasift_litellm_headers(args, kwargs, routes)
+            matching_routes = _match_alphasift_litellm_routes(args, kwargs, routes)
+            headers = next(
+                (
+                    dict(route.get("extra_headers") or {})
+                    for route in matching_routes
+                    if route.get("extra_headers")
+                ),
+                {},
+            )
+            outbound_urls = _dedupe_strings(
+                [route.get("api_base") for route in matching_routes]
+            )
             if headers:
                 existing_headers = kwargs.get("extra_headers")
                 if isinstance(existing_headers, dict):
@@ -3325,7 +3338,12 @@ def _alphasift_litellm_headers(config: Config) -> Iterator[None]:
                 elif existing_headers in (None, ""):
                     kwargs = dict(kwargs)
                     kwargs["extra_headers"] = dict(headers)
-        return original_completion(*args, **kwargs)
+        for key in ("api_base", "base_url", "azure_endpoint"):
+            value = _env_text(kwargs.get(key))
+            if value and value not in outbound_urls:
+                outbound_urls.append(value)
+        with guard_outbound_urls(outbound_urls, strict_dns=True):
+            return original_completion(*args, **kwargs)
 
     setattr(completion_with_dsa_headers, _ALPHASIFT_LITELLM_COMPLETION_ATTR, True)
     setattr(completion_with_dsa_headers, "_alphasift_litellm_completion_original", original_completion)
@@ -3385,7 +3403,10 @@ def _build_alphasift_litellm_header_routes(config: Config) -> List[Dict[str, Any
         if not isinstance(params, dict):
             continue
         headers = params.get("extra_headers")
-        if not isinstance(headers, dict) or not headers:
+        if not isinstance(headers, dict):
+            headers = {}
+        api_base = _env_text(params.get("api_base") or params.get("base_url"))
+        if not headers and not api_base:
             continue
         model_names = _dedupe_strings([
             entry.get("model_name"),
@@ -3397,26 +3418,43 @@ def _build_alphasift_litellm_header_routes(config: Config) -> List[Dict[str, Any
             {
                 "models": model_names,
                 "api_key": _env_text(params.get("api_key")),
-                "api_base": _env_text(params.get("api_base") or params.get("base_url")),
+                "api_base": api_base,
                 "extra_headers": dict(headers),
+            }
+        )
+    legacy_base_url = _env_text(config.openai_base_url)
+    primary_model, fallback_models = _resolve_alphasift_llm_models(config)
+    legacy_models = _dedupe_strings([primary_model, *fallback_models])
+    if legacy_base_url and legacy_models and not any(
+        route.get("api_base") == legacy_base_url
+        and set(route.get("models") or []).intersection(legacy_models)
+        for route in routes
+    ):
+        routes.append(
+            {
+                "models": legacy_models,
+                "api_key": "",
+                "api_base": legacy_base_url,
+                "extra_headers": {},
             }
         )
     return routes
 
 
-def _match_alphasift_litellm_headers(
+def _match_alphasift_litellm_routes(
     args: Tuple[Any, ...],
     kwargs: Dict[str, Any],
     routes: List[Dict[str, Any]],
-) -> Dict[str, Any]:
+) -> List[Dict[str, Any]]:
     model = _env_text(kwargs.get("model"))
     if not model and args:
         model = _env_text(args[0])
     if not model:
-        return {}
+        return []
 
     api_key = _env_text(kwargs.get("api_key"))
     api_base = _env_text(kwargs.get("api_base") or kwargs.get("base_url"))
+    matches: List[Dict[str, Any]] = []
     for route in routes:
         if model not in set(route.get("models") or []):
             continue
@@ -3426,9 +3464,8 @@ def _match_alphasift_litellm_headers(
         route_api_base = _env_text(route.get("api_base"))
         if route_api_base and api_base and route_api_base != api_base:
             continue
-        headers = route.get("extra_headers")
-        return dict(headers) if isinstance(headers, dict) else {}
-    return {}
+        matches.append(route)
+    return matches
 
 
 def _resolve_dsa_llm_max_candidates(max_results: Optional[int]) -> int:

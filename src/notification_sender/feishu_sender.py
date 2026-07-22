@@ -20,6 +20,8 @@ from typing import Any, Dict, Optional
 
 import requests
 
+from src.security.outbound_policy import safe_post
+
 from src.config import Config
 from src.formatters import (
     MIN_MAX_BYTES,
@@ -612,11 +614,12 @@ class FeishuSender:
             request_payload = dict(payload)
             request_payload.update(security_fields)
             try:
-                response = requests.post(
+                response = safe_post(
                     self._feishu_url,
                     json=request_payload,
                     timeout=timeout_seconds or _WEBHOOK_SEND_TIMEOUT_SECONDS,
                     verify=self._webhook_verify_ssl,
+                    transport=requests,
                 )
             except (requests.exceptions.ConnectionError,
                     requests.exceptions.Timeout,

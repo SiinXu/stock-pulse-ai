@@ -24,6 +24,7 @@ from tenacity import (
     retry_if_exception_type,
 )
 
+from src.security.outbound_policy import safe_get
 from src.utils.sanitize import log_safe_exception, safe_before_sleep_log
 
 logger = logging.getLogger(__name__)
@@ -55,7 +56,7 @@ _REQUEST_RETRY_WAIT_CAP = 5  # wait_exponential(..., max=5)
 def _get_with_retry(url: str, *, headers: Dict[str, str], params: Optional[Dict[str, Any]] = None,
                     timeout: int = _REQUEST_TIMEOUT) -> requests.Response:
     """GET with retry on transient network errors."""
-    return requests.get(url, headers=headers, params=params or {}, timeout=timeout)
+    return safe_get(url, headers=headers, params=params or {}, timeout=timeout)
 
 
 class SocialSentimentService:

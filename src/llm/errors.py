@@ -4,13 +4,15 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Callable, Dict, List, Optional
+from contextlib import contextmanager
+from typing import Any, Callable, Dict, Iterator, List, Optional
 
 from src.llm.generation_params import (
     GenerationParamRecovery,
     apply_litellm_param_recovery,
     remember_litellm_generation_param_recovery,
 )
+from src.security.outbound_policy import guard_outbound_urls
 
 _UNSUPPORTED_PARAM_MARKERS = (
     "unsupported",
@@ -125,8 +127,13 @@ def call_litellm_with_param_recovery(
     """Call LiteLLM once, then retry once for explicit generation-parameter errors."""
     effective_kwargs = dict(call_kwargs)
     try:
-        return call(effective_kwargs)
-    except Exception as exc:
+        with guard_litellm_outbound_call(
+            model=model,
+            call_kwargs=effective_kwargs,
+            model_list=model_list,
+        ):
+            return call(effective_kwargs)
+    except Exception as exc:  # broad-exception: cleanup - Inspect for one scoped retry; unmatched errors re-raise.
         recovery = classify_litellm_generation_param_error(exc)
         if recovery is None:
             raise
@@ -140,7 +147,12 @@ def call_litellm_with_param_recovery(
                 model,
                 recovery.reason,
             )
-        response = call(retry_kwargs)
+        with guard_litellm_outbound_call(
+            model=model,
+            call_kwargs=retry_kwargs,
+            model_list=model_list,
+        ):
+            response = call(retry_kwargs)
         if cache_recovery:
             remember_litellm_generation_param_recovery(
                 model,
@@ -149,3 +161,47 @@ def call_litellm_with_param_recovery(
                 request_overrides=retry_kwargs,
             )
         return response
+
+
+@contextmanager
+def guard_litellm_outbound_call(
+    *,
+    model: str,
+    call_kwargs: Dict[str, Any],
+    model_list: Optional[List[Dict[str, Any]]] = None,
+) -> Iterator[None]:
+    """Guard explicit HTTP endpoints that one LiteLLM call can select."""
+
+    outbound_urls = _litellm_outbound_urls(model, call_kwargs, model_list)
+    with guard_outbound_urls(outbound_urls, strict_dns=True):
+        yield
+
+
+def _litellm_outbound_urls(
+    model: str,
+    call_kwargs: Dict[str, Any],
+    model_list: Optional[List[Dict[str, Any]]],
+) -> List[str]:
+    """Return explicit HTTP base URLs that may be selected for one LiteLLM call."""
+
+    urls: List[str] = []
+    for key in ("api_base", "base_url", "azure_endpoint"):
+        value = str(call_kwargs.get(key) or "").strip()
+        if value:
+            urls.append(value)
+
+    for deployment in model_list or []:
+        if not isinstance(deployment, dict):
+            continue
+        params = deployment.get("litellm_params")
+        if not isinstance(params, dict):
+            continue
+        model_name = str(deployment.get("model_name") or "").strip()
+        wire_model = str(params.get("model") or "").strip()
+        if model not in {model_name, wire_model}:
+            continue
+        for key in ("api_base", "base_url", "azure_endpoint"):
+            value = str(params.get(key) or "").strip()
+            if value:
+                urls.append(value)
+    return list(dict.fromkeys(urls))

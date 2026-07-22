@@ -37,6 +37,7 @@ from src.config import (
     normalize_news_strategy_profile,
     resolve_news_window_days,
 )
+from src.security.outbound_policy import safe_get, safe_post
 from src.services.run_diagnostics import record_provider_run, record_provider_run_started
 from src.utils.sanitize import (
     exception_chain_redaction_values,
@@ -125,7 +126,13 @@ _SEARCH_TRANSIENT_EXCEPTIONS = (
 )
 def _post_with_retry(url: str, *, headers: Dict[str, str], json: Dict[str, Any], timeout: int) -> requests.Response:
     """POST with retry on transient SSL/network errors."""
-    return requests.post(url, headers=headers, json=json, timeout=timeout)
+    return safe_post(
+        url,
+        headers=headers,
+        json=json,
+        timeout=timeout,
+        transport=requests,
+    )
 
 
 @retry(
@@ -144,7 +151,13 @@ def _get_with_retry(
     url: str, *, headers: Dict[str, str], params: Dict[str, Any], timeout: int
 ) -> requests.Response:
     """GET with retry on transient SSL/network errors."""
-    return requests.get(url, headers=headers, params=params, timeout=timeout)
+    return safe_get(
+        url,
+        headers=headers,
+        params=params,
+        timeout=timeout,
+        transport=requests,
+    )
 
 
 def fetch_url_content(url: str, timeout: int = 5) -> str:
@@ -159,8 +172,16 @@ def fetch_url_content(url: str, timeout: int = 5) -> str:
         config.fetch_images = False  # Do not download images
         config.memoize_articles = False # Not cached
 
-        article = Article(url, config=config, language='zh') # Default is Chinese, but also supports others
-        article.download()
+        response = safe_get(
+            url,
+            headers={"User-Agent": config.browser_user_agent},
+            timeout=timeout,
+            transport=requests,
+        )
+        response.raise_for_status()
+
+        article = Article(url, config=config, language='zh')  # Chinese is the default, but other languages remain supported.
+        article.download(input_html=response.text)
         article.parse()
 
         # Get the main text
@@ -170,8 +191,8 @@ def fetch_url_content(url: str, timeout: int = 5) -> str:
         lines = [line.strip() for line in text.split('\n') if line.strip()]
         text = '\n'.join(lines)
 
-        return text[:1500]  # Limit return length (slightly more than bs4, as newspaper parsing is cleaner)
-    except Exception as exc:
+        return text[:1500]  # Allow slightly more than bs4 because newspaper produces cleaner text.
+    except Exception as exc:  # broad-exception: fallback_recorded - Optional content enrichment logs and returns empty.
         log_safe_exception(
             logger,
             "Search result content fetch failed",
@@ -1184,14 +1205,17 @@ class BochaSearchProvider(BaseSearchProvider):
                 success=False,
                 error_message=error_msg
             )
-        except Exception as e:
-            error_msg = _safe_search_exception_message(
-                provider=self.name,
-                event="Bocha search failed unexpectedly",
+        except Exception as e:  # broad-exception: fallback_recorded - Provider failure becomes a stable search result.
+            log_safe_exception(
+                logger,
+                "Bocha search failed unexpectedly",
+                e,
                 error_code="bocha_search_failed",
-                exc=e,
-                public_message="Unexpected search error",
+                level=logging.ERROR,
+                context={"provider": self.name},
+                exception_redaction_values=exception_chain_redaction_values(e),
             )
+            error_msg = "Unexpected search error"
             return SearchResponse(
                 query=query,
                 results=[],
@@ -1380,14 +1404,17 @@ class AnspireSearchProvider(BaseSearchProvider):
                 success=False,
                 error_message=error_msg
             )
-        except Exception as e:
-            error_msg = _safe_search_exception_message(
-                provider=self.name,
-                event="Anspire search failed unexpectedly",
+        except Exception as e:  # broad-exception: fallback_recorded - Provider failure becomes a stable search result.
+            log_safe_exception(
+                logger,
+                "Anspire search failed unexpectedly",
+                e,
                 error_code="anspire_search_failed",
-                exc=e,
-                public_message="Unexpected search error",
+                level=logging.ERROR,
+                context={"provider": self.name},
+                exception_redaction_values=exception_chain_redaction_values(e),
             )
+            error_msg = "Unexpected search error"
             return SearchResponse(
                 query=query,
                 results=[],
@@ -1708,12 +1735,13 @@ class BraveSearchProvider(BaseSearchProvider):
             if country:
                 params["country"] = country
 
-            # Execute search (GET request)
-            response = requests.get(
+            # Execute the GET search through the outbound safety policy.
+            response = safe_get(
                 self.API_ENDPOINT,
                 headers=headers,
                 params=params,
-                timeout=10
+                timeout=10,
+                transport=requests,
             )
 
             # Check HTTP status code
@@ -1815,14 +1843,17 @@ class BraveSearchProvider(BaseSearchProvider):
                 success=False,
                 error_message=error_msg
             )
-        except Exception as e:
-            error_msg = _safe_search_exception_message(
-                provider=self.name,
-                event="Brave search failed unexpectedly",
+        except Exception as e:  # broad-exception: fallback_recorded - Provider failure becomes a stable search result.
+            log_safe_exception(
+                logger,
+                "Brave search failed unexpectedly",
+                e,
                 error_code="brave_search_failed",
-                exc=e,
-                public_message="Unexpected search error",
+                level=logging.ERROR,
+                context={"provider": self.name},
+                exception_redaction_values=exception_chain_redaction_values(e),
             )
+            error_msg = "Unexpected search error"
             return SearchResponse(
                 query=query,
                 results=[],
@@ -1991,9 +2022,10 @@ class SearXNGSearchProvider(BaseSearchProvider):
                     return stale_urls
 
             try:
-                response = requests.get(
+                response = safe_get(
                     cls.PUBLIC_INSTANCES_URL,
                     timeout=cls.PUBLIC_INSTANCES_TIMEOUT_SECONDS,
+                    transport=requests,
                 )
                 if response.status_code != 200:
                     logger.warning(
@@ -2008,7 +2040,7 @@ class SearXNGSearchProvider(BaseSearchProvider):
                         logger.info("[SearXNG] 已刷新公共实例池，共 %s 个候选实例", len(urls))
                         return list(urls)
                     logger.warning("[SearXNG] searx.space 未返回可用公共实例，保留已有缓存")
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: fallback_recorded - Refresh failure keeps the last safe cache.
                 log_safe_exception(
                     logger,
                     "SearXNG public instance list refresh failed",
@@ -2073,7 +2105,7 @@ class SearXNGSearchProvider(BaseSearchProvider):
                 "pageno": 1,
             }
 
-            request_get = _get_with_retry if retry_enabled else requests.get
+            request_get = _get_with_retry if retry_enabled else safe_get
             response = request_get(search_url, headers=headers, params=params, timeout=timeout)
 
             if response.status_code != 200:
@@ -2184,14 +2216,17 @@ class SearXNGSearchProvider(BaseSearchProvider):
                 success=False,
                 error_message=error_msg,
             )
-        except Exception as exc:
-            error_msg = _safe_search_exception_message(
-                provider=self.name,
-                event="SearXNG search failed unexpectedly",
+        except Exception as exc:  # broad-exception: fallback_recorded - Provider failure becomes a stable search result.
+            log_safe_exception(
+                logger,
+                "SearXNG search failed unexpectedly",
+                exc,
                 error_code="searxng_search_failed",
-                exc=exc,
-                public_message="Unexpected search error",
+                level=logging.ERROR,
+                context={"provider": self.name},
+                exception_redaction_values=exception_chain_redaction_values(exc),
             )
+            error_msg = "Unexpected search error"
             return SearchResponse(
                 query=query,
                 results=[],

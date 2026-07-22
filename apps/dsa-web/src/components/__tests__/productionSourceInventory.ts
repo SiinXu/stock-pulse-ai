@@ -30,9 +30,14 @@ const discoveredCssSources = import.meta.glob('../../**/*.css', {
 }) as RawSourceInventory;
 
 export function isProductionSourcePath(filename: string): boolean {
+  // `src/dev/**` holds dev-only tooling (e.g. the Loupe stub and the API mock
+  // switch) that is gated behind `import.meta.env.DEV` and tree-shaken out of
+  // production builds. It is therefore not part of the production architecture
+  // and is allowed to bridge to the `playground/` preview harness.
   return !filename.includes('/__tests__/')
     && !filename.includes('/__fixtures__/')
     && !filename.includes('/fixtures/')
+    && !filename.includes('/dev/')
     && !filename.includes('/generated/')
     && !filename.includes('/stories/')
     && !/\.(?:test|spec)\.[jt]sx?$/.test(filename)

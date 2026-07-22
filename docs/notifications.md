@@ -172,7 +172,7 @@ AstrBot 已是一等通知渠道，优先使用 `ASTRBOT_URL` 和可选的 `ASTR
 CUSTOM_WEBHOOK_BODY_TEMPLATE={"content":$content_json}
 ```
 
-ntfy 已是一等通知渠道，优先使用 `NTFY_URL` 和可选的 `NTFY_TOKEN`。`NTFY_URL` 表示完整 topic endpoint，例如 `https://ntfy.sh/my-topic` 或 `https://self-hosted:port/my-topic`；系统会解析最后一个 path segment 作为 topic，并向 server root 发送 JSON publish：
+ntfy 已是一等通知渠道，优先使用 `NTFY_URL` 和可选的 `NTFY_TOKEN`。`NTFY_URL` 表示完整 topic endpoint，例如 `https://ntfy.sh/my-topic` 或 `https://self-hosted:port/my-topic`；系统会解析最后一个 path segment 作为 topic，并向 server root 发送 JSON publish。私网/loopback 的 ntfy、Gotify、AstrBot 或自定义 Webhook 还必须把精确 `host:port` 加入 `OUTBOUND_HTTP_ALLOWLIST`，详见 [出站 HTTP 安全策略](security-outbound-policy.md)：
 
 ```env
 NTFY_URL=https://ntfy.sh/my-topic
@@ -196,11 +196,13 @@ NapCat / OneBot HTTP API 需要按实际 endpoint 和目标类型调整。下面
 
 ```env
 # 私聊：CUSTOM_WEBHOOK_URLS=http://127.0.0.1:3000/send_private_msg
+# OUTBOUND_HTTP_ALLOWLIST=127.0.0.1:3000
 CUSTOM_WEBHOOK_BODY_TEMPLATE={"user_id":123456,"message":$content_json}
 ```
 
 ```env
 # 群聊：CUSTOM_WEBHOOK_URLS=http://127.0.0.1:3000/send_group_msg
+# OUTBOUND_HTTP_ALLOWLIST=127.0.0.1:3000
 CUSTOM_WEBHOOK_BODY_TEMPLATE={"group_id":123456789,"message":$content_json}
 ```
 

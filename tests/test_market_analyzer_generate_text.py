@@ -863,7 +863,8 @@ class TestAnalyzerGenerateText(_AnalyzerFactoryMixin):
         assert dispatch_calls[0]["stream"] is True
         assert "stream" not in dispatch_calls[1]
 
-    def test_call_litellm_hermes_route_forces_non_stream_direct_client(self):
+    def test_call_litellm_hermes_route_forces_non_stream_direct_client(self, monkeypatch):
+        monkeypatch.setenv("OUTBOUND_HTTP_ALLOWLIST", "127.0.0.1:8642")
         analyzer = self._make_analyzer()
         analyzer._config_override = SimpleNamespace(
             litellm_model="openai/hermes-agent",

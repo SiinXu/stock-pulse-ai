@@ -16,6 +16,7 @@ import requests
 from src.config import Config
 from src.formatters import chunk_content_by_max_bytes, slice_at_max_bytes
 from src.notification_contracts import is_dingtalk_session_webhook_url
+from src.security.outbound_policy import safe_post
 from src.utils.sanitize import log_safe_exception, sanitize_exception_chain
 
 
@@ -96,7 +97,7 @@ class CustomWebhookSender:
                 else:
                     logger.error(f"自定义 Webhook {i+1} 推送失败")
                     
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: fallback_recorded - Per-target delivery failure is logged and isolated.
                 log_safe_exception(
                     logger,
                     "Custom webhook delivery failed",
@@ -126,9 +127,9 @@ class CustomWebhookSender:
                         headers["Authorization"] = (
                             f"Bearer {self._custom_webhook_bearer_token}"
                         )
-                    response = requests.post(
+                    response = safe_post(
                         url, data=data, files=files, headers=headers, timeout=30,
-                        verify=self._webhook_verify_ssl
+                        verify=self._webhook_verify_ssl, transport=requests,
                     )
                     if response.status_code in (200, 204):
                         logger.info("自定义 Webhook %d（Discord 图片）推送成功", i + 1)
@@ -150,7 +151,7 @@ class CustomWebhookSender:
                         logger.warning(
                             "自定义 Webhook %d 不支持图片，且无回退内容，跳过", i + 1
                         )
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: fallback_recorded - Per-target image failure is logged and isolated.
                 log_safe_exception(
                     logger,
                     "Custom webhook image delivery failed",
@@ -169,7 +170,14 @@ class CustomWebhookSender:
         if self._custom_webhook_bearer_token:
             headers['Authorization'] = f'Bearer {self._custom_webhook_bearer_token}'
         body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
-        response = requests.post(url, data=body, headers=headers, timeout=timeout, verify=self._webhook_verify_ssl)
+        response = safe_post(
+            url,
+            data=body,
+            headers=headers,
+            timeout=timeout,
+            verify=self._webhook_verify_ssl,
+            transport=requests,
+        )
         if response.status_code == 200:
             return True
         logger.error(f"自定义 Webhook 推送失败: HTTP {response.status_code}")
@@ -183,12 +191,13 @@ class CustomWebhookSender:
             'User-Agent': 'StockAnalysis/1.0',
         }
         body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
-        response = requests.post(
+        response = safe_post(
             url,
             data=body,
             headers=headers,
             timeout=timeout,
             verify=self._webhook_verify_ssl,
+            transport=requests,
         )
         if response.status_code == 200:
             return True
@@ -241,19 +250,27 @@ class CustomWebhookSender:
         body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
         started_at = time.perf_counter()
         try:
-            response = requests.post(
+            response = safe_post(
                 url,
                 data=body,
                 headers=headers,
                 timeout=timeout_seconds,
                 verify=self._webhook_verify_ssl,
+                transport=requests,
             )
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Test attempts return a structured failure record.
             error_code, retryable = self._classify_custom_webhook_exception(exc)
+            log_safe_exception(
+                logger,
+                "Custom webhook test delivery failed",
+                exc,
+                error_code="custom_webhook_test_delivery_failed",
+                context={"webhook_index": index + 1},
+            )
             return {
                 "channel": "custom",
                 "success": False,
-                "message": f"自定义 Webhook {index + 1} 测试失败: {exc}",
+                "message": f"自定义 Webhook {index + 1} 测试失败: {sanitize_exception_chain(exc)}",
                 "target": url,
                 "error_code": error_code,
                 "stage": "notification_send",

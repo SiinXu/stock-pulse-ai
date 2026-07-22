@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Set, Tuple
 from urllib.parse import quote, unquote, urlparse, urlunparse
 
+from src.security.outbound_policy import guard_outbound_urls
+
 
 HERMES_CHANNEL_NAME = "hermes"
 HERMES_DEPLOYMENT_MARKER_KEY = "dsa_channel"
@@ -468,17 +470,18 @@ def open_hermes_no_proxy_client(*, api_key: str, base_url: str, timeout: float) 
     import openai
 
     canonical_base_url = canonicalize_hermes_base_url(base_url)
-    http_client = httpx.Client(
-        trust_env=False,
-        follow_redirects=False,
-        timeout=timeout,
-    )
-    client = openai.OpenAI(
-        api_key=api_key,
-        base_url=canonical_base_url,
-        http_client=http_client,
-    )
-    try:
-        yield client
-    finally:
-        http_client.close()
+    with guard_outbound_urls((canonical_base_url,), strict_dns=True):
+        http_client = httpx.Client(
+            trust_env=False,
+            follow_redirects=False,
+            timeout=timeout,
+        )
+        client = openai.OpenAI(
+            api_key=api_key,
+            base_url=canonical_base_url,
+            http_client=http_client,
+        )
+        try:
+            yield client
+        finally:
+            http_client.close()

@@ -117,11 +117,13 @@ def test_content_fetch_auxiliary_log_redacts_raw_exception_diagnostic(caplog) ->
     raw_path = "/Users/private-user/.config/stockpulse/content-fetch.json"
     article = MagicMock()
     article.download.side_effect = OSError(5, f"provider failed {canary}", raw_path)
+    response = MagicMock(text="<html><body>content</body></html>")
     caplog.set_level(logging.DEBUG, logger="src.search_service")
 
     with (
         patch("src.search_service.Config", return_value=MagicMock()),
         patch("src.search_service.Article", return_value=article),
+        patch("src.search_service.safe_get", return_value=response),
     ):
         result = fetch_url_content("https://example.com/article")
 
@@ -131,6 +133,18 @@ def test_content_fetch_auxiliary_log_redacts_raw_exception_diagnostic(caplog) ->
     assert raw_path not in visible
     assert "provider failed" not in visible
     assert "error_code=search_result_content_fetch_failed" in visible
+
+
+def test_content_fetch_rejects_loopback_before_article_download() -> None:
+    with (
+        patch("src.search_service.requests.get") as request_get,
+        patch("src.search_service.Article") as article_cls,
+    ):
+        result = fetch_url_content("http://2130706433/private")
+
+    assert result == ""
+    request_get.assert_not_called()
+    article_cls.assert_not_called()
 
 
 def test_other_provider_http_failures_do_not_return_or_log_response_body(caplog) -> None:

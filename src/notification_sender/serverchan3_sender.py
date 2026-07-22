@@ -8,6 +8,7 @@ Server酱3 发送提醒服务
 import logging
 from typing import Optional
 import requests
+from src.security.outbound_policy import safe_post
 from datetime import datetime
 import re
 
@@ -94,7 +95,13 @@ class Serverchan3Sender:
             headers = {
                 'Content-Type': 'application/json;charset=utf-8'
             }
-            response = requests.post(url, json=params, headers=headers, timeout=timeout_seconds or 10)
+            response = safe_post(
+                url,
+                json=params,
+                headers=headers,
+                timeout=timeout_seconds or 10,
+                transport=requests,
+            )
 
             if response.status_code == 200:
                 result = response.json()
@@ -105,7 +112,7 @@ class Serverchan3Sender:
                 logger.error(f"响应内容: {response.text}")
                 return False
 
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Channel failure is safely logged and isolated.
             log_safe_exception(
                 logger,
                 "ServerChan3 message delivery failed",

@@ -7,11 +7,22 @@ import requests
 import json
 import uuid
 import logging
+from typing import Any
+from urllib.parse import urlsplit
 from fake_useragent import UserAgent
 
+from src.security.outbound_policy import safe_post
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
+
+_EASTMONEY_REQUEST_HOSTS = frozenset(
+    {
+        "fund.eastmoney.com",
+        "push2.eastmoney.com",
+        "push2his.eastmoney.com",
+    }
+)
 
 original_request = requests.Session.request
 
@@ -41,6 +52,19 @@ class PatchSign:
 
 
 _patch_sign = PatchSign()
+
+
+def _is_eastmoney_request_url(raw_url: Any) -> bool:
+    """Return whether the parsed request host belongs to an intended EastMoney domain."""
+
+    try:
+        hostname = (urlsplit(str(raw_url or "")).hostname or "").lower().rstrip(".")
+    except ValueError:
+        return False
+    return any(
+        hostname == domain or hostname.endswith(f".{domain}")
+        for domain in _EASTMONEY_REQUEST_HOSTS
+    )
 
 
 def _get_nid(user_agent):
@@ -125,9 +149,9 @@ def _get_nid(user_agent):
                 'Cookie': f'st_nvi={generate_st_nvi()}',
                 'Content-Type': 'application/json'
             }
-            # Increase timeout to prevent indefinite waiting
-            response = requests.request("POST", url, headers=headers, data=payload, timeout=30)
-            response.raise_for_status()  # Raise HTTPError for 4xx/5xx responses
+            # Use a bounded timeout to prevent indefinite waiting.
+            response = safe_post(url, headers=headers, data=payload, timeout=30)
+            response.raise_for_status()  # Raise HTTPError for 4xx/5xx responses.
 
             data = response.json()
             nid = data['data']['nid']
@@ -166,16 +190,8 @@ def eastmoney_patch():
         return
 
     def patched_request(self, method, url, **kwargs):
-        # Exclude non-target domains
-        is_target = any(
-            d in (url or "")
-            for d in [
-                "fund.eastmoney.com",
-                "push2.eastmoney.com",
-                "push2his.eastmoney.com",
-            ]
-        )
-        if not is_target:
+        # Exclude non-target domains using the shared URL validator.
+        if not _is_eastmoney_request_url(url):
             return original_request(self, method, url, **kwargs)
         # Get a random User-Agent
         user_agent = ua.random

@@ -20,6 +20,7 @@ import time
 from typing import List, Optional, Tuple
 
 from src.config import Config, get_config
+from src.llm.errors import guard_litellm_outbound_call
 from src.llm.hermes import route_has_hermes
 from src.utils.sanitize import log_safe_exception
 
@@ -306,7 +307,12 @@ def _call_litellm_vision(image_b64: str, mime_type: str, api_key: Optional[str] 
     if getattr(litellm, "completion", None) is None:
         import litellm as litellm_module
         litellm = litellm_module
-    response = litellm.completion(**call_kwargs)
+    with guard_litellm_outbound_call(
+        model=wire_model,
+        call_kwargs=call_kwargs,
+        model_list=model_list,
+    ):
+        response = litellm.completion(**call_kwargs)
     if response and response.choices and response.choices[0].message.content:
         return response.choices[0].message.content
     raise ValueError("LiteLLM vision returned empty response")

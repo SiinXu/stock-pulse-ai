@@ -62,7 +62,7 @@ function findVenvPython() {
 function resolveBackendCommand() {
   const python = findVenvPython();
   console.info(`[playwright] backend Python: ${python}`);
-  return `${python} apps/dsa-web/e2e/run-backend-fixture.py --port ${backendPort}`;
+  return `${python} apps/dsa-web/e2e/run-backend-fixture.py --port ${backendPort} --fake-provider-port ${fakeProviderPort}`;
 }
 
 export default defineConfig({

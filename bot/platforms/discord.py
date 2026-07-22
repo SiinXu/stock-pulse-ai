@@ -11,11 +11,12 @@ Discord 平台适配器
 """
 
 import logging
+import requests
 import time
 from datetime import datetime
 from typing import Dict, Any, Optional, Tuple, List
 
-import requests
+from src.security.outbound_policy import safe_patch, safe_post
 from nacl.exceptions import BadSignatureError
 from nacl.signing import VerifyKey
 
@@ -296,17 +297,19 @@ class DiscordPlatform(BotPlatform):
             try:
                 if idx == 0:
                     # PATCH the original deferred message
-                    resp = requests.patch(
+                    resp = safe_patch(
                         f"{base_url}/messages/@original",
                         json={"content": chunk},
                         timeout=10,
+                        transport=requests,
                     )
                 else:
                     # POST additional follow-up messages
-                    resp = requests.post(
+                    resp = safe_post(
                         base_url,
                         json={"content": chunk},
                         timeout=10,
+                        transport=requests,
                     )
                 if resp.status_code >= 300:
                     logger.error(
@@ -316,7 +319,7 @@ class DiscordPlatform(BotPlatform):
                         resp.status_code,
                     )
                     success = False
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: fallback_recorded - Failed follow-up chunks are logged and isolated.
                 log_safe_exception(
                     logger,
                     "[Discord] Follow-up chunk request failed",

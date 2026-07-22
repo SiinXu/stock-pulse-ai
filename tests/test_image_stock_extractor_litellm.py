@@ -37,6 +37,7 @@ from src.services.image_stock_extractor import (
     VISION_API_TIMEOUT,
 )
 from src.config import Config
+from src.security.outbound_policy import OutboundPolicyError
 from src.llm.model_ref import encode_model_ref
 
 
@@ -239,6 +240,28 @@ class TestCallLitellmVision:
         assert kwargs["api_key"] == "sk-work-exact-key"
         assert kwargs["api_base"] == "https://work.example/v1"
         assert kwargs["extra_headers"] == {"X-Workspace": "work"}
+
+    def test_private_connection_base_is_rejected_before_completion(self):
+        model_ref = encode_model_ref("private", "openai/gpt-4o")
+        cfg = _cfg(
+            vision_model=model_ref,
+            llm_model_list=[
+                {
+                    "model_name": model_ref,
+                    "litellm_params": {
+                        "model": "openai/gpt-4o",
+                        "api_key": "sk-private-exact-key",
+                        "api_base": "http://127.0.0.1:8080/v1",
+                    },
+                }
+            ],
+        )
+        with patch("src.services.image_stock_extractor.get_config", return_value=cfg), \
+             patch("src.services.image_stock_extractor.litellm.completion") as mock_comp:
+            with pytest.raises(OutboundPolicyError, match="private_ip_blocked"):
+                _call_litellm_vision("b64", "image/jpeg")
+
+        mock_comp.assert_not_called()
 
     def test_raises_when_model_not_configured(self):
         cfg = _cfg(openai_vision_model=None, litellm_model="", gemini_api_keys=[], anthropic_api_keys=[], openai_api_keys=[])

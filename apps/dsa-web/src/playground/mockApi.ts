@@ -26,6 +26,11 @@ type TimedRequestConfig = InternalAxiosRequestConfig & {
 type InstallPlaygroundApiMockOptions = {
   onRequestLog?: (event: PlaygroundRequestLog) => void;
   delayResponse?: number;
+  // Optional dev-only hook to register higher-priority handlers before the
+  // standard fixtures (first match wins) and before the unregistered-route
+  // guard. Left unset by the playground itself, so production behaviour and the
+  // shipped bundle are unchanged.
+  registerPriorityHandlers?: (mock: AxiosMockAdapter, profile: PlaygroundFixtureProfile) => void;
 };
 
 type MockState = {
@@ -230,6 +235,10 @@ export function installPlaygroundApiMock(
       return Promise.reject(error);
     },
   );
+
+  // Dev-only overrides register first so they take precedence for the endpoints
+  // they cover; every other route still falls through to the fixtures below.
+  options.registerPriorityHandlers?.(mock, profile);
 
   mock.onGet('/api/v1/portfolio/accounts').reply(() => responseFor(profile, {
     accounts: [

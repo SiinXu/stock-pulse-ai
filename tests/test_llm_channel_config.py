@@ -1401,20 +1401,30 @@ class LLMChannelConfigTestCase(unittest.TestCase):
                 self.assertTrue(SystemConfigService._is_valid_llm_base_url(value))
                 self.assertFalse(SystemConfigService._is_safe_base_url(value))
 
-    def test_llm_base_url_accepts_common_openai_compatible_and_local_shapes(self) -> None:
+    def test_llm_base_url_accepts_common_public_openai_compatible_shapes(self) -> None:
         valid_urls = [
             "https://api.openai.com/v1",
             "https://api.deepseek.com/v1",
             "https://api.siliconflow.cn/v1",
             "https://dashscope.aliyuncs.com/compatible-mode/v1",
-            "http://127.0.0.1:11434",
-            "http://127.0.0.1:11434/v1",
         ]
 
         for value in valid_urls:
             with self.subTest(value=value):
                 self.assertTrue(SystemConfigService._is_valid_llm_base_url(value), msg=value)
                 self.assertTrue(SystemConfigService._is_safe_base_url(value), msg=value)
+
+    def test_llm_local_base_url_requires_explicit_outbound_allowlist(self) -> None:
+        values = ["http://127.0.0.1:11434", "http://127.0.0.1:11434/v1"]
+        for value in values:
+            with self.subTest(value=value):
+                self.assertTrue(SystemConfigService._is_valid_llm_base_url(value), msg=value)
+                self.assertFalse(SystemConfigService._is_safe_base_url(value), msg=value)
+
+        with patch.dict(os.environ, {"OUTBOUND_HTTP_ALLOWLIST": "127.0.0.1:11434"}, clear=False):
+            for value in values:
+                with self.subTest(allowlisted=value):
+                    self.assertTrue(SystemConfigService._is_safe_base_url(value), msg=value)
 
     @patch("src.services.system_config_service.requests.get")
     def test_discover_llm_channel_models_blocks_parser_differential_url(self, mock_get) -> None:

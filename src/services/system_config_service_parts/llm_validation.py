@@ -47,46 +47,13 @@ if TYPE_CHECKING:
 class _SystemConfigLLMValidationMethods:
     @staticmethod
     def _is_safe_base_url(value: str) -> bool:
-        """Block link-local and cloud metadata addresses to prevent SSRF.
-
-        Allows localhost / private-LAN addresses (e.g. Ollama on 192.168.x.x)
-        but blocks 169.254.x.x (AWS/Azure/GCP/Alibaba instance-metadata service)
-        and other known metadata hostnames.
-        """
-        import ipaddress
+        """Apply the central outbound target policy without performing DNS I/O."""
+        from src.security.outbound_policy import OutboundPolicyError, validate_outbound_url
 
         try:
-            parsed = urlparse(value)
-            raw_host = parsed.hostname or ""
-        except ValueError:
+            validate_outbound_url(value, resolve_dns=False)
+        except OutboundPolicyError:
             return False
-        if not raw_host:
-            return True
-        host = SystemConfigService._normalize_hostname_for_security(raw_host)
-        if not host:
-            return False
-        # Known cloud metadata hostnames
-        _BLOCKED_HOSTS = frozenset({
-            "169.254.169.254",
-            "metadata.google.internal",
-            "100.100.100.200",
-        })
-        if host in _BLOCKED_HOSTS:
-            return False
-        if SystemConfigService._is_noncanonical_ipv4_numeric_host(host):
-            return False
-        # Numeric IPs: block link-local range (169.254.0.0/16), including IPv4-mapped IPv6.
-        try:
-            addr = ipaddress.ip_address(host)
-            candidate_addrs = [addr]
-            mapped_addr = getattr(addr, "ipv4_mapped", None)
-            if mapped_addr is not None:
-                candidate_addrs.append(mapped_addr)
-            for candidate_addr in candidate_addrs:
-                if str(candidate_addr) in _BLOCKED_HOSTS or candidate_addr.is_link_local:
-                    return False
-        except ValueError:
-            pass  # hostname, not an IP — already checked against blocklist above
         return True
 
     @staticmethod
@@ -1256,9 +1223,9 @@ class _SystemConfigLLMValidationMethods:
                 {
                     "key": base_url_key,
                     "code": "ssrf_blocked",
-                    "message": "LLM channel base URL points to a restricted address (cloud metadata services are not allowed)",
+                    "message": "LLM channel base URL is blocked by the outbound HTTP policy",
                     "severity": "error",
-                    "expected": "publicly reachable or local LLM endpoint",
+                    "expected": "public endpoint or host listed in OUTBOUND_HTTP_ALLOWLIST",
                     "actual": base_url_value,
                 }
             )
