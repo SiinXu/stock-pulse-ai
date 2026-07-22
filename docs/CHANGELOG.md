@@ -304,7 +304,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Split search provider implementations and shared result contracts into focused private modules while preserving the `src.search_service` facade, fallback, and outbound-policy behavior.
 - [Fixed] Prevented stale Desktop backend process events from marking a replacement generation unavailable during rapid macOS close and reactivate fallback.
 - [Fixed] Aligned runtime, Web, CLI, and review-tool dependency-install guidance with the constrained bootstrap and removed the temporary #400 tracked-text exceptions.
-- [Fixed] Serialized composition-root replacement and reset so old plugins finish unloading before a successor can start or an unload callback can recreate the root.
+- [Fixed] Serialized composition-root replacement and reset so old plugins finish unloading before a successor can start, callback-owned replacement workers cannot deadlock, and terminal process shutdown cannot recreate the root.
 
 ## [3.26.3] - 2026-07-15
 

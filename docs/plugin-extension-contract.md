@@ -61,9 +61,13 @@ previous root remains the discoverable root until its complete reverse-order
 unload finishes; only then is a successor published and started. A lifecycle
 callback that resolves `get_application_services()` during the transition sees
 the root that owns the callback, so reset and process-exit cleanup cannot
-implicitly create a fresh root. Re-entrant replacement requests are deferred
-until the active transition finishes, with the most recent explicit request
-becoming the next root.
+implicitly create a fresh root. Re-entrant or concurrent replacement requests
+made during a lifecycle callback are queued without waiting for that callback;
+the most recent explicit request becomes the next root after the active
+transition finishes, including a request that retains the current root. Normal
+reset remains reusable, but the process-exit handler first enters a terminal
+shutdown state: unload callbacks can still resolve their owning root, while
+later atexit callbacks cannot lazily create or install another root.
 
 There is currently no default lifecycle-style built-in catalog to fabricate:
 existing Data Provider built-ins remain owned by each `DataFetcherManager`, and

@@ -1,6 +1,9 @@
 """Tests for the ApplicationServices composition root."""
 
 import json
+import subprocess
+import sys
+import textwrap
 import threading
 from pathlib import Path
 
@@ -521,3 +524,168 @@ def test_reentrant_replacement_is_deferred_until_old_unload_finishes():
         "old-unload-end",
         "load:test.final",
     ]
+
+
+def test_concurrent_replacement_request_does_not_deadlock_unload_callback():
+    events: list[str] = []
+    final_root_holder: list[ApplicationServices] = []
+    worker_returned = threading.Event()
+    workers: list[threading.Thread] = []
+
+    class _WorkerReplacingUnloadPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("old-unload-begin")
+
+            def request_final_root() -> None:
+                set_application_services(final_root_holder[0])
+                worker_returned.set()
+
+            worker = threading.Thread(target=request_final_root)
+            workers.append(worker)
+            worker.start()
+            if not worker_returned.wait(timeout=5):
+                raise AssertionError("replacement worker deadlocked during unload")
+            worker.join(timeout=5)
+            events.append("old-unload-end")
+
+    first = ApplicationServices(
+        builtin_plugins=(_WorkerReplacingUnloadPlugin("test.old", events),),
+        plugins_dir="",
+    )
+    superseded = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.superseded", events),),
+        plugins_dir="",
+    )
+    final = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.final", events),),
+        plugins_dir="",
+    )
+    final_root_holder.append(final)
+
+    set_application_services(first)
+    set_application_services(superseded)
+
+    assert worker_returned.is_set()
+    assert all(not worker.is_alive() for worker in workers)
+    assert get_application_services() is final
+    assert superseded.plugin_manager.plugin_ids() == ()
+    assert events == [
+        "load:test.old",
+        "old-unload-begin",
+        "old-unload-end",
+        "load:test.final",
+    ]
+
+
+def test_concurrent_replacement_request_does_not_deadlock_load_callback():
+    events: list[str] = []
+    final_root_holder: list[ApplicationServices] = []
+    worker_returned = threading.Event()
+    workers: list[threading.Thread] = []
+
+    class _WorkerReplacingLoadPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("intermediate-load-begin")
+
+            def request_final_root() -> None:
+                set_application_services(final_root_holder[0])
+                worker_returned.set()
+
+            worker = threading.Thread(target=request_final_root)
+            workers.append(worker)
+            worker.start()
+            if not worker_returned.wait(timeout=5):
+                raise AssertionError("replacement worker deadlocked during load")
+            worker.join(timeout=5)
+            events.append("intermediate-load-end")
+
+    intermediate = ApplicationServices(
+        builtin_plugins=(_WorkerReplacingLoadPlugin("test.intermediate", events),),
+        plugins_dir="",
+    )
+    final = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.final", events),),
+        plugins_dir="",
+    )
+    final_root_holder.append(final)
+
+    set_application_services(intermediate)
+
+    assert worker_returned.is_set()
+    assert all(not worker.is_alive() for worker in workers)
+    assert get_application_services() is final
+    assert events == [
+        "intermediate-load-begin",
+        "intermediate-load-end",
+        "unload:test.intermediate",
+        "load:test.final",
+    ]
+
+
+def test_latest_reentrant_request_can_retain_the_current_root():
+    events: list[str] = []
+    current_root_holder: list[ApplicationServices] = []
+    superseded_root = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.superseded", events),),
+        plugins_dir="",
+    )
+
+    class _RetainingLoadPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("current-load-begin")
+            set_application_services(superseded_root)
+            set_application_services(current_root_holder[0])
+            events.append("current-load-end")
+
+    current_root = ApplicationServices(
+        builtin_plugins=(_RetainingLoadPlugin("test.current", events),),
+        plugins_dir="",
+    )
+    current_root_holder.append(current_root)
+
+    set_application_services(current_root)
+
+    assert get_application_services() is current_root
+    assert superseded_root.plugin_manager.plugin_ids() == ()
+    assert current_root.plugin_manager.snapshot("test.current").state == "enabled"
+    assert events == ["current-load-begin", "current-load-end"]
+
+
+def test_terminal_atexit_shutdown_blocks_late_root_recreation():
+    script = textwrap.dedent(
+        """
+        import atexit
+        import os
+
+        os.environ.pop("PLUGINS_DIR", None)
+
+        def late_callback():
+            from src.application_services import get_application_services
+
+            try:
+                get_application_services()
+            except RuntimeError:
+                print("LATE_ROOT_BLOCKED")
+            else:
+                print("LATE_ROOT_RECREATED")
+
+        atexit.register(late_callback)
+
+        from src.application_services import get_application_services
+
+        get_application_services()
+        """
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "LATE_ROOT_BLOCKED" in result.stdout
+    assert "LATE_ROOT_RECREATED" not in result.stdout

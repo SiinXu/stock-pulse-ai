@@ -209,6 +209,7 @@ _services_lock = threading.Lock()
 _services_transition_lock = threading.RLock()
 _services_transition_active = False
 _services_transition_pending: list[Optional[ApplicationServices]] = []
+_services_shutdown = False
 
 
 def get_application_services() -> ApplicationServices:
@@ -219,9 +220,13 @@ def get_application_services() -> ApplicationServices:
                 # Lifecycle callbacks must resolve the root whose transition
                 # they belong to without starting or resurrecting a successor.
                 return _services
+            if _services_shutdown:
+                raise RuntimeError("Application services are shutting down")
 
         with _services_transition_lock:
             with _services_lock:
+                if _services_shutdown:
+                    raise RuntimeError("Application services are shutting down")
                 services = _services
             if services is None:
                 services = ApplicationServices()
@@ -240,11 +245,19 @@ def set_application_services(services: Optional[ApplicationServices]) -> None:
     """
     global _services, _services_transition_active
 
+    with _services_lock:
+        if _services_shutdown and services is not None:
+            raise RuntimeError("Application services are shutting down")
+        if _services_transition_active:
+            _services_transition_pending[:] = [services]
+            return
+
     with _services_transition_lock:
         with _services_lock:
+            if _services_shutdown and services is not None:
+                raise RuntimeError("Application services are shutting down")
             if _services_transition_active:
-                if _services is not services:
-                    _services_transition_pending[:] = [services]
+                _services_transition_pending[:] = [services]
                 return
             _services_transition_active = True
             _services_transition_pending.clear()
@@ -284,4 +297,12 @@ def reset_application_services() -> None:
     set_application_services(None)
 
 
-atexit.register(reset_application_services)
+def _shutdown_application_services() -> None:
+    """Enter terminal process shutdown and close the installed root."""
+    global _services_shutdown
+    with _services_lock:
+        _services_shutdown = True
+    set_application_services(None)
+
+
+atexit.register(_shutdown_application_services)
