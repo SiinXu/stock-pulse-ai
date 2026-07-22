@@ -239,7 +239,7 @@ def get_application_services() -> ApplicationServices:
 def set_application_services(services: Optional[ApplicationServices]) -> None:
     """Install a root after fully shutting down the previous root.
 
-    Pass ``None`` to clear the installed root. Re-entrant replacement requests
+    Pass ``None`` to clear the installed root. Overlapping replacement requests
     from plugin callbacks are deferred until the active lifecycle transition
     finishes, with the most recent request winning.
     """
@@ -303,6 +303,11 @@ def _shutdown_application_services() -> None:
     with _services_lock:
         _services_shutdown = True
     set_application_services(None)
+    # A concurrent transition queues the terminal reset without waiting so its
+    # callback-owned workers cannot deadlock. The exit handler itself must wait
+    # until that transition consumes the reset before later atexit handlers run.
+    with _services_transition_lock:
+        pass
 
 
 atexit.register(_shutdown_application_services)
