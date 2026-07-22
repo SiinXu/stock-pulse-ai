@@ -305,6 +305,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Aligned runtime, Web, CLI, and review-tool dependency-install guidance with the constrained bootstrap and removed the temporary #400 tracked-text exceptions.
 - [Chore] Converged analysis context pack prompt and overview modules into `src/analysis_context_pack/` with strict legacy facades and compatibility guards.
 - [Changed] Split search provider implementations and shared result contracts into focused private modules while preserving the `src.search_service` facade, fallback, and outbound-policy behavior.
+- [Docs] Defined repository directory ownership, the retained `webui.py` compatibility role, and the separate backend package-root decision.
 
 ## [3.26.3] - 2026-07-15
 
