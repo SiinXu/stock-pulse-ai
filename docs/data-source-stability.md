@@ -1,5 +1,7 @@
 # 数据源稳定性与故障处理图示
 
+> English version: [Data-source Priority, Health, and Degradation](data-source-stability_EN.md).
+
 本文面向用户、部署者和维护者，说明 DSA 已接入的数据源如何参与分析、选股和大盘复盘，以及当数据源失败时系统会怎么降级。
 
 核心原则：先用项目已经接入并验证过的数据源，把失败路径讲清楚；新增外部数据源应放在第二阶段，避免先扩大维护面。
@@ -12,20 +14,21 @@
 
 - A 股个股与 AlphaSift：优先配置 `TUSHARE_TOKEN`，并保留 AkShare / Efinance / Tencent / Baostock / YFinance 兜底。
 - A 股大盘复盘：配置 `TICKFLOW_API_KEY` 后，指数和市场宽度会优先尝试 TickFlow，失败后回退现有免费源。
-- 港股 / 美股：配置 `LONGBRIDGE_*` 后优先使用 Longbridge，YFinance、Finnhub、AlphaVantage 继续兜底。
+- 港股 / 美股：配置 `LONGBRIDGE_*` 后，支持的实时行情与美股个股日线会优先使用 Longbridge；港股日线仍按静态 numeric priority，YFinance、AkShare、Tushare、Finnhub、AlphaVantage 继续按市场能力兜底。
 - 热点题材：AlphaSift 热点默认走 DSA EastMoney provider，并使用本地 last-good cache 降低实时接口失败影响。
 
 ## 已接入数据源矩阵
 
 | 场景 | 已接入源 | 默认使用方式 | 失败处理 |
 | --- | --- | --- | --- |
-| A 股日线 / 技术面 | Efinance、Tencent、AkShare、Tushare、Pytdx、Baostock、YFinance | `DataFetcherManager` 按优先级尝试；配置 `TUSHARE_TOKEN` 后 Tushare 自动进入候选源 | 单源失败后尝试下一个源；连续失败会短期熔断该源 |
+| A 股日线 / 技术面 | Tushare、Efinance、Tencent、AkShare、TickFlow、Pytdx、Baostock、YFinance | `DataFetcherManager` 按 numeric priority 尝试；Tushare 配置且初始化成功后固定提升为 `-1`，TickFlow 仅在配置 Key 后实例化，Pytdx 无需凭据 | 单源失败后尝试下一个源；连续失败会短期熔断该源 |
 | A 股实时行情 | Tencent、AkShare Sina、Efinance、AkShare EM、Tushare | `REALTIME_SOURCE_PRIORITY` 控制顺序，默认偏向 Tencent / Sina 这类轻量源 | 失败源记录 `fallback_from`，成功源继续返回 |
 | A 股大盘复盘 | TickFlow、AkShare、Tushare、Efinance | 配置 `TICKFLOW_API_KEY` 后，主指数和市场宽度优先尝试 TickFlow | TickFlow 权限不足或失败时回退 AkShare / Tushare / Efinance 链路 |
 | AlphaSift 选股快照 | Tushare、Sina、Efinance、AkShare EM、EastMoney Datacenter | 有 `TUSHARE_TOKEN` 时自动把 `tushare` 放入快照优先级；否则使用免费源链路 | AlphaSift 维护 source health；DSA 状态接口透出 snapshot/daily health |
 | AlphaSift 日线补特征 | DSA `DataFetcherManager` | AlphaSift 调用 DSA provider context，优先复用 DSA 日线与缓存链路 | DSA 链路失败后才回到 AlphaSift 原始日线源 |
 | AlphaSift 热点题材 | DSA EastMoney provider、AlphaSift hotspot、last-good cache | 未指定 provider 时默认使用 DSA EastMoney provider | 实时失败时回退热点缓存；无缓存时返回稳定空态和可读错误 |
-| 港股 / 美股 | Longbridge、YFinance、AkShare、Tushare、Finnhub、AlphaVantage、Stooq | 配置 Longbridge 凭证后参与港美股日线/实时兜底；YFinance 保持基础兜底 | Longbridge 冷却或失败时回退 YFinance / 其他可用源 |
+| 港股 | Tushare、AkShare、YFinance、Longbridge | 日线按 numeric priority；配置且初始化成功的 Tushare 为 `-1`，Longbridge 默认 `5`。实时行情配置 Longbridge 后优先 Longbridge | 日线继续尝试下一个 HK-capable provider；实时行情回退 AkShare |
+| 美股 | Longbridge、Finnhub、AlphaVantage、YFinance | 个股配置 Longbridge 后使用 `Longbridge -> Finnhub -> AlphaVantage -> YFinance`，否则使用 `Finnhub -> AlphaVantage -> YFinance`；指数固定 `YFinance -> Finnhub` | named route 忽略 numeric priority；全部失败后才使用符合窗口的 stale 日线缓存 |
 
 ## 总体链路图
 
@@ -41,9 +44,12 @@ flowchart TD
     D --> C[本地 stock_daily 缓存]
     C -->|命中且新鲜| COK[复用缓存]
     C -->|缺失或过期| DM{市场}
-    DM -->|A 股| CN[Tushare if token -> Efinance/Tencent -> AkShare -> Pytdx -> Baostock -> YFinance]
-    DM -->|港股| HK[Longbridge if configured -> AkShare/Tushare -> YFinance]
-    DM -->|美股| US[Longbridge/YFinance -> Finnhub/AlphaVantage -> Stooq]
+    DM -->|A 股| CN[Tushare if initialized -> Efinance/Tencent -> AkShare -> TickFlow/Pytdx -> Baostock -> YFinance]
+    DM -->|港股| HK[Tushare if initialized -> AkShare -> YFinance -> Longbridge by numeric priority]
+    DM -->|美股指数| USI[YFinance -> Finnhub]
+    DM -->|美股个股| USL{Longbridge available?}
+    USL -->|yes| USLB[Longbridge -> Finnhub -> AlphaVantage -> YFinance]
+    USL -->|no| USF[Finnhub -> AlphaVantage -> YFinance]
 
     R --> RP[REALTIME_SOURCE_PRIORITY]
     RP --> RS[Tencent -> AkShare Sina -> Efinance -> AkShare EM]
@@ -60,7 +66,9 @@ flowchart TD
 
     CN --> QL[质量标记: source/fallback/stale/fetch_failed]
     HK --> QL
-    US --> QL
+    USI --> QL
+    USLB --> QL
+    USF --> QL
     RS --> QL
     RT --> QL
     AS --> QL
@@ -198,7 +206,7 @@ DAILY_FETCH_MAX_WORKERS=1
 
 ### 港股 / 美股稳定模式
 
-适合港美股组合、持仓和个股分析。Longbridge 配置后优先参与港美股链路；YFinance、Finnhub、AlphaVantage 作为兜底。
+适合港美股组合、持仓和个股分析。Longbridge 配置后优先参与支持的港美股实时行情和美股个股日线；港股日线仍按静态 numeric priority。YFinance、AkShare、Tushare、Finnhub、AlphaVantage 按市场能力继续兜底。
 
 ```env
 LONGBRIDGE_OAUTH_CLIENT_ID=your_client_id
@@ -283,3 +291,5 @@ manager.invalidate_daily_cache()          # 失效全部日线缓存
 - Longbridge OpenAPI: https://open.longportapp.com/
 - Finnhub API: https://finnhub.io/docs/api
 - Alpha Vantage API: https://www.alphavantage.co/documentation/
+
+LLM 配置来源、模型 fallback、backend fallback 与事务化热加载的区别，见 [LLM 路由与降级顺序](LLM_CONFIG_GUIDE.md#llm-路由与降级顺序)。
