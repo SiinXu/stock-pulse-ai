@@ -666,6 +666,23 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
     await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
   });
 
+  test('stock and workspace deep link restores the same Home context after refresh', async ({ page }) => {
+    await openFixtureHome(page, '/?recordId=1&stock=00700.HK&workspace=watchlist&keep=yes');
+
+    await expect(page.getByRole('region', { name: 'Watchlist' })).toBeVisible();
+    await expect(page.locator('#home-stock-search')).toHaveValue('HK00700');
+    await expectSearchParams(page, {
+      recordId: '1',
+      stock: 'HK00700',
+      workspace: 'watchlist',
+      keep: 'yes',
+    });
+
+    await page.reload();
+    await expect(page.getByRole('region', { name: 'Watchlist' })).toBeVisible();
+    await expect(page.locator('#home-stock-search')).toHaveValue('HK00700');
+  });
+
   test('a slow report response cannot replace the newer URL selection', async ({ page }) => {
     const fixture = await openFixtureHome(page, '/?recordId=1', { delayFirstRecord: true });
     await expect.poll(() => fixture.detailRequests.includes(1)).toBe(true);

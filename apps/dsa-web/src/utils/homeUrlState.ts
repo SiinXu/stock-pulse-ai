@@ -1,8 +1,10 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { RunFlowSnapshotSource } from '../types/runFlow';
+import { parseDeepLink, type HomeWorkspaceView } from './deepLink';
 
 const HOME_RECORD_ID_PARAM = 'recordId';
+const HOME_WORKSPACE_PARAM = 'workspace';
 const HOME_RUN_FLOW_PARAM = 'runFlow';
 const HOME_RUN_FLOW_RECORD_ID_PARAM = 'runFlowRecordId';
 const HOME_RUN_FLOW_TASK_ID_PARAM = 'runFlowTaskId';
@@ -11,8 +13,13 @@ const STABLE_TASK_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 export type HomeUrlState = {
   recordId: number | null;
   runFlow: RunFlowSnapshotSource | null;
+  stockCode: string | null;
+  workspace: HomeWorkspaceView;
   invalidRecordId: boolean;
   invalidRunFlow: boolean;
+  invalidStockCode: boolean;
+  invalidWorkspace: boolean;
+  sensitiveParameterRemoved: boolean;
   normalizedSearch: string;
   needsNormalization: boolean;
 };
@@ -83,25 +90,32 @@ function normalizeCoreParams(params: URLSearchParams): {
 
 export function parseHomeUrlState(search: string): HomeUrlState {
   const rawSearch = search && !search.startsWith('?') ? `?${search}` : search;
-  const rawParams = toSearchParams(search);
-  const normalized = normalizeCoreParams(rawParams);
+  const parsedDeepLink = parseDeepLink(`/${rawSearch}`);
+  const deepLinkParams = toSearchParams(parsedDeepLink.normalizedSearch);
+  const normalized = normalizeCoreParams(deepLinkParams);
   const normalizedSearch = toSearch(normalized.params);
+  const homeTarget = parsedDeepLink.target?.page === 'home' ? parsedDeepLink.target : null;
   return {
     recordId: normalized.recordId,
     runFlow: normalized.runFlow,
-    invalidRecordId: rawParams.has(HOME_RECORD_ID_PARAM) && normalized.recordId === null,
+    stockCode: homeTarget?.stockCode ?? null,
+    workspace: homeTarget?.workspace ?? 'history',
+    invalidRecordId: parsedDeepLink.issues.some((issue) => issue.code === 'invalid_record_id'),
     invalidRunFlow: (
-      rawParams.has(HOME_RUN_FLOW_PARAM)
-      || rawParams.has(HOME_RUN_FLOW_RECORD_ID_PARAM)
-      || rawParams.has(HOME_RUN_FLOW_TASK_ID_PARAM)
+      deepLinkParams.has(HOME_RUN_FLOW_PARAM)
+      || deepLinkParams.has(HOME_RUN_FLOW_RECORD_ID_PARAM)
+      || deepLinkParams.has(HOME_RUN_FLOW_TASK_ID_PARAM)
     ) && normalized.runFlow === null,
+    invalidStockCode: parsedDeepLink.issues.some((issue) => issue.code === 'invalid_stock_code'),
+    invalidWorkspace: parsedDeepLink.issues.some((issue) => issue.code === 'invalid_workspace'),
+    sensitiveParameterRemoved: parsedDeepLink.issues.some((issue) => issue.code === 'sensitive_parameter'),
     normalizedSearch,
     needsNormalization: normalizedSearch !== rawSearch,
   };
 }
 
 function getNormalizedParams(search: string): URLSearchParams {
-  return normalizeCoreParams(toSearchParams(search)).params;
+  return toSearchParams(parseHomeUrlState(search).normalizedSearch);
 }
 
 export function setHomeRecord(search: string, recordId: number): string {
@@ -145,5 +159,15 @@ export function clearHomeRunFlow(search: string): string {
   params.delete(HOME_RUN_FLOW_PARAM);
   params.delete(HOME_RUN_FLOW_RECORD_ID_PARAM);
   params.delete(HOME_RUN_FLOW_TASK_ID_PARAM);
+  return toSearch(params);
+}
+
+export function setHomeWorkspace(search: string, workspace: HomeWorkspaceView): string {
+  const params = getNormalizedParams(search);
+  if (workspace === 'history') {
+    params.delete(HOME_WORKSPACE_PARAM);
+  } else {
+    params.set(HOME_WORKSPACE_PARAM, workspace);
+  }
   return toSearch(params);
 }
