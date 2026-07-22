@@ -18,6 +18,14 @@
   "build": {
     "appId": "com.daily-stock-analysis.desktop",
     "productName": "StockPulse",
+    "protocols": [
+      {
+        "name": "StockPulse",
+        "schemes": [
+          "stockpulse"
+        ]
+      }
+    ],
     "directories": {
       "output": "dist"
     },
