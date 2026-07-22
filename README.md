@@ -145,7 +145,9 @@
 git clone https://github.com/SiinXu/stock-pulse-ai.git && cd stock-pulse-ai
 
 # 安装依赖
-pip install -r requirements.txt
+python -m pip install --upgrade --constraint constraints.txt pip
+python -m pip install --build-constraint build-constraints.txt -r requirements.txt
+python -m pip check
 
 # 配置环境变量
 cp .env.example .env && vim .env
