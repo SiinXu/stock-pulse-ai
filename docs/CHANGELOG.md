@@ -271,6 +271,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Docs] Added an English operator guide for data-source priority, health scoring, adaptive ordering, degradation, and troubleshooting, and synchronized bilingual LLM fallback guidance.
 - [Docs] Defined the versioned plugin lifecycle, manifest, trust model, and six official extension-point contracts.
 - [Changed] Split the Agent orchestrator, executor, LLM adapter, and runner into focused compatibility-backed modules without changing runtime behavior.
+- [Changed] Split the pipeline analysis stage into focused private modules while preserving both analysis and pipeline facade contracts.
 
 ## [3.26.3] - 2026-07-15
 
