@@ -45,8 +45,8 @@ import { SCREENING_TEXT } from '../locales/screening';
 import { formatUiDateTime, formatUiNumber, getUiListSeparator } from '../utils/uiLocale';
 import { formatTaskMessage } from '../utils/taskMessage';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
+import { SCREEN_TASK_SESSION_STORAGE_KEY } from '../utils/sessionPersistence';
 
-const SCREEN_TASK_STORAGE_KEY = 'dsa.alphasift.activeScreenTask.v1';
 const SCREEN_TASK_POLL_INTERVAL_MS = 2000;
 
 type PersistedScreenTask = {
@@ -107,7 +107,7 @@ const readPersistedScreenTask = (): PersistedScreenTask | null => {
     return null;
   }
   try {
-    const raw = window.sessionStorage.getItem(SCREEN_TASK_STORAGE_KEY);
+    const raw = window.sessionStorage.getItem(SCREEN_TASK_SESSION_STORAGE_KEY);
     if (!raw) {
       return null;
     }
@@ -129,7 +129,7 @@ const readPersistedScreenTask = (): PersistedScreenTask | null => {
 
 const persistScreenTask = (task: PersistedScreenTask) => {
   try {
-    window.sessionStorage.setItem(SCREEN_TASK_STORAGE_KEY, JSON.stringify(task));
+    window.sessionStorage.setItem(SCREEN_TASK_SESSION_STORAGE_KEY, JSON.stringify(task));
   } catch {
     // Session storage is best-effort; polling still works while the page stays mounted.
   }
@@ -137,7 +137,7 @@ const persistScreenTask = (task: PersistedScreenTask) => {
 
 const clearPersistedScreenTask = () => {
   try {
-    window.sessionStorage.removeItem(SCREEN_TASK_STORAGE_KEY);
+    window.sessionStorage.removeItem(SCREEN_TASK_SESSION_STORAGE_KEY);
   } catch {
     // Ignore storage cleanup failures.
   }

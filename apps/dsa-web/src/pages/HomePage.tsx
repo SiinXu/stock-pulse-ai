@@ -877,13 +877,13 @@ const HomePage: React.FC = () => {
 
   useEffect(() => {
     const state = location.state as StockAnalysisNavigationState | null;
-    if (!state?.focusStockSearch) return undefined;
-    const frame = window.requestAnimationFrame(() => {
-      document.getElementById('home-stock-search')?.focus();
+    if (!state?.focusStockSearch) return;
+    document.getElementById('home-stock-search')?.focus();
+    navigate(`${location.pathname}${location.search}${location.hash}`, {
+      replace: true,
+      state: null,
     });
-    navigate(location.pathname, { replace: true, state: null });
-    return () => window.cancelAnimationFrame(frame);
-  }, [location.pathname, location.state, navigate]);
+  }, [location.hash, location.pathname, location.search, location.state, navigate]);
 
   useEffect(() => {
     const state = location.state as StockAnalysisNavigationState | null;
@@ -893,11 +893,14 @@ const HomePage: React.FC = () => {
     }
     const stockName = typeof state?.stockName === 'string' ? state.stockName.trim() : '';
     setQuery(stockCode);
-    navigate(location.pathname, { replace: true, state: null });
+    navigate(`${location.pathname}${location.search}${location.hash}`, {
+      replace: true,
+      state: null,
+    });
     if (state?.autoAnalyze) {
       handleSubmitAnalysis(stockCode, stockName || undefined, 'import');
     }
-  }, [handleSubmitAnalysis, location.pathname, location.state, navigate, setQuery]);
+  }, [handleSubmitAnalysis, location.hash, location.pathname, location.search, location.state, navigate, setQuery]);
 
   useEffect(() => {
     setQuery(homeUrlState.stockCode ?? '');

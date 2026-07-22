@@ -658,6 +658,27 @@ describe('DecisionSignalsPage', () => {
     expect(screen.getByText('action_blocked_by_guardrail')).toBeInTheDocument();
   });
 
+  it('opens the selected signal source report and history Run Flow in one click', async () => {
+    renderPage();
+    await screen.findByText('贵州茅台');
+
+    fireEvent.click(screen.getByRole('button', { name: '查看 贵州茅台 AI 建议详情' }));
+    const sourceLink = await screen.findByRole('link', { name: '来源报告 #3001' });
+    expect(sourceLink).toHaveAttribute(
+      'href',
+      '/?recordId=3001&stock=600519&runFlow=history&runFlowRecordId=3001',
+    );
+    fireEvent.click(sourceLink);
+
+    await waitFor(() => expect(window.location.pathname).toBe('/'));
+    expect(Object.fromEntries(new URLSearchParams(window.location.search))).toEqual({
+      recordId: '3001',
+      stock: '600519',
+      runFlow: 'history',
+      runFlowRecordId: '3001',
+    });
+  });
+
   it('reassesses from an existing source report id filter without a selected signal', async () => {
     window.history.pushState({}, '', '/decision-signals?sourceReportId=3001');
     vi.mocked(decisionSignalsApi.list).mockResolvedValueOnce(listResponse([], 0));

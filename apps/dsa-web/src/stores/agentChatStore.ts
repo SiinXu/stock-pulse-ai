@@ -9,8 +9,12 @@ import {
   type ParsedApiError,
 } from '../api/error';
 import { generateUUID } from '../utils/uuid';
-
-const STORAGE_KEY_SESSION = 'dsa_chat_session_id';
+import {
+  CHAT_SESSION_STORAGE_KEY,
+  readSessionItemWithLegacyLocal,
+  removeSessionItem,
+  writeSessionItem,
+} from '../utils/sessionPersistence';
 
 export interface ProgressStep {
   type: string;
@@ -151,12 +155,11 @@ interface AgentChatActions {
   startStream: (payload: ChatStreamRequest, meta?: StreamMeta, options?: StartStreamOptions) => Promise<void>;
   retryLastStream: () => Promise<void>;
   stopStream: () => void;
+  resetSessionState: () => void;
 }
 
 const getInitialSessionId = (): string =>
-  typeof localStorage !== 'undefined'
-    ? localStorage.getItem(STORAGE_KEY_SESSION) || generateUUID()
-    : generateUUID();
+  readSessionItemWithLegacyLocal(CHAT_SESSION_STORAGE_KEY) || generateUUID();
 
 let sessionHistoryGeneration = 0;
 let sessionListGeneration = 0;
@@ -205,9 +208,10 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     const { hasInitialLoad } = get();
     if (hasInitialLoad) return;
     const preferred = preferredSessionId?.trim() || null;
+    const persistedSessionId = readSessionItemWithLegacyLocal(CHAT_SESSION_STORAGE_KEY);
     const generation = ++sessionHistoryGeneration;
     if (preferred) {
-      localStorage.setItem(STORAGE_KEY_SESSION, preferred);
+      writeSessionItem(CHAT_SESSION_STORAGE_KEY, preferred);
     }
     set({
       hasInitialLoad: true,
@@ -224,9 +228,9 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
       }
       set({ sessions: sessionList });
 
-      const savedId = preferred || localStorage.getItem(STORAGE_KEY_SESSION);
+      const savedId = preferred || persistedSessionId;
       if (!savedId) {
-        localStorage.setItem(STORAGE_KEY_SESSION, get().sessionId);
+        writeSessionItem(CHAT_SESSION_STORAGE_KEY, get().sessionId);
         return;
       }
 
@@ -235,13 +239,13 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
         if (generation === sessionHistoryGeneration) {
           const newId = generateUUID();
           set({ sessionId: newId });
-          localStorage.setItem(STORAGE_KEY_SESSION, newId);
+          writeSessionItem(CHAT_SESSION_STORAGE_KEY, newId);
         }
         return;
       }
 
       set({ sessionId: savedId });
-      localStorage.setItem(STORAGE_KEY_SESSION, savedId);
+      writeSessionItem(CHAT_SESSION_STORAGE_KEY, savedId);
       const msgs = await agentApi.getChatSessionMessages(savedId);
       if (
         generation !== sessionHistoryGeneration
@@ -293,7 +297,7 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
         messages: msgs.map(fromSessionMessage),
         sessionError: null,
       });
-      localStorage.setItem(STORAGE_KEY_SESSION, targetSessionId);
+      writeSessionItem(CHAT_SESSION_STORAGE_KEY, targetSessionId);
       return true;
     } catch (error) {
       if (generation === sessionHistoryGeneration) {
@@ -317,6 +321,30 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     set({ loading: false, progressSteps: [], abortController: null });
   },
 
+  resetSessionState: () => {
+    get().abortController?.abort();
+    sessionHistoryGeneration += 1;
+    sessionListGeneration += 1;
+    removeSessionItem(CHAT_SESSION_STORAGE_KEY);
+    set({
+      messages: [],
+      loading: false,
+      progressSteps: [],
+      sessionId: generateUUID(),
+      sessions: [],
+      sessionsLoading: false,
+      sessionsError: null,
+      sessionLoading: false,
+      sessionError: null,
+      chatError: null,
+      currentRoute: '',
+      completionBadge: false,
+      hasInitialLoad: false,
+      abortController: null,
+      lastFailedRequest: null,
+    });
+  },
+
   startNewChat: () => {
     // Abort any in-flight stream so the old request does not keep running
     get().abortController?.abort();
@@ -334,7 +362,7 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
       abortController: null,
       lastFailedRequest: null,
     });
-    localStorage.setItem(STORAGE_KEY_SESSION, newId);
+    writeSessionItem(CHAT_SESSION_STORAGE_KEY, newId);
     return newId;
   },
 

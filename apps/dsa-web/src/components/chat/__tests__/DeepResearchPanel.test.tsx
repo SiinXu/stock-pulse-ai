@@ -29,6 +29,7 @@ describe('DeepResearchPanel', () => {
   beforeEach(() => {
     researchMock.mockReset();
     window.localStorage.clear();
+    window.sessionStorage.clear();
   });
 
   it('shows the empty hint before a run', () => {
@@ -85,7 +86,7 @@ describe('DeepResearchPanel', () => {
       content: 'Restored findings.',
       sources: ['Prior sub-question'],
     };
-    window.localStorage.setItem('dsa_research_run:sess-restore', JSON.stringify(stored));
+    window.sessionStorage.setItem('dsa_research_run:sess-restore', JSON.stringify(stored));
 
     renderPanel('sess-restore');
 
@@ -96,9 +97,24 @@ describe('DeepResearchPanel', () => {
 
   it('does not restore a stale running state (coerces it to re-runnable)', () => {
     const stored: { question: string; stockCode: string; status: string } = { question: 'Interrupted', stockCode: '', status: 'running' };
-    window.localStorage.setItem('dsa_research_run:sess-run', JSON.stringify(stored));
+    window.sessionStorage.setItem('dsa_research_run:sess-run', JSON.stringify(stored));
     renderPanel('sess-run');
     // A running run cannot resume after refresh; the Start button is available again.
     expect(screen.getByRole('button', { name: 'Start research' })).toBeTruthy();
+  });
+
+  it('migrates a legacy local run into session storage', () => {
+    window.localStorage.setItem('dsa_research_run:sess-legacy', JSON.stringify({
+      question: 'Legacy question',
+      stockCode: 'AAPL',
+      status: 'done',
+      content: 'Migrated findings.',
+    }));
+
+    renderPanel('sess-legacy');
+
+    expect(screen.getByText('Migrated findings.')).toBeTruthy();
+    expect(window.localStorage.getItem('dsa_research_run:sess-legacy')).toBeNull();
+    expect(window.sessionStorage.getItem('dsa_research_run:sess-legacy')).toContain('Migrated findings.');
   });
 });

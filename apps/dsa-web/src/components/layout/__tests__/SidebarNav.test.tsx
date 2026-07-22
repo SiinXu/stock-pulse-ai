@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { recordSessionLocation } from '../../../utils/sessionContinuity';
 import { SidebarNav } from '../SidebarNav';
 
 if (!HTMLElement.prototype.scrollIntoView) {
@@ -14,6 +15,16 @@ const mockThemeToggle = vi.fn(({ collapsed }: { collapsed?: boolean }) => (
 ));
 
 const completionBadgeState = { value: true };
+
+function ClearPortfolioStateHarness() {
+  const navigate = useNavigate();
+  return (
+    <>
+      <SidebarNav />
+      <button type="button" onClick={() => navigate('/portfolio')}>All accounts</button>
+    </>
+  );
+}
 
 vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: () => ({
@@ -40,6 +51,10 @@ vi.mock('../../theme/ThemeToggle', () => ({
 }));
 
 describe('SidebarNav', () => {
+  beforeEach(() => {
+    window.sessionStorage.clear();
+  });
+
   it('keeps icon-only collapse and search controls at least 44px square', () => {
     const onToggleCollapse = vi.fn();
     const { rerender } = render(
@@ -87,6 +102,49 @@ describe('SidebarNav', () => {
     );
 
     expect(screen.getByRole('link', { name: '选股' })).toHaveAttribute('href', '/screening');
+  });
+
+  it('carries the current stock into stock-aware navigation destinations', () => {
+    render(
+      <MemoryRouter initialEntries={['/stocks/AAPL']}>
+        <SidebarNav />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('link', { name: '首页' })).toHaveAttribute('href', '/?stock=AAPL');
+    expect(screen.getByRole('link', { name: '问股' })).toHaveAttribute('href', '/chat?stock=AAPL');
+    expect(screen.getByRole('link', { name: 'AI 建议' })).toHaveAttribute('href', '/decision-signals?stock=AAPL');
+    expect(screen.getByRole('link', { name: '回测' })).toHaveAttribute('href', '/backtest?code=AAPL');
+  });
+
+  it('restores destination-specific state from the current tab session', () => {
+    recordSessionLocation('/portfolio?account=12');
+    recordSessionLocation('/screening?strategy=quality&count=20');
+
+    render(
+      <MemoryRouter initialEntries={['/settings']}>
+        <SidebarNav />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('link', { name: '持仓' })).toHaveAttribute('href', '/portfolio?account=12');
+    expect(screen.getByRole('link', { name: '选股' })).toHaveAttribute('href', '/screening?strategy=quality&count=20');
+  });
+
+  it('does not resurrect destination state after the current route clears it', async () => {
+    recordSessionLocation('/portfolio?account=12');
+    render(
+      <MemoryRouter initialEntries={['/portfolio?account=12']}>
+        <ClearPortfolioStateHarness />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('link', { name: '持仓' })).toHaveAttribute('href', '/portfolio?account=12');
+    fireEvent.click(screen.getByRole('button', { name: 'All accounts' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: '持仓' })).toHaveAttribute('href', '/portfolio');
+    });
   });
 
   it('shows the screening navigation item when AlphaSift is enabled', async () => {
@@ -293,7 +351,7 @@ describe('SidebarNav', () => {
 
   it('opens the logout confirmation and confirms logout', async () => {
     render(
-      <MemoryRouter initialEntries={['/chat']}>
+      <MemoryRouter initialEntries={['/chat?session=private&stock=AAPL&recordId=9']}>
         <SidebarNav />
       </MemoryRouter>,
     );
@@ -303,5 +361,8 @@ describe('SidebarNav', () => {
     expect(await screen.findByRole('heading', { name: '退出登录' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '确认退出' }));
     expect(mockLogout).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: '退出登录' })).not.toBeInTheDocument();
+    });
   });
 });

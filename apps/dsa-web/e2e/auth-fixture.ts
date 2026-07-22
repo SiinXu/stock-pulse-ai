@@ -72,7 +72,9 @@ export async function loginAsE2eAdmin(page: Page): Promise<void> {
     await confirmation.fill(smokePassword);
   }
 
-  const submitButton = page.getByRole('button', { name: /授权进入工作台|完成设置并登录/ });
+  const submitButton = page.getByRole('button', {
+    name: /授权进入工作台|完成设置并登录|Enter workspace|Finish setup and sign in/,
+  });
   await expect(submitButton).toBeVisible();
   await Promise.all([
     page.waitForResponse(

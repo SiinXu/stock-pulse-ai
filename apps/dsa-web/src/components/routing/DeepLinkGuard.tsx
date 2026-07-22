@@ -5,6 +5,7 @@ import { useLayoutEffect, useMemo, useRef } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { parseDeepLink } from '../../utils/deepLink';
+import { markSessionRestoreSuppressed } from '../../utils/sessionContinuity';
 import { useToast } from '../common/toastContext';
 
 type DeepLinkGuardProps = {
@@ -47,6 +48,6 @@ export const DeepLinkGuard: React.FC<DeepLinkGuardProps> = ({ children }) => {
   ]);
 
   return normalizationRequired
-    ? <Navigate to={parsed.normalizedHref} replace state={location.state} />
+    ? <Navigate to={parsed.normalizedHref} replace state={markSessionRestoreSuppressed(location.state)} />
     : children;
 };
