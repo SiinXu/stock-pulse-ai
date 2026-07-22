@@ -265,8 +265,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - [Fixed] Preserved per-stock analysis history and decision signals in GitHub Actions artifacts for full and stocks-only runs.
 - [Docs] Added a business architecture view and directional technical data flow that separate stakeholder capabilities from implementation and resilience details.
-- [Docs] Defined the versioned plugin lifecycle, manifest, trust model, and six official extension-point contracts.
 - [Added] Added validated transactional runtime configuration activation, optional LLM connectivity probing, redacted operational audit logs, and one-step last-known-good rollback without changing in-flight task snapshots or authentication boundaries.
+- [Docs] Defined the versioned plugin lifecycle, manifest, trust model, and six official extension-point contracts.
 
 ## [3.26.3] - 2026-07-15
 
