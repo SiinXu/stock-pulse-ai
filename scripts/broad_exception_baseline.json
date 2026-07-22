@@ -423,7 +423,6 @@
     {"path":"src/scheduler.py","scope":"<module>.Scheduler._refresh_daily_schedule_if_needed","caught":["Exception"],"digest":"ad6a117ba14ae2e38693c6fd366055dc3097890686765a7c160a266b41ba88b8"},
     {"path":"src/scheduler.py","scope":"<module>.Scheduler._safe_run_task","caught":["Exception"],"digest":"476180b545803645dc5129355179f68eaec3171c1ee664916bf887da7b33dbd0"},
     {"path":"src/scheduler.py","scope":"<module>.Scheduler._start_background_task._runner","caught":["Exception"],"digest":"302d9d7af765f9cdf843143ecfe207d152b2a4dc5b4aa47b02dd527e10c4860b"},
-    {"path":"src/search_service.py","scope":"<module>.SearchService.search_stock_price_fallback","caught":["Exception"],"digest":"6aebca6de5653b21f7cb715b569b4f9573e622c7252ef9b89ee50398da2c1e51"},
     {"path":"src/services/alert_indicators.py","scope":"<module>._latest_timestamp","caught":["Exception"],"digest":"b06956630d13bfa1862377167627661d4c9a52a27246aaf8fde28c47f331bf79"},
     {"path":"src/services/alert_service.py","scope":"<module>.AlertService._coerce_datetime","caught":["Exception"],"digest":"6e497da67f494274f0df985eed18bf9ced1df086ea4cbea20a3ce3615ecb0702"},
     {"path":"src/services/alert_service.py","scope":"<module>.AlertService._cooldown_summary_for_rule","caught":["Exception"],"digest":"e6853798c0dfcb05abdf0ab00e41614360cd0eb731d5df2d3997da3944222c39"},
