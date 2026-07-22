@@ -82,6 +82,26 @@ Start-Process 'stockpulse://app/stocks/AAPL?period=weekly'
 
 验证时应确认链接落在预期页面、重复打开会唤起现有窗口，并用 `stockpulse://evil.example/settings` 或 `stockpulse://app/login` 确认拒绝路径不会改变当前页面。在非 Windows 环境只能验证 electron-builder 配置和确定性 argv 测试，不能替代 NSIS 安装后的注册表与二实例验收。
 
+## 桌面悬浮助手
+
+Desktop 启动后会在系统 tray / macOS 菜单栏创建 StockPulse 图标。菜单提供以下入口：
+
+- `Open Floating Assistant`：打开固定尺寸、无边框、always-on-top 的悬浮助手；双击 tray 图标也会切换助手显隐
+- `Show Main Window` / `Hide Main Window`：显示或隐藏主窗口
+- `Quit StockPulse`：退出桌面进程并停止内置后端
+
+主窗口普通关闭在 tray 可用时会转为隐藏，避免销毁窗口后重复启动内置后端；助手的关闭按钮同样只隐藏窗口。真正退出仍走 tray 的 `Quit StockPulse`、系统退出命令或更新安装流程。若 tray 图标初始化失败，桌面端保留原有主窗口关闭行为，并在 `logs/desktop.log` 记录 `tray unavailable`。
+
+助手只展示 Desktop 壳层可以准确判断的状态：
+
+- `Starting`：本地后端或 Web origin 尚未就绪
+- `Ready`：本地健康检查通过，主 Web 页面已加载
+- `Unavailable`：后端启动失败或进程退出
+
+该状态不是分析任务状态，也不代表所有第三方数据源、模型或通知渠道可用。助手中的 `Open analysis`、股票查询、持仓、预警和筛选均为现有主窗口页面的快捷入口；主进程只接受固定动作 ID 和 `1-16` 位 ASCII 字母、数字或点号股票代码，再通过既有 `stockpulse://app` 路由白名单映射到私有本地 Web origin。助手不会直接提交分析任务、复制 Web session cookie、显示最近报告或绕过 Web/API 认证。
+
+助手使用独立 preload，保持 `contextIsolation: true`、`nodeIntegration: false` 和 `sandbox: true`。renderer 没有任意 URL、网络、Node 或 shell 权限；IPC handler 还会校验调用方必须是当前助手窗口。electron-builder 会把现有 StockPulse 32px 品牌 PNG 复制为 `assistant-tray.png`，无需依赖 Web 构建产物提供 tray 图标。
+
 ## 打包 (Windows)
 
 ### 前置条件

@@ -57,6 +57,22 @@ function loadMainModule(t, options = {}) {
     on: () => undefined,
     removeListener: () => undefined,
   };
+  const fakeMenu = options.menu || {
+    buildFromTemplate: (template) => ({ template }),
+  };
+  const fakeNativeImage = options.nativeImage || {
+    createFromPath: () => ({ isEmpty: () => false }),
+  };
+  class DefaultTray extends EventEmitter {
+    isDestroyed() {
+      return false;
+    }
+
+    setToolTip() {}
+
+    setContextMenu() {}
+  }
+  const fakeTray = options.tray || DefaultTray;
 
   Module._load = function patchedLoad(request, parent, isMain) {
     if (request === 'electron') {
@@ -65,8 +81,11 @@ function loadMainModule(t, options = {}) {
         BrowserWindow: fakeBrowserWindow,
         dialog: fakeDialog,
         ipcMain: fakeIpcMain,
+        Menu: fakeMenu,
+        nativeImage: fakeNativeImage,
         shell: fakeShell,
         nativeTheme: fakeNativeTheme,
+        Tray: fakeTray,
       };
     }
     if (request === 'http' && options.http) {
@@ -174,6 +193,319 @@ test('desktop package exposes StockPulse while retaining the stable upgrade appI
   assert.match(installerScript, /'"\$appExe" "%1"'/);
   assert.match(installerScript, /!macro customUnInstall\b/);
   assert.match(installerScript, /DeleteRegKey SHELL_CONTEXT "Software\\Classes\\stockpulse"/);
+});
+
+test('desktop package includes the isolated floating assistant surface and tray asset', () => {
+  const packageMetadata = JSON.parse(
+    fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf-8')
+  );
+  const assistantPage = fs.readFileSync(
+    path.join(__dirname, '..', 'renderer', 'assistant.html'),
+    'utf-8'
+  );
+  const assistantScript = fs.readFileSync(
+    path.join(__dirname, '..', 'renderer', 'assistant.js'),
+    'utf-8'
+  );
+
+  assert.ok(packageMetadata.build.files.includes('assistant-preload.js'));
+  assert.ok(packageMetadata.build.files.includes('renderer/**/*'));
+  assert.ok(packageMetadata.build.extraResources.some((entry) =>
+    entry.to === 'assistant-tray.png'
+    && entry.from.endsWith('lightlogo.iconset/icon_32x32.png')));
+  assert.match(assistantPage, /connect-src 'none'/);
+  assert.match(assistantPage, /script-src 'self'/);
+  assert.match(assistantPage, /id="stockLookupForm"/);
+  assert.match(assistantPage, /data-action="analysis"/);
+  assert.doesNotMatch(assistantScript, /\bfetch\s*\(/);
+  assert.doesNotMatch(assistantScript, /innerHTML/);
+});
+
+test('desktop assistant actions map only to allowlisted routes', (t) => {
+  const mainModule = loadMainModule(t);
+
+  assert.equal(mainModule.buildDesktopAssistantRoute('analysis'), '/');
+  assert.equal(mainModule.buildDesktopAssistantRoute('portfolio'), '/portfolio');
+  assert.equal(mainModule.buildDesktopAssistantRoute('alerts'), '/alerts');
+  assert.equal(mainModule.buildDesktopAssistantRoute('screening'), '/screening');
+  assert.equal(mainModule.buildDesktopAssistantRoute('stock', ' aapl '), '/stocks/AAPL');
+  assert.equal(mainModule.buildDesktopAssistantRoute('stock', 'HK00700'), '/stocks/HK00700');
+
+  for (const [action, stockCode] of [
+    ['settings', ''],
+    ['stock', 'AAPL/../../settings'],
+    ['stock', 'AAPL%2Fsettings'],
+    ['stock', 'AAPL?next=https://evil.example'],
+    ['stock', ''],
+    ['stock', 'X'.repeat(17)],
+  ]) {
+    assert.equal(mainModule.buildDesktopAssistantRoute(action, stockCode), null);
+  }
+});
+
+test('desktop assistant reports only shell-owned readiness states', (t) => {
+  const mainModule = loadMainModule(t);
+
+  assert.deepEqual(mainModule.buildDesktopAssistantState(), {
+    serviceStatus: 'starting',
+    mainWindowVisible: false,
+    lastReadyAt: '',
+  });
+
+  mainModule.__setDesktopAssistantStateForTest({
+    webReady: true,
+    lastReadyAt: '2026-07-22T08:00:00.000Z',
+  });
+  assert.deepEqual(mainModule.buildDesktopAssistantState(), {
+    serviceStatus: 'ready',
+    mainWindowVisible: false,
+    lastReadyAt: '2026-07-22T08:00:00.000Z',
+  });
+
+  mainModule.__setDesktopAssistantStateForTest({
+    webReady: false,
+    startError: new Error('backend stopped'),
+    lastReadyAt: '2026-07-22T08:00:00.000Z',
+  });
+  assert.deepEqual(mainModule.buildDesktopAssistantState(), {
+    serviceStatus: 'unavailable',
+    mainWindowVisible: false,
+    lastReadyAt: '2026-07-22T08:00:00.000Z',
+  });
+});
+
+test('floating assistant BrowserWindow is fixed, isolated, and hides instead of closing', async (t) => {
+  const mainModule = loadMainModule(t);
+  let browserWindowOptions = null;
+  let loadedPath = '';
+  let openHandler = null;
+  let hidden = false;
+  let centered = false;
+
+  class FakeAssistantWindow extends EventEmitter {
+    constructor(options) {
+      super();
+      browserWindowOptions = options;
+      this.webContents = {
+        send: () => undefined,
+        setWindowOpenHandler: (handler) => {
+          openHandler = handler;
+        },
+      };
+    }
+
+    isDestroyed() {
+      return false;
+    }
+
+    async loadFile(filePath) {
+      loadedPath = filePath;
+    }
+
+    hide() {
+      hidden = true;
+    }
+
+    center() {
+      centered = true;
+    }
+  }
+
+  const assistant = await mainModule.createDesktopAssistantWindow({
+    BrowserWindowClass: FakeAssistantWindow,
+  });
+
+  assert.equal(browserWindowOptions.frame, false);
+  assert.equal(browserWindowOptions.alwaysOnTop, true);
+  assert.equal(browserWindowOptions.resizable, false);
+  assert.equal(browserWindowOptions.skipTaskbar, true);
+  assert.equal(browserWindowOptions.webPreferences.nodeIntegration, false);
+  assert.equal(browserWindowOptions.webPreferences.contextIsolation, true);
+  assert.equal(browserWindowOptions.webPreferences.sandbox, true);
+  assert.match(browserWindowOptions.webPreferences.preload, /assistant-preload\.js$/);
+  assert.match(loadedPath, /renderer\/assistant\.html$/);
+  assert.deepEqual(openHandler({ url: 'https://evil.example' }), { action: 'deny' });
+  assert.equal(centered, true);
+
+  let prevented = false;
+  assistant.emit('close', {
+    preventDefault: () => {
+      prevented = true;
+    },
+  });
+  assert.equal(prevented, true);
+  assert.equal(hidden, true);
+});
+
+test('desktop assistant IPC rejects other renderers and routes validated stock actions', async (t) => {
+  const mainModule = loadMainModule(t);
+  const assistantWebContents = {
+    send: () => undefined,
+  };
+  let assistantHidden = false;
+  const assistantWindowRef = {
+    isDestroyed: () => false,
+    hide: () => {
+      assistantHidden = true;
+    },
+    webContents: assistantWebContents,
+  };
+  const lifecycle = [];
+  const mainWindowRef = {
+    isDestroyed: () => false,
+    isMinimized: () => false,
+    isVisible: () => true,
+    show: () => lifecycle.push('show'),
+    focus: () => lifecycle.push('focus'),
+    loadURL: async (url) => lifecycle.push(`load:${url}`),
+  };
+  mainModule.__setAssistantWindowForTest(assistantWindowRef);
+  mainModule.__setMainWindowForTest(mainWindowRef);
+  mainModule.__setDesktopDeepLinkStateForTest({
+    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=3.21.0&cache_bust=123',
+    ready: true,
+  });
+
+  const openAction = mainModule.__getIpcMainHandler(
+    mainModule.DESKTOP_ASSISTANT_OPEN_ACTION_CHANNEL
+  );
+  await assert.rejects(
+    () => openAction({ sender: {} }, { action: 'portfolio' }),
+    /Unauthorized desktop assistant IPC sender/
+  );
+
+  assert.deepEqual(
+    await openAction(
+      { sender: assistantWebContents },
+      { action: 'stock', stockCode: 'aapl' }
+    ),
+    { ok: true, pending: false }
+  );
+  assert.deepEqual(lifecycle.slice(0, 2), ['show', 'focus']);
+  assert.equal(new URL(lifecycle[2].slice('load:'.length)).pathname, '/stocks/AAPL');
+  assert.equal(assistantHidden, true);
+
+  const loadCount = lifecycle.filter((entry) => entry.startsWith('load:')).length;
+  assert.deepEqual(
+    await openAction(
+      { sender: assistantWebContents },
+      { action: 'stock', stockCode: 'AAPL/../../settings' }
+    ),
+    { ok: false, error: 'invalid-action' }
+  );
+  assert.equal(lifecycle.filter((entry) => entry.startsWith('load:')).length, loadCount);
+});
+
+test('desktop tray exposes assistant, main-window, and explicit quit commands', (t) => {
+  const mainModule = loadMainModule(t);
+  let resolvedIconPath = '';
+  let menuTemplate = null;
+
+  class FakeTray extends EventEmitter {
+    constructor(icon) {
+      super();
+      this.icon = icon;
+      this.destroyed = false;
+    }
+
+    isDestroyed() {
+      return this.destroyed;
+    }
+
+    setToolTip(value) {
+      this.toolTip = value;
+    }
+
+    setContextMenu(value) {
+      this.contextMenu = value;
+    }
+  }
+
+  const tray = mainModule.createDesktopTray({
+    iconPath: '/tmp/assistant-tray.png',
+    TrayClass: FakeTray,
+    imageApi: {
+      createFromPath: (iconPath) => {
+        resolvedIconPath = iconPath;
+        return { isEmpty: () => false };
+      },
+    },
+    menuApi: {
+      buildFromTemplate: (template) => {
+        menuTemplate = template;
+        return { template };
+      },
+    },
+  });
+
+  assert.equal(resolvedIconPath, '/tmp/assistant-tray.png');
+  assert.equal(tray.toolTip, 'StockPulse');
+  assert.deepEqual(
+    menuTemplate.filter((item) => item.label).map((item) => item.label),
+    [
+      'Open Floating Assistant',
+      'Show Main Window',
+      'Hide Main Window',
+      'Quit StockPulse',
+    ]
+  );
+  assert.equal(mainModule.resolveDesktopAssistantTrayIconPath({
+    packaged: true,
+    resourcesPath: '/Applications/StockPulse.app/Contents/Resources',
+  }), '/Applications/StockPulse.app/Contents/Resources/assistant-tray.png');
+});
+
+test('main-window close hides to tray unless the application is quitting', (t) => {
+  const mainModule = loadMainModule(t);
+  let hidden = 0;
+  let prevented = 0;
+  mainModule.__setMainWindowForTest({
+    isDestroyed: () => false,
+    hide: () => {
+      hidden += 1;
+    },
+  });
+  mainModule.__setDesktopTrayForTest({
+    isDestroyed: () => false,
+  });
+
+  assert.equal(mainModule.handleMainWindowClose({
+    preventDefault: () => {
+      prevented += 1;
+    },
+  }), true);
+  assert.equal(hidden, 1);
+  assert.equal(prevented, 1);
+
+  mainModule.__setDesktopIsQuittingForTest(true);
+  assert.equal(mainModule.handleMainWindowClose({
+    preventDefault: () => {
+      prevented += 1;
+    },
+  }), false);
+  assert.equal(hidden, 1);
+  assert.equal(prevented, 1);
+});
+
+test('main-window close keeps the original lifecycle when tray creation failed', (t) => {
+  const mainModule = loadMainModule(t);
+  let hidden = 0;
+  let prevented = 0;
+  mainModule.__setMainWindowForTest({
+    isDestroyed: () => false,
+    hide: () => {
+      hidden += 1;
+    },
+  });
+  mainModule.__setDesktopTrayForTest(null);
+
+  assert.equal(mainModule.handleMainWindowClose({
+    preventDefault: () => {
+      prevented += 1;
+    },
+  }), false);
+  assert.equal(hidden, 0);
+  assert.equal(prevented, 0);
 });
 
 test('desktop deep-link parser preserves allowlisted Web paths and search state', (t) => {
