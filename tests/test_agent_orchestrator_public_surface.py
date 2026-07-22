@@ -104,10 +104,10 @@ EXPECTED_DASHBOARD_METHODS = (
 )
 
 EXPECTED_AST_HASHES = {
-    "_ExecutionMethods": "c4fc99490e95e66bbcb79ca2e2196abff1024efd156205cc5898705f49e9f91b",
-    "_ChatMethods": "f8365a4cd942e0b0a836c10ca11689ca157cedbd754bd061f059e149f27da3b9",
-    "_PipelineMethods": "25b1e8e2031eb4f3519d996018e7eabaa97a86b19bf206f8fedeee58713d89f8",
-    "_DashboardMethods": "c049531e3e4398323fa7963293fad0c03542477fa34e4b375e5159ef5c3c46a3",
+    "_ExecutionMethods": "353d048051f1e3c3459a836a41481d45d35c0b3c064c06f459670209414c28e6",
+    "_ChatMethods": "a9ff0fdd1f1363159512199a1d4e8e8f64de57cc13330c77a9bb94e12d735227",
+    "_PipelineMethods": "e9b7e36df2f12986455f7716df961ce7fe673be7605860da0245bdafc2b957a3",
+    "_DashboardMethods": "ae832f41bcba833a70fa8252140cda8c605cd81f6589e96c0c7f159b823ec76e",
 }
 
 
@@ -133,6 +133,23 @@ def _loaded_globals(code: CodeType):
     return names
 
 
+def _canonical_ast(value):
+    """Serialize ASTs without fields introduced only by newer Python versions."""
+
+    if isinstance(value, ast.AST):
+        return [
+            value.__class__.__name__,
+            [
+                [field, _canonical_ast(child)]
+                for field, child in ast.iter_fields(value)
+                if field != "type_params"
+            ],
+        ]
+    if isinstance(value, list):
+        return [_canonical_ast(item) for item in value]
+    return value
+
+
 def _container_ast_hash(container) -> str:
     source_path = inspect.getsourcefile(container)
     tree = ast.parse(Path(source_path).read_text(encoding="utf-8"))
@@ -144,7 +161,7 @@ def _container_ast_hash(container) -> str:
     records = [
         (
             node.name,
-            ast.dump(node, annotate_fields=True, include_attributes=False),
+            _canonical_ast(node),
         )
         for node in class_node.body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
