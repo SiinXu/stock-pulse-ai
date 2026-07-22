@@ -1,0 +1,5 @@
+# Desktop backend runtime and packaging toolchain.
+-c constraints.txt
+-r requirements.txt
+
+pyinstaller

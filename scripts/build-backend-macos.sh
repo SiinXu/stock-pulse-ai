@@ -33,13 +33,13 @@ popd >/dev/null
 log "Verifying static asset references (source)..."
 "${PYTHON_BIN}" "${SCRIPT_DIR}/check_static_assets.py" "${ROOT_DIR}/static"
 
-log "Building backend executable..."
-if ! "${PYTHON_BIN}" -m PyInstaller --version >/dev/null 2>&1; then
-  "${PYTHON_BIN}" -m pip install pyinstaller
-fi
+log "Installing reproducible desktop backend dependencies..."
+"${PYTHON_BIN}" -m pip install --upgrade --constraint "${ROOT_DIR}/constraints.txt" pip
+"${PYTHON_BIN}" -m pip install --build-constraint "${ROOT_DIR}/build-constraints.txt" -r "${ROOT_DIR}/requirements-desktop.txt"
+"${PYTHON_BIN}" -m pip check
 
-log "Installing backend dependencies..."
-"${PYTHON_BIN}" -m pip install -r "${ROOT_DIR}/requirements.txt"
+log "Checking PyInstaller availability..."
+"${PYTHON_BIN}" -m PyInstaller --version >/dev/null
 
 log "Checking python-multipart availability..."
 "${PYTHON_BIN}" -c "import multipart, multipart.multipart"

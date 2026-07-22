@@ -1,0 +1,2 @@
+# PEP 517 build-isolation dependencies reviewed for immutable source builds.
+setuptools==83.0.0

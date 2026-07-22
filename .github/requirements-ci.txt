@@ -1,8 +1,10 @@
 # Backend CI dependencies.
+-c ../constraints.txt
 -r ../requirements.txt
 
-# Test and lint tooling used by backend-gate.
-# Bounded to the majors CI currently resolves so tool releases cannot
-# break CI without a code change.
+# Bootstrap, test, and lint tooling. Versions resolve through constraints.txt.
+pip
 flake8>=7,<8
-pytest>=8,<9
+pip-audit
+pytest>=9.0.3,<10
+uv==0.11.31

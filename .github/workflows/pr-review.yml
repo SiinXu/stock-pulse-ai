@@ -121,11 +121,15 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
+          cache-dependency-path: |
+            constraints.txt
+            build-constraints.txt
+            .github/requirements-review.txt
       
       - name: 📦 Install Dependencies
         run: |
-          pip install --upgrade pip
-          pip install flake8
+          python -m pip install --upgrade --build-constraint build-constraints.txt -r .github/requirements-review.txt
+          python -m pip check
       
       - name: 📋 Identify Changed Files
         id: check_files
