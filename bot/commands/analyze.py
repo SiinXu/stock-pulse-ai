@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Stock Analysis Command
+股票分析命令
 ===================================
 
-Analyze a specified stock and call AI to generate an analysis report.
+分析指定股票，调用 AI 生成分析报告。
 """
 
 import logging
@@ -49,7 +49,7 @@ class AnalyzeCommand(BotCommand):
         return "/analyze <600519|HK00700|AAPL> [full]"
     
     def validate_args(self, args: List[str]) -> Optional[str]:
-        """Validate parameters"""
+        """验证参数"""
         if not args:
             return (
                 "请输入股票代码 / Please provide a stock symbol.\n"
@@ -64,7 +64,7 @@ class AnalyzeCommand(BotCommand):
         return None
     
     def execute(self, message: BotMessage, args: List[str]) -> BotResponse:
-        """Execute analysis command"""
+        """执行分析命令"""
         if not args:
             return BotResponse.error_response(
                 "请输入股票代码 / Please provide a stock symbol.\n"

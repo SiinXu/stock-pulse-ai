@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Data access layer module initialization
+数据访问层模块初始化
 ===================================
 
-Responsibilities:
-1. Export all Repository classes
+职责：
+1. 导出所有 Repository 类
 """
 
 from src.repositories.analysis_repo import AnalysisRepository

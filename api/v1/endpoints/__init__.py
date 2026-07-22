@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-API v1 Endpoints Module initialization
+API v1 Endpoints 模块初始化
 ===================================
 
-Responsibilities:
-1. Declare all endpoint routing modules
+职责：
+1. 声明所有 endpoint 路由模块
 """
 
 from api.v1.endpoints import (

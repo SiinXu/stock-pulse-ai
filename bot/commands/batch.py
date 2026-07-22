@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Bulk analysis command
+批量分析命令
 ===================================
 
-Bulk analysis of all stocks in the watchlist.
+批量分析自选股列表中的所有股票。
 """
 
 import logging
@@ -23,13 +23,13 @@ logger = logging.getLogger(__name__)
 
 class BatchCommand(BotCommand):
     """
-    Bulk analysis command
+    批量分析命令
     
-    Bulk analysis of the watchlist stocks configured in the list, generating a summary report.
+    批量分析配置中的自选股列表，生成汇总报告。
     
-    Usage:
-        /batch      - analyze all watchlist stocks
-        /batch 3    - Only analyze before 3 Only
+    用法：
+        /batch      - 分析所有自选股
+        /batch 3    - 只分析前3只
     """
     
     @property
@@ -50,11 +50,11 @@ class BatchCommand(BotCommand):
     
     @property
     def admin_only(self) -> bool:
-        """Bulk analysis requires administrator permissions (to prevent abuse)"""
+        """批量分析需要管理员权限（防止滥用）"""
         return False  # Can be set to True as needed.
     
     def execute(self, message: BotMessage, args: List[str]) -> BotResponse:
-        """Execute batch analysis command"""
+        """执行批量分析命令"""
         from src.config import get_config
         
         config = get_config()
@@ -107,7 +107,7 @@ class BatchCommand(BotCommand):
         stock_list: List[str],
         request_context: AnalysisRequestContext,
     ) -> None:
-        """Perform batch analysis in the background."""
+        """后台执行批量分析"""
         try:
             from src.config import get_config
             from main import StockAnalysisPipeline

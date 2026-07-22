@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright (c) 2026 SiinXu / StockPulse contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Tests for the experimental PydanticAI runtime adapter (AR-PY-04, Plan B).
+"""Tests for the experimental PydanticAI runtime adapter (AR-PY-04, 方案 B).
 
 Two contracts are asserted:
 

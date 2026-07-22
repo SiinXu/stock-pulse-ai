@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Status command
+状态命令
 ===================================
 
-Displays system running status and configuration information.
+显示系统运行状态和配置信息。
 """
 
 import platform
@@ -18,12 +18,12 @@ from bot.models import BotMessage, BotResponse
 
 class StatusCommand(BotCommand):
     """
-    Status command
+    状态命令
     
-    Displays system running status, including:
-    - Service status.
-    - Configuration information
-    - Available features.
+    显示系统运行状态，包括：
+    - 服务状态
+    - 配置信息
+    - 可用功能
     """
     
     @property
@@ -43,7 +43,7 @@ class StatusCommand(BotCommand):
         return "/status"
     
     def execute(self, message: BotMessage, args: List[str]) -> BotResponse:
-        """Execute status command"""
+        """执行状态命令"""
         from src.config import get_config
         
         config = get_config()
@@ -57,7 +57,7 @@ class StatusCommand(BotCommand):
         return BotResponse.markdown_response(text)
     
     def _collect_status(self, config) -> dict:
-        """Collect system status information"""
+        """收集系统状态信息"""
         from src.config import _uses_direct_env_provider, get_configured_llm_models
 
         status = {
@@ -143,7 +143,7 @@ class StatusCommand(BotCommand):
         return status
     
     def _format_status(self, status: dict, platform: str) -> str:
-        """Format status information"""
+        """格式化状态信息"""
         # Status icon
         def icon(enabled: bool) -> str:
             return "✅" if enabled else "❌"

@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-FastAPI application factory module
+FastAPI 应用工厂模块
 ===================================
 
-Responsibilities:
-1. Create and configure a FastAPI application instance
-2. Configure CORS middleware
-3. Register route and exception handler
-4. Host frontend static files (production mode)
+职责：
+1. 创建和配置 FastAPI 应用实例
+2. 配置 CORS 中间件
+3. 注册路由和异常处理器
+4. 托管前端静态文件（生产模式）
 
-Usage:
+使用方式：
     from api.app import create_app
     app = create_app()
 """
@@ -311,13 +311,13 @@ async def app_lifespan(app: FastAPI):
 
 def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     """
-    Create and configure a FastAPI application instance
+    创建并配置 FastAPI 应用实例
     
     Args:
-        static_dir: static file directory path (optional, default is the static directory under the project root)
+        static_dir: 静态文件目录路径（可选，默认为项目根目录下的 static）
         
     Returns:
-        FastAPI application instance configured upon completion
+        配置完成的 FastAPI 应用实例
     """
     # Default static file directory
     _register_frontend_asset_mime_types()
@@ -396,7 +396,7 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
 
         @app.get("/", include_in_schema=False)
         async def root():
-            """Root route - Returns the frontend page."""
+            """根路由 - 返回前端页面"""
             return _frontend_index_response(static_dir)
     else:
         _FRONTEND_NOT_BUILT_HTML = """<!DOCTYPE html>
@@ -428,7 +428,7 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
 
         @app.get("/", include_in_schema=False)
         async def root():
-            """Root route - Returns a tutorial page if the frontend is not built."""
+            """根路由 - 前端未构建时返回引导页面"""
             return HTMLResponse(content=_FRONTEND_NOT_BUILT_HTML)
     
     @app.get(
@@ -446,7 +446,7 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
         description="用于负载均衡器或监控系统检查服务状态"
     )
     async def health_check() -> HealthResponse:
-        """Health check interface"""
+        """健康检查接口"""
         return HealthResponse(
             status="ok",
             timestamp=datetime.now().isoformat()
@@ -531,10 +531,10 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
                 media_type=_missing_asset_media_type(asset_path),
             )
 
-        # SPA Route Rollback
+        # SPA route fallback.
         @app.get("/{full_path:path}", include_in_schema=False)
         async def serve_spa(request: Request, full_path: str):
-            """SPA Route Rollback - Non-API Routes return index.html"""
+            """SPA 路由回退 - 非 API 路由返回 index.html"""
             if full_path == "api" or full_path.startswith("api/"):
                 return JSONResponse(
                     status_code=404,

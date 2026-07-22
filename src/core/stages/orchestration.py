@@ -142,20 +142,20 @@ class _OrchestrationStageMixin:
         current_time: Optional[datetime] = None,
     ) -> Tuple[bool, Optional[str]]:
         """
-        Get and save data for a single stock
+        获取并保存单只股票数据
 \x20\x20\x20\x20\x20\x20\x20\x20
-        Checkpoint resumption logic:
-        1. Check if latest reusable trading day data exists in the database
-        2. If available and not forced to refresh, skip the network request
-        3. Otherwise, retrieve and save from the data source
+        断点续传逻辑：
+        1. 检查数据库是否已有最新可复用交易日数据
+        2. 如果有且不强制刷新，则跳过网络请求
+        3. 否则从数据源获取并保存
 \x20\x20\x20\x20\x20\x20\x20\x20
         Args:
-            code: stock code
-            force_refresh: Whether to force refresh (ignore local cache)
-            current_time: Timestamp frozen for the current run, used for unified breakpoint transmission target trading day judgment
+            code: 股票代码
+            force_refresh: 是否强制刷新（忽略本地缓存）
+            current_time: 本轮运行冻结的参考时间，用于统一断点续传目标交易日判断
 \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20
         Returns:
-            Tuple[Success status, Error information]
+            Tuple[是否成功, 错误信息]
         """
         stock_name = code
         try:
@@ -241,26 +241,26 @@ class _OrchestrationStageMixin:
         current_time: Optional[datetime] = None,
     ) -> Optional[AnalysisResult]:
         """
-        Process the complete workflow for a single stock
+        处理单只股票的完整流程
 
-        Includes:
-        1. Get data
-        2. Save data
-        3. AI analysis
-        4. (Optional, #55) Single stock push
+        包括：
+        1. 获取数据
+        2. 保存数据
+        3. AI 分析
+        4. 单股推送（可选，#55）
 
-        This method will be called by the thread pool, needs to handle exceptions.
+        此方法会被线程池调用，需要处理好异常
 
         Args:
-            analysis_query_id: Query link correlation? id
-            code: stock code
-            skip_analysis: Skip? AI analysis
-            single_stock_notify: Whether to enable single-stock push mode (push immediately after analyzing each stock)
-            report_type: report type enumeration (read from configuration, Issue #119)
-            current_time: Timestamp frozen for the current run, used for unified breakpoint transmission target trading day judgment
+            analysis_query_id: 查询链路关联 id
+            code: 股票代码
+            skip_analysis: 是否跳过 AI 分析
+            single_stock_notify: 是否启用单股推送模式（每分析完一只立即推送）
+            report_type: 报告类型枚举（从配置读取，Issue #119）
+            current_time: 本轮运行冻结的参考时间，用于统一断点续传目标交易日判断
 
         Returns:
-            AnalysisResult Or None
+            AnalysisResult 或 None
         """
         logger.info("========== Processing %s ==========", code)
 
@@ -492,23 +492,23 @@ class _OrchestrationStageMixin:
         current_time: Optional[datetime] = None,
     ) -> List[AnalysisResult]:
         """
-        Run the complete analysis flow
+        运行完整的分析流程
 
-        Process:
-        1. Get the list of stocks to analyze
-        2. Use thread pool for concurrent processing
-        3. Collect analysis results
-        4. Send notification
+        流程：
+        1. 获取待分析的股票列表
+        2. 使用线程池并发处理
+        3. 收集分析结果
+        4. 发送通知
 
         Args:
-            stock_codes: List of stock codes (optional, defaults to selected stocks in configuration)
-            dry_run: Whether to retrieve data only without analysis
-            send_notification: Send push notifications?
-            merge_notification: Whether to merge push notifications (skip this push, consolidate individual stocks and major indices for unified sending, Issue #190)
-            current_time: Timestamp frozen for the current run; empty when generated within run
+            stock_codes: 股票代码列表（可选，默认使用配置中的自选股）
+            dry_run: 是否仅获取数据不分析
+            send_notification: 是否发送推送通知
+            merge_notification: 是否合并推送（跳过本次推送，由 main 层合并个股+大盘后统一发送，Issue #190）
+            current_time: 本轮运行冻结的参考时间；为空时在 run 内生成
 
         Returns:
-            List of analysis results.
+            分析结果列表
         """
         start_time = time.time()
 

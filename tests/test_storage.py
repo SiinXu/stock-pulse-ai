@@ -492,7 +492,7 @@ class TestStorage(unittest.TestCase):
         temp_dir.cleanup()
     
     def test_parse_sniper_value(self):
-        """Test parse sniper point value"""
+        """测试解析狙击点位数值"""
         
         # 1. Normal numerical value
         self.assertEqual(DatabaseManager._parse_sniper_value(100), 100.0)
@@ -500,12 +500,12 @@ class TestStorage(unittest.TestCase):
         self.assertEqual(DatabaseManager._parse_sniper_value("100"), 100.0)
         self.assertEqual(DatabaseManager._parse_sniper_value("100.5"), 100.5)
         
-        # 2. A dictionary containing Chinese descriptions and "yuan"
+        # 2. A dictionary containing Chinese descriptions and "元"
         self.assertEqual(DatabaseManager._parse_sniper_value("建议在 100 元附近买入"), 100.0)
         self.assertEqual(DatabaseManager._parse_sniper_value("价格：100.5元"), 100.5)
         
         # 3. Includes interfering numbers (fixed bug scenario)
-        # Previously "MA5" might be incorrectly extracted as 5.0, should now be extracted "yuan" the previous 100
+        # Previously "MA5" might be incorrectly extracted as 5.0, should now be extracted "元" the previous 100
         text_bug = "无法给出。需等待MA5数据恢复，在股价回踩MA5且乖离率<2%时考虑100元"
         self.assertEqual(DatabaseManager._parse_sniper_value(text_bug), 100.0)
         
@@ -513,15 +513,15 @@ class TestStorage(unittest.TestCase):
         text_complex = "MA10为20.5，建议在30元买入"
         self.assertEqual(DatabaseManager._parse_sniper_value(text_complex), 30.0)
         
-        text_multiple = "支撑位10元，阻力位20元" # Extract 20, the number before the final "yuan" marker
-        # The current logic is to find the last colon, then find the first "yuan" (digit) after it and extract the intermediate number.
+        text_multiple = "支撑位10元，阻力位20元" # Extract 20, the number before the final "元" marker
+        # The current logic is to find the last colon, then find the first "元" (digit) after it and extract the intermediate number.
         # Test does not handle colon cases.
         self.assertEqual(DatabaseManager._parse_sniper_value("30元"), 30.0)
         
-        # Test multiple numbers before "yuan"
+        # Test multiple numbers before "元"
         self.assertEqual(DatabaseManager._parse_sniper_value("MA5 10 20元"), 20.0)
         
-        # 5. Fallback: no "yuan" character — extracts last non-MA number
+        # 5. Fallback: no "元" character — extracts last non-MA number
         self.assertEqual(DatabaseManager._parse_sniper_value("102.10-103.00（MA5附近）"), 103.0)
         self.assertEqual(DatabaseManager._parse_sniper_value("97.62-98.50（MA10附近）"), 98.5)
         self.assertEqual(DatabaseManager._parse_sniper_value("93.40下方（MA20支撑）"), 93.4)

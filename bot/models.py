@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Robot message model
+机器人消息模型
 ===================================
 
-Define a unified message and response model, shielding differences across platforms.
+定义统一的消息和响应模型，屏蔽各平台差异。
 """
 
 from dataclasses import dataclass, field
@@ -14,14 +14,14 @@ from typing import Dict, Any, Optional, List
 
 
 class ChatType(str, Enum):
-    """Session type"""
+    """会话类型"""
     GROUP = "group"      # Chat room
     PRIVATE = "private"  # Private chat
     UNKNOWN = "unknown"  # Unknown.
 
 
 class Platform(str, Enum):
-    """Platform type"""
+    """平台类型"""
     FEISHU = "feishu"        # Feishu
     DINGTALK = "dingtalk"    # DingTalk
     WECOM = "wecom"          # WeCom
@@ -32,23 +32,23 @@ class Platform(str, Enum):
 @dataclass
 class BotMessage:
     """
-    Use a unified robot message model
+    统一的机器人消息模型
     
-    Standardize message formats from each platform to be compatible with the command processor.
+    将各平台的消息格式统一为此模型，便于命令处理器处理。
     
     Attributes:
-        platform: platform identifier
-        message_id: Message ID(platform original data ID)
-        user_id: Sender ID
-        user_name: Sender name
-        chat_id: group chat ID or private chat ID
-        chat_type: conversation type
-        content: message text content (excluding @robot parts)
-        raw_content: raw message content
-        mentioned: whether mentioned the robot
-        mentions: user list
-        timestamp: message timestamp
-        raw_data: raw request data (platform-specific, for debugging)
+        platform: 平台标识
+        message_id: 消息 ID（平台原始 ID）
+        user_id: 发送者 ID
+        user_name: 发送者名称
+        chat_id: 会话 ID（群聊 ID 或私聊 ID）
+        chat_type: 会话类型
+        content: 消息文本内容（已去除 @机器人 部分）
+        raw_content: 原始消息内容
+        mentioned: 是否 @了机器人
+        mentions: @的用户列表
+        timestamp: 消息时间戳
+        raw_data: 原始请求数据（平台特定，用于调试）
     """
     platform: str
     message_id: str
@@ -65,14 +65,14 @@ class BotMessage:
     
     def get_command_and_args(self, prefix: str = "/") -> tuple:
         """
-        Parse commands and parameters
+        解析命令和参数
         
         Args:
-            prefix: command prefix, default "/"
+            prefix: 命令前缀，默认 "/"
             
         Returns:
-            (command, args) Tuple, If ("analyze", ["600519"])
-            If not a command, return (None, [])
+            (command, args) 元组，如 ("analyze", ["600519"])
+            如果不是命令，返回 (None, [])
         """
         text = self.content.strip()
         
@@ -106,7 +106,7 @@ class BotMessage:
         return command, args
     
     def is_command(self, prefix: str = "/") -> bool:
-        """Check if the message is a command"""
+        """检查消息是否是命令"""
         cmd, _ = self.get_command_and_args(prefix)
         return cmd is not None
 
@@ -114,16 +114,16 @@ class BotMessage:
 @dataclass
 class BotResponse:
     """
-    Use a unified robot response model
+    统一的机器人响应模型
     
-    Command processor returns this model, which is converted to a platform-specific format by the platform adapter.
+    命令处理器返回此模型，由平台适配器转换为平台特定格式。
     
     Attributes:
-        text: reply text
-        markdown: Whether the content is Markdown
-        at_user: Whether to @sender
-        reply_to_message: Reply to original message?
-        extra: Extra data (platform-specific)
+        text: 回复文本
+        markdown: 是否为 Markdown 格式
+        at_user: 是否 @发送者
+        reply_to_message: 是否回复原消息
+        extra: 额外数据（平台特定）
     """
     text: str
     markdown: bool = False
@@ -133,31 +133,31 @@ class BotResponse:
     
     @classmethod
     def text_response(cls, text: str, at_user: bool = True) -> 'BotResponse':
-        """Create plain text response"""
+        """创建纯文本响应"""
         return cls(text=text, markdown=False, at_user=at_user)
     
     @classmethod
     def markdown_response(cls, text: str, at_user: bool = True) -> 'BotResponse':
-        """Create Markdown response"""
+        """创建 Markdown 响应"""
         return cls(text=text, markdown=True, at_user=at_user)
     
     @classmethod
     def error_response(cls, message: str) -> 'BotResponse':
-        """Create error response"""
+        """创建错误响应"""
         return cls(text=f"❌ 错误：{message}", markdown=False, at_user=True)
 
 
 @dataclass
 class WebhookResponse:
     """
-    Response model for Webhook
+    Webhook 响应模型
     
-    Platform adapter returns this model, including HTTP response content.
+    平台适配器返回此模型，包含 HTTP 响应内容。
     
     Attributes:
-        status_code: HTTP Status code
-        body: Response body (dictionary, will be JSON serialized)
-        headers: additional response headers
+        status_code: HTTP 状态码
+        body: 响应体（字典，将被 JSON 序列化）
+        headers: 额外的响应头
     """
     status_code: int = 200
     body: Dict[str, Any] = field(default_factory=dict)
@@ -165,15 +165,15 @@ class WebhookResponse:
     
     @classmethod
     def success(cls, body: Optional[Dict] = None) -> 'WebhookResponse':
-        """Create a success response"""
+        """创建成功响应"""
         return cls(status_code=200, body=body or {})
     
     @classmethod
     def challenge(cls, challenge: str) -> 'WebhookResponse':
-        """Create validation response (for platform URL verification)"""
+        """创建验证响应（用于平台 URL 验证）"""
         return cls(status_code=200, body={"challenge": challenge})
     
     @classmethod
     def error(cls, message: str, status_code: int = 400) -> 'WebhookResponse':
-        """Create error response"""
+        """创建错误响应"""
         return cls(status_code=status_code, body={"error": message})

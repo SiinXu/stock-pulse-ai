@@ -68,12 +68,12 @@ class _ConfigLoadingMethods:
     @classmethod
     def _load_from_env(cls) -> 'Config':
         """
-        Loads configuration from .env file.
+        从 .env 文件加载配置
 \x20\x20\x20\x20\x20\x20\x20\x20
-        Load priority:
-        1. Most configurations prioritize system environment variables
-        2. WebUI writable runtime key priority reuse persistence `.env`, but retains startup explicit process environment variable override
-        3. Default values in the code
+        加载优先级：
+        1. 大多数配置保持系统环境变量优先
+        2. WebUI 可写的运行期关键键优先复用持久化 `.env`，但保留启动时显式进程环境变量的 override
+        3. 代码中的默认值
         """
         cls._capture_bootstrap_runtime_env_overrides()
         preexisting_report_language = os.environ.get("REPORT_LANGUAGE")
@@ -87,7 +87,7 @@ class _ConfigLoadingMethods:
         if http_proxy:
             # Domestic financial data source domain list
             domestic_domains = [
-                'eastmoney.com',   # Efinance (Efinance/Akshare)
+                'eastmoney.com',   # Eastmoney (efinance/AkShare)
                 'sina.com.cn',     # Sina Finance (Akshare)
                 '163.com',         # NetEase Finance (Akshare)
                 'tushare.pro',     # Tushare
@@ -909,11 +909,11 @@ class _ConfigLoadingMethods:
             feishu_verification_token=os.getenv('FEISHU_VERIFICATION_TOKEN'),
             feishu_encrypt_key=os.getenv('FEISHU_ENCRYPT_KEY'),
             feishu_stream_enabled=os.getenv('FEISHU_STREAM_ENABLED', 'false').lower() == 'true',
-            # Feishu robot
+            # DingTalk robot
             dingtalk_app_key=os.getenv('DINGTALK_APP_KEY'),
             dingtalk_app_secret=os.getenv('DINGTALK_APP_SECRET'),
             dingtalk_stream_enabled=os.getenv('DINGTALK_STREAM_ENABLED', 'false').lower() == 'true',
-            # Feishu Bot
+            # WeCom bot
             wecom_corpid=os.getenv('WECOM_CORPID'),
             wecom_token=os.getenv('WECOM_TOKEN'),
             wecom_encoding_aes_key=os.getenv('WECOM_ENCODING_AES_KEY'),
@@ -922,19 +922,19 @@ class _ConfigLoadingMethods:
             telegram_webhook_secret=os.getenv('TELEGRAM_WEBHOOK_SECRET'),
             # Discord Bot extension configuration
             discord_bot_status=os.getenv('DISCORD_BOT_STATUS', 'A股智能分析 | /help'),
-            # Enhanced real-time data configuration.
+            # Enhanced real-time quote configuration.
             enable_realtime_quote=os.getenv('ENABLE_REALTIME_QUOTE', 'true').lower() == 'true',
             enable_realtime_technical_indicators=os.getenv(
                 'ENABLE_REALTIME_TECHNICAL_INDICATORS', 'true'
             ).lower() == 'true',
             enable_chip_distribution=os.getenv('ENABLE_CHIP_DISTRIBUTION', 'true').lower() == 'true',
-            # Efinance interface patch switch
+            # Eastmoney API patch switch
             enable_eastmoney_patch=os.getenv('ENABLE_EASTMONEY_PATCH', 'false').lower() == 'true',
             # Real-time quote data source priority:
-            # - tencent: Tencents Finance, provides ratios like PB/turnover/PE/PB for individual stocks (recommended)
-            # - akshare_sina: Sina Finance, stable basic data but no volume ratio
-            # - efinance/akshare_em: DCAP full interface, most complete data but prone to being blocked
-            # - tushare: Tushare Pro, requires 2000 points, comprehensive data
+            # - tencent: Tencent Finance; provides volume ratio, turnover rate, P/E, and P/B (recommended)
+            # - akshare_sina: Sina Finance; stable basic quotes without volume ratio
+            # - efinance/akshare_em: Eastmoney full-data APIs; most complete, but prone to blocking
+            # - tushare: Tushare Pro; requires 2,000 points and provides comprehensive data
             realtime_source_priority=cls._resolve_realtime_source_priority(),
             realtime_cache_ttl=parse_env_int(os.getenv('REALTIME_CACHE_TTL'), 600, field_name='REALTIME_CACHE_TTL', minimum=0),
             circuit_breaker_cooldown=parse_env_int(os.getenv('CIRCUIT_BREAKER_COOLDOWN'), 300, field_name='CIRCUIT_BREAKER_COOLDOWN', minimum=0),
@@ -1214,7 +1214,7 @@ class _ConfigLoadingMethods:
 
     @classmethod
     def _parse_market_review_region(cls, value: str) -> str:
-        """Parse the market review for major indices, invalid values record warning and rollback to cn"""
+        """解析大盘复盘市场区域，非法值记录警告后回退为 cn"""
         import logging
         v = (value or 'cn').strip().lower()
         supported_regions = ('cn', 'hk', 'us', 'jp', 'kr', 'both')

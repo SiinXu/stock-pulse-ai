@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Log configuration module - Initialize a unified logging system
+日志配置模块 - 统一的日志系统初始化
 ===================================
 
-Responsibilities:
-1. Provides a unified log format and configuration constants
-2. Supports console + file (regular/debug) three-level logging output
-3. Automatically reduce third-party library log level
+职责：
+1. 提供统一的日志格式和配置常量
+2. 支持控制台 + 文件（常规/调试）三层日志输出
+3. 自动降低第三方库日志级别
 """
 
 import logging
@@ -38,7 +38,7 @@ _DEFAULT_LITELLM_LOG_LEVEL = 'WARNING'
 
 
 class RelativePathFormatter(logging.Formatter):
-    """Custom Formatter, output relative paths instead of absolute paths"""
+    """自定义 Formatter，输出相对路径而非绝对路径"""
 
     def __init__(self, fmt=None, datefmt=None, relative_to=None):
         super().__init__(fmt, datefmt)
@@ -230,19 +230,19 @@ def setup_logging(
     extra_quiet_loggers: Optional[List[str]] = None,
 ) -> None:
     """
-    Initialize the unified logging system
+    统一的日志系统初始化
 
-    Configure three-layer logging output:
-    1. Console: Set level based on debug parameter or console_level
-    2. Regular log file: INFO level, 10MB rotation, keep 5 backups
-    3. Debug log file: DEBUG level, 50MB rotation, keep 3 backups
+    配置三层日志输出：
+    1. 控制台：根据 debug 参数或 console_level 设置级别
+    2. 常规日志文件：INFO 级别，10MB 轮转，保留 5 个备份
+    3. 调试日志文件：DEBUG 级别，50MB 轮转，保留 3 个备份
 
     Args:
-        log_prefix: Log File Prefix(If "api_server" -> api_server_20240101.log)
-        log_dir: log file directory, default ./logs
-        console_level: Console log level (optional, takes precedence over debug parameter)
-        debug: enable debugging mode (console output at DEBUG level)
-        extra_quiet_loggers: List of third-party libraries requiring quieter log levels
+        log_prefix: 日志文件名前缀（如 "api_server" -> api_server_20240101.log）
+        log_dir: 日志文件目录，默认 ./logs
+        console_level: 控制台日志级别（可选，优先于 debug 参数）
+        debug: 是否启用调试模式（控制台输出 DEBUG 级别）
+        extra_quiet_loggers: 额外需要降低日志级别的第三方库列表
     """
     # Determine console log level
     if console_level is not None:

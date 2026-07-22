@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Format the tool module
+格式化工具模块
 ===================================
 
-Provides various content formatting tool functions to convert generic formats to platform-specific formats.
+提供各种内容格式化工具函数，用于将通用格式转换为平台特定格式。
 """
 
 import re
@@ -31,13 +31,13 @@ def _page_marker(i: int, total: int) -> str:
 
 
 def _is_special_char(c: str) -> bool:
-    """Determine if the character is a special character.
+    """判断字符是否为特殊字符
     
     Args:
-        char: character
+        c: 字符
         
     Returns:
-        True if the character is a special character, False otherwise
+        True 如果字符为特殊字符，False 否则
     """
     if len(c) != 1:
         return False
@@ -47,10 +47,10 @@ def _is_special_char(c: str) -> bool:
 
 def _count_special_chars(s: str) -> int:
     """
-    Calculate the number of special characters in a string
+    计算字符串中的特殊字符数量
     
     Args:
-        s: string
+        s: 字符串
     """
     # reg find all (0x10000, 0xFFFFF)
     match = _SPECIAL_CHAR_REGEX.findall(s)
@@ -59,14 +59,14 @@ def _count_special_chars(s: str) -> int:
 
 def _effective_len(s: str, special_char_len: int = 2) -> int:
     """
-    Calculate the effective length of a string
+    计算字符串的有效长度
     
     Args:
-        s: string
-        special_char_len: length of each special character, default is 2
+        s: 字符串
+        special_char_len: 每个特殊字符的长度，默认为 2
         
     Returns:
-        The valid length of s
+        s 的有效长度
     """
     n = len(s)
     n += _count_special_chars(s) * (special_char_len - 1)
@@ -75,15 +75,15 @@ def _effective_len(s: str, special_char_len: int = 2) -> int:
 
 def _slice_at_effective_len(s: str, effective_len: int, special_char_len: int = 2) -> tuple[str, str]:
     """
-    Split string by effective length.
+    按有效长度分割字符串
     
     Args:
-        s: string
-        effective_len: Valid length?
-        special_char_len: length of each special character, default is 2
+        s: 字符串
+        effective_len: 有效长度
+        special_char_len: 每个特殊字符的长度，默认为 2
         
     Returns:
-        The front and back parts of the string after splitting
+        分割后的前、后部分字符串
     """
     if _effective_len(s, special_char_len) <= effective_len:
         return s, ""
@@ -228,9 +228,9 @@ def markdown_to_html_document(markdown_text: str) -> str:
 
 def markdown_to_plain_text(markdown_text: str) -> str:
     """
-    Convert Markdown to plain text
+    将 Markdown 转换为纯文本
     
-    Remove Markdown formatting, preserve readability
+    移除 Markdown 格式标记，保留可读性
     """
     text = markdown_text
     
@@ -598,15 +598,15 @@ def _chunk_by_max_bytes(content: str, max_bytes: int) -> List[str]:
 
 def chunk_content_by_max_bytes(content: str, max_bytes: int, add_page_marker: bool = False) -> List[str]:
     """
-    Intelligently split message content by bytes.
+    按字节数智能分割消息内容
     
     Args:
-        content: Full message content
-        max_bytes: maximum byte count per message
-        add_page_marker: Add pagination marker?
+        content: 完整消息内容
+        max_bytes: 单条消息最大字节数
+        add_page_marker: 是否添加分页标记
         
     Returns:
-        The list of blocks after splitting
+        分割后的区块列表
     """
     def _chunk(content: str, max_bytes: int) -> List[str]:
         # Prefer splitting by delimiter/title to ensure natural pagination.
@@ -684,14 +684,14 @@ def chunk_content_by_max_bytes(content: str, max_bytes: int, add_page_marker: bo
 
 def slice_at_max_bytes(text: str, max_bytes: int) -> tuple[str, str]:
     """
-    Truncate string by bytes to avoid splitting multi-byte characters in the middle.
+    按字节数截断字符串，确保不会在多字节字符中间截断
 
     Args:
-        text: string to truncate
-        max_bytes: maximum byte count
+        text: 要截断的字符串
+        max_bytes: 最大字节数
 
     Returns:
-        (String truncated after, Remaining unprocessed content)
+        (截断后的字符串, 剩余未截断内容)
     """
     encoded = text.encode("utf-8")
     if len(encoded) <= max_bytes:
@@ -749,35 +749,35 @@ def _format_feishu_markdown_unprotected(content: str) -> str:
 
 def format_feishu_markdown(content: str) -> str:
     """
-    Convert generic Markdown to Feishu lark_md friendly format
+    将通用 Markdown 转换为飞书 lark_md 更友好的格式
 
-    Conversion rules:
-    - Feishu does not support Markdown headings (# / ## / ###), use bold instead
-    - Use prefixes instead of referencing blocks
-    - Use a dashed line for the separator
-    - Convert table to list items.
+    转换规则：
+    - 飞书不支持 Markdown 标题（# / ## / ###），用加粗代替
+    - 引用块使用前缀替代
+    - 分隔线统一为细线
+    - 表格转换为条目列表
 
     Args:
-        content: Original Markdown content
+        content: 原始 Markdown 内容
 
     Returns:
-        Converted Feishu Markdown content
+        转换后的飞书 Markdown 格式内容
 
     Example:
-        >>> markdown = "# Title\\n> Quote\\n| Column 1 | Column 2 |"
+        >>> markdown = "# 标题\\n> 引用\\n| 列1 | 列2 |"
         >>> formatted = format_feishu_markdown(markdown)
         >>> print(formatted)
-**Title**
-        💬 Quote
-        * Column 1: Value 1 | Column 2: Value 2
+        **标题**
+        💬 引用
+        • 列1：值1 | 列2：值2
     """
     def _flush_table_rows(buffer: List[str], output: List[str]) -> None:
-        """Convert rows from the table buffer to Feishu format"""
+        """将表格缓冲区中的行转换为飞书格式"""
         if not buffer:
             return
 
         def _parse_row(row: str) -> List[str]:
-            """Parse table rows, extract cells"""
+            """解析表格行，提取单元格"""
             return _parse_markdown_table_row(row)
 
         rows = []
@@ -912,14 +912,14 @@ def format_slack_mrkdwn(content: str) -> str:
 
 def _chunk_by_separators(content: str) -> tuple[list[str], str]:
     """
-    Split message content into multiple blocks using special characters like dividers
+    通过分割线等特殊字符将消息内容分割为多个区块
     
     Args:
-        content: Full message content
+        content: 完整消息内容
         
     Returns:
-        sections: List of segmented blocks
-        separator: Separator between blocks, None indicates that it cannot be split
+        sections: 分割后的区块列表
+        separator: 区块之间的分隔符，None 表示无法分割
     """
     # Smart split: Prioritize separating (stock dividers) with "---"
     # Next, try to split each level of titles.
@@ -957,15 +957,15 @@ def _chunk_by_separators(content: str) -> tuple[list[str], str]:
 
 def _chunk_by_max_words(content: str, max_words: int, special_char_len: int = 2) -> list[str]:
     """
-    Split message content by character count.
+    按字数分割消息内容
     
     Args:
-        content: Full message content
-        max_words: maximum word count per message
-        special_char_len: length of each special character, default is 2
+        content: 完整消息内容
+        max_words: 单条消息最大字数
+        special_char_len: 每个特殊字符的长度，默认为 2
         
     Returns:
-        The list of blocks after splitting
+        分割后的区块列表
     """
     if _effective_len(content, special_char_len) <= max_words:
         return [content]
@@ -999,16 +999,16 @@ def chunk_content_by_max_words(
     add_page_marker: bool = False
     ) -> list[str]:
     """
-    Intelligently split message content by byte block to avoid exceeding limits per message.
+    按字数智能分割消息内容
     
     Args:
-        content: Full message content
-        max_words: maximum word count per message
-        special_char_len: length of each special character, default is 2
-        add_page_marker: Add pagination marker?
+        content: 完整消息内容
+        max_words: 单条消息最大字数
+        special_char_len: 每个特殊字符的长度，默认为 2
+        add_page_marker: 是否添加分页标记
         
     Returns:
-        The list of blocks after splitting
+        分割后的区块列表
     """
     def _chunk(content: str, max_words: int, special_char_len: int = 2) -> list[str]:
         if max_words < MIN_MAX_WORDS:

@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Platform adapter module
+平台适配器模块
 ===================================
 
-A dictionary containing Webhook handling and message parsing logic for each platform.
+包含各平台的 Webhook 处理和消息解析逻辑。
 
-Supports two access modes:
-1. Webhook Mode: Requires Public IP, Configure Callback URL
-2. Streaming mode: No public IP required, via long WebSocket connection (supported by DingTalk and Feishu)
+支持两种接入模式：
+1. Webhook 模式：需要公网 IP，配置回调 URL
+2. Stream 模式：无需公网 IP，通过 WebSocket 长连接（钉钉、飞书支持）
 """
 
 from bot.platforms.base import BotPlatform

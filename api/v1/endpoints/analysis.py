@@ -1,19 +1,19 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Stock Analysis Interface
+股票分析接口
 ===================================
 
-Responsibilities:
-1. Provides POST /api/v1/analysis/analyze trigger analysis interface
-2. Provide GET /api/v1/analysis/status/{task_id} query task status interface
-3. Provide GET /api/v1/analysis/tasks get task list interface
-4. Provide GET /api/v1/analysis/tasks/stream SSE real-time push interface
+职责：
+1. 提供 POST /api/v1/analysis/analyze 触发分析接口
+2. 提供 GET /api/v1/analysis/status/{task_id} 查询任务状态接口
+3. 提供 GET /api/v1/analysis/tasks 获取任务列表接口
+4. 提供 GET /api/v1/analysis/tasks/stream SSE 实时推送接口
 
-Features:
-- Asynchronous task queue: Analyze tasks execute asynchronously without blocking requests
-- Prevent duplicate submission: when the same stock code is being analyzed, a 409 response is returned.
-- SSE Real-time Push: Task status changes real-time notify the frontend
+特性：
+- 异步任务队列：分析任务异步执行，不阻塞请求
+- 防重复提交：相同股票代码正在分析时返回 409
+- SSE 实时推送：任务状态变化实时通知前端
 """
 
 import asyncio
@@ -291,27 +291,27 @@ def trigger_analysis(
         config: Config = Depends(get_config_dep)
 ) -> Union[AnalysisResultResponse, JSONResponse]:
     """
-    Trigger stock analysis
+    触发股票分析
     
-    Start AI intelligent analysis task, supports batch analysis of single or multiple stocks
+    启动 AI 智能分析任务，支持单只或多只股票批量分析
     
-    Process:
-    1. Validate request parameters
-    2. Asynchronous mode: Check for duplicates -> Submit to task queue -> Return 202
-    3. Sync mode: Directly execute analysis -> Returns 200.
+    流程：
+    1. 校验请求参数
+    2. 异步模式：检查重复 -> 提交任务队列 -> 返回 202
+    3. 同步模式：直接执行分析 -> 返回 200
     
     Args:
-        request: analysis request parameters
-        config: Configuration dependency
+        request: 分析请求参数
+        config: 配置依赖
         
     Returns:
-        AnalysisResultResponse: analysis results(Synchronous Mode)
-        TaskAccepted | BatchTaskAcceptedResponse: Task accepted (asynchronous mode, returns 202)
+        AnalysisResultResponse: 分析结果（同步模式）
+        TaskAccepted | BatchTaskAcceptedResponse: 任务已接受（异步模式，返回 202）
         
     Raises:
-        HTTPException: 400 - Invalid request parameters
-        HTTPException: 409 - Stock is being analyzed
-        HTTPException: 500 - analysis failed
+        HTTPException: 400 - 请求参数错误
+        HTTPException: 409 - 股票正在分析中
+        HTTPException: 500 - 分析失败
     """
     # Validate request parameters
     stock_codes = []
@@ -477,9 +477,9 @@ def _handle_sync_analysis(
     request: AnalyzeRequest
 ) -> AnalysisResultResponse:
     """
-    Handle synchronous analysis requests
+    处理同步分析请求
     
-    Execute analysis directly and return results after completion
+    直接执行分析，等待完成后返回结果
     """
     import uuid
     from src.services.analysis_service import AnalysisService
@@ -636,14 +636,14 @@ def get_task_list(
     limit: int = Query(20, description="返回数量限制", ge=1, le=100),
 ) -> TaskListResponse:
     """
-    Get the list of analysis tasks
+    获取分析任务列表
     
     Args:
-        status: status filter (optional)
-        limit: return limit
+        status: 状态筛选（可选）
+        limit: 返回数量限制
         
     Returns:
-        TaskListResponse: Task list response
+        TaskListResponse: 任务列表响应
     """
     task_queue = get_task_queue()
     
@@ -705,19 +705,19 @@ def get_task_list(
 )
 async def task_stream():
     """
-    SSE Task Status Stream
+    SSE 任务状态流
     
-    Event type:
-    - connected: Connection successful
-    - task_created: New task created
-    - task_started: Task started executing
-    - task_progress: Task stage progress update
-    - task_completed: Task completed
-    - task_failed: Task failed
-    - heartbeat: heartbeat (every 30 seconds)
+    事件类型：
+    - connected: 连接成功
+    - task_created: 新任务创建
+    - task_started: 任务开始执行
+    - task_progress: 任务阶段进度更新
+    - task_completed: 任务完成
+    - task_failed: 任务失败
+    - heartbeat: 心跳（每 30 秒）
     
     Returns:
-        StreamingResponse: SSE Event stream
+        StreamingResponse: SSE 事件流
     """
     async def event_generator():
         task_queue = get_task_queue()
@@ -764,14 +764,14 @@ async def task_stream():
 
 def _format_sse_event(event_type: str, data: Dict[str, Any]) -> str:
     """
-    Format SSE events.
+    格式化 SSE 事件
     
     Args:
-        event_type: Event type
-        data: Event data
+        event_type: 事件类型
+        data: 事件数据
         
     Returns:
-        SSE Format String
+        SSE 格式字符串
     """
     return f"event: {event_type}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
@@ -820,7 +820,7 @@ def _load_history_run_flow_by_query_id(
 )
 def get_task_run_flow(task_id: str) -> RunFlowSnapshot:
     """
-    Query analysis task running stream.
+    查询分析任务运行流。
 
     Active tasks are served from the in-memory task queue. Completed tasks try
     to hydrate from persisted history diagnostics using the same task_id/query_id.
@@ -1079,18 +1079,18 @@ def _build_task_analysis_result(task: Any) -> AnalysisResultResponse:
 )
 def get_analysis_status(task_id: str) -> TaskStatus:
     """
-    Query analysis task status
+    查询分析任务状态
     
-    Prioritize querying from task queue, if not found query historical records from database
+    优先从任务队列查询，如果不存在则从数据库查询历史记录
     
     Args:
-        task_id: Task ID
+        task_id: 任务 ID
         
     Returns:
-        TaskStatus: Task status information
+        TaskStatus: 任务状态信息
         
     Raises:
-        HTTPException: 404 - Task does not exist
+        HTTPException: 404 - 任务不存在
     """
     # 1. Query from task queue first
     task_queue = get_task_queue()
@@ -1379,19 +1379,19 @@ def _build_analysis_report(
         fallback_raw_result_payload: Optional[Any] = None,
 ) -> AnalysisReport:
     """
-    Build analysis report compliant with API standards
+    构建符合 API 规范的分析报告
     
     Args:
-        report_data: original report data
-        query_id: query ID
-        stock_code: stock code
-        stock_name: Stock name
-        context_snapshot: Context Snapshot(Optional)
-        fallback_fundamental_payload: Fundamental Snapshot payload(Optional)
-        fallback_raw_result_payload: Original analysis results payload(Optional)
+        report_data: 原始报告数据
+        query_id: 查询 ID
+        stock_code: 股票代码
+        stock_name: 股票名称
+        context_snapshot: 上下文快照（可选）
+        fallback_fundamental_payload: 基本面快照 payload（可选）
+        fallback_raw_result_payload: 原始分析结果 payload（可选）
         
     Returns:
-        AnalysisReport: Structured analysis report
+        AnalysisReport: 结构化的分析报告
     """
     meta_data = report_data.get("meta", {})
     summary_data = report_data.get("summary", {})

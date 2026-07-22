@@ -36,12 +36,12 @@ from src.llm.local_cli_backend import (
 @dataclass
 class Config:
     """
-    System configuration class - Singleton pattern
+    系统配置类 - 单例模式
 \x20\x20\x20\x20
-    Design specifications:
-    - Use dataclass to simplify configuration attribute definitions.
-    - All configuration items are read from environment variables, supporting default values
-    - Class method get_instance() implements singleton access
+    设计说明：
+    - 使用 dataclass 简化配置属性定义
+    - 所有配置项从环境变量读取，支持默认值
+    - 类方法 get_instance() 实现单例访问
     """
 
     # Watchlist Stocks Configuration
@@ -208,7 +208,7 @@ class Config:
 
     # === Notification Configuration (Can configure multiple, all push) ===
 
-    # Feishu Webhook
+    # WeCom Webhook
     wechat_webhook_url: Optional[str] = None
 
     # Feishu Webhook
@@ -319,9 +319,9 @@ class Config:
     # Message length limit (bytes) - Automatically split long messages for sending
     feishu_max_bytes: int = 20000  # Feishu limits to approximately 20KB, default 20000 bytes
     feishu_send_as_file: bool = False  # Does Feishu send reports in file format (default: text message)?
-    wechat_max_bytes: int = 4000   # Feishu limits 4096 bytes, default 4000 bytes
+    wechat_max_bytes: int = 4000   # WeCom limit is 4096 bytes; default 4000 bytes
     discord_max_words: int = 2000  # Discord limits 2000 words, defaults to 2000 words
-    wechat_msg_type: str = "markdown"  # Feishu Message Type, default markdown type
+    wechat_msg_type: str = "markdown"  # WeCom message type; defaults to markdown
 
     # Markdown to image (Issue #289): Send unsupported Markdown channels as images
     markdown_to_image_channels: List[str] = field(default_factory=list)  # Comma-separated: telegram,wechat,custom,email
@@ -373,19 +373,19 @@ class Config:
     trading_day_check_enabled: bool = True
 
     # === Real-Time Quote Enhanced Data Configuration ===
-    # Real-time switch (disabled, use historical closing prices for analysis).
+    # Real-time quote switch; when disabled, analysis uses historical closing prices.
     enable_realtime_quote: bool = True
     # Real-time technical analysis during trading: When enabled, it uses real prices to calculate MA/long positions (Issue #234); when disabled, it uses yesterday's closing price.
     enable_realtime_technical_indicators: bool = True
     # Chip distribution switch (this interface is unstable, cloud deployment is recommended to close)
     enable_chip_distribution: bool = True
-    # Efinance interface patch switch
+    # Eastmoney API patch switch
     enable_eastmoney_patch: bool = False
     # Real-time quote data source priority (comma separated)
     # Recommendation order:tencent > akshare_sina > efinance > akshare_em > tushare
     # - tencent: Financial data from Tencent, including PB/Turnover Rate/PE ratio etc., stable single-stock query (recommended)
     # - akshare_sina: Sina Finance, stable basic data but no volume ratio
-    # - efinance/akshare_em: DCAP full interface, most complete data but prone to being blocked
+    # - efinance/akshare_em: Eastmoney full-data APIs; most complete, but prone to blocking
     # - tushare: Tushare Pro, requires 2000 points, comprehensive data (paid users have priority)
     realtime_source_priority: str = "tencent,akshare_sina,efinance,akshare_em"
     # Real-time quote cache time (seconds)
@@ -449,12 +449,12 @@ class Config:
     feishu_encrypt_key: Optional[str] = None         # Message encryption key (optional)
     feishu_stream_enabled: bool = False              # Whether long connection Stream mode is enabled (no public IP required)
 
-    # Feishu robot
+    # DingTalk robot
     dingtalk_app_key: Optional[str] = None      # Application AppKey
     dingtalk_app_secret: Optional[str] = None   # Application AppSecret
     dingtalk_stream_enabled: bool = False       # Whether Stream mode is enabled (no public IP required)
 
-    # Feishu Bot (Callback Mode)
+    # WeCom bot (callback mode)
     wecom_corpid: Optional[str] = None              # Company ID
     wecom_token: Optional[str] = None               # Callback Token
     wecom_encoding_aes_key: Optional[str] = None    # Message encryption and decryption key
@@ -524,12 +524,12 @@ class Config:
     @classmethod
     def get_instance(cls) -> 'Config':
         """
-        Get a singleton instance of the configuration
+        获取配置单例实例
 \x20\x20\x20\x20\x20\x20\x20\x20
-        Singleton pattern ensures:
-        1. Only one configuration instance globally
-        2. Configuration only loads once from environment variables
-        3. All modules share the same configuration
+        单例模式确保：
+        1. 全局只有一个配置实例
+        2. 配置只从环境变量加载一次
+        3. 所有模块共享相同配置
         """
         if cls._instance is None:
             cls._instance = cls._load_from_env()

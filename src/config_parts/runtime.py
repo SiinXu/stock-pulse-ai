@@ -17,7 +17,7 @@ from src.services.stock_list_parser import split_stock_list
 class _ConfigRuntimeMethods:
     @classmethod
     def reset_instance(cls) -> None:
-        """Reset singleton (mainly for testing)."""
+        """重置单例（主要用于测试）"""
         cls._instance = None
         cls._BOOTSTRAP_RUNTIME_ENV_OVERRIDES_CAPTURED = False
         cls._BOOTSTRAP_RUNTIME_ENV_OVERRIDES = frozenset()
@@ -89,11 +89,11 @@ class _ConfigRuntimeMethods:
 
     def refresh_stock_list(self) -> None:
         """
-        Read STOCK_LIST environment variable and update the watchlist stocks list in configuration.
+        热读取 STOCK_LIST 环境变量并更新配置中的自选股列表
 \x20\x20\x20\x20\x20\x20\x20\x20
-        Supports two configuration methods:
-        1. .env file (Local development, scheduled task mode) - Changes will take effect automatically on the next execution
-        2. System environment variables (GitHub Actions, Docker) - Fixed at startup, unchanged during runtime
+        支持两种配置方式：
+        1. .env 文件（本地开发、定时任务模式） - 修改后下次执行自动生效
+        2. 系统环境变量（GitHub Actions、Docker） - 启动时固定，运行中不变
         """
         # Prioritize reading the latest configuration from .env file, so even in container environments, if you modify the .env file,
         # It can also obtain the latest stock list configuration

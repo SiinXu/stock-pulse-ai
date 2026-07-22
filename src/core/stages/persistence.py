@@ -120,7 +120,7 @@ class _PersistenceStageMixin:
         market_phase_summary: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
-        Build the analysis context snapshot
+        构建分析上下文快照
         """
         snapshot = {
             "enhanced_context": self._without_runtime_prompt_context(enhanced_context),
@@ -753,7 +753,7 @@ class _PersistenceStageMixin:
     @staticmethod
     def _safe_to_dict(value: Any) -> Optional[Dict[str, Any]]:
         """
-        Safely convert to dictionary
+        安全转换为字典
         """
         if value is None:
             return None

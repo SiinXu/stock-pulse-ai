@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class FeishuDocManager:
-    """Feishu cloud document manager (based on the official SDK lark-oapi)"""
+    """飞书云文档管理器 (基于官方 SDK lark-oapi)"""
 
     def __init__(self):
         self.config = get_config()
@@ -32,12 +32,12 @@ class FeishuDocManager:
             self.client = None
 
     def is_configured(self) -> bool:
-        """Check if the configuration is complete"""
+        """检查配置是否完整"""
         return bool(self.app_id and self.app_secret and self.folder_token)
 
     def create_daily_doc(self, title: str, content_md: str) -> Optional[str]:
         """
-        Create daily report document
+        创建日报文档
         """
         if not self.client or not self.is_configured():
             logger.warning("飞书 SDK 未初始化或配置缺失，跳过创建")
@@ -104,7 +104,7 @@ class FeishuDocManager:
 
     def _markdown_to_sdk_blocks(self, md_text: str) -> List[Block]:
         """
-        Convert simple Markdown to Feishu SDK Block object
+        将简单的 Markdown 转换为飞书 SDK 的 Block 对象
         """
         blocks = []
         lines = md_text.split('\n')

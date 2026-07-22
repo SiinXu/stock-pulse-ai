@@ -1,26 +1,26 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Tushare stock list retrieval script
+Tushare 股票列表获取脚本
 
-Gets A-shares, Hong Kong stocks, U.S. stocks lists from Tushare Pro, saves them as CSV files.
+从 Tushare Pro 获取 A股、港股、美股列表信息，保存为 CSV 文件
 
-Method:
+使用方法：
     python3 scripts/fetch_tushare_stock_list.py
     python3 scripts/fetch_tushare_stock_list.py --a-rk
 
-Environment Requirements:
-    - Needs to be configured TUSHARE_TOKEN in .env
-    - Install tushare: pip install tushare
-    - Account point requirements:
-        * A-shares/Hong Kong stocks: 2000 points
-        * U.S. stocks: 120 points trial, 5000 points formal permission
+环境要求：
+    - 需要在 .env 中配置 TUSHARE_TOKEN
+    - 需要安装 tushare: pip install tushare
+    - 账号积分要求：
+        * A股/港股：2000积分
+        * 美股：120积分试用，5000积分正式权限
 
-Output file:
-    - data/stock_list_a.csv      A-shares list(--a-rk Will Override with Corrected Name)
-    - data/stock_list_hk.csv     Hong Kong stock list
-    - data/stock_list_us.csv     U.S. stocks List
-    - data/README_stock_list.md  Data Description Document
+输出文件：
+    - data/stock_list_a.csv      A股列表（--a-rk 时会覆盖为修正后名称）
+    - data/stock_list_hk.csv     港股列表
+    - data/stock_list_us.csv     美股列表
+    - data/README_stock_list.md  数据说明文档
 """
 
 import argparse
@@ -62,10 +62,10 @@ A_RK_NAME_PREFIX_RE = re.compile(r"^(XD|XR|DR|N|C)")
 
 def get_tushare_api() -> Optional[ts.pro_api]:
     """
-    Get Tushare API instance
+    获取 Tushare API 实例
 
     Returns:
-        Tushare API instance, or None on failure
+        Tushare API 实例，失败返回 None
     """
     if not TUSHARE_TOKEN:
         print("[错误] 未找到 TUSHARE_TOKEN")
@@ -88,11 +88,11 @@ def get_tushare_api() -> Optional[ts.pro_api]:
 
 def random_sleep(min_seconds: int = SLEEP_MIN, max_seconds: int = SLEEP_MAX):
     """
-    Random sleep, avoid frequent requests
+    随机睡眠，避免频繁请求
 
     Args:
-        min_seconds: Minimum sleep time
-        max_seconds: maximum sleep time
+        min_seconds: 最小睡眠时间
+        max_seconds: 最大睡眠时间
     """
     sleep_time = random.uniform(min_seconds, max_seconds)
     print(f"  ⏱  休息 {sleep_time:.1f} 秒...")
@@ -101,16 +101,16 @@ def random_sleep(min_seconds: int = SLEEP_MIN, max_seconds: int = SLEEP_MAX):
 
 def fetch_a_stock_list(api: ts.pro_api) -> Optional[pd.DataFrame]:
     """
-    Get A-shares list
+    获取 A股列表
 
-    Interface: stock_basic
-    Limited: Maximum 6000 rows (covers the entire A-shares market)
+    接口：stock_basic
+    限量：单次最多6000行（覆盖全市场A股）
 
     Args:
-        api: Tushare API instance
+        api: Tushare API 实例
 
     Returns:
-        DataFrame containing A-share data, or None on failure
+        A股数据 DataFrame，失败返回 None
     """
     print("\n[1/3] 正在获取 A股列表...")
 
@@ -139,9 +139,9 @@ def fetch_a_stock_list(api: ts.pro_api) -> Optional[pd.DataFrame]:
 
 def should_fix_a_stock_name(name: str) -> bool:
     """
-    Check if the A-shares name belongs to a state that needs correction.
+    判断 A 股名称是否属于需要修正的状态名。
 
-    Primarily covers new stock and ex-dividend adjustments prefixes:
+    主要覆盖新股、除权除息等前缀：
     XD / XR / DR / N / C
     """
     if name is None:
@@ -155,20 +155,20 @@ def should_fix_a_stock_name(name: str) -> bool:
 
 
 def chunk_list(items: List[str], chunk_size: int) -> List[List[str]]:
-    """Split the list into chunks of a fixed size."""
+    """将列表按固定大小切片。"""
     return [items[i:i + chunk_size] for i in range(0, len(items), chunk_size)]
 
 
 def fetch_rt_k_names(api: ts.pro_api, ts_codes: List[str]) -> Dict[str, str]:
     """
-    Batch retrieve stock names returned by rt_k.
+    批量获取 rt_k 返回的股票名称。
 
-    Refer to the official documentation:
+    参考官方文档：
     https://tushare.pro/wctapi/documents/372.md
 
-    rt_k is a real-time daily candlestick interface for A-shares, supporting extraction by stock code and wildcard stock code.
-    Real-time daily K-line data. This script only uses it as an auxiliary source for name backfill correction.
-    stock_basic returns short-term trading status prefix name.
+    rt_k 是 A 股实时日线接口，支持按股票代码和股票代码通配符提取
+    实时日 K 线行情。本脚本只把它用作名称回填的辅助来源，修正
+    stock_basic 中返回的短期交易状态前缀名称。
     """
     if not ts_codes:
         return {}
@@ -213,9 +213,9 @@ def fetch_rt_k_names(api: ts.pro_api, ts_codes: List[str]) -> Dict[str, str]:
 
 def fix_a_stock_names_with_rt_k(api: ts.pro_api, df: pd.DataFrame) -> pd.DataFrame:
     """
-    Use rt_k to correct A-shares name.
+    使用 rt_k 修正 A 股名称。
 
-    Corrects names with XD / XR / DR / N / C prefixes.
+    仅对名称带有 XD / XR / DR / N / C 前缀的股票进行校正。
     """
     if df is None or len(df) == 0:
         return df
@@ -261,16 +261,16 @@ def fix_a_stock_names_with_rt_k(api: ts.pro_api, df: pd.DataFrame) -> pd.DataFra
 
 def fetch_hk_stock_list(api: ts.pro_api) -> Optional[pd.DataFrame]:
     """
-    Get the list of Hong Kong stocks
+    获取港股列表
 
-    Interface: hk_basic
-    Limited: All stocks in trading within Hong Kong stocks
+    接口：hk_basic
+    限量：单次可提取全部在交易的港股
 
     Args:
-        api: Tushare API instance
+        api: Tushare API 实例
 
     Returns:
-        DataFrame containing Hong Kong stock data, or None on failure
+        港股数据 DataFrame，失败返回 None
     """
     print("\n[2/3] 正在获取港股列表...")
 
@@ -294,16 +294,16 @@ def fetch_hk_stock_list(api: ts.pro_api) -> Optional[pd.DataFrame]:
 
 def fetch_us_stock_list(api: ts.pro_api) -> Optional[pd.DataFrame]:
     """
-    Get US stock list (pagination read)
+    获取美股列表（分页读取）
 
-    Interface: us_basic
-    Limited: Maximum 6000, requires pagination extraction
+    接口：us_basic
+    限量：单次最大6000，需要分页提取
 
     Args:
-        api: Tushare API instance
+        api: Tushare API 实例
 
     Returns:
-    DataFrame containing U.S. stock data, or None on failure
+        美股数据 DataFrame，失败返回 None
     """
     print("\n[3/3] 正在获取美股列表（分页读取）...")
 
@@ -359,15 +359,15 @@ def fetch_us_stock_list(api: ts.pro_api) -> Optional[pd.DataFrame]:
 
 def save_to_csv(df: pd.DataFrame, filename: str, market_name: str) -> bool:
     """
-    Save data to CSV file
+    保存数据到 CSV 文件
 
     Args:
-        df: Input DataFrame
-        filename: Filename
-        market_name: market name (for logging)
+        df: 数据 DataFrame
+        filename: 文件名
+        market_name: 市场名称（用于日志）
 
     Returns:
-        Whether saved successfully
+        是否保存成功
     """
     if df is None or len(df) == 0:
         print(f"[跳过] {market_name} 数据为空，不保存文件")
@@ -396,12 +396,12 @@ def generate_data_documentation(
     a_title: str = "A股列表"
 ):
     """
-    Generate data documentation
+    生成数据说明文档
 
     Args:
-        a_df: A-shares data
-        hk_df: Hong Kong stock data
-        us_df: U.S. stock data
+        a_df: A股数据
+        hk_df: 港股数据
+        us_df: 美股数据
     """
     doc_path = OUTPUT_DIR / "README_stock_list.md"
 
@@ -586,7 +586,7 @@ us_stocks = pd.read_csv('data/stock_list_us.csv')
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    """Build command-line parameters."""
+    """构建命令行参数。"""
     parser = argparse.ArgumentParser(description="Tushare 股票列表获取工具")
     parser.add_argument(
         "--a-rk",
@@ -597,7 +597,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[List[str]] = None):
-    """Main Function"""
+    """主函数"""
     parser = build_arg_parser()
     args = parser.parse_args(argv)
 

@@ -62,7 +62,7 @@ def clone_facade_function(
 
 
 def parse_arguments() -> argparse.Namespace:
-    """Parse command-line arguments"""
+    """解析命令行参数"""
     parser = argparse.ArgumentParser(
         description='A股自选股智能分析系统',
         formatter_class=argparse.RawDescriptionHelpFormatter,

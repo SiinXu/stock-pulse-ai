@@ -1995,7 +1995,7 @@ class TestAnalyzeWithAgentStockName(unittest.TestCase):
             self.assertNotIn("chip_unavailable_reason", dp)
 
     def test_analyze_with_agent_history_context_includes_diagnostic_snapshot(self):
-        """Agent analyzes incoming data archiving should preserve diagnostics snapshots to avoid historical diagnostics returning unknown."""
+        """Agent 分析入库存档时应保留 diagnostics 快照，避免历史诊断返回 unknown。"""
         with patch('src.core.pipeline.get_config') as mock_config, \
              patch('src.core.pipeline.get_db'), \
              patch('src.core.pipeline.DataFetcherManager'), \
@@ -2815,7 +2815,7 @@ class TestSafeInt(unittest.TestCase):
         self.assertEqual(safe_int("80"), 80)
 
     def test_string_with_unit(self):
-        """LLM may return '80 split' instead of 80."""
+        """LLM may return '80分' instead of 80."""
         safe_int = self._get_safe_int()
         self.assertEqual(safe_int("80分"), 80)
 
@@ -2947,7 +2947,7 @@ class TestSkillActivation(unittest.TestCase):
             from src.enums import ReportType
             pipeline = StockAnalysisPipeline(config=mock_cfg)
 
-            # Dashboard with "80 split" instead of 80
+            # Dashboard with "80分" instead of 80
             agent_result = AgentResult(
                 success=True,
                 content="{}",

@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A-shares Watchlist Analysis System - Historical data storage unit test
+A股自选股智能分析系统 - 分析历史存储单元测试
 ===================================
 
-Responsibilities:
-1. Validate historical analysis saving logic
-2. Validate context snapshot save switch
+职责：
+1. 验证分析历史保存逻辑
+2. 验证上下文快照保存开关
 """
 
 import json
@@ -124,10 +124,10 @@ def _market_phase_summary() -> dict:
 
 
 class AnalysisHistoryTestCase(unittest.TestCase):
-    """Analyze historical storage test"""
+    """分析历史存储测试"""
 
     def setUp(self) -> None:
-        """Initialize independent databases for each use case"""
+        """为每个用例初始化独立数据库"""
         auth._auth_enabled = False
         self._temp_dir = tempfile.TemporaryDirectory()
         self._db_path = os.path.join(self._temp_dir.name, "test_analysis_history.db")
@@ -150,7 +150,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.db = DatabaseManager.get_instance()
 
     def tearDown(self) -> None:
-        """Clean resources"""
+        """清理资源"""
         Config._instance = None
         DatabaseManager.reset_instance()
         for key, value in self._original_env.items():
@@ -282,7 +282,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             HistoryService(self.db).delete_history_by_code(" ")
 
     def _build_result(self) -> AnalysisResult:
-        """Construct an analysis result"""
+        """构造分析结果"""
         return AnalysisResult(
             code="600519",
             name="贵州茅台",
@@ -293,7 +293,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         )
 
     def _save_history(self, query_id: str) -> int:
-        """Save a test history record and return the primary key ID."""
+        """保存一条测试历史记录并返回主键 ID。"""
         result = self._build_result()
         saved = self.db.save_analysis_history(
             result=result,
@@ -313,7 +313,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             return row.id
 
     def test_save_analysis_history_with_snapshot(self) -> None:
-        """Save the history record and write the context snapshot"""
+        """保存历史记录并写入上下文快照"""
         result = self._build_result()
         result.dashboard = {
             "battle_plan": {
@@ -486,7 +486,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertEqual(stock_bar.items[0].analysis_count, 2)
 
     def test_save_analysis_history_persists_sniper_columns_via_shared_parser(self) -> None:
-        """After migrating the sniper parser, historical sniper positions are still saved according to the original rules."""
+        """迁出 sniper parser 后历史狙击点位列仍按原规则保存。"""
         result = self._build_result()
         result.dashboard = {
             "battle_plan": {
@@ -522,7 +522,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             self.assertEqual(row.take_profit, 150.0)
 
     def test_get_latest_analysis_history_id_filters_by_report_type_and_latest_record(self) -> None:
-        """Return the latest real historical primary key based on query/code/report_type."""
+        """按 query/code/report_type 返回最新真实历史主键。"""
         for report_type in ("simple", "full", "simple"):
             saved = self.db.save_analysis_history(
                 result=self._build_result(),
@@ -550,12 +550,12 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertGreater(simple_id, full_id)
 
     def test_get_latest_analysis_history_id_requires_report_type(self) -> None:
-        """report_type is a required parameter to avoid misinterpretation with query/code."""
+        """report_type 是必传参数，避免误取同 query/code 的其他报告。"""
         with self.assertRaises(TypeError):
             self.db.get_latest_analysis_history_id(query_id="query", code="600519")
 
     def test_save_analysis_history_without_snapshot(self) -> None:
-        """Do not write context_snapshot when snapshot saving is disabled."""
+        """关闭快照保存时不写入 context_snapshot"""
         result = self._build_result()
 
         saved = self.db.save_analysis_history(
@@ -600,7 +600,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             self.assertEqual(payload.get("model_used"), "gemini/gemini-2.0-flash")
 
     def test_update_analysis_history_diagnostics_preserves_snapshot_fields(self) -> None:
-        """After sending a notification, do not overwrite existing upper and lower text fields when writing diagnostics."""
+        """通知发送后补写 diagnostics 时，不应覆盖已有上下文字段。"""
         saved = self.db.save_analysis_history(
             result=self._build_result(),
             query_id="query_diag_patch",
@@ -1113,7 +1113,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertEqual({item["stock_code"] for item in from_plain["items"]}, expected)
 
     def test_history_detail_preserves_zero_change_pct(self) -> None:
-        """change_pct=0.0(closing price)Respond as is returned, Not Lost as a Missing Value.
+        """change_pct=0.0（平盘）应原样返回，而不是被当成缺失值丢失。
 
         Regression for issue #1084: history endpoint used `or` chains that
         treated 0.0 as falsy and silently dropped the daily change.
@@ -1149,7 +1149,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertEqual(report.meta.change_pct, 0.0)
 
     def test_history_detail_falls_back_to_realtime_quote_raw_change_pct(self) -> None:
-        """If `enhanced_context.realtime.change_pct` is missing, fallback to `realtime_quote_raw`.
+        """缺少 enhanced_context.realtime.change_pct 时，应回退到 realtime_quote_raw。
 
         Regression for issue #1084: previously the realtime_quote_raw fallback
         was only consulted when current_price was missing, so reports with
@@ -2271,7 +2271,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             )
 
     def test_delete_analysis_history_records_keeps_signals_for_nonexistent_history_id(self) -> None:
-        """Historical IDs that do not exist should not trigger weak-correlation DecisionSignal cleanup."""
+        """不存在的历史 ID 不应触发弱关联 DecisionSignal 清理。"""
         missing_id = 987654321
 
         with self.db.session_scope() as session:
@@ -2303,7 +2303,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             )
 
     def test_delete_analysis_history_records_keeps_manual_signal_with_same_report_id(self) -> None:
-        """source_report_id is a weak reference, real history deletion should not mistakenly delete manual/pre-report signals."""
+        """source_report_id 是弱引用，真实 history 删除不应误删 manual/pre-report 信号。"""
         record_id = self._save_history("query_delete_manual_collision")
 
         with self.db.session_scope() as session:
@@ -2356,7 +2356,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             )
 
     def test_delete_analysis_history_records_cleans_only_existing_ids_in_mixed_batch(self) -> None:
-        """When mixed existence/non-existence ID, only clear associated data records that actually exist."""
+        """混合存在/不存在 ID 时，只清理实际存在历史记录的关联数据。"""
         record_id = self._save_history("query_delete_mixed")
         missing_id = record_id + 987654
 

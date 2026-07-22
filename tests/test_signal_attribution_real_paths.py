@@ -17,7 +17,7 @@ from src.analyzer import AnalysisResult
 
 
 class TestNormalizeSignalAttribution:
-    """Test normalization function (executed before _parse_response)"""
+    """测试归一化函数（接在 _parse_response 之前执行）"""
 
     def test_string_percentage_conversion(self):
         d = {"technical_indicators": "70%", "news_sentiment": "0%", "fundamentals": "15%", "market_conditions": "15%"}
@@ -51,7 +51,7 @@ class TestNormalizeSignalAttribution:
 
 
 class TestNormalizeDashboardSignalAttribution:
-    """Test dashboard-level normalization (directly operating on the dashboard dict)."""
+    """测试 dashboard 级别的归一化（直接在 dashboard dict 上操作）"""
 
     def test_inplace_normalization(self):
         dashboard = {
@@ -78,14 +78,14 @@ class TestNormalizeDashboardSignalAttribution:
 
 class TestParseResponseIntegration:
     """
-    Test `_parse_response` can correctly parse signal_attribution.
-    Because `_parse_response` is an instance method and depends on many configurations, we use integration testing to verify that the normalization function is called correctly.
+    测试 _parse_response 能正确解析 signal_attribution。
+    由于 _parse_response 是实例方法且依赖很多配置，这里用集成测试验证归一化函数被正确调用。
     """
 
     def test_normalization_called_in_parse_response(self):
         """
-        Verification: If the LLM returns a string percentage, normalize it to an integer.
-        Verify the normalization call of `_parse_response` through direct testing.
+        验证：如果 LLM 返回字符串百分比，归一化后变成 int。
+        通过直接测试 _parse_response 的归一化调用来验证。
         """
         # Simulate LLM returned data dict
         data = {
@@ -114,10 +114,10 @@ class TestParseResponseIntegration:
 
 
 class TestHistoryServiceDisplay:
-    """Test HistoryService._generate_single_stock_markdown can display signal_attribution"""
+    """测试 HistoryService._generate_single_stock_markdown 能展示 signal_attribution"""
 
     def test_signal_attribution_in_markdown(self):
-        """Verify markdown report contains signal attribution paragraphs"""
+        """验证 markdown 报告包含信号归因段落"""
         from src.services.history_service import HistoryService
 
         result = AnalysisResult(
@@ -147,7 +147,7 @@ class TestHistoryServiceDisplay:
         assert "70%" in markdown or "70%" in markdown
 
     def test_no_signal_attribution_no_section(self):
-        """Do not display paragraphs when signal_attribution is not present"""
+        """验证没有 signal_attribution 时不显示段落"""
         from src.services.history_service import HistoryService
 
         result = AnalysisResult(

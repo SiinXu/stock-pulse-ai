@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Image stock code extraction (Vision LLM)
+图片股票代码提取 (Vision LLM)
 ===================================
 
-Extract stock code from screenshots/images, using Vision LLM.
-Priority: Gemini -> Anthropic -> OpenAI (first available).
+从截图/图片中提取股票代码，使用 Vision LLM。
+优先级：Gemini -> Anthropic -> OpenAI（首个可用）。
 """
 
 from __future__ import annotations
@@ -111,7 +111,7 @@ def _normalize_code(raw: str) -> Optional[str]:
 
 
 def _parse_codes_from_text(text: str) -> List[str]:
-    """Parses stock code from LLM response text (legacy format)."""
+    """从 LLM 响应文本解析股票代码（legacy format）。"""
     seen: set[str] = set()
     result: List[str] = []
 
@@ -317,20 +317,20 @@ def extract_stock_codes_from_image(
     mime_type: str,
 ) -> Tuple[List[Tuple[str, Optional[str], str]], str]:
     """
-    Extract stock code and name from images (using Vision LLM).
+    从图片中提取股票代码及名称（使用 Vision LLM）。
 
-    Priority: Gemini -> Anthropic -> OpenAI (first available).
-    Supports multi-key polling and retry (up to 3 times, exponential backoff).
+    优先级：Gemini -> Anthropic -> OpenAI（首个可用）。
+    支持多 Key 轮询与重试（最多 3 次，指数退避）。
 
     Args:
-        image_bytes: original image bytes
-        mime_type: MIME Type(If image/jpeg, image/png)
+        image_bytes: 原始图片字节
+        mime_type: MIME 类型（如 image/jpeg, image/png）
 
     Returns:
-        (items, raw_text) - items For [(code, name?, confidence), ...], raw_text For original LLM Response.
+        (items, raw_text) - items 为 [(code, name?, confidence), ...]，raw_text 为原始 LLM 响应。
 
     Raises:
-        ValueError: Invalid image, Vision API not configured or extraction failed.
+        ValueError: 图片无效、未配置 Vision API 或提取失败时。
     """
     mime_type = (mime_type or "image/jpeg").strip().lower().split(";")[0].strip()
     if mime_type not in ALLOWED_MIME:

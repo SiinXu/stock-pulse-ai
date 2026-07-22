@@ -215,7 +215,7 @@ def resolve_name_to_code(name: str) -> Optional[str]:
     if akshare_map:
         all_name_to_code.update(akshare_map)
     # Skip fuzzy matching for very short inputs (<=2 chars) to avoid false positives,
-    # e.g. 'China' matching arbitrary company names in a pool of 5000+ stocks.
+    # e.g. '中国' matching arbitrary company names in a pool of 5000+ stocks.
     # Use a higher cutoff (0.8) to reduce mis-hits on longer inputs as well.
     if len(s) > 2:
         names = list(all_name_to_code.keys())
@@ -226,7 +226,7 @@ def resolve_name_to_code(name: str) -> Optional[str]:
 
         # Conservative fallback for one-character typo in medium/long names.
         # This keeps the strict default threshold while fixing obvious misspellings
-        # such as "Guizhou Maotai" -> "Guizhou Maotai".
+        # such as "贵州茅苔" -> "贵州茅台".
         typo_matches = difflib.get_close_matches(s, names, n=1, cutoff=0.7)
         if typo_matches and _is_single_char_typo(s, typo_matches[0]):
             logger.debug(f"[NameResolver] 命中单字误写兜底: input={s}, matched={typo_matches[0]}")

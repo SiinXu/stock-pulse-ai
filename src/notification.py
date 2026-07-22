@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A-shares Watchlist Analysis System - Notification layer
+A股自选股智能分析系统 - 通知层
 ===================================
 
-Responsibilities:
-1. Generate daily report by aggregating analysis results
-2. Supports Markdown output format
-3. Multi-channel push (automatically identifies):
-   - WeCom Webhook
-   - Feishu Webhook
+职责：
+1. 汇总分析结果生成日报
+2. 支持 Markdown 格式输出
+3. 多渠道推送（自动识别）：
+   - 企业微信 Webhook
+   - 飞书 Webhook
    - Telegram Bot
-   - Email SMTP.
-   - Pushover (mobile/desktop push)
+   - 邮件 SMTP
+   - Pushover（手机/桌面推送）
 """
 from __future__ import annotations
 
@@ -169,7 +169,7 @@ if TYPE_CHECKING:
 
 
 class NotificationChannel(Enum):
-    """Notification Channel Type"""
+    """通知渠道类型"""
     WECHAT = "wechat"      # WeCom
     DINGTALK = "dingtalk"
     FEISHU = "feishu"      # Feishu
@@ -212,14 +212,14 @@ class NotificationDispatchResult:
 
 class ChannelDetector:
     """
-    Channel detector - simplified version
+    渠道检测器 - 简化版
 
-    Determine the channel type directly based on configuration (no need for URL parsing).
+    根据配置直接判断渠道类型（不再需要 URL 解析）
     """
 
     @staticmethod
     def get_channel_name(channel: NotificationChannel) -> str:
-        """Get channel Chinese names"""
+        """获取渠道中文名称"""
         names = {
             NotificationChannel.WECHAT: "企业微信",
             NotificationChannel.FEISHU: "飞书",
@@ -257,21 +257,21 @@ class NotificationService(
     WechatSender
 ):
     """
-    Notification Service
+    通知服务
 
-    Responsibilities:
-    1. Generate Markdown format analysis daily report
-    2. Push messages to all configured channels (multi-channel concurrent)
-    3. Supports local daily report saving
+    职责：
+    1. 生成 Markdown 格式的分析日报
+    2. 向所有已配置的渠道推送消息（多渠道并发）
+    3. 支持本地保存日报
 
-    Supported channels:
-    - WeCom Webhook
-    - Feishu Webhook
+    支持的渠道：
+    - 企业微信 Webhook
+    - 飞书 Webhook
     - Telegram Bot
-    - Email SMTP.
-    - Pushover (mobile/desktop push)
+    - 邮件 SMTP
+    - Pushover（手机/桌面推送）
 
-    Note: All configured channels will receive push notifications.
+    注意：所有已配置的渠道都会收到推送
     """
 
     def __init__(self, request_context: Optional[AnalysisRequestContext] = None):
@@ -529,19 +529,19 @@ class NotificationService(
 
     def _detect_all_channels(self) -> List[NotificationChannel]:
         """
-        Detect all configured channels
+        检测所有已配置的渠道
 
         Returns:
-            List of configured channels
+            已配置的渠道列表
         """
         return self.detect_configured_channels(self._config)
 
     def is_available(self) -> bool:
-        """Check if the notification service is available (at least one channel or context channel)"""
+        """检查通知服务是否可用（至少有一个渠道或上下文渠道）"""
         return len(self._available_channels) > 0 or self._has_context_channel()
 
     def get_available_channels(self) -> List[NotificationChannel]:
-        """Get all configured channels"""
+        """获取所有已配置的渠道"""
         return self._available_channels
 
     def get_channels_for_route(
@@ -581,7 +581,7 @@ class NotificationService(
         return [channel for channel in target_channels if channel.value in allowed]
 
     def get_channel_names(self) -> str:
-        """Get the names of all configured channels"""
+        """获取所有已配置渠道的名称"""
         names = [ChannelDetector.get_channel_name(ch) for ch in self._available_channels]
         if self._has_context_channel():
             names.append("钉钉会话")
@@ -618,7 +618,7 @@ class NotificationService(
 
     # ===== Context channel =====
     def _has_context_channel(self) -> bool:
-        """Check for temporary channels based on message context (e.g., DingTalk conversations, Feishu conversations)."""
+        """判断是否存在基于消息上下文的临时渠道（如钉钉会话、飞书会话）"""
         return (
             self._extract_dingtalk_session_webhook() is not None
             or self._extract_feishu_reply_info() is not None
@@ -626,7 +626,7 @@ class NotificationService(
         )
 
     def _extract_telegram_context_chat_id(self) -> Optional[str]:
-        """Extract Telegram context chat_id from source message (for asynchronous replies)."""
+        """从来源消息中提取 Telegram 上下文 chat_id（用于异步回复）。"""
         if self._request_context is None:
             return None
         return self._request_context.reply_address("telegram")
@@ -639,17 +639,17 @@ class NotificationService(
         )
 
     def _extract_dingtalk_session_webhook(self) -> Optional[str]:
-        """Extract DingTalk session Webhook (for Stream mode replies)"""
+        """从来源消息中提取钉钉会话 Webhook（用于 Stream 模式回复）"""
         if self._request_context is None:
             return None
         return self._request_context.reply_address("dingtalk")
 
     def _extract_feishu_reply_info(self) -> Optional[Dict[str, str]]:
         """
-        Extract Feishu replies from source messages (for Stream mode responses)
+        从来源消息中提取飞书回复信息（用于 Stream 模式回复）
 
         Returns:
-            A dictionary containing chat_id or None
+            包含 chat_id 的字典，或 None
         """
         if self._request_context is None:
             return None
@@ -660,18 +660,18 @@ class NotificationService(
 
     def send_to_context(self, content: str) -> bool:
         """
-        Send messages to channels based on message context (e.g., DingTalk Stream sessions).
+        向基于消息上下文的渠道发送消息（例如钉钉 Stream 会话）
 
         Args:
-            content: Markdown Content format
+            content: Markdown 格式内容
         """
         return self._send_via_source_context(content)
 
     def _send_via_source_context(self, content: str) -> bool:
         """
-        Send a report using message context (e.g., Feishu/DingTalk conversations)
+        使用消息上下文（如钉钉/飞书会话）发送一份报告
 
-        Primarily used for tasks triggered from a Stream mode robot, ensuring results return to the triggering conversation.
+        主要用于从机器人 Stream 模式触发的任务，确保结果能回到触发的会话。
         """
         success = False
 
@@ -730,14 +730,14 @@ class NotificationService(
 
     def _send_feishu_stream_reply(self, chat_id: str, content: str) -> bool:
         """
-        Send messages to a specified session in Stream mode via Feishu.
+        通过飞书 Stream 模式发送消息到指定会话
 
         Args:
-            chat_id: Feishu conversation ID
-            content: Message content
+            chat_id: 飞书会话 ID
+            content: 消息内容
 
         Returns:
-            Whether sent successfully
+            是否发送成功
         """
         try:
             from bot.platforms.feishu_stream import FeishuReplyClient, FEISHU_SDK_AVAILABLE
@@ -792,16 +792,16 @@ class NotificationService(
         max_bytes: int
     ) -> bool:
         """
-        Batch send long messages to Feishu (Stream mode)
+        分批发送长消息到飞书（Stream 模式）
 
         Args:
-            reply_client: FeishuReplyClient instance
-            chat_id: Feishu conversation ID
-            content: Full message content
-            max_bytes: maximum byte count per message
+            reply_client: FeishuReplyClient 实例
+            chat_id: 飞书会话 ID
+            content: 完整消息内容
+            max_bytes: 单条消息最大字节数
 
         Returns:
-            Whether all sent successfully
+            是否全部发送成功
         """
         import time
 
@@ -859,14 +859,14 @@ class NotificationService(
         report_date: Optional[str] = None
     ) -> str:
         """
-        Generate detailed Markdown format daily report
+        生成 Markdown 格式的日报（详细版）
 
         Args:
-            results: analysis result list
-            report_date: report date (default to today)
+            results: 分析结果列表
+            report_date: 报告日期（默认今天）
 
         Returns:
-            Daily report content in Markdown format
+            Markdown 格式的日报内容
         """
         if report_date is None:
             report_date = datetime.now().strftime('%Y-%m-%d')
@@ -1209,16 +1209,16 @@ class NotificationService(
         report_date: Optional[str] = None
     ) -> str:
         """
-        Generate detailed daily reports in the format of the decision dashboard.
+        生成决策仪表盘格式的日报（详细版）
 
-        Format: Market overview + Important information + Core conclusion + Data insight + Action plan
+        格式：市场概览 + 重要信息 + 核心结论 + 数据透视 + 作战计划
 
         Args:
-            results: analysis result list
-            report_date: report date (default to today)
+            results: 分析结果列表
+            report_date: 报告日期（默认今天）
 
         Returns:
-            Daily dashboard report in Markdown format
+            Markdown 格式的决策仪表盘日报
         """
         config = get_config()
         report_language = self._get_report_language(results)
@@ -1564,15 +1564,15 @@ class NotificationService(
 
     def generate_wechat_dashboard(self, results: List[AnalysisResult]) -> str:
         """
-        Generate a concise version of the WeCom decision dashboard (under 4000 characters).
+        生成企业微信决策仪表盘精简版（控制在4000字符内）
 
-        Keep only core conclusions and target price points.
+        只保留核心结论和狙击点位
 
         Args:
-            results: analysis result list
+            results: 分析结果列表
 
         Returns:
-            Simplified decision dashboard
+            精简版决策仪表盘
         """
         config = get_config()
         report_language = self._get_report_language(results)
@@ -1728,7 +1728,7 @@ class NotificationService(
                 # Simplified checklist
                 checklist = battle.get('action_checklist', []) if battle else []
                 if checklist:
-                    # Show only inactive projects.
+                    # Show only failed checklist items.
                     failed_checks = [str(c) for c in checklist if str(c).startswith('❌') or str(c).startswith('⚠️')]
                     if failed_checks:
                         lines.append(f"**{labels['failed_checks_heading']}**:")
@@ -1751,13 +1751,13 @@ class NotificationService(
 
     def generate_wechat_summary(self, results: List[AnalysisResult]) -> str:
         """
-        Generate a simplified daily report for WeCom (under 4000 characters).
+        生成企业微信精简版日报（控制在4000字符内）
 
         Args:
-            results: analysis result list
+            results: 分析结果列表
 
         Returns:
-            Simplified Markdown content
+            精简版 Markdown 内容
         """
         report_date = datetime.now().strftime('%Y-%m-%d')
         report_language = self._get_report_language(results)
@@ -1883,15 +1883,15 @@ class NotificationService(
 
     def generate_single_stock_report(self, result: AnalysisResult) -> str:
         """
-        Generate an analysis report for a single stock (for single-stock push mode #55).
+        生成单只股票的分析报告（用于单股推送模式 #55）
 
-        Compact but complete information, suitable for immediate push after analyzing each stock
+        格式精简但信息完整，适合每分析完一只股票立即推送
 
         Args:
-            result: single stock's analysis result
+            result: 单只股票的分析结果
 
         Returns:
-            Single stock report in Markdown format
+            Markdown 格式的单股报告
         """
         report_date = datetime.now().strftime('%Y-%m-%d %H:%M')
         report_language = self._get_report_language(result)
@@ -2107,9 +2107,9 @@ class NotificationService(
 
     @classmethod
     def _format_amount_cn(cls, value: Any, currency: Optional[str] = None) -> str:
-        """Format absolute amounts in 100 million/10,000 + currency suffix; returns N/A on non-numeric.
+        """Format absolute amounts in 亿/万 + currency suffix; returns N/A on non-numeric.
 
-        ``currency`` accepts ``USD``/``HKD``/``CNY``; unknown values fall back to yuan.
+        ``currency`` accepts ``USD``/``HKD``/``CNY``; unknown values fall back to 元.
         """
         try:
             amount = float(value)
@@ -2216,7 +2216,7 @@ class NotificationService(
         }
 
     def _append_fundamental_blocks(self, lines: List[str], result: AnalysisResult) -> None:
-        """Append financial summaries / shareholder returns / related sectors markdown blocks.
+        """Append 财务摘要 / 股东回报 / 关联板块 markdown blocks.
 
         Each block is only rendered when at least one cell has data; this keeps
         the email compact when the fundamental pipeline returned partial/failed
@@ -2318,9 +2318,9 @@ class NotificationService(
 
     @classmethod
     def _format_net_shares(cls, value: Any) -> str:
-        """Format an institutional net buy/sell in 10,000 shares/100 million shares, signed (+ = net buy).
+        """Format an institutional net buy/sell in 万股/亿股, signed (+ = net buy).
 
-        Thresholds: abs >= 1e8 -> 100 million shares, >= 1e4 -> Ten Thousand Shares, else Shares. None/NaN/non-numeric -> N/A.
+        Thresholds: abs >= 1e8 -> 亿股, >= 1e4 -> 万股, else 股. None/NaN/non-numeric -> N/A.
         """
         try:
             amount = float(value)
@@ -2342,7 +2342,7 @@ class NotificationService(
         blocks: Dict[str, Any],
         labels: Dict[str, str],
     ) -> None:
-        """Append the institutional investors (institutional flows) table — tw-only.
+        """Append the 三大法人 (institutional flows) table — tw-only.
 
         Renders only when the institution block reached status='ok' (a Taiwan stock
         whose TWSE T86 / TPEx fetch succeeded); every other market keeps
@@ -2585,13 +2585,13 @@ class NotificationService(
         - When WeChat image exceeds ~2MB: that channel falls back to Markdown text.
 
         Args:
-            content: Message content in Markdown format
-            email_stock_codes: Stock code list (optional, for email channel routing to corresponding group emails, Issue #268)
-            email_send_to_all: Whether email sent to all configured email addresses (for large-scale market review content without stock ownership)
-            route_type: notification routing type; None maintains old behavior, report/alert/system_error filtered by configuration for static channels
-            severity: Notification severity; inferred if not set
-            dedup_key: optional stable deduplication key; uses content hash if not set
-            cooldown_key: optional cooldown key; uses routing/level default key if not set
+            content: 消息内容（Markdown 格式）
+            email_stock_codes: 股票代码列表（可选，用于邮件渠道路由到对应分组邮箱，Issue #268）
+            email_send_to_all: 邮件是否发往所有配置邮箱（用于大盘复盘等无股票归属的内容）
+            route_type: 通知路由类型；None 保持旧行为，report/alert/system_error 按配置过滤静态渠道
+            severity: 通知严重级别；未设置时按路由类型推断
+            dedup_key: 可选稳定去重 key；未设置时使用内容 hash
+            cooldown_key: 可选冷却 key；未设置时使用路由/级别默认 key
 
         Returns:
             Structured dispatch diagnostics.
@@ -2794,10 +2794,10 @@ class NotificationService(
         cooldown_key: Optional[str] = None,
     ) -> bool:
         """
-        Unified sending interface - sends to all configured channels.
+        统一发送接口 - 向所有已配置的渠道发送。
 
         Returns:
-            Did at least one channel send successfully?
+            是否至少有一个渠道发送成功
         """
         result = self.send_with_results(
             content,
@@ -2816,14 +2816,14 @@ class NotificationService(
         filename: Optional[str] = None
     ) -> str:
         """
-        Save daily report to local file
+        保存日报到本地文件
 
         Args:
-            content: Daily report content
-            filename: Filename (optional, defaults to date-based generation)
+            content: 日报内容
+            filename: 文件名（可选，默认按日期生成）
 
         Returns:
-            Saved file path
+            保存的文件路径
         """
         from pathlib import Path
 
@@ -2868,9 +2868,9 @@ class NotificationService(
 
 class NotificationBuilder:
     """
-    Notification Message Builder
+    通知消息构建器
 
-    Provides a convenient message building method
+    提供便捷的消息构建方法
     """
 
     @staticmethod
@@ -2880,12 +2880,12 @@ class NotificationBuilder:
         alert_type: str = "info"
     ) -> str:
         """
-        Build simple reminder message
+        构建简单的提醒消息
 
         Args:
-            title: title
-            content: Content
-            alert_type: Type(info, warning, error, success)
+            title: 标题
+            content: 内容
+            alert_type: 类型（info, warning, error, success）
         """
         emoji_map = {
             "info": "ℹ️",
@@ -2900,9 +2900,9 @@ class NotificationBuilder:
     @staticmethod
     def build_stock_summary(results: List[AnalysisResult]) -> str:
         """
-        Build stock summary (short version)
+        构建股票摘要（简短版）
 
-        Suitable for quick notifications
+        适用于快速通知
         """
         report_language = normalize_report_language(
             next((getattr(result, "report_language", None) for result in results if getattr(result, "report_language", None)), None)
@@ -2945,15 +2945,15 @@ class NotificationBuilder:
 
 # Convenient function
 def get_notification_service() -> NotificationService:
-    """Get notification service instance"""
+    """获取通知服务实例"""
     return NotificationService()
 
 
 def send_daily_report(results: List[AnalysisResult]) -> bool:
     """
-    Send a shortcut to the daily report
+    发送每日报告的快捷方式
 
-    Automatically identify channels and push
+    自动识别渠道并推送
     """
     service = get_notification_service()
 

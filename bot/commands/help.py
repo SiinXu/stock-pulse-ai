@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Help command
+帮助命令
 ===================================
 
-Displays the list of available commands and usage instructions.
+显示可用命令列表和使用说明。
 """
 
 from typing import List
@@ -15,14 +15,14 @@ from bot.models import BotMessage, BotResponse
 
 class HelpCommand(BotCommand):
     """
-    Help command
+    帮助命令
     
-    Displays the list of all available commands and usage instructions.
-    You can also view detailed help for specific commands.
+    显示所有可用命令的列表和使用说明。
+    也可以查看特定命令的详细帮助。
     
-    Usage:
-        /help         - Show all commands?
-        /help analyze - Show? analyze Detailed Command Help
+    用法：
+        /help         - 显示所有命令
+        /help analyze - 显示 analyze 命令的详细帮助
     """
     
     @property
@@ -42,7 +42,7 @@ class HelpCommand(BotCommand):
         return "/help [命令名]"
     
     def execute(self, message: BotMessage, args: List[str]) -> BotResponse:
-        """Execute help command"""
+        """执行帮助命令"""
         # Delayed import to avoid circular dependency
         from bot.dispatcher import get_dispatcher
         
@@ -68,7 +68,7 @@ class HelpCommand(BotCommand):
         return BotResponse.markdown_response(help_text)
     
     def _format_help_list(self, commands: List[BotCommand], prefix: str) -> str:
-        """Format a list of commands"""
+        """格式化命令列表"""
         lines = [
             "📚 **股票分析助手 - 命令帮助**",
             "",
@@ -109,7 +109,7 @@ class HelpCommand(BotCommand):
         return "\n".join(lines)
     
     def _format_command_help(self, command: BotCommand, prefix: str) -> str:
-        """Format a single command's detailed help"""
+        """格式化单个命令的详细帮助"""
         lines = [
             f"📖 **{prefix}{command.name}** - {command.description}",
             "",

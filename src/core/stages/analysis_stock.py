@@ -79,24 +79,24 @@ class _StockAnalysisStageMixin:
         current_time: Optional[datetime] = None,
     ) -> Optional[AnalysisResult]:
         """
-        Analyze a single stock (enhanced version: composition ratio, turnover rate, shorting analysis, multi-dimensional intelligence)
+        分析单只股票（增强版：含量比、换手率、筹码分析、多维度情报）
 \x20\x20\x20\x20\x20\x20\x20\x20
-        Process:
-        1. Get real-time quotes (VWAP, turnover rate) - Automatic failover via DataFetcherManager
-        2. Get holding distribution - through DataFetcherManager with circuit protection
-        3. Conduct trend analysis (based on trading philosophy).
-        4. Multi-dimensional intelligence search (latest news + risk assessment + earnings expectations)
-        5. Get analysis context from database.
-        6. Call AI for comprehensive analysis
+        流程：
+        1. 获取实时行情（量比、换手率）- 通过 DataFetcherManager 自动故障切换
+        2. 获取筹码分布 - 通过 DataFetcherManager 带熔断保护
+        3. 进行趋势分析（基于交易理念）
+        4. 多维度情报搜索（最新消息+风险排查+业绩预期）
+        5. 从数据库获取分析上下文
+        6. 调用 AI 进行综合分析
 \x20\x20\x20\x20\x20\x20\x20\x20
         Args:
-            query_id: query link association id
-            code: stock code
-            report_type: report type
-            current_time: Timestamp frozen for the current run, used for unified market stage context
+            query_id: 查询链路关联 id
+            code: 股票代码
+            report_type: 报告类型
+            current_time: 本轮运行冻结的参考时间，用于统一市场阶段上下文
 \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20
         Returns:
-            AnalysisResult Or None(If Analysis Failure)
+            AnalysisResult 或 None（如果分析失败）
         """
         stock_name = code
         active_stage: Optional[PipelineStageObservation] = None
@@ -618,7 +618,7 @@ class _StockAnalysisStageMixin:
                     'yesterday': {}
                 }
 
-            # Step 6: Enhance Context Data (Add Real-Time Quotes, Positions, Trend Analysis Results, Stock Names)
+            # Step 6: Add real-time quotes, chip distribution, trend analysis, and the stock name to the context.
             enhanced_context = self._enhance_context(
                 context,
                 realtime_quote,

@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A-shares self-selected stock intelligent analysis system - Core analysis pipeline
+A股自选股智能分析系统 - 核心分析流水线
 ===================================
 
-Responsibilities:
-1. Manage the entire analytics workflow
-2. Coordinate data retrieval, storage, search, analysis, and notification modules
-3. Implement concurrency control and exception handling
-4. Provides the core stock analysis functionality
+职责：
+1. 管理整个分析流程
+2. 协调数据获取、存储、搜索、分析、通知等模块
+3. 实现并发控制和异常处理
+4. 提供股票分析的核心功能
 """
 
 import logging
@@ -203,12 +203,12 @@ _DEFER_PIPELINE_DELIVERY_OBSERVATION: ContextVar[bool] = ContextVar(
 
 class StockAnalysisPipeline(_DeliveryStageMixin):
     """
-    Stock analysis main workflow scheduler
+    股票分析主流程调度器
     
-    Responsibilities:
-    1. Manage the entire analytics workflow
-    2. Coordinate data retrieval, storage, search, analysis, and notification modules
-    3. Implement concurrency control and exception handling
+    职责：
+    1. 管理整个分析流程
+    2. 协调数据获取、存储、搜索、分析、通知等模块
+    3. 实现并发控制和异常处理
     """
     
     def __init__(
@@ -307,7 +307,7 @@ class StockAnalysisPipeline(_DeliveryStageMixin):
         
         logger.info("Analysis scheduler initialized: max_workers=%s", self.max_workers)
         logger.info("Technical analysis engine enabled (moving averages, trend, volume and price)")
-        # Print real-time quotes/bullish configuration status
+        # Log the real-time quote and chip-distribution configuration status.
         if self.config.enable_realtime_quote:
             logger.info(
                 "Realtime quotes enabled: source_priority=%s",

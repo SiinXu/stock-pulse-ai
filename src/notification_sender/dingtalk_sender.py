@@ -20,7 +20,7 @@ class DingtalkSender:
         self.secret = config.dingtalk_secret
 
     def send_to_dingtalk(self, content: str, title: str = "", timeout_seconds: int = 10) -> bool:
-        """Send Markdown message to DingTalk group (Send DingTalk Markdown message)"""
+        """发送 Markdown 消息到钉钉群 (Send DingTalk Markdown message)"""
         if not self.webhook_url:
             return False
 

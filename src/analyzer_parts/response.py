@@ -175,10 +175,10 @@ class GeminiAnalyzer:
         name: str
     ) -> AnalysisResult:
         """
-        Parse Gemini responses (decision dashboard version)
+        解析 Gemini 响应（决策仪表盘版）
 \x20\x20\x20\x20\x20\x20\x20\x20
-        Attempt to extract JSON formatted analysis results from the response, including dashboard field
-        If parsing fails, attempt intelligent extraction or return default results.
+        尝试从响应中提取 JSON 格式的分析结果，包含 dashboard 字段
+        如果解析失败，尝试智能提取或返回默认结果
         """
         try:
             report_language = normalize_report_language(
@@ -294,7 +294,7 @@ class GeminiAnalyzer:
             return self._parse_text_response(response_text, code, name)
 
     def _fix_json_string(self, json_str: str) -> str:
-        """Fix common JSON format issues"""
+        """修复常见的 JSON 格式问题"""
         import re
 
         # Remove comment
@@ -359,7 +359,7 @@ class GeminiAnalyzer:
         code: str,
         name: str
     ) -> AnalysisResult:
-        """Extract as much analysis information as possible from plain text responses."""
+        """从纯文本响应中尽可能提取分析信息"""
         report_language = normalize_report_language(
             getattr(self._get_runtime_config(), "report_language", "zh")
         )
@@ -428,16 +428,16 @@ class GeminiAnalyzer:
         delay_between: float = 2.0
     ) -> List[AnalysisResult]:
         """
-        Bulk analysis of multiple stocks
+        批量分析多只股票
 \x20\x20\x20\x20\x20\x20\x20\x20
-        Note: There will be delays between analyses to avoid API rate limits.
+        注意：为避免 API 速率限制，每次分析之间会有延迟
 \x20\x20\x20\x20\x20\x20\x20\x20
         Args:
-            contexts: context data list
-            delay_between: delay between analyses (seconds)
+            contexts: 上下文数据列表
+            delay_between: 每次分析之间的延迟（秒）
 \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20
         Returns:
-            AnalysisResult list
+            AnalysisResult 列表
         """
         results = []
 

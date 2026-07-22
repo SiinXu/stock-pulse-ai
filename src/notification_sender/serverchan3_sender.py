@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-ServerChan3 notification service
+Server酱3 发送提醒服务
 
-Responsibilities:
-1. via Serversauce3 API send Serversauce3 message
+职责：
+1. 通过 Server酱3 API 发送 Server酱3 消息
 """
 import logging
 from typing import Optional
@@ -22,10 +22,10 @@ class Serverchan3Sender:
     
     def __init__(self, config: Config):
         """
-        Initialization ServerFlavor3 Configuration
+        初始化 Server酱3 配置
 
         Args:
-            config: Configuration object
+            config: 配置对象
         """
         self._serverchan3_sendkey = getattr(config, 'serverchan3_sendkey', None)
         
@@ -37,28 +37,28 @@ class Serverchan3Sender:
         timeout_seconds: Optional[float] = None,
     ) -> bool:
         """
-        Push message to Serversauce3
+        推送消息到 Server酱3
 
-        ServerChan3 API format:
+        Server酱3 API 格式：
         POST https://sctapi.ftqq.com/{sendkey}.send
-        Or
+        或
         POST https://{num}.push.ft07.com/send/{sendkey}.send
         {
-            "title": "Message title",
-            "desp": "Message content",
+            "title": "消息标题",
+            "desp": "消息内容",
             "options": {}
         }
 
-        ServerChan3 features:
-        - Domestic push service, supports multiple domestic system push channels, can push without a backend
-        - Simple and easy-to-use API interface
+        Server酱3 特点：
+        - 国内推送服务，支持多家国产系统推送通道，可无后台推送
+        - 简单易用的 API 接口
 
         Args:
-            content: Message content in Markdown format
-            title: Message title (optional)
+            content: 消息内容（Markdown 格式）
+            title: 消息标题（可选）
 
         Returns:
-            Whether sent successfully
+            是否发送成功
         """
         if not self._serverchan3_sendkey:
             logger.warning("Server酱3 SendKey 未配置，跳过推送")

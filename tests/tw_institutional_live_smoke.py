@@ -5,8 +5,8 @@ The offline unit tests (tests/test_tw_institutional_fetcher.py) pin the parser t
 FROZEN fixtures, so by construction they can never notice an upstream feed change.
 This script hits the REAL TWSE T86 + TPEx OpenAPI endpoints to surface that drift:
 an endpoint move, a core-column rename (which makes the fetcher fail-open SILENTLY,
-returning None for every stock), a Minguo->ISO date-format switch, or a schema change.
-Both feeds are public Government open data — no credentials, no key.
+returning None for every stock), a 民國->ISO date-format switch, or a schema change.
+Both feeds are public 政府開放資料 — no credentials, no key.
 
 Skip vs drift (a drift detector must not report a feed change as "PASS"):
     - A transport error (endpoint unreachable / SSL / timeout) -> SOFT SKIP: you cannot

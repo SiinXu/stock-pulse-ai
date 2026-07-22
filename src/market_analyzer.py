@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Market review module
+大盘复盘分析模块
 ===================================
 
-Responsibilities:
-1. Get major index data (Shanghai, Shenzhen, and the ChiNext)
-2. Search for market review intelligence.
-3. Use a large language model to generate daily market review reports.
+职责：
+1. 获取大盘指数数据（上证、深证、创业板）
+2. 搜索市场新闻形成复盘情报
+3. 使用大模型生成每日大盘复盘报告
 """
 
 import logging
@@ -61,7 +61,7 @@ _CHINESE_SECTION_PATTERNS = {
 
 @dataclass
 class MarketIndex:
-    """Main board index data"""
+    """大盘指数数据"""
     code: str                    # Index code
     name: str                    # Index name
     current: float = 0.0         # Current level
@@ -71,7 +71,7 @@ class MarketIndex:
     high: float = 0.0            # Peak value
     low: float = 0.0             # Lowest point
     prev_close: float = 0.0      # Yesterday's closing value
-    volume: float = 0.0          # Volume (hands)
+    volume: float = 0.0          # Volume (lots)
     amount: float = 0.0          # trading value (yuan)
     amplitude: float = 0.0       # Amplitude (%)
     
@@ -93,7 +93,7 @@ class MarketIndex:
 
 @dataclass
 class MarketOverview:
-    """Market Overview Data"""
+    """市场概览数据"""
     date: str                           # Date
     indices: List[MarketIndex] = field(default_factory=list)  # Major Indices
     up_count: int = 0                   # Number of rising stocks
@@ -123,14 +123,14 @@ class MarketLightReviewResult:
 
 class MarketAnalyzer:
     """
-    Market review analyzer
+    大盘复盘分析器
     
-    Function:
-    1. Get real-time quotes for major indices
-    2. Get market rise-fall statistics
-    3. Get sector rise-fall rankings
-    4. Search market news
-    5. Generate a comprehensive market review report.
+    功能：
+    1. 获取大盘指数实时行情
+    2. 获取市场涨跌统计
+    3. 获取板块涨跌榜
+    4. 搜索市场新闻
+    5. 生成大盘复盘报告
     """
     
     def __init__(
@@ -141,13 +141,13 @@ class MarketAnalyzer:
         config: Optional[Any] = None,
     ):
         """
-        Initialize the main market analyzer
+        初始化大盘分析器
 
         Args:
-            search_service: Search service instance
-            analyzer: AI Analyzer instance (for calling LLM)
-            region: market region cn=A-shares hk=Hong Kong stocks us=U.S. stocks jp=Japan kr=Korean
-            config: The configuration used for this review; uses global config if not provided
+            search_service: 搜索服务实例
+            analyzer: AI分析器实例（用于调用LLM）
+            region: 市场区域 cn=A股 hk=港股 us=美股 jp=日本 kr=韩国
+            config: 本次复盘使用的配置；未传时读取全局配置
         """
         self.config = config or get_config()
         self.search_service = search_service
@@ -505,10 +505,10 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
 
     def get_market_overview(self) -> MarketOverview:
         """
-        Get market overview data
+        获取市场概览数据
         
         Returns:
-            MarketOverview: Market overview data object
+            MarketOverview: 市场概览数据对象
         """
         today = datetime.now().strftime('%Y-%m-%d')
         overview = MarketOverview(date=today)
@@ -532,7 +532,7 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
 
     
     def _get_main_indices(self) -> List[MarketIndex]:
-        """Get real-time quotes for key indices."""
+        """获取主要指数实时行情"""
         indices = []
 
         try:
@@ -581,7 +581,7 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
         return indices
 
     def _get_market_statistics(self, overview: MarketOverview):
-        """Get market rise-fall statistics"""
+        """获取市场涨跌统计"""
         try:
             logger.info("[大盘] %s action=get_market_stats status=start", self._log_context())
 
@@ -620,7 +620,7 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
             )
 
     def _get_sector_rankings(self, overview: MarketOverview):
-        """Get sector rise-fall rankings"""
+        """获取板块涨跌榜"""
         try:
             logger.info("[大盘] %s action=get_sector_rankings status=start", self._log_context())
 
@@ -650,7 +650,7 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
             )
 
     def _get_concept_rankings(self, overview: MarketOverview):
-        """Get concept/theme rise-fall rankings (fail-open)."""
+        """获取概念/题材涨跌榜（fail-open）。"""
         try:
             logger.info("[大盘] %s action=get_concept_rankings status=start", self._log_context())
 
@@ -680,32 +680,32 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
             )
     
     # def _get_north_flow(self, overview: MarketOverview):
-    #     """Get Northbound Funds Inflow"""
+    #     """获取北向资金流入"""
     #     try:
-    #         logger.info("[Main Chart] Getting northbound funds...")
+    #         logger.info("[大盘] 获取北向资金...")
     #         
     #         # Get Northbound Funds Data
-    #         df = ak.stock_hsgt_north_net_flow_in_em(symbol="Northbound")
+    #         df = ak.stock_hsgt_north_net_flow_in_em(symbol="北上")
     #         
     #         if df is not None and not df.empty:
     #             # Get latest data point
     #             latest = df.iloc[-1]
-    #             if 'Net inflow on the day' in df.columns:
-    #                 overview.north_flow = float(latest['Net inflow on the day']) / 1e8  # Convert to CNY 100 million of yuan
-    #             elif 'net inflow' in df.columns:
-    #                 overview.north_flow = float(latest['net inflow']) / 1e8
+    #             if '当日净流入' in df.columns:
+    #                 overview.north_flow = float(latest['当日净流入']) / 1e8  # Convert to CNY 100 million of yuan
+    #             elif '净流入' in df.columns:
+    #                 overview.north_flow = float(latest['净流入']) / 1e8
     #                 
-    #             logger.info(f"[Main Chart] Northbound fund net inflow: {overview.north_flow:.2f} 100 million")
+    #             logger.info(f"[大盘] 北向资金净流入: {overview.north_flow:.2f}亿")
     #             
     #     except Exception as e:
-    #         logger.warning(f"[Main Chart] Failed to get northbound funds: {e}")
+    #         logger.warning(f"[大盘] 获取北向资金失败: {e}")
     
     def search_market_news(self) -> List[Dict]:
         """
-        Search market news
+        搜索市场新闻
         
         Returns:
-            News list
+            新闻列表
         """
         if not self.search_service:
             logger.warning(
@@ -767,14 +767,14 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
     
     def generate_market_review(self, overview: MarketOverview, news: List) -> str:
         """
-        Use an LLM to generate a market review report
+        使用大模型生成大盘复盘报告
         
         Args:
-            overview: market overview data
-            news: Market News List (SearchResult object list)
+            overview: 市场概览数据
+            news: 市场新闻列表 (SearchResult 对象列表)
             
         Returns:
-            Main Market Review Report Text
+            大盘复盘报告文本
         """
         backend_error = self._get_analyzer_generation_backend_config_error()
         if backend_error is not None:
@@ -1214,7 +1214,7 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
         return reasons[:4]
 
     def _build_indices_block(self, overview: MarketOverview) -> str:
-        """Build index quote tables"""
+        """构建指数行情表格"""
         if not overview.indices:
             return ""
         if self._get_review_language() == "en":
@@ -1517,7 +1517,7 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
         return "\n\n".join(sections)
 
     def _build_review_prompt(self, overview: MarketOverview, news: List) -> str:
-        """Build the replay report Prompt"""
+        """构建复盘报告 Prompt"""
         review_language = self._get_review_language()
         # Korean reuses the English structural template but the model is told to
         # write the entire shell, headings, guidance and conclusion in Korean.
@@ -1757,7 +1757,7 @@ Output the report content directly, no extra commentary.
 """
     
     def _generate_template_review(self, overview: MarketOverview, news: List) -> str:
-        """Generate a review report from a template when no LLM is available."""
+        """使用模板生成复盘报告（无大模型时的备选方案）"""
         template_language = self._get_template_review_language()
         mood_code = self.profile.mood_index_code
         # Lookup the corresponding index based on mood_index_code
@@ -1989,10 +1989,10 @@ Market conditions can change quickly. The data above is for reference only and d
 
     def run_daily_review(self) -> str:
         """
-        Execute daily market review process
+        执行每日大盘复盘流程
 
         Returns:
-            Market review report text
+            复盘报告文本
         """
         return self.run_daily_review_with_snapshot().report
 

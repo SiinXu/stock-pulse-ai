@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A-shares Watchlist Analysis System - Asynchronous task queue
+A股自选股智能分析系统 - 异步任务队列
 ===================================
 
-Responsibilities:
-1. Manage the lifecycle of asynchronous analysis tasks
-2. Prevent duplicate submission of the same stock code.
-3. Provides SSE event broadcasting mechanism
-4. Persistence to Database After Task Completion
+职责：
+1. 管理异步分析任务的生命周期
+2. 防止相同股票代码重复提交
+3. 提供 SSE 事件广播机制
+4. 任务完成后持久化到数据库
 """
 
 from __future__ import annotations
@@ -253,9 +253,9 @@ class TaskInfo:
 
 class DuplicateTaskError(Exception):
     """
-    Repeated submission exception.
+    重复提交异常
     
-    Throw this exception when the stock is already in analysis
+    当股票已在分析中时抛出此异常
     """
     def __init__(self, stock_code: str, existing_task_id: str):
         self.stock_code = stock_code
@@ -416,15 +416,15 @@ class _QueueTaskEventStream:
 
 class AnalysisTaskQueue:
     """
-    Asynchronous analysis task queue
+    异步分析任务队列
     
-    Singleton pattern, global unique instance
+    单例模式，全局唯一实例
     
-    Features:
-    1. Prevent duplicate submission of the same stock code.
-    2. ThreadPool executes tasks
-    3. SSE Event Broadcasting Mechanism
-    4. Automatic Persistence After Task Completion
+    特性：
+    1. 防止相同股票代码重复提交
+    2. 线程池执行分析任务
+    3. SSE 事件广播机制
+    4. 任务完成后自动持久化
     """
     
     _instance: Optional['AnalysisTaskQueue'] = None
@@ -476,7 +476,7 @@ class AnalysisTaskQueue:
     
     @property
     def executor(self) -> ThreadPoolExecutor:
-        """Lazy-load thread pool"""
+        """懒加载线程池"""
         if self._shutdown:
             raise TaskQueueShutdownError()
         if self._executor is None:
@@ -692,13 +692,13 @@ class AnalysisTaskQueue:
     
     def is_analyzing(self, stock_code: str) -> bool:
         """
-        Check if the stock is currently being analyzed
+        检查股票是否正在分析中
         
         Args:
-            stock_code: stock code
+            stock_code: 股票代码
             
         Returns:
-            True indicates that it is under analysis
+            True 表示正在分析中
         """
         dedupe_key = _dedupe_stock_code_key(stock_code)
         with self._data_lock:
@@ -706,13 +706,13 @@ class AnalysisTaskQueue:
     
     def get_analyzing_task_id(self, stock_code: str) -> Optional[str]:
         """
-        Get the task ID currently analyzing this stock
+        获取正在分析该股票的任务 ID
         
         Args:
-            stock_code: stock code
+            stock_code: 股票代码
             
         Returns:
-            Task ID, if none returns None
+            任务 ID，如果没有则返回 None
         """
         dedupe_key = _dedupe_stock_code_key(stock_code)
         with self._data_lock:
@@ -1306,19 +1306,19 @@ class AnalysisTaskQueue:
         return accepted
 
     def _rollback_submitted_tasks_locked(self, task_ids: List[str]) -> None:
-        """Rollback the current batch tasks that were created but not yet stabilized for the caller."""
+        """回滚当前批次已创建但尚未稳定返回给调用方的任务。"""
         for task_id in task_ids:
             self._rollback_task_locked(task_id)
     
     def get_task(self, task_id: str) -> Optional[TaskInfo]:
         """
-        Get task information
+        获取任务信息
         
         Args:
-            task_id: Task ID
+            task_id: 任务 ID
             
         Returns:
-            TaskInfo Or None
+            TaskInfo 或 None
         """
         with self._data_lock:
             task = self._tasks.get(task_id)
@@ -1364,10 +1364,10 @@ class AnalysisTaskQueue:
     
     def list_pending_tasks(self) -> List[TaskInfo]:
         """
-        Get all pending + processing tasks
+        获取所有进行中的任务（pending + processing）
         
         Returns:
-            Task List (Copy)
+            任务列表（副本）
         """
         with self._data_lock:
             return [
@@ -1377,13 +1377,13 @@ class AnalysisTaskQueue:
     
     def list_all_tasks(self, limit: int = 50) -> List[TaskInfo]:
         """
-        Get all tasks (by creation time descending)
+        获取所有任务（按创建时间倒序）
         
         Args:
-            limit: return limit
+            limit: 返回数量限制
             
         Returns:
-            Task List (Copy)
+            任务列表（副本）
         """
         with self._data_lock:
             tasks = sorted(
@@ -1395,10 +1395,10 @@ class AnalysisTaskQueue:
     
     def get_task_stats(self) -> Dict[str, int]:
         """
-        Get task statistics
+        获取任务统计信息
         
         Returns:
-            Dictionary of statistical information
+            统计信息字典
         """
         with self._data_lock:
             stats = {
@@ -1871,10 +1871,10 @@ class AnalysisTaskQueue:
 
 def get_task_queue() -> AnalysisTaskQueue:
     """
-    Get the singleton task queue
+    获取任务队列单例
     
     Returns:
-        AnalysisTaskQueue instance
+        AnalysisTaskQueue 实例
     """
     queue = AnalysisTaskQueue()
     try:

@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-API v1 module initialization
+API v1 模块初始化
 ===================================
 
-Responsibilities:
-1. Export v1 version API routes
+职责：
+1. 导出 v1 版本 API 的路由
 """
 
 from api.v1.router import router as api_v1_router

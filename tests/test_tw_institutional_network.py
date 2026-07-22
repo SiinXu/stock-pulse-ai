@@ -11,7 +11,7 @@ Each test is self-contained (one raw fetch + the fetcher, in the same test) so a
 rename is caught LOUD and a narrow connectivity window cannot split-skip two corroborating
 tests. Drift fails LOUD; a transport error, non-trading day, or transient blip skips QUIET
 so the cron is not noisy. A 200 that is NOT JSON (maintenance page / URL migration) is
-DRIFT, not a blip, so it fails — never skipped. Both feeds are public Government open data, no creds.
+DRIFT, not a blip, so it fails — never skipped. Both feeds are public 政府開放資料, no creds.
 
 For the richer human-readable cross-check, see tests/tw_institutional_live_smoke.py.
 """

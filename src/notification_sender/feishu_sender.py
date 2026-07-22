@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Feishu reminder sending service
+飞书 发送提醒服务
 
-Responsibilities:
-1. Send Feishu messages via webhook
-2. Send messages via the Feishu App Bot (lark-oapi SDK).
+职责：
+1. 通过 webhook 发送飞书消息
+2. 通过飞书应用机器人（App Bot）发送消息（lark-oapi SDK）
 """
 import base64
 import hashlib

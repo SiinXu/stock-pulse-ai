@@ -1,25 +1,25 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A-shares self-selected stock intelligent analysis system - Main scheduler
+A股自选股智能分析系统 - 主调度程序
 ===================================
 
-Responsibilities:
-1. Coordinate modules to complete the stock analysis workflow
-2. Implement thread pool scheduling for low concurrency
-3. Global exception handling, ensuring single-stock failure does not affect the overall process
-4. Provides command-line entry point
+职责：
+1. 协调各模块完成股票分析流程
+2. 实现低并发的线程池调度
+3. 全局异常处理，确保单股失败不影响整体
+4. 提供命令行入口
 
-Usage:
-    python main.py              # Normal running
-    python main.py --debug      # Debug mode
-    python main.py --dry-run    # Only get data without analysis
+使用方式：
+    python main.py              # 正常运行
+    python main.py --debug      # 调试模式
+    python main.py --dry-run    # 仅获取数据不分析
 
-Trading philosophy (integrated into analysis):
-- Strict entry strategy: Don't chase highs, if the deviation rate is greater than 5% do not buy in
-- Trend trading: Long positions are arranged with MA5 > MA10 > MA20
-- Efficiency first.: Focus on stocks with high volume concentration.
-- Entry Preference: Support after low volume rebound of MA5/MA10
+交易理念（已融入分析）：
+- 严进策略：不追高，乖离率 > 5% 不买入
+- 趋势交易：只做 MA5>MA10>MA20 多头排列
+- 效率优先：关注筹码集中度好的股票
+- 买点偏好：缩量回踩 MA5/MA10 支撑
 """
 from __future__ import annotations
 
@@ -565,9 +565,9 @@ def run_full_analysis(
     raise_errors: bool = False,
 ) -> bool:
     """
-    Execute the complete analysis process (individual stocks + market review)
+    执行完整的分析流程（个股 + 大盘复盘）
 
-    This is the main function called by scheduled tasks
+    这是定时任务调用的主函数
     """
     # Import pipeline modules outside the broad try/except so that import-time
     # failures propagate to the caller instead of being silently swallowed.
@@ -838,7 +838,7 @@ def run_full_analysis(
             if feishu_doc.is_configured() and (results or market_report):
                 logger.info("Creating a Feishu document")
 
-                # 1. Prepare title "01-01 13:01 Market Review"
+                # 1. Prepare title "01-01 13:01大盘复盘"
                 tz_cn = timezone(timedelta(hours=8))
                 now = datetime.now(tz_cn)
                 doc_title = f"{now.strftime('%Y-%m-%d %H:%M')} 大盘复盘"
@@ -846,7 +846,7 @@ def run_full_analysis(
                 # 2. Prepare content (concatenate individual stock analysis and market review)
                 full_content = ""
 
-                # Add major index review content (if any)
+                # Add market-review content when available.
                 if market_report:
                     full_content += f"# 📈 大盘复盘\n\n{market_report}\n\n---\n\n"
 
@@ -947,12 +947,12 @@ def _run_analysis_with_runtime_scheduler_lock(
 
 def start_api_server(host: str, port: int, config: Config) -> None:
     """
-    Start FastAPI service in a background thread.
+    在后台线程启动 FastAPI 服务
 
     Args:
-        host: listening address
-        port: listening port
-        config: Configuration object
+        host: 监听地址
+        port: 监听端口
+        config: 配置对象
     """
     import socket
     import threading
@@ -1048,7 +1048,7 @@ def _is_truthy_env(var_name: str, default: str = "true") -> bool:
 
 def start_bot_stream_clients(config: Config) -> None:
     """Start bot stream clients when enabled in config."""
-    # Start the Feishu Stream client
+    # Start the DingTalk Stream client.
     if config.dingtalk_stream_enabled:
         try:
             from bot.platforms import start_dingtalk_stream_background, DINGTALK_STREAM_AVAILABLE
@@ -1068,7 +1068,7 @@ def start_bot_stream_clients(config: Config) -> None:
                 error_code="main_dingtalk_stream_start_failed",
             )
 
-    # Start the WeCom Stream client
+    # Start the Feishu Stream client.
     if getattr(config, 'feishu_stream_enabled', False):
         try:
             from bot.platforms import start_feishu_stream_background, FEISHU_SDK_AVAILABLE
@@ -1165,10 +1165,10 @@ def _build_schedule_times_provider(default_schedule_time: str):
 
 def main() -> int:
     """
-    Main Entry Function
+    主入口函数
 
     Returns:
-        Exit code (0 indicates success)
+        退出码（0 表示成功）
     """
     # Parse command-line arguments
     args = parse_arguments()

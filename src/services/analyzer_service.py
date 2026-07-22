@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A-shares Watchlist Analysis System - Analysis service layer
+A股自选股智能分析系统 - 分析服务层
 ===================================
 
-Responsibilities:
-1. Encapsulate the core analysis logic, supporting multiple callers (CLI, WebUI, Bot).
-2. Provides a clear API interface, not dependent on command-line parameters
-3. Supports dependency injection for easier testing and expansion.
-4. Manage and configure analysis workflows uniformly
+职责：
+1. 封装核心分析逻辑，支持多调用方（CLI、WebUI、Bot）
+2. 提供清晰的API接口，不依赖于命令行参数
+3. 支持依赖注入，便于测试和扩展
+4. 统一管理分析流程和配置
 """
 
 import uuid
@@ -29,16 +29,16 @@ def analyze_stock(
     notifier: Optional[NotificationService] = None,
 ) -> Optional[AnalysisResult]:
     """
-    Analyze a single stock
+    分析单只股票
 
     Args:
-        stock_code: stock code
-        config: Configuration object (optional, defaults to singleton)
-        full_report: Generate full report?
-        notifier: Notification Service (optional)
+        stock_code: 股票代码
+        config: 配置对象（可选，默认使用单例）
+        full_report: 是否生成完整报告
+        notifier: 通知服务（可选）
 
     Returns:
-        Analysis results object
+        分析结果对象
     """
     if config is None:
         config = get_config()
@@ -75,16 +75,16 @@ def analyze_stocks(
     notifier: Optional[NotificationService] = None,
 ) -> List[AnalysisResult]:
     """
-    Analyze multiple stocks
+    分析多只股票
 
     Args:
-        stock_codes: List of stock codes
-        config: Configuration object (optional, defaults to singleton)
-        full_report: Generate full report?
-        notifier: Notification Service (optional)
+        stock_codes: 股票代码列表
+        config: 配置对象（可选，默认使用单例）
+        full_report: 是否生成完整报告
+        notifier: 通知服务（可选）
 
     Returns:
-        List of analysis results.
+        分析结果列表
     """
     if config is None:
         config = get_config()
@@ -103,14 +103,14 @@ def perform_market_review(
     notifier: Optional[NotificationService] = None,
 ) -> Optional[str]:
     """
-    Execute market review
+    执行大盘复盘
 
     Args:
-        config: Configuration object (optional, defaults to singleton)
-        notifier: Notification Service (optional)
+        config: 配置对象（可选，默认使用单例）
+        notifier: 通知服务（可选）
 
     Returns:
-        Market review report content
+        复盘报告内容
     """
     if config is None:
         config = get_config()

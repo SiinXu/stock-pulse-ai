@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Slack sending reminder service
+Slack 发送提醒服务
 
-Responsibilities:
-1. Send Slack messages via Slack Bot API or Incoming Webhook
-   (When configuring simultaneously, prioritize the Bot API to ensure text and images are sent to the same channel)
+职责：
+1. 通过 Slack Bot API 或 Incoming Webhook 发送 Slack 消息
+   （同时配置时优先使用 Bot API，确保文本与图片发送到同一频道）
 """
 import logging
 import json
@@ -28,10 +28,10 @@ class SlackSender:
 
     def __init__(self, config: Config):
         """
-        Initialize Slack configuration
+        初始化 Slack 配置
 
         Args:
-            config: Configuration object
+            config: 配置对象
         """
         self._slack_webhook_url = getattr(config, 'slack_webhook_url', None)
         self._slack_bot_token = getattr(config, 'slack_bot_token', None)
@@ -40,25 +40,25 @@ class SlackSender:
 
     @property
     def _use_bot(self) -> bool:
-        """Prioritize Bot API when the bot configuration is complete to ensure text and images use the same transmission channel."""
+        """Bot 配置完整时优先走 Bot API，保证文本和图片使用同一传输通道。"""
         return bool(self._slack_bot_token and self._slack_channel_id)
 
     def _is_slack_configured(self) -> bool:
-        """Verify Slack configuration is complete (supports Webhook or Bot API)"""
+        """检查 Slack 配置是否完整（支持 Webhook 或 Bot API）"""
         return self._use_bot or bool(self._slack_webhook_url)
 
     def send_to_slack(self, content: str, *, timeout_seconds: Optional[float] = None) -> bool:
         """
-        Push message to Slack (supports Webhook and Bot API)
+        推送消息到 Slack（支持 Webhook 和 Bot API）
 
-        The send priority is consistent with _send_slack_image(): Bot > Webhook,
-        Prevent messages from falling into different channels when Webhooks send text and Bots send images.
+        传输优先级与 _send_slack_image() 保持一致：Bot > Webhook，
+        避免文本走 Webhook、图片走 Bot 导致消息落入不同频道。
 
         Args:
-            content: Markdown Message content format
+            content: Markdown 格式的消息内容
 
         Returns:
-            Whether sent successfully
+            是否发送成功
         """
         # Divide bytes into blocks to avoid single messages exceeding the limit.
         try:
@@ -85,9 +85,9 @@ class SlackSender:
 
     def _build_blocks(self, content: str) -> list:
         """
-        Construct content as Slack Block Kit format
+        将内容构建为 Slack Block Kit 格式
 
-        If content exceeds the single section block limit, it will be automatically split into multiple blocks.
+        如果内容超过单个 section block 限制，会自动拆分为多个 block。
         """
         blocks = []
         # Shard by block text limit.
@@ -106,13 +106,13 @@ class SlackSender:
 
     def _send_slack_webhook(self, content: str, *, timeout_seconds: Optional[float] = None) -> bool:
         """
-        Use Incoming Webhook to send messages to Slack
+        使用 Incoming Webhook 发送消息到 Slack
 
         Args:
-            content: Message content
+            content: 消息内容
 
         Returns:
-            Whether sent successfully
+            是否发送成功
         """
         try:
             payload = {
@@ -142,13 +142,13 @@ class SlackSender:
 
     def _send_slack_bot(self, content: str, *, timeout_seconds: Optional[float] = None) -> bool:
         """
-        Use the Bot API (chat.postMessage) to send messages to Slack
+        使用 Bot API (chat.postMessage) 发送消息到 Slack
 
         Args:
-            content: Message content
+            content: 消息内容
 
         Returns:
-            Whether sent successfully
+            是否发送成功
         """
         try:
             headers = {
@@ -183,17 +183,17 @@ class SlackSender:
 
     def _send_slack_image(self, image_bytes: bytes, fallback_content: str = "") -> bool:
         """
-        Send image to Slack
+        发送图片到 Slack
 
-        Bot Using pattern files.getUploadURLExternal + files.completeUploadExternal
-        (Slack New Version File Upload API); Webhook Rollback to text in pattern mode.
+        Bot 模式下使用 files.getUploadURLExternal + files.completeUploadExternal
+        (Slack 新版文件上传 API)；Webhook 模式下回退为文本。
 
         Args:
-            image_bytes: PNG Image Bytes
-            fallback_content: Fallback text when image sending fails
+            image_bytes: PNG 图片字节
+            fallback_content: 图片发送失败时的回退文本
 
         Returns:
-            Whether sent successfully
+            是否发送成功
         """
         # Bot mode: Using the new file upload API
         if self._use_bot:

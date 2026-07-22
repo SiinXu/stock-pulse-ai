@@ -321,7 +321,7 @@ describe('searchStocks', () => {
     test('alias match', () => {
       const results = searchStocks('银', mockIndex);
       expect(results.length).toBeGreaterThan(0);
-      // Should match PingAn Bank and Pufa Bank
+      // The query should match both bank-name fixtures.
       const banks = results.filter(r => r.nameZh.includes('银行'));
       expect(banks.length).toBeGreaterThan(0);
     });
@@ -481,7 +481,7 @@ describe('searchStocks', () => {
 
     test('alias field match', () => {
       const results = searchStocks('茅台', mockIndex);
-      // Should match Guizhou Moutai
+      // The alias should match the Moutai stock fixture.
       expect(results.length).toBeGreaterThan(0);
     });
   });

@@ -25,4 +25,4 @@ skip = [".git", "__pycache__", ".env", "venv", ".venv"]
 
 [tool.bandit]
 exclude_dirs = ["tests", "test_*.py"]
-skips = ["B101"]  # assert 语句在测试中是允许的
+skips = ["B101"]  # Assert statements are allowed in tests.

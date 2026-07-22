@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Historical records related models
+历史记录相关模型
 ===================================
 
-Responsibilities:
-1. Define the historical record list and details model
-2. Define the complete analysis report model
+职责：
+1. 定义历史记录列表和详情模型
+2. 定义分析报告完整模型
 """
 
 from typing import Optional, List, Any, Dict, Literal
@@ -18,7 +18,7 @@ from src.schemas.decision_action import DecisionAction
 
 
 class HistoryItem(BaseModel):
-    """Historical records summary (for listing)"""
+    """历史记录摘要（列表展示用）"""
 
     id: Optional[int] = Field(None, description="分析历史记录主键 ID")
     query_id: str = Field(..., description="分析记录关联 query_id（批量分析时重复）")
@@ -63,7 +63,7 @@ class HistoryItem(BaseModel):
 
 
 class HistoryListResponse(BaseModel):
-    """Historical records list response"""
+    """历史记录列表响应"""
     
     total: int = Field(..., description="总记录数")
     page: int = Field(..., description="当前页码")
@@ -81,19 +81,19 @@ class HistoryListResponse(BaseModel):
 
 
 class DeleteHistoryRequest(BaseModel):
-    """Delete historical records request"""
+    """删除历史记录请求"""
 
     record_ids: List[int] = Field(default_factory=list, description="要删除的历史记录主键 ID 列表")
 
 
 class DeleteHistoryResponse(BaseModel):
-    """Delete historical records response"""
+    """删除历史记录响应"""
 
     deleted: int = Field(..., description="实际删除的历史记录数量")
 
 
 class NewsIntelItem(BaseModel):
-    """News intelligence item"""
+    """新闻情报条目"""
 
     title: str = Field(..., description="新闻标题")
     snippet: str = Field("", description="新闻摘要（最多200字）")
@@ -109,7 +109,7 @@ class NewsIntelItem(BaseModel):
 
 
 class NewsIntelResponse(BaseModel):
-    """News intelligence response"""
+    """新闻情报响应"""
 
     total: int = Field(..., description="新闻条数")
     items: List[NewsIntelItem] = Field(default_factory=list, description="新闻列表")
@@ -123,7 +123,7 @@ class NewsIntelResponse(BaseModel):
 
 
 class ReportMeta(BaseModel):
-    """Report meta information"""
+    """报告元信息"""
 
     model_config = ConfigDict(protected_namespaces=("model_validate", "model_dump"))
 
@@ -147,7 +147,7 @@ class ReportMeta(BaseModel):
 
 
 class ReportSummary(BaseModel):
-    """Report overview area"""
+    """报告概览区"""
     
     analysis_summary: Optional[str] = Field(None, description="关键结论")
     operation_advice: Optional[str] = Field(None, description="操作建议")
@@ -162,7 +162,7 @@ class ReportSummary(BaseModel):
 
 
 class ReportStrategy(BaseModel):
-    """Strategy target zone."""
+    """策略点位区"""
     
     ideal_buy: Optional[str] = Field(None, description="理想买入价")
     secondary_buy: Optional[str] = Field(None, description="第二买入价")
@@ -171,7 +171,7 @@ class ReportStrategy(BaseModel):
 
 
 class AnalysisContextPackOverviewSubject(BaseModel):
-    """AnalysisContextPack Visible summary information about the mark"""
+    """AnalysisContextPack 可见摘要标的信息"""
 
     code: str = Field(..., description="股票代码")
     stock_name: Optional[str] = Field(None, description="股票名称")
@@ -179,7 +179,7 @@ class AnalysisContextPackOverviewSubject(BaseModel):
 
 
 class AnalysisContextPackOverviewBlock(BaseModel):
-    """AnalysisContextPack Visible summary data block"""
+    """AnalysisContextPack 可见摘要数据块"""
 
     key: str = Field(..., description="数据块稳定 key")
     label: str = Field(..., description="数据块展示名称")
@@ -199,7 +199,7 @@ class AnalysisContextPackOverviewBlock(BaseModel):
 
 
 class AnalysisContextPackOverviewCounts(BaseModel):
-    """AnalysisContextPack Visible summary status count"""
+    """AnalysisContextPack 可见摘要状态计数"""
 
     available: int = 0
     missing: int = 0
@@ -212,14 +212,14 @@ class AnalysisContextPackOverviewCounts(BaseModel):
 
 
 class AnalysisContextPackOverviewMetadata(BaseModel):
-    """AnalysisContextPack Visible summary metadata"""
+    """AnalysisContextPack 可见摘要元数据"""
 
     trigger_source: Optional[str] = Field(None, description="触发来源")
     news_result_count: Optional[int] = Field(None, description="新闻结果数量")
 
 
 class AnalysisContextPackOverviewDataQuality(BaseModel):
-    """AnalysisContextPack visible summary data quality score"""
+    """AnalysisContextPack 可见摘要数据质量评分"""
 
     overall_score: Optional[int] = Field(None, ge=0, le=100, description="输入数据质量总分")
     level: Optional[Literal["good", "usable", "limited", "poor"]] = Field(
@@ -231,7 +231,7 @@ class AnalysisContextPackOverviewDataQuality(BaseModel):
 
 
 class AnalysisContextPackOverview(BaseModel):
-    """Historical/API-visible low sensitivity AnalysisContextPack summary"""
+    """历史/API 可见的低敏 AnalysisContextPack 摘要"""
 
     pack_version: str = Field(..., description="AnalysisContextPack 版本")
     created_at: Optional[str] = Field(None, description="创建时间")
@@ -247,7 +247,7 @@ class AnalysisContextPackOverview(BaseModel):
 
 
 class ReportDetails(BaseModel):
-    """Report details area"""
+    """报告详情区"""
     
     news_content: Optional[str] = Field(None, description="新闻摘要")
     raw_result: Optional[Any] = Field(None, description="原始分析结果（JSON）")
@@ -287,7 +287,7 @@ class ReportDetails(BaseModel):
 
 
 class AnalysisReport(BaseModel):
-    """Full analysis report."""
+    """完整分析报告"""
 
     meta: ReportMeta = Field(..., description="元信息")
     summary: ReportSummary = Field(..., description="概览区")
@@ -323,7 +323,7 @@ class AnalysisReport(BaseModel):
 
 
 class MarkdownReportResponse(BaseModel):
-    """Respond to Markdown formatted reports"""
+    """Markdown 格式报告响应"""
 
     content: str = Field(..., description="Markdown 格式的完整报告内容")
 
@@ -335,7 +335,7 @@ class MarkdownReportResponse(BaseModel):
 
 
 class StockBarItem(BaseModel):
-    """Individual stock item (deduplicated summary at the stock level)"""
+    """个股栏条目（去重后的股票维度摘要）"""
 
     id: int = Field(..., description="该股最新一次分析的历史记录主键 ID")
     stock_code: str = Field(..., description="股票代码")
@@ -374,27 +374,27 @@ class StockBarItem(BaseModel):
 
 
 class StockBarResponse(BaseModel):
-    """Response for individual stock list"""
+    """个股栏列表响应"""
 
     total: int = Field(..., description="不重复个股数")
     items: List[StockBarItem] = Field(default_factory=list, description="个股列表")
 
 
 class WatchlistRequest(BaseModel):
-    """Watchlist queue operation request"""
+    """自选队列操作请求"""
 
     stock_code: str = Field(..., description="股票代码", min_length=1)
 
 
 class WatchlistResponse(BaseModel):
-    """Watchlist queue response"""
+    """自选队列响应"""
 
     stock_codes: List[str] = Field(default_factory=list, description="当前自选队列股票代码列表")
     message: str = Field(..., description="操作结果描述")
 
 
 class RunDiagnosticComponent(BaseModel):
-    """Summary of a single running diagnostic component."""
+    """单个运行诊断组件摘要。"""
 
     key: str = Field(..., description="组件键")
     label: str = Field(..., description="组件显示名称")
@@ -404,7 +404,7 @@ class RunDiagnosticComponent(BaseModel):
 
 
 class RunDiagnosticSummaryResponse(BaseModel):
-    """Historical report run diagnostic summary."""
+    """历史报告运行诊断摘要。"""
 
     trace_id: Optional[str] = Field(None, description="诊断 trace ID")
     task_id: Optional[str] = Field(None, description="任务 ID")

@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-API dependency injection module
+API 依赖注入模块
 ===================================
 
-Responsibilities:
-1. Provides database Session dependency
-2. Provides configuration dependencies
-3. Provides service layer dependency
+职责：
+1. 提供数据库 Session 依赖
+2. 提供配置依赖
+3. 提供服务层依赖
 """
 
 from typing import Generator
@@ -23,12 +23,12 @@ from src.services.runtime_scheduler import RuntimeSchedulerService
 
 def get_db() -> Generator[Session, None, None]:
     """
-    Get database Session dependency
+    获取数据库 Session 依赖
     
-    Use FastAPI dependency injection mechanism to ensure Session is automatically closed after requests
+    使用 FastAPI 依赖注入机制，确保请求结束后自动关闭 Session
     
     Yields:
-        Session: SQLAlchemy Session object
+        Session: SQLAlchemy Session 对象
         
     Example:
         @router.get("/items")
@@ -45,20 +45,20 @@ def get_db() -> Generator[Session, None, None]:
 
 def get_config_dep() -> Config:
     """
-    Get configuration dependencies
+    获取配置依赖
     
     Returns:
-        Config: Singleton configuration object
+        Config: 配置单例对象
     """
     return get_config()
 
 
 def get_database_manager() -> DatabaseManager:
     """
-    Get database manager dependency
+    获取数据库管理器依赖
     
     Returns:
-        DatabaseManager: Database Manager singleton object
+        DatabaseManager: 数据库管理器单例对象
     """
     return DatabaseManager.get_instance()
 

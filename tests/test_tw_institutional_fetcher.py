@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Offline unit tests for TwInstitutionalFetcher (Taiwan stocks institutional investors data-layer fetcher).
+"""Offline unit tests for TwInstitutionalFetcher (台股三大法人 data-layer fetcher).
 
 Fixtures are trimmed from real TWSE T86 / TPEx OpenAPI responses (captured
 2026-06-26) so the parser is pinned to the actual field layout, date formats,

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright (c) 2026 SiinXu / StockPulse contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Experimental PydanticAI runtime adapter (AR-PY-04 / RF-05, Plan B).
+"""Experimental PydanticAI runtime adapter (AR-PY-04 / RF-05, 方案 B).
 
 An **isolated, test/evidence-only** ``AgentRuntime`` backed by PydanticAI,
 reinstated as an executable POC by ADR-002. It has no factory, config,
@@ -15,7 +15,7 @@ without ``pydantic-ai-slim`` starts and runs Native unaffected, and asking
 for this runtime without the dependency raises one explicit error rather
 than degrading silently.
 
-Scheme B was selected over Scheme A by the AR-PY-04 model-integration Spike
+方案 B was selected over 方案 A by the AR-PY-04 model-integration Spike
 (``.claude/reviews/ar-py-04-model-integration-spike.md``): PydanticAI 2.12
 ships no LiteLLM *Model* — only a proxy-oriented ``LiteLLMProvider`` — so a
 custom ``Model`` that reuses StockPulse's in-process ``LLMToolAdapter`` is
@@ -287,7 +287,7 @@ def build_stockpulse_backed_model(
     cancelled_check: Optional[Callable[[], bool]] = None,
     usage_recorder: Any = None,
 ) -> Any:
-    """Build a PydanticAI ``Model`` backed by StockPulse's adapter (Plan B).
+    """Build a PydanticAI ``Model`` backed by StockPulse's adapter (方案 B).
 
     PydanticAI drives the agent loop while the actual wire call reuses
     StockPulse's already-resolved routing, thinking payload and error
@@ -408,7 +408,7 @@ def build_stockpulse_backed_model(
 
 
 class PydanticAIRuntimeAdapter:
-    """Test/evidence POC runtime backed by PydanticAI (Plan B, RF-05).
+    """Test/evidence POC runtime backed by PydanticAI (方案 B, RF-05).
 
     Injection points keep this off the product default: ``model`` is a
     deterministic test double or the StockPulse-backed model, ``executor`` is

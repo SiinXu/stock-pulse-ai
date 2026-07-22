@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Smart Stock Analysis System - Market Review Module (supports A-shares / Hong Kong stocks / U.S. stocks / Japan / Korea)
+股票智能分析系统 - 大盘复盘模块（支持 A 股 / 港股 / 美股 / 日本 / 韩国）
 ===================================
 
-Responsibilities:
-1. Select market region (cn / hk / us / jp / kr / both) according to MARKET_REVIEW_REGION configuration
-2. Execute market review analysis and generate review report
-3. Save and send review report
+职责：
+1. 根据 MARKET_REVIEW_REGION 配置选择市场区域（cn / hk / us / jp / kr / both）
+2. 执行大盘复盘分析并生成复盘报告
+3. 保存和发送复盘报告
 """
 
 import logging
@@ -194,23 +194,23 @@ def run_market_review(
     trigger_source: str = "cli",
 ) -> Optional[str] | Optional[MarketReviewRunResult]:
     """
-    Execute market review analysis
+    执行大盘复盘分析
 
     Args:
-        notifier: Notification Service
-        analyzer: AI Analyzer (optional)
-        search_service: Search service(Optional)
-        config: The configuration used for this review (optional, uses global config if not provided)
-        send_notification: Send notifications?
-        merge_notification: Whether to merge push notifications (skip this push, consolidate individual stocks and major indices for unified sending, Issue #190)
-        override_region: overrides config's market_review_region (effective subset after Issue #373 daily trading filtering)
-        query_id: historical record association ID; API background task passes in task_id, CLI/Bot is empty and automatically generated
-        save_report_file: Whether to save Markdown files; context generation path can be closed to avoid overlapping temporary reviews across regions.
-        persist_history: whether to write analysis_history; the preheat path can be closed to avoid overwriting user-visible same-day market review records
-        trigger_source: Trigger source for troubleshooting (cli/schedule/api/bot/service etc.)
+        notifier: 通知服务
+        analyzer: AI分析器（可选）
+        search_service: 搜索服务（可选）
+        config: 本次复盘使用的配置（可选，未传时读取全局配置）
+        send_notification: 是否发送通知
+        merge_notification: 是否合并推送（跳过本次推送，由 main 层合并个股+大盘后统一发送，Issue #190）
+        override_region: 覆盖 config 的 market_review_region（Issue #373 交易日过滤后有效子集）
+        query_id: 历史记录关联 ID；API 后台任务会传入 task_id，CLI/Bot 为空时自动生成
+        save_report_file: 是否保存 Markdown 文件；上下文生成路径可关闭以避免多区域临时复盘互相覆盖
+        persist_history: 是否写入 analysis_history；预热路径可关闭以避免覆盖用户可见的同日大盘复盘记录
+        trigger_source: 触发来源，用于日志排障（cli/schedule/api/bot/service 等）
 
     Returns:
-        Market review report text
+        复盘报告文本
     """
     runtime_config = config or get_config()
     history_query_id = query_id or f"market_review_{uuid.uuid4().hex}"

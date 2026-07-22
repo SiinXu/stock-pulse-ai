@@ -27,7 +27,7 @@ class TestDingtalkSender(unittest.TestCase):
 
     @patch("src.notification_sender.dingtalk_sender.requests.post")
     def test_send_chunked_long_chinese_message_payload_size(self, mock_post):
-        """Testing multi-byte Chinese long text and long titles exceeding 20KB limits, verifying that the actual JSON payload byte count strictly adheres to the restriction."""
+        """测试超过 20KB 限制的多字节中文长文本与长标题，验证实际发送的 JSON payload 字节数严格遵守限制"""
         mock_response = MagicMock()
         mock_response.json.return_value = {"errcode": 0, "errmsg": "ok"}
         mock_post.return_value = mock_response

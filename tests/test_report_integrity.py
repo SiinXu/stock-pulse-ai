@@ -515,7 +515,7 @@ class TestIntegrityRetryPrompt(unittest.TestCase):
     """Retry prompt construction tests."""
 
     def test_retry_prompt_includes_previous_response(self) -> None:
-        """Retry prompt should carry previous response so supplement is incremental."""
+        """Retry prompt should carry previous response so补全是增量的。"""
         with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
             analyzer = GeminiAnalyzer()
         prompt = analyzer._build_integrity_retry_prompt(

@@ -19,7 +19,7 @@ class TestStooqFallback(unittest.TestCase):
 
     @patch('data_provider.yfinance_fetcher.urlopen')
     def test_stooq_success_logic(self, mock_urlopen):
-        """Test Stooq normal fetching and parsing logic"""
+        """测试 Stooq 正常抓取与解析逻辑"""
         # Simulate Stooq returned CSV format data (real-time + daily historical)
         mock_realtime_payload = (
             "Symbol,Date,Time,Open,High,Low,Close,Volume\n"
@@ -59,7 +59,7 @@ class TestStooqFallback(unittest.TestCase):
     @unittest.skipUnless(HAS_YFINANCE, "yfinance is required for this test")
     @patch('yfinance.Ticker')
     def test_fetcher_integration_with_fallback(self, mock_ticker_class):
-        """Test automatic triggering of Stooq logic after yfinance failure"""
+        """测试 yfinance 失败后自动触发 Stooq 逻辑"""
         # 1. Simulate yfinance completely failing
         mock_ticker = MagicMock()
         # Simulate raising an exception when accessing the fast_info attribute

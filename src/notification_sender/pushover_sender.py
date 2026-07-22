@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Pushover Send Notification Service
+Pushover 发送提醒服务
 
-Responsibilities:
-1. Send Pushover messages via Pushover API
+职责：
+1. 通过 Pushover API 发送 Pushover 消息
 """
 import logging
 from typing import Optional
@@ -22,10 +22,10 @@ class PushoverSender:
     
     def __init__(self, config: Config):
         """
-        Initialize Pushover configuration
+        初始化 Pushover 配置
 
         Args:
-            config: Configuration object
+            config: 配置对象
         """
         self._pushover_config = {
             'user_key': getattr(config, 'pushover_user_key', None),
@@ -33,7 +33,7 @@ class PushoverSender:
         }
         
     def _is_pushover_configured(self) -> bool:
-        """Verify Pushover configuration is complete"""
+        """检查 Pushover 配置是否完整"""
         return bool(self._pushover_config['user_key'] and self._pushover_config['api_token'])
 
     def send_to_pushover(
@@ -44,29 +44,29 @@ class PushoverSender:
         timeout_seconds: Optional[float] = None,
     ) -> bool:
         """
-        Push message to Pushover
+        推送消息到 Pushover
         
-        Pushover API Format:
+        Pushover API 格式：
         POST https://api.pushover.net/1/messages.json
         {
-            "token": "Apply API Token",
-            "user": "User Key",
-            "message": "Message content",
-            "title": "Title(Optional)"
+            "token": "应用 API Token",
+            "user": "用户 Key",
+            "message": "消息内容",
+            "title": "标题（可选）"
         }
         
-        Pushover Features:
-        - Supports multi-platform push on iOS/Android/desktop
-        - Message limited to 1024 characters
-        - Supports priority settings.
-        - Supports HTML format
+        Pushover 特点：
+        - 支持 iOS/Android/桌面多平台推送
+        - 消息限制 1024 字符
+        - 支持优先级设置
+        - 支持 HTML 格式
         
         Args:
-            content: Message content (Markdown format, converted to plain text)
-            title: Message title (optional, defaults to "Stock Analysis Report")
+            content: 消息内容（Markdown 格式，会转为纯文本）
+            title: 消息标题（可选，默认为"股票分析报告"）
 
         Returns:
-            Whether sent successfully
+            是否发送成功
         """
         if not self._is_pushover_configured():
             logger.warning("Pushover 配置不完整，跳过推送")
@@ -116,15 +116,15 @@ class PushoverSender:
         timeout_seconds: Optional[float] = None,
     ) -> bool:
         """
-        Send single Pushover message
+        发送单条 Pushover 消息
         
         Args:
-            api_url: Pushover API Endpoint
-            user_key: User Key
-            api_token: Apply API Token
-            message: Message content
-            title: message title
-            priority: priority (-2 ~ 2, default 0)
+            api_url: Pushover API 端点
+            user_key: 用户 Key
+            api_token: 应用 API Token
+            message: 消息内容
+            title: 消息标题
+            priority: 优先级 (-2 ~ 2，默认 0)
         """
         try:
             payload = {
@@ -172,9 +172,9 @@ class PushoverSender:
         timeout_seconds: Optional[float] = None,
     ) -> bool:
         """
-        Segment long Pushover messages
+        分段发送长 Pushover 消息
         
-        Split by paragraphs, ensuring each paragraph does not exceed the maximum length.
+        按段落分割，确保每段不超过最大长度
         """
         import time
         

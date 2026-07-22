@@ -610,7 +610,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         )
 
     def test_outer_market_phrase_is_not_filtered_as_adult_spam(self) -> None:
-        """` Peripheral Market ` market-context headlines should not be treated as adult spam."""
+        """`外围市场` market-context headlines should not be treated as adult spam."""
         fresh = datetime.now().date().isoformat()
         service, _ = self._create_service_with_mock_provider(
             news_max_age_days=3,
@@ -948,7 +948,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         self.assertEqual([item.title for item in resp.results], ["腾讯控股 00700 发布业绩公告"])
 
     def test_finance_client_boilerplate_does_not_trigger_download_filter(self) -> None:
-        """Finance media boilerplate such as client message should not look like an app page."""
+        """Finance media boilerplate such as 客户端讯 should not look like an app page."""
         fresh = datetime.now().date().isoformat()
         service, _ = self._create_service_with_mock_provider(
             news_max_age_days=3,
@@ -972,7 +972,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         self.assertEqual(resp.results[0].relevance_category, "direct_company_news")
 
     def test_market_peripheral_phrase_does_not_trigger_adult_spam_filter(self) -> None:
-        """Finance usage of Peripheral Market should not be treated as adult-service spam."""
+        """Finance usage of 外围市场 should not be treated as adult-service spam."""
         fresh = datetime.now().date().isoformat()
         service, _ = self._create_service_with_mock_provider(
             news_max_age_days=3,
@@ -999,7 +999,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         self.assertEqual(resp.results[0].relevance_category, "direct_company_news")
 
     def test_business_full_service_phrase_does_not_trigger_adult_spam_filter(self) -> None:
-        """Business-safe full suite of services wording should require adult-service context."""
+        """Business-safe 全套服务 wording should require adult-service context."""
         fresh = datetime.now().date().isoformat()
         service, _ = self._create_service_with_mock_provider(
             news_max_age_days=3,
@@ -1164,7 +1164,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         self.assertEqual([item.title for item in resp.results], ["腾讯控股 00700 发布回购公告"])
 
     def test_adult_alphanumeric_contact_handle_is_filtered(self) -> None:
-        """Contact handles such as WeChat: abc123 should count as adult-service spam signals."""
+        """Contact handles such as 微信：abc123 should count as adult-service spam signals."""
         fresh = datetime.now().date().isoformat()
         service, _ = self._create_service_with_mock_provider(
             news_max_age_days=3,
@@ -1251,7 +1251,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         self.assertEqual(resp.results[0].relevance_category, "direct_company_news")
 
     def test_content_moderation_pornography_phrase_does_not_trigger_adult_spam_filter(self) -> None:
-        """Content-safety/regulatory news can mention pornographic content without being adult-service spam."""
+        """Content-safety/regulatory news can mention 色情 without being adult-service spam."""
         fresh = datetime.now().date().isoformat()
         service, _ = self._create_service_with_mock_provider(
             news_max_age_days=3,

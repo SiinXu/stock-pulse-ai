@@ -486,7 +486,7 @@ class BacktestEngine:
     def _matches_intent(cls, text: str, keywords: Sequence[str]) -> bool:
         """Check if text expresses the intent of any keyword, accounting for negation.
 
-        Tier 1: exact match (covers clean labels like "Buy", "hold").
+        Tier 1: exact match (covers clean labels like "买入", "hold").
         Tier 2: substring match with negation guard.
         Keywords are assumed to be lowercase (matching _normalize_text output).
         """
@@ -525,7 +525,7 @@ class BacktestEngine:
                     continue
 
             # For non-ASCII terms (Chinese), use substring matching to keep
-            # natural language phrasings like "Recommend buy" effective.
+            # natural language phrasings like "建议买入" effective.
             if re.search(r"[\u4e00-\u9fff]", keyword):
                 start = 0
                 while True:

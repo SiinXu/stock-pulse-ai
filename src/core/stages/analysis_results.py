@@ -81,7 +81,7 @@ class _AnalysisResultStageMixin:
         trend_result: Optional[TrendAnalysisResult] = None,
     ) -> AnalysisResult:
         """
-        Convert AgentResult to AnalysisResult.
+        将 AgentResult 转换为 AnalysisResult。
         """
         report_language = normalize_report_language(getattr(self.config, "report_language", "zh"))
         dash = None
@@ -570,7 +570,7 @@ class _AnalysisResultStageMixin:
 
     @staticmethod
     def _safe_int(value: Any, default: int = 50) -> int:
-        """Safely convert value to integer."""
+        """安全地将值转换为整数。"""
         if value is None:
             return default
         if isinstance(value, int):
@@ -586,9 +586,9 @@ class _AnalysisResultStageMixin:
 
     def _describe_volume_ratio(self, volume_ratio: float) -> str:
         """
-        Relative Volume Description
+        量比描述
 \x20\x20\x20\x20\x20\x20\x20\x20
-        Volume ratio = current trading volume / average trading volume over the past 5 days
+        量比 = 当前成交量 / 过去5日平均成交量
         """
         if volume_ratio < 0.5:
             return "极度萎缩"
@@ -628,8 +628,8 @@ class _AnalysisResultStageMixin:
         self, df: pd.DataFrame, realtime_quote: Any, code: str
     ) -> pd.DataFrame:
         """
-        Supplement historical OHLCV data with real-time market quotes for intra-day MA calculations.
-        Issue #234: Technical indicators use real-time prices, not the closing price from yesterday.
+        使用当日实时行情补齐历史 OHLCV，用于盘中 MA 计算。
+        Issue #234：技术指标使用实时价格，而不是沿用昨日收盘价。
         """
         if df is None or df.empty or 'close' not in df.columns:
             return df

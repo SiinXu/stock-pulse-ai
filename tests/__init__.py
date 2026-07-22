@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A-shares Watchlist Analysis System - Test package
+A股自选股智能分析系统 - 测试包
 ===================================
 
-Responsibilities:
-1. Provides unit test package structure
-2. Unified test module entry
+职责：
+1. 提供单元测试包结构
+2. 统一测试模块入口
 """

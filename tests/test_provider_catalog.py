@@ -38,7 +38,7 @@ from src.services.system_config_service import SystemConfigService  # noqa: E402
 # A concrete model ID is a *versioned* vendor model name (gpt-4o,
 # claude-sonnet-4-6, gemini-3-flash, deepseek-v4, qwen3.5, MiniMax-M2, llama3.2,
 # glm-5 ...). The pattern requires the version-ish suffix so it does NOT flag
-# bare provider ids / labels / protocols (openai, minimax, "MiniMax official").
+# bare provider ids / labels / protocols (openai, minimax, "MiniMax 官方").
 _MODEL_ID_PATTERN = re.compile(
     r"(?i)("
     r"gpt-\w|\bo[1-9]\b|claude-\w|gemini-\d|deepseek-v\d|qwen\d|"

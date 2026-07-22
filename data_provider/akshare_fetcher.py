@@ -1,26 +1,26 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-AkshareFetcher - Master data source (Priority 1)
+AkshareFetcher - 主数据源 (Priority 1)
 ===================================
 
-Data source:
-1. Eastmoney crawler (using the akshare library) - default data source
-2. Sina Finance interface - alternative data source
-3. Tencent Finance API - alternative data source.
+数据来源：
+1. 东方财富爬虫（通过 akshare 库） - 默认数据源
+2. 新浪财经接口 - 备选数据源
+3. 腾讯财经接口 - 备选数据源
 
-Characteristics: Free, no Token required, comprehensive data
-Risk: Crawling mechanism is easily banned by anti-crawling
+特点：免费、无需 Token、数据全面
+风险：爬虫机制易被反爬封禁
 
-Anti-ban strategy:
-1. Randomly sleep 2-5 seconds before each request
-2. Randomly rotate User-Agent
-3. Use tenacity to implement exponential backoff retries
-4. Circuit breaker mechanism: automatically cools down after consecutive failures
+防封禁策略：
+1. 每次请求前随机休眠 2-5 秒
+2. 随机轮换 User-Agent
+3. 使用 tenacity 实现指数退避重试
+4. 熔断器机制：连续失败后自动冷却
 
-Enhance data:
-- Real-time quote: Volume ratio, turnover rate, P/E ratio, P/B ratio, total market capitalization, circulating market capitalization
-- Chip distribution: Profit ratio, average cost, chip concentration
+增强数据：
+- 实时行情：量比、换手率、市盈率、市净率、总市值、流通市值
+- 筹码分布：获利比例、平均成本、筹码集中度
 """
 
 import logging
@@ -97,17 +97,17 @@ _etf_realtime_cache: Dict[str, Any] = {
 
 def _is_etf_code(stock_code: str) -> bool:
     """
-    Determine if the code is an ETF fund.
+    判断代码是否为 ETF 基金
     
-    ETF Code Rules:
-    - Shanghai Stock Exchange ETFs: 51xxxx, 52xxxx, 56xxxx, 58xxxx
-    - Shenzhen Stock Exchange ETFs: 15xxxx, 16xxxx, 18xxxx
+    ETF 代码规则：
+    - 上交所 ETF: 51xxxx, 52xxxx, 56xxxx, 58xxxx
+    - 深交所 ETF: 15xxxx, 16xxxx, 18xxxx
     
     Args:
-        stock_code: stock/fund code
+        stock_code: 股票/基金代码
         
     Returns:
-        True indicates ETF code, False indicates ordinary stock code
+        True 表示是 ETF 代码，False 表示是普通股票代码
     """
     etf_prefixes = ('51', '52', '56', '58', '15', '16', '18')
     code = stock_code.strip().split('.')[0]
@@ -116,17 +116,17 @@ def _is_etf_code(stock_code: str) -> bool:
 
 def _is_hk_code(stock_code: str) -> bool:
     """
-    Determine if the code is a Hong Kong stock.
+    判断代码是否为港股
 
-    Hong Kong stocks code rules:
-    - 5-digit code, such as '00700' (Tencent Holdings)
-    - Some Hong Kong stock codes may have prefixes such as 'hk00700', 'hk1810'
+    港股代码规则：
+    - 5位数字代码，如 '00700' (腾讯控股)
+    - 部分港股代码可能带有前缀，如 'hk00700', 'hk1810'
 
     Args:
-        stock_code: stock code
+        stock_code: 股票代码
 
     Returns:
-        True indicates a Hong Kong stock code, False indicates it is not a Hong Kong stock code
+        True 表示是港股代码，False 表示不是港股代码
     """
     # Remove possible 'hk' Prefix and check if it is a pure number
     code = stock_code.strip().lower()
@@ -143,13 +143,12 @@ def _is_hk_code(stock_code: str) -> bool:
 
 def _normalize_tencent_volume(fields: List[str]) -> Optional[int]:
     """
-    Normalize Tencent real-time transaction volume into shares.
+    将腾讯实时行情成交量归一为股。
 
-    Tencent's documented meaning for field 6 does not always match observed responses. Use
-    turnover rate, price, and circulating market capitalization to compare the raw value with
-    the legacy "lots to shares" conversion and choose the closer result. If cross-validation is
-    unavailable, retain the legacy conversion so traditional Tencent responses do not regress
-    to one hundredth of the actual volume.
+    腾讯返回内容对字段 6 的公开说明和实际返回不完全一致。优先使用
+    换手率、价格、流通市值交叉校验，在原值和旧的“手转股”结果中选择
+    更接近的一方。若无法交叉校验，则保留旧的“手转股”兜底逻辑，避免
+    传统腾讯返回内容回归为原成交量的 1/100。
     """
     if len(fields) <= 6 or not fields[6]:
         return None
@@ -176,10 +175,10 @@ def _normalize_tencent_volume(fields: List[str]) -> Optional[int]:
 
 def _parse_tencent_amount(fields: List[str]) -> Optional[float]:
     """
-    Parse Tencent real-time market data turnover, unit is yuan.
+    解析腾讯实时行情成交额，单位为元。
 
-    In the observed return content, field 35 contains more precise "price/volume/turnover",
-    Triples. Field 37 is the legacy 'ten-thousand-yuan' fallback field.
+    观测到的返回内容中，字段 35 包含更精确的“价格/成交量/成交额”
+    三元组。字段 37 是旧的“万元”口径兜底字段。
     """
     if len(fields) > 35 and fields[35]:
         parts = fields[35].split("/")
@@ -209,15 +208,15 @@ def is_hk_stock_code(stock_code: str) -> bool:
 
 def _is_us_code(stock_code: str) -> bool:
     """
-    Determine if the code is a U.S. stock (not including U.S. indices).
+    判断代码是否为美股股票（不包括美股指数）。
 
-    Delegate the is_us_stock_code() function to the us_index_mapping module.
+    委托给 us_index_mapping 模块的 is_us_stock_code()。
 
     Args:
-        stock_code: stock code
+        stock_code: 股票代码
 
     Returns:
-        True indicates a US stock code, False indicates it is not a US stock code
+        True 表示是美股代码，False 表示不是美股代码
 
     Examples:
         >>> _is_us_code('AAPL')
@@ -374,15 +373,15 @@ def _terminate_akshare_process(process) -> None:
 
 class AkshareFetcher(BaseFetcher):
     """
-    Akshare data source implementation
+    Akshare 数据源实现
     
-    Priority: 1 (highest).
-    Data source: Eastmoney website crawlers
+    优先级：1（最高）
+    数据来源：东方财富网爬虫
     
-    Key strategy:
-    - Randomly sleep 2.0-5.0 seconds before each request
-    - Random User-Agent rotation
-    - retries with exponential backoff after failures (maximum 3 times)
+    关键策略：
+    - 每次请求前随机休眠 2.0-5.0 秒
+    - 随机 User-Agent 轮换
+    - 失败后指数退避重试（最多3次）
     """
     
     name = "AkshareFetcher"
@@ -390,11 +389,11 @@ class AkshareFetcher(BaseFetcher):
     
     def __init__(self, sleep_min: float = 2.0, sleep_max: float = 5.0):
         """
-        Initialize AkshareFetcher
+        初始化 AkshareFetcher
         
         Args:
-            sleep_min: Minimum sleep time (seconds)
-            sleep_max: Maximum sleep time (seconds)
+            sleep_min: 最小休眠时间（秒）
+            sleep_max: 最大休眠时间（秒）
         """
         self.sleep_min = sleep_min
         self.sleep_max = sleep_max
@@ -406,10 +405,10 @@ class AkshareFetcher(BaseFetcher):
     
     def _set_random_user_agent(self) -> None:
         """
-        Set a random User-Agent
+        设置随机 User-Agent
         
-        Implement by modifying requests Session headers
-        This is one of the key anti-crawling strategies
+        通过修改 requests Session 的 headers 实现
+        这是关键的反爬策略之一
         """
         try:
             import akshare as ak
@@ -428,12 +427,12 @@ class AkshareFetcher(BaseFetcher):
     
     def _enforce_rate_limit(self) -> None:
         """
-        Enforce rate limits
+        强制执行速率限制
         
-        Strategy:
-        1. Check the interval since the last request
-        2. If the interval is insufficient, add sleep time.
-        3. Then execute random jitter sleep.
+        策略：
+        1. 检查距离上次请求的时间间隔
+        2. 如果间隔不足，补充休眠时间
+        3. 然后再执行随机 jitter 休眠
         """
         if self._last_request_time is not None:
             elapsed = time.time() - self._last_request_time
@@ -460,20 +459,20 @@ class AkshareFetcher(BaseFetcher):
     )
     def _fetch_raw_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """
-        Gets raw data from Akshare.
+        从 Akshare 获取原始数据
         
-        Select API automatically based on code type:
-        - U.S. stocks: Not supported, throws an exception handled by YfinanceFetcher (Issue #311)
-        - Hong Kong stocks: Use ak.stock_hk_hist()
-        - ETF Fund: Use ak.fund_etf_hist_em()
-        - Regular A-shares: using ak.stock_zh_a_hist()
+        根据代码类型自动选择 API：
+        - 美股：不支持，抛出异常由 YfinanceFetcher 处理（Issue #311）
+        - 港股：使用 ak.stock_hk_hist()
+        - ETF 基金：使用 ak.fund_etf_hist_em()
+        - 普通 A 股：使用 ak.stock_zh_a_hist()
         
-        Process:
-        1. Determine code type(U.S. stocks/Hong Kong stocks/ETF/A-shares)
-        2. Set a random User-Agent
-        3. Apply rate limiting with a random delay
-        4. Call the corresponding akshare API
-        5. Process returned data
+        流程：
+        1. 判断代码类型（美股/港股/ETF/A股）
+        2. 设置随机 User-Agent
+        3. 执行速率限制（随机休眠）
+        4. 调用对应的 akshare API
+        5. 处理返回数据
         """
         # Choose different retrieval methods based on code type:
         if _is_us_code(stock_code):
@@ -491,12 +490,12 @@ class AkshareFetcher(BaseFetcher):
     
     def _fetch_stock_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """
-        Get historical A-shares data
+        获取普通 A 股历史数据
 
-        Strategy:
-        1. Prefer Eastmoney interface (ak.stock_zh_a_hist).
-        2. Try Sina Finance interface (ak.stock_zh_a_daily) after failure
-        3. Try Tencent Finance interface (ak.stock_zh_a_hist_tx)
+        策略：
+        1. 优先尝试东方财富接口 (ak.stock_zh_a_hist)
+        2. 失败后尝试新浪财经接口 (ak.stock_zh_a_daily)
+        3. 最后尝试腾讯财经接口 (ak.stock_zh_a_hist_tx)
         """
         # Try each source in order
         methods = [
@@ -532,8 +531,8 @@ class AkshareFetcher(BaseFetcher):
 
     def _fetch_stock_data_em(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """
-        Get historical A-shares data (Eastmoney)
-        Data source: ak.stock_zh_a_hist()
+        获取普通 A 股历史数据 (东方财富)
+        数据来源：ak.stock_zh_a_hist()
         """
         import akshare as ak
 
@@ -574,8 +573,8 @@ class AkshareFetcher(BaseFetcher):
 
     def _fetch_stock_data_sina(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """
-        Get historical A-shares data (Sina Finance)
-        Data source: ak.stock_zh_a_daily()
+        获取普通 A 股历史数据 (新浪财经)
+        数据来源：ak.stock_zh_a_daily()
         """
         import akshare as ak
 
@@ -623,8 +622,8 @@ class AkshareFetcher(BaseFetcher):
 
     def _fetch_stock_data_tx(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """
-        Get historical A-shares data (Tencent Finance)
-        Data source: ak.stock_zh_a_hist_tx()
+        获取普通 A 股历史数据 (腾讯财经)
+        数据来源：ak.stock_zh_a_hist_tx()
         """
         import akshare as ak
 
@@ -654,7 +653,7 @@ class AkshareFetcher(BaseFetcher):
                 }
                 df = df.rename(columns=rename_map)
 
-                # Tencent data typically includes 'percentage change', and calculates if it is missing.
+                # Tencent data typically includes '涨跌幅', and calculates if it is missing.
                 if 'pct_chg' in df.columns:
                     df = df.rename(columns={'pct_chg': '涨跌幅'})
                 elif '收盘' in df.columns:
@@ -669,17 +668,17 @@ class AkshareFetcher(BaseFetcher):
     
     def _fetch_etf_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """
-        Get historical ETF fund data
+        获取 ETF 基金历史数据
         
-        Data source: ak.fund_etf_hist_em()
+        数据来源：ak.fund_etf_hist_em()
         
         Args:
-            stock_code: ETF Code, If '512400', '159883'
-            start_date: Start date in 'YYYY-MM-DD' format
-            end_date: End date in 'YYYY-MM-DD' format
+            stock_code: ETF 代码，如 '512400', '159883'
+            start_date: 开始日期，格式 'YYYY-MM-DD'
+            end_date: 结束日期，格式 'YYYY-MM-DD'
             
         Returns:
-            DataFrame containing historical ETF data
+            ETF 历史数据 DataFrame
         """
         import akshare as ak
         
@@ -737,17 +736,17 @@ class AkshareFetcher(BaseFetcher):
     
     def _fetch_us_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """
-        Get historical US stock data
+        获取美股历史数据
         
-        Data source: ak.stock_us_daily() (Sina Finance API)
+        数据来源：ak.stock_us_daily()（新浪财经接口）
         
         Args:
-            stock_code: U.S. stocks Code, If 'AMD', 'AAPL', 'TSLA'
-            start_date: Start date in 'YYYY-MM-DD' format
-            end_date: End date in 'YYYY-MM-DD' format
+            stock_code: 美股代码，如 'AMD', 'AAPL', 'TSLA'
+            start_date: 开始日期，格式 'YYYY-MM-DD'
+            end_date: 结束日期，格式 'YYYY-MM-DD'
             
         Returns:
-            DataFrame containing historical U.S. stock data
+            美股历史数据 DataFrame
         """
         import akshare as ak
         
@@ -839,17 +838,17 @@ class AkshareFetcher(BaseFetcher):
 
     def _fetch_hk_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """
-        Get historical data for Hong Kong stocks
+        获取港股历史数据
         
-        Data source: ak.stock_hk_hist()
+        数据来源：ak.stock_hk_hist()
         
         Args:
-            stock_code: Hong Kong stocks code, such as '00700', '01810'
-            start_date: Start date in 'YYYY-MM-DD' format
-            end_date: End date in 'YYYY-MM-DD' format
+            stock_code: 港股代码，如 '00700', '01810'
+            start_date: 开始日期，格式 'YYYY-MM-DD'
+            end_date: 结束日期，格式 'YYYY-MM-DD'
             
         Returns:
-            DataFrame containing historical Hong Kong stock data
+            港股历史数据 DataFrame
         """
         import akshare as ak
         
@@ -910,12 +909,12 @@ class AkshareFetcher(BaseFetcher):
     
     def _normalize_data(self, df: pd.DataFrame, stock_code: str) -> pd.DataFrame:
         """
-        Standardize Akshare data
+        标准化 Akshare 数据
         
-        Akshare returned column names (Chinese):
-        Date, open, close, high, low, volume, trading value, amplitude, percentage change, price change, turnover rate
+        Akshare 返回的列名（中文）：
+        日期, 开盘, 收盘, 最高, 最低, 成交量, 成交额, 振幅, 涨跌幅, 涨跌额, 换手率
         
-        Map to standard column names:
+        需要映射到标准列名：
         date, open, high, low, close, volume, amount, pct_chg
         """
         df = df.copy()
@@ -947,19 +946,19 @@ class AkshareFetcher(BaseFetcher):
     
     def get_realtime_quote(self, stock_code: str, source: str = "em") -> Optional[UnifiedRealtimeQuote]:
         """
-        Get real-time quote data (supports multiple data sources)
+        获取实时行情数据（支持多数据源）
 
-        Data source priority (configurable):
-        1. em: Eastmoney (akshare ak.stock_zh_a_spot_em) - Most complete data, including volume ratio, P/E, P/B, and market capitalization
-        2. sina: Sina Finance(akshare ak.stock_zh_a_spot)- lightweight, basic quotes
-        3. tencent: Tencent connection - single stock query, small load
+        数据源优先级（可配置）：
+        1. em: 东方财富（akshare ak.stock_zh_a_spot_em）- 数据最全，含量比/PE/PB/市值等
+        2. sina: 新浪财经（akshare ak.stock_zh_a_spot）- 轻量级，基本行情
+        3. tencent: 腾讯直连接口 - 单股票查询，负载小
 
         Args:
-            stock_code: Stocks/ETF Code
-            source: Data source type, Optional "em", "sina", "tencent"
+            stock_code: 股票/ETF代码
+            source: 数据源类型，可选 "em", "sina", "tencent"
 
         Returns:
-            UnifiedRealtimeQuote object, or None on failure
+            UnifiedRealtimeQuote 对象，获取失败返回 None
         """
         circuit_breaker = get_realtime_circuit_breaker()
 
@@ -991,11 +990,11 @@ class AkshareFetcher(BaseFetcher):
     
     def _get_stock_realtime_quote_em(self, stock_code: str) -> Optional[UnifiedRealtimeQuote]:
         """
-        Get real-time A-shares data (Eastmoney data source)
+        获取普通 A 股实时行情数据（东方财富数据源）
         
-        Data source: ak.stock_zh_a_spot_em()
-    Advantages: Most complete data, including volume ratio, turnover rate, P/E ratio, P/B ratio, total market capitalization, and circulating market capitalization.
-        Disadvantages: Full data pull, large data volume, prone to timeouts/rate limits
+        数据来源：ak.stock_zh_a_spot_em()
+        优点：数据最全，含量比、换手率、市盈率、市净率、总市值、流通市值等
+        缺点：全量拉取，数据量大，容易超时/限流
         """
         import akshare as ak
         circuit_breaker = get_realtime_circuit_breaker()
@@ -1112,13 +1111,13 @@ class AkshareFetcher(BaseFetcher):
     
     def _get_stock_realtime_quote_sina(self, stock_code: str) -> Optional[UnifiedRealtimeQuote]:
         """
-        Get real-time A-shares data (Sina Finance data source)
+        获取普通 A 股实时行情数据（新浪财经数据源）
         
-        Data source: Sina Finance API (direct connection, single stock query)
-        Advantages: Single stock query, low load, fast speed
-        Disadvantages: Fewer fields; no volume ratio, P/E, or P/B data
+        数据来源：新浪财经接口（直连，单股票查询）
+        优点：单股票查询，负载小，速度快
+        缺点：数据字段较少，无量比/PE/PB等
         
-        API format: http://hq.sinajs.cn/list=sh600519,sz000001
+        接口格式：http://hq.sinajs.cn/list=sh600519,sz000001
         """
         circuit_breaker = get_realtime_circuit_breaker()
         source_key = "akshare_sina"
@@ -1156,7 +1155,7 @@ class AkshareFetcher(BaseFetcher):
                 circuit_breaker.record_failure(source_key, failure_message)
                 return None
             
-            # parse data: var hq_str_sh600519="Guizhou Moutai,1866.000,1870.000,..."
+            # parse data: var hq_str_sh600519="贵州茅台,1866.000,1870.000,..."
             content = response.text.strip()
             if '=""' in content or not content:
                 failure_message = _build_realtime_failure_message(
@@ -1266,13 +1265,13 @@ class AkshareFetcher(BaseFetcher):
     
     def _get_stock_realtime_quote_tencent(self, stock_code: str) -> Optional[UnifiedRealtimeQuote]:
         """
-        Get real-time A-shares data (Tencent Finance data source)
+        获取普通 A 股实时行情数据（腾讯财经数据源）
         
-        Data source: Tencent Finance API (direct connection, single stock query)
-        Advantages: Single stock query, low load, includes turnover rate
-        Disadvantages: No volume ratio, P/E, or P/B valuation data
+        数据来源：腾讯财经接口（直连，单股票查询）
+        优点：单股票查询，负载小，包含换手率
+        缺点：无量比/PE/PB等估值数据
         
-        API format: http://qt.gtimg.cn/q=sh600519,sz000001
+        接口格式：http://qt.gtimg.cn/q=sh600519,sz000001
         """
         circuit_breaker = get_realtime_circuit_breaker()
         source_key = "akshare_tencent"
@@ -1422,16 +1421,16 @@ class AkshareFetcher(BaseFetcher):
     
     def _get_etf_realtime_quote(self, stock_code: str) -> Optional[UnifiedRealtimeQuote]:
         """
-        Get ETF Real-time fund quote data
+        获取 ETF 基金实时行情数据
         
-        Data source: ak.fund_etf_spot_em()
-        Includes: latest price, percentage change, trading volume, trading value, turnover rate, etc.
+        数据来源：ak.fund_etf_spot_em()
+        包含：最新价、涨跌幅、成交量、成交额、换手率等
         
         Args:
-            stock_code: ETF Code
+            stock_code: ETF 代码
             
         Returns:
-            UnifiedRealtimeQuote object, or None on failure
+            UnifiedRealtimeQuote 对象，获取失败返回 None
         """
         import akshare as ak
         circuit_breaker = get_realtime_circuit_breaker()
@@ -1539,17 +1538,17 @@ class AkshareFetcher(BaseFetcher):
     
     def _get_hk_realtime_quote(self, stock_code: str) -> Optional[UnifiedRealtimeQuote]:
         """
-        Get real-time quotes for Hong Kong stocks
+        获取港股实时行情数据
 
-        Primary Data Source: ak.stock_hk_spot_em() (Eastmoney)
-        Backup data source: ak.stock_hk_spot() (Sina)
-        Includes: latest price, percentage change, trading volume, trading value, etc.
+        主数据源：ak.stock_hk_spot_em()（东方财富）
+        备用数据源：ak.stock_hk_spot()（新浪）
+        包含：最新价、涨跌幅、成交量、成交额等
 
         Args:
-            stock_code: Hong Kong stocks code
+            stock_code: 港股代码
 
         Returns:
-            UnifiedRealtimeQuote object, or None on failure
+            UnifiedRealtimeQuote 对象，获取失败返回 None
         """
         import akshare as ak
         circuit_breaker = get_realtime_circuit_breaker()
@@ -1678,18 +1677,18 @@ class AkshareFetcher(BaseFetcher):
     
     def get_chip_distribution(self, stock_code: str) -> Optional[ChipDistribution]:
         """
-        Get chip distribution data
+        获取筹码分布数据
         
-        Data source: ak.stock_cyq_em()
-        Includes: profit ratio, average cost, chip concentration
+        数据来源：ak.stock_cyq_em()
+        包含：获利比例、平均成本、筹码集中度
         
-        Note: ETFs and indices have no chip distribution data, so this returns None.
+        注意：ETF/指数没有筹码分布数据，会直接返回 None
         
         Args:
-            stock_code: stock code
+            stock_code: 股票代码
             
         Returns:
-            ChipDistribution object (latest daily data), returns None if retrieval fails
+            ChipDistribution 对象（最新一天的数据），获取失败返回 None
         """
         import akshare as ak
 
@@ -1763,14 +1762,14 @@ class AkshareFetcher(BaseFetcher):
     
     def get_enhanced_data(self, stock_code: str, days: int = 60) -> Dict[str, Any]:
         """
-        Get enhanced data (historical K-lines + real-time quotes + chip distribution)
+        获取增强数据（历史K线 + 实时行情 + 筹码分布）
         
         Args:
-            stock_code: stock code
-            days: historical data days
+            stock_code: 股票代码
+            days: 历史数据天数
             
         Returns:
-            Includes a dictionary of all data
+            包含所有数据的字典
         """
         result = {
             'code': stock_code,
@@ -1803,7 +1802,7 @@ class AkshareFetcher(BaseFetcher):
 
     def get_main_indices(self, region: str = "cn") -> Optional[List[Dict[str, Any]]]:
         """
-        Get real-time quotes for key indices (Sina interface), only supports A-shares.
+        获取主要指数实时行情 (新浪接口)，仅支持 A 股
         """
         if region != "cn":
             return None
@@ -1876,11 +1875,11 @@ class AkshareFetcher(BaseFetcher):
 
     def get_market_stats(self) -> Optional[Dict[str, Any]]:
         """
-        Get market rise-fall statistics
+        获取市场涨跌统计
 
-        Data source priority:
-        1. Eastmoney interface (ak.stock_zh_a_spot_em)
-        2. Sina interface (ak.stock_zh_a_spot)
+        数据源优先级：
+        1. 东财接口 (ak.stock_zh_a_spot_em)
+        2. 新浪接口 (ak.stock_zh_a_spot)
         """
         import akshare as ak
 
@@ -1954,7 +1953,7 @@ class AkshareFetcher(BaseFetcher):
         self,
         df: pd.DataFrame,
         ) -> Optional[Dict[str, Any]]:
-        """Calculate advance/decline statistics from a market DataFrame."""
+        """从行情 DataFrame 计算涨跌统计。"""
         import numpy as np
 
         df = df.copy()
@@ -2041,11 +2040,11 @@ class AkshareFetcher(BaseFetcher):
 
     def get_sector_rankings(self, n: int = 5) -> Optional[Tuple[List[Dict], List[Dict]]]:
         """
-        Get the rising/falling sector leaderboard
+        获取行业板块涨跌榜
 
-        Data source priority:
-        1. Eastmoney interface (ak.stock_board_industry_name_em)
-        2. Sina interface (ak.stock_sector_spot)
+        数据源优先级：
+        1. 东财接口 (ak.stock_board_industry_name_em)
+        2. 新浪接口 (ak.stock_sector_spot)
         """
         import akshare as ak
 
@@ -2112,7 +2111,7 @@ class AkshareFetcher(BaseFetcher):
             return None
 
     def get_concept_rankings(self, n: int = 5) -> Optional[Tuple[List[Dict], List[Dict]]]:
-        """Get concept/theme rise-fall rankings."""
+        """获取概念/题材涨跌榜。"""
         import akshare as ak
 
         try:
@@ -2155,7 +2154,7 @@ class AkshareFetcher(BaseFetcher):
             return None
 
     def get_hot_stocks(self, n: int = 10) -> Optional[List[Dict[str, Any]]]:
-        """Get the popular-stock ranking, falling back through hot-list sources that require no configuration."""
+        """获取人气股榜，按免配置热榜数据源降级。"""
         import akshare as ak
 
         fetch_attempts = (
@@ -2184,7 +2183,7 @@ class AkshareFetcher(BaseFetcher):
         return None
 
     def _get_eastmoney_hot_stocks(self, ak: Any, n: int = 10) -> Optional[List[Dict[str, Any]]]:
-        """Get the popularity stock list from Eastmoney."""
+        """获取东方财富人气股榜。"""
         self._set_random_user_agent()
         self._enforce_rate_limit()
 
@@ -2206,7 +2205,7 @@ class AkshareFetcher(BaseFetcher):
         return rows
 
     def _get_eastmoney_hot_up_stocks(self, ak: Any, n: int = 10) -> Optional[List[Dict[str, Any]]]:
-        """Get the top rising stocks from Eastmoney."""
+        """获取东方财富飙升榜。"""
         self._set_random_user_agent()
         self._enforce_rate_limit()
 
@@ -2236,7 +2235,7 @@ class AkshareFetcher(BaseFetcher):
         return rows
 
     def _get_xueqiu_hot_stocks(self, ak: Any, n: int = 10) -> Optional[List[Dict[str, Any]]]:
-        """Fetch the Xueqiu trending list fallback. This interface is slow and only attempts when the popularity ranking fails."""
+        """获取雪球关注榜兜底。该接口较慢，仅在人气榜失败后尝试。"""
         self._set_random_user_agent()
         self._enforce_rate_limit()
 
@@ -2262,7 +2261,7 @@ class AkshareFetcher(BaseFetcher):
         date: Optional[str] = None,
         n: int = 20,
     ) -> Optional[List[Dict[str, Any]]]:
-        """Get the list of limit-up pool, prioritizing by number of consecutive rises and board-closing time."""
+        """获取涨停池，优先按连板数和封板时间展示。"""
         import akshare as ak
 
         query_date = date or datetime.now().strftime('%Y%m%d')

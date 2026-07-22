@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Unified import parsing pipeline.
+统一导入解析管道
 ===================================
 
 Parse CSV/Excel/clipboard text into stock items (code, name, confidence).
@@ -48,7 +48,7 @@ def _should_use_single_column_fast_path(lines: List[str]) -> bool:
     for ln in lines:
         parts = ln.split()
         if len(parts) >= 2 and is_code_like(parts[0]):
-            # Example: "600519 Guizhou Baiyun Dairy" / "HK00700 Tencent Holdings"
+            # Example: "600519 贵州茅台" / "HK00700 腾讯控股"
             # First token is code-like and tail contains non-code token(s).
             if any(not is_code_like(p) for p in parts[1:]):
                 return False
@@ -109,7 +109,7 @@ def _parse_dataframe(df: pd.DataFrame) -> List[Tuple[Optional[str], Optional[str
         if code_val:
             code = normalize_code(code_val)
             # If code_val is not a valid code, treat as name only when name_val is empty
-            # (do not overwrite valid name with dirty code_val, e.g. INVALID,Guizhou Moutai)
+            # Do not overwrite a valid name with a dirty code value such as `INVALID,贵州茅台`.
             if not code and not is_code_like(code_val):
                 if name_val:
                     code = resolve_name_to_code(name_val)

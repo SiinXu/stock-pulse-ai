@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-data_provider/us_index_mapping.py Unit test
+data_provider/us_index_mapping.py 的单元测试
 """
 import unittest
 import sys

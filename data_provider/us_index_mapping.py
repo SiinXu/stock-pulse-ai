@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Tool for U.S. stock index and code mapping
+美股指数与股票代码工具
 ===================================
 
-Provides:
-1. U.S. stocks index mapping (e.g., SPX -> ^GSPC)
-2. Recognition of U.S. stocks codes (AAPL, TSLA, etc.)
+提供：
+1. 美股指数代码映射（如 SPX -> ^GSPC）
+2. 美股股票代码识别（AAPL、TSLA 等）
 
-U.S. stocks indices in Yahoo Finance require the '^' prefix, which is different from stock codes.
+美股指数在 Yahoo Finance 中需使用 ^ 前缀，与股票代码不同。
 """
 
 import re
@@ -45,13 +45,13 @@ US_INDEX_MAPPING = {
 
 def is_us_index_code(code: str) -> bool:
     """
-    Determine if the code is a U.S. stock index symbol.
+    判断代码是否为美股指数符号。
 
     Args:
-        code: stock/index code, such as 'SPX', 'DJI'
+        code: 股票/指数代码，如 'SPX', 'DJI'
 
     Returns:
-        True indicates a known US stock index symbol, otherwise False
+        True 表示是已知美股指数符号，否则 False
 
     Examples:
         >>> is_us_index_code('SPX')
@@ -64,16 +64,16 @@ def is_us_index_code(code: str) -> bool:
 
 def is_us_stock_code(code: str) -> bool:
     """
-    Determine if the code is a U.S. stock symbol (excluding U.S. indices).
+    判断代码是否为美股股票符号（排除美股指数）。
 
-    U.S. stocks codes are 1-5 uppercase letters, optionally followed by '.X' like BRK.B.
-    U.S. stocks indices (SPX, DJI, etc.) are explicitly excluded.
+    美股股票代码为 1-5 个大写字母，可选 .X 后缀如 BRK.B。
+    美股指数（SPX、DJI 等）明确排除。
 
     Args:
-        code: Stock Code, If 'AAPL', 'TSLA', 'BRK.B'
+        code: 股票代码，如 'AAPL', 'TSLA', 'BRK.B'
 
     Returns:
-        True indicates whether it is a U.S. stock symbol, otherwise False
+        True 表示是美股股票符号，否则 False
 
     Examples:
         >>> is_us_stock_code('AAPL')
@@ -96,17 +96,17 @@ def is_us_stock_code(code: str) -> bool:
 
 def get_us_index_yf_symbol(code: str) -> tuple:
     """
-    Get Yahoo Finance symbol and Chinese name for US stock indices.
+    获取美股指数的 Yahoo Finance 符号与中文名称。
 
     Args:
-        code: User input, If 'SPX', '^GSPC', 'DJI'
+        code: 用户输入，如 'SPX', '^GSPC', 'DJI'
 
     Returns:
-        (yf_symbol, chinese_name) Tuple, Return when not found? (None, None).
+        (yf_symbol, chinese_name) 元组，未找到时返回 (None, None)。
 
     Examples:
         >>> get_us_index_yf_symbol('SPX')
-        ('^GSPC', 'S&P 500 Index')
+        ('^GSPC', '标普500指数')
         >>> get_us_index_yf_symbol('AAPL')
         (None, None)
     """

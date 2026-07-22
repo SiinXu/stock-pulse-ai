@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Global exception handling middleware
+全局异常处理中间件
 ===================================
 
-Responsibilities:
-1. Capture unhandled exceptions
-2. Implement a unified error response format
-3. Record error logs
+职责：
+1. 捕获未处理的异常
+2. 统一错误响应格式
+3. 记录错误日志
 """
 
 import logging
@@ -74,9 +74,9 @@ def _public_validation_issues(errors: Iterable[Dict[str, Any]]) -> List[Dict[str
 
 class ErrorHandlerMiddleware(BaseHTTPMiddleware):
     """
-    Global exception handling middleware
+    全局异常处理中间件
     
-    Capture all unhandled exceptions and return a unified error response
+    捕获所有未处理的异常，返回统一格式的错误响应
     """
     
     async def dispatch(
@@ -85,14 +85,14 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
         call_next: Callable
     ) -> Response:
         """
-        Handle request, catch exceptions
+        处理请求，捕获异常
         
         Args:
-            request: request object
-            call_next: next processor
+            request: 请求对象
+            call_next: 下一个处理器
             
         Returns:
-            Response: Response Object
+            Response: 响应对象
         """
         try:
             response = await call_next(request)
@@ -123,19 +123,19 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
 
 def add_error_handlers(app) -> None:
     """
-    Add global exception handler
+    添加全局异常处理器
     
-    Add various exception handlers to the FastAPI application
+    为 FastAPI 应用添加各类异常的处理器
     
     Args:
-        app: FastAPI application instance
+        app: FastAPI 应用实例
     """
     from fastapi import HTTPException
     from fastapi.exceptions import RequestValidationError
     
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException):
-        """Handle HTTP exceptions"""
+        """处理 HTTP 异常"""
         trace_id = _request_trace_id(request)
         if exc.status_code >= 500:
             safe_log_exception = HTTPException(
@@ -177,7 +177,7 @@ def add_error_handlers(app) -> None:
     
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError):
-        """Handle request verification exceptions"""
+        """处理请求验证异常"""
         trace_id = _request_trace_id(request)
         return JSONResponse(
             status_code=422,
@@ -192,7 +192,7 @@ def add_error_handlers(app) -> None:
     
     @app.exception_handler(Exception)
     async def general_exception_handler(request: Request, exc: Exception):
-        """Handle general exceptions"""
+        """处理通用异常"""
         trace_id = _request_trace_id(request)
         log_safe_exception(
             logger,

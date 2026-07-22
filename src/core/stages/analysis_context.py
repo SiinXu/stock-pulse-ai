@@ -83,20 +83,20 @@ class _AnalysisContextStageMixin:
         portfolio_context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
-        Enhance analysis context
+        增强分析上下文
 \x20\x20\x20\x20\x20\x20\x20\x20
-        Add real-time quotes, short interest distribution, trend analysis results, and stock names to the context.
+        将实时行情、筹码分布、趋势分析结果、股票名称添加到上下文中
 \x20\x20\x20\x20\x20\x20\x20\x20
         Args:
-            context: original context
-            realtime_quote: real-time market data(UnifiedRealtimeQuote Or None)
-            chip_data: chip distribution data
-            trend_result: Trend analysis result
-            stock_name: Stock name
-            market_phase_context: built market phase context for marking partial bar
+            context: 原始上下文
+            realtime_quote: 实时行情数据（UnifiedRealtimeQuote 或 None）
+            chip_data: 筹码分布数据
+            trend_result: 趋势分析结果
+            stock_name: 股票名称
+            market_phase_context: 已构建的市场阶段上下文，用于标记盘中 partial bar
 \x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20
         Returns:
-            Enhanced context
+            增强后的上下文
         """
         enhanced = context.copy()
         enhanced["report_language"] = normalize_report_language(getattr(self.config, "report_language", "zh"))
@@ -141,7 +141,7 @@ class _AnalysisContextStageMixin:
             # Remove None values to reduce context size
             enhanced['realtime'] = {k: v for k, v in enhanced['realtime'].items() if v is not None}
 
-        # Add bullish distribution
+        # Add chip-distribution data.
         if chip_data:
             current_price = getattr(realtime_quote, 'price', 0) if realtime_quote else 0
             enhanced['chip'] = {

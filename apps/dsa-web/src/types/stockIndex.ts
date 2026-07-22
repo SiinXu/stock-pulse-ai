@@ -15,7 +15,7 @@ export interface StockIndexItem {
   canonicalCode: string;
   /** Display code: 600519 */
   displayCode: string;
-  /** Chinese name: Guizhou Moutai */
+  /** Stock name in Chinese, for example, "贵州茅台". */
   nameZh: string;
   /** English name: Kweichow Moutai */
   nameEn?: string;
@@ -23,7 +23,7 @@ export interface StockIndexItem {
   pinyinFull?: string;
   /** Pinyin abbreviation: gzmt */
   pinyinAbbr?: string;
-  /** Aliases: ["Maotai"] */
+  /** Aliases: ["茅台"] */
   aliases?: string[];
   /** Market */
   market: Market;

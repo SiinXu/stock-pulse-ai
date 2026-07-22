@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Discord reminder service
+Discord 发送提醒服务
 
-Responsibilities:
-1. Send Discord messages via webhook or Discord bot API
+职责：
+1. 通过 webhook 或 Discord bot API 发送 Discord 消息
 """
 import logging
 import time
@@ -28,10 +28,10 @@ class DiscordSender:
     
     def __init__(self, config: Config):
         """
-        Initialize Discord configuration
+        初始化 Discord 配置
 
         Args:
-            config: Configuration object
+            config: 配置对象
         """
         self._discord_config = {
             'bot_token': getattr(config, 'discord_bot_token', None),
@@ -52,7 +52,7 @@ class DiscordSender:
         return max(MIN_MAX_WORDS, min(configured, DISCORD_MAX_CONTENT_LENGTH))
     
     def _is_discord_configured(self) -> bool:
-        """Verify Discord configuration is complete (supports Bot or Webhook)"""
+        """检查 Discord 配置是否完整（支持 Bot 或 Webhook）"""
         # If the Webhook or complete Bot Token+Channel is configured, it's considered available.
         bot_ok = bool(self._discord_config['bot_token'] and self._discord_config['channel_id'])
         webhook_ok = bool(self._discord_config['webhook_url'])
@@ -60,13 +60,13 @@ class DiscordSender:
     
     def send_to_discord(self, content: str, *, timeout_seconds: Optional[float] = None) -> bool:
         """
-        Push message to Discord (supports Webhook and Bot API)
+        推送消息到 Discord（支持 Webhook 和 Bot API）
         
         Args:
-            content: Markdown Message content format
+            content: Markdown 格式的消息内容
             
         Returns:
-            Whether sent successfully
+            是否发送成功
         """
         # Split content to avoid a single message exceeding Discord limits
         chunks = self._split_discord_content(content)
@@ -93,7 +93,7 @@ class DiscordSender:
         return False
 
     def _split_discord_content(self, content: str) -> list[str]:
-        """Split Discord content limit messages."""
+        """按 Discord content 上限拆分消息。"""
         try:
             chunks = chunk_content_by_max_words(content, self._discord_max_words)
             if len(chunks) > 1:
@@ -124,7 +124,7 @@ class DiscordSender:
         *,
         timeout_seconds: Optional[float] = None,
     ) -> bool:
-        """Send Discord messages slice by slice; failed slices should not block subsequent slice attempts."""
+        """逐片发送 Discord 消息；失败片不应阻断后续片尝试。"""
         total_chunks = len(chunks)
         success_count = 0
 
@@ -147,15 +147,15 @@ class DiscordSender:
   
     def _send_discord_webhook(self, content: str, *, timeout_seconds: Optional[float] = None) -> bool:
         """
-        Use Webhook to send messages to Discord
+        使用 Webhook 发送消息到 Discord
         
-        Markdown format supported by Discord webhooks
+        Discord Webhook 支持 Markdown 格式
         
         Args:
-            content: Markdown Message content format
+            content: Markdown 格式的消息内容
             
         Returns:
-            Whether sent successfully
+            是否发送成功
         """
         payload = {
             'content': content,
@@ -174,13 +174,13 @@ class DiscordSender:
     
     def _send_discord_bot(self, content: str, *, timeout_seconds: Optional[float] = None) -> bool:
         """
-        Use Bot API to send messages to Discord
+        使用 Bot API 发送消息到 Discord
         
         Args:
-            content: Markdown Message content format
+            content: Markdown 格式的消息内容
             
         Returns:
-            Whether sent successfully
+            是否发送成功
         """
         headers = {
             'Authorization': f'Bot {self._discord_config["bot_token"]}',
@@ -209,7 +209,7 @@ class DiscordSender:
         timeout_seconds: Optional[float] = None,
         channel_name: str,
     ) -> bool:
-        """Send single Discord message, and reuse Telegram's limited retry logic for handling 429/5xx errors."""
+        """发送单条 Discord 消息，并复用 Telegram 的有限重试思路处理 429/5xx。"""
         request_kwargs = {
             'json': payload,
             'timeout': timeout_seconds or 10,

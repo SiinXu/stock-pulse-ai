@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Platform adapter base class
+平台适配器基类
 ===================================
 
-Define the abstract base class of platform adapters. Each platform must inherit from this class.
+定义平台适配器的抽象基类，各平台必须继承此类。
 """
 
 from abc import ABC, abstractmethod
@@ -15,29 +15,29 @@ from bot.models import BotMessage, BotResponse, WebhookResponse
 
 class BotPlatform(ABC):
     """
-    Platform adapter abstract base class
+    平台适配器抽象基类
     
-    Responsible for:
-    1. Validate Webhook request signature
-    2. Parse platform messages into a unified format
-    3. Convert responses to platform format
+    负责：
+    1. 验证 Webhook 请求签名
+    2. 解析平台消息为统一格式
+    3. 将响应转换为平台格式
     
-    Using example:
+    使用示例：
         class MyPlatform(BotPlatform):
             @property
             def platform_name(self) -> str:
                 return "myplatform"
             
             def verify_request(self, headers, body) -> bool:
-                # Validate signature logic
+                # 验证签名逻辑
                 return True
             
             def parse_message(self, data) -> Optional[BotMessage]:
-                # Parse message logic
+                # 解析消息逻辑
                 return BotMessage(...)
             
             def format_response(self, response, message) -> WebhookResponse:
-                # Format the response logic
+                # 格式化响应逻辑
                 return WebhookResponse.success({"text": response.text})
     """
     
@@ -45,41 +45,41 @@ class BotPlatform(ABC):
     @abstractmethod
     def platform_name(self) -> str:
         """
-        Platform identifier name
+        平台标识名称
         
-        Used for route matching and log identification, such as "feishu", "dingtalk".
+        用于路由匹配和日志标识，如 "feishu", "dingtalk"
         """
         pass
     
     @abstractmethod
     def verify_request(self, headers: Dict[str, str], body: bytes) -> bool:
         """
-        Verification Request Signature
+        验证请求签名
         
-        Each platform has a different signature verification mechanism and needs to be implemented separately.
+        各平台有不同的签名验证机制，需要单独实现。
         
         Args:
-            headers: HTTP request headers
-            body: Raw bytes of the request body
+            headers: HTTP 请求头
+            body: 请求体原始字节
             
         Returns:
-            Signature validity check
+            签名是否有效
         """
         pass
     
     @abstractmethod
     def parse_message(self, data: Dict[str, Any]) -> Optional[BotMessage]:
         """
-        Parse platform messages into a unified format
+        解析平台消息为统一格式
         
-        Convert platform-specific message formats to BotMessage.
-        If not the message type to be processed (e.g., event callback), return None.
+        将平台特定的消息格式转换为 BotMessage。
+        如果不是需要处理的消息类型（如事件回调），返回 None。
         
         Args:
-            data: Parsed JSON data
+            data: 解析后的 JSON 数据
             
         Returns:
-            BotMessage object, or None (no need to handle)
+            BotMessage 对象，或 None（不需要处理）
         """
         pass
     
@@ -90,14 +90,14 @@ class BotPlatform(ABC):
         message: BotMessage
     ) -> WebhookResponse:
         """
-        Convert unified responses to platform format
+        将统一响应转换为平台格式
         
         Args:
-            response: unified response object
-            message: Original message object (used to obtain reply target information)
+            response: 统一响应对象
+            message: 原始消息对象（用于获取回复目标等信息）
             
         Returns:
-            WebhookResponse object
+            WebhookResponse 对象
         """
         pass
     
@@ -119,16 +119,16 @@ class BotPlatform(ABC):
 
     def handle_challenge(self, data: Dict[str, Any]) -> Optional[WebhookResponse]:
         """
-        Process platform verification requests
+        处理平台验证请求
         
-        Some platforms send verification requests when configuring Webhooks, requiring a specific response to be returned.
-        Subclasses can override this method.
+        部分平台在配置 Webhook 时会发送验证请求，需要返回特定响应。
+        子类可重写此方法。
         
         Args:
-            data: Request data
+            data: 请求数据
             
         Returns:
-            Validate response, or None (not a validation request)
+            验证响应，或 None（不是验证请求）
         """
         return None
     
@@ -139,20 +139,20 @@ class BotPlatform(ABC):
         data: Dict[str, Any]
     ) -> Tuple[Optional[BotMessage], Optional[WebhookResponse]]:
         """
-        Handle webhook requests
+        处理 Webhook 请求
         
-        This is the main entry method, coordinating verification and parsing processes.
+        这是主入口方法，协调验证、解析等流程。
         
         Args:
-            headers: HTTP request headers
-            body: Raw bytes of the request body
-            data: Parsed JSON data
+            headers: HTTP 请求头
+            body: 请求体原始字节
+            data: 解析后的 JSON 数据
             
         Returns:
-            (BotMessage, WebhookResponse) Tuple
-            - If it's a validation request: (None, challenge_response)
-            - If it's a normal message: (message, None) - The response will be generated after command processing
-            - If verification fails or no processing is required: (None, error_response or None)
+            (BotMessage, WebhookResponse) 元组
+            - 如果是验证请求：(None, challenge_response)
+            - 如果是普通消息：(message, None) - 响应将在命令处理后生成
+            - 如果验证失败或无需处理：(None, error_response 或 None)
         """
         # 1. Check if it's a validation request.
         challenge_response = self.handle_challenge(data)

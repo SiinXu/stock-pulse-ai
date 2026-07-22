@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Telegram reminder service
+Telegram 发送提醒服务
 
-Responsibilities:
-1. Send text messages via Telegram Bot API
-2. Send image messages via Telegram Bot API
+职责：
+1. 通过 Telegram Bot API 发送 文本消息
+2. 通过 Telegram Bot API 发送 图片消息
 """
 import logging
 from typing import Optional
@@ -23,10 +23,10 @@ class TelegramSender:
 
     def __init__(self, config: Config):
         """
-        Initialize Telegram configuration
+        初始化 Telegram 配置
 
         Args:
-            config: Configuration object
+            config: 配置对象
         """
         self._telegram_config = {
             'bot_token': getattr(config, 'telegram_bot_token', None),
@@ -35,7 +35,7 @@ class TelegramSender:
         }
 
     def _is_telegram_configured(self) -> bool:
-        """Verify Telegram configuration is complete"""
+        """检查 Telegram 配置是否完整"""
         return bool(self._telegram_config['bot_token'] and self._telegram_config['chat_id'])
 
     def send_to_telegram(
@@ -47,21 +47,21 @@ class TelegramSender:
         timeout_seconds: Optional[float] = None,
     ) -> bool:
         """
-        Push messages to Telegram bot
+        推送消息到 Telegram 机器人
 
-        Telegram Bot API format:
+        Telegram Bot API 格式：
         POST https://api.telegram.org/bot<token>/sendMessage
         {
             "chat_id": "xxx",
-            "text": "Message content",
+            "text": "消息内容",
             "parse_mode": "Markdown"
         }
 
         Args:
-            content: Message content in Markdown format
+            content: 消息内容（Markdown 格式）
 
         Returns:
-            Whether sent successfully
+            是否发送成功
         """
         target_chat_id = chat_id if chat_id is not None else self._telegram_config.get("chat_id")
         target_message_thread_id = (
@@ -282,7 +282,7 @@ class TelegramSender:
         *,
         timeout_seconds: Optional[float] = None,
     ) -> bool:
-        """Segment long messages based on converted Telegram Markdown payload."""
+        """按已转换的 Telegram Markdown payload 分段发送长消息。"""
         # Segment by paragraph.
         sections = content.split("\n---\n")
         delimiter = "\n---\n"
@@ -390,12 +390,12 @@ class TelegramSender:
 
     def _convert_to_telegram_markdown(self, text: str) -> str:
         """
-        Convert standard Markdown to Telegram-supported format
+        将标准 Markdown 转换为 Telegram 支持的格式
 
-        Telegram Markdown Limit:
-        - Does not support # Title
-        - Use *bold* instead of **bold**
-        - Use _italic_
+        Telegram Markdown 限制：
+        - 不支持 # 标题
+        - 使用 *bold* 而非 **bold**
+        - 使用 _italic_
         """
         result = text
 

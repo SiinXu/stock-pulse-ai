@@ -334,8 +334,8 @@ class _ConfigLLMMethods:
         LITELLM_FALLBACK_MODELS.
 
         Compatibility note:
-        - LiteLLM OpenAI-compatible Agreement: https://docs.litellm.ai/docs/providers/openai_compatible
-        - OpenAI Request authentication agreement: https://platform.openai.com/docs/api-reference/making-requests
+        - LiteLLM OpenAI-compatible 约定: https://docs.litellm.ai/docs/providers/openai_compatible
+        - OpenAI 请求与鉴权约定: https://platform.openai.com/docs/api-reference/making-requests
           / https://platform.openai.com/docs/api-reference/authentication
         """
         model_list: List[Dict[str, Any]] = []

@@ -1,12 +1,12 @@
 """
-End-to-end test: signal_attribution complete contract convergence test.
+端到端测试：signal_attribution 完整契约收敛测试。
 
-Validate the following path:
-1. LLM raw JSON → _parse_response() → AnalysisResult.dashboard (Normalization effective)
-2. AnalysisResult.dashboard → notification (display correctly)
-3. AnalysisResult.dashboard → Jinja2 template (Rendering successful)
-4. AnalysisResult.dashboard → HistoryService markdown (Rendering successful)
-5. check_content_integrity() (Contract Check)
+验证以下路径：
+1. LLM raw JSON → _parse_response() → AnalysisResult.dashboard (归一化生效)
+2. AnalysisResult.dashboard → notification (展示正确)
+3. AnalysisResult.dashboard → Jinja2 template (渲染正确)
+4. AnalysisResult.dashboard → HistoryService markdown (渲染正确)
+5. check_content_integrity() (契约检查)
 """
 import sys
 import os
@@ -23,10 +23,10 @@ from src.services.report_renderer import render
 
 
 class TestSignalAttributionE2E:
-    """End-to-end test: Verify that signal_attribution works correctly in all paths."""
+    """端到端测试：验证 signal_attribution 在所有路径中正确工作"""
 
     def _make_dashboard_with_signal_attr(self, signal_attr):
-        """Create a dashboard dict containing signal_attribution"""
+        """创建包含 signal_attribution 的 dashboard dict"""
         return {
             "core_conclusion": {
                 "one_sentence": "测试结论",
@@ -40,7 +40,7 @@ class TestSignalAttributionE2E:
         }
 
     def _make_result(self, dashboard):
-        """Create AnalysisResult"""
+        """创建 AnalysisResult"""
         return AnalysisResult(
             code="600519",
             name="测试股票",
@@ -56,11 +56,11 @@ class TestSignalAttributionE2E:
     # ========== Test 1: _parse_response() Normalization ==========
     def test_normalize_called_in_parse_response(self):
         """
-        Test the normalization function is called in `_parse_response()`.
+        测试 _parse_response() 中归一化函数被调用。
 
-        Verification:
-        1. Input contribution string "30%" → normalized to int 30
-        2. Sum of input contributions not equal to 100 → normalized to sum=100
+        验证：
+        1. 输入贡献度为字符串 "30%" → 归一化后变为 int 30
+        2. 输入贡献度之和不为 100 → 归一化后变为之和=100
         """
         from src.analyzer import GeminiAnalyzer
 
@@ -114,11 +114,11 @@ class TestSignalAttributionE2E:
     # ========== Test 2: notification Rendering ==========
     def test_notification_renders_signal_attribution(self):
         """
-        Test `notification.py`'s `generate_dashboard_report()` correctly renders signal_attribution.
+        测试 notification.py 中 generate_dashboard_report() 正确渲染 signal_attribution。
 
-        Verification:
-        1. signal_attribution: If exists, includes "Signal Attribution" paragraph in notification
-        2. Four contribution values are displayed correctly.
+        验证：
+        1. signal_attribution 存在时，通知中包含"信号归因"段落
+        2. 四个贡献度都正确显示
         """
         from src.notification import NotificationService
 
@@ -148,11 +148,11 @@ class TestSignalAttributionE2E:
     # ========== Test 3: Jinja2 Template Rendering ==========
     def test_jinja2_template_renders_signal_attribution(self):
         """
-        Test that templates/report_markdown.j2 correctly renders signal_attribution.
+        测试 templates/report_markdown.j2 正确渲染 signal_attribution。
 
-        Verification:
-        1. signal_attribution: If exists, includes attribution weight in template output
-        2. Four contribution values are displayed correctly.
+        验证：
+        1. signal_attribution 存在时，模板输出中包含归因权重
+        2. 四个贡献度都正确显示
         """
         signal_attr = {
             "technical_indicators": 35,
@@ -326,11 +326,11 @@ class TestSignalAttributionE2E:
     # ========== Test 4: HistoryService markdown Rendering ==========
     def test_history_service_renders_signal_attribution(self):
         """
-        Test HistoryService._generate_single_stock_markdown() correctly renders signal_attribution.
+        测试 HistoryService._generate_single_stock_markdown() 正确渲染 signal_attribution。
 
-        Verification:
-        1. signal_attribution: If exists, includes "Signal Attribution Analysis" paragraph in markdown
-        2. Four contribution values are displayed correctly.
+        验证：
+        1. signal_attribution 存在时，markdown 中包含"信号归因分析"段落
+        2. 四个贡献度都正确显示
         """
         from src.services.history_service import HistoryService
 
@@ -361,12 +361,12 @@ class TestSignalAttributionE2E:
     # ========== Test 5: check_content_integrity() optional Contract ==========
     def test_check_content_integrity_treats_signal_attribution_as_optional(self):
         """
-        Test `check_content_integrity()` treats signal_attribution as an optional display field.
+        测试 check_content_integrity() 将 signal_attribution 作为可选展示字段。
 
-        Verification:
-        1. signal_attribution When Exists, Do Not Add To missing
-        2. signal_attribution When Missing, Do Not Add To missing
-        3. signal_attribution When contribution is missing, Do Not Add To missing
+        验证：
+        1. signal_attribution 存在时，不添加到 missing
+        2. signal_attribution 缺失时，不添加到 missing
+        3. signal_attribution 贡献度缺失时，不添加到 missing
         """
         # Case 1: signal_attribution complete
         signal_attr = {
@@ -410,13 +410,13 @@ class TestSignalAttributionE2E:
     # ========== Test 6: Normalization Function Test ==========
     def test_normalize_dashboard_signal_attribution_direct(self):
         """
-        Test the normalize_dashboard_signal_attribution() function directly.
+        直接测试 normalize_dashboard_signal_attribution() 函数。
 
-        Verification:
-        1. Convert percentage string to int
-        2. Convert negative numbers to 0
-        3. Normalize to 100 when the sum ≠ 100
-        4. Handling None values
+        验证：
+        1. 字符串百分比转为 int
+        2. 负数转为 0
+        3. 总和≠100 时归一化为 100
+        4. None 值处理
         """
         # Case 1: String percentage
         dashboard = {

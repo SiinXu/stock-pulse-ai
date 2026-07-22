@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Command dispatcher
+命令分发器
 ===================================
 
-Responsible for parsing commands, matching processors, and distributing execution.
+负责解析命令、匹配处理器、分发执行。
 """
 
 import asyncio
@@ -28,16 +28,16 @@ logger = logging.getLogger(__name__)
 
 class RateLimiter:
     """
-    Simple rate limiter
+    简单的频率限制器
 
-    Based on a sliding window algorithm, limits the request frequency for each user.
+    基于滑动窗口算法，限制每个用户的请求频率。
     """
 
     def __init__(self, max_requests: int = 10, window_seconds: int = 60):
         """
         Args:
-            max_requests: maximum request count in window
-            window_seconds: Window time(Seconds)
+            max_requests: 窗口内最大请求数
+            window_seconds: 窗口时间（秒）
         """
         self.max_requests = max_requests
         self.window_seconds = window_seconds
@@ -45,13 +45,13 @@ class RateLimiter:
 
     def is_allowed(self, user_id: str) -> bool:
         """
-        Check if the user is allowed to request
+        检查用户是否允许请求
 
         Args:
-            user_id: User identifier
+            user_id: 用户标识
 
         Returns:
-            Whether allowed
+            是否允许
         """
         now = time.time()
         window_start = now - self.window_seconds
@@ -71,7 +71,7 @@ class RateLimiter:
         return True
 
     def get_remaining(self, user_id: str) -> int:
-        """Get the remaining available request count"""
+        """获取剩余可用请求数"""
         now = time.time()
         window_start = now - self.window_seconds
 
@@ -86,15 +86,15 @@ class RateLimiter:
 
 class CommandDispatcher:
     """
-    Command dispatcher
+    命令分发器
 
-    Responsibilities:
-    1. Register and manage command processor
-    2. Parse commands and parameters in the message
-    3. Dispatch command to corresponding processor
-    4. Handle unknown commands and errors
+    职责：
+    1. 注册和管理命令处理器
+    2. 解析消息中的命令和参数
+    3. 分发命令到对应处理器
+    4. 处理未知命令和错误
 
-    Using example:
+    使用示例：
         dispatcher = CommandDispatcher()
         dispatcher.register(AnalyzeCommand())
         dispatcher.register(HelpCommand())
@@ -111,10 +111,10 @@ class CommandDispatcher:
     ):
         """
         Args:
-            command_prefix: Command Prefix, Default "/"
-            rate_limit_requests: rate limit: maximum number of requests in the window
-            rate_limit_window: rate limit: window time (seconds)
-            admin_users: List of administrator user IDs
+            command_prefix: 命令前缀，默认 "/"
+            rate_limit_requests: 频率限制：窗口内最大请求数
+            rate_limit_window: 频率限制：窗口时间（秒）
+            admin_users: 管理员用户 ID 列表
         """
         self.command_prefix = command_prefix
         self.admin_users = set(admin_users or [])
@@ -128,10 +128,10 @@ class CommandDispatcher:
 
     def register(self, command: BotCommand) -> None:
         """
-        Registration command
+        注册命令
 
         Args:
-            command: command instance
+            command: 命令实例
         """
         name = command.name.lower()
 
@@ -161,22 +161,22 @@ class CommandDispatcher:
 
     def register_class(self, command_class: Type[BotCommand]) -> None:
         """
-        Registration command class (automatically instantiated)
+        注册命令类（自动实例化）
 
         Args:
-            command_class: Command Class
+            command_class: 命令类
         """
         self.register(command_class())
 
     def unregister(self, name: str) -> bool:
         """
-        Deactivate command
+        注销命令
 
         Args:
-            name: Command Name
+            name: 命令名称
 
         Returns:
-            Did it log out successfully?
+            是否成功注销
         """
         name = name.lower()
 
@@ -194,15 +194,15 @@ class CommandDispatcher:
 
     def get_command(self, name: str) -> Optional[BotCommand]:
         """
-        Get command
+        获取命令
 
-        Supports querying by command name and alias.
+        支持命令名和别名查询。
 
         Args:
-            name: Command name or alias
+            name: 命令名或别名
 
         Returns:
-            Command instance, or None
+            命令实例，或 None
         """
         name = name.lower()
 
@@ -218,13 +218,13 @@ class CommandDispatcher:
 
     def list_commands(self, include_hidden: bool = False) -> List[BotCommand]:
         """
-        List all commands
+        列出所有命令
 
         Args:
-            include_hidden: whether to include hidden commands
+            include_hidden: 是否包含隐藏命令
 
         Returns:
-            Command list
+            命令列表
         """
         commands = list(self._commands.values())
 
@@ -234,21 +234,21 @@ class CommandDispatcher:
         return sorted(commands, key=lambda c: c.name)
 
     def is_admin(self, user_id: str) -> bool:
-        """Check if the user is an administrator"""
+        """检查用户是否是管理员"""
         return user_id in self.admin_users
 
     def add_admin(self, user_id: str) -> None:
-        """Add administrator"""
+        """添加管理员"""
         self.admin_users.add(user_id)
 
     def remove_admin(self, user_id: str) -> None:
-        """Remove administrator"""
+        """移除管理员"""
         self.admin_users.discard(user_id)
 
     def dispatch(self, message: BotMessage) -> BotResponse:
-        """Synchronize message distribution.
+        """同步分发消息。
 
-        Maintain existing synchronous call compatibility, delegate the actual logic to `dispatch_async()`
+        保持现有同步调用方兼容，实际逻辑委托给 `dispatch_async()`。
         """
         try:
             asyncio.get_running_loop()
@@ -341,13 +341,13 @@ class CommandDispatcher:
 
     async def dispatch_async(self, message: BotMessage) -> BotResponse:
         """
-        Distribute messages to corresponding commands asynchronously
+        异步分发消息到对应命令
 
         Args:
-            message: Message object
+            message: 消息对象
 
         Returns:
-            Response object
+            响应对象
         """
         cmd_name, args, command, early_response = self._prepare_dispatch(message)
         if early_response is not None:
@@ -387,12 +387,12 @@ class CommandDispatcher:
 
     def set_help_command_getter(self, getter: Callable) -> None:
         """
-        Set the command list retriever for help commands
+        设置帮助命令的命令列表获取器
 
-        Allows HelpCommand to retrieve command lists.
+        用于让 HelpCommand 获取命令列表。
 
         Args:
-            getter: Callback function, returns command list
+            getter: 回调函数，返回命令列表
         """
         self._help_command_getter = getter
 
@@ -791,9 +791,9 @@ _dispatcher: Optional[CommandDispatcher] = None
 
 def get_dispatcher() -> CommandDispatcher:
     """
-    Get the global distributor instance
+    获取全局分发器实例
 
-    Use singleton pattern, automatically initialize and register all commands on the first call.
+    使用单例模式，首次调用时自动初始化并注册所有命令。
     """
     global _dispatcher
 
@@ -824,6 +824,6 @@ def get_dispatcher() -> CommandDispatcher:
 
 
 def reset_dispatcher() -> None:
-    """Reset global distributor (mainly for testing)."""
+    """重置全局分发器（主要用于测试）"""
     global _dispatcher
     _dispatcher = None

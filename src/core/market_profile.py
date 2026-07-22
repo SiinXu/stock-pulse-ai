@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Main Market Review Market Region Configuration
+大盘复盘市场区域配置
 
-Define metadata for each market region, including indices, news search terms, and prompts.
-Used by MarketAnalyzer to switch between A-shares, Hong Kong stocks, U.S. stocks, Japanese and Korean market reviews.
+定义各市场区域的指数、新闻搜索词、Prompt 提示等元数据，
+供 MarketAnalyzer 按 region 切换 A 股/港股/美股/日韩复盘行为。
 """
 
 from dataclasses import dataclass
@@ -12,7 +12,7 @@ from typing import List
 
 @dataclass
 class MarketProfile:
-    """Main Market Review Market Region Configuration"""
+    """大盘复盘市场区域配置"""
 
     region: str  # "cn" | "hk" | "us" | "jp" | "kr"
     # Index code for judging overall trend, cn Use Shanghai Composite Index 000001, us Use S&P SPX
@@ -94,7 +94,7 @@ KR_PROFILE = MarketProfile(
 
 
 def get_profile(region: str) -> MarketProfile:
-    """Return the corresponding MarketProfile based on region"""
+    """根据 region 返回对应的 MarketProfile"""
     if region == "us":
         return US_PROFILE
     if region == "hk":

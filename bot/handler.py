@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Bot Webhook processor
+Bot Webhook 处理器
 ===================================
 
-Handle webhooks from various platforms, forwarding to command handlers.
+处理各平台的 Webhook 回调，分发到命令处理器。
 """
 
 import asyncio
@@ -29,15 +29,15 @@ _platform_instances: Dict[str, 'BotPlatform'] = {}
 
 def get_platform(platform_name: str) -> Optional['BotPlatform']:
     """
-    Get platform adapter instance
+    获取平台适配器实例
 
-    Use caching to avoid creating repeatedly.
+    使用缓存避免重复创建。
 
     Args:
-        platform_name: platform name
+        platform_name: 平台名称
 
     Returns:
-        Platform adapter instance, or None
+        平台适配器实例，或 None
     """
     if platform_name not in _platform_instances:
         platform_class = ALL_PLATFORMS.get(platform_name)
@@ -57,18 +57,18 @@ def handle_webhook(
     query_params: Optional[Dict[str, list]] = None
 ) -> WebhookResponse:
     """
-    Handle webhook requests
+    处理 Webhook 请求
 
-    This is the unified entry point for all platform Webhooks.
+    这是所有平台 Webhook 的统一入口。
 
     Args:
-        platform_name: platform name (feishu, dingtalk, wecom, telegram)
-        headers: HTTP request headers
-        body: Raw bytes of the request body
-        query_params: URL query parameters (for verification in some platforms)
+        platform_name: 平台名称 (feishu, dingtalk, wecom, telegram)
+        headers: HTTP 请求头
+        body: 请求体原始字节
+        query_params: URL 查询参数（用于某些平台的验证）
 
     Returns:
-        WebhookResponse Response Object
+        WebhookResponse 响应对象
     """
     logger.info("[BotHandler] Received webhook request: platform=%s", platform_name)
 
@@ -248,20 +248,20 @@ async def handle_webhook_async(
 
 
 def handle_feishu_webhook(headers: Dict[str, str], body: bytes) -> WebhookResponse:
-    """Handle Feishu Webhook"""
+    """处理飞书 Webhook"""
     return handle_webhook('feishu', headers, body)
 
 
 def handle_dingtalk_webhook(headers: Dict[str, str], body: bytes) -> WebhookResponse:
-    """Handle DingTalk Webhook"""
+    """处理钉钉 Webhook"""
     return handle_webhook('dingtalk', headers, body)
 
 
 def handle_wecom_webhook(headers: Dict[str, str], body: bytes) -> WebhookResponse:
-    """Handle WeCom webhooks"""
+    """处理企业微信 Webhook"""
     return handle_webhook('wecom', headers, body)
 
 
 def handle_telegram_webhook(headers: Dict[str, str], body: bytes) -> WebhookResponse:
-    """Handle Telegram Webhooks"""
+    """处理 Telegram Webhook"""
     return handle_webhook('telegram', headers, body)

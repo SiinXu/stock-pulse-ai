@@ -388,7 +388,7 @@ function getStockContextModal() {
 }
 
 // Scoped to the modal body so it returns only the input, not the dialog itself
-// (which now carries an aria-labelledby with the same "Current stock" name).
+// (which now carries an aria-labelledby with the same "当前股票" name).
 function getStockContextInput() {
   return within(getStockContextModal()).getByLabelText('当前股票');
 }

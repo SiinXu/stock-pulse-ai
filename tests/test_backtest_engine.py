@@ -405,11 +405,11 @@ class BacktestEngineTestCase(unittest.TestCase):
         self.assertNotEqual(BacktestEngine.infer_direction_expected("do not sell"), "down")
 
     def test_chinese_negated_sell_not_bearish(self):
-        # "Do Not Sell" = "don't sell" — should NOT be direction=down
+        # "不要卖出" = "don't sell" — should NOT be direction=down
         self.assertNotEqual(BacktestEngine.infer_direction_expected("不要卖出"), "down")
 
     def test_conditional_support_phrase_not_negating_hold(self):
-        # "Continue holding while support remains intact" is a conditional hold, not an explicit non-hold signal.
+        # "不跌破支撑继续持有" is a conditional hold, not an explicit non-hold signal.
         self.assertEqual(
             BacktestEngine.infer_position_recommendation("不跌破支撑继续持有"),
             "long",

@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Unit test for intraday real-time technical indicators in Issue #234.
+Issue #234 盘中实时技术指标的单元测试。
 
-Coverage range:
-- _augment_historical_with_realtime: Append/Update logic and protection conditions?
-- _compute_ma_status: Moving Average Arrangement Text
-- _enhance_context: Use realtime + trend_result cover today
+覆盖范围：
+- _augment_historical_with_realtime：追加/更新逻辑和防护条件
+- _compute_ma_status：均线排列文案
+- _enhance_context：使用 realtime + trend_result 覆盖 today
 """
 
 import os
@@ -49,7 +49,7 @@ def _make_realtime_quote(
 
 
 def _make_historical_df(days: int = 25, last_date: date = None) -> pd.DataFrame:
-    """Construct a historical OHLCV DataFrame."""
+    """构造历史 OHLCV DataFrame。"""
     if last_date is None:
         last_date = date.today() - timedelta(days=1)
     dates = [last_date - timedelta(days=i) for i in range(days - 1, -1, -1)]
@@ -76,7 +76,7 @@ def _make_historical_df(days: int = 25, last_date: date = None) -> pd.DataFrame:
 
 
 class TestAugmentHistoricalWithRealtime(unittest.TestCase):
-    """_augment_historical_with_realtime Test."""
+    """_augment_historical_with_realtime 的测试。"""
 
     def setUp(self) -> None:
         self._db_path = os.path.join(
@@ -159,7 +159,7 @@ class TestAugmentHistoricalWithRealtime(unittest.TestCase):
 
 
 class TestComputeMaStatus(unittest.TestCase):
-    """_compute_ma_status Test."""
+    """_compute_ma_status 的测试。"""
 
     def test_bullish_alignment(self) -> None:
         status = StockAnalysisPipeline._compute_ma_status(11, 10, 9.5, 9)
@@ -175,7 +175,7 @@ class TestComputeMaStatus(unittest.TestCase):
 
 
 class TestEnhanceContextRealtimeOverride(unittest.TestCase):
-    """_enhance_context uses real-time quotes and trend results to cover today's test."""
+    """_enhance_context 使用实时行情和趋势结果覆盖 today 的测试。"""
 
     def setUp(self) -> None:
         self._db_path = os.path.join(
@@ -412,7 +412,7 @@ class TestEnhanceContextRealtimeOverride(unittest.TestCase):
         self.assertEqual(enhanced["today"]["close"], 15.0)
 
     def test_today_not_overridden_when_trend_ma_zero(self) -> None:
-        """Do not override today's value when StockTrendAnalyzer returns early with ma5=0.0 due to insufficient data."""
+        """StockTrendAnalyzer 因数据不足提前返回 ma5=0.0 时，不应覆盖 today。"""
         context = {"code": "600519", "today": {"close": 15.0, "ma5": 14.8}}
         quote = _make_realtime_quote(price=15.72)
         trend = TrendAnalysisResult(code="600519")  # Default ma5=ma10=ma20=0.0

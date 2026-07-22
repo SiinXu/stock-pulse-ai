@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Historical records interface
+历史记录接口
 ===================================
 
-Responsibilities:
-1. Provides GET /api/v1/history historical data query interface
-2. Provides GET /api/v1/history/{query_id} detailed historical data query interface
+职责：
+1. 提供 GET /api/v1/history 历史列表查询接口
+2. 提供 GET /api/v1/history/{query_id} 历史详情查询接口
 """
 
 import logging
@@ -161,21 +161,21 @@ def get_history_list(
     db_manager: DatabaseManager = Depends(get_database_manager)
 ) -> HistoryListResponse:
     """
-    Get the history analysis list
+    获取历史分析列表
     
-    Retrieve historical analysis summaries in batches, supporting filtering by stock code and date range
+    分页获取历史分析记录摘要，支持按股票代码和日期范围筛选
     
     Args:
-        stock_code: stock code filtering
-        report_type: report type filtering
-        start_date: start date
-        end_date: End date
-        page: page number
-        limit: page size
-        db_manager: database manager dependency
+        stock_code: 股票代码筛选
+        report_type: 报告类型筛选
+        start_date: 开始日期
+        end_date: 结束日期
+        page: 页码
+        limit: 每页数量
+        db_manager: 数据库管理器依赖
         
     Returns:
-        HistoryListResponse: Historical record list
+        HistoryListResponse: 历史记录列表
     """
     try:
         service = HistoryService(db_manager)
@@ -293,7 +293,7 @@ def delete_history_records(
     db_manager: DatabaseManager = Depends(get_database_manager)
 ) -> DeleteHistoryResponse:
     """
-    Delete historical analysis records in bulk by primary key ID.
+    按主键 ID 批量删除历史分析记录。
     """
     record_ids = sorted({record_id for record_id in request.record_ids if record_id is not None})
     if not record_ids:
@@ -455,20 +455,20 @@ def get_history_detail(
     db_manager: DatabaseManager = Depends(get_database_manager)
 ) -> AnalysisReport:
     """
-    Get details of the historical report
+    获取历史报告详情
     
-    Get the complete historical analysis report based on analysis history record primary key ID or query_id.
-    Prefer querying by primary key ID (integer); if the parameter is not a valid integer, query by query_id.
+    根据分析历史记录主键 ID 或 query_id 获取完整的历史分析报告。
+    优先尝试按主键 ID（整数）查询，若参数不是合法整数则按 query_id 查询。
     
     Args:
-        record_id: analysis history record primary key ID (integer) or query_id (string)
-        db_manager: database manager dependency
+        record_id: 分析历史记录主键 ID（整数）或 query_id（字符串）
+        db_manager: 数据库管理器依赖
         
     Returns:
-        AnalysisReport: complete analysis report
+        AnalysisReport: 完整分析报告
         
     Raises:
-        HTTPException: 404 - Report does not exist
+        HTTPException: 404 - 报告不存在
     """
     try:
         service = HistoryService(db_manager)
@@ -630,7 +630,7 @@ def get_history_diagnostics(
     db_manager: DatabaseManager = Depends(get_database_manager),
 ) -> RunDiagnosticSummaryResponse:
     """
-    Get historical report run diagnostic summary.
+    获取历史报告运行诊断摘要。
     """
     try:
         service = HistoryService(db_manager)
@@ -679,7 +679,7 @@ def get_history_run_flow(
     db_manager: DatabaseManager = Depends(get_database_manager),
 ) -> RunFlowSnapshot:
     """
-    Get the running stream of the historical report.
+    获取历史报告运行流。
     """
     try:
         service = HistoryService(db_manager)
@@ -728,18 +728,18 @@ def get_history_news(
     db_manager: DatabaseManager = Depends(get_database_manager)
 ) -> NewsIntelResponse:
     """
-    Get historical report related news
+    获取历史报告关联新闻
 
-    Retrieve a list of related intelligence news based on analysis history record ID or query_id.
-    Parse record_id → query_id internally.
+    根据分析历史记录 ID 或 query_id 获取关联的新闻情报列表。
+    在内部完成 record_id → query_id 的解析。
 
     Args:
-        record_id: analysis history record primary key ID (integer) or query_id (string)
-        limit: return limit
-        db_manager: database manager dependency
+        record_id: 分析历史记录主键 ID（整数）或 query_id（字符串）
+        limit: 返回数量限制
+        db_manager: 数据库管理器依赖
 
     Returns:
-        NewsIntelResponse: News Intelligence List
+        NewsIntelResponse: 新闻情报列表
     """
     try:
         service = HistoryService(db_manager)
@@ -792,20 +792,20 @@ def get_history_markdown(
     db_manager: DatabaseManager = Depends(get_database_manager)
 ) -> MarkdownReportResponse:
     """
-    Get the Markdown format content of the historical report
+    获取历史报告的 Markdown 格式内容
 
-    Generate a Markdown report with push notification format based on analysis history record ID or query_id.
+    根据分析历史记录 ID 或 query_id 生成与推送通知格式一致的 Markdown 报告。
 
     Args:
-        record_id: analysis history record primary key ID (integer) or query_id (string)
-        db_manager: database manager dependency
+        record_id: 分析历史记录主键 ID（整数）或 query_id（字符串）
+        db_manager: 数据库管理器依赖
 
     Returns:
-        MarkdownReportResponse: Markdown Complete report format
+        MarkdownReportResponse: Markdown 格式的完整报告
 
     Raises:
-        HTTPException: 404 - Report does not exist
-        HTTPException: 500 - Report generation failed (server error)
+        HTTPException: 404 - 报告不存在
+        HTTPException: 500 - 报告生成失败（服务器内部错误）
     """
     service = HistoryService(db_manager)
 

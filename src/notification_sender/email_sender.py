@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Email sending reminder service
+Email 发送提醒服务
 
-Responsibilities:
-1. Send Email messages via SMTP
+职责：
+1. 通过 SMTP 发送 Email 消息
 """
 import logging
 from typing import Optional, List
@@ -53,10 +53,10 @@ class EmailSender:
     
     def __init__(self, config: Config):
         """
-        Initialize Email configuration
+        初始化 Email 配置
 
         Args:
-            config: Configuration object
+            config: 配置对象
         """
         self._email_config = {
             'sender': config.email_sender,
@@ -67,7 +67,7 @@ class EmailSender:
         self._stock_email_groups = getattr(config, 'stock_email_groups', None) or []
         
     def _is_email_configured(self) -> bool:
-        """Check if the email configuration is complete (just email and authorization code)"""
+        """检查邮件配置是否完整（只需邮箱和授权码）"""
         return bool(self._email_config['sender'] and self._email_config['password'])
     
     def get_receivers_for_stocks(self, stock_codes: List[str]) -> List[str]:
@@ -141,15 +141,15 @@ class EmailSender:
         timeout_seconds: Optional[float] = None,
     ) -> bool:
         """
-        Send emails (automatically identifies SMTP server) via SMTP
+        通过 SMTP 发送邮件（自动识别 SMTP 服务器）
         
         Args:
-            content: email content (supports Markdown, converts to HTML)
-            subject: Email subject (optional, defaults to automatic generation)
-            receivers: recipient list (optional, uses configured receivers by default)
+            content: 邮件内容（支持 Markdown，会转换为 HTML）
+            subject: 邮件主题（可选，默认自动生成）
+            receivers: 收件人列表（可选，默认使用配置的 receivers）
             
         Returns:
-            Whether sent successfully
+            是否发送成功
         """
         if not self._is_email_configured():
             logger.warning("邮件配置不完整，跳过推送")

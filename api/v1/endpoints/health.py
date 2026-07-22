@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Health check interface
+健康检查接口
 ===================================
 
-Responsibilities:
-1. Provide /api/v1/health health check interface
-2. For load balancers and monitoring systems.
+职责：
+1. 提供 /api/v1/health 健康检查接口
+2. 用于负载均衡器和监控系统
 """
 
 from datetime import datetime
@@ -21,12 +21,12 @@ router = APIRouter()
 @router.get("/health", response_model=HealthResponse)
 async def health_check() -> HealthResponse:
     """
-    Health check interface
+    健康检查接口
     
-    Checks the status of services on a load balancer or monitoring system.
+    用于负载均衡器或监控系统检查服务状态
     
     Returns:
-        HealthResponse: Contains service status and timestamp
+        HealthResponse: 包含服务状态和时间戳
     """
     return HealthResponse(
         status="ok",

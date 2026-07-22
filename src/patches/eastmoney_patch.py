@@ -45,17 +45,17 @@ _patch_sign = PatchSign()
 
 def _get_nid(user_agent):
     """
-    Get the NID authorization token from Eastmoney.
+    获取东方财富的 NID 授权令牌
 
     Args:
-        user_agent (str): User agent string, used to simulate different browser access
+        user_agent (str): 用户代理字符串，用于模拟不同的浏览器访问
 
     Returns:
-        str: Returns the obtained NID authorization token, if retrieval fails, return None
+        str: 返回获取到的 NID 授权令牌，如果获取失败则返回 None
 
-    Function description:
-        This function obtains the NID token by sending requests to Eastmoney's authorized interface.
-        Used for subsequent data access authorization. The function implements a caching mechanism to avoid frequent requests.
+    功能说明:
+        该函数通过向东方财富的授权接口发送请求来获取 NID 令牌，
+        用于后续的数据访问授权。函数实现了缓存机制来避免频繁请求。
     """
     now = time.time()
     # Check if the cache is valid, to avoid repeated requests
@@ -66,8 +66,8 @@ def _get_nid(user_agent):
         try:
             def generate_uuid_md5():
                 """
-                Generate UUID and perform MD5 hashing on it
-                :return: MD5 hash value (32-bit hexadecimal string)
+                生成 UUID 并对其进行 MD5 哈希处理
+                :return: MD5 哈希值（32位十六进制字符串）
                 """
                 # Generate UUID
                 unique_id = str(uuid.uuid4())
@@ -77,25 +77,25 @@ def _get_nid(user_agent):
 
             def generate_st_nvi():
                 """
-                Method for generating st_nvi value
-                :return: Returns the generated st_nvi value
+                生成 st_nvi 值的方法
+                :return: 返回生成的 st_nvi 值
                 """
                 HASH_LENGTH = 4  # Extract the first few digits of the hash value
 
                 def generate_random_string(length=21):
                     """
-                    Generate a random string of the specified length
-                    :param length: String length, default is 21
-                    :return: Random string
+                    生成指定长度的随机字符串
+                    :param length: 字符串长度，默认为 21
+                    :return: 随机字符串
                     """
                     charset = "useandom-26T198340PX75pxJACKVERYMINDBUSHWOLF_GQZbfghjklqvwyzrict"
                     return ''.join(secrets.choice(charset) for _ in range(length))
 
                 def sha256(input_str):
                     """
-                    Calculate SHA-256 hash value
-                    :param input_str: Input string
-                    :return: Hash value (hexadecimal)
+                    计算 SHA-256 哈希值
+                    :param input_str: 输入字符串
+                    :return: 哈希值（十六进制）
                     """
                     return hashlib.sha256(input_str.encode('utf-8')).hexdigest()
 

@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Real-time scheduling module.
+定时调度模块
 ===================================
 
-Responsibilities:
-1. Supports scheduled daily execution of stock analysis
-2. Supports scheduled execution of market review
-3. Gracefully handles signals to ensure reliable exit
+职责：
+1. 支持每日定时执行股票分析
+2. 支持定时执行大盘复盘
+3. 优雅处理信号，确保可靠退出
 
-Dependent:
-- schedule: Lightweight scheduling task library
+依赖：
+- schedule: 轻量级定时任务库
 """
 
 import logging
@@ -52,9 +52,9 @@ def normalize_schedule_times(
 
 class GracefulShutdown:
     """
-    Graceful exit processor
+    优雅退出处理器
 
-    Catch SIGTERM/SIGINT signals to ensure exit after task completion
+    捕获 SIGTERM/SIGINT 信号，确保任务完成后再退出
     """
 
     def __init__(self, register_signals: bool = True):
@@ -68,7 +68,7 @@ class GracefulShutdown:
         signal.signal(signal.SIGTERM, self._signal_handler)
 
     def _signal_handler(self, signum: int, frame):
-        """Signal processing function"""
+        """信号处理函数"""
         with self._lock:
             if not self.shutdown_requested:
                 logger.info(f"收到退出信号 ({signum})，等待当前任务完成...")
@@ -76,19 +76,19 @@ class GracefulShutdown:
 
     @property
     def should_shutdown(self) -> bool:
-        """Check if exit should be triggered."""
+        """检查是否应该退出"""
         with self._lock:
             return self.shutdown_requested
 
 
 class Scheduler:
     """
-    Scheduled task scheduler.
+    定时任务调度器
 
-    Implemented using the schedule library, supports:
-    - Run daily on a schedule
-    - Execute immediately on startup
-    - Graceful exit
+    基于 schedule 库实现，支持：
+    - 每日定时执行
+    - 启动时立即执行
+    - 优雅退出
     """
 
     def __init__(
@@ -100,10 +100,10 @@ class Scheduler:
         register_signals: bool = True,
     ):
         """
-        Initialize scheduler
+        初始化调度器
 
         Args:
-            schedule_time: Daily execution time in "HH:MM" format
+            schedule_time: 每日执行时间，格式 "HH:MM"
         """
         try:
             import schedule
@@ -129,11 +129,11 @@ class Scheduler:
 
     def set_daily_task(self, task: Callable, run_immediately: bool = True):
         """
-        Schedule daily tasks
+        设置每日定时任务
 
         Args:
-            task: Function to execute (no parameters)
-            run_immediately: Whether to execute once immediately after setting.
+            task: 要执行的任务函数（无参数）
+            run_immediately: 是否在设置后立即执行一次
         """
         self._task_callback = task
         if not self._configure_daily_tasks(self.schedule_times):
@@ -291,7 +291,7 @@ class Scheduler:
         self._refresh_daily_schedule_if_needed()
 
     def _safe_run_task(self):
-        """Safely execute task (with exception handling)"""
+        """安全执行任务（带异常捕获）"""
         if self._task_callback is None:
             return
 
@@ -403,9 +403,9 @@ class Scheduler:
 
     def run(self):
         """
-        Run scheduler main loop
+        运行调度器主循环
 
-        Block execution until an exit signal is received.
+        阻塞运行，直到收到退出信号
         """
         self._running = True
         logger.info("调度器开始运行...")
@@ -424,7 +424,7 @@ class Scheduler:
         logger.info("调度器已停止")
 
     def _get_next_run_time(self) -> str:
-        """Get the next execution time"""
+        """获取下次执行时间"""
         jobs = self.schedule.get_jobs()
         if jobs:
             next_run = min(job.next_run for job in jobs)
@@ -432,7 +432,7 @@ class Scheduler:
         return "未设置"
 
     def stop(self):
-        """Stop scheduler"""
+        """停止调度器"""
         self._running = False
         self._cancel_daily_job()
 
@@ -447,17 +447,17 @@ def run_with_schedule(
     schedule_times_provider: Optional[Callable[[], Union[Sequence[str], str]]] = None,
 ):
     """
-    Convenient function: Run tasks with scheduled scheduling
+    便捷函数：使用定时调度运行任务
 
     Args:
-        task: Function to execute
-        schedule_time: Daily execution time
-        run_immediately: Whether to execute once immediately.
-        background_tasks: Optional list of background task definitions. Each item is a dictionary,
-            Must include `task` and `interval_seconds`, optionally include `name`
-            Like `run_immediately`. The `interval_seconds` unit is in seconds.
-        schedule_time_provider: Optional time provider; the scheduler reads it before each round of checks,
-            Automatically rebuild daily job when the return value changes.
+        task: 要执行的任务函数
+        schedule_time: 每日执行时间
+        run_immediately: 是否立即执行一次
+        background_tasks: 可选的后台任务定义列表。每项为一个字典，
+            需包含 `task` 与 `interval_seconds`，可选包含 `name`
+            和 `run_immediately`。`interval_seconds` 单位为秒。
+        schedule_time_provider: 可选的时间提供器；调度器每轮检查前会读取，
+            当返回值变化时自动重建 daily job。
     """
     scheduler_kwargs: Dict[str, Any] = {
         "schedule_time": schedule_time,

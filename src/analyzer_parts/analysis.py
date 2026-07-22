@@ -55,20 +55,20 @@ class GeminiAnalyzer:
         analysis_context_pack_summary: Optional[str] = None,
     ) -> AnalysisResult:
         """
-        Analyze a single stock
+        分析单只股票
 \x20\x20\x20\x20\x20\x20\x20\x20
-        Process:
-        1. Formatted input data (technical face + news)
-        2. Call Gemini API (with retry and model switch)
-        3. Parse JSON responses
-        4. Returns structured result
+        流程：
+        1. 格式化输入数据（技术面 + 新闻）
+        2. 调用 Gemini API（带重试和模型切换）
+        3. 解析 JSON 响应
+        4. 返回结构化结果
 \x20\x20\x20\x20\x20\x20\x20\x20
         Args:
-            context: From storage.get_analysis_context() contextual data obtained
-            news_context: Pre-fetched News Content (optional)
+            context: 从 storage.get_analysis_context() 获取的上下文数据
+            news_context: 预先搜索的新闻内容（可选）
 
         Returns:
-            AnalysisResult object
+            AnalysisResult 对象
         """
         def _emit_progress(progress: int, message: str) -> None:
             if progress_callback is None:
@@ -388,14 +388,14 @@ class GeminiAnalyzer:
         analysis_context_pack_summary: Optional[str] = None,
     ) -> str:
         """
-        Format analysis prompts (Decision Dashboard v2.0).
+        格式化分析提示词（决策仪表盘 v2.0）
 \x20\x20\x20\x20\x20\x20\x20\x20
-        Includes: technical indicators, real-time quotes (volume ratio/turnover rate), retail distribution, trend analysis, news
+        包含：技术指标、实时行情（量比/换手率）、筹码分布、趋势分析、新闻
 \x20\x20\x20\x20\x20\x20\x20\x20
         Args:
-            context: technical data context (includes enhanced data)
-            name: Stock Name (default, may be overwritten by context)
-            news_context: Pre-fetched News Content
+            context: 技术面数据上下文（包含增强数据）
+            name: 股票名称（默认值，可能被上下文覆盖）
+            news_context: 预先搜索的新闻内容
         """
         code = context.get('code', 'Unknown')
         report_language = normalize_report_language(report_language)
@@ -598,8 +598,8 @@ class GeminiAnalyzer:
 > 资金流向只能作为价格位置的过滤器：接近压力且主力流出时不得追买；接近支撑且未放量跌破时，优先判断为持有观察、震荡或洗盘观察。
 """
 
-        # Tracking major investor actions(Taiwan stocks retail filter)— tw-only; Only when institution Block status='ok'
-        # And When Net Assets Exist, other markets status='not_supported' Skip, Strict additive.
+        # Add Taiwan institutional-investor activity as a chip filter only when the institution block is ok
+        # and all net-flow values exist. Other markets remain not_supported; this input is strictly additive.
         institution_block = (
             fundamental_context.get("institution", {})
             if isinstance(fundamental_context, dict)
@@ -632,7 +632,7 @@ class GeminiAnalyzer:
 > 三大法人是台股的筹码过滤器（相当于 A 股主力资金/龙虎榜的角色，但口径不同、不可混用）：外资与投信同向净买支持价格、同向净卖压制价格。请据此判断台股筹码结构，不要在有本数据时写“筹码结构：数据缺失”。
 """
 
-        # Add bullish distribution data
+        # Add chip-distribution data.
         if 'chip' in context:
             chip = context['chip']
             profit_ratio = chip.get('profit_ratio', 0)
@@ -660,7 +660,7 @@ class GeminiAnalyzer:
 > {chip_instruction}
 """
 
-        # Add trend analysis results (only implicit built-in bull_trend defaults to retaining the old setting)
+        # Add trend analysis; only the implicit built-in bull_trend fallback preserves the legacy behavior.
         if 'trend_analysis' in context:
             trend = _sanitize_trend_analysis_for_prompt(
                 context['trend_analysis'],
@@ -883,7 +883,7 @@ class GeminiAnalyzer:
         return prompt
 
     def _format_volume(self, volume: Optional[float]) -> str:
-        """Format trade volume display"""
+        """格式化成交量显示"""
         if volume is None:
             return 'N/A'
         if volume >= 1e8:
@@ -894,7 +894,7 @@ class GeminiAnalyzer:
             return f"{volume:.0f} 股"
 
     def _format_amount(self, amount: Optional[float]) -> str:
-        """Format trading amount display"""
+        """格式化成交额显示"""
         if amount is None:
             return 'N/A'
         if amount >= 1e8:
@@ -905,7 +905,7 @@ class GeminiAnalyzer:
             return f"{amount:.0f} 元"
 
     def _format_percent(self, value: Optional[float]) -> str:
-        """Format percentage display"""
+        """格式化百分比显示"""
         if value is None:
             return 'N/A'
         try:
@@ -914,7 +914,7 @@ class GeminiAnalyzer:
             return 'N/A'
 
     def _format_price(self, value: Optional[float]) -> str:
-        """Format price display."""
+        """格式化价格显示"""
         if value is None:
             return 'N/A'
         try:
@@ -923,7 +923,7 @@ class GeminiAnalyzer:
             return 'N/A'
 
     def _build_market_snapshot(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Build daily market snapshot (for display)"""
+        """构建当日行情快照（展示用）"""
         today = context.get('today', {}) or {}
         realtime = context.get('realtime', {}) or {}
         yesterday = context.get('yesterday', {}) or {}

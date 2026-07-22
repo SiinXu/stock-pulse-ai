@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Custom Webhook-based reminder service
+自定义 Webhook 发送提醒服务
 
-Responsibilities:
-1. Send custom Webhook message
+职责：
+1. 发送自定义 Webhook 消息
 """
 import logging
 import json
@@ -26,10 +26,10 @@ class CustomWebhookSender:
 
     def __init__(self, config: Config):
         """
-        Initialize custom Webhook configuration
+        初始化自定义 Webhook 配置
 
         Args:
-            config: Configuration object
+            config: 配置对象
         """
         self._custom_webhook_urls = getattr(config, 'custom_webhook_urls', []) or []
         self._custom_webhook_bearer_token = getattr(config, 'custom_webhook_bearer_token', None)
@@ -38,23 +38,23 @@ class CustomWebhookSender:
  
     def send_to_custom(self, content: str) -> bool:
         """
-        Push messages to custom Webhook
+        推送消息到自定义 Webhook
         
-        Supports any Webhook endpoint that accepts POST JSON.
-        Default send format: {"text": "message content", "content": "message content"}
+        支持任意接受 POST JSON 的 Webhook 端点
+        默认发送格式：{"text": "消息内容", "content": "消息内容"}
         
-        Applicable to:
-        - DingTalk robot
+        适用于：
+        - 钉钉机器人
         - Discord Webhook
         - Slack Incoming Webhook
-        - Self-built notification service
-        - Other services support POST JSON.
+        - 自建通知服务
+        - 其他支持 POST JSON 的服务
         
         Args:
-            content: Message content in Markdown format
+            content: 消息内容（Markdown 格式）
             
         Returns:
-            Did at least one webhook send successfully?
+            是否至少有一个 Webhook 发送成功
         """
         if not self._custom_webhook_urls:
             logger.warning("未配置自定义 Webhook，跳过推送")
@@ -301,9 +301,9 @@ class CustomWebhookSender:
     
     def _build_custom_webhook_payload(self, url: str, content: str) -> dict:
         """
-        Construct the corresponding Webhook payload based on URL
+        根据 URL 构建对应的 Webhook payload
         
-        Automatically identify common services and use corresponding formats
+        自动识别常见服务并使用对应格式
         """
         templated_payload = self._build_custom_webhook_template_payload(content)
         if templated_payload is not None:

@@ -21,7 +21,7 @@ def _make_platform(public_key: str) -> DiscordPlatform:
 
 
 def _current_timestamp() -> str:
-    """Returns the current Unix timestamp string, used to generate a valid signature."""
+    """返回当前 Unix 秒字符串，用于生成有效签名。"""
     return str(int(time.time()))
 
 
@@ -54,7 +54,7 @@ def test_signed_ping_request_is_accepted():
 
 
 def test_signed_interaction_request_returns_deferred_ack():
-    """type=2 Interaction should return type 5 Delay ACK, Still parsed out simultaneously BotMessage."""
+    """type=2 交互应返回 type 5 延迟 ACK，同时仍解析出 BotMessage。"""
     signing_key = SigningKey.generate()
     platform = _make_platform(signing_key.verify_key.encode().hex())
     payload = {
@@ -162,7 +162,7 @@ def test_invalid_public_key_configuration_is_rejected():
 
 
 def test_expired_timestamp_is_rejected():
-    """Expired timestamp (outside ±5 minute window) should be rejected, preventing rate limiting attacks."""
+    """过期 timestamp（超出 ±5 分钟窗口）应被拒绝，防重放攻击。"""
     signing_key = SigningKey.generate()
     platform = _make_platform(signing_key.verify_key.encode().hex())
     payload = {"type": 1}
@@ -182,7 +182,7 @@ def test_expired_timestamp_is_rejected():
 
 
 def test_format_response_wraps_interaction_callback():
-    """type=2 Use for interaction response Interaction Response Callback Format(type=4 + data)."""
+    """type=2 交互响应应使用 Interaction Response 回调格式（type=4 + data）。"""
     from bot.models import BotMessage, BotResponse, ChatType
 
     platform = _make_platform("00" * 32)
@@ -208,7 +208,7 @@ def test_format_response_wraps_interaction_callback():
 
 
 def test_send_followup_patches_original_message():
-    """send_followup Respond PATCH Discord follow-up webhook."""
+    """send_followup 应 PATCH Discord follow-up webhook。"""
     from bot.models import BotMessage, BotResponse, ChatType
 
     platform = _make_platform("00" * 32)
@@ -241,7 +241,7 @@ def test_send_followup_patches_original_message():
 
 
 def test_send_followup_chunks_long_content():
-    """Follow-up exceeding 2000 characters should be chunked: initial PATCH, subsequent POST."""
+    """超过 2000 字符的 follow-up 应被分块：首块 PATCH，后续 POST。"""
     from bot.models import BotMessage, BotResponse, ChatType
 
     platform = _make_platform("00" * 32)
@@ -281,7 +281,7 @@ def test_send_followup_chunks_long_content():
 
 
 def test_send_followup_missing_token_returns_false():
-    """If the `interaction token` is missing, `send_followup` should return False."""
+    """缺少 interaction token 时 send_followup 应返回 False。"""
     from bot.models import BotMessage, BotResponse, ChatType
 
     platform = _make_platform("00" * 32)
@@ -300,7 +300,7 @@ def test_send_followup_missing_token_returns_false():
 
 
 def test_non_numeric_timestamp_is_rejected():
-    """Non-numeric timestamp should be rejected."""
+    """非数字 timestamp 应被拒绝。"""
     signing_key = SigningKey.generate()
     platform = _make_platform(signing_key.verify_key.encode().hex())
     payload = {"type": 1}
@@ -318,7 +318,7 @@ def test_non_numeric_timestamp_is_rejected():
 
 
 def test_boolean_option_true_emits_name():
-    """The boolean True option should output option name, instead of the literal 'true'."""
+    """布尔 True 选项应输出 option name，而非字面 'true'。"""
     platform = _make_platform("00" * 32)
     interaction_data = {
         "name": "analyze",
@@ -332,7 +332,7 @@ def test_boolean_option_true_emits_name():
 
 
 def test_boolean_option_false_is_omitted():
-    """The boolean False option should be ignored and not appear in the command content."""
+    """布尔 False 选项应被忽略，不出现在命令内容中。"""
     platform = _make_platform("00" * 32)
     interaction_data = {
         "name": "analyze",

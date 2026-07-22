@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Stock Data Service Layer
+股票数据服务层
 ===================================
 
-Responsibilities:
-1. Encapsulate stock data retrieval logic
-2. Provides real-time quote and historical data interface
+职责：
+1. 封装股票数据获取逻辑
+2. 提供实时行情和历史数据接口
 """
 
 import logging
@@ -21,24 +21,24 @@ logger = logging.getLogger(__name__)
 
 class StockService:
     """
-    Stock Data Service
+    股票数据服务
     
-    Encapsulate business logic for fetching stock data.
+    封装股票数据获取的业务逻辑
     """
     
     def __init__(self):
-        """Initialize stock data service"""
+        """初始化股票数据服务"""
         self.repo = StockRepository()
     
     def get_realtime_quote(self, stock_code: str) -> Optional[Dict[str, Any]]:
         """
-        Get real-time stock quotes
+        获取股票实时行情
         
         Args:
-            stock_code: stock code
+            stock_code: 股票代码
             
         Returns:
-            Real-time data dictionary
+            实时行情数据字典
         """
         try:
             # Call the data retriever to get real-time quotes
@@ -99,18 +99,18 @@ class StockService:
         days: int = 30
     ) -> Dict[str, Any]:
         """
-        Get historical stock quotes
+        获取股票历史行情
         
         Args:
-            stock_code: stock code
-            period: K Line cycle (daily/weekly/monthly)
-            days: number of days to fetch
+            stock_code: 股票代码
+            period: K 线周期 (daily/weekly/monthly)
+            days: 获取天数
             
         Returns:
-            Historical market data dictionary
+            历史行情数据字典
             
         Raises:
-            ValueError: Raised when period is not daily (weekly/monthly not yet implemented)
+            ValueError: 当 period 不是 daily 时抛出（weekly/monthly 暂未实现）
         """
         # Validate period parameter, only supports daily
         if period != "daily":
@@ -175,13 +175,13 @@ class StockService:
     
     def _get_placeholder_quote(self, stock_code: str) -> Dict[str, Any]:
         """
-        Get placeholder market data (for testing)
+        获取占位行情数据（用于测试）
         
         Args:
-            stock_code: stock code
+            stock_code: 股票代码
             
         Returns:
-            Placeholder market data
+            占位行情数据
         """
         return {
             "stock_code": stock_code,

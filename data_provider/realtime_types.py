@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Unified type definition & circuit breaker mechanism for real-time quotes
+实时行情统一类型定义 & 熔断机制
 ===================================
 
-Design goals:
-1. Unified real-time quote data return structure from all data sources.
-2. Implement circuit breaker/cooling mechanism to avoid repeated requests when continuously failing
-3. Supports multi-data source failover
+设计目标：
+1. 统一各数据源的实时行情返回结构
+2. 实现熔断/冷却机制，避免连续失败时反复请求
+3. 支持多数据源故障切换
 
-Usage:
-- All Fetcher's get_realtime_quote() uniformly return UnifiedRealtimeQuote
-- CircuitBreaker manages the circuit break status for each data source
+使用方式：
+- 所有 Fetcher 的 get_realtime_quote() 统一返回 UnifiedRealtimeQuote
+- CircuitBreaker 管理各数据源的熔断状态
 """
 
 import logging
@@ -35,20 +35,20 @@ logger = logging.getLogger(__name__)
 
 def safe_float(val: Any, default: Optional[float] = None) -> Optional[float]:
     """
-    Safely convert to float.
+    安全转换为浮点数
     
-    Process scenario:
-    - None / Empty string → default
+    处理场景：
+    - None / 空字符串 → default
     - pandas NaN / numpy NaN → default
-    - Convert numeric string to float
-    - Already numeric → float
+    - 数值字符串 → float
+    - 已是数值 → float
     
     Args:
-        val: Value to be converted
-        default: default value when conversion fails
+        val: 待转换的值
+        default: 转换失败时的默认值
         
     Returns:
-        Converted float, or default value
+        转换后的浮点数，或默认值
     """
     try:
         if val is None:
@@ -76,16 +76,16 @@ def safe_float(val: Any, default: Optional[float] = None) -> Optional[float]:
 
 def safe_int(val: Any, default: Optional[int] = None) -> Optional[int]:
     """
-    Safely convert to integer
+    安全转换为整数
     
-    Convert to float first, then truncate, handle cases like "123.0"
+    先转换为 float，再取整，处理 "123.0" 这类情况
     
     Args:
-        val: Value to be converted
-        default: default value when conversion fails
+        val: 待转换的值
+        default: 转换失败时的默认值
         
     Returns:
-        Converted integer, or default value
+        转换后的整数，或默认值
     """
     f_val = safe_float(val, default=None)
     if f_val is not None:
@@ -94,39 +94,39 @@ def safe_int(val: Any, default: Optional[int] = None) -> Optional[int]:
 
 
 class RealtimeSource(Enum):
-    """Real-time quote data source"""
-    EFINANCE = "efinance"           # Efinance (efinance library)
-    AKSHARE_EM = "akshare_em"       # Efinance (akshare library)
+    """实时行情数据源"""
+    EFINANCE = "efinance"           # Eastmoney via the efinance library
+    AKSHARE_EM = "akshare_em"       # Eastmoney via the AkShare library
     AKSHARE_SINA = "akshare_sina"   # Sina Finance
     AKSHARE_QQ = "akshare_qq"       # Tencent Finance.
     TUSHARE = "tushare"             # Tushare Pro
     TICKFLOW = "tickflow"           # TickFlow
     TENCENT = "tencent"             # Direct connection to Tencent.
     SINA = "sina"                   # Sina direct connection
-    STOOQ = "stooq"                 # Stooq US equities bottom fishing
-    LONGBRIDGE = "longbridge"       # Longbridge (US stocks/Hong Kong stocks bottom-fishing)
+    STOOQ = "stooq"                 # Stooq U.S. stock fallback
+    LONGBRIDGE = "longbridge"       # Longbridge U.S./Hong Kong stock fallback
     FALLBACK = "fallback"           # Fallback to degraded mode.
 
 
 @dataclass
 class UnifiedRealtimeQuote:
     """
-    Unified real-time market data structure.
+    统一实时行情数据结构
     
-    Design principles:
-    - The fields returned by each data source may be different, with missing fields represented by None
-    - Main Process uses getattr(quote, field, None) to get, ensuring compatibility.
-    - source field indicates data source for debugging
+    设计原则：
+    - 各数据源返回的字段可能不同，缺失字段用 None 表示
+    - 主流程使用 getattr(quote, field, None) 获取，保证兼容性
+    - source 字段标记数据来源，便于调试
     """
     code: str
     name: str = ""
     source: RealtimeSource = RealtimeSource.FALLBACK
 
-    # === Data Quality Metadata (Unified supplemented by DataFetcherManager) ===
-    fetched_at: Optional[str] = None             # System acquisition timestamp (ISO 8601 datetime)
-    provider_timestamp: Optional[str] = None     # Provider Real-time market data(ISO 8601 datetime)
-    is_stale: Optional[bool] = None              # provider_timestamp Exceeds minimum TTL Threshold value is for True
-    stale_seconds: Optional[int] = None          # provider_timestamp Distance fetched_at Seconds
+    # === Data quality metadata (normalized by DataFetcherManager) ===
+    fetched_at: Optional[str] = None             # System fetch timestamp (ISO 8601 datetime)
+    provider_timestamp: Optional[str] = None     # Provider quote timestamp (ISO 8601 datetime)
+    is_stale: Optional[bool] = None              # True when provider_timestamp exceeds the minimum TTL threshold
+    stale_seconds: Optional[int] = None          # Seconds between provider_timestamp and fetched_at
     fallback_from: Optional[str] = None          # Fallback source token for the primary source
     market: Optional[str] = None                 # Market Tags (cn/hk/us/jp/kr/tw)
     currency: Optional[str] = None               # Quote currency (JPY/KRW/TWD/USD/HKD/CNY etc.)
@@ -151,7 +151,7 @@ class UnifiedRealtimeQuote:
     low: Optional[float] = None             # Lowest price
     pre_close: Optional[float] = None       # Yesterday's closing price
     
-    # === Valuation Metrics (only available with full interfaces like East China Securities) ===
+    # === Valuation metrics (available only from full-data providers such as Eastmoney) ===
     pe_ratio: Optional[float] = None        # Dynamic Price-to-Earnings Ratio
     pb_ratio: Optional[float] = None        # Price-to-Book Ratio
     total_mv: Optional[float] = None        # Total market capitalization (yuan)
@@ -163,7 +163,7 @@ class UnifiedRealtimeQuote:
     low_52w: Optional[float] = None         # 52 weeks low
     
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to Dictionary (filter None values)"""
+        """转换为字典（过滤 None 值）"""
         result = {
             'code': self.code,
             'name': self.name,
@@ -186,20 +186,20 @@ class UnifiedRealtimeQuote:
         return result
     
     def has_basic_data(self) -> bool:
-        """Check if basic price data is available."""
+        """检查是否有基本的价格数据"""
         return self.price is not None and self.price > 0
     
     def has_volume_data(self) -> bool:
-        """Check if volume and price data is available."""
+        """检查是否有量价数据"""
         return self.volume_ratio is not None or self.turnover_rate is not None
 
 
 @dataclass
 class ChipDistribution:
     """
-    Chip distribution data
+    筹码分布数据
     
-    Reflects the distribution of holding costs and profit figures
+    反映持仓成本分布和获利情况
     """
     code: str
     date: str = ""
@@ -219,7 +219,7 @@ class ChipDistribution:
     concentration_70: float = 0.0  # 70% chip concentration
     
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to Dictionary"""
+        """转换为字典"""
         return {
             'code': self.code,
             'date': self.date,
@@ -234,13 +234,13 @@ class ChipDistribution:
     
     def get_chip_status(self, current_price: float) -> str:
         """
-        Get holding status description
+        获取筹码状态描述
         
         Args:
-            current_price: Current stock price
+            current_price: 当前股价
             
         Returns:
-            Chip status description
+            筹码状态描述
         """
         status_parts = []
         
@@ -636,10 +636,10 @@ _chip_circuit_breaker = CircuitBreaker(
 
 
 def get_realtime_circuit_breaker() -> CircuitBreaker:
-    """Get real-time quote circuit breaker"""
+    """获取实时行情熔断器"""
     return _realtime_circuit_breaker
 
 
 def get_chip_circuit_breaker() -> CircuitBreaker:
-    """Get holding interface circuit breaker"""
+    """获取筹码接口熔断器"""
     return _chip_circuit_breaker

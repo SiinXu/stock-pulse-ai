@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""TwInstitutionalFetcher — Taiwan institutional investors (institutional-investor) daily net buy/sell.
+"""TwInstitutionalFetcher — Taiwan 三大法人 (institutional-investor) daily net buy/sell.
 
 Data-layer only, ``tw``-only, strictly additive. This module is a self-contained
 data-access building block: it fetches, parses, caches and fail-opens. It is NOT
@@ -7,19 +7,19 @@ wired into the analysis report / Web / scoring path — that is a deliberate
 follow-up (per #1777). It does not touch the existing A-share / HK / US / JP / KR
 flows in ``data_provider/base.py``.
 
-Sources (Government Open Data, Government Data Open Authorization Agreement Version 1 / OGDL v1, commercial-safe, no key):
-  - Listed Stocks TWSE T86 「Daily report of institutional investors」 (per-stock), legacy RWD JSON endpoint
+Sources (政府開放資料, 政府資料開放授權條款第 1 版 / OGDL v1, commercial-safe, no key):
+  - 上市 TWSE T86 「三大法人買賣超日報」 (per-stock), legacy RWD JSON endpoint
     https://www.twse.com.tw/rwd/zh/fund/T86?response=json&date=YYYYMMDD&selectType=ALLBUT0999
-    (date is Gregorian ``YYYYMMDD``; numeric values are comma-formatted strings)
-  - OTC-listed-listed-listed TPEx ``tpex_3insti_daily_trading``, OpenAPI
+    (date is 西元 ``YYYYMMDD``; numeric values are comma-formatted strings)
+  - 上櫃 TPEx ``tpex_3insti_daily_trading``, OpenAPI
     https://www.tpex.org.tw/openapi/v1/tpex_3insti_daily_trading
-    (date is Minguo ``1150626``; numeric values are plain integer strings)
+    (date is 民國 ``1150626``; numeric values are plain integer strings)
 
 Fail-open contract: any network error, rate-limit, empty response, unexpected
 shape or missing field returns ``None`` (no data) — it never raises into the
 caller, so the analysis main flow is never interrupted.
 
-Units are **shares (Stocks)**, not lots (Zhang). Buy/sell-net signs are preserved
+Units are **shares (股)**, not lots (張). Buy/sell-net signs are preserved
 (negative = net sell).
 """
 
@@ -89,10 +89,10 @@ def _to_int(value: Any) -> Optional[int]:
 
 
 def minguo_to_ad(date_str: Any) -> Optional[str]:
-    """Convert a TPEx Minguo date ``YYYMMDD`` (e.g. ``1150626``) to Gregorian ``YYYYMMDD``.
+    """Convert a TPEx 民國 date ``YYYMMDD`` (e.g. ``1150626``) to 西元 ``YYYYMMDD``.
 
-    ``1150626`` -> ``20260626`` (Minguo 115 + 1911 = Gregorian 2026). Returns ``None`` for
-    anything that is not a 7-digit Minguo date, so a format change fails open.
+    ``1150626`` -> ``20260626`` (民國 115 + 1911 = 西元 2026). Returns ``None`` for
+    anything that is not a 7-digit 民國 date, so a format change fails open.
     """
     text = str(date_str).strip()
     if not (text.isdigit() and len(text) == 7):
@@ -101,7 +101,7 @@ def minguo_to_ad(date_str: Any) -> Optional[str]:
 
 
 class TwInstitutionalFetcher:
-    """Fetch Taiwan per-stock institutional investors net buy/sell, ``.TW`` (Listed) / ``.TWO`` (OTC-listed-listed-listed) only."""
+    """Fetch Taiwan per-stock 三大法人 net buy/sell, ``.TW`` (上市) / ``.TWO`` (上櫃) only."""
 
     name = "TwInstitutionalFetcher"
 
@@ -135,11 +135,11 @@ class TwInstitutionalFetcher:
     def get_institutional_net(
         self, stock_code: str, date: Optional[str] = None
     ) -> Optional[dict]:
-        """Return the normalized institutional investors record for one TW stock, or ``None``.
+        """Return the normalized 三大法人 record for one TW stock, or ``None``.
 
         ``stock_code`` must carry an explicit ``.TW`` / ``.TWO`` suffix; a bare or
-        non-TW code returns ``None`` (not applicable). ``date`` (Gregorian ``YYYYMMDD``)
-        only applies to listed/T86; OTC-listed-listed-listed-listed/TPEx OpenAPI serves the latest trading day.
+        non-TW code returns ``None`` (not applicable). ``date`` (西元 ``YYYYMMDD``)
+        only applies to 上市/T86; 上櫃/TPEx OpenAPI serves the latest trading day.
         Fail-open: any error returns ``None``.
         """
         market = self._market_of(stock_code)

@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-TushareFetcher - Backup Data Source 1 (Priority 2)
+TushareFetcher - 备用数据源 1 (Priority 2)
 ===================================
 
-Data source: Tushare Pro API
-Features: Requires Token, has request quota limits
-Advantages: High data quality, stable interface
+数据来源：Tushare Pro API（挖地兔）
+特点：需要 Token、有请求配额限制
+优点：数据质量高、接口稳定
 
-Rate limiting strategy:
-1. Implement "minute call counter"
-2. Force sleep to the next minute when exceeding free quota (80 requests/min)
-3. Use tenacity to implement exponential backoff retries
+流控策略：
+1. 实现"每分钟调用计数器"
+2. 超过免费配额（80次/分）时，强制休眠到下一分钟
+3. 使用 tenacity 实现指数退避重试
 """
 
 import json as _json
@@ -62,11 +62,11 @@ def _is_etf_code(stock_code: str) -> bool:
 
 def _is_us_code(stock_code: str) -> bool:
     """
-    Determine if the code is a U.S. stock.
+    判断代码是否为美股
     
-    U.S. stock code rules:
-    - 1-5 uppercase letters, such as 'AAPL', 'TSLA'
-    - May contain '.', such as 'BRK.B'.
+    美股代码规则：
+    - 1-5个大写字母，如 'AAPL', 'TSLA'
+    - 可能包含 '.'，如 'BRK.B'
     """
     code = stock_code.strip().upper()
     return bool(re.match(r'^[A-Z]{1,5}(\.[A-Z])?$', code))
@@ -112,19 +112,19 @@ class _TushareHttpClient:
 
 class TushareFetcher(BaseFetcher):
     """
-    Tushare Pro data source implementation
+    Tushare Pro 数据源实现
     
-    Priority: 2
-    Data source: Tushare Pro API
+    优先级：2
+    数据来源：Tushare Pro API
     
-    Key strategy:
-    - Call counter per minute to prevent exceeding quota
-    - Force wait when exceeding 80 requests/minute
-    - retries with exponential backoff after failures
+    关键策略：
+    - 每分钟调用计数器，防止超出配额
+    - 超过 80 次/分钟时强制等待
+    - 失败后指数退避重试
     
-    Quota explanation (Tushare free users):
-    - Maximum 80 requests per minute
-    - Maximum 500 requests per day
+    配额说明（Tushare 免费用户）：
+    - 每分钟最多 80 次请求
+    - 每天最多 500 次请求
     """
     
     name = "TushareFetcher"
@@ -132,10 +132,10 @@ class TushareFetcher(BaseFetcher):
 
     def __init__(self, rate_limit_per_minute: int = 80):
         """
-        Initialize TushareFetcher
+        初始化 TushareFetcher
 
         Args:
-            rate_limit_per_minute: maximum requests per minute (default 80, Tushare free quota)
+            rate_limit_per_minute: 每分钟最大请求数（默认80，Tushare免费配额）
         """
         self.rate_limit_per_minute = rate_limit_per_minute
         self._call_count = 0  # Calls per minute within the current minute
@@ -152,11 +152,11 @@ class TushareFetcher(BaseFetcher):
     
     def _init_api(self) -> None:
         """
-        Initialize Tushare API
+        初始化 Tushare API
 
-        If Token is not configured, this data source will be unavailable.
-        This directly uses the built-in HTTP client, avoiding runtime dependency on the tushare SDK.
-        Reduce initialization failures due to missing packages in Docker/PyInstaller/multi-virtual environment scenarios.
+        如果 Token 未配置，此数据源将不可用。
+        这里直接使用内置 HTTP client，避免运行时强依赖 tushare SDK，
+        从而减少 Docker / PyInstaller / 多虚拟环境场景下因缺包导致的初始化失败。
         """
         config = get_config()
 
@@ -190,14 +190,14 @@ class TushareFetcher(BaseFetcher):
 
     def _determine_priority(self) -> int:
         """
-        Determine priority based on token configuration and API initialization status
+        根据 Token 配置和 API 初始化状态确定优先级
 
-        Strategy:
-        - Token is configured and API initialization succeeds: Priority -1 (absolute highest, better than efinance)
-        - Other cases: Priority 2 (default).
+        策略：
+        - Token 配置且 API 初始化成功：优先级 -1（绝对最高，优于 efinance）
+        - 其他情况：优先级 2（默认）
 
         Returns:
-            Priority numbers (0=highest, larger numbers have lower priority).
+            优先级数字（0=最高，数字越大优先级越低）
         """
         config = get_config()
 
@@ -211,21 +211,21 @@ class TushareFetcher(BaseFetcher):
 
     def is_available(self) -> bool:
         """
-        Check if the data source is available
+        检查数据源是否可用
 
         Returns:
-            True indicates availability, False indicates unavailability
+            True 表示可用，False 表示不可用
         """
         return self._api is not None
 
     def _check_rate_limit(self) -> None:
         """
-        Check and enforce rate limits
+        检查并执行速率限制
         
-        Rate limiting strategy:
-        1. Check if it's entering a new minute.
-        2. If so, reset the counter
-        3. If the number of calls to the current minute exceeds the limit, forcibly sleep.
+        流控策略：
+        1. 检查是否进入新的一分钟
+        2. 如果是，重置计数器
+        3. 如果当前分钟调用次数超过限制，强制休眠
         """
         current_time = time.time()
         
@@ -261,7 +261,7 @@ class TushareFetcher(BaseFetcher):
         logger.debug(f"Tushare 当前分钟调用次数: {self._call_count}/{self.rate_limit_per_minute}")
 
     def _call_api_with_rate_limit(self, method_name: str, **kwargs) -> pd.DataFrame:
-        """Wrap Tushare API calls with rate limiting consistently."""
+        """统一通过速率限制包装 Tushare API 调用。"""
         if self._api is None:
             raise DataFetchError("Tushare API 未初始化，请检查 Token 配置")
 
@@ -270,11 +270,11 @@ class TushareFetcher(BaseFetcher):
         return method(**kwargs)
 
     def _get_china_now(self) -> datetime:
-        """Returns the current time in Shanghai timezone, convenient for testing cross-day refresh logic."""
+        """返回上海时区当前时间，方便测试覆盖跨日刷新逻辑。"""
         return datetime.now(ZoneInfo("Asia/Shanghai"))
 
     def _get_trade_dates(self, end_date: Optional[str] = None) -> List[str]:
-        """Refresh the trading calendar cache by natural day to avoid continuing to reuse old calendars after cross-day service."""
+        """按自然日刷新交易日历缓存，避免服务跨日后继续复用旧日历。"""
         if self._api is None:
             return []
 
@@ -308,7 +308,7 @@ class TushareFetcher(BaseFetcher):
 
     @staticmethod
     def _pick_trade_date(trade_dates: List[str], use_today: bool) -> Optional[str]:
-        """Select the trading day (today or previous trading day) based on available trading days list."""
+        """根据可用交易日列表选择当天或前一交易日。"""
         if not trade_dates:
             return None
         if use_today or len(trade_dates) == 1:
@@ -347,19 +347,19 @@ class TushareFetcher(BaseFetcher):
     
     def _convert_stock_code(self, stock_code: str) -> str:
         """
-        Convert A-shares / ETF / Beijing Stock Exchange etc. to Tushare ts_code (excluding Hong Kong stock logic).
+        转换 A 股 / ETF / 北交所等为 Tushare ts_code（不含港股逻辑）。
 
-        Tushare required format example:
-        - Shanghai stocks: 600519.SH
-        - Shenzhen stocks: 000001.SZ
-        - Shanghai Stock Exchange ETFs: 510050.SH
-        - Shenzhen Stock Exchange ETFs: 159919.SZ
+        Tushare 要求的格式示例：
+        - 沪市股票：600519.SH
+        - 深市股票：000001.SZ
+        - 沪市 ETF：510050.SH
+        - 深市 ETF：159919.SZ
 
         Args:
-            stock_code: original code, such as '600519', '000001', '563230'
+            stock_code: 原始代码，如 '600519', '000001', '563230'
 
         Returns:
-            Tushare format code, such as '600519.SH', '000001.SZ'
+            Tushare 格式代码，如 '600519.SH', '000001.SZ'
         """
         raw_code = stock_code.strip()
         
@@ -380,7 +380,7 @@ class TushareFetcher(BaseFetcher):
             raise DataFetchError(f"TushareFetcher 不支持美股 {raw_code}，请使用 AkshareFetcher 或 YfinanceFetcher")
 
         if _is_hk_market(raw_code):
-            # raise DataFetchError(f"TushareFetcher does not support Hong Kong stocks {raw_code}; use AkshareFetcher")
+            # raise DataFetchError(f"TushareFetcher 不支持港股 {raw_code}，请使用 AkshareFetcher")
             return normalize_stock_code(raw_code)
 
         code = normalize_stock_code(raw_code)
@@ -416,10 +416,10 @@ class TushareFetcher(BaseFetcher):
 
     def _convert_hk_stock_code_for_tushare(self, stock_code: str) -> str:
         """
-        Convert user input to Tushare Pro interface required ts_code (including Hong Kong stocks nnnnn.HK)
+        将用户输入转为 Tushare Pro 接口所需的 ts_code（含港股 nnnnn.HK）。
 
-        - Not HK stocks: use _convert_stock_code (A-shares / ETF / Beijing Stock Exchange).
-        - Hong Kong stocks: Convert HK00700, 00700, 00700.HK etc. into a 5-digit number + .HK.
+        - 非港股：委托 _convert_stock_code（A 股 / ETF / 北交所等）。
+        - 港股：从 HK00700、00700、00700.HK 等形式归一为 5 位数字 + .HK。
         """
         raw_code = stock_code.strip()
         if _is_hk_market(raw_code):
@@ -449,18 +449,18 @@ class TushareFetcher(BaseFetcher):
     )
     def _fetch_raw_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """
-        Get raw data from Tushare
+        从 Tushare 获取原始数据
         
-        Select different interfaces based on code type:
-        - Regular stocks: daily()
-        - ETF Fund: fund_daily()
+        根据代码类型选择不同接口：
+        - 普通股票：daily()
+        - ETF 基金：fund_daily()
         
-        Process:
-        1. Check API availability
-        2. Check if it's U.S. stocks (not supported)
-        3. Execute rate limit check
-        4. Convert stock code format
-        5. Select interface and call based on code type:
+        流程：
+        1. 检查 API 是否可用
+        2. 检查是否为美股（不支持）
+        3. 执行速率限制检查
+        4. 转换股票代码格式
+        5. 根据代码类型选择接口并调用
         """
         if self._api is None:
             raise DataFetchError("Tushare API 未初始化，请检查 Token 配置")
@@ -534,19 +534,19 @@ class TushareFetcher(BaseFetcher):
     
     def _normalize_data(self, df: pd.DataFrame, stock_code: str) -> pd.DataFrame:
         """
-        Standardize Tushare data
+        标准化 Tushare 数据
         
-        Tushare daily / fund_daily Column name returned:
+        Tushare daily / fund_daily 返回的列名：
         ts_code, trade_date, open, high, low, close, pre_close, change, pct_chg, vol, amount
         
-        Map to standard column names:
+        需要映射到标准列名：
         date, open, high, low, close, volume, amount, pct_chg
 
-        Unit scaling only applies to A-shares (and ETFs using the same unit interface):
-        - vol is measured in lots; multiply by 100 to convert it to shares
-        - amount is measured in CNY 1,000; multiply by 1,000 to convert it to yuan
+        单位缩放仅适用于 A 股（及 ETF 等使用同一套单位的接口）：
+        - vol 按「手」计，乘以 100 转为「股」
+        - amount 按「千元」计，乘以 1000 转为「元」
 
-        Hong Kong `hk_daily` volume and amount are already at a usable scale and must not be converted this way.
+        港股 hk_daily 返回的 vol / amount 已是可直接使用的量级，不做上述缩放。
         """
         df = df.copy()
         is_hk = _is_hk_market(stock_code)
@@ -564,7 +564,7 @@ class TushareFetcher(BaseFetcher):
         if 'date' in df.columns:
             df['date'] = pd.to_datetime(df['date'], format='%Y%m%d')
         
-        # Volume/trading value: convert units only for A-share interfaces; do not convert hk_daily values
+        # Convert volume/trading-value units only for A-share APIs; Hong Kong hk_daily values need no conversion.
         if 'volume' in df.columns and not is_hk:
             df['volume'] = df['volume'] * 100
         
@@ -583,15 +583,15 @@ class TushareFetcher(BaseFetcher):
 
     def get_stock_name(self, stock_code: str) -> Optional[str]:
         """
-        Get stock name
+        获取股票名称
         
-        Use Tushare's stock_basic interface to retrieve stock basic information
+        使用 Tushare 的 stock_basic 接口获取股票基本信息
         
         Args:
-            stock_code: stock code
+            stock_code: 股票代码
             
         Returns:
-            Stock Name, returns None on failure
+            股票名称，失败返回 None
         """
         if self._api is None:
             logger.warning("Tushare API 未初始化，无法获取股票名称")
@@ -653,12 +653,12 @@ class TushareFetcher(BaseFetcher):
     
     def get_stock_list(self) -> Optional[pd.DataFrame]:
         """
-        Get stock list
+        获取股票列表
         
-        Use Tushare's stock_basic interface to get a list of A-shares (excluding Hong Kong stocks)
+        使用 Tushare 的 stock_basic 接口获取 A 股列表（不含港股）。
         
         Returns:
-            A DataFrame containing code, name, industry, area, market columns, returns None on failure
+            包含 code, name, industry, area, market 列的 DataFrame，失败返回 None
         """
         if self._api is None:
             logger.warning("Tushare API 未初始化，无法获取股票列表")
@@ -700,17 +700,17 @@ class TushareFetcher(BaseFetcher):
     
     def get_realtime_quote(self, stock_code: str) -> Optional[UnifiedRealtimeQuote]:
         """
-        Get real-time quotes
+        获取实时行情
 
-        Strategy:
-        1. Prefer Pro interface (requires 2000 points): Full data, high stability.
-        2. Failure falls back to the old interface: low threshold, less data
+        策略：
+        1. 优先尝试 Pro 接口（需要2000积分）：数据全，稳定性高
+        2. 失败降级到旧版接口：门槛低，数据较少
 
         Args:
-            stock_code: stock code
+            stock_code: 股票代码
 
         Returns:
-            UnifiedRealtimeQuote object, or None on failure
+            UnifiedRealtimeQuote 对象，失败返回 None
         """
         if self._api is None:
             return None
@@ -822,7 +822,7 @@ class TushareFetcher(BaseFetcher):
 
     def get_main_indices(self, region: str = "cn") -> Optional[List[dict]]:
         """
-        Get real-time quotes for key indices (Tushare Pro), only supports A-shares.
+        获取主要指数实时行情 (Tushare Pro)，仅支持 A 股
         """
         if region != "cn":
             return None
@@ -907,9 +907,9 @@ class TushareFetcher(BaseFetcher):
 
     def get_market_stats(self) -> Optional[dict]:
         """
-        Get market rise-fall statistics (Tushare Pro)
-        2000 points, access ts.pro_api().rt_k twice daily
-        API limits see: https://tushare.pro/document/1?doc_id=108
+        获取市场涨跌统计 (Tushare Pro)
+        2000积分 每天访问该接口 ts.pro_api().rt_k 两次
+        接口限制见：https://tushare.pro/document/1?doc_id=108
         """
         if self._api is None:
             return None
@@ -1008,7 +1008,7 @@ class TushareFetcher(BaseFetcher):
             self,
             df: pd.DataFrame,
             ) -> Optional[Dict[str, Any]]:
-            """Calculate advance/decline statistics from a market DataFrame."""
+            """从行情 DataFrame 计算涨跌统计。"""
             import numpy as np
 
             df = df.copy()
@@ -1095,14 +1095,14 @@ class TushareFetcher(BaseFetcher):
 
     def get_trade_time(self,early_time='09:30',late_time='16:30') -> Optional[str]:
         '''
-        Get the current time to obtain the start date of available data
+        获取当前时间可以获得数据的开始时间日期
 
         Args:
-                early_time: Default '09:30'
-                late_time: default '16:30'
-                'early_time'-'late_time' represents the time period for using the previous trading day's data; other times use today's data.
+                early_time: 默认 '09:30'
+                late_time: 默认 '16:30'
+                early_time-late_time 之间为使用上一个交易日数据的时间段，其他时间为使用当天数据的时间段
         Returns:
-                start_date: can obtain the start date of the data
+                start_date: 可以获得数据的开始日期
         '''
         china_now = self._get_china_now()
         china_date = china_now.strftime("%Y%m%d")
@@ -1132,12 +1132,12 @@ class TushareFetcher(BaseFetcher):
     
     def get_sector_rankings(self, n: int = 5) -> Optional[Tuple[list, list]]:
         """
-        Get the rising/falling sector leaderboard (Tushare Pro)
+        获取行业板块涨跌榜 (Tushare Pro)
         
-        Data source priority:
-        1. ts.pro_api().moneyflow_ind_ths (Tonghuashun interface)
-        2. Eastmoney interface (ts.pro_api().moneyflow_ind_dc)
-        Note: Different industries and sectors have different definitions across each interface, leading to inconsistent results.
+        数据源优先级：
+        1. 同花顺接口 (ts.pro_api().moneyflow_ind_ths)
+        2. 东财接口 (ts.pro_api().moneyflow_ind_dc)
+        注意：每个接口的行业分类和板块定义不同，会导致结果两者不一致
         """
         def _get_rank_top_n(df: pd.DataFrame, change_col: str, industry_name: str, n: int) -> Tuple[list, list]:
             df[change_col] = pd.to_numeric(df[change_col], errors='coerce')
@@ -1208,19 +1208,19 @@ class TushareFetcher(BaseFetcher):
     
     def get_chip_distribution(self, stock_code: str) -> Optional[ChipDistribution]:
         """
-        Get chip distribution data
+        获取筹码分布数据
         
-        Data source: ts.pro_api().cyq_chips()
-        Includes: profit ratio, average cost, chip concentration
+        数据来源：ts.pro_api().cyq_chips()
+        包含：获利比例、平均成本、筹码集中度
         
-        Note: ETFs and indices have no chip distribution data; Hong Kong stocks are unsupported. Both cases return None.
-        Less than 5000 points, access up to 15 times daily, up to 5 times per hour
+        注意：ETF/指数没有筹码分布数据，会直接返回 None；港股不支持，直接返回 None。
+        5000积分以下每天访问15次,每小时访问5次
         
         Args:
-            stock_code: stock code
+            stock_code: 股票代码
             
         Returns:
-            ChipDistribution object (latest trading day data), returns None if retrieval fails
+            ChipDistribution 对象（最新交易日的数据），获取失败返回 None
 
         """
         if _is_us_code(stock_code):
@@ -1292,10 +1292,10 @@ class TushareFetcher(BaseFetcher):
 
     def compute_cyq_metrics(self, df: pd.DataFrame, current_price: float) -> dict:
         """
-        Calculate common chip-distribution indicators from Tushare's cyq_chips table.
-        :param df: DataFrame containing 'price' and 'percent' columns
-        :param current_price: Stock's daily current price/closing price (used to calculate profit ratio)
-        :return: Dictionary containing chip-distribution indicators
+        基于 Tushare 的筹码分布明细表 (cyq_chips) 计算常用筹码指标  
+        :param df: 包含 'price' 和 'percent' 列的 DataFrame  
+        :param current_price: 股票当天的当前价/收盘价 (用于计算获利比例)  
+        :return: 包含各项筹码指标的字典  
         """
         import numpy as np
         # 1. Sort by price in ascending order (Tushare data is often returned in descending order)
@@ -1306,11 +1306,11 @@ class TushareFetcher(BaseFetcher):
 
         df_sorted['norm_percent'] = df_sorted['percent'] / total_percent * 100
 
-        # 3. Calculate the cumulative distribution of holdings
+        # 3. Calculate the cumulative chip distribution.
         df_sorted['cumsum'] = df_sorted['norm_percent'].cumsum()
 
         # --- Profit Ratio ---
-        # The sum of all positions with prices <= current price
+        # Sum the chips whose prices are at or below the current price.
         winner_rate = df_sorted[df_sorted['price'] <= current_price]['norm_percent'].sum()
 
         # --- Average Cost ---

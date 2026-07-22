@@ -1,22 +1,22 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A-shares Watchlist Analysis System - Environment validation test
+A股自选股智能分析系统 - 环境验证测试
 ===================================
 
-Validates if .env configuration is correct, including:
-1. Configuration load test
-2. Database viewing
-3. Data source testing
-4. LLM call testing.
-5. Notification Push Test
+用于验证 .env 配置是否正确，包括：
+1. 配置加载测试
+2. 数据库查看
+3. 数据源测试
+4. LLM 调用测试
+5. 通知推送测试
 
-Method:
-    python scripts/check_env.py              # Run all tests
-    python scripts/check_env.py --db         # Only view the database
-    python scripts/check_env.py --llm        # Only test LLM
-    python scripts/check_env.py --fetch      # Only test data retrieval
-    python scripts/check_env.py --notify     # Only test notifications
+使用方法：
+    python scripts/check_env.py              # 运行所有测试
+    python scripts/check_env.py --db         # 仅查看数据库
+    python scripts/check_env.py --llm        # 仅测试 LLM
+    python scripts/check_env.py --fetch      # 仅测试数据获取
+    python scripts/check_env.py --notify     # 仅测试通知
 
 """
 import os
@@ -74,19 +74,19 @@ logger = logging.getLogger(__name__)
 
 
 def print_header(title: str):
-    """Print the title"""
+    """打印标题"""
     print("\n" + "=" * 60)
     print(f"  {title}")
     print("=" * 60)
 
 
 def print_section(title: str):
-    """Print sector"""
+    """打印小节"""
     print(f"\n--- {title} ---")
 
 
 def check_config():
-    """Configuration loading test"""
+    """测试配置加载"""
     print_header("1. 配置加载测试")
     
     from src.config import get_config
@@ -123,7 +123,7 @@ def check_config():
 
 
 def view_database():
-    """View database content"""
+    """查看数据库内容"""
     print_header("2. 数据库内容查看")
     
     from src.storage import get_db
@@ -204,7 +204,7 @@ def view_database():
 
 
 def check_data_fetch(stock_code: str = "600519"):
-    """Testing data retrieval"""
+    """测试数据获取"""
     print_header("3. 数据获取测试")
     
     from data_provider import DataFetcherManager
@@ -239,7 +239,7 @@ def check_data_fetch(stock_code: str = "600519"):
 
 
 def check_llm():
-    """Test LLM call"""
+    """测试 LLM 调用"""
     print_header("4. LLM (Gemini) 调用测试")
     
     from src.analyzer import GeminiAnalyzer
@@ -342,7 +342,7 @@ def check_llm():
 
 
 def check_notification():
-    """Notification push test."""
+    """测试通知推送"""
     print_header("5. 通知推送测试")
     
     from src.notification import NotificationService
@@ -389,7 +389,7 @@ def check_notification():
 
 
 def run_all_tests():
-    """Run all tests"""
+    """运行所有测试"""
     print("\n" + "🚀" * 20)
     print("  A股自选股智能分析系统 - 环境验证")
     print("  " + datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
@@ -412,10 +412,10 @@ def run_all_tests():
         results['数据库'] = False
     
     # 3. Data fetching (skip to avoid being too slow)
-    # results['Data Acquisition'] = check_data_fetch()
+    # results['数据获取'] = check_data_fetch()
     
     # 4. LLM testing (optional).
-    # results['LLM Call'] = check_llm()
+    # results['LLM调用'] = check_llm()
     
     # Aggregate
     print_header("测试结果汇总")
@@ -429,7 +429,7 @@ def run_all_tests():
 
 
 def query_stock_data(stock_code: str, days: int = 10):
-    """Query data for a specified stock"""
+    """查询指定股票的数据"""
     print_header(f"查询股票数据: {stock_code}")
     
     from src.storage import get_db

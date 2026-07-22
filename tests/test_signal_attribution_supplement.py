@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Signal Attribution supplementary testing
+Signal Attribution 补充测试
 
-Coverage:
-1. generate_single_stock_report() Rendering
-2. _parse_response() Real call
-3. parse_dashboard_json() Real call
-4. Normalize boundary scenarios (all-zero, >100, partial invalid)
+覆盖：
+1. generate_single_stock_report() 渲染
+2. _parse_response() 真实调用
+3. parse_dashboard_json() 真实调用
+4. 归一化边界场景（all-zero, >100, partial invalid）
 """
 import os
 import sys
@@ -24,10 +24,10 @@ logger = logging.getLogger(__name__)
 
 
 class TestGenerateSingleStockReport:
-    """Test `generate_single_stock_report()` renders signal_attribution."""
+    """测试 generate_single_stock_report() 渲染 signal_attribution"""
 
     def test_single_stock_report_renders_signal_attribution(self):
-        """Test `generate_single_stock_report()` correctly renders signal_attribution."""
+        """测试 generate_single_stock_report() 正确渲染 signal_attribution"""
         from src.analyzer import AnalysisResult
         from src.notification import NotificationService
 
@@ -52,7 +52,7 @@ class TestGenerateSingleStockReport:
         print("  ✅ generate_single_stock_report() 正确渲染 signal_attribution")
 
     def test_single_stock_report_without_signal_attribution(self):
-        """Test will not crash when signal_attribution is missing."""
+        """测试没有 signal_attribution 时不会崩溃"""
         from src.analyzer import AnalysisResult
         from src.notification import NotificationService
 
@@ -80,10 +80,10 @@ class TestGenerateSingleStockReport:
 
 
 class TestNormalizationEdgeCases:
-    """Test normalization boundary scenarios"""
+    """测试归一化边界场景"""
 
     def test_all_zero_contributions(self):
-        """When all contribution scores are 0, retain 0 instead of changing it to 25"""
+        """测试所有贡献度都是 0 时，保留 0 而不是改成 25"""
         from src.utils.data_processing import normalize_dashboard_signal_attribution
 
         dashboard = {
@@ -105,7 +105,7 @@ class TestNormalizationEdgeCases:
         print("  ✅ 所有贡献度都是 0 时，保留 0")
 
     def test_all_none_contributions(self):
-        """When all contribution scores are None, retain None"""
+        """测试所有贡献度都是 None 时，保留 None"""
         from src.utils.data_processing import normalize_dashboard_signal_attribution
 
         dashboard = {
@@ -125,7 +125,7 @@ class TestNormalizationEdgeCases:
         print("  ✅ 所有贡献度都是 None 时，保留 None")
 
     def test_values_greater_than_100(self):
-        """If contribution ratio > 100, the upper limit is clipped to 100."""
+        """测试贡献度 >100 时，上限裁剪到 100"""
         from src.utils.data_processing import normalize_dashboard_signal_attribution
 
         dashboard = {
@@ -144,7 +144,7 @@ class TestNormalizationEdgeCases:
         print(f"  ✅ 贡献度 >100 时，裁剪到 100 (实际: {attr['technical_indicators']})")
 
     def test_partial_invalid_values(self):
-        """Testing partially valid and partially invalid input."""
+        """测试部分有效、部分无效的输入"""
         from src.utils.data_processing import normalize_dashboard_signal_attribution
 
         dashboard = {
@@ -173,10 +173,10 @@ class TestNormalizationEdgeCases:
 
 
 class TestParseResponseIntegration:
-    """Test that `_parse_response()` actually calls."""
+    """测试 _parse_response() 真实调用"""
 
     def test_parse_response_calls_normalization(self):
-        """Test that `_parse_response()` correctly calls the normalization function."""
+        """测试 _parse_response() 正确调用归一化函数"""
         from src.analyzer import GeminiAnalyzer
         from unittest.mock import MagicMock
 
@@ -238,7 +238,7 @@ class TestParseResponseIntegration:
 
 
 def run_tests():
-    """Run all tests"""
+    """运行所有测试"""
     print("\n" + "="*80)
     print("Signal Attribution 补充测试")
     print("="*80 + "\n")

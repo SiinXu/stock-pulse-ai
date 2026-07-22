@@ -11,9 +11,9 @@ Input:
 Output: apps/dsa-web/public/stocks.index.json
 
 Usage:
-    python3 scripts/generate_index_from_csv.py              # Use default Tushare
+    python3 scripts/generate_index_from_csv.py              # 默认使用 Tushare
     python3 scripts/generate_index_from_csv.py --source akshare
-    python3 scripts/generate_index_from_csv.py --test       # Test mode
+    python3 scripts/generate_index_from_csv.py --test       # 测试模式
 """
 
 import argparse
@@ -85,13 +85,13 @@ def load_csv_data(csv_path: Path) -> List[Dict[str, Any]]:
 
 def load_tushare_data(data_dir: Path) -> List[Dict[str, Any]]:
     """
-    Loads multi-market stock data from Tushare CSV files.
+    从 Tushare CSV 文件加载多市场股票数据
 
     Args:
-        data_dir: Data directory path
+        data_dir: 数据目录路径
 
     Returns:
-        The list of stocks after merging
+        合并后的股票列表
     """
     all_stocks = []
     seed_dir = Path(__file__).parent / 'stock_index_seeds'
@@ -158,19 +158,19 @@ def load_tushare_data(data_dir: Path) -> List[Dict[str, Any]]:
 
 def get_us_delist_priority(row: Dict[str, str]) -> int:
     """
-    Generate deduplication priority based on US stock records with ticker
+    为复用 ticker 的美股记录生成去重优先级。
 
-    Tushare us_basic's delist_date is not always stable for the current record:
-    - An empty string usually indicates that the ticker is currently in use.
-    - ``NaT`` often appears in historical records or date placeholders
-    - Actually clear the date indicating full delisting
+    Tushare us_basic 导出的 delist_date 对当前记录并不总是稳定：
+    - 空字符串通常表示当前仍在使用的 ticker
+    - ``NaT`` 多见于历史记录或日期占位值
+    - 实际日期表示明确退市
 
-    Therefore, the priority choice for front-end deduplication is:
-    1. delist_date is empty
-    2. delist_date For NaT
-    3. delist_date is an actual date
+    因此前置去重时优先选择：
+    1. delist_date 为空
+    2. delist_date 为 NaT
+    3. delist_date 为实际日期
 
-    When priorities are the same, keep the record that appears earliest in the CSV to avoid arbitrary name switching when information is insufficient.
+    同优先级时保留 CSV 中最先出现的记录，避免在信息不足时随意切换名称。
     """
     delist_date = (row.get('delist_date') or '').strip()
     if not delist_date:
@@ -182,18 +182,18 @@ def get_us_delist_priority(row: Dict[str, str]) -> int:
 
 def load_akshare_data(logs_dir: Path) -> List[Dict[str, Any]]:
     """
-    Loads stock data from AkShare CSV files.
+    从 AkShare CSV 文件加载股票数据
 
     Args:
-        logs_dir: log directory path
+        logs_dir: 日志目录路径
 
     Returns:
-        Stock List
+        股票列表
 
-    Note:
-        AkShare retains its original name field, without extra wrapping.
-        Tushare A-shares's XD / XR / DR status prefix correction logic. The goal here is
-        Reuse the display names output by AkShare instead of performing secondary normalization on them.
+    说明：
+        AkShare 这条输入路径保留其原始 name 字段，不额外套用
+        Tushare A 股那套 XD / XR / DR 状态前缀修正逻辑。这里的目标是
+        复用 AkShare 已输出的展示名，而不是对其做二次归一化。
     """
     csv_files = list(logs_dir.glob("stock_basic_*.csv"))
 
@@ -298,19 +298,19 @@ def normalize_stock_name_for_index(name: str, market: str) -> str:
 
 def extract_symbol_from_ts_code(ts_code: str, market: str) -> Optional[str]:
     """
-    Extract displayCode from ts_code
+    从 ts_code 提取 displayCode
 
-    - A-shares: 000001.SZ → 000001
-    - Hong Kong stocks: 00700.HK → 00700
-    - U.S. stocks: AAPL → AAPL
-    - Japanese/Korean stocks: 7203.T / 005930.KS -> preserve the suffix to avoid conflicts with bare codes from other markets
+    - A股：000001.SZ → 000001
+    - 港股：00700.HK → 00700
+    - 美股：AAPL → AAPL
+    - 日股/韩股：7203.T / 005930.KS → 保留后缀，避免与其他市场裸代码冲突
 
     Args:
-        ts_code: TS code
-        market: market code
+        ts_code: TS代码
+        market: 市场代码
 
     Returns:
-        displayCode Or None
+        displayCode 或 None
     """
     if not ts_code:
         return None
@@ -328,17 +328,17 @@ def extract_symbol_from_ts_code(ts_code: str, market: str) -> Optional[str]:
 
 def get_stock_name(row: Dict[str, str], market: str) -> Optional[str]:
     """
-    Get stock name
+    获取股票名称
 
-    - A-shares/Hong Kong stocks/Japanese stocks/Korean stocks: using the 'name' field
-    - U.S. stocks: Use the 'enname' field (English name)
+    - A股/港股/日股/韩股：使用 name 字段
+    - 美股：使用 enname 字段（英文名称）
 
     Args:
-        row: CSV row data
-        market: market code
+        row: CSV 行数据
+        market: 市场代码
 
     Returns:
-        Stock Name or None
+        股票名称或 None
     """
     if market == 'US':
         # U.S. stocks use English names
@@ -367,19 +367,19 @@ def parse_aliases(row: Dict[str, str]) -> List[str]:
 
 def parse_stock_row(row: Dict[str, str], preferred_market: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
-    Parse single stock data
+    解析单行股票数据
 
-    - Strict filtering of U.S. Stock DUMMY
-    - Null value validation
-    - Automatically determine market type (use preferred_market if unable to determine).
-    - Returns a dictionary in a unified format
+    - 美股 DUMMY 过滤（严格过滤）
+    - 空值校验
+    - 自动判断市场类型（当无法判断时使用 preferred_market）
+    - 返回统一格式的字典
 
     Args:
-        row: CSV row data
-        preferred_market: used when ts_code cannot determine the market (e.g., US stocks DUMMY record)
+        row: CSV 行数据
+        preferred_market: 当 ts_code 无法判断市场时使用（如美股 DUMMY 记录）
 
     Returns:
-        Parsed stock dictionary, invalid data returns None
+        解析后的股票字典，无效数据返回 None
     """
     ts_code = row.get('ts_code', '').strip()
 
@@ -443,7 +443,7 @@ def determine_market(ts_code: str) -> str:
             return 'JP'
         elif suffix in ['KS', 'KQ']:
             return 'KR'
-        # Check if the suffix is not for Chinese market if it exists.
+        # If the suffix is not a Chinese-market suffix, check whether this is a U.S. stock.
         # U.S. stocks may have suffixes like (BRK.B, GOOG.A, AAPL.U)
         prefix = ts_code.split('.')[0]
         if prefix.isalpha():
@@ -547,7 +547,7 @@ def build_stock_index(stocks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     Build the stock index.
 
     Args:
-        stocks: Raw stock rows(already included market Field)
+        stocks: Raw stock rows（已包含 market 字段）
 
     Returns:
         Stock index entries
@@ -591,13 +591,13 @@ def build_stock_index(stocks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 def compress_index(index: List[Dict[str, Any]]) -> List[List]:
     """
-    Index compression in array format to reduce file size
+    压缩索引为数组格式以减少文件大小
 
     Args:
-        index: original index
+        index: 原始索引
 
     Returns:
-        Compressed index
+        压缩后的索引
     """
     compressed = []
     for item in index:
@@ -617,7 +617,7 @@ def compress_index(index: List[Dict[str, Any]]) -> List[List]:
 
 
 def main():
-    """Main Function"""
+    """主函数"""
     parser = argparse.ArgumentParser(description='从 CSV 生成股票自动补全索引')
     parser.add_argument(
         '--source',

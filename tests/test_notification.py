@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A-shares Watchlist Analysis System - Notification Service Unit Test
+A股自选股智能分析系统 - 通知服务单元测试
 ===================================
 
-Responsibilities:
-1. Verification Notification Service Configuration Detection Logic
-2. Verification Notification Service Channel Detection Logic
-3. Verification Notification Service Message Sending Logic
+职责：
+1. 验证通知服务的配置检测逻辑
+2. 验证通知服务的渠道检测逻辑
+3. 验证通知服务的消息发送逻辑
 
 TODO: 
-1. Add tests outside of the sending channel, such as:
-    - Generate daily reports
-2. Add test for send_to_context
+1. 添加发送渠道以外的测试，如：
+    - 生成日报
+2. 添加 send_to_context 的测试
 """
 import os
 import sys
@@ -126,31 +126,31 @@ def _make_telegram_message() -> BotMessage:
 
 
 class TestNotificationServiceSendToMethods(unittest.TestCase):
-    """Notification sending service test.
+    """测试通知发送服务
 
-    Test Design:
+    测试设计：
 
-    Testing sorting by channel letters, adding new test methods in the appropriate position.
-    If long messages are sent in batches, test the batch sending logic separately.
+    测试按照渠道的字母顺序排列，在合适位置添加新的测试方法。
+    如果采用长消息分批发送，必须单独测试分批发送的逻辑，
         e.g. test_send_to_discord_via_notification_service_with_bot_requires_chunking
 
-    1. Add simulation configuration:
-    Use mock.patch decorator to simulate the get_config function,
-    Use the `make_config` function to add configuration and return a Config instance.
+    1. 添加模拟配置：
+    使用 mock.patch 装饰器来模拟 get_config 函数，
+    使用 _make_config 函数添加配置，并返回 Config 实例。
 
-    2. Check if the configuration is correct:
-    Use `assertIn` to check if NotificationChannel.xxxx is in...
-    `NotificationService.get_available_channels()` In the return value.
+    2. 检查配置是否正确：
+    使用 assertIn 检查 NotificationChannel.xxxx 是否在
+    `NotificationService.get_available_channels()` 返回值中。
 
-    3. Simulate request response:
-    Use mock.patch decorator to simulate requests.post function,
-    Use the `make_response` function to simulate request responses and return a Response instance.
-    If other functions simulate response, use the mock.patch decorator to simulate that function.
+    3. 模拟请求响应：
+    使用 mock.patch 装饰器来模拟 requests.post 函数，
+    使用 _make_response 函数模拟请求响应，并返回 Response 实例。
+    若使用其他函数模拟请求响应，则使用 mock.patch 装饰器来模拟该函数。
 
-    4. Use `assertTrue` to check the return value of `send`.
+    4. 使用 assertTrue 检查 send 的返回值。
 
-    5. Use `assert_called_once` to check if the request function is called once.
-    Test when batch sending, use assertAlmostEqual(mock_post.call_count, ...) to check if the request function is called
+    5. 使用 assert_called_once 检查请求函数是否被调用一次。
+    测试分批发送时，使用 assertAlmostEqual(mock_post.call_count, ...) 检查请求函数被调用次数
 
     """
 
@@ -765,7 +765,7 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
 
 
 class TestNotificationServiceReportGeneration(unittest.TestCase):
-    """Report generation and route related tests."""
+    """报告生成与选路相关测试。"""
 
     def test_signal_metadata_uses_resolved_eight_state_action(self):
         service = NotificationService()
@@ -1698,7 +1698,7 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
     def test_generate_single_stock_report_uses_currency_for_us(
         self, mock_get_config: mock.MagicMock
     ):
-        """USD currency on financial_report yields USD 100 million suffix instead of CNY 100 million."""
+        """USD currency on financial_report yields 亿美元 suffix instead of 亿元."""
         mock_get_config.return_value = _make_config(report_renderer_enabled=False)
         service = NotificationService()
         result = AnalysisResult(
@@ -1759,7 +1759,7 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
     def test_related_boards_drops_signal_columns_when_no_sector_data(
         self, mock_get_config: mock.MagicMock
     ):
-        """Omit status and change_pct columns when HK/US sector rankings are unavailable."""
+        """HK/US lack 板块涨跌榜 — drop status / change_pct columns entirely."""
         mock_get_config.return_value = _make_config(report_renderer_enabled=False)
         service = NotificationService()
         result = AnalysisResult(
@@ -1911,8 +1911,8 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
     ):
         """HK ADRs have financialCurrency=CNY but trade/pay dividends in HKD.
 
-        The financial summary must render in yuan (CNY income statement) while
-        dividends must render in Hong Kong dollar — they are NOT the same currency on
+        The financial summary must render in 元 (CNY income statement) while
+        dividends must render in 港元 — they are NOT the same currency on
         yfinance HK payloads, so the renderer must read each block's own
         ``currency`` field rather than assuming a single global currency.
         """

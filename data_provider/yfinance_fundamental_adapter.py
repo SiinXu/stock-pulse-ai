@@ -11,7 +11,7 @@ without changing downstream consumers. Adds HK/US-specific fields:
   yfinance commonly reports ``financialCurrency=CNY`` while trades settle in
   HKD, so this differs from the dividend currency below.
 - ``earnings.dividend.currency`` — trading / dividend currency from
-  ``info.currency`` (e.g. HKD for 0700.HK). Used to suffix Hong Kong dollars/US dollars/yuan for
+  ``info.currency`` (e.g. HKD for 0700.HK). Used to suffix 港元/美元/元 for
   per-share cash dividends and to scope the TTM yield denominator.
 - ``earnings.dividend.ttm_dividend_yield_pct`` — computed as
   ``ttm_cash_dividend_per_share / latest_price * 100``, both sides in the
@@ -19,7 +19,7 @@ without changing downstream consumers. Adds HK/US-specific fields:
   ``info.dividendYield`` is only used as a last-resort fallback and is
   passed through as-is (current yfinance reports it in percent units).
 - ``belong_boards`` — derived from ``info.sector`` + ``info.industry``; the CN
-  pipeline derives it from AkShare Sector list?, this is the HK/US analogue.
+  pipeline derives it from AkShare 板块名单, this is the HK/US analogue.
 
 This adapter intentionally treats every yfinance call as best-effort and never
 raises to caller. Partial data is allowed; downstream `_infer_block_status` will

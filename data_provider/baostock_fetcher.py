@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-BaostockFetcher - Backup Data Source 2 (Priority 3)
+BaostockFetcher - 备用数据源 2 (Priority 3)
 ===================================
 
-Data source: StockDawn (Baostock)
-Characteristics: Free, no Token required, requires login management
-Advantages: Stable, no quota limits
+数据来源：证券宝（Baostock）
+特点：免费、无需 Token、需要登录管理
+优点：稳定、无配额限制
 
-Key strategy:
-1. Manage bs.login() and bs.logout() lifecycle
-2. Use a context manager to prevent connection leaks
-3. retries with exponential backoff after failures
+关键策略：
+1. 管理 bs.login() 和 bs.logout() 生命周期
+2. 使用上下文管理器防止连接泄露
+3. 失败后指数退避重试
 """
 
 import logging
@@ -45,11 +45,11 @@ logger = logging.getLogger(__name__)
 
 def _is_us_code(stock_code: str) -> bool:
     """
-    Determine if the code is a U.S. stock.
+    判断代码是否为美股
     
-    U.S. stock code rules:
-    - 1-5 uppercase letters, such as 'AAPL', 'TSLA'
-    - May contain '.', such as 'BRK.B'.
+    美股代码规则：
+    - 1-5个大写字母，如 'AAPL', 'TSLA'
+    - 可能包含 '.'，如 'BRK.B'
     """
     code = stock_code.strip().upper()
     return bool(re.match(r'^[A-Z]{1,5}(\.[A-Z])?$', code))
@@ -57,34 +57,34 @@ def _is_us_code(stock_code: str) -> bool:
 
 class BaostockFetcher(BaseFetcher):
     """
-    Baostock data source implementation
+    Baostock 数据源实现
     
-    Priority: 3
-    Data source: StockDawn Baostock API
+    优先级：3
+    数据来源：证券宝 Baostock API
     
-    Key strategy:
-    - Use a context manager to manage the connection lifecycle
-    - Re-login/logout on each request to prevent connection leaks
-    - retries with exponential backoff after failures
+    关键策略：
+    - 使用上下文管理器管理连接生命周期
+    - 每次请求都重新登录/登出，防止连接泄露
+    - 失败后指数退避重试
     
-    Baostock features:
-    - Free, no registration required
-    - Explicitly log in/out
-    - Data updates may be slightly delayed (T+1)
+    Baostock 特点：
+    - 免费、无需注册
+    - 需要显式登录/登出
+    - 数据更新略有延迟（T+1）
     """
     
     name = "BaostockFetcher"
     priority = int(os.getenv("BAOSTOCK_PRIORITY", "3"))
     
     def __init__(self):
-        """Initialize BaostockFetcher"""
+        """初始化 BaostockFetcher"""
         self._bs_module = None
     
     def _get_baostock(self):
         """
-        Lazy load baostock module
+        延迟加载 baostock 模块
         
-        Import only on the first use to avoid errors if not installed.
+        只在首次使用时导入，避免未安装时报错
         """
         if self._bs_module is None:
             import baostock as bs
@@ -94,16 +94,16 @@ class BaostockFetcher(BaseFetcher):
     @contextmanager
     def _baostock_session(self) -> Generator:
         """
-        Baostock connection context manager
+        Baostock 连接上下文管理器
         
-        Ensure:
-        1. Automatically log in when context is entered.
-        2. Automatically log out when exiting context
-        3. Log out correctly even in abnormal situations
+        确保：
+        1. 进入上下文时自动登录
+        2. 退出上下文时自动登出
+        3. 异常时也能正确登出
         
-        Using example:
+        使用示例：
             with self._baostock_session():
-                # Execute data queries here
+                # 在这里执行数据查询
         """
         bs = self._get_baostock()
         login_result = None
@@ -138,17 +138,17 @@ class BaostockFetcher(BaseFetcher):
     
     def _convert_stock_code(self, stock_code: str) -> str:
         """
-        Convert stock codes to Baostock format
+        转换股票代码为 Baostock 格式
         
-        Baostock required format:
-        - Shanghai: sh.600519
-        - Shanghai: sz.000001
+        Baostock 要求的格式：
+        - 沪市：sh.600519
+        - 深市：sz.000001
         
         Args:
-            stock_code: original code, such as '600519', '000001'
+            stock_code: 原始代码，如 '600519', '000001'
             
         Returns:
-            Baostock Code format, If 'sh.600519', 'sz.000001'
+            Baostock 格式代码，如 'sh.600519', 'sz.000001'
         """
         raw_code = stock_code.strip()
         upper = raw_code.upper()
@@ -201,16 +201,16 @@ class BaostockFetcher(BaseFetcher):
     )
     def _fetch_raw_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """
-        Gets raw data from Baostock.
+        从 Baostock 获取原始数据
         
-        Use query_history_k_data_plus() to get daily data
+        使用 query_history_k_data_plus() 获取日线数据
         
-        Process:
-        1. Check if it's U.S. stocks (not supported)
-        2. Use a context manager to manage the connection
-        3. Convert stock code format
-        4. Call API to query data
-        5. Convert results to DataFrame
+        流程：
+        1. 检查是否为美股（不支持）
+        2. 使用上下文管理器管理连接
+        3. 转换股票代码格式
+        4. 调用 API 查询数据
+        5. 将结果转换为 DataFrame
         """
         # U.S. stocks are not supported, Throw an exception to allow DataFetcherManager Switch to another data source
         if _is_us_code(stock_code):
@@ -266,12 +266,12 @@ class BaostockFetcher(BaseFetcher):
     
     def _normalize_data(self, df: pd.DataFrame, stock_code: str) -> pd.DataFrame:
         """
-        Standardize Baostock data
+        标准化 Baostock 数据
         
-        Baostock returned column names:
+        Baostock 返回的列名：
         date, open, high, low, close, volume, amount, pctChg
         
-        Map to standard column names:
+        需要映射到标准列名：
         date, open, high, low, close, volume, amount, pct_chg
         """
         df = df.copy()
@@ -301,15 +301,15 @@ class BaostockFetcher(BaseFetcher):
 
     def get_stock_name(self, stock_code: str) -> Optional[str]:
         """
-        Get stock name
+        获取股票名称
         
-        Use Baostock's query_stock_basic interface to retrieve basic stock information
+        使用 Baostock 的 query_stock_basic 接口获取股票基本信息
         
         Args:
-            stock_code: stock code
+            stock_code: 股票代码
             
         Returns:
-            Stock Name, returns None on failure
+            股票名称，失败返回 None
         """
         # Check the cache
         if hasattr(self, '_stock_name_cache') and stock_code in self._stock_name_cache:
@@ -355,12 +355,12 @@ class BaostockFetcher(BaseFetcher):
     
     def get_stock_list(self) -> Optional[pd.DataFrame]:
         """
-        Get stock list
+        获取股票列表
         
-        Use Baostock's query_stock_basic interface to get all stock lists
+        使用 Baostock 的 query_stock_basic 接口获取全部股票列表
         
         Returns:
-            A DataFrame containing code and name columns, returns None on failure
+            包含 code, name 列的 DataFrame，失败返回 None
         """
         try:
             with self._baostock_session() as bs:

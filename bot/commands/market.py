@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Main Market Review Command
+大盘复盘命令
 ===================================
 
-Execute market review analysis, generate market overview report.
+执行大盘复盘分析，生成市场概览报告。
 """
 
 import logging
@@ -22,16 +22,16 @@ logger = logging.getLogger(__name__)
 
 class MarketCommand(BotCommand):
     """
-    Main Market Review Command
+    大盘复盘命令
 
-    Execute market review analysis, including:
-    - Major Index Performance
-    - Sector hot topics
-    - Market Sentiment
-    - Future outlook.
+    执行大盘复盘分析，包括：
+    - 主要指数表现
+    - 板块热点
+    - 市场情绪
+    - 后市展望
 
-    Usage:
-        /market - Market review of the overall market
+    用法：
+        /market - 执行大盘复盘
     """
 
     @property
@@ -51,7 +51,7 @@ class MarketCommand(BotCommand):
         return "/market"
 
     def execute(self, message: BotMessage, args: List[str]) -> BotResponse:
-        """Execute market review command"""
+        """执行大盘复盘命令"""
         try:
             request_context = to_analysis_request_context(message)
         except Exception as exc:
@@ -140,7 +140,7 @@ class MarketCommand(BotCommand):
         config,
         lock_token: Optional[Any],
     ) -> None:
-        """Perform market review in the background."""
+        """后台执行大盘复盘"""
         try:
             override_region = self._compute_market_review_override_region(config)
             if override_region == "":

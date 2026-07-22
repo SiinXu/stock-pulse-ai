@@ -214,7 +214,7 @@ _config_model_module._bind_config_facade(globals())
 
 # === Convenient Configuration Access Function ===
 def get_config() -> Config:
-    """Get a shortcut to the global configuration instance"""
+    """获取全局配置实例的快捷方式"""
     return Config.get_instance()
 
 

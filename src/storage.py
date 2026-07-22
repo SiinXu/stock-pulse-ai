@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A-shares Watchlist Analysis System - Storage layer
+A股自选股智能分析系统 - 存储层
 ===================================
 
-Responsibilities:
-1. Manage SQLite database connection (singleton pattern)
-2. Define ORM data model
-3. Provides data access interface
-4. Implement intelligent update logic (resume with breakpoints)
+职责：
+1. 管理 SQLite 数据库连接（单例模式）
+2. 定义 ORM 数据模型
+3. 提供数据存取接口
+4. 实现智能更新逻辑（断点续传）
 """
 
 import atexit
@@ -115,10 +115,10 @@ class DatabaseSchemaMigration(Base):
 
 class StockDaily(Base):
     """
-    Daily stock data model
+    股票日线数据模型
     
-    Store daily market data and technical indicators calculated
-    Supports unique constraints for multiple stocks and dates
+    存储每日行情数据和计算的技术指标
+    支持多股票、多日期的唯一约束
     """
     __tablename__ = 'stock_daily'
     
@@ -165,7 +165,7 @@ class StockDaily(Base):
         return f"<StockDaily(code={self.code}, date={self.date}, close={self.close})>"
     
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to Dictionary"""
+        """转换为字典"""
         return {
             'code': self.code,
             'date': self.date,
@@ -186,9 +186,9 @@ class StockDaily(Base):
 
 class NewsIntel(Base):
     """
-    News intelligence data model
+    新闻情报数据模型
 
-    Store news intelligence items searched and found, for subsequent analysis and query
+    存储搜索到的新闻情报条目，用于后续分析与查询
     """
     __tablename__ = 'news_intel'
 
@@ -233,7 +233,7 @@ class NewsIntel(Base):
 
 
 class IntelligenceSource(Base):
-    """Configurable data source."""
+    """可配置资讯源。"""
 
     __tablename__ = 'intelligence_sources'
 
@@ -258,7 +258,7 @@ class IntelligenceSource(Base):
 
 
 class IntelligenceItem(Base):
-    """Insights / intelligence items after consolidation."""
+    """沉淀后的资讯 / 情报条目。"""
 
     __tablename__ = 'intelligence_items'
 
@@ -293,9 +293,9 @@ class IntelligenceItem(Base):
 
 class FundamentalSnapshot(Base):
     """
-    Fundamentals context snapshot (P0 write-only).
+    基本面上下文快照（P0 write-only）。
 
-    Used only for writing; the main link does not depend on reading this table, facilitating subsequent backtesting/profiling expansion.
+    仅用于写入，主链路不依赖读取该表，便于后续回测/画像扩展。
     """
     __tablename__ = 'fundamental_snapshot'
 
@@ -318,9 +318,9 @@ class FundamentalSnapshot(Base):
 
 class AnalysisHistory(Base):
     """
-    Model for historical record of analysis results.
+    分析结果历史记录模型
 
-    Save each analysis result, supports searching by query_id/stock code
+    保存每次分析结果，支持按 query_id/股票代码检索
     """
     __tablename__ = 'analysis_history'
 
@@ -358,7 +358,7 @@ class AnalysisHistory(Base):
     )
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to Dictionary"""
+        """转换为字典"""
         return {
             'id': self.id,
             'query_id': self.query_id,
@@ -381,7 +381,7 @@ class AnalysisHistory(Base):
 
 
 class BacktestResult(Base):
-    """Backtesting results of a single analysis record."""
+    """单条分析记录的回测结果。"""
 
     __tablename__ = 'backtest_results'
 
@@ -449,7 +449,7 @@ class BacktestResult(Base):
 
 
 class BacktestSummary(Base):
-    """Backtesting summary metrics (by stock or global)."""
+    """回测汇总指标（按股票或全局）。"""
 
     __tablename__ = 'backtest_summaries'
 
@@ -732,7 +732,7 @@ class PortfolioFxRate(Base):
 
 class ConversationMessage(Base):
     """
-    Agent conversation history table
+    Agent 对话历史记录表
     """
     __tablename__ = 'conversation_messages'
 
@@ -1186,12 +1186,12 @@ class _DatabaseManagerMeta(type):
 
 class DatabaseManager(metaclass=_DatabaseManagerMeta):
     """
-    Database manager - Singleton pattern
+    数据库管理器 - 单例模式
     
-    Responsibilities:
-    1. Manage database connection pools
-    2. Provides Session context management
-    3. Encapsulate data storage and retrieval operations.
+    职责：
+    1. 管理数据库连接池
+    2. 提供 Session 上下文管理
+    3. 封装数据存取操作
     """
     
     _instance: Optional['DatabaseManager'] = None
@@ -1199,7 +1199,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
     _initialized: bool = False
     
     def __new__(cls, *args, **kwargs):
-        """Singleton pattern implementation"""
+        """单例模式实现"""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialized = False
@@ -1207,10 +1207,10 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
     
     def __init__(self, db_url: Optional[str] = None):
         """
-        Initialize the database manager
+        初始化数据库管理器
         
         Args:
-            db_url: database connection URL (optional, reads from configuration by default)
+            db_url: 数据库连接 URL（可选，默认从配置读取）
         """
         if getattr(self, '_initialized', False):
             return
@@ -1641,7 +1641,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
     @classmethod
     def get_instance(cls) -> 'DatabaseManager':
-        """Get a singleton instance"""
+        """获取单例实例"""
         with cls._init_lock:
             if cls._instance is None:
                 cls()
@@ -1649,7 +1649,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
     
     @classmethod
     def reset_instance(cls) -> None:
-        """Reset singleton (for testing)."""
+        """重置单例（用于测试）"""
         with cls._init_lock:
             if cls._instance is not None:
                 if hasattr(cls._instance, '_engine') and cls._instance._engine is not None:
@@ -1660,12 +1660,12 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
     @classmethod
     def _cleanup_engine(cls, engine) -> None:
         """
-        Clean the database engine (atexit hook)
+        清理数据库引擎（atexit 钩子）
 
-        Ensure all database connections are closed when the program exits to avoid ResourceWarning
+        确保程序退出时关闭所有数据库连接，避免 ResourceWarning
 
         Args:
-            engine: SQLAlchemy Engine object
+            engine: SQLAlchemy 引擎对象
         """
         try:
             if engine is not None:
@@ -1681,7 +1681,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
             )
 
     def _install_sqlite_pragma_handler(self) -> None:
-        """Install competitive protection parameters for SQLite connection."""
+        """为 SQLite 连接安装竞争保护参数。"""
         if not self._is_sqlite_engine:
             return
 
@@ -1819,12 +1819,12 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
     
     def get_session(self) -> Session:
         """
-        Get database Session
+        获取数据库 Session
         
-        Using example:
+        使用示例:
             with db.get_session() as session:
-                # Execute query
-                session.commit()  # If Needed
+                # 执行查询
+                session.commit()  # 如果需要
         """
         if not getattr(self, '_initialized', False) or not hasattr(self, '_SessionLocal'):
             raise RuntimeError(
@@ -1853,16 +1853,16 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
     
     def has_today_data(self, code: str, target_date: Optional[date] = None) -> bool:
         """
-        Check if data exists for a specified date.
+        检查是否已有指定日期的数据
         
-        Logic for resuming from checkpoints: skips network requests if data already exists.
+        用于断点续传逻辑：如果已有数据则跳过网络请求
         
         Args:
-            code: stock code
-            target_date: Target date (default to today)
+            code: 股票代码
+            target_date: 目标日期（默认今天）
             
         Returns:
-            Does data exist?
+            是否存在数据
         """
         if target_date is None:
             target_date = date.today()
@@ -1888,16 +1888,16 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         days: int = 2
     ) -> List[StockDaily]:
         """
-        Get data for the last N days
+        获取最近 N 天的数据
         
-        Calculates changes "compared to yesterday".
+        用于计算"相比昨日"的变化
         
         Args:
-            code: stock code
-            days: number of days to fetch
+            code: 股票代码
+            days: 获取天数
             
         Returns:
-            StockDaily object list (sorted by date descending)
+            StockDaily 对象列表（按日期降序）
         """
         with self.get_session() as session:
             results = session.execute(
@@ -1919,14 +1919,14 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         query_context: Optional[Dict[str, str]] = None
     ) -> int:
         """
-        Save news intelligence to database
+        保存新闻情报到数据库
 
-        Deduplication strategy:
-        - Prefer URL deduplication (unique constraint).
-        - URL When Missing, Use... title + source + published_date Perform soft deduplication
+        去重策略：
+        - 优先按 URL 去重（唯一约束）
+        - URL 缺失时按 title + source + published_date 进行软去重
 
-        Related strategies:
-        - query_context records user query information (platform, user, session, original command, etc.)
+        关联策略：
+        - query_context 记录用户查询信息（平台、用户、会话、原始指令等）
         """
         if not response or not response.results:
             return 0
@@ -2054,7 +2054,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         coverage: Optional[Any] = None,
     ) -> int:
         """
-        Save fundamental snapshot (P0 write-only).  Don't raise exceptions on failure, return write count 0/1.
+        保存基本面快照（P0 write-only）。失败不抛异常，返回写入条数 0/1。
         """
         if not query_id or not code or payload is None:
             return 0
@@ -2092,9 +2092,9 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         code: str,
     ) -> Optional[Dict[str, Any]]:
         """
-        Get the latest fundamental snapshot payload for query_id + code
+        获取指定 query_id + code 的最新基本面快照 payload。
 
-        Returns None (fail-open) if reading fails or does not exist.
+        读取失败或不存在时返回 None（fail-open）。
         """
         if not query_id or not code:
             return None
@@ -2133,7 +2133,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
     def get_recent_news(self, code: str, days: int = 7, limit: int = 20) -> List[NewsIntel]:
         """
-        Get recent N days of intelligence news for a specific stock
+        获取指定股票最近 N 天的新闻情报
         """
         cutoff_date = datetime.now() - timedelta(days=days)
 
@@ -2154,14 +2154,14 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
     def get_news_intel_by_query_id(self, query_id: str, limit: int = 20) -> List[NewsIntel]:
         """
-        Get the news intelligence list based on query_id
+        根据 query_id 获取新闻情报列表
 
         Args:
-            query_id: unique identifier for analysis record
-            limit: return limit
+            query_id: 分析记录唯一标识
+            limit: 返回数量限制
 
         Returns:
-            NewsIntel list (in reverse order of publish time or scrape time)
+            NewsIntel 列表（按发布时间或抓取时间倒序）
         """
         from sqlalchemy import func
 
@@ -2188,10 +2188,10 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         save_snapshot: bool = True
     ) -> int:
         """
-        Save the analysis result history record.
+        保存分析结果历史记录。
 
         Returns:
-            ID of the saved AnalysisHistory row, or 0 on failure
+            新保存的 AnalysisHistory.id；保存失败返回 0。
         """
         if result is None:
             return 0
@@ -2248,10 +2248,10 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         notification_runs: Optional[List[Dict[str, Any]]] = None,
     ) -> int:
         """
-        Update running diagnostic snapshots of saved analysis history.
+        更新已保存分析历史的运行诊断快照。
 
-        Notification results usually only appear after the analysis history is archived, so here it only supplements
-        context_snapshot.diagnostics, does not change the report body or other historical fields.
+        通知结果通常在分析历史落库后才产生，因此这里仅补写
+        context_snapshot.diagnostics，不改变报告正文或其它历史字段。
         """
         if not query_id or (diagnostics is None and not notification_runs):
             return 0
@@ -2400,18 +2400,18 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         limit: int = 20
     ) -> Tuple[List[AnalysisHistory], int]:
         """
-        Paginate query of historical analysis records (with total count)
+        分页查询分析历史记录（带总数）
         
         Args:
-            code: stock code filtering
-            report_type: report type filtering
-            start_date: start date (inclusive)
-            end_date: End date (inclusive)
-            offset: offset (skip the first N items)
-            limit: page size
+            code: 股票代码筛选
+            report_type: 报告类型筛选
+            start_date: 开始日期（含）
+            end_date: 结束日期（含）
+            offset: 偏移量（跳过前 N 条）
+            limit: 每页数量
             
         Returns:
-            Tuple[List[AnalysisHistory], int]: (record list, Total count)
+            Tuple[List[AnalysisHistory], int]: (记录列表, 总数)
         """
         from sqlalchemy import func
         
@@ -2455,16 +2455,16 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
     
     def get_analysis_history_by_id(self, record_id: int) -> Optional[AnalysisHistory]:
         """
-        Query a single analysis history record based on the database primary key ID.
+        根据数据库主键 ID 查询单条分析历史记录
         
-        Because `query_id` may repeat (when multiple records share the same `query_id` during batch analysis),
-        Use primary key ID to ensure precise querying of unique records.
+        由于 query_id 可能重复（批量分析时多条记录共享同一 query_id），
+        使用主键 ID 确保精确查询唯一记录。
         
         Args:
-            record_id: analysis history record primary key ID
+            record_id: 分析历史记录的主键 ID
             
         Returns:
-            AnalysisHistory object, Return if Not Exists None
+            AnalysisHistory 对象，不存在返回 None
         """
         with self.get_session() as session:
             result = session.execute(
@@ -2474,17 +2474,17 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
     def delete_analysis_history_records(self, record_ids: List[int]) -> int:
         """
-        Delete the analysis history of the specified item.
+        删除指定的分析历史记录。
 
-        Clean up historical backtesting results and analysis source decision signals that depend on these records to avoid
-        Residual derived data dependent on historical records. DecisionSignal's source_report_id
-        Allow weak references, Therefore, we only clean this up source_type=analysis True historical binding signals.
+        同时清理依赖这些历史记录的回测结果和分析来源决策信号，避免
+        依赖历史记录的派生数据残留。DecisionSignal 的 source_report_id
+        允许弱引用，因此这里只清理 source_type=analysis 的真实历史绑定信号。
 
         Args:
-            record_ids: list of historical record primary key IDs to delete
+            record_ids: 要删除的历史记录主键 ID 列表
 
         Returns:
-            The actual number of historical records deleted
+            实际删除的历史记录数量
         """
         ids = sorted({int(record_id) for record_id in record_ids if record_id is not None})
         if not ids:
@@ -2539,19 +2539,19 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         include_market_review: bool = False,
     ) -> List[AnalysisHistory]:
         """
-        Get a list of unique stocks from the history records, with each stock taking the latest record.
+        获取历史记录中的不重复股票列表，每只股票取最新一条记录。
 
-        Use subqueries to group by code retrieve complete records MAX(id), again JOIN query back fully recorded data.
-        Default exclude market review, avoiding mixing into individual stock columns.
+        使用子查询按 code 分组取 MAX(id)，再 JOIN 回查完整记录。
+        默认排除大盘复盘，避免混入普通个股栏。
 
         Args:
-            start_date: start date
-            end_date: End date
-            limit: Maximum return count
-            include_market_review: whether to include market review records
+            start_date: 开始日期
+            end_date: 结束日期
+            limit: 最大返回数量
+            include_market_review: 是否包含大盘复盘记录
 
         Returns:
-            List of the latest AnalysisHistory records for each stock
+            每条股票最新一条 AnalysisHistory 记录列表
         """
         with self.get_session() as session:
             subq = (
@@ -2602,17 +2602,17 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         report_type: Optional[str] = None,
     ) -> Optional[AnalysisHistory]:
         """
-        Query the latest analysis record based on query_id
+        根据 query_id 查询最新一条分析历史记录
 
-        query_id may be repeated in batch analysis, so the latest created one is returned.
+        query_id 在批量分析时可能重复，故返回最近创建的一条。
 
         Args:
-            query_id: associate analysis records with query_id
-            code: Optional stock code filter to distinguish between MARKET and individual stock records under the same query_id
-            report_type: optional report type filter
+            query_id: 分析记录关联的 query_id
+            code: 可选股票代码过滤，用于区分同一 query_id 下的 MARKET 与个股记录
+            report_type: 可选报告类型过滤
 
         Returns:
-            AnalysisHistory object, Return if Not Exists None
+            AnalysisHistory 对象，不存在返回 None
         """
         with self.get_session() as session:
             conditions = [AnalysisHistory.query_id == query_id]
@@ -2636,15 +2636,15 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         end_date: date
     ) -> List[StockDaily]:
         """
-        Get data within a specified date range
+        获取指定日期范围的数据
         
         Args:
-            code: stock code
-            start_date: start date
-            end_date: End date
+            code: 股票代码
+            start_date: 开始日期
+            end_date: 结束日期
             
         Returns:
-            StockDaily object list
+            StockDaily 对象列表
         """
         with self.get_session() as session:
             results = session.execute(
@@ -2668,20 +2668,20 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         data_source: str = "Unknown"
     ) -> int:
         """
-        Save intraday data to database
+        保存日线数据到数据库
         
-        Strategy:
-        - Perform batch UPSERT using `(code, date)`, overwriting existing records
-        - If there are duplicate dates within the same batch, use the last record
-        - SQLite Branch writes in chunks to avoid bind parameter limits
+        策略：
+        - 按 `(code, date)` 做批量 UPSERT，已存在记录会覆盖更新
+        - 同一批次内若存在重复日期，以最后一条记录为准
+        - SQLite 分支按 chunk 写入以避免绑定参数上限
         
         Args:
-            df: DataFrame containing intraday data
-            code: stock code
-            data_source: Data source name
+            df: 包含日线数据的 DataFrame
+            code: 股票代码
+            data_source: 数据来源名称
             
         Returns:
-            The actual number of records added during this time (excluding updates)
+            本次实际新增的记录数（不含更新）
         """
         if df is None or df.empty:
             logger.warning(f"No data to save; skipping {code}")
@@ -2826,16 +2826,16 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         target_date: Optional[date] = None
     ) -> Optional[Dict[str, Any]]:
         """
-        Get the context data required for analysis
+        获取分析所需的上下文数据
         
-        Returns today's data plus yesterday's comparison information
+        返回今日数据 + 昨日数据的对比信息
         
         Args:
-            code: stock code
-            target_date: Target date (default to today)
+            code: 股票代码
+            target_date: 目标日期（默认今天）
             
         Returns:
-            A dictionary containing today's data, yesterday's comparison information, etc.
+            包含今日数据、昨日对比等信息的字典
         """
         if target_date is None:
             target_date = date.today()
@@ -2881,12 +2881,12 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
     
     def _analyze_ma_status(self, data: StockDaily) -> str:
         """
-        Analyze moving average patterns
+        分析均线形态
         
-        Judgment criteria:
-        - bullish alignment: close > ma5 > ma10 > ma20
-        - Trailing arrangement: close < ma5 < ma10 < ma20
-        - range-bound movement: other cases
+        判断条件：
+        - 多头排列：close > ma5 > ma10 > ma20
+        - 空头排列：close < ma5 < ma10 < ma20
+        - 震荡整理：其他情况
         """
         # Note: The moving average pattern judgment is based on static comparison of 'close/ma5/ma10/ma20'.
         # Does not consider moving average turning points, slopes, or differences in data source price-adjustment conventions.
@@ -2910,7 +2910,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
     @staticmethod
     def _parse_published_date(value: Optional[str]) -> Optional[datetime]:
         """
-        Parse the publication time string (returns None on failure)
+        解析发布时间字符串（失败返回 None）
         """
         if not value:
             return None
@@ -2946,7 +2946,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
     @staticmethod
     def _safe_json_dumps(data: Any) -> str:
         """
-        Securely serialize as a JSON string
+        安全序列化为 JSON 字符串
         """
         try:
             return json.dumps(data, ensure_ascii=False, default=str)
@@ -2956,7 +2956,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
     @staticmethod
     def _build_raw_result(result: Any) -> Dict[str, Any]:
         """
-        Generate the complete analysis result dictionary.
+        生成完整分析结果字典
         """
         data = result.to_dict() if hasattr(result, "to_dict") else {}
         data.update({
@@ -2982,7 +2982,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         published_date: Optional[datetime]
     ) -> str:
         """
-        Generate a unique key when no URL is provided (ensure stability and shortness)
+        生成无 URL 时的去重键（确保稳定且较短）
         """
         date_str = published_date.isoformat() if published_date else ""
         raw_key = f"{code}|{title}|{source}|{date_str}"
@@ -2991,7 +2991,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
     def save_conversation_message(self, session_id: str, role: str, content: str) -> int:
         """
-        Save Agent conversation messages
+        保存 Agent 对话消息
         """
         with self.session_scope() as session:
             msg = ConversationMessage(
@@ -3005,7 +3005,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
     def get_conversation_history(self, session_id: str, limit: int = 20) -> List[Dict[str, Any]]:
         """
-        Get Agent conversation history
+        获取 Agent 对话历史
         """
         with self.session_scope() as session:
             stmt = select(ConversationMessage).filter(
@@ -3252,7 +3252,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         extra_session_ids: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """
-        Get chat session list (from conversation_messages aggregation)
+        获取聊天会话列表（从 conversation_messages 聚合）
 
         Args:
             limit: Maximum number of sessions to return.
@@ -3263,7 +3263,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 addition to the scoped prefix.
 
         Returns:
-            List of conversations sorted by most recently active time in descending order, each entry includes session_id, title, message_count, last_active.
+            按最近活跃时间倒序的会话列表，每条包含 session_id, title, message_count, last_active
         """
         from sqlalchemy import func
 
@@ -3325,7 +3325,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
     def get_conversation_messages(self, session_id: str, limit: int = 100) -> List[Dict[str, Any]]:
         """
-        Get the list of complete messages for a single session (for frontend historical recovery)
+        获取单个会话的完整消息列表（用于前端恢复历史）
         """
         with self.session_scope() as session:
             stmt = (
@@ -3347,10 +3347,10 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
     def delete_conversation_session(self, session_id: str) -> int:
         """
-        Delete all messages for the specified session
+        删除指定会话的所有消息
 
         Returns:
-            Number of messages deleted
+            删除的消息数
         """
         with self.session_scope() as session:
             session.execute(

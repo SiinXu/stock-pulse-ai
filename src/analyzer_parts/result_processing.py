@@ -263,7 +263,7 @@ _CHIP_KEYS: tuple = ("profit_ratio", "avg_cost", "concentration", "chip_health")
 
 
 def _is_value_placeholder(v: Any) -> bool:
-    """True if value is empty or placeholder (N/A, Data missing, etc.)."""
+    """True if value is empty or placeholder (N/A, 数据缺失, etc.)."""
     return is_chip_placeholder_value(v)
 
 
@@ -600,7 +600,7 @@ def _sanitize_trend_analysis_for_prompt(
 def _derive_chip_health(profit_ratio: float, concentration_90: float, language: str = "zh") -> str:
     """Derive chip_health from profit_ratio and concentration_90."""
     if profit_ratio >= 0.9:
-        return localize_chip_health("警惕", language)  # Very high profit board
+        return localize_chip_health("警惕", language)  # Very high proportion of profitable chips
     if concentration_90 >= 0.25:
         return localize_chip_health("警惕", language)  # Chip dispersion
     if concentration_90 < 0.15 and 0.3 <= profit_ratio < 0.9:
@@ -779,7 +779,7 @@ def stabilize_decision_with_structure(
 
     The LLM can overreact to one-day price movement.  This guard keeps the
     public `decision_type` enum stable while allowing richer neutral wording
-    such as Volatility/Market cleansing observation when support, resistance, and fund flow do not confirm
+    such as 震荡/洗盘观察 when support, resistance, and fund flow do not confirm
     an immediate buy/sell action.
     """
     if not result:
@@ -1395,21 +1395,21 @@ def get_stock_name_multi_source(
     data_manager = None
 ) -> str:
     """
-    Retrieve stock names in Chinese from multiple sources
+    多来源获取股票中文名称
 
-    Get strategy (by priority):
-    1. Get (realtime data) from the input context
-    2. Retrieve from STOCK_NAME_MAP static mapping table.
-    3. Gets data from DataFetcherManager (all data sources).
-    4. Return default name (stock + code)
+    获取策略（按优先级）：
+    1. 从传入的 context 中获取（realtime 数据）
+    2. 从静态映射表 STOCK_NAME_MAP 获取
+    3. 从 DataFetcherManager 获取（各数据源）
+    4. 返回默认名称（股票+代码）
 
     Args:
-        stock_code: stock code
-        context: analysis context (optional)
-        data_manager: DataFetcherManager instance(Optional)
+        stock_code: 股票代码
+        context: 分析上下文（可选）
+        data_manager: DataFetcherManager 实例（可选）
 
     Returns:
-        Stock Chinese name
+        股票中文名称
     """
     # 1. Get (realtime market data) from context
     if context:

@@ -94,7 +94,7 @@ class TestNormalizeCode:
 
 class TestBuildReverseMapNoDuplicates:
     def test_excludes_ambiguous_names(self):
-        # "Alibaba" maps to both BABA and 09988
+        # "阿里巴巴" maps to both BABA and 09988
         code_to_name = {"BABA": "阿里巴巴", "09988": "阿里巴巴", "600519": "贵州茅台"}
         result = _build_reverse_map_no_duplicates(code_to_name)
         assert "阿里巴巴" not in result
@@ -128,14 +128,13 @@ class TestResolveNameToCode:
         assert resolve_name_to_code(None) is None  # type: ignore
 
     def test_ambiguous_name_returns_none(self):
-        # "Alibaba" maps to both BABA and 09988 in STOCK_NAME_MAP
+        # "阿里巴巴" maps to both BABA and 09988 in STOCK_NAME_MAP
         assert resolve_name_to_code("阿里巴巴") is None
 
     @patch("src.services.name_to_code_resolver._get_akshare_name_to_code")
     def test_akshare_fallback_when_not_in_local(self, mock_akshare):
         mock_akshare.return_value = {"平安银行": "000001"}
-        # 000001 is in local map as Ping An Bank, so we use a name that's only in akshare
-        # Actually local has 000001 -> Ping An Bank. So "Ping An Bank" would hit local first.
+        # The local map already owns 000001, so use a different AkShare-only fixture.
         # Use a name not in STOCK_NAME_MAP - e.g. some A-share only in AkShare
         mock_akshare.return_value = {"浦发银行": "600000"}
         result = resolve_name_to_code("浦发银行")
@@ -145,7 +144,7 @@ class TestResolveNameToCode:
     @patch("src.services.name_to_code_resolver._get_akshare_name_to_code")
     def test_fuzzy_match_fallback(self, mock_akshare):
         mock_akshare.return_value = {"贵州茅台": "600519"}
-        # Typo: Guizhou Mouta -> should fuzzy match Guizhou Moutai
+        # A one-character typo should fuzzy-match the Moutai fixture.
         result = resolve_name_to_code("贵州茅苔")
         assert result == "600519"
 

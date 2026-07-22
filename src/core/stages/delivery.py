@@ -115,7 +115,7 @@ class _DeliveryStageMixin:
         report_type: ReportType = ReportType.SIMPLE,
         fallback_code: Optional[str] = None,
     ) -> None:
-        """Send individual stock notification, used by both the direct stock entry and batch serial push"""
+        """发送单股通知，供直接单股入口和批量串行推送共用。"""
         if not self.notifier.is_available():
             self._record_pipeline_stage_result(
                 PipelineStageResult.skipped(
@@ -542,7 +542,7 @@ class _DeliveryStageMixin:
         results: List[AnalysisResult],
         report_type: ReportType = ReportType.SIMPLE,
     ) -> None:
-        """Save the analysis report to a local file (decoupled from notification push)"""
+        """保存分析报告到本地文件（与通知推送解耦）"""
         render_stage = observe_pipeline_stage(
             "render",
             input_summary={
@@ -1013,7 +1013,7 @@ class _DeliveryStageMixin:
                             _get_md2img_hint(),
                         )
 
-                # Feishu: Only send the simplified version (platform limit)
+                # WeCom accepts only the condensed report because of platform limits.
                 wechat_success = False
                 if NotificationChannel.WECHAT in channels:
                     def _send_wechat_report() -> bool:

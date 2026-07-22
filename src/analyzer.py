@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A-shares self-selected stock intelligent analysis system - AI analysis layer
+A股自选股智能分析系统 - AI分析层
 ===================================
 
-Responsibilities:
-1. Encapsulate the LLM calling logic (through LiteLLM for unified calls to Gemini/Anthropic/OpenAI, etc.)
-2. Generate an analysis report based on technical and fundamental data.
-3. Parse LLM responses as a structured AnalysisResult
+职责：
+1. 封装 LLM 调用逻辑（通过 LiteLLM 统一调用 Gemini/Anthropic/OpenAI 等）
+2. 结合技术面和消息面生成分析报告
+3. 解析 LLM 响应为结构化 AnalysisResult
 """
 
 import importlib as __importlib
@@ -290,9 +290,9 @@ from src.utils.sanitize import (
 @dataclass
 class AnalysisResult:
     """
-    AI analysis result data class - Decision Dashboard version
+    AI 分析结果数据类 - 决策仪表盘版
 
-    Encapsulate the analysis results returned by Gemini, including decision dashboards and detailed analysis.
+    封装 Gemini 返回的分析结果，包含决策仪表盘和详细分析
     """
     code: str
     name: str
@@ -318,7 +318,7 @@ class AnalysisResult:
     # ========== Technical Context Analysis ==========
     technical_analysis: str = ""  # Comprehensive technical indicator analysis
     ma_analysis: str = ""  # Moving Average analysis (bullish/bearish patterns, golden cross/death cross, etc.)
-    volume_analysis: str = ""  # Momentum Analysis (Expanding/Shrinking Volume, Market Movers etc.)
+    volume_analysis: str = ""  # Volume analysis (expansion/contraction and major-fund activity)
     pattern_analysis: str = ""  # Candlestick pattern analysis.
 
     # ========== Fundamental Analysis ==========
@@ -360,7 +360,7 @@ class AnalysisResult:
     market_structure_context: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to Dictionary"""
+        """转换为字典"""
         return {
             'code': self.code,
             'name': self.name,
@@ -401,13 +401,13 @@ class AnalysisResult:
         }
 
     def get_core_conclusion(self) -> str:
-        """Get core conclusions (one sentence)"""
+        """获取核心结论（一句话）"""
         if self.dashboard and 'core_conclusion' in self.dashboard:
             return self.dashboard['core_conclusion'].get('one_sentence', self.analysis_summary)
         return self.analysis_summary
 
     def get_position_advice(self, has_position: bool = False) -> str:
-        """Get holding recommendations"""
+        """获取持仓建议"""
         if self.dashboard and 'core_conclusion' in self.dashboard:
             pos_advice = self.dashboard['core_conclusion'].get('position_advice', {})
             if has_position:
@@ -416,25 +416,25 @@ class AnalysisResult:
         return self.operation_advice
 
     def get_sniper_points(self) -> Dict[str, str]:
-        """Get target price levels"""
+        """获取狙击点位"""
         if self.dashboard and 'battle_plan' in self.dashboard:
             return self.dashboard['battle_plan'].get('sniper_points', {})
         return {}
 
     def get_checklist(self) -> List[str]:
-        """Get checklist"""
+        """获取检查清单"""
         if self.dashboard and 'battle_plan' in self.dashboard:
             return self.dashboard['battle_plan'].get('action_checklist', [])
         return []
 
     def get_risk_alerts(self) -> List[str]:
-        """Get risk alert."""
+        """获取风险警报"""
         if self.dashboard and 'intelligence' in self.dashboard:
             return self.dashboard['intelligence'].get('risk_alerts', [])
         return []
 
     def get_emoji(self) -> str:
-        """Return corresponding emoji based on recommendation suggestion"""
+        """根据操作建议返回对应 emoji"""
         _, emoji, _ = get_signal_level(
             self.operation_advice,
             self.sentiment_score,
@@ -443,7 +443,7 @@ class AnalysisResult:
         return emoji
 
     def get_confidence_stars(self) -> str:
-        """Return confidence star level"""
+        """返回置信度星级"""
         star_map = {
             "高": "⭐⭐⭐",
             "high": "⭐⭐⭐",
@@ -584,14 +584,14 @@ else:
 
 class GeminiAnalyzer:
     """
-    Gemini AI Analyzer
+    Gemini AI 分析器
 
-    Responsibilities:
-    1. Call Google Gemini API for stock analysis
-    2. Generate an analysis report using pre-searched news and technical data.
-    3. Parse AI's JSON format results
+    职责：
+    1. 调用 Google Gemini API 进行股票分析
+    2. 结合预先搜索的新闻和技术面数据生成分析报告
+    3. 解析 AI 返回的 JSON 格式结果
 
-    Usage:
+    使用方式：
         analyzer = GeminiAnalyzer()
         result = analyzer.analyze(context, news_context)
     """
@@ -1002,7 +1002,7 @@ class GeminiAnalyzer:
 
 # Convenient function
 def get_analyzer() -> GeminiAnalyzer:
-    """Get LLM analyzer instance"""
+    """获取 LLM 分析器实例"""
     return GeminiAnalyzer()
 
 

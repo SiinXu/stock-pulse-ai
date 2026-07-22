@@ -116,7 +116,7 @@ class _AgentAnalysisStageMixin:
         market_structure_context: Optional[Dict[str, Any]] = None,
     ) -> Optional[AnalysisResult]:
         """
-        Analyze a single stock using Agent mode.
+        使用 Agent 模式分析单只股票。
         """
         active_stage: Optional[PipelineStageObservation] = None
         try:
