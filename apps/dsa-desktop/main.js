@@ -1,4 +1,14 @@
-const { app, BrowserWindow, dialog, ipcMain, shell, nativeTheme } = require('electron');
+const {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  nativeImage,
+  nativeTheme,
+  shell,
+  Tray,
+} = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -8,6 +18,11 @@ const https = require('https');
 const { TextDecoder } = require('util');
 
 let mainWindow = null;
+let assistantWindow = null;
+let assistantWindowLoadPromise = null;
+let desktopTray = null;
+let desktopIsQuitting = false;
+let desktopAssistantLastReadyAt = '';
 let backendProcess = null;
 let logFilePath = null;
 let backendStartError = null;
@@ -20,7 +35,9 @@ let electronUpdateCheckInFlight = false;
 let desktopMainPageUrl = '';
 let desktopWebReady = false;
 let pendingDesktopDeepLinkRoute = null;
+let pendingDesktopDeepLinkOutcome = null;
 let desktopDeepLinkNavigationInFlight = false;
+let desktopDeepLinkFlushPromise = null;
 
 function resolveWindowBackgroundColor() {
   return nativeTheme.shouldUseDarkColors ? '#08080c' : '#f4f7fb';
@@ -49,6 +66,20 @@ const DESKTOP_BACKEND_DEFAULT_HOST = '127.0.0.1';
 const DESKTOP_PROTOCOL = 'stockpulse';
 const DESKTOP_PROTOCOL_HOST = 'app';
 const DESKTOP_DEEP_LINK_MAX_LENGTH = 4096;
+const DESKTOP_ASSISTANT_GET_STATE_CHANNEL = 'desktop-assistant:get-state';
+const DESKTOP_ASSISTANT_OPEN_ACTION_CHANNEL = 'desktop-assistant:open-action';
+const DESKTOP_ASSISTANT_SET_MAIN_VISIBILITY_CHANNEL = 'desktop-assistant:set-main-visibility';
+const DESKTOP_ASSISTANT_HIDE_CHANNEL = 'desktop-assistant:hide';
+const DESKTOP_ASSISTANT_STATE_EVENT = 'desktop-assistant:state';
+const DESKTOP_ASSISTANT_WINDOW_WIDTH = 368;
+const DESKTOP_ASSISTANT_WINDOW_HEIGHT = 484;
+const DESKTOP_ASSISTANT_STOCK_CODE_PATTERN = /^[A-Za-z0-9.]{1,16}$/;
+const DESKTOP_ASSISTANT_ACTION_ROUTES = Object.freeze({
+  analysis: '/',
+  alerts: '/alerts',
+  portfolio: '/portfolio',
+  screening: '/screening',
+});
 const DESKTOP_DEEP_LINK_EXACT_PATHS = Object.freeze(new Set([
   '/',
   '/alerts',
@@ -215,50 +246,148 @@ function sanitizeUrlForLog(rawUrl) {
   }
 }
 
-function queueDesktopDeepLink(rawUrl) {
+function normalizeDesktopAssistantStockCode(rawStockCode) {
+  if (typeof rawStockCode !== 'string') {
+    return null;
+  }
+  const stockCode = rawStockCode.trim().toUpperCase();
+  return DESKTOP_ASSISTANT_STOCK_CODE_PATTERN.test(stockCode) ? stockCode : null;
+}
+
+function buildDesktopAssistantRoute(action, rawStockCode = '') {
+  if (action === 'stock') {
+    const stockCode = normalizeDesktopAssistantStockCode(rawStockCode);
+    return stockCode ? `/stocks/${stockCode}` : null;
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(DESKTOP_ASSISTANT_ACTION_ROUTES, action)) {
+    return null;
+  }
+  return DESKTOP_ASSISTANT_ACTION_ROUTES[action];
+}
+
+function isDesktopWindowAvailable(windowRef) {
+  return Boolean(windowRef && !windowRef.isDestroyed());
+}
+
+function isDesktopWindowVisible(windowRef) {
+  return Boolean(
+    isDesktopWindowAvailable(windowRef)
+    && typeof windowRef.isVisible === 'function'
+    && windowRef.isVisible()
+  );
+}
+
+function buildDesktopAssistantState() {
+  let serviceStatus = 'starting';
+  if (backendStartError
+    || (backendProcess && (backendProcess.exitCode !== null || backendProcess.signalCode))) {
+    serviceStatus = 'unavailable';
+  } else if (desktopWebReady) {
+    serviceStatus = 'ready';
+  }
+
+  return {
+    serviceStatus,
+    mainWindowVisible: isDesktopWindowVisible(mainWindow),
+    lastReadyAt: desktopAssistantLastReadyAt,
+  };
+}
+
+function notifyDesktopAssistantState() {
+  if (!isDesktopWindowAvailable(assistantWindow)
+    || !assistantWindow.webContents
+    || (typeof assistantWindow.webContents.isDestroyed === 'function'
+      && assistantWindow.webContents.isDestroyed())) {
+    return false;
+  }
+  assistantWindow.webContents.send(
+    DESKTOP_ASSISTANT_STATE_EVENT,
+    buildDesktopAssistantState()
+  );
+  return true;
+}
+
+function isDesktopAssistantSender(event) {
+  return Boolean(
+    event
+    && event.sender
+    && isDesktopWindowAvailable(assistantWindow)
+    && assistantWindow.webContents === event.sender
+  );
+}
+
+function assertDesktopAssistantSender(event) {
+  if (!isDesktopAssistantSender(event)) {
+    throw new Error('Unauthorized desktop assistant IPC sender');
+  }
+}
+
+function queueDesktopDeepLink(rawUrl, { outcome = null } = {}) {
   const route = parseDesktopDeepLink(rawUrl);
   if (!route) {
     logLine('[deep-link] rejected inbound protocol URL');
     return false;
   }
+  if (pendingDesktopDeepLinkOutcome) {
+    pendingDesktopDeepLinkOutcome.status = 'superseded';
+  }
   pendingDesktopDeepLinkRoute = route;
+  pendingDesktopDeepLinkOutcome = outcome;
   logLine(`[deep-link] accepted route path=${new URL(route, 'http://stockpulse.local').pathname}`);
   return true;
 }
 
 async function flushPendingDesktopDeepLink() {
+  if (desktopDeepLinkNavigationInFlight && desktopDeepLinkFlushPromise) {
+    return desktopDeepLinkFlushPromise;
+  }
   if (!desktopWebReady
     || !desktopMainPageUrl
     || !pendingDesktopDeepLinkRoute
-    || desktopDeepLinkNavigationInFlight
     || !mainWindow
     || mainWindow.isDestroyed()) {
     return false;
   }
 
   desktopDeepLinkNavigationInFlight = true;
-  let navigated = false;
-  try {
+  const flushPromise = Promise.resolve().then(async () => {
+    let navigated = false;
     while (desktopWebReady
       && pendingDesktopDeepLinkRoute
       && mainWindow
       && !mainWindow.isDestroyed()) {
       const route = pendingDesktopDeepLinkRoute;
+      const outcome = pendingDesktopDeepLinkOutcome;
       pendingDesktopDeepLinkRoute = null;
+      pendingDesktopDeepLinkOutcome = null;
       const targetUrl = buildDesktopDeepLinkTargetUrl(desktopMainPageUrl, route);
       try {
         await mainWindow.loadURL(targetUrl);
         navigated = true;
+        if (outcome) {
+          outcome.status = 'navigated';
+        }
         logLine(`[deep-link] routed path=${new URL(targetUrl).pathname}`);
       } catch (error) {
+        if (outcome) {
+          outcome.status = 'failed';
+        }
         const errorName = error instanceof Error && error.name ? error.name : 'unknown_error';
         logLine(`[deep-link] route failed type=${errorName}`);
       }
     }
+    return navigated;
+  });
+  desktopDeepLinkFlushPromise = flushPromise;
+  try {
+    return await flushPromise;
   } finally {
-    desktopDeepLinkNavigationInFlight = false;
+    if (desktopDeepLinkFlushPromise === flushPromise) {
+      desktopDeepLinkNavigationInFlight = false;
+      desktopDeepLinkFlushPromise = null;
+    }
   }
-  return navigated;
 }
 
 function registerDesktopProtocolClient({
@@ -1706,7 +1835,9 @@ function startBackend({ port, envFile, dbPath, logDir, host = null }) {
     });
     backendProcess.on('error', (error) => {
       backendStartError = error;
+      desktopWebReady = false;
       logLine(`[backend] failed to start: ${error.message}`);
+      notifyDesktopAssistantState();
     });
     backendProcess.stdout.on('data', (data) => {
       if (!firstStdoutLogged) {
@@ -1723,7 +1854,12 @@ function startBackend({ port, envFile, dbPath, logDir, host = null }) {
       logLine(`[backend] ${decodeBackendOutput(data, stderrDecoder)}`);
     });
     backendProcess.on('exit', (code, signal) => {
+      desktopWebReady = false;
+      if (!desktopIsQuitting && !backendStartError) {
+        backendStartError = new Error('Backend process exited');
+      }
       logLine(`[backend] exited with code ${code}, signal ${signal || 'none'}`);
+      notifyDesktopAssistantState();
     });
   }
 
@@ -2224,6 +2360,238 @@ async function performDesktopUpdateCheck({ manual = false, notify = false } = {}
   }
 }
 
+function resolveDesktopAssistantTrayIconPath({
+  packaged = app.isPackaged,
+  resourcesPath = process.resourcesPath,
+} = {}) {
+  if (packaged) {
+    return path.join(resourcesPath, 'assistant-tray.png');
+  }
+  return path.resolve(
+    __dirname,
+    '..',
+    '..',
+    'docs',
+    'assets',
+    'dsa_vi',
+    'lightlogo.iconset',
+    'icon_32x32.png'
+  );
+}
+
+function isDesktopTrayAvailable() {
+  return Boolean(
+    desktopTray
+    && (typeof desktopTray.isDestroyed !== 'function' || !desktopTray.isDestroyed())
+  );
+}
+
+function hideExistingMainWindow() {
+  if (!isDesktopWindowAvailable(mainWindow) || typeof mainWindow.hide !== 'function') {
+    return false;
+  }
+  mainWindow.hide();
+  notifyDesktopAssistantState();
+  return true;
+}
+
+function handleMainWindowClose(event) {
+  if (desktopIsQuitting || !isDesktopTrayAvailable() || !isDesktopWindowAvailable(mainWindow)) {
+    return false;
+  }
+  if (event && typeof event.preventDefault === 'function') {
+    event.preventDefault();
+  }
+  hideExistingMainWindow();
+  return true;
+}
+
+async function openDesktopAssistantAction(action, rawStockCode = '') {
+  const route = buildDesktopAssistantRoute(action, rawStockCode);
+  if (!route) {
+    return { ok: false, error: 'invalid-action' };
+  }
+  if (!isDesktopWindowAvailable(mainWindow)) {
+    return { ok: false, error: 'main-window-unavailable' };
+  }
+
+  const rawUrl = `${DESKTOP_PROTOCOL}://${DESKTOP_PROTOCOL_HOST}${route}`;
+  const navigationOutcome = { status: 'pending' };
+  if (!queueDesktopDeepLink(rawUrl, { outcome: navigationOutcome })) {
+    return { ok: false, error: 'route-rejected' };
+  }
+
+  focusExistingMainWindow();
+  await flushPendingDesktopDeepLink();
+  if (navigationOutcome.status === 'failed') {
+    return { ok: false, error: 'navigation-failed' };
+  }
+  if (navigationOutcome.status === 'superseded') {
+    return { ok: false, error: 'navigation-superseded' };
+  }
+  return {
+    ok: true,
+    pending: navigationOutcome.status === 'pending',
+  };
+}
+
+async function createDesktopAssistantWindow({ BrowserWindowClass = BrowserWindow } = {}) {
+  if (isDesktopWindowAvailable(assistantWindow)) {
+    return assistantWindowLoadPromise || assistantWindow;
+  }
+
+  const createdWindow = new BrowserWindowClass({
+    width: DESKTOP_ASSISTANT_WINDOW_WIDTH,
+    height: DESKTOP_ASSISTANT_WINDOW_HEIGHT,
+    minWidth: DESKTOP_ASSISTANT_WINDOW_WIDTH,
+    maxWidth: DESKTOP_ASSISTANT_WINDOW_WIDTH,
+    minHeight: DESKTOP_ASSISTANT_WINDOW_HEIGHT,
+    maxHeight: DESKTOP_ASSISTANT_WINDOW_HEIGHT,
+    useContentSize: true,
+    frame: false,
+    alwaysOnTop: true,
+    resizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    show: false,
+    title: 'StockPulse Assistant',
+    backgroundColor: resolveWindowBackgroundColor(),
+    webPreferences: {
+      preload: path.join(__dirname, 'assistant-preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+    },
+  });
+  assistantWindow = createdWindow;
+
+  createdWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  const denyRendererNavigation = (event) => {
+    event.preventDefault();
+  };
+  createdWindow.webContents.on('will-navigate', denyRendererNavigation);
+  createdWindow.webContents.on('will-redirect', denyRendererNavigation);
+  createdWindow.on('close', (event) => {
+    if (desktopIsQuitting) {
+      return;
+    }
+    if (event && typeof event.preventDefault === 'function') {
+      event.preventDefault();
+    }
+    createdWindow.hide();
+    notifyDesktopAssistantState();
+  });
+  createdWindow.on('show', notifyDesktopAssistantState);
+  createdWindow.on('hide', notifyDesktopAssistantState);
+  createdWindow.once('closed', () => {
+    if (assistantWindow === createdWindow) {
+      assistantWindow = null;
+      assistantWindowLoadPromise = null;
+    }
+  });
+
+  const assistantPath = path.join(__dirname, 'renderer', 'assistant.html');
+  assistantWindowLoadPromise = Promise.resolve(createdWindow.loadFile(assistantPath))
+    .then(() => {
+      if (typeof createdWindow.center === 'function') {
+        createdWindow.center();
+      }
+      return createdWindow;
+    })
+    .catch((error) => {
+      logLine(`[assistant] failed to load: ${error instanceof Error ? error.message : String(error)}`);
+      if (assistantWindow === createdWindow) {
+        assistantWindow = null;
+      }
+      if (!createdWindow.isDestroyed() && typeof createdWindow.destroy === 'function') {
+        createdWindow.destroy();
+      }
+      throw error;
+    })
+    .finally(() => {
+      assistantWindowLoadPromise = null;
+    });
+
+  return assistantWindowLoadPromise;
+}
+
+async function showDesktopAssistantWindow() {
+  try {
+    const windowRef = await createDesktopAssistantWindow();
+    if (!isDesktopWindowAvailable(windowRef)) {
+      return false;
+    }
+    windowRef.show();
+    windowRef.focus();
+    notifyDesktopAssistantState();
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+async function toggleDesktopAssistantWindow() {
+  if (isDesktopWindowVisible(assistantWindow)) {
+    assistantWindow.hide();
+    return false;
+  }
+  return showDesktopAssistantWindow();
+}
+
+function createDesktopTray({
+  iconPath = resolveDesktopAssistantTrayIconPath(),
+  TrayClass = Tray,
+  imageApi = nativeImage,
+  menuApi = Menu,
+} = {}) {
+  if (isDesktopTrayAvailable()) {
+    return desktopTray;
+  }
+
+  try {
+    const icon = imageApi.createFromPath(iconPath);
+    if (!icon || (typeof icon.isEmpty === 'function' && icon.isEmpty())) {
+      throw new Error('tray icon is empty');
+    }
+
+    desktopTray = new TrayClass(icon);
+    desktopTray.setToolTip('StockPulse');
+    desktopTray.setContextMenu(menuApi.buildFromTemplate([
+      {
+        label: 'Open Floating Assistant',
+        click: () => {
+          void showDesktopAssistantWindow();
+        },
+      },
+      {
+        label: 'Show Main Window',
+        click: focusExistingMainWindow,
+      },
+      {
+        label: 'Hide Main Window',
+        click: hideExistingMainWindow,
+      },
+      { type: 'separator' },
+      {
+        label: 'Quit StockPulse',
+        click: () => {
+          desktopIsQuitting = true;
+          app.quit();
+        },
+      },
+    ]));
+    desktopTray.on('double-click', () => {
+      void toggleDesktopAssistantWindow();
+    });
+    return desktopTray;
+  } catch (error) {
+    desktopTray = null;
+    logLine(`[assistant] tray unavailable: ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  }
+}
+
 ipcMain.handle('desktop:get-update-state', () => desktopUpdateState);
 ipcMain.handle('desktop:check-for-updates', () => performDesktopUpdateCheck({ manual: true }));
 ipcMain.handle('desktop:install-downloaded-update', () => installDownloadedUpdate());
@@ -2231,14 +2599,47 @@ ipcMain.handle('desktop:open-release-page', async (_event, releaseUrl) => {
   await shell.openExternal(sanitizeReleaseUrl(releaseUrl));
   return true;
 });
+ipcMain.handle(DESKTOP_ASSISTANT_GET_STATE_CHANNEL, (event) => {
+  assertDesktopAssistantSender(event);
+  return buildDesktopAssistantState();
+});
+ipcMain.handle(DESKTOP_ASSISTANT_OPEN_ACTION_CHANNEL, async (event, payload = {}) => {
+  assertDesktopAssistantSender(event);
+  const result = await openDesktopAssistantAction(payload.action, payload.stockCode);
+  if (result.ok && !result.pending && isDesktopWindowAvailable(assistantWindow)) {
+    assistantWindow.hide();
+  }
+  return result;
+});
+ipcMain.handle(DESKTOP_ASSISTANT_SET_MAIN_VISIBILITY_CHANNEL, (event, visible) => {
+  assertDesktopAssistantSender(event);
+  if (visible === true) {
+    focusExistingMainWindow();
+  } else if (visible === false) {
+    hideExistingMainWindow();
+  } else {
+    throw new TypeError('Desktop assistant visibility must be boolean');
+  }
+  return buildDesktopAssistantState();
+});
+ipcMain.handle(DESKTOP_ASSISTANT_HIDE_CHANNEL, (event) => {
+  assertDesktopAssistantSender(event);
+  if (isDesktopWindowAvailable(assistantWindow)) {
+    assistantWindow.hide();
+  }
+  return true;
+});
 
 async function createWindow(brandMigrationResult) {
   desktopMainPageUrl = '';
   desktopWebReady = false;
   desktopDeepLinkNavigationInFlight = false;
+  backendStartError = null;
+  notifyDesktopAssistantState();
   const restoreResult = isWindowsNsisInstalledApp() ? restorePackagedRuntimeStateFromBackup() : null;
   const macMigrationResult = migrateMacPackagedRuntimeState();
   initLogging();
+  createDesktopTray();
   if (brandMigrationResult?.sourceDir) {
     if (brandMigrationResult.alreadyCompleted) {
       logLine(`[brand-migration] legacy user data migration already completed; rollback source retained at ${brandMigrationResult.sourceDir}`);
@@ -2301,6 +2702,14 @@ async function createWindow(brandMigrationResult) {
   });
   logStartup('BrowserWindow created');
 
+  if (typeof mainWindow.on === 'function') {
+    mainWindow.on('close', handleMainWindowClose);
+    mainWindow.on('show', notifyDesktopAssistantState);
+    mainWindow.on('hide', notifyDesktopAssistantState);
+    mainWindow.on('minimize', notifyDesktopAssistantState);
+    mainWindow.on('restore', notifyDesktopAssistantState);
+  }
+
   const loadingPath = path.join(__dirname, 'renderer', 'loading.html');
   const loadingPageStartedAt = Date.now();
   await mainWindow.loadFile(loadingPath);
@@ -2318,6 +2727,7 @@ async function createWindow(brandMigrationResult) {
     mainWindow = null;
     desktopMainPageUrl = '';
     desktopWebReady = false;
+    notifyDesktopAssistantState();
   });
 
   const webViewStartedAt = Date.now();
@@ -2368,6 +2778,9 @@ async function createWindow(brandMigrationResult) {
     logStartup(`Backend launch cwd=${launchInfo.cwd}`);
     logStartup('Waiting for backend health check');
   } catch (error) {
+    backendStartError = error instanceof Error ? error : new Error(String(error));
+    desktopWebReady = false;
+    notifyDesktopAssistantState();
     logStartup(`Backend launch failed: ${String(error)}`);
     const errorUrl = `file://${loadingPath}?error=${encodeURIComponent(String(error))}`;
     await mainWindow.loadURL(errorUrl);
@@ -2442,19 +2855,30 @@ async function createWindow(brandMigrationResult) {
     const mainPageUrl = buildMainPageUrl(port, Date.now(), backendConnectHost);
     desktopMainPageUrl = mainPageUrl;
     const initialDeepLinkRoute = pendingDesktopDeepLinkRoute;
+    const initialDeepLinkOutcome = pendingDesktopDeepLinkOutcome;
     pendingDesktopDeepLinkRoute = null;
+    pendingDesktopDeepLinkOutcome = null;
     const initialPageUrl = initialDeepLinkRoute
       ? buildDesktopDeepLinkTargetUrl(mainPageUrl, initialDeepLinkRoute)
       : mainPageUrl;
     try {
       await mainWindow.loadURL(initialPageUrl);
+      if (initialDeepLinkOutcome) {
+        initialDeepLinkOutcome.status = 'navigated';
+      }
     } catch (error) {
       if (initialDeepLinkRoute) {
+        if (initialDeepLinkOutcome) {
+          initialDeepLinkOutcome.status = 'failed';
+        }
         throw new Error('Desktop deep-link navigation failed');
       }
       throw error;
     }
     desktopWebReady = true;
+    backendStartError = null;
+    desktopAssistantLastReadyAt = new Date().toISOString();
+    notifyDesktopAssistantState();
     await flushPendingDesktopDeepLink();
     logStartup(
       `Main page loadURL resolved in ${Date.now() - mainPageStartedAt}ms url=${sanitizeUrlForLog(initialPageUrl)}`
@@ -2465,6 +2889,8 @@ async function createWindow(brandMigrationResult) {
     }
   } catch (error) {
     desktopWebReady = false;
+    backendStartError = error instanceof Error ? error : new Error(String(error));
+    notifyDesktopAssistantState();
     logStartup(`Startup failed while waiting for health: ${String(error)}`);
     const errorUrl = `file://${loadingPath}?error=${encodeURIComponent(String(error))}`;
     await mainWindow.loadURL(errorUrl);
@@ -2491,6 +2917,7 @@ function focusExistingMainWindow() {
   if (typeof mainWindow.focus === 'function') {
     mainWindow.focus();
   }
+  notifyDesktopAssistantState();
 }
 
 async function handleDesktopSecondInstance(_event, argv) {
@@ -2528,15 +2955,20 @@ if (hasDesktopInstanceLock) {
   app.whenReady().then(() => createWindow(desktopBrandMigrationResult));
   app.on('second-instance', handleDesktopSecondInstance);
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+    if (!isDesktopWindowAvailable(mainWindow)) {
+      void createWindow();
+      return;
     }
+    focusExistingMainWindow();
   });
 } else {
   app.quit();
 }
 
 app.on('window-all-closed', () => {
+  if (!desktopIsQuitting && isDesktopTrayAvailable()) {
+    return;
+  }
   void stopBackend();
   if (process.platform !== 'darwin') {
     app.quit();
@@ -2544,6 +2976,11 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  desktopIsQuitting = true;
+  if (isDesktopTrayAvailable() && typeof desktopTray.destroy === 'function') {
+    desktopTray.destroy();
+  }
+  desktopTray = null;
   void stopBackend();
 });
 
@@ -2553,6 +2990,11 @@ module.exports = {
   GITHUB_REPO,
   LATEST_RELEASE_API_URL,
   RELEASES_PAGE_URL,
+  DESKTOP_ASSISTANT_GET_STATE_CHANNEL,
+  DESKTOP_ASSISTANT_HIDE_CHANNEL,
+  DESKTOP_ASSISTANT_OPEN_ACTION_CHANNEL,
+  DESKTOP_ASSISTANT_SET_MAIN_VISIBILITY_CHANNEL,
+  DESKTOP_ASSISTANT_STATE_EVENT,
   DESKTOP_PROTOCOL,
   DESKTOP_PROTOCOL_HOST,
   DESKTOP_UPDATE_RUNTIME_RELATIVE_FILES,
@@ -2571,11 +3013,16 @@ module.exports = {
   fetchLatestReleaseJson,
   findAvailablePort,
   buildMainPageUrl,
+  buildDesktopAssistantRoute,
+  buildDesktopAssistantState,
   buildDesktopDeepLinkTargetUrl,
+  createDesktopAssistantWindow,
+  createDesktopTray,
   extractDesktopDeepLink,
   flushPendingDesktopDeepLink,
   handleDesktopOpenUrl,
   handleDesktopSecondInstance,
+  handleMainWindowClose,
   isWindowsNsisInstalledApp,
   migrateMacPackagedRuntimeState,
   migrateLegacyProductUserData,
@@ -2586,6 +3033,7 @@ module.exports = {
   readEnvFileValue,
   requestPackagedSingleInstanceLock,
   registerDesktopProtocolClient,
+  resolveDesktopAssistantTrayIconPath,
   resolveAppDir,
   resolveLegacyProductUserDataDirs,
   resolveBackendBindHost,
@@ -2602,6 +3050,25 @@ module.exports = {
   __setMainWindowForTest(mainWindowRef = null) {
     mainWindow = mainWindowRef;
   },
+  __setAssistantWindowForTest(assistantWindowRef = null) {
+    assistantWindow = assistantWindowRef;
+    assistantWindowLoadPromise = null;
+  },
+  __setDesktopTrayForTest(trayRef = null) {
+    desktopTray = trayRef;
+  },
+  __setDesktopIsQuittingForTest(isQuitting = false) {
+    desktopIsQuitting = isQuitting;
+  },
+  __setDesktopAssistantStateForTest({
+    webReady = false,
+    startError = null,
+    lastReadyAt = '',
+  } = {}) {
+    desktopWebReady = webReady;
+    backendStartError = startError;
+    desktopAssistantLastReadyAt = lastReadyAt;
+  },
   __setDesktopDeepLinkStateForTest({
     mainPageUrl = '',
     ready = false,
@@ -2610,6 +3077,7 @@ module.exports = {
     desktopMainPageUrl = mainPageUrl;
     desktopWebReady = ready;
     pendingDesktopDeepLinkRoute = pendingRoute;
+    pendingDesktopDeepLinkOutcome = null;
     desktopDeepLinkNavigationInFlight = false;
   },
   __getPendingDesktopDeepLinkRouteForTest() {

@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self' data:; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>StockPulse Assistant</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f7f8fa;
+        --surface: #ffffff;
+        --surface-strong: #eef1f5;
+        --border: #d9dee7;
+        --text: #18202d;
+        --muted: #667085;
+        --accent: #007f73;
+        --accent-hover: #006b61;
+        --blue: #2563eb;
+        --blue-hover: #1d4ed8;
+        --ready: #16855b;
+        --starting: #b26a00;
+        --danger: #be123c;
+        --danger-bg: #fff1f4;
+        --shadow: rgba(16, 24, 40, 0.16);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #121419;
+          --surface: #1b1e25;
+          --surface-strong: #252a33;
+          --border: #343a46;
+          --text: #f2f4f7;
+          --muted: #a8b0bf;
+          --accent: #39b8a9;
+          --accent-hover: #55c8bb;
+          --blue: #78a7ff;
+          --blue-hover: #94b9ff;
+          --ready: #52c995;
+          --starting: #f0ae49;
+          --danger: #ff8ba7;
+          --danger-bg: #351923;
+          --shadow: rgba(0, 0, 0, 0.38);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+      }
+
+      body {
+        font-family: "Fira Sans", "IBM Plex Sans", "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        box-shadow: 0 14px 36px var(--shadow);
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      button {
+        letter-spacing: 0;
+      }
+
+      .titlebar {
+        height: 52px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 10px 0 14px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        -webkit-app-region: drag;
+      }
+
+      .brand {
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .brand img {
+        width: 28px;
+        height: 28px;
+        flex: 0 0 28px;
+      }
+
+      .brand-copy {
+        min-width: 0;
+      }
+
+      .brand-name,
+      .brand-kind {
+        margin: 0;
+        letter-spacing: 0;
+      }
+
+      .brand-name {
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 18px;
+      }
+
+      .brand-kind {
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 14px;
+      }
+
+      .icon-button {
+        width: 32px;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+        -webkit-app-region: no-drag;
+      }
+
+      .icon-button:hover,
+      .icon-button:focus-visible {
+        background: var(--surface-strong);
+        color: var(--text);
+        outline: none;
+      }
+
+      main {
+        height: calc(100% - 52px);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 14px;
+      }
+
+      .status-band {
+        min-height: 56px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 10px 12px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      .status-label,
+      .status-value {
+        margin: 0;
+        letter-spacing: 0;
+      }
+
+      .status-label {
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .status-value {
+        margin-top: 2px;
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      .status-marker {
+        width: 10px;
+        height: 10px;
+        flex: 0 0 10px;
+        border-radius: 50%;
+        background: var(--starting);
+      }
+
+      .status-marker.ready {
+        background: var(--ready);
+      }
+
+      .status-marker.unavailable {
+        background: var(--danger);
+      }
+
+      .lookup-label,
+      .section-label {
+        display: block;
+        margin: 0 0 6px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 650;
+        letter-spacing: 0;
+      }
+
+      .lookup-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 82px;
+        gap: 8px;
+      }
+
+      .lookup-row input {
+        min-width: 0;
+        height: 38px;
+        padding: 0 11px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--surface);
+        color: var(--text);
+        font-size: 13px;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      .lookup-row input:focus {
+        border-color: var(--blue);
+        outline: 2px solid color-mix(in srgb, var(--blue) 24%, transparent);
+        outline-offset: 0;
+      }
+
+      .command-button,
+      .shortcut-button,
+      .segment-button {
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        cursor: pointer;
+      }
+
+      .command-button {
+        height: 38px;
+        background: var(--blue);
+        border-color: var(--blue);
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .command-button:hover,
+      .command-button:focus-visible {
+        background: var(--blue-hover);
+        border-color: var(--blue-hover);
+        outline: none;
+      }
+
+      .form-error {
+        height: 15px;
+        margin: 4px 0 0;
+        color: var(--danger);
+        font-size: 10px;
+        line-height: 15px;
+      }
+
+      .primary-action {
+        width: 100%;
+        height: 42px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 13px;
+        border: 0;
+        border-radius: 6px;
+        background: var(--accent);
+        color: #ffffff;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .primary-action:hover,
+      .primary-action:focus-visible {
+        background: var(--accent-hover);
+        outline: none;
+      }
+
+      .shortcut-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .shortcut-button {
+        min-width: 0;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 0 6px;
+        background: var(--surface);
+        color: var(--text);
+        font-size: 11px;
+        font-weight: 650;
+      }
+
+      .shortcut-button:hover,
+      .shortcut-button:focus-visible,
+      .segment-button:hover,
+      .segment-button:focus-visible {
+        border-color: var(--blue);
+        color: var(--blue);
+        outline: none;
+      }
+
+      .window-controls {
+        margin-top: auto;
+      }
+
+      .segmented {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0;
+      }
+
+      .segment-button {
+        height: 36px;
+        background: var(--surface);
+        color: var(--text);
+        font-size: 11px;
+        font-weight: 650;
+      }
+
+      .segment-button:first-child {
+        border-radius: 6px 0 0 6px;
+      }
+
+      .segment-button:last-child {
+        margin-left: -1px;
+        border-radius: 0 6px 6px 0;
+      }
+
+      button:disabled {
+        cursor: default;
+        opacity: 0.5;
+      }
+
+      .footer-status {
+        min-height: 16px;
+        margin: 0;
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 16px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="titlebar">
+      <div class="brand">
+        <img
+          alt=""
+          src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAHhlWElmTU0AKgAAAAgABAEaAAUAAAABAAAAPgEbAAUAAAABAAAARgEoAAMAAAABAAIAAIdpAAQAAAABAAAATgAAAAAAAABIAAAAAQAAAEgAAAABAAOgAQADAAAAAQABAACgAgAEAAAAAQAAACCgAwAEAAAAAQAAACAAAAAAnwlWxAAAAAlwSFlzAAALEwAACxMBAJqcGAAABIhJREFUWAntV01sG0UU/mbX65/12k7cOglplOK2KPxGQaWQFAUhuBT1iJC4VgIkbsCVE6AcKyT+LggJjlQgceQEpRIUUYRAKiBVRIrKT9zEcVLHdmqvd4dvNvZmdxMHh0Rw6ZOe583M23lv3nxv5hm4Tf9zBEQv+1JKnXMnyfeR82SDrPSDzK5PklKQbfZXyb+QvxdCtNn2RzT+CPkS2SXvl9QaX5Nn+rJOxVPkFfJB0yoX3OZE6AioEKeXF8nbFPvyPqC0sORgrS6RNQWKw7p3bpz+jvwYj6PZVY068DAnviWHxrvK/baLqy5e+qCG6oaEmQDePJfBeEHrfn6aDlzudvzRzsD9bPdlXK1zqyXRtCUMwrhFKNabCps+PeBLFKIODAYn/60suAXFioLy5ghCNmKdwW6jUm3P9FdtCTcaZRRSeYxlRjaN945jyGaoQ8vR/j86c7O5jpe/nMP16iLGs6P48Kk5nqEJ1+WlwMi7ZNUGKORa9AgCev2JNbuB5cYqNMZ6rVnFRruFQUtg/LCGOON5fETHUC5kM7Twnncc+pqdfDKHmdEpXFtdwGRhApZhIU7wnT9nYaMFZJIC2i7b3LcDqVgSc7OvRP3CfMnFHysOd69h8mjMB2VUcW8OSBdu5SLz7DpEegJiYAa228Yn1z7HIoF4z6ETOFOcRWUdeO1CHeWqixwvovdeyGB4YOcw7MkBWbuK9o/PAk4DSB5BfOYblBnm93+6gHW7jiHzEGbHHuQ9kGH+S6TiwgPhLcq9aGe3emk7Nc5wMT1NeNOyuwGCneEVMLQYjblwyMHcVxngKKUeFHVgF1Wu4G1kC9HSdZj7OTwxPo0j1jDOHnscGSODNnPQM0r9tgPYuzzE0SPwTChnpd1C49IXcCplxO+6G8mphyAF1V2+I5KraurdYqpx569Ov6g+8SkVd5G3ND5GLgbSGnLpLad9pY7Q0wF7YR4r59+AbLUQL57AyLsfQctOInbvO3SuApEqQiRHPRB+ShD+vl7CmDWCZybOoJCN4e3nLTT5JiSJAzPRvwO+g9JxIAzeJHrHR4YbWgraHQqEdY6bPHwdK43lDggbyMYtPHl0BgWCcb7koMRXsZDVMFUMpaEfZWUsGgFVRm0j6R2+Dtn8E+0fnmZ7A8I8DuPkZwQhAagbSMoEEjEDuiawUgVe/7iOm43NTHjrOQt3DqkKz6MQIqIOqBpukxR8iWjPNqPB7RJNZcj6PGW61PiNkahRinnIV06y9vIyoEV1h58nDeGBscGECdCWDQ5Gs+Aqx7wQaSmTu7S8Y9AHWZPqVI0NsDTNUcOGSIx66WjyJhwy8wSj4bUJLYE0i5Bh3oAGt3c4K5BLhTCgbPgUmumUZF9xdlo9Ye2lEmTbhp7JEYA0TJK1XwnMZTp3jCAc88bUI1S3N/gOmMglMt5YleFXhYi6jAa2suAKJ2eDJZmnHPyhE6oirpAPmta44OmgrZ4yFafJqpQ+iLKcy8jL5Ed3Mhg6gqACP1AAPUWO/jEJqvWSFY66f0x+pnyFYd8xw3otcHv8P4vA30TD0QyfaiqNAAAAAElFTkSuQmCC"
+        />
+        <div class="brand-copy">
+          <p class="brand-name">StockPulse</p>
+          <p class="brand-kind">Floating assistant</p>
+        </div>
+      </div>
+      <button class="icon-button" id="closeButton" type="button" title="Hide assistant" aria-label="Hide assistant">
+        &#10005;
+      </button>
+    </header>
+
+    <main>
+      <section class="status-band" aria-live="polite">
+        <div>
+          <p class="status-label">Local service</p>
+          <p class="status-value" id="serviceStatus">Starting</p>
+        </div>
+        <span class="status-marker" id="serviceMarker" aria-hidden="true"></span>
+      </section>
+
+      <form id="stockLookupForm" novalidate>
+        <label class="lookup-label" for="stockCodeInput">Quick stock lookup</label>
+        <div class="lookup-row">
+          <input
+            id="stockCodeInput"
+            name="stockCode"
+            type="text"
+            maxlength="16"
+            autocomplete="off"
+            autocapitalize="characters"
+            spellcheck="false"
+            placeholder="AAPL / 600519"
+          />
+          <button class="command-button" type="submit">Open &#8594;</button>
+        </div>
+        <p class="form-error" id="formError" aria-live="polite"></p>
+      </form>
+
+      <button class="primary-action" type="button" data-action="analysis">
+        <span>Open analysis</span>
+        <span aria-hidden="true">&#8594;</span>
+      </button>
+
+      <nav class="shortcut-grid" aria-label="Quick actions">
+        <button class="shortcut-button" type="button" data-action="portfolio">
+          <span aria-hidden="true">&#9638;</span>
+          <span>Portfolio</span>
+        </button>
+        <button class="shortcut-button" type="button" data-action="alerts">
+          <span aria-hidden="true">&#9679;</span>
+          <span>Alerts</span>
+        </button>
+        <button class="shortcut-button" type="button" data-action="screening">
+          <span aria-hidden="true">&#8942;</span>
+          <span>Screening</span>
+        </button>
+      </nav>
+
+      <section class="window-controls">
+        <p class="section-label" id="mainWindowStatus">Main window</p>
+        <div class="segmented" role="group" aria-labelledby="mainWindowStatus">
+          <button class="segment-button" id="showMainButton" type="button">
+            Show main window
+          </button>
+          <button class="segment-button" id="hideMainButton" type="button">
+            Hide main window
+          </button>
+        </div>
+      </section>
+
+      <p class="footer-status" id="lastReadyStatus"></p>
+    </main>
+
+    <script src="assistant.js" defer></script>
+  </body>
+</html>

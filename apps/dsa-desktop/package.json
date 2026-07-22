@@ -31,6 +31,7 @@
     },
     "files": [
       "main.js",
+      "assistant-preload.js",
       "preload.js",
       "renderer/**/*"
     ],
@@ -42,6 +43,10 @@
       {
         "from": "../../dist/backend/stock_analysis",
         "to": "backend/stock_analysis"
+      },
+      {
+        "from": "../../docs/assets/dsa_vi/lightlogo.iconset/icon_32x32.png",
+        "to": "assistant-tray.png"
       }
     ],
     "win": {

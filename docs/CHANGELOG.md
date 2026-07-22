@@ -296,6 +296,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Docs] Aligned maintained Markdown source-install guidance with the constrained pip bootstrap, PEP 517 build constraint, and pip check required by the reproducible dependency contract.
 - [Changed] Split analysis orchestration into a focused application module while preserving the legacy main entrypoint and analysis behavior.
 - [Fixed] Preserved Data Provider plugin market, capability, and priority eligibility in in-flight snapshots during concurrent unload.
+- [Added] Added a tray-opened, isolated floating Desktop assistant with local readiness state, validated Web-route shortcuts, and hide-to-tray main-window controls.
 
 ## [3.26.3] - 2026-07-15
 
