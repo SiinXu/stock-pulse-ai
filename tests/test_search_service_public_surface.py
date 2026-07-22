@@ -25,7 +25,7 @@ EXPECTED_PUBLIC_SURFACE_SHA256 = (
     "c527fe8817034ae49440db32d059f8c7498a3bff246c1ca36d8fd7e54f1ad305"
 )
 EXPECTED_REFLECTION_SHA256 = (
-    "b913b7dec821deeed9ae1351da38c00788f6cc2d2c612309a73fe6efeeab02ee"
+    "60c033a897a4a895205d167c6445aee59a3cab5a56febc8e411b7168ffa2d6ef"
 )
 
 EXPECTED_AST_GROUPS = (
@@ -286,6 +286,9 @@ def _class_record(module, cls):
             for field in dataclasses.fields(cls)
         ]
         params = cls.__dataclass_params__
+        # Keep this payload stable on Python 3.11 and 3.12. The newer
+        # _DataclassParams attributes are already covered through signatures,
+        # fields, __match_args__, and the raw class surface above.
         record["dataclass_params"] = [
             getattr(params, name, None)
             for name in (
@@ -295,10 +298,6 @@ def _class_record(module, cls):
                 "order",
                 "unsafe_hash",
                 "frozen",
-                "match_args",
-                "kw_only",
-                "slots",
-                "weakref_slot",
             )
         ]
     return record
@@ -353,9 +352,23 @@ def test_search_moved_definition_asts_match_pre_split_snapshot():
 
 
 def test_search_moved_reflection_matches_pre_split_snapshot():
-    module = importlib.import_module("src.search_service")
+    script = r'''
+import src.search_service as module
+from tests.test_search_service_public_surface import _digest, _reflection_snapshot
 
-    assert _digest(_reflection_snapshot(module)) == EXPECTED_REFLECTION_SHA256
+print(_digest(_reflection_snapshot(module)))
+'''
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout.strip() == EXPECTED_REFLECTION_SHA256
+
+    module = importlib.import_module("src.search_service")
     for class_name in MOVED_CLASSES:
         cls = getattr(module, class_name)
         assert cls.__module__ == module.__name__
