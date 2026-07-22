@@ -1338,7 +1338,11 @@ const PortfolioPage: React.FC = () => {
         <PageHeader title={text.title} description={text.description} />
       </section>
 
-      {error ? <ApiErrorAlert error={error} onDismiss={() => setError(null)} /> : null}
+      {error ? (
+        <div className="[&_details]:border-t-0 [&_details]:pt-0">
+          <ApiErrorAlert error={error} onDismiss={() => setError(null)} />
+        </div>
+      ) : null}
       {accountCreateSuccess ? (
         <InlineAlert variant="success" size="compact" message={accountCreateSuccess} />
       ) : null}

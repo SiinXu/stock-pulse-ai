@@ -93,5 +93,8 @@ docs/specs/
 /node_modules/
 .playwright-mcp/
 
+# ignore local git worktrees used for parallel agent work
+/.worktrees/
+
 # ignore local screenshots / one-off visual evidence
 /*.png

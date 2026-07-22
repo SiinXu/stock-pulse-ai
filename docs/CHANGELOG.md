@@ -239,6 +239,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Split the Alerts & Automation, System & Security, and Data Sources settings sections and the new top-level Advanced section into horizontal tab views (push routing/behavior & limits/event monitor, scheduling/system settings/web & logs/auth & security/version & updates, sources/intel sources/providers, backend status/developer diagnostics/config backup) with `?section=&view=` deep links and cross-view validation-error jumps; Developer Diagnostics is now a flat tab instead of a collapsed panel, and the push-routing channel empty state collapses into a single compact hint with a configure-channels entry.
 - [Fixed] Aligned the home stock-bar and history-list row checkboxes with the select-all column (removing the centered offset and negative margin) and reveal the per-item delete button only on hover or keyboard focus, staying always visible on touch devices without hover, matching the Chat session list.
 - [Fixed] Removed the `max-w-6xl` cap on the AlphaSift screening page content so it fills the viewport like the other workspace pages.
+- [Fixed] Corrected dark-mode Chat controls, deep-research layout, screening parameter rows, portfolio error details, and Decision Signals action and filter alignment.
 - [Fixed] Required current-password reauthentication before disabling administrator authentication and blocked generic configuration or non-canonical key aliases from changing the auth toggle.
 - [Changed] Split pipeline delivery, rendering, and dispatch stages into a focused module while preserving the `src.core.pipeline` compatibility surface.
 - [Changed] Added configurable daily-provider health scoring, serialized circuit admission, redacted failover metadata, and half-open recovery without changing market capability boundaries.
@@ -278,6 +279,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Enforced a shared fail-closed outbound HTTP policy for search, intelligence, custom model endpoints, webhooks, and notification tests with connection-time DNS checks, bounded redirects and responses, credential stripping, and an explicit self-host allowlist.
 - [Chore] Translated historical developer comments across source, configuration, scripts, and tests into English while preserving runtime-consumed docstrings and localized content.
 - [Fixed] Kept the existing persistent daily-provider cache in Desktop runtime data and Windows update backups while preserving explicit cache paths.
+- [Changed] Split DatabaseManager lifecycle and storage operations into focused private modules while preserving the `src.storage` facade and migration behavior.
 
 ## [3.26.3] - 2026-07-15
 

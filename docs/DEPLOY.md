@@ -342,7 +342,7 @@ deploy:
 
 - **直接部署（pip + python）**：先构建前端，再启动服务：
   ```bash
-  # 安装 Node.js 18+（推荐 20+，如尚未安装）
+  # 安装 Node.js 22 LTS（如尚未安装）
   # 构建前端
   cd apps/dsa-web
   npm ci
