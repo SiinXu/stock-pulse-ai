@@ -256,22 +256,29 @@ class PluginManager:
 
             record.transition = operation
             context = PluginContext(plugin_id, self._registry)
-            load_error = False
+            load_error_code: str | None = None
             try:
                 record.plugin.onload(context)
             except Exception as exc:  # broad-exception: fallback_recorded - A plugin load failure is safely logged before partial registrations are removed.
-                load_error = True
+                load_error_code = (
+                    exc.error_code
+                    if isinstance(exc, PluginError)
+                    else "plugin_onload_failed"
+                )
                 log_safe_exception(
                     logger,
                     "Plugin onload callback failed",
                     exc,
-                    error_code="plugin_onload_failed",
+                    error_code=load_error_code,
                     context={"plugin_id": plugin_id, "operation": operation},
                 )
             finally:
                 context.close()
 
-            if load_error:
+            if load_error_code is None:
+                load_error_code = context.recovery_error_code
+
+            if load_error_code is not None:
                 remaining, cleanup_errors = self._cleanup_handles(
                     plugin_id,
                     context.handles,
@@ -288,7 +295,7 @@ class PluginManager:
                     error_code=(
                         cleanup_errors[0]
                         if cleanup_errors
-                        else "plugin_onload_failed"
+                        else load_error_code
                     ),
                 )
 

@@ -63,9 +63,9 @@ class NativeRegistrationBackend(Protocol):
         """Remove exactly the supplied implementation when it is still owned."""
 
 
-def _accept_implementation(implementation: object) -> bool:
+def _reject_unconfigured_implementation(implementation: object) -> bool:
     del implementation
-    return True
+    return False
 
 
 def _attribute_identity(attribute: str) -> IdentityResolver:
@@ -80,7 +80,7 @@ class ExtensionContract:
     """Validation and optional native delegation for one extension point."""
 
     identity_resolver: IdentityResolver
-    validator: ImplementationValidator = _accept_implementation
+    validator: ImplementationValidator = _reject_unconfigured_implementation
     supported_versions: frozenset[str] = field(default_factory=lambda: frozenset({"1"}))
     backend: NativeRegistrationBackend | None = None
 
@@ -97,7 +97,7 @@ class ExtensionContract:
 
 
 def default_extension_contracts() -> Mapping[ExtensionPoint, ExtensionContract]:
-    """Return attribute-level contracts for all extension points in ADR-007."""
+    """Return fail-closed identity contracts for the ADR-007 extension points."""
 
     contracts: dict[ExtensionPoint, ExtensionContract] = {
         "data_provider": ExtensionContract(_attribute_identity("provider_id")),
@@ -184,6 +184,7 @@ class ExtensionRegistration:
 class _RegistryEntry:
     registration: ExtensionRegistration
     token: object
+    recovery_only: bool = False
 
 
 class RegistrationHandle:
@@ -362,6 +363,7 @@ class ExtensionRegistry:
                 self._entries[key] = _RegistryEntry(registration=registration, token=token)
             except Exception as exc:  # broad-exception: fallback_recorded - Partial native registration is rolled back and recorded before a typed failure is returned.
                 rollback_failed = False
+                recovery_handle: RegistrationHandle | None = None
                 if contract.backend is not None:
                     try:
                         contract.backend.unregister(registration_id, implementation)
@@ -376,6 +378,17 @@ class ExtensionRegistry:
                         )
                 if rollback_failed:
                     error_code = "native_registry_rollback_failed"
+                    self._entries[key] = _RegistryEntry(
+                        registration=registration,
+                        token=token,
+                        recovery_only=True,
+                    )
+                    recovery_handle = RegistrationHandle(
+                        self,
+                        extension_point,
+                        registration_id,
+                        token,
+                    )
                 elif contract.backend is not None:
                     error_code = "native_registry_registration_failed"
                 else:
@@ -387,7 +400,10 @@ class ExtensionRegistry:
                     error_code=error_code,
                     context={"extension_point": extension_point, "plugin_id": plugin_id},
                 )
-                raise PluginRegistryError(error_code) from None
+                raise PluginRegistryError(
+                    error_code,
+                    recovery_handle=recovery_handle,
+                ) from None
             self._next_order += 1
             return RegistrationHandle(self, extension_point, registration_id, token)
 
@@ -401,7 +417,8 @@ class ExtensionRegistry:
             values = tuple(
                 entry.registration
                 for entry in self._entries.values()
-                if extension_point is None or entry.registration.extension_point == extension_point
+                if not entry.recovery_only
+                and (extension_point is None or entry.registration.extension_point == extension_point)
             )
         return tuple(sorted(values, key=lambda item: (item.priority, item.registration_order)))
 
@@ -414,7 +431,7 @@ class ExtensionRegistry:
 
         with self._lock:
             entry = self._entries.get((extension_point, registration_id))
-            return None if entry is None else entry.registration
+            return None if entry is None or entry.recovery_only else entry.registration
 
     def _owns(
         self,
@@ -468,6 +485,7 @@ class PluginContext:
         self._plugin_id = plugin_id
         self._registry = registry
         self._handles: list[RegistrationHandle] = []
+        self._recovery_error_code: str | None = None
         self._active = True
         self._lock = threading.RLock()
 
@@ -485,6 +503,13 @@ class PluginContext:
         with self._lock:
             return tuple(self._handles)
 
+    @property
+    def recovery_error_code(self) -> str | None:
+        """Return cleanup debt that must fail this load even if plugin code catches it."""
+
+        with self._lock:
+            return self._recovery_error_code
+
     def register(
         self,
         extension_point: ExtensionPoint,
@@ -500,15 +525,21 @@ class PluginContext:
         with self._lock:
             if not self._active:
                 raise PluginContextClosedError("plugin_context_closed")
-            handle = self._registry.register(
-                plugin_id=self._plugin_id,
-                extension_point=extension_point,
-                registration_id=registration_id,
-                implementation=implementation,
-                contract_version=contract_version,
-                priority=priority,
-                metadata=metadata,
-            )
+            try:
+                handle = self._registry.register(
+                    plugin_id=self._plugin_id,
+                    extension_point=extension_point,
+                    registration_id=registration_id,
+                    implementation=implementation,
+                    contract_version=contract_version,
+                    priority=priority,
+                    metadata=metadata,
+                )
+            except PluginRegistryError as exc:
+                if isinstance(exc.recovery_handle, RegistrationHandle):
+                    self._handles.append(exc.recovery_handle)
+                    self._recovery_error_code = exc.error_code
+                raise
             self._handles.append(handle)
             return handle
 

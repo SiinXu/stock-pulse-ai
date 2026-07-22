@@ -11,7 +11,7 @@ integration is not yet wired.
 
 | Surface | Current authority | Track X delivery |
 | --- | --- | --- |
-| Plugin lifecycle, manifest, registry | `src/plugins/` core, not startup-wired | #273 X2a implemented |
+| Plugin lifecycle, manifest, registry | `src/plugins/` core; native validators and startup not wired | #273 X2a core implemented |
 | Built-in/external startup wiring | `src/application_services.py` composition root | #273 X2b, only after GATE-P3 |
 | Data Providers | `BaseFetcher` and `DataFetcherManager` | #276 X3 |
 | Analysis Strategies | `Skill`, `SkillManager`, `StrategyEngine` | Contract only in this batch |
@@ -30,6 +30,13 @@ or import external code during application startup. A caller first uses
 plugins, then invokes `PluginManager.load(...)` or `load_all()` separately.
 Startup composition and its opt-in configuration remain X2b work behind
 GATE-P3.
+
+Default extension-point contracts enforce canonical identity but reject every
+implementation until composition supplies that point's concrete validator.
+Identity alone is never treated as proof that an implementation satisfies its
+full protocol. The native adapters delivered by X2b, X3, or a later integration
+must inject the validator and optional native backend before registrations for
+that point can succeed.
 
 ## Package And Manifest
 
@@ -213,8 +220,12 @@ commit ownership. Existing permissive `SkillManager.register()` and
 `ToolRegistry.register()` overwrite behavior must never be called when their
 native key already exists. If delegation or later bookkeeping fails, the new
 native entry and unified reservation are rolled back before the error reaches
-the plugin. Unregistration removes only the exact implementation owned by that
-handle, so a stale handle cannot remove a built-in or another plugin's entry.
+the plugin. If native rollback itself fails, the registry retains a quarantined
+owner reservation and recovery handle, excludes that implementation from active
+unified snapshots, and lets manager cleanup retry the exact native removal. The
+same plugin cannot be marked enabled merely because it catches that registration
+error. Unregistration removes only the exact implementation owned by that handle,
+so a stale handle cannot remove a built-in or another plugin's entry.
 
 Lower numeric priority runs first where ordering is meaningful. Equal priority
 uses registration order for deterministic process-local behavior. Priority does

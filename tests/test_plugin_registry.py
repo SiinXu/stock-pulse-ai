@@ -109,6 +109,53 @@ def test_backend_write_is_rolled_back_when_registration_raises() -> None:
     assert registry.registrations() == ()
 
 
+def test_failed_rollback_retains_quarantined_owner_until_cleanup_retry() -> None:
+    backend = _Backend()
+    backend.fail_register_after_write = True
+    backend.fail_unregister = True
+    registry = _registry(backend)
+    implementation = _Template("daily")
+
+    with pytest.raises(PluginRegistryError) as raised:
+        registry.register(
+            plugin_id="failing-plugin",
+            extension_point="report_template",
+            registration_id="daily",
+            implementation=implementation,
+        )
+
+    assert raised.value.error_code == "native_registry_rollback_failed"
+    recovery_handle = raised.value.recovery_handle
+    assert recovery_handle is not None
+    assert recovery_handle.active is True
+    assert backend.items["daily"] is implementation
+    assert registry.registrations() == ()
+    assert registry.get("report_template", "daily") is None
+    _assert_error(
+        "extension_registration_conflict",
+        lambda: registry.register(
+            plugin_id="replacement-plugin",
+            extension_point="report_template",
+            registration_id="daily",
+            implementation=_Template("daily"),
+        ),
+    )
+
+    backend.fail_unregister = False
+    recovery_handle.unregister()
+
+    assert recovery_handle.active is False
+    assert backend.items == {}
+    backend.fail_register_after_write = False
+    replacement_handle = registry.register(
+        plugin_id="replacement-plugin",
+        extension_point="report_template",
+        registration_id="daily",
+        implementation=_Template("daily"),
+    )
+    assert replacement_handle.active is True
+
+
 def test_unregister_removes_only_exact_owner_and_stale_handle_is_safe() -> None:
     backend = _Backend()
     registry = _registry(backend)
@@ -251,3 +298,17 @@ def test_registry_rejects_identity_version_metadata_and_validator_drift() -> Non
             identity_resolver=lambda implementation: implementation.template_id,
             supported_versions=frozenset({1}),  # type: ignore[arg-type]
         )
+
+
+def test_default_contracts_fail_closed_until_native_validator_is_configured() -> None:
+    registry = ExtensionRegistry()
+
+    _assert_error(
+        "extension_implementation_invalid",
+        lambda: registry.register(
+            plugin_id="example-plugin",
+            extension_point="report_template",
+            registration_id="daily",
+            implementation=_Template("daily"),
+        ),
+    )

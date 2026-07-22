@@ -18,6 +18,7 @@ from src.plugins import (
     PluginContextClosedError,
     PluginManager,
     PluginManifest,
+    PluginRegistryError,
 )
 
 
@@ -85,6 +86,7 @@ class _Backend:
     def __init__(self) -> None:
         self.items: dict[str, object] = {}
         self.unregister_order: list[str] = []
+        self.fail_register_after_write = False
         self.fail_unregister = False
 
     def contains(self, registration_id: str) -> bool:
@@ -92,6 +94,8 @@ class _Backend:
 
     def register(self, registration_id: str, implementation: object) -> None:
         self.items[registration_id] = implementation
+        if self.fail_register_after_write:
+            raise RuntimeError("token=registration-secret")
 
     def unregister(self, registration_id: str, implementation: object) -> None:
         self.unregister_order.append(registration_id)
@@ -114,8 +118,20 @@ def _manager_with_backend(backend: _Backend) -> PluginManager:
     return PluginManager(application_version="2.0.0", registry=registry)
 
 
+def _manager() -> PluginManager:
+    registry = ExtensionRegistry(
+        {
+            "report_template": ExtensionContract(
+                identity_resolver=lambda implementation: implementation.template_id,
+                validator=lambda implementation: isinstance(implementation, _Template),
+            )
+        }
+    )
+    return PluginManager(application_version="2.0.0", registry=registry)
+
+
 def test_register_is_separate_from_load_and_lifecycle_is_exactly_once() -> None:
-    manager = PluginManager(application_version="2.0.0")
+    manager = _manager()
     plugin = _RecordingPlugin(_manifest("example-plugin"), ("daily",))
 
     registered = manager.register(plugin, source="builtin")
@@ -188,7 +204,7 @@ def test_onload_failure_cleans_in_reverse_order() -> None:
 
 
 def test_load_all_continues_after_failed_plugin() -> None:
-    manager = PluginManager(application_version="2.0.0")
+    manager = _manager()
     failing = _RecordingPlugin(
         _manifest("failing-plugin"),
         ("failing",),
@@ -250,7 +266,7 @@ def test_context_rejects_registration_after_onload_returns() -> None:
 
 
 def test_onunload_failure_still_disables_and_cleans_exactly_once() -> None:
-    manager = PluginManager(application_version="2.0.0")
+    manager = _manager()
     plugin = _RecordingPlugin(
         _manifest("unload-plugin"),
         ("daily",),
@@ -290,6 +306,51 @@ def test_native_cleanup_failure_keeps_failed_state_until_retry() -> None:
     assert retried.success is True
     assert retried.state == "disabled"
     assert manager.registrations() == ()
+    assert plugin.unload_count == 1
+
+
+def test_failed_registration_rollback_remains_owned_when_plugin_swallows_error() -> None:
+    backend = _Backend()
+    backend.fail_register_after_write = True
+    backend.fail_unregister = True
+    manager = _manager_with_backend(backend)
+
+    class SwallowingPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            self.load_count += 1
+            self.last_context = context
+            try:
+                context.register(
+                    "report_template",
+                    "daily",
+                    _Template("daily"),
+                )
+            except PluginRegistryError:
+                pass
+
+    plugin = SwallowingPlugin(_manifest("rollback-plugin"))
+    manager.register(plugin, source="builtin")
+
+    failed = manager.load("rollback-plugin")
+
+    assert failed.success is False
+    assert failed.state == "failed"
+    assert failed.error_code == "native_registry_unregistration_failed"
+    assert manager.registrations() == ()
+    assert backend.items["daily"].template_id == "daily"  # type: ignore[attr-defined]
+    assert plugin.unload_count == 0
+
+    backend.fail_register_after_write = False
+    backend.fail_unregister = False
+    recovered = manager.disable("rollback-plugin")
+
+    assert recovered.success is True
+    assert recovered.state == "disabled"
+    assert backend.items == {}
+    assert plugin.unload_count == 0
+    assert manager.enable("rollback-plugin").success is True
+    assert plugin.load_count == 2
+    assert manager.disable("rollback-plugin").success is True
     assert plugin.unload_count == 1
 
 

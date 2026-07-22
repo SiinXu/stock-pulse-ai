@@ -16,6 +16,15 @@ class PluginError(Exception):
 class PluginRegistryError(PluginError):
     """Raised when an extension registration cannot be completed safely."""
 
+    def __init__(
+        self,
+        error_code: str,
+        *,
+        recovery_handle: object | None = None,
+    ) -> None:
+        self.recovery_handle = recovery_handle
+        super().__init__(error_code)
+
 
 class PluginContextClosedError(PluginError):
     """Raised when a plugin uses its registration context outside ``onload``."""
