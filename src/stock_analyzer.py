@@ -35,7 +35,7 @@ class TrendStatus(Enum):
     STRONG_BULL = "强势多头"      # MA5 > MA10 > MA20, and the gap expands
     BULL = "多头排列"             # MA5 > MA10 > MA20
     WEAK_BULL = "弱势多头"        # MA5 > MA10, but MA10 < MA20
-    CONSOLIDATION = "盘整"        # Moving average wrapping
+    CONSOLIDATION = "盘整"        # Moving averages are intertwined
     WEAK_BEAR = "弱势空头"        # MA5 < MA10, but MA10 > MA20
     BEAR = "空头排列"             # MA5 < MA10 < MA20
     STRONG_BEAR = "强势空头"      # MA5 < MA10 < MA20, and the distance expands.
@@ -44,9 +44,9 @@ class TrendStatus(Enum):
 class VolumeStatus(Enum):
     """量能状态枚举"""
     HEAVY_VOLUME_UP = "放量上涨"       # Volume and price rising together
-    HEAVY_VOLUME_DOWN = "放量下跌"     # Stop-loss kill
-    SHRINK_VOLUME_UP = "缩量上涨"      # No volume increase
-    SHRINK_VOLUME_DOWN = "缩量回调"    # Volume shrinkage callback (good)
+    HEAVY_VOLUME_DOWN = "放量下跌"     # Selloff on heavy volume
+    SHRINK_VOLUME_UP = "缩量上涨"      # Price rise on weak volume
+    SHRINK_VOLUME_DOWN = "缩量回调"    # Pullback on declining volume (favorable)
     NORMAL = "量能正常"
 
 
@@ -54,10 +54,10 @@ class BuySignal(Enum):
     """买入信号枚举"""
     STRONG_BUY = "强烈买入"       # Multiple conditions satisfied
     BUY = "买入"                  # Basic conditions met
-    HOLD = "持有"                 # Currently holding, can continue
-    WAIT = "观望"                 # Wait for a better opportunity.
-    SELL = "卖出"                 # Weak trend
-    STRONG_SELL = "强烈卖出"      # Trend disruption
+    HOLD = "持有"                 # Already held; can continue holding
+    WAIT = "观望"                 # Wait for a better entry
+    SELL = "卖出"                 # Trend weakening
+    STRONG_SELL = "强烈卖出"      # Trend breakdown
 
 
 class MACDStatus(Enum):
@@ -65,7 +65,7 @@ class MACDStatus(Enum):
     GOLDEN_CROSS_ZERO = "零轴上金叉"      # DIF crosses DEA and is above the zero axis
     GOLDEN_CROSS = "金叉"                # DIF crosses DEA
     BULLISH = "多头"                    # DIF>DEA>0
-    CROSSING_UP = "上穿零轴"             # DIF crosses the zero axis
+    CROSSING_UP = "上穿零轴"             # DIF crosses above the zero axis
     CROSSING_DOWN = "下穿零轴"           # DIF crosses below the zero axis
     BEARISH = "空头"                    # DIF<DEA<0
     DEATH_CROSS = "死叉"                # DIF crosses below DEA
@@ -102,12 +102,12 @@ class TrendAnalysisResult:
     bias_ma10: float = 0.0
     bias_ma20: float = 0.0
     
-    # Momentum Analysis
+    # Volume analysis
     volume_status: VolumeStatus = VolumeStatus.NORMAL
-    volume_ratio_5d: float = 0.0     # Daily trading volume / 5-day average
-    volume_trend: str = ""           # Momentum Trend Description
+    volume_ratio_5d: float = 0.0     # Current-day volume / 5-day average volume
+    volume_trend: str = ""           # Volume trend description
     
-    # Support resistance
+    # Support and resistance
     support_ma5: bool = False        # Whether MA5 acts as support
     support_ma10: bool = False       # Whether MA10 acts as support
     resistance_levels: List[float] = field(default_factory=list)
@@ -116,14 +116,14 @@ class TrendAnalysisResult:
     # MACD indicator
     macd_dif: float = 0.0          # DIF fast line
     macd_dea: float = 0.0          # DEA slow line
-    macd_bar: float = 0.0           # MACD candlestick chart
+    macd_bar: float = 0.0           # MACD histogram
     macd_status: MACDStatus = MACDStatus.BULLISH
     macd_signal: str = ""            # MACD signal description
 
-    # RSI Indicator
-    rsi_6: float = 0.0              # RSI(6) Short-Term
-    rsi_12: float = 0.0             # RSI(12) Medium-Term
-    rsi_24: float = 0.0             # RSI(24) Long-Term
+    # RSI indicator
+    rsi_6: float = 0.0              # RSI(6) short-term
+    rsi_12: float = 0.0             # RSI(12) medium-term
+    rsi_24: float = 0.0             # RSI(24) long-term
     rsi_status: RSIStatus = RSIStatus.NEUTRAL
     rsi_signal: str = ""              # RSI Signal Description
 
@@ -184,18 +184,18 @@ class StockTrendAnalyzer:
     
     # Trading parameter configuration (BIAS_THRESHOLD read from Config, see _generate_signal)
     VOLUME_SHRINK_RATIO = 0.7   # Volume shrinkage judgment threshold (daily volume / 5-day average volume)
-    VOLUME_HEAVY_RATIO = 1.5    # Threshold for significant judgment
+    VOLUME_HEAVY_RATIO = 1.5    # Heavy-volume threshold
     MA_SUPPORT_TOLERANCE = 0.02  # MA support judgment tolerance (2%).
 
     # MACD parameters (standard 12/26/9)
-    MACD_FAST = 12              # Fast cycle period
-    MACD_SLOW = 26             # Slow line cycle
-    MACD_SIGNAL = 9             # Signal line cycle
+    MACD_FAST = 12              # Fast-line period
+    MACD_SLOW = 26             # Slow-line period
+    MACD_SIGNAL = 9             # Signal-line period
 
     # RSI Parameters
-    RSI_SHORT = 6               # Short RSI Cycle
-    RSI_MID = 12               # Medium-term RSI cycle
-    RSI_LONG = 24              # Long RSI period
+    RSI_SHORT = 6               # Short-term RSI period
+    RSI_MID = 12               # Medium-term RSI period
+    RSI_LONG = 24              # Long-term RSI period
     RSI_OVERBOUGHT = 70        # Overbought threshold
     RSI_OVERSOLD = 30          # Oversold threshold
     
@@ -242,13 +242,13 @@ class StockTrendAnalyzer:
         # 1. Trend judgment
         self._analyze_trend(df, result)
 
-        # 2. bias ratio calculation
+        # 2. Bias ratio calculation
         self._calculate_bias(result)
 
-        # 3. Momentum Analysis
+        # 3. Volume analysis
         self._analyze_volume(df, result)
 
-        # 4. Resistance support analysis
+        # 4. Support and resistance analysis
         self._analyze_support_resistance(df, result)
 
         # 5. MACD analysis
@@ -297,7 +297,7 @@ class StockTrendAnalyzer:
         # Calculate signal line DEA
         df['MACD_DEA'] = df['MACD_DIF'].ewm(span=self.MACD_SIGNAL, adjust=False).mean()
 
-        # Calculate Bar Chart
+        # Calculate histogram
         df['MACD_BAR'] = (df['MACD_DIF'] - df['MACD_DEA']) * 2
 
         return df
@@ -317,7 +317,7 @@ class StockTrendAnalyzer:
             # Calculate price change
             delta = df['close'].diff()
 
-            # Separate rising and falling stocks
+            # Separate price gains and losses
             gain = delta.where(delta > 0, 0)
             loss = -delta.where(delta < 0, 0)
 
@@ -427,7 +427,7 @@ class StockTrendAnalyzer:
         prev_close = df.iloc[-2]['close']
         price_change = (latest['close'] - prev_close) / prev_close * 100
         
-        # Momentum Status Judgment
+        # Determine volume status
         if result.volume_ratio_5d >= self.VOLUME_HEAVY_RATIO:
             if price_change > 0:
                 result.volume_status = VolumeStatus.HEAVY_VOLUME_UP
@@ -710,11 +710,11 @@ class StockTrendAnalyzer:
 
         # === RSI Score (10 points) ===
         rsi_scores = {
-            RSIStatus.OVERSOLD: 10,       # Extreme oversold
+            RSIStatus.OVERSOLD: 10,       # Oversold is best
             RSIStatus.STRONG_BUY: 8,     # Strong
             RSIStatus.NEUTRAL: 5,        # Neutral
             RSIStatus.WEAK: 3,            # Weak
-            RSIStatus.OVERBOUGHT: 0,       # Extreme overbought
+            RSIStatus.OVERBOUGHT: 0,       # Overbought is worst
         }
         rsi_score = rsi_scores.get(result.rsi_status, 5)
         score += rsi_score

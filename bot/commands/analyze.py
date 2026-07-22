@@ -78,7 +78,7 @@ class AnalyzeCommand(BotCommand):
 
         code = symbol.code
         
-        # Check if a full report is required (defaults to brief, pass full/complete/detailed to switch)
+        # Check whether a full report is required (brief by default; pass `full`, `完整`, or `详细` to switch)
         report_type = "simple"
         if len(args) > 1 and args[1].lower() in ["full", "完整", "详细"]:
             report_type = "full"

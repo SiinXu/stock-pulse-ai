@@ -103,7 +103,7 @@ class MarketOverview:
     indices: List[MarketIndex] = field(default_factory=list)  # Major Indices
     up_count: int = 0                   # Number of rising stocks
     down_count: int = 0                 # Number of falling stocks
-    flat_count: int = 0                 # Average Volume
+    flat_count: int = 0                 # Number of unchanged stocks
     limit_up_count: int = 0             # Number of limit-up stocks
     limit_down_count: int = 0           # limit-down count
     total_amount: float = 0.0           # trading value in the two markets(CNY 100 million)
