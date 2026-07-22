@@ -974,6 +974,50 @@ def test_unload_callback_worker_can_close_installed_root_without_deadlock():
     assert events == ["load:test.worker-close", "unload-begin", "unload-end"]
 
 
+def test_overlapping_direct_close_returns_current_snapshot_without_waiting():
+    events: list[str] = []
+    unload_started = threading.Event()
+    release_unload = threading.Event()
+    first_results: list[tuple] = []
+
+    class _BlockingUnloadPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("unload-begin")
+            unload_started.set()
+            if not release_unload.wait(timeout=5):
+                raise AssertionError("test did not release direct close")
+            events.append("unload-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(_BlockingUnloadPlugin("test.blocking-close", events),),
+        plugins_dir="",
+    )
+    set_application_services(services)
+    first_close = threading.Thread(
+        target=lambda: first_results.append(services.close()),
+    )
+    first_close.start()
+    assert unload_started.wait(timeout=5)
+
+    try:
+        queued_result = services.close()
+        assert queued_result == ()
+        assert services.plugin_shutdown_results == ()
+        assert first_close.is_alive()
+    finally:
+        release_unload.set()
+        first_close.join(timeout=5)
+
+    assert not first_close.is_alive()
+    assert first_results == [services.plugin_shutdown_results]
+    assert [result.success for result in first_results[0]] == [True]
+    assert events == [
+        "load:test.blocking-close",
+        "unload-begin",
+        "unload-end",
+    ]
+
+
 def test_root_closed_during_plugin_start_is_not_left_installed():
     events: list[str] = []
     root_holder: list[ApplicationServices] = []
