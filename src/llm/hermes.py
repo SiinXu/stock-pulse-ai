@@ -15,6 +15,7 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Set,
 from urllib.parse import quote, unquote, urlparse, urlunparse
 
 from src.security.outbound_policy import guard_outbound_urls
+from src.utils.sanitize import sanitize_diagnostic_text
 
 
 HERMES_CHANNEL_NAME = "hermes"
@@ -138,19 +139,11 @@ def sanitize_hermes_error_text(
         pattern = _comma_flexible_secret_pattern(secret)
         if pattern is not None:
             sanitized = pattern.sub("[REDACTED]", sanitized)
-    for secret in sorted(values, key=len, reverse=True):
-        if secret:
-            sanitized = sanitized.replace(secret, "[REDACTED]")
-    patterns = [
-        (r"(?i)(authorization\s*[:=]\s*)(bearer\s+)?([^\s,;]+)", r"\1[REDACTED]"),
-        (r"(?i)(api[_-]?key\s*[:=]\s*)([^\s,;]+)", r"\1[REDACTED]"),
-        (r"(?i)(cookie\s*[:=]\s*)([^\s,;]+)", r"\1[REDACTED]"),
-        (r"(?i)bearer\s+[a-z0-9._\-]+", "Bearer [REDACTED]"),
-        (r"(?i)sk-[a-z0-9_\-]+", "[REDACTED]"),
-    ]
-    for pattern, replacement in patterns:
-        sanitized = re.sub(pattern, replacement, sanitized)
-    return " ".join(sanitized.split())[:300]
+    return sanitize_diagnostic_text(
+        sanitized,
+        max_length=300,
+        redaction_values=values,
+    )
 
 
 def canonicalize_hermes_protocol(protocol: str) -> str:

@@ -15,7 +15,6 @@ from contextlib import ExitStack, contextmanager
 import json
 import os
 from pathlib import Path
-import re
 import shutil
 import signal
 import subprocess
@@ -23,7 +22,6 @@ import tempfile
 import threading
 import time
 from typing import Any, Callable, Dict, Iterator, Mapping, Optional, Sequence
-from urllib.parse import parse_qsl, urlsplit
 
 from src.llm.backend_registry import (
     CLAUDE_CODE_CLI_BACKEND_ID,
@@ -37,6 +35,7 @@ from src.llm.generation_backend import (
     GenerationErrorCode,
     GenerationResult,
 )
+from src.utils.sanitize import redact_sensitive_text
 
 
 DEFAULT_LOCAL_CLI_TIMEOUT_SECONDS = 300
@@ -52,7 +51,7 @@ _PREVIEW_LIMIT = 800
 _FINAL_MESSAGE_OMITTED_PREVIEW = "<final-message omitted from stdout preview>"
 _STDOUT_PREVIEW_OMITTED = "<stdout preview omitted because output-last-message was too large>"
 _PROCESS_POLL_INTERVAL_SECONDS = 0.05
-_URL_PATTERN = re.compile(r"https?://[^\s,;)\]}]+", re.IGNORECASE)
+_EXISTING_REDACTION_SENTINEL = '"@@SP_EXISTING@@"'
 _SHELL_META_CHARS = ("|", ">", "<", ";", "`")
 _SHELL_META_STRINGS = ("&&", "||", "$(")
 _UNSUPPORTED_ARG_MARKERS = (
@@ -66,19 +65,6 @@ _UNSUPPORTED_ARG_MARKERS = (
     "unknown flag",
     "unrecognized flag",
 )
-_SENSITIVE_URL_KEY_PARTS = {
-    "access_token",
-    "api_key",
-    "apikey",
-    "auth_token",
-    "authorization",
-    "cookie",
-    "password",
-    "secret",
-    "sendkey",
-    "token",
-    "webhook",
-}
 _SAFE_ENV_EXACT = {
     "PATH",
     "HOME",
@@ -349,80 +335,23 @@ def _popen_session_kwargs() -> Dict[str, Any]:
 def redact_diagnostic_text(text: str, *, home: Optional[str] = None, limit: int = _PREVIEW_LIMIT) -> str:
     """Redact sensitive diagnostics and return a bounded preview."""
 
-    redacted = text or ""
+    redacted = (text or "").replace(
+        "[REDACTED]",
+        _EXISTING_REDACTION_SENTINEL,
+    )
     home_path = home or os.path.expanduser("~")
     if home_path:
         redacted = redacted.replace(home_path, "~")
-    redacted = re.sub(r"([a-zA-Z][a-zA-Z0-9+.-]*://)[^/\s:@]+:[^@\s/]+@", r"\1<redacted>@", redacted)
-    redacted = _URL_PATTERN.sub(_redact_sensitive_diagnostic_url, redacted)
-    redacted = re.sub(r"(?i)(authorization\s*[:=]\s*)(bearer\s+)?[^\s]+", r"\1<redacted>", redacted)
-    redacted = re.sub(r"(?i)(cookie\s*[:=]\s*)[^\n\r]+", r"\1<redacted>", redacted)
-    redacted = re.sub(r"(?i)(session[_-]?secret\s*[:=]\s*)[^\s]+", r"\1<redacted>", redacted)
-    redacted = re.sub(r"\b(sk-[A-Za-z0-9_-]{12,})\b", "<redacted-api-key>", redacted)
-    redacted = re.sub(r"\b(AIza[A-Za-z0-9_-]{16,})\b", "<redacted-api-key>", redacted)
-    redacted = re.sub(r"\b(gh[pousr]_[A-Za-z0-9_]{16,})\b", "<redacted-token>", redacted)
-    # Conservative by design: local CLI diagnostics may contain opaque long-lived credentials.
-    redacted = re.sub(r"\b([A-Za-z0-9_-]{32,})\b", "<redacted-token>", redacted)
+    redacted = redact_sensitive_text(redacted, redact_opaque_tokens=True)
+    redacted = redacted.replace("[REDACTED_URL]", "<redacted-url>")
+    redacted = redacted.replace("[REDACTED]", "<redacted>")
+    redacted = redacted.replace(
+        _EXISTING_REDACTION_SENTINEL,
+        "[REDACTED]",
+    )
     if len(redacted) > limit:
         return redacted[:limit] + "...<truncated>"
     return redacted
-
-
-def _redact_sensitive_diagnostic_url(match: re.Match[str]) -> str:
-    url = match.group(0)
-    return "<redacted-url>" if _is_sensitive_diagnostic_url(url) else url
-
-
-def _is_sensitive_diagnostic_url(url: str) -> bool:
-    try:
-        parsed = urlsplit(url)
-    except ValueError:
-        return True
-    if parsed.username or parsed.password:
-        return True
-    if _is_webhook_diagnostic_url(parsed.hostname or "", parsed.path):
-        return True
-    return (
-        _has_sensitive_url_params(parsed.query)
-        or _has_sensitive_url_params(parsed.fragment)
-    )
-
-
-def _is_webhook_diagnostic_url(hostname: str, path: str) -> bool:
-    hostname = str(hostname or "").lower().strip(".")
-    normalized_path = f"/{path.lstrip('/').lower()}"
-    path_segments = {segment for segment in normalized_path.split("/") if segment}
-
-    if hostname == "hooks.slack.com" and normalized_path.startswith("/services/"):
-        return True
-    if hostname == "oapi.dingtalk.com" and normalized_path.startswith("/robot/send"):
-        return True
-    if hostname in {"discord.com", "discordapp.com"} and "/api/webhooks/" in normalized_path:
-        return True
-    if hostname == "open.feishu.cn" and "/open-apis/bot/" in normalized_path and "/hook/" in normalized_path:
-        return True
-    if hostname == "qyapi.weixin.qq.com" and normalized_path.startswith("/cgi-bin/webhook/send"):
-        return True
-    if hostname.startswith("hooks."):
-        return True
-    return bool({"hook", "webhook", "webhooks"} & path_segments)
-
-
-def _has_sensitive_url_params(params_text: str) -> bool:
-    if not params_text:
-        return False
-    try:
-        params = parse_qsl(params_text, keep_blank_values=True)
-    except ValueError:
-        return True
-    for key, value in params:
-        key_text = str(key or "").strip().lower().replace("-", "_")
-        if key_text in _SENSITIVE_URL_KEY_PARTS or any(part in key_text for part in _SENSITIVE_URL_KEY_PARTS):
-            return True
-        if re.search(r"\b(sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{16,}|[A-Za-z0-9_-]{32,})\b", str(value or "")):
-            return True
-    return False
-
 
 def _extract_claude_code_json(result: LocalCliExecutionResult, *, schema_mode: bool) -> str:
     raw = (result.stdout or "").strip()

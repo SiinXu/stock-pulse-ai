@@ -1228,6 +1228,38 @@ class TestAgentExecutor(unittest.TestCase):
         self.assertEqual(result.tool_calls_log[0]["tool"], "echo")
         self.assertTrue(result.tool_calls_log[0]["success"])
 
+    def test_tool_execution_trace_redacts_sensitive_arguments(self):
+        secret = "sec2-execution-trace-canary"
+        registry = _make_registry_with_echo()
+        adapter = _make_mock_adapter()
+        adapter.call_with_tools.side_effect = [
+            LLMResponse(
+                content="Checking.",
+                tool_calls=[
+                    ToolCall(
+                        id="call_secret",
+                        name="echo",
+                        arguments={"message": f"api_key={secret}"},
+                    )
+                ],
+                usage={"total_tokens": 10},
+                provider="openai",
+            ),
+            LLMResponse(
+                content=json.dumps(SAMPLE_DASHBOARD, ensure_ascii=False),
+                tool_calls=[],
+                usage={"total_tokens": 20},
+                provider="openai",
+            ),
+        ]
+
+        result = AgentExecutor(registry, adapter, max_steps=3).run("Analyze 600519")
+
+        self.assertTrue(result.success)
+        trace = json.dumps(result.tool_calls_log, ensure_ascii=False)
+        self.assertNotIn(secret, trace)
+        self.assertIn("[REDACTED]", trace)
+
     def test_run_agent_loop_replays_reasoning_and_provider_specific_fields_on_followup_call(self):
         registry = _make_registry_with_echo()
         adapter = _make_mock_adapter()

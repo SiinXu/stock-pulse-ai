@@ -18,7 +18,12 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, List, Optional
 
-from src.utils.sanitize import log_safe_exception
+from src.utils.sanitize import (
+    is_sensitive_key,
+    log_safe_exception,
+    redact_sensitive_data,
+    redact_sensitive_text,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,57 +44,9 @@ PIPELINE_STAGE_NAMES = (
 )
 PIPELINE_STAGE_STATUSES = frozenset({"success", "degraded", "failed", "skipped"})
 
-_SECRET_REDACTIONS = (
-    (
-        re.compile(r"(?i)\b(authorization)\s*[:=]\s*(?:(?:Bearer|Basic|Token)\s+)?[^\s,&;]+"),
-        lambda match: f"{match.group(1)}=<redacted>",
-    ),
-    (
-        re.compile(r"(https?://)([^/\s:@]+):([^@\s/]+)@"),
-        r"\1<redacted>:<redacted>@",
-    ),
-    (
-        re.compile(r"https?://[^\s]+?(?:token|key|secret|webhook)[^\s]*", re.IGNORECASE),
-        "<redacted-url>",
-    ),
-    (
-        re.compile(
-            r"(?i)([\"']?)"
-            r"([A-Z0-9_]*?(?:api[_-]?key|access[_-]?token|token|secret|password|passwd|cookie))"
-            r"\1\s*:\s*([\"'])([^\"']+)\3"
-        ),
-        lambda match: f"{match.group(1)}{match.group(2)}{match.group(1)}: {match.group(3)}<redacted>{match.group(3)}",
-    ),
-    (
-        re.compile(
-            r"(?i)\b([A-Z0-9_]*?(?:api[_-]?key|access[_-]?token|token|secret|password|passwd|cookie))"
-            r"\s*=\s*([^\s,&;]+)"
-        ),
-        lambda match: f"{match.group(1)}=<redacted>",
-    ),
-    (
-        re.compile(
-            r"(?i)\b(api[_-]?key|access[_-]?token|token|secret|password|passwd|cookie)"
-            r"\s*:\s*([^\s,&;]+)"
-        ),
-        lambda match: f"{match.group(1)}=<redacted>",
-    ),
-    (
-        re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+"),
-        "Bearer <redacted>",
-    ),
-)
-_SENSITIVE_KEY_RE = re.compile(
-    r"(?i)(authorization|api[_-]?key|access[_-]?token|(?:^|[_-])(?:auth|refresh|session|bearer)?[_-]?token$|secret|password|passwd|cookie|"
-    r"webhook|sendkey|prompt|raw[_-]?prompt|raw[_-]?response|headers?|proxy)"
-)
-_WEBHOOK_URL_RE = re.compile(r"https?://[^\s]+?(?:webhook|token|key|secret|sendkey)[^\s]*", re.IGNORECASE)
+_EXISTING_REDACTION_SENTINEL = '"__STOCKPULSE_EXISTING_REDACTION__"'
 _LOCAL_ABSOLUTE_PATH_RE = re.compile(
     r"(?<![\w:/.-])(?:/(?:home|Users|root|var|tmp|opt|etc)/[^\s,;]+|[A-Za-z]:\\[^\s,;]+)"
-)
-_SENSITIVE_ASSIGNMENT_RE = re.compile(
-    r"(?i)\b(api[_-]?key|access[_-]?token|token|secret|password|passwd|cookie|webhook|sendkey|"
-    r"prompt|raw[_-]?prompt|raw[_-]?response)\s*[:=]\s*([^\s,&;]+)"
 )
 
 
@@ -98,20 +55,105 @@ def build_trace_id() -> str:
     return uuid.uuid4().hex
 
 
+def _localize_redaction_text(text: str) -> str:
+    """Keep the established diagnostics marker format after central redaction."""
+
+    localized = text.replace("[REDACTED]@", "<redacted>:<redacted>@")
+    localized = localized.replace("[REDACTED_URL]", "<redacted-url>")
+    localized = localized.replace("[REDACTED]", "<redacted>")
+    return re.sub(
+        r"(?i)\b(authorization|proxy[_-]?authorization)\s*[:=]\s*<redacted>",
+        r"\1=<redacted>",
+        localized,
+    )
+
+
+def _localize_redaction_markers(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {
+            key: _localize_redaction_markers(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_localize_redaction_markers(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_localize_redaction_markers(item) for item in value)
+    if isinstance(value, str):
+        return _localize_redaction_text(value)
+    return value
+
+
+def _replace_redaction_markers(value: Any, old: str, new: str) -> Any:
+    if type(value) is dict:
+        return {
+            key: _replace_redaction_markers(item, old, new)
+            for key, item in value.items()
+        }
+    if type(value) is list:
+        return [
+            _replace_redaction_markers(item, old, new)
+            for item in value
+        ]
+    if type(value) is tuple:
+        return tuple(
+            _replace_redaction_markers(item, old, new)
+            for item in value
+        )
+    if type(value) is str:
+        return value.replace(old, new)
+    return value
+
+
+def _redact_diagnostic_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Apply central redaction while preserving already-public marker spelling."""
+
+    protected = _replace_redaction_markers(
+        payload,
+        "[REDACTED]",
+        _EXISTING_REDACTION_SENTINEL,
+    )
+    redacted = redact_sensitive_data(
+        protected,
+        preserve_http_credential_hosts=True,
+    )
+    localized = _localize_redaction_markers(redacted)
+    restored = _replace_redaction_markers(
+        localized,
+        _EXISTING_REDACTION_SENTINEL,
+        "[REDACTED]",
+    )
+    return (
+        restored
+        if isinstance(restored, dict)
+        else {"redaction_error": "<redacted>"}
+    )
+
+
 def sanitize_diagnostic_text(value: Any, *, max_length: int = 300) -> Optional[str]:
     """Return a short diagnostic string with sensitive details redacted."""
     if value is None:
         return None
 
-    text = " ".join(str(value).split())
+    protected = _replace_redaction_markers(
+        value,
+        "[REDACTED]",
+        _EXISTING_REDACTION_SENTINEL,
+    )
+    redacted = redact_sensitive_text(
+        protected,
+        preserve_http_credential_hosts=True,
+    )
+    localized = _localize_redaction_text(redacted)
+    restored = _replace_redaction_markers(
+        localized,
+        _EXISTING_REDACTION_SENTINEL,
+        "[REDACTED]",
+    )
+    text = " ".join(str(restored).split())
     if not text:
         return None
 
-    for pattern, replacement in _SECRET_REDACTIONS:
-        text = pattern.sub(replacement, text)
-    text = _WEBHOOK_URL_RE.sub("<redacted-url>", text)
     text = _LOCAL_ABSOLUTE_PATH_RE.sub("<redacted-path>", text)
-    text = _SENSITIVE_ASSIGNMENT_RE.sub(lambda match: f"{match.group(1)}=<redacted>", text)
 
     if len(text) > max_length:
         return f"{text[:max_length].rstrip()}..."
@@ -137,7 +179,7 @@ def sanitize_diagnostic_metadata(value: Any, *, depth: int = 0) -> Any:
             safe_key = safe_diagnostic_key(key)
             if not safe_key:
                 continue
-            if _SENSITIVE_KEY_RE.search(str(key)):
+            if is_sensitive_key(key):
                 sanitized[safe_key] = "<redacted>"
                 continue
             safe_value = sanitize_diagnostic_metadata(item, depth=depth + 1)
@@ -448,7 +490,8 @@ class RunDiagnosticSummary:
             },
         }
         payload["copy_text"] = format_copyable_diagnostics(payload)
-        return {key: value for key, value in payload.items() if value is not None}
+        compact = {key: value for key, value in payload.items() if value is not None}
+        return _redact_diagnostic_payload(compact)
 
 
 @dataclass
@@ -623,7 +666,7 @@ class RunDiagnosticContext:
             )
 
     def snapshot(self) -> Dict[str, Any]:
-        return {
+        payload = {
             "trace_id": self.trace_id,
             "task_id": self.task_id,
             "query_id": self.query_id,
@@ -636,6 +679,7 @@ class RunDiagnosticContext:
             "history_runs": [run.to_dict() for run in self.history_runs],
             "pipeline_stage_runs": [run.to_dict() for run in self.pipeline_stage_runs],
         }
+        return _redact_diagnostic_payload(payload)
 
 
 def get_current_diagnostic_context() -> Optional[RunDiagnosticContext]:
@@ -703,7 +747,17 @@ def _sanitize_stage_summary(value: Optional[Mapping[str, Any]]) -> Dict[str, Any
     if not isinstance(value, Mapping):
         return {}
     sanitized = sanitize_diagnostic_metadata(dict(value))
+    if _contains_unrenderable_marker(sanitized):
+        raise ValueError("Pipeline stage summary contains an unrenderable value")
     return dict(sanitized) if isinstance(sanitized, Mapping) else {}
+
+
+def _contains_unrenderable_marker(value: Any) -> bool:
+    if type(value) is dict:
+        return any(_contains_unrenderable_marker(item) for item in value.values())
+    if type(value) in {list, tuple}:
+        return any(_contains_unrenderable_marker(item) for item in value)
+    return value == "[UNRENDERABLE]"
 
 
 def observe_pipeline_stage(
