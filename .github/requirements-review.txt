@@ -1,0 +1,8 @@
+# PR Review tooling. Versions resolve through the repository-wide lock.
+-c ../constraints.txt
+
+pip
+flake8
+google-genai
+httpx
+openai

@@ -53,11 +53,16 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
+          cache-dependency-path: |
+            requirements.txt
+            constraints.txt
+            build-constraints.txt
       
       - name: Install Dependencies
         run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
+          python -m pip install --upgrade --constraint constraints.txt pip
+          python -m pip install --build-constraint build-constraints.txt -r requirements.txt
+          python -m pip check
       
       - name: Create Runtime Directories
         run: |

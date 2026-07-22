@@ -35,15 +35,23 @@ function Test-PythonCode {
   }
 }
 
-Write-Host 'Building backend executable...'
-if (-not (Test-PythonCode -Python $pythonBin -Code "import PyInstaller")) {
-  & $pythonBin -m pip install pyinstaller
+Write-Host 'Installing reproducible desktop backend dependencies...'
+& $pythonBin -m pip install --upgrade --constraint constraints.txt pip
+if ($LASTEXITCODE -ne 0) {
+  throw "Pinned pip bootstrap failed with exit code $LASTEXITCODE."
+}
+& $pythonBin -m pip install --build-constraint build-constraints.txt -r requirements-desktop.txt
+if ($LASTEXITCODE -ne 0) {
+  throw "pip install -r requirements-desktop.txt failed with exit code $LASTEXITCODE."
+}
+& $pythonBin -m pip check
+if ($LASTEXITCODE -ne 0) {
+  throw "pip check failed with exit code $LASTEXITCODE."
 }
 
-Write-Host 'Installing backend dependencies...'
-& $pythonBin -m pip install -r requirements.txt
-if ($LASTEXITCODE -ne 0) {
-  throw "pip install -r requirements.txt failed with exit code $LASTEXITCODE."
+Write-Host 'Checking PyInstaller availability...'
+if (-not (Test-PythonCode -Python $pythonBin -Code "import PyInstaller")) {
+  throw 'PyInstaller is not importable after installing requirements-desktop.txt.'
 }
 
 Write-Host 'Checking python-multipart availability...'

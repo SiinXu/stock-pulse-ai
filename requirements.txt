@@ -2,6 +2,11 @@
 # Daily Stock Analysis - dependencies
 # ===================================
 
+# Resolve every direct requirement below through the reviewed universal lock.
+# Update the lock only with `python scripts/check_dependency_locks.py --update`.
+# For source builds, also pass `--build-constraint build-constraints.txt` to pip.
+-c constraints.txt
+
 # Core dependencies
 python-dotenv>=1.0.0        # Environment variable configuration
 tenacity>=8.2.0             # Retry support with exponential backoff

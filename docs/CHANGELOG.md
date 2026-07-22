@@ -278,6 +278,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Registered a guarded `stockpulse://` desktop protocol with allowlisted private-origin routing, macOS `open-url`, second-instance forwarding, packaging metadata, and lifecycle regression coverage.
 - [Added] Added the validated plugin manifest, isolated lifecycle manager, ownership-aware extension registry, and explicit trusted-directory plugin loader without startup wiring.
 - [Fixed] Enforced a shared fail-closed outbound HTTP policy for search, intelligence, custom model endpoints, webhooks, and notification tests with connection-time DNS checks, bounded redirects and responses, credential stripping, and an explicit self-host allowlist.
+- [Docs] Documented analysis-execution and business-capability responsibility layers plus the product Skill/Strategy loading, routing, evidence, and compatibility boundaries.
 - [Chore] Translated historical developer comments across source, configuration, scripts, and tests into English while preserving runtime-consumed docstrings and localized content.
 - [Fixed] Kept the existing persistent daily-provider cache in Desktop runtime data and Windows update backups while preserving explicit cache paths.
 - [Changed] Split DatabaseManager lifecycle and storage operations into focused private modules while preserving the `src.storage` facade and migration behavior.
@@ -287,6 +288,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Added tab-scoped Web session continuity for stock context, active Run Flow, route filters, consumed Chat report context, Chat/Research/Screening workflows, source-report handoff, bare-route reload restoration, context-aware navigation, legacy local-storage migration, and redirect-free logout cleanup.
 - [Changed] Extracted the storage ORM schema into a focused private module while preserving the `src.storage` model, metadata, reload, and migration contracts.
 - [Added] Added stable Data Provider plugin contracts and priority-aware dynamic registration while preserving existing routing, fallback, health, cache, and diagnostics policies.
+- [Chore] Added one reviewable universal Python dependency lock across source, CI, Docker, desktop, static review tooling, and optional runtime paths with resolver reproduction, constrained source builds, bounded exceptions, and vulnerability auditing.
 
 ## [3.26.3] - 2026-07-15
 

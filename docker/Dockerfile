@@ -43,10 +43,13 @@ RUN groupadd -g 1000 dsa && \
     useradd -u 1000 -g dsa -m dsa
 
 # Copy dependency files
-COPY requirements.txt .
+COPY requirements.txt constraints.txt build-constraints.txt ./
 
 # Install Python dependencies.
-RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade --constraint constraints.txt pip && \
+    PIP_BUILD_CONSTRAINT=build-constraints.txt pip install -r requirements.txt && \
+    pip check
 
 # Copy application code
 COPY *.py ./
