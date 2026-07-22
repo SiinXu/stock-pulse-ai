@@ -11,24 +11,15 @@ from src.utils.sanitize import log_safe_exception
 
 if TYPE_CHECKING:
     from main import (
-        _build_schedule_time_provider,
-        _build_schedule_times_provider,
-        _reload_runtime_config,
-        _resolve_scheduled_stock_codes,
-        _resolve_web_service_bind,
+        __coordinate_service_runtime,
+        __keep_service_runtime_alive,
+        __run_schedule_mode,
+        __run_service_only_mode,
         _run_analysis_with_runtime_scheduler_lock,
         _run_market_review_with_shared_lock,
-        _warn_if_public_webui_without_auth,
-        json,
         logger,
-        os,
-        prepare_webui_frontend_assets,
         resolve_index_stock_code_for_analysis,
-        run_full_analysis,
         split_stock_list,
-        start_api_server,
-        start_bot_stream_clients,
-        time,
     )
 
 
@@ -255,100 +246,13 @@ def _dispatch_cli(config: Config, args: argparse.Namespace) -> int:
         ]
         logger.info("Using the stock list supplied on the command line: %s", stock_codes)
 
-    # === Handle --webui / --webui-only Parameters, Map To --serve / --serve-only ===
-    if args.webui:
-        args.serve = True
-    if args.webui_only:
-        args.serve_only = True
-
-    # Compatible with the old WEBUI_ENABLED environment variable.
-    if config.webui_enabled and not (args.serve or args.serve_only):
-        args.serve = True
-
-    # === Start Web Service (if enabled) ===
-    start_serve = (args.serve or args.serve_only) and os.getenv("GITHUB_ACTIONS") != "true"
-
-    if start_serve:
-        args.host, args.port = _resolve_web_service_bind(args, config)
-        _warn_if_public_webui_without_auth(args.host)
-
-    bot_clients_started = False
-    if start_serve:
-        from src.services.runtime_scheduler import (
-            CLI_SCHEDULER_OWNER_ENV,
-            RUNTIME_SCHEDULER_ARGS_ENV,
-            RUNTIME_SCHEDULER_FORCE_ENABLED_ENV,
-            RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV,
-            RUNTIME_SCHEDULER_SUPPRESS_START_ENV,
-        )
-
-        # The API runtime scheduler owns schedules once the Web/API service starts.
-        # This keeps Web settings, status, and run-now actions attached to the real
-        # scheduler instead of a separate CLI loop.
-        os.environ.pop(CLI_SCHEDULER_OWNER_ENV, None)
-        if args.serve_only:
-            os.environ[RUNTIME_SCHEDULER_SUPPRESS_START_ENV] = "true"
-        else:
-            os.environ.pop(RUNTIME_SCHEDULER_SUPPRESS_START_ENV, None)
-        runtime_schedule_requested = not args.serve_only and (
-            args.schedule or config.schedule_enabled
-        )
-        if not args.serve_only and args.schedule:
-            os.environ[RUNTIME_SCHEDULER_FORCE_ENABLED_ENV] = "true"
-        else:
-            os.environ.pop(RUNTIME_SCHEDULER_FORCE_ENABLED_ENV, None)
-        if runtime_schedule_requested:
-            runtime_run_immediately = config.schedule_run_immediately
-            if getattr(args, 'no_run_immediately', False):
-                runtime_run_immediately = False
-            os.environ[RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV] = (
-                "true" if runtime_run_immediately else "false"
-            )
-        else:
-            os.environ.pop(RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV, None)
-        os.environ[RUNTIME_SCHEDULER_ARGS_ENV] = json.dumps({
-            "no_notify": bool(getattr(args, "no_notify", False)),
-            "no_market_review": bool(getattr(args, "no_market_review", False)),
-            "dry_run": bool(getattr(args, "dry_run", False)),
-            "force_run": bool(getattr(args, "force_run", False)),
-            "single_notify": bool(getattr(args, "single_notify", False)),
-            "no_context_snapshot": bool(getattr(args, "no_context_snapshot", False)),
-            "workers": getattr(args, "workers", None),
-        })
-        if not prepare_webui_frontend_assets():
-            logger.warning(
-                "Frontend assets are not ready; starting FastAPI without a usable Web page"
-            )
-        try:
-            start_api_server(host=args.host, port=args.port, config=config)
-            bot_clients_started = True
-        except Exception as exc:  # broad-exception: fallback_recorded - preserve service-start fallback and logged CLI failure behavior
-            log_safe_exception(
-                logger,
-                "FastAPI service startup failed",
-                exc,
-                error_code="main_fastapi_start_failed",
-            )
-            if args.serve_only:
-                return 1
-            start_serve = False
-
-    if bot_clients_started:
-        start_bot_stream_clients(config)
+    start_serve, service_exit_code = __coordinate_service_runtime(config, args)
+    if service_exit_code is not None:
+        return service_exit_code
 
     # === Only Web Service Mode: No automatic analysis ===
     if args.serve_only:
-        logger.info("Mode: Web service only")
-        logger.info("Web service running at http://%s:%s", args.host, args.port)
-        logger.info("Trigger analysis through /api/v1/analysis/analyze")
-        logger.info("API documentation: http://%s:%s/docs", args.host, args.port)
-        logger.info("Press Ctrl+C to exit")
-        try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            logger.info("\nInterrupted by the user; exiting")
-        return 0
+        return __run_service_only_mode(args)
 
     try:
         # Mode 0: Backtesting
@@ -408,74 +312,7 @@ def _dispatch_cli(config: Config, args: argparse.Namespace) -> int:
 
         # Mode 2: Scheduled task mode
         if args.schedule or config.schedule_enabled:
-            if start_serve:
-                logger.info("Mode: Web/API runtime scheduler")
-                logger.info("Web service running at http://%s:%s", args.host, args.port)
-                logger.info(
-                    "The Web/API runtime scheduler owns scheduled runs; "
-                    "saved settings apply to this process"
-                )
-                logger.info("Press Ctrl+C to exit")
-                try:
-                    while True:
-                        time.sleep(1)
-                except KeyboardInterrupt:
-                    logger.info("\nInterrupted by the user; exiting")
-                return 0
-
-            logger.info("Mode: scheduled analysis")
-            logger.info("Daily run time: %s", config.schedule_time)
-
-            # Determine whether to run immediately:
-            # Command line arg --no-run-immediately overrides config if present.
-            # Otherwise use config (defaults to True).
-            should_run_immediately = config.schedule_run_immediately
-            if getattr(args, 'no_run_immediately', False):
-                should_run_immediately = False
-
-            logger.info("Run immediately at startup: %s", should_run_immediately)
-
-            from src.scheduler import run_with_schedule
-            scheduled_stock_codes = _resolve_scheduled_stock_codes(stock_codes)
-            schedule_time_provider = _build_schedule_time_provider(config.schedule_time)
-            schedule_times_provider = _build_schedule_times_provider(config.schedule_time)
-
-            def scheduled_task():
-                runtime_config = _reload_runtime_config()
-                run_full_analysis(runtime_config, args, scheduled_stock_codes)
-
-            background_tasks = []
-            if getattr(config, 'agent_event_monitor_enabled', False):
-                from src.services.alert_worker import AlertWorker
-
-                interval_minutes = max(1, getattr(config, 'agent_event_monitor_interval_minutes', 5))
-                alert_worker = AlertWorker(config_provider=_reload_runtime_config)
-
-                def event_monitor_task():
-                    stats = alert_worker.run_once()
-                    triggered_count = stats.get("triggered", 0)
-                    if triggered_count:
-                        logger.info("[EventMonitor] Triggered %d alerts in this run", triggered_count)
-
-                background_tasks.append({
-                    "task": event_monitor_task,
-                    "interval_seconds": interval_minutes * 60,
-                    "run_immediately": True,
-                    "name": "agent_event_monitor",
-                })
-
-            schedule_kwargs = {
-                "task": scheduled_task,
-                "schedule_time": config.schedule_time,
-                "run_immediately": should_run_immediately,
-                "background_tasks": background_tasks,
-                "schedule_time_provider": schedule_time_provider,
-            }
-            if hasattr(config, "schedule_times"):
-                schedule_kwargs["schedule_times"] = config.schedule_times
-                schedule_kwargs["schedule_times_provider"] = schedule_times_provider
-            run_with_schedule(**schedule_kwargs)
-            return 0
+            return __run_schedule_mode(config, args, stock_codes, start_serve)
 
         # Mode 3: Normal single run
         if config.run_immediately:
@@ -485,16 +322,7 @@ def _dispatch_cli(config: Config, args: argparse.Namespace) -> int:
 
         logger.info("\nProgram execution completed")
 
-        # If the service is enabled and not in scheduled task mode, keep the program running.
-        keep_running = start_serve and not (args.schedule or config.schedule_enabled)
-        if keep_running:
-            logger.info("API service is running (press Ctrl+C to exit)")
-            try:
-                while True:
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                pass
-
+        __keep_service_runtime_alive(start_serve, args, config)
         return 0
 
     except KeyboardInterrupt:

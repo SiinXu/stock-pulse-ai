@@ -281,6 +281,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Kept the existing persistent daily-provider cache in Desktop runtime data and Windows update backups while preserving explicit cache paths.
 - [Changed] Split DatabaseManager lifecycle and storage operations into focused private modules while preserving the `src.storage` facade and migration behavior.
 - [Added] Added A-share sector-index analysis with session trend, broad-index relative strength, risk labels, explicit provider data limits, and unavailable-ranking fallbacks to market-review reports and structured payloads.
+- [Changed] Split scheduling and service startup coordination into a focused application runtime module while preserving the legacy main entrypoint and startup behavior.
 
 ## [3.26.3] - 2026-07-15
 
