@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { loginAsE2eAdmin } from './auth-fixture';
+import { UI_TEXT } from '../src/i18n/uiText';
 import { LEGACY_ROUTE_PATHS } from '../src/routing/routes';
 
 const usageDashboard = {
@@ -229,7 +230,15 @@ test.describe('surface and task-state foundation', () => {
 
     for (const viewport of viewports) {
       await page.setViewportSize(viewport);
-      await expect(page.getByRole('heading', { level: 2, name: 'Token 用量监控' })).toBeVisible();
+      await expect(page.locator('h1')).toHaveCount(1);
+      await expect(page.getByRole('heading', {
+        level: 1,
+        name: UI_TEXT.zh['settings.pageTitle'],
+      })).toBeVisible();
+      await expect(page.getByRole('heading', {
+        level: 2,
+        name: UI_TEXT.zh['usage.title'],
+      })).toBeVisible();
       await expectNoDocumentOverflow(page, `${viewport.width}x${viewport.height}`);
     }
 
