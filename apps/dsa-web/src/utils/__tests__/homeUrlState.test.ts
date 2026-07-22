@@ -7,6 +7,7 @@ import {
   setHomeHistoryRunFlow,
   setHomeRecord,
   setHomeTaskRunFlow,
+  setHomeWorkspace,
 } from '../homeUrlState';
 
 describe('homeUrlState', () => {
@@ -24,6 +25,15 @@ describe('homeUrlState', () => {
       recordId: null,
       runFlow: { type: 'task', taskId: 'task_01:us-east.2' },
       needsNormalization: false,
+    });
+  });
+
+  it('restores stock and workspace context through the shared deep-link parser', () => {
+    expect(parseHomeUrlState('?stock=00700.HK&workspace=watchlist&keep=yes')).toMatchObject({
+      stockCode: 'HK00700',
+      workspace: 'watchlist',
+      normalizedSearch: '?stock=HK00700&workspace=watchlist&keep=yes',
+      needsNormalization: true,
     });
   });
 
@@ -50,6 +60,15 @@ describe('homeUrlState', () => {
     expect(parsed.needsNormalization).toBe(true);
   });
 
+  it('falls back from malformed workspace and sensitive URL state with explicit issue flags', () => {
+    const parsed = parseHomeUrlState('?workspace=admin&api_key=secret&keep=yes');
+
+    expect(parsed.workspace).toBe('history');
+    expect(parsed.invalidWorkspace).toBe(true);
+    expect(parsed.sensitiveParameterRemoved).toBe(true);
+    expect(parsed.normalizedSearch).toBe('?keep=yes');
+  });
+
   it('updates only the report identity and preserves Run Flow plus unrelated state', () => {
     expect(setHomeRecord('?tab=history&runFlow=task&runFlowTaskId=task-1', 9)).toBe(
       '?tab=history&runFlow=task&runFlowTaskId=task-1&recordId=9',
@@ -68,5 +87,11 @@ describe('homeUrlState', () => {
     expect(
       clearHomeRunFlow('?recordId=3&runFlow=history&runFlowRecordId=3&filter=open'),
     ).toBe('?recordId=3&filter=open');
+  });
+
+  it('pushes non-default workspace state and removes the default from the URL', () => {
+    const watchlistSearch = setHomeWorkspace('?recordId=3&keep=yes', 'watchlist');
+    expect(watchlistSearch).toBe('?recordId=3&keep=yes&workspace=watchlist');
+    expect(setHomeWorkspace(watchlistSearch, 'history')).toBe('?recordId=3&keep=yes');
   });
 });

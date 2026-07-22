@@ -18,7 +18,7 @@ import logging
 import time
 from threading import RLock
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Any, Union
+from typing import Callable, Optional, Dict, Any, Union
 from enum import Enum
 
 from src.utils.sanitize import sanitize_diagnostic_text
@@ -95,16 +95,16 @@ def safe_int(val: Any, default: Optional[int] = None) -> Optional[int]:
 
 class RealtimeSource(Enum):
     """Real-time quote data source"""
-    EFINANCE = "efinance"           # Eastmoney (Eastmoney library)
-    AKSHARE_EM = "akshare_em"       # Eastmoney (akshare library)
+    EFINANCE = "efinance"           # Efinance (efinance library)
+    AKSHARE_EM = "akshare_em"       # Efinance (akshare library)
     AKSHARE_SINA = "akshare_sina"   # Sina Finance
     AKSHARE_QQ = "akshare_qq"       # Tencent Finance.
     TUSHARE = "tushare"             # Tushare Pro
     TICKFLOW = "tickflow"           # TickFlow
     TENCENT = "tencent"             # Direct connection to Tencent.
     SINA = "sina"                   # Sina direct connection
-    STOOQ = "stooq"                 # Stooq U.S. stocks fallback
-    LONGBRIDGE = "longbridge"       # Longbridge (U.S. stocks/Hong Kong stocks fallback)
+    STOOQ = "stooq"                 # Stooq US equities bottom fishing
+    LONGBRIDGE = "longbridge"       # Longbridge (US stocks/Hong Kong stocks bottom-fishing)
     FALLBACK = "fallback"           # Fallback to degraded mode.
 
 
@@ -133,15 +133,15 @@ class UnifiedRealtimeQuote:
     data_quality: Optional[str] = None           # ok/partial/unavailable
     missing_fields: Optional[list[str]] = None   # provider missing key fields
     
-    # === Core Price Data (Almost All Sources Have It) ===
+    # Core Price Data (Almost All Sources Have It)
     price: Optional[float] = None           # Latest price
     change_pct: Optional[float] = None      # Percentage change
     change_amount: Optional[float] = None   # Change in value
     
     # === Quantitative and Price Indicators (Some sources may be missing) ===
     volume: Optional[int] = None            # Volume (shares, consistent with historical daily line scale)
-    amount: Optional[float] = None          # trading value (yuan)
-    volume_ratio: Optional[float] = None    # volume ratio
+    amount: Optional[float] = None          # Value (yuan)
+    volume_ratio: Optional[float] = None    # Relative Volume
     turnover_rate: Optional[float] = None   # Turnover Rate (%)
     amplitude: Optional[float] = None       # Amplitude (%)
     
@@ -151,7 +151,7 @@ class UnifiedRealtimeQuote:
     low: Optional[float] = None             # Lowest price
     pre_close: Optional[float] = None       # Yesterday's closing price
     
-    # === Valuation Metrics (only available with full interfaces like Eastmoney) ===
+    # === Valuation Metrics (only available with full interfaces like East China Securities) ===
     pe_ratio: Optional[float] = None        # Dynamic Price-to-Earnings Ratio
     pb_ratio: Optional[float] = None        # Price-to-Book Ratio
     total_mv: Optional[float] = None        # Total market capitalization (yuan)
@@ -284,144 +284,308 @@ class ChipDistribution:
 
 
 class CircuitBreaker:
-    """
-    Circuit Breaker - Manage data source throttling/cooling status
-    
-    Strategy:
-    - Enter a circuit break state after failing N times consecutively.
-    - Skip this data source during the circuit breaker period
-    - Restore half-open state automatically after cooling time
-    - Order succeeds once in half-open state, then fully recovers; failure continues to trigger a circuit breaker
-    
-    Status machine:
-    CLOSED (normal) --failure N times--> OPEN (circuit break) --cooling time expired--> HALF_OPEN (half-open)
-    HALF_OPEN --Success--> CLOSED
-    HALF_OPEN --Failure--> OPEN
-    """
-    
-    # Status constants
-    CLOSED = "closed"      # Normal state
-    OPEN = "open"          # Circuit breaker status (unavailable)
-    HALF_OPEN = "half_open"  # Half-open state (probe request)
-    
+    """Track bounded provider health and enforce circuit/cooldown transitions."""
+
+    CLOSED = "closed"
+    OPEN = "open"
+    HALF_OPEN = "half_open"
+
     def __init__(
         self,
-        failure_threshold: int = 3,       # Consecutive failure threshold
-        cooldown_seconds: float = 300.0,  # Cooling time (seconds), default 5 minutes
-        half_open_max_calls: int = 1      # Maximum attempt times for half-open state
+        failure_threshold: int = 3,
+        cooldown_seconds: float = 300.0,
+        half_open_max_calls: int = 1,
+        health_window_size: int = 20,
+        enabled: bool = True,
+        clock: Optional[Callable[[], float]] = None,
     ):
-        self.failure_threshold = failure_threshold
-        self.cooldown_seconds = cooldown_seconds
-        self.half_open_max_calls = half_open_max_calls
-        
-        # Data source status {source_name: {state, failures, last_failure_time, half_open_calls}}
+        self.failure_threshold = max(1, int(failure_threshold))
+        self.cooldown_seconds = max(0.0, float(cooldown_seconds))
+        self.half_open_max_calls = max(1, int(half_open_max_calls))
+        self.health_window_size = max(1, int(health_window_size))
+        self.enabled = bool(enabled)
+        self._clock = clock or time.time
         self._states: Dict[str, Dict[str, Any]] = {}
         self._lock = RLock()
-    
+
+    def configure(
+        self,
+        *,
+        failure_threshold: Optional[int] = None,
+        cooldown_seconds: Optional[float] = None,
+        health_window_size: Optional[int] = None,
+        enabled: Optional[bool] = None,
+    ) -> None:
+        """Update runtime policy without discarding accumulated health observations."""
+        with self._lock:
+            if failure_threshold is not None:
+                self.failure_threshold = max(1, int(failure_threshold))
+            if cooldown_seconds is not None:
+                self.cooldown_seconds = max(0.0, float(cooldown_seconds))
+            if health_window_size is not None:
+                self.health_window_size = max(1, int(health_window_size))
+                for state in self._states.values():
+                    state["outcomes"] = state["outcomes"][-self.health_window_size:]
+                    state["latencies_ms"] = state["latencies_ms"][-self.health_window_size:]
+            if enabled is not None:
+                self.enabled = bool(enabled)
+                if not self.enabled:
+                    for state in self._states.values():
+                        state["state"] = self.CLOSED
+                        state["half_open_calls"] = 0
+
     def _get_state_locked(self, source: str) -> Dict[str, Any]:
-        """Get or initialize data source status (caller must hold lock)."""
+        """Return mutable source state while the caller holds ``self._lock``."""
         if source not in self._states:
             self._states[source] = {
-                'state': self.CLOSED,
-                'failures': 0,
-                'last_failure_time': 0.0,
-                'half_open_calls': 0
+                "state": self.CLOSED,
+                "failures": 0,
+                "last_failure_time": 0.0,
+                "last_success_time": 0.0,
+                "half_open_calls": 0,
+                "outcomes": [],
+                "latencies_ms": [],
             }
         return self._states[source]
-    
-    def is_available(self, source: str) -> bool:
-        """
-        Check if the data source is available
-        
-        Return True if the request can be attempted
-        Return False to skip this data source
-        """
+
+    def _record_observation_locked(
+        self,
+        state: Dict[str, Any],
+        *,
+        success: bool,
+        latency_ms: Optional[float],
+    ) -> None:
+        state["outcomes"].append(bool(success))
+        state["outcomes"] = state["outcomes"][-self.health_window_size:]
+        self._record_latency_locked(state, latency_ms)
+
+    def _record_latency_locked(
+        self,
+        state: Dict[str, Any],
+        latency_ms: Optional[float],
+    ) -> None:
+        if latency_ms is not None:
+            try:
+                normalized_latency = max(0.0, float(latency_ms))
+            except (TypeError, ValueError):
+                normalized_latency = None
+            if normalized_latency is not None:
+                state["latencies_ms"].append(normalized_latency)
+                state["latencies_ms"] = state["latencies_ms"][-self.health_window_size:]
+
+    def record_latency(self, source: str, latency_ms: Optional[float]) -> None:
+        """Record request latency independently from its eventual outcome classification."""
         with self._lock:
             state = self._get_state_locked(source)
-            current_time = time.time()
+            self._record_latency_locked(state, latency_ms)
 
-            if state['state'] == self.CLOSED:
+    def _snapshot_locked(self, source: str, state: Dict[str, Any], now: float) -> Dict[str, Any]:
+        outcomes = list(state["outcomes"])
+        latencies = list(state["latencies_ms"])
+        sample_count = len(outcomes)
+        failure_count = sum(1 for outcome in outcomes if not outcome)
+        success_count = sample_count - failure_count
+        success_rate = success_count / sample_count if sample_count else 1.0
+        error_rate = failure_count / sample_count if sample_count else 0.0
+        average_latency_ms = sum(latencies) / len(latencies) if latencies else None
+        latency_factor = (
+            1.0
+            if average_latency_ms is None
+            else 1.0 / (1.0 + (average_latency_ms / 1000.0))
+        )
+        streak_factor = max(
+            0.0,
+            1.0 - (state["failures"] / float(self.failure_threshold)),
+        )
+        health_score = max(
+            0.0,
+            min(100.0, (success_rate * 70.0) + (latency_factor * 20.0) + (streak_factor * 10.0)),
+        )
+        cooldown_remaining = 0.0
+        if self.enabled and state["state"] == self.OPEN:
+            cooldown_remaining = max(
+                0.0,
+                self.cooldown_seconds - (now - state["last_failure_time"]),
+            )
+        available = self._can_attempt_locked(state, now)
+        return {
+            "source": source,
+            "state": state["state"],
+            "circuit_enabled": self.enabled,
+            "available": available,
+            "health_score": round(health_score, 2),
+            "success_rate": round(success_rate, 4),
+            "error_rate": round(error_rate, 4),
+            "sample_count": sample_count,
+            "success_count": success_count,
+            "failure_count": failure_count,
+            "recent_failure_count": failure_count,
+            "consecutive_failures": state["failures"],
+            "average_latency_ms": (
+                round(average_latency_ms, 2)
+                if average_latency_ms is not None
+                else None
+            ),
+            "cooldown_remaining_seconds": round(cooldown_remaining, 3),
+            "last_failure_time": state["last_failure_time"] or None,
+            "last_success_time": state["last_success_time"] or None,
+        }
+
+    def _can_attempt_locked(self, state: Dict[str, Any], now: float) -> bool:
+        if not self.enabled or state["state"] == self.CLOSED:
+            return True
+        elapsed = now - state["last_failure_time"]
+        if state["state"] == self.OPEN:
+            return elapsed >= self.cooldown_seconds
+        if state["state"] == self.HALF_OPEN:
+            return (
+                state["half_open_calls"] < self.half_open_max_calls
+                or elapsed >= self.cooldown_seconds
+            )
+        return True
+
+    def can_attempt(self, source: str) -> bool:
+        """Peek at admission without transitioning state or reserving a half-open probe."""
+        with self._lock:
+            state = self._get_state_locked(source)
+            return self._can_attempt_locked(state, self._clock())
+
+    def is_available(self, source: str) -> bool:
+        """Return whether a request may enter the source, reserving half-open probes."""
+        with self._lock:
+            state = self._get_state_locked(source)
+            if not self.enabled:
+                return True
+            current_time = self._clock()
+
+            if state["state"] == self.CLOSED:
                 return True
 
-            if state['state'] == self.OPEN:
-                # Check cooldown time
-                time_since_failure = current_time - state['last_failure_time']
+            if state["state"] == self.OPEN:
+                time_since_failure = current_time - state["last_failure_time"]
                 if time_since_failure >= self.cooldown_seconds:
-                    # Cooling complete, entering half-open state (does not preempt quota, managed by HALF_OPEN branch)
-                    state['state'] = self.HALF_OPEN
-                    state['half_open_calls'] = 0
-                    state['last_failure_time'] = current_time
-                    logger.info(f"[熔断器] {source} 冷却完成，进入半开状态")
-                    # Fall through to HALF_OPEN check below
+                    state["state"] = self.HALF_OPEN
+                    state["half_open_calls"] = 0
+                    state["last_failure_time"] = current_time
+                    logger.info(
+                        "provider_circuit event=half_open source=%s",
+                        source,
+                    )
                 else:
                     remaining = self.cooldown_seconds - time_since_failure
-                    logger.debug(f"[熔断器] {source} 处于熔断状态，剩余冷却时间: {remaining:.0f}s")
+                    logger.debug(
+                        "provider_circuit event=skip_open source=%s cooldown_remaining_seconds=%.3f",
+                        source,
+                        remaining,
+                    )
                     return False
 
-            if state['state'] == self.HALF_OPEN:
-                if state['half_open_calls'] < self.half_open_max_calls:
-                    state['half_open_calls'] += 1
+            if state["state"] == self.HALF_OPEN:
+                if state["half_open_calls"] < self.half_open_max_calls:
+                    state["half_open_calls"] += 1
                     return True
-                # All probe slots are full; if the cooldown time does not receive it again when it expires
-                # record_success/record_failure Callback, Reset quota allows re-detection,
-                # Avoid getting permanently stuck in HALF_OPEN.
-                time_since_failure = current_time - state['last_failure_time']
+                time_since_failure = current_time - state["last_failure_time"]
                 if time_since_failure >= self.cooldown_seconds:
-                    state['half_open_calls'] = 1
-                    state['last_failure_time'] = current_time
-                    logger.info(f"[熔断器] {source} 半开状态探测超时，重新探测")
+                    state["half_open_calls"] = 1
+                    state["last_failure_time"] = current_time
+                    logger.info(
+                        "provider_circuit event=half_open_probe_retry source=%s",
+                        source,
+                    )
                     return True
                 return False
 
             return True
-    
+
     def record_inconclusive(self, source: str) -> None:
-        """Record uncertain detection results (such as returning None).
-
-        Only affects HALF_OPEN state: converts it back to OPEN to allow cooldown detection.
-        If in CLOSED state, it's an empty operation and does not affect failure counts.
-        """
+        """Release an inconclusive half-open probe back into cooldown."""
         with self._lock:
             state = self._get_state_locked(source)
-            if state['state'] == self.HALF_OPEN:
-                state['state'] = self.OPEN
-                state['half_open_calls'] = 0
-                state['last_failure_time'] = time.time()
-                logger.info(f"[熔断器] {source} 半开探测结果不确定，重新进入冷却")
+            if self.enabled and state["state"] == self.HALF_OPEN:
+                state["state"] = self.OPEN
+                state["half_open_calls"] = 0
+                state["last_failure_time"] = self._clock()
+                logger.info(
+                    "provider_circuit event=half_open_inconclusive source=%s",
+                    source,
+                )
 
-    def record_success(self, source: str) -> None:
-        """Record successful request"""
+    def record_success(self, source: str, latency_ms: Optional[float] = None) -> None:
+        """Record a successful provider request and close a half-open circuit."""
         with self._lock:
             state = self._get_state_locked(source)
+            self._record_observation_locked(state, success=True, latency_ms=latency_ms)
+            state["last_success_time"] = self._clock()
 
-            if state['state'] == self.HALF_OPEN:
-                # Success in half-open state, fully recovers
-                logger.info(f"[熔断器] {source} 半开状态请求成功，恢复正常")
+            if state["state"] == self.HALF_OPEN:
+                logger.info(
+                    "provider_circuit event=recovered source=%s",
+                    source,
+                )
 
-            # Reset state
-            state['state'] = self.CLOSED
-            state['failures'] = 0
-            state['half_open_calls'] = 0
-    
-    def record_failure(self, source: str, error: Optional[str] = None) -> None:
-        """Record failed requests"""
+            state["state"] = self.CLOSED
+            state["failures"] = 0
+            state["half_open_calls"] = 0
+
+    def record_quality_failure(
+        self,
+        source: str,
+        latency_ms: Optional[float] = None,
+    ) -> None:
+        """Record unusable data without incrementing the circuit failure streak."""
         with self._lock:
             state = self._get_state_locked(source)
-            current_time = time.time()
+            self._record_observation_locked(state, success=False, latency_ms=latency_ms)
+            state["last_failure_time"] = self._clock()
 
-            state['failures'] += 1
-            state['last_failure_time'] = current_time
+            if self.enabled and state["state"] == self.HALF_OPEN:
+                state["state"] = self.OPEN
+                state["half_open_calls"] = 0
+                logger.info(
+                    "provider_circuit event=half_open_quality_failed source=%s",
+                    source,
+                )
+                return
 
-            if state['state'] == self.HALF_OPEN:
-                # Failure continues to trigger a circuit breaker in half-open state
-                state['state'] = self.OPEN
-                state['half_open_calls'] = 0
-                logger.warning(f"[熔断器] {source} 半开状态请求失败，继续熔断 {self.cooldown_seconds}s")
-            elif state['failures'] >= self.failure_threshold:
-                # Reached threshold, entering circuit break.
-                state['state'] = self.OPEN
-                logger.warning(f"[熔断器] {source} 连续失败 {state['failures']} 次，进入熔断状态 "
-                              f"(冷却 {self.cooldown_seconds}s)")
+            state["state"] = self.CLOSED
+            state["failures"] = 0
+            state["half_open_calls"] = 0
+
+    def record_failure(
+        self,
+        source: str,
+        error: Optional[str] = None,
+        latency_ms: Optional[float] = None,
+    ) -> None:
+        """Record a provider failure and open the circuit at the configured threshold."""
+        with self._lock:
+            state = self._get_state_locked(source)
+            current_time = self._clock()
+
+            self._record_observation_locked(state, success=False, latency_ms=latency_ms)
+            state["failures"] += 1
+            state["last_failure_time"] = current_time
+
+            if not self.enabled:
+                return
+
+            if state["state"] == self.HALF_OPEN:
+                state["state"] = self.OPEN
+                state["half_open_calls"] = 0
+                logger.warning(
+                    "provider_circuit event=half_open_failed source=%s cooldown_seconds=%.3f",
+                    source,
+                    self.cooldown_seconds,
+                )
+            elif state["failures"] >= self.failure_threshold:
+                state["state"] = self.OPEN
+                logger.warning(
+                    "provider_circuit event=open source=%s consecutive_failures=%d "
+                    "cooldown_seconds=%.3f",
+                    source,
+                    state["failures"],
+                    self.cooldown_seconds,
+                )
                 if error:
                     logger.warning(
                         "Circuit breaker last failure source=%s error_code=%s",
@@ -430,12 +594,24 @@ class CircuitBreaker:
                     )
     
     def get_status(self) -> Dict[str, str]:
-        """Get the status of all data sources"""
+        """Return the existing compact source-to-circuit-state contract."""
         with self._lock:
-            return {source: info['state'] for source, info in self._states.items()}
-    
+            return {source: info["state"] for source, info in self._states.items()}
+
+    def get_snapshot(self, source: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
+        """Return a non-mutating, secret-free health snapshot for diagnostics."""
+        with self._lock:
+            now = self._clock()
+            if source is not None:
+                state = self._get_state_locked(source)
+                return {source: self._snapshot_locked(source, state, now)}
+            return {
+                source_name: self._snapshot_locked(source_name, state, now)
+                for source_name, state in sorted(self._states.items())
+            }
+
     def reset(self, source: Optional[str] = None) -> None:
-        """Reset circuit breaker status"""
+        """Reset one source or all circuit and health observations."""
         with self._lock:
             if source:
                 if source in self._states:

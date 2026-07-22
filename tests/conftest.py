@@ -33,6 +33,19 @@ def _restore_external_database_path():
     if _EXTERNAL_DATABASE_PATH is not None:
         os.environ["DATABASE_PATH"] = _EXTERNAL_DATABASE_PATH
 
+
+@pytest.fixture(autouse=True)
+def _disable_daily_provider_cache_by_default(monkeypatch):
+    """Keep persistent provider cache state from coupling otherwise unrelated tests."""
+    monkeypatch.setenv("PROVIDER_DAILY_CACHE_ENABLED", "false")
+
+
+@pytest.fixture(autouse=True)
+def _disable_adaptive_provider_priority_by_default(monkeypatch):
+    """Keep process-local provider health from changing unrelated test ordering."""
+    monkeypatch.setenv("PROVIDER_ADAPTIVE_PRIORITY_ENABLED", "false")
+
+
 _original_call_soon_threadsafe = asyncio.BaseEventLoop.call_soon_threadsafe
 
 

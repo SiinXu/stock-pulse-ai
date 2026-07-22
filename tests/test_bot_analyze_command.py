@@ -17,6 +17,8 @@ from concurrent.futures import Future
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 try:
     import litellm  # noqa: F401
 except ModuleNotFoundError:
@@ -120,6 +122,7 @@ def test_execute_submits_through_unified_queue_with_bot_context() -> None:
     assert response.markdown is True
     assert "分析任务已提交" in response.text
     assert "股票代码: `600519`" in response.text
+    assert "市场 / Market: A 股 (CN) / A-share" in response.text
     assert "报告类型: 精简报告" in response.text
     assert task.task_id[:20] in response.text
 
@@ -149,6 +152,7 @@ def test_execute_duplicate_stock_returns_friendly_message() -> None:
     assert response.text == (
         "⏳ **该股票正在分析中**\n\n"
         "• 股票代码: `600519`\n\n"
+        "• 市场 / Market: A 股 (CN) / A-share\n\n"
         "请等待当前分析完成后再试。"
     )
 
@@ -162,3 +166,66 @@ def test_execute_generic_failure_returns_stable_error() -> None:
         response = AnalyzeCommand().execute(message, ["600519"])
 
     assert response.text == "❌ 错误：分析失败，请稍后重试"
+
+
+@pytest.mark.parametrize(
+    ("raw_code", "expected_code", "expected_market"),
+    [
+        ("600519", "600519", "A 股 (CN) / A-share"),
+        ("00700.HK", "HK00700", "港股 (HK) / Hong Kong"),
+        ("aapl", "AAPL", "美股 (US) / US stock"),
+    ],
+)
+def test_execute_routes_three_markets_through_the_real_queue(
+    raw_code: str,
+    expected_code: str,
+    expected_market: str,
+) -> None:
+    message = _feishu_message(f"/analyze {raw_code}")
+    response, queue, analyze_stock = _run_execute_with_real_queue(
+        message,
+        [raw_code],
+        {"query_id": "q1", "stock_code": expected_code},
+    )
+
+    tasks = queue.list_all_tasks()
+    assert len(tasks) == 1
+    assert tasks[0].stock_code == expected_code
+    assert analyze_stock.call_args.kwargs["stock_code"] == expected_code
+    assert f"股票代码: `{expected_code}`" in response.text
+    assert f"市场 / Market: {expected_market}" in response.text
+
+
+def test_validate_args_rejects_unsupported_market_with_actionable_guidance() -> None:
+    message = AnalyzeCommand().validate_args(["7203.T"])
+
+    assert message is not None
+    assert "暂不支持日股" in message
+    assert "does not currently support Japan stocks" in message
+    assert "HK00700" in message
+
+
+def test_execute_rejects_invalid_symbol_without_submitting_a_task() -> None:
+    queue = MagicMock()
+
+    with patch("src.services.task_queue.get_task_queue", return_value=queue):
+        response = AnalyzeCommand().execute(
+            _feishu_message("/analyze abc123"),
+            ["abc123"],
+        )
+
+    assert "Unrecognized stock symbol" in response.text
+    queue.submit_task.assert_not_called()
+
+
+def test_execute_rejects_index_resolved_unsupported_market_without_submission() -> None:
+    queue = MagicMock()
+
+    with patch("src.services.task_queue.get_task_queue", return_value=queue):
+        response = AnalyzeCommand().execute(
+            _feishu_message("/analyze 005930"),
+            ["005930"],
+        )
+
+    assert "does not currently support Korea stocks" in response.text
+    queue.submit_task.assert_not_called()

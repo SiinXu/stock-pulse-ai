@@ -17,11 +17,17 @@ same implementation.
 import json
 import logging
 import uuid
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from src.config import get_config
-from src.agent.chat_context import build_agent_chat_context_bundle
+from src.agent.chat_context import (
+    build_agent_chat_context_bundle,
+    build_agent_chat_chip_instruction,
+    build_agent_chat_market_context,
+    build_agent_chat_tool_registry,
+)
 from src.agent.llm_adapter import LLMToolAdapter
 from src.agent.provider_trace import extract_provider_trace_turns
 from src.agent.public_contract import (
@@ -42,8 +48,48 @@ from src.market_phase_prompt import format_market_phase_prompt_section
 from src.market_structure_prompt import format_market_structure_prompt_section
 from src.services.daily_market_context import format_daily_market_context_prompt_section
 from src.utils.sanitize import log_safe_exception
+from src.agent.facade_binding import bind_facade_methods as _bind_facade_methods
+from src.agent.executor_parts.chat import _ChatMethods
+from src.agent.executor_parts.loop import _LoopMethods
+from src.agent.executor_parts.run import _RunMethods
 
 logger = logging.getLogger(__name__)
+
+# Preserve the legacy module namespace and provide the global lookup surface
+# used by descriptors rebound from the private source containers.
+_EXECUTOR_COMPAT_EXPORTS = (
+    AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
+    AGENT_CHAT_FAILURE_MESSAGE,
+    build_agent_chat_chip_instruction,
+    build_agent_chat_context_bundle,
+    build_agent_chat_market_context,
+    build_agent_chat_tool_registry,
+    Callable,
+    classify_result_terminal_state,
+    ExecutionState,
+    extract_provider_trace_turns,
+    format_daily_market_context_prompt_section,
+    format_market_phase_prompt_section,
+    format_market_structure_prompt_section,
+    get_config,
+    get_db,
+    get_market_guidelines,
+    get_market_role,
+    json,
+    log_safe_exception,
+    parse_dashboard_json_result,
+    resolve_stock_scope,
+    run_agent_loop,
+    sanitize_agent_diagnostic,
+    StockScope,
+    Tuple,
+    uuid,
+)
+
+_CHAT_TOOL_REGISTRY: ContextVar[Optional[ToolRegistry]] = ContextVar(
+    "agent_chat_tool_registry",
+    default=None,
+)
 
 
 # ============================================================
@@ -401,7 +447,7 @@ LEGACY_DEFAULT_CHAT_SYSTEM_PROMPT = """你是一位专注于趋势交易的{mark
 
 **第二阶段 · 技术与筹码**（等第一阶段结果返回后再执行）
 - 调用 `analyze_trend` 获取 MA/MACD/RSI 等技术指标
-- 调用 `get_chip_distribution` 获取筹码分布结构
+- {chip_distribution_instruction}
 
 **第三阶段 · 情报搜索**（等前两阶段完成后再执行）
 - 调用 `search_stock_news` 搜索最新新闻公告、减持、业绩预告等风险信号
@@ -438,7 +484,7 @@ CHAT_SYSTEM_PROMPT = """你是一位{market_role}投资分析 Agent，拥有数�
 
 **第二阶段 · 技术与筹码**（等第一阶段结果返回后再执行）
 - 调用 `analyze_trend` 获取 MA/MACD/RSI 等技术指标
-- 调用 `get_chip_distribution` 获取筹码分布结构
+- {chip_distribution_instruction}
 
 **第三阶段 · 情报搜索**（等前两阶段完成后再执行）
 - 调用 `search_stock_news` 搜索最新新闻公告、减持、业绩预告等风险信号
@@ -530,431 +576,13 @@ class AgentExecutor:
         self.max_steps = max_steps
         self.timeout_seconds = timeout_seconds
 
-    def run(
-        self,
-        task: str,
-        context: Optional[Dict[str, Any]] = None,
-        cancelled_check: Optional[Callable[[], bool]] = None,
-    ) -> AgentResult:
-        """Execute the agent loop for a given task.
 
-        Args:
-            task: The user task / analysis request.
-            context: Optional context dict (e.g., {"stock_code": "600519"}).
-            cancelled_check: Optional cooperative-cancellation probe threaded
-                into the shared runner.
-
-        Returns:
-            AgentResult with parsed dashboard or error.
-        """
-        system_prompt, user_message, tool_decls = self.build_run_messages(task, context)
-
-        # Initialize conversation
-        messages: List[Dict[str, Any]] = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message},
-        ]
-
-        return self._run_loop(
-            messages, tool_decls, parse_dashboard=True, cancelled_check=cancelled_check
-        )
-
-    def build_run_messages(
-        self, task: str, context: Optional[Dict[str, Any]] = None
-    ) -> Tuple[str, str, List[Dict[str, Any]]]:
-        """Assemble the resolved single-run prompt inputs.
-
-        Single authority for the Single RUN system prompt, user message and
-        OpenAI tool declarations so every runtime (native loop and the
-        experimental PydanticAI adapter) seeds from the same resolved skill,
-        market and dashboard constraints instead of rebuilding them.
-
-        Returns ``(system_prompt, user_message, tool_decls)``.
-        """
-        skills_section = ""
-        if self.skill_instructions:
-            skills_section = f"## 激活的交易技能\n\n{self.skill_instructions}"
-        default_skill_policy_section = ""
-        if self.default_skill_policy:
-            default_skill_policy_section = f"\n{self.default_skill_policy}\n"
-        report_language = normalize_report_language((context or {}).get("report_language", "zh"))
-        stock_code = (context or {}).get("stock_code", "")
-        market_role = get_market_role(stock_code, report_language)
-        market_guidelines = get_market_guidelines(stock_code, report_language)
-        prompt_template = (
-            LEGACY_DEFAULT_AGENT_SYSTEM_PROMPT
-            if self.use_legacy_default_prompt
-            else AGENT_SYSTEM_PROMPT
-        )
-        system_prompt = prompt_template.format(
-            market_role=market_role,
-            market_guidelines=market_guidelines,
-            default_skill_policy_section=default_skill_policy_section,
-            skills_section=skills_section,
-            language_section=_build_language_section(report_language),
-        )
-
-        # Build tool declarations in OpenAI format (litellm handles all providers)
-        tool_decls = self.tool_registry.to_openai_tools()
-        user_message = self._build_user_message(task, context)
-        return system_prompt, user_message, tool_decls
-
-    def chat(self, message: str, session_id: str, progress_callback: Optional[Callable] = None, context: Optional[Dict[str, Any]] = None, cancelled_check: Optional[Callable[[], bool]] = None) -> AgentResult:
-        """Execute the agent loop for a free-form chat message.
-
-        Args:
-            message: The user's chat message.
-            session_id: The conversation session ID.
-            progress_callback: Optional callback for streaming progress events.
-            context: Optional context dict from previous analysis for data reuse.
-
-        Returns:
-            AgentResult with the text response.
-        """
-        from src.agent.conversation import conversation_manager
-
-        scope_resolution = resolve_stock_scope(message, context)
-        context = scope_resolution.effective_context
-
-        # Build system prompt with skills
-        skills_section = ""
-        if self.skill_instructions:
-            skills_section = f"## 激活的交易技能\n\n{self.skill_instructions}"
-        default_skill_policy_section = ""
-        if self.default_skill_policy:
-            default_skill_policy_section = f"\n{self.default_skill_policy}\n"
-        report_language = normalize_report_language((context or {}).get("report_language", "zh"))
-        stock_code = (context or {}).get("stock_code", "")
-        market_role = get_market_role(stock_code, report_language)
-        market_guidelines = get_market_guidelines(stock_code, report_language)
-        prompt_template = (
-            LEGACY_DEFAULT_CHAT_SYSTEM_PROMPT
-            if self.use_legacy_default_prompt
-            else CHAT_SYSTEM_PROMPT
-        )
-        system_prompt = prompt_template.format(
-            market_role=market_role,
-            market_guidelines=market_guidelines,
-            default_skill_policy_section=default_skill_policy_section,
-            skills_section=skills_section,
-            language_section=_build_language_section(report_language, chat_mode=True),
-        )
-
-        # Build tool declarations in OpenAI format (litellm handles all providers)
-        tool_decls = self.tool_registry.to_openai_tools()
-
-        # Get conversation history
-        conversation_manager.get_or_create(session_id)
-        config = getattr(self.llm_adapter, "_config", None) or get_config()
-        bundle = build_agent_chat_context_bundle(session_id, self.llm_adapter, config)
-
-        # Initialize conversation
-        messages: List[Dict[str, Any]] = [
-            {"role": "system", "content": system_prompt},
-        ]
-        messages.extend(bundle.context_messages)
-
-        # Inject previous analysis context if provided (data reuse from report follow-up)
-        if context:
-            context_parts = []
-            if context.get("stock_code"):
-                context_parts.append(f"股票代码: {context['stock_code']}")
-            if context.get("stock_name"):
-                context_parts.append(f"股票名称: {context['stock_name']}")
-            if context.get("previous_price"):
-                context_parts.append(f"上次分析价格: {context['previous_price']}")
-            if context.get("previous_change_pct"):
-                context_parts.append(f"上次涨跌幅: {context['previous_change_pct']}%")
-            if context.get("previous_analysis_summary"):
-                summary = context["previous_analysis_summary"]
-                summary_text = json.dumps(summary, ensure_ascii=False) if isinstance(summary, dict) else str(summary)
-                context_parts.append(f"上次分析摘要:\n{summary_text}")
-            if context.get("previous_strategy"):
-                strategy = context["previous_strategy"]
-                strategy_text = json.dumps(strategy, ensure_ascii=False) if isinstance(strategy, dict) else str(strategy)
-                context_parts.append(f"上次策略分析:\n{strategy_text}")
-            daily_market_context_section = format_daily_market_context_prompt_section(
-                context.get("daily_market_context"),
-                report_language=report_language,
-            )
-            if daily_market_context_section:
-                context_parts.append(daily_market_context_section.strip())
-            market_structure_section = format_market_structure_prompt_section(
-                context.get("market_structure_context"),
-                report_language=report_language,
-            )
-            if market_structure_section:
-                context_parts.append(market_structure_section.strip())
-            if context_parts:
-                context_msg = "[系统提供的历史分析上下文，可供参考对比]\n" + "\n".join(context_parts)
-                messages.append({"role": "user", "content": context_msg})
-                messages.append({"role": "assistant", "content": "好的，我已了解该股票的历史分析数据。请告诉我你想了解什么？"})
-
-        messages.append({"role": "user", "content": message})
-        baseline_len = len(messages)
-        run_id = str(uuid.uuid4())
-
-        # Persist the user turn immediately so the session appears in history during processing
-        user_message_id = conversation_manager.add_message(session_id, "user", message)
-
-        try:
-            result = self._run_loop(
-                messages,
-                tool_decls,
-                parse_dashboard=False,
-                progress_callback=progress_callback,
-                stock_scope=scope_resolution.stock_scope,
-                cancelled_check=cancelled_check,
-            )
-        except Exception as exc:
-            log_safe_exception(
-                logger,
-                "Agent chat execution raised",
-                exc,
-                error_code="agent_chat_failed",
-                context={"session_id": session_id},
-            )
-            conversation_manager.add_message(
-                session_id,
-                "assistant",
-                AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
-            )
-            return AgentResult(
-                success=False,
-                content="",
-                error=AGENT_CHAT_FAILURE_MESSAGE,
-            )
-
-        # Persist assistant reply (or error note) for context continuity.
-        # The terminal state is classified through the single shared authority
-        # so this write fence stays byte-identical to the SSE endpoint's
-        # lifecycle classification. A cancelled run is user intent, not an
-        # agent failure: skip the failure sentinel and the provider trace so
-        # the cancelled turn leaves no misleading "analysis failed" assistant
-        # message and no late partial trace behind.
-        terminal_state = classify_result_terminal_state(result)
-        if terminal_state is ExecutionState.SUCCEEDED:
-            assistant_message_id = conversation_manager.add_message(session_id, "assistant", result.content)
-            self._persist_provider_trace(
-                session_id=session_id,
-                run_id=run_id,
-                messages=result.messages,
-                baseline_len=baseline_len,
-                user_message_id=user_message_id,
-                assistant_message_id=assistant_message_id,
-            )
-        elif terminal_state is ExecutionState.CANCELLED:
-            logger.info("Agent chat cancelled: session_id=%s", session_id)
-        else:
-            logger.error(
-                "Agent chat failed: session_id=%s diagnostic=%s",
-                session_id,
-                sanitize_agent_diagnostic(result.error),
-            )
-            conversation_manager.add_message(
-                session_id,
-                "assistant",
-                AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
-            )
-
-        return result
-
-    def _persist_provider_trace(
-        self,
-        *,
-        session_id: str,
-        run_id: str,
-        messages: List[Dict[str, Any]],
-        baseline_len: int,
-        user_message_id: int,
-        assistant_message_id: int,
-    ) -> None:
-        try:
-            turns, diagnostics = extract_provider_trace_turns(
-                messages,
-                baseline_len=baseline_len,
-                run_id=run_id,
-                anchor_user_message_id=user_message_id,
-                anchor_assistant_message_id=assistant_message_id,
-            )
-        except Exception as exc:
-            log_safe_exception(
-                logger,
-                "Provider trace extraction failed",
-                exc,
-                error_code="agent_provider_trace_extraction_failed",
-                level=logging.WARNING,
-                context={"session_id": session_id, "run_id": run_id},
-            )
-            return
-
-        if diagnostics.trace_dropped_reason:
-            logger.debug(
-                "Provider trace skipped for session %s run %s: %s",
-                session_id,
-                run_id,
-                diagnostics.trace_dropped_reason,
-            )
-        if not turns:
-            return
-
-        try:
-            db = get_db()
-        except Exception as exc:
-            log_safe_exception(
-                logger,
-                "Provider trace storage unavailable",
-                exc,
-                error_code="agent_provider_trace_storage_unavailable",
-                level=logging.WARNING,
-                context={"session_id": session_id, "run_id": run_id},
-            )
-            return
-
-        for turn in turns:
-            try:
-                db.save_agent_provider_turn(
-                    session_id=session_id,
-                    run_id=run_id,
-                    provider=turn.provider,
-                    model=turn.model,
-                    anchor_user_message_id=user_message_id,
-                    anchor_assistant_message_id=assistant_message_id,
-                    messages=turn.messages,
-                    contains_reasoning=turn.contains_reasoning,
-                    contains_tool_calls=turn.contains_tool_calls,
-                    contains_thinking_blocks=turn.contains_thinking_blocks,
-                    must_roundtrip=turn.must_roundtrip,
-                    estimated_tokens=turn.estimated_tokens,
-                )
-            except Exception as exc:
-                log_safe_exception(
-                    logger,
-                    "Provider trace persistence failed",
-                    exc,
-                    error_code="agent_provider_trace_persistence_failed",
-                    level=logging.WARNING,
-                    context={
-                        "session_id": session_id,
-                        "run_id": run_id,
-                        "provider": turn.provider,
-                        "model": turn.model,
-                    },
-                )
-
-    def _run_loop(
-        self,
-        messages: List[Dict[str, Any]],
-        tool_decls: List[Dict[str, Any]],
-        parse_dashboard: bool,
-        progress_callback: Optional[Callable] = None,
-        stock_scope: Optional[StockScope] = None,
-        cancelled_check: Optional[Callable[[], bool]] = None,
-    ) -> AgentResult:
-        """Delegate to the shared runner and adapt the result.
-
-        Dashboard mode preserves the raw answer unless deterministic
-        post-processing removes a reserved model-authored field. Free-form
-        mode always preserves the raw text.
-        """
-        loop_result = run_agent_loop(
-            messages=messages,
-            tool_registry=self.tool_registry,
-            llm_adapter=self.llm_adapter,
-            max_steps=self.max_steps,
-            progress_callback=progress_callback,
-            max_wall_clock_seconds=self.timeout_seconds,
-            stock_scope=stock_scope,
-            cancelled_check=cancelled_check,
-        )
-
-        model_str = loop_result.model
-
-        if parse_dashboard and loop_result.success:
-            parse_result = parse_dashboard_json_result(loop_result.content)
-            dashboard = parse_result.payload if parse_result is not None else None
-            return AgentResult(
-                success=dashboard is not None,
-                content=(
-                    json.dumps(dashboard, ensure_ascii=False, indent=2)
-                    if parse_result is not None and parse_result.reserved_field_removed
-                    else loop_result.content
-                ),
-                dashboard=dashboard,
-                tool_calls_log=loop_result.tool_calls_log,
-                total_steps=loop_result.total_steps,
-                total_tokens=loop_result.total_tokens,
-                provider=loop_result.provider,
-                model=model_str,
-                error=None if dashboard else "Failed to parse dashboard JSON from agent response",
-                messages=loop_result.messages,
-                cancelled=loop_result.cancelled,
-                timed_out=loop_result.timed_out,
-            )
-
-        return AgentResult(
-            success=loop_result.success,
-            content=loop_result.content,
-            dashboard=None,
-            tool_calls_log=loop_result.tool_calls_log,
-            total_steps=loop_result.total_steps,
-            total_tokens=loop_result.total_tokens,
-            provider=loop_result.provider,
-            model=model_str,
-            error=loop_result.error,
-            messages=loop_result.messages,
-            cancelled=loop_result.cancelled,
-            timed_out=loop_result.timed_out,
-        )
-
-    def _build_user_message(self, task: str, context: Optional[Dict[str, Any]] = None) -> str:
-        """Build the initial user message."""
-        parts = [task]
-        if context:
-            report_language = normalize_report_language(context.get("report_language", "zh"))
-            if context.get("stock_code"):
-                parts.append(f"\n股票代码: {context['stock_code']}")
-            if context.get("report_type"):
-                parts.append(f"报告类型: {context['report_type']}")
-            if report_language == "en":
-                parts.append("输出语言: English（所有 JSON 键名保持不变，所有面向用户的文本值使用英文）")
-            elif report_language == "ko":
-                parts.append("출력 언어: 한국어（모든 JSON 키는 그대로 유지하고, 사용자 노출 텍스트 값은 한국어로 작성）")
-            else:
-                parts.append("输出语言: 中文（所有 JSON 键名保持不变，所有面向用户的文本值使用中文）")
-
-            market_phase_section = format_market_phase_prompt_section(
-                context.get("market_phase_context"),
-                report_language=report_language,
-            )
-            if market_phase_section:
-                parts.append(market_phase_section)
-
-            daily_market_context_section = format_daily_market_context_prompt_section(
-                context.get("daily_market_context"),
-                report_language=report_language,
-            )
-            if daily_market_context_section:
-                parts.append(daily_market_context_section)
-
-            market_structure_section = format_market_structure_prompt_section(
-                context.get("market_structure_context"),
-                report_language=report_language,
-            )
-            if market_structure_section:
-                parts.append(market_structure_section)
-
-            analysis_context_pack_summary = context.get("analysis_context_pack_summary")
-            if isinstance(analysis_context_pack_summary, str) and analysis_context_pack_summary:
-                parts.append(analysis_context_pack_summary)
-
-            # Inject pre-fetched context data to avoid redundant fetches
-            if context.get("realtime_quote"):
-                parts.append(f"\n[系统已获取的实时行情]\n{json.dumps(context['realtime_quote'], ensure_ascii=False)}")
-            if context.get("chip_distribution"):
-                parts.append(f"\n[系统已获取的筹码分布]\n{json.dumps(context['chip_distribution'], ensure_ascii=False)}")
-            if context.get("news_context"):
-                parts.append(f"\n[系统已获取的新闻与舆情情报]\n{context['news_context']}")
-
-        parts.append("\n请使用可用工具获取缺失的数据（如历史K线、新闻等），然后以决策仪表盘 JSON 格式输出分析结果。")
-        return "\n".join(parts)
+_RUN_METHOD_NAMES = _bind_facade_methods(
+    AgentExecutor, _RunMethods, globals(), evaluate_annotations=True
+)
+_CHAT_METHOD_NAMES = _bind_facade_methods(
+    AgentExecutor, _ChatMethods, globals(), evaluate_annotations=True
+)
+_LOOP_METHOD_NAMES = _bind_facade_methods(
+    AgentExecutor, _LoopMethods, globals(), evaluate_annotations=True
+)

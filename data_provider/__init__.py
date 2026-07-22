@@ -25,9 +25,12 @@ Data source priority (dynamically adjusted):
 4. TushareFetcher (Priority 2) - From the tushare library (unavailable)
 5. BaostockFetcher (Priority 3) - From? baostock library
 6. YfinanceFetcher (Priority 4) - From? yfinance library
-7. LongbridgeFetcher (Priority 5) - Longbridge OpenAPI (U.S./Hong Kong stocks fallback).
+7. LongbridgeFetcher (Priority 5) - Longbridge OpenAPI (US/HK stocks fallback).
 
-Tip: Lower priority numbers have higher priority; same priority is sorted by initialization order.
+Runtime adaptive ordering can reorder only contiguous, sufficiently sampled
+providers within the same numeric priority. Sparse and circuit-state providers,
+capability filters, and explicit market routes remain uncrossable boundaries;
+disabling adaptive ordering restores initialization order.
 """
 
 from .base import BaseFetcher, DataFetcherManager

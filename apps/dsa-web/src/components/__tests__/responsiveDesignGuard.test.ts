@@ -7,20 +7,12 @@ import { describe, expect, it } from 'vitest';
 import tailwindConfigSource from '../../../tailwind.config.js?raw';
 import marketReviewSource from '../report/MarketReviewReportView.tsx?raw';
 import reportOverviewSource from '../report/ReportOverview.tsx?raw';
+import { productionCssAndTsxSources } from './productionSourceInventory';
 
-const productionSources = import.meta.glob('../../**/*.{css,tsx}', {
-  eager: true,
-  import: 'default',
-  query: '?raw',
-}) as Record<string, string>;
+const productionSources = productionCssAndTsxSources;
 const indexCssSource = fs.readFileSync('src/index.css', 'utf8');
 
 const RAW_STATIC_VIEWPORT_HEIGHT = /(^|[^a-zA-Z0-9])100vh([^a-zA-Z0-9]|$)/;
-
-function isProductionSource(filename: string): boolean {
-  return !filename.includes('/__tests__/')
-    && !/\.(?:test|spec|stories|generated)\.tsx$/.test(filename);
-}
 
 describe('responsive design guard', () => {
   it('detects static viewport units without rejecting dvh', () => {
@@ -31,7 +23,6 @@ describe('responsive design guard', () => {
 
   it('keeps raw 100vh out of production CSS and TSX', () => {
     const failures = Object.entries(productionSources)
-      .filter(([filename]) => isProductionSource(filename))
       .filter(([, source]) => RAW_STATIC_VIEWPORT_HEIGHT.test(source))
       .map(([filename]) => filename);
 

@@ -11,15 +11,17 @@ Design patterns: Strategy Pattern
 Anti-ban strategy:
 1. Each Fetcher has built-in flow control logic
 2. Fail to switch to the next data source automatically
-3. exponential backoff mechanism
+3. Index risk-off mechanism
 """
 
+import json
 import logging
+import os
 import random
 import time
-from threading import BoundedSemaphore, RLock, Thread
+from threading import BoundedSemaphore, RLock, Thread, local
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Callable, Optional, List, Tuple, Dict, Any
 
 import pandas as pd
@@ -28,7 +30,8 @@ from src.data.stock_index_loader import get_index_stock_name
 from src.data.stock_mapping import STOCK_NAME_MAP, is_meaningful_stock_name
 from src.services.market_symbol_utils import is_suffix_market_symbol
 from src.services.run_diagnostics import record_provider_run, record_provider_run_started
-from src.utils.sanitize import log_safe_exception
+from src.utils.sanitize import log_safe_exception, sanitize_diagnostic_text
+from .daily_cache import DailyCacheKey, DailyCacheLookup, DailyCacheRead, DailyDataCache
 from .fundamental_adapter import AkshareFundamentalAdapter
 from .yfinance_fundamental_adapter import YfinanceFundamentalAdapter
 from .realtime_types import CircuitBreaker, UnifiedRealtimeQuote
@@ -37,7 +40,59 @@ from .realtime_types import CircuitBreaker, UnifiedRealtimeQuote
 logger = logging.getLogger(__name__)
 
 
-# === Standardized Column Name Definition ===
+_PROVIDER_CIRCUIT_ENABLED_DEFAULT = True
+_PROVIDER_CIRCUIT_FAILURE_THRESHOLD_DEFAULT = 3
+_PROVIDER_CIRCUIT_COOLDOWN_SECONDS_DEFAULT = 300.0
+_PROVIDER_HEALTH_WINDOW_SIZE_DEFAULT = 20
+_PROVIDER_ADAPTIVE_PRIORITY_ENABLED_DEFAULT = True
+_PROVIDER_ADAPTIVE_PRIORITY_MIN_SAMPLES_DEFAULT = 3
+_PROVIDER_DAILY_HEALTH_SCHEMA_VERSION = "provider_daily_health_v1"
+
+
+def _read_bool_env(name: str, default: bool) -> bool:
+    raw_value = os.getenv(name)
+    if raw_value is None or not raw_value.strip():
+        return default
+    normalized = raw_value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    logger.warning("Invalid boolean configuration name=%s; using default", name)
+    return default
+
+
+def _read_positive_int_env(name: str, default: int) -> int:
+    raw_value = os.getenv(name)
+    if raw_value is None or not raw_value.strip():
+        return default
+    try:
+        value = int(raw_value)
+    except ValueError:
+        logger.warning("Invalid integer configuration name=%s; using default", name)
+        return default
+    if value < 1:
+        logger.warning("Out-of-range integer configuration name=%s; using default", name)
+        return default
+    return value
+
+
+def _read_non_negative_float_env(name: str, default: float) -> float:
+    raw_value = os.getenv(name)
+    if raw_value is None or not raw_value.strip():
+        return default
+    try:
+        value = float(raw_value)
+    except ValueError:
+        logger.warning("Invalid numeric configuration name=%s; using default", name)
+        return default
+    if not np.isfinite(value) or value < 0:
+        logger.warning("Out-of-range numeric configuration name=%s; using default", name)
+        return default
+    return value
+
+
+# Standardized Column Name Definition
 STANDARD_COLUMNS = ['date', 'open', 'high', 'low', 'close', 'volume', 'amount', 'pct_chg']
 
 
@@ -65,7 +120,7 @@ def summarize_exception(exc: Exception) -> Tuple[str, str]:
     root = unwrap_exception(exc)
     error_type = type(root).__name__
     message = str(exc).strip() or str(root).strip() or error_type
-    return error_type, " ".join(message.split())
+    return error_type, sanitize_diagnostic_text(" ".join(message.split()))
 
 
 def normalize_stock_code(stock_code: str) -> str:
@@ -283,7 +338,7 @@ def is_st_stock(name: str) -> bool:
 
 def is_kc_cy_stock(code: str) -> bool:
     """
-    Check if the stock is a STAR Market (ChiNext) or ChiNext (STAR Market (Growth Enterprise Market)) stock based on its code.
+    Check if the stock is a STAR Market (Innovation Board) or ChiNext (GEM (Growth Enterprise Market)) stock based on its code.
 
     - STAR Market: Codes starting with 688
     - ChiNext: Codes starting with 300
@@ -325,6 +380,11 @@ class DataSourceUnavailableError(DataFetchError):
     pass
 
 
+class CircuitOpenError(DataSourceUnavailableError):
+    """A provider call was skipped because its circuit is in cooldown."""
+    pass
+
+
 class BaseFetcher(ABC):
     """
     Data source abstract base class
@@ -350,11 +410,11 @@ class BaseFetcher(ABC):
         
         Args:
             stock_code: stock code, such as '600519', '000001'
-            start_date: Start date in 'YYYY-MM-DD' format
-            end_date: End date in 'YYYY-MM-DD' format
+            start_date: Start date, Format? 'YYYY-MM-DD'
+            end_date: End date, Format? 'YYYY-MM-DD'
             
         Returns:
-            Raw DataFrame (column names vary by data source)
+            Original data DataFrame (column names vary by data source)
         """
         pass
     
@@ -383,7 +443,7 @@ class BaseFetcher(ABC):
                 - change: increase or decrease point
                 - change_pct: percentage change
                 - volume: Trading volume
-                - trading value: Transaction Volume
+                - amount: Transaction Volume
         """
         return None
 
@@ -396,9 +456,9 @@ class BaseFetcher(ABC):
                 - up_count: Number of stocks that increased
                 - down_count: Number of declines
                 - flat_count: Flat count
-                - limit_up_count: Number of limit-up stocks
-                - limit_down_count: limit-down count
-                - total_amount: trading value in two markets
+                - limit_up_count: Number of stocks hitting the daily limit
+                - limit_down_count: Number of stocks halted
+                - total_amount: Trading volume in two markets
         """
         return None
 
@@ -410,7 +470,7 @@ class BaseFetcher(ABC):
             n: Return the top n items
 
         Returns:
-            Tuple: (Leading sector list, Leading decline sector list)
+            Tuple: (Leading board list, Leading decline board list)
         """
         return None
 
@@ -438,7 +498,7 @@ class BaseFetcher(ABC):
         n: int = 20,
     ) -> Optional[List[Dict[str, Any]]]:
         """
-        Get the list of limit-up pool/momentum teams.
+        Get the list of surging pools/momentum teams.
 
         Args:
             date: YYYYMMDD, default determined by the specific data source
@@ -573,7 +633,7 @@ class BaseFetcher(ABC):
         df['ma10'] = df['close'].rolling(window=10, min_periods=1).mean()
         df['ma20'] = df['close'].rolling(window=20, min_periods=1).mean()
         
-        # volume ratio: Daily Trading Volume / 5-Day Average Trading Volume
+        # Relative Volume: Daily Trading Volume / 5-Day Average Trading Volume
         # Note: This volume_ratio is the relative multiple of 'daily trading volume / 5-day average (shift 1)'.
         # Different from the 'split-time volume ratio' in some trading software (comparison at the same time), closer to 'volume expansion multiple'.
         # This behavior is currently retained (logic will not be modified based on demand).
@@ -629,7 +689,14 @@ class DataFetcherManager:
         "FinnhubFetcher": {"us"},
         "AlphaVantageFetcher": {"us"},
     }
-    _daily_source_health = CircuitBreaker(failure_threshold=3, cooldown_seconds=300.0)
+    _DAILY_MARKETS = frozenset({"cn", "hk", "us", "jp", "kr", "tw"})
+    _daily_source_health = CircuitBreaker(
+        failure_threshold=_PROVIDER_CIRCUIT_FAILURE_THRESHOLD_DEFAULT,
+        cooldown_seconds=_PROVIDER_CIRCUIT_COOLDOWN_SECONDS_DEFAULT,
+        health_window_size=_PROVIDER_HEALTH_WINDOW_SIZE_DEFAULT,
+        enabled=_PROVIDER_CIRCUIT_ENABLED_DEFAULT,
+    )
+    _daily_health_handoff = local()
     _CONCEPT_RANKINGS_CACHE_TTL_SECONDS = 300.0
     _CONCEPT_RANKINGS_EMPTY_CACHE_TTL_SECONDS = 30.0
     _concept_rankings_cache_lock = RLock()
@@ -642,6 +709,8 @@ class DataFetcherManager:
         Args:
             fetchers: Data source list (optional, defaults to automatic creation based on priority)
         """
+        self._configure_daily_source_health()
+        self._configure_daily_adaptive_priority()
         self._fetchers: List[BaseFetcher] = []
         self._fetchers_lock = RLock()
         self._fetchers_by_name: Dict[str, BaseFetcher] = {}
@@ -649,6 +718,7 @@ class DataFetcherManager:
         self._fetcher_call_locks_lock = RLock()
         self._stock_name_cache: Dict[str, str] = {}
         self._stock_name_cache_lock = RLock()
+        self._daily_data_cache: Optional[DailyDataCache] = None
         
         if fetchers:
             # Sort by priority.
@@ -681,6 +751,12 @@ class DataFetcherManager:
             self._stock_name_cache = {}
         if not hasattr(self, "_stock_name_cache_lock") or self._stock_name_cache_lock is None:
             self._stock_name_cache_lock = RLock()
+        if not hasattr(self, "_daily_data_cache"):
+            self._daily_data_cache = None
+        if not hasattr(self, "_daily_adaptive_priority_enabled"):
+            self._daily_adaptive_priority_enabled = _PROVIDER_ADAPTIVE_PRIORITY_ENABLED_DEFAULT
+        if not hasattr(self, "_daily_adaptive_priority_min_samples"):
+            self._daily_adaptive_priority_min_samples = _PROVIDER_ADAPTIVE_PRIORITY_MIN_SAMPLES_DEFAULT
 
     def _get_fetchers_snapshot(self) -> List[BaseFetcher]:
         self._ensure_concurrency_guards()
@@ -751,7 +827,54 @@ class DataFetcherManager:
         """Serialize shared fetcher state access through manager-owned per-instance locks."""
         method = getattr(fetcher, method_name)
         with self._get_fetcher_call_lock(fetcher):
-            return method(*args, **kwargs)
+            if method_name != "get_daily_data":
+                return method(*args, **kwargs)
+
+            stock_code = kwargs.get("stock_code") or (args[0] if args else "")
+            market = _market_tag(normalize_stock_code(str(stock_code)))
+            health_key = self._daily_health_key(fetcher, market)
+            if not self._daily_source_health.is_available(health_key):
+                self._mark_daily_health_recorded(health_key)
+                logger.info(
+                    "provider_health event=circuit_skip_after_queue data_type=daily_data provider=%s",
+                    sanitize_diagnostic_text(fetcher.name, max_length=120),
+                )
+                raise CircuitOpenError(
+                    f"[{fetcher.name}] provider circuit is in cooldown"
+                )
+
+            started_at = time.monotonic()
+            try:
+                result = method(*args, **kwargs)
+            except Exception:
+                latency_ms = (time.monotonic() - started_at) * 1000.0
+                self._daily_source_health.record_failure(
+                    health_key,
+                    error="data_provider_daily_data_attempt_failed",
+                    latency_ms=latency_ms,
+                )
+                self._mark_daily_health_recorded(health_key)
+                raise
+
+            latency_ms = (time.monotonic() - started_at) * 1000.0
+            if isinstance(result, pd.DataFrame):
+                if result.empty:
+                    self._daily_source_health.record_quality_failure(
+                        health_key,
+                        latency_ms=latency_ms,
+                    )
+                else:
+                    self._daily_source_health.record_success(
+                        health_key,
+                        latency_ms=latency_ms,
+                    )
+                self._mark_daily_health_recorded(health_key)
+            elif result is None:
+                self._daily_source_health.record_quality_failure(
+                    health_key,
+                    latency_ms=latency_ms,
+                )
+            return result
 
     @classmethod
     def _filter_daily_fetchers_for_market(
@@ -808,18 +931,171 @@ class DataFetcherManager:
         return f"daily_data:{market}:{fetcher.name}"
 
     @classmethod
+    def _mark_daily_health_recorded(cls, health_key: str) -> None:
+        pending = getattr(cls._daily_health_handoff, "pending", None)
+        if pending is None:
+            pending = {}
+            cls._daily_health_handoff.pending = pending
+        pending[health_key] = pending.get(health_key, 0) + 1
+
+    @classmethod
+    def _consume_daily_health_recorded(cls, health_key: str) -> bool:
+        pending = getattr(cls._daily_health_handoff, "pending", None)
+        if not pending or pending.get(health_key, 0) < 1:
+            return False
+        remaining = pending[health_key] - 1
+        if remaining:
+            pending[health_key] = remaining
+        else:
+            pending.pop(health_key, None)
+        return True
+
+    @classmethod
+    def _configure_daily_source_health(cls) -> None:
+        cls._daily_source_health.configure(
+            enabled=_read_bool_env(
+                "PROVIDER_CIRCUIT_BREAKER_ENABLED",
+                _PROVIDER_CIRCUIT_ENABLED_DEFAULT,
+            ),
+            failure_threshold=_read_positive_int_env(
+                "PROVIDER_CIRCUIT_FAILURE_THRESHOLD",
+                _PROVIDER_CIRCUIT_FAILURE_THRESHOLD_DEFAULT,
+            ),
+            cooldown_seconds=_read_non_negative_float_env(
+                "PROVIDER_CIRCUIT_COOLDOWN_SECONDS",
+                _PROVIDER_CIRCUIT_COOLDOWN_SECONDS_DEFAULT,
+            ),
+            health_window_size=_read_positive_int_env(
+                "PROVIDER_HEALTH_WINDOW_SIZE",
+                _PROVIDER_HEALTH_WINDOW_SIZE_DEFAULT,
+            ),
+        )
+
+    def _configure_daily_adaptive_priority(self) -> None:
+        self._daily_adaptive_priority_enabled = _read_bool_env(
+            "PROVIDER_ADAPTIVE_PRIORITY_ENABLED",
+            _PROVIDER_ADAPTIVE_PRIORITY_ENABLED_DEFAULT,
+        )
+        self._daily_adaptive_priority_min_samples = _read_positive_int_env(
+            "PROVIDER_ADAPTIVE_PRIORITY_MIN_SAMPLES",
+            _PROVIDER_ADAPTIVE_PRIORITY_MIN_SAMPLES_DEFAULT,
+        )
+
+    @staticmethod
+    def _daily_adaptive_sort_key(
+        snapshot: Dict[str, Any],
+        static_index: int,
+    ) -> Tuple[float, float, float, int]:
+        latency = snapshot.get("average_latency_ms")
+        return (
+            -float(snapshot.get("health_score", 0.0)),
+            -float(snapshot.get("success_rate", 0.0)),
+            float(latency) if latency is not None else float("inf"),
+            static_index,
+        )
+
+    def _order_daily_fetchers(
+        self,
+        fetchers: List[BaseFetcher],
+        market: str,
+    ) -> List[BaseFetcher]:
+        """Adapt contiguous eligible peers without crossing static or health anchors."""
+        self._ensure_concurrency_guards()
+        static_order = list(fetchers)
+        if not self._daily_adaptive_priority_enabled or len(static_order) < 2:
+            return static_order
+
+        snapshots: Dict[int, Dict[str, Any]] = {}
+        for static_index, fetcher in enumerate(static_order):
+            health_key = self._daily_health_key(fetcher, market)
+            snapshots[static_index] = self._daily_source_health.get_snapshot(health_key)[health_key]
+
+        selected_order = list(static_order)
+        eligible_count = 0
+        run_positions: List[int] = []
+
+        def rank_run() -> None:
+            if len(run_positions) < 2:
+                run_positions.clear()
+                return
+            ranked_positions = sorted(
+                run_positions,
+                key=lambda position: self._daily_adaptive_sort_key(
+                    snapshots[position],
+                    position,
+                ),
+            )
+            for target_position, ranked_position in zip(run_positions, ranked_positions):
+                selected_order[target_position] = static_order[ranked_position]
+            run_positions.clear()
+
+        for position, fetcher in enumerate(static_order):
+            snapshot = snapshots[position]
+            eligible = (
+                snapshot["state"] == CircuitBreaker.CLOSED
+                and snapshot["sample_count"]
+                >= self._daily_adaptive_priority_min_samples
+            )
+            if not eligible:
+                rank_run()
+                continue
+
+            if (
+                run_positions
+                and static_order[run_positions[-1]].priority != fetcher.priority
+            ):
+                rank_run()
+            run_positions.append(position)
+            eligible_count += 1
+        rank_run()
+
+        if selected_order != static_order:
+            health_summary = [
+                {
+                    "provider": sanitize_diagnostic_text(fetcher.name, max_length=120),
+                    "priority": fetcher.priority,
+                    "sample_count": snapshots[index]["sample_count"],
+                    "success_rate": snapshots[index]["success_rate"],
+                    "average_latency_ms": snapshots[index]["average_latency_ms"],
+                    "health_score": snapshots[index]["health_score"],
+                }
+                for index, fetcher in enumerate(static_order)
+            ]
+            logger.info(
+                "provider_priority event=adaptive_reorder data_type=daily_data market=%s "
+                "min_samples=%d eligible_count=%d static_order=%s selected_order=%s health=%s",
+                market,
+                self._daily_adaptive_priority_min_samples,
+                eligible_count,
+                ",".join(
+                    sanitize_diagnostic_text(fetcher.name, max_length=120)
+                    for fetcher in static_order
+                ),
+                ",".join(
+                    sanitize_diagnostic_text(fetcher.name, max_length=120)
+                    for fetcher in selected_order
+                ),
+                json.dumps(health_summary, sort_keys=True, separators=(",", ":")),
+            )
+        return selected_order
+
+    @classmethod
     def _is_daily_source_available(
         cls,
         fetcher: BaseFetcher,
         market: str,
     ) -> bool:
         key = cls._daily_health_key(fetcher, market)
-        if cls._daily_source_health.is_available(key):
+        if cls._daily_source_health.can_attempt(key):
             return True
+        snapshot = cls._daily_source_health.get_snapshot(key)[key]
         logger.info(
-            "[数据源健康度] %s 日线跳过短期熔断的数据源: %s",
+            "provider_health event=circuit_skip data_type=daily_data market=%s "
+            "provider=%s cooldown_remaining_seconds=%.3f health_score=%.2f",
             market,
             fetcher.name,
+            snapshot["cooldown_remaining_seconds"],
+            snapshot["health_score"],
         )
         return False
 
@@ -828,17 +1104,264 @@ class DataFetcherManager:
         return f"[{fetcher.name}] (CircuitOpen) 数据源短期熔断"
 
     @classmethod
-    def _record_daily_source_success(cls, fetcher: BaseFetcher, market: str) -> None:
-        cls._daily_source_health.record_success(cls._daily_health_key(fetcher, market))
+    def _record_daily_source_success(
+        cls,
+        fetcher: BaseFetcher,
+        market: str,
+        latency_ms: Optional[int] = None,
+    ) -> None:
+        health_key = cls._daily_health_key(fetcher, market)
+        if cls._consume_daily_health_recorded(health_key):
+            return
+        cls._daily_source_health.record_success(
+            health_key,
+            latency_ms=latency_ms,
+        )
 
     @classmethod
-    def _record_daily_source_failure(cls, fetcher: BaseFetcher, market: str, error: str) -> None:
-        cls._daily_source_health.record_failure(cls._daily_health_key(fetcher, market), error=error)
+    def _record_daily_source_failure(
+        cls,
+        fetcher: BaseFetcher,
+        market: str,
+        error: str,
+        latency_ms: Optional[int] = None,
+    ) -> None:
+        health_key = cls._daily_health_key(fetcher, market)
+        if cls._consume_daily_health_recorded(health_key):
+            return
+        cls._daily_source_health.record_failure(
+            health_key,
+            error=error,
+            latency_ms=latency_ms,
+        )
+
+    @classmethod
+    def _next_daily_fallback_name(
+        cls,
+        fetchers: List[BaseFetcher],
+        start_index: int,
+        market: str,
+    ) -> Optional[str]:
+        for candidate in fetchers[start_index:]:
+            health_key = cls._daily_health_key(candidate, market)
+            if cls._daily_source_health.can_attempt(health_key):
+                return candidate.name
+        return None
+
+    @classmethod
+    def _next_named_daily_fallback_name(
+        cls,
+        source_order: List[str],
+        start_index: int,
+        fetchers: List[BaseFetcher],
+        market: str,
+    ) -> Optional[str]:
+        fetchers_by_name = {fetcher.name: fetcher for fetcher in fetchers}
+        for source_name in source_order[start_index:]:
+            candidate = fetchers_by_name.get(source_name)
+            if candidate is None:
+                continue
+            health_key = cls._daily_health_key(candidate, market)
+            if cls._daily_source_health.can_attempt(health_key):
+                return candidate.name
+        return None
+
+    @classmethod
+    def _record_daily_source_circuit_skip(
+        cls,
+        fetcher: BaseFetcher,
+        market: str,
+        fallback_to: Optional[str],
+    ) -> None:
+        key = cls._daily_health_key(fetcher, market)
+        snapshot = cls._daily_source_health.get_snapshot(key)[key]
+        record_provider_run(
+            data_type="daily_data",
+            provider=fetcher.name,
+            operation="get_daily_data",
+            success=False,
+            latency_ms=0,
+            error_type="CircuitOpen",
+            error_message="provider cooldown active",
+            fallback_to=fallback_to,
+            record_count=0,
+        )
+        logger.info(
+            "provider_failover event=skip_open data_type=daily_data market=%s "
+            "provider=%s fallback_to=%s health_score=%.2f",
+            market,
+            fetcher.name,
+            fallback_to or "none",
+            snapshot["health_score"],
+        )
+
+    @classmethod
+    def get_daily_source_health_snapshot(cls) -> Dict[str, Dict[str, Any]]:
+        """Return the current process-local daily provider health snapshot."""
+        return cls._daily_source_health.get_snapshot()
+
+    def get_daily_provider_health_report(
+        self,
+        market: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Return a JSON-serializable daily-provider health report for operators."""
+        self._ensure_concurrency_guards()
+        market_filter = str(market or "").strip().lower()
+        if market_filter and market_filter not in self._DAILY_MARKETS:
+            raise ValueError("market must be one of: cn, hk, us, jp, kr, tw")
+        fetchers_by_name = {
+            fetcher.name: fetcher
+            for fetcher in self._get_fetchers_snapshot()
+        }
+        providers: List[Dict[str, Any]] = []
+        for source, snapshot in self._daily_source_health.get_snapshot().items():
+            source_parts = source.split(":", 2)
+            if len(source_parts) != 3 or source_parts[0] != "daily_data":
+                continue
+            source_market, provider_name = source_parts[1], source_parts[2]
+            if market_filter and source_market != market_filter:
+                continue
+            fetcher = fetchers_by_name.get(provider_name)
+            supported_markets = self._DAILY_MARKET_FETCHER_SUPPORT.get(provider_name)
+            providers.append(
+                {
+                    "data_type": "daily_data",
+                    "market": source_market,
+                    "provider": sanitize_diagnostic_text(provider_name, max_length=120),
+                    "static_priority": getattr(fetcher, "priority", None),
+                    "supported_markets": (
+                        sorted(supported_markets)
+                        if supported_markets is not None
+                        else None
+                    ),
+                    **{
+                        key: value
+                        for key, value in snapshot.items()
+                        if key != "source"
+                    },
+                }
+            )
+
+        providers.sort(
+            key=lambda item: (
+                item["market"],
+                item["static_priority"] is None,
+                item["static_priority"] if item["static_priority"] is not None else 0,
+                item["provider"],
+            )
+        )
+        return {
+            "schema_version": _PROVIDER_DAILY_HEALTH_SCHEMA_VERSION,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "market": market_filter or "all",
+            "adaptive_priority": {
+                "enabled": self._daily_adaptive_priority_enabled,
+                "min_samples": self._daily_adaptive_priority_min_samples,
+                "boundary": "equal_static_priority_after_capability_filtering",
+            },
+            "provider_count": len(providers),
+            "providers": providers,
+        }
+
+    def log_daily_provider_health_report(
+        self,
+        market: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Write and return a structured, secret-free daily-provider health report."""
+        report = self.get_daily_provider_health_report(market=market)
+        logger.info(
+            "provider_health event=snapshot data_type=daily_data market=%s payload=%s",
+            report["market"],
+            json.dumps(report, sort_keys=True, separators=(",", ":")),
+        )
+        return report
 
     @classmethod
     def reset_daily_source_health(cls) -> None:
         """Reset daily source health state for tests/admin diagnostics."""
         cls._daily_source_health.reset()
+        cls._daily_health_handoff.pending = {}
+
+    def _get_daily_data_cache(self) -> DailyDataCache:
+        self._ensure_concurrency_guards()
+        with self._fetchers_lock:
+            if self._daily_data_cache is None:
+                self._daily_data_cache = DailyDataCache.from_env()
+            return self._daily_data_cache
+
+    @staticmethod
+    def _daily_cache_key(
+        stock_code: str,
+        start_date: Optional[str],
+        end_date: Optional[str],
+        days: int,
+    ) -> DailyCacheKey:
+        effective_end = end_date or datetime.now().strftime("%Y-%m-%d")
+        effective_start = start_date
+        if effective_start is None:
+            start_dt = datetime.strptime(effective_end, "%Y-%m-%d") - timedelta(days=days * 2)
+            effective_start = start_dt.strftime("%Y-%m-%d")
+        return DailyCacheKey(
+            symbol=canonical_stock_code(stock_code),
+            start_date=effective_start,
+            end_date=effective_end,
+            days=days,
+        )
+
+    @staticmethod
+    def _record_daily_cache_read(
+        cache_read: DailyCacheRead,
+        request_start: float,
+    ) -> None:
+        record_provider_run(
+            data_type="daily_data",
+            provider=cache_read.source_name,
+            operation="get_daily_data",
+            success=True,
+            latency_ms=int((time.time() - request_start) * 1000),
+            cache_hit=True,
+            stale_seconds=int(cache_read.age_seconds),
+            record_count=len(cache_read.frame),
+        )
+
+    def _daily_stale_cache_result(
+        self,
+        cache_lookup: DailyCacheLookup,
+        *,
+        stock_code: str,
+        market: str,
+        request_start: float,
+        provider_failure_count: int,
+    ) -> Optional[Tuple[pd.DataFrame, str]]:
+        if cache_lookup.stale is None:
+            return None
+        cache_read = self._get_daily_data_cache().use_stale(cache_lookup.stale)
+        if cache_read is None:
+            return None
+        self._record_daily_cache_read(cache_read, request_start)
+        logger.warning(
+            "provider_failover event=stale_cache data_type=daily_data symbol=%s "
+            "market=%s source=%s stale_seconds=%d provider_failure_count=%d",
+            sanitize_diagnostic_text(stock_code, max_length=80),
+            market,
+            sanitize_diagnostic_text(cache_read.source_name, max_length=120),
+            int(cache_read.age_seconds),
+            provider_failure_count,
+        )
+        return cache_read.frame, cache_read.source_name
+
+    def get_daily_cache_stats(self) -> Dict[str, int]:
+        """Return manager-local daily cache hit, miss, and lifecycle counters."""
+        return self._get_daily_data_cache().stats_snapshot()
+
+    def invalidate_daily_cache(self, stock_code: Optional[str] = None) -> int:
+        """Invalidate daily cache entries for one symbol, or every symbol when omitted."""
+        normalized = (
+            None
+            if stock_code is None
+            else canonical_stock_code(normalize_stock_code(stock_code))
+        )
+        return self._get_daily_data_cache().invalidate(normalized)
 
     def _get_cached_stock_name(self, stock_code: str) -> Optional[str]:
         self._ensure_concurrency_guards()
@@ -1175,7 +1698,7 @@ class DataFetcherManager:
 
         Dynamic priority adjustment logic:
         - If TUSHARE_TOKEN is configured, instantiate TushareFetcher and boost its priority according to its internal logic.
-        - If Longbridge OAuth or Legacy credentials are configured: instantiate LongbridgeFetcher as the fallback for US/Hong Kong stocks.
+        - If Longbridge OAuth or Legacy credentials are configured: instantiate LongbridgeFetcher as the bottom-up for US/HK stocks.
         - Uninstantiated optional data sources are not configured, avoiding repeated detection of invalid sources during batch retrieval.
         - Default priority:
           0. EfinanceFetcher (Priority 0) - Highest priority?
@@ -1225,7 +1748,7 @@ class DataFetcherManager:
             logger.debug("[data source init] skip TickFlowFetcher because TICKFLOW_API_KEY is not configured")
 
         if LongbridgeFetcher.has_configured_credentials(config):
-            optional_fetchers.append(LongbridgeFetcher())  # Longbridge (U.S. stocks/Hong Kong stocks fallback, lazy loading)
+            optional_fetchers.append(LongbridgeFetcher())  # Longbridge (US stocks/Hong Kong stocks bottom-fishing, lazy loading)
         else:
             logger.debug("[数据源初始化] 跳过未配置的 LongbridgeFetcher")
 
@@ -1306,13 +1829,21 @@ class DataFetcherManager:
         # Normalize code (strip SH/SZ prefix etc.)
         stock_code = normalize_stock_code(stock_code)
 
+        request_start = time.time()
+        cache_key = self._daily_cache_key(stock_code, start_date, end_date, days)
+        daily_cache = self._get_daily_data_cache()
+        cache_lookup = daily_cache.lookup(cache_key)
+        if cache_lookup.fresh is not None:
+            self._record_daily_cache_read(cache_lookup.fresh, request_start)
+            return cache_lookup.fresh.frame, cache_lookup.fresh.source_name
+
         fetchers = self._get_fetchers_snapshot()
         errors = []
-        request_start = time.time()
+        provider_failure_count = 0
 
-        # Quick path: Use dedicated data source routing for U.S. stocks; filter out data sources that do not support Hong Kong daily lines for Hong Kong stocks
+        # Quick path: Use dedicated data source routing for US stocks; filter out data sources that do not support Hong Kong daily lines for Hong Kong stocks
         #   - Configure Longbridge credentials: Longbridge is preferred, YFinance/AkShare fallback.
-        #   - Unconfigured Longbridge: YFinance is preferred (U.S. stocks), generic fetcher loop (Hong Kong stocks).
+        #   - Unconfigured long bridge: YFinance is preferred (U.S. stocks), generic fetcher loop (Hong Kong stocks).
         #   - U.S. stock indices: Always use YFinance as the primary source (Longbridge does not provide index candles)
         is_us_index = is_us_index_code(stock_code)
         is_us = is_us_index or is_us_stock_code(stock_code)
@@ -1324,15 +1855,26 @@ class DataFetcherManager:
         if market != "cn":
             fetchers = self._filter_daily_fetchers_for_market(fetchers, market)
         fetchers = self._filter_fetchers_by_capability(fetchers, capability="daily_data")
+        if not is_us:
+            fetchers = self._order_daily_fetchers(fetchers, market)
         total_fetchers = len(fetchers)
 
         if total_fetchers == 0:
+            stale_result = self._daily_stale_cache_result(
+                cache_lookup,
+                stock_code=stock_code,
+                market=market,
+                request_start=request_start,
+                provider_failure_count=0,
+            )
+            if stale_result is not None:
+                return stale_result
             market_label = "美股指数" if is_us_index else "美股" if is_us else "港股" if is_hk else "台股" if is_tw else "A股"
             error_summary = f"{market_label} {stock_code} 获取失败:\n暂无可用数据源"
             logger.error(f"[数据源终止] {stock_code} 获取失败: {error_summary}")
             raise DataFetchError(error_summary)
 
-        # U.S. stocks (including U.S. stocks indices) use dedicated routing; Hong Kong stocks use the standard data source loop
+        # US stocks (including US stock indices) use dedicated routing; Hong Kong stocks use the standard data source loop
         # Failover chain: Finnhub(P2) -> AlphaVantage(P3) -> Yfinance(P4) -> Longbridge(P5)
         # When Longbridge preferred: Longbridge -> Finnhub -> AlphaVantage -> Yfinance
         if is_us:
@@ -1347,15 +1889,22 @@ class DataFetcherManager:
             market_label = "美股指数" if is_us_index else "美股"
 
             for order_index, src_name in enumerate(source_order):
-                fallback_to = (
-                    source_order[order_index + 1]
-                    if order_index + 1 < len(source_order)
-                    else None
+                fallback_to = self._next_named_daily_fallback_name(
+                    source_order,
+                    order_index + 1,
+                    fetchers,
+                    market,
                 )
                 for attempt, fetcher in enumerate(fetchers, start=1):
                     if fetcher.name != src_name:
                         continue
                     if not self._is_daily_source_available(fetcher, market):
+                        provider_failure_count += 1
+                        self._record_daily_source_circuit_skip(
+                            fetcher,
+                            market,
+                            fallback_to,
+                        )
                         errors.append(self._daily_source_unavailable_error(fetcher))
                         break
                     attempt_start = time.time()
@@ -1379,6 +1928,7 @@ class DataFetcherManager:
                             days=days,
                         )
                         if df is not None and not df.empty:
+                            df = daily_cache.store(cache_key, df, fetcher.name)
                             duration_ms = int((time.time() - attempt_start) * 1000)
                             record_provider_run(
                                 data_type="daily_data",
@@ -1386,6 +1936,7 @@ class DataFetcherManager:
                                 operation="get_daily_data",
                                 success=True,
                                 latency_ms=duration_ms,
+                                cache_hit=False,
                                 record_count=len(df),
                             )
                             elapsed = time.time() - request_start
@@ -1396,6 +1947,7 @@ class DataFetcherManager:
                             self._record_daily_source_success(fetcher, market)
                             return df, fetcher.name
                         duration_ms = int((time.time() - attempt_start) * 1000)
+                        provider_failure_count += 1
                         record_provider_run(
                             data_type="daily_data",
                             provider=fetcher.name,
@@ -1409,7 +1961,8 @@ class DataFetcherManager:
                         )
                         if df is not None and df.empty:
                             self._record_daily_source_success(fetcher, market)
-                    except Exception as e:
+                    except Exception as e:  # broad-exception: fallback_recorded - safe provider-run and log precede failover
+                        provider_failure_count += 1
                         error_type, error_reason = summarize_exception(e)
                         error_msg = f"[{fetcher.name}] ({error_type}) {error_reason}"
                         duration_ms = int((time.time() - attempt_start) * 1000)
@@ -1444,6 +1997,15 @@ class DataFetcherManager:
                         errors.append(error_msg)
                     break
 
+            stale_result = self._daily_stale_cache_result(
+                cache_lookup,
+                stock_code=stock_code,
+                market=market,
+                request_start=request_start,
+                provider_failure_count=provider_failure_count,
+            )
+            if stale_result is not None:
+                return stale_result
             error_summary = f"{market_label} {stock_code} 获取失败:\n" + "\n".join(errors)
             logger.error(
                 "All eligible data providers failed daily data request symbol=%s market=%s",
@@ -1453,11 +2015,21 @@ class DataFetcherManager:
             raise DataFetchError(error_summary)
 
         for attempt, fetcher in enumerate(fetchers, start=1):
+            fallback_to = self._next_daily_fallback_name(
+                fetchers,
+                attempt,
+                market,
+            )
             if not self._is_daily_source_available(fetcher, market):
+                provider_failure_count += 1
+                self._record_daily_source_circuit_skip(
+                    fetcher,
+                    market,
+                    fallback_to,
+                )
                 errors.append(self._daily_source_unavailable_error(fetcher))
                 continue
             attempt_start = time.time()
-            fallback_to = fetchers[attempt].name if attempt < total_fetchers else None
             try:
                 logger.info(f"[数据源尝试 {attempt}/{total_fetchers}] [{fetcher.name}] 获取 {stock_code}...")
                 record_provider_run_started(
@@ -1475,6 +2047,7 @@ class DataFetcherManager:
                 )
                 
                 if df is not None and not df.empty:
+                    df = daily_cache.store(cache_key, df, fetcher.name)
                     duration_ms = int((time.time() - attempt_start) * 1000)
                     record_provider_run(
                         data_type="daily_data",
@@ -1482,6 +2055,7 @@ class DataFetcherManager:
                         operation="get_daily_data",
                         success=True,
                         latency_ms=duration_ms,
+                        cache_hit=False,
                         record_count=len(df),
                     )
                     elapsed = time.time() - request_start
@@ -1492,6 +2066,7 @@ class DataFetcherManager:
                     self._record_daily_source_success(fetcher, market)
                     return df, fetcher.name
                 duration_ms = int((time.time() - attempt_start) * 1000)
+                provider_failure_count += 1
                 record_provider_run(
                     data_type="daily_data",
                     provider=fetcher.name,
@@ -1506,7 +2081,8 @@ class DataFetcherManager:
                 if df is not None and df.empty:
                     self._record_daily_source_success(fetcher, market)
 
-            except Exception as e:
+            except Exception as e:  # broad-exception: fallback_recorded - safe provider-run and log precede failover
+                provider_failure_count += 1
                 error_type, error_reason = summarize_exception(e)
                 error_msg = f"[{fetcher.name}] ({error_type}) {error_reason}"
                 duration_ms = int((time.time() - attempt_start) * 1000)
@@ -1539,12 +2115,26 @@ class DataFetcherManager:
                     "data_provider_daily_data_attempt_failed",
                 )
                 errors.append(error_msg)
-                if attempt < total_fetchers:
-                    next_fetcher = fetchers[attempt]
-                    logger.info(f"[数据源切换] {stock_code}: [{fetcher.name}] -> [{next_fetcher.name}]")
+                if fallback_to is not None:
+                    logger.info(
+                        "[数据源切换] %s: [%s] -> [%s]",
+                        stock_code,
+                        fetcher.name,
+                        fallback_to,
+                    )
                 # Try the next data source
                 continue
         
+        stale_result = self._daily_stale_cache_result(
+            cache_lookup,
+            stock_code=stock_code,
+            market=market,
+            request_start=request_start,
+            provider_failure_count=provider_failure_count,
+        )
+        if stale_result is not None:
+            return stale_result
+
         # All data sources failed
         error_summary = f"所有数据源获取 {stock_code} 失败:\n" + "\n".join(errors)
         logger.error(
@@ -1570,8 +2160,8 @@ class DataFetcherManager:
         
         The benefits of this are:
         - When using Sina/Tencent: query each stock independently, without full retrieval issues.
-        - When using Eastmoney/Eastmoney/Tushare, prefetch once and cache hits afterwards.
-        - When using TickFlow: batch fetch watchlist stocks based on watchlist stocks to avoid repeated requests per stock
+        - When using efinance/Dongtai/Tushare, prefetch once and cache hits afterwards.
+        - When using TickFlow: batch fetch selected stocks based on current holdings to avoid repeated requests per stock
         
         Args:
             stock_codes: list of stocks to be analyzed
@@ -1834,7 +2424,7 @@ class DataFetcherManager:
         # ----------------------------------------------------------
         # U.S. Stocks (Indices + Individual Stocks) / Hong Kong Stocks — Dedicated Dual-Source Routing
         #   Configure Longbridge: Longbridge is preferred, YFinance/AkShare supplement.
-        #   Unconfigured Longbridge: YFinance/AkShare preferred, Longbridge supplement.
+        #   Unconfigured long bridge: YFinance/AkShare preferred, Longbridge supplement.
         #   U.S. stock indices: Always use YFinance as the primary source (Longbridge does not provide index data)
         # ----------------------------------------------------------
         is_us_index = is_us_index_code(stock_code)
@@ -2232,7 +2822,7 @@ class DataFetcherManager:
 
     def get_chip_distribution(self, stock_code: str):
         """
-        Get chip distribution data (with circuit protection and multi-data source degradation)
+        Get holding distribution data (with circuit protection and multi-data source degradation)
 
         Strategy:
         1. Check configuration switch
@@ -2254,7 +2844,7 @@ class DataFetcherManager:
 
         config = get_config()
 
-        # Return None when chip distribution is disabled.
+        # If the short selling feature is disabled, directly return None.
         if not config.enable_chip_distribution:
             logger.debug(f"[筹码分布] 功能已禁用，跳过 {stock_code}")
             return None
@@ -2264,7 +2854,7 @@ class DataFetcherManager:
         candidate_fetchers = []
         # Iterate through data sources listed in priority order by the manager
         for fetcher in self._get_fetchers_snapshot():
-            # Only process data sources that implement chip distribution.
+            # Process data sources that implement short interest logic.
             if not hasattr(fetcher, 'get_chip_distribution'):
                 continue
 
@@ -3647,7 +4237,7 @@ class DataFetcherManager:
         )
 
     def get_dragon_tiger_context(self, stock_code: str, budget_seconds: Optional[float] = None) -> Dict[str, Any]:
-        """Dragon-Tiger List block (fail-open)."""
+        """Tiger Broker block (fail-open)."""
         from src.config import get_config
 
         config = get_config()
@@ -3920,7 +4510,7 @@ class DataFetcherManager:
         date: Optional[str] = None,
         n: int = 20,
     ) -> List[Dict[str, Any]]:
-        """Get the list of limit-up pool and momentum teams (automatically switch data sources)."""
+        """Get the list of surging pools and momentum teams (automatically switch data sources)."""
         last_error = ""
         for fetcher in self._fetchers:
             try:

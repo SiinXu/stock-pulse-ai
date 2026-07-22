@@ -1,5 +1,7 @@
 name: StockPulse Daily Analysis
 
+permissions: {}
+
 on:
   # Run at 18:00 China Standard Time (10:00 UTC) on weekdays.
   schedule:
@@ -31,6 +33,8 @@ concurrency:
 jobs:
   analyze:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     # Preserve compatibility when STOCK_LIST was configured in an environment with the same name.
     # Repository variables under Settings -> Secrets and variables -> Actions remain the recommended location.
     environment: STOCK_LIST
@@ -42,10 +46,10 @@ jobs:
         run: sleep $((RANDOM % 60))  # Delay startup by 0-59 seconds.
       
       - name: Checkout Repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       
       - name: Set Up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.11'
           cache: 'pip'
@@ -532,12 +536,13 @@ jobs:
           fi
       
       - name: Upload Analysis Reports
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: always()
         with:
           name: analysis-reports-${{ github.run_number }}
           path: |
             reports/
+            data/stock_analysis.db*
             logs/
           retention-days: 30
       

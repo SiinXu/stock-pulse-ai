@@ -60,7 +60,3 @@ export * from './Popover';
 export * from './Pagination';
 export * from './ConfirmDialog';
 export * from './Modal';
-export * from '../layout/Shell';
-export * from '../layout/SidebarNav';
-export * from '../theme/ThemeProvider';
-export * from '../theme/ThemeToggle';

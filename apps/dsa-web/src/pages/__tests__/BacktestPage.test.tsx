@@ -286,7 +286,7 @@ describe('BacktestPage', () => {
     expect(await screen.findByPlaceholderText('Filter by stock code (leave empty for all)'))
       .toHaveAttribute('data-size', 'default');
     expect(screen.getByRole('tab', { name: 'Evaluation window' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByLabelText('Result filters · Phase')).toHaveTextContent('All phases');
+    expect(await screen.findByLabelText('Result filters · Phase')).toHaveTextContent('All phases');
     expect(screen.getByRole('button', { name: 'Run backtest' })).toBeInTheDocument();
 
     await act(async () => {
@@ -307,7 +307,7 @@ describe('BacktestPage', () => {
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
-    const phaseSelect = screen.getByLabelText('结果筛选 · 阶段');
+    const phaseSelect = await screen.findByLabelText('结果筛选 · 阶段');
     expect(phaseSelect).toHaveTextContent('全部阶段');
     const fromInput = screen.getByLabelText('分析开始日期');
     const toInput = screen.getByLabelText('分析结束日期');
@@ -350,7 +350,7 @@ describe('BacktestPage', () => {
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     fireEvent.change(filterInput, { target: { value: 'aapl' } });
-    const phaseSelect = screen.getByLabelText('结果筛选 · 阶段');
+    const phaseSelect = await screen.findByLabelText('结果筛选 · 阶段');
 
     mockGetResults.mockClear();
     mockGetStockPerformance.mockClear();
@@ -522,7 +522,7 @@ describe('BacktestPage', () => {
     expect(screen.getByPlaceholderText('10')).toHaveValue(20);
     expect(screen.getByLabelText('分析开始日期')).toHaveValue('2026-03-01');
     expect(screen.getByLabelText('分析结束日期')).toHaveValue('2026-03-31');
-    expect(screen.getByLabelText('结果筛选 · 阶段')).toHaveTextContent('盘中');
+    expect(await screen.findByLabelText('结果筛选 · 阶段')).toHaveTextContent('盘中');
     await waitFor(() => expect(mockGetResults).toHaveBeenCalledWith({
       code: 'AAPL',
       evalWindowDays: 20,

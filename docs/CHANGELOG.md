@@ -8,7 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [Chore] Translated developer comments and Python docstrings across the codebase into English.
 - [Changed] Added unified Web page and Router patterns with `AppPage`, `WorkspacePage`, `ResponsiveRail`, `PageHeader`, `Toolbar`, `Tabs`, `TabPanel`, `SummaryStrip`, and `WorkspaceNavigation`, plus focus restoration and guards against duplicate navigation primitives.
 - [Changed] Formalized the shared Surface migration contract around `canvas`, `section`, `interactive`, and `overlay`, removed unused card styles, and added stable token-count guards with dual-theme and nine-viewport fixtures.
 - [Changed] Added fail-open diagnostics for Pipeline `resolve`, `fetch`, `intelligence`, `context`, `analyze`, `persist`, `render`, and `dispatch` stages, including redacted summaries, traces, timing, status, degradation, and retryability.
@@ -239,8 +238,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Split the Alerts & Automation, System & Security, and Data Sources settings sections and the new top-level Advanced section into horizontal tab views (push routing/behavior & limits/event monitor, scheduling/system settings/web & logs/auth & security/version & updates, sources/intel sources/providers, backend status/developer diagnostics/config backup) with `?section=&view=` deep links and cross-view validation-error jumps; Developer Diagnostics is now a flat tab instead of a collapsed panel, and the push-routing channel empty state collapses into a single compact hint with a configure-channels entry.
 - [Fixed] Aligned the home stock-bar and history-list row checkboxes with the select-all column (removing the centered offset and negative margin) and reveal the per-item delete button only on hover or keyboard focus, staying always visible on touch devices without hover, matching the Chat session list.
 - [Fixed] Removed the `max-w-6xl` cap on the AlphaSift screening page content so it fills the viewport like the other workspace pages.
+- [Fixed] Required current-password reauthentication before disabling administrator authentication and blocked generic configuration or non-canonical key aliases from changing the auth toggle.
+- [Changed] Split pipeline delivery, rendering, and dispatch stages into a focused module while preserving the `src.core.pipeline` compatibility surface.
+- [Changed] Added configurable daily-provider health scoring, serialized circuit admission, redacted failover metadata, and half-open recovery without changing market capability boundaries.
+- [Changed] Split pipeline analysis, context assembly, and result normalization into a focused stage module while preserving the legacy entry point.
+- [Chore] Split oversized configuration modules into focused packages while preserving public import and runtime compatibility.
+- [Docs] Documented the serialized domain-artifact versioning strategy (version-tag inventory, forward/backward compatibility rules, bump procedure) in the database migrations guide and added a guard test binding the inventory to the real constants.
+- [Added] Added bounded memory and atomic local daily-provider caches with explicit invalidation, hit/miss telemetry, and marked stale-if-error fallback.
 <!-- New entry format: - [Type] Description (Type: Added/Changed/Fixed/Docs/Tests/Chore) -->
 <!-- Append each entry as one line at the end of this section; do not add category headings. -->
+- [Fixed] Made fork pull requests run PR Review static checks with a read-only token while skipping secret- and write-dependent review steps; same-repository pull requests retain the full advisory review flow.
+- [Added] Added configurable Agent tool, stage, and full-run guards with loop detection, stage failure isolation, and structured runtime events.
+- [Changed] Normalized A-share, Hong Kong, and US symbols across Bot analysis commands with explicit market labels and actionable unsupported-market guidance.
+- [Docs] Established an ADR registry and template, backfilled four implemented architecture decisions, and added a current component and data-flow overview.
+- [Changed] Split pipeline orchestration and persistence stages into focused modules while preserving the legacy facade and runtime behavior.
+- [Changed] Added bounded adaptive daily-provider ordering and structured health snapshot export without crossing configured priority or market capability boundaries.
+- [Docs] Documented foundation pipeline and product layer boundaries, contribution placement, upstream-compatible fix porting policy, and dual-license provenance.
+- [Added] Added a least-privilege `/claim` workflow with a one-open-issue limit and existing-assignment protection.
+- [Chore] Split the oversized system configuration service into focused private modules while preserving its public facade.
+- [Changed] Split analyzer result-processing helpers into a focused internal module while preserving the legacy facade and runtime behavior.
+- [Changed] Added canonical A-share/HK/US Chat scope, market-specific tool filtering, session continuity, and per-symbol Multi-Agent comparison with currency/timezone/field context.
+- [Changed] Split GeminiAnalyzer generation, analysis, and response methods into focused internal modules while preserving the legacy class facade and runtime behavior.
+- [Fixed] Hardened multi-market Agent Chat symbol evidence, concurrent session continuity, and deterministic partial/all-unavailable comparison outcomes.
+- [Docs] Defined the core security and compliance baseline for access, secrets, egress, auditability, supply chain, and investment disclosures.
+- [Changed] Split CLI parsing and mode dispatch into a focused application module while preserving the legacy main entrypoint and runtime behavior.
+- [Added] Added typed Web deep links with canonical stock, report, Home workspace, Chat, Portfolio account, and Decision Signal context restoration plus safe invalid-parameter fallback.
+
+- [Fixed] Preserved per-stock analysis history and decision signals in GitHub Actions artifacts for full and stocks-only runs.
+- [Docs] Added a business architecture view and directional technical data flow that separate stakeholder capabilities from implementation and resilience details.
+- [Added] Added validated transactional runtime configuration activation, optional LLM connectivity probing, redacted operational audit logs, and one-step last-known-good rollback without changing in-flight task snapshots or authentication boundaries.
+- [Chore] Pinned third-party GitHub Actions to reviewed commits, minimized workflow token permissions, and added automated supply-chain policy checks.
+- [Docs] Added an English operator guide for data-source priority, health scoring, adaptive ordering, degradation, and troubleshooting, and synchronized bilingual LLM fallback guidance.
+- [Docs] Defined the versioned plugin lifecycle, manifest, trust model, and six official extension-point contracts.
+- [Changed] Split the Agent orchestrator, executor, LLM adapter, and runner into focused compatibility-backed modules without changing runtime behavior.
+- [Changed] Split the pipeline analysis stage into focused private modules while preserving both analysis and pipeline facade contracts.
+- [Chore] Translated developer comments and Python docstrings across the codebase into English.
 
 ## [3.26.3] - 2026-07-15
 

@@ -104,8 +104,9 @@ def test_disabled_discussions_are_not_advertised() -> None:
 
 
 def test_external_defaults_use_stockpulse_identity() -> None:
+    from src.config import Config
+
     workflow = (ROOT_DIR / ".github/workflows/00-daily-analysis.yml").read_text(encoding="utf-8")
-    config = (ROOT_DIR / "src/config.py").read_text(encoding="utf-8")
     api = (ROOT_DIR / "api/app.py").read_text(encoding="utf-8")
     api_spec = json.loads((ROOT_DIR / "docs/architecture/api_spec.json").read_text(encoding="utf-8"))
     user_agents = "\n".join(
@@ -120,7 +121,7 @@ def test_external_defaults_use_stockpulse_identity() -> None:
 
     assert workflow.startswith("name: StockPulse Daily Analysis\n")
     assert "EMAIL_SENDER_NAME" in workflow and "'StockPulse'" in workflow
-    assert 'email_sender_name: str = "StockPulse"' in config
+    assert Config.__dataclass_fields__["email_sender_name"].default == "StockPulse"
     assert 'title="StockPulse API"' in api
     assert api_spec["info"]["title"] == "StockPulse API"
     assert user_agents.count('"User-Agent": "StockPulse/1.0"') == 2

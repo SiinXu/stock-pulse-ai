@@ -185,7 +185,11 @@ class CommandDispatcher:
 
 |------|------|------|------|
 
-| /analyze | /a, 分析 | 分析指定股票 | `/analyze 600519` |
+| /analyze | /a, 分析 | 分析 A 股、港股或美股 | `/analyze 600519`、`/analyze HK00700`、`/analyze AAPL` |
+
+| /ask | 问股 | 使用 Agent 技能分析一只或多只股票 | `/ask HK00700`、`/ask 600519,AAPL trend` |
+
+| /chat | 对话 | 多轮策略问股（保留会话上下文） | `/chat 分析 HK00700`、`/chat analyze AAPL` |
 
 | /market | /m, 大盘 | 大盘复盘 | `/market` |
 
@@ -194,6 +198,14 @@ class CommandDispatcher:
 | /help | /h, 帮助 | 显示帮助信息 | `/help` |
 
 | /status | /s, 状态 | 系统状态 | `/status` |
+
+股票代码格式：A 股支持 6 位代码及常见交易所形式（如 `600519`、`SH600519`）；港股支持 5 位代码、`HK` 前缀或 `.HK` 后缀（如 `00700`、`HK00700`、`00700.HK`），进入分析队列时统一为 `HK00700`；美股使用 `AAPL`、`BRK.B` 等 ticker。`/analyze` 与 `/ask` 遇到无效代码或当前 Bot 命令暂不支持的市场时，会返回中英双语的可行动格式提示。
+
+`/analyze` 仍统一提交到 `AnalysisTaskQueue`；多市场归一化不会新增 Bot 专属任务生命周期，也不会改变 Task ID、进行中去重、状态枚举或通知回复目标。
+
+`/chat` 会从首轮消息识别 A 股、港股和 1–5 字母美股代码（包括 `F`、`T` 等单字母代码），并把 `00700.HK` / `hk00700` 统一为 `HK00700`。裸代码加问号、`AAPL price?`、`Tell me about AAPL` 等常见问法也会建立同一规范 scope；全角或半角连接符拼接的无效代码会整体拒绝，不会把片段当成股票。同一 Bot 会话的持久化恢复以明确点名标的的用户消息为准；“改看 AAPL”或“switch to AAPL”等明确语句会切换标的。比较问题只授权本轮明确出现的多个代码：若用户点名两个新标的，先前会话的 active symbol 与单标的历史不会进入本轮工具 scope。
+
+Agent prompt 会带入对应市场的交易规则、计价货币、时区和专属字段。`get_chip_distribution`、`get_capital_flow` 与 `get_sector_rankings` 仅适用于 A 股；港股、美股 Chat 不会暴露或要求调用这些工具。Single-Agent 混合市场轮次采用保守过滤，同样不暴露这三项；Multi-Agent 比较则按标的隔离能力，只在 A 股 pipeline 暴露，非 A 股 pipeline 不暴露。Multi-Agent 随后用无工具综合步骤生成跨市场结论，所有逐标的阶段与综合步骤共享同一个总超时预算。若某个标的失败或超时，代码会在成功综合后确定性追加该标的的数据限制，不能由模型省略；若全部标的均不可用，则执行保持失败并沿用统一错误与空内容。工具或数据源缺少其他覆盖时不会用 A 股默认值补齐。
 
 ## 五、`/status` 与模型配置诊断说明
 

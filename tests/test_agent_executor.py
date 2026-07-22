@@ -386,7 +386,7 @@ class TestAgentExecutor(unittest.TestCase):
         self.assertEqual(captured["stock_scope"].expected_stock_code, "AAPL")
         self.assertEqual(captured["stock_scope"].allowed_stock_codes, {"AAPL"})
 
-    def test_chat_does_not_trust_exchange_token_from_public_context(self):
+    def test_chat_does_not_trust_invalid_code_from_public_context(self):
         registry = _make_registry_with_echo()
         adapter = _make_mock_adapter()
         adapter._config = MagicMock()
@@ -408,14 +408,17 @@ class TestAgentExecutor(unittest.TestCase):
                         executor.chat(
                             "继续看",
                             "session-1",
-                            context={"stock_code": "HK", "stock_name": "港股"},
+                            context={
+                                "stock_code": "NOT-A-SYMBOL",
+                                "stock_name": "invalid",
+                            },
                         )
 
         history_context = "\n".join(
             msg["content"] for msg in captured["messages"] if msg["role"] == "user"
         )
-        self.assertNotIn("股票代码: HK", history_context)
-        self.assertNotIn("股票名称: 港股", history_context)
+        self.assertNotIn("NOT-A-SYMBOL", history_context)
+        self.assertNotIn("股票名称: invalid", history_context)
         self.assertEqual(captured["stock_scope"].expected_stock_code, "")
         self.assertEqual(captured["stock_scope"].allowed_stock_codes, set())
 
@@ -446,12 +449,13 @@ class TestAgentExecutor(unittest.TestCase):
         self.assertEqual(result.effective_context["stock_name"], "贵州茅台")
         self.assertEqual(result.stock_scope.allowed_stock_codes, {"600519", "AAPL"})
 
-    def test_resolve_stock_scope_keeps_ambiguous_bare_code_on_current_stock(self):
+    def test_resolve_stock_scope_switches_bare_code_from_current_stock(self):
         result = resolve_stock_scope("AAPL", {"stock_code": "600519", "stock_name": "贵州茅台"})
 
-        self.assertEqual(result.stock_scope.mode, "maintain")
-        self.assertEqual(result.effective_context["stock_code"], "600519")
-        self.assertEqual(result.stock_scope.allowed_stock_codes, {"600519"})
+        self.assertEqual(result.stock_scope.mode, "switch")
+        self.assertEqual(result.effective_context["stock_code"], "AAPL")
+        self.assertEqual(result.effective_context["stock_name"], "")
+        self.assertEqual(result.stock_scope.allowed_stock_codes, {"AAPL"})
 
     def test_run_agent_loop_does_not_persist_agent_usage_without_provider_usage(self):
         registry = _make_registry_with_echo()
@@ -753,7 +757,7 @@ class TestAgentExecutor(unittest.TestCase):
 
         self.assertTrue(result.success)
         self.assertEqual(scope.mode, "compare")
-        self.assertEqual(scope.allowed_stock_codes, {"600519", "HK01810", "AAPL"})
+        self.assertEqual(scope.allowed_stock_codes, {"HK01810", "AAPL"})
         self.assertEqual(executed_calls, [("quote", "01810")])
         self.assertFalse(result.tool_calls_log[0].get("guarded", False))
 
@@ -794,7 +798,7 @@ class TestAgentExecutor(unittest.TestCase):
 
         self.assertTrue(result.success)
         self.assertEqual(scope.mode, "compare")
-        self.assertEqual(scope.allowed_stock_codes, {"600519", "AAPL", "TSLA"})
+        self.assertEqual(scope.allowed_stock_codes, {"AAPL", "TSLA"})
         self.assertEqual(executed_calls, [("quote", "AAPL"), ("quote", "TSLA")])
         self.assertFalse(result.tool_calls_log[0].get("guarded", False))
         self.assertFalse(result.tool_calls_log[1].get("guarded", False))
@@ -917,11 +921,10 @@ class TestAgentExecutor(unittest.TestCase):
                 self.assertEqual(len(tool_messages), 1)
                 self.assertIn("stock_scope_violation", tool_messages[0]["content"])
 
-    def test_run_agent_loop_blocks_untrusted_context_denied_token(self):
+    def test_run_agent_loop_blocks_invalid_context_code(self):
         cases = [
-            ("继续看", "HK", "港股"),
-            ("继续看", "KDJ", "KDJ 指标"),
-            ("分析 MA 均线", "MA", "均线"),
+            ("继续看", "NOT-A-SYMBOL", "invalid"),
+            ("继续看", "TOO-LONG", "invalid"),
         ]
 
         for message, requested_code, stock_name in cases:

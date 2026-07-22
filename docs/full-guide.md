@@ -453,7 +453,7 @@ stock-pulse-ai/
 | 变量名 | 说明 | 默认值 |
 |--------|------|--------|
 | `STOCK_LIST` | 自选股代码（逗号分隔） | - |
-| `ADMIN_AUTH_ENABLED` | Web 登录：设为 `true` 启用密码保护；首次访问在网页设置初始密码，可在「系统设置 > 修改密码」修改；忘记密码执行 `python -m src.auth reset_password`。Web 的 `.env` 备份导入导出仅在开启该开关后可用（桌面端不受此限制）。 | `false` |
+| `ADMIN_AUTH_ENABLED` | Web 登录：设为 `true` 启用密码保护；首次访问在网页设置初始密码，可在「系统设置 > 修改密码」修改；忘记密码执行 `python -m src.auth reset_password`。关闭已启用的认证必须再次提交当前密码，有效 session Cookie 不能替代该校验。通用系统配置保存或 `.env` 导入只允许保留该键的当前值；切换状态必须使用认证专用入口，且配置键必须符合标准环境变量名格式 `[A-Za-z_][A-Za-z0-9_]*`。Web 的 `.env` 备份导入导出仅在开启该开关后可用（桌面端不受此限制）。 | `false` |
 | `TRUST_X_FORWARDED_FOR` | 单层可信反向代理部署时设为 `true`，取 `X-Forwarded-For` 最右值作为真实客户端 IP（用于登录限流等）；直连公网时保持 `false` 防伪造。多级代理/CDN 场景下限流 key 可能退化为边缘代理 IP，需额外评估 | `false` |
 | `MAX_WORKERS` | 并发线程数 | `3` |
 | `MARKET_REVIEW_ENABLED` | 启用大盘复盘 | `true` |
@@ -1722,6 +1722,14 @@ A: 检查是否启用了 Actions，以及 cron 表达式是否正确（注意是
 ---
 
 更多问题请 [提交 Issue](https://github.com/SiinXu/stock-pulse-ai/issues)
+
+## Agent 运行时护栏
+
+Agent 的超时分为三层：`AGENT_TOOL_TIMEOUT_S` 默认以 120 秒限制单次工具调用；`AGENT_TECHNICAL_AGENT_TIMEOUT_S`、`AGENT_INTEL_AGENT_TIMEOUT_S`、`AGENT_RISK_AGENT_TIMEOUT_S`、`AGENT_DECISION_AGENT_TIMEOUT_S`、`AGENT_PORTFOLIO_AGENT_TIMEOUT_S` 和 `AGENT_SKILL_AGENT_TIMEOUT_S` 可为对应 Stage 设置独立上限；`AGENT_ORCHESTRATOR_TIMEOUT_S` 默认以 600 秒限制 single-agent 整体循环或 multi-agent Pipeline。多个预算同时生效时使用剩余时间最短的一项，超时后的工具结果会被运行时 fence 丢弃，不会回写为成功结果。Multi-agent Stage 会在隔离的上下文副本中执行，只有按时返回 `COMPLETED` 才提交状态；超时后的 late state 和 progress 不会进入后续 Stage。Python 无法强制终止已经运行的原生线程，因此自定义 Stage 或工具 handler 仍可能在后台结束并产生自身的外部副作用，但不能回写已接受的 Agent 上下文或 tool-session 缓存。Progress callback 是同步 hook，必须及时返回；仓库支持的 SSE 与 runtime adapter 只负责入队或发布，不会同步等待下游。Stage fence 会保证已接受的 callback 排在关闭之前，但不会尝试抢占已经进入任意调用方 callback 的代码。
+
+`AGENT_MAX_IDENTICAL_TOOL_CALLS=3` 允许同一运行中相同工具名与规范化参数最多执行三次，第 4 次会在 dispatch 前停止当前 Agent；`AGENT_MAX_STAGE_ENTRIES=1` 允许同名 Stage 每条 Pipeline 进入一次，再次进入会直接硬停。数值项设为 `0` 可单独关闭对应护栏。循环日志只记录工具名和参数签名的短哈希，不记录参数原文。
+
+`AGENT_STAGE_FAILURE_POLICY=isolate` 是默认策略：`intel`、`risk` 和 specialist/skill 等既有非关键 Stage 发生失败或未捕获异常时，会记录失败并走降级路径继续；`technical` 与 `decision` 仍为关键边界。设置为 `fail_fast` 后，任一 Stage 失败都会停止 Pipeline。护栏以 `agent_runtime_guard {JSON}` 输出低敏结构化日志，事件包括 `tool_timeout`、`run_timeout`、`tool_loop_detected`、`stage_loop_detected`、`stage_exception_captured`、`stage_timeout`、`stage_failure_isolated` 和 `stage_failure_fail_fast`。这些内部日志不改变公开 SSE、API、报告或 Web/Desktop 契约。
 
 ## Agent 工具数据缓存与持久化
 

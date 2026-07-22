@@ -85,6 +85,46 @@ blocked while unchanged or in flight, and a loading Apply cannot close the
 Drawer early. New filter surfaces should prefer `FilterBar` plus
 `AdvancedFilterSheet` unless they need this existing split-filter contract.
 
+## Deep Link And URL State Semantics
+
+`utils/deepLink.ts` is the neutral authority for links that move stock,
+report, chat, portfolio, or decision-signal context between major views.
+Callers use the typed `buildDeepLink()` target union instead of interpolating
+query strings. `parseDeepLink()` accepts only same-origin stable routes,
+canonicalizes stock codes and positive numeric identities, removes invalid
+owned values, and preserves unrelated non-sensitive query parameters. The
+shared route guard applies that normalization before a product page renders,
+so every major route consumes the same validation and sensitive-key policy.
+
+The current shareable state contract includes Home report and Run Flow
+identity, Home stock prefill and workspace view, Chat session/report context,
+Portfolio account scope, stock-details period/range, Decision Signals stock,
+signal, view, and filter context, and the existing page-owned filter codecs.
+Stable view choices create history entries when Back/Forward should restore
+them. Canonicalization, missing-resource fallback, and default-value removal
+use Router replace navigation so they do not create dead history entries. A
+valid but unavailable Portfolio account falls back to the first available
+account (or all accounts) and displays the shared invalid-link warning.
+Chat keeps validated stock/name/report identity in the URL until the prepared
+follow-up is sent; refresh can therefore rebuild the unsent prompt and report
+context. Sending, starting a new chat, or explicitly switching sessions removes
+that pending context while retaining the stable session identity.
+
+Credentials, authorization values, passwords, private keys, and secret-like
+parameters never belong in a deep link. The route guard removes recognized
+sensitive keys, including provider-prefixed API key and token names, before
+state restoration and presents a localized warning when URL state is cleaned.
+An invalid stock path is replaced with safe Home state before the stock page
+can issue requests. Draft text, unsaved forms, notification payloads, and
+other potentially sensitive state stay out of URLs. A valid stock prefill or
+selected stock context may be represented, but draft stock text is not written
+to the URL and a restored Home stock never auto-submits analysis.
+
+Electron currently consumes the same browser routes after loading its private
+local Web origin. External custom-protocol registration and OS `open-url` or
+second-instance URL forwarding are not part of the Web contract and require a
+separate desktop-owned change.
+
 ## Selection Control Semantics
 
 `SelectionChip` is the shared compact choice for text-led candidates whose

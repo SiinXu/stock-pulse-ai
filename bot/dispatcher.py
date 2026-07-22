@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 
 from bot.models import BotMessage, BotResponse
 from bot.commands.base import BotCommand
+from bot.stock_symbols import is_recognized_stock_symbol
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -411,7 +412,10 @@ Return a JSON object (and NOTHING else) with these fields:
   * "chat" → the user is asking a general question related to finance
   * "none" → the message is irrelevant or you are unsure
 - "codes": a list of stock codes mentioned (may be empty).
-  Format: A-share 6-digit ("600519"), HK with prefix ("hk00700"), US ticker uppercase ("AAPL").
+  Supported Bot formats: A-share 6-digit ("600519"), HK prefix/suffix/bare
+  ("hk00700", "00700.HK", or "00700"), and US ticker uppercase ("AAPL").
+  Preserve explicit JP/KR/TW suffix symbols such as "7203.T", "005930.KS",
+  or "2330.TW" so the Bot can return its market-capability guidance.
 - "strategy": strategy/technique name if the user specified one, else null.
   e.g. "缠论", "MACD", "趋势跟踪", "chan_theory", etc.
 
@@ -473,6 +477,9 @@ User: "analyze TSLA and NVDA using trend strategy"
         stripped = (text or "").strip()
         if " " in stripped or len(stripped) > 10:
             return False
+
+        if any(char.isdigit() for char in stripped) and is_recognized_stock_symbol(stripped):
+            return True
 
         from src.agent.orchestrator import _extract_stock_code
 

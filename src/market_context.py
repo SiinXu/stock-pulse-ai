@@ -27,7 +27,7 @@ def detect_market(stock_code: Optional[str]) -> str:
     code = stock_code.strip().upper()
 
     # HK stocks: HK00700, 00700.HK, or 5-digit pure numbers
-    if code.startswith("HK") or code.endswith(".HK"):
+    if re.fullmatch(r"HK\.?\d{1,5}", code) or code.endswith(".HK"):
         return "hk"
     lower = code.lower()
     if lower.endswith(".hk"):

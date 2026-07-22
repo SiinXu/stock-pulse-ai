@@ -7,12 +7,14 @@ import {
   RouterProvider,
   useLocation,
 } from 'react-router-dom';
-import { ApiErrorAlert, Shell, ToastProvider } from './components/common';
+import { ApiErrorAlert, ToastProvider } from './components/common';
+import { Shell } from './components/layout/Shell';
 import {
   PageLoadingFallback,
   RouteOutletBoundary,
   StandaloneRouteBoundary,
 } from './components/layout/RouteBoundary';
+import { DeepLinkGuard } from './components/routing/DeepLinkGuard';
 import { RouteFocusCoordinator } from './components/routing';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { UiLanguageProvider, useUiLanguage } from './contexts/UiLanguageContext';
@@ -92,7 +94,9 @@ const routes = [
     element: (
       <AuthProvider>
         <RouteFocusCoordinator>
-          <AppLayout />
+          <DeepLinkGuard>
+            <AppLayout />
+          </DeepLinkGuard>
         </RouteFocusCoordinator>
       </AuthProvider>
     ),

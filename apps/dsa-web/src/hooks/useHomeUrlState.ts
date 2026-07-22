@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import type { ParsedApiError } from '../api/error';
 import type { RunFlowSnapshotSource } from '../types/runFlow';
+import type { HomeWorkspaceView } from '../utils/deepLink';
 import {
   clearHomeRecord,
   clearHomeRunFlow,
@@ -11,6 +12,7 @@ import {
   setHomeHistoryRunFlow,
   setHomeRecord,
   setHomeTaskRunFlow,
+  setHomeWorkspace,
 } from '../utils/homeUrlState';
 
 type UseHomeUrlStateOptions = {
@@ -28,7 +30,9 @@ type UseHomeUrlStateOptions = {
 type UseHomeUrlStateResult = {
   recordId: number | null;
   runFlowSource: RunFlowSnapshotSource | null;
-  urlIssue: 'invalid_record' | 'invalid_run_flow' | null;
+  stockCode: string | null;
+  workspace: HomeWorkspaceView;
+  urlIssue: HomeUrlIssue | null;
   dismissUrlIssue: () => void;
   navigateToRecord: (recordId: number) => void;
   replaceRecord: (recordId: number | null, preserveError?: boolean) => void;
@@ -36,9 +40,15 @@ type UseHomeUrlStateResult = {
   openHistoryRunFlow: (recordId: number) => void;
   closeRunFlow: () => void;
   removeUnavailableRunFlow: () => void;
+  setWorkspace: (workspace: HomeWorkspaceView) => void;
 };
 
-type HomeUrlIssue = 'invalid_record' | 'invalid_run_flow';
+type HomeUrlIssue =
+  | 'invalid_record'
+  | 'invalid_run_flow'
+  | 'invalid_stock'
+  | 'invalid_workspace'
+  | 'sensitive_parameter';
 type PendingSearchNavigation = {
   originKey: string;
   targetSearch: string;
@@ -92,13 +102,26 @@ export function useHomeUrlState({
       : {}
   ), [location.state]);
   const persistedUrlIssue = navigationState[HOME_URL_ISSUE_STATE_KEY];
-  const urlIssue: HomeUrlIssue | null = urlState.invalidRecordId
-    ? 'invalid_record'
-    : urlState.invalidRunFlow
-      ? 'invalid_run_flow'
-      : persistedUrlIssue === 'invalid_record' || persistedUrlIssue === 'invalid_run_flow'
-        ? persistedUrlIssue
-        : null;
+  const detectedUrlIssue: HomeUrlIssue | null = urlState.sensitiveParameterRemoved
+    ? 'sensitive_parameter'
+    : urlState.invalidRecordId
+      ? 'invalid_record'
+      : urlState.invalidRunFlow
+        ? 'invalid_run_flow'
+        : urlState.invalidStockCode
+          ? 'invalid_stock'
+          : urlState.invalidWorkspace
+            ? 'invalid_workspace'
+            : null;
+  const isPersistedUrlIssue = (
+    persistedUrlIssue === 'invalid_record'
+    || persistedUrlIssue === 'invalid_run_flow'
+    || persistedUrlIssue === 'invalid_stock'
+    || persistedUrlIssue === 'invalid_workspace'
+    || persistedUrlIssue === 'sensitive_parameter'
+  );
+  const urlIssue: HomeUrlIssue | null = detectedUrlIssue
+    ?? (isPersistedUrlIssue ? persistedUrlIssue : null);
 
   useEffect(() => {
     if (observedReportSelectionEpochRef.current === reportSelectionEpoch) {
@@ -153,17 +176,15 @@ export function useHomeUrlState({
 
   useEffect(() => {
     if (urlState.needsNormalization) {
-      const issue = urlState.invalidRecordId
-        ? 'invalid_record'
-        : urlState.invalidRunFlow
-          ? 'invalid_run_flow'
-          : undefined;
-      navigateSearch(urlState.normalizedSearch, true, { set: issue });
+      navigateSearch(
+        urlState.normalizedSearch,
+        true,
+        detectedUrlIssue ? { set: detectedUrlIssue } : {},
+      );
     }
   }, [
+    detectedUrlIssue,
     navigateSearch,
-    urlState.invalidRecordId,
-    urlState.invalidRunFlow,
     urlState.needsNormalization,
     urlState.normalizedSearch,
   ]);
@@ -337,9 +358,18 @@ export function useHomeUrlState({
     navigateSearch(location.search, true, { clear: true });
   }, [location.search, navigateSearch]);
 
+  const setWorkspace = useCallback((workspace: HomeWorkspaceView) => {
+    const nextSearch = setHomeWorkspace(location.search, workspace);
+    if (nextSearch !== location.search) {
+      navigateSearch(nextSearch, false, { clear: true });
+    }
+  }, [location.search, navigateSearch]);
+
   return {
     recordId: urlState.recordId,
     runFlowSource: urlState.runFlow,
+    stockCode: urlState.stockCode,
+    workspace: urlState.workspace,
     urlIssue,
     dismissUrlIssue,
     navigateToRecord,
@@ -348,6 +378,7 @@ export function useHomeUrlState({
     openHistoryRunFlow,
     closeRunFlow,
     removeUnavailableRunFlow,
+    setWorkspace,
   };
 }
 
