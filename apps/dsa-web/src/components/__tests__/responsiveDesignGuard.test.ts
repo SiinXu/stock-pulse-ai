@@ -59,12 +59,15 @@ describe('responsive design guard', () => {
 
   it('expands compact control hit targets whenever any pointer is coarse', () => {
     const coarsePointerStart = indexCssSource.indexOf('@media (any-pointer: coarse)');
-    const hitTargetRule = indexCssSource
-      .slice(coarsePointerStart)
+    const coarsePointerSource = indexCssSource.slice(coarsePointerStart);
+    const hitTargetOwnerRule = coarsePointerSource
+      .match(/\.control-hit-target\s*\{[^}]+\}/)?.[0];
+    const hitTargetRule = coarsePointerSource
       .match(/\.control-hit-target::after\s*\{[^}]+\}/)?.[0];
 
     expect(coarsePointerStart).toBeGreaterThanOrEqual(0);
     expect(indexCssSource).not.toContain('@media (pointer: coarse)');
+    expect(hitTargetOwnerRule).toContain('position: relative;');
     expect(hitTargetRule).toContain('min-width: 2.75rem;');
     expect(hitTargetRule).toContain('min-height: 2.75rem;');
   });
