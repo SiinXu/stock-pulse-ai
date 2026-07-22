@@ -208,15 +208,21 @@ class ApplicationServices:
         Closing the installed process root enters the same transition authority
         as replacement and reset. This keeps the owning root discoverable until
         its complete unload finishes and defers callback-requested successors.
+        A request made while that transition is active is queued without waiting
+        so a lifecycle callback may safely join its requesting worker; the
+        transition owner completes shutdown through ``_close_plugins()``.
         """
 
         with _services_lock:
-            close_installed_root = (
-                _services is self and not _services_transition_active
-            )
+            close_installed_root = _services is self
         if close_installed_root:
             set_application_services(None)
             return self._plugin_shutdown_results
+
+        return self._close_plugins()
+
+    def _close_plugins(self) -> tuple["PluginOperationResult", ...]:
+        """Perform root-local shutdown for the global transition owner."""
 
         with self._plugin_lifecycle_lock:
             if self._plugins_closed:
@@ -313,7 +319,7 @@ def set_application_services(services: Optional[ApplicationServices]) -> None:
                     previous = _services
 
                 if previous is not None and previous is not target:
-                    previous.close()
+                    previous._close_plugins()
 
                 with _services_lock:
                     has_pending, pending_target = (

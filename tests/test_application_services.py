@@ -897,6 +897,83 @@ def test_direct_close_callback_worker_can_lookup_and_replace_without_deadlock():
     ]
 
 
+def test_load_callback_worker_can_close_installed_root_without_deadlock():
+    events: list[str] = []
+    root_holder: list[ApplicationServices] = []
+    worker_returned = threading.Event()
+    workers: list[threading.Thread] = []
+
+    class _WorkerClosingLoadPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("load-begin")
+
+            def close_root() -> None:
+                root_holder[0].close()
+                worker_returned.set()
+
+            worker = threading.Thread(target=close_root)
+            workers.append(worker)
+            worker.start()
+            if not worker_returned.wait(timeout=5):
+                raise AssertionError("close worker deadlocked during load")
+            worker.join(timeout=5)
+            events.append("load-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(_WorkerClosingLoadPlugin("test.worker-close", events),),
+        plugins_dir="",
+    )
+    root_holder.append(services)
+
+    set_application_services(services)
+
+    assert worker_returned.is_set()
+    assert all(not worker.is_alive() for worker in workers)
+    assert services.is_closed is True
+    assert get_application_services() is not services
+    assert events == ["load-begin", "load-end", "unload:test.worker-close"]
+
+
+def test_unload_callback_worker_can_close_installed_root_without_deadlock():
+    events: list[str] = []
+    root_holder: list[ApplicationServices] = []
+    worker_returned = threading.Event()
+    workers: list[threading.Thread] = []
+
+    class _WorkerClosingUnloadPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("unload-begin")
+
+            def close_root() -> None:
+                root_holder[0].close()
+                worker_returned.set()
+
+            worker = threading.Thread(target=close_root)
+            workers.append(worker)
+            worker.start()
+            if not worker_returned.wait(timeout=5):
+                raise AssertionError("close worker deadlocked during unload")
+            worker.join(timeout=5)
+            events.append("unload-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(
+            _WorkerClosingUnloadPlugin("test.worker-close", events),
+        ),
+        plugins_dir="",
+    )
+    root_holder.append(services)
+    set_application_services(services)
+
+    services.close()
+
+    assert worker_returned.is_set()
+    assert all(not worker.is_alive() for worker in workers)
+    assert services.is_closed is True
+    assert get_application_services() is not services
+    assert events == ["load:test.worker-close", "unload-begin", "unload-end"]
+
+
 def test_root_closed_during_plugin_start_is_not_left_installed():
     events: list[str] = []
     root_holder: list[ApplicationServices] = []

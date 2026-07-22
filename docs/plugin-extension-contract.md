@@ -74,7 +74,12 @@ terminal shutdown state: unload callbacks can still resolve their owning root,
 while later atexit callbacks cannot lazily create or install another root.
 Calling `close()` directly on the installed process root uses this same
 serialized boundary; it cannot expose or start a callback-requested successor
-until the complete reverse-order unload has finished.
+until the complete reverse-order unload has finished. If a lifecycle callback
+or its worker requests that close while a transition is already active, the
+request is queued without waiting; the returned tuple is the current immutable
+shutdown-result snapshot, and the transition owner completes the shutdown after
+the callback returns. This non-blocking overlap rule prevents callback-worker
+joins from deadlocking the root-local lifecycle lock.
 
 There is currently no default lifecycle-style built-in catalog to fabricate:
 existing Data Provider built-ins remain owned by each `DataFetcherManager`, and
