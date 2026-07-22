@@ -14,7 +14,7 @@
 | 使用 Bot / IM 接入 | [Bot 命令与接入](bot-command.md) | [Bot 平台配置](bot/) |
 | 排查运行问题 | [FAQ](FAQ.md) | [更新日志](CHANGELOG.md) |
 | 处理数据源失败或降级 | [数据源稳定性与故障处理图示](data-source-stability.md) | [FAQ](FAQ.md) |
-| 参与开发或提交 PR | [贡献指南](CONTRIBUTING.md) | [高层架构总览](architecture-overview.md)、[ADR 注册表](adr/README.md)、[API 规格](architecture/api_spec.json) |
+| 参与开发或提交 PR | [贡献指南](CONTRIBUTING.md) | [业务架构](business-architecture.md)、[技术架构总览](architecture-overview.md)、[ADR 注册表](adr/README.md)、[API 规格](architecture/api_spec.json) |
 
 ## 快速开始
 
@@ -64,7 +64,8 @@
 
 | 文档 | 内容 |
 | --- | --- |
-| [高层架构总览](architecture-overview.md) | 当前组件、入口、所有权边界、进程模式与八阶段分析数据流 |
+| [业务架构](business-architecture.md) | 利益相关者、业务能力、结果与从证据获取到通知的价值流 |
+| [技术架构总览](architecture-overview.md) | 当前组件、入口、所有权边界、进程模式、缓存/fallback 旁路与八阶段分析数据流 |
 | [Foundation Pipeline 与 Product Layer](foundation-product-architecture.md) | 双轨职责、交互边界、贡献归属、上游移植与许可证来源规则 |
 | [ADR 注册表与流程](adr/README.md) | 架构决策编号、状态、模板、重大 PR 考量规则与历史决策入口 |
 | [API 规格](architecture/api_spec.json) | FastAPI OpenAPI 规格产物 |

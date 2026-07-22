@@ -226,8 +226,9 @@ LONGBRIDGE_ACCESS_TOKEN=your_access_token
    `data/provider_cache/daily`（相对进程工作目录）。写入使用同目录临时文件和原子替换；不会反序列化 pickle。
 3. key 包含规范化股票代码、实际开始/结束日期和 `days`，不同查询窗口不会互相覆盖。只缓存非空的成功结果。
 4. fresh 命中会直接返回；未命中时仍按原有 provider 优先级、市场能力和熔断策略请求。
-5. provider 链全部失败后，才允许读取超过 L2 fresh TTL 的 last-good 数据。默认额外 stale 窗口为
-   86400 秒；超过该窗口仍按原有方式抛出数据获取错误。
+5. provider 链全部失败后，才会从 L1 内存与 L2 持久层保留的 stale 候选中选择较新的 last-good 数据。
+   候选数据的年龄必须超过 L2 fresh TTL，且仍在默认额外 86400 秒的 stale 窗口内；超过该窗口仍按
+   原有方式抛出数据获取错误。
 
 默认配置如下；不配置时缓存已启用。TTL 或 stale 窗口设为 `0` 可分别关闭对应 fresh 层或 stale 降级，
 `PROVIDER_DAILY_CACHE_ENABLED=false` 可整体关闭：
