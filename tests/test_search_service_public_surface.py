@@ -25,7 +25,7 @@ EXPECTED_PUBLIC_SURFACE_SHA256 = (
     "c527fe8817034ae49440db32d059f8c7498a3bff246c1ca36d8fd7e54f1ad305"
 )
 EXPECTED_REFLECTION_SHA256 = (
-    "60c033a897a4a895205d167c6445aee59a3cab5a56febc8e411b7168ffa2d6ef"
+    "a7c6be2ceb001b21eaa8c4e4eb8c7c37b58938abee6c487f1bb12a2042d90933"
 )
 
 EXPECTED_AST_GROUPS = (
@@ -181,6 +181,14 @@ def _stable_value(value):
         return "<MISSING>"
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
+    if value is typing.Any:
+        return {"typing": "Any"}
+    if (
+        typing.get_origin(value) is typing.Union
+        and set(typing.get_args(value)) == {typing.Any, type(None)}
+    ):
+        # Python 3.10 implicitly wraps defaulted Any hints in Optional.
+        return {"typing": "Any"}
     if isinstance(value, type):
         return {"type": f"{value.__module__}.{value.__qualname__}"}
     if isinstance(value, (tuple, list)):
