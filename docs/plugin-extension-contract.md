@@ -235,11 +235,15 @@ inference for new plugins; existing providers retain their current names and
 behavior through compatibility adapters.
 
 The provider factory supplies an implementation. `DataFetcherManager` remains
-the only routing authority and must apply, in order, configuration/availability,
-market capability filtering, static priority, health/circuit admission,
-eligible adaptive ordering, provider call serialization, cache behavior,
-fallback, and `RunDiagnosticContext` recording. Plugins cannot supply their own
-fallback loop or bypass these policies.
+the only routing authority. For daily data, fresh L1/L2 cache lookup wraps the
+provider route and may return before provider selection. On a miss, the manager
+applies configuration and market/capability eligibility, preserves explicit
+market routes and static-priority boundaries, and performs eligible adaptive
+ordering. It then applies health/circuit admission immediately before each
+serialized provider call, records the attempt in `RunDiagnosticContext`, stores
+non-empty successes, and preserves stale last-good fallback only after the
+eligible provider chain fails. Plugins cannot supply their own fallback loop or
+bypass any of these policies.
 
 [ADR-005](adr/ADR-005-provider-fallback-and-circuit-control.md) governs the
 capability-first static-priority and circuit anchors. PR #312's compatible
