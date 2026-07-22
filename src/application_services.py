@@ -203,7 +203,20 @@ class ApplicationServices:
                 self._plugins_starting = False
 
     def close(self) -> tuple["PluginOperationResult", ...]:
-        """Disable the owned plugin snapshot once in reverse registration order."""
+        """Disable the owned plugin snapshot once in reverse registration order.
+
+        Closing the installed process root enters the same transition authority
+        as replacement and reset. This keeps the owning root discoverable until
+        its complete unload finishes and defers callback-requested successors.
+        """
+
+        with _services_lock:
+            close_installed_root = (
+                _services is self and not _services_transition_active
+            )
+        if close_installed_root:
+            set_application_services(None)
+            return self._plugin_shutdown_results
 
         with self._plugin_lifecycle_lock:
             if self._plugins_closed:

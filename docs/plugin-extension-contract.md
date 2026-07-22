@@ -72,6 +72,9 @@ root closes itself during startup, the next stable lookup creates a fresh root.
 Normal reset remains reusable, but the process-exit handler first enters a
 terminal shutdown state: unload callbacks can still resolve their owning root,
 while later atexit callbacks cannot lazily create or install another root.
+Calling `close()` directly on the installed process root uses this same
+serialized boundary; it cannot expose or start a callback-requested successor
+until the complete reverse-order unload has finished.
 
 There is currently no default lifecycle-style built-in catalog to fabricate:
 existing Data Provider built-ins remain owned by each `DataFetcherManager`, and

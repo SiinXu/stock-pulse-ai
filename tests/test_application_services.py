@@ -783,6 +783,120 @@ def test_get_replaces_a_directly_closed_installed_root():
     assert replacement.is_closed is False
 
 
+def test_direct_close_keeps_installed_root_visible_during_unload():
+    observed_roots: list[ApplicationServices] = []
+    events: list[str] = []
+
+    class _UnloadLookupPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("unload-begin")
+            observed_roots.append(get_application_services())
+            events.append("unload-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(_UnloadLookupPlugin("test.direct-close", events),),
+        plugins_dir="",
+    )
+    set_application_services(services)
+
+    services.close()
+
+    assert observed_roots == [services]
+    assert events == ["load:test.direct-close", "unload-begin", "unload-end"]
+    assert get_application_services() is not services
+
+
+def test_direct_close_defers_reentrant_replacement_until_reverse_unload_finishes():
+    events: list[str] = []
+    replacement_holder: list[ApplicationServices] = []
+
+    class _ReplacingUnloadPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("replacer-unload-begin")
+            set_application_services(replacement_holder[0])
+            events.append("replacer-unload-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(
+            _RecordingPlugin("test.first", events),
+            _ReplacingUnloadPlugin("test.replacer", events),
+        ),
+        plugins_dir="",
+    )
+    replacement = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.new", events),),
+        plugins_dir="",
+    )
+    replacement_holder.append(replacement)
+    set_application_services(services)
+
+    services.close()
+
+    assert get_application_services() is replacement
+    assert events == [
+        "load:test.first",
+        "load:test.replacer",
+        "replacer-unload-begin",
+        "replacer-unload-end",
+        "unload:test.first",
+        "load:test.new",
+    ]
+
+
+def test_direct_close_callback_worker_can_lookup_and_replace_without_deadlock():
+    events: list[str] = []
+    observed_roots: list[ApplicationServices] = []
+    replacement_holder: list[ApplicationServices] = []
+    worker_returned = threading.Event()
+    workers: list[threading.Thread] = []
+
+    class _WorkerReplacingUnloadPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("replacer-unload-begin")
+
+            def request_replacement() -> None:
+                observed_roots.append(get_application_services())
+                set_application_services(replacement_holder[0])
+                worker_returned.set()
+
+            worker = threading.Thread(target=request_replacement)
+            workers.append(worker)
+            worker.start()
+            if not worker_returned.wait(timeout=5):
+                raise AssertionError("replacement worker deadlocked during direct close")
+            worker.join(timeout=5)
+            events.append("replacer-unload-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(
+            _RecordingPlugin("test.first", events),
+            _WorkerReplacingUnloadPlugin("test.replacer", events),
+        ),
+        plugins_dir="",
+    )
+    replacement = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.new", events),),
+        plugins_dir="",
+    )
+    replacement_holder.append(replacement)
+    set_application_services(services)
+
+    services.close()
+
+    assert worker_returned.is_set()
+    assert all(not worker.is_alive() for worker in workers)
+    assert observed_roots == [services]
+    assert get_application_services() is replacement
+    assert events == [
+        "load:test.first",
+        "load:test.replacer",
+        "replacer-unload-begin",
+        "replacer-unload-end",
+        "unload:test.first",
+        "load:test.new",
+    ]
+
+
 def test_root_closed_during_plugin_start_is_not_left_installed():
     events: list[str] = []
     root_holder: list[ApplicationServices] = []
