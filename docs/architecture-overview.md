@@ -70,7 +70,7 @@ resolve -> fetch -> intelligence -> context -> analyze -> persist -> render -> d
 | Path | Responsibility |
 | --- | --- |
 | `src/` | Primary application package for orchestration, services, schemas, persistence, report rendering, and shared runtime logic. |
-| `src/market/` | Canonical market-analysis, market-context, phase-prompt, phase-summary, and structure-prompt implementations. The corresponding top-level `src/market_*.py` modules remain compatibility facades. |
+| `src/market/` | Canonical market-analysis, market-context, phase-prompt, phase-summary, and structure-prompt implementations. The top-level `src/market_analyzer.py`, `src/market_context.py`, `src/market_phase_prompt.py`, `src/market_phase_summary.py`, and `src/market_structure_prompt.py` modules remain compatibility facades. |
 | `src/analysis_context_pack/` | Canonical context projection and prompt-rendering implementations. `src/analysis_context_pack_overview.py` and `src/analysis_context_pack_prompt.py` remain compatibility facades. |
 | `data_provider/` | Provider adapters, capability routing, normalization, caching, fallback, and health control. |
 | `api/` | FastAPI transport, middleware, lifecycle, and public HTTP schemas. |
