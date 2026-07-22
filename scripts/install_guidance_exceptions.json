@@ -1,0 +1,265 @@
+{
+  "exceptions": [
+    {
+      "path": ".github/scripts/ai_review.py",
+      "text_sha256": "fcdc04938a718f07668b2ce897068d27acdde266ac593d1bc8989f5bc4d9fe4f",
+      "occurrences": 2,
+      "expires": "2026-08-20",
+      "owner": "ci-maintainers",
+      "issue": "#400",
+      "reason": "Review-tool diagnostics are cross-track and must point to the canonical bootstrap."
+    },
+    {
+      "path": "apps/dsa-web/src/api/__tests__/alphasift.test.ts",
+      "text_sha256": "4640b6a9bfc9e7a9a330eb29c4a2e85bc8479602767634aa189dfb458c1974af",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "web-maintainers",
+      "issue": "#400",
+      "reason": "AlphaSift Web guidance and its assertions require coordinated translation updates."
+    },
+    {
+      "path": "apps/dsa-web/src/api/alphasift.ts",
+      "text_sha256": "046e9122d2e9a70175f61703ee3b92036a292ee10be5d2741913cf2a909766e9",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "web-maintainers",
+      "issue": "#400",
+      "reason": "AlphaSift Web guidance and its assertions require coordinated translation updates."
+    },
+    {
+      "path": "apps/dsa-web/src/i18n/translations/de.ts",
+      "text_sha256": "110fe74641f3aae46c3df9e909a286574ba500533aa0f17453c711509e506daf",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "web-maintainers",
+      "issue": "#400",
+      "reason": "Localized AlphaSift guidance must change with the canonical Web source."
+    },
+    {
+      "path": "apps/dsa-web/src/i18n/translations/en.ts",
+      "text_sha256": "dae42c9d1499cc927cc8522f80788cd108992a857db71c874416295e3f29b537",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "web-maintainers",
+      "issue": "#400",
+      "reason": "Localized AlphaSift guidance must change with the canonical Web source."
+    },
+    {
+      "path": "apps/dsa-web/src/i18n/translations/es.ts",
+      "text_sha256": "eed8a3efa0b4b3ef28adebf852cad1f835a43b642290604a2ee6ea4b579dc490",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "web-maintainers",
+      "issue": "#400",
+      "reason": "Localized AlphaSift guidance must change with the canonical Web source."
+    },
+    {
+      "path": "apps/dsa-web/src/i18n/translations/fr.ts",
+      "text_sha256": "5ebc8fd8b1b31c5086ae055a2888d59b3e910ab3a86e1ff2dac45c1ef1b06931",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "web-maintainers",
+      "issue": "#400",
+      "reason": "Localized AlphaSift guidance must change with the canonical Web source."
+    },
+    {
+      "path": "apps/dsa-web/src/i18n/translations/id.ts",
+      "text_sha256": "e8324f24a126743358637cb18d860e9e80e51af1b7844587dfb37165e200c4cd",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "web-maintainers",
+      "issue": "#400",
+      "reason": "Localized AlphaSift guidance must change with the canonical Web source."
+    },
+    {
+      "path": "apps/dsa-web/src/i18n/translations/ja.ts",
+      "text_sha256": "2ae9922fb58dcddc2f527695d9eeecb50c5d6dc20259e809b48d3f5160c66157",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "web-maintainers",
+      "issue": "#400",
+      "reason": "Localized AlphaSift guidance must change with the canonical Web source."
+    },
+    {
+      "path": "apps/dsa-web/src/i18n/translations/ko.ts",
+      "text_sha256": "dcb9b36e96a51e6482cbbe54ebbe480ad9479cc74c028e6d07b86dae78f8d479",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "web-maintainers",
+      "issue": "#400",
+      "reason": "Localized AlphaSift guidance must change with the canonical Web source."
+    },
+    {
+      "path": "apps/dsa-web/src/i18n/translations/ms.ts",
+      "text_sha256": "cf6b01888b7c65fa08d16502e8cfdd74df11975a25acc156b0494efbac286493",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "web-maintainers",
+      "issue": "#400",
+      "reason": "Localized AlphaSift guidance must change with the canonical Web source."
+    },
+    {
+      "path": "apps/dsa-web/src/i18n/translations/zh-TW.ts",
+      "text_sha256": "dd1f2a898b962f5e71e6da0f5056484d3f5360a93acb6e18b918f118851c9962",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "web-maintainers",
+      "issue": "#400",
+      "reason": "Localized AlphaSift guidance must change with the canonical Web source."
+    },
+    {
+      "path": "apps/dsa-web/src/locales/settingsHelp.ts",
+      "text_sha256": "1c55d0fcf950f9c1d177041bbccd0a9a4967a89381b621afde6b631697364c96",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "web-maintainers",
+      "issue": "#400",
+      "reason": "Canonical localized help must converge with generated translations."
+    },
+    {
+      "path": "apps/dsa-web/src/locales/settingsHelp.ts",
+      "text_sha256": "a144d47f74d78f14febd6289215ea9706a6e8c1787c12f531d653f8b8175b18a",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "web-maintainers",
+      "issue": "#400",
+      "reason": "Canonical localized help must converge with generated translations."
+    },
+    {
+      "path": "apps/dsa-web/src/pages/__tests__/StockScreeningPage.test.tsx",
+      "text_sha256": "1daa0cbf34e6bdac0a18ed9b9fee10db7ff42473ef53df4818a98ac2605ab250",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "web-maintainers",
+      "issue": "#400",
+      "reason": "Web assertions must change with the user-visible AlphaSift guidance."
+    },
+    {
+      "path": "apps/dsa-web/src/pages/__tests__/StockScreeningPage.test.tsx",
+      "text_sha256": "82e761fc915ead1b5fcdc7a7dafa5eaeb5f91b3d54f2402e6e43af5172c758ab",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "web-maintainers",
+      "issue": "#400",
+      "reason": "Web assertions must change with the user-visible AlphaSift guidance."
+    },
+    {
+      "path": "docs/alphasift-integration.md",
+      "text_sha256": "97d8c0f31b28cca2e18150b948cec95b8416d8ef8c23e0e038c105b668511499",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "alphasift-maintainers",
+      "issue": "#400",
+      "reason": "Product quick-fix descriptions must converge with the AlphaSift runtime message."
+    },
+    {
+      "path": "docs/alphasift-integration.md",
+      "text_sha256": "da3eb5fe6225a9153141ce4f0fbb351f90f2b35a38bad0f1d75c31f6fc86dca0",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "alphasift-maintainers",
+      "issue": "#400",
+      "reason": "Product quick-fix descriptions must converge with the AlphaSift runtime message."
+    },
+    {
+      "path": "requirements-pydanticai.txt",
+      "text_sha256": "7878251e8bcf2fa0792725a04e9e93fc773bcda46619264478aa1c1af9de0de6",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "dependency-maintainers",
+      "issue": "#400",
+      "reason": "Optional-install comments must use the canonical constrained command."
+    },
+    {
+      "path": "scripts/build-backend.ps1",
+      "text_sha256": "cfd07df875224bb2a47a4ddde45d0cabb5584419a7d3b15903107ff0f33670ca",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "release-maintainers",
+      "issue": "#400",
+      "reason": "The desktop error label must not resemble unconstrained operator guidance."
+    },
+    {
+      "path": "scripts/e2e_test_feishu_app.py",
+      "text_sha256": "d5d983328d00d613be2d778e581ecc991b809d474a9a6636eac9e8c2e40abb37",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "notification-maintainers",
+      "issue": "#400",
+      "reason": "Feishu tool diagnostics are outside the supply-chain script boundary."
+    },
+    {
+      "path": "scripts/generate_index_from_csv.py",
+      "text_sha256": "8388dd4c4d5b2290a618856f4133f8b0defdc698e7aae59830ae0fc802790172",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "data-tooling-maintainers",
+      "issue": "#400",
+      "reason": "Data-tool diagnostics are outside the supply-chain script boundary."
+    },
+    {
+      "path": "scripts/generate_longbridge_oauth_token.py",
+      "text_sha256": "7f4eae372e2ca6efa1b2ef4f80ab974cbd87b1d0de36fb074ef7eb62102b5832",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "provider-tooling-maintainers",
+      "issue": "#400",
+      "reason": "Provider-tool diagnostics are outside the supply-chain script boundary."
+    },
+    {
+      "path": "src/notification_sender/feishu_sender.py",
+      "text_sha256": "36d9b79637e8d170c0538f36d17fd4758200e2cfafed15b1952322527054e6b8",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "notification-maintainers",
+      "issue": "#400",
+      "reason": "Track OPS cannot modify the runtime-owned Feishu diagnostic."
+    },
+    {
+      "path": "src/services/alphasift_service.py",
+      "text_sha256": "0261ec3d31f09754bcba05721693d99c54d611c4696ba580433cc3e16b893fa3",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "alphasift-maintainers",
+      "issue": "#400",
+      "reason": "Track OPS cannot modify the runtime-owned AlphaSift diagnostic."
+    },
+    {
+      "path": "tests/test_alphasift_install_and_task.py",
+      "text_sha256": "fcdf63561e8592784534094b8fcb09450cf06fbaa7e78cd1bfe74fe5bda3f632",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "alphasift-maintainers",
+      "issue": "#400",
+      "reason": "The runtime assertion must change with the AlphaSift diagnostic."
+    },
+    {
+      "path": "tests/test_docker_entrypoint.py",
+      "text_sha256": "b52f01a5d3789d2ff86059f0d02dd17fa66406934ba3037c72fcf35dd70562d0",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "release-maintainers",
+      "issue": "#400",
+      "reason": "The Docker assertion must distinguish constrained execution from raw guidance."
+    },
+    {
+      "path": "tests/test_notification_sender.py",
+      "text_sha256": "420b3fa8347cc8c6d9d0fce88102eed15189df97fc4f66817046597fa2be985c",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "notification-maintainers",
+      "issue": "#400",
+      "reason": "The notification assertion must change with the runtime diagnostic."
+    },
+    {
+      "path": "tests/test_tushare_fetcher_get_stock_list.py",
+      "text_sha256": "6dc226bf643b6fd7f4e6f50a1824fb0de0434058812d7da896ca58b00a897755",
+      "occurrences": 1,
+      "expires": "2026-08-20",
+      "owner": "data-tooling-maintainers",
+      "issue": "#400",
+      "reason": "The test-module setup hint must use canonical dependency guidance."
+    }
+  ]
+}

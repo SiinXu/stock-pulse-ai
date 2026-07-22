@@ -297,6 +297,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Split analysis orchestration into a focused application module while preserving the legacy main entrypoint and analysis behavior.
 - [Fixed] Preserved Data Provider plugin market, capability, and priority eligibility in in-flight snapshots during concurrent unload.
 - [Added] Added a tray-opened, isolated floating Desktop assistant with local readiness state, validated Web-route shortcuts, and hide-to-tray main-window controls.
+- [Chore] Made the secret-bearing AI review job install only from immutable trusted-base dependency inputs and added bounded guards for its secret boundary and cross-track install guidance.
 
 ## [3.26.3] - 2026-07-15
 
