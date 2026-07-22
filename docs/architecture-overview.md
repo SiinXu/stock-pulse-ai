@@ -2,33 +2,49 @@
 
 - Status: `Living`
 - Last verified: 2026-07-21
-- Scope: current component boundaries, process entrypoints, and analysis data flow
+- Scope: current technical component boundaries, process entrypoints, and analysis data flow
 
-This document maps the current implementation. It is not an API specification or
-a product roadmap. Durable design rationale belongs in the
+This document is the technical view of the current implementation. For
+stakeholder capabilities and value flow, start with the
+[business architecture](business-architecture.md). This document is not an API
+specification or a product roadmap. Durable design rationale belongs in the
 [ADR registry](adr/README.md); focused contracts remain authoritative for their
 specific mechanics.
 
-## System At A Glance
+## View Boundary
+
+| View | Answers | Includes |
+| --- | --- | --- |
+| [Business architecture](business-architecture.md) | Who receives value, what capabilities participate, and how an intent becomes an outcome | Stakeholders, capabilities, and the business value flow |
+| Technical architecture (this document) | How the current repository executes and connects those capabilities | Entrypoints, module ownership, process modes, data paths, persistence, and runtime constraints |
+
+Reliability mechanisms such as runtime guards, cache layers, provider health,
+and circuit control belong in this technical view or a focused technical
+contract. They are represented in the business view only by the outcome they
+protect, not as business capabilities.
+
+## Technical System At A Glance
 
 ```mermaid
 flowchart LR
-  CLI[CLI and scheduler<br/>main.py] --> PIPE
-  WEB[React Web<br/>apps/dsa-web] --> API
-  DESKTOP[Electron shell<br/>apps/dsa-desktop] --> API
+  CLI[CLI and scheduler<br/>main.py and src/app/cli.py] -->|direct analysis| PIPE
+  WEB[React Web<br/>apps/dsa-web] -->|HTTP and SSE| API
+  DESKTOP[Electron shell<br/>apps/dsa-desktop] -->|starts backend and loads Web UI| API
   BOT[Bot adapters<br/>bot/] -->|/analyze| QUEUE
   BOT -->|/batch| PIPE
-  API[FastAPI<br/>server.py and api/] --> QUEUE[Process-local task queue<br/>src/services/task_queue.py]
-  API --> SERVICES[Application services<br/>src/services/]
-  QUEUE --> SERVICES
-  SERVICES --> PIPE[StockAnalysisPipeline<br/>src/core/pipeline.py]
-  PIPE --> DATA[Market providers<br/>data_provider/]
-  PIPE --> INTEL[Search, context, LLM, and Agent]
-  DATA --> STORE[Storage and repositories<br/>src/storage.py and src/repositories/]
-  INTEL --> STORE
-  PIPE --> STORE
-  PIPE --> OUTPUT[Reports and notifications<br/>templates, renderer, delivery]
+  API[FastAPI<br/>server.py and api/] -->|async task| QUEUE[Process-local task queue<br/>src/services/task_queue.py]
+  API -->|synchronous use case| SERVICES[Application services<br/>src/services/]
+  QUEUE -->|execute task| SERVICES
+  SERVICES -->|invoke analysis| PIPE[StockAnalysisPipeline<br/>src/core/pipeline.py]
+  PIPE -->|fetch through adapters| DATA[Market providers<br/>data_provider/]
+  PIPE -->|retrieve and analyze| INTEL[Search, context, LLM, and Agent]
+  PIPE -->|domain writes| STORE[Storage and repositories<br/>src/storage.py and src/repositories/]
+  PIPE -->|render and dispatch| OUTPUT[Reports and notifications<br/>templates, renderer, delivery]
 ```
+
+Edges in this component view mean caller to dependency; they do not add a
+second arrow for the return value. The directional stage and fallback flow is
+shown below.
 
 The canonical pipeline stage vocabulary is:
 
@@ -40,7 +56,8 @@ resolve -> fetch -> intelligence -> context -> analyze -> persist -> render -> d
 
 | Entrypoint | Responsibility | Important boundary |
 | --- | --- | --- |
-| `main.py` | CLI, one-shot and batch analysis, market review, scheduling, optional API serving, and Bot stream startup | CLI and scheduled analysis call the pipeline directly; they do not all pass through the task queue. |
+| `main.py` | Process bootstrap, analysis and scheduling coordination, optional API serving, Bot stream startup, and compatibility exports | Runtime helpers and direct analysis remain here; parsing and mode dispatch are rebound from `src/app/cli.py` to preserve the existing import surface. |
+| `src/app/cli.py` | CLI argument parsing and mode dispatch | Dispatches through `main.py` runtime helpers; it does not own a second analysis or service lifecycle. |
 | `server.py` | Direct ASGI/uvicorn entry | Installs `ApplicationServices` and exports the FastAPI application; it does not start Bot stream clients. |
 | `api/app.py` | FastAPI factory and lifespan | Owns auth/CORS/errors, routes, static Web hosting, `RuntimeSchedulerService`, and app-scoped `SystemConfigService`. |
 | `bot/` | Platform adapters, dispatcher, and commands | Bot `/analyze` submits to the shared process-local queue. Stream clients are started by `main.py`; Bot webhooks are not FastAPI routes. |
@@ -101,13 +118,54 @@ is used for background analysis lifecycle, not as a universal service bus.
 
 ## Canonical Analysis Data Flow
 
+```mermaid
+flowchart TB
+  START[Analysis request] -->|start run| RESOLVE[resolve<br/>effective trading date]
+  RESOLVE -->|frozen run scope| FETCH[fetch<br/>market inputs]
+
+  subgraph DAILY[Daily-data cache and provider branch]
+    direction LR
+    DB{Reusable stock_daily data?}
+    DB -->|fresh hit| READY[Daily market data prepared]
+    DB -->|miss or refresh| CACHE{Provider L1 or L2 fresh hit?}
+    CACHE -->|fresh hit| READY
+    CACHE -->|miss| PROVIDERS[Capability-filtered provider priority chain]
+    PROVIDERS -->|success; cache and stock_daily write| READY
+    PROVIDERS -->|all providers fail| STALE{Eligible last-good cache data?}
+    STALE -->|yes; marked stale| READY
+    STALE -->|no| DEGRADED[Recorded fetch degradation]
+  end
+
+  FETCH -->|daily-data lookup| DB
+
+  READY -->|market evidence| INTELLIGENCE[intelligence<br/>news and optional evidence]
+  DEGRADED -->|continue with eligible stored data if available| INTELLIGENCE
+  INTELLIGENCE -->|evidence with provenance| CONTEXT[context<br/>bounded analysis context]
+  CONTEXT -->|analysis input| ANALYZE[analyze<br/>LLM or approved Agent path]
+  ANALYZE -->|normalized guarded result| PERSIST[persist<br/>history and eligible context]
+  PERSIST -->|stored result| RENDER[render<br/>report representation and artifact]
+  RENDER -->|selected output| DISPATCH[dispatch<br/>isolated channel attempts]
+  DISPATCH -->|per-channel outcome| COMPLETE[History, report, notification, or contextual reply]
+```
+
+The diagram uses one-way, labeled edges. A cache hit bypasses provider calls;
+a cache miss enters the configured provider chain; an eligible stale candidate
+from the memory or persistent cache is considered only after every provider
+fails. With no eligible stale entry, the
+`fetch` stage records a typed degradation and the Pipeline may continue with
+eligible data already in storage; later stages still surface insufficient data
+rather than manufacturing evidence. Provider capability, priority, health,
+circuit, cache freshness, and stale-window rules are defined in
+[data-source stability](data-source-stability.md) and
+[ADR-005](adr/ADR-005-provider-fallback-and-circuit-control.md).
+
 | Stage | Current responsibility | Primary owners |
 | --- | --- | --- |
 | `resolve` | Resolve and freeze the effective trading date used by resume and history lookup for one stock run. | `src/core/pipeline.py`, market-time and history services |
 | `fetch` | Prepare daily, realtime, chip, fundamental, market-phase, and market-structure inputs through database/cache/provider paths. | `data_provider/`, `src/storage.py`, market services |
 | `intelligence` | Retrieve fresh or persisted news, social sentiment, and other optional intelligence evidence. | search and intelligence services |
 | `context` | Assemble bounded historical, request, and prompt context with provenance and quality state. | analysis context services and schemas |
-| `analyze` | Execute normal LLM analysis or the approved Agent path, then normalize and guard the result. | `src/analyzer.py`, `src/llm/`, `src/agent/` |
+| `analyze` | Execute normal LLM analysis or the approved Agent path, then normalize and guard the result. | `src/analyzer.py`, `src/analyzer_parts/`, `src/llm/`, `src/agent/` |
 | `persist` | Store analysis history and its eligible context snapshot. | `src/repositories/`, `src/storage.py` |
 | `render` | Generate the selected report representation and persist local report artifacts. | report schema, renderer, templates, delivery stage |
 | `dispatch` | Isolate notification and contextual-reply attempts across configured delivery channels. | delivery stage and notification modules |
@@ -131,6 +189,7 @@ is used for background analysis lifecycle, not as a universal service bus.
 
 ## Focused Documentation
 
+- [Business architecture](business-architecture.md)
 - [Foundation pipeline and product layer](foundation-product-architecture.md)
 - [ADR registry and process](adr/README.md)
 - [Task execution contract](task-execution-contract.md)
@@ -148,5 +207,7 @@ is used for background analysis lifecycle, not as a universal service bus.
 ## Keeping This Overview Current
 
 Update this document when an entrypoint, ownership boundary, pipeline stage name,
-or process constraint changes. Use an ADR when the reason or durable policy
-changes; use the focused living contract when only detailed mechanics change.
+data path, or process constraint changes. Update the business architecture when
+a stakeholder, capability, outcome, or value-flow relationship changes. Use an
+ADR when the reason or durable policy changes; use the focused living contract
+when only detailed mechanics change.
