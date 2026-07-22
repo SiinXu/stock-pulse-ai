@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
 import {
+  buildHomeHistoryRunFlowHref,
   clearHomeRunFlow,
   parseHomeUrlState,
   setHomeHistoryRunFlow,
@@ -11,6 +12,12 @@ import {
 } from '../homeUrlState';
 
 describe('homeUrlState', () => {
+  it('builds a canonical source-report handoff into the history Run Flow', () => {
+    expect(buildHomeHistoryRunFlowHref(3001, '600519.SH')).toBe(
+      '/?recordId=3001&stock=600519&runFlow=history&runFlowRecordId=3001',
+    );
+  });
+
   it('parses a canonical report and history Run Flow deep link', () => {
     expect(parseHomeUrlState('?recordId=42&runFlow=history&runFlowRecordId=42')).toMatchObject({
       recordId: 42,

@@ -46,8 +46,8 @@ _UA = (
 
 # TWSE T86 core column NAMES. Read by name (not a fixed index) so a TWSE column
 # rename / reorder fails open instead of silently shipping misaligned numbers.
-# foreign = Overseas Investment (NOT incl Foreign Broker-Dealer): foreign-dealer sits outside the Foreign Investment
-# category in the official institutional investors total.
+# foreign = `外陸資` (excluding `外資自營商`); foreign-dealer activity sits outside
+# the `外資` category in the official `三大法人` total.
 _T86_CODE = "證券代號"
 _T86_FOREIGN = "外陸資買賣超股數(不含外資自營商)"
 _T86_TRUST = "投信買賣超股數"
@@ -163,7 +163,7 @@ class TwInstitutionalFetcher:
         record = table.get(base)
         # TPEx OpenAPI serves only the LATEST trading day (no date param). If a caller
         # asked for a specific date, never silently return a different-day record --
-        # fail open (None) so a date-mismatched OTC-listed-listed-listed-listed figure can't reach a report.
+        # fail open (None) so a date-mismatched `上櫃` figure cannot reach a report.
         if record is not None and date and market == "tpex":
             requested = self._norm_ad_date(date)
             if requested and record.get("date") != requested:
@@ -280,7 +280,7 @@ class TwInstitutionalFetcher:
         resp.raise_for_status()
         return resp.json()
 
-    # ------------------------------------------------------------- TWSE T86 (Listed)
+    # ------------------------------------------------------------- TWSE T86 (`上市`)
     def _fetch_twse(self, ad_date: Optional[str]) -> Dict[str, dict]:
         params = {"response": "json", "selectType": "ALLBUT0999"}
         if ad_date:
@@ -332,7 +332,7 @@ class TwInstitutionalFetcher:
         code = str(row[idx[_T86_CODE]]).strip()
         if not code:
             return None
-        foreign = _to_int(row[idx[_T86_FOREIGN]])  # Foreign assets (ex foreign proprietary traders)
+        foreign = _to_int(row[idx[_T86_FOREIGN]])  # `外陸資` (excluding `外資自營商`)
         trust = _to_int(row[idx[_T86_TRUST]])
         dealer = _to_int(row[idx[_T86_DEALER]])
         total = _to_int(row[idx[_T86_TOTAL]])
@@ -344,7 +344,7 @@ class TwInstitutionalFetcher:
             code, ad_date, "上市", "TWSE-T86", foreign, trust, dealer, total
         )
 
-    # -------------------------------------------------------------- TPEx (Over-the-Counter)
+    # -------------------------------------------------------------- TPEx (`上櫃`)
     def _fetch_tpex(self) -> Dict[str, dict]:
         payload = self._get_json(_TPEX_URL)
         if not isinstance(payload, list) or not payload:
@@ -364,7 +364,7 @@ class TwInstitutionalFetcher:
         if not code:
             return None
         ad_date = minguo_to_ad(raw.get("Date", ""))
-        if ad_date is None:  # Minguo date unconvertible -> no attributable day -> fail-open
+        if ad_date is None:  # Unconvertible `民國` date -> no attributable day -> fail-open
             return None
         foreign = _to_int(raw.get(_TPEX_FOREIGN_EXCL))  # dealer-excluded foreign
         trust = _to_int(raw.get(_TPEX_TRUST))

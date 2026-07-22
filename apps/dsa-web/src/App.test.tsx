@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import * as AuthContext from './contexts/AuthContext';
+import { recordSessionLocation } from './utils/sessionContinuity';
 import { UI_LANGUAGE_STORAGE_KEY } from './utils/uiLanguage';
 
 type AuthState = ReturnType<typeof AuthContext.useAuth>;
@@ -89,6 +90,7 @@ function makeAuthState(overrides: Partial<AuthState> = {}): AuthState {
     setupState: 'no_password',
     isLoading: false,
     loadError: null,
+    logoutRedirectPending: false,
     login: vi.fn().mockResolvedValue({ success: true }),
     changePassword: vi.fn().mockResolvedValue({ success: true }),
     logout: vi.fn().mockResolvedValue(undefined),
@@ -102,6 +104,7 @@ beforeEach(() => {
   chatPageShouldThrow.value = false;
   window.history.pushState({}, '', '/');
   localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'zh');
+  sessionStorage.clear();
   vi.mocked(AuthContext.useAuth).mockReturnValue(makeAuthState());
 });
 
@@ -127,6 +130,22 @@ describe('App routing behavior', () => {
     expect(await screen.findByTestId('login-page')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/login');
     expect(window.location.search).toBe('?redirect=%2Fportfolio');
+  });
+
+  it('redirects an explicit logout to plain login without retaining workflow identity', async () => {
+    vi.mocked(AuthContext.useAuth).mockReturnValue(makeAuthState({
+      authEnabled: true,
+      loggedIn: false,
+      setupState: 'enabled',
+      logoutRedirectPending: true,
+    }));
+    window.history.pushState({}, '', '/chat?session=private&stock=AAPL&recordId=9');
+
+    render(<App />);
+
+    expect(await screen.findByTestId('login-page')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/login');
+    expect(window.location.search).toBe('');
   });
 
   it('keeps the hidden playground behind the existing authentication boundary', async () => {
@@ -168,6 +187,27 @@ describe('App routing behavior', () => {
     expect(setCurrentRoute).toHaveBeenCalledWith('/chat');
     expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
     expect(screen.queryByTestId('home-page')).not.toBeInTheDocument();
+  });
+
+  it('restores the last tab-scoped route state on a bare reload', async () => {
+    recordSessionLocation('/portfolio?account=4');
+    window.history.pushState({}, '', '/portfolio');
+
+    render(<App />);
+
+    expect(await screen.findByTestId('portfolio-page')).toBeInTheDocument();
+    expect(window.location.search).toBe('?account=4');
+  });
+
+  it('does not replace an invalid-link fallback with stale session state', async () => {
+    recordSessionLocation('/?stock=AAPL&workspace=watchlist');
+    window.history.pushState({}, '', '/stocks/%3Cscript%3E');
+
+    render(<App />);
+
+    expect(await screen.findByTestId('home-page')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/');
+    expect(window.location.search).toBe('');
   });
 
   it('routes /usage to the token usage page after auth is ready', async () => {

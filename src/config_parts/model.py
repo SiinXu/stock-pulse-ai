@@ -383,7 +383,7 @@ class Config:
     enable_eastmoney_patch: bool = False
     # Real-time quote data source priority (comma separated)
     # Recommendation order:tencent > akshare_sina > efinance > akshare_em > tushare
-    # - tencent: Financial data from Tencent, including PB/Turnover Rate/PE ratio etc., stable single-stock query (recommended)
+    # - tencent: Tencent Finance, including volume ratio, turnover rate, and P/E ratio; stable single-stock query (recommended)
     # - akshare_sina: Sina Finance, stable basic data but no volume ratio
     # - efinance/akshare_em: Eastmoney full-data APIs; most complete, but prone to blocking
     # - tushare: Tushare Pro, requires 2000 points, comprehensive data (paid users have priority)

@@ -16,6 +16,7 @@ import { SidebarNav } from '../../components/layout/SidebarNav';
 import { SidebarProfile } from '../../components/layout/SidebarProfile';
 import { RouteFocusCoordinator } from '../../components/routing';
 import { DeepLinkGuard } from '../../components/routing/DeepLinkGuard';
+import { SessionContinuityGuard } from '../../components/routing/SessionContinuityGuard';
 import { ThemeToggle } from '../../components/theme/ThemeToggle';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { PLAYGROUND_TEXT } from '../../locales/playground';
@@ -117,6 +118,12 @@ const DeepLinkGuardStory = () => (
   </DeepLinkGuard>
 );
 
+const SessionContinuityGuardStory = () => (
+  <SessionContinuityGuard>
+    <RoutePreviewContent />
+  </SessionContinuityGuard>
+);
+
 const DashboardPanelHeaderStory = () => {
   const text = useSamples();
   return (
@@ -158,6 +165,7 @@ export const LAYOUT_DASHBOARD_SCENARIOS: Record<string, PlaygroundScenarioRender
   'route-outlet-boundary': RouteOutletBoundaryStory,
   'standalone-route-boundary': StandaloneRouteBoundaryStory,
   'deep-link-guard': DeepLinkGuardStory,
+  'session-continuity-guard': SessionContinuityGuardStory,
   'route-focus-coordinator': RouteFocusCoordinatorStory,
   'theme-toggle': ThemeToggleStory,
   'ui-language-toggle': UiLanguageToggleStory,
