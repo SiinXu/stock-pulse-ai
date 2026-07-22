@@ -37,7 +37,7 @@ MODULES = {
             "get_renderer_preset",
             "normalize_channel_name",
         ),
-        "b68a8a85759b10266e0e1c62dda9f0901bfde20b03f1d683412e6ddaa6a739e0",
+        "c560a6081fd037f584a7d5e419d9927d9496551d3ce3262f85b2c9cd4e3ff743",
     ),
     "src.notification_contracts": (
         "src.notification_parts.contracts",
@@ -57,7 +57,7 @@ MODULES = {
             "parse_qsl",
             "urlsplit",
         ),
-        "e1710b474c9ef0b83a0b047a5a0ea24033a5a55721d754ad1db765ced2e2c906",
+        "92c4e7d3970cf65c2b5bc1e99f7dc84df5f4fdec7ccb67cb1104dc41e47a7053",
     ),
     "src.notification_noise": (
         "src.notification_parts.noise",
@@ -92,7 +92,7 @@ MODULES = {
             "uuid",
             "validate_notification_timezone",
         ),
-        "161104785d8435e353bbabb70fb8936038f1ac5bb02f93a1fc6a969b7eb5a91c",
+        "69b5dab6ac1905457c05e5b5aeba397c8028b42cd7dd812f83c3f754347a99df",
     ),
     "src.notification_routing": (
         "src.notification_parts.route_config",
@@ -110,7 +110,7 @@ MODULES = {
             "parse_notification_route_channels",
             "split_notification_route_channels",
         ),
-        "16cdd3c0160ce82f1458d5e1db74344a2680cb9423952d75dc77d4c96b0a8ae1",
+        "c85ccfb6502e0b81ec63569b5b6e8aa3f99a7e515d07ca0e03b5327454cda925",
     ),
 }
 
@@ -143,6 +143,22 @@ def _descriptor_function(descriptor: Any):
     if isinstance(descriptor, FunctionType):
         return descriptor
     return None
+
+
+def _stable_ast(node: Any):
+    """Serialize AST nodes without interpreter-version-only empty fields."""
+    if isinstance(node, ast.AST):
+        return (
+            type(node).__name__,
+            tuple(
+                (field, _stable_ast(getattr(node, field)))
+                for field in node._fields
+                if field != "type_params"
+            ),
+        )
+    if isinstance(node, list):
+        return tuple(_stable_ast(item) for item in node)
+    return node
 
 
 @pytest.mark.parametrize("legacy_name", MODULES)
@@ -360,6 +376,6 @@ def test_relocated_sources_are_ast_identical(legacy_name: str) -> None:
     implementation_name, _, expected_digest = MODULES[legacy_name]
     implementation = importlib.import_module(implementation_name)
     tree = ast.parse(Path(implementation.__file__).read_text(encoding="utf-8"))
-    payload = ast.dump(tree, include_attributes=False)
+    payload = repr(_stable_ast(tree))
     digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
     assert digest == expected_digest
