@@ -13,7 +13,7 @@
 | 部署到服务器或云平台 | [部署指南](DEPLOY.md) | [云端 WebUI 部署](deploy-webui-cloud.md)、[Zeabur 部署](docker/zeabur-deployment.md) |
 | 使用 Bot / IM 接入 | [Bot 命令与接入](bot-command.md) | [Bot 平台配置](bot/) |
 | 排查运行问题 | [FAQ](FAQ.md) | [更新日志](CHANGELOG.md) |
-| 处理数据源失败或降级 | [数据源稳定性与故障处理图示](data-source-stability.md) | [FAQ](FAQ.md) |
+| 处理数据源失败或降级 | [数据源稳定性与故障处理图示](data-source-stability.md) | [英文版](data-source-stability_EN.md)、[FAQ](FAQ.md) |
 | 参与开发或提交 PR | [贡献指南](CONTRIBUTING.md) | [业务架构](business-architecture.md)、[技术架构总览](architecture-overview.md)、[ADR 注册表](adr/README.md)、[API 规格](architecture/api_spec.json) |
 
 ## 快速开始
@@ -32,6 +32,7 @@
 | 文档 | 内容 |
 | --- | --- |
 | [LLM 配置指南](LLM_CONFIG_GUIDE.md) | 模型服务商与连接、三层配置、Web 设置页和常见模型配置 |
+| [数据源稳定性与故障处理图示](data-source-stability.md) | 市场感知的 provider 顺序、健康评分、自适应排序、熔断、stale 降级与推荐配置 |
 | [LLM 服务商配置指南](llm-providers.md) | Provider 预设、Actions 映射、错误分类和诊断建议 |
 | [LiteLLM YAML 示例](examples/litellm_config.example.yaml) | LiteLLM 多渠道配置示例 |
 | [通知能力基线](notifications.md) | 企业微信、飞书、Telegram、Discord、Slack、邮件等通知渠道配置 |

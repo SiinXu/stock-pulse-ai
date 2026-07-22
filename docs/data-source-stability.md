@@ -1,5 +1,7 @@
 # 数据源稳定性与故障处理图示
 
+> English version: [Data-source Priority, Health, and Degradation](data-source-stability_EN.md).
+
 本文面向用户、部署者和维护者，说明 DSA 已接入的数据源如何参与分析、选股和大盘复盘，以及当数据源失败时系统会怎么降级。
 
 核心原则：先用项目已经接入并验证过的数据源，把失败路径讲清楚；新增外部数据源应放在第二阶段，避免先扩大维护面。
@@ -12,7 +14,7 @@
 
 - A 股个股与 AlphaSift：优先配置 `TUSHARE_TOKEN`，并保留 AkShare / Efinance / Tencent / Baostock / YFinance 兜底。
 - A 股大盘复盘：配置 `TICKFLOW_API_KEY` 后，指数和市场宽度会优先尝试 TickFlow，失败后回退现有免费源。
-- 港股 / 美股：配置 `LONGBRIDGE_*` 后优先使用 Longbridge，YFinance、Finnhub、AlphaVantage 继续兜底。
+- 港股 / 美股：配置 `LONGBRIDGE_*` 后，支持的实时行情与美股个股日线会优先使用 Longbridge；港股日线仍按静态 numeric priority，YFinance、AkShare、Tushare、Finnhub、AlphaVantage 继续按市场能力兜底。
 - 热点题材：AlphaSift 热点默认走 DSA EastMoney provider，并使用本地 last-good cache 降低实时接口失败影响。
 
 ## 已接入数据源矩阵
@@ -198,7 +200,7 @@ DAILY_FETCH_MAX_WORKERS=1
 
 ### 港股 / 美股稳定模式
 
-适合港美股组合、持仓和个股分析。Longbridge 配置后优先参与港美股链路；YFinance、Finnhub、AlphaVantage 作为兜底。
+适合港美股组合、持仓和个股分析。Longbridge 配置后优先参与支持的港美股实时行情和美股个股日线；港股日线仍按静态 numeric priority。YFinance、AkShare、Tushare、Finnhub、AlphaVantage 按市场能力继续兜底。
 
 ```env
 LONGBRIDGE_OAUTH_CLIENT_ID=your_client_id
@@ -283,3 +285,5 @@ manager.invalidate_daily_cache()          # 失效全部日线缓存
 - Longbridge OpenAPI: https://open.longportapp.com/
 - Finnhub API: https://finnhub.io/docs/api
 - Alpha Vantage API: https://www.alphavantage.co/documentation/
+
+LLM 配置来源、模型 fallback、backend fallback 与事务化热加载的区别，见 [LLM 路由与降级顺序](LLM_CONFIG_GUIDE.md#llm-路由与降级顺序)。
