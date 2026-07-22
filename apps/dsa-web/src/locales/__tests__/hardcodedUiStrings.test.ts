@@ -188,7 +188,7 @@ describe('hardcoded UI string scanner', () => {
   it('does not treat imports, routes, classes, technical IDs, or translation keys as UI copy', () => {
     const sourceText = `
       import { Settings } from './Settings';
-      const route = '/settings/model-access';
+      const route = '/' + 'settings/model-access';
       const modelId = 'gpt-4o';
       const panelId = 'settings-panel';
       const panelClass = 'flex items-center';

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, Clock3, Cpu, Database, Gauge, RefreshCw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import {
   usageApi,
   type UsageCallRecord,
@@ -23,6 +24,7 @@ import {
 } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiLanguage, UiTextKey, UiTextParams } from '../../i18n/uiText';
+import { APP_ROUTE_PATHS } from '../../routing/routes';
 import { getUiLocale } from '../../utils/uiLocale';
 
 type Translate = (key: UiTextKey, params?: UiTextParams) => string;
@@ -84,12 +86,18 @@ function buildParsedError(error: unknown, t: Translate): ParsedApiError {
   };
 }
 
-const ModelUsageCard: React.FC<{ model: UsageModelBreakdown; language: UiLanguage; t: Translate }> = ({ model, language, t }) => {
+const ModelUsageCard: React.FC<{
+  model: UsageModelBreakdown;
+  language: UiLanguage;
+  t: Translate;
+  headingAs?: 'h3' | 'h4';
+}> = ({ model, language, t, headingAs = 'h3' }) => {
+  const Heading = headingAs;
   return (
     <Surface as="article" level="section" padding="sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="truncate text-base font-semibold text-foreground">{model.model}</h3>
+          <Heading className="truncate text-base font-semibold text-foreground">{model.model}</Heading>
           <p className="mt-1 text-xs text-secondary-text">{t('usage.calls', { count: formatNumber(model.calls, language) })}</p>
         </div>
         <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-1 text-xs text-primary">
@@ -120,6 +128,7 @@ type TokenUsagePageProps = {
 
 const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => {
   const { language, t } = useUiLanguage();
+  const navigate = useNavigate();
   useEffect(() => {
     if (embedded) return;
     document.title = t('usage.documentTitle');
@@ -223,36 +232,31 @@ const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => 
     },
   ], [language, t]);
 
-  const content = (
-    <div className="space-y-5">
-        <PageHeader
-          eyebrow={t('usage.eyebrow')}
-          title={t('usage.title')}
-          description={t('usage.description')}
-          actions={(
-            <div className="flex flex-wrap items-center gap-2">
-              <SegmentedControl
-                value={period}
-                options={PERIOD_OPTIONS.map((option) => ({ value: option, label: t(PERIOD_LABEL_KEYS[option]) }))}
-                onChange={handlePeriodChange}
-                ariaLabel={t('usage.title')}
-              />
-              <Button
-                type="button"
-                variant="secondary"
-                size="default"
-                onClick={() => void loadDashboard()}
-                disabled={loading}
-                isLoading={loading}
-                loadingText={t('usage.refresh')}
-              >
-                <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                {t('usage.refresh')}
-              </Button>
-            </div>
-          )}
-        />
+  const actions = (
+    <div className="flex flex-wrap items-center gap-2">
+      <SegmentedControl
+        value={period}
+        options={PERIOD_OPTIONS.map((option) => ({ value: option, label: t(PERIOD_LABEL_KEYS[option]) }))}
+        onChange={handlePeriodChange}
+        ariaLabel={t('usage.title')}
+      />
+      <Button
+        type="button"
+        variant="secondary"
+        size="default"
+        onClick={() => void loadDashboard()}
+        disabled={loading}
+        isLoading={loading}
+        loadingText={t('usage.refresh')}
+      >
+        <RefreshCw className="h-4 w-4" aria-hidden="true" />
+        {t('usage.refresh')}
+      </Button>
+    </div>
+  );
 
+  const dashboardContent = (
+    <>
         {error && dashboard ? (
           <ApiErrorAlert error={error} actionLabel={t('common.retry')} onAction={() => void loadDashboard()} />
         ) : null}
@@ -261,6 +265,7 @@ const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => 
           <StatePanel
             state="loading"
             title={t('common.loading')}
+            titleAs={embedded ? 'h3' : 'h2'}
             surfaceLevel="section"
           />
         ) : null}
@@ -270,6 +275,7 @@ const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => 
             state="error"
             title={localizedError.title}
             description={localizedError.message}
+            titleAs={embedded ? 'h3' : 'h2'}
             surfaceLevel="section"
             action={(
               <Button type="button" variant="secondary" size="default" onClick={() => void loadDashboard()}>
@@ -284,7 +290,18 @@ const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => 
             state="empty"
             title={t('usage.emptyTitle')}
             description={t('usage.emptyDescription')}
+            titleAs={embedded ? 'h3' : 'h2'}
             surfaceLevel="section"
+            action={(
+              <Button
+                type="button"
+                variant="primary"
+                size="default"
+                onClick={() => navigate(APP_ROUTE_PATHS.home)}
+              >
+                {t('home.startAnalysisTitle')}
+              </Button>
+            )}
           />
         ) : null}
 
@@ -301,10 +318,17 @@ const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => 
               <Section
                 title={t('usage.modelUsage')}
                 description={t('usage.modelUsageDescription')}
+                headingAs={embedded ? 'h3' : 'h2'}
                 contentClassName="grid gap-4"
               >
                 {dashboard.byModel.map((model) => (
-                  <ModelUsageCard key={model.model} model={model} language={language} t={t} />
+                  <ModelUsageCard
+                    key={model.model}
+                    model={model}
+                    language={language}
+                    t={t}
+                    headingAs={embedded ? 'h4' : 'h3'}
+                  />
                 ))}
               </Section>
 
@@ -313,6 +337,7 @@ const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => 
                 eyebrow={t('usage.breakdown')}
                 level="section"
                 padding="sm"
+                headingAs={embedded ? 'h3' : 'h2'}
               >
                     <div className="space-y-4">
                       {dashboard.byCallType.map((item) => (
@@ -344,6 +369,7 @@ const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => 
               title={t('usage.recentCalls')}
               description={t('usage.recentCallsDescription')}
               actions={<Clock3 className="h-5 w-5 text-secondary-text" aria-hidden="true" />}
+              headingAs={embedded ? 'h3' : 'h2'}
             >
               <DataTable
                 caption={t('usage.recentCalls')}
@@ -358,6 +384,29 @@ const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => 
             </Section>
           </>
         ) : null}
+    </>
+  );
+
+  const content = embedded ? (
+    <Section
+      title={t('usage.title')}
+      description={t('usage.description')}
+      eyebrow={t('usage.eyebrow')}
+      actions={actions}
+      headingAs="h2"
+      contentClassName="space-y-5"
+    >
+      {dashboardContent}
+    </Section>
+  ) : (
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow={t('usage.eyebrow')}
+        title={t('usage.title')}
+        description={t('usage.description')}
+        actions={actions}
+      />
+      {dashboardContent}
     </div>
   );
 

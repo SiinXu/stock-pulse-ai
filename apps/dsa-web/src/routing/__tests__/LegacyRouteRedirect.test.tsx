@@ -17,6 +17,7 @@ import {
   LEGACY_ROUTE_PATHS,
   SETTINGS_ROUTE_QUERY_KEYS,
   SETTINGS_SECTION_IDS,
+  buildSettingsHref,
 } from '../routes';
 
 function SettingsLocationProbe() {
@@ -66,6 +67,17 @@ describe('resolveLegacyRouteRedirect', () => {
   });
 });
 
+describe('buildSettingsHref', () => {
+  it('owns the Settings path and known query-key serialization', () => {
+    expect(buildSettingsHref()).toBe(APP_ROUTE_PATHS.settings);
+    expect(buildSettingsHref({
+      section: 'ai_models',
+      view: 'connections',
+      source: 'task_routing',
+    })).toBe(`${APP_ROUTE_PATHS.settings}?section=ai_models&view=connections&from=task_routing`);
+  });
+});
+
 describe('LegacyRouteRedirect', () => {
   it('replaces history and suppresses destination session restoration', async () => {
     render(
@@ -100,7 +112,7 @@ describe('LegacyRouteRedirect', () => {
     );
 
     expect(await screen.findByTestId('settings-location'))
-      .toHaveTextContent('/settings?period=all&section=usage#recent');
+      .toHaveTextContent(`${APP_ROUTE_PATHS.settings}?period=all&section=usage#recent`);
     expect(JSON.parse(screen.getByTestId('settings-state').textContent ?? '{}')).toEqual({
       source: 'bookmark',
       [SESSION_RESTORE_SUPPRESS_STATE_KEY]: true,

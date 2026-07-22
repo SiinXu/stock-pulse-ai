@@ -1,6 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { beforeEach, describe, expect, it } from 'vitest';
+import { APP_ROUTE_PATHS } from '../../routing/routes';
 import { WEB_SESSION_CONTINUITY_STORAGE_KEY } from '../sessionPersistence';
 import {
   recordSessionLocation,
@@ -54,13 +55,13 @@ describe('sessionContinuity', () => {
     recordSessionLocation('/decision-signals?view=timeline&market=us');
     recordSessionLocation('/stocks/00700.HK?period=weekly&days=120');
 
-    expect(resolveContextAwareNavigationTarget('/chat', '/settings')).toBe(
+    expect(resolveContextAwareNavigationTarget('/chat', APP_ROUTE_PATHS.settings)).toBe(
       '/chat?session=session-1&stock=HK00700',
     );
-    expect(resolveContextAwareNavigationTarget('/decision-signals', '/settings')).toBe(
+    expect(resolveContextAwareNavigationTarget('/decision-signals', APP_ROUTE_PATHS.settings)).toBe(
       '/decision-signals?stock=HK00700&view=timeline&market=us',
     );
-    expect(resolveContextAwareNavigationTarget('/backtest', '/settings')).toBe(
+    expect(resolveContextAwareNavigationTarget('/backtest', APP_ROUTE_PATHS.settings)).toBe(
       '/backtest?code=HK00700',
     );
   });
@@ -79,7 +80,7 @@ describe('sessionContinuity', () => {
       '/?recordId=9&stock=AAPL&workspace=watchlist&runFlow=history&runFlowRecordId=9',
     );
 
-    expect(resolveContextAwareNavigationTarget('/', '/settings')).toBe(
+    expect(resolveContextAwareNavigationTarget('/', APP_ROUTE_PATHS.settings)).toBe(
       '/?recordId=9&stock=AAPL&workspace=watchlist&runFlow=history&runFlowRecordId=9',
     );
     expect(resolveContextAwareNavigationTarget('/', '/stocks/MSFT')).toBe(
@@ -92,7 +93,7 @@ describe('sessionContinuity', () => {
       '/chat?session=session-1&stock=AAPL&name=Apple&recordId=9&context=active',
     );
 
-    expect(resolveContextAwareNavigationTarget('/chat', '/settings')).toBe(
+    expect(resolveContextAwareNavigationTarget('/chat', APP_ROUTE_PATHS.settings)).toBe(
       '/chat?session=session-1&stock=AAPL&name=Apple&recordId=9&context=active',
     );
     expect(resolveContextAwareNavigationTarget('/chat', '/stocks/MSFT')).toBe(

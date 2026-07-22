@@ -1,6 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
+import { APP_ROUTE_PATHS } from '../src/routing/routes';
 import { loginAsE2eAdmin } from './auth-fixture';
 
 const UI_LANGUAGE_STORAGE_KEY = 'dsa.uiLanguage';
@@ -334,7 +335,7 @@ async function openFixtureHome(page: Page, url: string, options: HomeApiOptions 
   await loginAsE2eAdmin(page);
   // Leave the post-login Home document before installing deterministic Home
   // routes so its in-flight lifecycle requests cannot overlap this scenario.
-  await page.goto('/settings');
+  await page.goto(APP_ROUTE_PATHS.settings);
   await page.waitForLoadState('domcontentloaded');
   await page.evaluate((key) => localStorage.setItem(key, 'en'), UI_LANGUAGE_STORAGE_KEY);
   const fixture = await installHomeApiFixture(page, options);

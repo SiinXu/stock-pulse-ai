@@ -9,6 +9,7 @@ import { legacyToSectionView } from '../../components/settings/settingsInformati
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import { loadUiLanguageTranslations } from '../../i18n/translations';
 import {
+  APP_ROUTE_PATHS,
   SETTINGS_ROUTE_QUERY_KEYS,
   SETTINGS_SECTION_IDS,
 } from '../../routing/routes';
@@ -47,6 +48,8 @@ const {
   refreshAfterExternalSave,
   refreshStatus,
   settingsPanelErrorBoundary,
+  getUsageDashboard,
+  usageNavigate,
   useAuthMock,
   useSystemConfigMock,
   webBuildInfoMock,
@@ -82,6 +85,8 @@ const {
   refreshAfterExternalSave: vi.fn(),
   refreshStatus: vi.fn(),
   settingsPanelErrorBoundary: vi.fn(),
+  getUsageDashboard: vi.fn(),
+  usageNavigate: vi.fn(),
   useAuthMock: vi.fn(),
   useSystemConfigMock: vi.fn(),
   webBuildInfoMock: {
@@ -137,12 +142,10 @@ vi.mock('../../hooks', () => ({
   useSystemConfig: () => useSystemConfigMock(),
 }));
 
-vi.mock('../../components/usage/TokenUsagePage', () => ({
-  default: ({ embedded }: { embedded?: boolean }) => (
-    <div data-embedded={String(Boolean(embedded))} data-testid="token-usage-page">
-      Token usage dashboard
-    </div>
-  ),
+vi.mock('../../api/usage', () => ({
+  usageApi: {
+    getDashboard: (...args: unknown[]) => getUsageDashboard(...args),
+  },
 }));
 
 type BlockerArgs = { currentLocation: { pathname: string }; nextLocation: { pathname: string } };
@@ -166,6 +169,7 @@ vi.mock('react-router-dom', async (importOriginal) => ({
     return routerBlockerMock;
   },
   useSearchParams: () => [routerSearchParamsMock.params, routerSearchParamsMock.setParams] as const,
+  useNavigate: () => usageNavigate,
 }));
 
 vi.mock('../../api/systemConfig', () => ({
@@ -915,24 +919,42 @@ describe('SettingsPage', () => {
       refreshStatus,
     });
     useSystemConfigMock.mockReturnValue(buildSystemConfigState());
+    getUsageDashboard.mockResolvedValue({
+      period: 'month',
+      fromDate: '2026-07-01',
+      toDate: '2026-07-22',
+      totalCalls: 0,
+      totalPromptTokens: 0,
+      totalCompletionTokens: 0,
+      totalTokens: 0,
+      byCallType: [],
+      byModel: [],
+      recentCalls: [],
+    });
     delete (window as { dsaDesktop?: unknown }).dsaDesktop;
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock');
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(mockedAnchorClick);
   });
 
-  it('embeds TokenUsagePage while keeping the Settings configuration state mounted', () => {
+  it('embeds TokenUsagePage with one page heading while keeping Settings state mounted', async () => {
     routerSearchParamsMock.params = new URLSearchParams({
       [SETTINGS_ROUTE_QUERY_KEYS.section]: SETTINGS_SECTION_IDS.usage,
     });
 
     const { rerender } = render(<SettingsPage />);
 
-    expect(screen.getByTestId('token-usage-page')).toHaveAttribute('data-embedded', 'true');
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1, name: '系统设置' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Token 用量监控' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '用量与成本' }))
       .toHaveAttribute('aria-current', 'page');
     expect(useSystemConfigMock).toHaveBeenCalled();
     expect(routerSearchParamsMock.setParams).not.toHaveBeenCalled();
+    expect(await screen.findByRole('heading', {
+      level: 3,
+      name: '暂无 Token 用量记录',
+    })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '概览' }));
     const [nextParams, options] = routerSearchParamsMock.setParams.mock.calls.at(-1) ?? [];
@@ -942,7 +964,7 @@ describe('SettingsPage', () => {
 
     routerSearchParamsMock.params = nextParams as URLSearchParams;
     rerender(<SettingsPage />);
-    expect(screen.queryByTestId('token-usage-page')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Token 用量监控' })).not.toBeInTheDocument();
     expect(document.title).toBe('系统设置 - StockPulse');
   });
 
@@ -1334,13 +1356,13 @@ describe('SettingsPage', () => {
     render(<SettingsPage />);
 
     const args: BlockerArgs = {
-      currentLocation: { pathname: '/settings' },
+      currentLocation: { pathname: APP_ROUTE_PATHS.settings },
       nextLocation: { pathname: '/' },
     };
     expect(routerBlockerMock.shouldBlock?.(args)).toBe(true);
     expect(routerBlockerMock.shouldBlock?.({
-      currentLocation: { pathname: '/settings' },
-      nextLocation: { pathname: '/settings' },
+      currentLocation: { pathname: APP_ROUTE_PATHS.settings },
+      nextLocation: { pathname: APP_ROUTE_PATHS.settings },
     } satisfies BlockerArgs)).toBe(false);
   });
 
@@ -1350,7 +1372,7 @@ describe('SettingsPage', () => {
     render(<SettingsPage />);
 
     expect(routerBlockerMock.shouldBlock?.({
-      currentLocation: { pathname: '/settings' },
+      currentLocation: { pathname: APP_ROUTE_PATHS.settings },
       nextLocation: { pathname: '/' },
     } satisfies BlockerArgs)).toBe(false);
   });

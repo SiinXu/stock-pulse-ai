@@ -1,6 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { expect, test } from '@playwright/test';
+import { buildSettingsHref } from '../src/routing/routes';
 import { loginAsE2eAdmin } from './auth-fixture';
 
 // Smoke coverage for the Intel Sources tab only. The
@@ -48,7 +49,7 @@ test.describe('intelligence sources settings', () => {
     });
 
     await loginAsE2eAdmin(page);
-    await page.goto('/settings?section=data_sources&view=intelligence');
+    await page.goto(buildSettingsHref({ section: 'data_sources', view: 'intelligence' }));
 
     await expect(page.getByText('E2E Intelligence Feed')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('A-share market RSS')).toBeVisible();

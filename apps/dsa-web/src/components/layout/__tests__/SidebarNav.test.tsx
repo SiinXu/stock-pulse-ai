@@ -123,7 +123,7 @@ describe('SidebarNav', () => {
     recordSessionLocation('/screening?strategy=quality&count=20');
 
     render(
-      <MemoryRouter initialEntries={['/settings']}>
+      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.settings]}>
         <SidebarNav />
       </MemoryRouter>,
     );

@@ -267,7 +267,7 @@ describe('App routing behavior', () => {
     render(<App />);
 
     expect(await screen.findByTestId('settings-page')).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/settings');
+    expect(window.location.pathname).toBe(APP_ROUTE_PATHS.settings);
     expect(window.location.search).toBe('?section=ai_models');
     expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
   });
