@@ -28,6 +28,10 @@ export const DeepLinkGuard: React.FC<DeepLinkGuardProps> = ({ children }) => {
     : null;
 
   useLayoutEffect(() => {
+    if (!warningKey) {
+      lastWarningRef.current = null;
+      return;
+    }
     if (warningKey && lastWarningRef.current !== warningKey) {
       lastWarningRef.current = warningKey;
       showToast({

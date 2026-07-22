@@ -7,18 +7,19 @@ import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import { ToastProvider } from '../../common';
 import { DeepLinkGuard } from '../DeepLinkGuard';
 
-function LocationProbe() {
+function LocationProbe({ onRender }: { onRender?: (pathname: string) => void }) {
   const location = useLocation();
+  onRender?.(location.pathname);
   return <output aria-label="Current route">{`${location.pathname}${location.search}${location.hash}`}</output>;
 }
 
-function renderGuard(initialEntry: string) {
+function renderGuard(initialEntry: string, onRender?: (pathname: string) => void) {
   return render(
     <UiLanguageProvider initialLanguage="en">
       <ToastProvider>
         <MemoryRouter initialEntries={[initialEntry]}>
           <DeepLinkGuard>
-            <LocationProbe />
+            <LocationProbe onRender={onRender} />
           </DeepLinkGuard>
         </MemoryRouter>
       </ToastProvider>
@@ -40,5 +41,14 @@ describe('DeepLinkGuard', () => {
 
     expect(screen.getByLabelText('Current route')).toHaveTextContent('/missing?ref=notification');
     expect(screen.queryByText('Invalid link')).not.toBeInTheDocument();
+  });
+
+  it('redirects an invalid stock path before the product page renders', async () => {
+    const renderedPaths: string[] = [];
+    renderGuard('/stocks/%3Cscript%3E?days=30', (pathname) => renderedPaths.push(pathname));
+
+    await waitFor(() => expect(screen.getByLabelText('Current route')).toHaveTextContent('/'));
+    expect(screen.getByText('Invalid link')).toBeInTheDocument();
+    expect(renderedPaths).not.toContain('/stocks/%3Cscript%3E');
   });
 });

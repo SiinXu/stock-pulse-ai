@@ -66,13 +66,17 @@ describe('deepLink', () => {
   });
 
   it('removes common credential aliases from query and fragment state', () => {
-    const parsed = parseDeepLink('/chat?token=query-secret&passwd=legacy-secret&keep=yes#access_token=fragment-secret&tab=history');
+    const parsed = parseDeepLink(
+      '/chat?token=query-secret&passwd=legacy-secret&openai_api_key=provider-secret&telegram_bot_token=bot-secret&keep=yes#anthropic_api_key=fragment-secret&tab=history',
+    );
 
     expect(parsed.normalizedHref).toBe('/chat?keep=yes#tab=history');
     expect(parsed.issues).toEqual([
       { code: 'sensitive_parameter', parameter: 'token' },
       { code: 'sensitive_parameter', parameter: 'passwd' },
-      { code: 'sensitive_parameter', parameter: 'access_token' },
+      { code: 'sensitive_parameter', parameter: 'openai_api_key' },
+      { code: 'sensitive_parameter', parameter: 'telegram_bot_token' },
+      { code: 'sensitive_parameter', parameter: 'anthropic_api_key' },
     ]);
   });
 
@@ -103,6 +107,17 @@ describe('deepLink', () => {
     expect(parsed.issues).toEqual([
       { code: 'invalid_period', parameter: 'period' },
       { code: 'invalid_days', parameter: 'days' },
+    ]);
+  });
+
+  it('redirects an invalid stock path to safe Home state', () => {
+    const parsed = parseDeepLink('/stocks/%3Cscript%3E?period=weekly&keep=yes#chart');
+
+    expect(parsed.target).toBeNull();
+    expect(parsed.normalizedHref).toBe('/');
+    expect(parsed.normalizedSearch).toBe('');
+    expect(parsed.issues).toEqual([
+      { code: 'invalid_stock_code', parameter: 'stockCode' },
     ]);
   });
 

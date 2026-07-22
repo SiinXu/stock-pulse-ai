@@ -105,11 +105,17 @@ them. Canonicalization, missing-resource fallback, and default-value removal
 use Router replace navigation so they do not create dead history entries. A
 valid but unavailable Portfolio account falls back to the first available
 account (or all accounts) and displays the shared invalid-link warning.
+Chat keeps validated stock/name/report identity in the URL until the prepared
+follow-up is sent; refresh can therefore rebuild the unsent prompt and report
+context. Sending, starting a new chat, or explicitly switching sessions removes
+that pending context while retaining the stable session identity.
 
 Credentials, authorization values, passwords, private keys, and secret-like
 parameters never belong in a deep link. The route guard removes recognized
-sensitive keys before state restoration and presents a localized warning when
-URL state is cleaned. Draft text, unsaved forms, notification payloads, and
+sensitive keys, including provider-prefixed API key and token names, before
+state restoration and presents a localized warning when URL state is cleaned.
+An invalid stock path is replaced with safe Home state before the stock page
+can issue requests. Draft text, unsaved forms, notification payloads, and
 other potentially sensitive state stay out of URLs. A valid stock prefill or
 selected stock context may be represented, but draft stock text is not written
 to the URL and a restored Home stock never auto-submits analysis.

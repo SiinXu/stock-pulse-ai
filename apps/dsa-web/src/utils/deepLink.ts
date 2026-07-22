@@ -108,6 +108,26 @@ const SENSITIVE_PARAMETER_KEYS = new Set([
   'token',
   'webhookurl',
 ]);
+const SENSITIVE_PARAMETER_SUFFIXES = [
+  'accesstoken',
+  'apikey',
+  'apikeys',
+  'authorization',
+  'bottoken',
+  'credential',
+  'credentials',
+  'idtoken',
+  'password',
+  'passwd',
+  'privatekey',
+  'pwd',
+  'refreshtoken',
+  'secret',
+  'secretkey',
+  'token',
+  'tokens',
+  'webhookurl',
+];
 
 function assertPositiveInteger(value: number, field: string): number {
   if (!Number.isSafeInteger(value) || value <= 0) {
@@ -161,7 +181,9 @@ function setPositiveInteger(params: URLSearchParams, key: string, value?: number
 function stripSensitiveParameters(params: URLSearchParams, issues: DeepLinkIssue[]): void {
   for (const key of [...params.keys()]) {
     const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (!SENSITIVE_PARAMETER_KEYS.has(normalizedKey)) continue;
+    const hasSeparatedKeySuffix = /(?:^|[_.-])keys?$/i.test(key) || /\[keys?\]$/i.test(key);
+    const hasSensitiveSuffix = SENSITIVE_PARAMETER_SUFFIXES.some((suffix) => normalizedKey.endsWith(suffix));
+    if (!SENSITIVE_PARAMETER_KEYS.has(normalizedKey) && !hasSeparatedKeySuffix && !hasSensitiveSuffix) continue;
     params.delete(key);
     issues.push({ code: 'sensitive_parameter', parameter: key });
   }
@@ -426,6 +448,9 @@ export function parseDeepLink(input: string, origin = DEFAULT_ORIGIN): ParsedDee
       const stockCode = normalizeSafeStockCode(rawStockCode);
       if (!stockCode) {
         issues.push({ code: 'invalid_stock_code', parameter: 'stockCode' });
+        url.pathname = '/';
+        url.hash = '';
+        for (const key of [...params.keys()]) params.delete(key);
       } else {
         url.pathname = `/stocks/${encodeURIComponent(stockCode)}`;
         const rawPeriod = params.get('period');
