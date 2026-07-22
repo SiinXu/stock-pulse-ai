@@ -270,6 +270,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Pinned third-party GitHub Actions to reviewed commits, minimized workflow token permissions, and added automated supply-chain policy checks.
 - [Docs] Added an English operator guide for data-source priority, health scoring, adaptive ordering, degradation, and troubleshooting, and synchronized bilingual LLM fallback guidance.
 - [Docs] Defined the versioned plugin lifecycle, manifest, trust model, and six official extension-point contracts.
+- [Changed] Split the Agent orchestrator, executor, LLM adapter, and runner into focused compatibility-backed modules without changing runtime behavior.
 
 ## [3.26.3] - 2026-07-15
 
