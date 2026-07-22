@@ -33,6 +33,7 @@ from tenacity import (
 from .base import BaseFetcher, DataFetchError, RateLimitError, STANDARD_COLUMNS,is_bse_code, is_st_stock, is_kc_cy_stock, normalize_stock_code, _is_hk_market
 from .realtime_types import UnifiedRealtimeQuote, ChipDistribution
 from src.config import get_config
+from src.security.outbound_policy import safe_post
 from src.utils.sanitize import log_safe_exception, safe_before_sleep_log
 import os
 from zoneinfo import ZoneInfo
@@ -87,7 +88,11 @@ class _TushareHttpClient:
             "params": kwargs,
             "fields": fields,
         }
-        res = requests.post(self._api_url, json=req_params, timeout=self._timeout)
+        res = safe_post(
+            self._api_url,
+            json=req_params,
+            timeout=self._timeout,
+        )
         if res.status_code != 200:
             raise Exception(f"Tushare API HTTP {res.status_code}")
 
@@ -1372,8 +1377,11 @@ if __name__ == "__main__":
         name = fetcher.get_stock_name('600519')
         print(f"股票名称: {name}")
         
-    except Exception as e:
-        print(f"获取失败: {e}")
+    except Exception as exc:  # broad-exception: fallback_recorded - Manual smoke failure is logged safely.
+        logger.error(
+            "Tushare manual daily-data check failed error_type=%s",
+            type(exc).__name__,
+        )
 
     # 测试市场统计
     print("\n" + "=" * 50)
@@ -1389,8 +1397,11 @@ if __name__ == "__main__":
             print(f"Total Amount: {stats['total_amount']:.2f} 亿 (Yi)")
         else:
             print("Failed to compute market stats.")
-    except Exception as e:
-        print(f"Failed to compute market stats: {e}")
+    except Exception as exc:  # broad-exception: fallback_recorded - Manual smoke failure is logged safely.
+        logger.error(
+            "Tushare manual market-stats check failed error_type=%s",
+            type(exc).__name__,
+        )
 
 
     # 测试筹码分布数据
@@ -1399,8 +1410,11 @@ if __name__ == "__main__":
     print("=" * 50)
     try:
         chip = fetcher.get_chip_distribution('600519')  # 茅台
-    except Exception as e:
-        print(f"[筹码分布] 获取失败: {e}")
+    except Exception as exc:  # broad-exception: fallback_recorded - Manual smoke failure is logged safely.
+        logger.error(
+            "Tushare manual chip-distribution check failed error_type=%s",
+            type(exc).__name__,
+        )
 
     # 测试行业板块排名
     print("\n" + "=" * 50)
@@ -1418,5 +1432,8 @@ if __name__ == "__main__":
                 print(f"{sector['name']}: {sector['change_pct']}%")
         else:
             print("未获取到行业板块排名数据")
-    except Exception as e:
-        print(f"[行业板块排名] 获取失败: {e}")
+    except Exception as exc:  # broad-exception: fallback_recorded - Manual smoke failure is logged safely.
+        logger.error(
+            "Tushare manual sector-ranking check failed error_type=%s",
+            type(exc).__name__,
+        )

@@ -4,17 +4,15 @@
 from __future__ import annotations
 
 import hashlib
-import ipaddress
 import json
 import logging
 import re
-import socket
 import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any, Dict, List, Optional
-from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from xml.etree import ElementTree as ET
 
 import requests
@@ -22,6 +20,7 @@ from sqlalchemy.exc import IntegrityError
 
 from src.config import Config, get_config
 from src.repositories.intelligence_repo import IntelligenceRepository
+from src.security.outbound_policy import OutboundPolicyError, safe_get, validate_outbound_url
 from src.storage import IntelligenceSource, INTELLIGENCE_ITEM_NULL_SCOPE_VALUE
 from src.services.run_diagnostics import (
     sanitize_diagnostic_text as sanitize_run_diagnostic_text,
@@ -32,13 +31,9 @@ logger = logging.getLogger(__name__)
 _ALLOWED_SOURCE_TYPES = {"rss", "atom", "newsnow"}
 _ALLOWED_SCOPE_TYPES = {"symbol", "market", "sector"}
 _ALLOWED_MARKETS = {"cn", "hk", "us", "jp", "kr", "tw", "global"}
-_PRIVATE_HOSTNAMES = {"localhost", "localhost.localdomain"}
 _MAX_FEED_BYTES = 2 * 1024 * 1024
 _MAX_FEED_REDIRECTS = 5
 _UPSTREAM_FETCH_FAILURE_MESSAGE = "fetch failed: upstream request failed"
-_REDIRECT_STATUS_CODES = {301, 302, 303, 307, 308}
-_DISABLE_REQUEST_PROXIES = {"http": None, "https": None}
-_DNS_GUARD_LOCK = threading.Lock()
 _AUTO_FETCH_MIN_INTERVAL_SECONDS = 60 * 60
 _BUILTIN_SOURCE_TEMPLATES = [
     {
@@ -275,7 +270,7 @@ class IntelligenceService:
                 "dry_run": dry_run,
                 "sample_items": [self._feed_entry_to_dict(entry) for entry in entries[:5]],
             }
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: cleanup - Translate an upstream exception without exposing its detail.
             error = self._sanitize_error(exc)
             if not dry_run:
                 self.repo.update_source_status(source.id, status="failed", error=error)
@@ -348,7 +343,7 @@ class IntelligenceService:
                 bootstrap.get("enabled_count"),
                 bootstrap.get("error_count"),
             )
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: cleanup - Translate an upstream exception without exposing its detail.
             error = self._sanitize_error(exc)
             logger.warning("Intelligence auto fetch failed (fail-open): %s", error)
             result = {"ok": False, "skipped": False, "error": error}
@@ -395,52 +390,18 @@ class IntelligenceService:
     def _validate_url(self, raw_url: str, *, allow_no_url: bool = False) -> None:
         if allow_no_url and raw_url.startswith("no-url:intel:"):
             return
-        parsed = urlparse(raw_url)
-        if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
-            raise IntelligenceServiceError("source url must be an absolute http(s) URL")
-        if parsed.username or parsed.password:
-            raise IntelligenceServiceError("source url must not contain credentials")
-        hostname = (parsed.hostname or "").strip().lower().rstrip(".")
-        if not hostname:
-            raise IntelligenceServiceError("source url host is required")
-        if hostname in _PRIVATE_HOSTNAMES or hostname.endswith(".local"):
-            raise IntelligenceServiceError("source url host is not allowed")
-        has_public_address = False
         try:
-            ip = ipaddress.ip_address(hostname)
-        except ValueError:
-            ip = None
-        if ip is not None:
-            if self._is_blocked_ip(ip):
-                raise IntelligenceServiceError("source url must not target private or local network addresses")
-            return
-        try:
-            addr_infos = socket.getaddrinfo(hostname, None)
-        except OSError as exc:
-            raise IntelligenceServiceError(f"source url host DNS resolution failed: {hostname}") from exc
-        if not addr_infos:
-            raise IntelligenceServiceError(f"source url host DNS resolution failed: {hostname}")
-        for info in addr_infos:
-            try:
-                ip = ipaddress.ip_address(info[4][0])
-            except (IndexError, ValueError):
-                continue
-            if self._is_blocked_ip(ip):
-                raise IntelligenceServiceError("source url must not target private or local network addresses")
-            has_public_address = True
-        if not has_public_address:
-            raise IntelligenceServiceError(f"source url host DNS resolution failed: {hostname}")
-
-    @staticmethod
-    def _is_blocked_ip(ip: ipaddress._BaseAddress) -> bool:
-        return (
-            not ip.is_global
-            or ip.is_private
-            or ip.is_loopback
-            or ip.is_link_local
-            or ip.is_reserved
-            or ip.is_multicast
-        )
+            validate_outbound_url(raw_url)
+        except OutboundPolicyError as exc:
+            if exc.reason in {"invalid_url", "host_missing", "scheme_not_allowed"}:
+                message = "source url must be an absolute http(s) URL"
+            elif exc.reason == "credentials_not_allowed":
+                message = "source url must not contain credentials"
+            elif exc.reason in {"dns_resolution_failed", "dns_no_usable_address"}:
+                message = "source url host DNS resolution failed"
+            else:
+                message = "source url must not target private or local network addresses"
+            raise IntelligenceServiceError(message) from exc
 
     def _fetch_feed_entries(self, fields: Dict[str, Any], *, limit: int) -> List[FeedEntry]:
         if fields["source_type"] == "newsnow":
@@ -448,33 +409,16 @@ class IntelligenceService:
 
         timeout = max(1, min(float(self.config.news_intel_fetch_timeout_sec), 30.0))
         headers = {"User-Agent": "StockPulse-Intel/1.0"}
-        self._validate_url(fields["url"])
-        request_url = fields["url"]
         response = None
         try:
-            for _ in range(_MAX_FEED_REDIRECTS + 1):
-                response = self._get_with_validated_dns(
-                    request_url,
-                    timeout=timeout,
-                    headers=headers,
-                    allow_redirects=False,
-                    stream=True,
-                )
-                status_code = int(getattr(response, "status_code", 200))
-                if status_code in _REDIRECT_STATUS_CODES:
-                    location = getattr(response, "headers", {}).get("Location")
-                    if not location:
-                        raise IntelligenceServiceError("feed redirect missing Location header")
-                    response.close()
-                    request_url = urljoin(request_url, location)
-                    self._validate_url(request_url)
-                    continue
-                response.raise_for_status()
-                break
-            else:
-                raise IntelligenceServiceError(f"feed redirect chain exceeds {_MAX_FEED_REDIRECTS}")
-
-            self._validate_url(response.url or request_url)
+            response = safe_get(
+                fields["url"],
+                timeout=timeout,
+                headers=headers,
+                max_redirects=_MAX_FEED_REDIRECTS,
+                stream=True,
+            )
+            response.raise_for_status()
 
             if hasattr(response, "iter_content") and callable(response.iter_content):
                 chunks = []
@@ -494,7 +438,8 @@ class IntelligenceService:
             return self._parse_feed(content, source_name=fields["name"], limit=limit)
         except IntelligenceServiceError:
             raise
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Log before stable error mapping.
+            logger.warning("Intelligence feed fetch failed type=rss")
             raise IntelligenceServiceError(_UPSTREAM_FETCH_FAILURE_MESSAGE) from exc
         finally:
             if response is not None:
@@ -509,10 +454,9 @@ class IntelligenceService:
             ),
             "Accept": "application/json",
         }
-        self._validate_url(fields["url"])
         response = None
         try:
-            response = self._get_with_validated_dns(
+            response = safe_get(
                 fields["url"],
                 timeout=timeout,
                 headers=headers,
@@ -520,10 +464,9 @@ class IntelligenceService:
                 stream=True,
             )
             status_code = int(getattr(response, "status_code", 200))
-            if status_code in _REDIRECT_STATUS_CODES:
+            if 300 <= status_code < 400:
                 raise IntelligenceServiceError("NewsNow API redirects are not followed")
             response.raise_for_status()
-            self._validate_url(response.url or fields["url"])
 
             content = self._read_limited_response(response)
             try:
@@ -533,7 +476,8 @@ class IntelligenceService:
             return self._parse_newsnow_payload(payload, source_name=fields["name"], limit=limit)
         except IntelligenceServiceError:
             raise
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Log before stable error mapping.
+            logger.warning("Intelligence feed fetch failed type=newsnow")
             raise IntelligenceServiceError(_UPSTREAM_FETCH_FAILURE_MESSAGE) from exc
         finally:
             if response is not None:
@@ -555,46 +499,6 @@ class IntelligenceService:
         if len(content) > _MAX_FEED_BYTES:
             raise IntelligenceServiceError("feed response is too large")
         return content
-
-    def _get_with_validated_dns(self, raw_url: str, **kwargs: Any) -> requests.Response:
-        parsed = urlparse(raw_url)
-        target_hostname = self._normalize_hostname(parsed.hostname)
-        original_getaddrinfo = socket.getaddrinfo
-
-        def guarded_getaddrinfo(host: Any, port: Any, *args: Any, **inner_kwargs: Any) -> Any:
-            addrinfos = original_getaddrinfo(host, port, *args, **inner_kwargs)
-            if self._normalize_hostname(host) == target_hostname:
-                self._validate_addrinfos(addrinfos)
-            return addrinfos
-
-        with _DNS_GUARD_LOCK:
-            socket.getaddrinfo = guarded_getaddrinfo
-            try:
-                request_kwargs = dict(kwargs)
-                request_kwargs.setdefault("proxies", _DISABLE_REQUEST_PROXIES)
-                return requests.get(raw_url, **request_kwargs)
-            finally:
-                socket.getaddrinfo = original_getaddrinfo
-
-    @staticmethod
-    def _normalize_hostname(hostname: Any) -> str:
-        if isinstance(hostname, bytes):
-            hostname = hostname.decode("ascii", errors="ignore")
-        normalized = str(hostname or "").strip().lower().rstrip(".")
-        try:
-            return normalized.encode("idna").decode("ascii")
-        except UnicodeError:
-            return normalized
-
-    @staticmethod
-    def _validate_addrinfos(addr_infos: Any) -> None:
-        for info in addr_infos or []:
-            try:
-                ip = ipaddress.ip_address(info[4][0])
-            except (IndexError, TypeError, ValueError):
-                continue
-            if IntelligenceService._is_blocked_ip(ip):
-                raise IntelligenceServiceError("source url must not target private or local network addresses")
 
     def _parse_feed(self, content: bytes, *, source_name: str, limit: int) -> List[FeedEntry]:
         try:

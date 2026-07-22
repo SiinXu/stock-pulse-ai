@@ -39,7 +39,7 @@ class IntelligenceApiTestCase(unittest.TestCase):
         Config._instance = None
         DatabaseManager.reset_instance()
         self._dns_patcher = patch(
-            "src.services.intelligence_service.socket.getaddrinfo",
+            "src.security.outbound_policy.socket.getaddrinfo",
             return_value=[(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))],
         )
         self._dns_patcher.start()

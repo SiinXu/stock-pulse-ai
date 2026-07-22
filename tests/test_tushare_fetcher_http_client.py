@@ -8,6 +8,8 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from src.security.outbound_policy import OutboundPolicyError
+
 from tests.litellm_stub import ensure_litellm_stub
 
 ensure_litellm_stub()
@@ -57,8 +59,24 @@ class TestTushareHttpClient(unittest.TestCase):
                 "fields": "",
             },
             timeout=15,
+            proxies={"http": "", "https": "", "all": ""},
+            stream=True,
+            allow_redirects=False,
         )
         self.assertEqual(df.to_dict(orient="records"), [{"ts_code": "600519.SH", "close": 1688.0}])
+
+    def test_query_rejects_private_custom_endpoint_before_post(self) -> None:
+        client = _TushareHttpClient(
+            token="demo-token",
+            timeout=15,
+            api_url="http://127.0.0.1:8000/tushare",
+        )
+
+        with patch("data_provider.tushare_fetcher.requests.post") as post_mock:
+            with self.assertRaises(OutboundPolicyError):
+                client.daily(ts_code="600519.SH")
+
+        post_mock.assert_not_called()
 
 
 class TestTushareFetcherInit(unittest.TestCase):

@@ -720,7 +720,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
             "LLM_HERMES_API_KEY=sk-hermes-secret-value",
         )
 
-        with patch("src.services.system_config_service.requests.Session") as session_cls:
+        with patch("src.services.system_config_service.requests.get") as requests_get:
             result = self.service.discover_llm_channel_models(
                 name="hermes",
                 protocol="openai",
@@ -732,7 +732,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
 
         self.assertFalse(result["success"])
         self.assertEqual(result["error_code"], "saved_secret_scope_mismatch")
-        session_cls.assert_not_called()
+        requests_get.assert_not_called()
 
     def test_hermes_saved_secret_runtime_env_cannot_rebind_endpoint(self) -> None:
         self._rewrite_env(
@@ -744,7 +744,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         )
 
         with patch.dict(os.environ, {"LLM_HERMES_BASE_URL": "http://127.0.0.1:9999/v1"}, clear=False), \
-             patch("src.services.system_config_service.requests.Session") as session_cls:
+             patch("src.services.system_config_service.requests.get") as requests_get:
             result = self.service.discover_llm_channel_models(
                 name="hermes",
                 protocol="openai",
@@ -757,30 +757,19 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertFalse(result["success"])
         self.assertEqual(result["error_code"], "saved_secret_scope_mismatch")
         self.assertNotIn("saved-secret-token", str(result))
-        session_cls.assert_not_called()
+        requests_get.assert_not_called()
 
-    def test_hermes_model_discovery_uses_no_proxy_session(self) -> None:
-        observed: Dict[str, Any] = {}
+    def test_hermes_model_discovery_uses_outbound_policy_request(self) -> None:
+        response = SimpleNamespace(
+            status_code=200,
+            ok=True,
+            json=lambda: {"data": [{"id": "hermes-agent"}]},
+        )
 
-        class FakeSession:
-            def __init__(self) -> None:
-                self.trust_env = True
-
-            def get(self, url: str, **kwargs: Any) -> Any:
-                observed["url"] = url
-                observed["trust_env"] = self.trust_env
-                observed["headers"] = kwargs.get("headers") or {}
-                return SimpleNamespace(
-                    status_code=200,
-                    ok=True,
-                    json=lambda: {"data": [{"id": "hermes-agent"}]},
-                )
-
-            def close(self) -> None:
-                observed["closed"] = True
-
-        with patch("src.services.system_config_service.requests.Session", side_effect=FakeSession), \
-             patch("src.services.system_config_service.requests.get") as requests_get:
+        with patch(
+            "src.services.system_config_service.requests.get",
+            return_value=response,
+        ) as requests_get:
             result = self.service.discover_llm_channel_models(
                 name="hermes",
                 protocol="openai",
@@ -790,14 +779,15 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
             )
 
         self.assertTrue(result["success"])
-        self.assertEqual(observed["url"], "http://127.0.0.1:8642/v1/models")
-        self.assertFalse(observed["trust_env"])
-        self.assertEqual(observed["headers"]["Authorization"], "Bearer sk-hermes-secret-value")
-        self.assertTrue(observed["closed"])
-        requests_get.assert_not_called()
+        requests_get.assert_called_once()
+        self.assertEqual(requests_get.call_args.args[0], "http://127.0.0.1:8642/v1/models")
+        request_kwargs = requests_get.call_args.kwargs
+        self.assertEqual(request_kwargs["headers"]["Authorization"], "Bearer sk-hermes-secret-value")
+        self.assertEqual(request_kwargs["proxies"], {"http": "", "https": "", "all": ""})
+        self.assertFalse(request_kwargs["allow_redirects"])
 
     def test_hermes_model_discovery_invalid_url_fails_before_request(self) -> None:
-        with patch("src.services.system_config_service.requests.Session") as session_cls:
+        with patch("src.services.system_config_service.requests.get") as requests_get:
             result = self.service.discover_llm_channel_models(
                 name="hermes",
                 protocol="openai",
@@ -811,25 +801,17 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertEqual(result["error_code"], "invalid_config")
         self.assertEqual(result["details"]["reason"], "invalid_hermes_url")
         self.assertNotIn("saved-secret-token", rendered)
-        session_cls.assert_not_called()
+        requests_get.assert_not_called()
 
     def test_hermes_model_discovery_http_error_redacts_non_sk_secret(self) -> None:
-        class FakeSession:
-            def __init__(self) -> None:
-                self.trust_env = True
+        response = SimpleNamespace(
+            status_code=500,
+            ok=False,
+            json=lambda: {"error": {"message": "upstream saw saved-secret-token"}},
+            text="upstream saw saved-secret-token",
+        )
 
-            def get(self, *_args: Any, **_kwargs: Any) -> Any:
-                return SimpleNamespace(
-                    status_code=500,
-                    ok=False,
-                    json=lambda: {"error": {"message": "upstream saw saved-secret-token"}},
-                    text="upstream saw saved-secret-token",
-                )
-
-            def close(self) -> None:
-                pass
-
-        with patch("src.services.system_config_service.requests.Session", side_effect=FakeSession):
+        with patch("src.services.system_config_service.requests.get", return_value=response):
             result = self.service.discover_llm_channel_models(
                 name="hermes",
                 protocol="openai",
@@ -931,17 +913,10 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertIn("[REDACTED]", rendered)
 
     def test_hermes_model_discovery_request_exception_redacts_response_and_logs(self) -> None:
-        class FakeSession:
-            def __init__(self) -> None:
-                self.trust_env = True
-
-            def get(self, *_args: Any, **_kwargs: Any) -> Any:
-                raise requests.RequestException("proxy saw saved-secret-token")
-
-            def close(self) -> None:
-                pass
-
-        with patch("src.services.system_config_service.requests.Session", side_effect=FakeSession), \
+        with patch(
+            "src.services.system_config_service.requests.get",
+            side_effect=requests.RequestException("proxy saw saved-secret-token"),
+        ), \
              self.assertLogs("src.services.system_config_service", level="WARNING") as logs:
             result = self.service.discover_llm_channel_models(
                 name="hermes",
@@ -1030,7 +1005,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         completion.assert_not_called()
 
     def test_hermes_masked_key_is_not_sent_for_model_discovery(self) -> None:
-        with patch("src.services.system_config_service.requests.Session") as session_cls:
+        with patch("src.services.system_config_service.requests.get") as requests_get:
             result = self.service.discover_llm_channel_models(
                 name="hermes",
                 protocol="openai",
@@ -1043,7 +1018,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertFalse(result["success"])
         self.assertEqual(result["error_code"], "runtime_secret_not_reusable")
         self.assertEqual(result["details"]["reason"], "runtime_secret_not_reusable")
-        session_cls.assert_not_called()
+        requests_get.assert_not_called()
 
     def test_hermes_saved_literal_masked_key_is_not_reused(self) -> None:
         self._rewrite_env(
@@ -1094,7 +1069,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
 
     def test_hermes_model_discovery_rejects_comma_api_key_before_outbound(self) -> None:
         raw_key = "key-a,key-b"
-        with patch("src.services.system_config_service.requests.Session") as session_cls:
+        with patch("src.services.system_config_service.requests.get") as requests_get:
             result = self.service.discover_llm_channel_models(
                 name="hermes",
                 protocol="openai",
@@ -1110,7 +1085,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertNotIn(raw_key, rendered)
         self.assertNotIn("key-a", rendered)
         self.assertNotIn("key-b", rendered)
-        session_cls.assert_not_called()
+        requests_get.assert_not_called()
 
     def test_hermes_unsupported_capabilities_are_skipped_without_probe(self) -> None:
         no_proxy_calls: List[Dict[str, Any]] = []

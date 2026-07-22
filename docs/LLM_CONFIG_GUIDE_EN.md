@@ -122,6 +122,8 @@ LITELLM_MODEL=ollama/qwen3:8b
 ```
 
 > **Important**: Ollama must be configured with `OLLAMA_API_BASE`. **Do not** use `OPENAI_BASE_URL`, or the system will concatenate URLs incorrectly (e.g. 404, `api/generate/api/show`). For remote Ollama, set `OLLAMA_API_BASE` to the actual address (e.g. `http://192.168.1.100:11434`). Current dependency constraint is `litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0` (matches requirements.txt).
+>
+> **Outbound security**: loopback and private destinations are denied by default. For local/private Ollama, also set the exact target in `.env`, for example `OUTBOUND_HTTP_ALLOWLIST=localhost:11434`; use `127.0.0.1:8642` for local Hermes. See [Outbound HTTP Security Policy](security-outbound-policy.md).
 
 > **Congratulations! If you're a beginner, you can stop reading here and run the program!**
 > Want to test the connection? Open your terminal in the root directory and run: `python scripts/check_env.py --llm`
@@ -324,6 +326,7 @@ LLM_CHANNELS=hermes
 LLM_HERMES_PROVIDER=custom
 LLM_HERMES_PROTOCOL=openai
 LLM_HERMES_BASE_URL=http://127.0.0.1:8642/v1
+OUTBOUND_HTTP_ALLOWLIST=127.0.0.1:8642
 LLM_HERMES_API_KEY=sk-local-hermes
 LLM_HERMES_MODELS=hermes-agent
 LITELLM_MODEL=openai/hermes-agent
