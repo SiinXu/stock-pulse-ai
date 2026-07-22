@@ -174,7 +174,6 @@
     {"path":"data_provider/base.py","scope":"<module>.DataFetcherManager._get_tickflow_fetcher","caught":["Exception"],"digest":"fc84e68e3c8b7149483903a0c6be01095bc39d87c011cfae84965d4d6cf89d76"},
     {"path":"data_provider/base.py","scope":"<module>.DataFetcherManager._run_with_timeout","caught":["Exception"],"digest":"538db9ce1278cd4e69330052c168d15d6aa9c152971a039148fd2cce100db6f7"},
     {"path":"data_provider/base.py","scope":"<module>.DataFetcherManager._run_with_timeout.runner","caught":["Exception"],"digest":"fd6365921bdf911df350251cd640b9baf549b218d57e9a7bb685bf056155d313"},
-    {"path":"data_provider/base.py","scope":"<module>.DataFetcherManager._try_fetcher_quote","caught":["Exception"],"digest":"ddbeb3a28b6ba128ac5b0cda1fe7c83f458107bf19aead4a3d54ca2dd7d828c5"},
     {"path":"data_provider/base.py","scope":"<module>.DataFetcherManager.close","caught":["Exception"],"digest":"d571dcb65de4afc3277d9127b99e41d05f205c6d22ba4fc5fe6d86a058eeb21c"},
     {"path":"data_provider/base.py","scope":"<module>.DataFetcherManager.get_belong_boards","caught":["Exception"],"digest":"a0212977c745c2a9832b26da982534cebb9b213c52bc4275729f0a3f81a4f940"},
     {"path":"data_provider/base.py","scope":"<module>.DataFetcherManager.prefetch_daily_klines","caught":["Exception"],"digest":"70eafe7b789b39a8b7675f3962033f773d4eb3e9bf19c1fee688c997acd453b0"},

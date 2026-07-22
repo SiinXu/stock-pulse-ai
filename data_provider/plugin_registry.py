@@ -155,6 +155,9 @@ class _RegisteredDataProviderAdapter(DataProvider):
     def allow_empty_daily_data(self) -> bool:
         return getattr(self._provider, "allow_empty_daily_data", False)
 
+    def _manager_call_identity(self) -> object:
+        return self._provider
+
     def get_daily_data(
         self,
         stock_code: str,

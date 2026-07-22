@@ -128,6 +128,10 @@ try eligible plugins only as tail fallbacks.
 The manager pins the factory-time runtime name for routing, health state, cache
 attribution, and diagnostics. Later mutation of the provider object's `name`
 cannot rename the active registration or impersonate a fixed built-in route.
+After a route selects an eligible provider-adapter snapshot, the current attempt
+calls that exact adapter. A concurrent disable, enable, or same-name replacement
+affects the next route selection and cannot rebind the current request to a
+provider with different market eligibility.
 Unload does not rewrite unexpired daily-cache entries or process-local health
 observations; they keep their existing TTL, stale, and reset semantics.
 

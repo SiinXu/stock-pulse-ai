@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import os
+from threading import Event, Thread
 from types import SimpleNamespace
 from typing import Callable
 from unittest.mock import patch
@@ -532,6 +533,32 @@ def test_unload_uses_captured_runtime_name_and_retains_call_guard() -> None:
     assert manager.available_fetchers == ["MutableFetcher", "FallbackFetcher"]
 
 
+def test_reenabled_plugin_reuses_call_guard_for_same_factory_instance() -> None:
+    fallback = _DailyProvider("FallbackFetcher", 50, _daily_frame())
+    shared_provider = _DailyProvider("SharedProvider", 10, _daily_frame())
+    manager = DataFetcherManager(fetchers=[fallback])
+    plugins = _plugin_manager(manager)
+    plugin = _ProviderPlugin(
+        "shared-provider-plugin",
+        _registration("shared-provider", lambda: shared_provider),
+        priority=10,
+    )
+    assert plugins.register(plugin, source="external").success is True
+    assert plugins.load(plugin.manifest.id).success is True
+    first_adapter = manager._get_fetcher_by_name("SharedProvider")
+    assert first_adapter is not None
+    first_guard = manager._get_fetcher_call_lock(first_adapter)
+
+    assert plugins.disable(plugin.manifest.id).success is True
+    assert manager.available_fetchers == ["FallbackFetcher"]
+    assert plugins.enable(plugin.manifest.id).success is True
+    second_adapter = manager._get_fetcher_by_name("SharedProvider")
+
+    assert second_adapter is not None
+    assert second_adapter is not first_adapter
+    assert manager._get_fetcher_call_lock(second_adapter) is first_guard
+
+
 def test_enabled_plugin_runtime_name_is_pinned_before_fixed_route_lookup() -> None:
     yfinance = _DailyProvider("YfinanceFetcher", 4, _daily_frame(20.0))
     plugin_provider = _DailyProvider("MutablePluginFetcher", 999, _daily_frame(30.0))
@@ -574,6 +601,100 @@ def test_enabled_plugin_runtime_name_is_pinned_before_fixed_route_lookup() -> No
     assert frame.iloc[-1]["close"] == 20.0
     assert yfinance.calls == 1
     assert plugin_provider.calls == 1
+
+
+def test_realtime_route_calls_selected_market_eligible_snapshot_after_reload() -> None:
+    fallback = _DailyProvider("FallbackFetcher", 50, _daily_frame())
+    us_provider = _DailyProvider("SharedRealtimeFetcher", 10, _daily_frame())
+    cn_provider = _DailyProvider("SharedRealtimeFetcher", 10, _daily_frame())
+    us_calls = 0
+    cn_calls = 0
+
+    def us_quote(stock_code: str) -> UnifiedRealtimeQuote:
+        nonlocal us_calls
+        us_calls += 1
+        return UnifiedRealtimeQuote(code=stock_code, name="US", price=11.0)
+
+    def cn_quote(stock_code: str) -> UnifiedRealtimeQuote:
+        nonlocal cn_calls
+        cn_calls += 1
+        return UnifiedRealtimeQuote(code=stock_code, name="CN", price=22.0)
+
+    us_provider.get_realtime_quote = us_quote  # type: ignore[method-assign]
+    cn_provider.get_realtime_quote = cn_quote  # type: ignore[method-assign]
+    manager = DataFetcherManager(fetchers=[fallback])
+    plugins = _plugin_manager(manager)
+    us_plugin = _ProviderPlugin(
+        "shared-realtime-us",
+        _registration(
+            "shared-realtime-us",
+            lambda: us_provider,
+            markets={"us"},
+            capabilities={"realtime_quote"},
+        ),
+        priority=10,
+    )
+    cn_plugin = _ProviderPlugin(
+        "shared-realtime-cn",
+        _registration(
+            "shared-realtime-cn",
+            lambda: cn_provider,
+            markets={"cn"},
+            capabilities={"realtime_quote"},
+        ),
+        priority=10,
+    )
+    for plugin in (us_plugin, cn_plugin):
+        assert plugins.register(plugin, source="external").success is True
+    assert plugins.load(us_plugin.manifest.id).success is True
+
+    selected = Event()
+    resume = Event()
+    route_result: dict[str, object] = {}
+    original_try_quote = manager._try_fetcher_quote
+
+    def delayed_try_quote(stock_code: str, fetcher_name: str, **kwargs):
+        selected.set()
+        assert resume.wait(timeout=2)
+        return original_try_quote(stock_code, fetcher_name, **kwargs)
+
+    def route_us_quote() -> None:
+        try:
+            route_result["value"] = manager._try_plugin_realtime_quote(
+                "AAPL",
+                "us",
+            )
+        except BaseException as exc:
+            route_result["error"] = exc
+
+    with patch.object(
+        manager,
+        "_try_fetcher_quote",
+        side_effect=delayed_try_quote,
+    ):
+        route_thread = Thread(target=route_us_quote)
+        route_thread.start()
+        try:
+            assert selected.wait(timeout=2)
+            assert plugins.disable(us_plugin.manifest.id).success is True
+            assert manager.available_fetchers == ["FallbackFetcher"]
+            assert plugins.load(cn_plugin.manifest.id).success is True
+            assert manager.available_fetchers == [
+                "SharedRealtimeFetcher",
+                "FallbackFetcher",
+            ]
+        finally:
+            resume.set()
+            route_thread.join(timeout=2)
+
+    assert route_thread.is_alive() is False
+    assert "error" not in route_result
+    quote, provider_name = route_result["value"]
+    assert quote is not None
+    assert quote.price == 11.0
+    assert provider_name == "SharedRealtimeFetcher"
+    assert us_calls == 1
+    assert cn_calls == 0
 
 
 def test_stock_list_plugin_enforces_market_before_call_and_result_acceptance() -> None:

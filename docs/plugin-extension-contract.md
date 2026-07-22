@@ -292,6 +292,10 @@ The manager pins the validated factory-time runtime name for routing, health,
 cache attribution, and diagnostics. Later mutation of the provider object's
 `name` cannot rename the active registration or impersonate a fixed built-in
 route.
+Once routing selects an eligible provider adapter snapshot, that attempt calls
+the exact selected adapter. A concurrent disable, enable, or same-name
+replacement affects the next route selection; it cannot rebind the current
+attempt to a provider with different market eligibility.
 
 Built-ins use stable IDs `efinance`, `tencent`, `akshare`, `tushare`, `tickflow`,
 `pytdx`, `baostock`, `yfinance`, `longbridge`, `finnhub`, and `alphavantage`.

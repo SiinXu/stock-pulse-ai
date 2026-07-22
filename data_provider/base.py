@@ -396,6 +396,11 @@ class DataProvider(ABC):
     priority: int = 99
     allow_empty_daily_data: bool = False
 
+    def _manager_call_identity(self) -> object:
+        """Return the mutable provider state serialized by the manager."""
+
+        return self
+
     @abstractmethod
     def get_daily_data(
         self,
@@ -1014,7 +1019,12 @@ class DataFetcherManager:
 
     def _get_fetcher_call_lock(self, fetcher: BaseFetcher) -> RLock:
         self._ensure_concurrency_guards()
-        fetcher_id = id(fetcher)
+        lock_owner = (
+            fetcher._manager_call_identity()
+            if isinstance(fetcher, DataProvider)
+            else fetcher
+        )
+        fetcher_id = id(lock_owner)
         with self._fetcher_call_locks_lock:
             lock = self._fetcher_call_locks.get(fetcher_id)
             if lock is None:
@@ -2659,7 +2669,11 @@ class DataFetcherManager:
             market=market,
             plugins_only=True,
         ):
-            quote = self._try_fetcher_quote(stock_code, fetcher.name)
+            quote = self._try_fetcher_quote(
+                stock_code,
+                fetcher.name,
+                _selected_fetcher=fetcher,
+            )
             if quote is not None:
                 return quote, fetcher.name
         return None, None
@@ -3044,9 +3058,26 @@ class DataFetcherManager:
             capability=capability,
         ) is not None
 
-    def _try_fetcher_quote(self, stock_code: str, fetcher_name: str, **kw):
+    def _try_fetcher_quote(
+        self,
+        stock_code: str,
+        fetcher_name: str,
+        *,
+        _selected_fetcher: Optional[DataProvider] = None,
+        **kw,
+    ):
         """Try to get a realtime quote from a named fetcher; returns quote or None."""
-        fetcher = self._get_fetcher_by_name(fetcher_name, capability="realtime_quote")
+        fetcher = _selected_fetcher
+        if fetcher is None:
+            fetcher = self._get_fetcher_by_name(
+                fetcher_name,
+                capability="realtime_quote",
+            )
+        elif not self._is_fetcher_available(
+            fetcher,
+            capability="realtime_quote",
+        ):
+            fetcher = None
         if fetcher is None or not hasattr(fetcher, 'get_realtime_quote'):
             record_provider_run(
                 data_type="realtime_quote",
@@ -3085,7 +3116,7 @@ class DataFetcherManager:
                 error_message="empty or incomplete quote",
                 record_count=0,
             )
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - diagnostics precede realtime fallback
             error_type, error_reason = summarize_exception(e)
             record_provider_run(
                 data_type="realtime_quote",
