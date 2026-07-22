@@ -11,9 +11,9 @@ integration is not yet wired.
 
 | Surface | Current authority | Track X delivery |
 | --- | --- | --- |
-| Plugin lifecycle, manifest, registry | `src/plugins/` core; native validators and startup not wired | #273 X2a core implemented |
+| Plugin lifecycle, manifest, registry | `src/plugins/` core; Data Provider native adapter wired, other points fail closed | #273 X2a core implemented |
 | Built-in/external startup wiring | `src/application_services.py` composition root | #273 X2b, only after GATE-P3 |
-| Data Providers | `BaseFetcher` and `DataFetcherManager` | #276 X3 |
+| Data Providers | `DataProvider`, `BaseFetcher`, and `DataFetcherManager` | #276 X3 implemented |
 | Analysis Strategies | `Skill`, `SkillManager`, `StrategyEngine` | Contract only in this batch |
 | Agent Tools | `ToolDefinition`, `ToolRegistry`, Tool Surface | Contract only; `src/agent/**` stays untouched |
 | Notification Channels | `NotificationChannel`, sender mixins, `NotificationService` | Contract only in this batch |
@@ -30,6 +30,13 @@ or import external code during application startup. A caller first uses
 plugins, then invokes `PluginManager.load(...)` or `load_all()` separately.
 Startup composition and its opt-in configuration remain X2b work behind
 GATE-P3.
+
+X3 exposes its configured unified registry as
+`DataFetcherManager.plugin_registry`. Programmatic composition may pass that
+exact registry to `PluginManager`; the provider manager and plugin manager must
+not be given separate registries. This makes dynamic registration available
+without claiming that external-directory startup is wired. Automatic built-in
+and opt-in external startup remains X2b work.
 
 Default extension-point contracts enforce canonical identity but reject every
 implementation until composition supplies that point's concrete validator.
@@ -255,6 +262,73 @@ provider ID, markets, and capabilities replace class-name-only capability
 inference for new plugins; existing providers retain their current names and
 behavior through compatibility adapters.
 
+Contract version 1 accepts the markets `cn`, `hk`, `us`, `jp`, `kr`, and `tw`.
+It accepts these capabilities, each of which requires the corresponding callable
+on the factory result:
+
+| Capability | Required method |
+| --- | --- |
+| `daily_data` | `get_daily_data` |
+| `realtime_quote` | `get_realtime_quote` |
+| `chip_distribution` | `get_chip_distribution` |
+| `stock_name` / `stock_list` | `get_stock_name` / `get_stock_list` |
+| `belong_boards` | `get_belong_board` |
+| `main_indices` / `market_stats` | `get_main_indices` / `get_market_stats` |
+| `sector_rankings` / `concept_rankings` | `get_sector_rankings` / `get_concept_rankings` |
+| `hot_stocks` / `limit_up_pool` | `get_hot_stocks` / `get_limit_up_pool` |
+
+Existing `prefetch_*` paths remain built-in manager optimizations and are not
+plugin capabilities in contract version 1.
+
+The factory runs during the X2 registration transaction. It must return a
+`DataProvider` with a non-empty runtime `name`; IDs and runtime names cannot
+collide with built-ins or another active plugin. A factory or validation failure
+fails that plugin load without modifying the manager route. Disabling the plugin
+removes only its exact provider instance, and the manager applies the new
+registration snapshot before its next route selection. Existing fresh/stale
+cache entries and process-local health observations keep their normal TTL/reset
+semantics; disabling a provider does not rewrite cached market data.
+The manager pins the validated factory-time runtime name for routing, health,
+cache attribution, and diagnostics. Later mutation of the provider object's
+`name` cannot rename the active registration or impersonate a fixed built-in
+route.
+Once routing selects an eligible provider adapter snapshot, that attempt calls
+the exact selected adapter. A concurrent disable, enable, or same-name
+replacement affects the next route selection; it cannot rebind the current
+attempt to a provider with different market eligibility.
+
+Built-ins use stable IDs `efinance`, `tencent`, `akshare`, `tushare`, `tickflow`,
+`pytdx`, `baostock`, `yfinance`, `longbridge`, `finnhub`, and `alphavantage`.
+Their existing runtime names, optional credential gates, constructor order, and
+instance-derived priorities remain unchanged. The legacy `fetchers=` constructor
+and `add_fetcher()` remain compatibility inputs, but plugins must use the unified
+registry so lifecycle ownership can be enforced.
+
+Minimal programmatic registration:
+
+```python
+manager = DataFetcherManager()
+plugins = PluginManager(
+    application_version=application_version,
+    registry=manager.plugin_registry,
+)
+
+class ExampleProviderPlugin(Plugin):
+    def onload(self, context: PluginContext) -> None:
+        registration = DataProviderRegistration(
+            provider_id="example-market-data",
+            factory=ExampleDataProvider,
+            markets=frozenset({"cn", "hk"}),
+            capabilities=frozenset({"daily_data"}),
+        )
+        context.register(
+            "data_provider",
+            registration.provider_id,
+            registration,
+            priority=20,
+        )
+```
+
 The provider factory supplies an implementation. `DataFetcherManager` remains
 the only routing authority. For daily data, fresh L1/L2 cache lookup wraps the
 provider route and may return before provider selection. On a miss, the manager
@@ -265,6 +339,14 @@ serialized provider call, records the attempt in `RunDiagnosticContext`, stores
 non-empty successes, and preserves stale last-good fallback only after the
 eligible provider chain fails. Plugins cannot supply their own fallback loop or
 bypass any of these policies.
+
+Lower plugin priority values run earlier only inside routes governed by numeric
+priority. Existing named routes remain hard anchors: U.S. index, U.S. stock, and
+Longbridge-preferred built-in chains execute in their historical order, and an
+eligible plugin is appended as fallback. Realtime market-specific and configured
+built-in routes follow the same rule. This prevents a plugin priority from
+silently rewriting an operator's fixed route while still providing dynamic
+fallback.
 
 [ADR-005](adr/ADR-005-provider-fallback-and-circuit-control.md) governs the
 capability-first static-priority and circuit anchors. PR #312's compatible

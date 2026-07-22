@@ -22,7 +22,7 @@ import time
 from threading import BoundedSemaphore, RLock, Thread, local
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, timezone
-from typing import Callable, Optional, List, Tuple, Dict, Any
+from typing import TYPE_CHECKING, Callable, Optional, List, Tuple, Dict, Any
 
 import pandas as pd
 import numpy as np
@@ -35,6 +35,10 @@ from .daily_cache import DailyCacheKey, DailyCacheLookup, DailyCacheRead, DailyD
 from .fundamental_adapter import AkshareFundamentalAdapter
 from .yfinance_fundamental_adapter import YfinanceFundamentalAdapter
 from .realtime_types import CircuitBreaker, UnifiedRealtimeQuote
+
+if TYPE_CHECKING:
+    from src.plugins import ExtensionRegistry
+    from .plugin_registry import _ActiveDataProvider
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -385,7 +389,30 @@ class CircuitOpenError(DataSourceUnavailableError):
     pass
 
 
-class BaseFetcher(ABC):
+class DataProvider(ABC):
+    """Stable daily-market-data interface implemented by provider plugins."""
+
+    name: str = "DataProvider"
+    priority: int = 99
+    allow_empty_daily_data: bool = False
+
+    def _manager_call_identity(self) -> object:
+        """Return the mutable provider state serialized by the manager."""
+
+        return self
+
+    @abstractmethod
+    def get_daily_data(
+        self,
+        stock_code: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        days: int = 30,
+    ) -> pd.DataFrame:
+        """Return normalized daily data for one stock code."""
+
+
+class BaseFetcher(DataProvider):
     """
     数据源抽象基类
     
@@ -689,6 +716,20 @@ class DataFetcherManager:
         "FinnhubFetcher": {"us"},
         "AlphaVantageFetcher": {"us"},
     }
+    _BUILTIN_DATA_PROVIDER_IDS = {
+        "EfinanceFetcher": "efinance",
+        "TencentFetcher": "tencent",
+        "AkshareFetcher": "akshare",
+        "TushareFetcher": "tushare",
+        "TickFlowFetcher": "tickflow",
+        "PytdxFetcher": "pytdx",
+        "BaostockFetcher": "baostock",
+        "YfinanceFetcher": "yfinance",
+        "LongbridgeFetcher": "longbridge",
+        "FinnhubFetcher": "finnhub",
+        "AlphaVantageFetcher": "alphavantage",
+    }
+    _BUILTIN_DATA_PROVIDER_PLUGIN_ID = "stockpulse.builtin.data-providers"
     _DAILY_MARKETS = frozenset({"cn", "hk", "us", "jp", "kr", "tw"})
     _daily_source_health = CircuitBreaker(
         failure_threshold=_PROVIDER_CIRCUIT_FAILURE_THRESHOLD_DEFAULT,
@@ -702,7 +743,7 @@ class DataFetcherManager:
     _concept_rankings_cache_lock = RLock()
     _concept_rankings_cache: Dict[int, Tuple[float, List[Dict], List[Dict]]] = {}
 
-    def __init__(self, fetchers: Optional[List[BaseFetcher]] = None):
+    def __init__(self, fetchers: Optional[List[DataProvider]] = None):
         """
         初始化管理器
         
@@ -711,19 +752,37 @@ class DataFetcherManager:
         """
         self._configure_daily_source_health()
         self._configure_daily_adaptive_priority()
-        self._fetchers: List[BaseFetcher] = []
+        from .plugin_registry import _DataProviderPluginRuntime
+
+        self._fetchers: List[DataProvider] = []
         self._fetchers_lock = RLock()
-        self._fetchers_by_name: Dict[str, BaseFetcher] = {}
+        self._fetchers_by_name: Dict[str, DataProvider] = {}
         self._fetcher_call_locks: Dict[int, RLock] = {}
         self._fetcher_call_locks_lock = RLock()
+        self._data_provider_runtime = _DataProviderPluginRuntime(
+            self._BUILTIN_DATA_PROVIDER_IDS
+        )
+        self._registered_fetchers: Dict[str, DataProvider] = {}
+        self._provider_registrations: Dict[int, "_ActiveDataProvider"] = {}
+        self._provider_priorities: Dict[int, int] = {}
+        self._fetcher_static_order: Dict[int, int] = {}
+        self._next_fetcher_static_order = 0
+        self._builtin_provider_handles = []
         self._stock_name_cache: Dict[str, str] = {}
         self._stock_name_cache_lock = RLock()
         self._daily_data_cache: Optional[DailyDataCache] = None
         
         if fetchers:
-            # Sort by priority.
-            self._fetchers = sorted(fetchers, key=lambda f: f.priority)
-            self._refresh_fetcher_indexes_locked()
+            # Preserve compatibility-input names and historical priority order.
+            self._data_provider_runtime.reserve_provider_names(
+                fetcher.name for fetcher in fetchers
+            )
+            with self._fetchers_lock:
+                self._fetchers = list(fetchers)
+                for fetcher in self._fetchers:
+                    self._assign_fetcher_static_order_locked(fetcher)
+                self._sort_fetchers_locked()
+                self._refresh_fetcher_indexes_locked()
         else:
             # Default data source will be lazily loaded on first use
             self._init_default_fetchers()
@@ -739,6 +798,8 @@ class DataFetcherManager:
 
     def _ensure_concurrency_guards(self) -> None:
         """Lazily initialize thread-safety primitives for test scaffolds using __new__."""
+        if not hasattr(self, "_fetchers") or self._fetchers is None:
+            self._fetchers = []
         if not hasattr(self, "_fetchers_lock") or self._fetchers_lock is None:
             self._fetchers_lock = RLock()
         if not hasattr(self, "_fetchers_by_name") or self._fetchers_by_name is None:
@@ -747,6 +808,20 @@ class DataFetcherManager:
             self._fetcher_call_locks = {}
         if not hasattr(self, "_fetcher_call_locks_lock") or self._fetcher_call_locks_lock is None:
             self._fetcher_call_locks_lock = RLock()
+        if not hasattr(self, "_data_provider_runtime"):
+            self._data_provider_runtime = None
+        if not hasattr(self, "_registered_fetchers") or self._registered_fetchers is None:
+            self._registered_fetchers = {}
+        if not hasattr(self, "_provider_registrations") or self._provider_registrations is None:
+            self._provider_registrations = {}
+        if not hasattr(self, "_provider_priorities") or self._provider_priorities is None:
+            self._provider_priorities = {}
+        if not hasattr(self, "_fetcher_static_order") or self._fetcher_static_order is None:
+            self._fetcher_static_order = {}
+        if not hasattr(self, "_next_fetcher_static_order"):
+            self._next_fetcher_static_order = 0
+        if not hasattr(self, "_builtin_provider_handles"):
+            self._builtin_provider_handles = []
         if not hasattr(self, "_stock_name_cache") or self._stock_name_cache is None:
             self._stock_name_cache = {}
         if not hasattr(self, "_stock_name_cache_lock") or self._stock_name_cache_lock is None:
@@ -758,22 +833,151 @@ class DataFetcherManager:
         if not hasattr(self, "_daily_adaptive_priority_min_samples"):
             self._daily_adaptive_priority_min_samples = _PROVIDER_ADAPTIVE_PRIORITY_MIN_SAMPLES_DEFAULT
 
-    def _get_fetchers_snapshot(self) -> List[BaseFetcher]:
+    @property
+    def plugin_registry(self) -> "ExtensionRegistry":
+        """Return the manager-owned X2 registry used by provider plugins."""
+
         self._ensure_concurrency_guards()
+        if self._data_provider_runtime is None:
+            from .plugin_registry import _DataProviderPluginRuntime
+
+            self._data_provider_runtime = _DataProviderPluginRuntime(
+                self._BUILTIN_DATA_PROVIDER_IDS
+            )
+            self._data_provider_runtime.reserve_provider_names(
+                fetcher.name for fetcher in getattr(self, "_fetchers", [])
+            )
+        return self._data_provider_runtime.registry
+
+    def _assign_fetcher_static_order_locked(self, fetcher: DataProvider) -> None:
+        fetcher_key = id(fetcher)
+        if fetcher_key in self._fetcher_static_order:
+            return
+        self._fetcher_static_order[fetcher_key] = self._next_fetcher_static_order
+        self._next_fetcher_static_order += 1
+
+    def _provider_priority(self, fetcher: DataProvider) -> int:
+        return self._provider_priorities.get(id(fetcher), fetcher.priority)
+
+    def _sort_fetchers_locked(self) -> None:
+        self._fetchers.sort(
+            key=lambda fetcher: (
+                self._provider_priority(fetcher),
+                self._fetcher_static_order.get(id(fetcher), 0),
+            )
+        )
+
+    def _remove_registered_fetcher_locked(self, fetcher: DataProvider) -> None:
+        self._fetchers = [item for item in self._fetchers if item is not fetcher]
+        fetcher_key = id(fetcher)
+        self._provider_registrations.pop(fetcher_key, None)
+        self._provider_priorities.pop(fetcher_key, None)
+        self._fetcher_static_order.pop(fetcher_key, None)
+        # A caller may still hold a pre-unload provider snapshot. Retaining the
+        # manager-owned guard keeps those late calls serialized on the same lock.
+
+    def _sync_registered_data_providers(self) -> None:
+        runtime = getattr(self, "_data_provider_runtime", None)
+        if runtime is None:
+            return
+        while True:
+            generation, active = runtime.active_provider_snapshot()
+            active_by_id = {
+                item.extension.registration_id: item
+                for item in active
+            }
+            with self._fetchers_lock:
+                for registration_id, fetcher in tuple(
+                    self._registered_fetchers.items()
+                ):
+                    current = active_by_id.get(registration_id)
+                    if current is None or current.provider is not fetcher:
+                        self._remove_registered_fetcher_locked(fetcher)
+                        del self._registered_fetchers[registration_id]
+
+                for item in active:
+                    registration_id = item.extension.registration_id
+                    fetcher = item.provider
+                    if self._registered_fetchers.get(registration_id) is not fetcher:
+                        self._registered_fetchers[registration_id] = fetcher
+                        self._fetchers.append(fetcher)
+                        self._assign_fetcher_static_order_locked(fetcher)
+                    fetcher_key = id(fetcher)
+                    self._provider_registrations[fetcher_key] = item
+                    self._provider_priorities[fetcher_key] = item.extension.priority
+
+                self._sort_fetchers_locked()
+                self._refresh_fetcher_indexes_locked()
+            if runtime.generation == generation:
+                return
+
+    def _get_fetchers_snapshot(self) -> List[DataProvider]:
+        self._ensure_concurrency_guards()
+        self._sync_registered_data_providers()
         with self._fetchers_lock:
             return list(getattr(self, "_fetchers", []))
+
+    def _provider_supports_capability(
+        self,
+        fetcher: DataProvider,
+        capability: str,
+        market: Optional[str] = None,
+    ) -> bool:
+        active = self._provider_registrations.get(id(fetcher))
+        if (
+            active is None
+            or active.extension.plugin_id
+            == self._BUILTIN_DATA_PROVIDER_PLUGIN_ID
+        ):
+            return True
+        return (
+            capability in active.registration.capabilities
+            and (market is None or market in active.registration.markets)
+        )
+
+    def _get_fetchers_for_capability(
+        self,
+        capability: str,
+        *,
+        market: Optional[str] = None,
+        plugins_only: bool = False,
+    ) -> List[DataProvider]:
+        fetchers = self._get_fetchers_snapshot()
+        selected: List[DataProvider] = []
+        for fetcher in fetchers:
+            active = self._provider_registrations.get(id(fetcher))
+            is_plugin = (
+                active is not None
+                and active.extension.plugin_id
+                != self._BUILTIN_DATA_PROVIDER_PLUGIN_ID
+            )
+            if plugins_only and not is_plugin:
+                continue
+            if self._provider_supports_capability(
+                fetcher,
+                capability,
+                market,
+            ):
+                selected.append(fetcher)
+        return selected
 
     def _refresh_fetcher_indexes_locked(self) -> None:
         self._fetchers_by_name = {fetcher.name: fetcher for fetcher in self._fetchers}
 
-    def _get_fetcher_by_name(self, fetcher_name: str, capability: str = "") -> Optional[BaseFetcher]:
+    def _get_fetcher_by_name(self, fetcher_name: str, capability: str = "") -> Optional[DataProvider]:
         self._ensure_concurrency_guards()
+        self._sync_registered_data_providers()
         with self._fetchers_lock:
             fetcher = self._fetchers_by_name.get(fetcher_name)
             if fetcher is None and self._fetchers:
                 self._refresh_fetcher_indexes_locked()
                 fetcher = self._fetchers_by_name.get(fetcher_name)
         if fetcher is None:
+            return None
+        if capability and not self._provider_supports_capability(
+            fetcher,
+            capability,
+        ):
             return None
         if not self._is_fetcher_available(fetcher, capability=capability):
             return None
@@ -815,7 +1019,12 @@ class DataFetcherManager:
 
     def _get_fetcher_call_lock(self, fetcher: BaseFetcher) -> RLock:
         self._ensure_concurrency_guards()
-        fetcher_id = id(fetcher)
+        lock_owner = (
+            fetcher._manager_call_identity()
+            if isinstance(fetcher, DataProvider)
+            else fetcher
+        )
+        fetcher_id = id(lock_owner)
         with self._fetcher_call_locks_lock:
             lock = self._fetcher_call_locks.get(fetcher_id)
             if lock is None:
@@ -876,18 +1085,27 @@ class DataFetcherManager:
                 )
             return result
 
-    @classmethod
     def _filter_daily_fetchers_for_market(
-        cls,
-        fetchers: List[BaseFetcher],
+        self,
+        fetchers: List[DataProvider],
         market: str,
-    ) -> List[BaseFetcher]:
-        """Skip built-in daily fetchers that are known not to support a market."""
+    ) -> List[DataProvider]:
+        """Apply plugin declarations without changing built-in CN eligibility."""
 
-        kept: List[BaseFetcher] = []
+        kept: List[DataProvider] = []
         skipped: List[str] = []
         for fetcher in fetchers:
-            supported = cls._DAILY_MARKET_FETCHER_SUPPORT.get(fetcher.name)
+            active = self._provider_registrations.get(id(fetcher))
+            if (
+                active is not None
+                and active.extension.plugin_id
+                != self._BUILTIN_DATA_PROVIDER_PLUGIN_ID
+            ):
+                supported = active.registration.markets
+            elif market != "cn":
+                supported = self._DAILY_MARKET_FETCHER_SUPPORT.get(fetcher.name)
+            else:
+                supported = None
             if supported is not None and market not in supported:
                 skipped.append(fetcher.name)
             else:
@@ -901,18 +1119,22 @@ class DataFetcherManager:
             )
         return kept
 
-    @classmethod
     def _filter_fetchers_by_capability(
-        cls,
-        fetchers: List[BaseFetcher],
+        self,
+        fetchers: List[DataProvider],
         capability: str,
-    ) -> List[BaseFetcher]:
+    ) -> List[DataProvider]:
         """Skip request-time unavailable fetchers before entering route-specific loops."""
-        kept: List[BaseFetcher] = []
+        kept: List[DataProvider] = []
         skipped: List[str] = []
 
         for fetcher in fetchers:
-            if cls._is_fetcher_available(fetcher, capability=capability):
+            active = self._provider_registrations.get(id(fetcher))
+            declared = (
+                active is None
+                or capability in active.registration.capabilities
+            )
+            if declared and self._is_fetcher_available(fetcher, capability=capability):
                 kept.append(fetcher)
             else:
                 skipped.append(fetcher.name)
@@ -996,9 +1218,9 @@ class DataFetcherManager:
 
     def _order_daily_fetchers(
         self,
-        fetchers: List[BaseFetcher],
+        fetchers: List[DataProvider],
         market: str,
-    ) -> List[BaseFetcher]:
+    ) -> List[DataProvider]:
         """Adapt contiguous eligible peers without crossing static or health anchors."""
         self._ensure_concurrency_guards()
         static_order = list(fetchers)
@@ -1042,7 +1264,8 @@ class DataFetcherManager:
 
             if (
                 run_positions
-                and static_order[run_positions[-1]].priority != fetcher.priority
+                and self._provider_priority(static_order[run_positions[-1]])
+                != self._provider_priority(fetcher)
             ):
                 rank_run()
             run_positions.append(position)
@@ -1053,7 +1276,7 @@ class DataFetcherManager:
             health_summary = [
                 {
                     "provider": sanitize_diagnostic_text(fetcher.name, max_length=120),
-                    "priority": fetcher.priority,
+                    "priority": self._provider_priority(fetcher),
                     "sample_count": snapshots[index]["sample_count"],
                     "success_rate": snapshots[index]["success_rate"],
                     "average_latency_ms": snapshots[index]["average_latency_ms"],
@@ -1222,13 +1445,26 @@ class DataFetcherManager:
             if market_filter and source_market != market_filter:
                 continue
             fetcher = fetchers_by_name.get(provider_name)
-            supported_markets = self._DAILY_MARKET_FETCHER_SUPPORT.get(provider_name)
+            active = (
+                None
+                if fetcher is None
+                else self._provider_registrations.get(id(fetcher))
+            )
+            supported_markets = (
+                active.registration.markets
+                if active is not None
+                else self._DAILY_MARKET_FETCHER_SUPPORT.get(provider_name)
+            )
             providers.append(
                 {
                     "data_type": "daily_data",
                     "market": source_market,
                     "provider": sanitize_diagnostic_text(provider_name, max_length=120),
-                    "static_priority": getattr(fetcher, "priority", None),
+                    "static_priority": (
+                        None
+                        if fetcher is None
+                        else self._provider_priority(fetcher)
+                    ),
                     "supported_markets": (
                         sorted(supported_markets)
                         if supported_markets is not None
@@ -1692,6 +1928,30 @@ class DataFetcherManager:
             return [{"name": board_name}]
         return []
     
+    def _register_builtin_data_provider(self, fetcher: object) -> None:
+        from .plugin_registry import (
+            DataProviderRegistration,
+            _adapt_builtin_provider,
+        )
+
+        provider = _adapt_builtin_provider(fetcher)
+        provider_id = self._BUILTIN_DATA_PROVIDER_IDS.get(provider.name)
+        supported_markets = self._DAILY_MARKET_FETCHER_SUPPORT.get(provider.name)
+        if provider_id is None or supported_markets is None:
+            raise ValueError("built-in data provider identity is not configured")
+        registration = DataProviderRegistration(
+            provider_id=provider_id,
+            factory=lambda provider=provider: provider,
+            markets=supported_markets,
+            capabilities={"daily_data"},
+        )
+        handle = self._data_provider_runtime.register_builtin(
+            registration=registration,
+            priority=provider.priority,
+            plugin_id=self._BUILTIN_DATA_PROVIDER_PLUGIN_ID,
+        )
+        self._builtin_provider_handles.append(handle)
+
     def _init_default_fetchers(self) -> None:
         """
         初始化默认数据源列表
@@ -1766,33 +2026,34 @@ class DataFetcherManager:
         else:
             logger.debug("[数据源初始化] 跳过未配置的 AlphaVantageFetcher")
 
-        # Initialize the data source list
-        self._ensure_concurrency_guards()
-        with self._fetchers_lock:
-            self._fetchers = [
-                efinance,
-                tencent,
-                akshare,
-                pytdx,
-                baostock,
-                yfinance,
-                *optional_fetchers,
-            ]
+        for fetcher in (
+            efinance,
+            tencent,
+            akshare,
+            pytdx,
+            baostock,
+            yfinance,
+            *optional_fetchers,
+        ):
+            self._register_builtin_data_provider(fetcher)
+        self._sync_registered_data_providers()
 
-            # Sort by priority (Tushare's priority is 0 if a Token is configured and initialized successfully).
-            self._fetchers.sort(key=lambda f: f.priority)
-            self._refresh_fetcher_indexes_locked()
-
-        # Build priority instructions
-        priority_info = ", ".join([f"{f.name}(P{f.priority})" for f in self._get_fetchers_snapshot()])
+        # Build the priority summary from the synchronized registry snapshot.
+        priority_info = ", ".join(
+            f"{fetcher.name}(P{self._provider_priority(fetcher)})"
+            for fetcher in self._get_fetchers_snapshot()
+        )
         logger.info(f"已初始化 {len(self._fetchers)} 个数据源（按优先级）: {priority_info}")
     
-    def add_fetcher(self, fetcher: BaseFetcher) -> None:
+    def add_fetcher(self, fetcher: DataProvider) -> None:
         """添加数据源并重新排序"""
         self._ensure_concurrency_guards()
+        if self._data_provider_runtime is not None:
+            self._data_provider_runtime.reserve_provider_names((fetcher.name,))
         with self._fetchers_lock:
             self._fetchers.append(fetcher)
-            self._fetchers.sort(key=lambda f: f.priority)
+            self._assign_fetcher_static_order_locked(fetcher)
+            self._sort_fetchers_locked()
             self._refresh_fetcher_indexes_locked()
     
     def get_daily_data(
@@ -1852,8 +2113,7 @@ class DataFetcherManager:
         is_kr = (not is_us) and (not is_hk) and _is_kr_market(stock_code)
         is_tw = (not is_us) and (not is_hk) and _is_tw_market(stock_code)
         market = "us" if is_us else "hk" if is_hk else "jp" if is_jp else "kr" if is_kr else "tw" if is_tw else "cn"
-        if market != "cn":
-            fetchers = self._filter_daily_fetchers_for_market(fetchers, market)
+        fetchers = self._filter_daily_fetchers_for_market(fetchers, market)
         fetchers = self._filter_fetchers_by_capability(fetchers, capability="daily_data")
         if not is_us:
             fetchers = self._order_daily_fetchers(fetchers, market)
@@ -1886,6 +2146,17 @@ class DataFetcherManager:
                 source_order = ["LongbridgeFetcher", "FinnhubFetcher", "AlphaVantageFetcher", "YfinanceFetcher"]
             else:
                 source_order = ["FinnhubFetcher", "AlphaVantageFetcher", "YfinanceFetcher", "LongbridgeFetcher"]
+            source_order.extend(
+                fetcher.name
+                for fetcher in fetchers
+                if (
+                    fetcher.name not in source_order
+                    and (active := self._provider_registrations.get(id(fetcher)))
+                    is not None
+                    and active.extension.plugin_id
+                    != self._BUILTIN_DATA_PROVIDER_PLUGIN_ID
+                )
+            )
             market_label = "美股指数" if is_us_index else "美股"
 
             for order_index, src_name in enumerate(source_order):
@@ -2385,6 +2656,27 @@ class DataFetcherManager:
         setattr(quote, "stale_seconds", stale_seconds)
         setattr(quote, "is_stale", stale_seconds > int(ttl))
         return quote
+
+    def _try_plugin_realtime_quote(
+        self,
+        stock_code: str,
+        market: str,
+    ) -> Tuple[Optional[UnifiedRealtimeQuote], Optional[str]]:
+        """Try declared plugin providers after the frozen built-in route."""
+
+        for fetcher in self._get_fetchers_for_capability(
+            "realtime_quote",
+            market=market,
+            plugins_only=True,
+        ):
+            quote = self._try_fetcher_quote(
+                stock_code,
+                fetcher.name,
+                _selected_fetcher=fetcher,
+            )
+            if quote is not None:
+                return quote, fetcher.name
+        return None, None
     
     def get_realtime_quote(self, stock_code: str, *, log_final_failure: bool = True):
         """
@@ -2443,6 +2735,24 @@ class DataFetcherManager:
                     quote,
                     realtime_cache_ttl=getattr(config, "realtime_cache_ttl", None),
                 )
+            market = "jp" if is_jp else "kr" if is_kr else "tw"
+            quote, plugin_name = self._try_plugin_realtime_quote(
+                stock_code,
+                market,
+            )
+            if quote is not None:
+                logger.info(
+                    "Realtime quote plugin fallback succeeded "
+                    "market=%s symbol=%s provider=%s",
+                    market,
+                    stock_code,
+                    plugin_name,
+                )
+                return self._enrich_realtime_quote(
+                    quote,
+                    fallback_from="yfinance",
+                    realtime_cache_ttl=getattr(config, "realtime_cache_ttl", None),
+                )
             if log_final_failure:
                 logger.info(f"[实时行情] {market_label} {stock_code} 无可用数据源")
             return None
@@ -2480,6 +2790,24 @@ class DataFetcherManager:
                 return self._enrich_realtime_quote(
                     primary_quote,
                     fallback_from=fallback_from,
+                    realtime_cache_ttl=getattr(config, "realtime_cache_ttl", None),
+                )
+            market = "us" if is_us else "hk"
+            plugin_quote, plugin_name = self._try_plugin_realtime_quote(
+                stock_code,
+                market,
+            )
+            if plugin_quote is not None:
+                logger.info(
+                    "Realtime quote plugin fallback succeeded "
+                    "market=%s symbol=%s provider=%s",
+                    market,
+                    stock_code,
+                    plugin_name,
+                )
+                return self._enrich_realtime_quote(
+                    plugin_quote,
+                    fallback_from=primary_token,
                     realtime_cache_ttl=getattr(config, "realtime_cache_ttl", None),
                 )
             if log_final_failure:
@@ -2621,7 +2949,7 @@ class DataFetcherManager:
                     if primary_quote is None:
                         failed_sources.append(source)
                     
-            except Exception as e:
+            except Exception as e:  # broad-exception: fallback_recorded - diagnostics precede realtime fallback
                 error_msg = f"[{source}] 失败: {str(e)}"
                 error_type, error_reason = summarize_exception(e)
                 record_provider_run(
@@ -2655,6 +2983,23 @@ class DataFetcherManager:
             return self._enrich_realtime_quote(
                 primary_quote,
                 fallback_from=primary_fallback_from,
+                realtime_cache_ttl=getattr(config, "realtime_cache_ttl", None),
+            )
+
+        plugin_quote, plugin_name = self._try_plugin_realtime_quote(
+            stock_code,
+            "cn",
+        )
+        if plugin_quote is not None:
+            logger.info(
+                "Realtime quote plugin fallback succeeded "
+                "market=cn symbol=%s provider=%s",
+                stock_code,
+                plugin_name,
+            )
+            return self._enrich_realtime_quote(
+                plugin_quote,
+                fallback_from=failed_sources[0] if failed_sources else None,
                 realtime_cache_ttl=getattr(config, "realtime_cache_ttl", None),
             )
 
@@ -2713,9 +3058,26 @@ class DataFetcherManager:
             capability=capability,
         ) is not None
 
-    def _try_fetcher_quote(self, stock_code: str, fetcher_name: str, **kw):
+    def _try_fetcher_quote(
+        self,
+        stock_code: str,
+        fetcher_name: str,
+        *,
+        _selected_fetcher: Optional[DataProvider] = None,
+        **kw,
+    ):
         """Try to get a realtime quote from a named fetcher; returns quote or None."""
-        fetcher = self._get_fetcher_by_name(fetcher_name, capability="realtime_quote")
+        fetcher = _selected_fetcher
+        if fetcher is None:
+            fetcher = self._get_fetcher_by_name(
+                fetcher_name,
+                capability="realtime_quote",
+            )
+        elif not self._is_fetcher_available(
+            fetcher,
+            capability="realtime_quote",
+        ):
+            fetcher = None
         if fetcher is None or not hasattr(fetcher, 'get_realtime_quote'):
             record_provider_run(
                 data_type="realtime_quote",
@@ -2754,7 +3116,7 @@ class DataFetcherManager:
                 error_message="empty or incomplete quote",
                 record_count=0,
             )
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - diagnostics precede realtime fallback
             error_type, error_reason = summarize_exception(e)
             record_provider_run(
                 data_type="realtime_quote",
@@ -2796,7 +3158,7 @@ class DataFetcherManager:
                     filled = self._merge_quote_fields(primary_quote, secondary)
                     if filled:
                         logger.info(f"[实时行情] {stock_code} 从 {fetcher_name} 补充了: {filled}")
-            except Exception as e:
+            except Exception as e:  # broad-exception: fallback_recorded - safe log preserves the primary quote
                 log_safe_exception(
                     logger,
                     "Realtime quote supplement failed",
@@ -2852,8 +3214,11 @@ class DataFetcherManager:
         circuit_breaker = get_chip_circuit_breaker()
 
         candidate_fetchers = []
-        # Iterate through data sources listed in priority order by the manager
-        for fetcher in self._get_fetchers_snapshot():
+        # Iterate through the manager's capability-filtered priority order.
+        for fetcher in self._get_fetchers_for_capability(
+            "chip_distribution",
+            market=_market_tag(stock_code),
+        ):
             # Use only data sources that implement chip-distribution logic.
             if not hasattr(fetcher, 'get_chip_distribution'):
                 continue
@@ -2915,7 +3280,7 @@ class DataFetcherManager:
                         )
                     # Empty result or placeholder: Release HALF_OPEN probe slot, avoid getting stuck.
                     circuit_breaker.record_inconclusive(source_key)
-            except Exception as e:
+            except Exception as e:  # broad-exception: fallback_recorded - diagnostics precede chip fallback
                 error_type, error_reason = summarize_exception(e)
                 record_provider_run(
                     data_type="chip",
@@ -2993,10 +3358,19 @@ class DataFetcherManager:
         from .akshare_fetcher import _is_us_code
         is_us = _is_us_code(stock_code)
         _US_CAPABLE_FETCHERS = {"YfinanceFetcher", "LongbridgeFetcher", "FinnhubFetcher", "AlphaVantageFetcher"}
-        for fetcher in self._get_fetchers_snapshot():
+        for fetcher in self._get_fetchers_for_capability(
+            "stock_name",
+            market=_market_tag(stock_code),
+        ):
             if not hasattr(fetcher, 'get_stock_name'):
                 continue
-            if is_us and fetcher.name not in _US_CAPABLE_FETCHERS:
+            active = self._provider_registrations.get(id(fetcher))
+            is_plugin = (
+                active is not None
+                and active.extension.plugin_id
+                != self._BUILTIN_DATA_PROVIDER_PLUGIN_ID
+            )
+            if is_us and fetcher.name not in _US_CAPABLE_FETCHERS and not is_plugin:
                 continue
             if not self._is_fetcher_available(fetcher, capability="stock_name"):
                 continue
@@ -3006,7 +3380,7 @@ class DataFetcherManager:
                     self._cache_stock_name(stock_code, name)
                     logger.info(f"[股票名称] 从 {fetcher.name} 获取: {stock_code} -> {name}")
                     return name
-            except Exception as e:
+            except Exception as e:  # broad-exception: fallback_recorded - safe log precedes stock-name fallback
                 log_safe_exception(
                     logger,
                     "Data provider stock name lookup failed",
@@ -3032,7 +3406,10 @@ class DataFetcherManager:
             return []
         candidate_fetchers = [
             fetcher
-            for fetcher in self._fetchers
+            for fetcher in self._get_fetchers_for_capability(
+                "belong_boards",
+                market="cn",
+            )
             if hasattr(fetcher, "get_belong_board")
         ]
         for index, fetcher in enumerate(candidate_fetchers):
@@ -3145,9 +3522,22 @@ class DataFetcherManager:
         if not missing_codes:
             return result
         
-        # 2. Attempt to batch get stock list
-        for fetcher in self._get_fetchers_snapshot():
+        # 2. Attempt to fetch stock lists in capability-filtered priority order.
+        for fetcher in self._get_fetchers_for_capability("stock_list"):
             if not hasattr(fetcher, 'get_stock_list') or not missing_codes:
+                continue
+            missing_markets = {
+                _market_tag(normalize_stock_code(str(code)))
+                for code in missing_codes
+            }
+            if not any(
+                self._provider_supports_capability(
+                    fetcher,
+                    "stock_list",
+                    market,
+                )
+                for market in missing_markets
+            ):
                 continue
             if not self._is_fetcher_available(fetcher, capability="stock_list"):
                 continue
@@ -3159,6 +3549,15 @@ class DataFetcherManager:
                         code = row.get('code')
                         name = row.get('name')
                         if code and name:
+                            result_market = _market_tag(
+                                normalize_stock_code(str(code))
+                            )
+                            if not self._provider_supports_capability(
+                                fetcher,
+                                "stock_list",
+                                result_market,
+                            ):
+                                continue
                             cache_updates[code] = name
                             if code in missing_codes:
                                 result[code] = name
@@ -3172,7 +3571,7 @@ class DataFetcherManager:
                         break
                     
                     logger.info(f"[股票名称] 从 {fetcher.name} 批量获取完成，剩余 {len(missing_codes)} 个待查")
-            except Exception as e:
+            except Exception as e:  # broad-exception: fallback_recorded - safe log precedes bulk-name fallback
                 log_safe_exception(
                     logger,
                     "Data provider bulk stock name lookup failed",
@@ -3203,7 +3602,7 @@ class DataFetcherManager:
                     if data:
                         logger.info("[TickFlowFetcher] 获取指数行情成功")
                         return data
-                except Exception as e:
+                except Exception as e:  # broad-exception: fallback_recorded - safe log precedes built-in index fallback
                     log_safe_exception(
                         logger,
                         "TickFlow market indices fetch failed",
@@ -3213,7 +3612,10 @@ class DataFetcherManager:
                         context={"market": region},
                     )
 
-        for fetcher in self._fetchers:
+        for fetcher in self._get_fetchers_for_capability(
+            "main_indices",
+            market=region if region in self._DAILY_MARKETS else None,
+        ):
             if region == "cn" and fetcher.name == "TickFlowFetcher":
                 continue
             try:
@@ -3221,7 +3623,7 @@ class DataFetcherManager:
                 if data:
                     logger.info(f"[{fetcher.name}] 获取指数行情成功")
                     return data
-            except Exception as e:
+            except Exception as e:  # broad-exception: fallback_recorded - safe log precedes index fallback
                 log_safe_exception(
                     logger,
                     "Data provider market indices fetch failed",
@@ -3256,7 +3658,7 @@ class DataFetcherManager:
                     purpose,
                     elapsed,
                 )
-            except Exception as e:
+            except Exception as e:  # broad-exception: fallback_recorded - safe log precedes market-stats fallback
                 log_safe_exception(
                     logger,
                     "TickFlow market statistics fetch failed",
@@ -3266,7 +3668,10 @@ class DataFetcherManager:
                     context={"purpose": purpose},
                 )
 
-        for fetcher in self._fetchers:
+        for fetcher in self._get_fetchers_for_capability(
+            "market_stats",
+            market="cn",
+        ):
             if fetcher.name == "TickFlowFetcher":
                 continue
             started_at = time.monotonic()
@@ -3289,7 +3694,7 @@ class DataFetcherManager:
                     fetcher.name,
                     elapsed,
                 )
-            except Exception as e:
+            except Exception as e:  # broad-exception: fallback_recorded - safe log precedes provider fallback
                 log_safe_exception(
                     logger,
                     "Data provider market statistics fetch failed",
@@ -4352,8 +4757,11 @@ class DataFetcherManager:
             source_chain: List[Dict[str, Any]] = []
             last_error = ""
 
-            # Iterate through data sources listed in priority order by the manager
-            for fetcher in self._fetchers:
+            # Iterate through the manager's capability-filtered priority order.
+            for fetcher in self._get_fetchers_for_capability(
+                "sector_rankings",
+                market="cn",
+            ):
                 if not hasattr(fetcher, 'get_sector_rankings'):
                     continue
 
@@ -4381,7 +4789,7 @@ class DataFetcherManager:
                             "error": last_error,
                         }
                     )
-                except Exception as e:
+                except Exception as e:  # broad-exception: fallback_recorded - source chain records ranking fallback
                     error_type, error_reason = summarize_exception(e)
                     last_error = f"{fetcher.name} ({error_type}) {error_reason}"
                     duration_ms = int((time.time() - start) * 1000)
@@ -4442,7 +4850,10 @@ class DataFetcherManager:
 
             top: List[Dict] = []
             bottom: List[Dict] = []
-            for fetcher in self._get_fetchers_snapshot():
+            for fetcher in self._get_fetchers_for_capability(
+                "concept_rankings",
+                market="cn",
+            ):
                 try:
                     data = fetcher.get_concept_rankings(normalized_n)
                     if data and (data[0] or data[1]):
@@ -4451,7 +4862,7 @@ class DataFetcherManager:
                         logger.info(f"[{fetcher.name}] 获取概念排行成功")
                         break
                     last_error = f"{fetcher.name}返回空结果"
-                except Exception as e:
+                except Exception as e:  # broad-exception: fallback_recorded - safe log precedes concept fallback
                     error_type, error_reason = summarize_exception(e)
                     last_error = f"{fetcher.name} ({error_type}) {error_reason}"
                     log_safe_exception(
@@ -4483,14 +4894,17 @@ class DataFetcherManager:
     def get_hot_stocks(self, n: int = 10) -> List[Dict[str, Any]]:
         """获取市场人气股榜（自动切换数据源）。"""
         last_error = ""
-        for fetcher in self._fetchers:
+        for fetcher in self._get_fetchers_for_capability(
+            "hot_stocks",
+            market="cn",
+        ):
             try:
                 data = fetcher.get_hot_stocks(n)
                 if data:
                     logger.info(f"[{fetcher.name}] 获取人气股成功")
                     return data[:n]
                 last_error = f"{fetcher.name}返回空结果"
-            except Exception as e:
+            except Exception as e:  # broad-exception: fallback_recorded - safe log precedes hot-stock fallback
                 error_type, error_reason = summarize_exception(e)
                 last_error = f"{fetcher.name} ({error_type}) {error_reason}"
                 log_safe_exception(
@@ -4512,14 +4926,17 @@ class DataFetcherManager:
     ) -> List[Dict[str, Any]]:
         """获取涨停池与连板梯队（自动切换数据源）。"""
         last_error = ""
-        for fetcher in self._fetchers:
+        for fetcher in self._get_fetchers_for_capability(
+            "limit_up_pool",
+            market="cn",
+        ):
             try:
                 data = fetcher.get_limit_up_pool(date=date, n=n)
                 if data:
                     logger.info(f"[{fetcher.name}] 获取涨停池成功")
                     return data[:n]
                 last_error = f"{fetcher.name}返回空结果"
-            except Exception as e:
+            except Exception as e:  # broad-exception: fallback_recorded - safe log precedes limit-up fallback
                 error_type, error_reason = summarize_exception(e)
                 last_error = f"{fetcher.name} ({error_type}) {error_reason}"
                 log_safe_exception(

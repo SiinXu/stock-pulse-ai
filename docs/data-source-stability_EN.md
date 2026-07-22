@@ -108,6 +108,38 @@ PROVIDER_DAILY_CACHE_MEMORY_MAX_ENTRIES=256
 
 Set an individual TTL or stale window to `0` to disable that behavior, or set `PROVIDER_DAILY_CACHE_ENABLED=false` to disable this provider-manager cache. Stale data is marked with `is_stale=true`, its age, layer, and source; it must not be presented as a live quote.
 
+## Data Provider Plugins
+
+`DataProvider` and `DataProviderRegistration` are now the stable plugin
+contract. Built-in sources also register through the unified X2 registry while
+retaining their existing runtime names, credential gates, construction order,
+and instance priorities. With no plugin loaded, market filtering, fixed routes,
+circuit behavior, cache semantics, adaptive ordering, and diagnostics therefore
+remain unchanged.
+
+A plugin declares a stable `provider_id`, factory, markets, and capabilities
+through the same registry exposed by `DataFetcherManager.plugin_registry`. The
+factory runs inside the plugin load transaction; a factory failure, invalid
+implementation, ID collision, or runtime-name collision fails only that plugin.
+Unloading removes the exact owned provider. Numeric plugin priority affects only
+routes already governed by priority. U.S. index, U.S. stock,
+Longbridge-preferred, and realtime built-in chains retain their fixed order and
+try eligible plugins only as tail fallbacks.
+The manager pins the factory-time runtime name for routing, health state, cache
+attribution, and diagnostics. Later mutation of the provider object's `name`
+cannot rename the active registration or impersonate a fixed built-in route.
+After a route selects an eligible provider-adapter snapshot, the current attempt
+calls that exact adapter. A concurrent disable, enable, or same-name replacement
+affects the next route selection and cannot rebind the current request to a
+provider with different market eligibility.
+Unload does not rewrite unexpired daily-cache entries or process-local health
+observations; they keep their existing TTL, stale, and reset semantics.
+
+This batch exposes programmatic registration. External-directory startup
+scanning remains deferred to X2b behind GATE-P3 and is not automatically wired.
+See the [plugin extension contract](plugin-extension-contract.md#data-providers)
+for fields, capability identifiers, and an example.
+
 ## Recommended Profiles
 
 ### Zero-cost local profile
