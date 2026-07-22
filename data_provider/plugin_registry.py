@@ -5,9 +5,10 @@
 from __future__ import annotations
 
 import re
+from contextlib import contextmanager
 from dataclasses import dataclass
-from threading import RLock
-from typing import Callable, Iterable
+from threading import RLock, local
+from typing import Callable, Iterable, Iterator, Mapping
 
 from src.plugins import (
     ExtensionContract,
@@ -55,6 +56,16 @@ def _freeze_string_set(
     if pattern is not None and any(pattern.fullmatch(value) is None for value in frozen):
         raise ValueError(f"{field_name} contains an invalid identifier")
     return frozen
+
+
+def _is_valid_provider_name(value: object) -> bool:
+    return (
+        type(value) is str
+        and bool(value.strip())
+        and value == value.strip()
+        and len(value) <= 120
+        and all(ord(character) >= 32 and ord(character) != 127 for character in value)
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,6 +146,7 @@ def _adapt_builtin_provider(fetcher: object) -> DataProvider:
 class _NativeProviderEntry:
     registration: DataProviderRegistration
     provider: DataProvider
+    provider_name: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,12 +159,72 @@ class _ActiveDataProvider:
 class _DataProviderBackend:
     """Instantiate and remove exact provider registrations for X2 ownership."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        builtin_identities: Mapping[str, str],
+    ) -> None:
+        identities = dict(builtin_identities)
+        if any(
+            not _is_valid_provider_name(provider_name)
+            or type(provider_id) is not str
+            or _PROVIDER_ID_PATTERN.fullmatch(provider_id) is None
+            for provider_name, provider_id in identities.items()
+        ):
+            raise ValueError("built-in provider identities are invalid")
+        if len(set(identities.values())) != len(identities):
+            raise ValueError("built-in provider IDs must be unique")
         self._entries: dict[str, _NativeProviderEntry] = {}
         self._provider_names: dict[str, str] = {}
-        self._reserved_names: set[str] = set()
+        self._builtin_ids_by_name = identities
+        self._builtin_names_by_id = {
+            provider_id: provider_name
+            for provider_name, provider_id in identities.items()
+        }
+        self._reserved_names: set[str] = set(identities)
+        self._builtin_registration_handoff = local()
         self._generation = 0
         self._lock = RLock()
+
+    def _builtin_registration_is_allowed(
+        self,
+        registration_id: str,
+        implementation: object | None = None,
+    ) -> bool:
+        handoff = getattr(
+            self._builtin_registration_handoff,
+            "registration",
+            None,
+        )
+        if handoff is None or handoff[0] != registration_id:
+            return False
+        return implementation is None or handoff[1] is implementation
+
+    @contextmanager
+    def allow_builtin_registration(
+        self,
+        registration_id: str,
+        implementation: DataProviderRegistration,
+    ) -> Iterator[None]:
+        """Authorize one exact built-in registration on the current thread."""
+
+        if registration_id not in self._builtin_names_by_id:
+            raise ValueError("built-in provider ID is not reserved")
+        previous = getattr(
+            self._builtin_registration_handoff,
+            "registration",
+            None,
+        )
+        self._builtin_registration_handoff.registration = (
+            registration_id,
+            implementation,
+        )
+        try:
+            yield
+        finally:
+            if previous is None:
+                del self._builtin_registration_handoff.registration
+            else:
+                self._builtin_registration_handoff.registration = previous
 
     @property
     def generation(self) -> int:
@@ -173,7 +245,13 @@ class _DataProviderBackend:
 
     def contains(self, registration_id: str) -> bool:
         with self._lock:
-            return registration_id in self._entries
+            return (
+                registration_id in self._entries
+                or (
+                    registration_id in self._builtin_names_by_id
+                    and not self._builtin_registration_is_allowed(registration_id)
+                )
+            )
 
     def register(self, registration_id: str, implementation: object) -> None:
         if not isinstance(implementation, DataProviderRegistration):
@@ -182,17 +260,15 @@ class _DataProviderBackend:
         if not isinstance(provider, DataProvider):
             raise TypeError("data provider factory must return DataProvider")
         provider_name = getattr(provider, "name", None)
-        if (
-            type(provider_name) is not str
-            or not provider_name.strip()
-            or provider_name != provider_name.strip()
-            or len(provider_name) > 120
-            or any(
-                ord(character) < 32 or ord(character) == 127
-                for character in provider_name
-            )
-        ):
+        if not _is_valid_provider_name(provider_name):
             raise ValueError("data provider name must be a non-empty string")
+        builtin_allowed = self._builtin_registration_is_allowed(
+            registration_id,
+            implementation,
+        )
+        expected_builtin_name = self._builtin_names_by_id.get(registration_id)
+        if builtin_allowed and provider_name != expected_builtin_name:
+            raise ValueError("built-in provider name does not match its stable ID")
         for capability in implementation.capabilities:
             method_name = DATA_PROVIDER_CAPABILITY_METHODS[capability]
             if not callable(getattr(provider, method_name, None)):
@@ -204,13 +280,17 @@ class _DataProviderBackend:
             if registration_id in self._entries:
                 raise ValueError("provider registration already exists")
             if (
-                provider_name in self._reserved_names
+                (
+                    provider_name in self._reserved_names
+                    and not builtin_allowed
+                )
                 or provider_name in self._provider_names
             ):
                 raise ValueError("provider name already exists")
             self._entries[registration_id] = _NativeProviderEntry(
                 registration=implementation,
                 provider=provider,
+                provider_name=provider_name,
             )
             self._provider_names[provider_name] = registration_id
             self._generation += 1
@@ -221,7 +301,7 @@ class _DataProviderBackend:
             if entry is None or entry.registration is not implementation:
                 return
             del self._entries[registration_id]
-            provider_name = entry.provider.name
+            provider_name = entry.provider_name
             if self._provider_names.get(provider_name) == registration_id:
                 del self._provider_names[provider_name]
             self._generation += 1
@@ -241,8 +321,8 @@ class _DataProviderBackend:
 class _DataProviderPluginRuntime:
     """Point-specific backend attached to the unified X2 registry."""
 
-    def __init__(self) -> None:
-        self._backend = _DataProviderBackend()
+    def __init__(self, builtin_identities: Mapping[str, str]) -> None:
+        self._backend = _DataProviderBackend(builtin_identities)
         self.registry = ExtensionRegistry(
             {
                 "data_provider": ExtensionContract(
@@ -266,13 +346,17 @@ class _DataProviderPluginRuntime:
         priority: int,
         plugin_id: str,
     ) -> RegistrationHandle:
-        return self.registry.register(
-            plugin_id=plugin_id,
-            extension_point="data_provider",
-            registration_id=registration.provider_id,
-            implementation=registration,
-            priority=priority,
-        )
+        with self._backend.allow_builtin_registration(
+            registration.provider_id,
+            registration,
+        ):
+            return self.registry.register(
+                plugin_id=plugin_id,
+                extension_point="data_provider",
+                registration_id=registration.provider_id,
+                implementation=registration,
+                priority=priority,
+            )
 
     @property
     def generation(self) -> int:

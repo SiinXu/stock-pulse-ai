@@ -22,6 +22,21 @@ from data_provider.realtime_types import UnifiedRealtimeQuote
 from src.plugins import Plugin, PluginContext, PluginManager, PluginManifest
 
 
+_BUILTIN_IDENTITIES = {
+    "EfinanceFetcher": "efinance",
+    "TencentFetcher": "tencent",
+    "AkshareFetcher": "akshare",
+    "TushareFetcher": "tushare",
+    "TickFlowFetcher": "tickflow",
+    "PytdxFetcher": "pytdx",
+    "BaostockFetcher": "baostock",
+    "YfinanceFetcher": "yfinance",
+    "LongbridgeFetcher": "longbridge",
+    "FinnhubFetcher": "finnhub",
+    "AlphaVantageFetcher": "alphavantage",
+}
+
+
 def _daily_frame(value: float = 10.2) -> pd.DataFrame:
     return pd.DataFrame(
         {
@@ -106,6 +121,23 @@ class _ProviderPlugin(Plugin):
         self.unload_count += 1
 
 
+class _RenamingProviderPlugin(_ProviderPlugin):
+    def __init__(
+        self,
+        plugin_id: str,
+        registration: DataProviderRegistration,
+        provider: DataProvider,
+        *,
+        priority: int,
+    ) -> None:
+        super().__init__(plugin_id, registration, priority=priority)
+        self.provider = provider
+
+    def onunload(self) -> None:
+        super().onunload()
+        self.provider.name = "RenamedDuringUnloadFetcher"
+
+
 def _registration(
     provider_id: str,
     factory: Callable[[], DataProvider],
@@ -157,6 +189,8 @@ def test_base_fetcher_remains_compatible_with_stable_data_provider_contract() ->
 
 
 def test_default_providers_are_registered_without_order_or_name_drift() -> None:
+    assert DataFetcherManager._BUILTIN_DATA_PROVIDER_IDS == _BUILTIN_IDENTITIES
+
     config = SimpleNamespace(
         tushare_token="",
         tickflow_api_key="",
@@ -397,6 +431,145 @@ def test_provider_id_and_runtime_name_collisions_are_rejected() -> None:
     assert name_result.success is False
     assert name_result.error_code == "native_registry_registration_failed"
     assert manager.available_fetchers == ["CommunityFetcher", "FallbackFetcher"]
+
+
+@pytest.mark.parametrize(
+    ("provider_name", "provider_id"),
+    tuple(_BUILTIN_IDENTITIES.items()),
+)
+def test_inactive_builtin_provider_ids_remain_reserved(
+    provider_name: str,
+    provider_id: str,
+) -> None:
+    manager = DataFetcherManager(
+        fetchers=[_DailyProvider("FallbackFetcher", 50, _daily_frame())]
+    )
+    plugins = _plugin_manager(manager)
+    factory_calls = 0
+
+    def factory() -> DataProvider:
+        nonlocal factory_calls
+        factory_calls += 1
+        return _DailyProvider(f"External{provider_name}", 10, _daily_frame())
+
+    plugin = _ProviderPlugin(
+        f"reserved-id-{provider_id}",
+        _registration(provider_id, factory),
+        priority=10,
+    )
+    assert plugins.register(plugin, source="external").success is True
+
+    result = plugins.load(plugin.manifest.id)
+
+    assert result.success is False
+    assert result.error_code == "native_registration_conflict"
+    assert factory_calls == 0
+    assert manager.available_fetchers == ["FallbackFetcher"]
+
+
+@pytest.mark.parametrize(
+    ("provider_name", "provider_id"),
+    tuple(_BUILTIN_IDENTITIES.items()),
+)
+def test_inactive_builtin_runtime_names_remain_reserved(
+    provider_name: str,
+    provider_id: str,
+) -> None:
+    manager = DataFetcherManager(
+        fetchers=[_DailyProvider("FallbackFetcher", 50, _daily_frame())]
+    )
+    plugins = _plugin_manager(manager)
+    plugin = _ProviderPlugin(
+        f"reserved-name-{provider_id}",
+        _registration(
+            f"external-{provider_id}",
+            lambda: _DailyProvider(provider_name, 10, _daily_frame()),
+        ),
+        priority=10,
+    )
+    assert plugins.register(plugin, source="external").success is True
+
+    result = plugins.load(plugin.manifest.id)
+
+    assert result.success is False
+    assert result.error_code == "native_registry_registration_failed"
+    assert manager.available_fetchers == ["FallbackFetcher"]
+
+
+def test_unload_uses_captured_runtime_name_and_retains_call_guard() -> None:
+    fallback = _DailyProvider("FallbackFetcher", 50, _daily_frame())
+    first_provider = _DailyProvider("MutableFetcher", 10, _daily_frame())
+    manager = DataFetcherManager(fetchers=[fallback])
+    plugins = _plugin_manager(manager)
+    first = _RenamingProviderPlugin(
+        "mutable-provider-one",
+        _registration("mutable-one", lambda: first_provider),
+        first_provider,
+        priority=10,
+    )
+    assert plugins.register(first, source="external").success is True
+    assert plugins.load(first.manifest.id).success is True
+    original_call_guard = manager._get_fetcher_call_lock(first_provider)
+
+    assert plugins.disable(first.manifest.id).success is True
+    assert manager.available_fetchers == ["FallbackFetcher"]
+    assert manager._get_fetcher_call_lock(first_provider) is original_call_guard
+
+    second_provider = _DailyProvider("MutableFetcher", 10, _daily_frame())
+    second = _ProviderPlugin(
+        "mutable-provider-two",
+        _registration("mutable-two", lambda: second_provider),
+        priority=10,
+    )
+    assert plugins.register(second, source="external").success is True
+    assert plugins.load(second.manifest.id).success is True
+    assert manager.available_fetchers == ["MutableFetcher", "FallbackFetcher"]
+
+
+def test_stock_list_plugin_enforces_market_before_call_and_result_acceptance() -> None:
+    fallback = _DailyProvider("FallbackFetcher", 50, _daily_frame())
+    hk_provider = _DailyProvider("HongKongStockListFetcher", 10, _daily_frame())
+    stock_list_calls = 0
+
+    def get_stock_list() -> pd.DataFrame:
+        nonlocal stock_list_calls
+        stock_list_calls += 1
+        return pd.DataFrame(
+            {
+                "code": ["HK00700", "600519"],
+                "name": ["Tencent", "Plugin CN Name"],
+            }
+        )
+
+    hk_provider.get_stock_list = get_stock_list  # type: ignore[attr-defined]
+    manager = DataFetcherManager(fetchers=[fallback])
+    plugins = _plugin_manager(manager)
+    plugin = _ProviderPlugin(
+        "hong-kong-stock-list",
+        _registration(
+            "hong-kong-stock-list",
+            lambda: hk_provider,
+            markets={"hk"},
+            capabilities={"stock_list"},
+        ),
+        priority=10,
+    )
+    assert plugins.register(plugin, source="external").success is True
+    assert plugins.load(plugin.manifest.id).success is True
+
+    with patch.object(manager, "get_stock_name", return_value=""):
+        assert manager.batch_get_stock_names(["600519"]) == {}
+    assert stock_list_calls == 0
+
+    with patch.object(manager, "get_stock_name", return_value="Fallback CN Name"):
+        result = manager.batch_get_stock_names(["600519", "HK00700"])
+
+    assert stock_list_calls == 1
+    assert result == {
+        "HK00700": "Tencent",
+        "600519": "Fallback CN Name",
+    }
+    assert manager._stock_name_cache == {"HK00700": "Tencent"}
 
 
 def test_factory_failure_isolated_while_later_plugin_remains_available() -> None:

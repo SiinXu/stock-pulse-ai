@@ -754,7 +754,9 @@ class DataFetcherManager:
         self._fetchers_by_name: Dict[str, DataProvider] = {}
         self._fetcher_call_locks: Dict[int, RLock] = {}
         self._fetcher_call_locks_lock = RLock()
-        self._data_provider_runtime = _DataProviderPluginRuntime()
+        self._data_provider_runtime = _DataProviderPluginRuntime(
+            self._BUILTIN_DATA_PROVIDER_IDS
+        )
         self._registered_fetchers: Dict[str, DataProvider] = {}
         self._provider_registrations: Dict[int, "_ActiveDataProvider"] = {}
         self._provider_priorities: Dict[int, int] = {}
@@ -767,9 +769,7 @@ class DataFetcherManager:
         
         if fetchers:
             self._data_provider_runtime.reserve_provider_names(
-                tuple(self._BUILTIN_DATA_PROVIDER_IDS) + tuple(
-                    fetcher.name for fetcher in fetchers
-                )
+                fetcher.name for fetcher in fetchers
             )
             with self._fetchers_lock:
                 self._fetchers = list(fetchers)
@@ -835,7 +835,9 @@ class DataFetcherManager:
         if self._data_provider_runtime is None:
             from .plugin_registry import _DataProviderPluginRuntime
 
-            self._data_provider_runtime = _DataProviderPluginRuntime()
+            self._data_provider_runtime = _DataProviderPluginRuntime(
+                self._BUILTIN_DATA_PROVIDER_IDS
+            )
             self._data_provider_runtime.reserve_provider_names(
                 fetcher.name for fetcher in getattr(self, "_fetchers", [])
             )
@@ -865,8 +867,8 @@ class DataFetcherManager:
         self._provider_registrations.pop(fetcher_key, None)
         self._provider_priorities.pop(fetcher_key, None)
         self._fetcher_static_order.pop(fetcher_key, None)
-        with self._fetcher_call_locks_lock:
-            self._fetcher_call_locks.pop(fetcher_key, None)
+        # A caller may still hold a pre-unload provider snapshot. Retaining the
+        # manager-owned guard keeps those late calls serialized on the same lock.
 
     def _sync_registered_data_providers(self) -> None:
         runtime = getattr(self, "_data_provider_runtime", None)
@@ -2725,8 +2727,9 @@ class DataFetcherManager:
             )
             if quote is not None:
                 logger.info(
-                    "[实时行情] %s %s 成功获取 (来源: %s)",
-                    market_label,
+                    "Realtime quote plugin fallback succeeded "
+                    "market=%s symbol=%s provider=%s",
+                    market,
                     stock_code,
                     plugin_name,
                 )
@@ -2781,8 +2784,9 @@ class DataFetcherManager:
             )
             if plugin_quote is not None:
                 logger.info(
-                    "[实时行情] %s %s 成功获取 (来源: %s)",
-                    market_label,
+                    "Realtime quote plugin fallback succeeded "
+                    "market=%s symbol=%s provider=%s",
+                    market,
                     stock_code,
                     plugin_name,
                 )
@@ -2973,7 +2977,8 @@ class DataFetcherManager:
         )
         if plugin_quote is not None:
             logger.info(
-                "[实时行情] %s 成功获取 (来源: %s)",
+                "Realtime quote plugin fallback succeeded "
+                "market=cn symbol=%s provider=%s",
                 stock_code,
                 plugin_name,
             )
@@ -3489,6 +3494,19 @@ class DataFetcherManager:
         for fetcher in self._get_fetchers_for_capability("stock_list"):
             if not hasattr(fetcher, 'get_stock_list') or not missing_codes:
                 continue
+            missing_markets = {
+                _market_tag(normalize_stock_code(str(code)))
+                for code in missing_codes
+            }
+            if not any(
+                self._provider_supports_capability(
+                    fetcher,
+                    "stock_list",
+                    market,
+                )
+                for market in missing_markets
+            ):
+                continue
             if not self._is_fetcher_available(fetcher, capability="stock_list"):
                 continue
             try:
@@ -3499,6 +3517,15 @@ class DataFetcherManager:
                         code = row.get('code')
                         name = row.get('name')
                         if code and name:
+                            result_market = _market_tag(
+                                normalize_stock_code(str(code))
+                            )
+                            if not self._provider_supports_capability(
+                                fetcher,
+                                "stock_list",
+                                result_market,
+                            ):
+                                continue
                             cache_updates[code] = name
                             if code in missing_codes:
                                 result[code] = name
