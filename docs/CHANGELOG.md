@@ -277,6 +277,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Added the validated plugin manifest, isolated lifecycle manager, ownership-aware extension registry, and explicit trusted-directory plugin loader without startup wiring.
 - [Fixed] Enforced a shared fail-closed outbound HTTP policy for search, intelligence, custom model endpoints, webhooks, and notification tests with connection-time DNS checks, bounded redirects and responses, credential stripping, and an explicit self-host allowlist.
 - [Fixed] Kept the existing persistent daily-provider cache in Desktop runtime data and Windows update backups while preserving explicit cache paths.
+- [Changed] Split DatabaseManager lifecycle and storage operations into focused private modules while preserving the `src.storage` facade and migration behavior.
 
 ## [3.26.3] - 2026-07-15
 
