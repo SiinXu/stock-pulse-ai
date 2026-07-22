@@ -95,6 +95,14 @@ from src.services.config import (
 # Re-exported for api.v1.endpoints.system_config and tests.
 from src.services.config import ConfigConflictError  # noqa: F401
 from src.services.config import llm_channel_map
+from src.services.system_config_service_parts.runtime_reliability import (
+    LastGoodConfigUnavailableError as _LastGoodConfigUnavailableError,
+    RuntimeConfigActivationError as _RuntimeConfigActivationError,
+    RuntimeConfigTransaction as _RuntimeConfigTransaction,
+    build_auth_rollback_issue as _build_auth_rollback_issue,
+    build_connectivity_failure_issue as _build_connectivity_failure_issue,
+    log_config_audit as _log_config_audit,
+)
 from src.utils.sanitize import (
     log_safe_exception,
     sanitize_diagnostic_text,
@@ -114,6 +122,14 @@ class ConfigValidationError(Exception):
 
 class ConfigImportError(Exception):
     """Raised when an imported `.env` payload is invalid."""
+
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.message = message
+
+
+class ConfigRollbackError(Exception):
+    """Raised when no safe last-known-good configuration can be restored."""
 
     def __init__(self, message: str):
         super().__init__(message)

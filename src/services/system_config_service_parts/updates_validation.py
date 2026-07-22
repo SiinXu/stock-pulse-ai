@@ -9,6 +9,7 @@ if TYPE_CHECKING:
         Any,
         Config,
         ConfigImportError,
+        ConfigRollbackError,
         ConfigValidationError,
         ConfigVersionMismatchError,
         Dict,
@@ -19,6 +20,11 @@ if TYPE_CHECKING:
         Set,
         SystemConfigService,
         Tuple,
+        _LastGoodConfigUnavailableError,
+        _RuntimeConfigActivationError,
+        _build_auth_rollback_issue,
+        _build_connectivity_failure_issue,
+        _log_config_audit,
         canonicalize_llm_channel_protocol,
         evaluate_config_conditions,
         get_contract_field_definitions,
@@ -47,106 +53,288 @@ class _SystemConfigUpdateMethods:
         items: Sequence[Dict[str, str]],
         mask_token: str = "******",
         reload_now: bool = True,
+        validate_connectivity: bool = False,
+        connectivity_timeout_seconds: float = 20.0,
+        actor: str = "system_config_service",
     ) -> Dict[str, Any]:
-        """Validate and persist updates into `.env`, then reload runtime config."""
+        """Validate, persist, and transactionally activate configuration updates."""
+        submitted_keys = {item["key"].upper() for item in items}
         self._conflict.guard_version(config_version)
 
         issues = self._collect_issues(items=items, mask_token=mask_token)
         errors = [issue for issue in issues if issue["severity"] == "error"]
         if errors:
+            _log_config_audit(
+                actor=actor,
+                operation="update",
+                outcome="rejected_validation",
+                keys=submitted_keys,
+                config_version=config_version,
+            )
             raise ConfigValidationError(issues=errors)
 
-        previous_map = self._manager.read_config_map()
-        submitted_keys: Set[str] = set()
-        updates: List[Tuple[str, str]] = []
-        sensitive_keys: Set[str] = set()
-        for item in items:
-            key = item["key"].upper()
-            value = item["value"]
-            field_schema = get_field_definition(key, value)
-            normalized_value = self._normalize_value_for_storage(value, field_schema)
-            submitted_keys.add(key)
-            updates.append((key, normalized_value))
-            if bool(field_schema.get("is_sensitive", False)):
-                sensitive_keys.add(key)
-
-        try:
-            updated_keys, skipped_masked_keys, new_version = self._manager.apply_updates(
-                updates=updates,
-                sensitive_keys=sensitive_keys,
+        if validate_connectivity:
+            probe_result = self.test_generation_backend(
+                items=items,
                 mask_token=mask_token,
-                expected_version=config_version,
+                timeout_seconds=connectivity_timeout_seconds,
             )
-        except ConfigVersionMismatchError as exc:
-            raise self._conflict.as_conflict(exc) from exc
+            if not probe_result.get("success", False):
+                _log_config_audit(
+                    actor=actor,
+                    operation="update",
+                    outcome="rejected_connectivity",
+                    keys=submitted_keys,
+                    config_version=config_version,
+                )
+                raise ConfigValidationError(
+                    issues=[_build_connectivity_failure_issue(probe_result)]
+                )
 
-        warnings: List[str] = []
-        reload_triggered = False
-        if reload_now:
+        with self._runtime_config_transaction.lock:
+            previous_map = self._manager.read_config_map()
+            updates: List[Tuple[str, str]] = []
+            sensitive_keys: Set[str] = set()
+            for item in items:
+                key = item["key"].upper()
+                value = item["value"]
+                field_schema = get_field_definition(key, value)
+                normalized_value = self._normalize_value_for_storage(value, field_schema)
+                updates.append((key, normalized_value))
+                if bool(field_schema.get("is_sensitive", False)):
+                    sensitive_keys.add(key)
+
+            redaction_values = tuple(
+                value for key, value in updates if key in sensitive_keys
+            )
             try:
-                Config.reset_instance()
-                self._reload_runtime_singletons()
-                setup_env(override=True)
-                config = Config.get_instance()
-                warnings.extend(config.validate())
-                reload_triggered = True
-            except Exception as exc:  # pragma: no cover; broad-exception: fallback_recorded - report reload failure
+                updated_keys, skipped_masked_keys, new_version = self._manager.apply_updates(
+                    updates=updates,
+                    sensitive_keys=sensitive_keys,
+                    mask_token=mask_token,
+                    expected_version=config_version,
+                )
+            except ConfigVersionMismatchError as exc:
+                _log_config_audit(
+                    actor=actor,
+                    operation="update",
+                    outcome="version_conflict",
+                    keys=submitted_keys,
+                    config_version=exc.current_version,
+                )
+                raise self._conflict.as_conflict(exc) from exc
+
+            warnings: List[str] = []
+            reload_triggered = False
+            if reload_now:
+                try:
+                    warnings.extend(
+                        self._runtime_config_transaction.activate_persisted_candidate(
+                            redaction_values=redaction_values,
+                        )
+                    )
+                    reload_triggered = True
+                except _RuntimeConfigActivationError as exc:
+                    log_safe_exception(
+                        logger,
+                        "Configuration activation failed",
+                        exc,
+                        error_code="configuration_activation_failed",
+                        redaction_values=redaction_values,
+                        context={
+                            "rollback_succeeded": exc.rollback_succeeded,
+                            "updated_keys": sorted(updated_keys),
+                        },
+                    )
+                    _log_config_audit(
+                        actor=actor,
+                        operation="update",
+                        outcome=(
+                            "rolled_back_activation_failure"
+                            if exc.rollback_succeeded
+                            else "rollback_failed"
+                        ),
+                        keys=submitted_keys,
+                        config_version=self._manager.get_config_version(),
+                    )
+                    if not exc.rollback_succeeded:
+                        raise RuntimeError(
+                            "Configuration activation and restoration failed"
+                        ) from exc
+                    raise ConfigValidationError(issues=[{
+                        "key": "RUNTIME_CONFIG",
+                        "code": "runtime_activation_failed",
+                        "severity": "error",
+                        "message": (
+                            "The candidate configuration could not be activated; "
+                            "the previous runtime configuration was restored."
+                        ),
+                        "expected": "loadable runtime configuration",
+                        "actual": "activation failed",
+                        "details": {
+                            "rollback_succeeded": True,
+                            "current_config_version": self._manager.get_config_version(),
+                        },
+                    }]) from exc
+
+            warnings.extend(
+                self._build_explainability_warnings(
+                    submitted_keys=submitted_keys,
+                    reload_now=reload_now,
+                )
+            )
+            update_map = dict(updates)
+            warnings.extend(
+                self._build_runtime_model_cleanup_warnings(
+                    previous_map=previous_map,
+                    updates=update_map,
+                )
+            )
+            warnings.extend(
+                self._build_hermes_unsupported_key_cleanup_warnings(
+                    previous_map=previous_map,
+                    updates=update_map,
+                )
+            )
+            if self._runtime_scheduler is not None and submitted_keys & {
+                "SCHEDULE_ENABLED",
+                "SCHEDULE_TIME",
+                "SCHEDULE_TIMES",
+            }:
+                try:
+                    self._runtime_scheduler.reconcile_from_config(
+                        clear_enabled_override="SCHEDULE_ENABLED" in submitted_keys,
+                    )
+                except Exception as exc:  # pragma: no cover; broad-exception: fallback_recorded - report scheduler failure
+                    log_safe_exception(
+                        logger,
+                        "Runtime scheduler reconciliation failed",
+                        exc,
+                        error_code="runtime_scheduler_reconcile_failed",
+                        redaction_values=redaction_values,
+                    )
+                    warnings.append("Configuration updated but runtime scheduler reconcile failed")
+
+            _log_config_audit(
+                actor=actor,
+                operation="update",
+                outcome="activated" if reload_triggered else "persisted_only",
+                keys=updated_keys,
+                config_version=new_version,
+            )
+            return {
+                "success": True,
+                "config_version": new_version,
+                "applied_count": len(updated_keys),
+                "skipped_masked_count": len(skipped_masked_keys),
+                "reload_triggered": reload_triggered,
+                "updated_keys": updated_keys,
+                "warnings": warnings,
+            }
+
+    def restore_last_good_config(
+        self,
+        *,
+        config_version: str,
+        actor: str = "system_config_service",
+    ) -> Dict[str, Any]:
+        """Restore the previous active config without crossing the auth boundary."""
+        with self._runtime_config_transaction.lock:
+            self._conflict.guard_version(config_version)
+            try:
+                target_snapshot = self._runtime_config_transaction.read_last_good_snapshot()
+            except _LastGoodConfigUnavailableError as exc:
+                _log_config_audit(
+                    actor=actor,
+                    operation="rollback",
+                    outcome="unavailable",
+                    keys=(),
+                    config_version=config_version,
+                )
+                raise ConfigRollbackError(str(exc)) from exc
+
+            current_map = self._manager.read_config_map()
+            target_map = self._runtime_config_transaction.snapshot_config_map(
+                target_snapshot
+            )
+            auth_issue = _build_auth_rollback_issue(
+                current_map=current_map,
+                target_map=target_map,
+            )
+            if auth_issue is not None:
+                _log_config_audit(
+                    actor=actor,
+                    operation="rollback",
+                    outcome="rejected_auth_boundary",
+                    keys=("ADMIN_AUTH_ENABLED",),
+                    config_version=config_version,
+                )
+                raise ConfigValidationError(issues=[auth_issue])
+
+            try:
+                new_version, changed_keys, warnings = (
+                    self._runtime_config_transaction.rollback_to_last_good(
+                        target_snapshot=target_snapshot,
+                    )
+                )
+            except _RuntimeConfigActivationError as exc:
                 log_safe_exception(
                     logger,
-                    "Configuration reload failed",
+                    "Configuration rollback activation failed",
                     exc,
-                    error_code="configuration_reload_failed",
-                    redaction_values=(updates[key] for key in sensitive_keys),
+                    error_code="configuration_rollback_activation_failed",
+                    context={"rollback_succeeded": exc.rollback_succeeded},
                 )
-                warnings.append("Configuration updated but reload failed")
+                _log_config_audit(
+                    actor=actor,
+                    operation="rollback",
+                    outcome=(
+                        "restored_current_after_failure"
+                        if exc.rollback_succeeded
+                        else "rollback_failed"
+                    ),
+                    keys=(),
+                    config_version=self._manager.get_config_version(),
+                )
+                raise RuntimeError("Last-known-good configuration activation failed") from exc
 
-        warnings.extend(
-            self._build_explainability_warnings(
-                submitted_keys=submitted_keys,
-                reload_now=reload_now,
-            )
-        )
-        update_map = dict(updates)
-        warnings.extend(
-            self._build_runtime_model_cleanup_warnings(
-                previous_map=previous_map,
-                updates=update_map,
-            )
-        )
-        warnings.extend(
-            self._build_hermes_unsupported_key_cleanup_warnings(
-                previous_map=previous_map,
-                updates=update_map,
-            )
-        )
-        if self._runtime_scheduler is not None and submitted_keys & {
-            "SCHEDULE_ENABLED",
-            "SCHEDULE_TIME",
-            "SCHEDULE_TIMES",
-        }:
-            try:
-                self._runtime_scheduler.reconcile_from_config(
-                    clear_enabled_override="SCHEDULE_ENABLED" in submitted_keys,
-                )
-            except Exception as exc:  # pragma: no cover; broad-exception: fallback_recorded - report scheduler failure
-                log_safe_exception(
-                    logger,
-                    "Runtime scheduler reconciliation failed",
-                    exc,
-                    error_code="runtime_scheduler_reconcile_failed",
-                    redaction_values=(updates[key] for key in sensitive_keys),
-                )
-                warnings.append("Configuration updated but runtime scheduler reconcile failed")
+            if self._runtime_scheduler is not None and set(changed_keys) & {
+                "SCHEDULE_ENABLED",
+                "SCHEDULE_TIME",
+                "SCHEDULE_TIMES",
+            }:
+                try:
+                    self._runtime_scheduler.reconcile_from_config(
+                        clear_enabled_override="SCHEDULE_ENABLED" in changed_keys,
+                    )
+                except Exception as exc:  # broad-exception: fallback_recorded - report rollback scheduler failure
+                    log_safe_exception(
+                        logger,
+                        "Runtime scheduler rollback reconciliation failed",
+                        exc,
+                        error_code="runtime_scheduler_rollback_reconcile_failed",
+                    )
+                    warnings.append(
+                        "Configuration rolled back but runtime scheduler reconcile failed"
+                    )
 
-        return {
-            "success": True,
-            "config_version": new_version,
-            "applied_count": len(updated_keys),
-            "skipped_masked_count": len(skipped_masked_keys),
-            "reload_triggered": reload_triggered,
-            "updated_keys": updated_keys,
-            "warnings": warnings,
-        }
+            warnings.append("The previous last-known-good configuration was restored.")
+            _log_config_audit(
+                actor=actor,
+                operation="rollback",
+                outcome="activated",
+                keys=changed_keys,
+                config_version=new_version,
+            )
+            return {
+                "success": True,
+                "config_version": new_version,
+                "applied_count": len(changed_keys),
+                "skipped_masked_count": 0,
+                "reload_triggered": True,
+                "updated_keys": changed_keys,
+                "warnings": warnings,
+            }
 
     def _build_explainability_warnings(
         self,
@@ -355,11 +543,13 @@ class _SystemConfigUpdateMethods:
         mask_token: str = "******",
     ) -> None:
         """Apply raw key updates without validation (internal service use only)."""
-        self._manager.apply_updates(
-            updates=updates,
-            sensitive_keys=set(),
-            mask_token=mask_token,
-        )
+        with self._runtime_config_transaction.lock:
+            self._manager.apply_updates(
+                updates=updates,
+                sensitive_keys=set(),
+                mask_token=mask_token,
+            )
+            self._runtime_config_transaction.mark_persisted_config_active()
 
     @staticmethod
     def _parse_imported_env_content(content: str) -> List[Dict[str, str]]:
