@@ -238,7 +238,7 @@ def review_with_gemini(prompt):
         return response.text
     except ImportError as e:
         print(f"❌ Gemini dependency is not installed: {_escape_non_ascii(e)}")
-        print("   Install google-genai with: pip install google-genai")
+        print("   Install review tools with: pip install -r .github/requirements-review.txt")
         return None
     except Exception as e:
         _log_exception("❌ Gemini review failed", e)
@@ -271,7 +271,7 @@ def review_with_openai(prompt):
         return response.choices[0].message.content
     except ImportError as e:
         print(f"❌ OpenAI dependency is not installed: {_escape_non_ascii(e)}")
-        print("   Install openai with: pip install openai")
+        print("   Install review tools with: pip install -r .github/requirements-review.txt")
         return None
     except Exception as e:
         _log_exception("❌ OpenAI-compatible review failed", e)

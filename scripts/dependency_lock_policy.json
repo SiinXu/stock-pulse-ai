@@ -1,0 +1,84 @@
+{
+  "schema_version": 2,
+  "lock_file": "constraints.txt",
+  "build_constraint_file": "build-constraints.txt",
+  "resolver": {
+    "name": "uv",
+    "version": "0.11.31",
+    "python_version": "3.10",
+    "python_versions": [
+      "3.10",
+      "3.11",
+      "3.12",
+      "3.13",
+      "3.14"
+    ],
+    "exclude_newer": "2026-07-22T03:00:00Z",
+    "universal": true
+  },
+  "source_files": [
+    "requirements.txt",
+    "requirements-pydanticai.txt",
+    ".github/requirements-ci.txt",
+    ".github/requirements-review.txt",
+    "requirements-desktop.txt",
+    "build-constraints.txt"
+  ],
+  "exact_source_files": [
+    "requirements-pydanticai.txt",
+    "build-constraints.txt"
+  ],
+  "install_contracts": {
+    "requirements.txt": {
+      "constraint": "constraints.txt",
+      "includes": [],
+      "packages": [],
+      "allow_other_packages": true
+    },
+    ".github/requirements-ci.txt": {
+      "constraint": "constraints.txt",
+      "includes": [
+        "requirements.txt"
+      ],
+      "packages": [
+        "flake8",
+        "pip",
+        "pip-audit",
+        "uv",
+        "pytest"
+      ],
+      "allow_other_packages": false
+    },
+    ".github/requirements-review.txt": {
+      "constraint": "constraints.txt",
+      "includes": [],
+      "packages": [
+        "flake8",
+        "google-genai",
+        "httpx",
+        "openai",
+        "pip"
+      ],
+      "allow_other_packages": false
+    },
+    "requirements-desktop.txt": {
+      "constraint": "constraints.txt",
+      "includes": [
+        "requirements.txt"
+      ],
+      "packages": [
+        "pyinstaller"
+      ],
+      "allow_other_packages": false
+    }
+  },
+  "runtime_install_contracts": {
+    "src/services/alphasift_service.py": {
+      "package": "alphasift",
+      "required_flags": [
+        "--no-deps"
+      ]
+    }
+  },
+  "lock_sha256": "2feb81280c211ab64ec206f5c45e63091e7fa91a4c4f0b06df01c39d199acc72"
+}
