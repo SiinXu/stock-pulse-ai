@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { APP_ROUTE_PATHS } from '../../routing/routes';
 import LoginPage from '../LoginPage';
 
 const { connectionState, navigate, useSearchParamsMock, useAuthMock } = vi.hoisted(() => ({
@@ -31,7 +32,9 @@ describe('LoginPage', () => {
     vi.clearAllMocks();
     connectionState.status = 'local-http';
     document.documentElement.className = 'light';
-    useSearchParamsMock.mockReturnValue([new URLSearchParams('redirect=%2Fsettings')]);
+    useSearchParamsMock.mockReturnValue([
+      new URLSearchParams({ redirect: APP_ROUTE_PATHS.settings }),
+    ]);
   });
 
   it('blocks first-time setup when confirmation does not match', async () => {
@@ -70,7 +73,7 @@ describe('LoginPage', () => {
     fireEvent.change(screen.getByLabelText('登录密码'), { target: { value: 'passwd6' } });
     fireEvent.click(screen.getByRole('button', { name: '授权进入工作台' }));
 
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/settings', { replace: true }));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith(APP_ROUTE_PATHS.settings, { replace: true }));
     expect(screen.getByLabelText('登录密码')).toHaveAttribute('data-appearance', 'login');
     expect(screen.getByLabelText('登录密码')).toHaveAttribute('name', 'stockpulse-admin-current-password');
     expect(screen.getByLabelText('登录密码')).toHaveAttribute('autocomplete', 'current-password');

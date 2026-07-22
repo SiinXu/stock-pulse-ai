@@ -20,6 +20,7 @@ import {
   LEGACY_ROUTE_PATHS,
   SETTINGS_ROUTE_QUERY_KEYS,
   SETTINGS_SECTION_IDS,
+  buildSettingsHref,
   buildSettingsSectionHref,
 } from '../src/routing/routes';
 import { loginAsE2eAdmin, updateE2eConfigOutsidePlaywrightTrace } from './auth-fixture';
@@ -32,6 +33,13 @@ const fakeProviderBaseUrl = `http://127.0.0.1:${fakeProviderPort}/v1`;
 const uiLanguageStorageKey = 'dsa.uiLanguage';
 const screeningTaskStorageKey = 'dsa.alphasift.activeScreenTask.v1';
 const usageSettingsHref = buildSettingsSectionHref(SETTINGS_SECTION_IDS.usage);
+const settingsHrefs = {
+  modelConnections: buildSettingsHref({ section: 'ai_models', view: 'connections' }),
+  modelTaskRouting: buildSettingsHref({ section: 'ai_models', view: 'task_routing' }),
+  modelReliability: buildSettingsHref({ section: 'ai_models', view: 'reliability' }),
+  advancedDiagnostics: buildSettingsHref({ section: 'advanced', view: 'diagnostics' }),
+  systemService: buildSettingsHref({ section: 'system_security', view: 'service' }),
+} as const;
 
 const MODEL_KEYS_TO_RESET = [
   'LLM_CONFIG_MODE',
@@ -369,7 +377,7 @@ async function getFakeProviderRequests(page: Page) {
 async function openConnections(page: Page, reset = true) {
   await login(page);
   if (reset) await resetModelConfig(page);
-  await page.goto('/settings?section=ai_models&view=connections');
+  await page.goto(settingsHrefs.modelConnections);
   await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible({ timeout: 15_000 });
 }
 
@@ -708,9 +716,11 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.goto(`${LEGACY_ROUTE_PATHS.usage}?period=today&section=legacy#recent`);
 
     await expect(page.getByRole('heading', {
+      level: 2,
       name: UI_TEXT.en['usage.title'],
       exact: true,
     })).toBeVisible();
+    await expect(page.locator('h1')).toHaveCount(1);
     const redirectedUrl = new URL(page.url());
     expect(redirectedUrl.pathname).toBe(APP_ROUTE_PATHS.settings);
     expect(redirectedUrl.searchParams.get('period')).toBe('today');
@@ -1135,10 +1145,10 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       });
       await route.fulfill({ response, json: { ...body, items } });
     });
-    await page.goto('/settings?section=ai_models&view=connections');
+    await page.goto(settingsHrefs.modelConnections);
     await expect(page.getByRole('button', { name: /添加模型服务/ })).toBeDisabled();
     await expect(page.getByLabel('API 密钥')).toHaveCount(0);
-    await page.goto('/settings?section=advanced&view=diagnostics');
+    await page.goto(settingsHrefs.advancedDiagnostics);
     await expect(page.getByText(/schema_ui_placement_missing/).first()).toBeVisible();
   });
 
@@ -1146,7 +1156,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await login(page);
     await configureConnections(page, [{ id: 'primary_gateway', model: 'shared-model' }]);
     await page.route('**/api/v1/system/config/llm/providers', (route) => fulfillJson(route, {}, 500));
-    await page.goto('/settings?section=ai_models&view=connections');
+    await page.goto(settingsHrefs.modelConnections);
     const card = page.getByTestId('connection-card-primary_gateway');
     await expect(card).toBeVisible();
     await expect(card).toContainText('openai');
@@ -1157,7 +1167,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
   test('22 the UI adds a second Connection for the same Provider without replacing the first', async ({ page }) => {
     await login(page);
     await configureConnections(page, [{ id: 'alpha_conn', model: 'model-alpha' }]);
-    await page.goto('/settings?section=ai_models&view=connections');
+    await page.goto(settingsHrefs.modelConnections);
     await expect(page.getByTestId('connection-card-alpha_conn')).toBeVisible();
     const secondConnectionId = await addOpenAiConnectionThroughUi(page, 'beta_conn', 'model-beta');
     await expect(page.getByTestId('connection-card-alpha_conn')).toContainText('OpenAI');
@@ -1175,7 +1185,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       { id: 'alpha_conn', model: 'shared-model' },
       { id: 'beta_conn', model: 'shared-model' },
     ]);
-    await page.goto('/settings?section=ai_models&view=task_routing');
+    await page.goto(settingsHrefs.modelTaskRouting);
     await page.getByRole('button', { name: '主要模型', exact: true }).click();
     const alphaRef = encodeModelRef('alpha_conn', 'openai/shared-model');
     const betaRef = encodeModelRef('beta_conn', 'openai/shared-model');
@@ -1195,7 +1205,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       { key: 'GENERATION_BACKEND', value: 'litellm' },
       { key: 'GENERATION_FALLBACK_BACKEND', value: '' },
     ]);
-    await page.goto('/settings?section=ai_models&view=task_routing');
+    await page.goto(settingsHrefs.modelTaskRouting);
     const betaRef = encodeModelRef('beta_conn', 'openai/shared-model');
     const autosave = page.waitForResponse((response) => response.url().endsWith('/api/v1/system/config') && response.request().method() === 'PUT');
     await page.getByRole('button', { name: '主要模型', exact: true }).click();
@@ -1319,7 +1329,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
   test('27 Settings autosaves successfully and exposes no global Save action', async ({ page }) => {
     await login(page);
     await configureConnections(page, [{ id: 'alpha_conn', model: 'model-alpha' }]);
-    await page.goto('/settings?section=ai_models&view=connections');
+    await page.goto(settingsHrefs.modelConnections);
     const autosave = page.waitForResponse((response) => response.url().endsWith('/api/v1/system/config') && response.request().method() === 'PUT');
     await editConnectionAddModel(page, 'alpha_conn', 'model-autosaved');
     expect((await autosave).status()).toBe(200);
@@ -1332,7 +1342,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
   test('28 Settings autosave failure preserves draft, blocks leaving, and succeeds on explicit retry', async ({ page }) => {
     await login(page);
     await configureConnections(page, [{ id: 'alpha_conn', model: 'model-alpha' }]);
-    await page.goto('/settings?section=ai_models&view=connections');
+    await page.goto(settingsHrefs.modelConnections);
     await page.route('**/api/v1/system/config', async (route) => {
       if (route.request().method() === 'PUT') {
         await fulfillJson(route, { error: 'config_save_failed', message: 'raw save failure', params: {} }, 500);
@@ -1357,7 +1367,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
   test('29 Settings 409 conflict exposes both versions and recovers by keeping the local draft', async ({ page }) => {
     await login(page);
     await configureConnections(page, [{ id: 'alpha_conn', model: 'model-alpha' }]);
-    await page.goto('/settings?section=ai_models&view=connections');
+    await page.goto(settingsHrefs.modelConnections);
     const baseConfig = await currentConfig(page);
     const baseModels = baseConfig.items.find((item) => item.key === 'LLM_ALPHA_CONN_MODELS')?.value;
     expect(baseModels).toBe('model-alpha');
@@ -1395,7 +1405,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
   test('30 Model Access and Task Routing round-trip refreshes models and preserves navigation source', async ({ page }) => {
     await login(page);
     await resetModelConfig(page);
-    await page.goto('/settings?section=ai_models&view=task_routing');
+    await page.goto(settingsHrefs.modelTaskRouting);
     await page.getByRole('button', { name: '前往模型接入' }).click();
     await expect(page).toHaveURL(/view=connections&from=task_routing/);
     const connectionId = await addOpenAiConnectionThroughUi(page, 'alpha_conn', 'round-trip-model');
@@ -2046,7 +2056,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await assertNoDocumentOverflow(page, '/backtest');
     await assertNoDocumentOverflow(page, '/alerts');
     await assertNoDocumentOverflow(page, usageSettingsHref);
-    await assertNoDocumentOverflow(page, '/settings');
+    await assertNoDocumentOverflow(page, APP_ROUTE_PATHS.settings);
     await assertNoDocumentOverflow(page, '/missing-responsive-route');
   });
 
@@ -2066,7 +2076,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     const homeDarkContrast = await getElementContrast(homeText);
     expect(homeDarkContrast).not.toEqual(homeLightContrast);
 
-    await page.goto('/settings?section=ai_models&view=connections');
+    await page.goto(settingsHrefs.modelConnections);
     const settingsHeading = page.getByRole('heading', { name: '系统设置' });
     const settingsBody = page.getByText('统一管理模型、数据源、通知、安全认证与导入能力。', { exact: true });
     await expect(settingsHeading).toBeVisible();
@@ -2120,7 +2130,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
         { key: 'LITELLM_FALLBACK_MODELS', value: betaRef },
       ]);
 
-      await page.goto('/settings?section=ai_models&view=task_routing');
+      await page.goto(settingsHrefs.modelTaskRouting);
       const primaryModel = page.getByRole('button', { name: '主要模型', exact: true });
       await expectMinimumTouchTarget(primaryModel);
       await primaryModel.click();
@@ -2128,7 +2138,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       await expectMinimumTouchTarget(betaOption);
       await page.keyboard.press('Escape');
 
-      await page.goto('/settings?section=ai_models&view=reliability');
+      await page.goto(settingsHrefs.modelReliability);
       const fallbackSelector = page.getByRole('button', { name: '选择备用模型', exact: true });
       await expectMinimumTouchTarget(fallbackSelector);
       await expectMinimumTouchTarget(page.getByRole('button', { name: /移除模型 model-beta/ }));
@@ -2164,7 +2174,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       const fallbackCheckbox = page.getByRole('checkbox', { name: /model-beta/ });
       await expectMinimumTouchTarget(fallbackCheckbox.locator('xpath=ancestor::label'));
 
-      await page.goto('/settings?section=system_security&view=service');
+      await page.goto(settingsHrefs.systemService);
       const logLevelSelect = page.getByRole('combobox', { name: '日志级别', exact: true });
       await expectMinimumTouchTarget(logLevelSelect);
       await logLevelSelect.click();

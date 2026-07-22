@@ -1,11 +1,14 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { expect, test, type ConsoleMessage, type Request } from '@playwright/test';
+import { buildSettingsHref } from '../src/routing/routes';
 import { getE2eAuthStatus, loginAsE2eAdmin } from './auth-fixture';
 
 const firstRunPassword = process.env.DSA_WEB_SMOKE_PASSWORD || 'dsa-e2e-smoke';
 const interactionCanary = process.env.DSA_PLAYWRIGHT_ARTIFACT_CANARY
   || 'stockpulse-e2e-credential-interaction-canary';
+const baseSettingsHref = buildSettingsHref({ section: 'base', view: 'base' });
+const modelConnectionsHref = buildSettingsHref({ section: 'ai_models', view: 'connections' });
 
 function isCredentialSideEffect(request: Request): boolean {
   const { pathname } = new URL(request.url());
@@ -37,7 +40,7 @@ test('first admin password stays isolated from the first-run Provider API key', 
     });
   });
 
-  await page.goto('/login?redirect=%2Fsettings%3Fsection%3Dbase%26view%3Dbase');
+  await page.goto(`/login?${new URLSearchParams({ redirect: baseSettingsHref })}`);
   const adminPassword = page.getByLabel('管理员密码');
   const confirmation = page.getByLabel('确认密码');
   await expect(adminPassword).toHaveAttribute('name', 'stockpulse-admin-new-password');
@@ -53,7 +56,7 @@ test('first admin password stays isolated from the first-run Provider API key', 
     )),
     page.getByRole('button', { name: '完成设置并登录' }).click(),
   ]);
-  await page.waitForURL(/\/settings\?section=base&view=base$/);
+  await page.waitForURL(`**${baseSettingsHref}`);
 
   await page.getByRole('button', { name: '启动向导' }).click();
   const dialog = page.getByRole('dialog', { name: '快速配置向导' });
@@ -81,7 +84,7 @@ test('first admin password stays isolated from the first-run Provider API key', 
 test('Provider secret reveal, native copy, and clear stay out of diagnostics', async ({ page }, testInfo) => {
   expect(testInfo.project.use.trace, 'credential-bearing acceptance must not create browser traces').toBe('off');
   await loginAsE2eAdmin(page);
-  await page.goto('/settings?section=ai_models&view=connections');
+  await page.goto(modelConnectionsHref);
   await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible({ timeout: 15_000 });
   await page.getByRole('button', { name: /添加模型服务/ }).first().click();
   const dialog = page.getByRole('dialog', { name: '添加模型服务' });

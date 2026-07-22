@@ -37,6 +37,7 @@ import { buildDeepLink } from '../utils/deepLink';
 import { normalizeStockCode } from '../utils/stockCode';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
 import { getUiListSeparator } from '../utils/uiLocale';
+import { APP_ROUTE_PATHS } from '../routing/routes';
 
 type MarketReviewNotice = {
   variant: 'success' | 'warning' | 'danger';
@@ -1665,7 +1666,7 @@ const HomePage: React.FC = () => {
                   type="button"
                   variant="secondary"
                   size="default"
-                  onClick={() => navigate('/settings')}
+                  onClick={() => navigate(APP_ROUTE_PATHS.settings)}
                 >
                   {t('home.goSettings')}
                 </Button>

@@ -1,6 +1,8 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
+import { APP_ROUTE_PATHS } from '../../routing/routes';
 import TokenUsagePage from '../TokenUsagePage';
 
 const { get } = vi.hoisted(() => ({
@@ -84,11 +86,19 @@ function createDeferred<T>() {
   return { promise, resolve, reject };
 }
 
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location-probe">{location.pathname}</div>;
+}
+
 function renderPage({ embedded = false }: { embedded?: boolean } = {}) {
   return render(
-    <UiLanguageProvider>
-      <TokenUsagePage embedded={embedded} />
-    </UiLanguageProvider>
+    <MemoryRouter initialEntries={[APP_ROUTE_PATHS.settings]}>
+      <UiLanguageProvider>
+        <TokenUsagePage embedded={embedded} />
+        <LocationProbe />
+      </UiLanguageProvider>
+    </MemoryRouter>
   );
 }
 
@@ -102,9 +112,19 @@ beforeEach(() => {
 describe('TokenUsagePage', () => {
   it('leaves page-shell and document-title ownership to the Settings host when embedded', async () => {
     document.title = 'Settings host';
-    const { container } = renderPage({ embedded: true });
+    const { container } = render(
+      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.settings]}>
+        <UiLanguageProvider>
+          <main>
+            <h1>系统设置</h1>
+            <TokenUsagePage embedded />
+          </main>
+        </UiLanguageProvider>
+      </MemoryRouter>,
+    );
 
-    expect(await screen.findByRole('heading', { name: 'Token 用量监控' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 2, name: 'Token 用量监控' })).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(document.title).toBe('Settings host');
     expect(container.querySelector('[data-pattern="app-page"]')).toBeNull();
   });
@@ -144,6 +164,9 @@ describe('TokenUsagePage', () => {
     expect(container.querySelectorAll('[data-state-panel="empty"]')).toHaveLength(1);
     expect(screen.queryByText('总 Token')).not.toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '开始分析' }));
+    expect(screen.getByTestId('location-probe')).toHaveTextContent(APP_ROUTE_PATHS.home);
 
     get.mockRejectedValueOnce(new Error('refresh unavailable'));
     fireEvent.click(screen.getByRole('button', { name: '刷新' }));

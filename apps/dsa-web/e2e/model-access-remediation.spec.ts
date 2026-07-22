@@ -1,6 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { expect, test, type Page } from '@playwright/test';
+import { APP_ROUTE_PATHS, buildSettingsHref } from '../src/routing/routes';
 import { encodeModelRef } from '../src/utils/modelRef';
 import { loginAsE2eAdmin } from './auth-fixture';
 
@@ -108,7 +109,7 @@ async function resetModelConfig(page: Page) {
 
 async function openSettings(page: Page) {
   await login(page);
-  await page.goto('/settings');
+  await page.goto(APP_ROUTE_PATHS.settings);
   await expect(page.getByRole('heading', { name: '系统设置' })).toBeVisible({ timeout: 15_000 });
 }
 
@@ -117,7 +118,7 @@ async function openConnections(page: Page, reset = true) {
   if (reset) {
     await resetModelConfig(page);
   }
-  await page.goto('/settings?section=ai_models&view=connections');
+  await page.goto(buildSettingsHref({ section: 'ai_models', view: 'connections' }));
   await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible({ timeout: 15_000 });
 }
 
@@ -273,7 +274,7 @@ test.describe('model access product convergence', () => {
 
   test('02 legacy provider URLs replace-redirect to Model Access', async ({ page }) => {
     await login(page);
-    await page.goto('/settings?category=ai_model&sub=providers');
+    await page.goto(buildSettingsHref({ legacyCategory: 'ai_model', legacySub: 'providers' }));
     await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible();
     await expect.poll(() => page.url()).toContain('section=ai_models');
     expect(page.url()).toContain('view=connections');
@@ -717,7 +718,7 @@ test.describe('model access product convergence', () => {
     await login(page);
     await resetModelConfig(page);
     await page.route('**/api/v1/system/config/llm/available-models', (route) => route.fulfill({ status: 500, body: '{}' }));
-    await page.goto('/settings?section=ai_models&view=task_routing');
+    await page.goto(buildSettingsHref({ section: 'ai_models', view: 'task_routing' }));
     await expect(page.getByText(/可用模型加载失败/)).toBeVisible();
     await expect(page.getByRole('button', { name: /重试|重新加载/ })).toBeVisible();
     await expect(page.getByText('还没有可用模型')).toHaveCount(0);
@@ -878,7 +879,7 @@ test.describe('model access product convergence', () => {
   test('28 developer diagnostics is a dedicated uncollapsed Advanced tab', async ({ page }) => {
     await openSettings(page);
     // Backend Status keeps the banner/status panels on the default tab.
-    await page.goto('/settings?section=advanced&view=raw_config');
+    await page.goto(buildSettingsHref({ section: 'advanced', view: 'raw_config' }));
     await expect(page.getByTestId('generation-backend-status-panel')).toBeVisible();
     // Developer fields moved to their own tab and render without a collapsible.
     await page.getByRole('tab', { name: '开发者诊断' }).click();

@@ -1,13 +1,15 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
+import { buildSettingsHref } from '../../routing/routes';
 import { resolveLoginRedirect } from '../loginRedirect';
 
 describe('resolveLoginRedirect', () => {
   it('returns same-origin absolute paths including query strings', () => {
     expect(resolveLoginRedirect('?redirect=%2Fportfolio')).toBe('/portfolio');
-    expect(resolveLoginRedirect('?redirect=%2Fsettings%3Fsection%3Dai_models%26view%3Dconnections'))
-      .toBe('/settings?section=ai_models&view=connections');
+    const settingsHref = buildSettingsHref({ section: 'ai_models', view: 'connections' });
+    expect(resolveLoginRedirect(`?${new URLSearchParams({ redirect: settingsHref })}`))
+      .toBe(settingsHref);
     expect(resolveLoginRedirect('?redirect=%2Fportfolio%3Ftab%3Dwatchlist%23saved')).toBe(
       '/portfolio?tab=watchlist#saved',
     );

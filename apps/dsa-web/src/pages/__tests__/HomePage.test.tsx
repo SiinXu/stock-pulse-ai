@@ -12,6 +12,7 @@ import { useStockPoolStore } from '../../stores/stockPoolStore';
 import type { RunFlowSnapshot } from '../../types/runFlow';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
+import { APP_ROUTE_PATHS } from '../../routing/routes';
 import HomePage from '../HomePage';
 
 const navigateMock = vi.fn();
@@ -1911,7 +1912,7 @@ describe('HomePage', () => {
     expect(await screen.findByText('基础配置未完成')).toBeInTheDocument();
     expect(screen.getByText(/LLM 主渠道、自选股/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '去配置' }));
-    expect(navigateMock).toHaveBeenCalledWith('/settings');
+    expect(navigateMock).toHaveBeenCalledWith(APP_ROUTE_PATHS.settings);
   });
 
   it('navigates to chat with report context when asking a follow-up question', async () => {
