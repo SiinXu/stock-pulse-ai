@@ -82,12 +82,15 @@ that are inactive on the CI host. Conflicting platform versions are split into
 collision-free audit batches. Immutable VCS sources are reported separately
 because they are not present in the PyPI advisory database; all other skips fail.
 
-`.github/requirements-review.txt` is the reviewed review-tool manifest. During
-its bootstrap PR, the read-only static job consumes it while the secret-bearing
-AI job retains its existing hardcoded install. After the manifest is present on
-the default branch, the closing #326 follow-up must make that job consume only
-the trusted default-branch manifest and lock; it must never install PR-controlled
-dependency inputs before injecting review secrets.
+`.github/requirements-review.txt` is the reviewed review-tool manifest. The
+read-only static job consumes the pull-request copy because it receives no
+secrets. The secret-bearing AI job instead checks out the manifest,
+`constraints.txt`, `build-constraints.txt`, and the review script from the
+immutable pull-request base commit (or the current commit for a manual dispatch)
+before installing dependencies. It never installs pull-request-controlled
+dependency inputs before injecting review secrets. The
+workflow guard enforces this trust boundary, rejects additional sparse-checkout
+paths or install steps, and prevents secrets from being injected before install.
 
 ## GitHub Actions
 
@@ -220,6 +223,8 @@ python scripts/check_workflow_supply_chain.py
 python scripts/check_dependency_locks.py --self-test
 python scripts/check_dependency_locks.py
 python scripts/check_dependency_locks.py --verify-generated
+python scripts/check_install_guidance.py --self-test
+python scripts/check_install_guidance.py
 python scripts/check_dependency_vulnerabilities.py --self-test
 python scripts/check_dependency_vulnerabilities.py
 python -c "import glob,yaml;[yaml.safe_load(open(path)) for path in glob.glob('.github/workflows/*.yml')]"
@@ -229,13 +234,23 @@ actionlint .github/workflows/*.yml
 The self-tests cover compliant manifests, a representative immutable pin
 update, conventionally formatted and flow-mapped movable references, floating
 release comments, missing permission declarations, top-level write access,
-active/expired/overlong exceptions, and unapproved read or write scopes.
+active/expired/overlong exceptions, unapproved read or write scopes, and the
+immutable trusted-base dependency boundary for the secret-bearing review job.
 The dependency self-tests separately cover source and lock drift, lock and direct
 movable Git sources, non-exact versions, future cutoffs, overlapping markers,
 runtime install contracts, active/expired/overlong exceptions, resolver-output
 drift, and a representative reviewed dependency update. Vulnerability self-tests
 cover findings, exact active exceptions, expired/overlong/unused exceptions,
 allowed versus unexpected audit skips, and complete multi-version audit planning.
+
+The install-guidance guard scans git-tracked text for raw requirements-file
+install hints. A temporary cross-track exception must identify the exact path,
+line-text SHA-256, occurrence count, owner, issue, reason, and an expiry no more
+than 30 days away. Text or count drift, unused entries, and expired or overlong
+exceptions fail CI. Issue #400 owns removal of the current runtime, Web, CLI,
+and tool-diagnostic exceptions; maintained Markdown setup instructions are
+converged separately by #394. Historical Changelog entries are not executable
+guidance and are excluded from this scan.
 
 For a bad Action update, revert the affected workflow file to its last reviewed
 SHA and release comment, then rerun the same checks. For a permission regression,

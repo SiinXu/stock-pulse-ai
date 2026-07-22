@@ -23,6 +23,29 @@ MAX_EXCEPTION_DAYS = 30
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 RELEASE_RE = re.compile(r"^v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$")
 DOCKER_DIGEST_RE = re.compile(r"^docker://.+@sha256:[0-9a-f]{64}$")
+PIP_INSTALL_RE = re.compile(
+    r"\b(?:python(?:3(?:\.\d+)?)?\s+-m\s+)?pip3?\s+install\b"
+)
+
+PR_REVIEW_WORKFLOW = ".github/workflows/pr-review.yml"
+TRUSTED_REVIEW_CHECKOUT_ID = "trusted-review-inputs"
+TRUSTED_REVIEW_INSTALL_ID = "install-trusted-review-dependencies"
+TRUSTED_REVIEW_STEP_ID = "run-ai-review"
+TRUSTED_REVIEW_SPARSE_PATHS = frozenset(
+    {
+        ".github/scripts",
+        ".github/requirements-review.txt",
+        "constraints.txt",
+        "build-constraints.txt",
+    }
+)
+TRUSTED_REVIEW_INSTALL_LINES = (
+    "python -m pip install --upgrade --constraint main-scripts/constraints.txt pip",
+    "python -m pip install --build-constraint main-scripts/build-constraints.txt "
+    "-r main-scripts/.github/requirements-review.txt",
+    "python -m pip check",
+)
+TRUSTED_REVIEW_REF = "${{ github.event.pull_request.base.sha || github.sha }}"
 
 # Every job permission is part of the reviewed contract, including read access.
 APPROVED_JOB_PERMISSIONS = frozenset(
@@ -120,6 +143,36 @@ def _load_exceptions(path: Path, today: date) -> tuple[dict[tuple[str, str, str]
 
 def _mapping_values(node: MappingNode, key: str) -> list[Node]:
     return [value for candidate, value in node.value if isinstance(candidate, ScalarNode) and candidate.value == key]
+
+
+def _named_mapping_value(node: MappingNode, key: str) -> MappingNode | None:
+    """Return one named child mapping when it is declared exactly once."""
+    values = _mapping_values(node, key)
+    if len(values) == 1 and isinstance(values[0], MappingNode):
+        return values[0]
+    return None
+
+
+def _scalar_value(node: MappingNode, key: str) -> str | None:
+    """Return one named scalar value when it is declared exactly once."""
+    values = _mapping_values(node, key)
+    if len(values) == 1 and isinstance(values[0], ScalarNode):
+        return values[0].value
+    return None
+
+
+def _contains_secret_expression(node: Node) -> bool:
+    """Report whether a YAML node contains a GitHub secret expression."""
+    if isinstance(node, ScalarNode):
+        return "secrets." in node.value
+    if isinstance(node, MappingNode):
+        return any(
+            _contains_secret_expression(key) or _contains_secret_expression(value)
+            for key, value in node.value
+        )
+    if isinstance(node, SequenceNode):
+        return any(_contains_secret_expression(value) for value in node.value)
+    return False
 
 
 def _uses_nodes(node: Node) -> Iterable[ScalarNode]:
@@ -235,6 +288,102 @@ def _action_errors(
     return errors
 
 
+def _trusted_review_dependency_errors(document: Node, relative_path: str) -> list[str]:
+    """Keep secret-bearing review installs on immutable trusted-base inputs."""
+    if relative_path != PR_REVIEW_WORKFLOW or not isinstance(document, MappingNode):
+        return []
+
+    errors: list[str] = []
+    jobs = _named_mapping_value(document, "jobs")
+    ai_review = _named_mapping_value(jobs, "ai-review") if jobs is not None else None
+    if ai_review is None:
+        return [f"{relative_path}: missing the reviewed 'ai-review' job"]
+
+    steps_values = _mapping_values(ai_review, "steps")
+    if len(steps_values) != 1 or not isinstance(steps_values[0], SequenceNode):
+        return [f"{relative_path}: ai-review must declare one steps sequence"]
+    steps = [step for step in steps_values[0].value if isinstance(step, MappingNode)]
+
+    identified_steps: dict[str, tuple[int, MappingNode]] = {}
+    for index, step in enumerate(steps):
+        step_id = _scalar_value(step, "id")
+        if step_id is not None:
+            identified_steps[step_id] = (index, step)
+
+    checkout_index: int | None = None
+    checkout_entry = identified_steps.get(TRUSTED_REVIEW_CHECKOUT_ID)
+    if checkout_entry is None:
+        errors.append(f"{relative_path}: ai-review is missing its trusted-base checkout")
+    else:
+        checkout_index, checkout_step = checkout_entry
+        checkout_action = _scalar_value(checkout_step, "uses") or ""
+        if not checkout_action.startswith("actions/checkout@"):
+            errors.append(f"{relative_path}: trusted review inputs must use actions/checkout")
+        checkout_with = _named_mapping_value(checkout_step, "with")
+        if checkout_with is None:
+            errors.append(f"{relative_path}: trusted review checkout must declare inputs")
+        else:
+            if _scalar_value(checkout_with, "ref") != TRUSTED_REVIEW_REF:
+                errors.append(f"{relative_path}: review dependencies must be pinned to the trusted base commit")
+            if _scalar_value(checkout_with, "path") != "main-scripts":
+                errors.append(f"{relative_path}: trusted review checkout path must be 'main-scripts'")
+            sparse_checkout = _scalar_value(checkout_with, "sparse-checkout") or ""
+            sparse_paths = {line.strip() for line in sparse_checkout.splitlines() if line.strip()}
+            if sparse_paths != TRUSTED_REVIEW_SPARSE_PATHS:
+                errors.append(
+                    f"{relative_path}: trusted review checkout must contain exactly "
+                    f"{sorted(TRUSTED_REVIEW_SPARSE_PATHS)}"
+                )
+            if _scalar_value(checkout_with, "sparse-checkout-cone-mode") != "false":
+                errors.append(f"{relative_path}: trusted review checkout must disable sparse-checkout cone mode")
+
+    install_entry = identified_steps.get(TRUSTED_REVIEW_INSTALL_ID)
+    review_entry = identified_steps.get(TRUSTED_REVIEW_STEP_ID)
+    if install_entry is None:
+        errors.append(f"{relative_path}: ai-review is missing its reviewed dependency install step")
+    else:
+        install_index, install_step = install_entry
+        install_run = _scalar_value(install_step, "run") or ""
+        install_lines = tuple(line.strip() for line in install_run.splitlines() if line.strip())
+        if install_lines != TRUSTED_REVIEW_INSTALL_LINES:
+            errors.append(
+                f"{relative_path}: ai-review dependency step must use the trusted manifest, lock, "
+                "build constraint, and pip check"
+            )
+        if _mapping_values(install_step, "working-directory"):
+            errors.append(f"{relative_path}: trusted dependency install must not run from PR-controlled code")
+        if _contains_secret_expression(install_step):
+            errors.append(f"{relative_path}: dependency installation must run before secrets are injected")
+        if review_entry is not None and install_index >= review_entry[0]:
+            errors.append(f"{relative_path}: dependency installation must precede the secret-bearing review step")
+        if checkout_index is not None and checkout_index >= install_index:
+            errors.append(f"{relative_path}: trusted dependency checkout must precede installation")
+
+        job_env = _named_mapping_value(ai_review, "env")
+        if job_env is not None and _contains_secret_expression(job_env):
+            errors.append(f"{relative_path}: ai-review must not inject secrets at job scope")
+        for prior_step in steps[:install_index]:
+            if _contains_secret_expression(prior_step):
+                errors.append(f"{relative_path}: dependency installation must precede every secret-bearing step")
+
+    if review_entry is None:
+        errors.append(f"{relative_path}: ai-review is missing its secret-bearing review step")
+    else:
+        _, review_step = review_entry
+        if not _contains_secret_expression(review_step):
+            errors.append(f"{relative_path}: reviewed AI step no longer contains the expected secret boundary")
+        if _scalar_value(review_step, "run") != "python ../main-scripts/.github/scripts/ai_review.py":
+            errors.append(f"{relative_path}: AI review must execute the trusted-base script")
+
+    for step in steps:
+        run = _scalar_value(step, "run") or ""
+        if PIP_INSTALL_RE.search(run) and _scalar_value(step, "id") != TRUSTED_REVIEW_INSTALL_ID:
+            errors.append(
+                f"{relative_path}: only the reviewed dependency step may install packages in ai-review"
+            )
+    return errors
+
+
 def check_repository(
     root: Path,
     workflow_dir: Path,
@@ -268,6 +417,7 @@ def check_repository(
         errors.extend(permission_errors)
         actual_permissions.update(workflow_permissions)
         errors.extend(_action_errors(document, lines, relative_path, exceptions, used_exceptions))
+        errors.extend(_trusted_review_dependency_errors(document, relative_path))
 
     for path, job, scope, access in sorted(actual_permissions - approved_job_permissions):
         errors.append(f"{path}: job '{job}' has unapproved '{scope}: {access}' permission")
@@ -286,12 +436,13 @@ def _fixture_errors(
     exceptions: Iterable[dict[str, str]] = (),
     today: date,
     approved_permissions: frozenset[tuple[str, str, str, str]],
+    workflow_name: str = "fixture.yml",
 ) -> list[str]:
     with tempfile.TemporaryDirectory() as temporary_directory:
         root = Path(temporary_directory)
         workflow_dir = root / ".github" / "workflows"
         workflow_dir.mkdir(parents=True)
-        (workflow_dir / "fixture.yml").write_text(workflow, encoding="utf-8")
+        (workflow_dir / workflow_name).write_text(workflow, encoding="utf-8")
         exception_path = root / "exceptions.json"
         exception_path.write_text(json.dumps({"exceptions": list(exceptions)}), encoding="utf-8")
         return check_repository(
@@ -385,7 +536,118 @@ jobs:
     approved_write = frozenset({(fixture_path, "check", "issues", "write")})
     if errors := fixture_errors(write_fixture, approved_permissions=approved_write):
         raise AssertionError(f"approved write fixture failed: {errors!r}")
-    print("Workflow supply-chain self-tests passed (16 cases).")
+
+    trusted_path = PR_REVIEW_WORKFLOW
+    trusted_permissions = frozenset({(trusted_path, "ai-review", "contents", "read")})
+    trusted_review = f"""name: PR Review
+permissions: {{}}
+on: pull_request
+jobs:
+  ai-review:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout trusted inputs
+        id: {TRUSTED_REVIEW_CHECKOUT_ID}
+        uses: actions/checkout@{sha} # v5.1.0
+        with:
+          ref: {TRUSTED_REVIEW_REF}
+          sparse-checkout: |
+            .github/scripts
+            .github/requirements-review.txt
+            constraints.txt
+            build-constraints.txt
+          sparse-checkout-cone-mode: false
+          path: main-scripts
+      - name: Install trusted dependencies
+        id: {TRUSTED_REVIEW_INSTALL_ID}
+        run: |
+          {TRUSTED_REVIEW_INSTALL_LINES[0]}
+          {TRUSTED_REVIEW_INSTALL_LINES[1]}
+          {TRUSTED_REVIEW_INSTALL_LINES[2]}
+      - name: Run AI review
+        id: {TRUSTED_REVIEW_STEP_ID}
+        working-directory: pr-code
+        env:
+          OPENAI_API_KEY: ${{{{ secrets.OPENAI_API_KEY }}}}
+        run: python ../main-scripts/.github/scripts/ai_review.py
+"""
+
+    def trusted_errors(workflow: str) -> list[str]:
+        """Validate one isolated secret-bearing review workflow fixture."""
+        return _fixture_errors(
+            workflow,
+            today=today,
+            approved_permissions=trusted_permissions,
+            workflow_name="pr-review.yml",
+        )
+
+    if errors := trusted_errors(trusted_review):
+        raise AssertionError(f"trusted review fixture failed: {errors!r}")
+    _expect_failure(
+        trusted_errors(
+            trusted_review.replace(
+                "main-scripts/.github/requirements-review.txt",
+                "pr-code/requirements.txt",
+            )
+        ),
+        "trusted manifest",
+    )
+    _expect_failure(
+        trusted_errors(trusted_review.replace("            build-constraints.txt\n", "")),
+        "contain exactly",
+    )
+    _expect_failure(
+        trusted_errors(
+            trusted_review.replace(
+                "            build-constraints.txt\n",
+                "            build-constraints.txt\n            docs\n",
+            )
+        ),
+        "contain exactly",
+    )
+    _expect_failure(
+        trusted_errors(trusted_review.replace("          sparse-checkout-cone-mode: false\n", "")),
+        "disable sparse-checkout cone mode",
+    )
+    _expect_failure(
+        trusted_errors(
+            trusted_review.replace(
+                "      - name: Install trusted dependencies\n",
+                "      - name: Premature secret use\n"
+                "        env:\n"
+                "          TOKEN: ${{ secrets.REVIEW_TOKEN }}\n"
+                "        run: echo guarded\n"
+                "      - name: Install trusted dependencies\n",
+            )
+        ),
+        "precede every secret-bearing step",
+    )
+    _expect_failure(
+        trusted_errors(
+            trusted_review.replace(
+                "    runs-on: ubuntu-latest\n",
+                "    runs-on: ubuntu-latest\n"
+                "    env:\n"
+                "      TOKEN: ${{ secrets.REVIEW_TOKEN }}\n",
+            )
+        ),
+        "must not inject secrets at job scope",
+    )
+    _expect_failure(
+        trusted_errors(
+            trusted_review.replace(
+                "      - name: Run AI review\n",
+                "      - name: Install pull-request plugin\n"
+                "        run: python3 -m pip "
+                "install -r pr-code/requirements.txt\n"
+                "      - name: Run AI review\n",
+            )
+        ),
+        "only the reviewed dependency step",
+    )
+    print("Workflow supply-chain self-tests passed (24 cases).")
 
 
 def parse_args() -> argparse.Namespace:
