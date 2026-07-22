@@ -22,9 +22,10 @@ import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../../utils
 import { formatDateTime } from '../../utils/format';
 import { truncateStockName } from '../../utils/stockName';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import type { HomeWorkspaceView } from '../../utils/deepLink';
 import type { UiTextKey, UiTextParams } from '../../i18n/uiText';
 
-export type HomeWorkspaceTab = 'watchlist' | 'today' | 'history';
+export type HomeWorkspaceTab = HomeWorkspaceView;
 export type WatchlistAnalyzeMode = 'all' | 'pending';
 
 export interface HomeWatchlistRow {
