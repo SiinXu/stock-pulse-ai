@@ -20,6 +20,8 @@ flake8_checks() {
 
 deterministic_checks() {
   echo "==> backend-gate: local deterministic checks"
+  python scripts/check_workflow_supply_chain.py --self-test
+  python scripts/check_workflow_supply_chain.py
   ./scripts/test.sh code
   ./scripts/test.sh yfinance
 }

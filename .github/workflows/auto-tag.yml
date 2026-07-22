@@ -1,5 +1,7 @@
 name: Auto Tag
 
+permissions: {}
+
 # Trigger when code is pushed to the main branch.
 on:
   push:
@@ -26,12 +28,12 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
 
       - name: Bump version and push tag
-        uses: anothrNick/github-tag-action@v1
+        uses: anothrNick/github-tag-action@4ed44965e0db8dab2b466a16da04aec3cc312fd8 # 1.75.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WITH_V: true

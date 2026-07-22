@@ -1,5 +1,7 @@
 name: Network Smoke
 
+permissions: {}
+
 on:
   schedule:
     - cron: '0 2 * * 1-5'
@@ -16,10 +18,10 @@ jobs:
       contents: read
     steps:
       - name: 📥 Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: 🐍 Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.11'
           cache: 'pip'
@@ -44,7 +46,7 @@ jobs:
 
       - name: 📤 Upload smoke logs
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: network-smoke-logs-${{ github.run_number }}
           path: |
