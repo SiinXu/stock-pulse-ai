@@ -276,6 +276,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Registered a guarded `stockpulse://` desktop protocol with allowlisted private-origin routing, macOS `open-url`, second-instance forwarding, packaging metadata, and lifecycle regression coverage.
 - [Added] Added the validated plugin manifest, isolated lifecycle manager, ownership-aware extension registry, and explicit trusted-directory plugin loader without startup wiring.
 - [Fixed] Enforced a shared fail-closed outbound HTTP policy for search, intelligence, custom model endpoints, webhooks, and notification tests with connection-time DNS checks, bounded redirects and responses, credential stripping, and an explicit self-host allowlist.
+- [Docs] Documented analysis-execution and business-capability responsibility layers plus the product Skill/Strategy loading, routing, evidence, and compatibility boundaries.
 
 ## [3.26.3] - 2026-07-15
 

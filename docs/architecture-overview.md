@@ -170,6 +170,93 @@ circuit, cache freshness, and stale-window rules are defined in
 | `render` | Generate the selected report representation and persist local report artifacts. | report schema, renderer, templates, delivery stage |
 | `dispatch` | Isolate notification and contextual-reply attempts across configured delivery channels. | delivery stage and notification modules |
 
+## Product Skill And Strategy Execution
+
+Product terminology is **Skill**; **Strategy** remains in user-facing trading
+language and compatibility names. The current implementation has one product
+runtime authority, not parallel Skill and Strategy engines.
+
+```mermaid
+flowchart TB
+  BUILTIN[Built-in definitions<br/>strategies/*.yaml] -->|load| MANAGER[SkillManager<br/>src/agent/skills/base.py]
+  CUSTOM[Configured custom directory<br/>top-level YAML or nested SKILL.md] -->|load; same name overrides built-in| MANAGER
+  MANAGER -->|catalog clone and activation| ASSEMBLY[Runtime assembly<br/>src/agent/runtime_assembly.py]
+
+  ASSEMBLY -->|active instructions| SINGLE[Single-Agent prompt path]
+  SINGLE -->|guarded analysis result| RESULT[Analysis result and dashboard]
+
+  ASSEMBLY -->|active instructions and catalog| MULTI[Multi-Agent orchestration]
+  MULTI -->|technical, intelligence, and risk opinions| ENGINE[StrategyEngine<br/>partition, aggregate, synthesize]
+  MULTI -->|specialist mode only, after technical opinion| ROUTER[SkillRouter]
+  MANAGER -->|available catalog| ROUTER
+  ROUTER -->|up to three selected skill ids| AGENTS[SkillAgent specialists]
+  MANAGER -->|registered definition and required tools| AGENTS
+  AGENTS -->|skill opinions| ENGINE
+  ENGINE -->|valid evidence and consensus| DECISION[DecisionAgent]
+  ENGINE -->|deterministic strategy_synthesis when skill evidence exists| RESULT
+  DECISION -->|guarded decision| RESULT
+  RESULT -->|eligible run outputs| CONSUMERS[History and reports]
+```
+
+The flow has two execution shapes:
+
+1. `SkillManager` loads built-in top-level YAML definitions from `strategies/`
+   and, when `AGENT_SKILL_DIR` is configured, top-level `*.yaml` / `*.yml` files
+   plus nested `SKILL.md` bundles from that custom directory. A custom definition
+   with the same name replaces the built-in catalog entry.
+2. `src/agent/runtime_assembly.py` caches the disk-loaded prototype, returns an
+   isolated clone per assembly, resolves active skills, and supplies their prompt
+   instructions to both Single-Agent and Multi-Agent paths. `src/agent/factory.py`
+   preserves the legacy assembly import and patch surface.
+3. In Multi-Agent `specialist` mode only, `SkillRouter` selects explicit,
+   manually configured, market-regime, or default skills after the technical
+   opinion exists. At most three `SkillAgent` specialists execute their selected
+   definitions. Other modes can still receive active skill prompt instructions
+   without creating specialist agents.
+4. `StrategyEngine` is the current class name for the authoritative skill-opinion
+   evidence facade. It removes invalid skill signals to diagnostics, retains
+   valid and non-skill opinions, applies eligible aggregation and synthesis, and
+   provides the consensus evidence consumed by `DecisionAgent`. Backtest history
+   can influence eligible skill weights; Backtesting does not become a Pipeline
+   stage.
+5. The orchestrator rejects an LLM-authored `strategy_synthesis` and attaches the
+   deterministic engine result to the dashboard. History and report renderers
+   consume that evidence downstream.
+
+| Surface | Current role | Boundary |
+| --- | --- | --- |
+| `strategies/` | Built-in natural-language Skill definitions in top-level YAML files; the directory name is retained for product language and compatibility | Definition catalog, not a second loader or execution engine |
+| Configured `AGENT_SKILL_DIR` | Optional custom top-level YAML definitions and nested `SKILL.md` bundles | Custom names can override built-ins; no directory is loaded when the setting is empty |
+| `src/agent/skills/` | Canonical product runtime: model, loaders, `SkillManager`, defaults, `SkillRouter`, `SkillAgent`, aggregation, synthesis, and `StrategyEngine` | Source of truth for current Skill/Strategy execution semantics |
+| `src/agent/runtime_assembly.py` | Tool and Skill catalog assembly, activation, prompt-state resolution, and Single/Multi executor construction | `src/agent/factory.py` remains a compatibility facade, not another authority |
+| `src/agent/orchestrator.py` and `src/agent/orchestrator_parts/` | Public `AgentOrchestrator` facade plus private pipeline, execution, dashboard, and chat method owners | The facade retains the legacy class, import, patch, reflection, and reload surface; the parts are internal implementation owners, not another runtime |
+| `src/agent/strategies/` | Re-exports legacy `StrategyAgent`, `StrategyRouter`, and `StrategyAggregator` names from `src/agent/skills/` | Compatibility aliases only; do not add a parallel implementation here |
+| `.claude/skills/` | Repository collaboration workflows for issue analysis, PR analysis, and issue fixing | Not scanned by `SkillManager` and not part of product runtime architecture |
+
+The root `SKILL.md` documents an external integration and is likewise not the
+built-in product Skill catalog. The accepted runtime boundary remains Native
+production assembly under [ADR-001](architecture/ADR-001-agent-runtime.md), with
+the isolated PydanticAI test/evidence scope governed by
+[ADR-002](architecture/ADR-002-pydanticai-runtime-reinstatement.md). This flow
+does not expand the lightweight composition root in
+[ADR-003](adr/ADR-003-application-services-composition-root.md), replace the
+process-local task authority in
+[ADR-004](adr/ADR-004-process-local-task-execution-authority.md), or bypass the
+provider evidence rules in
+[ADR-005](adr/ADR-005-provider-fallback-and-circuit-control.md). Any later
+structural extraction must preserve compatibility or record a deliberate
+contract change as required by
+[ADR-006](adr/ADR-006-behavior-preserving-module-decomposition.md).
+
+<a id="extension-points"></a>
+## Extension Points
+
+The versioned plugin boundary is defined by the
+[plugin extension contract](plugin-extension-contract.md) and
+[ADR-007](adr/ADR-007-versioned-plugin-extension-boundary.md). This section
+remains a stable navigation target and does not duplicate or extend that
+separately owned contract.
+
 ## Runtime Constraints
 
 - The [composition root](adr/ADR-003-application-services-composition-root.md)
