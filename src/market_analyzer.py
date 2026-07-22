@@ -1258,13 +1258,6 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
 
     def _build_sector_block(self, overview: MarketOverview) -> str:
         """Build industry and concept ranking blocks."""
-        if (
-            not overview.top_sectors
-            and not overview.bottom_sectors
-            and not overview.top_concepts
-            and not overview.bottom_concepts
-        ):
-            return ""
         lines = []
         language = self._get_review_language()
 
@@ -1295,7 +1288,9 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
             append_ranking("#### 概念板块领跌 Top 5", "概念板块", overview.bottom_concepts)
         analysis_block = self._build_sector_analysis_block(overview)
         if analysis_block:
-            lines.extend(["", analysis_block])
+            if lines:
+                lines.append("")
+            lines.append(analysis_block)
         return "\n".join(lines)
 
     def _build_sector_analysis_block(self, overview: MarketOverview) -> str:
@@ -1857,7 +1852,13 @@ Output the report content directly, no extra commentary.
 | Turnover ({self._get_turnover_unit_label()}) | {overview.total_amount:.0f} |
 """
             sector_section = ""
-            if self.profile.has_sector_rankings and (top_text or bottom_text or top_concept_text or bottom_concept_text):
+            if self.profile.has_sector_rankings and (
+                top_text
+                or bottom_text
+                or top_concept_text
+                or bottom_concept_text
+                or sector_analysis_block
+            ):
                 sector_section = f"""
 ### 4. Sector / Theme Highlights
 - **Industry Leaders**: {top_text or "N/A"}

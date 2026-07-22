@@ -122,6 +122,46 @@ def test_sector_analysis_keeps_missing_benchmark_and_provider_boundaries_explici
     assert unsupported["status"] == "not_supported"
     assert unsupported["industries"] == []
     assert unsupported["concepts"] == []
+    assert us_analyzer._build_sector_block(MarketOverview(date="2026-07-21")) == ""
+
+
+def test_provider_empty_rankings_keep_explicit_limits_in_both_report_languages() -> None:
+    """Provider-empty reports must retain the same unavailable-data contract."""
+    overview = MarketOverview(
+        date="2026-07-21",
+        indices=[
+            MarketIndex(code="000001", name="Shanghai Composite", change_pct=0.4),
+            MarketIndex(code="399001", name="Shenzhen Component", change_pct=0.8),
+        ],
+    )
+
+    zh_analyzer = _make_market_analyzer(language="zh")
+    zh_block = zh_analyzer._build_sector_block(overview)
+    zh_prompt = zh_analyzer._build_review_prompt(overview, [])
+    zh_report = zh_analyzer._generate_template_review(overview, [])
+
+    assert "#### 板块指数分析" in zh_block
+    assert "**状态**：不可用（本次未返回有效行业/概念排行）" in zh_block
+    assert "**比较基准**：主要指数平均 +0.60%（2 个指数）" in zh_block
+    assert "板块指数命名空间/代码/点位、无冲突规范 ID、ETF 映射" in zh_block
+    assert "状态：不可用；本次未返回有效行业/概念排行" in zh_prompt
+    assert "板块指数命名空间/代码/点位、无冲突规范 ID、ETF 映射" in zh_prompt
+    assert zh_report.count("#### 板块指数分析") == 1
+    assert "**状态**：不可用（本次未返回有效行业/概念排行）" in zh_report
+
+    en_analyzer = _make_market_analyzer(language="en")
+    en_block = en_analyzer._build_sector_block(overview)
+    en_prompt = en_analyzer._build_review_prompt(overview, [])
+    en_report = en_analyzer._generate_template_review(overview, [])
+
+    assert "#### Sector Index Analysis" in en_block
+    assert "**Status**: unavailable (no valid sector/theme rankings" in en_block
+    assert "**Benchmark**: major-index average +0.60% (2 indices)" in en_block
+    assert "collision-free canonical IDs, ETF mappings" in en_block
+    assert "Status: unavailable; no valid sector/theme rankings" in en_prompt
+    assert "collision-free canonical IDs, ETF mappings" in en_prompt
+    assert en_report.count("#### Sector Index Analysis") == 1
+    assert "**Status**: unavailable (no valid sector/theme rankings" in en_report
 
 
 def test_market_review_payload_adds_sector_analysis_without_replacing_rankings() -> None:

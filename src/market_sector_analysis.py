@@ -140,7 +140,8 @@ def render_sector_analysis_markdown(
 ) -> str:
     """Render a bounded sector-analysis table for a market-review report."""
     report_rows = _select_report_rows(analysis, rank_limit=rank_limit)
-    if not report_rows:
+    analysis_status = str(analysis.get("status") or "")
+    if not report_rows and analysis_status != "unavailable":
         return ""
 
     use_english = language == "en"
@@ -158,16 +159,28 @@ def render_sector_analysis_markdown(
                 "the average move of available major indices. This is not a "
                 "multi-session trend or fund-flow measure."
             ),
+        ]
+        if not report_rows:
+            lines.append(
+                "- **Status**: unavailable (no valid sector/theme rankings "
+                "were returned for this run)"
+            )
+        lines.append(
             (
                 f"- **Benchmark**: major-index average {benchmark_text} "
                 f"({benchmark_count} indices)"
                 if benchmark_count
                 else "- **Benchmark**: unavailable"
-            ),
-            "",
-            "| Group / Rank | Sector / Theme | Session Trend | Relative Strength | Risk |",
-            "|--------------|----------------|---------------|-------------------|------|",
-        ]
+            )
+        )
+        if report_rows:
+            lines.extend(
+                [
+                    "",
+                    "| Group / Rank | Sector / Theme | Session Trend | Relative Strength | Risk |",
+                    "|--------------|----------------|---------------|-------------------|------|",
+                ]
+            )
     else:
         lines = [
             "#### 板块指数分析",
@@ -175,16 +188,25 @@ def render_sector_analysis_markdown(
                 "> 口径：仅比较当日行业/概念涨跌榜与可用主要指数平均涨跌幅，"
                 "不代表多日趋势或真实资金流。"
             ),
+        ]
+        if not report_rows:
+            lines.append("- **状态**：不可用（本次未返回有效行业/概念排行）")
+        lines.append(
             (
                 f"- **比较基准**：主要指数平均 {benchmark_text}"
                 f"（{benchmark_count} 个指数）"
                 if benchmark_count
                 else "- **比较基准**：暂无可用主要指数"
-            ),
-            "",
-            "| 类型/排名 | 板块/题材 | 当日趋势 | 相对强弱 | 风险 |",
-            "|-----------|-----------|----------|----------|------|",
-        ]
+            )
+        )
+        if report_rows:
+            lines.extend(
+                [
+                    "",
+                    "| 类型/排名 | 板块/题材 | 当日趋势 | 相对强弱 | 风险 |",
+                    "|-----------|-----------|----------|----------|------|",
+                ]
+            )
 
     for item in report_rows:
         category = item.get("category")
@@ -240,7 +262,8 @@ def render_sector_analysis_prompt_context(
 ) -> str:
     """Render compact evidence for the LLM without duplicating report headings."""
     report_rows = _select_report_rows(analysis, rank_limit=rank_limit)
-    if not report_rows:
+    analysis_status = str(analysis.get("status") or "")
+    if not report_rows and analysis_status != "unavailable":
         return ""
 
     use_english = language == "en"
@@ -248,24 +271,31 @@ def render_sector_analysis_prompt_context(
     benchmark_text = _format_signed_pct(benchmark.get("change_pct"))
     benchmark_count = int(benchmark.get("sample_size") or 0)
     if use_english:
-        lines = [
-            "Deterministic sector-analysis inputs:",
+        lines = ["Deterministic sector-analysis inputs:"]
+        if not report_rows:
+            lines.append(
+                "- Status: unavailable; no valid sector/theme rankings were "
+                "returned for this run."
+            )
+        lines.append(
             (
                 f"- Session benchmark: {benchmark_text} "
                 f"(average of {benchmark_count} major indices)"
                 if benchmark_count
                 else "- Session benchmark: unavailable"
-            ),
-        ]
+            )
+        )
     else:
-        lines = [
-            "确定性板块分析输入：",
+        lines = ["确定性板块分析输入："]
+        if not report_rows:
+            lines.append("- 状态：不可用；本次未返回有效行业/概念排行。")
+        lines.append(
             (
                 f"- 当日比较基准：{benchmark_text}（{benchmark_count} 个主要指数平均）"
                 if benchmark_count
                 else "- 当日比较基准：不可用"
-            ),
-        ]
+            )
+        )
 
     for item in report_rows:
         if use_english:
