@@ -307,6 +307,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Split search provider implementations and shared result contracts into focused private modules while preserving the `src.search_service` facade, fallback, and outbound-policy behavior.
 - [Docs] Defined repository directory ownership, the retained `webui.py` compatibility role, and the separate backend package-root decision.
 - [Changed] Split `SearchService` state, news processing, and orchestration methods into focused private modules while preserving the `src.search_service` facade and search behavior.
+- [Chore] Converged notification capability, contract, noise-control, and route-configuration helpers into `src/notification_parts/` with strict legacy facades.
 
 ## [3.26.3] - 2026-07-15
 
