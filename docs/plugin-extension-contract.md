@@ -11,7 +11,7 @@ integration is not yet wired.
 
 | Surface | Current authority | Track X delivery |
 | --- | --- | --- |
-| Plugin lifecycle, manifest, registry | No shared implementation | #273 X2a |
+| Plugin lifecycle, manifest, registry | `src/plugins/` core, not startup-wired | #273 X2a implemented |
 | Built-in/external startup wiring | `src/application_services.py` composition root | #273 X2b, only after GATE-P3 |
 | Data Providers | `BaseFetcher` and `DataFetcherManager` | #276 X3 |
 | Analysis Strategies | `Skill`, `SkillManager`, `StrategyEngine` | Contract only in this batch |
@@ -22,6 +22,14 @@ integration is not yet wired.
 
 "Contract only" means a plugin cannot yet rely on runtime wiring for that
 extension point. It does not mean the existing core path is deprecated.
+
+The X2a core validates manifests, owns lifecycle transitions and registrations,
+and exposes an explicit external-directory loader. It does not scan a directory
+or import external code during application startup. A caller first uses
+`ExternalPluginLoader.register_from_directory(...)` to import and register
+plugins, then invokes `PluginManager.load(...)` or `load_all()` separately.
+Startup composition and its opt-in configuration remain X2b work behind
+GATE-P3.
 
 ## Package And Manifest
 
