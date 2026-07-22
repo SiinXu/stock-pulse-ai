@@ -1,5 +1,26 @@
 # 市场支持与边界
 
+## A 股板块指数分析 MVP（Issue #264）
+
+A 股大盘复盘会复用既有行业/概念涨跌榜和主要指数行情，生成确定性的板块指数分析。它不把板块代码送入个股入口，因此不会把与个股重号的指数代码误识别为股票。
+
+支持范围：
+
+- 行业与概念领涨/领跌项保留名称、榜单方向、排名和当日涨跌幅。
+- 以本次可用主要指数涨跌幅的算术平均值为比较基准，计算板块相对强弱；相对值达到 `+0.5` 个百分点标记 `outperforming`，不高于 `-0.5` 标记 `underperforming`，其余为 `in_line`。没有可用主要指数时，比较基准和相对强弱明确为 `unavailable/unknown`。
+- “趋势”只描述当前交易日会话：涨跌幅达到 `+2%/-2%` 分别标记 `strong_up/strong_down`，其余按正、零、负标记 `up/flat/down`，不宣称多日趋势。
+- 风险等级只使用当日涨跌、榜单方向和相对大盘表现：跌幅达到 `-3%` 或跑输大盘至少 `2` 个百分点为 `high`；领跌、下跌或绝对涨跌达到 `3%` 为 `moderate`；其余为 `low`。同时保留对应风险标记。
+- 结构化结果追加在 `market_review_payload.sector_analysis`；原有 `sectors`、`concepts` 和 Markdown 排行表保持兼容。
+- Provider 排行失败时保持 fail-open：板块分析返回 `unavailable`，不会阻断指数、新闻、报告持久化或通知。
+
+当前边界：
+
+- 只覆盖 `MarketProfile.has_sector_rankings=true` 的 A 股 market-review 路径；港股、美股、日股和韩股返回 `not_supported`。
+- 现有公共 provider 合同不提供任意申万/中信行业指数解析、ETF 对应关系、板块指数点位、板块历史序列或板块资金流。结构化结果通过 `data_quality.missing_fields` 与 `capital_flow.status=not_available` 明确这些缺口，Prompt 同样禁止推断。
+- 无新增配置、数据库字段、API 参数或通知分支。CLI、schedule、API 和 Bot 通过既有 `run_market_review()` 自然消费同一报告。
+
+回滚方式：revert 对应 A2 squash merge；不需要恢复配置、数据库或用户数据。
+
 ## 日本/韩国个股 suffix-only MVP（Issue #1718，Refs #1718）
 
 当前阶段支持手动输入日本、韩国股票的 Yahoo Finance 后缀代码，进入既有个股分析、历史保存和基础报告展示链路。Web 自动补全内置一批常用日股/韩股种子索引，支持按 suffix 代码、中英文名称或常用别名搜索。
