@@ -5,8 +5,6 @@
   "legacy_handlers": [
     {"path":"api/app.py","scope":"<module>._refresh_stock_index_cache_in_background","caught":["Exception"],"digest":"a8817ce5e867d84e13b85ee07aa4226775663b86dfd132cca11721cd9af94274"},
     {"path":"api/middlewares/error_handler.py","scope":"<module>.ErrorHandlerMiddleware.dispatch","caught":["Exception"],"digest":"04f6c6d748591cc08ae72cf0719d8466e467eaeee9adaa699fa54d6a58be34de"},
-    {"path":"api/v1/endpoints/agent.py","scope":"<module>.agent_chat_stream.event_generator","caught":["Exception"],"digest":"b7af0cf6cb4af8495789b7c43d9a285a32fdfdb11241a1e1dbd6d5a61fc0d1e9"},
-    {"path":"api/v1/endpoints/agent.py","scope":"<module>.agent_chat_stream.run_sync","caught":["Exception"],"digest":"fb39695882a9e9e4afc5908d8d46241e95cbf9c9e3ef0219fd8426309c57f912"},
     {"path":"api/v1/endpoints/alerts.py","scope":"<module>.create_rule","caught":["Exception"],"digest":"a7a2a48087668ad69e390fe2e40a389e40b7f08ddc41d33733cb148487e92cd7"},
     {"path":"api/v1/endpoints/alerts.py","scope":"<module>.delete_rule","caught":["Exception"],"digest":"d2d17ed2084c320d10d739f4b94e94dcd38641fab341032b2f2e1a6b91d256c3"},
     {"path":"api/v1/endpoints/alerts.py","scope":"<module>.disable_rule","caught":["Exception"],"digest":"02e765b63185fb85d1e0a736021d78b68ea40896e175ff01ed06b651f3816475"},

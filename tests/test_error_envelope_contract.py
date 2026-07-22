@@ -29,6 +29,7 @@ SERVER_ERROR_SECRET_MARKERS = (
     "server-extra-payload-canary",
     "server-header-canary",
 )
+SECRET_SHAPED_TRACE_ID = "sk-sec2-api-trace-header-1234567890"
 
 
 def _client() -> TestClient:
@@ -178,6 +179,34 @@ def test_validation_error_preserves_alias_and_status() -> None:
     assert payload["error"] == "validation_error"
     assert payload["detail"] == payload["details"]
     assert payload["details"]["issues"]
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "json_body"),
+    (
+        ("get", "/structured", None),
+        ("get", "/internal", None),
+        ("post", "/validation", {"value": "not-an-integer"}),
+    ),
+)
+def test_secret_shaped_request_trace_id_is_not_reflected_in_error_outputs(
+    method: str,
+    path: str,
+    json_body,
+) -> None:
+    response = _client().request(
+        method,
+        path,
+        headers={"X-Trace-ID": SECRET_SHAPED_TRACE_ID},
+        json=json_body,
+    )
+    payload = response.json()
+
+    assert response.status_code >= 400
+    assert SECRET_SHAPED_TRACE_ID not in response.text
+    assert SECRET_SHAPED_TRACE_ID not in response.headers["x-trace-id"]
+    assert payload["trace_id"] == response.headers["x-trace-id"]
+    assert payload["trace_id"]
 
 
 @pytest.mark.parametrize(

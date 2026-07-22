@@ -287,12 +287,17 @@ def _strip_trace_metadata_value(value: Any) -> Any:
 
 
 def _protocol_message_requires_redaction(message: Dict[str, Any]) -> bool:
-    """Fail closed when a protocol message cannot be compared safely."""
+    """Fail closed when the persisted protocol representation would change."""
 
     redacted_message = redact_sensitive_data(message)
     if not isinstance(redacted_message, dict):
         return True
     try:
-        return redacted_message != message
+        original_json = json.dumps(message, ensure_ascii=False)
+        redacted_json = json.dumps(
+            redacted_message,
+            ensure_ascii=False,
+        )
+        return redacted_json != original_json
     except BaseException:  # broad-exception: optional_metadata - Opaque provider values drop the trace.
         return True

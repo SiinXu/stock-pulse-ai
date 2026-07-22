@@ -70,14 +70,24 @@ _URL_PATTERN = re.compile(r"https?://[^\s,;)\]}]+", re.IGNORECASE)
 # (postgresql://, mysql://, redis://, mongodb://, amqp://, ...). _URL_PATTERN
 # only covers http(s), so a password embedded in a non-HTTP connection string
 # (e.g. a SQLAlchemy error) would otherwise leak into a diagnostic. The
-# password segment allows '@' and matches greedily up to the last '@' before
-# the host, so an unescaped '@' inside the password is redacted too; the '/'
+# userinfo segment matches greedily up to the last '@' before the host, so both
+# username-only tokens and username:password credentials are redacted; the '/'
 # boundary keeps the match from spilling into the host or path.
 _URL_CREDENTIALS_PATTERN = re.compile(
-    r"(?P<scheme>[a-zA-Z][a-zA-Z0-9+.\-]*://)[^\s:/?#@]*:[^\s/?#]*@"
+    r"(?P<scheme>[a-zA-Z][a-zA-Z0-9+.\-]*://)[^\s/?#]+@"
 )
 _BEARER_PATTERN = re.compile(
     r"\b(bearer\s+)[^\s,;&\"']+",
+    re.IGNORECASE,
+)
+_DIGEST_AUTH_PARAM_PATTERN = (
+    r"[A-Za-z][A-Za-z0-9_-]*\s*=\s*"
+    r'(?:"(?:\\.|[^"\\])*"|[^,;\s]+)'
+)
+_DIGEST_AUTHORIZATION_HEADER_PATTERN = re.compile(
+    r"\b(authorization|proxy[_-]?authorization)(\s*[:=]\s*)"
+    rf"Digest\s+{_DIGEST_AUTH_PARAM_PATTERN}"
+    rf"(?:\s*,\s*{_DIGEST_AUTH_PARAM_PATTERN})*",
     re.IGNORECASE,
 )
 _AUTHORIZATION_HEADER_PATTERN = re.compile(
@@ -92,16 +102,28 @@ _OPAQUE_AUTHORIZATION_SCHEME_PATTERN = re.compile(
     r"[A-Za-z0-9._~+/=-]{12,}(?=$|[\s,;&\"'])",
     re.IGNORECASE,
 )
+_COOKIE_VALUE_PATTERN = r'(?:"(?:\\.|[^"\\])*"|[^,;\s]+)'
+_COOKIE_PAIR_PATTERN = rf"[^=,;\s]+={_COOKIE_VALUE_PATTERN}"
 _COOKIE_HEADER_PATTERN = re.compile(
-    r"\b(cookie|set[_-]?cookie)(\s*:\s*)[^\r\n]+",
+    r"(?<!set-)(?<!set_)\b(cookie)(\s*:\s*)"
+    rf"{_COOKIE_VALUE_PATTERN}(?:\s*;\s*{_COOKIE_PAIR_PATTERN})*",
+    re.IGNORECASE,
+)
+_SET_COOKIE_HEADER_PATTERN = re.compile(
+    r"\b(set[_-]?cookie)(\s*:\s*)"
+    rf"{_COOKIE_VALUE_PATTERN}",
+    re.IGNORECASE,
+)
+_SET_COOKIE_SENSITIVE_ATTRIBUTE_PATTERN = re.compile(
+    r"\b(set[_-]?cookie)(\s*:\s*)\[REDACTED\]"
+    r"(?=[^\r\n]*;\s*[A-Za-z0-9_-]*"
+    r"(?:auth|credential|key|password|secret|session|token)"
+    r"[A-Za-z0-9_-]*\s*=)[^\r\n]+",
     re.IGNORECASE,
 )
 _COOKIE_ASSIGNMENT_PATTERN = re.compile(
-    r"\b(cookie|set[_-]?cookie)(\s*=\s*)[^\s,;&\"']+",
-    re.IGNORECASE,
-)
-_COOKIE_SEGMENT_PATTERN = re.compile(
-    r"\b(cookie|set[_-]?cookie)(\s*[:=]\s*)[^\s,;&]+",
+    r"\b(cookie|set[_-]?cookie)(\s*=\s*)"
+    rf"{_COOKIE_VALUE_PATTERN}(?:\s*;\s*{_COOKIE_PAIR_PATTERN})*",
     re.IGNORECASE,
 )
 _SENSITIVE_ASSIGNMENT_KEY_PATTERN = (
@@ -478,17 +500,21 @@ def _redact_common_secret_patterns(
         f"{_URL_USERINFO_REDACTION}@",
         "[REDACTED]@",
     )
+    sanitized = _DIGEST_AUTHORIZATION_HEADER_PATTERN.sub(
+        r"\1\2[REDACTED]",
+        sanitized,
+    )
     sanitized = _OPAQUE_AUTHORIZATION_SCHEME_PATTERN.sub(
         r"\1\2[REDACTED]",
         sanitized,
     )
     sanitized = _AUTHORIZATION_HEADER_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
-    cookie_pattern = (
-        _COOKIE_HEADER_PATTERN
-        if redact_all_http_urls
-        else _COOKIE_SEGMENT_PATTERN
+    sanitized = _COOKIE_HEADER_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
+    sanitized = _SET_COOKIE_HEADER_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
+    sanitized = _SET_COOKIE_SENSITIVE_ATTRIBUTE_PATTERN.sub(
+        r"\1\2[REDACTED]",
+        sanitized,
     )
-    sanitized = cookie_pattern.sub(r"\1\2[REDACTED]", sanitized)
     sanitized = _COOKIE_ASSIGNMENT_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
     sanitized = _BEARER_PATTERN.sub(r"\1[REDACTED]", sanitized)
     sanitized = _QUOTED_SECRET_ASSIGNMENT_PATTERN.sub(
