@@ -294,6 +294,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Split notification routing, rendering, report setup, and dispatch methods into focused private modules while preserving the `src.notification` facade and delivery behavior.
 - [Fixed] Applied one recursive sensitive-data redaction policy to logs, API errors, Agent traces and audits, diagnostics exports, and provider errors, with debug-safe defaults and fail-closed protocol-trace handling.
 - [Docs] Aligned maintained Markdown source-install guidance with the constrained pip bootstrap, PEP 517 build constraint, and pip check required by the reproducible dependency contract.
+- [Changed] Split analysis orchestration into a focused application module while preserving the legacy main entrypoint and analysis behavior.
 
 ## [3.26.3] - 2026-07-15
 
