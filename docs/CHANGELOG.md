@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Changed] Grouped Web navigation into five primary domains and moved market review, screening, and backtesting into Research with query- and hash-preserving legacy redirects.
 - [Tests] Aligned the Usage settings browser contract with the single-page-heading hierarchy.
 - [Changed] Moved Token Usage into Settings > Usage & cost and retained `/usage` as a query- and hash-preserving compatibility redirect.
 - [Fixed] Corrected English developer comments to preserve financial terminology and localized fixture literals without changing runtime behavior.

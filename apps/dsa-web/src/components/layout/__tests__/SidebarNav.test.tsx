@@ -22,7 +22,7 @@ function ClearPortfolioStateHarness() {
   return (
     <>
       <SidebarNav />
-      <button type="button" onClick={() => navigate('/portfolio')}>All accounts</button>
+      <button type="button" onClick={() => navigate(APP_ROUTE_PATHS.portfolio)}>All accounts</button>
     </>
   );
 }
@@ -93,7 +93,7 @@ describe('SidebarNav', () => {
     expect(screen.queryByRole('button', { name: '展开侧边栏' })).not.toBeInTheDocument();
   });
 
-  it('keeps the screening navigation item discoverable while AlphaSift is disabled', () => {
+  it('keeps Discover nested under Research while AlphaSift is disabled', () => {
     mockGetAlphaSiftStatus.mockResolvedValueOnce({ enabled: false, available: false, installSpecIsDefault: false });
 
     render(
@@ -102,7 +102,8 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole('link', { name: '选股' })).toHaveAttribute('href', '/screening');
+    expect(screen.getByRole('link', { name: '发现' }))
+      .toHaveAttribute('href', APP_ROUTE_PATHS.researchDiscover);
   });
 
   it('carries the current stock into stock-aware navigation destinations', () => {
@@ -113,14 +114,14 @@ describe('SidebarNav', () => {
     );
 
     expect(screen.getByRole('link', { name: '首页' })).toHaveAttribute('href', '/?stock=AAPL');
-    expect(screen.getByRole('link', { name: '问股' })).toHaveAttribute('href', '/chat?stock=AAPL');
-    expect(screen.getByRole('link', { name: 'AI 建议' })).toHaveAttribute('href', '/decision-signals?stock=AAPL');
-    expect(screen.getByRole('link', { name: '回测' })).toHaveAttribute('href', '/backtest?code=AAPL');
+    expect(screen.getByRole('link', { name: 'Agent' })).toHaveAttribute('href', `${APP_ROUTE_PATHS.agent}?stock=AAPL`);
+    expect(screen.getByRole('link', { name: 'AI 建议' })).toHaveAttribute('href', `${APP_ROUTE_PATHS.decisionSignals}?stock=AAPL`);
+    expect(screen.getByRole('link', { name: '回测' })).toHaveAttribute('href', `${APP_ROUTE_PATHS.researchBacktest}?code=AAPL`);
   });
 
   it('restores destination-specific state from the current tab session', () => {
-    recordSessionLocation('/portfolio?account=12');
-    recordSessionLocation('/screening?strategy=quality&count=20');
+    recordSessionLocation(`${APP_ROUTE_PATHS.portfolio}?account=12`);
+    recordSessionLocation(`${APP_ROUTE_PATHS.researchDiscover}?strategy=quality&count=20`);
 
     render(
       <MemoryRouter initialEntries={[APP_ROUTE_PATHS.settings]}>
@@ -128,27 +129,28 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole('link', { name: '持仓' })).toHaveAttribute('href', '/portfolio?account=12');
-    expect(screen.getByRole('link', { name: '选股' })).toHaveAttribute('href', '/screening?strategy=quality&count=20');
+    expect(screen.getByRole('link', { name: '持仓' })).toHaveAttribute('href', `${APP_ROUTE_PATHS.portfolio}?account=12`);
+    expect(screen.getByRole('link', { name: '发现' }))
+      .toHaveAttribute('href', `${APP_ROUTE_PATHS.researchDiscover}?strategy=quality&count=20`);
   });
 
   it('does not resurrect destination state after the current route clears it', async () => {
-    recordSessionLocation('/portfolio?account=12');
+    recordSessionLocation(`${APP_ROUTE_PATHS.portfolio}?account=12`);
     render(
-      <MemoryRouter initialEntries={['/portfolio?account=12']}>
+      <MemoryRouter initialEntries={[`${APP_ROUTE_PATHS.portfolio}?account=12`]}>
         <ClearPortfolioStateHarness />
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole('link', { name: '持仓' })).toHaveAttribute('href', '/portfolio?account=12');
+    expect(screen.getByRole('link', { name: '持仓' })).toHaveAttribute('href', `${APP_ROUTE_PATHS.portfolio}?account=12`);
     fireEvent.click(screen.getByRole('button', { name: 'All accounts' }));
 
     await waitFor(() => {
-      expect(screen.getByRole('link', { name: '持仓' })).toHaveAttribute('href', '/portfolio');
+      expect(screen.getByRole('link', { name: '持仓' })).toHaveAttribute('href', APP_ROUTE_PATHS.portfolio);
     });
   });
 
-  it('shows the screening navigation item when AlphaSift is enabled', async () => {
+  it('shows the Discover navigation item when AlphaSift is enabled', async () => {
     mockGetAlphaSiftStatus.mockResolvedValueOnce({ enabled: true, available: false, installSpecIsDefault: false });
 
     render(
@@ -157,10 +159,11 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByRole('link', { name: '选股' })).toHaveAttribute('href', '/screening');
+    expect(await screen.findByRole('link', { name: '发现' }))
+      .toHaveAttribute('href', APP_ROUTE_PATHS.researchDiscover);
   });
 
-  it('places screening directly after chat when AlphaSift is enabled', async () => {
+  it('renders the grouped domain order when AlphaSift is enabled', async () => {
     mockGetAlphaSiftStatus.mockResolvedValueOnce({ enabled: true, available: false, installSpecIsDefault: false });
 
     render(
@@ -169,12 +172,22 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    await screen.findByRole('link', { name: '选股' });
+    await screen.findByRole('link', { name: '发现' });
     const hrefs = screen.getAllByRole('link').map((link) => link.getAttribute('href'));
-    expect(hrefs.slice(0, 5)).toEqual(['/', '/chat', '/screening', '/portfolio', '/decision-signals']);
+    expect(hrefs.slice(0, 9)).toEqual([
+      APP_ROUTE_PATHS.home,
+      APP_ROUTE_PATHS.decisionSignals,
+      APP_ROUTE_PATHS.alerts,
+      APP_ROUTE_PATHS.researchMarket,
+      APP_ROUTE_PATHS.researchMarket,
+      APP_ROUTE_PATHS.researchDiscover,
+      APP_ROUTE_PATHS.researchBacktest,
+      APP_ROUTE_PATHS.portfolio,
+      APP_ROUTE_PATHS.agent,
+    ]);
   });
 
-  it('keeps the screening navigation item stable after config save events', () => {
+  it('keeps the Discover navigation item stable after config save events', () => {
     mockGetAlphaSiftStatus
       .mockResolvedValueOnce({ enabled: false, available: false, installSpecIsDefault: false })
       .mockResolvedValueOnce({ enabled: true, available: false, installSpecIsDefault: false });
@@ -185,16 +198,18 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole('link', { name: '选股' })).toHaveAttribute('href', '/screening');
+    expect(screen.getByRole('link', { name: '发现' }))
+      .toHaveAttribute('href', APP_ROUTE_PATHS.researchDiscover);
     window.dispatchEvent(new Event('dsa-system-config-changed'));
-    expect(screen.getByRole('link', { name: '选股' })).toHaveAttribute('href', '/screening');
+    expect(screen.getByRole('link', { name: '发现' }))
+      .toHaveAttribute('href', APP_ROUTE_PATHS.researchDiscover);
   });
 
   it('shows the shared completion badge only when chat completion is pending', () => {
     completionBadgeState.value = true;
 
     const { rerender } = render(
-      <MemoryRouter initialEntries={['/chat']}>
+      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.agent]}>
         <SidebarNav />
       </MemoryRouter>,
     );
@@ -204,7 +219,7 @@ describe('SidebarNav', () => {
 
     completionBadgeState.value = false;
     rerender(
-      <MemoryRouter initialEntries={['/chat']}>
+      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.agent]}>
         <SidebarNav />
       </MemoryRouter>,
     );
@@ -249,7 +264,7 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    const chatLink = screen.getByRole('link', { name: '问股' });
+    const chatLink = screen.getByRole('link', { name: 'Agent' });
     expect(chatLink).toHaveAttribute('data-route-focus-return-key', 'shell:mobile-navigation');
     const preventNativeNavigation = (event: MouseEvent) => event.preventDefault();
     document.addEventListener('click', preventNativeNavigation);
@@ -272,7 +287,7 @@ describe('SidebarNav', () => {
     expect(onNavigate).toHaveBeenCalledWith();
   });
 
-  it('shows shared tooltips for compact icon-only navigation controls', async () => {
+  it('shows grouped flyouts and shared tooltips for compact navigation controls', async () => {
     render(
       <MemoryRouter initialEntries={['/']}>
         <SidebarNav collapsed onToggleCollapse={vi.fn()} />
@@ -285,14 +300,47 @@ describe('SidebarNav', () => {
     search.blur();
     await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
 
-    const home = screen.getByRole('link', { name: '首页' });
-    home.focus();
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('首页');
+    const research = screen.getByRole('link', { name: '研究' });
+    research.focus();
+    fireEvent.mouseEnter(research);
+    const menu = await screen.findByRole('menu', { name: '研究' });
+    expect(within(menu).getByRole('menuitem', { name: '大盘复盘' }))
+      .toHaveAttribute('href', APP_ROUTE_PATHS.researchMarket);
+    expect(within(menu).getByRole('menuitem', { name: '发现' }))
+      .toHaveAttribute('href', APP_ROUTE_PATHS.researchDiscover);
+    expect(research).toHaveAttribute('aria-expanded', 'true');
+    expect(research).toHaveFocus();
+  });
+
+  it('opens compact groups with ArrowRight and restores the trigger with ArrowLeft or Escape', async () => {
+    render(
+      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.home]}>
+        <SidebarNav collapsed />
+      </MemoryRouter>,
+    );
+
+    const research = screen.getByRole('link', { name: '研究' });
+    research.focus();
+    fireEvent.keyDown(research, { key: 'ArrowRight' });
+
+    let menu = await screen.findByRole('menu', { name: '研究' });
+    const firstItem = within(menu).getByRole('menuitem', { name: '大盘复盘' });
+    await waitFor(() => expect(firstItem).toHaveFocus());
+    fireEvent.keyDown(firstItem, { key: 'ArrowLeft' });
+    await waitFor(() => expect(screen.queryByRole('menu', { name: '研究' })).not.toBeInTheDocument());
+    await waitFor(() => expect(research).toHaveFocus());
+
+    fireEvent.keyDown(research, { key: 'ArrowRight' });
+    menu = await screen.findByRole('menu', { name: '研究' });
+    await waitFor(() => expect(within(menu).getByRole('menuitem', { name: '大盘复盘' })).toHaveFocus());
+    fireEvent.keyDown(menu, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('menu', { name: '研究' })).not.toBeInTheDocument());
+    await waitFor(() => expect(research).toHaveFocus());
   });
 
   it('renders stable, unique route focus markers from the navigation descriptor', () => {
     render(
-      <MemoryRouter initialEntries={['/alerts']}>
+      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.alerts]}>
         <SidebarNav focusKeyPrefix="shell-nav-desktop" />
       </MemoryRouter>,
     );
@@ -331,25 +379,25 @@ describe('SidebarNav', () => {
 
   it('renders the alerts navigation item and marks it active', () => {
     render(
-      <MemoryRouter initialEntries={['/alerts']}>
+      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.alerts]}>
         <SidebarNav />
       </MemoryRouter>,
     );
 
     const alertsLink = screen.getByRole('link', { name: '告警' });
-    expect(alertsLink).toHaveAttribute('href', '/alerts');
+    expect(alertsLink).toHaveAttribute('href', APP_ROUTE_PATHS.alerts);
     expect(alertsLink).toHaveClass('font-medium');
   });
 
   it('renders the AI signals navigation item and marks it active', () => {
     render(
-      <MemoryRouter initialEntries={['/decision-signals']}>
+      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.decisionSignals]}>
         <SidebarNav />
       </MemoryRouter>,
     );
 
     const signalsLink = screen.getByRole('link', { name: 'AI 建议' });
-    expect(signalsLink).toHaveAttribute('href', '/decision-signals');
+    expect(signalsLink).toHaveAttribute('href', APP_ROUTE_PATHS.decisionSignals);
     expect(signalsLink).toHaveClass('font-medium');
   });
 
@@ -365,7 +413,7 @@ describe('SidebarNav', () => {
 
   it('opens the logout confirmation and confirms logout', async () => {
     render(
-      <MemoryRouter initialEntries={['/chat?session=private&stock=AAPL&recordId=9']}>
+      <MemoryRouter initialEntries={[`${APP_ROUTE_PATHS.agent}?session=private&stock=AAPL&recordId=9`]}>
         <SidebarNav />
       </MemoryRouter>,
     );

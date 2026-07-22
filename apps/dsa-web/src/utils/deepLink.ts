@@ -259,7 +259,7 @@ function toHref(url: URL): string {
 
 export function buildDeepLink(target: DeepLinkTarget): string {
   const params = new URLSearchParams();
-  let pathname = '/';
+  let pathname: string = APP_ROUTE_PATHS.home;
 
   switch (target.page) {
     case 'home':
@@ -271,7 +271,7 @@ export function buildDeepLink(target: DeepLinkTarget): string {
       }
       break;
     case 'chat': {
-      pathname = '/chat';
+      pathname = APP_ROUTE_PATHS.agent;
       if (target.sessionId) params.set('session', requireSessionId(target.sessionId));
       if (target.stockCode) {
         params.set('stock', requireStockCode(target.stockCode));
@@ -293,11 +293,11 @@ export function buildDeepLink(target: DeepLinkTarget): string {
       break;
     }
     case 'portfolio':
-      pathname = '/portfolio';
+      pathname = APP_ROUTE_PATHS.portfolio;
       setPositiveInteger(params, 'account', target.accountId);
       break;
     case 'decision-signals':
-      pathname = '/decision-signals';
+      pathname = APP_ROUTE_PATHS.decisionSignals;
       if (target.stockCode) params.set('stock', requireStockCode(target.stockCode));
       setPositiveInteger(params, 'signal', target.signalId);
       if (target.view && target.view !== (target.stockCode ? 'latest' : 'signals')) {
@@ -353,7 +353,7 @@ export function parseDeepLink(input: string, origin = DEFAULT_ORIGIN): ParsedDee
   stripSensitiveHash(url, issues);
   let target: DeepLinkTarget | null = null;
 
-  if (url.pathname === '/') {
+  if (url.pathname === APP_ROUTE_PATHS.home) {
     const recordId = parsePositiveIntegerParam(params, issues, 'recordId', 'invalid_record_id');
     const stockCode = parseStockParam(params, issues);
     const rawWorkspace = params.get('workspace');
@@ -368,7 +368,7 @@ export function parseDeepLink(input: string, origin = DEFAULT_ORIGIN): ParsedDee
       }
     }
     target = { page: 'home', recordId, stockCode, workspace };
-  } else if (url.pathname === '/chat') {
+  } else if (url.pathname === APP_ROUTE_PATHS.agent) {
     const rawSessionId = params.get('session');
     let sessionId: string | undefined;
     if (rawSessionId !== null) {
@@ -413,10 +413,10 @@ export function parseDeepLink(input: string, origin = DEFAULT_ORIGIN): ParsedDee
       recordId: stockCode ? recordId : undefined,
       ...(stockCode && contextState ? { contextState } : {}),
     };
-  } else if (url.pathname === '/portfolio') {
+  } else if (url.pathname === APP_ROUTE_PATHS.portfolio) {
     const accountId = parsePositiveIntegerParam(params, issues, 'account', 'invalid_account_id');
     target = { page: 'portfolio', accountId };
-  } else if (url.pathname === '/decision-signals') {
+  } else if (url.pathname === APP_ROUTE_PATHS.decisionSignals) {
     const stockCode = parseStockParam(params, issues);
     const signalId = parsePositiveIntegerParam(params, issues, 'signal', 'invalid_signal_id');
     parseEnumParam(params, issues, 'market', DECISION_SIGNAL_MARKETS);
@@ -494,13 +494,16 @@ export function parseDeepLink(input: string, origin = DEFAULT_ORIGIN): ParsedDee
         }
         target = { page: 'stock', stockCode, period, days };
       }
-    } else if (![
-      '/alerts',
-      '/backtest',
-      '/screening',
+    } else if (!new Set<string>([
+      APP_ROUTE_PATHS.alerts,
+      APP_ROUTE_PATHS.researchMarket,
+      APP_ROUTE_PATHS.researchBacktest,
+      APP_ROUTE_PATHS.researchDiscover,
       APP_ROUTE_PATHS.settings,
+      LEGACY_ROUTE_PATHS.backtest,
+      LEGACY_ROUTE_PATHS.screening,
       LEGACY_ROUTE_PATHS.usage,
-    ].includes(url.pathname)) {
+    ]).has(url.pathname)) {
       issues.push({ code: 'unsupported_route' });
     }
   }

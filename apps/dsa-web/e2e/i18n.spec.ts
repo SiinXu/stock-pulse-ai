@@ -115,7 +115,7 @@ test.describe('complete UI i18n acceptance', () => {
 
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en'); // 7
-    await page.getByRole('link', { name: 'Ask' }).click();
+    await page.getByRole('link', { name: 'Agent' }).click();
     await page.goBack();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en'); // 8
     await page.goForward();
@@ -200,13 +200,14 @@ test.describe('complete UI i18n acceptance', () => {
   test('every first-level route renders English chrome and an English document title', async ({ page }) => {
     await loginInEnglish(page);
     const routes = [
-      { path: '/', text: UI_TEXT.en['home.analyze'], title: UI_TEXT.en['home.pageTitle'] },
-      { path: '/chat', text: UI_TEXT.en['chat.title'], title: UI_TEXT.en['chat.pageTitle'] },
-      { path: '/screening', text: SCREENING_TEXT.en.title, title: SCREENING_TEXT.en.documentTitle },
-      { path: '/portfolio', text: PORTFOLIO_TEXT.en.title, title: PORTFOLIO_TEXT.en.documentTitle },
-      { path: '/decision-signals', text: UI_TEXT.en['decisionSignals.title'], title: UI_TEXT.en['decisionSignals.pageTitle'] },
-      { path: '/backtest', text: BACKTEST_TEXT.en.runBacktest, title: BACKTEST_TEXT.en.documentTitle },
-      { path: '/alerts', text: ALERT_PAGE_TEXT.en.title, title: ALERT_PAGE_TEXT.en.documentTitle },
+      { path: APP_ROUTE_PATHS.home, text: UI_TEXT.en['home.analyze'], title: UI_TEXT.en['home.pageTitle'] },
+      { path: APP_ROUTE_PATHS.agent, text: UI_TEXT.en['chat.title'], title: UI_TEXT.en['chat.pageTitle'] },
+      { path: APP_ROUTE_PATHS.researchMarket, text: UI_TEXT.en['home.marketReview'], title: UI_TEXT.en['home.marketReviewPageTitle'] },
+      { path: APP_ROUTE_PATHS.researchDiscover, text: SCREENING_TEXT.en.title, title: SCREENING_TEXT.en.documentTitle },
+      { path: APP_ROUTE_PATHS.portfolio, text: PORTFOLIO_TEXT.en.title, title: PORTFOLIO_TEXT.en.documentTitle },
+      { path: APP_ROUTE_PATHS.decisionSignals, text: UI_TEXT.en['decisionSignals.title'], title: UI_TEXT.en['decisionSignals.pageTitle'] },
+      { path: APP_ROUTE_PATHS.researchBacktest, text: BACKTEST_TEXT.en.runBacktest, title: BACKTEST_TEXT.en.documentTitle },
+      { path: APP_ROUTE_PATHS.alerts, text: ALERT_PAGE_TEXT.en.title, title: ALERT_PAGE_TEXT.en.documentTitle },
       { path: usageSettingsHref, text: UI_TEXT.en['usage.title'], title: UI_TEXT.en['usage.title'] },
       { path: APP_ROUTE_PATHS.settings, text: UI_TEXT.en['settings.pageTitle'], title: UI_TEXT.en['settings.pageTitle'] },
       { path: '/missing-i18n-route', text: UI_TEXT.en['notFound.title'], title: UI_TEXT.en['notFound.pageTitle'] },
@@ -217,7 +218,7 @@ test.describe('complete UI i18n acceptance', () => {
       await expect(page.getByText(route.text, { exact: true }).first()).toBeVisible({ timeout: 15_000 });
       await expect(page).toHaveTitle(new RegExp(route.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
     }
-    expect(routes).toHaveLength(10); // 16-25
+    expect(routes).toHaveLength(11); // 16-26
   });
 
   test('English Settings localizes model access, discovery success, and discovery failure', async ({ page }) => {

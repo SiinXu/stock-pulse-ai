@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
-import { BarChart3, LogOut, PanelLeft, PanelRight, Search } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { BarChart3, ChevronDown, ChevronRight, LogOut, PanelLeft, PanelRight, Search } from 'lucide-react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAgentChatStore } from '../../stores/agentChatStore';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
 import { resolveContextAwareNavigationTarget } from '../../utils/sessionContinuity';
+import { APP_ROUTE_PATHS } from '../../routing/routes';
 import { ConfirmDialog } from '../common/ConfirmDialog';
+import { Popover } from '../common/Popover';
 import { StatusDot } from '../common/StatusDot';
 import { Tooltip } from '../common/Tooltip';
 import { SidebarProfile } from './SidebarProfile';
@@ -47,13 +49,16 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
   const currentHref = `${location.pathname}${location.search}${location.hash}`;
 
   const openSearch = () => {
-    navigate(resolveContextAwareNavigationTarget('/', currentHref), {
+    navigate(resolveContextAwareNavigationTarget(APP_ROUTE_PATHS.home, currentHref), {
       state: { focusStockSearch: true, focusToken: Date.now() },
     });
     onNavigate?.();
   };
   const completionBadge = useAgentChatStore((state) => state.completionBadge);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [openGroupKey, setOpenGroupKey] = useState<string | null>(null);
+  const [focusFlyoutGroupKey, setFocusFlyoutGroupKey] = useState<string | null>(null);
+  const groupCloseTimerRef = useRef<number | null>(null);
   const navItems = APPLICATION_NAVIGATION_ITEMS;
   const isRail = variant === 'rail';
   const itemBaseClass = cn(
@@ -71,6 +76,33 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
   const itemActiveClass = 'border-[var(--nav-active-border)] bg-[var(--nav-active-bg)] font-medium text-foreground shadow-[0_1px_2px_var(--nav-active-shadow)]';
   const itemIconClass = cn('h-5 w-5', 'shrink-0');
   const itemLabelClass = cn('truncate', isRail ? 'text-center' : '');
+  const cancelGroupClose = useCallback(() => {
+    if (groupCloseTimerRef.current !== null) {
+      window.clearTimeout(groupCloseTimerRef.current);
+      groupCloseTimerRef.current = null;
+    }
+  }, []);
+  const openGroup = useCallback((key: string, focusContent: boolean) => {
+    cancelGroupClose();
+    setFocusFlyoutGroupKey(focusContent ? key : null);
+    setOpenGroupKey(key);
+  }, [cancelGroupClose]);
+  const closeGroup = useCallback(() => {
+    cancelGroupClose();
+    setOpenGroupKey(null);
+    setFocusFlyoutGroupKey(null);
+  }, [cancelGroupClose]);
+  const scheduleGroupClose = useCallback(() => {
+    cancelGroupClose();
+    groupCloseTimerRef.current = window.setTimeout(closeGroup, 120);
+  }, [cancelGroupClose, closeGroup]);
+  useEffect(() => cancelGroupClose, [cancelGroupClose]);
+
+  const isRouteActive = useCallback((to: string, exact = false) => (
+    exact
+      ? location.pathname === to
+      : location.pathname === to || location.pathname.startsWith(`${to}/`)
+  ), [location.pathname]);
   const logoutButton = authEnabled ? (
     <button
       type="button"
@@ -180,9 +212,13 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
         )}
         aria-label={t('layout.mainNav')}
       >
-        {navItems.map(({ key, labelKey, to, icon: Icon, exact, badge }) => {
+        {navItems.map((item) => {
+          const { key, labelKey, to, icon: Icon, exact, badge, children } = item;
           const label = t(labelKey);
           const navigationTarget = resolveContextAwareNavigationTarget(to, currentHref);
+          const groupActive = isRouteActive(to, exact)
+            || children?.some((child) => isRouteActive(child.to, child.exact))
+            || false;
           const link = (
             <NavLink
               to={navigationTarget}
@@ -198,14 +234,19 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               className={({ isActive }) =>
                 cn(
                   itemInteractiveClass,
-                  isActive ? itemActiveClass : ''
+                  isActive || groupActive ? itemActiveClass : ''
                 )
               }
             >
-              {({ isActive }) => (
+              {({ isActive }) => {
+                const active = isActive || groupActive;
+                return (
                 <>
-                  <Icon className={cn(itemIconClass, isActive ? 'text-[var(--nav-icon-active)]' : 'text-current')} />
+                  <Icon className={cn(itemIconClass, active ? 'text-[var(--nav-icon-active)]' : 'text-current')} />
                   {!collapsed ? <span className={itemLabelClass}>{label}</span> : null}
+                  {!collapsed && children ? (
+                    <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-muted-text" aria-hidden="true" />
+                  ) : null}
                   {badge === 'completion' && completionBadge ? (
                     <StatusDot
                       tone="info"
@@ -218,9 +259,158 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                     />
                   ) : null}
                 </>
-              )}
+                );
+              }}
             </NavLink>
           );
+
+          if (children && collapsed) {
+            const contentId = `${focusKeyPrefix}-${key}-flyout`;
+            const triggerFocusKey = `${focusKeyPrefix}:${key}`;
+            return (
+              <Popover
+                key={key}
+                open={openGroupKey === key}
+                onOpenChange={(open) => {
+                  if (open) openGroup(key, true);
+                  else closeGroup();
+                }}
+                rootClassName="w-full shrink-0"
+                contentRole="menu"
+                contentId={contentId}
+                ariaLabel={label}
+                placement="right"
+                autoFocusContent={focusFlyoutGroupKey === key}
+                contentClassName="w-56 p-1.5"
+                onContentKeyDown={(event) => {
+                  if (event.key === 'Tab') {
+                    closeGroup();
+                    return;
+                  }
+                  if (event.key !== 'ArrowLeft') return;
+                  event.preventDefault();
+                  closeGroup();
+                  window.requestAnimationFrame(() => {
+                    document.querySelector<HTMLElement>(
+                      `[data-route-focus-key="${triggerFocusKey}"]`,
+                    )?.focus();
+                  });
+                }}
+                trigger={({ open }) => (
+                  <NavLink
+                    to={navigationTarget}
+                    end={exact}
+                    aria-label={label}
+                    aria-haspopup="menu"
+                    aria-expanded={open}
+                    aria-controls={open ? contentId : undefined}
+                    data-route-focus-key={triggerFocusKey}
+                    data-route-focus-return-key={returnFocusKey}
+                    onMouseEnter={() => openGroup(key, false)}
+                    onMouseLeave={scheduleGroupClose}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'ArrowRight') return;
+                      event.preventDefault();
+                      openGroup(key, true);
+                    }}
+                    onClick={(event) => {
+                      if (shouldDelegateCurrentDocumentNavigation(event)) {
+                        closeGroup();
+                        onNavigate?.();
+                      }
+                    }}
+                    className={cn(itemInteractiveClass, groupActive ? itemActiveClass : '')}
+                  >
+                    <Icon className={cn(itemIconClass, groupActive ? 'text-[var(--nav-icon-active)]' : 'text-current')} />
+                    <ChevronRight
+                      className="absolute bottom-1.5 right-1.5 h-3 w-3 text-muted-text"
+                      aria-hidden="true"
+                    />
+                  </NavLink>
+                )}
+              >
+                {() => (
+                  <div onMouseEnter={cancelGroupClose} onMouseLeave={scheduleGroupClose}>
+                    <div className="px-2.5 pb-1.5 pt-1 text-xs font-medium text-muted-text">
+                      {label}
+                    </div>
+                    {children.map((child) => {
+                      const ChildIcon = child.icon;
+                      const childLabel = t(child.labelKey);
+                      const childActive = isRouteActive(child.to, child.exact);
+                      return (
+                        <NavLink
+                          key={child.key}
+                          role="menuitem"
+                          tabIndex={-1}
+                          to={resolveContextAwareNavigationTarget(child.to, currentHref)}
+                          end={child.exact}
+                          aria-label={childLabel}
+                          data-route-focus-key={`${focusKeyPrefix}:${child.key}`}
+                          data-route-focus-return-key={triggerFocusKey}
+                          onClick={(event) => {
+                            if (shouldDelegateCurrentDocumentNavigation(event)) {
+                              closeGroup();
+                              onNavigate?.();
+                            }
+                          }}
+                          className={cn(
+                            'flex min-h-11 items-center gap-2.5 rounded-lg px-2.5 text-sm text-secondary-text transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-foreground motion-reduce:transition-none',
+                            childActive ? itemActiveClass : '',
+                          )}
+                        >
+                          <ChildIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                          <span className="truncate">{childLabel}</span>
+                        </NavLink>
+                      );
+                    })}
+                  </div>
+                )}
+              </Popover>
+            );
+          }
+
+          if (children) {
+            return (
+              <div key={key} className="flex shrink-0 flex-col gap-1">
+                {link}
+                <div className="ml-4 flex flex-col gap-1 border-l border-border pl-3">
+                  {children.map((child) => {
+                    const ChildIcon = child.icon;
+                    const childLabel = t(child.labelKey);
+                    return (
+                      <NavLink
+                        key={child.key}
+                        to={resolveContextAwareNavigationTarget(child.to, currentHref)}
+                        end={child.exact}
+                        onClick={(event) => {
+                          if (shouldDelegateCurrentDocumentNavigation(event)) {
+                            onNavigate?.();
+                          }
+                        }}
+                        aria-label={childLabel}
+                        data-route-focus-key={`${focusKeyPrefix}:${child.key}`}
+                        data-route-focus-return-key={returnFocusKey}
+                        className={({ isActive }) => cn(
+                          itemInteractiveClass,
+                          'min-h-10 gap-2.5 px-2.5 text-xs',
+                          isActive ? itemActiveClass : '',
+                        )}
+                      >
+                        {({ isActive }) => (
+                          <>
+                            <ChildIcon className={cn('h-4 w-4 shrink-0', isActive ? 'text-[var(--nav-icon-active)]' : 'text-current')} />
+                            <span className="truncate">{childLabel}</span>
+                          </>
+                        )}
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          }
+
           return (
             <React.Fragment key={key}>
               {collapsed ? (

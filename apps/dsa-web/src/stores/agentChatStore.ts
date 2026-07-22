@@ -15,6 +15,7 @@ import {
   removeSessionItem,
   writeSessionItem,
 } from '../utils/sessionPersistence';
+import { APP_ROUTE_PATHS } from '../routing/routes';
 
 export interface ProgressStep {
   type: string;
@@ -506,7 +507,7 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
         }));
       }
 
-      if (currentRoute !== '/chat') {
+      if (currentRoute !== APP_ROUTE_PATHS.agent) {
         set({ completionBadge: true });
       }
     } catch (error: unknown) {
@@ -521,7 +522,7 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
           lastFailedRequest: { payload, meta },
         });
         const { currentRoute } = get();
-        if (currentRoute !== '/chat') {
+        if (currentRoute !== APP_ROUTE_PATHS.agent) {
           set({ completionBadge: true });
         }
       }

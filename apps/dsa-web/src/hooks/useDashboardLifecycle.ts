@@ -10,8 +10,6 @@ type UseDashboardLifecycleOptions = {
   pollKnownTasks?: () => Promise<void>;
   loadStockBar: () => Promise<void>;
   refreshStockBar: () => Promise<void>;
-  loadMarketReviewHistory?: () => Promise<void>;
-  refreshMarketReviewHistory?: (silent?: boolean) => Promise<unknown>;
   syncTaskCreated: (task: TaskInfo) => void;
   syncTaskUpdated: (task: TaskInfo) => void;
   syncTaskFailed: (task: TaskInfo) => void;
@@ -33,8 +31,6 @@ export function useDashboardLifecycle({
   pollKnownTasks = noopAsync,
   loadStockBar,
   refreshStockBar,
-  loadMarketReviewHistory,
-  refreshMarketReviewHistory,
   syncTaskCreated,
   syncTaskUpdated,
   syncTaskFailed,
@@ -54,9 +50,8 @@ export function useDashboardLifecycle({
 
     void loadInitialHistory();
     void loadStockBar();
-    void loadMarketReviewHistory?.();
     void refreshActiveTasks();
-  }, [enabled, loadInitialHistory, loadMarketReviewHistory, loadStockBar, refreshActiveTasks]);
+  }, [enabled, loadInitialHistory, loadStockBar, refreshActiveTasks]);
 
   useEffect(() => {
     if (!enabled) {
@@ -66,13 +61,12 @@ export function useDashboardLifecycle({
     const intervalId = window.setInterval(() => {
       void refreshHistory(true);
       void refreshStockBar();
-      void refreshMarketReviewHistory?.(true);
       void refreshActiveTasks();
       onDashboardDataRefresh?.();
     }, 30_000);
 
     return () => window.clearInterval(intervalId);
-  }, [enabled, onDashboardDataRefresh, refreshHistory, refreshMarketReviewHistory, refreshStockBar, refreshActiveTasks]);
+  }, [enabled, onDashboardDataRefresh, refreshHistory, refreshStockBar, refreshActiveTasks]);
 
   useEffect(() => {
     if (!enabled) {
@@ -83,7 +77,6 @@ export function useDashboardLifecycle({
       if (document.visibilityState === 'visible') {
         void refreshHistory(true);
         void refreshStockBar();
-        void refreshMarketReviewHistory?.(true);
         void refreshActiveTasks();
         onDashboardDataRefresh?.();
       }
@@ -91,7 +84,7 @@ export function useDashboardLifecycle({
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [enabled, onDashboardDataRefresh, refreshHistory, refreshMarketReviewHistory, refreshStockBar, refreshActiveTasks]);
+  }, [enabled, onDashboardDataRefresh, refreshHistory, refreshStockBar, refreshActiveTasks]);
 
   useEffect(() => {
     const removalTimeouts = removalTimeoutsRef.current;
@@ -130,7 +123,6 @@ export function useDashboardLifecycle({
       void Promise.allSettled([historyRefresh, stockBarRefresh]).then(() => {
         onCompletedTaskDataRefreshed?.(task);
       });
-      void refreshMarketReviewHistory?.(true);
       // Keep the terminal task visible long enough for the user to see the
       // completion and dismiss it; the panel now renders terminal tasks.
       scheduleTaskRemoval(task.taskId, terminalRetentionMs);

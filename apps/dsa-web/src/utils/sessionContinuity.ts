@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { DeepLinkTarget } from './deepLink';
 import { buildDeepLink, parseDeepLink } from './deepLink';
+import { APP_ROUTE_PATHS, LEGACY_ROUTE_PATHS } from '../routing/routes';
 import { parseHomeUrlState } from './homeUrlState';
 import {
   WEB_SESSION_CONTINUITY_STORAGE_KEY,
@@ -13,12 +14,13 @@ import { normalizeStockCode } from './stockCode';
 import { validateStockCode } from './validation';
 
 type PersistedRouteKey =
-  | 'backtest'
   | 'chat'
   | 'decision-signals'
   | 'home'
   | 'portfolio'
-  | 'screening'
+  | 'research-backtest'
+  | 'research-discover'
+  | 'research-market'
   | 'stock';
 
 type PersistedStockContext = {
@@ -36,12 +38,13 @@ type PersistedSessionContinuity = {
 const EMPTY_STATE: PersistedSessionContinuity = { version: 1, routes: {} };
 const MAX_PERSISTED_HREF_LENGTH = 2_048;
 const INITIAL_RESTORE_PATHS = new Map<string, PersistedRouteKey>([
-  ['/', 'home'],
-  ['/backtest', 'backtest'],
-  ['/chat', 'chat'],
-  ['/decision-signals', 'decision-signals'],
-  ['/portfolio', 'portfolio'],
-  ['/screening', 'screening'],
+  [APP_ROUTE_PATHS.home, 'home'],
+  [APP_ROUTE_PATHS.agent, 'chat'],
+  [APP_ROUTE_PATHS.decisionSignals, 'decision-signals'],
+  [APP_ROUTE_PATHS.portfolio, 'portfolio'],
+  [APP_ROUTE_PATHS.researchBacktest, 'research-backtest'],
+  [APP_ROUTE_PATHS.researchDiscover, 'research-discover'],
+  [APP_ROUTE_PATHS.researchMarket, 'research-market'],
 ]);
 const DEEP_LINK_ROUTE_KEYS = new Map<DeepLinkTarget['page'], PersistedRouteKey>([
   ['home', 'home'],
@@ -79,8 +82,9 @@ const ALLOWED_QUERY_KEYS: Record<PersistedRouteKey, readonly string[]> = {
     'sourceReportId',
   ],
   stock: ['period', 'days'],
-  screening: ['market', 'strategy', 'count'],
-  backtest: ['code', 'window', 'from', 'to', 'phase', 'page'],
+  'research-discover': ['market', 'strategy', 'count'],
+  'research-backtest': ['code', 'window', 'from', 'to', 'phase', 'page'],
+  'research-market': ['recordId', 'runFlow', 'runFlowRecordId', 'runFlowTaskId'],
 };
 const BACKTEST_PHASES = new Set(['premarket', 'intraday', 'postmarket', 'unknown']);
 const SAFE_IDENTIFIER_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
@@ -142,15 +146,25 @@ function positiveInteger(value: string | null, maximum = Number.MAX_SAFE_INTEGER
 
 function sanitizeStandaloneRoute(url: URL): SanitizedRoute | null {
   const params = new URLSearchParams();
-  if (url.pathname === '/screening') {
+  if (
+    url.pathname === APP_ROUTE_PATHS.researchDiscover
+    || url.pathname === LEGACY_ROUTE_PATHS.screening
+  ) {
     if (url.searchParams.get('market') === 'cn') params.set('market', 'cn');
     const strategy = url.searchParams.get('strategy');
     if (strategy && SAFE_IDENTIFIER_PATTERN.test(strategy)) params.set('strategy', strategy);
     const count = positiveInteger(url.searchParams.get('count'), 100);
     if (count) params.set('count', count);
-    return { key: 'screening', href: `/screening${params.size ? `?${params}` : ''}`, target: null };
+    return {
+      key: 'research-discover',
+      href: `${APP_ROUTE_PATHS.researchDiscover}${params.size ? `?${params}` : ''}`,
+      target: null,
+    };
   }
-  if (url.pathname === '/backtest') {
+  if (
+    url.pathname === APP_ROUTE_PATHS.researchBacktest
+    || url.pathname === LEGACY_ROUTE_PATHS.backtest
+  ) {
     const code = url.searchParams.get('code');
     const normalizedCode = code ? normalizeSafeStockCode(code) : null;
     if (normalizedCode) params.set('code', normalizedCode);
@@ -164,7 +178,23 @@ function sanitizeStandaloneRoute(url: URL): SanitizedRoute | null {
     if (phase && BACKTEST_PHASES.has(phase)) params.set('phase', phase);
     const page = positiveInteger(url.searchParams.get('page'));
     if (page) params.set('page', page);
-    return { key: 'backtest', href: `/backtest${params.size ? `?${params}` : ''}`, target: null };
+    return {
+      key: 'research-backtest',
+      href: `${APP_ROUTE_PATHS.researchBacktest}${params.size ? `?${params}` : ''}`,
+      target: null,
+    };
+  }
+  if (url.pathname === APP_ROUTE_PATHS.researchMarket) {
+    const normalized = new URLSearchParams(parseHomeUrlState(url.search).normalizedSearch);
+    for (const key of ALLOWED_QUERY_KEYS['research-market']) {
+      const value = normalized.get(key);
+      if (value !== null) params.set(key, value);
+    }
+    return {
+      key: 'research-market',
+      href: `${APP_ROUTE_PATHS.researchMarket}${params.size ? `?${params}` : ''}`,
+      target: null,
+    };
   }
   return null;
 }
@@ -250,13 +280,13 @@ function stockContextFromTarget(target: DeepLinkTarget | null): PersistedStockCo
 function stockContextFromRoute(route: SanitizedRoute | null): PersistedStockContext | null {
   const targetContext = stockContextFromTarget(route?.target ?? null);
   if (targetContext) return targetContext;
-  if (route?.key !== 'backtest') return null;
+  if (route?.key !== 'research-backtest') return null;
   const code = new URL(route.href, 'http://stockpulse.local').searchParams.get('code');
   return code ? { stockCode: code } : null;
 }
 
 function routeOwnsStockContext(route: SanitizedRoute | null): boolean {
-  return Boolean(route && ['backtest', 'chat', 'decision-signals', 'home', 'stock'].includes(route.key));
+  return Boolean(route && ['research-backtest', 'chat', 'decision-signals', 'home', 'stock'].includes(route.key));
 }
 
 export function recordSessionLocation(href: string): void {
@@ -369,7 +399,7 @@ export function resolveContextAwareNavigationTarget(to: string, currentHref: str
         saved?.stockCode === sourceContext.stockCode ? new Set() : new Set(['signal']),
       );
     }
-    case 'backtest': {
+    case 'research-backtest': {
       const url = new URL(savedHref, 'http://stockpulse.local');
       url.searchParams.set('code', sourceContext.stockCode);
       return `${url.pathname}${url.search}`;

@@ -688,8 +688,8 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     expect(await page.evaluate((key) => localStorage.getItem(key), uiLanguageStorageKey)).toBe('en');
     await page.reload();
-    await expect(page.getByRole('link', { name: 'Ask' })).toBeVisible();
-    await page.getByRole('link', { name: 'Ask' }).click();
+    await expect(page.getByRole('link', { name: 'Agent' })).toBeVisible();
+    await page.getByRole('link', { name: 'Agent' }).click();
     await page.goBack();
     await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
     await page.goForward();
@@ -699,13 +699,14 @@ test.describe('infrastructure interaction acceptance matrix', () => {
 
   test('05 application routes render English chrome and localized document titles', async ({ page }) => {
     await login(page, 'en');
-    await assertRouteChrome(page, '/', UI_TEXT.en['home.analyze'], UI_TEXT.en['home.pageTitle']);
-    await assertRouteChrome(page, '/chat', UI_TEXT.en['chat.title'], UI_TEXT.en['chat.pageTitle']);
-    await assertRouteChrome(page, '/screening', SCREENING_TEXT.en.title, SCREENING_TEXT.en.documentTitle);
-    await assertRouteChrome(page, '/portfolio', PORTFOLIO_TEXT.en.title, PORTFOLIO_TEXT.en.documentTitle);
-    await assertRouteChrome(page, '/decision-signals', UI_TEXT.en['decisionSignals.title'], UI_TEXT.en['decisionSignals.pageTitle']);
-    await assertRouteChrome(page, '/backtest', BACKTEST_TEXT.en.runBacktest, BACKTEST_TEXT.en.documentTitle);
-    await assertRouteChrome(page, '/alerts', ALERT_PAGE_TEXT.en.title, ALERT_PAGE_TEXT.en.documentTitle);
+    await assertRouteChrome(page, APP_ROUTE_PATHS.home, UI_TEXT.en['home.analyze'], UI_TEXT.en['home.pageTitle']);
+    await assertRouteChrome(page, APP_ROUTE_PATHS.agent, UI_TEXT.en['chat.title'], UI_TEXT.en['chat.pageTitle']);
+    await assertRouteChrome(page, APP_ROUTE_PATHS.researchMarket, UI_TEXT.en['home.marketReview'], UI_TEXT.en['home.marketReviewPageTitle']);
+    await assertRouteChrome(page, APP_ROUTE_PATHS.researchDiscover, SCREENING_TEXT.en.title, SCREENING_TEXT.en.documentTitle);
+    await assertRouteChrome(page, APP_ROUTE_PATHS.portfolio, PORTFOLIO_TEXT.en.title, PORTFOLIO_TEXT.en.documentTitle);
+    await assertRouteChrome(page, APP_ROUTE_PATHS.decisionSignals, UI_TEXT.en['decisionSignals.title'], UI_TEXT.en['decisionSignals.pageTitle']);
+    await assertRouteChrome(page, APP_ROUTE_PATHS.researchBacktest, BACKTEST_TEXT.en.runBacktest, BACKTEST_TEXT.en.documentTitle);
+    await assertRouteChrome(page, APP_ROUTE_PATHS.alerts, ALERT_PAGE_TEXT.en.title, ALERT_PAGE_TEXT.en.documentTitle);
     await assertRouteChrome(page, usageSettingsHref, UI_TEXT.en['usage.title'], UI_TEXT.en['usage.title']);
     await assertRouteChrome(page, APP_ROUTE_PATHS.settings, UI_TEXT.en['settings.pageTitle'], UI_TEXT.en['settings.pageTitle']);
     await assertRouteChrome(page, '/missing-route', UI_TEXT.en['notFound.title'], UI_TEXT.en['notFound.pageTitle']);
@@ -730,6 +731,24 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page.getByRole('button', { name: 'Usage & cost' }))
       .toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('link', { name: 'Usage' })).toHaveCount(0);
+  });
+
+  test('05b legacy Research deep links preserve context and replace into canonical routes', async ({ page }) => {
+    await login(page, 'en');
+
+    for (const [legacyPath, canonicalPath] of [
+      [LEGACY_ROUTE_PATHS.screening, APP_ROUTE_PATHS.researchDiscover],
+      [LEGACY_ROUTE_PATHS.backtest, APP_ROUTE_PATHS.researchBacktest],
+    ] as const) {
+      await page.goto(`${legacyPath}?keep=yes#results`);
+      await expect.poll(() => new URL(page.url()).pathname).toBe(canonicalPath);
+      const redirectedUrl = new URL(page.url());
+      expect(redirectedUrl.searchParams.get('keep')).toBe('yes');
+      expect(redirectedUrl.hash).toBe('#results');
+
+      await page.goBack();
+      await expect.poll(() => new URL(page.url()).pathname).toBe(APP_ROUTE_PATHS.home);
+    }
   });
 
   test('06 Chinese UI with Chinese report keeps both report body and system actions Chinese', async ({ page }) => {
@@ -876,7 +895,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       },
     ]);
     await login(page, 'en');
-    await page.goto('/screening');
+    await page.goto(APP_ROUTE_PATHS.researchDiscover);
 
     const strategySelect = page.getByRole('combobox', { name: 'Select strategy' });
     await expect(strategySelect).toHaveAttribute('data-value', 'dual_low');
@@ -953,7 +972,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       key: screeningTaskStorageKey,
       value: { taskId: 'restore-success', market: 'cn', strategy: 'bull_trend', maxResults: 20 },
     });
-    await page.goto('/screening');
+    await page.goto(APP_ROUTE_PATHS.researchDiscover);
     await expect(page.getByText('RESTORED', { exact: true }).first()).toBeVisible();
     expect(await page.evaluate((key) => sessionStorage.getItem(key), screeningTaskStorageKey)).toBeNull();
 
@@ -1656,7 +1675,8 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       });
     });
     await login(page);
-    const marketReviewButton = page.getByRole('button', { name: '大盘复盘', exact: true });
+    await page.goto(APP_ROUTE_PATHS.researchMarket);
+    const marketReviewButton = page.getByRole('button', { name: '大盘复盘', exact: true }).first();
     await marketReviewButton.click();
     await expect.poll(() => submissions).toBe(1);
     await oldPollStarted.promise;
@@ -1669,7 +1689,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect.poll(() => submissions).toBe(2);
     const persistedReport = page.getByTestId('market-review-report');
     await expect(persistedReport.getByText('NEW_GENERATION_PERSISTED', { exact: true })).toBeVisible();
-    await expect(page).toHaveURL(`/?recordId=${persistedReviewId}`);
+    await expect(page).toHaveURL(`${APP_ROUTE_PATHS.researchMarket}?recordId=${persistedReviewId}`);
     await expect(page.getByText('NEW_RAW_STATUS_SHOULD_NOT_RENDER', { exact: true })).toHaveCount(0);
     oldPoll.resolve();
     await page.waitForTimeout(200);
@@ -1951,7 +1971,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       await fulfillJson(route, performance(marker));
     });
     await login(page);
-    await page.goto('/backtest');
+    await page.goto(APP_ROUTE_PATHS.researchBacktest);
     const phase = page.getByRole('combobox', { name: /结果筛选.*阶段/ });
     await phase.click();
     await page.locator('[role="option"][data-value="intraday"]').click();
@@ -2018,14 +2038,13 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(chatHistory).toBeFocused();
   });
 
-  test('38 320px Home keeps Analyze, Market Review, and History fully reachable', async ({ page }) => {
+  test('38 320px Home and Market Review keep their primary controls fully reachable', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 720 });
     await login(page);
     const input = page.getByPlaceholder('输入股票代码或名称，如 600519、贵州茅台、AAPL');
     await input.fill('AAPL');
     const controls = [
       page.getByRole('button', { name: '分析', exact: true }),
-      page.getByRole('button', { name: '大盘复盘', exact: true }),
       page.getByRole('button', { name: '历史记录' }),
     ];
     for (const control of controls) {
@@ -2036,12 +2055,21 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       expect(box!.x + box!.width).toBeLessThanOrEqual(320);
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
+
+    await page.goto(APP_ROUTE_PATHS.researchMarket);
+    const marketReview = page.getByRole('button', { name: '大盘复盘', exact: true }).first();
+    await expect(marketReview).toBeVisible();
+    const marketReviewBox = await marketReview.boundingBox();
+    expect(marketReviewBox).not.toBeNull();
+    expect(marketReviewBox!.x).toBeGreaterThanOrEqual(0);
+    expect(marketReviewBox!.x + marketReviewBox!.width).toBeLessThanOrEqual(320);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
   });
 
   test('39 every first-level page avoids critical document-level horizontal clipping at 390px', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await login(page);
-    await assertNoDocumentOverflow(page, '/');
+    await assertNoDocumentOverflow(page, APP_ROUTE_PATHS.home);
     await expect(page.getByPlaceholder('输入股票代码或名称，如 600519、贵州茅台、AAPL')).toBeVisible();
     const reportHeading = page.getByRole('heading', { name: 'E2E Fixture' });
     const reportBody = page.getByText('E2E_MARKDOWN_FIXTURE: deterministic report content.', { exact: true });
@@ -2049,12 +2077,13 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(reportBody).toBeVisible();
     await expect.poll(async () => (await getElementContrast(reportHeading)).ratio).toBeGreaterThanOrEqual(3);
     await expect.poll(async () => (await getElementContrast(reportBody)).ratio).toBeGreaterThanOrEqual(4.5);
-    await assertNoDocumentOverflow(page, '/chat');
-    await assertNoDocumentOverflow(page, '/screening');
-    await assertNoDocumentOverflow(page, '/portfolio');
-    await assertNoDocumentOverflow(page, '/decision-signals');
-    await assertNoDocumentOverflow(page, '/backtest');
-    await assertNoDocumentOverflow(page, '/alerts');
+    await assertNoDocumentOverflow(page, APP_ROUTE_PATHS.agent);
+    await assertNoDocumentOverflow(page, APP_ROUTE_PATHS.researchMarket);
+    await assertNoDocumentOverflow(page, APP_ROUTE_PATHS.researchDiscover);
+    await assertNoDocumentOverflow(page, APP_ROUTE_PATHS.portfolio);
+    await assertNoDocumentOverflow(page, APP_ROUTE_PATHS.decisionSignals);
+    await assertNoDocumentOverflow(page, APP_ROUTE_PATHS.researchBacktest);
+    await assertNoDocumentOverflow(page, APP_ROUTE_PATHS.alerts);
     await assertNoDocumentOverflow(page, usageSettingsHref);
     await assertNoDocumentOverflow(page, APP_ROUTE_PATHS.settings);
     await assertNoDocumentOverflow(page, '/missing-responsive-route');
@@ -2062,7 +2091,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
 
   test('40 light and dark themes keep Home and Settings key content readable', async ({ page }, testInfo) => {
     await login(page);
-    const homeText = page.getByRole('button', { name: '大盘复盘', exact: true });
+    const homeText = page.getByRole('heading', { name: '个股栏', exact: true });
     await selectTheme(page, '浅色');
     await expect(page.locator('html')).not.toHaveClass(/dark/);
     await expect(homeText).toBeVisible();
