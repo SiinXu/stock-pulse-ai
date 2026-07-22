@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { APP_ROUTE_PATHS, LEGACY_ROUTE_PATHS } from '../../../routing/routes';
 import {
   APPLICATION_NAVIGATION_ITEMS,
   shouldDelegateCurrentDocumentNavigation,
 } from '../navigation';
 
 describe('application navigation descriptor', () => {
-  it('retains the approved flat canonical route order', () => {
+  it('retains the approved flat route order without the nested usage utility', () => {
     expect(APPLICATION_NAVIGATION_ITEMS.map(({ key, to }) => [key, to])).toEqual([
       ['home', '/'],
       ['chat', '/chat'],
@@ -14,8 +15,7 @@ describe('application navigation descriptor', () => {
       ['decision-signals', '/decision-signals'],
       ['backtest', '/backtest'],
       ['alerts', '/alerts'],
-      ['usage', '/usage'],
-      ['settings', '/settings'],
+      ['settings', APP_ROUTE_PATHS.settings],
     ]);
   });
 
@@ -27,6 +27,8 @@ describe('application navigation descriptor', () => {
     expect(new Set(targets).size).toBe(targets.length);
     expect(keys).not.toContain('research');
     expect(keys).not.toContain('more');
+    expect(keys).not.toContain('usage');
+    expect(targets).not.toContain(LEGACY_ROUTE_PATHS.usage);
     expect(targets).not.toContain('/research');
     expect(targets).not.toContain('/more');
   });

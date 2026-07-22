@@ -6,6 +6,10 @@ import { useAuth, useSystemConfig } from '../hooks';
 import { useProviderCatalog } from '../hooks/useProviderCatalog';
 import { useAvailableModels } from '../hooks/useAvailableModels';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
+import {
+  SETTINGS_ROUTE_QUERY_KEYS,
+  SETTINGS_SECTION_IDS,
+} from '../routing/routes';
 import { getUiListSeparator, getUiLocale } from '../utils/uiLocale';
 import { createParsedApiError, getParsedApiError, type ParsedApiError } from '../api/error';
 import { analysisApi } from '../api/analysis';
@@ -108,6 +112,7 @@ import { formatUiText, type UiLanguage, type UiTextKey } from '../i18n/uiText';
 import { SETTINGS_PAGE_TEXT, SETTINGS_TASK_REFERENCE_LABELS, SETTINGS_TASK_ROUTE_LABELS } from '../locales/settingsPage';
 import { SETTINGS_NOTIFICATION_TEXT } from '../locales/settingsNotifications';
 import { resolveSettingsFieldTitle } from '../locales/settingsFieldTitle';
+import TokenUsagePage from '../components/usage/TokenUsagePage';
 
 type DesktopWindow = Window & {
   dsaDesktop?: {
@@ -1140,23 +1145,23 @@ const SettingsPage: React.FC = () => {
   const desktopAppVersion = getDesktopAppVersion();
   const shouldShowDesktopVersionCard = Boolean(desktopAppVersion);
 
-  // Set page title
-  useEffect(() => {
-    document.title = t('settings.pageTitleDocument');
-  }, [t]);
-
   const [searchParams, setSearchParams] = useSearchParams();
   // Seed the active tab from the URL once so deep links / refresh restore it.
   // Prefer the new section/view scheme; fall back to (and migrate from) the
   // legacy category/sub params below.
   const [initialTab] = useState(() => {
-    const section = searchParams.get('section');
+    const section = searchParams.get(SETTINGS_ROUTE_QUERY_KEYS.section);
     if (section) {
-      const legacy = sectionViewToLegacy(section, searchParams.get('view'));
+      const legacy = sectionViewToLegacy(
+        section,
+        searchParams.get(SETTINGS_ROUTE_QUERY_KEYS.view),
+      );
       return { category: legacy.category, subCategory: legacy.sub };
     }
-    const category = searchParams.get('category');
-    return category ? { category, subCategory: searchParams.get('sub') } : undefined;
+    const category = searchParams.get(SETTINGS_ROUTE_QUERY_KEYS.legacyCategory);
+    return category
+      ? { category, subCategory: searchParams.get(SETTINGS_ROUTE_QUERY_KEYS.legacySub) }
+      : undefined;
   });
 
   const {
@@ -1214,24 +1219,35 @@ const SettingsPage: React.FC = () => {
   // seeds the initial state and is migrated away; it never decides the section
   // (which is why Reports vs Alerts, or Conversation vs Agent, no longer jump).
   const activeSection = useMemo<SettingsSectionId>(() => {
-    const section = searchParams.get('section');
+    const section = searchParams.get(SETTINGS_ROUTE_QUERY_KEYS.section);
     if (section && isSettingsSectionId(section)) {
       return section;
     }
-    const category = searchParams.get('category');
+    const category = searchParams.get(SETTINGS_ROUTE_QUERY_KEYS.legacyCategory);
     if (category) {
-      return legacyToSectionView(category, searchParams.get('sub')).section;
+      return legacyToSectionView(
+        category,
+        searchParams.get(SETTINGS_ROUTE_QUERY_KEYS.legacySub),
+      ).section;
     }
     return SETTINGS_SECTIONS[0].id;
   }, [searchParams]);
+  useEffect(() => {
+    document.title = t(activeSection === SETTINGS_SECTION_IDS.usage
+      ? 'usage.documentTitle'
+      : 'settings.pageTitleDocument');
+  }, [activeSection, t]);
   const activeView = useMemo<string>(() => {
-    const view = searchParams.get('view');
+    const view = searchParams.get(SETTINGS_ROUTE_QUERY_KEYS.view);
     if (getSectionViews(activeSection).some((entry) => entry.id === view)) {
       return view as string;
     }
-    const category = searchParams.get('category');
-    if (category && !searchParams.get('section')) {
-      const legacy = legacyToSectionView(category, searchParams.get('sub'));
+    const category = searchParams.get(SETTINGS_ROUTE_QUERY_KEYS.legacyCategory);
+    if (category && !searchParams.get(SETTINGS_ROUTE_QUERY_KEYS.section)) {
+      const legacy = legacyToSectionView(
+        category,
+        searchParams.get(SETTINGS_ROUTE_QUERY_KEYS.legacySub),
+      );
       if (legacy.section === activeSection) {
         return legacy.view;
       }
@@ -1246,17 +1262,17 @@ const SettingsPage: React.FC = () => {
 
   const selectSectionView = useCallback((section: SettingsSectionId, view: string) => {
     const next = new URLSearchParams(searchParams);
-    next.delete('category');
-    next.delete('sub');
-    next.delete('from');
-    next.set('section', section);
+    next.delete(SETTINGS_ROUTE_QUERY_KEYS.legacyCategory);
+    next.delete(SETTINGS_ROUTE_QUERY_KEYS.legacySub);
+    next.delete(SETTINGS_ROUTE_QUERY_KEYS.source);
+    next.set(SETTINGS_ROUTE_QUERY_KEYS.section, section);
     const resolvedView = getSectionViews(section).some((entry) => entry.id === view)
       ? view
       : getDefaultView(section);
     if (resolvedView) {
-      next.set('view', resolvedView);
+      next.set(SETTINGS_ROUTE_QUERY_KEYS.view, resolvedView);
     } else {
-      next.delete('view');
+      next.delete(SETTINGS_ROUTE_QUERY_KEYS.view);
     }
     // Normal navigation pushes a history entry so Back/Forward return here.
     setSearchParams(next, { replace: false });
@@ -1264,21 +1280,21 @@ const SettingsPage: React.FC = () => {
 
   const goToModelAccessFromTaskRouting = useCallback(() => {
     const next = new URLSearchParams(searchParams);
-    next.delete('category');
-    next.delete('sub');
-    next.set('section', 'ai_models');
-    next.set('view', 'connections');
-    next.set('from', 'task_routing');
+    next.delete(SETTINGS_ROUTE_QUERY_KEYS.legacyCategory);
+    next.delete(SETTINGS_ROUTE_QUERY_KEYS.legacySub);
+    next.set(SETTINGS_ROUTE_QUERY_KEYS.section, 'ai_models');
+    next.set(SETTINGS_ROUTE_QUERY_KEYS.view, 'connections');
+    next.set(SETTINGS_ROUTE_QUERY_KEYS.source, 'task_routing');
     setSearchParams(next, { replace: false });
   }, [searchParams, setSearchParams]);
 
   const returnToTaskRouting = useCallback(() => {
     const next = new URLSearchParams(searchParams);
-    next.delete('category');
-    next.delete('sub');
-    next.delete('from');
-    next.set('section', 'ai_models');
-    next.set('view', 'task_routing');
+    next.delete(SETTINGS_ROUTE_QUERY_KEYS.legacyCategory);
+    next.delete(SETTINGS_ROUTE_QUERY_KEYS.legacySub);
+    next.delete(SETTINGS_ROUTE_QUERY_KEYS.source);
+    next.set(SETTINGS_ROUTE_QUERY_KEYS.section, 'ai_models');
+    next.set(SETTINGS_ROUTE_QUERY_KEYS.view, 'task_routing');
     setSearchParams(next, { replace: false });
   }, [searchParams, setSearchParams]);
 
@@ -1296,21 +1312,22 @@ const SettingsPage: React.FC = () => {
   // Migrate legacy category/sub URLs and normalize non-canonical params to the
   // canonical section/view URL. This is the ONLY place that uses replace.
   useEffect(() => {
-    const hasLegacy = searchParams.has('category') || searchParams.has('sub');
+    const hasLegacy = searchParams.has(SETTINGS_ROUTE_QUERY_KEYS.legacyCategory)
+      || searchParams.has(SETTINGS_ROUTE_QUERY_KEYS.legacySub);
     const canonical = !hasLegacy
-      && searchParams.get('section') === activeSection
-      && searchParams.get('view') === activeView;
+      && searchParams.get(SETTINGS_ROUTE_QUERY_KEYS.section) === activeSection
+      && (searchParams.get(SETTINGS_ROUTE_QUERY_KEYS.view) ?? '') === activeView;
     if (canonical) {
       return;
     }
     const next = new URLSearchParams(searchParams);
-    next.delete('category');
-    next.delete('sub');
-    next.set('section', activeSection);
+    next.delete(SETTINGS_ROUTE_QUERY_KEYS.legacyCategory);
+    next.delete(SETTINGS_ROUTE_QUERY_KEYS.legacySub);
+    next.set(SETTINGS_ROUTE_QUERY_KEYS.section, activeSection);
     if (activeView) {
-      next.set('view', activeView);
+      next.set(SETTINGS_ROUTE_QUERY_KEYS.view, activeView);
     } else {
-      next.delete('view');
+      next.delete(SETTINGS_ROUTE_QUERY_KEYS.view);
     }
     setSearchParams(next, { replace: true });
   }, [searchParams, activeSection, activeView, setSearchParams]);
@@ -2806,7 +2823,7 @@ const SettingsPage: React.FC = () => {
         ) : null}
       </div>
 
-      {loadError ? (
+      {loadError && activeSection !== SETTINGS_SECTION_IDS.usage ? (
         <ApiErrorAlert
           error={loadError}
           actionLabel={retryAction === 'load' ? t('common.retry') : t('settings.reload')}
@@ -2815,7 +2832,7 @@ const SettingsPage: React.FC = () => {
         />
       ) : null}
 
-      {isLoading ? (
+      {isLoading && activeSection !== SETTINGS_SECTION_IDS.usage ? (
         <SettingsLoading />
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
@@ -2831,19 +2848,23 @@ const SettingsPage: React.FC = () => {
           </aside>
 
           <section ref={contentRegionRef} tabIndex={-1} className="space-y-4 outline-none">
-            <SettingsViewTabs
-              section={activeSection}
-              activeView={activeView}
-              onSelectView={(view) => selectSectionView(activeSection, view)}
-              language={uiLanguage}
-              tabsLabel={t('settings.categoryNavTitle')}
-            />
-            <SettingsErrorSummary
-              entries={errorSummaryEntries}
-              onJump={jumpToErrorField}
-              language={uiLanguage}
-            />
-            {hasDirtyRestartRequired ? (
+            {activeSection === SETTINGS_SECTION_IDS.usage ? (
+              <TokenUsagePage embedded />
+            ) : (
+              <>
+                <SettingsViewTabs
+                  section={activeSection}
+                  activeView={activeView}
+                  onSelectView={(view) => selectSectionView(activeSection, view)}
+                  language={uiLanguage}
+                  tabsLabel={t('settings.categoryNavTitle')}
+                />
+                <SettingsErrorSummary
+                  entries={errorSummaryEntries}
+                  onJump={jumpToErrorField}
+                  language={uiLanguage}
+                />
+                {hasDirtyRestartRequired ? (
               <SettingsAlert
                 variant="warning"
                 title={t('settings.fieldRestartRequired')}
@@ -3378,7 +3399,7 @@ const SettingsPage: React.FC = () => {
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-2">
-                    {searchParams.get('from') === 'task_routing' ? (
+                    {searchParams.get(SETTINGS_ROUTE_QUERY_KEYS.source) === 'task_routing' ? (
                       <Button type="button" variant="secondary" onClick={returnToTaskRouting}>
                         {settingsText.returnTaskRouting}
                       </Button>
@@ -3480,7 +3501,9 @@ const SettingsPage: React.FC = () => {
                   ))}
                 </form>
               </SettingsSectionCard>
-            ) : null}
+                ) : null}
+              </>
+            )}
           </section>
         </div>
       )}

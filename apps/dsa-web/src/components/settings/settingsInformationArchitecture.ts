@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { createUiLanguageRecord } from '../../i18n/createUiLanguageRecord';
 import type { UiLanguage } from '../../i18n/uiLanguages';
+import { SETTINGS_SECTION_IDS } from '../../routing/routes';
 // Web-only settings Information Architecture (IA) mapping layer.
 //
 // The backend groups config under coarse `category` values (base, ai_model,
@@ -28,6 +29,7 @@ export type SettingsSectionId =
   | 'reports'
   | 'alerts'
   | 'notifications'
+  | typeof SETTINGS_SECTION_IDS.usage
   | 'backtesting'
   | 'system_security'
   | 'advanced';
@@ -110,6 +112,13 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.notifications.label", { zh: '通知', en: 'Notifications' }),
     views: [{ id: 'channels', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.notifications.views.channels.label", { zh: '渠道', en: 'Channels' }) }],
     defaultView: 'channels',
+  },
+  {
+    id: SETTINGS_SECTION_IDS.usage,
+    label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.usage.label", { zh: '用量与成本', en: 'Usage & cost' }),
+    // TokenUsagePage owns its period segments, so this section has no second-level settings view.
+    views: [],
+    defaultView: '',
   },
   {
     id: 'backtesting',
@@ -238,6 +247,9 @@ export function sectionViewToLegacy(section: string, view: string | null): Legac
       return { category: 'notification', sub: 'rules' };
     case 'notifications':
       return { category: 'notification', sub: 'channels' };
+    case SETTINGS_SECTION_IDS.usage:
+      // SettingsPage renders TokenUsagePage directly for this section.
+      return { category: 'base', sub: null };
     case 'backtesting':
       return { category: 'backtest', sub: null };
     case 'system_security':

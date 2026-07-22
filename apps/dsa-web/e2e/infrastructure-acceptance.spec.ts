@@ -15,6 +15,13 @@ import { BACKTEST_TEXT } from '../src/locales/backtest';
 import { PORTFOLIO_TEXT } from '../src/locales/portfolio';
 import { SCREENING_TEXT } from '../src/locales/screening';
 import { UI_TEXT } from '../src/i18n/uiText';
+import {
+  APP_ROUTE_PATHS,
+  LEGACY_ROUTE_PATHS,
+  SETTINGS_ROUTE_QUERY_KEYS,
+  SETTINGS_SECTION_IDS,
+  buildSettingsSectionHref,
+} from '../src/routing/routes';
 import { loginAsE2eAdmin, updateE2eConfigOutsidePlaywrightTrace } from './auth-fixture';
 
 type JsonObject = Record<string, unknown>;
@@ -24,6 +31,7 @@ const fakeProviderOrigin = `http://127.0.0.1:${fakeProviderPort}`;
 const fakeProviderBaseUrl = `http://127.0.0.1:${fakeProviderPort}/v1`;
 const uiLanguageStorageKey = 'dsa.uiLanguage';
 const screeningTaskStorageKey = 'dsa.alphasift.activeScreenTask.v1';
+const usageSettingsHref = buildSettingsSectionHref(SETTINGS_SECTION_IDS.usage);
 
 const MODEL_KEYS_TO_RESET = [
   'LLM_CONFIG_MODE',
@@ -681,7 +689,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   });
 
-  test('05 ten first-level routes render English chrome and localized document titles', async ({ page }) => {
+  test('05 application routes render English chrome and localized document titles', async ({ page }) => {
     await login(page, 'en');
     await assertRouteChrome(page, '/', UI_TEXT.en['home.analyze'], UI_TEXT.en['home.pageTitle']);
     await assertRouteChrome(page, '/chat', UI_TEXT.en['chat.title'], UI_TEXT.en['chat.pageTitle']);
@@ -690,9 +698,28 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await assertRouteChrome(page, '/decision-signals', UI_TEXT.en['decisionSignals.title'], UI_TEXT.en['decisionSignals.pageTitle']);
     await assertRouteChrome(page, '/backtest', BACKTEST_TEXT.en.runBacktest, BACKTEST_TEXT.en.documentTitle);
     await assertRouteChrome(page, '/alerts', ALERT_PAGE_TEXT.en.title, ALERT_PAGE_TEXT.en.documentTitle);
-    await assertRouteChrome(page, '/usage', UI_TEXT.en['usage.title'], UI_TEXT.en['usage.title']);
-    await assertRouteChrome(page, '/settings', UI_TEXT.en['settings.pageTitle'], UI_TEXT.en['settings.pageTitle']);
+    await assertRouteChrome(page, usageSettingsHref, UI_TEXT.en['usage.title'], UI_TEXT.en['usage.title']);
+    await assertRouteChrome(page, APP_ROUTE_PATHS.settings, UI_TEXT.en['settings.pageTitle'], UI_TEXT.en['settings.pageTitle']);
     await assertRouteChrome(page, '/missing-route', UI_TEXT.en['notFound.title'], UI_TEXT.en['notFound.pageTitle']);
+  });
+
+  test('05a legacy Usage deep links preserve context and replace into Settings', async ({ page }) => {
+    await login(page, 'en');
+    await page.goto(`${LEGACY_ROUTE_PATHS.usage}?period=today&section=legacy#recent`);
+
+    await expect(page.getByRole('heading', {
+      name: UI_TEXT.en['usage.title'],
+      exact: true,
+    })).toBeVisible();
+    const redirectedUrl = new URL(page.url());
+    expect(redirectedUrl.pathname).toBe(APP_ROUTE_PATHS.settings);
+    expect(redirectedUrl.searchParams.get('period')).toBe('today');
+    expect(redirectedUrl.searchParams.get(SETTINGS_ROUTE_QUERY_KEYS.section))
+      .toBe(SETTINGS_SECTION_IDS.usage);
+    expect(redirectedUrl.hash).toBe('#recent');
+    await expect(page.getByRole('button', { name: 'Usage & cost' }))
+      .toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('link', { name: 'Usage' })).toHaveCount(0);
   });
 
   test('06 Chinese UI with Chinese report keeps both report body and system actions Chinese', async ({ page }) => {
@@ -2018,7 +2045,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await assertNoDocumentOverflow(page, '/decision-signals');
     await assertNoDocumentOverflow(page, '/backtest');
     await assertNoDocumentOverflow(page, '/alerts');
-    await assertNoDocumentOverflow(page, '/usage');
+    await assertNoDocumentOverflow(page, usageSettingsHref);
     await assertNoDocumentOverflow(page, '/settings');
     await assertNoDocumentOverflow(page, '/missing-responsive-route');
   });

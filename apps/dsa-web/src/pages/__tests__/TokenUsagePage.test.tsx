@@ -84,10 +84,10 @@ function createDeferred<T>() {
   return { promise, resolve, reject };
 }
 
-function renderPage() {
+function renderPage({ embedded = false }: { embedded?: boolean } = {}) {
   return render(
     <UiLanguageProvider>
-      <TokenUsagePage />
+      <TokenUsagePage embedded={embedded} />
     </UiLanguageProvider>
   );
 }
@@ -100,6 +100,15 @@ beforeEach(() => {
 });
 
 describe('TokenUsagePage', () => {
+  it('leaves page-shell and document-title ownership to the Settings host when embedded', async () => {
+    document.title = 'Settings host';
+    const { container } = renderPage({ embedded: true });
+
+    expect(await screen.findByRole('heading', { name: 'Token 用量监控' })).toBeInTheDocument();
+    expect(document.title).toBe('Settings host');
+    expect(container.querySelector('[data-pattern="app-page"]')).toBeNull();
+  });
+
   it('renders one stable loading state instead of a zero-value dashboard shell', async () => {
     const request = createDeferred<{ data: typeof dashboardResponse }>();
     get.mockReturnValue(request.promise);

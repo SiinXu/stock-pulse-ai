@@ -8,6 +8,10 @@ import { getDefaultSubCategory } from '../../components/settings/settingsSubCate
 import { legacyToSectionView } from '../../components/settings/settingsInformationArchitecture';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import { loadUiLanguageTranslations } from '../../i18n/translations';
+import {
+  SETTINGS_ROUTE_QUERY_KEYS,
+  SETTINGS_SECTION_IDS,
+} from '../../routing/routes';
 import { getFieldTitle } from '../../utils/systemConfigI18n';
 import SettingsPage from '../SettingsPage';
 
@@ -131,6 +135,14 @@ function withTestConnectionCoreFields(
 vi.mock('../../hooks', () => ({
   useAuth: () => useAuthMock(),
   useSystemConfig: () => useSystemConfigMock(),
+}));
+
+vi.mock('../../components/usage/TokenUsagePage', () => ({
+  default: ({ embedded }: { embedded?: boolean }) => (
+    <div data-embedded={String(Boolean(embedded))} data-testid="token-usage-page">
+      Token usage dashboard
+    </div>
+  ),
 }));
 
 type BlockerArgs = { currentLocation: { pathname: string }; nextLocation: { pathname: string } };
@@ -907,6 +919,31 @@ describe('SettingsPage', () => {
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock');
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(mockedAnchorClick);
+  });
+
+  it('embeds TokenUsagePage while keeping the Settings configuration state mounted', () => {
+    routerSearchParamsMock.params = new URLSearchParams({
+      [SETTINGS_ROUTE_QUERY_KEYS.section]: SETTINGS_SECTION_IDS.usage,
+    });
+
+    const { rerender } = render(<SettingsPage />);
+
+    expect(screen.getByTestId('token-usage-page')).toHaveAttribute('data-embedded', 'true');
+    expect(screen.getByRole('button', { name: '用量与成本' }))
+      .toHaveAttribute('aria-current', 'page');
+    expect(useSystemConfigMock).toHaveBeenCalled();
+    expect(routerSearchParamsMock.setParams).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '概览' }));
+    const [nextParams, options] = routerSearchParamsMock.setParams.mock.calls.at(-1) ?? [];
+    expect(nextParams.get(SETTINGS_ROUTE_QUERY_KEYS.section)).toBe('overview');
+    expect(nextParams.get(SETTINGS_ROUTE_QUERY_KEYS.view)).toBe('readiness');
+    expect(options).toEqual({ replace: false });
+
+    routerSearchParamsMock.params = nextParams as URLSearchParams;
+    rerender(<SettingsPage />);
+    expect(screen.queryByTestId('token-usage-page')).not.toBeInTheDocument();
+    expect(document.title).toBe('系统设置 - StockPulse');
   });
 
   it('renders category navigation and auth settings modules', async () => {

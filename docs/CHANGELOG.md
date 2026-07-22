@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Changed] Moved Token Usage into Settings > Usage & cost and retained `/usage` as a query- and hash-preserving compatibility redirect.
 - [Fixed] Corrected English developer comments to preserve financial terminology and localized fixture literals without changing runtime behavior.
 - [Chore] Added a dev-only Web API mock switch (`?mock=ready|empty|error|slow` or `VITE_MOCK_API`) with larger deterministic fixtures for UI walkthroughs; gated behind `import.meta.env.DEV` and tree-shaken from production builds.
 - [Changed] Added unified Web page and Router patterns with `AppPage`, `WorkspacePage`, `ResponsiveRail`, `PageHeader`, `Toolbar`, `Tabs`, `TabPanel`, `SummaryStrip`, and `WorkspaceNavigation`, plus focus restoration and guards against duplicate navigation primitives.

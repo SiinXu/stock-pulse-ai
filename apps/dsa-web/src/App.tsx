@@ -20,6 +20,13 @@ import { RouteFocusCoordinator } from './components/routing';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { UiLanguageProvider, useUiLanguage } from './contexts/UiLanguageContext';
 import type { UiLanguage } from './i18n/uiLanguages';
+import { LegacyRouteRedirect } from './routing/LegacyRedirectRoute';
+import {
+  APP_ROUTE_PATHS,
+  LEGACY_ROUTE_PATHS,
+  SETTINGS_ROUTE_QUERY_KEYS,
+  SETTINGS_SECTION_IDS,
+} from './routing/routes';
 import { useAgentChatStore } from './stores/agentChatStore';
 import { resolveLoginRedirect } from './utils/loginRedirect';
 import './App.css';
@@ -33,7 +40,6 @@ const ChatPage = lazy(() => import('./pages/ChatPage'));
 const PortfolioPage = lazy(() => import('./pages/PortfolioPage'));
 const DecisionSignalsPage = lazy(() => import('./pages/DecisionSignalsPage'));
 const AlertsPage = lazy(() => import('./pages/AlertsPage'));
-const TokenUsagePage = lazy(() => import('./pages/TokenUsagePage'));
 const StockScreeningPage = lazy(() => import('./pages/StockScreeningPage'));
 const StockDetailsPage = lazy(() => import('./pages/StockDetailsPage'));
 const ComponentPlaygroundPage = lazy(() => import('./playground/ComponentPlaygroundPage'));
@@ -155,8 +161,18 @@ const routes = [
           { path: '/screening', element: <StockScreeningPage /> },
           { path: '/backtest', element: <BacktestPage /> },
           { path: '/alerts', element: <AlertsPage /> },
-          { path: '/usage', element: <TokenUsagePage /> },
-          { path: '/settings', element: <SettingsPage /> },
+          {
+            path: LEGACY_ROUTE_PATHS.usage,
+            element: (
+              <LegacyRouteRedirect
+                to={APP_ROUTE_PATHS.settings}
+                overrideSearchParams={{
+                  [SETTINGS_ROUTE_QUERY_KEYS.section]: SETTINGS_SECTION_IDS.usage,
+                }}
+              />
+            ),
+          },
+          { path: APP_ROUTE_PATHS.settings, element: <SettingsPage /> },
           { path: '*', element: <NotFoundPage /> },
         ],
       },

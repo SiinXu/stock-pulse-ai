@@ -5,13 +5,13 @@ import {
   BarChart3,
   Bell,
   BriefcaseBusiness,
-  Gauge,
   Home,
   MessageSquareQuote,
   Search,
   Settings2,
 } from 'lucide-react';
 import type { UiTextKey } from '../../i18n/uiText';
+import { APP_ROUTE_PATHS } from '../../routing/routes';
 
 export type ApplicationNavigationItem = {
   key: string;
@@ -47,6 +47,5 @@ export const APPLICATION_NAVIGATION_ITEMS: readonly ApplicationNavigationItem[] 
   { key: 'decision-signals', labelKey: 'layout.nav.decisionSignals', to: '/decision-signals', icon: Activity },
   { key: 'backtest', labelKey: 'layout.nav.backtest', to: '/backtest', icon: BarChart3 },
   { key: 'alerts', labelKey: 'layout.nav.alerts', to: '/alerts', icon: Bell },
-  { key: 'usage', labelKey: 'layout.nav.usage', to: '/usage', icon: Gauge },
-  { key: 'settings', labelKey: 'layout.nav.settings', to: '/settings', icon: Settings2 },
+  { key: 'settings', labelKey: 'layout.nav.settings', to: APP_ROUTE_PATHS.settings, icon: Settings2 },
 ];

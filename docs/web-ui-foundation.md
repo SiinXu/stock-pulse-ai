@@ -364,9 +364,14 @@ background, border, radius, shadow, and responsive outer gutter around page
 content. Wide page content remains reachable through the `main` scroll
 container instead of being clipped or widening the document. UI-N01 does not
 replace or reinterpret the separately owned UI4 L-09 target. The typed
-application navigation descriptor preserves the nine approved flat routes;
-Research, More, or another top-level destination requires a separate
-information-architecture decision.
+application navigation descriptor exposes eight flat routes after Token Usage
+moved into Settings as the `Usage & cost` section. The legacy `/usage` URL uses
+the shared replace-redirect contract to preserve unrelated query parameters
+and the hash while the destination-owned `section=usage` value wins conflicts.
+Redirect destinations suppress tab-session restoration, and route paths plus
+Settings query keys come from the centralized route contract. Research, More,
+or another top-level destination requires a separate information-architecture
+decision.
 
 The responsive contract has three states:
 
