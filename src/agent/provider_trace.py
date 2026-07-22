@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from src.llm.generation_params import resolve_litellm_wire_model
+from src.utils.sanitize import redact_sensitive_data
 
 
 PROVIDER_TRACE_RETENTION_LIMIT = 3
@@ -176,11 +177,21 @@ def extract_provider_trace_turns(
                 contains_provider_specific_fields
                 or _tool_calls_have_provider_specific_fields(raw_msg.get("tool_calls") or [])
             )
-            protocol_messages.append(strip_trace_metadata(raw_msg))
+            protocol_message = strip_trace_metadata(raw_msg)
+            if _protocol_message_requires_redaction(protocol_message):
+                diagnostics.trace_dropped_reason = "sensitive_data_redacted"
+                diagnostics.dropped_trace_count = 1
+                return [], diagnostics
+            protocol_messages.append(protocol_message)
             continue
 
         if role == "tool" and protocol_messages:
-            protocol_messages.append(strip_trace_metadata(raw_msg))
+            protocol_message = strip_trace_metadata(raw_msg)
+            if _protocol_message_requires_redaction(protocol_message):
+                diagnostics.trace_dropped_reason = "sensitive_data_redacted"
+                diagnostics.dropped_trace_count = 1
+                return [], diagnostics
+            protocol_messages.append(protocol_message)
 
     if not protocol_messages or not contains_tool_calls:
         return [], diagnostics
@@ -273,3 +284,15 @@ def _strip_trace_metadata_value(value: Any) -> Any:
     if isinstance(value, list):
         return [_strip_trace_metadata_value(item) for item in value]
     return value
+
+
+def _protocol_message_requires_redaction(message: Dict[str, Any]) -> bool:
+    """Fail closed when a protocol message cannot be compared safely."""
+
+    redacted_message = redact_sensitive_data(message)
+    if not isinstance(redacted_message, dict):
+        return True
+    try:
+        return redacted_message != message
+    except BaseException:  # broad-exception: optional_metadata - Opaque provider values drop the trace.
+        return True

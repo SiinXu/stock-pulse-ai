@@ -8,6 +8,8 @@ from typing import Any, Mapping, Optional
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 
+from src.utils.sanitize import redact_sensitive_data, redact_sensitive_text
+
 
 def error_body(
     error: str,
@@ -25,13 +27,23 @@ def error_body(
     """
     if details is None and detail is not None:
         details = detail
+    safe_params = redact_sensitive_data(params if params is not None else {})
+    if not isinstance(safe_params, dict):
+        safe_params = {}
+    safe_details = redact_sensitive_data(details)
+    safe_error = redact_sensitive_text(error)
+    safe_message = redact_sensitive_text(message)
     return {
-        "error": str(error or "unknown_error"),
-        "message": str(message or "Request failed"),
-        "params": dict(params or {}),
-        "details": details,
-        "detail": details,
-        "trace_id": trace_id,
+        "error": safe_error or "unknown_error",
+        "message": safe_message or "Request failed",
+        "params": safe_params,
+        "details": safe_details,
+        "detail": safe_details,
+        "trace_id": (
+            redact_sensitive_text(trace_id)
+            if trace_id is not None
+            else None
+        ),
     }
 
 

@@ -37,7 +37,7 @@ GET /api/v1/history/{record_id}/diagnostics
 - 实时行情、日线、新闻、LLM、通知、历史保存的简短状态
 - 首要原因
 
-生成前会复用运行诊断脱敏规则，避免输出 token、API key、Authorization、Cookie、webhook URL、邮箱密码、代理凭据等敏感信息。
+生成前会复用中央敏感数据脱敏规则，避免输出 token、API key、Authorization、Cookie、webhook URL、邮箱密码、代理凭据等敏感信息。保证与限制见 [Sensitive-Data Redaction](security-sensitive-data-redaction.md)。
 
 ## 兼容性边界
 

@@ -290,6 +290,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Added one reviewable universal Python dependency lock across source, CI, Docker, desktop, static review tooling, and optional runtime paths with resolver reproduction, constrained source builds, bounded exceptions, and vulnerability auditing.
 - [Added] Added stable Data Provider plugin contracts and priority-aware dynamic registration while preserving existing routing, fallback, health, cache, and diagnostics policies.
 - [Fixed] Anchored coarse-pointer Web hit-target expansions to their owning controls so compact links cannot intercept taps across a surrounding drawer.
+- [Fixed] Applied one recursive sensitive-data redaction policy to logs, API errors, Agent traces and audits, diagnostics exports, and provider errors, with debug-safe defaults and fail-closed protocol-trace handling.
 
 ## [3.26.3] - 2026-07-15
 

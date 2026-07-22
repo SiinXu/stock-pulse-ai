@@ -13,18 +13,26 @@
 import logging
 import re
 import uuid
-from typing import Any, Callable, Dict, Iterable, List
+from typing import Any, Callable, Dict, Iterable, List, Mapping
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from api.v1.errors import error_body, normalize_error_body
-from src.utils.sanitize import log_safe_exception, sanitize_diagnostic_text
+from src.utils.sanitize import (
+    log_safe_exception,
+    redact_sensitive_text,
+    sanitize_diagnostic_text,
+)
 
 logger = logging.getLogger(__name__)
 
 _TRACE_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+_PUBLIC_HTTP_EXCEPTION_HEADERS = {
+    "retry-after": "Retry-After",
+    "www-authenticate": "WWW-Authenticate",
+}
 
 
 def _request_trace_id(request: Request) -> str:
@@ -70,6 +78,33 @@ def _public_validation_issues(errors: Iterable[Dict[str, Any]]) -> List[Dict[str
             }
         )
     return issues
+
+
+def _public_http_exception_headers(headers: Any) -> Dict[str, str]:
+    """Preserve only public protocol headers and redact their values."""
+
+    if not isinstance(headers, Mapping):
+        return {}
+    public_headers: Dict[str, str] = {}
+    try:
+        for raw_name, raw_value in headers.items():
+            canonical_name = _PUBLIC_HTTP_EXCEPTION_HEADERS.get(
+                str(raw_name).strip().lower()
+            )
+            if canonical_name is None:
+                continue
+            safe_value = redact_sensitive_text(raw_value).strip()
+            if (
+                not safe_value
+                or safe_value == "[UNRENDERABLE]"
+                or "\r" in safe_value
+                or "\n" in safe_value
+            ):
+                continue
+            public_headers[canonical_name] = safe_value
+    except BaseException:  # broad-exception: optional_metadata - Invalid exception headers are dropped.
+        return {}
+    return public_headers
 
 
 class ErrorHandlerMiddleware(BaseHTTPMiddleware):
@@ -165,10 +200,8 @@ def add_error_handlers(app) -> None:
                 default_message="Request failed",
                 trace_id=trace_id,
             )
-            response_headers = {
-                **(exc.headers or {}),
-                "X-Trace-ID": str(content["trace_id"]),
-            }
+            response_headers = _public_http_exception_headers(exc.headers)
+            response_headers["X-Trace-ID"] = str(content["trace_id"])
         return JSONResponse(
             status_code=exc.status_code,
             content=content,
