@@ -412,7 +412,7 @@ def _calculate_rsi(close: pd.Series, period: int) -> pd.Series:
     delta = close.diff()
     gain = delta.where(delta > 0, 0)
     loss = -delta.where(delta < 0, 0)
-    # Use Wilder's EMA / SMMA range, do not use rolling SMA
+    # Use Wilder's EMA / SMMA convention rather than a rolling SMA
     avg_gain = gain.ewm(alpha=1 / period, adjust=False).mean()
     avg_loss = loss.ewm(alpha=1 / period, adjust=False).mean()
     rs = avg_gain / avg_loss

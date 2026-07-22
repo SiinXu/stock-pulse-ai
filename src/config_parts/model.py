@@ -375,9 +375,9 @@ class Config:
     # === Real-Time Quote Enhanced Data Configuration ===
     # Real-time quote switch; when disabled, analysis uses historical closing prices.
     enable_realtime_quote: bool = True
-    # Real-time technical analysis during trading: When enabled, it uses real prices to calculate MA/long positions (Issue #234); when disabled, it uses yesterday's closing price.
+    # Intraday technical analysis uses real-time prices for moving averages and bullish MA alignment (Issue #234); otherwise it uses the previous close.
     enable_realtime_technical_indicators: bool = True
-    # Chip distribution switch (this interface is unstable, cloud deployment is recommended to close)
+    # Chip distribution switch (the upstream API is unstable; disabling it is recommended for cloud deployments)
     enable_chip_distribution: bool = True
     # Eastmoney API patch switch
     enable_eastmoney_patch: bool = False

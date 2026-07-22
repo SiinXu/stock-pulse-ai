@@ -5,7 +5,7 @@
 # ===================================
 # Multi-stage build: frontend packaging + backend running
 
-FROM node:20-slim AS web-builder
+FROM node:22-slim AS web-builder
 
 WORKDIR /app/apps/dsa-web
 

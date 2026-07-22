@@ -122,18 +122,18 @@ class UnifiedRealtimeQuote:
     name: str = ""
     source: RealtimeSource = RealtimeSource.FALLBACK
 
-    # === Data quality metadata (normalized by DataFetcherManager) ===
-    fetched_at: Optional[str] = None             # System fetch timestamp (ISO 8601 datetime)
-    provider_timestamp: Optional[str] = None     # Provider quote timestamp (ISO 8601 datetime)
+    # === Data-quality metadata (normalized by DataFetcherManager) ===
+    fetched_at: Optional[str] = None             # Timestamp captured by this system (ISO 8601 datetime)
+    provider_timestamp: Optional[str] = None     # Provider's actual quote timestamp (ISO 8601 datetime)
     is_stale: Optional[bool] = None              # True when provider_timestamp exceeds the minimum TTL threshold
     stale_seconds: Optional[int] = None          # Seconds between provider_timestamp and fetched_at
-    fallback_from: Optional[str] = None          # Fallback source token for the primary source
-    market: Optional[str] = None                 # Market Tags (cn/hk/us/jp/kr/tw)
+    fallback_from: Optional[str] = None          # Failed preferred-source token for whole-source fallback
+    market: Optional[str] = None                 # Market identifier (cn/hk/us/jp/kr/tw)
     currency: Optional[str] = None               # Quote currency (JPY/KRW/TWD/USD/HKD/CNY etc.)
     data_quality: Optional[str] = None           # ok/partial/unavailable
-    missing_fields: Optional[list[str]] = None   # provider missing key fields
+    missing_fields: Optional[list[str]] = None   # Key fields missing from the provider response
     
-    # Core Price Data (Almost All Sources Have It)
+    # Core price data (available from nearly all sources)
     price: Optional[float] = None           # Latest price
     change_pct: Optional[float] = None      # Percentage change
     change_amount: Optional[float] = None   # Change in value

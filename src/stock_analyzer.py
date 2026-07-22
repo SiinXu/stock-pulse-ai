@@ -321,7 +321,7 @@ class StockTrendAnalyzer:
             gain = delta.where(delta > 0, 0)
             loss = -delta.where(delta < 0, 0)
 
-            # Use Wilder's EMA / SMMA range, consistent with common RSI chart tools
+            # Use Wilder's EMA / SMMA convention, consistent with common RSI charting tools
             avg_gain = gain.ewm(alpha=1 / period, adjust=False).mean()
             avg_loss = loss.ewm(alpha=1 / period, adjust=False).mean()
 
@@ -504,10 +504,10 @@ class StockTrendAnalyzer:
         prev_dif_dea = prev['MACD_DIF'] - prev['MACD_DEA']
         curr_dif_dea = result.macd_dif - result.macd_dea
 
-        # Green cross: DIF breaks above DEA
+        # Golden cross: DIF crosses above DEA
         is_golden_cross = prev_dif_dea <= 0 and curr_dif_dea > 0
 
-        # Dead cross: DIF below DEA
+        # Death cross: DIF crosses below DEA
         is_death_cross = prev_dif_dea >= 0 and curr_dif_dea < 0
 
         # Zero-axis crossing
@@ -664,13 +664,13 @@ class StockTrendAnalyzer:
                 f"❌ 乖离率过高({bias:.1f}%>{base_threshold:.1f}%)，严禁追高！"
             )
 
-        # === Quant Score (15 points) ===
+        # === Volume score (15 points) ===
         volume_scores = {
-            VolumeStatus.SHRINK_VOLUME_DOWN: 15,  # Volume shrinkage callback optimal
-            VolumeStatus.HEAVY_VOLUME_UP: 12,     # Significant increase is secondary; significant decrease is worst
+            VolumeStatus.SHRINK_VOLUME_DOWN: 15,  # A pullback on declining volume is best
+            VolumeStatus.HEAVY_VOLUME_UP: 12,     # A rise on heavy volume is next best
             VolumeStatus.NORMAL: 10,
-            VolumeStatus.SHRINK_VOLUME_UP: 6,     # Low-volume rise with weak confirmation
-            VolumeStatus.HEAVY_VOLUME_DOWN: 0,    # Significant decrease is the worst
+            VolumeStatus.SHRINK_VOLUME_UP: 6,     # A rise on weak volume provides poor confirmation
+            VolumeStatus.HEAVY_VOLUME_DOWN: 0,    # A decline on heavy volume is worst
         }
         vol_score = volume_scores.get(result.volume_status, 8)
         score += vol_score
@@ -688,15 +688,15 @@ class StockTrendAnalyzer:
             score += 5
             reasons.append("✅ MA10支撑有效")
 
-        # === MACD Score (15 period) ===
+        # === MACD score (15 points) ===
         macd_scores = {
             MACDStatus.GOLDEN_CROSS_ZERO: 15,  # Golden cross on the zero axis is strongest
-            MACDStatus.GOLDEN_CROSS: 12,      # Golden Cross
-            MACDStatus.CROSSING_UP: 10,       # Breakthrough zero axis
-            MACDStatus.BULLISH: 8,            # Long positions
-            MACDStatus.BEARISH: 2,            # Trailing stop
-            MACDStatus.CROSSING_DOWN: 0,       # Fall below zero axis
-            MACDStatus.DEATH_CROSS: 0,        # Dead cross
+            MACDStatus.GOLDEN_CROSS: 12,       # Golden cross
+            MACDStatus.CROSSING_UP: 10,        # Crosses above the zero axis
+            MACDStatus.BULLISH: 8,             # Bullish
+            MACDStatus.BEARISH: 2,             # Bearish
+            MACDStatus.CROSSING_DOWN: 0,       # Crosses below the zero axis
+            MACDStatus.DEATH_CROSS: 0,         # Death cross
         }
         macd_score = macd_scores.get(result.macd_status, 5)
         score += macd_score

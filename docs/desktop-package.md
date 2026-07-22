@@ -86,7 +86,7 @@ Start-Process 'stockpulse://app/stocks/AAPL?period=weekly'
 
 ### 前置条件
 
-- Node.js 18+
+- Node.js 22 LTS
 - Python 3.10+
 - 开启 Windows 开发者模式（electron-builder 需要创建符号链接）
   - 设置 -> 隐私和安全性 -> 开发者选项 -> 开发者模式

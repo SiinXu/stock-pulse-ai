@@ -347,7 +347,7 @@ class DiscordPlatform(BotPlatform):
         Returns:
             验证响应，或 None（不是验证请求）
         """
-        # Discord Webhook The request type is valid. 1
+        # Discord Webhook validation requests use type 1
         if data.get("type") == 1:
             return WebhookResponse.success({
                 "type": 1

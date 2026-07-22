@@ -2,11 +2,11 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ChevronDown, SlidersHorizontal } from 'lucide-react';
+import { ChevronDown, SlidersHorizontal, RefreshCw } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { agentApi } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Badge, Button, Checkbox, ConfirmDialog, Drawer, EmptyState, InlineAlert, ScrollArea, SearchInput, SegmentedControl, Surface, Switch, Tooltip, useClipboard } from '../components/common';
+import { ApiErrorAlert, Badge, Button, Checkbox, ConfirmDialog, Drawer, EmptyState, IconButton, InlineAlert, ScrollArea, SearchInput, SegmentedControl, Surface, Switch, Tooltip, useClipboard } from '../components/common';
 import { DeepResearchPanel } from '../components/chat/DeepResearchPanel';
 import { getParsedApiError } from '../api/error';
 import type { SkillInfo } from '../api/agent';
@@ -987,11 +987,23 @@ const ChatPage: React.FC = () => {
             title={t('chat.loadingSessions')}
           />
         ) : sessionsError ? (
-          <ApiErrorAlert
-            error={sessionsError}
-            actionLabel={t('common.retry')}
-            onAction={() => void loadSessions()}
-          />
+          <div className="relative [&_details]:border-t-0 [&_details]:pt-0">
+            <ApiErrorAlert
+              error={sessionsError}
+              className="pr-10"
+            />
+            <Tooltip content={t('common.retry')} className="absolute right-2 top-2 z-10">
+              <IconButton
+                variant="danger"
+                size="compact"
+                tooltip={false}
+                aria-label={t('common.retry')}
+                onClick={() => void loadSessions()}
+              >
+                <RefreshCw aria-hidden="true" />
+              </IconButton>
+            </Tooltip>
+          </div>
         ) : sessions.length === 0 ? (
           <DashboardStateBlock
             compact
@@ -1250,6 +1262,7 @@ const ChatPage: React.FC = () => {
               value={chatMode}
               onChange={(value) => setChatMode(value)}
               ariaLabel={t('research.modeLabel')}
+              className="dark:!bg-foreground/10 dark:[&_.segmented-control-tab[aria-selected=true]]:!bg-foreground dark:[&_.segmented-control-tab[aria-selected=true]]:text-background dark:[&_.segmented-control-tab[aria-selected=false]]:text-foreground/70"
               options={[
                 { value: 'chat', label: t('research.chatMode') },
                 { value: 'research', label: t('research.mode') },
@@ -1268,7 +1281,7 @@ const ChatPage: React.FC = () => {
         </header>
 
         {chatMode === 'research' ? (
-          <Surface level="interactive" className="z-10 flex min-h-0 flex-1 flex-col overflow-auto p-4 md:p-6">
+          <Surface level="section" className="z-10 flex min-h-0 flex-1 flex-col overflow-auto p-4 md:p-6">
             <DeepResearchPanel key={sessionId} sessionId={sessionId} />
           </Surface>
         ) : null}

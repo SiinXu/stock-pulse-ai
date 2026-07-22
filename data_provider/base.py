@@ -635,13 +635,13 @@ class BaseFetcher(ABC):
         
         # Relative Volume: Daily Trading Volume / 5-Day Average Trading Volume
         # Note: This volume_ratio is the relative multiple of 'daily trading volume / 5-day average (shift 1)'.
-        # Different from the 'split-time volume ratio' in some trading software (comparison at the same time), closer to 'volume expansion multiple'.
+        # This differs from the intraday volume ratio used by some trading tools (same-time comparison) and is closer to a volume-expansion multiple.
         # This behavior is currently retained (logic will not be modified based on demand).
         avg_volume_5 = df['volume'].rolling(window=5, min_periods=1).mean()
         df['volume_ratio'] = df['volume'] / avg_volume_5.shift(1)
         df['volume_ratio'] = df['volume_ratio'].fillna(1.0)
         
-        # to be retained2with a decimal place
+        # Retain two decimal places
         for col in ['ma5', 'ma10', 'ma20', 'volume_ratio']:
             if col in df.columns:
                 df[col] = df[col].round(2)
@@ -1722,14 +1722,14 @@ class DataFetcherManager:
         efinance = EfinanceFetcher()
         tencent = TencentFetcher()
         akshare = AkshareFetcher()
-        pytdx = PytdxFetcher()      # Trading master data source (can be configured with PYTDX_HOST/PYTDX_PORT)
+        pytdx = PytdxFetcher()      # Tongdaxin data source (configurable with PYTDX_HOST/PYTDX_PORT)
         baostock = BaostockFetcher()
         yfinance = YfinanceFetcher()
         optional_fetchers: List[BaseFetcher] = []
 
         tushare_token = (getattr(config, "tushare_token", None) or "").strip()
         if tushare_token:
-            optional_fetchers.append(TushareFetcher())  # Automatically adjusts priority based on Token configuration
+            optional_fetchers.append(TushareFetcher())  # Automatically adjusts priority when a token is configured
         else:
             logger.debug("[数据源初始化] 跳过未配置的 TushareFetcher")
 
