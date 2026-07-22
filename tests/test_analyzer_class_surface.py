@@ -114,8 +114,9 @@ def _assert_facade_code_matches_source(facade_code, source_code):
     assert facade_code.co_freevars == source_code.co_freevars
     assert facade_code.co_cellvars == source_code.co_cellvars
     assert facade_code.co_name == source_code.co_name
-    assert facade_code.co_qualname == source_code.co_qualname
-    assert facade_code.co_exceptiontable == source_code.co_exceptiontable
+    if sys.version_info >= (3, 11):
+        assert facade_code.co_qualname == source_code.co_qualname
+        assert facade_code.co_exceptiontable == source_code.co_exceptiontable
     assert len(facade_code.co_consts) == len(source_code.co_consts)
     for facade_constant, source_constant in zip(
         facade_code.co_consts,
@@ -262,7 +263,8 @@ def test_analyzer_methods_preserve_facade_metadata_and_globals():
             assert facade_function.__module__ == "src.analyzer"
             assert facade_function.__name__ == name
             assert facade_function.__qualname__ == f"GeminiAnalyzer.{name}"
-            assert facade_function.__code__.co_qualname == f"GeminiAnalyzer.{name}"
+            if sys.version_info >= (3, 11):
+                assert facade_function.__code__.co_qualname == f"GeminiAnalyzer.{name}"
             assert getattr(facade_function, "__type_params__", ()) == getattr(
                 source_function,
                 "__type_params__",
@@ -349,6 +351,7 @@ def test_analyzer_class_and_method_sources_restore_on_reload():
         import __future__
         import importlib
         import inspect
+        import sys
         import typing
         from types import CodeType, FunctionType
 
@@ -360,7 +363,8 @@ def test_analyzer_class_and_method_sources_restore_on_reload():
             assert facade_code.co_freevars == source_code.co_freevars
             assert facade_code.co_cellvars == source_code.co_cellvars
             assert facade_code.co_name == source_code.co_name
-            assert facade_code.co_qualname == source_code.co_qualname
+            if sys.version_info >= (3, 11):
+                assert facade_code.co_qualname == source_code.co_qualname
             assert len(facade_code.co_consts) == len(source_code.co_consts)
             for facade_constant, source_constant in zip(
                 facade_code.co_consts,
@@ -372,17 +376,36 @@ def test_analyzer_class_and_method_sources_restore_on_reload():
                 else:
                     assert facade_constant == source_constant
 
-        def resolved_annotations(function, facade_globals):
-            annotations = typing.get_type_hints(
-                function,
-                globalns=facade_globals,
-                localns=facade_globals,
-                include_extras=True,
+        def contains_forward_reference(annotation):
+            if isinstance(annotation, typing.ForwardRef):
+                return True
+            return any(
+                contains_forward_reference(argument)
+                for argument in typing.get_args(annotation)
             )
-            for name, value in function.__annotations__.items():
-                if value is None:
-                    annotations[name] = None
-            return annotations
+
+        def resolved_annotations(function, facade_globals):
+            annotations = dict(function.__annotations__)
+            if any(
+                contains_forward_reference(value)
+                for value in annotations.values()
+            ):
+                resolved = typing.get_type_hints(
+                    function,
+                    globalns=facade_globals,
+                    localns=facade_globals,
+                    include_extras=True,
+                )
+                for name, value in annotations.items():
+                    if value is None:
+                        resolved[name] = None
+                return resolved
+            return inspect.get_annotations(
+                function,
+                globals=facade_globals,
+                locals=facade_globals,
+                eval_str=True,
+            )
 
         method_groups = {(
             ("src.analyzer_parts.generation", GENERATION_METHODS),
