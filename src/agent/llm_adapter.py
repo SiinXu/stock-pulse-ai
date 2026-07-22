@@ -23,10 +23,15 @@ from src.config import (
     get_configured_llm_models,
     get_effective_agent_primary_model,
 )
+from src.agent.facade_binding import bind_facade_methods as _bind_facade_methods
 from src.agent.litellm_route_resolution import (
     AgentLiteLLMRouteResolution,
     resolve_agent_litellm_route,
 )
+from src.agent.llm_adapter_parts.calls import _CallMethods
+from src.agent.llm_adapter_parts.messages import _MessageMethods
+from src.agent.llm_adapter_parts.setup import _SetupMethods
+from src.agent.llm_adapter_parts.transport import _TransportMethods
 from src.agent.provider_trace import (
     TRACE_MODEL_KEY,
     TRACE_PROVIDER_KEY,
@@ -358,249 +363,6 @@ class LLMToolAdapter:
         self._register_custom_model_pricing()
         self._init_litellm()
 
-    @staticmethod
-    def _register_custom_model_pricing() -> None:
-        """Register custom model pricing for models not in LiteLLM's built-in price list.
-
-        This prevents cost calculation errors for MiniMax-M2.7 and similar models.
-        """
-        for model_name, pricing in _CUSTOM_MODEL_PRICING.items():
-            try:
-                litellm.register_model(
-                    {
-                        model_name: pricing
-                    }
-                )
-                logger.debug(f"Registered custom pricing for {model_name}")
-            except Exception as exc:
-                log_safe_exception(
-                    logger,
-                    "Custom model pricing registration skipped",
-                    exc,
-                    error_code="agent_model_pricing_registration_failed",
-                    level=logging.DEBUG,
-                    context={"model": model_name},
-                )
-
-    def _has_channel_config(self) -> bool:
-        """Check if multi-channel config (channels / YAML) is active."""
-        return bool(self._config.llm_model_list) and not all(
-            e.get('model_name', '').startswith('__legacy_') for e in self._config.llm_model_list
-        )
-
-    def _init_litellm(self) -> None:
-        """Initialize litellm Router from channels / YAML / legacy keys."""
-        config = self._config
-        self._legacy_router_model_list = []
-        try:
-            self._generation_backend_id = resolve_agent_generation_backend_id(config)
-        except GenerationError as exc:
-            self._backend_error = exc
-            log_safe_exception(
-                logger,
-                "Agent LLM backend configuration error",
-                exc,
-                error_code="agent_backend_configuration_error",
-            )
-            return
-        if self._generation_backend_id != LITELLM_BACKEND_ID:
-            self._backend_error = GenerationError(
-                error_code=GenerationErrorCode.UNSUPPORTED_TOOL_CALLING,
-                stage="generation",
-                retryable=False,
-                fallbackable=False,
-                backend=self._generation_backend_id,
-                provider=self._generation_backend_id,
-                details={
-                    "field": "AGENT_GENERATION_BACKEND",
-                    "requested_backend": self._generation_backend_id,
-                    "supported_tool_backend": LITELLM_BACKEND_ID,
-                },
-            )
-            logger.error(
-                "Agent LLM backend %s does not support tool calling",
-                self._generation_backend_id,
-            )
-            return
-
-        self._route_resolution = resolve_agent_litellm_route(config)
-        litellm_model = self._route_resolution.primary_model or get_effective_agent_primary_model(config)
-        if not self._route_resolution.available and litellm_model:
-            self._backend_error = GenerationError(
-                error_code=GenerationErrorCode.UNSUPPORTED_TOOL_CALLING,
-                stage="generation",
-                retryable=False,
-                fallbackable=False,
-                backend=LITELLM_BACKEND_ID,
-                provider="agent",
-                details={
-                    "field": "AGENT_LITELLM_MODEL",
-                    "reason": self._route_resolution.reason,
-                    "primary_model": litellm_model,
-                },
-            )
-            logger.error("Agent LLM unavailable: %s", self._route_resolution.reason)
-            return
-        if not litellm_model:
-            generation_backend = str(
-                getattr(config, "generation_backend", LITELLM_BACKEND_ID) or LITELLM_BACKEND_ID
-            ).strip().lower()
-            agent_backend = str(
-                getattr(config, "agent_generation_backend", AUTO_AGENT_BACKEND_ID)
-                or AUTO_AGENT_BACKEND_ID
-            ).strip().lower()
-            if generation_backend in GENERATION_ONLY_BACKEND_IDS and agent_backend == AUTO_AGENT_BACKEND_ID:
-                self._backend_error = GenerationError(
-                    error_code=GenerationErrorCode.UNSUPPORTED_TOOL_CALLING,
-                    stage="generation",
-                    retryable=False,
-                    fallbackable=False,
-                    backend=generation_backend,
-                    provider=generation_backend,
-                    details={
-                        "field": "AGENT_GENERATION_BACKEND",
-                        "requested_backend": AUTO_AGENT_BACKEND_ID,
-                        "generation_backend": generation_backend,
-                        "supported_tool_backend": LITELLM_BACKEND_ID,
-                        "reason": "litellm_agent_backend_unavailable",
-                    },
-                )
-                logger.error(
-                    "Agent auto backend cannot inherit %s because it does not support tool calling",
-                    generation_backend,
-                )
-                return
-            logger.warning("Agent LLM: no effective primary model configured")
-            return
-
-        # --- Channel / YAML path ---
-        if self._has_channel_config():
-            model_list = self._route_resolution.model_list
-            if not model_list:
-                self._backend_error = GenerationError(
-                    error_code=GenerationErrorCode.UNSUPPORTED_TOOL_CALLING,
-                    stage="generation",
-                    retryable=False,
-                    fallbackable=False,
-                    backend=LITELLM_BACKEND_ID,
-                    provider="agent",
-                    details={
-                        "field": "AGENT_LITELLM_MODEL",
-                        "reason": self._route_resolution.reason or "no_safe_agent_models",
-                        "primary_model": litellm_model,
-                    },
-                )
-                logger.warning("Agent LLM: no Agent-safe channel deployments after Hermes filtering")
-                return
-            self._router = Router(
-                model_list=model_list,
-                routing_strategy="simple-shuffle",
-                num_retries=2,
-            )
-            unique_models = list(dict.fromkeys(
-                e['litellm_params']['model'] for e in model_list
-            ))
-            logger.info(
-                f"Agent LLM: Router initialized from channels/YAML — "
-                f"{len(model_list)} deployment(s), models: {unique_models}"
-            )
-            return
-
-        # --- Legacy path ---
-        keys = get_api_keys_for_model(litellm_model, config)
-        if not keys:
-            logger.info(
-                f"Agent LLM: litellm initialized (model={litellm_model}, "
-                f"API key from environment)"
-            )
-            self._litellm_available = True
-            return
-
-        if len(keys) > 1:
-            ep = extra_litellm_params(litellm_model, config)
-            legacy_model_list = [
-                {
-                    "model_name": litellm_model,
-                    "litellm_params": {
-                        "model": litellm_model,
-                        "api_key": k,
-                        **ep,
-                    },
-                }
-                for k in keys
-            ]
-            self._legacy_router_model_list = legacy_model_list
-            self._router = Router(
-                model_list=legacy_model_list,
-                routing_strategy="simple-shuffle",
-                num_retries=2,
-            )
-            logger.info(
-                f"Agent LLM: Legacy Router initialized with {len(keys)} keys "
-                f"for {litellm_model}"
-            )
-        else:
-            logger.info(f"Agent LLM: litellm initialized (model={litellm_model})")
-        self._litellm_available = True
-
-    @property
-    def is_available(self) -> bool:
-        """True if litellm is configured and at least one API key is present."""
-        if self._backend_error is not None:
-            return False
-        return self._router is not None or self._litellm_available
-
-    @property
-    def primary_provider(self) -> str:
-        """Provider name extracted from litellm_model prefix."""
-        model = get_effective_agent_primary_model(self._config)
-        if "/" in model:
-            return model.split("/")[0]
-        return model or "none"
-
-    # ============================================================
-    # Unified call
-    # ============================================================
-
-    def call_with_tools(
-        self,
-        messages: List[Dict[str, Any]],
-        tools: List[dict],
-        provider: Optional[str] = None,
-        timeout: Optional[float] = None,
-    ) -> LLMResponse:
-        """Send messages + tool declarations to LLM, return normalized response.
-
-        Args:
-            messages: Conversation history in provider-neutral format:
-                      [{"role": "system"/"user"/"assistant"/"tool", "content": ...}, ...]
-            tools: OpenAI-format tool declarations; litellm converts to each provider's format.
-            provider: Ignored (kept for backward compatibility).
-
-        Returns:
-            LLMResponse with either content (final answer) or tool_calls.
-        """
-        return self.call_completion(messages, tools=tools, provider=provider, timeout=timeout)
-
-    def call_text(
-        self,
-        messages: List[Dict[str, Any]],
-        *,
-        provider: Optional[str] = None,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
-        timeout: Optional[float] = None,
-    ) -> LLMResponse:
-        """Send a text-only completion through the shared routing stack."""
-        return self.call_completion(
-            messages,
-            tools=None,
-            provider=provider,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            timeout=timeout,
-        )
-
     def call_completion(
         self,
         messages: List[Dict[str, Any]],
@@ -713,288 +475,6 @@ class LLMToolAdapter:
         )
         return LLMResponse(content=public_message, provider="error")
 
-    @staticmethod
-    def _get_model_provider(model: str) -> str:
-        """Return LiteLLM provider namespace for model fallback grouping."""
-        if "/" in model:
-            return model.split("/", 1)[0]
-        return "openai"
-
-    def _call_litellm_model(
-        self,
-        messages: List[Dict[str, Any]],
-        tools: List[dict],
-        model: str,
-        *,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
-        timeout: Optional[float] = None,
-    ) -> LLMResponse:
-        """Call a specific litellm model with OpenAI-format messages and tools."""
-        openai_messages = self._convert_messages(messages, target_model=model)
-
-        # Use short model name (without provider prefix) for thinking model lookup
-        model_short = model.split("/")[-1] if "/" in model else model
-        extra = get_thinking_extra_body(model_short)
-
-        call_kwargs: Dict[str, Any] = {
-            "model": model,
-            "messages": openai_messages,
-        }
-        if max_tokens is not None:
-            call_kwargs["max_tokens"] = max_tokens
-        if timeout is not None:
-            call_kwargs["timeout"] = timeout
-
-        if extra:
-            call_kwargs["extra_body"] = extra
-
-        if tools:
-            call_kwargs["tools"] = tools
-
-        # Use Router for primary model (multi-key), direct litellm for others
-        use_channel_router = self._has_channel_config()
-        resolution = getattr(self, "_route_resolution", None) or resolve_agent_litellm_route(self._config)
-        _router_model_names = set(get_configured_llm_models(resolution.model_list))
-        agent_primary_model = resolution.primary_model or get_effective_agent_primary_model(self._config)
-        uses_router = (
-            bool(use_channel_router and self._router and model in _router_model_names)
-            or bool(self._router and model == agent_primary_model and not use_channel_router)
-        )
-        recovery_model_list = resolution.model_list or self._config.llm_model_list
-        if self._router and model == agent_primary_model and not use_channel_router:
-            recovery_model_list = self._legacy_router_model_list or self._config.llm_model_list
-        if not uses_router:
-            keys = get_api_keys_for_model(model, self._config)
-            if keys:
-                call_kwargs["api_key"] = keys[0]
-            call_kwargs.update(extra_litellm_params(model, self._config))
-        call_kwargs = apply_litellm_generation_params(
-            call_kwargs,
-            model,
-            self._get_temperature() if temperature is None else temperature,
-            model_list=recovery_model_list,
-        )
-        diagnostics_level = normalize_prompt_cache_diagnostics_level(
-            getattr(self._config, "llm_prompt_cache_diagnostics_level", "off")
-        )
-        if diagnostics_level != "off":
-            route_context = build_provider_cache_route_context(
-                model=model,
-                call_kwargs=call_kwargs,
-                model_list=recovery_model_list,
-                call_type="agent",
-            )
-            caps = resolve_provider_cache_caps(route_context)
-            logger.debug(
-                "[PromptCache] agent diagnostics provider=%s api_surface=%s verification=%s activation=%s",
-                caps.provider,
-                caps.api_surface,
-                caps.verification_status,
-                caps.cache_activation,
-            )
-        register_fallback_model_pricing(
-            resolve_fallback_litellm_wire_models(model, recovery_model_list)
-        )
-        if use_channel_router and self._router and model in _router_model_names:
-            # Channel / YAML path: Router manages all models in its model_list
-            response = call_litellm_with_param_recovery(
-                lambda kwargs: self._router.completion(**kwargs),
-                model=model,
-                call_kwargs=call_kwargs,
-                model_list=recovery_model_list,
-                logger=logger,
-            )
-        elif self._router and model == agent_primary_model and not use_channel_router:
-            # Legacy path: Router for primary model multi-key
-            response = call_litellm_with_param_recovery(
-                lambda kwargs: self._router.completion(**kwargs),
-                model=model,
-                call_kwargs=call_kwargs,
-                model_list=recovery_model_list,
-                logger=logger,
-            )
-        else:
-            # Legacy/direct-env path: direct call (also handles direct-env
-            # providers like groq/ or bedrock/ that are not in the Router
-            # model_list even when channel mode is active)
-            response = call_litellm_with_param_recovery(
-                lambda kwargs: litellm.completion(**kwargs),
-                model=model,
-                call_kwargs=call_kwargs,
-                model_list=recovery_model_list,
-                logger=logger,
-            )
-
-        return self._parse_litellm_response(
-            response,
-            model,
-            openai_messages,
-            model_list=recovery_model_list,
-        )
-
-    def _get_temperature(self) -> float:
-        """Return the raw configured temperature before per-model normalization."""
-        return float(self._config.llm_temperature)
-
-    def _convert_messages(
-        self,
-        messages: List[Dict[str, Any]],
-        *,
-        target_model: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
-        """Convert internal message format to OpenAI-compatible format for litellm."""
-        openai_messages: List[Dict[str, Any]] = []
-        target_provider = self._trace_provider_for_target(target_model)
-        for msg in messages:
-            trace_matches_target = _message_trace_matches_target(
-                msg,
-                target_model,
-                target_provider=target_provider,
-            )
-            if not trace_matches_target:
-                continue
-            if msg["role"] == "tool":
-                openai_messages.append({
-                    "role": "tool",
-                    "tool_call_id": msg.get("tool_call_id", ""),
-                    "content": msg["content"] if isinstance(msg["content"], str) else json.dumps(msg["content"]),
-                })
-            elif msg["role"] == "assistant" and msg.get("tool_calls"):
-                openai_tc = []
-                for tc in msg["tool_calls"]:
-                    tc_dict: Dict[str, Any] = {
-                        "id": tc.get("id", str(uuid.uuid4())[:8]),
-                        "type": "function",
-                        "function": {
-                            "name": tc["name"],
-                            "arguments": json.dumps(tc["arguments"]),
-                        },
-                    }
-                    provider_specific_fields = dict(tc.get("provider_specific_fields") or {})
-                    sig = tc.get("thought_signature")
-                    if sig is not None:
-                        provider_specific_fields.setdefault("thought_signature", sig)
-                    if provider_specific_fields:
-                        tc_dict["provider_specific_fields"] = provider_specific_fields
-                    openai_tc.append(tc_dict)
-                content = (
-                    msg.get("provider_blocks")
-                    if msg.get("provider_blocks")
-                    else msg.get("content")
-                )
-                openai_msg: Dict[str, Any] = {
-                    "role": "assistant",
-                    "content": content,
-                    "tool_calls": openai_tc,
-                }
-                if msg.get("reasoning_content") is not None:
-                    openai_msg["reasoning_content"] = msg["reasoning_content"]
-                openai_messages.append(openai_msg)
-            else:
-                openai_messages.append({
-                    "role": msg["role"],
-                    "content": msg["content"],
-                })
-        return openai_messages
-
-    def _trace_provider_for_target(self, target_model: Optional[str]) -> str:
-        if not target_model:
-            return ""
-        resolution = getattr(self, "_route_resolution", None)
-        model_list = (
-            getattr(resolution, "model_list", None)
-            or getattr(getattr(self, "_config", None), "llm_model_list", [])
-            or []
-        )
-        return resolved_provider_namespace(target_model, model_list)
-
-    def _parse_litellm_response(
-        self,
-        response: Any,
-        model: str,
-        messages: Optional[List[Dict[str, Any]]] = None,
-        *,
-        model_list: Optional[List[Dict[str, Any]]] = None,
-    ) -> LLMResponse:
-        """Parse litellm OpenAI-compatible response into LLMResponse."""
-        choice = response.choices[0]
-        tool_calls: List[ToolCall] = []
-
-        provider_blocks, provider_text = _extract_provider_blocks(choice)
-
-        # Handle MiniMax-specific content_blocks format
-        # MiniMax-M3 may return content_blocks at choice level or inside message
-        # Check both possible locations for content_blocks to ensure consistency
-        # Concatenate ALL text blocks to avoid truncating multi-block responses
-        text_content = choice.message.content
-        if isinstance(text_content, list):
-            text_content = provider_text
-        if text_content is None:
-            text_content = provider_text
-
-        # DeepSeek/Qwen thinking mode; not in standard OpenAI type, accessed via getattr
-        reasoning_content = getattr(choice.message, "reasoning_content", None)
-
-        if choice.message.tool_calls:
-            for tc in choice.message.tool_calls:
-                args: Dict[str, Any] = {}
-                if tc.function.arguments:
-                    try:
-                        args = json.loads(tc.function.arguments)
-                    except json.JSONDecodeError:
-                        args = {"raw": tc.function.arguments}
-
-                provider_specific_fields = _provider_specific_fields_from(
-                    getattr(tc, "provider_specific_fields", None)
-                )
-                provider_specific_fields.update(
-                    _provider_specific_fields_from(
-                        getattr(tc.function, "provider_specific_fields", None)
-                    )
-                )
-                sig = provider_specific_fields.get("thought_signature")
-                if sig is None:
-                    sig = getattr(tc, "thought_signature", None)
-                raw_tool_name = tc.function.name
-                tool_name = raw_tool_name if type(raw_tool_name) is str else ""
-
-                tool_calls.append(ToolCall(
-                    id=tc.id,
-                    name=tool_name,
-                    arguments=args,
-                    thought_signature=sig,
-                    provider_specific_fields=provider_specific_fields,
-                ))
-
-        usage_model_list = (
-            model_list
-            if model_list is not None
-            else getattr(getattr(self, "_config", None), "llm_model_list", []) or []
-        )
-        usage_model, provider_name = resolved_model_provider_identity(model, usage_model_list)
-        usage_payload = extract_usage_payload(response)
-        if usage_payload:
-            usage = normalize_litellm_usage(
-                usage_payload,
-                model=usage_model or model,
-                provider=provider_name,
-            )
-            usage = attach_message_hmacs(usage, messages)
-            usage = filter_prompt_cache_telemetry(usage, getattr(self, "_config", None))
-        else:
-            usage = {}
-        return LLMResponse(
-            content=text_content,
-            tool_calls=tool_calls,
-            reasoning_content=reasoning_content,
-            provider_blocks=provider_blocks,
-            usage=usage,
-            provider=provider_name,
-            model=model,
-            raw=response,
-        )
-
 
 def register_fallback_model_pricing(models: Iterable[str]) -> None:
     """Register zero-cost pricing for unknown OpenAI-compatible models."""
@@ -1045,3 +525,70 @@ def register_fallback_model_pricing(models: Iterable[str]) -> None:
                 level=logging.DEBUG,
                 context={"model": wire_model},
             )
+
+
+# Preserve the legacy module namespace used by descriptors rebound from the
+# private source containers. The tuple also makes the complete compatibility
+# dependency surface explicit for static analysis and regression guards.
+_LLM_ADAPTER_COMPAT_EXPORTS = (
+    AGENT_LLM_FAILURE_MESSAGE,
+    AUTO_AGENT_BACKEND_ID,
+    GENERATION_ONLY_BACKEND_IDS,
+    GenerationError,
+    GenerationErrorCode,
+    LITELLM_BACKEND_ID,
+    LLMResponse,
+    Router,
+    ToolCall,
+    _CUSTOM_MODEL_PRICING,
+    _extract_provider_blocks,
+    _message_trace_matches_target,
+    _provider_specific_fields_from,
+    _resolve_litellm_exception,
+    apply_litellm_generation_params,
+    attach_message_hmacs,
+    build_provider_cache_route_context,
+    call_litellm_with_param_recovery,
+    extra_litellm_params,
+    extract_usage_payload,
+    filter_prompt_cache_telemetry,
+    get_api_keys_for_model,
+    get_configured_llm_models,
+    get_effective_agent_primary_model,
+    get_thinking_extra_body,
+    json,
+    litellm,
+    log_safe_exception,
+    logger,
+    logging,
+    normalize_litellm_usage,
+    normalize_prompt_cache_diagnostics_level,
+    register_fallback_model_pricing,
+    resolve_agent_generation_backend_id,
+    resolve_agent_litellm_route,
+    resolve_fallback_litellm_wire_models,
+    resolve_provider_cache_caps,
+    resolved_model_provider_identity,
+    resolved_provider_namespace,
+    sanitize_agent_diagnostic,
+    time,
+    uuid,
+)
+
+_RETAINED_CALL_COMPLETION = LLMToolAdapter.__dict__["call_completion"]
+delattr(LLMToolAdapter, "call_completion")
+
+_SETUP_METHOD_NAMES = _bind_facade_methods(
+    LLMToolAdapter, _SetupMethods, globals(), evaluate_annotations=True
+)
+_CALL_METHOD_NAMES = _bind_facade_methods(
+    LLMToolAdapter, _CallMethods, globals(), evaluate_annotations=True
+)
+setattr(LLMToolAdapter, "call_completion", _RETAINED_CALL_COMPLETION)
+_TRANSPORT_METHOD_NAMES = _bind_facade_methods(
+    LLMToolAdapter, _TransportMethods, globals(), evaluate_annotations=True
+)
+_MESSAGE_METHOD_NAMES = _bind_facade_methods(
+    LLMToolAdapter, _MessageMethods, globals(), evaluate_annotations=True
+)
+del _RETAINED_CALL_COMPLETION
