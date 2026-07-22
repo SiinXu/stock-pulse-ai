@@ -38,7 +38,7 @@ from .realtime_types import CircuitBreaker, UnifiedRealtimeQuote
 
 if TYPE_CHECKING:
     from src.plugins import ExtensionRegistry
-    from .plugin_registry import _ActiveDataProvider
+    from .plugin_registry import DataProviderRegistration
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -400,6 +400,23 @@ class DataProvider(ABC):
         """Return the mutable provider state serialized by the manager."""
 
         return self
+
+    def _manager_plugin_registration(
+        self,
+    ) -> Optional["DataProviderRegistration"]:
+        """Return immutable plugin eligibility pinned to this adapter."""
+
+        return None
+
+    def _manager_plugin_priority(self) -> Optional[int]:
+        """Return plugin registration priority pinned to this adapter."""
+
+        return None
+
+    def _manager_bind_plugin_priority(self, priority: int) -> None:
+        """Bind manager metadata when this is a stable plugin adapter."""
+
+        del priority
 
     @abstractmethod
     def get_daily_data(
@@ -763,7 +780,6 @@ class DataFetcherManager:
             self._BUILTIN_DATA_PROVIDER_IDS
         )
         self._registered_fetchers: Dict[str, DataProvider] = {}
-        self._provider_registrations: Dict[int, "_ActiveDataProvider"] = {}
         self._provider_priorities: Dict[int, int] = {}
         self._fetcher_static_order: Dict[int, int] = {}
         self._next_fetcher_static_order = 0
@@ -812,8 +828,6 @@ class DataFetcherManager:
             self._data_provider_runtime = None
         if not hasattr(self, "_registered_fetchers") or self._registered_fetchers is None:
             self._registered_fetchers = {}
-        if not hasattr(self, "_provider_registrations") or self._provider_registrations is None:
-            self._provider_registrations = {}
         if not hasattr(self, "_provider_priorities") or self._provider_priorities is None:
             self._provider_priorities = {}
         if not hasattr(self, "_fetcher_static_order") or self._fetcher_static_order is None:
@@ -857,6 +871,11 @@ class DataFetcherManager:
         self._next_fetcher_static_order += 1
 
     def _provider_priority(self, fetcher: DataProvider) -> int:
+        resolver = getattr(fetcher, "_manager_plugin_priority", None)
+        if callable(resolver):
+            priority = resolver()
+            if type(priority) is int:
+                return priority
         return self._provider_priorities.get(id(fetcher), fetcher.priority)
 
     def _sort_fetchers_locked(self) -> None:
@@ -870,7 +889,6 @@ class DataFetcherManager:
     def _remove_registered_fetcher_locked(self, fetcher: DataProvider) -> None:
         self._fetchers = [item for item in self._fetchers if item is not fetcher]
         fetcher_key = id(fetcher)
-        self._provider_registrations.pop(fetcher_key, None)
         self._provider_priorities.pop(fetcher_key, None)
         self._fetcher_static_order.pop(fetcher_key, None)
         # A caller may still hold a pre-unload provider snapshot. Retaining the
@@ -898,12 +916,14 @@ class DataFetcherManager:
                 for item in active:
                     registration_id = item.extension.registration_id
                     fetcher = item.provider
+                    fetcher._manager_bind_plugin_priority(
+                        item.extension.priority
+                    )
                     if self._registered_fetchers.get(registration_id) is not fetcher:
                         self._registered_fetchers[registration_id] = fetcher
                         self._fetchers.append(fetcher)
                         self._assign_fetcher_static_order_locked(fetcher)
                     fetcher_key = id(fetcher)
-                    self._provider_registrations[fetcher_key] = item
                     self._provider_priorities[fetcher_key] = item.extension.priority
 
                 self._sort_fetchers_locked()
@@ -917,22 +937,36 @@ class DataFetcherManager:
         with self._fetchers_lock:
             return list(getattr(self, "_fetchers", []))
 
+    @staticmethod
+    def _provider_plugin_registration(
+        fetcher: object,
+    ) -> Optional["DataProviderRegistration"]:
+        resolver = getattr(fetcher, "_manager_plugin_registration", None)
+        if not callable(resolver):
+            return None
+        registration = resolver()
+        if registration is None:
+            return None
+        from .plugin_registry import DataProviderRegistration
+
+        return (
+            registration
+            if isinstance(registration, DataProviderRegistration)
+            else None
+        )
+
     def _provider_supports_capability(
         self,
         fetcher: DataProvider,
         capability: str,
         market: Optional[str] = None,
     ) -> bool:
-        active = self._provider_registrations.get(id(fetcher))
-        if (
-            active is None
-            or active.extension.plugin_id
-            == self._BUILTIN_DATA_PROVIDER_PLUGIN_ID
-        ):
+        registration = self._provider_plugin_registration(fetcher)
+        if registration is None:
             return True
         return (
-            capability in active.registration.capabilities
-            and (market is None or market in active.registration.markets)
+            capability in registration.capabilities
+            and (market is None or market in registration.markets)
         )
 
     def _get_fetchers_for_capability(
@@ -945,12 +979,7 @@ class DataFetcherManager:
         fetchers = self._get_fetchers_snapshot()
         selected: List[DataProvider] = []
         for fetcher in fetchers:
-            active = self._provider_registrations.get(id(fetcher))
-            is_plugin = (
-                active is not None
-                and active.extension.plugin_id
-                != self._BUILTIN_DATA_PROVIDER_PLUGIN_ID
-            )
+            is_plugin = self._provider_plugin_registration(fetcher) is not None
             if plugins_only and not is_plugin:
                 continue
             if self._provider_supports_capability(
@@ -1095,13 +1124,9 @@ class DataFetcherManager:
         kept: List[DataProvider] = []
         skipped: List[str] = []
         for fetcher in fetchers:
-            active = self._provider_registrations.get(id(fetcher))
-            if (
-                active is not None
-                and active.extension.plugin_id
-                != self._BUILTIN_DATA_PROVIDER_PLUGIN_ID
-            ):
-                supported = active.registration.markets
+            registration = self._provider_plugin_registration(fetcher)
+            if registration is not None:
+                supported = registration.markets
             elif market != "cn":
                 supported = self._DAILY_MARKET_FETCHER_SUPPORT.get(fetcher.name)
             else:
@@ -1129,11 +1154,7 @@ class DataFetcherManager:
         skipped: List[str] = []
 
         for fetcher in fetchers:
-            active = self._provider_registrations.get(id(fetcher))
-            declared = (
-                active is None
-                or capability in active.registration.capabilities
-            )
+            declared = self._provider_supports_capability(fetcher, capability)
             if declared and self._is_fetcher_available(fetcher, capability=capability):
                 kept.append(fetcher)
             else:
@@ -1445,14 +1466,14 @@ class DataFetcherManager:
             if market_filter and source_market != market_filter:
                 continue
             fetcher = fetchers_by_name.get(provider_name)
-            active = (
+            registration = (
                 None
                 if fetcher is None
-                else self._provider_registrations.get(id(fetcher))
+                else self._provider_plugin_registration(fetcher)
             )
             supported_markets = (
-                active.registration.markets
-                if active is not None
+                registration.markets
+                if registration is not None
                 else self._DAILY_MARKET_FETCHER_SUPPORT.get(provider_name)
             )
             providers.append(
@@ -2151,10 +2172,7 @@ class DataFetcherManager:
                 for fetcher in fetchers
                 if (
                     fetcher.name not in source_order
-                    and (active := self._provider_registrations.get(id(fetcher)))
-                    is not None
-                    and active.extension.plugin_id
-                    != self._BUILTIN_DATA_PROVIDER_PLUGIN_ID
+                    and self._provider_plugin_registration(fetcher) is not None
                 )
             )
             market_label = "美股指数" if is_us_index else "美股"
@@ -3364,12 +3382,7 @@ class DataFetcherManager:
         ):
             if not hasattr(fetcher, 'get_stock_name'):
                 continue
-            active = self._provider_registrations.get(id(fetcher))
-            is_plugin = (
-                active is not None
-                and active.extension.plugin_id
-                != self._BUILTIN_DATA_PROVIDER_PLUGIN_ID
-            )
+            is_plugin = self._provider_plugin_registration(fetcher) is not None
             if is_us and fetcher.name not in _US_CAPABLE_FETCHERS and not is_plugin:
                 continue
             if not self._is_fetcher_available(fetcher, capability="stock_name"):

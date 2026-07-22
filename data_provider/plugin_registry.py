@@ -139,9 +139,16 @@ class _LegacyDataProviderAdapter(DataProvider):
 class _RegisteredDataProviderAdapter(DataProvider):
     """Pin a plugin's validated runtime name while delegating its behavior."""
 
-    def __init__(self, provider: DataProvider, provider_name: str) -> None:
+    def __init__(
+        self,
+        provider: DataProvider,
+        provider_name: str,
+        registration: DataProviderRegistration,
+    ) -> None:
         self._provider = provider
         self._provider_name = provider_name
+        self._registration = registration
+        self._registration_priority: int | None = None
 
     @property
     def name(self) -> str:
@@ -157,6 +164,22 @@ class _RegisteredDataProviderAdapter(DataProvider):
 
     def _manager_call_identity(self) -> object:
         return self._provider
+
+    def _manager_plugin_registration(self) -> DataProviderRegistration:
+        return self._registration
+
+    def _manager_bind_plugin_priority(self, priority: int) -> None:
+        if type(priority) is not int:
+            raise TypeError("data provider plugin priority must be an integer")
+        if (
+            self._registration_priority is not None
+            and self._registration_priority != priority
+        ):
+            raise RuntimeError("data provider plugin priority cannot change")
+        self._registration_priority = priority
+
+    def _manager_plugin_priority(self) -> int | None:
+        return self._registration_priority
 
     def get_daily_data(
         self,
@@ -330,7 +353,11 @@ class _DataProviderBackend:
             routed_provider = (
                 provider
                 if builtin_allowed
-                else _RegisteredDataProviderAdapter(provider, provider_name)
+                else _RegisteredDataProviderAdapter(
+                    provider,
+                    provider_name,
+                    implementation,
+                )
             )
             self._entries[registration_id] = _NativeProviderEntry(
                 registration=implementation,
