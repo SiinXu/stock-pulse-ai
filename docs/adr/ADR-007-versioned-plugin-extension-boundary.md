@@ -1,9 +1,9 @@
 # ADR-007: Establish A Versioned Plugin Extension Boundary
 
-- Status: `Proposed`
-- Decision date: Pending acceptance
+- Status: `Accepted`
+- Decision date: 2026-07-21
 - Decision owners: StockPulse maintainers
-- References: [Issue #274](https://github.com/SiinXu/stock-pulse-ai/issues/274), [Issue #273](https://github.com/SiinXu/stock-pulse-ai/issues/273), [Issue #276](https://github.com/SiinXu/stock-pulse-ai/issues/276), [plugin extension contract](../plugin-extension-contract.md), [ADR-005](ADR-005-provider-fallback-and-circuit-control.md), [serialized artifact versioning](../database-migrations_EN.md#serialized-artifact-versioning)
+- References: [Issue #274](https://github.com/SiinXu/stock-pulse-ai/issues/274), [Issue #273](https://github.com/SiinXu/stock-pulse-ai/issues/273), [Issue #276](https://github.com/SiinXu/stock-pulse-ai/issues/276), [PR #339](https://github.com/SiinXu/stock-pulse-ai/pull/339), [plugin extension contract](../plugin-extension-contract.md), [ADR-005](ADR-005-provider-fallback-and-circuit-control.md), [PR #312](https://github.com/SiinXu/stock-pulse-ai/pull/312), [serialized artifact versioning](../database-migrations_EN.md#serialized-artifact-versioning)
 
 ## Context
 
@@ -22,6 +22,13 @@ execution guards. `NotificationService` owns route selection, noise control,
 per-channel isolation, and result aggregation. The report renderer owns its
 fallback behavior. Plugins may supply implementations, but must not bypass
 those policies.
+
+PR #312 later added bounded health-based ordering among eligible providers at
+the same static priority while retaining ADR-005's capability, static-priority,
+circuit, and process-local authority boundaries. That PR explicitly recorded
+the change as compatible evolution rather than a new architectural decision.
+This ADR preserves the current behavior and links the history in both records;
+it does not recast ADR-005 as the source of the adaptive-ordering mechanics.
 
 Python code loaded from outside the application is trusted process code. A
 manifest cannot prevent it from reading files, environment variables, or
@@ -48,7 +55,8 @@ extension point are rejected rather than silently overwritten.
 
 The existing managers and services remain policy authorities. In particular,
 provider plugins enter through `DataFetcherManager`; they do not own fallback,
-health, cache, capability filtering, or run diagnostics. Tool plugins enter
+health, cache, bounded adaptive ordering, capability filtering, or run
+diagnostics. Tool plugins enter
 through `ToolRegistry` and the Tool Surface. Notification adapters enter before
 the existing route/noise/aggregation path, and report templates retain the
 existing fallback renderer. Event Hooks are synchronous, observational,

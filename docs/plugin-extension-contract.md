@@ -1,6 +1,6 @@
 # Plugin Extension Contract
 
-Status: Proposed with [ADR-007](adr/ADR-007-versioned-plugin-extension-boundary.md)
+Status: Accepted with [ADR-007](adr/ADR-007-versioned-plugin-extension-boundary.md)
 
 This document is the living contract for StockPulse plugins. It defines the
 first supported extension boundaries and the signatures that implementation
@@ -68,6 +68,10 @@ Example `manifest.json`:
 release does not change the extension contract version, and an extension
 contract bump does not rewrite the plugin's historical release versions.
 
+The loader resolves the entrypoint to a class, calls it with the already
+validated `PluginManifest`, and requires a `Plugin` instance. Constructor and
+module-import failures are isolated before any registration is committed.
+
 The external loader scans only when `PLUGINS_DIR` is non-empty. It does not scan
 a default home directory, follow a remote catalog, download packages, install
 dependencies, or hot-reload files. Invalid manifests, incompatible application
@@ -79,8 +83,24 @@ are recorded against that plugin and skipped without aborting the scan.
 The signature-level lifecycle contract is:
 
 ```python
+PluginSource = Literal["builtin", "external"]
+PluginState = Literal["registered", "enabled", "disabled", "failed"]
+
+
+@dataclass(frozen=True)
+class PluginOperationResult:
+    plugin_id: str
+    operation: str
+    success: bool
+    state: PluginState
+    error_code: str | None = None
+
+
 class Plugin:
-    manifest: PluginManifest
+    def __init__(self, manifest: PluginManifest) -> None: ...
+
+    @property
+    def manifest(self) -> PluginManifest: ...
 
     def onload(self, context: "PluginContext") -> None:
         """Register extension implementations for one enable transition."""
@@ -96,7 +116,6 @@ class PluginManager:
     def register(
         self,
         plugin: Plugin,
-        manifest: PluginManifest,
         *,
         source: PluginSource,
     ) -> PluginOperationResult: ...
@@ -106,7 +125,7 @@ class PluginManager:
     def disable(self, plugin_id: str) -> PluginOperationResult: ...
 ```
 
-`register` validates identity and records a plugin without invoking its
+`register` validates `plugin.manifest` and records a plugin without invoking its
 lifecycle. `load` performs the first `registered -> enabled` transition.
 `enable` performs `disabled -> enabled` and is idempotent for an already enabled
 plugin. `disable` invokes `onunload`, removes every registration owned by the
@@ -167,6 +186,28 @@ validates the implementation against the point's contract, and returns an
 idempotent handle. A plugin may unregister early; the manager still retains
 ownership bookkeeping for cleanup.
 
+The registration ID is also the canonical native key. It cannot be an alias
+that hides a collision in a point-specific registry:
+
+| Extension point | Required canonical identity |
+| --- | --- |
+| Data Provider | `DataProviderRegistration.provider_id` |
+| Analysis Strategy | `Skill.name` |
+| Agent Tool | `ToolDefinition.name` |
+| Notification Channel | `NotificationChannelAdapter.channel_id` |
+| Report Template | `ReportTemplate.template_id` |
+| Event Hook | `EventHookRegistration.hook_id` |
+
+The unified registry serializes registration under one manager-owned lock. It
+first validates exact identity equality and checks both its own keyspace and the
+target native registry. Only then may it delegate to the native registry and
+commit ownership. Existing permissive `SkillManager.register()` and
+`ToolRegistry.register()` overwrite behavior must never be called when their
+native key already exists. If delegation or later bookkeeping fails, the new
+native entry and unified reservation are rolled back before the error reaches
+the plugin. Unregistration removes only the exact implementation owned by that
+handle, so a stale handle cannot remove a built-in or another plugin's entry.
+
 Lower numeric priority runs first where ordering is meaningful. Equal priority
 uses registration order for deterministic process-local behavior. Priority does
 not let a plugin cross core eligibility boundaries or silently replace an
@@ -181,6 +222,7 @@ Registration shape:
 ```python
 @dataclass(frozen=True)
 class DataProviderRegistration:
+    provider_id: str
     factory: Callable[[], DataProvider]
     markets: frozenset[str]
     capabilities: frozenset[str]
@@ -199,10 +241,13 @@ eligible adaptive ordering, provider call serialization, cache behavior,
 fallback, and `RunDiagnosticContext` recording. Plugins cannot supply their own
 fallback loop or bypass these policies.
 
-The frozen behavior is documented in [ADR-005](adr/ADR-005-provider-fallback-and-circuit-control.md)
-and [data source stability](data-source-stability.md). X3 must preserve existing
-return values, error classification, empty-result behavior, health keys,
-provider names in diagnostics, cache attribution, and market-specific routes.
+[ADR-005](adr/ADR-005-provider-fallback-and-circuit-control.md) governs the
+capability-first static-priority and circuit anchors. PR #312's compatible
+evolution and [data source stability](data-source-stability.md) govern bounded
+adaptive ordering inside those anchors, while the living document also owns
+the layered-cache mechanics. X3 must preserve existing return values, error
+classification, empty-result behavior, health keys, provider names in
+diagnostics, cache attribution, and market-specific routes.
 
 ### Analysis Strategies
 
@@ -247,26 +292,65 @@ belongs to the Agent decomposition track.
 Registration shape:
 
 ```python
+@dataclass(frozen=True)
+class NotificationRequest:
+    content: str
+    route_type: str | None
+    severity: str | None
+    image_bytes: bytes | None
+    stock_codes: tuple[str, ...]
+    metadata: Mapping[str, JSONValue]
+
+
+@dataclass(frozen=True)
+class NotificationAdapterResult:
+    success: bool
+    error_code: str | None = None
+    retryable: bool = False
+    diagnostics: str | None = None
+
+
 class NotificationChannelAdapter(Protocol):
     channel_id: str
+    display_name: str
 
     def is_available(self) -> bool: ...
 
     def send(
         self,
         request: NotificationRequest,
-    ) -> ChannelAttemptResult: ...
+    ) -> NotificationAdapterResult: ...
 
 
 NotificationChannelFactory = Callable[[Config], NotificationChannelAdapter]
 ```
 
 The factory receives the application configuration and returns one adapter.
-The core selects available registered adapters, applies route and noise-control
-policy, prepares text/image inputs, invokes each adapter under per-channel error
-isolation, and aggregates `ChannelAttemptResult` into the existing
+The core, not the adapter, measures latency, binds the canonical channel ID, and
+maps `NotificationAdapterResult` into the existing `ChannelAttemptResult` and
 `NotificationDispatchResult` semantics. One adapter failure must not stop later
 channels or the analysis workflow.
+
+Dynamic routing extends the current plain-string route contract without
+bypassing it. For each dispatch, the core takes an allowed-ID snapshot containing
+`ROUTABLE_NOTIFICATION_CHANNELS` plus the canonical IDs of enabled registered
+plugin adapters. Availability is evaluated separately. The core parses the
+existing route configuration in user order and validates tokens against the
+allowed-ID snapshot. An empty route configuration keeps all available channels.
+A non-empty configuration keeps only configured, available IDs; unknown,
+disabled, failed, and unloaded plugin IDs are reported as invalid, while an
+enabled but unavailable adapter is valid but cannot become a target. A route
+with no available matches remains empty rather than falling back to broadcast.
+Target channel order remains the core's deterministic available-channel order.
+
+Dispatch order remains: resolve available channels, apply route filtering,
+reserve noise control, prepare optional image content once, invoke each adapter
+under error isolation, aggregate attempts, then record or release noise state.
+`NotificationRequest` is constructed only after those shared decisions. Its
+metadata is bounded and sanitized and does not include credentials or raw
+exceptions. The core also validates and sanitizes adapter error codes and
+diagnostics before recording them. The plugin route adapter must generalize the
+current fixed allowlist; it must not maintain a parallel route configuration.
 
 Adapters do not send before route/noise decisions and do not claim success
 without a real delivery attempt. User-influenced outbound endpoints remain
@@ -278,23 +362,40 @@ No notification runtime wiring is part of this batch.
 Registration shape:
 
 ```python
+@dataclass(frozen=True)
+class ReportRenderRequest:
+    platform: Literal["markdown", "wechat", "brief"]
+    results: tuple[AnalysisResult, ...]
+    report_date: str
+    summary_only: bool
+    report_language: str
+    extra_context: Mapping[str, JSONValue]
+
+
 class ReportTemplate(Protocol):
     template_id: str
+    platforms: frozenset[str]
 
     def render(self, request: ReportRenderRequest) -> str | None: ...
 ```
 
-`ReportRenderRequest` carries a report kind/platform, an immutable result list,
-report date, language, summary flag, and bounded extra context. Returning
-`None` means "not rendered" and preserves the current fallback path. Raising is
-recorded and also falls back; one template failure must not prevent a report or
-notification when the built-in renderer can continue.
+The core normalizes the requested platform and selects only enabled plugin
+templates whose `platforms` contain that exact value. Candidates run by numeric
+registration priority and then registration order. The first non-empty string
+wins; `None` or an empty string continues, and an exception is safely recorded
+before continuing. Duplicate template IDs are rejected by the canonical
+identity rule above.
+
+If no plugin candidate renders, the core calls the existing Jinja renderer
+under its current `REPORT_RENDERER_ENABLED` setting. If that renderer is
+disabled, missing, empty, or failed, the caller's existing hard-coded report
+fallback remains final. Plugin priority can order explicitly enabled plugin
+candidates, but cannot unregister or erase either legacy fallback layer.
 
 The real current path is `src/services/report_renderer.py` plus
 `templates/report_markdown.j2`, `report_wechat.j2`, and `report_brief.j2`;
-there is no `src/reports/` package. Template IDs cannot silently replace
-built-ins. Existing `REPORT_TEMPLATES_DIR` remains the supported file-template
-override until later plugin wiring is implemented.
+there is no `src/reports/` package. Existing `REPORT_TEMPLATES_DIR` remains the
+supported Jinja file-template override until later plugin wiring is implemented.
 
 ### Event Hooks
 
@@ -311,6 +412,13 @@ class PluginEvent:
 
 
 EventHook = Callable[[PluginEvent], None]
+
+
+@dataclass(frozen=True)
+class EventHookRegistration:
+    hook_id: str
+    event_names: frozenset[str]
+    callback: EventHook
 ```
 
 The initial event names are:

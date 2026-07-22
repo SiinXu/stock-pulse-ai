@@ -4,7 +4,7 @@
 - Decision date: 2026-07-21
 - Recorded: 2026-07-21
 - Decision owners: StockPulse maintainers
-- References: [PR #290](https://github.com/SiinXu/stock-pulse-ai/pull/290), merge `7b3f80f1cfb4f7337853559656bc26e05b9ff22c`, [`docs/data-source-stability.md`](../data-source-stability.md)
+- References: [PR #290](https://github.com/SiinXu/stock-pulse-ai/pull/290), merge `7b3f80f1cfb4f7337853559656bc26e05b9ff22c`, [PR #312](https://github.com/SiinXu/stock-pulse-ai/pull/312), [`docs/data-source-stability.md`](../data-source-stability.md), [ADR-007](ADR-007-versioned-plugin-extension-boundary.md)
 
 ## Context
 
@@ -55,3 +55,13 @@ exceptions and credentials do not enter public diagnostics.
 - Health resets on process restart and does not coordinate across workers.
 - Real provider rate limits and unusual live latency distributions remain an
   operational risk beyond deterministic failure-path tests.
+
+## Later Compatible Evolution
+
+PR #312 later added bounded health-based ordering only among contiguous,
+sufficiently sampled, closed providers at the same static numeric priority.
+Static priority changes, sparse providers, and open or half-open providers stay
+uncrossable anchors. This evolution remains inside this ADR's capability-first,
+static-priority, and process-local health boundaries; it does not amend the
+historical statement that ADR-005 itself did not introduce adaptive ordering.
+ADR-007 requires plugin-supplied providers to preserve both contracts.
