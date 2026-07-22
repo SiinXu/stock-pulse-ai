@@ -280,6 +280,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Kept the existing persistent daily-provider cache in Desktop runtime data and Windows update backups while preserving explicit cache paths.
 - [Changed] Split DatabaseManager lifecycle and storage operations into focused private modules while preserving the `src.storage` facade and migration behavior.
 
+- [Added] Added tab-scoped Web session continuity for stock context, active Run Flow, route filters, consumed Chat report context, Chat/Research/Screening workflows, source-report handoff, bare-route reload restoration, context-aware navigation, legacy local-storage migration, and redirect-free logout cleanup.
+
 ## [3.26.3] - 2026-07-15
 
 ### Release Highlights

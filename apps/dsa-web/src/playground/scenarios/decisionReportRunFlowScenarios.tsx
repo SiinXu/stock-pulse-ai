@@ -165,7 +165,7 @@ const DeepResearchPanelStory = () => {
     const suffix = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
     const id = `playground-${profile}-${scenario}-${suffix}`;
     if (scenario === 'error') {
-      window.localStorage.setItem(`dsa_research_run:${id}`, JSON.stringify({
+      window.sessionStorage.setItem(`dsa_research_run:${id}`, JSON.stringify({
         question: text.preview,
         stockCode: '600519',
         status: 'error',
@@ -176,7 +176,7 @@ const DeepResearchPanelStory = () => {
   });
 
   useEffect(() => {
-    return () => window.localStorage.removeItem(`dsa_research_run:${sessionId}`);
+    return () => window.sessionStorage.removeItem(`dsa_research_run:${sessionId}`);
   }, [sessionId]);
 
   return <DeepResearchPanel sessionId={sessionId} />;

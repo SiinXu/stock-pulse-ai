@@ -7,6 +7,12 @@ import { agentApi } from '../../api/agent';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { ApiErrorAlert, Button, Field, InlineAlert, Input, StatePanel, Surface, Textarea } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import {
+  DEEP_RESEARCH_SESSION_STORAGE_PREFIX,
+  readSessionItemWithLegacyLocal,
+  removeSessionItem,
+  writeSessionItem,
+} from '../../utils/sessionPersistence';
 
 type ResearchStatus = 'idle' | 'running' | 'done' | 'error';
 
@@ -20,13 +26,13 @@ interface ResearchRun {
 }
 
 function storageKey(sessionId: string): string {
-  return `dsa_research_run:${sessionId}`;
+  return `${DEEP_RESEARCH_SESSION_STORAGE_PREFIX}${sessionId}`;
 }
 
 function loadRun(sessionId: string): ResearchRun | null {
   if (typeof window === 'undefined' || !sessionId) return null;
   try {
-    const raw = window.localStorage.getItem(storageKey(sessionId));
+    const raw = readSessionItemWithLegacyLocal(storageKey(sessionId));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<ResearchRun>;
     if (!parsed || typeof parsed.question !== 'string') return null;
@@ -50,8 +56,8 @@ function loadRun(sessionId: string): ResearchRun | null {
 function saveRun(sessionId: string, run: ResearchRun | null): void {
   if (typeof window === 'undefined' || !sessionId) return;
   try {
-    if (run) window.localStorage.setItem(storageKey(sessionId), JSON.stringify(run));
-    else window.localStorage.removeItem(storageKey(sessionId));
+    if (run) writeSessionItem(storageKey(sessionId), JSON.stringify(run));
+    else removeSessionItem(storageKey(sessionId));
   } catch {
     // Ignore storage failures (private mode / quota); persistence is best-effort.
   }

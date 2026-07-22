@@ -16,7 +16,8 @@ describe('deepLink', () => {
       stockCode: '00700.HK',
       stockName: ' Tencent ',
       recordId: 7,
-    })).toBe('/chat?stock=HK00700&name=Tencent&recordId=7');
+      contextState: 'active',
+    })).toBe('/chat?stock=HK00700&name=Tencent&recordId=7&context=active');
     expect(buildDeepLink({ page: 'portfolio', accountId: 3 })).toBe('/portfolio?account=3');
     expect(buildDeepLink({
       page: 'decision-signals',
@@ -94,6 +95,22 @@ describe('deepLink', () => {
     expect(parsed.issues).toContainEqual({ code: 'invalid_stock_code', parameter: 'stock' });
   });
 
+  it('normalizes the active Chat context marker through the shared parser', () => {
+    const active = parseDeepLink('/chat?stock=AAPL&recordId=7&context=active');
+    expect(active.target).toEqual({
+      page: 'chat',
+      sessionId: undefined,
+      stockCode: 'AAPL',
+      stockName: undefined,
+      recordId: 7,
+      contextState: 'active',
+    });
+
+    const invalid = parseDeepLink('/chat?stock=AAPL&context=consumed&keep=yes');
+    expect(invalid.normalizedHref).toBe('/chat?stock=AAPL&keep=yes');
+    expect(invalid.issues).toContainEqual({ code: 'invalid_filter', parameter: 'context' });
+  });
+
   it('normalizes invalid stock-detail controls to their safe defaults', () => {
     const parsed = parseDeepLink('/stocks/sh600519?period=hourly&days=999&keep=yes');
 
@@ -151,5 +168,6 @@ describe('deepLink', () => {
     expect(() => buildDeepLink({ page: 'chat', sessionId: 'secret session' })).toThrow(TypeError);
     expect(() => buildDeepLink({ page: 'home', stockCode: '<script>' })).toThrow(TypeError);
     expect(() => buildDeepLink({ page: 'chat', recordId: 1 })).toThrow(TypeError);
+    expect(() => buildDeepLink({ page: 'chat', contextState: 'active' })).toThrow(TypeError);
   });
 });

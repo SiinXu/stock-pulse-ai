@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { RunFlowSnapshotSource } from '../types/runFlow';
-import { parseDeepLink, type HomeWorkspaceView } from './deepLink';
+import { buildDeepLink, parseDeepLink, type HomeWorkspaceView } from './deepLink';
 
 const HOME_RECORD_ID_PARAM = 'recordId';
 const HOME_WORKSPACE_PARAM = 'workspace';
@@ -152,6 +152,12 @@ export function setHomeHistoryRunFlow(search: string, recordId: number): string 
   params.set(HOME_RUN_FLOW_PARAM, 'history');
   params.set(HOME_RUN_FLOW_RECORD_ID_PARAM, String(recordId));
   return toSearch(params);
+}
+
+export function buildHomeHistoryRunFlowHref(recordId: number, stockCode?: string): string {
+  const baseHref = buildDeepLink({ page: 'home', recordId, stockCode });
+  const baseUrl = new URL(baseHref, 'http://stockpulse.local');
+  return `${baseUrl.pathname}${setHomeHistoryRunFlow(baseUrl.search, recordId)}`;
 }
 
 export function clearHomeRunFlow(search: string): string {

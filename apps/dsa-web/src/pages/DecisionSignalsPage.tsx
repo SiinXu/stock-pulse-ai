@@ -1,7 +1,16 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, BarChart3, PlusCircle, RefreshCw, Search, ShieldCheck, X } from 'lucide-react';
-import { useLocation, useNavigate, useNavigationType } from 'react-router-dom';
+import {
+  Activity,
+  BarChart3,
+  FileText,
+  PlusCircle,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  X,
+} from 'lucide-react';
+import { Link, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import {
   decisionSignalsApi,
   getDecisionSignalReassessBlockedError,
@@ -75,6 +84,7 @@ import { getDecisionProfile } from '../utils/decisionSignalProfile';
 import { parseDecisionSignalDate } from '../utils/decisionSignalTime';
 import { getDecisionSignalPresentation } from '../utils/decisionSignalPresentation';
 import { parseDeepLink, type DecisionSignalsView } from '../utils/deepLink';
+import { buildHomeHistoryRunFlowHref } from '../utils/homeUrlState';
 import { areStockCodesEquivalent } from '../utils/stockCode';
 
 const PAGE_SIZE = 20;
@@ -2002,26 +2012,43 @@ const DecisionSignalsPage: React.FC = () => {
               feedbackSaving={feedbackSaving}
               feedbackError={selectedFeedbackError?.message ?? null}
               onFeedbackSubmit={handleFeedbackSubmit}
-              actions={STATUS_ACTIONS.map((status) => (
-                <Button
-                  key={status}
-                  type="button"
-                  variant="secondary"
-                  size="comfortable"
-                  className="text-xs"
-                  onClick={() => {
-                    setStatusError(null);
-                    setPendingStatus({
-                      item: selected.item,
-                      status,
-                      message: t(STATUS_ACTION_CONFIRM_KEYS[status]),
-                    });
-                  }}
-                  disabled={statusUpdating || selected.item.status === status}
-                >
-                  {t(STATUS_ACTION_LABEL_KEYS[status])}
-                </Button>
-              ))}
+              actions={(
+                <>
+                  {selected.item.sourceReportId ? (
+                    <Link
+                      to={buildHomeHistoryRunFlowHref(
+                        selected.item.sourceReportId,
+                        selected.item.stockCode,
+                      )}
+                      data-control="navigation-link"
+                      className="control-hit-target inline-flex min-h-7 min-w-0 max-w-full items-center gap-1.5 px-1.5 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      {t('decisionSignals.reassessSource', { id: selected.item.sourceReportId })}
+                    </Link>
+                  ) : null}
+                  {STATUS_ACTIONS.map((status) => (
+                    <Button
+                      key={status}
+                      type="button"
+                      variant="secondary"
+                      size="comfortable"
+                      className="text-xs"
+                      onClick={() => {
+                        setStatusError(null);
+                        setPendingStatus({
+                          item: selected.item,
+                          status,
+                          message: t(STATUS_ACTION_CONFIRM_KEYS[status]),
+                        });
+                      }}
+                      disabled={statusUpdating || selected.item.status === status}
+                    >
+                      {t(STATUS_ACTION_LABEL_KEYS[status])}
+                    </Button>
+                  ))}
+                </>
+              )}
             />
           </div>
         ) : null}

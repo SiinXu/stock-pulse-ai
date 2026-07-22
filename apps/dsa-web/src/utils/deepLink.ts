@@ -6,6 +6,7 @@ import { validateStockCode } from './validation';
 
 export type HomeWorkspaceView = 'history' | 'watchlist' | 'today';
 export type DecisionSignalsView = 'signals' | 'latest' | 'timeline' | 'stats';
+export type ChatContextState = 'active';
 
 export type DeepLinkTarget =
   | {
@@ -20,6 +21,7 @@ export type DeepLinkTarget =
       stockCode?: string;
       stockName?: string;
       recordId?: number;
+      contextState?: ChatContextState;
     }
   | {
       page: 'portfolio';
@@ -69,6 +71,7 @@ export type ParsedDeepLink = {
 
 const HOME_WORKSPACE_VIEWS = new Set<HomeWorkspaceView>(['history', 'watchlist', 'today']);
 const DECISION_SIGNAL_VIEWS = new Set<DecisionSignalsView>(['signals', 'latest', 'timeline', 'stats']);
+const CHAT_CONTEXT_STATES = new Set<ChatContextState>(['active']);
 const STOCK_HISTORY_PERIODS = new Set<StockHistoryPeriod>(['daily', 'weekly', 'monthly']);
 const DECISION_SIGNAL_MARKETS = new Set(['cn', 'hk', 'us', 'jp', 'kr', 'tw']);
 const DECISION_SIGNAL_ACTIONS = new Set(['buy', 'add', 'hold', 'reduce', 'sell', 'watch', 'avoid', 'alert']);
@@ -277,8 +280,14 @@ export function buildDeepLink(target: DeepLinkTarget): string {
           params.set('name', stockName);
         }
         setPositiveInteger(params, 'recordId', target.recordId);
+        if (target.contextState) {
+          if (!CHAT_CONTEXT_STATES.has(target.contextState)) throw new TypeError('Unsupported Chat context state');
+          params.set('context', target.contextState);
+        }
       } else if (target.stockName || target.recordId !== undefined) {
         throw new TypeError('Chat stockName and recordId require stockCode');
+      } else if (target.contextState) {
+        throw new TypeError('Chat context state requires stockCode');
       }
       break;
     }
@@ -375,12 +384,19 @@ export function parseDeepLink(input: string, origin = DEFAULT_ORIGIN): ParsedDee
     const rawStockName = params.get('name');
     const stockName = rawStockName === null ? null : normalizeStockName(rawStockName);
     const recordId = parsePositiveIntegerParam(params, issues, 'recordId', 'invalid_record_id');
+    const contextState = parseEnumParam(
+      params,
+      issues,
+      'context',
+      CHAT_CONTEXT_STATES,
+    ) as ChatContextState | undefined;
     if (!stockCode) {
-      if (rawStockName !== null || recordId !== undefined) {
+      if (rawStockName !== null || recordId !== undefined || contextState !== undefined) {
         issues.push({ code: 'incomplete_chat_context', parameter: 'stock' });
       }
       params.delete('name');
       params.delete('recordId');
+      params.delete('context');
     } else if (rawStockName !== null) {
       if (stockName) params.set('name', stockName);
       else {
@@ -394,6 +410,7 @@ export function parseDeepLink(input: string, origin = DEFAULT_ORIGIN): ParsedDee
       stockCode,
       stockName: stockCode ? stockName ?? undefined : undefined,
       recordId: stockCode ? recordId : undefined,
+      ...(stockCode && contextState ? { contextState } : {}),
     };
   } else if (url.pathname === '/portfolio') {
     const accountId = parsePositiveIntegerParam(params, issues, 'account', 'invalid_account_id');

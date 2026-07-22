@@ -2,7 +2,9 @@ import type React from 'react';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
 import { authApi } from '../api/auth';
+import { useAgentChatStore } from '../stores/agentChatStore';
 import { useStockPoolStore } from '../stores/stockPoolStore';
+import { clearPersistedWebSession } from '../utils/sessionPersistence';
 
 type AuthContextValue = {
   authEnabled: boolean;
@@ -12,6 +14,7 @@ type AuthContextValue = {
   setupState: 'enabled' | 'password_retained' | 'no_password';
   isLoading: boolean;
   loadError: ParsedApiError | null;
+  logoutRedirectPending: boolean;
   login: (password: string, passwordConfirm?: string) => Promise<{ success: boolean; error?: ParsedApiError }>;
   changePassword: (
     currentPassword: string,
@@ -28,6 +31,12 @@ function extractLoginError(err: unknown): ParsedApiError {
   return getParsedApiError(err);
 }
 
+function resetPrivateClientSession(): void {
+  clearPersistedWebSession();
+  useAgentChatStore.getState().resetSessionState();
+  useStockPoolStore.getState().resetDashboardState();
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authEnabled, setAuthEnabled] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
@@ -36,6 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [setupState, setSetupState] = useState<'enabled' | 'password_retained' | 'no_password'>('no_password');
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<ParsedApiError | null>(null);
+  const [logoutRedirectPending, setLogoutRedirectPending] = useState(false);
 
   // Guard against out-of-order status responses: a stale in-flight request
   // (e.g. the initial mount fetch) must not overwrite the state written by a
@@ -58,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setPasswordChangeable(status.passwordChangeable ?? false);
       setSetupState(status.setupState);
       if (status.authEnabled && !status.loggedIn) {
-        useStockPoolStore.getState().resetDashboardState();
+        resetPrivateClientSession();
       }
     } catch (err) {
       if (requestId !== statusRequestSeq.current) {
@@ -70,6 +80,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setPasswordSet(false);
       setPasswordChangeable(false);
       setSetupState('no_password');
+      // A transient status failure does not prove that the authenticated session ended.
+      // Preserve tab-scoped continuity so a successful retry can resume the workflow.
       useStockPoolStore.getState().resetDashboardState();
     } finally {
       if (requestId === statusRequestSeq.current) {
@@ -87,6 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password: string,
       passwordConfirm?: string
     ): Promise<{ success: boolean; error?: ParsedApiError }> => {
+      setLogoutRedirectPending(false);
       try {
         await authApi.login(password, passwordConfirm);
         await fetchStatus();
@@ -115,16 +128,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const logout = useCallback(async () => {
+    setLogoutRedirectPending(true);
     let logoutError: unknown = null;
     try {
       await authApi.logout();
+      resetPrivateClientSession();
     } catch (err) {
       logoutError = err;
+      if (getParsedApiError(err).status === 401) {
+        resetPrivateClientSession();
+      }
     } finally {
       await fetchStatus();
     }
 
     if (logoutError && getParsedApiError(logoutError).status !== 401) {
+      setLogoutRedirectPending(false);
       throw logoutError;
     }
   }, [fetchStatus]);
@@ -139,6 +158,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setupState,
         isLoading,
         loadError,
+        logoutRedirectPending,
         login,
         changePassword,
         logout,

@@ -15,6 +15,7 @@ import {
   StandaloneRouteBoundary,
 } from './components/layout/RouteBoundary';
 import { DeepLinkGuard } from './components/routing/DeepLinkGuard';
+import { SessionContinuityGuard } from './components/routing/SessionContinuityGuard';
 import { RouteFocusCoordinator } from './components/routing';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { UiLanguageProvider, useUiLanguage } from './contexts/UiLanguageContext';
@@ -40,7 +41,14 @@ const PlaygroundRenderPage = lazy(() => import('./playground/PlaygroundRenderPag
 
 const AppLayout: React.FC = () => {
   const location = useLocation();
-  const { authEnabled, loggedIn, isLoading, loadError, refreshStatus } = useAuth();
+  const {
+    authEnabled,
+    loggedIn,
+    isLoading,
+    loadError,
+    logoutRedirectPending,
+    refreshStatus,
+  } = useAuth();
   const { t } = useUiLanguage();
 
   useEffect(() => {
@@ -74,6 +82,9 @@ const AppLayout: React.FC = () => {
     if (isLoginRoute) {
       return <Outlet />;
     }
+    if (logoutRedirectPending) {
+      return <Navigate to="/login" replace />;
+    }
     const redirect = encodeURIComponent(location.pathname + location.search);
     return <Navigate to={`/login?redirect=${redirect}`} replace />;
   }
@@ -84,7 +95,11 @@ const AppLayout: React.FC = () => {
     return <Navigate to={resolveLoginRedirect(location.search)} replace />;
   }
 
-  return <Outlet />;
+  return (
+    <SessionContinuityGuard>
+      <Outlet />
+    </SessionContinuityGuard>
+  );
 };
 
 // Data router (instead of declarative <BrowserRouter>) so pages can use
