@@ -2411,7 +2411,7 @@ if __name__ == "__main__":
     print("测试 ETF 实时行情获取")
     print("=" * 50)
     try:
-        quote = fetcher.get_realtime_quote('512880')  # Stocks and ETFs
+        quote = fetcher.get_realtime_quote('512880')  # `证券ETF` (securities-sector ETF)
         if quote:
             print(f"[ETF实时] {quote.name}: 价格={quote.price}, 涨跌幅={quote.change_pct}%")
         else:

@@ -37,7 +37,7 @@ import sys
 _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, _PROJECT_ROOT)
 
-try:  # Windows cp950 console mangles the Chinese feed messages / listed·OTC-listed-listed-listed-listed labels
+try:  # Windows cp950 console mangles Chinese feed messages and the `上市` / `上櫃` labels
     sys.stdout.reconfigure(encoding="utf-8")
 except Exception:  # noqa: BLE001 - cosmetic only; never block the smoke on console encoding
     pass
@@ -178,7 +178,7 @@ def level_twse(fetcher: TwInstitutionalFetcher, codes) -> bool:
         rec = _fetch_with_retry(fetcher, code)
         if rec is None:
             # raw row present but the fetcher returned None => a parse/date drift the fetcher
-            # fail-opened on (e.g. a Minguo->ISO date switch) — fail LOUD, never a soft-skip
+            # fail-opened on (e.g. a `民國` -> ISO date switch) — fail LOUD, never a soft-skip
             # (that conflation is exactly what would let the drift this script exists to catch slip).
             if raw is not None:
                 ok &= _check(f"{base}: fetcher must parse a row that exists in the raw feed", False,
@@ -230,7 +230,7 @@ def level_tpex(fetcher: TwInstitutionalFetcher, codes) -> bool:
         raw = by_code.get(base)
         rec = _fetch_with_retry(fetcher, code)
         if rec is None:
-            # raw row present but fetcher None => parse/date drift (e.g. a Minguo date-format change
+            # raw row present but fetcher None => parse/date drift (e.g. a `民國` date-format change
             # _parse_tpex_row can't convert) — fail LOUD, not a soft-skip.
             if raw is not None:
                 ok &= _check(f"{base}: fetcher must parse a row that exists in the raw feed", False,

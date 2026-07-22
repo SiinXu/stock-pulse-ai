@@ -30,9 +30,9 @@ describe('truncateStockName', () => {
     });
 
     test('truncates to 8 chars with trailing dot', () => {
-      // A 10-character Chinese name is truncated to 8 characters plus a dot.
+      // `贵州茅台股票有限公司` (10 Chinese characters) is truncated to `贵州茅台股票有限.` (8 characters plus a dot).
       expect(truncateStockName('贵州茅台股票有限公司')).toBe('贵州茅台股票有限.');
-      // An 11-character mixed name is truncated to its first 10 characters plus a dot.
+      // `中华人民共和国ABCD` (11 mixed characters) is truncated to `中华人民共和国ABC.` (10 characters plus a dot).
       expect(truncateStockName('中华人民共和国ABCD')).toBe('中华人民共和国ABC.');
     });
   });
@@ -44,10 +44,10 @@ describe('truncateStockName', () => {
     });
 
     test('truncates to 10 chars with trailing dot', () => {
-      // A 10-character Chinese name plus two Latin letters is truncated to 10 characters plus a dot.
-      // The first 10 characters are the complete Chinese name.
+      // `贵州茅台股票有限公司AB` (10 Chinese characters plus 2 Latin letters) is truncated after 10 characters.
+      // The retained prefix is the complete Chinese name: `贵州茅台股票有限公司.`
       expect(truncateStockName('贵州茅台股票有限公司AB')).toBe('贵州茅台股票有限公司.');
-      // Four Chinese characters plus six ASCII characters fit the 10-character mixed-name limit.
+      // `腾讯控股00700H` has 4 Chinese and 6 ASCII characters, so it fits the 10-character mixed-name limit.
       expect(truncateStockName('腾讯控股00700H')).toBe('腾讯控股00700H');
     });
   });
