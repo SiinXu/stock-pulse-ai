@@ -56,6 +56,15 @@ entrypoint edit:
 4. disable that snapshot in reverse order when the root is replaced, reset, or
    closed at process exit.
 
+Composition-root transitions are serialized around that shutdown boundary. The
+previous root remains the discoverable root until its complete reverse-order
+unload finishes; only then is a successor published and started. A lifecycle
+callback that resolves `get_application_services()` during the transition sees
+the root that owns the callback, so reset and process-exit cleanup cannot
+implicitly create a fresh root. Re-entrant replacement requests are deferred
+until the active transition finishes, with the most recent explicit request
+becoming the next root.
+
 There is currently no default lifecycle-style built-in catalog to fabricate:
 existing Data Provider built-ins remain owned by each `DataFetcherManager`, and
 the other five extension points are contract-only. `ApplicationServices`

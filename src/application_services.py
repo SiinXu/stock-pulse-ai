@@ -206,35 +206,77 @@ class ApplicationServices:
 
 _services: Optional[ApplicationServices] = None
 _services_lock = threading.Lock()
+_services_transition_lock = threading.RLock()
+_services_transition_active = False
+_services_transition_pending: list[Optional[ApplicationServices]] = []
 
 
 def get_application_services() -> ApplicationServices:
     """Return the installed composition root, creating a default one lazily."""
-    global _services
     while True:
         with _services_lock:
-            if _services is None:
-                _services = ApplicationServices()
-            services = _services
-        services.start_plugins()
-        with _services_lock:
-            if _services is services:
-                return services
+            if _services_transition_active and _services is not None:
+                # Lifecycle callbacks must resolve the root whose transition
+                # they belong to without starting or resurrecting a successor.
+                return _services
+
+        with _services_transition_lock:
+            with _services_lock:
+                services = _services
+            if services is None:
+                services = ApplicationServices()
+            set_application_services(services)
+            with _services_lock:
+                if _services is services:
+                    return services
 
 
 def set_application_services(services: Optional[ApplicationServices]) -> None:
-    """Install a composition root. Pass ``None`` to clear the installed root.
+    """Install a root after fully shutting down the previous root.
 
-    Intended for the startup layer and for tests that need isolated instances.
+    Pass ``None`` to clear the installed root. Re-entrant replacement requests
+    from plugin callbacks are deferred until the active lifecycle transition
+    finishes, with the most recent request winning.
     """
-    global _services
-    with _services_lock:
-        previous = _services
-        _services = services
-    if previous is not None and previous is not services:
-        previous.close()
-    if services is not None:
-        services.start_plugins()
+    global _services, _services_transition_active
+
+    with _services_transition_lock:
+        with _services_lock:
+            if _services_transition_active:
+                if _services is not services:
+                    _services_transition_pending[:] = [services]
+                return
+            _services_transition_active = True
+            _services_transition_pending.clear()
+
+        target = services
+        try:
+            while True:
+                with _services_lock:
+                    previous = _services
+
+                if previous is not None and previous is not target:
+                    previous.close()
+
+                with _services_lock:
+                    if _services_transition_pending:
+                        target = _services_transition_pending[-1]
+                        _services_transition_pending.clear()
+                    _services = target
+
+                if target is not None:
+                    target.start_plugins()
+
+                with _services_lock:
+                    if not _services_transition_pending:
+                        _services_transition_active = False
+                        return
+                    target = _services_transition_pending[-1]
+                    _services_transition_pending.clear()
+        finally:
+            with _services_lock:
+                _services_transition_active = False
+                _services_transition_pending.clear()
 
 
 def reset_application_services() -> None:

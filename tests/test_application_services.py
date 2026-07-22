@@ -1,6 +1,7 @@
 """Tests for the ApplicationServices composition root."""
 
 import json
+import threading
 from pathlib import Path
 
 import pytest
@@ -374,3 +375,149 @@ def test_plugin_load_can_resolve_the_already_installed_root():
 
     assert observed_roots == [services]
     assert events == ["load:test.root-aware"]
+
+
+def test_reset_does_not_recreate_root_from_unload_lookup():
+    observed_roots: list[ApplicationServices] = []
+    events: list[str] = []
+
+    class _UnloadLookupPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("unload-begin")
+            observed_roots.append(get_application_services())
+            events.append("unload-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(_UnloadLookupPlugin("test.reset-lookup", events),),
+        plugins_dir="",
+    )
+    set_application_services(services)
+
+    reset_application_services()
+
+    assert observed_roots == [services]
+    assert events == ["load:test.reset-lookup", "unload-begin", "unload-end"]
+    assert get_application_services() is not services
+
+
+def test_replacement_finishes_old_unload_before_new_root_load():
+    observed_roots: list[ApplicationServices] = []
+    events: list[str] = []
+
+    class _UnloadLookupPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("old-unload-begin")
+            observed_roots.append(get_application_services())
+            events.append("old-unload-end")
+
+    first = ApplicationServices(
+        builtin_plugins=(_UnloadLookupPlugin("test.old", events),),
+        plugins_dir="",
+    )
+    second = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.new", events),),
+        plugins_dir="",
+    )
+
+    set_application_services(first)
+    set_application_services(second)
+
+    assert observed_roots == [first]
+    assert events == [
+        "load:test.old",
+        "old-unload-begin",
+        "old-unload-end",
+        "load:test.new",
+    ]
+
+
+def test_concurrent_get_during_replacement_keeps_old_root_until_unload_finishes():
+    unload_started = threading.Event()
+    release_unload = threading.Event()
+    observed_roots: list[ApplicationServices] = []
+    events: list[str] = []
+
+    class _BlockingUnloadPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("old-unload-begin")
+            unload_started.set()
+            if not release_unload.wait(timeout=5):
+                raise AssertionError("test did not release the unload callback")
+            events.append("old-unload-end")
+
+    first = ApplicationServices(
+        builtin_plugins=(_BlockingUnloadPlugin("test.old", events),),
+        plugins_dir="",
+    )
+    second = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.new", events),),
+        plugins_dir="",
+    )
+    set_application_services(first)
+
+    replacement = threading.Thread(
+        target=set_application_services,
+        args=(second,),
+    )
+    lookup = threading.Thread(
+        target=lambda: observed_roots.append(get_application_services()),
+    )
+    replacement.start()
+    assert unload_started.wait(timeout=5)
+
+    try:
+        lookup.start()
+        lookup.join(timeout=5)
+        assert not lookup.is_alive()
+        assert observed_roots == [first]
+        assert "load:test.new" not in events
+    finally:
+        release_unload.set()
+        replacement.join(timeout=5)
+        lookup.join(timeout=5)
+
+    assert not replacement.is_alive()
+    assert not lookup.is_alive()
+    assert events == [
+        "load:test.old",
+        "old-unload-begin",
+        "old-unload-end",
+        "load:test.new",
+    ]
+
+
+def test_reentrant_replacement_is_deferred_until_old_unload_finishes():
+    events: list[str] = []
+    final_root_holder: list[ApplicationServices] = []
+
+    class _ReplacingUnloadPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("old-unload-begin")
+            set_application_services(final_root_holder[0])
+            events.append("old-unload-end")
+
+    first = ApplicationServices(
+        builtin_plugins=(_ReplacingUnloadPlugin("test.old", events),),
+        plugins_dir="",
+    )
+    superseded = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.superseded", events),),
+        plugins_dir="",
+    )
+    final = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.final", events),),
+        plugins_dir="",
+    )
+    final_root_holder.append(final)
+
+    set_application_services(first)
+    set_application_services(superseded)
+
+    assert get_application_services() is final
+    assert superseded.plugin_manager.plugin_ids() == ()
+    assert events == [
+        "load:test.old",
+        "old-unload-begin",
+        "old-unload-end",
+        "load:test.final",
+    ]
