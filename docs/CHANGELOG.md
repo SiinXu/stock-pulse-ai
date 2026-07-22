@@ -260,6 +260,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Added canonical A-share/HK/US Chat scope, market-specific tool filtering, session continuity, and per-symbol Multi-Agent comparison with currency/timezone/field context.
 - [Changed] Split GeminiAnalyzer generation, analysis, and response methods into focused internal modules while preserving the legacy class facade and runtime behavior.
 - [Fixed] Hardened multi-market Agent Chat symbol evidence, concurrent session continuity, and deterministic partial/all-unavailable comparison outcomes.
+- [Docs] Defined the core security and compliance baseline for access, secrets, egress, auditability, supply chain, and investment disclosures.
 
 ## [3.26.3] - 2026-07-15
 
