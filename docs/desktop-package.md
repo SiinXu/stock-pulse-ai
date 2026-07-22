@@ -40,6 +40,48 @@ npm run dev
 
 首次运行时会自动从 `.env.example` 复制生成 `.env`。
 
+## 桌面深链协议
+
+桌面安装包注册 `stockpulse` 自定义协议。规范形式是
+`stockpulse://app/<应用内路径>?<查询参数>`，例如：
+
+```text
+stockpulse://app/?stock=AAPL&workspace=watchlist
+stockpulse://app/portfolio?account=7
+stockpulse://app/stocks/HK00700?period=weekly&days=30
+```
+
+协议 authority 固定为 `app`。桌面壳只接受 Web 已声明为稳定产品入口的路径：
+
+- `/`
+- `/chat`
+- `/portfolio`
+- `/decision-signals`
+- `/stocks/<stockCode>`，其中股票代码必须是单个 ASCII 路径段
+- `/alerts`、`/backtest`、`/screening`、`/settings`、`/usage`
+
+Electron 会保留已接受链接的路径和查询参数，并把它们映射到当前运行时选择的私有本地 Web origin；`desktop_version` 和 `cache_bust` 始终由当前桌面进程覆盖。Web 侧继续负责各页面参数的规范化、敏感键清理和无效资源回退。桌面壳会在加载页面前拒绝非 `stockpulse` 协议、非 `app` authority、用户名或密码、端口、fragment、控制字符或未编码空格、路径归一化或编码走私，以及白名单外路径。拒绝的链接不会改变当前页面，日志也不会记录其原始 URL 或查询参数。
+
+冷启动时，Windows/Linux 从初始 argv 提取链接；macOS 通过 `open-url` 接收链接。若后端尚未通过健康检查，链接会排队到私有 Web origin 就绪后再作为首个产品页面加载。应用已运行时，Windows/Linux 的第二实例 argv 仍走同一验证入口，并先恢复、显示和聚焦主窗口；macOS `open-url` 使用同一排队与路由逻辑。没有协议 URL 的第二实例继续只聚焦现有窗口。
+
+`apps/dsa-desktop/package.json` 的 electron-builder `protocols` 声明负责生成 macOS bundle 的 `CFBundleURLTypes`。electron-builder 24 不会用该字段生成 Windows 协议注册；Windows NSIS 安装器因此通过 `installer.nsh` 在当前用户的 `Software\Classes\stockpulse` 写入带引号的 exe 与 `%1` 命令，并只在该命令仍指向当前安装目录时随卸载清理。运行时同时调用 `app.setAsDefaultProtocolClient('stockpulse')` 作为开发态和注册修复入口。Electron 开发态会把当前入口脚本作为协议启动参数；操作系统级注册和最终安装行为仍应以打包产物为准。
+
+macOS 安装包可用以下命令验证冷启动和已运行实例：
+
+```bash
+open "stockpulse://app/portfolio?account=7"
+open "stockpulse://app/stocks/AAPL?period=weekly"
+```
+
+Windows 安装包使用 PowerShell 验证：
+
+```powershell
+Start-Process 'stockpulse://app/portfolio?account=7'
+Start-Process 'stockpulse://app/stocks/AAPL?period=weekly'
+```
+
+验证时应确认链接落在预期页面、重复打开会唤起现有窗口，并用 `stockpulse://evil.example/settings` 或 `stockpulse://app/login` 确认拒绝路径不会改变当前页面。在非 Windows 环境只能验证 electron-builder 配置和确定性 argv 测试，不能替代 NSIS 安装后的注册表与二实例验收。
+
 ## 打包 (Windows)
 
 ### 前置条件
