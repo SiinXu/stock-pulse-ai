@@ -15,6 +15,7 @@ If you are choosing a concrete provider, setting up GitHub Actions Secrets / Var
 3. **[Veterans]** "I want complex load balancing, request routing, and enterprise-level high availability!" -> [Go to Method 3: Advanced YAML Config](#method-3-advanced-yaml-config-expert-setup)
 4. **[Local Models]** "I want to use Ollama local models!" -> [Go to Example 4: Using Ollama Local Models](#example-4-using-ollama-local-models)
 5. **[Vision Models]** "I want to extract stock codes from images!" -> [Go to Vision Model Config](#advanced-feature-vision-model-config)
+6. **[Fallbacks]** "I need the exact configuration, backend, and model degradation order." -> [Go to Routing and degradation order](#routing-and-degradation-order)
 
 ---
 
@@ -150,6 +151,76 @@ Activation is serialized with the persisted write. If candidate construction or 
 Use `POST /api/v1/system/config/rollback` with the current `config_version` to atomically activate that snapshot. The endpoint uses the same optimistic conflict and app-wide authentication middleware as normal config updates. It never changes `ADMIN_AUTH_ENABLED`; if the saved snapshot differs at that key, rollback fails with `auth_settings_endpoint_required` and the dedicated `/api/v1/auth/settings` reauthentication flow remains mandatory. A successful rollback retains the displaced valid version as the next last-known-good snapshot, so one more rollback reverses the operation. `reload_now=false` remains a persistence-only compatibility mode: it does not publish runtime state or replace the last-known-good snapshot.
 
 An analysis worker reads the current singleton when `AnalysisService` starts the task. Its `StockAnalysisPipeline` keeps that object for the complete run, so an in-flight task is not mutated by a later hot reload; a queued task that has not started receives the latest valid config when its worker starts. Operational audit logs record the operator class, UTC time, operation, result, changed key names, and config version. Values are never recorded. The current single-admin model can attribute an action to `authenticated_admin`, `desktop_operator`, or `local_operator`; it does not claim per-user identity or a durable security-audit store.
+
+### Routing and degradation order
+
+Configuration-source priority, generation-backend fallback, and model fallback are separate decisions:
+
+| Layer | Selection and degradation behavior |
+| --- | --- |
+| Configuration source | `LLM_CONFIG_MODE=auto` selects the first valid source in this order: LiteLLM YAML from `LITELLM_CONFIG`, declared `LLM_CHANNELS`, then legacy provider environment keys. `yaml`, `channels`, or `legacy` mode constrains selection to that source instead of silently mixing modes. An explicitly selected invalid Hermes route fails closed and does not silently reuse legacy credentials. |
+| Generation backend | `GENERATION_BACKEND` selects the primary backend. `GENERATION_FALLBACK_BACKEND=litellm` is useful when an opted-in local CLI backend returns a structured `fallbackable` error. When LiteLLM is already primary, `litellm -> litellm` is a no-op. An empty fallback value disables backend-level fallback. |
+| LiteLLM model chain | The runtime tries `LITELLM_MODEL` first, then each model in `LITELLM_FALLBACK_MODELS`. Request exceptions, empty responses, or response-validation failures move to the next model. In Channels/YAML mode, the Router can also load-balance keys and retry deployments within the current model route. |
+| Final failure | If every model fails, the request returns the existing typed/normalized failure; it is not reported as a successful degraded response. A non-fallbackable backend configuration or capability error fails before backend switching. |
+
+Streaming has one additional step: a failed stream retries the same model without streaming before the model chain advances. Partial text from a failed stream is not stitched to a different model's output.
+
+Configuration activation and request fallback also have different scopes. Candidate validation or an opted-in connectivity probe can reject a save before activation, leaving the old runtime and `.env` in place. A later production request failure uses the backend/model chain above but does not automatically rewrite configuration. Operators can use the one-step rollback endpoint to restore the last-known-good configuration when the new route proves unsuitable.
+
+#### Production fallback example
+
+Use independent providers, credentials, and endpoints so one account, quota, or regional outage does not remove the whole chain:
+
+```env
+LLM_CONFIG_MODE=channels
+LLM_CHANNELS=deepseek,relay
+
+LLM_DEEPSEEK_PROVIDER=deepseek
+LLM_DEEPSEEK_BASE_URL=https://api.deepseek.com
+LLM_DEEPSEEK_API_KEY=your_deepseek_key
+LLM_DEEPSEEK_MODELS=deepseek-v4-flash
+
+LLM_RELAY_PROVIDER=openai
+LLM_RELAY_BASE_URL=https://your-relay.example/v1
+LLM_RELAY_API_KEY=your_relay_key
+LLM_RELAY_MODELS=gpt-5.5
+
+LITELLM_MODEL=deepseek/deepseek-v4-flash
+LITELLM_FALLBACK_MODELS=openai/gpt-5.5
+```
+
+The concrete model IDs must exist for the configured account and endpoint. A second model on the same provider can protect against model-specific errors, but it does not protect against provider-wide authentication, quota, or network failure.
+
+#### Zero-cost local example
+
+Ollama needs no API key, but both models depend on the same local process and host:
+
+```env
+LLM_CONFIG_MODE=channels
+LLM_CHANNELS=ollama
+LLM_OLLAMA_PROVIDER=ollama
+LLM_OLLAMA_BASE_URL=http://localhost:11434
+LLM_OLLAMA_MODELS=qwen3:8b,llama3.2
+
+LITELLM_MODEL=ollama/qwen3:8b
+LITELLM_FALLBACK_MODELS=ollama/llama3.2
+GENERATION_FALLBACK_BACKEND=
+```
+
+Pull both models before use and size them for available memory. This avoids external API cost, not local compute cost or a local-host outage.
+
+#### Degradation troubleshooting
+
+| Symptom | Meaning and action |
+| --- | --- |
+| `connectivity_probe_failed` while saving | The candidate was not activated. Use `details.error_code` to distinguish authentication, quota, model, network, or backend-contract failure; correct the draft and retry. |
+| `401` / `403` on every model | Verify that each fallback has its own valid credential and endpoint. Multiple model IDs sharing one rejected key are not independent fallback. |
+| `429` / quota exhaustion | Wait for the provider window, reduce concurrent/batch demand, or route the fallback to a different provider/account. Key rotation inside one exhausted account may not help. |
+| Model not found or access denied | Confirm the exact provider model ID and account entitlement. Do not rely on discovery results from another endpoint or account. |
+| Timeout or connection refused | Check Base URL, proxy/egress, DNS/TLS, and local Ollama/CLI process availability. Cross-provider fallback is the useful boundary for network isolation. |
+| All models failed | Read the sanitized per-model logs and final typed error. The runtime does not silently reuse a partial or invalid response. |
+
+Market-data fallback is independent of model routing. See [data-source priority, health, and degradation](data-source-stability_EN.md) for provider ordering, rate limits, market support, circuit state, and stale-cache behavior.
 
 ### Web model connection editor: compatibility, migration, and rollback rules
 
