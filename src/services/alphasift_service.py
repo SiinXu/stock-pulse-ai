@@ -28,7 +28,11 @@ from pydantic import BaseModel, Field
 from src.auth import COOKIE_NAME, is_auth_enabled, refresh_auth_state, verify_session
 from src.config import Config, DEFAULT_ALPHASIFT_INSTALL_SPEC, get_configured_llm_models
 from src.security.outbound_policy import guard_outbound_urls
-from src.utils.sanitize import log_safe_exception, sanitize_sensitive_text
+from src.utils.sanitize import (
+    log_safe_exception,
+    redact_sensitive_data,
+    sanitize_sensitive_text,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1542,7 +1546,8 @@ def _sanitize_public_alphasift_diagnostics(value: Any) -> Any:
             sanitized[public_key] = _public_diagnostic_code(item, fallback_code=scalar_fallback_code)
         else:
             sanitized[public_key] = _sanitize_public_alphasift_diagnostics(item)
-    return sanitized
+    redacted = redact_sensitive_data(sanitized)
+    return redacted if isinstance(redacted, dict) else {}
 
 
 def _list_dict_values(value: Any) -> List[Dict[str, Any]]:

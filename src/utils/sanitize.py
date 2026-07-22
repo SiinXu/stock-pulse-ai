@@ -4,17 +4,20 @@
 from __future__ import annotations
 
 import inspect
+import json
 import logging
 import re
 from typing import Any, Callable, Iterable, Mapping, Optional
-from urllib.parse import parse_qsl, urlsplit
+from urllib.parse import parse_qsl, unquote, urlsplit
 
 
 _REDACTED = "[REDACTED]"
+_URL_USERINFO_REDACTION = "__STOCKPULSE_REDACTED__"
 _SENSITIVE_KEY_PARTS = {
     "authorization",
     "cookie",
     "credential",
+    "passwd",
     "password",
     "secret",
     "sendkey",
@@ -36,6 +39,12 @@ _SENSITIVE_KEY_PHRASES = {
     "licensekey",
     "private_key",
     "privatekey",
+    "proxy_authorization",
+    "proxyauthorization",
+    "proxy_url",
+    "proxyurl",
+    "raw_prompt",
+    "raw_response",
     "refresh_token",
     "refreshtoken",
     "secret_key",
@@ -44,6 +53,8 @@ _SENSITIVE_KEY_PHRASES = {
     "sessiontoken",
     "send_key",
     "sendkey",
+    "webhook_secret",
+    "webhooksecret",
     "webhook_url",
     "webhookurl",
 }
@@ -51,7 +62,8 @@ _SENSITIVE_COMPACT_KEY_PHRASES = {
     phrase.replace("_", "") for phrase in _SENSITIVE_KEY_PHRASES
 }
 _SENSITIVE_COMPACT_KEY_PATTERN = re.compile(
-    r"authorization|cookie|credential|password|secret|sendkey|token(?!s)|webhook"
+    r"authorization|cookie|credential|passwd|password|rawresponse|secret|"
+    r"sendkey|token(?!s)|webhook"
 )
 _URL_PATTERN = re.compile(r"https?://[^\s,;)\]}]+", re.IGNORECASE)
 # Credentials in the userinfo of a connection-string URL of any scheme
@@ -64,10 +76,20 @@ _URL_PATTERN = re.compile(r"https?://[^\s,;)\]}]+", re.IGNORECASE)
 _URL_CREDENTIALS_PATTERN = re.compile(
     r"(?P<scheme>[a-zA-Z][a-zA-Z0-9+.\-]*://)[^\s:/?#@]*:[^\s/?#]*@"
 )
-_BEARER_PATTERN = re.compile(r"\b(bearer\s+)[^\s,;&]+", re.IGNORECASE)
+_BEARER_PATTERN = re.compile(
+    r"\b(bearer\s+)[^\s,;&\"']+",
+    re.IGNORECASE,
+)
 _AUTHORIZATION_HEADER_PATTERN = re.compile(
     r"\b(authorization|proxy[_-]?authorization)(\s*[:=]\s*)"
-    r"(?:(?:Bearer|Basic|Token|Digest)\s+)?[^\s,;&]+",
+    r"(?:(?:Bearer|Basic|Token|Digest|ApiKey|Api-Key|HMAC|Negotiate|OAuth)\s+)?"
+    r"[^\s,;&\"']+",
+    re.IGNORECASE,
+)
+_OPAQUE_AUTHORIZATION_SCHEME_PATTERN = re.compile(
+    r"\b(authorization|proxy[_-]?authorization)(\s*[:=]\s*)"
+    r"[A-Za-z][A-Za-z0-9._~-]{0,31}\s+"
+    r"[A-Za-z0-9._~+/=-]{12,}(?=$|[\s,;&\"'])",
     re.IGNORECASE,
 )
 _COOKIE_HEADER_PATTERN = re.compile(
@@ -75,7 +97,7 @@ _COOKIE_HEADER_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _COOKIE_ASSIGNMENT_PATTERN = re.compile(
-    r"\b(cookie|set[_-]?cookie)(\s*=\s*)[^\s,;&]+",
+    r"\b(cookie|set[_-]?cookie)(\s*=\s*)[^\s,;&\"']+",
     re.IGNORECASE,
 )
 _COOKIE_SEGMENT_PATTERN = re.compile(
@@ -83,10 +105,14 @@ _COOKIE_SEGMENT_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _SENSITIVE_ASSIGNMENT_KEY_PATTERN = (
-    r"token|secret|password|credential|credentials|sendkey|x[_-]?api[_-]?key|"
+    r"(?:[a-z0-9]+[_-])*?(?:"
+    r"token|secret|passwd|password|credential|credentials|sendkey|x[_-]?api[_-]?key|"
     r"api[_-]?key|apikey|api[_-]?token|auth[_-]?token|"
     r"access[_-]?token|refresh[_-]?token|session[_-]?token|license[_-]?key|private[_-]?key|"
-    r"secret[_-]?key|webhook[_-]?url|authorization|proxy[_-]?authorization|cookie|set[_-]?cookie"
+    r"secret[_-]?key|webhook[_-]?(?:url|secret)|authorization|"
+    r"proxy[_-]?(?:authorization|url)|cookie|set[_-]?cookie|headers?|"
+    r"prompt|raw[_-]?prompt|raw[_-]?response"
+    r")"
 )
 _QUOTED_SECRET_ASSIGNMENT_PATTERN = re.compile(
     rf"(?P<key_quote>['\"])(?P<key>{_SENSITIVE_ASSIGNMENT_KEY_PATTERN})(?P=key_quote)"
@@ -97,17 +123,29 @@ _QUOTED_SECRET_ASSIGNMENT_PATTERN = re.compile(
 _QUOTED_SECRET_LITERAL_ASSIGNMENT_PATTERN = re.compile(
     rf"(?P<key_quote>['\"])(?P<key>{_SENSITIVE_ASSIGNMENT_KEY_PATTERN})(?P=key_quote)"
     r"(?P<separator>\s*:\s*)"
+    r"(?!\[REDACTED\])"
     r"(?P<value>[^,\}\]\s'\"]+)",
     re.IGNORECASE,
 )
 _SECRET_ASSIGNMENT_PATTERN = re.compile(
-    rf"\b({_SENSITIVE_ASSIGNMENT_KEY_PATTERN})(\s*[=:]\s*)[^\s,;&]+",
+    rf"\b({_SENSITIVE_ASSIGNMENT_KEY_PATTERN})(\s*[=:]\s*)"
+    r"[^\s,;&\"']+",
     re.IGNORECASE,
 )
 _TOKEN_LIKE_PATTERN = re.compile(
-    r"\b(?:sk-[a-z0-9_\-]{16,}|xox[baprs]-[a-z0-9\-]{16,}|gh[pousr]_[a-z0-9_]{20,})\b",
+    r"\b(?:"
+    r"sk-[a-z0-9_\-]{12,}|"
+    r"(?:sk|rk)_(?:live|test)_[a-z0-9]{12,}|"
+    r"xox[baprs]-[a-z0-9\-]{12,}|"
+    r"gh[pousr]_[a-z0-9_]{16,}|"
+    r"github_pat_[a-z0-9_]{16,}|"
+    r"AIza[a-z0-9_\-]{16,}|"
+    r"(?:AKIA|ASIA)[a-z0-9]{16}|"
+    r"SG\.[a-z0-9_\-]{12,}\.[a-z0-9_\-]{12,}"
+    r")\b",
     re.IGNORECASE,
 )
+_OPAQUE_TOKEN_PATTERN = re.compile(r"\b[A-Za-z0-9_-]{32,}\b")
 _SAFE_EXCEPTION_CHAIN_LIMIT = 4
 _SAFE_EXCEPTION_PART_MAX_LENGTH = 240
 _SAFE_EXCEPTION_SUMMARY_MAX_LENGTH = 900
@@ -413,6 +451,62 @@ def _redact_exact_values(text: str, redaction_values: tuple[str, ...]) -> str:
     return redacted
 
 
+def _redact_common_secret_patterns(
+    text: str,
+    *,
+    redact_all_http_urls: bool,
+    redact_opaque_tokens: bool = False,
+    preserve_http_credential_hosts: bool = False,
+) -> str:
+    """Apply the shared secret pattern set to one already-rendered string."""
+
+    sanitized = text
+    if preserve_http_credential_hosts and not redact_all_http_urls:
+        sanitized = _URL_CREDENTIALS_PATTERN.sub(
+            rf"\g<scheme>{_URL_USERINFO_REDACTION}@",
+            sanitized,
+        )
+    if redact_all_http_urls:
+        sanitized = _URL_PATTERN.sub("[REDACTED_URL]", sanitized)
+    else:
+        sanitized = _URL_PATTERN.sub(_redact_sensitive_url_match, sanitized)
+    sanitized = _URL_CREDENTIALS_PATTERN.sub(
+        r"\g<scheme>[REDACTED]@",
+        sanitized,
+    )
+    sanitized = sanitized.replace(
+        f"{_URL_USERINFO_REDACTION}@",
+        "[REDACTED]@",
+    )
+    sanitized = _OPAQUE_AUTHORIZATION_SCHEME_PATTERN.sub(
+        r"\1\2[REDACTED]",
+        sanitized,
+    )
+    sanitized = _AUTHORIZATION_HEADER_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
+    cookie_pattern = (
+        _COOKIE_HEADER_PATTERN
+        if redact_all_http_urls
+        else _COOKIE_SEGMENT_PATTERN
+    )
+    sanitized = cookie_pattern.sub(r"\1\2[REDACTED]", sanitized)
+    sanitized = _COOKIE_ASSIGNMENT_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
+    sanitized = _BEARER_PATTERN.sub(r"\1[REDACTED]", sanitized)
+    sanitized = _QUOTED_SECRET_ASSIGNMENT_PATTERN.sub(
+        r"\g<key_quote>\g<key>\g<key_quote>\g<separator>"
+        r"\g<value_quote>[REDACTED]\g<value_quote>",
+        sanitized,
+    )
+    sanitized = _QUOTED_SECRET_LITERAL_ASSIGNMENT_PATTERN.sub(
+        r"\g<key_quote>\g<key>\g<key_quote>\g<separator>[REDACTED]",
+        sanitized,
+    )
+    sanitized = _SECRET_ASSIGNMENT_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
+    sanitized = _TOKEN_LIKE_PATTERN.sub("[REDACTED]", sanitized)
+    if redact_opaque_tokens:
+        sanitized = _OPAQUE_TOKEN_PATTERN.sub("[REDACTED]", sanitized)
+    return sanitized
+
+
 def sanitize_diagnostic_text(
     text: Any,
     *,
@@ -446,24 +540,10 @@ def sanitize_diagnostic_text(
     sanitized = _safe_structured_string(structured_text).strip()
     if not sanitized:
         return ""
-    sanitized = _redact_exact_values(sanitized, exact_values)
-    sanitized = _URL_PATTERN.sub("[REDACTED_URL]", sanitized)
-    sanitized = _URL_CREDENTIALS_PATTERN.sub(r"\g<scheme>[REDACTED]@", sanitized)
-    sanitized = _AUTHORIZATION_HEADER_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
-    sanitized = _COOKIE_HEADER_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
-    sanitized = _COOKIE_ASSIGNMENT_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
-    sanitized = _BEARER_PATTERN.sub(r"\1[REDACTED]", sanitized)
-    sanitized = _QUOTED_SECRET_ASSIGNMENT_PATTERN.sub(
-        r"\g<key_quote>\g<key>\g<key_quote>\g<separator>"
-        r"\g<value_quote>[REDACTED]\g<value_quote>",
-        sanitized,
+    sanitized = _redact_common_secret_patterns(
+        _redact_exact_values(sanitized, exact_values),
+        redact_all_http_urls=True,
     )
-    sanitized = _QUOTED_SECRET_LITERAL_ASSIGNMENT_PATTERN.sub(
-        r"\g<key_quote>\g<key>\g<key_quote>\g<separator>[REDACTED]",
-        sanitized,
-    )
-    sanitized = _SECRET_ASSIGNMENT_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
-    sanitized = _TOKEN_LIKE_PATTERN.sub("[REDACTED]", sanitized)
     return " ".join(sanitized.split())[:max_length]
 
 
@@ -894,27 +974,198 @@ def redact_sensitive_mapping(obj: Any) -> Any:
     return obj
 
 
+def is_sensitive_key(key: Any) -> bool:
+    """Return whether a mapping key denotes secret-bearing data."""
+
+    return _is_sensitive_mapping_key(key)
+
+
+def redact_sensitive_text(
+    text: Any,
+    *,
+    redaction_values: Optional[Iterable[Any]] = None,
+    redact_opaque_tokens: bool = False,
+    preserve_http_credential_hosts: bool = False,
+) -> str:
+    """Redact secrets while preserving ordinary text and whitespace."""
+
+    exact_values = _normalize_redaction_values(redaction_values)
+    if exact_values is None:
+        return _SAFE_RENDER_FAILURE
+    rendered = _safe_structured_string(text)
+    if rendered == _SAFE_RENDER_FAILURE:
+        return _SAFE_RENDER_FAILURE
+    serialized_redaction = _redact_serialized_json_text(
+        rendered,
+        exact_values=exact_values,
+        redact_opaque_tokens=redact_opaque_tokens,
+        preserve_http_credential_hosts=preserve_http_credential_hosts,
+    )
+    if serialized_redaction is not None:
+        return serialized_redaction
+    return _redact_common_secret_patterns(
+        _redact_exact_values(rendered, exact_values),
+        redact_all_http_urls=False,
+        redact_opaque_tokens=redact_opaque_tokens,
+        preserve_http_credential_hosts=preserve_http_credential_hosts,
+    )
+
+
+def _redact_serialized_json_text(
+    text: str,
+    *,
+    exact_values: _NormalizedRedactionValues,
+    redact_opaque_tokens: bool,
+    preserve_http_credential_hosts: bool,
+) -> Optional[str]:
+    """Use structural redaction for serialized JSON objects and arrays."""
+
+    stripped = text.strip()
+    if not stripped or stripped[0] not in "[{":
+        return None
+    try:
+        parsed = json.loads(text)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+    if not isinstance(parsed, (dict, list)):
+        return None
+    redacted = _redact_sensitive_data_value(
+        parsed,
+        exact_values=exact_values,
+        redact_opaque_tokens=redact_opaque_tokens,
+        preserve_http_credential_hosts=preserve_http_credential_hosts,
+        depth=0,
+        seen=set(),
+    )
+    if redacted == parsed:
+        return None
+    try:
+        return json.dumps(redacted, ensure_ascii=False)
+    except (TypeError, ValueError):
+        return _SAFE_RENDER_FAILURE
+
+
+def redact_sensitive_data(
+    obj: Any,
+    *,
+    redaction_values: Optional[Iterable[Any]] = None,
+    redact_opaque_tokens: bool = False,
+    preserve_http_credential_hosts: bool = False,
+) -> Any:
+    """Recursively redact secret keys and string values at output boundaries."""
+
+    exact_values = _normalize_redaction_values(redaction_values)
+    if exact_values is None:
+        return _SAFE_RENDER_FAILURE
+    return _redact_sensitive_data_value(
+        obj,
+        exact_values=exact_values,
+        redact_opaque_tokens=redact_opaque_tokens,
+        preserve_http_credential_hosts=preserve_http_credential_hosts,
+        depth=0,
+        seen=set(),
+    )
+
+
+def _redact_sensitive_data_value(
+    obj: Any,
+    *,
+    exact_values: _NormalizedRedactionValues,
+    redact_opaque_tokens: bool,
+    preserve_http_credential_hosts: bool,
+    depth: int,
+    seen: set[int],
+) -> Any:
+    if depth > 20:
+        return _REDACTED
+    if obj is None or type(obj) in {bool, int, float}:
+        return obj
+    if type(obj) is str:
+        return redact_sensitive_text(
+            obj,
+            redaction_values=exact_values,
+            redact_opaque_tokens=redact_opaque_tokens,
+            preserve_http_credential_hosts=preserve_http_credential_hosts,
+        )
+    if type(obj) is bytes:
+        return redact_sensitive_text(
+            obj.decode("utf-8", errors="replace"),
+            redaction_values=exact_values,
+            redact_opaque_tokens=redact_opaque_tokens,
+            preserve_http_credential_hosts=preserve_http_credential_hosts,
+        )
+    if isinstance(obj, BaseException):
+        return sanitize_exception_chain(
+            obj,
+            redaction_values=exact_values,
+        )
+
+    if isinstance(obj, (Mapping, list, tuple, set, frozenset)):
+        identity = id(obj)
+        if identity in seen:
+            return _REDACTED
+        seen.add(identity)
+        try:
+            if isinstance(obj, Mapping):
+                redacted: dict[Any, Any] = {}
+                for key, value in obj.items():
+                    safe_key, sensitive_key = _redact_mapping_key(
+                        key,
+                        exact_values=exact_values,
+                        redact_opaque_tokens=redact_opaque_tokens,
+                        preserve_http_credential_hosts=preserve_http_credential_hosts,
+                    )
+                    if safe_key in redacted:
+                        return _SAFE_RENDER_FAILURE
+                    redacted[safe_key] = (
+                        _REDACTED
+                        if sensitive_key
+                        else _redact_sensitive_data_value(
+                            value,
+                            exact_values=exact_values,
+                            redact_opaque_tokens=redact_opaque_tokens,
+                            preserve_http_credential_hosts=preserve_http_credential_hosts,
+                            depth=depth + 1,
+                            seen=seen,
+                        )
+                    )
+                return redacted
+            values = [
+                _redact_sensitive_data_value(
+                    value,
+                    exact_values=exact_values,
+                    redact_opaque_tokens=redact_opaque_tokens,
+                    preserve_http_credential_hosts=preserve_http_credential_hosts,
+                    depth=depth + 1,
+                    seen=seen,
+                )
+                for value in obj
+            ]
+            if isinstance(obj, tuple):
+                return tuple(values)
+            if isinstance(obj, frozenset):
+                return frozenset(values)
+            if isinstance(obj, set):
+                return set(values)
+            return values
+        except BaseException:  # broad-exception: optional_metadata - Hostile containers use a fixed marker.
+            return _SAFE_RENDER_FAILURE
+        finally:
+            seen.discard(identity)
+
+    return redact_sensitive_text(
+        obj,
+        redaction_values=exact_values,
+        redact_opaque_tokens=redact_opaque_tokens,
+        preserve_http_credential_hosts=preserve_http_credential_hosts,
+    )
+
+
 def sanitize_sensitive_text(text: Any) -> str:
     """Redact secrets and credential-bearing URLs without changing normal text."""
-    sanitized = str(text or "").strip()
+    sanitized = redact_sensitive_text(text).strip()
     if not sanitized:
         return ""
-    sanitized = _URL_PATTERN.sub(_redact_sensitive_url_match, sanitized)
-    sanitized = _URL_CREDENTIALS_PATTERN.sub(r"\g<scheme>[REDACTED]@", sanitized)
-    sanitized = _AUTHORIZATION_HEADER_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
-    sanitized = _COOKIE_SEGMENT_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
-    sanitized = _BEARER_PATTERN.sub(r"\1[REDACTED]", sanitized)
-    sanitized = _QUOTED_SECRET_ASSIGNMENT_PATTERN.sub(
-        r"\g<key_quote>\g<key>\g<key_quote>\g<separator>"
-        r"\g<value_quote>[REDACTED]\g<value_quote>",
-        sanitized,
-    )
-    sanitized = _QUOTED_SECRET_LITERAL_ASSIGNMENT_PATTERN.sub(
-        r"\g<key_quote>\g<key>\g<key_quote>\g<separator>[REDACTED]",
-        sanitized,
-    )
-    sanitized = _SECRET_ASSIGNMENT_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
-    sanitized = _TOKEN_LIKE_PATTERN.sub("[REDACTED]", sanitized)
     return " ".join(sanitized.split())
 
 
@@ -954,16 +1205,28 @@ def _is_sensitive_url(url: str) -> bool:
         return True
     try:
         parsed = urlsplit(url)
-    except ValueError:
-        return False
-    if parsed.username or parsed.password:
+        username = parsed.username
+        password = parsed.password
+        hostname = parsed.hostname or ""
+        path = unquote(unquote(parsed.path))
+        query = parsed.query
+        fragment = parsed.fragment
+        if (
+            (username or password)
+            and not (
+                username == _URL_USERINFO_REDACTION
+                and password is None
+            )
+        ):
+            return True
+        if _is_webhook_url(hostname, path):
+            return True
+        return (
+            _has_sensitive_url_params(query)
+            or _has_sensitive_url_params(fragment)
+        )
+    except (TypeError, UnicodeError, ValueError):
         return True
-    if _is_webhook_url(parsed.hostname or "", parsed.path):
-        return True
-    return (
-        _has_sensitive_url_params(parsed.query)
-        or _has_sensitive_url_params(parsed.fragment)
-    )
 
 
 def _is_webhook_url(hostname: str, path: str) -> bool:
@@ -994,11 +1257,15 @@ def _has_sensitive_url_params(params_text: str) -> bool:
     if not params_text:
         return False
     try:
-        params = parse_qsl(params_text, keep_blank_values=True)
-    except ValueError:
-        return False
+        params = parse_qsl(
+            params_text,
+            keep_blank_values=True,
+            max_num_fields=100,
+        )
+    except (TypeError, UnicodeError, ValueError):
+        return True
     for key, value in params:
-        key_text = str(key or "").strip().lower()
+        key_text = unquote(unquote(str(key or ""))).strip().lower()
         if _is_sensitive_mapping_key(key_text):
             return True
         if _TOKEN_LIKE_PATTERN.search(str(value or "")):
@@ -1020,9 +1287,51 @@ def _is_sensitive_mapping_key_text(key_text: str) -> bool:
     if not key_text:
         return False
     parts = _mapping_key_parts(key_text)
+    if parts and parts[-1] == "proxy":
+        return True
+    if {"header", "headers"} & set(parts):
+        if parts[-1] in {"count", "length", "size"}:
+            return False
+        return True
+    for index, part in enumerate(parts):
+        if part != "prompt":
+            continue
+        if index + 1 < len(parts) and parts[index + 1] == "tokens":
+            continue
+        return True
     if _has_sensitive_phrase("_".join(parts)):
         return True
     return bool(set(parts) & _SENSITIVE_KEY_PARTS)
+
+
+def _redact_mapping_key(
+    key: Any,
+    *,
+    exact_values: _NormalizedRedactionValues,
+    redact_opaque_tokens: bool,
+    preserve_http_credential_hosts: bool,
+) -> tuple[Any, bool]:
+    """Return a JSON-safe key and classify it from the same bounded render."""
+
+    if key is None or type(key) in {bool, int, float}:
+        return key, False
+    if type(key) is bytes:
+        key_text = key.decode("utf-8", errors="replace")
+    elif type(key) is str:
+        key_text = key
+    else:
+        key_text = _safe_string(key)
+    if key_text == _SAFE_RENDER_FAILURE:
+        return _SAFE_RENDER_FAILURE, True
+    return (
+        redact_sensitive_text(
+            key_text,
+            redaction_values=exact_values,
+            redact_opaque_tokens=redact_opaque_tokens,
+            preserve_http_credential_hosts=preserve_http_credential_hosts,
+        ),
+        _is_sensitive_mapping_key_text(key_text),
+    )
 
 
 def _has_sensitive_phrase(normalized_key: str) -> bool:

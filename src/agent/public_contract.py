@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Mapping
 
-from src.utils.sanitize import sanitize_diagnostic_text
+from src.utils.sanitize import redact_sensitive_data, sanitize_diagnostic_text
 
 
 AGENT_CHAT_FAILED = "agent_chat_failed"
@@ -68,8 +68,9 @@ def agent_history_public_fields(role: str, content: Any) -> Dict[str, Any]:
 
 def sanitize_stream_event(event: Mapping[str, Any], *, trace_id: str) -> Dict[str, Any]:
     """Replace callback error events with the stable public SSE envelope."""
-    if event.get("type") != "error":
-        return dict(event)
+    redacted = redact_sensitive_data(event)
+    if isinstance(redacted, dict) and redacted.get("type") != "error":
+        return redacted
     return {
         "type": "error",
         "error": AGENT_STREAM_FAILED,
