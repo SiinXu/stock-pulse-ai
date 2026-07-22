@@ -156,6 +156,16 @@ class ApplicationServices:
 
         return self._plugin_shutdown_results
 
+    @property
+    def is_closed(self) -> bool:
+        """Return whether this one-shot root has entered terminal shutdown.
+
+        The flag is monotonic and intentionally lock-free so callback-owned
+        workers can reject a closing root without waiting on its lifecycle lock.
+        """
+
+        return self._plugins_closed
+
     def start_plugins(self) -> tuple["PluginOperationResult", ...]:
         """Compose and load plugins once after this root becomes discoverable."""
 
@@ -212,6 +222,23 @@ _services_transition_pending: list[Optional[ApplicationServices]] = []
 _services_shutdown = False
 
 
+def _take_latest_installable_pending_services() -> tuple[
+    bool,
+    Optional[ApplicationServices],
+]:
+    """Consume the latest pending target that has not already been closed.
+
+    The caller must hold ``_services_lock``.
+    """
+
+    while _services_transition_pending:
+        candidate = _services_transition_pending.pop()
+        if candidate is None or not candidate.is_closed:
+            _services_transition_pending.clear()
+            return True, candidate
+    return False, None
+
+
 def get_application_services() -> ApplicationServices:
     """Return the installed composition root, creating a default one lazily."""
     while True:
@@ -228,7 +255,7 @@ def get_application_services() -> ApplicationServices:
                 if _services_shutdown:
                     raise RuntimeError("Application services are shutting down")
                 services = _services
-            if services is None:
+            if services is None or services.is_closed:
                 services = ApplicationServices()
             set_application_services(services)
             with _services_lock:
@@ -249,16 +276,20 @@ def set_application_services(services: Optional[ApplicationServices]) -> None:
         if _services_shutdown and services is not None:
             raise RuntimeError("Application services are shutting down")
         if _services_transition_active:
-            _services_transition_pending[:] = [services]
+            _services_transition_pending.append(services)
             return
+        if services is not None and services.is_closed:
+            raise RuntimeError("Cannot install closed application services")
 
     with _services_transition_lock:
         with _services_lock:
             if _services_shutdown and services is not None:
                 raise RuntimeError("Application services are shutting down")
             if _services_transition_active:
-                _services_transition_pending[:] = [services]
+                _services_transition_pending.append(services)
                 return
+            if services is not None and services.is_closed:
+                raise RuntimeError("Cannot install closed application services")
             _services_transition_active = True
             _services_transition_pending.clear()
 
@@ -272,20 +303,26 @@ def set_application_services(services: Optional[ApplicationServices]) -> None:
                     previous.close()
 
                 with _services_lock:
-                    if _services_transition_pending:
-                        target = _services_transition_pending[-1]
-                        _services_transition_pending.clear()
+                    has_pending, pending_target = (
+                        _take_latest_installable_pending_services()
+                    )
+                    if has_pending:
+                        target = pending_target
                     _services = target
 
                 if target is not None:
                     target.start_plugins()
 
                 with _services_lock:
-                    if not _services_transition_pending:
+                    has_pending, pending_target = (
+                        _take_latest_installable_pending_services()
+                    )
+                    if not has_pending:
+                        if target is not None and target.is_closed:
+                            _services = None
                         _services_transition_active = False
                         return
-                    target = _services_transition_pending[-1]
-                    _services_transition_pending.clear()
+                    target = pending_target
         finally:
             with _services_lock:
                 _services_transition_active = False

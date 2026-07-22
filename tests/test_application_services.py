@@ -689,3 +689,119 @@ def test_terminal_atexit_shutdown_blocks_late_root_recreation():
     assert result.returncode == 0, result.stderr
     assert "LATE_ROOT_BLOCKED" in result.stdout
     assert "LATE_ROOT_RECREATED" not in result.stdout
+
+
+def test_unload_request_cannot_republish_the_closing_root():
+    events: list[str] = []
+    old_root_holder: list[ApplicationServices] = []
+
+    class _RetainingUnloadPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("old-unload-begin")
+            set_application_services(old_root_holder[0])
+            events.append("old-unload-end")
+
+    old_root = ApplicationServices(
+        builtin_plugins=(_RetainingUnloadPlugin("test.old", events),),
+        plugins_dir="",
+    )
+    new_root = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.new", events),),
+        plugins_dir="",
+    )
+    old_root_holder.append(old_root)
+
+    set_application_services(old_root)
+    set_application_services(new_root)
+
+    assert old_root.is_closed is True
+    assert get_application_services() is new_root
+    assert events == [
+        "load:test.old",
+        "old-unload-begin",
+        "old-unload-end",
+        "load:test.new",
+    ]
+
+
+def test_latest_installable_unload_request_wins_after_closing_root_request():
+    events: list[str] = []
+    roots: dict[str, ApplicationServices] = {}
+
+    class _MultipleRequestUnloadPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("old-unload-begin")
+            set_application_services(roots["final"])
+            set_application_services(roots["old"])
+            events.append("old-unload-end")
+
+    roots["old"] = ApplicationServices(
+        builtin_plugins=(_MultipleRequestUnloadPlugin("test.old", events),),
+        plugins_dir="",
+    )
+    superseded = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.superseded", events),),
+        plugins_dir="",
+    )
+    roots["final"] = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.final", events),),
+        plugins_dir="",
+    )
+
+    set_application_services(roots["old"])
+    set_application_services(superseded)
+
+    assert get_application_services() is roots["final"]
+    assert superseded.plugin_manager.plugin_ids() == ()
+    assert events == [
+        "load:test.old",
+        "old-unload-begin",
+        "old-unload-end",
+        "load:test.final",
+    ]
+
+
+def test_closed_root_cannot_be_installed_again():
+    services = ApplicationServices(plugins_dir="")
+    set_application_services(services)
+    reset_application_services()
+
+    assert services.is_closed is True
+    with pytest.raises(RuntimeError, match="Cannot install closed"):
+        set_application_services(services)
+
+
+def test_get_replaces_a_directly_closed_installed_root():
+    services = ApplicationServices(plugins_dir="")
+    set_application_services(services)
+    services.close()
+
+    replacement = get_application_services()
+
+    assert services.is_closed is True
+    assert replacement is not services
+    assert replacement.is_closed is False
+
+
+def test_root_closed_during_plugin_start_is_not_left_installed():
+    events: list[str] = []
+    root_holder: list[ApplicationServices] = []
+
+    class _ClosingLoadPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("load-begin")
+            root_holder[0].close()
+            events.append("load-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(_ClosingLoadPlugin("test.closing", events),),
+        plugins_dir="",
+    )
+    root_holder.append(services)
+
+    set_application_services(services)
+    replacement = get_application_services()
+
+    assert services.is_closed is True
+    assert replacement is not services
+    assert events == ["load-begin", "load-end", "unload:test.closing"]
