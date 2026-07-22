@@ -1,0 +1,1 @@
+"""Application entrypoint coordination modules."""

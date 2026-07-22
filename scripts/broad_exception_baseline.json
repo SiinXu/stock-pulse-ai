@@ -314,8 +314,6 @@
     {"path":"main.py","scope":"<module>._refresh_stock_index_cache_for_analysis","caught":["Exception"],"digest":"58b07d176d5ff08337d5ead28a074d07020532aaeeee14f7fd85e9d2f1489945"},
     {"path":"main.py","scope":"<module>._save_reused_market_review_report","caught":["Exception"],"digest":"459b5267bb9d1ca6ea385d67bbf3136709f72c2ad6d266272cb88fc1b8397e51"},
     {"path":"main.py","scope":"<module>.main","caught":["Exception"],"digest":"174b2acc52ac7aa75e1b73aa9af5c8cf2e762270ee72bcb0a71726546d997041"},
-    {"path":"main.py","scope":"<module>.main","caught":["Exception"],"digest":"88ff87222a10a08ea469fdd5676122b018cac0467ef30bb5510297067dda63a1"},
-    {"path":"main.py","scope":"<module>.main","caught":["Exception"],"digest":"8fdc80df52562aba2702b813f98efcd534e7e1d21be7794a08268f1a228a9b13"},
     {"path":"main.py","scope":"<module>.main","caught":["Exception"],"digest":"bd7815cffe9136f308bca160e3c7a7da25b3bff24eaa0688078b7c8e7a4a8ff0"},
     {"path":"main.py","scope":"<module>.main","caught":["Exception"],"digest":"d6b6991ef3388249c4b2ff30cc1d56384f3308b0bd9677e9c7e2e1a9b1009836"},
     {"path":"main.py","scope":"<module>.run_full_analysis","caught":["Exception"],"digest":"6c965572e571401c0f8279b7351f735c6c0f7016ff84ea148d613ae60eac40e3"},
