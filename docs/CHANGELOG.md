@@ -285,8 +285,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Split scheduling and service startup coordination into a focused application runtime module while preserving the legacy main entrypoint and startup behavior.
 
 - [Added] Added tab-scoped Web session continuity for stock context, active Run Flow, route filters, consumed Chat report context, Chat/Research/Screening workflows, source-report handoff, bare-route reload restoration, context-aware navigation, legacy local-storage migration, and redirect-free logout cleanup.
-- [Added] Added stable Data Provider plugin contracts and priority-aware dynamic registration while preserving existing routing, fallback, health, cache, and diagnostics policies.
 - [Changed] Extracted the storage ORM schema into a focused private module while preserving the `src.storage` model, metadata, reload, and migration contracts.
+- [Added] Added stable Data Provider plugin contracts and priority-aware dynamic registration while preserving existing routing, fallback, health, cache, and diagnostics policies.
 
 ## [3.26.3] - 2026-07-15
 
