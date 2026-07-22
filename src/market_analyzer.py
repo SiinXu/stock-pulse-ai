@@ -1608,7 +1608,8 @@ Concept lagging: {bottom_concepts_text if bottom_concepts_text else "N/A"}
                 )
             if self.profile.has_sector_rankings:
                 data_limit_lines.append(
-                    "- Sector analysis is session-only; sector index levels, historical series, and sector fund flow are unavailable."
+                    "- Sector analysis is session-only; namespace-aware sector index codes/levels, "
+                    "collision-free canonical IDs, ETF mappings, historical series, and sector fund flow are unavailable."
                 )
             else:
                 data_limit_lines.append("- Sector/theme ranking data is not available for this market.")
@@ -1635,7 +1636,8 @@ Concept lagging: {bottom_concepts_text if bottom_concepts_text else "N/A"}
                 data_limit_lines.append("- 该市场暂无涨跌家数、涨跌停、成交额汇总、参与度或资金流信号。")
             if self.profile.has_sector_rankings:
                 data_limit_lines.append(
-                    "- 板块分析仅使用当日排行；板块指数点位、历史序列和板块资金流暂不可用。"
+                    "- 板块分析仅使用当日排行；板块指数命名空间/代码/点位、无冲突规范 ID、"
+                    "ETF 映射、历史序列和板块资金流暂不可用。"
                 )
             else:
                 data_limit_lines.append("- 该市场暂无行业板块/概念题材涨跌榜。")

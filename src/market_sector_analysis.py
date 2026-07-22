@@ -86,8 +86,11 @@ def build_sector_analysis_payload(
         )
 
     missing_fields = [
+        "index_namespace",
+        "canonical_index_id",
         "index_code",
         "index_level",
+        "etf_mapping",
         "historical_series",
         "capital_flow",
     ]
@@ -119,6 +122,9 @@ def build_sector_analysis_payload(
             "missing_fields": missing_fields,
             "limitations": [
                 "single_session_rankings_only",
+                "no_namespace_aware_index_resolution",
+                "no_canonical_index_id",
+                "no_etf_mapping",
                 "no_historical_trend",
                 "no_sector_capital_flow",
             ],
@@ -205,9 +211,10 @@ def render_sector_analysis_markdown(
             [
                 "",
                 (
-                    "- **Data limits**: sector index codes/levels, historical "
-                    "series, and sector capital flow are unavailable from the "
-                    "current public provider contract."
+                    "- **Data limits**: namespace-aware sector index codes/levels, "
+                    "collision-free canonical IDs, ETF mappings, historical series, "
+                    "and sector capital flow are unavailable from the current public "
+                    "provider contract."
                 ),
             ]
         )
@@ -216,8 +223,9 @@ def render_sector_analysis_markdown(
             [
                 "",
                 (
-                    "- **数据限制**：当前公共 provider 合同不提供板块指数代码/"
-                    "点位、历史序列和板块资金流，不据此推断。"
+                    "- **数据限制**：当前公共 provider 合同不提供板块指数命名空间/"
+                    "代码/点位、无冲突规范 ID、ETF 映射、历史序列和板块资金流，"
+                    "不据此推断。"
                 ),
             ]
         )
@@ -277,12 +285,14 @@ def render_sector_analysis_prompt_context(
 
     lines.append(
         (
-            "- Data boundary: session rankings only; sector index levels, "
-            "historical series, and sector fund flow are unavailable."
+            "- Data boundary: session rankings only; namespace-aware sector index "
+            "codes/levels, collision-free canonical IDs, ETF mappings, historical "
+            "series, and sector fund flow are unavailable."
         )
         if use_english
         else (
-            "- 数据边界：仅有当日排行；板块指数点位、历史序列和板块资金流不可用。"
+            "- 数据边界：仅有当日排行；板块指数命名空间/代码/点位、无冲突规范 ID、"
+            "ETF 映射、历史序列和板块资金流不可用。"
         )
     )
     return "\n".join(lines)

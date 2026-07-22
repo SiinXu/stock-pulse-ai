@@ -77,6 +77,23 @@ def test_sector_analysis_derives_session_relative_strength_and_risk() -> None:
         "status": "not_available",
         "reason": "provider_contract_unavailable",
     }
+    assert analysis["data_quality"]["missing_fields"] == [
+        "index_namespace",
+        "canonical_index_id",
+        "index_code",
+        "index_level",
+        "etf_mapping",
+        "historical_series",
+        "capital_flow",
+    ]
+    assert analysis["data_quality"]["limitations"] == [
+        "single_session_rankings_only",
+        "no_namespace_aware_index_resolution",
+        "no_canonical_index_id",
+        "no_etf_mapping",
+        "no_historical_trend",
+        "no_sector_capital_flow",
+    ]
     assert overview == original
 
 
@@ -138,8 +155,9 @@ def test_chinese_sector_report_renders_analysis_and_truthful_data_limits() -> No
     assert "#### 板块指数分析" in block
     assert "**比较基准**：主要指数平均 +0.60%（2 个指数）" in block
     assert "| 行业 领涨 #1 | Semiconductors | +2.60% / 强势上行 | +2.00% / 跑赢 | 低 |" in block
-    assert "板块指数代码/点位、历史序列和板块资金流" in block
+    assert "板块指数命名空间/代码/点位、无冲突规范 ID、ETF 映射" in block
     assert "板块分析仅使用当日排行" in prompt
+    assert "命名空间/代码/点位、无冲突规范 ID、ETF 映射" in prompt
     assert "确定性板块分析输入" in prompt
     assert "#### 板块指数分析" not in prompt
 
@@ -154,4 +172,5 @@ def test_english_template_report_includes_sector_analysis_once() -> None:
     assert report.count("#### Sector Index Analysis") == 1
     assert "**Benchmark**: major-index average +0.60% (2 indices)" in report
     assert "| Industry Leader #1 | Semiconductors | +2.60% / Strong up | +2.00% / Outperforming | Low |" in report
-    assert "historical series, and sector capital flow are unavailable" in report
+    assert "collision-free canonical IDs, ETF mappings, historical series" in report
+    assert "sector capital flow are unavailable" in report
