@@ -247,6 +247,7 @@ jobs:
       
       # Check out the pull request code separately for diff analysis.
       - name: 📥 Checkout Pull Request Code
+        id: pull-request-analysis-inputs
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -254,10 +255,12 @@ jobs:
           path: pr-code
       
       - name: 🔄 Fetch Base Branch
+        id: fetch-analysis-base
         working-directory: pr-code
         run: git fetch origin ${{ github.base_ref || 'main' }}:refs/remotes/origin/${{ github.base_ref || 'main' }}
       
       - name: 🐍 Set Up Python
+        id: setup-review-python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.11'
@@ -284,14 +287,26 @@ jobs:
           CI_SYNTAX_OK: ${{ needs.auto-check.outputs.syntax_ok || '' }}
           CI_HAS_PY_CHANGES: ${{ needs.auto-check.outputs.has_py_changes || 'false' }}
           CI_AUTO_CHECK_RESULT: ${{ needs.auto-check.result || '' }}
-        run: python ../main-scripts/.github/scripts/ai_review.py
+        run: |
+          set -euo pipefail
+          trusted_output="${RUNNER_TEMP}/ai_review_result.txt"
+          rm -rf -- "${trusted_output}" ai_review_result.txt
+          python ../main-scripts/.github/scripts/ai_review.py
+          if [[ -e ai_review_result.txt || -L ai_review_result.txt ]]; then
+            if [[ ! -f ai_review_result.txt || -L ai_review_result.txt ]]; then
+              echo "AI review output must be a regular file"
+              exit 1
+            fi
+            mv -- ai_review_result.txt "${trusted_output}"
+          fi
       
       - name: 📤 Upload Review Result
+        id: upload-ai-review-result
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: always()
         with:
           name: ai-review-result
-          path: pr-code/ai_review_result.txt
+          path: ${{ runner.temp }}/ai_review_result.txt
           if-no-files-found: ignore
 
   # ==================== Automatic pull request labels ====================

@@ -305,6 +305,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Prevented stale Desktop backend process events from marking a replacement generation unavailable during rapid macOS close and reactivate fallback.
 - [Fixed] Aligned runtime, Web, CLI, and review-tool dependency-install guidance with the constrained bootstrap and removed the temporary #400 tracked-text exceptions.
 - [Chore] Converged analysis context pack prompt and overview modules into `src/analysis_context_pack/` with strict legacy facades and compatibility guards.
+- [Chore] Made PR review execution, runner-owned review artifacts, and install-guidance parsing fail closed against injected steps, decoy options, compact requirements, folded YAML, continuation, and comment bypasses.
 
 ## [3.26.3] - 2026-07-15
 
