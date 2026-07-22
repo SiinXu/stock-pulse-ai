@@ -573,6 +573,10 @@
     min-height: 2.75rem;
   }
 
+  .control-hit-target {
+    position: relative;
+  }
+
   .control-hit-target::after {
     content: '';
     position: absolute;
