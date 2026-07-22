@@ -1,5 +1,6 @@
 """Compatibility binding helpers for legacy Agent module facades."""
 
+import inspect
 from types import FunctionType
 from typing import Any, Dict, Optional, Tuple, Type
 
@@ -10,6 +11,7 @@ def clone_facade_function(
     *,
     module_name: str,
     qualname: str,
+    evaluate_annotations: bool = False,
 ) -> FunctionType:
     """Clone a moved function so global lookups retain facade semantics."""
 
@@ -23,7 +25,15 @@ def clone_facade_function(
         argdefs=function.__defaults__,
         closure=function.__closure__,
     )
-    cloned.__annotations__ = dict(function.__annotations__)
+    annotations = function.__annotations__
+    if evaluate_annotations:
+        annotations = inspect.get_annotations(
+            function,
+            globals=global_namespace,
+            locals=global_namespace,
+            eval_str=True,
+        )
+    cloned.__annotations__ = dict(annotations)
     cloned.__dict__.update(function.__dict__)
     cloned.__doc__ = function.__doc__
     cloned.__kwdefaults__ = (
@@ -52,6 +62,7 @@ def _clone_facade_descriptor(
     *,
     module_name: str,
     owner_qualname: str,
+    evaluate_annotations: bool,
 ) -> Any:
     """Clone a method descriptor with the legacy facade as its globals."""
 
@@ -63,6 +74,7 @@ def _clone_facade_descriptor(
             global_namespace,
             module_name=module_name,
             qualname=f"{owner_qualname}.{function.__name__}",
+            evaluate_annotations=evaluate_annotations,
         )
 
     if isinstance(descriptor, staticmethod):
@@ -83,6 +95,8 @@ def bind_facade_methods(
     target_class: Type[Any],
     source_container: Type[Any],
     global_namespace: Dict[str, Any],
+    *,
+    evaluate_annotations: bool = False,
 ) -> Tuple[str, ...]:
     """Bind source descriptors onto a legacy class without changing its API."""
 
@@ -99,6 +113,7 @@ def bind_facade_methods(
                 global_namespace,
                 module_name=module_name,
                 owner_qualname=target_class.__qualname__,
+                evaluate_annotations=evaluate_annotations,
             )
         setattr(target_class, name, rebound_descriptors[descriptor_id])
         bound_names.append(name)
