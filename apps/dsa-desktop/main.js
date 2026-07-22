@@ -1825,35 +1825,51 @@ function startBackend({ port, envFile, dbPath, logDir, host = null }) {
   }
 
   if (backendProcess) {
+    const launchedProcess = backendProcess;
     let firstStdoutLogged = false;
     let firstStderrLogged = false;
     const stdoutDecoder = new TextDecoder('utf-8', { fatal: false });
     const stderrDecoder = new TextDecoder('utf-8', { fatal: false });
 
-    backendProcess.once('spawn', () => {
-      logLine(`[backend] spawned pid=${backendProcess.pid} in ${Date.now() - launchStartedAt}ms`);
+    launchedProcess.once('spawn', () => {
+      if (backendProcess !== launchedProcess) {
+        return;
+      }
+      logLine(`[backend] spawned pid=${launchedProcess.pid} in ${Date.now() - launchStartedAt}ms`);
     });
-    backendProcess.on('error', (error) => {
+    launchedProcess.on('error', (error) => {
+      if (backendProcess !== launchedProcess) {
+        return;
+      }
       backendStartError = error;
       desktopWebReady = false;
       logLine(`[backend] failed to start: ${error.message}`);
       notifyDesktopAssistantState();
     });
-    backendProcess.stdout.on('data', (data) => {
+    launchedProcess.stdout.on('data', (data) => {
+      if (backendProcess !== launchedProcess) {
+        return;
+      }
       if (!firstStdoutLogged) {
         firstStdoutLogged = true;
         logLine(`[backend] first stdout after ${Date.now() - launchStartedAt}ms`);
       }
       logLine(`[backend] ${decodeBackendOutput(data, stdoutDecoder)}`);
     });
-    backendProcess.stderr.on('data', (data) => {
+    launchedProcess.stderr.on('data', (data) => {
+      if (backendProcess !== launchedProcess) {
+        return;
+      }
       if (!firstStderrLogged) {
         firstStderrLogged = true;
         logLine(`[backend] first stderr after ${Date.now() - launchStartedAt}ms`);
       }
       logLine(`[backend] ${decodeBackendOutput(data, stderrDecoder)}`);
     });
-    backendProcess.on('exit', (code, signal) => {
+    launchedProcess.on('exit', (code, signal) => {
+      if (backendProcess !== launchedProcess) {
+        return;
+      }
       desktopWebReady = false;
       if (!desktopIsQuitting && !backendStartError) {
         backendStartError = new Error('Backend process exited');

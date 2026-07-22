@@ -1387,6 +1387,55 @@ test('startBackend passes WEBUI_HOST from env file to backend args and env', (t)
   );
 });
 
+test('startBackend ignores lifecycle events from a replaced process generation', async (t) => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-desktop-backend-generation-'));
+  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+  const backendProcesses = Array.from({ length: 2 }, (_value, index) => {
+    const processRef = new EventEmitter();
+    processRef.pid = 4100 + index;
+    processRef.exitCode = null;
+    processRef.signalCode = null;
+    processRef.killed = false;
+    processRef.stdout = new EventEmitter();
+    processRef.stderr = new EventEmitter();
+    processRef.kill = () => {
+      processRef.killed = true;
+      return true;
+    };
+    return processRef;
+  });
+  let spawnIndex = 0;
+  const mainModule = loadMainModule(t, {
+    platform: 'darwin',
+    childProcess: {
+      spawn: () => backendProcesses[spawnIndex++],
+    },
+  });
+  t.after(() => mainModule.__setBackendProcessForTest(null));
+  const launchOptions = {
+    port: 8123,
+    envFile: path.join(tmpDir, '.env'),
+    dbPath: path.join(tmpDir, 'stock_analysis.db'),
+    logDir: path.join(tmpDir, 'logs'),
+  };
+
+  mainModule.startBackend(launchOptions);
+  const stoppedOldGeneration = mainModule.stopBackend();
+  mainModule.startBackend({ ...launchOptions, port: 8124 });
+  mainModule.__setDesktopAssistantStateForTest({ webReady: true });
+
+  backendProcesses[0].emit('error', new Error('stale backend failed'));
+  assert.equal(mainModule.buildDesktopAssistantState().serviceStatus, 'ready');
+  backendProcesses[0].exitCode = 0;
+  backendProcesses[0].emit('exit', 0, null);
+  await stoppedOldGeneration;
+  assert.equal(mainModule.buildDesktopAssistantState().serviceStatus, 'ready');
+  assert.equal(mainModule.__getBackendProcessForTest(), backendProcesses[1]);
+
+  backendProcesses[1].emit('error', new Error('current backend failed'));
+  assert.equal(mainModule.buildDesktopAssistantState().serviceStatus, 'unavailable');
+});
+
 test('extendMacDesktopBackendPath preserves existing order and avoids duplicates', (t) => {
   const mainModule = loadMainModule(t, { platform: 'darwin' });
 

@@ -8,7 +8,9 @@ in minimal CI environments without network calls.
 Run (repo root):
 
 - With pytest: ``python3 -m pytest tests/test_tushare_fetcher_get_stock_list.py``
-  (install once: ``pip install -r requirements-dev.txt`` or ``pip install pytest``)
+  (install once with ``python -m pip install --upgrade --constraint constraints.txt pip``,
+  ``python -m pip install --build-constraint build-constraints.txt -r .github/requirements-ci.txt``,
+  then ``python -m pip check``)
 - Without pytest: ``python3 tests/test_tushare_fetcher_get_stock_list.py``
 """
 

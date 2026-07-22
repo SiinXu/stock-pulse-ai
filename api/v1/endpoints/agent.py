@@ -34,6 +34,7 @@ from src.agent.runtime import (
 )
 from src.config import get_config
 from src.services.agent_model_service import list_agent_model_deployments
+from src.utils.sanitize import redact_sensitive_text
 
 # Tool name -> Chinese display name mapping
 TOOL_DISPLAY_NAMES: Dict[str, str] = {
@@ -462,6 +463,7 @@ async def agent_chat_stream(request: ChatRequest):
         raise api_error(400, "agent_disabled", "Agent mode is not enabled")
 
     session_id = request.session_id or str(uuid.uuid4())
+    public_session_id = redact_sensitive_text(session_id)
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue = asyncio.Queue()
 
@@ -496,7 +498,7 @@ async def agent_chat_stream(request: ChatRequest):
         if runtime_event is None:
             return
         public_event = sanitize_stream_event(
-            to_public_sse_event(runtime_event), trace_id=session_id
+            to_public_sse_event(runtime_event), trace_id=public_session_id
         )
         asyncio.run_coroutine_threadsafe(queue.put(public_event), loop)
 
@@ -515,7 +517,7 @@ async def agent_chat_stream(request: ChatRequest):
             if not result.success and not getattr(result, "cancelled", False):
                 logger.error(
                     "Agent stream chat failed: session_id=%s diagnostic=%s",
-                    session_id,
+                    public_session_id,
                     sanitize_agent_diagnostic(result.error),
                 )
             asyncio.run_coroutine_threadsafe(
@@ -527,17 +529,17 @@ async def agent_chat_stream(request: ChatRequest):
                     "message": None if result.success else AGENT_CHAT_FAILURE_MESSAGE,
                     "params": {},
                     "details": None,
-                    "trace_id": session_id,
+                    "trace_id": public_session_id,
                     "total_steps": result.total_steps,
-                    "session_id": session_id,
+                    "session_id": public_session_id,
                 }),
                 loop,
             )
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Stream failures emit a stable terminal event and sanitized log.
             lifecycle.fail(sanitize_agent_diagnostic(exc))
             logger.error(
                 "Agent stream error: session_id=%s exception_type=%s diagnostic=%s",
-                session_id,
+                public_session_id,
                 type(exc).__name__,
                 sanitize_agent_diagnostic(exc),
             )
@@ -548,7 +550,7 @@ async def agent_chat_stream(request: ChatRequest):
                     "message": AGENT_STREAM_FAILURE_MESSAGE,
                     "params": {},
                     "details": None,
-                    "trace_id": session_id,
+                    "trace_id": public_session_id,
                 }),
                 loop,
             )
@@ -567,7 +569,7 @@ async def agent_chat_stream(request: ChatRequest):
                         "message": AGENT_STREAM_TIMEOUT_MESSAGE,
                         "params": {"timeout_seconds": 300},
                         "details": None,
-                        "trace_id": session_id,
+                        "trace_id": public_session_id,
                     }, ensure_ascii=False) + "\n\n"
                     break
                 yield "data: " + json.dumps(event, ensure_ascii=False) + "\n\n"
@@ -585,12 +587,15 @@ async def agent_chat_stream(request: ChatRequest):
                 pass
             except asyncio.TimeoutError:
                 # Cleanup taking longer than 5s is treated as an expected timeout; no warning.
-                logger.debug("agent executor cleanup timed out after 5s for session %s", session_id)
-            except Exception as exc:
+                logger.debug(
+                    "agent executor cleanup timed out after 5s for session %s",
+                    public_session_id,
+                )
+            except Exception as exc:  # broad-exception: cleanup - Executor cleanup failures are sanitized after stream termination.
                 logger.warning(
                     "agent executor cleanup error (ignored): session_id=%s "
                     "exception_type=%s diagnostic=%s",
-                    session_id,
+                    public_session_id,
                     type(exc).__name__,
                     sanitize_agent_diagnostic(exc),
                 )

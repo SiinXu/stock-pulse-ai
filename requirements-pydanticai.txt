@@ -4,7 +4,9 @@
 # has zero dependency on this file (see docs/architecture/ADR-001-agent-runtime.md).
 # Install only to exercise the test/evidence PydanticAI POC path:
 #
-#   pip install -r requirements-pydanticai.txt
+#   python -m pip install --upgrade --constraint constraints.txt pip
+#   python -m pip install --build-constraint build-constraints.txt -r requirements-pydanticai.txt
+#   python -m pip check
 #
 # This file is the complete version-locked dependency closure for the slim POC
 # on the supported Python 3.11 CI matrix. Update the set atomically and validate

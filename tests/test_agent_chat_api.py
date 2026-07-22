@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Agent chat history API regressions."""
 
+import json
 import logging
 from pathlib import Path
 from types import SimpleNamespace
@@ -28,6 +29,7 @@ SENSITIVE_PROVIDER_ERROR = (
     "x-api-key: super-secret credential=super-secret at "
     "https://private.example/v1/chat?token=super-secret"
 )
+SENSITIVE_STREAM_SESSION_ID = "api_key=sk-sec2-stream-session-1234567890"
 
 
 def _build_all_unavailable_comparison_result() -> OrchestratorResult:
@@ -353,6 +355,47 @@ def test_agent_chat_stream_forwards_stock_context_to_executor(tmp_path: Path) ->
     assert kwargs["context"]["stock_name"] == "匿名标的"
 
 
+def test_agent_chat_stream_redacts_terminal_identifiers_but_not_chat_content(
+    tmp_path: Path,
+) -> None:
+    product_content = "The model discussed sk-product-content-1234567890."
+    executor = MagicMock()
+    executor.chat.return_value = SimpleNamespace(
+        success=True,
+        content=product_content,
+        error=None,
+        total_steps=1,
+    )
+    config = SimpleNamespace(is_agent_available=lambda: True)
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+                client = TestClient(create_app(static_dir=tmp_path / "static"))
+                response = client.post(
+                    "/api/v1/agent/chat/stream",
+                    json={
+                        "message": "terminal identifier redaction",
+                        "session_id": SENSITIVE_STREAM_SESSION_ID,
+                    },
+                )
+
+    events = [
+        json.loads(line.removeprefix("data: "))
+        for line in response.text.splitlines()
+        if line.startswith("data: ")
+    ]
+    terminal = events[-1]
+
+    assert response.status_code == 200
+    assert terminal["type"] == "done"
+    assert terminal["content"] == product_content
+    assert SENSITIVE_STREAM_SESSION_ID not in response.text
+    assert terminal["trace_id"] == "api_key=[REDACTED]"
+    assert terminal["session_id"] == "api_key=[REDACTED]"
+    assert executor.chat.call_args.kwargs["session_id"] == SENSITIVE_STREAM_SESSION_ID
+
+
 def test_agent_chat_stream_failure_does_not_expose_executor_details(tmp_path: Path, caplog) -> None:
     executor = MagicMock()
     executor.chat.return_value = SimpleNamespace(
@@ -450,6 +493,44 @@ def test_agent_chat_stream_callback_error_is_replaced_with_safe_event(tmp_path: 
     assert "private.example" not in response.text
 
 
+def test_agent_chat_stream_callback_error_redacts_secret_shaped_trace_id(
+    tmp_path: Path,
+) -> None:
+    executor = MagicMock()
+
+    def fail_with_callback(**kwargs):
+        kwargs["progress_callback"]({
+            "type": "error",
+            "message": "provider callback failed",
+        })
+        return SimpleNamespace(
+            success=False,
+            content="",
+            error="provider callback failed",
+            total_steps=1,
+        )
+
+    executor.chat.side_effect = fail_with_callback
+    config = SimpleNamespace(is_agent_available=lambda: True)
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+                client = TestClient(create_app(static_dir=tmp_path / "static"))
+                response = client.post(
+                    "/api/v1/agent/chat/stream",
+                    json={
+                        "message": "callback identifier redaction",
+                        "session_id": SENSITIVE_STREAM_SESSION_ID,
+                    },
+                )
+
+    assert response.status_code == 200
+    assert '"type": "error"' in response.text
+    assert SENSITIVE_STREAM_SESSION_ID not in response.text
+    assert '"trace_id": "api_key=[REDACTED]"' in response.text
+
+
 def test_agent_chat_stream_exception_is_redacted_from_event_and_logs(tmp_path: Path, caplog) -> None:
     executor = MagicMock()
     executor.chat.side_effect = RuntimeError(SENSITIVE_PROVIDER_ERROR)
@@ -462,12 +543,17 @@ def test_agent_chat_stream_exception_is_redacted_from_event_and_logs(tmp_path: P
                 client = TestClient(create_app(static_dir=tmp_path / "static"))
                 response = client.post(
                     "/api/v1/agent/chat/stream",
-                    json={"message": "流式异常场景", "session_id": "private-exception"},
+                    json={
+                        "message": "流式异常场景",
+                        "session_id": SENSITIVE_STREAM_SESSION_ID,
+                    },
                 )
 
     assert response.status_code == 200
     assert '"error": "agent_stream_failed"' in response.text
     assert "super-secret" not in response.text
     assert "private.example" not in response.text
+    assert SENSITIVE_STREAM_SESSION_ID not in response.text
     assert "super-secret" not in caplog.text
     assert "private.example" not in caplog.text
+    assert SENSITIVE_STREAM_SESSION_ID not in caplog.text

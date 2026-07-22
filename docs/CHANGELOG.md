@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Tests] Aligned the Usage settings browser contract with the single-page-heading hierarchy.
 - [Changed] Moved Token Usage into Settings > Usage & cost and retained `/usage` as a query- and hash-preserving compatibility redirect.
 - [Fixed] Corrected English developer comments to preserve financial terminology and localized fixture literals without changing runtime behavior.
 - [Chore] Added a dev-only Web API mock switch (`?mock=ready|empty|error|slow` or `VITE_MOCK_API`) with larger deterministic fixtures for UI walkthroughs; gated behind `import.meta.env.DEV` and tree-shaken from production builds.
@@ -301,6 +302,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Converged the five market analysis, context, prompt, and summary modules into `src/market/` with strict legacy facades and compatibility guards.
 - [Added] Wired built-in plugin composition and opt-in trusted external plugin discovery into `ApplicationServices` with isolated startup and reverse-order shutdown.
 - [Changed] Split search provider implementations and shared result contracts into focused private modules while preserving the `src.search_service` facade, fallback, and outbound-policy behavior.
+- [Fixed] Prevented stale Desktop backend process events from marking a replacement generation unavailable during rapid macOS close and reactivate fallback.
+- [Fixed] Aligned runtime, Web, CLI, and review-tool dependency-install guidance with the constrained bootstrap and removed the temporary #400 tracked-text exceptions.
 
 ## [3.26.3] - 2026-07-15
 

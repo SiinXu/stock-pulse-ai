@@ -7,7 +7,11 @@ from __future__ import annotations
 
 from typing import Any, Dict, Mapping
 
-from src.utils.sanitize import redact_sensitive_data, sanitize_diagnostic_text
+from src.utils.sanitize import (
+    redact_sensitive_data,
+    redact_sensitive_text,
+    sanitize_diagnostic_text,
+)
 
 
 AGENT_CHAT_FAILED = "agent_chat_failed"
@@ -77,5 +81,5 @@ def sanitize_stream_event(event: Mapping[str, Any], *, trace_id: str) -> Dict[st
         "message": AGENT_STREAM_FAILURE_MESSAGE,
         "params": {},
         "details": None,
-        "trace_id": trace_id,
+        "trace_id": redact_sensitive_text(trace_id),
     }

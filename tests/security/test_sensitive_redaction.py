@@ -55,7 +55,20 @@ def test_central_redaction_masks_supported_shapes_and_preserves_public_values() 
         "provider_error": f"request rejected {PREFIXED_API_KEY}",
         "authorization": f"Bearer {BEARER_SECRET}",
         "provider_auth_error": f"authorization=ApiKey {PLAIN_SECRET}",
+        "digest_auth_error": (
+            'Authorization: Digest username="operator", '
+            f'realm="{PLAIN_SECRET}", nonce="{BEARER_SECRET}", '
+            f'response="{WEBHOOK_SECRET}" public_status=401'
+        ),
+        "secondary_provider_error": (
+            f"Cookie: session={PLAIN_SECRET}; csrf={BEARER_SECRET}; "
+            f"webhook={WEBHOOK_SECRET} public_status=401"
+        ),
         "dsn": f"postgresql://svc:{DSN_SECRET}@db.example:5432/prod",
+        "username_only_dsn": f"redis://{PLAIN_SECRET}@cache.example/0",
+        "username_only_srv_dsn": (
+            f"mongodb+srv://{BEARER_SECRET}@cluster.example/prod"
+        ),
         "callback": f"https://hooks.slack.com/services/T/B/{WEBHOOK_SECRET}",
         "encoded_callback": (
             f"https://discord.com/api/%2577ebhooks/123/{WEBHOOK_SECRET}"
@@ -70,7 +83,17 @@ def test_central_redaction_masks_supported_shapes_and_preserves_public_values() 
     assert redacted["api_key"] == "[REDACTED]"
     assert redacted["authorization"] == "[REDACTED]"
     assert redacted["provider_auth_error"] == "authorization=[REDACTED]"
+    assert redacted["digest_auth_error"] == (
+        "Authorization: [REDACTED] public_status=401"
+    )
+    assert redacted["secondary_provider_error"] == (
+        "Cookie: [REDACTED] public_status=401"
+    )
     assert redacted["dsn"] == "postgresql://[REDACTED]@db.example:5432/prod"
+    assert redacted["username_only_dsn"] == "redis://[REDACTED]@cache.example/0"
+    assert redacted["username_only_srv_dsn"] == (
+        "mongodb+srv://[REDACTED]@cluster.example/prod"
+    )
     assert redacted["callback"] == "[REDACTED_URL]"
     assert redacted["encoded_callback"] == "[REDACTED_URL]"
     assert redacted["public_url"] == "https://example.com/docs?lang=en"
@@ -237,6 +260,43 @@ def test_agent_trace_and_sse_boundaries_fail_closed_on_secrets() -> None:
     assert diagnostics.dropped_trace_count == 1
     _assert_no_secret(public_event)
     assert public_event["details"]["api_key"] == "[REDACTED]"
+
+
+def test_provider_trace_drops_hostile_equality_spoof_before_persistence() -> None:
+    class EqualitySpoof:
+        def __str__(self) -> str:
+            return f"api_key={PLAIN_SECRET}"
+
+        def __eq__(self, _other: object) -> bool:
+            return True
+
+    messages = [
+        {"role": "user", "content": "current"},
+        {
+            "role": "assistant",
+            "_trace_provider": "deepseek",
+            "_trace_model": "deepseek/deepseek-chat",
+            "reasoning_content": EqualitySpoof(),
+            "tool_calls": [
+                {
+                    "id": "call-hostile",
+                    "name": "echo",
+                    "arguments": {"message": "public"},
+                }
+            ],
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "call-hostile",
+            "content": "public result",
+        },
+    ]
+
+    turns, diagnostics = extract_provider_trace_turns(messages, baseline_len=1)
+
+    assert turns == []
+    assert diagnostics.trace_dropped_reason == "sensitive_data_redacted"
+    assert diagnostics.dropped_trace_count == 1
 
 
 def test_diagnostics_snapshot_and_copy_export_share_central_redaction() -> None:

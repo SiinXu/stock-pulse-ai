@@ -37,7 +37,11 @@ _PUBLIC_HTTP_EXCEPTION_HEADERS = {
 
 def _request_trace_id(request: Request) -> str:
     candidate = (request.headers.get("x-trace-id") or "").strip()
-    if candidate and _TRACE_ID_PATTERN.fullmatch(candidate):
+    if (
+        candidate
+        and _TRACE_ID_PATTERN.fullmatch(candidate)
+        and redact_sensitive_text(candidate) == candidate
+    ):
         return candidate
     return uuid.uuid4().hex
 

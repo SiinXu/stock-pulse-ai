@@ -2311,7 +2311,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_ENABLED.notes.0": "AlphaSift가 후보 종목을 생성하고 StockPulse가 시세, 펀더멘털 및 뉴스 맥락을 보완합니다. 비활성화해도 기존 분석, 보고서 또는 알림에는 영향을 주지 않습니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_ENABLED.summary": "내장된 AlphaSift 종목 스크리닝 페이지를 제어합니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_ENABLED.title": "AlphaSift 종목 스크리닝",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_ENABLED.usage": "기본적으로 비활성화되어 있습니다. true로 설정하면 Web 앱이 백엔드 의존성과 함께 설치된 alphasift.dsa_adapter를 확인합니다. 없다면 pip install -r requirements.txt를 실행하거나 백엔드 산출물을 다시 빌드하세요.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_ENABLED.usage": "기본적으로 비활성화되어 있습니다. true로 설정하면 Web 앱이 백엔드 의존성과 함께 설치된 alphasift.dsa_adapter를 확인합니다. 없다면 저장소 루트에서 python -m pip install --upgrade --constraint constraints.txt pip, python -m pip install --build-constraint build-constraints.txt -r requirements.txt, python -m pip check를 순서대로 실행하거나 백엔드 산출물을 다시 빌드하세요.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_ENABLED.valueNotes.0": "AlphaSift는 StockPulse 백엔드 의존성으로 설치됩니다. /install은 명시적인 복구 작업으로만 유지됩니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_ENABLED.valueNotes.1": "주식 선택 결과는 연구 목적으로만 제공되며 투자 조언을 구성하지 않습니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_INSTALL_SPEC.impact.0": "AlphaSift 어댑터 소스 검증과 명시적인 복구 설치에 영향을 줍니다.",
