@@ -272,6 +272,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Docs] Defined the versioned plugin lifecycle, manifest, trust model, and six official extension-point contracts.
 - [Changed] Split the Agent orchestrator, executor, LLM adapter, and runner into focused compatibility-backed modules without changing runtime behavior.
 - [Changed] Split the pipeline analysis stage into focused private modules while preserving both analysis and pipeline facade contracts.
+- [Added] Registered a guarded `stockpulse://` desktop protocol with allowlisted private-origin routing, macOS `open-url`, second-instance forwarding, packaging metadata, and lifecycle regression coverage.
 - [Chore] Translated developer comments and Python docstrings across the codebase into English.
 
 ## [3.26.3] - 2026-07-15

@@ -79,6 +79,24 @@ DsaQuotedUninstallFailed_${SUFFIX}:
   !insertmacro _dsaRetryQuotedOldUninstall HKEY_CURRENT_USER CurrentUser
 !macroend
 
+!macro customInstall
+  ; electron-builder's protocols option is macOS-only. Register the per-user
+  ; Windows URL handler explicitly and quote both the executable and URL.
+  WriteRegStr SHELL_CONTEXT "Software\Classes\stockpulse" "" "URL:StockPulse Protocol"
+  WriteRegStr SHELL_CONTEXT "Software\Classes\stockpulse" "URL Protocol" ""
+  WriteRegStr SHELL_CONTEXT "Software\Classes\stockpulse\DefaultIcon" "" '"$appExe",0'
+  WriteRegStr SHELL_CONTEXT "Software\Classes\stockpulse\shell\open\command" "" '"$appExe" "%1"'
+!macroend
+
+!macro customUnInstall
+  ; Preserve a handler that another installation has claimed since this one
+  ; was installed. Only remove the command owned by the current install path.
+  ReadRegStr $R0 SHELL_CONTEXT "Software\Classes\stockpulse\shell\open\command" ""
+  StrCmp $R0 '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "%1"' 0 DsaProtocolUninstallDone
+  DeleteRegKey SHELL_CONTEXT "Software\Classes\stockpulse"
+DsaProtocolUninstallDone:
+!macroend
+
 !macro customHeader
 ; Reject system-protected directories (Program Files, Windows, etc.)
 ; to prevent runtime write failures for .env, data/ and logs/.
