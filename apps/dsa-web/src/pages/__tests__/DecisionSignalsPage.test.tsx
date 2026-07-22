@@ -471,6 +471,27 @@ describe('DecisionSignalsPage', () => {
     expect(screen.getAllByText('全部信号').length).toBeGreaterThan(0);
   });
 
+  it('centers the advanced signal filters and exposes clear stock as a tooltip icon', async () => {
+    renderPage();
+
+    expect(await screen.findByText('贵州茅台')).toBeInTheDocument();
+    const signalsPanel = screen.getByRole('tabpanel', { name: '全部信号' });
+    const filterForm = within(signalsPanel).getByRole('button', { name: '筛选' }).closest('form');
+    expect(filterForm).toHaveClass(
+      '[&>div.hidden]:justify-center',
+      '[&>div.hidden>div]:flex-none',
+    );
+
+    openStockContextModal();
+    fireEvent.change(getStockContextInput(), { target: { value: 'AAPL' } });
+    const clearButton = within(getStockContextModal()).getByRole('button', { name: '清空当前股票' });
+    expect(clearButton).toHaveAttribute('data-control', 'icon-button');
+    expect(clearButton).toHaveTextContent('');
+
+    fireEvent.mouseEnter(clearButton.parentElement!);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('清空当前股票');
+  });
+
   it('shows a zero-sample outcome stats state instead of misleading zero metrics', async () => {
     vi.mocked(decisionSignalsApi.getOutcomeStats).mockResolvedValueOnce({
       ...outcomeStats,

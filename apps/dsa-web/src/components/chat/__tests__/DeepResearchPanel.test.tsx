@@ -36,6 +36,20 @@ describe('DeepResearchPanel', () => {
     expect(screen.getByText('Enter a question to start deep research.')).toBeTruthy();
   });
 
+  it('keeps the empty hint lightweight and the research configuration at the bottom', () => {
+    renderPanel();
+
+    const hint = screen.getByText('Enter a question to start deep research.');
+    const section = hint.closest('section');
+    const form = section?.querySelector('form');
+
+    expect(hint).toHaveClass('text-muted-text');
+    expect(hint).not.toHaveClass('font-semibold');
+    expect(section).toHaveClass('flex', 'min-h-full', 'flex-col');
+    expect(form).toHaveClass('mt-auto');
+    expect(section?.lastElementChild).toBe(form);
+  });
+
   it('runs research and renders findings with sub-question references', async () => {
     researchMock.mockResolvedValue({ success: true, content: 'Moutai has a strong moat.', sources: ['What is the moat?', 'What are the risks?'], token_usage: 100 });
     renderPanel();
