@@ -900,9 +900,7 @@ const HomePage: React.FC = () => {
   }, [handleSubmitAnalysis, location.pathname, location.state, navigate, setQuery]);
 
   useEffect(() => {
-    if (homeUrlState.stockCode) {
-      setQuery(homeUrlState.stockCode);
-    }
+    setQuery(homeUrlState.stockCode ?? '');
   }, [homeUrlState.stockCode, setQuery]);
 
   const handleAskFollowUp = useCallback(() => {

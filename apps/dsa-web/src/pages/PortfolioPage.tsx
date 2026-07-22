@@ -205,6 +205,7 @@ const PortfolioPage: React.FC = () => {
   const [accounts, setAccounts] = useState<PortfolioAccountItem[]>([]);
   const [accountsLoaded, setAccountsLoaded] = useState(false);
   const [selectedAccount, setSelectedAccountState] = useState<AccountOption>(requestedAccountId ?? 'all');
+  const [unavailableAccountId, setUnavailableAccountId] = useState<number | null>(null);
   const selectedAccountRef = useRef<AccountOption>(selectedAccount);
   const searchParamsRef = useRef(searchParams);
   const setSearchParamsRef = useRef(setSearchParams);
@@ -339,9 +340,14 @@ const PortfolioPage: React.FC = () => {
       ? cashEvents.length
       : corporateEvents.length;
 
-  const setSelectedAccount = useCallback((account: AccountOption, replace = false) => {
+  const setSelectedAccount = useCallback((
+    account: AccountOption,
+    replace = false,
+    unavailableId: number | null = null,
+  ) => {
     selectedAccountRef.current = account;
     setSelectedAccountState(account);
+    setUnavailableAccountId(unavailableId);
     const next = new URLSearchParams(searchParamsRef.current);
     if (account === 'all') next.delete('account');
     else next.set('account', String(account));
@@ -372,7 +378,7 @@ const PortfolioPage: React.FC = () => {
     ) {
       return;
     }
-    setSelectedAccount(accounts[0]?.id ?? 'all', true);
+    setSelectedAccount(accounts[0]?.id ?? 'all', true, requestedAccountId);
   }, [accounts, accountsLoaded, requestedAccountId, setSelectedAccount]);
 
   const isActiveRefreshContext = (requestedViewKey: string, requestedRequestId: number) => {
@@ -389,9 +395,9 @@ const PortfolioPage: React.FC = () => {
       setAccounts(items);
       const currentAccount = selectedAccountRef.current;
       if (items.length === 0) {
-        if (currentAccount !== 'all') setSelectedAccount('all', true);
+        if (currentAccount !== 'all') setSelectedAccount('all', true, currentAccount);
       } else if (currentAccount !== 'all' && !items.some((item) => item.id === currentAccount)) {
-        setSelectedAccount(items[0].id, true);
+        setSelectedAccount(items[0].id, true, currentAccount);
       }
     } catch (err) {
       setError(getParsedApiError(err));
@@ -1335,6 +1341,13 @@ const PortfolioPage: React.FC = () => {
       {error ? <ApiErrorAlert error={error} onDismiss={() => setError(null)} /> : null}
       {accountCreateSuccess ? (
         <InlineAlert variant="success" size="compact" message={accountCreateSuccess} />
+      ) : null}
+      {unavailableAccountId !== null ? (
+        <InlineAlert
+          variant="warning"
+          title={t('deepLink.invalidTitle')}
+          message={t('deepLink.invalidMessage')}
+        />
       ) : null}
       {hasAccounts && riskWarning ? (
         <InlineAlert

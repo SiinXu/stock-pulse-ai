@@ -92,22 +92,27 @@ report, chat, portfolio, or decision-signal context between major views.
 Callers use the typed `buildDeepLink()` target union instead of interpolating
 query strings. `parseDeepLink()` accepts only same-origin stable routes,
 canonicalizes stock codes and positive numeric identities, removes invalid
-owned values, and preserves unrelated non-sensitive query parameters.
+owned values, and preserves unrelated non-sensitive query parameters. The
+shared route guard applies that normalization before a product page renders,
+so every major route consumes the same validation and sensitive-key policy.
 
 The current shareable state contract includes Home report and Run Flow
 identity, Home stock prefill and workspace view, Chat session/report context,
-Portfolio account scope, stock-details period/range, Decision Signals stock and
-signal context, and the existing page-owned filter codecs. User choices create
-history entries when Back/Forward should restore them. Canonicalization,
-missing-resource fallback, and default-value removal use Router replace
-navigation so they do not create dead history entries.
+Portfolio account scope, stock-details period/range, Decision Signals stock,
+signal, view, and filter context, and the existing page-owned filter codecs.
+Stable view choices create history entries when Back/Forward should restore
+them. Canonicalization, missing-resource fallback, and default-value removal
+use Router replace navigation so they do not create dead history entries. A
+valid but unavailable Portfolio account falls back to the first available
+account (or all accounts) and displays the shared invalid-link warning.
 
 Credentials, authorization values, passwords, private keys, and secret-like
-parameters never belong in a deep link. The parser removes recognized
-sensitive keys before state restoration; Home presents a localized warning
-when its URL state is cleaned. Draft text, unsaved forms, notification payloads, and other
-potentially sensitive state stay out of URLs. A valid stock prefill never
-auto-submits analysis.
+parameters never belong in a deep link. The route guard removes recognized
+sensitive keys before state restoration and presents a localized warning when
+URL state is cleaned. Draft text, unsaved forms, notification payloads, and
+other potentially sensitive state stay out of URLs. A valid stock prefill or
+selected stock context may be represented, but draft stock text is not written
+to the URL and a restored Home stock never auto-submits analysis.
 
 Electron currently consumes the same browser routes after loading its private
 local Web origin. External custom-protocol registration and OS `open-url` or

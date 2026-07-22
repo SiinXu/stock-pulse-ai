@@ -107,6 +107,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('layout', 'route-boundary', 'RouteBoundary', 'components/layout/RouteBoundary.tsx', ['default', 'error']),
   entry('layout', 'route-outlet-boundary', 'RouteOutletBoundary', 'components/layout/RouteBoundary.tsx'),
   entry('layout', 'standalone-route-boundary', 'StandaloneRouteBoundary', 'components/layout/RouteBoundary.tsx', ['default', 'error']),
+  entry('layout', 'deep-link-guard', 'DeepLinkGuard', 'components/routing/DeepLinkGuard.tsx'),
   entry('layout', 'route-focus-coordinator', 'RouteFocusCoordinator', 'components/routing/RouteFocusCoordinator.tsx'),
   entry('layout', 'theme-toggle', 'ThemeToggle', 'components/theme/ThemeToggle.tsx', ['interactive']),
   entry('layout', 'ui-language-toggle', 'UiLanguageToggle', 'components/i18n/UiLanguageToggle.tsx', ['interactive']),

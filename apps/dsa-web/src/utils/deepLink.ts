@@ -42,13 +42,16 @@ export type DeepLinkIssueCode =
   | 'external_origin'
   | 'invalid_account_id'
   | 'invalid_days'
+  | 'invalid_filter'
   | 'invalid_period'
   | 'invalid_record_id'
   | 'invalid_session_id'
   | 'invalid_signal_id'
   | 'invalid_stock_code'
+  | 'invalid_stock_name'
   | 'invalid_view'
   | 'invalid_workspace'
+  | 'incomplete_chat_context'
   | 'sensitive_parameter'
   | 'unsupported_route';
 
@@ -67,6 +70,22 @@ export type ParsedDeepLink = {
 const HOME_WORKSPACE_VIEWS = new Set<HomeWorkspaceView>(['history', 'watchlist', 'today']);
 const DECISION_SIGNAL_VIEWS = new Set<DecisionSignalsView>(['signals', 'latest', 'timeline', 'stats']);
 const STOCK_HISTORY_PERIODS = new Set<StockHistoryPeriod>(['daily', 'weekly', 'monthly']);
+const DECISION_SIGNAL_MARKETS = new Set(['cn', 'hk', 'us', 'jp', 'kr', 'tw']);
+const DECISION_SIGNAL_ACTIONS = new Set(['buy', 'add', 'hold', 'reduce', 'sell', 'watch', 'avoid', 'alert']);
+const DECISION_SIGNAL_PHASES = new Set([
+  'premarket',
+  'intraday',
+  'lunch_break',
+  'closing_auction',
+  'postmarket',
+  'non_trading',
+  'unknown',
+]);
+const DECISION_SIGNAL_SOURCES = new Set(['analysis', 'agent', 'alert', 'market_review', 'manual']);
+const DECISION_SIGNAL_STATUSES = new Set(['all', 'active', 'expired', 'invalidated', 'closed', 'archived']);
+const TIMELINE_RANGES = new Set(['30d', '90d', '180d']);
+const TIMELINE_STATUSES = new Set(['all', 'active']);
+const TIMELINE_PROFILES = new Set(['conservative', 'balanced', 'aggressive', 'unknown']);
 const SESSION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const MAX_STOCK_NAME_LENGTH = 80;
 const DEFAULT_ORIGIN = 'http://stockpulse.local';
@@ -80,10 +99,14 @@ const SENSITIVE_PARAMETER_KEYS = new Set([
   'credential',
   'idtoken',
   'password',
+  'passwd',
   'privatekey',
+  'pwd',
   'refreshtoken',
   'secret',
   'secretkey',
+  'token',
+  'webhookurl',
 ]);
 
 function assertPositiveInteger(value: number, field: string): number {
@@ -144,6 +167,17 @@ function stripSensitiveParameters(params: URLSearchParams, issues: DeepLinkIssue
   }
 }
 
+function stripSensitiveHash(url: URL, issues: DeepLinkIssue[]): void {
+  const rawHash = url.hash.slice(1);
+  if (!rawHash.includes('=')) return;
+  const params = new URLSearchParams(rawHash);
+  const issueCount = issues.length;
+  stripSensitiveParameters(params, issues);
+  if (issues.length === issueCount) return;
+  const normalized = params.toString();
+  url.hash = normalized ? `#${normalized}` : '';
+}
+
 function parseStockParam(
   params: URLSearchParams,
   issues: DeepLinkIssue[],
@@ -177,6 +211,20 @@ function parsePositiveIntegerParam(
   }
   params.set(key, String(value));
   return value;
+}
+
+function parseEnumParam(
+  params: URLSearchParams,
+  issues: DeepLinkIssue[],
+  key: string,
+  allowed: ReadonlySet<string>,
+): string | undefined {
+  const raw = params.get(key);
+  if (raw === null) return undefined;
+  if (allowed.has(raw)) return raw;
+  params.delete(key);
+  issues.push({ code: 'invalid_filter', parameter: key });
+  return undefined;
 }
 
 function toHref(url: URL): string {
@@ -220,7 +268,7 @@ export function buildDeepLink(target: DeepLinkTarget): string {
       pathname = '/decision-signals';
       if (target.stockCode) params.set('stock', requireStockCode(target.stockCode));
       setPositiveInteger(params, 'signal', target.signalId);
-      if (target.view && target.view !== 'signals') {
+      if (target.view && target.view !== (target.stockCode ? 'latest' : 'signals')) {
         if (!DECISION_SIGNAL_VIEWS.has(target.view)) throw new TypeError('Unsupported Decision Signals view');
         params.set('view', target.view);
       }
@@ -270,6 +318,7 @@ export function parseDeepLink(input: string, origin = DEFAULT_ORIGIN): ParsedDee
   const params = new URLSearchParams(url.search);
   const issues: DeepLinkIssue[] = [];
   stripSensitiveParameters(params, issues);
+  stripSensitiveHash(url, issues);
   let target: DeepLinkTarget | null = null;
 
   if (url.pathname === '/') {
@@ -305,11 +354,17 @@ export function parseDeepLink(input: string, origin = DEFAULT_ORIGIN): ParsedDee
     const stockName = rawStockName === null ? null : normalizeStockName(rawStockName);
     const recordId = parsePositiveIntegerParam(params, issues, 'recordId', 'invalid_record_id');
     if (!stockCode) {
+      if (rawStockName !== null || recordId !== undefined) {
+        issues.push({ code: 'incomplete_chat_context', parameter: 'stock' });
+      }
       params.delete('name');
       params.delete('recordId');
     } else if (rawStockName !== null) {
       if (stockName) params.set('name', stockName);
-      else params.delete('name');
+      else {
+        params.delete('name');
+        issues.push({ code: 'invalid_stock_name', parameter: 'name' });
+      }
     }
     target = {
       page: 'chat',
@@ -324,12 +379,35 @@ export function parseDeepLink(input: string, origin = DEFAULT_ORIGIN): ParsedDee
   } else if (url.pathname === '/decision-signals') {
     const stockCode = parseStockParam(params, issues);
     const signalId = parsePositiveIntegerParam(params, issues, 'signal', 'invalid_signal_id');
+    parseEnumParam(params, issues, 'market', DECISION_SIGNAL_MARKETS);
+    parseStockParam(params, issues, 'listStock');
+    parseEnumParam(params, issues, 'action', DECISION_SIGNAL_ACTIONS);
+    parseEnumParam(params, issues, 'phase', DECISION_SIGNAL_PHASES);
+    parseEnumParam(params, issues, 'source', DECISION_SIGNAL_SOURCES);
+    parseEnumParam(params, issues, 'status', DECISION_SIGNAL_STATUSES);
+    parsePositiveIntegerParam(params, issues, 'page', 'invalid_filter');
+    parseEnumParam(params, issues, 'timelineMarket', DECISION_SIGNAL_MARKETS);
+    parseEnumParam(params, issues, 'timelineRange', TIMELINE_RANGES);
+    parseEnumParam(params, issues, 'timelineStatus', TIMELINE_STATUSES);
+    parseEnumParam(params, issues, 'timelineProfile', TIMELINE_PROFILES);
+    const sourceReportId = parsePositiveIntegerParam(params, issues, 'sourceReportId', 'invalid_filter');
+    const legacySourceReportId = parsePositiveIntegerParam(
+      params,
+      issues,
+      'source_report_id',
+      'invalid_filter',
+    );
+    if (sourceReportId === undefined && legacySourceReportId !== undefined) {
+      params.set('sourceReportId', String(legacySourceReportId));
+    }
+    params.delete('source_report_id');
     const rawView = params.get('view');
-    let view: DecisionSignalsView = 'signals';
+    const defaultView: DecisionSignalsView = stockCode ? 'latest' : 'signals';
+    let view: DecisionSignalsView = defaultView;
     if (rawView !== null) {
       if (DECISION_SIGNAL_VIEWS.has(rawView as DecisionSignalsView)) {
         view = rawView as DecisionSignalsView;
-        if (view === 'signals') params.delete('view');
+        if (view === defaultView) params.delete('view');
       } else {
         params.delete('view');
         issues.push({ code: 'invalid_view', parameter: 'view' });

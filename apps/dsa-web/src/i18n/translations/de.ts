@@ -267,6 +267,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.common.showContent": "Inhalt anzeigen",
   "i18n.uiText.UI_TEXT.common.staleValue": "Die aktuelle Auswahl ist nicht verfügbar",
   "i18n.uiText.UI_TEXT.common.success": "Erfolgreich",
+  "i18n.uiText.UI_TEXT.deepLink.invalidMessage": "Der Link enthielt ungültige oder vertrauliche Statusparameter. Sie wurden sicher entfernt und die Standardwerte wiederhergestellt.",
+  "i18n.uiText.UI_TEXT.deepLink.invalidTitle": "Ungültiger Link",
   "i18n.uiText.UI_TEXT.decisionSignals.action": "Aktion",
   "i18n.uiText.UI_TEXT.decisionSignals.active": "Wirksam",
   "i18n.uiText.UI_TEXT.decisionSignals.activeOnly": "Aktive Signale werden standardmäßig angezeigt",

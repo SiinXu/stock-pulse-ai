@@ -267,6 +267,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.common.showContent": "Tampilkan konten",
   "i18n.uiText.UI_TEXT.common.staleValue": "Pilihan saat ini tidak tersedia",
   "i18n.uiText.UI_TEXT.common.success": "Berhasil",
+  "i18n.uiText.UI_TEXT.deepLink.invalidMessage": "Tautan berisi parameter status yang tidak valid atau sensitif. Parameter tersebut telah dihapus dengan aman dan nilai bawaan dipulihkan.",
+  "i18n.uiText.UI_TEXT.deepLink.invalidTitle": "Tautan tidak valid",
   "i18n.uiText.UI_TEXT.decisionSignals.action": "Tindakan",
   "i18n.uiText.UI_TEXT.decisionSignals.active": "Efektif",
   "i18n.uiText.UI_TEXT.decisionSignals.activeOnly": "Sinyal aktif ditampilkan secara default",

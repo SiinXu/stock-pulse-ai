@@ -267,6 +267,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.common.showContent": "顯示內容",
   "i18n.uiText.UI_TEXT.common.staleValue": "當前配置不可用",
   "i18n.uiText.UI_TEXT.common.success": "成功",
+  "i18n.uiText.UI_TEXT.deepLink.invalidMessage": "連結包含無效或敏感的狀態參數，已安全移除並恢復預設值。",
+  "i18n.uiText.UI_TEXT.deepLink.invalidTitle": "連結無效",
   "i18n.uiText.UI_TEXT.decisionSignals.action": "動作",
   "i18n.uiText.UI_TEXT.decisionSignals.active": "有效",
   "i18n.uiText.UI_TEXT.decisionSignals.activeOnly": "預設展示 active 訊號",

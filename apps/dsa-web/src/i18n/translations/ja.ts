@@ -267,6 +267,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.common.showContent": "コンテンツを表示",
   "i18n.uiText.UI_TEXT.common.staleValue": "現在の選択は利用できません",
   "i18n.uiText.UI_TEXT.common.success": "成功",
+  "i18n.uiText.UI_TEXT.deepLink.invalidMessage": "リンクに無効または機密性の高い状態パラメーターが含まれていました。安全に削除し、既定値を復元しました。",
+  "i18n.uiText.UI_TEXT.deepLink.invalidTitle": "無効なリンク",
   "i18n.uiText.UI_TEXT.decisionSignals.action": "アクション",
   "i18n.uiText.UI_TEXT.decisionSignals.active": "有効",
   "i18n.uiText.UI_TEXT.decisionSignals.activeOnly": "アクティブ信号はデフォルトで表示されます",

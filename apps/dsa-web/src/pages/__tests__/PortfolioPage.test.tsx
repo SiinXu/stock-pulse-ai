@@ -444,6 +444,8 @@ describe('PortfolioPage FX refresh', () => {
 
     await waitFor(() => expect(router.state.location.search).toBe('?account=1&keep=yes'));
     expect(screen.getAllByRole('combobox')[0]).toHaveTextContent('Main (#1)');
+    expect(screen.getByRole('status')).toHaveTextContent('链接无效');
+    expect(screen.getByRole('status')).toHaveTextContent('链接包含无效或敏感的状态参数');
   });
 
   it('shows only the account onboarding state when no portfolio account exists', async () => {

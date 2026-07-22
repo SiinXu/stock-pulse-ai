@@ -267,6 +267,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.common.showContent": "콘텐츠 표시",
   "i18n.uiText.UI_TEXT.common.staleValue": "현재 선택지는 제공되지 않습니다",
   "i18n.uiText.UI_TEXT.common.success": "성공",
+  "i18n.uiText.UI_TEXT.deepLink.invalidMessage": "링크에 유효하지 않거나 민감한 상태 매개변수가 포함되어 있어 안전하게 제거하고 기본값을 복원했습니다.",
+  "i18n.uiText.UI_TEXT.deepLink.invalidTitle": "유효하지 않은 링크",
   "i18n.uiText.UI_TEXT.decisionSignals.action": "조치",
   "i18n.uiText.UI_TEXT.decisionSignals.active": "효과적이다",
   "i18n.uiText.UI_TEXT.decisionSignals.activeOnly": "활성 신호는 기본적으로 표시됩니다",

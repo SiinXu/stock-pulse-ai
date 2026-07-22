@@ -65,6 +65,17 @@ describe('deepLink', () => {
     ]);
   });
 
+  it('removes common credential aliases from query and fragment state', () => {
+    const parsed = parseDeepLink('/chat?token=query-secret&passwd=legacy-secret&keep=yes#access_token=fragment-secret&tab=history');
+
+    expect(parsed.normalizedHref).toBe('/chat?keep=yes#tab=history');
+    expect(parsed.issues).toEqual([
+      { code: 'sensitive_parameter', parameter: 'token' },
+      { code: 'sensitive_parameter', parameter: 'passwd' },
+      { code: 'sensitive_parameter', parameter: 'access_token' },
+    ]);
+  });
+
   it('requires chat report context to have a valid stock identity', () => {
     const parsed = parseDeepLink('/chat?session=session-1&stock=%3Cbad%3E&name=Bad&recordId=5&keep=yes');
 
@@ -92,6 +103,27 @@ describe('deepLink', () => {
     expect(parsed.issues).toEqual([
       { code: 'invalid_period', parameter: 'period' },
       { code: 'invalid_days', parameter: 'days' },
+    ]);
+  });
+
+  it('normalizes Decision Signals view and filter state through the shared parser', () => {
+    const parsed = parseDeepLink(
+      '/decision-signals?stock=00700.HK&view=unknown&market=moon&listStock=aapl&page=0&timelineRange=30d&source_report_id=004&keep=yes',
+    );
+
+    expect(parsed.target).toEqual({
+      page: 'decision-signals',
+      stockCode: 'HK00700',
+      signalId: undefined,
+      view: 'latest',
+    });
+    expect(parsed.normalizedHref).toBe(
+      '/decision-signals?stock=HK00700&listStock=AAPL&timelineRange=30d&keep=yes&sourceReportId=4',
+    );
+    expect(parsed.issues).toEqual([
+      { code: 'invalid_filter', parameter: 'market' },
+      { code: 'invalid_filter', parameter: 'page' },
+      { code: 'invalid_view', parameter: 'view' },
     ]);
   });
 

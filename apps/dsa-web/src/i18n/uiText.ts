@@ -141,6 +141,8 @@ const zh = {
   'usage.totalCallsHint': '已记录的 LLM 调用',
   'usage.totalTokens': '总 tokens',
 
+  'deepLink.invalidMessage': '链接包含无效或敏感的状态参数，已安全移除并恢复默认值。',
+  'deepLink.invalidTitle': '链接无效',
   'routeError.backHome': '返回首页',
   'routeError.description': '当前页面资源或组件未能正常加载，可能是网络中断或页面版本已更新。请重新加载页面，或返回首页后再试。',
   'routeError.reload': '重新加载页面',
@@ -1273,6 +1275,8 @@ const en: Record<UiTextKey, string> = {
   'usage.totalCallsHint': 'Recorded LLM calls',
   'usage.totalTokens': 'Total tokens',
 
+  'deepLink.invalidMessage': 'The link contained invalid or sensitive state parameters. They were removed safely and defaults were restored.',
+  'deepLink.invalidTitle': 'Invalid link',
   'routeError.backHome': 'Back home',
   'routeError.description': 'This page or component could not load. The network may be unavailable, or the page version may have changed. Reload the page or return home and try again.',
   'routeError.reload': 'Reload page',
