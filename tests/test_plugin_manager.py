@@ -202,6 +202,17 @@ def test_onload_failure_cleans_in_reverse_order() -> None:
     assert backend.items == {}
     assert manager.registrations() == ()
 
+    recovered = manager.disable("failing-plugin")
+    assert recovered.success is True
+    assert recovered.state == "disabled"
+    assert plugin.unload_count == 0
+
+    plugin.fail_onload = False
+    assert manager.enable("failing-plugin").success is True
+    assert plugin.load_count == 2
+    assert manager.disable("failing-plugin").success is True
+    assert plugin.unload_count == 1
+
 
 def test_load_all_continues_after_failed_plugin() -> None:
     manager = _manager()
@@ -351,6 +362,47 @@ def test_failed_registration_rollback_remains_owned_when_plugin_swallows_error()
     assert manager.enable("rollback-plugin").success is True
     assert plugin.load_count == 2
     assert manager.disable("rollback-plugin").success is True
+    assert plugin.unload_count == 1
+
+
+def test_failed_load_can_disable_after_transient_recovery_cleanup() -> None:
+    class TransientRollbackBackend(_Backend):
+        def __init__(self) -> None:
+            super().__init__()
+            self.failures_remaining = 1
+
+        def unregister(self, registration_id: str, implementation: object) -> None:
+            self.unregister_order.append(registration_id)
+            if self.failures_remaining:
+                self.failures_remaining -= 1
+                raise RuntimeError("token=transient-cleanup-secret")
+            if self.items.get(registration_id) is implementation:
+                del self.items[registration_id]
+
+    backend = TransientRollbackBackend()
+    backend.fail_register_after_write = True
+    manager = _manager_with_backend(backend)
+    plugin = _RecordingPlugin(_manifest("transient-plugin"), ("daily",))
+    manager.register(plugin, source="builtin")
+
+    failed = manager.load("transient-plugin")
+
+    assert failed.success is False
+    assert failed.state == "failed"
+    assert failed.error_code == "native_registry_rollback_failed"
+    assert backend.unregister_order == ["daily", "daily"]
+    assert backend.items == {}
+    assert manager.registrations() == ()
+
+    recovered = manager.disable("transient-plugin")
+    assert recovered.success is True
+    assert recovered.state == "disabled"
+    assert plugin.unload_count == 0
+
+    backend.fail_register_after_write = False
+    assert manager.enable("transient-plugin").success is True
+    assert plugin.load_count == 2
+    assert manager.disable("transient-plugin").success is True
     assert plugin.unload_count == 1
 
 

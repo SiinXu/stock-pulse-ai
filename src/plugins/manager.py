@@ -311,7 +311,7 @@ class PluginManager:
             )
 
     def disable(self, plugin_id: str) -> PluginOperationResult:
-        """Unload one enabled plugin and remove all registrations in reverse order."""
+        """Unload an enabled plugin or converge a failed plugin after cleanup."""
 
         with self._lock:
             record = self._plugins.get(plugin_id)
@@ -332,7 +332,7 @@ class PluginManager:
                     success=True,
                     state="disabled",
                 )
-            if record.state == "failed" and record.cleanup_pending:
+            if record.state == "failed":
                 record.transition = "disable"
                 remaining, cleanup_errors = self._cleanup_handles(
                     plugin_id,

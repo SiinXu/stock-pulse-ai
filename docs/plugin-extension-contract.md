@@ -151,7 +151,9 @@ owned registrations still occurs if `onunload` raises.
 disable transition. If `onload` raises, its partial registrations are removed,
 the plugin is marked failed, the exception is safely logged, and loading
 continues with other plugins. A plugin callback exception never propagates into
-core startup or another plugin's lifecycle.
+core startup or another plugin's lifecycle. Disabling a failed plugin retries any
+remaining registration cleanup; once no owned handles remain, it converges to
+`disabled` without invoking `onunload`, so a later enable may retry `onload`.
 
 External module import itself executes arbitrary Python before `onload` and must
 receive the same isolation treatment. Error isolation protects application
