@@ -362,6 +362,26 @@ def test_notification_method_order_matches_pre_split_contract():
     assert actual_names == expected_names
 
 
+def test_notification_complete_class_member_order_matches_pre_split_contract():
+    module = importlib.import_module("src.notification")
+    rendering_names = EXPECTED_GROUPS[2][2]
+    expected_names = (
+        "__module__",
+        "__doc__",
+        "__init__",
+        *EXPECTED_GROUPS[0][2],
+        *EXPECTED_GROUPS[1][2],
+        *rendering_names[:14],
+        "_SOURCE_DISPLAY_NAMES",
+        *rendering_names[14:16],
+        "_CURRENCY_SUFFIX",
+        *rendering_names[16:],
+        *EXPECTED_GROUPS[3][2],
+    )
+
+    assert tuple(vars(module.NotificationService)) == expected_names
+
+
 def test_notification_type_hint_resolution_matches_pre_split_contract():
     module = importlib.import_module("src.notification")
     unresolved = set()

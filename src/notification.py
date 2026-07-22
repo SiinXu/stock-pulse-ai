@@ -358,6 +358,52 @@ class NotificationService(
             channel_names.extend(self._context_channels)
             logger.info(f"已配置 {len(channel_names)} 个通知渠道：{', '.join(channel_names)}")
 
+    # Reserve the legacy class namespace order. Facade binding replaces each
+    # method placeholder in place after the class has been created.
+    _normalize_report_type = None
+    _get_report_language = None
+    _get_labels = None
+    _get_display_name = None
+    _get_history_compare_context = None
+    generate_aggregate_report = None
+    _collect_models_used = None
+    _public_phase_pack_excerpt = None
+    _public_market_status_line = None
+    _append_market_status_line = None
+    _should_show_llm_model = None
+    detect_configured_channels = None
+    _detect_all_channels = None
+    is_available = None
+    get_available_channels = None
+    get_channels_for_route = None
+    get_channel_names = None
+    evaluate_noise_control = None
+    record_noise_control = None
+    release_noise_control = None
+    _has_context_channel = None
+    _extract_telegram_context_chat_id = None
+    should_broadcast_static_channels = None
+    _extract_dingtalk_session_webhook = None
+    _extract_feishu_reply_info = None
+    send_to_context = None
+    _send_via_source_context = None
+    _send_feishu_stream_reply = None
+    _send_feishu_stream_chunked = None
+    generate_daily_report = None
+    _escape_md = None
+    _clean_sniper_value = None
+    _phase_decision_list = None
+    _phase_decision_has_content = None
+    _append_phase_decision_block = None
+    _get_display_operation_advice = None
+    _count_display_decisions = None
+    _get_signal_level = None
+    generate_dashboard_report = None
+    generate_wechat_dashboard = None
+    generate_wechat_summary = None
+    generate_brief_report = None
+    generate_single_stock_report = None
+
     # Display name mapping for realtime data sources
     _SOURCE_DISPLAY_NAMES = {
         "tencent": {"zh": "腾讯财经", "en": "Tencent Finance"},
@@ -371,6 +417,8 @@ class NotificationService(
         "longbridge": {"zh": "长桥", "en": "Longbridge"},
         "fallback": {"zh": "降级兜底", "en": "Fallback"},
     }
+    _get_source_display_name = None
+    _append_market_snapshot = None
     _CURRENCY_SUFFIX = {
         "USD": "美元",
         "HKD": "港元",
@@ -379,6 +427,24 @@ class NotificationService(
         "CNH": "元",
         "TWD": "新台币",  # Taiwan stocks (TWSE/TPEx) are priced in New Taiwan Dollars to avoid confusion with A-shares "yuan" (Renminbi)
     }
+    _format_amount_cn = None
+    _format_percent = None
+    _format_per_share = None
+    _format_text = None
+    _get_fundamental_blocks = None
+    _append_fundamental_blocks = None
+    _append_financial_summary = None
+    _append_shareholder_return = None
+    _format_net_shares = None
+    _append_institutional_flow = None
+    _append_related_boards = None
+    _should_use_image_for_channel = None
+    _sanitize_notification_diagnostics = None
+    _send_to_static_channel = None
+    send_with_results = None
+    send = None
+    save_report_to_file = None
+    save_and_send_feishu_file = None
 
 
 # Bind after the facade class exists so every moved method keeps the legacy
