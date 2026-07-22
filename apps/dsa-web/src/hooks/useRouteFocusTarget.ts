@@ -4,9 +4,9 @@ import { useContext, useLayoutEffect } from 'react';
 import {
   RouteFocusRegistrationContext,
   type RouteFocusTarget,
-} from '../components/routing/routeFocusContext';
+} from '../contexts/routeFocusContext';
 
-export type { RouteFocusTarget } from '../components/routing/routeFocusContext';
+export type { RouteFocusTarget } from '../contexts/routeFocusContext';
 
 export function useRouteFocusTarget({ routeId, headingRef, ready }: RouteFocusTarget): void {
   const context = useContext(RouteFocusRegistrationContext);

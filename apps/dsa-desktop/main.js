@@ -17,6 +17,10 @@ let lastPromptedInstallVersion = '';
 let electronAutoUpdater = undefined;
 let electronAutoUpdaterConfigured = false;
 let electronUpdateCheckInFlight = false;
+let desktopMainPageUrl = '';
+let desktopWebReady = false;
+let pendingDesktopDeepLinkRoute = null;
+let desktopDeepLinkNavigationInFlight = false;
 
 function resolveWindowBackgroundColor() {
   return nativeTheme.shouldUseDarkColors ? '#08080c' : '#f4f7fb';
@@ -34,12 +38,29 @@ const DESKTOP_UPDATE_BACKUP_DIR = '.dsa-desktop-update-backup';
 const DESKTOP_UPDATE_BACKUP_MANIFEST_FILE = 'runtime-state.json';
 const DESKTOP_BRAND_MIGRATION_RECORD_FILE = '.stockpulse-brand-migration.json';
 const DESKTOP_BRAND_MIGRATION_TEMP_SUFFIX = '.stockpulse-migration.tmp';
+const PROVIDER_DAILY_CACHE_DIR_ENV_KEY = 'PROVIDER_DAILY_CACHE_DIR';
+const DESKTOP_PROVIDER_DAILY_CACHE_RELATIVE_PATH = path.join('data', 'provider_cache', 'daily');
 const LEGACY_DESKTOP_PRODUCT_NAMES = Object.freeze(['Daily Stock Analysis']);
 const WINDOWS_NSIS_UNINSTALLER_NAMES = Object.freeze([
   'Uninstall StockPulse.exe',
   'Uninstall Daily Stock Analysis.exe',
 ]);
 const DESKTOP_BACKEND_DEFAULT_HOST = '127.0.0.1';
+const DESKTOP_PROTOCOL = 'stockpulse';
+const DESKTOP_PROTOCOL_HOST = 'app';
+const DESKTOP_DEEP_LINK_MAX_LENGTH = 4096;
+const DESKTOP_DEEP_LINK_EXACT_PATHS = Object.freeze(new Set([
+  '/',
+  '/alerts',
+  '/backtest',
+  '/chat',
+  '/decision-signals',
+  '/portfolio',
+  '/screening',
+  '/settings',
+  '/usage',
+]));
+const DESKTOP_DEEP_LINK_STOCK_PATH_PATTERN = /^\/stocks\/[A-Za-z0-9.]{1,16}$/;
 const PUBLIC_BIND_HOSTS = Object.freeze(new Set(['0.0.0.0', '::', '[::]', '*']));
 const MAC_DESKTOP_CLI_PATH_ENTRIES = Object.freeze([
   '/opt/homebrew/bin',
@@ -59,6 +80,7 @@ const DESKTOP_UPDATE_RUNTIME_RELATIVE_FILES = Object.freeze([
   path.join('data', 'stock_analysis.db'),
   path.join('data', 'stock_analysis.db-wal'),
   path.join('data', 'stock_analysis.db-shm'),
+  DESKTOP_PROVIDER_DAILY_CACHE_RELATIVE_PATH,
   path.join('data', 'alphasift', 'hotspots.json'),
   path.join('data', 'alphasift', 'hotspot.history.jsonl'),
   path.join('data', 'alphasift', 'hotspot_details'),
@@ -94,6 +116,173 @@ const UPDATE_MODE = Object.freeze({
   AUTO: 'auto',
   MANUAL: 'manual',
 });
+
+function isAllowedDesktopDeepLinkPath(pathname) {
+  return DESKTOP_DEEP_LINK_EXACT_PATHS.has(pathname)
+    || DESKTOP_DEEP_LINK_STOCK_PATH_PATTERN.test(pathname);
+}
+
+function parseDesktopDeepLink(rawUrl) {
+  if (typeof rawUrl !== 'string'
+    || rawUrl.length === 0
+    || rawUrl.length > DESKTOP_DEEP_LINK_MAX_LENGTH
+    || rawUrl.trim() !== rawUrl
+    || /[\u0000-\u0020\u007F]/.test(rawUrl)) {
+    return null;
+  }
+
+  const schemeSeparator = rawUrl.indexOf('://');
+  if (schemeSeparator <= 0
+    || rawUrl.slice(0, schemeSeparator).toLowerCase() !== DESKTOP_PROTOCOL) {
+    return null;
+  }
+
+  const authorityStart = schemeSeparator + 3;
+  const authorityRemainder = rawUrl.slice(authorityStart);
+  const authorityEndOffset = authorityRemainder.search(/[/?#]/);
+  if (authorityEndOffset < 0) {
+    return null;
+  }
+  const authorityEnd = authorityStart + authorityEndOffset;
+  const rawAuthority = rawUrl.slice(authorityStart, authorityEnd);
+  if (rawAuthority.toLowerCase() !== DESKTOP_PROTOCOL_HOST || rawUrl[authorityEnd] !== '/') {
+    return null;
+  }
+
+  const searchIndex = rawUrl.indexOf('?', authorityEnd);
+  const hashIndex = rawUrl.indexOf('#', authorityEnd);
+  const pathEndCandidates = [searchIndex, hashIndex].filter((index) => index >= 0);
+  const pathEnd = pathEndCandidates.length ? Math.min(...pathEndCandidates) : rawUrl.length;
+  const rawPath = rawUrl.slice(authorityEnd, pathEnd);
+
+  let url;
+  try {
+    url = new URL(rawUrl);
+  } catch (_error) {
+    return null;
+  }
+
+  if (url.protocol !== `${DESKTOP_PROTOCOL}:`
+    || url.hostname.toLowerCase() !== DESKTOP_PROTOCOL_HOST
+    || url.host.toLowerCase() !== DESKTOP_PROTOCOL_HOST
+    || url.username
+    || url.password
+    || url.port
+    || url.hash
+    || url.pathname !== rawPath
+    || url.search.length > DESKTOP_DEEP_LINK_MAX_LENGTH
+    || !isAllowedDesktopDeepLinkPath(url.pathname)) {
+    return null;
+  }
+
+  return `${url.pathname}${url.search}`;
+}
+
+function extractDesktopDeepLink(argv = []) {
+  if (!Array.isArray(argv)) {
+    return null;
+  }
+  return argv.find(
+    (value) => typeof value === 'string' && value.toLowerCase().startsWith(`${DESKTOP_PROTOCOL}:`)
+  ) || null;
+}
+
+function buildDesktopDeepLinkTargetUrl(mainPageUrl, route) {
+  const baseUrl = new URL(mainPageUrl);
+  if (!['http:', 'https:'].includes(baseUrl.protocol)) {
+    throw new TypeError('Desktop Web origin must use HTTP or HTTPS');
+  }
+
+  const targetUrl = new URL(route, `${baseUrl.origin}/`);
+  if (targetUrl.origin !== baseUrl.origin) {
+    throw new TypeError('Desktop deep link must remain on the private Web origin');
+  }
+
+  for (const key of ['desktop_version', 'cache_bust']) {
+    if (baseUrl.searchParams.has(key)) {
+      targetUrl.searchParams.set(key, baseUrl.searchParams.get(key));
+    }
+  }
+  return targetUrl.toString();
+}
+
+function sanitizeUrlForLog(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    return `${url.protocol}//${url.host}${url.pathname}`;
+  } catch (_error) {
+    return '[invalid URL]';
+  }
+}
+
+function queueDesktopDeepLink(rawUrl) {
+  const route = parseDesktopDeepLink(rawUrl);
+  if (!route) {
+    logLine('[deep-link] rejected inbound protocol URL');
+    return false;
+  }
+  pendingDesktopDeepLinkRoute = route;
+  logLine(`[deep-link] accepted route path=${new URL(route, 'http://stockpulse.local').pathname}`);
+  return true;
+}
+
+async function flushPendingDesktopDeepLink() {
+  if (!desktopWebReady
+    || !desktopMainPageUrl
+    || !pendingDesktopDeepLinkRoute
+    || desktopDeepLinkNavigationInFlight
+    || !mainWindow
+    || mainWindow.isDestroyed()) {
+    return false;
+  }
+
+  desktopDeepLinkNavigationInFlight = true;
+  let navigated = false;
+  try {
+    while (desktopWebReady
+      && pendingDesktopDeepLinkRoute
+      && mainWindow
+      && !mainWindow.isDestroyed()) {
+      const route = pendingDesktopDeepLinkRoute;
+      pendingDesktopDeepLinkRoute = null;
+      const targetUrl = buildDesktopDeepLinkTargetUrl(desktopMainPageUrl, route);
+      try {
+        await mainWindow.loadURL(targetUrl);
+        navigated = true;
+        logLine(`[deep-link] routed path=${new URL(targetUrl).pathname}`);
+      } catch (error) {
+        const errorName = error instanceof Error && error.name ? error.name : 'unknown_error';
+        logLine(`[deep-link] route failed type=${errorName}`);
+      }
+    }
+  } finally {
+    desktopDeepLinkNavigationInFlight = false;
+  }
+  return navigated;
+}
+
+function registerDesktopProtocolClient({
+  defaultApp = Boolean(process.defaultApp),
+  executablePath = process.execPath,
+  argv = process.argv,
+} = {}) {
+  if (typeof app.setAsDefaultProtocolClient !== 'function') {
+    return false;
+  }
+  try {
+    if (defaultApp && typeof argv[1] === 'string' && argv[1]) {
+      return app.setAsDefaultProtocolClient(
+        DESKTOP_PROTOCOL,
+        executablePath,
+        [path.resolve(argv[1])]
+      );
+    }
+    return app.setAsDefaultProtocolClient(DESKTOP_PROTOCOL);
+  } catch (error) {
+    logLine(`[deep-link] protocol registration failed: ${error instanceof Error ? error.message : String(error)}`);
+    return false;
+  }
+}
 
 function normalizeVersionString(version) {
   return String(version || '')
@@ -1085,6 +1274,28 @@ function readEnvFileValue(envFile, key, sourceEnv = process.env) {
   return hasOwnValue(values, key) ? values[key] : null;
 }
 
+function resolveDesktopProviderDailyCacheDir({
+  envFile,
+  dbPath,
+  sourceEnv = process.env,
+} = {}) {
+  const sourceValue = hasOwnValue(sourceEnv, PROVIDER_DAILY_CACHE_DIR_ENV_KEY)
+    ? String(sourceEnv[PROVIDER_DAILY_CACHE_DIR_ENV_KEY] || '').trim()
+    : '';
+  if (sourceValue) {
+    return sourceValue;
+  }
+
+  const envFileValue = String(
+    readEnvFileValue(envFile, PROVIDER_DAILY_CACHE_DIR_ENV_KEY, sourceEnv) || ''
+  ).trim();
+  if (envFileValue) {
+    return envFileValue;
+  }
+
+  return path.join(path.dirname(dbPath), 'provider_cache', 'daily');
+}
+
 function resolveBackendBindHost({
   envFile,
   sourceEnv = process.env,
@@ -1150,6 +1361,11 @@ function buildBackendEnvironment({
     ENV_FILE: envFile,
     DATABASE_PATH: dbPath,
     LOG_DIR: logDir,
+    PROVIDER_DAILY_CACHE_DIR: resolveDesktopProviderDailyCacheDir({
+      envFile,
+      dbPath,
+      sourceEnv,
+    }),
     PYTHONUTF8: '1',
     PYTHONIOENCODING: 'utf-8',
     WEBUI_HOST: selectedHost,
@@ -2017,6 +2233,9 @@ ipcMain.handle('desktop:open-release-page', async (_event, releaseUrl) => {
 });
 
 async function createWindow(brandMigrationResult) {
+  desktopMainPageUrl = '';
+  desktopWebReady = false;
+  desktopDeepLinkNavigationInFlight = false;
   const restoreResult = isWindowsNsisInstalledApp() ? restorePackagedRuntimeStateFromBackup() : null;
   const macMigrationResult = migrateMacPackagedRuntimeState();
   initLogging();
@@ -2096,6 +2315,9 @@ async function createWindow(brandMigrationResult) {
   nativeTheme.on('updated', applyThemeBackground);
   mainWindow.once('closed', () => {
     nativeTheme.removeListener('updated', applyThemeBackground);
+    mainWindow = null;
+    desktopMainPageUrl = '';
+    desktopWebReady = false;
   });
 
   const webViewStartedAt = Date.now();
@@ -2112,7 +2334,7 @@ async function createWindow(brandMigrationResult) {
     'did-fail-load',
     (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
       logStartup(
-        `WebContents did-fail-load code=${errorCode} mainFrame=${isMainFrame} url=${validatedURL} reason=${errorDescription}`
+        `WebContents did-fail-load code=${errorCode} mainFrame=${isMainFrame} url=${sanitizeUrlForLog(validatedURL)} reason=${errorDescription}`
       );
     }
   );
@@ -2218,13 +2440,31 @@ async function createWindow(brandMigrationResult) {
     logStartup(`Backend ready in ${healthInfo.elapsedMs}ms (${healthInfo.attempts} probes)`);
     const mainPageStartedAt = Date.now();
     const mainPageUrl = buildMainPageUrl(port, Date.now(), backendConnectHost);
-    await mainWindow.loadURL(mainPageUrl);
-    logStartup(`Main page loadURL resolved in ${Date.now() - mainPageStartedAt}ms url=${mainPageUrl}`);
+    desktopMainPageUrl = mainPageUrl;
+    const initialDeepLinkRoute = pendingDesktopDeepLinkRoute;
+    pendingDesktopDeepLinkRoute = null;
+    const initialPageUrl = initialDeepLinkRoute
+      ? buildDesktopDeepLinkTargetUrl(mainPageUrl, initialDeepLinkRoute)
+      : mainPageUrl;
+    try {
+      await mainWindow.loadURL(initialPageUrl);
+    } catch (error) {
+      if (initialDeepLinkRoute) {
+        throw new Error('Desktop deep-link navigation failed');
+      }
+      throw error;
+    }
+    desktopWebReady = true;
+    await flushPendingDesktopDeepLink();
+    logStartup(
+      `Main page loadURL resolved in ${Date.now() - mainPageStartedAt}ms url=${sanitizeUrlForLog(initialPageUrl)}`
+    );
     logStartup(`Main UI loaded in ${Date.now() - startupStartedAt}ms`);
     if (!restoreFailed) {
       void performDesktopUpdateCheck({ notify: true });
     }
   } catch (error) {
+    desktopWebReady = false;
     logStartup(`Startup failed while waiting for health: ${String(error)}`);
     const errorUrl = `file://${loadingPath}?error=${encodeURIComponent(String(error))}`;
     await mainWindow.loadURL(errorUrl);
@@ -2253,14 +2493,40 @@ function focusExistingMainWindow() {
   }
 }
 
+async function handleDesktopSecondInstance(_event, argv) {
+  focusExistingMainWindow();
+  const rawUrl = extractDesktopDeepLink(argv);
+  if (!rawUrl || !queueDesktopDeepLink(rawUrl)) {
+    return false;
+  }
+  return flushPendingDesktopDeepLink();
+}
+
+async function handleDesktopOpenUrl(event, rawUrl) {
+  if (event && typeof event.preventDefault === 'function') {
+    event.preventDefault();
+  }
+  if (!queueDesktopDeepLink(rawUrl)) {
+    return false;
+  }
+  focusExistingMainWindow();
+  return flushPendingDesktopDeepLink();
+}
+
 const hasDesktopInstanceLock = requestPackagedSingleInstanceLock();
 const desktopBrandMigrationResult = hasDesktopInstanceLock
   ? migrateLegacyProductUserData()
   : null;
 
 if (hasDesktopInstanceLock) {
+  registerDesktopProtocolClient();
+  const initialDesktopDeepLink = extractDesktopDeepLink(process.argv);
+  if (initialDesktopDeepLink) {
+    queueDesktopDeepLink(initialDesktopDeepLink);
+  }
+  app.on('open-url', handleDesktopOpenUrl);
   app.whenReady().then(() => createWindow(desktopBrandMigrationResult));
-  app.on('second-instance', focusExistingMainWindow);
+  app.on('second-instance', handleDesktopSecondInstance);
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
@@ -2287,6 +2553,8 @@ module.exports = {
   GITHUB_REPO,
   LATEST_RELEASE_API_URL,
   RELEASES_PAGE_URL,
+  DESKTOP_PROTOCOL,
+  DESKTOP_PROTOCOL_HOST,
   DESKTOP_UPDATE_RUNTIME_RELATIVE_FILES,
   UPDATE_MODE,
   UPDATE_STATUS,
@@ -2303,17 +2571,26 @@ module.exports = {
   fetchLatestReleaseJson,
   findAvailablePort,
   buildMainPageUrl,
+  buildDesktopDeepLinkTargetUrl,
+  extractDesktopDeepLink,
+  flushPendingDesktopDeepLink,
+  handleDesktopOpenUrl,
+  handleDesktopSecondInstance,
   isWindowsNsisInstalledApp,
   migrateMacPackagedRuntimeState,
   migrateLegacyProductUserData,
   normalizeVersionString,
   parseSemver,
+  parseDesktopDeepLink,
+  queueDesktopDeepLink,
   readEnvFileValue,
   requestPackagedSingleInstanceLock,
+  registerDesktopProtocolClient,
   resolveAppDir,
   resolveLegacyProductUserDataDirs,
   resolveBackendBindHost,
   resolveDesktopConnectHost,
+  resolveDesktopProviderDailyCacheDir,
   restorePackagedRuntimeStateFromBackup,
   sanitizeReleaseUrl,
   startBackend,
@@ -2324,6 +2601,19 @@ module.exports = {
   __setBackendProcessForTest,
   __setMainWindowForTest(mainWindowRef = null) {
     mainWindow = mainWindowRef;
+  },
+  __setDesktopDeepLinkStateForTest({
+    mainPageUrl = '',
+    ready = false,
+    pendingRoute = null,
+  } = {}) {
+    desktopMainPageUrl = mainPageUrl;
+    desktopWebReady = ready;
+    pendingDesktopDeepLinkRoute = pendingRoute;
+    desktopDeepLinkNavigationInFlight = false;
+  },
+  __getPendingDesktopDeepLinkRouteForTest() {
+    return pendingDesktopDeepLinkRoute;
   },
   waitForBackendExit,
 };

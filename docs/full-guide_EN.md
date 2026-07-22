@@ -211,7 +211,7 @@ Default schedule: Every weekday at **18:00 (Beijing Time)** automatic execution.
 | `LITELLM_FALLBACK_MODELS` | Fallback models, comma-separated | - | No |
 | `LLM_CHANNELS` | Channel names (comma-separated), use with `LLM_{NAME}_*`, see [LLM Config Guide](LLM_CONFIG_GUIDE_EN.md) | - | No |
 | `LLM_HERMES_API_KEY` | Single API key for the reserved Hermes local HTTP generation channel; provide it through `.env`, runtime config, or Secrets only | - | Required for Hermes |
-| `LLM_HERMES_BASE_URL` | Hermes local loopback `/v1` endpoint; defaults to `http://127.0.0.1:8642/v1`; remote endpoints are not supported | `http://127.0.0.1:8642/v1` | No |
+| `LLM_HERMES_BASE_URL` | Hermes local loopback `/v1` endpoint; defaults to `http://127.0.0.1:8642/v1`; remote endpoints are not supported; also set `OUTBOUND_HTTP_ALLOWLIST=127.0.0.1:8642` | `http://127.0.0.1:8642/v1` | No |
 | `LLM_HERMES_MODELS` | Raw Hermes model list; Phase 3 defaults to `hermes-agent`, maps to runtime route `openai/hermes-agent`, and does not support Vision, stream, tools, or Agent tools | `hermes-agent` | No |
 | `LITELLM_CONFIG` | Advanced model routing YAML path (expert use) | - | No |
 | `LLM_USAGE_HMAC_SECRET` | Secret for LLM usage telemetry message HMACs; leave empty to use a generated local data-dir secret file | - | No |
@@ -224,7 +224,7 @@ Default schedule: Every weekday at **18:00 (Beijing Time)** automatic execution.
 | `ANTHROPIC_API_KEY` | Anthropic Claude API Key | - | Optional |
 | `OPENAI_API_KEY` | OpenAI-compatible API Key | - | Optional |
 | `OPENAI_BASE_URL` | OpenAI-compatible API endpoint | - | Optional |
-| `OLLAMA_API_BASE` | Ollama local service address (e.g. `http://localhost:11434`), see [LLM Config Guide](LLM_CONFIG_GUIDE_EN.md) | - | Optional |
+| `OLLAMA_API_BASE` | Ollama local service address (e.g. `http://localhost:11434`); private/loopback targets must also be listed in `OUTBOUND_HTTP_ALLOWLIST`, see [LLM Config Guide](LLM_CONFIG_GUIDE_EN.md) and [Outbound HTTP Security Policy](security-outbound-policy.md) | - | Optional |
 | `OPENAI_MODEL` | OpenAI model name (legacy) | `gpt-5.5` | Optional |
 
 > GitHub Actions note: the bundled `00-daily-analysis.yml` explicitly uses `litellm` when `GENERATION_FALLBACK_BACKEND` is not configured, so an unset Secret/Variable is not exported as an empty value that disables backend fallback. To disable backend fallback in Actions, set the fallback to the primary backend and let the resolver treat it as self no-op.
@@ -1563,6 +1563,14 @@ A: Check if Actions is enabled, and if cron expression is correct (note it's UTC
 - If upstream FX fetch fails, the page may still remain stale after refresh and will explain the fallback result inline.
 - When `PORTFOLIO_FX_UPDATE_ENABLED=false`, the refresh API returns an explicit disabled status and the page shows that online FX refresh is disabled instead of implying that no refreshable pairs exist.
 - Portfolio snapshot `positions[]` includes price metadata such as `price_source`, `price_date`, `price_stale`, and `price_available`. Today's snapshot tries realtime quotes by default, then falls back to the latest historical close on or before `as_of` when the realtime quote is unavailable or non-positive. Passing `include_realtime=false` skips realtime quotes and uses the local historical-close fallback path directly; the Web portfolio page uses this mode to render holdings before slow external realtime quote sources can block the first screen. Historical `as_of` snapshots stay on historical-close semantics and no longer silently treat cost basis as the current price. Missing-price positions are marked with `price_available=false` and excluded from market value / unrealized PnL totals.
+
+## Agent Runtime Guards
+
+Agent timeouts have three levels. `AGENT_TOOL_TIMEOUT_S` limits one tool call to 120 seconds by default. `AGENT_TECHNICAL_AGENT_TIMEOUT_S`, `AGENT_INTEL_AGENT_TIMEOUT_S`, `AGENT_RISK_AGENT_TIMEOUT_S`, `AGENT_DECISION_AGENT_TIMEOUT_S`, `AGENT_PORTFOLIO_AGENT_TIMEOUT_S`, and `AGENT_SKILL_AGENT_TIMEOUT_S` can set independent stage limits. `AGENT_ORCHESTRATOR_TIMEOUT_S` defaults to a 600-second limit for the complete single-agent loop or multi-agent pipeline. When limits overlap, the shortest remaining budget wins. Tool results that arrive after a timeout are fenced off and cannot be accepted as successful results. Each multi-agent stage runs against an isolated context copy and commits state only when it returns `COMPLETED` before the limit; late state and progress cannot enter later stages. Python cannot forcibly terminate a native thread that is already running, so a custom stage or tool handler may still finish in the background and produce its own external side effects, but it cannot write back into the accepted Agent context or tool-session cache. Progress callbacks are synchronous hooks and must return promptly; the supported SSE and runtime adapters only enqueue or publish without waiting. The stage fence orders an accepted callback before closure but does not attempt to preempt arbitrary caller code already executing inside a callback.
+
+`AGENT_MAX_IDENTICAL_TOOL_CALLS=3` permits an exact tool name and normalized argument set at most three times in one run; the fourth attempt stops the current Agent before dispatch. `AGENT_MAX_STAGE_ENTRIES=1` permits a stage name to enter once per pipeline and hard-stops a duplicate before execution. Set a numeric guard to `0` to disable that guard. Loop logs contain only the tool name and a short hash of the argument signature, never the raw arguments.
+
+`AGENT_STAGE_FAILURE_POLICY=isolate` is the default. Failures or uncaught exceptions from existing non-critical `intel`, `risk`, and specialist/skill stages are recorded and continue through the degraded path; `technical` and `decision` remain critical boundaries. With `fail_fast`, any failed stage stops the pipeline. Guards write low-sensitivity `agent_runtime_guard {JSON}` log records for `tool_timeout`, `run_timeout`, `tool_loop_detected`, `stage_loop_detected`, `stage_exception_captured`, `stage_timeout`, `stage_failure_isolated`, and `stage_failure_fail_fast`. These internal logs do not change the public SSE, API, report, or Web/Desktop contracts.
 
 ## Agent Tool Data Cache And Persistence
 

@@ -43,6 +43,22 @@ cp .env.example .env
 4. 推送分支：`git push origin feature/your-feature`
 5. 创建 Pull Request
 
+### 认领 Issue
+
+对于开放且尚未分配的 Issue，请发送一条内容仅为 `/claim` 的新评论。自动化只会把 Issue 分配给发出命令的真人评论者，每个账号同时最多持有一个开放 Issue 分配。它不处理 Pull Request 评论、Bot 评论、非精确命令或已关闭 Issue，也不会覆盖已有 assignee；如果 Issue 已分配，它会保留原状态并礼貌回复。
+
+认领后请在 3 天内发布 draft Pull Request 或进展更新。这个活动窗口由维护者手动执行，不会自动过期；当前不支持 `/unclaim`，需要释放认领时请联系维护者。
+
+### 架构决策
+
+如果 PR 会改变组件边界、跨模块单一权威、运行时/持久化/部署模型、安全或故障策略，或建立可复用的大型迁移方法，PR 正文必须完成 ADR 考量：链接一个新的或既有的 ADR，或者说明为什么改动仍受现有决策约束且不需要新 ADR。编号、状态、流程和模板见 [ADR 注册表](adr/README.md)。
+
+已接受的 ADR 保留为历史记录。重大改判应新增 ADR 并互相链接，不要直接重写旧记录来隐藏原决策。
+
+### 变更归属
+
+共享的数据源、分析管线、领域契约、持久化与领域报告语义应优先归入 foundation pipeline；API DTO 与投影、Web、Desktop、Bot、交互式 Agent 体验及仓库治理归入 product layer，并通过共享契约消费 foundation 能力。跨轨改动必须先确定单一权威并保持领域 Schema、API 投影、任务状态与报告视图兼容，不能在产品入口复制 provider fallback、管线编排或任务生命周期。完整路由、上游移植和许可证来源规则见 [Foundation Pipeline 与 Product Layer](foundation-product-architecture.md)。架构轨不决定许可证。
+
 ### Commit 规范
 
 使用 [Conventional Commits](https://www.conventionalcommits.org/) 规范：

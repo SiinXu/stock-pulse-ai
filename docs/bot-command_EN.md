@@ -152,15 +152,21 @@ class BotCommand(ABC):
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `/analyze` | Analyze a specific stock | `/analyze AAPL` or `/analyze 600519` |
-| `/ask` | Single-turn question about a stock or the market | `/ask what is RSI for AAPL` |
+| `/analyze` | Analyze an A-share, Hong Kong, or US stock | `/analyze 600519`, `/analyze HK00700`, or `/analyze AAPL` |
+| `/ask` | Analyze one or more stocks with Agent skills | `/ask HK00700` or `/ask 600519,AAPL trend` |
 | `/batch` | Batch-analyze your configured watchlist | `/batch` |
 | `/chat` | Multi-turn strategy chat (maintains conversation context) | `/chat` |
 | `/market` | Market review (A-shares / US stocks) | `/market` |
 | `/help` | Show help text | `/help` |
 | `/status` | Show system status | `/status` |
 
-> **Stock code formats:** A-shares use 6-digit codes (e.g. `600519`); HK stocks prefix `hk` (e.g. `hk00700`); US stocks use ticker symbols (e.g. `AAPL`, `TSLA`).
+> **Stock code formats:** A-shares accept 6-digit codes and common exchange forms (for example `600519` or `SH600519`). Hong Kong stocks accept a 5-digit code, an `HK` prefix, or a `.HK` suffix (for example `00700`, `HK00700`, or `00700.HK`) and are routed as canonical `HK00700`. US stocks use ticker symbols such as `AAPL` or `BRK.B`. `/analyze` and `/ask` return bilingual, actionable format guidance when a symbol is invalid or belongs to a market that these Bot commands do not currently support.
+
+`/analyze` continues to submit through the shared `AnalysisTaskQueue`; market normalization does not create a separate Bot task lifecycle or change Task IDs, in-flight deduplication, statuses, or notification reply targets.
+
+`/chat` detects A-share, Hong Kong, and one-to-five-letter US symbols (including one-letter tickers such as `F` and `T`) in the first message and canonicalizes `00700.HK` / `hk00700` as `HK00700`. Common forms such as a bare symbol with a question mark, `AAPL price?`, and `Tell me about AAPL` establish the same canonical scope. Invalid symbols joined with full-width or ASCII separators are rejected atomically instead of authorizing one fragment. Durable follow-up restoration uses persisted user messages that explicitly name the active symbol, and phrases such as `switch to AAPL` change it. Comparison questions authorize only the symbols explicitly present in that turn: when two new symbols are named, the prior active symbol and its single-stock history do not enter the tool scope.
+
+Agent prompts include the applicable market rules, quote currency, timezone, and market-specific fields. `get_chip_distribution`, `get_capital_flow`, and `get_sector_rankings` are A-share-only, so HK and US Chat turns do not expose or require them. A mixed-market Single-Agent turn conservatively removes all three tools; a Multi-Agent comparison isolates capability per symbol, exposing them only to an A-share pipeline and never to a non-A-share pipeline. Multi-Agent then uses a tool-free synthesis step, and all symbol pipelines plus synthesis share one overall timeout budget. Code deterministically appends a limitation for every failed or timed-out symbol after successful synthesis, so the model cannot omit partial-support evidence. If every symbol is unavailable, execution remains failed and retains the stable empty-content error contract. Other missing provider or tool coverage is never filled with A-share defaults.
 
 ---
 

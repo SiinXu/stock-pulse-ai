@@ -22,6 +22,7 @@
 3. **【高玩老手】** "我要做复杂的负载均衡、请求路由、甚至多异构平台高可用！" -> [指路【方式三：YAML 高级配置】](#方式三yaml高级配置适合老手自定义)
 4. **【本地模型】** "我想用 Ollama 本地模型！" -> [指路【示例 4：使用 Ollama 本地模型】](#示例-4使用-ollama-本地模型)
 5. **【视觉模型】** "我想用图片识别股票代码！" -> [指路【扩展功能：看图模型(Vision)配置】](#扩展功能看图模型vision配置)
+6. **【降级顺序】** "我需要确认配置来源、backend 和模型的准确 fallback 顺序。" -> [指路【LLM 路由与降级顺序】](#llm-路由与降级顺序)
 
 ---
 
@@ -141,6 +142,8 @@ LITELLM_MODEL=ollama/qwen3:8b
 ```
 
 > **重要**：Ollama 必须使用 `OLLAMA_API_BASE` 配置，**不要**使用 `OPENAI_BASE_URL`，否则系统会错误拼接 URL（如 404、`api/generate/api/show`）。远程 Ollama 时，将 `OLLAMA_API_BASE` 设为实际地址（如 `http://192.168.1.100:11434`）。当前依赖约束为 `litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0`（与 requirements.txt 一致）。
+>
+> **出站安全**：loopback 与私网地址默认拒绝。使用本地/私有 Ollama 时，还需在 `.env` 中设置精确目标，例如 `OUTBOUND_HTTP_ALLOWLIST=localhost:11434`；Hermes 同理使用 `127.0.0.1:8642`。规则与限制见 [出站 HTTP 安全策略](security-outbound-policy.md)。
 
 > **恭喜！小白读到这里就可以去运行程序了！**
 > 想测测看通没通？在主目录打开命令行输入：`python scripts/check_env.py --llm`
@@ -160,6 +163,86 @@ LITELLM_MODEL=ollama/qwen3:8b
 ### 首次启动配置状态
 
 后端提供只读状态接口 `GET /api/v1/system/config/setup/status`，用于判断首次启动闭环中最基础的几类配置是否已经就绪：LLM 主连接、Agent 模型、自选股、通知渠道和本地存储。首次向导与日常模型接入共用同一份 `connection_fields` 字段契约；Provider Catalog 权威提供 Provider 身份、标签、初始化默认值、发现能力与相关链接，但不权威决定字段 requirement。按当前内置 Schema，Ollama 免 Key，官方默认地址无需手填，Custom 才要求 Base URL。向导会写入显式 `_PROVIDER`，不会覆盖已有 Connection，也不会保存裸模型名或自动全选发现结果。状态接口本身只读取已保存的 `.env` 与当前进程环境变量，不会重载运行时配置、写入 `.env`、测试真实模型或创建数据库文件。
+
+### 事务化热加载与一步回退
+
+`PUT /api/v1/system/config` 会在持久化前校验完整候选配置，并且只在新的 `Config` 对象成功构建后才发布到运行时。旧客户端 payload 行为不变：`reload_now` 默认 `true`，`validate_connectivity` 默认 `false`，因此普通保存不会新增外部请求。调用方显式开启连通性探测时，会复用固定 prompt/schema 的 generation-backend smoke test；`connectivity_timeout_seconds` 可设为 1 到 120 秒。失败返回 `connectivity_probe_failed`，其 `details.error_code` 区分认证、额度、模型不可用、网络或后端契约错误，且不会回显凭据。
+
+持久化写入与运行时激活由同一事务锁串行化。候选构建或运行时重置失败时，服务会恢复原始 `.env` 内容、受影响的进程环境变量和旧的全局 `Config` 对象，并以 `runtime_activation_failed` 拒绝本次更新。激活成功后，会在 `ENV_FILE` 同目录生成 `.env.last-good-*` 本地快照；POSIX 系统强制仅文件所有者可读写的 `0600` 权限，Windows 则继承所在目录的访问控制列表（ACL）。该文件含上一版原始配置与 secret，受仓库 `.env.*` ignore 规则保护，严禁上传、附到 issue 或提交到 Git。
+
+调用 `POST /api/v1/system/config/rollback` 并提交当前 `config_version`，即可原子激活该快照。它复用普通配置写入的 optimistic conflict 和应用级认证中间件，且绝不会修改 `ADMIN_AUTH_ENABLED`；如果快照中的该字段不同，会返回 `auth_settings_endpoint_required`，仍必须通过 `/api/v1/auth/settings` 完成再认证。回退成功后，被替换的有效版本会成为下一份 last-known-good，因此再回退一次可以撤销本次操作。`reload_now=false` 继续作为只持久化兼容模式：不发布运行时状态，也不替换 last-known-good。
+
+分析 worker 在 `AnalysisService` 启动任务时读取当前 singleton，随后 `StockAnalysisPipeline` 在整次运行中持有该对象。因此运行中的任务不会被后续热加载中途改写；尚未启动的排队任务会在 worker 启动时获得最新有效配置。运维审计日志只记录操作者类别、UTC 时间、操作、结果、变更键名和配置版本，不记录任何值。当前单管理员模型只能归因为 `authenticated_admin`、`desktop_operator` 或 `local_operator`，不声明逐用户身份或持久化安全审计存储。
+
+### LLM 路由与降级顺序
+
+配置来源优先级、generation backend fallback 和模型 fallback 是三层独立决策：
+
+| 层级 | 选择与降级语义 |
+| --- | --- |
+| 配置来源 | `LLM_CONFIG_MODE=auto` 按 `LITELLM_CONFIG` 指向的有效 LiteLLM YAML、已声明的 `LLM_CHANNELS`、legacy provider 环境变量依次选择第一份有效来源。`yaml`、`channels` 或 `legacy` 模式只允许对应来源，不会静默混用；显式选中的无效 Hermes route 会 fail closed，不会静默复用 legacy 凭据。 |
+| Generation backend | `GENERATION_BACKEND` 选择主 backend。显式启用本地 CLI backend 后，只有结构化错误标记为 `fallbackable` 时，`GENERATION_FALLBACK_BACKEND=litellm` 才切换到 LiteLLM。LiteLLM 已是主 backend 时，`litellm -> litellm` 是 no-op；空值关闭 backend 级 fallback。 |
+| LiteLLM 模型链 | 运行时先尝试 `LITELLM_MODEL`，再按顺序尝试 `LITELLM_FALLBACK_MODELS`。请求异常、空响应或响应校验失败会进入下一模型；Channels/YAML 模式的 Router 还可在当前模型 route 内执行多 Key 负载均衡和 deployment retry。 |
+| 最终失败 | 所有模型都失败时返回既有 typed/normalized error，不会伪装为成功降级；不可 fallback 的 backend 配置或能力错误会在 backend 切换前失败。 |
+
+流式输出多一层同模型恢复：stream 失败后先对同一模型做 non-stream 重试，再决定是否进入下一个模型。失败 stream 的部分文本不会与另一个模型的输出拼接。
+
+配置激活与请求 fallback 的作用域也不同。候选校验或显式开启的连通性探测可以在激活前拒绝保存，旧运行时与 `.env` 保持原样。后续真实业务请求失败时会走上述 backend/model 链，但不会自动重写配置；新路由持续不合适时，由运维调用一步回退恢复 last-known-good。
+
+#### 生产 fallback 示例
+
+主备应尽量使用独立 provider、凭据和 endpoint，避免单一账号、额度或地域故障同时击穿整个链：
+
+```env
+LLM_CONFIG_MODE=channels
+LLM_CHANNELS=deepseek,relay
+
+LLM_DEEPSEEK_PROVIDER=deepseek
+LLM_DEEPSEEK_BASE_URL=https://api.deepseek.com
+LLM_DEEPSEEK_API_KEY=your_deepseek_key
+LLM_DEEPSEEK_MODELS=deepseek-v4-flash
+
+LLM_RELAY_PROVIDER=openai
+LLM_RELAY_BASE_URL=https://your-relay.example/v1
+LLM_RELAY_API_KEY=your_relay_key
+LLM_RELAY_MODELS=gpt-5.5
+
+LITELLM_MODEL=deepseek/deepseek-v4-flash
+LITELLM_FALLBACK_MODELS=openai/gpt-5.5
+```
+
+实际模型 ID 必须在对应账号与 endpoint 上可用。同一 provider 的第二个模型可以规避单模型错误，但不能规避 provider 级鉴权、额度或网络故障。
+
+#### 零成本本地示例
+
+Ollama 不需要 API Key，但两个模型仍依赖同一台机器和同一个本地进程：
+
+```env
+LLM_CONFIG_MODE=channels
+LLM_CHANNELS=ollama
+LLM_OLLAMA_PROVIDER=ollama
+LLM_OLLAMA_BASE_URL=http://localhost:11434
+LLM_OLLAMA_MODELS=qwen3:8b,llama3.2
+
+LITELLM_MODEL=ollama/qwen3:8b
+LITELLM_FALLBACK_MODELS=ollama/llama3.2
+GENERATION_FALLBACK_BACKEND=
+```
+
+使用前需提前 pull 两个模型并确认内存足够。该方案避免外部 API 费用，但不会消除本地算力成本或单机故障。
+
+#### 降级排障
+
+| 现象 | 含义与处理 |
+| --- | --- |
+| 保存时返回 `connectivity_probe_failed` | 候选未激活。根据 `details.error_code` 区分鉴权、额度、模型、网络或 backend 契约错误，修正草稿后重试。 |
+| 所有模型都返回 `401` / `403` | 确认每个 fallback 使用独立且有效的凭据与 endpoint；多个模型共享同一个被拒绝 Key 不构成独立 fallback。 |
+| `429` / 额度耗尽 | 等待 provider 窗口、降低并发/批量压力，或将 fallback 指向不同 provider/账号；同一耗尽账号内轮换 Key 未必有效。 |
+| 模型不存在或无访问权限 | 核对 provider 的精确模型 ID 与账号权限，不要复用另一个 endpoint/账号的发现结果。 |
+| Timeout / Connection refused | 检查 Base URL、代理/出网、DNS/TLS，以及本地 Ollama/CLI 进程。需要隔离网络故障时应使用跨 provider fallback。 |
+| 所有模型失败 | 查看脱敏后的逐模型日志和最终 typed error；运行时不会静默复用部分输出或无效响应。 |
+
+行情数据源 fallback 与模型路由彼此独立。数据源顺序、限流、市场支持、熔断和 stale cache 见 [数据源稳定性与故障处理](data-source-stability.md)。
 
 ### Web 模型连接编辑器的兼容性 / 迁移 / 回退规则
 
@@ -263,6 +346,7 @@ LLM_CHANNELS=hermes
 LLM_HERMES_PROVIDER=custom
 LLM_HERMES_PROTOCOL=openai
 LLM_HERMES_BASE_URL=http://127.0.0.1:8642/v1
+OUTBOUND_HTTP_ALLOWLIST=127.0.0.1:8642
 LLM_HERMES_API_KEY=sk-local-hermes
 LLM_HERMES_MODELS=hermes-agent
 LITELLM_MODEL=openai/hermes-agent

@@ -41,6 +41,16 @@ class TechnicalAgent(BaseAgent):
         baseline = ""
         if self.technical_skill_policy:
             baseline = f"\n{self.technical_skill_policy}\n"
+        market_context = ctx.meta.get("agent_chat_market_context")
+        disabled_tools = set(
+            getattr(market_context, "disabled_tool_names", ()) or ()
+        )
+        chip_workflow = (
+            "3. Analyse volume; chip distribution is unavailable for this market "
+            "and must not be substituted with A-share data"
+            if "get_chip_distribution" in disabled_tools
+            else "3. Analyse volume and chip distribution"
+        )
 
         return f"""\
 You are a **Technical Analysis Agent** specialising in Chinese A-shares, \
@@ -52,7 +62,7 @@ output a structured JSON opinion.
 ## Workflow (execute stages in order)
 1. Fetch realtime quote + daily history (if not already provided)
 2. Run trend analysis (MA alignment, MACD, RSI)
-3. Analyse volume and chip distribution
+{chip_workflow}
 4. Identify chart patterns
 
 {baseline}
@@ -100,4 +110,3 @@ Return **only** a JSON object (no markdown fences):
             },
             raw_data=parsed,
         )
-

@@ -1,0 +1,511 @@
+"""Command-line parsing and mode dispatch implementation."""
+
+from __future__ import annotations
+
+import argparse
+from types import FunctionType
+from typing import TYPE_CHECKING, Any, Dict
+
+from src.config import Config
+from src.utils.sanitize import log_safe_exception
+
+if TYPE_CHECKING:
+    from main import (
+        _build_schedule_time_provider,
+        _build_schedule_times_provider,
+        _reload_runtime_config,
+        _resolve_scheduled_stock_codes,
+        _resolve_web_service_bind,
+        _run_analysis_with_runtime_scheduler_lock,
+        _run_market_review_with_shared_lock,
+        _warn_if_public_webui_without_auth,
+        json,
+        logger,
+        os,
+        prepare_webui_frontend_assets,
+        resolve_index_stock_code_for_analysis,
+        run_full_analysis,
+        split_stock_list,
+        start_api_server,
+        start_bot_stream_clients,
+        time,
+    )
+
+
+def clone_facade_function(
+    function: FunctionType,
+    facade_globals: Dict[str, Any],
+    *,
+    module_name: str,
+    qualname: str,
+) -> FunctionType:
+    """Clone a moved CLI function with the legacy facade globals."""
+
+    cloned = FunctionType(
+        function.__code__,
+        facade_globals,
+        name=function.__name__,
+        argdefs=function.__defaults__,
+        closure=function.__closure__,
+    )
+    cloned.__annotations__ = dict(function.__annotations__)
+    cloned.__dict__.update(function.__dict__)
+    cloned.__doc__ = function.__doc__
+    cloned.__kwdefaults__ = (
+        dict(function.__kwdefaults__) if function.__kwdefaults__ else None
+    )
+    cloned.__module__ = module_name
+    cloned.__qualname__ = qualname
+    if hasattr(function, "__type_params__"):
+        cloned.__type_params__ = function.__type_params__
+    return cloned
+
+
+def parse_arguments() -> argparse.Namespace:
+    """解析命令行参数"""
+    parser = argparse.ArgumentParser(
+        description='A股自选股智能分析系统',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog='''
+示例:
+  python main.py                    # 正常运行
+  python main.py --debug            # 调试模式
+  python main.py --dry-run          # 仅获取数据，不进行 AI 分析
+  python main.py --stocks 600519,000001  # 指定分析特定股票
+  python main.py --no-notify        # 不发送推送通知
+  python main.py --check-notify     # 检查通知配置，不发送通知
+  python main.py --single-notify    # 启用单股推送模式（每分析完一只立即推送）
+  python main.py --schedule         # 启用定时任务模式
+  python main.py --market-review    # 仅运行大盘复盘
+        '''
+    )
+
+    parser.add_argument(
+        '--debug',
+        action='store_true',
+        help='启用调试模式，输出详细日志'
+    )
+
+    parser.add_argument(
+        '--dry-run',
+        action='store_true',
+        help='仅获取数据，不进行 AI 分析'
+    )
+
+    parser.add_argument(
+        '--stocks',
+        type=str,
+        help='指定要分析的股票代码，逗号分隔（覆盖配置文件）'
+    )
+
+    parser.add_argument(
+        '--no-notify',
+        action='store_true',
+        help='不发送推送通知'
+    )
+
+    parser.add_argument(
+        '--check-notify',
+        action='store_true',
+        help='只读检查通知渠道配置，不发送通知'
+    )
+
+    parser.add_argument(
+        '--single-notify',
+        action='store_true',
+        help='启用单股推送模式：每分析完一只股票立即推送，而不是汇总推送'
+    )
+
+    parser.add_argument(
+        '--workers',
+        type=int,
+        default=None,
+        help='并发线程数（默认使用配置值）'
+    )
+
+    parser.add_argument(
+        '--schedule',
+        action='store_true',
+        help='启用定时任务模式，每日定时执行'
+    )
+
+    parser.add_argument(
+        '--no-run-immediately',
+        action='store_true',
+        help='定时任务启动时不立即执行一次'
+    )
+
+    parser.add_argument(
+        '--market-review',
+        action='store_true',
+        help='仅运行大盘复盘分析'
+    )
+
+    parser.add_argument(
+        '--no-market-review',
+        action='store_true',
+        help='跳过大盘复盘分析'
+    )
+
+    parser.add_argument(
+        '--force-run',
+        action='store_true',
+        help='跳过交易日检查，强制执行全量分析（Issue #373）'
+    )
+
+    parser.add_argument(
+        '--webui',
+        action='store_true',
+        help='启动 Web 管理界面'
+    )
+
+    parser.add_argument(
+        '--webui-only',
+        action='store_true',
+        help='仅启动 Web 服务，不执行自动分析'
+    )
+
+    parser.add_argument(
+        '--serve',
+        action='store_true',
+        help='启动 FastAPI 后端服务（同时执行分析任务）'
+    )
+
+    parser.add_argument(
+        '--serve-only',
+        action='store_true',
+        help='仅启动 FastAPI 后端服务，不自动执行分析'
+    )
+
+    parser.add_argument(
+        '--port',
+        type=int,
+        default=None,
+        help='FastAPI 服务端口（默认使用 WEBUI_PORT，未配置时为 8000）'
+    )
+
+    parser.add_argument(
+        '--host',
+        type=str,
+        default=None,
+        help='FastAPI 服务监听地址（默认使用 WEBUI_HOST，未配置时为 127.0.0.1）'
+    )
+
+    parser.add_argument(
+        '--no-context-snapshot',
+        action='store_true',
+        help='不保存分析上下文快照'
+    )
+
+    # === Backtest ===
+    parser.add_argument(
+        '--backtest',
+        action='store_true',
+        help='运行回测（对历史分析结果进行评估）'
+    )
+
+    parser.add_argument(
+        '--backtest-code',
+        type=str,
+        default=None,
+        help='仅回测指定股票代码'
+    )
+
+    parser.add_argument(
+        '--backtest-days',
+        type=int,
+        default=None,
+        help='回测评估窗口（交易日数，默认使用配置）'
+    )
+
+    parser.add_argument(
+        '--backtest-force',
+        action='store_true',
+        help='强制回测（即使已有回测结果也重新计算）'
+    )
+
+    return parser.parse_args()
+
+
+def _dispatch_cli(config: Config, args: argparse.Namespace) -> int:
+    """Dispatch the configured CLI mode after startup bootstrap completes."""
+
+    # 验证配置
+    warnings = config.validate()
+    for warning in warnings:
+        logger.warning(warning)
+
+    if getattr(args, "check_notify", False):
+        from src.services.notification_diagnostics import (
+            format_notification_diagnostics,
+            run_notification_diagnostics,
+        )
+
+        result = run_notification_diagnostics(config)
+        print(format_notification_diagnostics(result))
+        return 0 if result.ok else 1
+
+    # 解析股票列表（统一为大写 Issue #355）
+    stock_codes = None
+    if args.stocks:
+        stock_codes = [
+            resolve_index_stock_code_for_analysis(c)
+            for c in split_stock_list(args.stocks)
+            if (c or "").strip()
+        ]
+        logger.info("Using the stock list supplied on the command line: %s", stock_codes)
+
+    # === 处理 --webui / --webui-only 参数，映射到 --serve / --serve-only ===
+    if args.webui:
+        args.serve = True
+    if args.webui_only:
+        args.serve_only = True
+
+    # 兼容旧版 WEBUI_ENABLED 环境变量
+    if config.webui_enabled and not (args.serve or args.serve_only):
+        args.serve = True
+
+    # === 启动 Web 服务 (如果启用) ===
+    start_serve = (args.serve or args.serve_only) and os.getenv("GITHUB_ACTIONS") != "true"
+
+    if start_serve:
+        args.host, args.port = _resolve_web_service_bind(args, config)
+        _warn_if_public_webui_without_auth(args.host)
+
+    bot_clients_started = False
+    if start_serve:
+        from src.services.runtime_scheduler import (
+            CLI_SCHEDULER_OWNER_ENV,
+            RUNTIME_SCHEDULER_ARGS_ENV,
+            RUNTIME_SCHEDULER_FORCE_ENABLED_ENV,
+            RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV,
+            RUNTIME_SCHEDULER_SUPPRESS_START_ENV,
+        )
+
+        # The API runtime scheduler owns schedules once the Web/API service starts.
+        # This keeps Web settings, status, and run-now actions attached to the real
+        # scheduler instead of a separate CLI loop.
+        os.environ.pop(CLI_SCHEDULER_OWNER_ENV, None)
+        if args.serve_only:
+            os.environ[RUNTIME_SCHEDULER_SUPPRESS_START_ENV] = "true"
+        else:
+            os.environ.pop(RUNTIME_SCHEDULER_SUPPRESS_START_ENV, None)
+        runtime_schedule_requested = not args.serve_only and (
+            args.schedule or config.schedule_enabled
+        )
+        if not args.serve_only and args.schedule:
+            os.environ[RUNTIME_SCHEDULER_FORCE_ENABLED_ENV] = "true"
+        else:
+            os.environ.pop(RUNTIME_SCHEDULER_FORCE_ENABLED_ENV, None)
+        if runtime_schedule_requested:
+            runtime_run_immediately = config.schedule_run_immediately
+            if getattr(args, 'no_run_immediately', False):
+                runtime_run_immediately = False
+            os.environ[RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV] = (
+                "true" if runtime_run_immediately else "false"
+            )
+        else:
+            os.environ.pop(RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV, None)
+        os.environ[RUNTIME_SCHEDULER_ARGS_ENV] = json.dumps({
+            "no_notify": bool(getattr(args, "no_notify", False)),
+            "no_market_review": bool(getattr(args, "no_market_review", False)),
+            "dry_run": bool(getattr(args, "dry_run", False)),
+            "force_run": bool(getattr(args, "force_run", False)),
+            "single_notify": bool(getattr(args, "single_notify", False)),
+            "no_context_snapshot": bool(getattr(args, "no_context_snapshot", False)),
+            "workers": getattr(args, "workers", None),
+        })
+        if not prepare_webui_frontend_assets():
+            logger.warning(
+                "Frontend assets are not ready; starting FastAPI without a usable Web page"
+            )
+        try:
+            start_api_server(host=args.host, port=args.port, config=config)
+            bot_clients_started = True
+        except Exception as exc:  # broad-exception: fallback_recorded - preserve service-start fallback and logged CLI failure behavior
+            log_safe_exception(
+                logger,
+                "FastAPI service startup failed",
+                exc,
+                error_code="main_fastapi_start_failed",
+            )
+            if args.serve_only:
+                return 1
+            start_serve = False
+
+    if bot_clients_started:
+        start_bot_stream_clients(config)
+
+    # === 仅 Web 服务模式：不自动执行分析 ===
+    if args.serve_only:
+        logger.info("Mode: Web service only")
+        logger.info("Web service running at http://%s:%s", args.host, args.port)
+        logger.info("Trigger analysis through /api/v1/analysis/analyze")
+        logger.info("API documentation: http://%s:%s/docs", args.host, args.port)
+        logger.info("Press Ctrl+C to exit")
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            logger.info("\nInterrupted by the user; exiting")
+        return 0
+
+    try:
+        # 模式0: 回测
+        if getattr(args, 'backtest', False):
+            logger.info("Mode: backtest")
+            from src.services.backtest_service import BacktestService
+
+            service = BacktestService()
+            stats = service.run_backtest(
+                code=getattr(args, 'backtest_code', None),
+                force=getattr(args, 'backtest_force', False),
+                eval_window_days=getattr(args, 'backtest_days', None),
+            )
+            logger.info(
+                f"Backtest completed: processed={stats.get('processed')} saved={stats.get('saved')} "
+                f"completed={stats.get('completed')} insufficient={stats.get('insufficient')} errors={stats.get('errors')}"
+            )
+            return 0
+
+        # 模式1: 仅大盘复盘
+        if args.market_review:
+            from src.core.market_review import run_market_review
+            from src.core.market_review_runtime import build_market_review_runtime
+
+            # Issue #373: Trading day check for market-review-only mode.
+            # Do NOT use _compute_trading_day_filter here: that helper checks
+            # config.market_review_enabled, which would wrongly block an
+            # explicit --market-review invocation when the flag is disabled.
+            effective_region = None
+            if not getattr(args, 'force_run', False) and getattr(config, 'trading_day_check_enabled', True):
+                from src.core.trading_calendar import get_open_markets_today, compute_effective_region as _compute_region
+                open_markets = get_open_markets_today()
+                effective_region = _compute_region(
+                    getattr(config, 'market_review_region', 'cn') or 'cn', open_markets
+                )
+                if effective_region == '':
+                    logger.info(
+                        "All markets relevant to the review are closed today; skipping the run. "
+                        "Use --force-run to override."
+                    )
+                    return 0
+
+            logger.info("Mode: market review only")
+            notifier, analyzer, search_service = build_market_review_runtime(config)
+
+            _run_market_review_with_shared_lock(
+                config,
+                run_market_review,
+                notifier=notifier,
+                analyzer=analyzer,
+                search_service=search_service,
+                send_notification=not args.no_notify,
+                override_region=effective_region,
+                trigger_source="cli",
+            )
+            return 0
+
+        # 模式2: 定时任务模式
+        if args.schedule or config.schedule_enabled:
+            if start_serve:
+                logger.info("Mode: Web/API runtime scheduler")
+                logger.info("Web service running at http://%s:%s", args.host, args.port)
+                logger.info(
+                    "The Web/API runtime scheduler owns scheduled runs; "
+                    "saved settings apply to this process"
+                )
+                logger.info("Press Ctrl+C to exit")
+                try:
+                    while True:
+                        time.sleep(1)
+                except KeyboardInterrupt:
+                    logger.info("\nInterrupted by the user; exiting")
+                return 0
+
+            logger.info("Mode: scheduled analysis")
+            logger.info("Daily run time: %s", config.schedule_time)
+
+            # Determine whether to run immediately:
+            # Command line arg --no-run-immediately overrides config if present.
+            # Otherwise use config (defaults to True).
+            should_run_immediately = config.schedule_run_immediately
+            if getattr(args, 'no_run_immediately', False):
+                should_run_immediately = False
+
+            logger.info("Run immediately at startup: %s", should_run_immediately)
+
+            from src.scheduler import run_with_schedule
+            scheduled_stock_codes = _resolve_scheduled_stock_codes(stock_codes)
+            schedule_time_provider = _build_schedule_time_provider(config.schedule_time)
+            schedule_times_provider = _build_schedule_times_provider(config.schedule_time)
+
+            def scheduled_task():
+                runtime_config = _reload_runtime_config()
+                run_full_analysis(runtime_config, args, scheduled_stock_codes)
+
+            background_tasks = []
+            if getattr(config, 'agent_event_monitor_enabled', False):
+                from src.services.alert_worker import AlertWorker
+
+                interval_minutes = max(1, getattr(config, 'agent_event_monitor_interval_minutes', 5))
+                alert_worker = AlertWorker(config_provider=_reload_runtime_config)
+
+                def event_monitor_task():
+                    stats = alert_worker.run_once()
+                    triggered_count = stats.get("triggered", 0)
+                    if triggered_count:
+                        logger.info("[EventMonitor] Triggered %d alerts in this run", triggered_count)
+
+                background_tasks.append({
+                    "task": event_monitor_task,
+                    "interval_seconds": interval_minutes * 60,
+                    "run_immediately": True,
+                    "name": "agent_event_monitor",
+                })
+
+            schedule_kwargs = {
+                "task": scheduled_task,
+                "schedule_time": config.schedule_time,
+                "run_immediately": should_run_immediately,
+                "background_tasks": background_tasks,
+                "schedule_time_provider": schedule_time_provider,
+            }
+            if hasattr(config, "schedule_times"):
+                schedule_kwargs["schedule_times"] = config.schedule_times
+                schedule_kwargs["schedule_times_provider"] = schedule_times_provider
+            run_with_schedule(**schedule_kwargs)
+            return 0
+
+        # 模式3: 正常单次运行
+        if config.run_immediately:
+            _run_analysis_with_runtime_scheduler_lock(config, args, stock_codes)
+        else:
+            logger.info("Immediate analysis is disabled (RUN_IMMEDIATELY=false)")
+
+        logger.info("\nProgram execution completed")
+
+        # 如果启用了服务且是非定时任务模式，保持程序运行
+        keep_running = start_serve and not (args.schedule or config.schedule_enabled)
+        if keep_running:
+            logger.info("API service is running (press Ctrl+C to exit)")
+            try:
+                while True:
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                pass
+
+        return 0
+
+    except KeyboardInterrupt:
+        logger.info("\nInterrupted by the user; exiting")
+        return 130
+
+    except Exception as exc:  # broad-exception: fallback_recorded - preserve the logged top-level CLI failure boundary
+        log_safe_exception(
+            logger,
+            "Main execution failed",
+            exc,
+            error_code="main_execution_failed",
+        )
+        return 1

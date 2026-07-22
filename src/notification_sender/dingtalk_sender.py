@@ -5,6 +5,7 @@ import hashlib
 import base64
 import urllib.parse
 import requests
+from src.security.outbound_policy import safe_post
 import logging
 from typing import Optional
 
@@ -67,7 +68,13 @@ class DingtalkSender:
 
             # 4. 发送请求
             try:
-                response = requests.post(url, json=payload, headers=headers, timeout=timeout_seconds)
+                response = safe_post(
+                    url,
+                    json=payload,
+                    headers=headers,
+                    timeout=timeout_seconds,
+                    transport=requests,
+                )
                 response.raise_for_status()
                 
                 result = response.json()
@@ -76,7 +83,7 @@ class DingtalkSender:
                 else:
                     logger.error(f"钉钉消息分段 {index + 1} 发送失败 (DingTalk API error): {result}")
                     all_success = False
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: fallback_recorded - Per-chunk failure is logged and isolated.
                 log_safe_exception(
                     logger,
                     "DingTalk notification chunk delivery failed",

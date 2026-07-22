@@ -10,6 +10,8 @@ not introduce an external queue, scheduler, worker service, or persistence layer
 API and other delivery adapters may project these types into their existing
 payloads, but they must not define a second lifecycle or status enum.
 
+Architecture decision: [ADR-004: Use One Process-Local Task Execution Authority](adr/ADR-004-process-local-task-execution-authority.md).
+
 ## Port
 
 ```text

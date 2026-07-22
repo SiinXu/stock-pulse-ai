@@ -10,6 +10,8 @@ from urllib.parse import unquote, urlparse, urlunparse
 
 import requests
 
+from src.security.outbound_policy import safe_post
+
 from src.config import Config
 
 
@@ -113,12 +115,13 @@ class NtfySender:
         }
 
         try:
-            response = requests.post(
+            response = safe_post(
                 server_url,
                 json=payload,
                 headers=headers,
                 timeout=timeout_seconds or 10,
                 verify=self._webhook_verify_ssl,
+                transport=requests,
             )
             if 200 <= response.status_code < 300:
                 logger.info("ntfy 消息发送成功")
@@ -134,7 +137,7 @@ class NtfySender:
             logger.error("发送 ntfy 消息失败: 网络请求异常")
             logger.debug("ntfy 请求异常类型: %s", type(exc).__name__)
             return False
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Unknown channel failure is logged and isolated.
             logger.error("发送 ntfy 消息失败: 未知异常")
             logger.debug("ntfy 未知异常类型: %s", type(exc).__name__)
             return False

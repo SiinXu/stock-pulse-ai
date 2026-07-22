@@ -8,7 +8,7 @@ import { analysisApi } from '../../api/analysis';
 import { agentApi } from '../../api/agent';
 import { historyApi } from '../../api/history';
 import { systemConfigApi } from '../../api/systemConfig';
-import { useStockPoolStore } from '../../stores';
+import { useStockPoolStore } from '../../stores/stockPoolStore';
 import type { UseTaskStreamOptions } from '../../hooks/useTaskStream';
 import type { AnalysisReport } from '../../types/analysis';
 import type { RunFlowSnapshot } from '../../types/runFlow';
@@ -205,13 +205,14 @@ function createDeferred<T>() {
   return { promise, reject, resolve };
 }
 
-function renderHome(initialEntry: string, strictMode = false) {
+function renderHome(initialEntry: string | string[], strictMode = false) {
+  const initialEntries = Array.isArray(initialEntry) ? initialEntry : [initialEntry];
   const router = createMemoryRouter(
     [
       { path: '/', element: <HomePage /> },
       { path: '/other', element: <h1>Other route</h1> },
     ],
-    { initialEntries: [initialEntry] },
+    { initialEntries, initialIndex: initialEntries.length - 1 },
   );
   const content = <RouterProvider router={router} />;
   render(strictMode ? <StrictMode>{content}</StrictMode> : content);
@@ -280,6 +281,17 @@ describe('HomePage URL state', () => {
     expect(await screen.findByText('报告二摘要')).toBeInTheDocument();
     expect(vi.mocked(historyApi.getDetail).mock.calls.map(([recordId]) => recordId)).toEqual([2]);
     expect(router.state.location.search).toBe('?recordId=2&keep=yes');
+  });
+
+  it('clears restored stock input when Back removes the URL-owned stock context', async () => {
+    const router = renderHome(['/', '/?stock=00700.HK&workspace=watchlist']);
+
+    await waitFor(() => expect(document.querySelector('#home-stock-search')).toHaveValue('HK00700'));
+    await act(async () => {
+      await router.navigate(-1);
+    });
+
+    await waitFor(() => expect(document.querySelector('#home-stock-search')).toHaveValue(''));
   });
 
   it('refetches the URL-owned report after the mounted dashboard store resets', async () => {

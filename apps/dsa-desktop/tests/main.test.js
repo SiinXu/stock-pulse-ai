@@ -17,6 +17,7 @@ function loadMainModule(t, options = {}) {
     getVersion: () => '3.12.0',
     getPath: () => '/tmp/dsa-user-data',
     requestSingleInstanceLock: () => true,
+    setAsDefaultProtocolClient: () => true,
     whenReady: () => ({ then: () => undefined }),
     on: () => undefined,
     quit: () => undefined,
@@ -143,10 +144,20 @@ test('desktop package exposes StockPulse while retaining the stable upgrade appI
     path.join(repositoryRoot, 'scripts', 'verify-desktop-updater-artifacts.ps1'),
     'utf-8'
   );
+  const installerScript = fs.readFileSync(
+    path.join(__dirname, '..', 'installer.nsh'),
+    'utf-8'
+  );
 
   assert.equal(packageMetadata.name, 'stockpulse-desktop');
   assert.equal(packageMetadata.build.productName, 'StockPulse');
   assert.equal(packageMetadata.build.appId, 'com.daily-stock-analysis.desktop');
+  assert.deepEqual(packageMetadata.build.protocols, [
+    {
+      name: 'StockPulse',
+      schemes: ['stockpulse'],
+    },
+  ]);
   assert.equal(
     packageMetadata.build.win.artifactName,
     'stockpulse-windows-installer-v${version}.${ext}'
@@ -158,6 +169,184 @@ test('desktop package exposes StockPulse while retaining the stable upgrade appI
   assert.match(releaseWorkflow, /stockpulse-windows-noinstall-/);
   assert.match(releaseWorkflow, /stockpulse-macos-/);
   assert.match(updaterVerification, /stockpulse-windows-installer-/);
+  assert.match(installerScript, /!macro customInstall\b/);
+  assert.match(installerScript, /Software\\Classes\\stockpulse\\shell\\open\\command/);
+  assert.match(installerScript, /'"\$appExe" "%1"'/);
+  assert.match(installerScript, /!macro customUnInstall\b/);
+  assert.match(installerScript, /DeleteRegKey SHELL_CONTEXT "Software\\Classes\\stockpulse"/);
+});
+
+test('desktop deep-link parser preserves allowlisted Web paths and search state', (t) => {
+  const mainModule = loadMainModule(t);
+  const acceptedLinks = new Map([
+    ['stockpulse://app/?stock=AAPL&workspace=watchlist', '/?stock=AAPL&workspace=watchlist'],
+    ['stockpulse://app/chat?session=run-123', '/chat?session=run-123'],
+    ['stockpulse://app/portfolio?account=7', '/portfolio?account=7'],
+    ['stockpulse://app/decision-signals?stock=HK00700&view=timeline', '/decision-signals?stock=HK00700&view=timeline'],
+    ['stockpulse://app/stocks/600519?period=weekly&days=30', '/stocks/600519?period=weekly&days=30'],
+    ['stockpulse://app/alerts', '/alerts'],
+    ['stockpulse://app/backtest', '/backtest'],
+    ['stockpulse://app/screening', '/screening'],
+    ['stockpulse://app/settings', '/settings'],
+    ['STOCKPULSE://APP/usage?keep=yes', '/usage?keep=yes'],
+  ]);
+
+  for (const [input, expected] of acceptedLinks) {
+    assert.equal(mainModule.parseDesktopDeepLink(input), expected, input);
+  }
+  assert.equal(
+    mainModule.extractDesktopDeepLink(['StockPulse', '--flag', 'stockpulse://app/settings']),
+    'stockpulse://app/settings'
+  );
+  assert.equal(mainModule.extractDesktopDeepLink(['StockPulse', '--flag']), null);
+});
+
+test('desktop deep-link parser rejects external, ambiguous, and smuggled routes', (t) => {
+  const mainModule = loadMainModule(t);
+  const rejectedLinks = [
+    'https://example.com/settings',
+    'stockpulse://evil.example/settings',
+    'stockpulse://app@evil.example/settings',
+    'stockpulse://app:443/settings',
+    'stockpulse:///settings',
+    'stockpulse://settings',
+    'stockpulse://app/settings#https://evil.example',
+    'stockpulse://app/login',
+    'stockpulse://app/playground',
+    'stockpulse://app//evil.example',
+    'stockpulse://app/foo/../settings',
+    'stockpulse://app/%2e%2e/settings',
+    'stockpulse://app/stocks/%2FAAPL',
+    ' stockpulse://app/settings',
+    `stockpulse://app/settings?value=${'x'.repeat(4096)}`,
+  ];
+
+  for (const input of rejectedLinks) {
+    assert.equal(mainModule.parseDesktopDeepLink(input), null, input);
+  }
+});
+
+test('desktop deep links stay on the selected private Web origin', (t) => {
+  const mainModule = loadMainModule(t);
+  const targetUrl = new URL(mainModule.buildDesktopDeepLinkTargetUrl(
+    'http://127.0.0.1:8123/?desktop_version=3.21.0&cache_bust=123',
+    '/portfolio?account=7&desktop_version=spoofed&keep=yes'
+  ));
+
+  assert.equal(targetUrl.origin, 'http://127.0.0.1:8123');
+  assert.equal(targetUrl.pathname, '/portfolio');
+  assert.equal(targetUrl.searchParams.get('account'), '7');
+  assert.equal(targetUrl.searchParams.get('keep'), 'yes');
+  assert.equal(targetUrl.searchParams.get('desktop_version'), '3.21.0');
+  assert.equal(targetUrl.searchParams.get('cache_bust'), '123');
+  assert.throws(
+    () => mainModule.buildDesktopDeepLinkTargetUrl(
+      'http://127.0.0.1:8123/?desktop_version=3.21.0',
+      'https://evil.example/settings'
+    ),
+    /private Web origin/
+  );
+});
+
+test('desktop lifecycle registers the protocol and OS URL handlers', (t) => {
+  const protocolCalls = [];
+  const eventHandlers = new Map();
+  const mainModule = loadMainModule(t, {
+    app: {
+      on: (eventName, handler) => {
+        eventHandlers.set(eventName, handler);
+      },
+      setAsDefaultProtocolClient: (...args) => {
+        protocolCalls.push(args);
+        return true;
+      },
+    },
+  });
+
+  assert.deepEqual(protocolCalls, [['stockpulse']]);
+  assert.equal(eventHandlers.get('open-url'), mainModule.handleDesktopOpenUrl);
+  assert.equal(eventHandlers.get('second-instance'), mainModule.handleDesktopSecondInstance);
+
+  protocolCalls.length = 0;
+  assert.equal(mainModule.registerDesktopProtocolClient({
+    defaultApp: true,
+    executablePath: '/Applications/Electron.app/Contents/MacOS/Electron',
+    argv: ['electron', '/repo/apps/dsa-desktop/main.js'],
+  }), true);
+  assert.deepEqual(protocolCalls, [[
+    'stockpulse',
+    '/Applications/Electron.app/Contents/MacOS/Electron',
+    ['/repo/apps/dsa-desktop/main.js'],
+  ]]);
+});
+
+test('second-instance deep links restore and focus before routing', async (t) => {
+  const mainModule = loadMainModule(t);
+  const lifecycle = [];
+  const fakeWindow = {
+    isDestroyed: () => false,
+    isMinimized: () => true,
+    restore: () => lifecycle.push('restore'),
+    show: () => lifecycle.push('show'),
+    focus: () => lifecycle.push('focus'),
+    loadURL: async (url) => {
+      lifecycle.push(`load:${url}`);
+    },
+  };
+  mainModule.__setMainWindowForTest(fakeWindow);
+  mainModule.__setDesktopDeepLinkStateForTest({
+    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=3.21.0&cache_bust=123',
+    ready: true,
+  });
+
+  assert.equal(await mainModule.handleDesktopSecondInstance(
+    null,
+    ['StockPulse', 'stockpulse://app/portfolio?account=7']
+  ), true);
+  assert.deepEqual(lifecycle.slice(0, 3), ['restore', 'show', 'focus']);
+  const loadedUrl = new URL(lifecycle[3].slice('load:'.length));
+  assert.equal(loadedUrl.pathname, '/portfolio');
+  assert.equal(loadedUrl.searchParams.get('account'), '7');
+  assert.equal(loadedUrl.searchParams.get('desktop_version'), '3.21.0');
+
+  const loadCount = lifecycle.filter((entry) => entry.startsWith('load:')).length;
+  assert.equal(await mainModule.handleDesktopSecondInstance(
+    null,
+    ['StockPulse', 'stockpulse://evil.example/settings']
+  ), false);
+  assert.equal(lifecycle.filter((entry) => entry.startsWith('load:')).length, loadCount);
+});
+
+test('macOS open-url deep links wait for the private Web origin to become ready', async (t) => {
+  const mainModule = loadMainModule(t);
+  const loadedUrls = [];
+  let prevented = false;
+  mainModule.__setMainWindowForTest({
+    isDestroyed: () => false,
+    isMinimized: () => false,
+    show: () => undefined,
+    focus: () => undefined,
+    loadURL: async (url) => loadedUrls.push(url),
+  });
+  mainModule.__setDesktopDeepLinkStateForTest();
+
+  assert.equal(await mainModule.handleDesktopOpenUrl({
+    preventDefault: () => {
+      prevented = true;
+    },
+  }, 'stockpulse://app/stocks/AAPL?period=weekly'), false);
+  assert.equal(prevented, true);
+  assert.equal(loadedUrls.length, 0);
+  const pendingRoute = mainModule.__getPendingDesktopDeepLinkRouteForTest();
+  assert.equal(pendingRoute, '/stocks/AAPL?period=weekly');
+
+  mainModule.__setDesktopDeepLinkStateForTest({
+    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=3.21.0&cache_bust=123',
+    ready: true,
+    pendingRoute,
+  });
+  assert.equal(await mainModule.flushPendingDesktopDeepLink(), true);
+  assert.equal(new URL(loadedUrls[0]).pathname, '/stocks/AAPL');
 });
 
 test('buildMainPageUrl includes desktop version and cache buster', (t) => {
@@ -236,6 +425,57 @@ test('buildBackendEnvironment keeps non-macOS PATH unchanged', (t) => {
   });
 
   assert.equal(env.PATH, '/custom/bin:/usr/bin');
+});
+
+test('buildBackendEnvironment keeps the daily provider cache in Desktop runtime data by default', (t) => {
+  const mainModule = loadMainModule(t, { platform: 'darwin' });
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-desktop-provider-cache-'));
+  t.after(() => fs.rmSync(tempRoot, { recursive: true, force: true }));
+  const envFile = path.join(tempRoot, '.env');
+  const dbPath = path.join(tempRoot, 'data', 'stock_analysis.db');
+
+  const env = mainModule.buildBackendEnvironment({
+    envFile,
+    dbPath,
+    logDir: path.join(tempRoot, 'logs'),
+    sourceEnv: {},
+  });
+
+  assert.equal(
+    env.PROVIDER_DAILY_CACHE_DIR,
+    path.join(tempRoot, 'data', 'provider_cache', 'daily')
+  );
+});
+
+test('buildBackendEnvironment preserves explicit daily provider cache paths', (t) => {
+  const mainModule = loadMainModule(t, { platform: 'darwin' });
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-desktop-provider-cache-'));
+  t.after(() => fs.rmSync(tempRoot, { recursive: true, force: true }));
+  const envFile = path.join(tempRoot, '.env');
+  const dbPath = path.join(tempRoot, 'data', 'stock_analysis.db');
+  fs.writeFileSync(
+    envFile,
+    'CACHE_ROOT=/tmp/file-cache\nPROVIDER_DAILY_CACHE_DIR=${CACHE_ROOT}/daily\n',
+    'utf-8'
+  );
+
+  const envFileOverride = mainModule.buildBackendEnvironment({
+    envFile,
+    dbPath,
+    logDir: path.join(tempRoot, 'logs'),
+    sourceEnv: {},
+  });
+  const processOverride = mainModule.buildBackendEnvironment({
+    envFile,
+    dbPath,
+    logDir: path.join(tempRoot, 'logs'),
+    sourceEnv: {
+      PROVIDER_DAILY_CACHE_DIR: '/tmp/process-cache/daily',
+    },
+  });
+
+  assert.equal(envFileOverride.PROVIDER_DAILY_CACHE_DIR, '/tmp/file-cache/daily');
+  assert.equal(processOverride.PROVIDER_DAILY_CACHE_DIR, '/tmp/process-cache/daily');
 });
 
 test('buildBackendEnvironment pins WEBUI_PORT to the Electron-selected backend port', (t) => {
@@ -476,12 +716,19 @@ test('findAvailablePort normalizes wildcard bind hosts before listening', async 
 
 test('startBackend passes WEBUI_HOST from env file to backend args and env', (t) => {
   const previousWebuiHost = process.env.WEBUI_HOST;
+  const previousProviderDailyCacheDir = process.env.PROVIDER_DAILY_CACHE_DIR;
   delete process.env.WEBUI_HOST;
+  delete process.env.PROVIDER_DAILY_CACHE_DIR;
   t.after(() => {
     if (previousWebuiHost === undefined) {
       delete process.env.WEBUI_HOST;
     } else {
       process.env.WEBUI_HOST = previousWebuiHost;
+    }
+    if (previousProviderDailyCacheDir === undefined) {
+      delete process.env.PROVIDER_DAILY_CACHE_DIR;
+    } else {
+      process.env.PROVIDER_DAILY_CACHE_DIR = previousProviderDailyCacheDir;
     }
   });
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-desktop-host-'));
@@ -522,6 +769,10 @@ test('startBackend passes WEBUI_HOST from env file to backend args and env', (t)
     '8123',
   ]);
   assert.equal(spawned[0].options.env.WEBUI_HOST, '0.0.0.0');
+  assert.equal(
+    spawned[0].options.env.PROVIDER_DAILY_CACHE_DIR,
+    path.join(tmpDir, 'provider_cache', 'daily')
+  );
 });
 
 test('extendMacDesktopBackendPath preserves existing order and avoids duplicates', (t) => {
@@ -850,6 +1101,12 @@ test('desktop update backup list preserves AlphaSift caches', (t) => {
   assert.ok(files.includes(path.join('data', 'alphasift', 'hotspot.history.jsonl')));
   assert.ok(files.includes(path.join('data', 'alphasift', 'hotspot_details')));
   assert.ok(files.includes(path.join('data', 'alphasift', 'snapshot.last_good.json')));
+});
+
+test('desktop update backup list preserves the daily provider cache', (t) => {
+  const mainModule = loadMainModule(t);
+  const files = mainModule.DESKTOP_UPDATE_RUNTIME_RELATIVE_FILES || [];
+  assert.ok(files.includes(path.join('data', 'provider_cache', 'daily')));
 });
 
 test('desktop update backup and restore preserve generation backend env keys', (t) => {
@@ -1581,7 +1838,7 @@ test('restorePackagedRuntimeStateFromBackup skips backup when app version did no
   assert.equal(fs.existsSync(manifestPath), false);
 });
 
-test('createWindow startup path does not throw ReferenceError after restore result handling', async (t) => {
+test('createWindow startup routes a pending deep link after restore and backend readiness', async (t) => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-desktop-startup-'));
   const appDir = path.join(tempRoot, 'app');
   const userDataDir = path.join(tempRoot, 'userData');
@@ -1721,6 +1978,7 @@ test('createWindow startup path does not throw ReferenceError after restore resu
       },
     },
   });
+  assert.equal(mainModule.queueDesktopDeepLink('stockpulse://app/portfolio?account=7'), true);
 
   await new Promise((resolve) => {
     setTimeout(resolve, 80);
@@ -1728,10 +1986,12 @@ test('createWindow startup path does not throw ReferenceError after restore resu
 
   assert.equal(loadedFiles.length >= 1, true);
   assert.equal(loadedUrls.length >= 1, true);
-  assert.match(
-    loadedUrls[0],
-    /^http:\/\/127\.0\.0\.1:\d+\/\?desktop_version=3\.12\.0&cache_bust=\d+$/
-  );
+  const loadedMainPageUrl = new URL(loadedUrls[0]);
+  assert.match(loadedMainPageUrl.origin, /^http:\/\/127\.0\.0\.1:\d+$/);
+  assert.equal(loadedMainPageUrl.pathname, '/portfolio');
+  assert.equal(loadedMainPageUrl.searchParams.get('account'), '7');
+  assert.equal(loadedMainPageUrl.searchParams.get('desktop_version'), '3.12.0');
+  assert.match(loadedMainPageUrl.searchParams.get('cache_bust'), /^\d+$/);
   assert.equal(updateCheckRequested, true);
   assert.equal(startupError, undefined);
   assert.equal(fs.existsSync(backupRoot), false);

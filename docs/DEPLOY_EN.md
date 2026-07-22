@@ -424,7 +424,7 @@ git push
 
 - Actions page shows run history
 - Click specific run record to view detailed logs
-- Analysis reports are saved as Artifacts for 30 days
+- Each run keeps the `analysis-reports-<run_number>` Artifact for 30 days. `full` and `stocks-only` runs include generated Markdown reports plus `data/stock_analysis.db*`, which retains successful per-stock analysis history and decision signals; `full` also includes the market review. `market-only` retains the market review and any database files created by that run. All modes include logs, where skipped or failed symbols are identified.
 
 ### Schedule Details
 

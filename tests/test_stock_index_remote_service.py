@@ -68,7 +68,13 @@ def test_refresh_remote_stock_index_cache_writes_valid_payload(tmp_path: Path) -
     assert result.refreshed is True
     assert result.cache_path == cache_path
     assert json.loads(cache_path.read_text(encoding="utf-8"))[0][2] == "平安银行"
-    get.assert_called_once_with(service.DEFAULT_STOCK_INDEX_REMOTE_URL, timeout=10)
+    get.assert_called_once_with(
+        service.DEFAULT_STOCK_INDEX_REMOTE_URL,
+        timeout=10,
+        proxies={"http": "", "https": "", "all": ""},
+        stream=True,
+        allow_redirects=False,
+    )
 
 
 def test_refresh_remote_stock_index_cache_decodes_remote_payload_as_utf8(tmp_path: Path) -> None:

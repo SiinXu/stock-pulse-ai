@@ -1,0 +1,140 @@
+name: Issue Claim
+
+permissions: {}
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  claim:
+    name: Process Issue Claim
+    if: >-
+      github.event.comment.body == '/claim' &&
+      github.event.comment.user.type == 'User' &&
+      github.event.issue.state == 'open' &&
+      !github.event.issue.pull_request
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    timeout-minutes: 5
+    concurrency:
+      group: issue-claim-${{ github.repository_id }}
+      cancel-in-progress: false
+      queue: max
+
+    steps:
+      - name: Assign Commenter
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issueNumber = context.payload.issue.number;
+            const claimant = context.payload.comment.user.login;
+
+            if (context.payload.comment.body !== '/claim') {
+              return;
+            }
+
+            const reply = async (body) => {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                body,
+              });
+            };
+
+            const { data: issue } = await github.rest.issues.get({
+              owner,
+              repo,
+              issue_number: issueNumber,
+            });
+
+            if (issue.state !== 'open') {
+              await reply(
+                `Thanks @${claimant}. This issue was closed before the claim could be processed, so no assignment was changed.`
+              );
+              return;
+            }
+
+            const assignees = issue.assignees || [];
+            if (assignees.length > 0) {
+              if (assignees.some((assignee) => assignee.login === claimant)) {
+                await reply(
+                  `Thanks @${claimant}. This issue is already assigned to you; no change was needed.`
+                );
+                return;
+              }
+
+              await reply(
+                `Thanks @${claimant}. This issue is already assigned; the existing assignment was left unchanged.`
+              );
+              return;
+            }
+
+            const assignedItems = await github.paginate(
+              github.rest.issues.listForRepo,
+              {
+                owner,
+                repo,
+                assignee: claimant,
+                state: 'open',
+                per_page: 100,
+              }
+            );
+            const activeClaims = assignedItems.filter(
+              (item) => !item.pull_request && item.number !== issueNumber
+            );
+            if (activeClaims.length > 0) {
+              await reply(
+                `Thanks @${claimant}. You already have an open assigned issue, so this claim was not added. Please finish it or ask a maintainer to release it before claiming another.`
+              );
+              return;
+            }
+
+            let updatedIssue;
+            try {
+              const response = await github.rest.issues.addAssignees({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                assignees: [claimant],
+              });
+              updatedIssue = response.data;
+            } catch (error) {
+              const status = Number.isInteger(error?.status)
+                ? ` (HTTP ${error.status})`
+                : '';
+              await reply(
+                `Sorry @${claimant}, GitHub could not assign this issue automatically${status}. A maintainer will need to assign it manually.`
+              );
+              core.setFailed(`Issue assignment failed${status}`);
+              return;
+            }
+
+            const assignmentConfirmed = (updatedIssue.assignees || [])
+              .some((assignee) => assignee.login === claimant);
+            if (!assignmentConfirmed) {
+              await reply(
+                `Sorry @${claimant}, GitHub did not confirm the assignment. A maintainer will need to assign it manually.`
+              );
+              core.setFailed('GitHub did not confirm the requested assignee');
+              return;
+            }
+
+            const concurrentAssignees = (updatedIssue.assignees || [])
+              .filter((assignee) => assignee.login !== claimant);
+            if (concurrentAssignees.length > 0) {
+              await reply(
+                `Thanks @${claimant}. Another assignment was added while this claim was processing. GitHub kept both assignments, so a maintainer should review this issue.`
+              );
+              core.warning('A concurrent external assignment was detected');
+              return;
+            }
+
+            await reply(
+              `Thanks @${claimant}. This issue is now assigned to you. You can hold one open issue assignment at a time. Please share a draft pull request or progress update within 3 days; maintainers may release inactive claims.`
+            );

@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { LlmConnectionFieldSchema } from '../types/systemConfig';
-import { SUPPORTED_CONNECTION_SCHEMA_KEYS } from '../components/settings/modelAccessFieldKey';
+import { SUPPORTED_CONNECTION_SCHEMA_KEYS } from './modelAccessFieldKey';
 import {
   hasUnknownConfigContractCondition,
   isFieldEnabledByContract,

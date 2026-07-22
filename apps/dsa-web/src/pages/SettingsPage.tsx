@@ -49,7 +49,7 @@ import {
   CONNECTION_SCHEMA_KEY_BY_SUFFIX,
   parseModelAccessFieldKey,
   type ModelAccessFieldFocusRequest,
-} from '../components/settings/modelAccessFieldKey';
+} from '../utils/modelAccessFieldKey';
 import {
   buildConnectionContractValues,
   evaluateConnectionSchemaAuthority,

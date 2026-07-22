@@ -9,6 +9,8 @@ Telegram 发送提醒服务
 import logging
 from typing import Optional
 import requests
+
+from src.security.outbound_policy import safe_post
 import time
 import re
 
@@ -107,7 +109,7 @@ class TelegramSender:
                     timeout_seconds=timeout_seconds,
                 )
 
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Message failure is safely logged and isolated.
             log_safe_exception(
                 logger,
                 "Telegram message delivery failed",
@@ -143,7 +145,12 @@ class TelegramSender:
         max_retries = 3
         for attempt in range(1, max_retries + 1):
             try:
-                response = requests.post(api_url, json=payload, timeout=timeout_seconds or 10)
+                response = safe_post(
+                    api_url,
+                    json=payload,
+                    timeout=timeout_seconds or 10,
+                    transport=requests,
+                )
             except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
                 if attempt < max_retries:
                     delay = 2 ** attempt  # 2s, 4s
@@ -242,7 +249,12 @@ class TelegramSender:
         plain_payload['text'] = text
 
         try:
-            response = requests.post(api_url, json=plain_payload, timeout=timeout_seconds or 10)
+            response = safe_post(
+                api_url,
+                json=plain_payload,
+                timeout=timeout_seconds or 10,
+                transport=requests,
+            )
         except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
             log_safe_exception(
                 logger,
@@ -373,13 +385,19 @@ class TelegramSender:
             if message_thread_id:
                 data['message_thread_id'] = message_thread_id
             files = {"photo": ("report.png", image_bytes, "image/png")}
-            response = requests.post(api_url, data=data, files=files, timeout=30)
+            response = safe_post(
+                api_url,
+                data=data,
+                files=files,
+                timeout=30,
+                transport=requests,
+            )
             if response.status_code == 200 and response.json().get('ok'):
                 logger.info("Telegram 图片发送成功")
                 return True
             logger.error("Telegram 图片发送失败: %s", response.text[:200])
             return False
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Image failure is safely logged and isolated.
             log_safe_exception(
                 logger,
                 "Telegram image delivery failed",

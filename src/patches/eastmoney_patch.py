@@ -7,11 +7,22 @@ import requests
 import json
 import uuid
 import logging
+from typing import Any
+from urllib.parse import urlsplit
 from fake_useragent import UserAgent
 
+from src.security.outbound_policy import safe_post
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
+
+_EASTMONEY_REQUEST_HOSTS = frozenset(
+    {
+        "fund.eastmoney.com",
+        "push2.eastmoney.com",
+        "push2his.eastmoney.com",
+    }
+)
 
 original_request = requests.Session.request
 
@@ -41,6 +52,19 @@ class PatchSign:
 
 
 _patch_sign = PatchSign()
+
+
+def _is_eastmoney_request_url(raw_url: Any) -> bool:
+    """Return whether the parsed request host belongs to an intended EastMoney domain."""
+
+    try:
+        hostname = (urlsplit(str(raw_url or "")).hostname or "").lower().rstrip(".")
+    except ValueError:
+        return False
+    return any(
+        hostname == domain or hostname.endswith(f".{domain}")
+        for domain in _EASTMONEY_REQUEST_HOSTS
+    )
 
 
 def _get_nid(user_agent):
@@ -126,7 +150,7 @@ def _get_nid(user_agent):
                 'Content-Type': 'application/json'
             }
             # 增加超时，防止无限等待
-            response = requests.request("POST", url, headers=headers, data=payload, timeout=30)
+            response = safe_post(url, headers=headers, data=payload, timeout=30)
             response.raise_for_status()  # 对 4xx/5xx 响应抛出 HTTPError
 
             data = response.json()
@@ -167,15 +191,7 @@ def eastmoney_patch():
 
     def patched_request(self, method, url, **kwargs):
         # 排除非目标域名
-        is_target = any(
-            d in (url or "")
-            for d in [
-                "fund.eastmoney.com",
-                "push2.eastmoney.com",
-                "push2his.eastmoney.com",
-            ]
-        )
-        if not is_target:
+        if not _is_eastmoney_request_url(url):
             return original_request(self, method, url, **kwargs)
         # 获取一个随机的 User-Agent
         user_agent = ua.random

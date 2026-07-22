@@ -222,6 +222,7 @@ const ChatPage: React.FC = () => {
   const isMountedRef = useRef(true);
   const sendToastTimerRef = useRef<number | null>(null);
   const followUpHydrationTokenRef = useRef(0);
+  const lastHydratedFollowUpKeyRef = useRef<string | null>(null);
   const followUpContextRef = useRef<ChatFollowUpContext | null>(null);
   const shouldStickToBottomRef = useRef(true);
   const pendingScrollBehaviorRef = useRef<ScrollBehavior>('auto');
@@ -424,13 +425,31 @@ const ChatPage: React.FC = () => {
     void loadInitialSession(initialUrlSessionIdRef.current);
   }, [loadInitialSession]);
 
-  const setSessionInUrl = useCallback((targetSessionId: string) => {
+  const setSessionInUrl = useCallback((targetSessionId: string, clearFollowUpContext = false) => {
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
       next.set(CHAT_SESSION_QUERY_KEY, targetSessionId);
+      if (clearFollowUpContext) {
+        next.delete('stock');
+        next.delete('name');
+        next.delete('recordId');
+      }
       return next;
     }, { replace: true });
   }, [setSearchParams]);
+
+  const clearFollowUpContextFromUrl = useCallback(() => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete('stock');
+      next.delete('name');
+      next.delete('recordId');
+      if (!next.get(CHAT_SESSION_QUERY_KEY)) {
+        next.set(CHAT_SESSION_QUERY_KEY, sessionId);
+      }
+      return next;
+    }, { replace: true });
+  }, [sessionId, setSearchParams]);
 
   useEffect(() => {
     if (!hasInitialLoad) {
@@ -594,7 +613,7 @@ const ChatPage: React.FC = () => {
     setActiveStockCode(null);
     requestScrollToBottom('auto');
     const newSessionId = useAgentChatStore.getState().startNewChat();
-    setSessionInUrl(newSessionId);
+    setSessionInUrl(newSessionId, true);
     setSidebarOpen(false);
   }, [requestScrollToBottom, setSessionInUrl]);
 
@@ -610,7 +629,7 @@ const ChatPage: React.FC = () => {
       setActiveStockContext(null);
       setActiveStockCode(null);
       requestScrollToBottom('auto');
-      setSessionInUrl(targetSessionId);
+      setSessionInUrl(targetSessionId, true);
       setSidebarOpen(false);
     }
   }, [requestScrollToBottom, sessionId, setSessionInUrl, switchSession]);
@@ -640,8 +659,16 @@ const ChatPage: React.FC = () => {
     const recordId = parseFollowUpRecordId(searchParams.get('recordId'));
 
     if (!stock) {
+      lastHydratedFollowUpKeyRef.current = null;
       return;
     }
+
+    const targetSessionId = searchParams.get(CHAT_SESSION_QUERY_KEY)?.trim() || sessionId;
+    const followUpKey = `${targetSessionId}:${stock}:${name ?? ''}:${recordId ?? ''}`;
+    if (lastHydratedFollowUpKeyRef.current === followUpKey) {
+      return;
+    }
+    lastHydratedFollowUpKeyRef.current = followUpKey;
 
     const hydrationToken = ++followUpHydrationTokenRef.current;
     setInput(buildFollowUpPrompt(stock, name));
@@ -673,17 +700,7 @@ const ChatPage: React.FC = () => {
         setIsFollowUpContextLoading(false);
       }
     });
-    setSearchParams((current) => {
-      const next = new URLSearchParams(current);
-      next.delete('stock');
-      next.delete('name');
-      next.delete('recordId');
-      if (!next.get(CHAT_SESSION_QUERY_KEY)) {
-        next.set(CHAT_SESSION_QUERY_KEY, sessionId);
-      }
-      return next;
-    }, { replace: true });
-  }, [searchParams, sessionId, setSearchParams]);
+  }, [searchParams, sessionId]);
 
   const handleSend = useCallback(
     async (overrideMessage?: string, overrideSkillIds?: string[]) => {
@@ -715,6 +732,7 @@ const ChatPage: React.FC = () => {
       followUpHydrationTokenRef.current += 1;
       followUpContextRef.current = null;
       setIsFollowUpContextLoading(false);
+      clearFollowUpContextFromUrl();
 
       setInput('');
       setMobileSkillPickerOpen(false);
@@ -724,7 +742,7 @@ const ChatPage: React.FC = () => {
         skillName: usedSkillNames.join(getUiListSeparator(language)),
       });
     },
-    [getSkillNames, input, isFollowUpContextLoading, isSkillsLoading, language, loading, normalizeSelectedSkillIds, requestScrollToBottom, selectedSkillIds, sessionId, sessionLoading, startStream, t],
+    [clearFollowUpContextFromUrl, getSkillNames, input, isFollowUpContextLoading, isSkillsLoading, language, loading, normalizeSelectedSkillIds, requestScrollToBottom, selectedSkillIds, sessionId, sessionLoading, startStream, t],
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

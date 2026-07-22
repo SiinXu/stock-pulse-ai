@@ -5,11 +5,17 @@ Shared stock code utilities.
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Optional
 
-from data_provider.base import canonical_stock_code, is_bse_code
+from data_provider.base import canonical_stock_code, is_bse_code, normalize_stock_code
+from src.market_context import detect_market
 from src.services.market_symbol_utils import normalize_suffix_market_symbol
+from src.utils.sanitize import log_safe_exception
+
+
+logger = logging.getLogger(__name__)
 
 
 # Known exchange prefixes (case-insensitive) and the digit lengths they accept.
@@ -136,6 +142,45 @@ def normalize_code(raw: str) -> Optional[str]:
     if stripped is not None:
         return stripped
     return None
+
+
+def canonicalize_analysis_stock_code(raw: str) -> Optional[str]:
+    """Return the canonical downstream identity for one recognized symbol.
+
+    This combines the repository's public format normalizer, index-backed
+    JP/KR resolution, and provider-facing canonicalization. Five-digit Hong
+    Kong symbols are made explicit before index resolution so they cannot be
+    confused with another market.
+    """
+    normalized = normalize_code(raw)
+    if normalized is None:
+        return None
+
+    # Downstream provider routing treats bare letter tickers as US symbols.
+    # The public ``.US`` alias is accepted at the boundary but must not leak
+    # through as a provider-facing identity, where it is otherwise classified
+    # as an A-share code.
+    if normalized.endswith(".US"):
+        normalized = normalized[:-3]
+
+    analysis_input = (
+        f"HK{normalized}"
+        if detect_market(normalized) == "hk"
+        else normalized
+    )
+    try:
+        resolved = resolve_index_stock_code_for_analysis(analysis_input)
+    except Exception as exc:  # broad-exception: fallback_recorded - Index failures retain canonical A/HK/US chat routing.
+        log_safe_exception(
+            logger,
+            "Stock symbol index resolution failed; using format-only fallback",
+            exc,
+            error_code="stock_symbol_index_resolution_failed",
+            context={"market": detect_market(normalized)},
+        )
+        resolved = analysis_input
+    canonical = canonical_stock_code(normalize_stock_code(resolved))
+    return canonical or None
 
 
 def resolve_index_stock_code_for_analysis(raw: str) -> str:

@@ -468,7 +468,7 @@ git push
 
 - Actions 页面可以看到运行历史
 - 点击具体的运行记录查看详细日志
-- 分析报告会作为 Artifact 保存 30 天
+- 每次运行的 `analysis-reports-<run_number>` Artifact 保留 30 天。`full` 和 `stocks-only` 会保存生成的 Markdown 报告及 `data/stock_analysis.db*`，其中包含成功个股的分析历史和决策信号；`full` 还包含大盘复盘。`market-only` 保存大盘复盘以及本次运行生成的数据库文件。所有模式都会保存日志，日志会标明跳过或失败的股票。
 
 ### 定时说明
 

@@ -44,6 +44,22 @@ cp .env.example .env
 4. Push the branch: `git push origin feature/your-feature`
 5. Open a Pull Request against `main`.
 
+### Claiming An Issue
+
+For an open, unassigned issue, create a new comment containing only `/claim`. The automation assigns only the human commenter who sent the command, and each account may hold at most one open issue assignment at a time. It ignores pull request comments, bot comments, non-exact commands, and closed issues, and it never overwrites an existing assignee; when an issue is already assigned, it keeps that assignment and replies politely.
+
+Post a draft pull request or progress update within 3 days of claiming. Maintainers enforce this activity window manually; claims do not expire automatically. `/unclaim` is not currently supported, so ask a maintainer when a claim needs to be released.
+
+### Architecture Decisions
+
+If a PR changes component boundaries, a cross-module source of truth, the runtime/persistence/deployment model, security or failure policy, or a reusable large-migration method, its description must record ADR consideration: link a new or existing ADR, or explain why the change stays within accepted decisions and needs no new record. See the [ADR registry](adr/README.md) for numbering, statuses, process, and the template.
+
+Accepted ADRs remain as history. Record a material reversal in a new ADR with reciprocal links instead of rewriting the earlier decision.
+
+### Change Placement
+
+Shared data-source, analysis-pipeline, domain, persistence, and domain-report semantics belong in the foundation pipeline first. API DTOs and projections, Web, Desktop, Bot, interactive Agent experiences, and repository governance belong in the product layer and consume foundation contracts. A cross-track change must identify one authority and preserve compatibility across domain schemas, API projections, task state, and report views; product entrypoints must not duplicate provider fallback, pipeline orchestration, or task lifecycle. See [Foundation Pipeline And Product Layer](foundation-product-architecture.md) for routing, upstream porting, and license-provenance rules. Architectural track does not determine license.
+
 ### Commit Message Convention
 
 This project follows [Conventional Commits](https://www.conventionalcommits.org/):

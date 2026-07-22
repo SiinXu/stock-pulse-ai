@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useStockPoolStore } from '../stores';
+import { useStockPoolStore } from '../stores/stockPoolStore';
 
 /**
  * Keep HomePage focused on local UI state while the store owns dashboard business state.

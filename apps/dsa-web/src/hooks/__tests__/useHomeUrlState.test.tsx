@@ -72,11 +72,15 @@ function Harness({
       <output data-testid="search">{location.search}</output>
       <output data-testid="location-key">{location.key}</output>
       <output data-testid="source">{source}</output>
+      <output data-testid="stock">{homeUrl.stockCode ?? 'none'}</output>
+      <output data-testid="workspace">{homeUrl.workspace}</output>
       <output data-testid="issue">{homeUrl.urlIssue ?? 'none'}</output>
       <button type="button" onClick={() => homeUrl.navigateToRecord(2)}>record 2</button>
       <button type="button" onClick={() => homeUrl.openTaskRunFlow('task-2')}>task flow</button>
       <button type="button" onClick={() => homeUrl.openHistoryRunFlow(2)}>history flow</button>
       <button type="button" onClick={() => homeUrl.closeRunFlow()}>close flow</button>
+      <button type="button" onClick={() => homeUrl.setWorkspace('watchlist')}>watchlist workspace</button>
+      <button type="button" onClick={() => homeUrl.setWorkspace('history')}>history workspace</button>
       <button type="button" onClick={() => navigate(-1)}>back</button>
       <button type="button" onClick={() => navigate(1)}>forward</button>
     </div>
@@ -100,12 +104,37 @@ describe('useHomeUrlState', () => {
     expect(screen.getByTestId('search')).toHaveTextContent('?recordId=42&keep=yes');
   });
 
+  it('restores stock and workspace context from a canonical deep link', async () => {
+    renderHarness('/?stock=00700.HK&workspace=watchlist&keep=yes');
+
+    await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent(
+      '?stock=HK00700&workspace=watchlist&keep=yes',
+    ));
+    expect(screen.getByTestId('stock')).toHaveTextContent('HK00700');
+    expect(screen.getByTestId('workspace')).toHaveTextContent('watchlist');
+  });
+
   it('replaces invalid core parameters without dropping unrelated query state', async () => {
     renderHarness('/?keep=yes&recordId=0&runFlow=task&runFlowTaskId=%20');
 
     await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent('?keep=yes'));
     expect(screen.getByTestId('source')).toHaveTextContent('none');
     expect(screen.getByTestId('issue')).toHaveTextContent('invalid_record');
+  });
+
+  it('reports and removes an invalid workspace without dropping unrelated state', async () => {
+    renderHarness('/?workspace=admin&keep=yes');
+
+    await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent('?keep=yes'));
+    expect(screen.getByTestId('workspace')).toHaveTextContent('history');
+    expect(screen.getByTestId('issue')).toHaveTextContent('invalid_workspace');
+  });
+
+  it('prioritizes the sensitive-parameter warning when several URL values are removed', async () => {
+    renderHarness('/?recordId=0&api_key=secret&keep=yes');
+
+    await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent('?keep=yes'));
+    expect(screen.getByTestId('issue')).toHaveTextContent('sensitive_parameter');
   });
 
   it('canonicalizes the initial default report once history is available', async () => {
@@ -194,6 +223,23 @@ describe('useHomeUrlState', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'back' }));
     await waitFor(() => expect(screen.getByTestId('source')).toHaveTextContent('history:2'));
+  });
+
+  it('pushes workspace changes and restores them with Back and Forward', async () => {
+    renderHarness('/?recordId=1', { initialSelectedRecordId: 1 });
+
+    fireEvent.click(screen.getByRole('button', { name: 'watchlist workspace' }));
+    await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent(
+      '?recordId=1&workspace=watchlist',
+    ));
+    expect(screen.getByTestId('workspace')).toHaveTextContent('watchlist');
+
+    fireEvent.click(screen.getByRole('button', { name: 'back' }));
+    await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent('?recordId=1'));
+    expect(screen.getByTestId('workspace')).toHaveTextContent('history');
+
+    fireEvent.click(screen.getByRole('button', { name: 'forward' }));
+    await waitFor(() => expect(screen.getByTestId('workspace')).toHaveTextContent('watchlist'));
   });
 
   it('removes a permanent failed report identity but keeps the localized error visible', async () => {

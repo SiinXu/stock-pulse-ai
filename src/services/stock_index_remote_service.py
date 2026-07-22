@@ -15,6 +15,7 @@ from typing import Any, Optional
 
 import requests
 
+from src.security.outbound_policy import safe_get
 from src.utils.sanitize import exception_chain_redaction_values, log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -157,7 +158,11 @@ def is_valid_remote_stock_index_file(cache_path: Path = DEFAULT_STOCK_INDEX_CACH
 
 
 def _download_remote_stock_index(settings: RemoteStockIndexSettings) -> bytes:
-    response = requests.get(settings.url, timeout=settings.timeout_seconds)
+    response = safe_get(
+        settings.url,
+        timeout=settings.timeout_seconds,
+        transport=requests,
+    )
     response.raise_for_status()
 
     content = response.content

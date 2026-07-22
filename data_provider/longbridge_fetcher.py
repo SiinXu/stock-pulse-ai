@@ -34,6 +34,7 @@ from typing import Optional, Dict, Any
 import pandas as pd
 
 from src.utils.sanitize import log_safe_exception
+from src.security.outbound_policy import validate_outbound_url
 
 from .base import BaseFetcher, STANDARD_COLUMNS
 from .realtime_types import UnifiedRealtimeQuote, RealtimeSource, safe_float
@@ -176,6 +177,8 @@ def _longbridge_config_kwargs() -> Dict[str, Any]:
         if pname in params:
             v = os.getenv(envname, "").strip()
             if v:
+                if envname == "LONGBRIDGE_HTTP_URL":
+                    validate_outbound_url(v)
                 kw[pname] = v
 
     if "language" in params:

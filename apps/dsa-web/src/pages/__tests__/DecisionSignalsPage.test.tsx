@@ -2017,6 +2017,22 @@ describe('DecisionSignalsPage', () => {
     });
   });
 
+  it('restores the selected view and follows browser history after tab changes', async () => {
+    window.history.pushState({}, '', '/decision-signals?view=timeline&keep=yes');
+    renderPage();
+
+    expect(screen.getByRole('tabpanel', { name: '股票信号时间线' })).toBeVisible();
+    openSignalsView('信号表现统计');
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get('view')).toBe('stats'));
+    expect(screen.getByRole('tabpanel', { name: '信号表现统计' })).toBeVisible();
+
+    act(() => window.history.back());
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get('view')).toBe('timeline'));
+    await waitFor(() => expect(
+      screen.getByRole('tabpanel', { name: '股票信号时间线' }),
+    ).toBeVisible());
+  });
+
   it('writes the current stock to the URL and removes it on clear', async () => {
     window.history.pushState({}, '', '/decision-signals?ref=dashboard#timeline');
     renderPage();
@@ -2026,6 +2042,8 @@ describe('DecisionSignalsPage', () => {
     await waitFor(() => {
       expect(new URLSearchParams(window.location.search).get('stock')).toBe('600519');
     });
+    expect(new URLSearchParams(window.location.search).get('view')).toBeNull();
+    expect(screen.getByRole('tabpanel', { name: '当前股票' })).toBeVisible();
     expect(new URLSearchParams(window.location.search).get('ref')).toBe('dashboard');
     expect(window.location.hash).toBe('#timeline');
 
@@ -2035,6 +2053,7 @@ describe('DecisionSignalsPage', () => {
     await waitFor(() => {
       expect(new URLSearchParams(window.location.search).get('stock')).toBeNull();
     });
+    expect(new URLSearchParams(window.location.search).get('view')).toBe('latest');
     expect(new URLSearchParams(window.location.search).get('ref')).toBe('dashboard');
     expect(window.location.hash).toBe('#timeline');
   });

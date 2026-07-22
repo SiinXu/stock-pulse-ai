@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, BarChart3, PlusCircle, RefreshCw, Search, ShieldCheck, X } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import {
   decisionSignalsApi,
   getDecisionSignalReassessBlockedError,
@@ -74,6 +74,7 @@ import {
 import { getDecisionProfile } from '../utils/decisionSignalProfile';
 import { parseDecisionSignalDate } from '../utils/decisionSignalTime';
 import { getDecisionSignalPresentation } from '../utils/decisionSignalPresentation';
+import { parseDeepLink, type DecisionSignalsView } from '../utils/deepLink';
 import { areStockCodesEquivalent } from '../utils/stockCode';
 
 const PAGE_SIZE = 20;
@@ -133,8 +134,6 @@ type SelectedSignal = {
   item: DecisionSignalItem;
   source: 'list' | 'latest' | 'timeline' | 'persisted';
 };
-
-type DecisionSignalsView = 'signals' | 'latest' | 'timeline' | 'stats';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -221,10 +220,6 @@ function getInitialFilters(search = typeof window === 'undefined' ? '' : window.
       ? ''
       : STATUS_OPTIONS.includes(status as DecisionSignalStatus) ? status as DecisionSignalStatus : DEFAULT_LIST_FILTERS.status,
   };
-}
-
-function getInitialStockCode(search = typeof window === 'undefined' ? '' : window.location.search): string {
-  return new URLSearchParams(search).get('stock')?.trim() ?? '';
 }
 
 function getInitialPage(search = typeof window === 'undefined' ? '' : window.location.search): number {
@@ -497,10 +492,39 @@ function formatStatPercent(value: number | null | undefined): string {
 
 const DecisionSignalsPage: React.FC = () => {
   const navigate = useNavigate();
+  const routeLocation = useLocation();
+  const navigationType = useNavigationType();
   const { t } = useUiLanguage();
-  const updateDecisionSignalSearchParams = useCallback((values: DecisionSignalSearchValues) => {
-    const location = getDecisionSignalLocation(values);
-    if (location) navigate(location, { replace: true });
+  const parsedDecisionSignalsLink = useMemo(
+    () => parseDeepLink(
+      `${routeLocation.pathname}${routeLocation.search}${routeLocation.hash}`,
+      window.location.origin,
+    ),
+    [routeLocation.hash, routeLocation.pathname, routeLocation.search],
+  );
+  const decisionSignalsTarget = parsedDecisionSignalsLink.target?.page === 'decision-signals'
+    ? parsedDecisionSignalsLink.target
+    : null;
+  const [activeView, setActiveViewState] = useState<DecisionSignalsView>(
+    decisionSignalsTarget?.view ?? 'signals',
+  );
+  const activeViewRef = useRef(activeView);
+  activeViewRef.current = activeView;
+  const updateDecisionSignalSearchParams = useCallback((
+    values: DecisionSignalSearchValues,
+    replace = true,
+  ) => {
+    const nextValues = { ...values };
+    if (!Object.hasOwn(nextValues, 'view')) {
+      const currentParams = new URLSearchParams(window.location.search);
+      const nextStock = values.stock === null
+        ? null
+        : values.stock ?? currentParams.get('stock');
+      const defaultView: DecisionSignalsView = nextStock ? 'latest' : 'signals';
+      nextValues.view = activeViewRef.current === defaultView ? null : activeViewRef.current;
+    }
+    const nextLocation = getDecisionSignalLocation(nextValues);
+    if (nextLocation) navigate(nextLocation, { replace });
   }, [navigate]);
   const syncListSearchParams = useCallback((filters: ListFilters, nextPage: number) => {
     updateDecisionSignalSearchParams(getListSearchValues(filters, nextPage));
@@ -508,9 +532,19 @@ const DecisionSignalsPage: React.FC = () => {
   const syncTimelineSearchParams = useCallback((filters: TimelineFilters) => {
     updateDecisionSignalSearchParams(getTimelineSearchValues(filters));
   }, [updateDecisionSignalSearchParams]);
-  const syncStockSearchParam = useCallback((code: string | null) => {
-    updateDecisionSignalSearchParams(getStockSearchValues(code));
+  const syncStockContextSearchParams = useCallback((code: string | null) => {
+    const defaultView: DecisionSignalsView = code ? 'latest' : 'signals';
+    updateDecisionSignalSearchParams({
+      ...getStockSearchValues(code),
+      view: activeViewRef.current === defaultView ? null : activeViewRef.current,
+    }, false);
   }, [updateDecisionSignalSearchParams]);
+  const setActiveView = useCallback((view: DecisionSignalsView) => {
+    const defaultView = decisionSignalsTarget?.stockCode ? 'latest' : 'signals';
+    activeViewRef.current = view;
+    setActiveViewState(view);
+    updateDecisionSignalSearchParams({ view: view === defaultView ? null : view }, false);
+  }, [decisionSignalsTarget?.stockCode, updateDecisionSignalSearchParams]);
   const actionLabels = useMemo(() => buildDecisionActionLabelMap(t), [t]);
   const { index: stockIndex } = useStockIndex();
   const [filters, setFilters] = useState<ListFilters>(() => getInitialFilters());
@@ -522,7 +556,6 @@ const DecisionSignalsPage: React.FC = () => {
   const [error, setError] = useState<ParsedApiError | null>(null);
   const [statusError, setStatusError] = useState<ParsedApiError | null>(null);
   const [selected, setSelected] = useState<SelectedSignal | null>(null);
-  const [activeView, setActiveView] = useState<DecisionSignalsView>('signals');
   const [pendingStatus, setPendingStatus] = useState<PendingStatusChange | null>(null);
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [outcomeStats, setOutcomeStats] = useState<DecisionSignalOutcomeStatsResponse | null>(null);
@@ -569,6 +602,17 @@ const DecisionSignalsPage: React.FC = () => {
   const selectedSignalIdRef = useRef<number | null>(null);
   const pendingSelectedSignalIdRef = useRef<number | null>(getInitialSelectedSignalId());
   const statusUpdateInFlightRef = useRef(false);
+  const didObserveViewNavigationRef = useRef(false);
+  useEffect(() => {
+    if (!didObserveViewNavigationRef.current) {
+      didObserveViewNavigationRef.current = true;
+      return;
+    }
+    if (navigationType !== 'POP') return;
+    const nextView = decisionSignalsTarget?.view ?? 'signals';
+    activeViewRef.current = nextView;
+    setActiveViewState(nextView);
+  }, [decisionSignalsTarget?.view, navigationType, routeLocation.key]);
   const timelineMarketSourceRef = useRef<TimelineMarketSource>(null);
   const mountedRef = useRef(true);
 
@@ -1031,7 +1075,7 @@ const DecisionSignalsPage: React.FC = () => {
     reassessSourceReportId,
   ]);
 
-  const applyStockContext = useCallback((nextContext: StockContext) => {
+  const applyStockContext = useCallback((nextContext: StockContext, syncUrl = true) => {
     const nextTimeline = buildNextTimelineFilters(
       timelineFilters,
       activeStockContext,
@@ -1040,13 +1084,22 @@ const DecisionSignalsPage: React.FC = () => {
     );
     timelineMarketSourceRef.current = nextTimeline.marketSource;
     setActiveStockContext(nextContext);
-    setActiveView('latest');
+    if (syncUrl) {
+      activeViewRef.current = 'latest';
+      setActiveViewState('latest');
+    }
     setStockDraft(nextContext.displayCode ?? nextContext.code);
     setTimelineFilters(nextTimeline.filters);
-    syncStockSearchParam(nextContext.code);
+    if (syncUrl) syncStockContextSearchParams(nextContext.code);
     void loadLatestForContext(nextContext);
     void loadTimelineForContext(nextContext, nextTimeline.filters);
-  }, [activeStockContext, loadLatestForContext, loadTimelineForContext, syncStockSearchParam, timelineFilters]);
+  }, [
+    activeStockContext,
+    loadLatestForContext,
+    loadTimelineForContext,
+    syncStockContextSearchParams,
+    timelineFilters,
+  ]);
 
   const handleStockSubmit = useCallback((
     code: string,
@@ -1081,10 +1134,10 @@ const DecisionSignalsPage: React.FC = () => {
     setActiveStockContext(null);
     timelineMarketSourceRef.current = null;
     setTimelineFilters((current) => ({ ...current, market: '' }));
-    syncStockSearchParam(null);
+    syncStockContextSearchParams(null);
     resetLatestView();
     resetTimelineView();
-  }, [resetLatestView, resetTimelineView, syncStockSearchParam]);
+  }, [resetLatestView, resetTimelineView, syncStockContextSearchParams]);
 
   // Restore the current-stock scope from the URL once on mount so a shared or
   // refreshed link reopens the same stock context.
@@ -1092,11 +1145,11 @@ const DecisionSignalsPage: React.FC = () => {
   useEffect(() => {
     if (didRestoreStockFromUrlRef.current) return;
     didRestoreStockFromUrlRef.current = true;
-    const urlStock = getInitialStockCode();
+    const urlStock = decisionSignalsTarget?.stockCode ?? '';
     if (urlStock) {
-      handleStockSubmit(urlStock);
+      applyStockContext({ code: urlStock }, false);
     }
-  }, [handleStockSubmit]);
+  }, [applyStockContext, decisionSignalsTarget?.stockCode]);
 
   const handleTimelineSearch = useCallback(() => {
     if (!activeStockContext) return;

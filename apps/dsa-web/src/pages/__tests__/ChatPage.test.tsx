@@ -1129,6 +1129,70 @@ describe('ChatPage', () => {
     });
   });
 
+  it('restores unsent report context after refresh and removes it only after sending', async () => {
+    vi.mocked(historyApi.getDetail).mockResolvedValue({
+      meta: {
+        id: 2,
+        queryId: 'q-2',
+        stockCode: 'AAPL',
+        stockName: 'Apple',
+        reportType: 'detailed',
+        createdAt: '2026-03-18T09:00:00Z',
+        currentPrice: 211.5,
+        changePct: 2.4,
+      },
+      summary: {
+        analysisSummary: 'Momentum remains constructive',
+        operationAdvice: 'Continue monitoring',
+        trendPrediction: 'Short-term strength',
+        sentimentScore: 81,
+      },
+      strategy: {
+        stopLoss: '205',
+      },
+    });
+
+    const entry = '/chat?stock=AAPL&name=Apple&recordId=2';
+    const firstRouter = createMemoryRouter(
+      [{ path: '/chat', element: <ChatPage /> }],
+      { initialEntries: [entry] },
+    );
+    const firstRender = render(<RouterProvider router={firstRouter} />);
+
+    expect(await screen.findByDisplayValue('请深入分析 Apple(AAPL)')).toBeInTheDocument();
+    await waitFor(() => expect(firstRouter.state.location.search).toContain('session=session-1'));
+    const refreshEntry = `${firstRouter.state.location.pathname}${firstRouter.state.location.search}`;
+    const persistedParams = new URLSearchParams(firstRouter.state.location.search);
+    expect(persistedParams.get('stock')).toBe('AAPL');
+    expect(persistedParams.get('name')).toBe('Apple');
+    expect(persistedParams.get('recordId')).toBe('2');
+    firstRender.unmount();
+
+    const refreshedRouter = createMemoryRouter(
+      [{ path: '/chat', element: <ChatPage /> }],
+      { initialEntries: [refreshEntry] },
+    );
+    render(<RouterProvider router={refreshedRouter} />);
+
+    expect(await screen.findByDisplayValue('请深入分析 Apple(AAPL)')).toBeInTheDocument();
+    await waitFor(() => expect(historyApi.getDetail).toHaveBeenCalledTimes(2));
+    fireEvent.click(await getReadySendButton());
+
+    await waitFor(() => {
+      expect(mockStartStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: '请深入分析 Apple(AAPL)',
+          context: expect.objectContaining({
+            stock_code: 'AAPL',
+            previous_price: 211.5,
+          }),
+        }),
+        expect.any(Object),
+      );
+      expect(refreshedRouter.state.location.search).toBe('?session=session-1');
+    });
+  });
+
   it('uses hydrated report context when it finishes before sending', async () => {
     vi.mocked(historyApi.getDetail).mockResolvedValue({
       meta: {

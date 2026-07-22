@@ -2,6 +2,7 @@ import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pie, PieChart, ResponsiveContainer, Tooltip, Legend, Cell } from 'recharts';
 import { Inbox, X } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { decisionSignalsApi } from '../api/decisionSignals';
 import { portfolioApi } from '../api/portfolio';
 import type { ParsedApiError } from '../api/error';
@@ -56,6 +57,7 @@ import { parseDecisionSignalDate } from '../utils/decisionSignalTime';
 import { buildDecisionActionLabelMap } from '../utils/decisionAction';
 import { getDecisionSignalPresentation } from '../utils/decisionSignalPresentation';
 import { createOperationId } from '../utils/operationId';
+import { parseDeepLink } from '../utils/deepLink';
 
 const PIE_COLORS = [
   'hsl(var(--primary))',
@@ -182,6 +184,7 @@ async function loadPortfolioSignalLookup(lookup: PortfolioSignalLookup): Promise
 }
 
 const PortfolioPage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { language, t } = useUiLanguage();
   const text = PORTFOLIO_TEXT[language];
   const fileText = PORTFOLIO_FILE_TEXT[language];
@@ -192,9 +195,22 @@ const PortfolioPage: React.FC = () => {
     document.title = text.documentTitle;
   }, [text.documentTitle]);
 
+  const parsedPortfolioLink = useMemo(
+    () => parseDeepLink(`/portfolio${searchParams.size ? `?${searchParams.toString()}` : ''}`),
+    [searchParams],
+  );
+  const requestedAccountId = parsedPortfolioLink.target?.page === 'portfolio'
+    ? parsedPortfolioLink.target.accountId
+    : undefined;
   const [accounts, setAccounts] = useState<PortfolioAccountItem[]>([]);
   const [accountsLoaded, setAccountsLoaded] = useState(false);
-  const [selectedAccount, setSelectedAccount] = useState<AccountOption>('all');
+  const [selectedAccount, setSelectedAccountState] = useState<AccountOption>(requestedAccountId ?? 'all');
+  const [unavailableAccountId, setUnavailableAccountId] = useState<number | null>(null);
+  const selectedAccountRef = useRef<AccountOption>(selectedAccount);
+  const searchParamsRef = useRef(searchParams);
+  const setSearchParamsRef = useRef(setSearchParams);
+  searchParamsRef.current = searchParams;
+  setSearchParamsRef.current = setSearchParams;
   const [showCreateAccount, setShowCreateAccount] = useState(false);
   const [tradeModalOpen, setTradeModalOpen] = useState(false);
   const [cashModalOpen, setCashModalOpen] = useState(false);
@@ -324,6 +340,47 @@ const PortfolioPage: React.FC = () => {
       ? cashEvents.length
       : corporateEvents.length;
 
+  const setSelectedAccount = useCallback((
+    account: AccountOption,
+    replace = false,
+    unavailableId: number | null = null,
+  ) => {
+    selectedAccountRef.current = account;
+    setSelectedAccountState(account);
+    setUnavailableAccountId(unavailableId);
+    const next = new URLSearchParams(searchParamsRef.current);
+    if (account === 'all') next.delete('account');
+    else next.set('account', String(account));
+    setSearchParamsRef.current(next, { replace });
+  }, []);
+
+  useEffect(() => {
+    const nextAccount = requestedAccountId ?? 'all';
+    if (selectedAccountRef.current !== nextAccount) {
+      selectedAccountRef.current = nextAccount;
+      setSelectedAccountState(nextAccount);
+    }
+  }, [requestedAccountId]);
+
+  useEffect(() => {
+    const currentSearch = searchParams.toString();
+    const normalizedSearch = parsedPortfolioLink.normalizedSearch.replace(/^\?/, '');
+    if (normalizedSearch !== currentSearch) {
+      setSearchParams(new URLSearchParams(normalizedSearch), { replace: true });
+    }
+  }, [parsedPortfolioLink.normalizedSearch, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (
+      !accountsLoaded
+      || requestedAccountId === undefined
+      || accounts.some((account) => account.id === requestedAccountId)
+    ) {
+      return;
+    }
+    setSelectedAccount(accounts[0]?.id ?? 'all', true, requestedAccountId);
+  }, [accounts, accountsLoaded, requestedAccountId, setSelectedAccount]);
+
   const isActiveRefreshContext = (requestedViewKey: string, requestedRequestId: number) => {
     return (
       refreshContextRef.current.viewKey === requestedViewKey
@@ -336,17 +393,18 @@ const PortfolioPage: React.FC = () => {
       const response = await portfolioApi.getAccounts(false);
       const items = response.accounts || [];
       setAccounts(items);
-      setSelectedAccount((prev) => {
-        if (items.length === 0) return 'all';
-        if (prev !== 'all' && !items.some((item) => item.id === prev)) return items[0].id;
-        return prev;
-      });
+      const currentAccount = selectedAccountRef.current;
+      if (items.length === 0) {
+        if (currentAccount !== 'all') setSelectedAccount('all', true, currentAccount);
+      } else if (currentAccount !== 'all' && !items.some((item) => item.id === currentAccount)) {
+        setSelectedAccount(items[0].id, true, currentAccount);
+      }
     } catch (err) {
       setError(getParsedApiError(err));
     } finally {
       setAccountsLoaded(true);
     }
-  }, []);
+  }, [setSelectedAccount]);
 
   const loadBrokers = useCallback(async () => {
     try {
@@ -919,7 +977,7 @@ const PortfolioPage: React.FC = () => {
       setWriteWarning(null);
       await portfolioApi.deleteAccount(pendingAccountDelete.accountId);
       const nextAccount = accounts.find((item) => item.id !== pendingAccountDelete.accountId);
-      setSelectedAccount(nextAccount?.id ?? 'all');
+      setSelectedAccount(nextAccount?.id ?? 'all', true);
       setPendingAccountDelete(null);
       setAccountDeleteError(null);
       setShowCreateAccount(false);
@@ -984,7 +1042,7 @@ const PortfolioPage: React.FC = () => {
         baseCurrency: accountForm.baseCurrency.trim() || 'CNY',
       });
       await loadAccounts();
-      setSelectedAccount(created.id);
+      setSelectedAccount(created.id, true);
       setShowCreateAccount(false);
       setWriteWarning(null);
       setAccountForm({
@@ -1036,7 +1094,7 @@ const PortfolioPage: React.FC = () => {
         baseCurrency: accountForm.baseCurrency.trim() || 'CNY',
       });
       await loadAccounts();
-      setSelectedAccount(updated.id);
+      setSelectedAccount(updated.id, true);
       setShowCreateAccount(false);
       setEditingAccountId(null);
       setAccountCreateSuccess(text.accountUpdated);
@@ -1287,6 +1345,13 @@ const PortfolioPage: React.FC = () => {
       ) : null}
       {accountCreateSuccess ? (
         <InlineAlert variant="success" size="compact" message={accountCreateSuccess} />
+      ) : null}
+      {unavailableAccountId !== null ? (
+        <InlineAlert
+          variant="warning"
+          title={t('deepLink.invalidTitle')}
+          message={t('deepLink.invalidMessage')}
+        />
       ) : null}
       {hasAccounts && riskWarning ? (
         <InlineAlert
