@@ -12,6 +12,10 @@ import typing
 from pathlib import Path
 
 
+EXPECTED_RAW_MODULE_COUNT = 74
+EXPECTED_RAW_MODULE_SURFACE_SHA256 = (
+    "3efea536587dc1ec7869bb10b5e1af280d41a1395e7e51f3356f146d0bef4805"
+)
 EXPECTED_MODULE_COUNT = 65
 EXPECTED_MODULE_SURFACE_SHA256 = (
     "4e54d92e2c354ac18ab7bdce417ced14af5910ae12063cba802a6eddc684286e"
@@ -31,6 +35,7 @@ EXPECTED_AST_GROUPS = (
             "_stable_search_failure_message",
             "_log_search_failure",
             "_safe_search_exception_message",
+            "_SEARCH_TRANSIENT_EXCEPTIONS",
             "_post_with_retry",
             "_get_with_retry",
             "fetch_url_content",
@@ -39,44 +44,53 @@ EXPECTED_AST_GROUPS = (
             "_stabilize_failed_search_response",
             "BaseSearchProvider",
         ),
-        "c3cd306167d0e8b809431553827692634e741abae9722382bba05e6958e8c79d",
+        "d056368e83f587e55c37c4bb5d54118c844ac423b84aa36d49e52cd5bf03ae92",
+        325,
     ),
     (
         "tavily.py",
         ("TavilySearchProvider",),
         "dc9e10ee3a046d7153ed77536513543653eed32fb88a6373a497b48bb0336089",
+        170,
     ),
     (
         "serpapi.py",
         ("SerpAPISearchProvider",),
         "cd556f72e045917e44249289ad1aa396d9d2c2876fedbc1b14a8255466161d87",
+        458,
     ),
     (
         "bocha.py",
         ("BochaSearchProvider",),
         "c19f826ebdb6ea4f70b0bc143be1e48dee81997798d29382cad2ec3c8e65f8b8",
+        201,
     ),
     (
         "anspire.py",
         ("AnspireSearchProvider",),
         "59922e88bb960fef0525d8266dd5f1c10c66c7a597b4ce1de0d2341cdab340de",
+        197,
     ),
     (
         "minimax.py",
         ("MiniMaxSearchProvider",),
         "9ca050a72dca0ee2a45b9ef07f80ef61eb352e6653cdd03d6552c49c1832cca4",
+        241,
     ),
     (
         "brave.py",
         ("BraveSearchProvider",),
         "dcfc4d45c074ea6d5364d7116ea919ed94880183ef23fef30b6294b51fdc8d72",
+        218,
     ),
     (
         "searxng.py",
         ("SearXNGSearchProvider",),
         "b14c330cb994e2e8a704a21daa60d14f5dd71e323cf33bdd9d60812ab5cbdfdb",
+        416,
     ),
 )
+EXPECTED_MOVED_AST_LINES = 2_226
 
 MOVED_FUNCTIONS = (
     "_stable_search_failure_message",
@@ -87,6 +101,7 @@ MOVED_FUNCTIONS = (
     "fetch_url_content",
     "_stabilize_failed_search_response",
 )
+MOVED_VALUES = ("_SEARCH_TRANSIENT_EXCEPTIONS",)
 MOVED_CLASSES = (
     "SearchResult",
     "SearchResponse",
@@ -101,7 +116,7 @@ MOVED_CLASSES = (
 )
 PRIVATE_MODULES = tuple(
     f"src.search_parts.{filename.removesuffix('.py')}"
-    for filename, _, _ in EXPECTED_AST_GROUPS
+    for filename, _, _, _ in EXPECTED_AST_GROUPS
 )
 
 
@@ -134,13 +149,31 @@ def _canonical_ast(value):
     return value
 
 
+def _definition_name(node):
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        return node.name
+    if (
+        isinstance(node, ast.Assign)
+        and len(node.targets) == 1
+        and isinstance(node.targets[0], ast.Name)
+    ):
+        return node.targets[0].id
+    return None
+
+
 def _definition_group(path: Path):
     tree = ast.parse(path.read_text(encoding="utf-8"))
     return [
         node
         for node in tree.body
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+        if _definition_name(node) is not None
     ]
+
+
+def _definition_line_count(node):
+    decorators = getattr(node, "decorator_list", ())
+    first_line = min([node.lineno, *(item.lineno for item in decorators)])
+    return node.end_lineno - first_line + 1
 
 
 def _stable_value(value):
@@ -286,9 +319,12 @@ def _reflection_snapshot(module):
 
 def test_search_module_surface_matches_pre_split_snapshot():
     module = importlib.import_module("src.search_service")
+    raw_names = tuple(vars(module))
     module_names = tuple(name for name in vars(module) if not name.startswith("__"))
     public_names = tuple(name for name in vars(module) if not name.startswith("_"))
 
+    assert len(raw_names) == EXPECTED_RAW_MODULE_COUNT
+    assert _digest(raw_names) == EXPECTED_RAW_MODULE_SURFACE_SHA256
     assert len(module_names) == EXPECTED_MODULE_COUNT
     assert _digest(module_names) == EXPECTED_MODULE_SURFACE_SHA256
     assert len(public_names) == EXPECTED_PUBLIC_COUNT
@@ -301,13 +337,19 @@ def test_search_module_surface_matches_pre_split_snapshot():
 
 def test_search_moved_definition_asts_match_pre_split_snapshot():
     parts = Path(__file__).parents[1] / "src" / "search_parts"
+    moved_lines = 0
 
-    for filename, expected_names, expected_hash in EXPECTED_AST_GROUPS:
+    for filename, expected_names, expected_hash, expected_lines in EXPECTED_AST_GROUPS:
         definitions = _definition_group(parts / filename)
-        assert tuple(node.name for node in definitions) == expected_names
+        assert tuple(_definition_name(node) for node in definitions) == expected_names
         assert _digest(
-            [(node.name, _canonical_ast(node)) for node in definitions]
+            [(_definition_name(node), _canonical_ast(node)) for node in definitions]
         ) == expected_hash
+        actual_lines = sum(_definition_line_count(node) for node in definitions)
+        assert actual_lines == expected_lines
+        moved_lines += actual_lines
+
+    assert moved_lines == EXPECTED_MOVED_AST_LINES
 
 
 def test_search_moved_reflection_matches_pre_split_snapshot():
@@ -342,16 +384,20 @@ def test_search_provider_methods_use_facade_patch_seams(monkeypatch):
 def test_search_private_modules_do_not_replace_facade_definitions():
     module = importlib.import_module("src.search_service")
     facade_definitions = {
-        name: getattr(module, name) for name in (*MOVED_FUNCTIONS, *MOVED_CLASSES)
+        name: getattr(module, name)
+        for name in (*MOVED_FUNCTIONS, *MOVED_VALUES, *MOVED_CLASSES)
     }
 
-    for private_name, (_, defined_names, _) in zip(
+    for private_name, (_, defined_names, _, _) in zip(
         PRIVATE_MODULES,
         EXPECTED_AST_GROUPS,
     ):
         private_module = importlib.import_module(private_name)
         for name in defined_names:
             private_value = getattr(private_module, name)
+            if name in MOVED_VALUES:
+                assert private_value == facade_definitions[name]
+                continue
             assert private_value is not facade_definitions[name]
             assert private_value.__module__ == private_name
 
