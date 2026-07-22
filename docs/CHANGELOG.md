@@ -263,6 +263,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Docs] Defined the core security and compliance baseline for access, secrets, egress, auditability, supply chain, and investment disclosures.
 - [Changed] Split CLI parsing and mode dispatch into a focused application module while preserving the legacy main entrypoint and runtime behavior.
 
+- [Fixed] Preserved per-stock analysis history and decision signals in GitHub Actions artifacts for full and stocks-only runs.
+
 ## [3.26.3] - 2026-07-15
 
 ### Release Highlights
