@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import threading
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -18,7 +19,9 @@ from src.agent.executor import AgentExecutor, AgentResult
 from src.agent.llm_adapter import LLMResponse, ToolCall
 from src.agent.orchestrator import AgentOrchestrator, OrchestratorResult
 from src.agent.runner import RunLoopResult, run_agent_loop
+from src.agent.runtime.contract import ExecutionState
 from src.agent.runtime.guards import RuntimeGuardPolicy
+from src.agent.runtime.lifecycle import classify_result_terminal_state
 from src.agent.stock_scope import resolve_stock_scope
 from src.agent.tools.data_tools import (
     get_realtime_quote_tool,
@@ -144,7 +147,20 @@ def test_first_chat_turn_creates_canonical_stock_scope_without_context(
         "analyze 600519.HKK",
         "analyze AAPL-TSLA",
         "analyze AAPL/TSLA",
+        "analyze AAPL+TSLA",
+        "analyze AAPL&TSLA",
+        "analyze AAPL|TSLA",
+        "analyze AAPL,TSLA",
+        "analyze AAPL, TSLA",
+        "analyze AAPL=TSLA",
         "analyze NYSE:AAPL",
+        "analyze NYSE：AAPL",
+        "分析 SH：000001",
+        "AAPL＋TSLA",
+        "AAPL／TSLA",
+        "AAPL｜TSLA",
+        "AAPL,TSLA",
+        "AAPL=TSLA",
         "analyze SH 000001",
         "analyze SZ 600519",
         "analyze HK 600519",
@@ -187,6 +203,19 @@ def test_invalid_exchange_qualified_token_is_not_reinterpreted(
         "compare with 600519-HK",
         "compare with 600519.HKK",
         "compare with AAPL/TSLA",
+        "analyze AAPL+TSLA",
+        "analyze AAPL&TSLA",
+        "analyze AAPL|TSLA",
+        "analyze AAPL,TSLA",
+        "analyze AAPL, TSLA",
+        "analyze AAPL=TSLA",
+        "analyze NYSE：AAPL",
+        "分析 SH：000001",
+        "AAPL＋TSLA",
+        "AAPL／TSLA",
+        "AAPL｜TSLA",
+        "AAPL,TSLA",
+        "AAPL=TSLA",
         "compare SH000001 and F",
         "compare SZ600519 and F",
         "compare HK600519 and F",
@@ -219,6 +248,10 @@ def test_invalid_atomic_symbol_keeps_active_context_without_authorizing_fragment
         ("analyze 00700 HK", {"HK00700"}),
         ("compare 600519 SH and F", {"600519", "F"}),
         ("compare 00700 HK and F", {"HK00700", "F"}),
+        ("compare F and SH 600519", {"F", "600519"}),
+        ("compare F and 00700 HK", {"F", "HK00700"}),
+        ("比较 000001 SZ 和 AAPL", {"000001", "AAPL"}),
+        ("比较 AAPL 和 HK 00700", {"AAPL", "HK00700"}),
     ],
 )
 def test_valid_spaced_exchange_slots_are_canonicalized_atomically(
@@ -502,6 +535,14 @@ def test_natural_target_outranks_real_indexed_prose_ticker() -> None:
         ("Could you analyze aapl?", "AAPL"),
         ("Can you review Brk.b?", "BRK.B"),
         ("Could you analyze AAPL.", "AAPL"),
+        ("AAPL?", "AAPL"),
+        ("00700.HK?", "HK00700"),
+        ("AAPL price?", "AAPL"),
+        ("AAPL performance?", "AAPL"),
+        ("Tell me about AAPL", "AAPL"),
+        ("Thoughts on AAPL?", "AAPL"),
+        ("Please assess AAPL", "AAPL"),
+        ("Could you check AAPL?", "AAPL"),
     ],
 )
 def test_indexed_natural_question_establishes_symbol_scope(
@@ -510,13 +551,51 @@ def test_indexed_natural_question_establishes_symbol_scope(
 ) -> None:
     with patch(
         "src.agent.stock_scope.get_stock_symbol_index_set",
-        return_value=frozenset({"F", "T", "AAPL", "PLTR", "BRK.B"}),
+        return_value=frozenset(
+            {"F", "T", "AAPL", "PLTR", "BRK.B", "HK00700"}
+        ),
     ):
         resolution = resolve_stock_scope(message, None)
 
     assert resolution.effective_context["stock_code"] == expected_code
     assert resolution.stock_scope.mode == "switch"
     assert resolution.stock_scope.allowed_stock_codes == {expected_code}
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Is this a good buy?",
+        "What is the best stock to buy?",
+        "I think AI will change the world",
+        "Please explain AI models",
+        "Please assess now",
+        "Could you check all?",
+        "Any AI news?",
+        "What does AI think about strategy?",
+    ],
+)
+def test_indexed_ordinary_prose_does_not_manufacture_stock_scope(
+    message: str,
+) -> None:
+    with patch(
+        "src.agent.stock_scope.get_stock_symbol_index_set",
+        return_value=frozenset({"AI", "ALL", "BEST", "GOOD", "NOW"}),
+    ):
+        first_turn = resolve_stock_scope(message, None)
+        active_turn = resolve_stock_scope(
+            message,
+            {"stock_code": "AAPL", "stock_name": "Apple"},
+        )
+
+    assert first_turn.effective_context == {}
+    assert first_turn.stock_scope is None
+    assert active_turn.effective_context == {
+        "stock_code": "AAPL",
+        "stock_name": "Apple",
+    }
+    assert active_turn.stock_scope.mode == "maintain"
+    assert active_turn.stock_scope.allowed_stock_codes == {"AAPL"}
 
 
 @pytest.mark.parametrize(
@@ -586,6 +665,7 @@ def test_first_chat_turn_builds_cross_market_compare_scope() -> None:
         ("compare AAPL vs TSLA", {"AAPL", "TSLA"}),
         ("compare F vs T", {"F", "T"}),
         ("compare aapl and tsla", {"AAPL", "TSLA"}),
+        ("compare AAPL, and TSLA", {"AAPL", "TSLA"}),
         ("比较 F 和 00700.HK", {"F", "HK00700"}),
         ("compare 600519 and T", {"600519", "T"}),
         ("compare 600519 and t", {"600519", "T"}),
@@ -729,6 +809,43 @@ def test_english_compare_with_adds_to_the_active_symbol_scope() -> None:
     assert resolution.stock_scope.mode == "compare"
     assert resolution.stock_scope.expected_stock_code == ""
     assert resolution.stock_scope.allowed_stock_codes == {"AAPL", "TSLA"}
+
+
+@pytest.mark.parametrize(
+    ("message", "expected_code"),
+    [
+        ("compare it to TSLA", "TSLA"),
+        ("How does it compare to TSLA?", "TSLA"),
+        ("compare this with TSLA", "TSLA"),
+        ("和 TSLA 比一下", "TSLA"),
+        ("与TSLA比较", "TSLA"),
+        ("对比 TSLA", "TSLA"),
+        ("比较 TSLA", "TSLA"),
+        ("拿 TSLA 对比", "TSLA"),
+        ("再和 00700.HK 比较", "HK00700"),
+        ("和 HK 00700 比较", "HK00700"),
+        ("对比 000001 SZ", "000001"),
+        ("versus HK 00700", "HK00700"),
+        ("和 TSLA 的差异怎么看", "TSLA"),
+        ("AAPL 相比 600519 怎么样", "600519"),
+    ],
+)
+def test_natural_active_comparison_adds_the_explicit_operand(
+    message: str,
+    expected_code: str,
+) -> None:
+    resolution = resolve_stock_scope(
+        message,
+        {"stock_code": "AAPL", "stock_name": "Apple"},
+    )
+
+    assert resolution.effective_context == {
+        "stock_code": "AAPL",
+        "stock_name": "Apple",
+    }
+    assert resolution.stock_scope.mode == "compare"
+    assert resolution.stock_scope.expected_stock_code == ""
+    assert resolution.stock_scope.allowed_stock_codes == {"AAPL", expected_code}
 
 
 @pytest.mark.parametrize(
@@ -1138,6 +1255,70 @@ def test_newer_request_context_survives_an_older_persisted_comparison() -> None:
     assert restored == {"stock_code": "AAPL", "stock_name": "Apple"}
     assert session.context == restored
     assert session._market_context_user_message_id == 3
+
+
+def test_stale_recovery_cannot_overwrite_newer_anchored_context() -> None:
+    class SnapshotDb:
+        def __init__(self) -> None:
+            self.messages = [
+                {"id": 1, "role": "user", "content": "analyze AAPL"},
+            ]
+            self.captured = threading.Event()
+            self.release = threading.Event()
+
+        def get_visible_conversation_messages(self, _session_id: str):
+            snapshot = [dict(row) for row in self.messages]
+            if not self.captured.is_set():
+                self.captured.set()
+                assert self.release.wait(5)
+            return snapshot
+
+    db = SnapshotDb()
+    session = ConversationSession("concurrent-market-context")
+    session.update_market_context(
+        {"stock_code": "AAPL", "stock_name": "Apple"},
+        anchor_user_message_id=1,
+    )
+    recovered: list[dict] = []
+
+    with patch("src.agent.conversation.get_db", return_value=db):
+        reader = threading.Thread(
+            target=lambda: recovered.append(session.get_market_context())
+        )
+        reader.start()
+        assert db.captured.wait(5)
+
+        db.messages.append({"id": 2, "role": "user", "content": "continue"})
+        session.update_market_context(
+            {"stock_code": "TSLA", "stock_name": "Tesla"},
+            anchor_user_message_id=2,
+        )
+        db.release.set()
+        reader.join(5)
+        assert not reader.is_alive()
+
+        next_recovery = session.get_market_context()
+
+    assert recovered == [{"stock_code": "TSLA", "stock_name": "Tesla"}]
+    assert next_recovery == {"stock_code": "TSLA", "stock_name": "Tesla"}
+    assert session.context == next_recovery
+    assert session._market_context_user_message_id == 2
+
+
+def test_out_of_order_anchored_update_cannot_replace_newer_context() -> None:
+    session = ConversationSession("out-of-order-market-context")
+    session.update_market_context(
+        {"stock_code": "TSLA", "stock_name": "Tesla"},
+        anchor_user_message_id=2,
+    )
+
+    session.update_market_context(
+        {"stock_code": "AAPL", "stock_name": "Apple"},
+        anchor_user_message_id=1,
+    )
+
+    assert session.context == {"stock_code": "TSLA", "stock_name": "Tesla"}
+    assert session._market_context_user_message_id == 2
 
 
 def _stock_registry(executed: list[str]) -> ToolRegistry:
@@ -1579,7 +1760,7 @@ def test_single_agent_malformed_contextless_symbol_blocks_fragment_dispatch() ->
         "src.agent.conversation.conversation_manager.add_message",
         side_effect=[1, 2],
     ), patch.object(executor, "_persist_provider_trace"):
-        result = executor.chat("analyze AAPL-TSLA", "malformed-single")
+        result = executor.chat("analyze AAPL：TSLA", "malformed-single")
 
     assert result.success is True
     assert executed == []
@@ -1657,7 +1838,7 @@ def test_multi_agent_malformed_contextless_symbol_blocks_fragment_dispatch() -> 
         "src.agent.conversation.conversation_manager.add_message",
         side_effect=[11, 12],
     ):
-        result = orchestrator.chat("analyze SH000001", "malformed-multi")
+        result = orchestrator.chat("分析 SH：000001", "malformed-multi")
 
     ctx = captured["context"]
     assert result.success is True
@@ -1841,8 +2022,63 @@ def test_multi_agent_compare_preserves_leg_timeout_after_synthesis() -> None:
     )
 
     assert result.success is True
-    assert result.content == "cross-market synthesis"
+    assert result.content.startswith("cross-market synthesis")
+    assert "### 数据限制" in result.content
+    assert "`AAPL`" in result.content
+    assert "超时或仅部分完成" in result.content
     assert result.timed_out is True
+
+
+def test_multi_agent_synthesis_cannot_omit_failed_symbol_limitation() -> None:
+    adapter = MagicMock()
+    adapter.call_with_tools.return_value = LLMResponse(
+        content="cross-market synthesis",
+        tool_calls=[],
+        usage={},
+        provider="openai",
+        model="test-model",
+    )
+    orchestrator = AgentOrchestrator(
+        tool_registry=_market_capability_registry(),
+        llm_adapter=adapter,
+        config=SimpleNamespace(agent_orchestrator_timeout_s=60),
+        runtime_guard_policy=RuntimeGuardPolicy(),
+    )
+    scope = resolve_stock_scope("compare AAPL and HK00700", None).stock_scope
+    market_context = build_agent_chat_market_context(
+        {},
+        scope,
+        "en",
+        per_symbol_tool_scopes=True,
+    )
+
+    result = orchestrator._synthesize_multi_symbol_chat(
+        message="compare AAPL and HK00700",
+        market_context=market_context,
+        report_language="en",
+        per_symbol_results=[
+            (
+                "AAPL",
+                OrchestratorResult(success=True, content="AAPL analysis"),
+            ),
+            (
+                "HK00700",
+                OrchestratorResult(
+                    success=False,
+                    error="HK quote unavailable",
+                ),
+            ),
+        ],
+        cancelled_check=None,
+        timeout_seconds=30,
+    )
+
+    assert result.success is True
+    assert result.content.startswith("cross-market synthesis")
+    assert "### Data limitations" in result.content
+    assert "`HK00700`" in result.content
+    assert "Unavailable" in result.content
+    assert "HK quote unavailable" in result.content
 
 
 def test_multi_agent_fallback_preserves_unavailable_symbol_diagnostic() -> None:
@@ -1899,7 +2135,7 @@ def test_multi_agent_fallback_preserves_unavailable_symbol_diagnostic() -> None:
     assert "HK quote unavailable" in result.content
 
 
-def test_multi_agent_all_unavailable_fallback_is_a_successful_degraded_response() -> None:
+def test_multi_agent_all_unavailable_comparison_remains_failed() -> None:
     orchestrator = AgentOrchestrator(
         tool_registry=_market_capability_registry(),
         llm_adapter=MagicMock(),
@@ -1932,13 +2168,11 @@ def test_multi_agent_all_unavailable_fallback_is_a_successful_degraded_response(
         timeout_seconds=0,
     )
 
-    assert result.success is True
-    assert result.error is None
-    assert result.timed_out is True
-    assert "## AAPL" in result.content
-    assert "US quote unavailable" in result.content
-    assert "## HK00700" in result.content
-    assert "HK quote unavailable" in result.content
+    assert result.success is False
+    assert result.content == ""
+    assert result.error == "Agent chat failed"
+    assert result.timed_out is False
+    assert classify_result_terminal_state(result) is ExecutionState.FAILED
 
 
 def test_multi_agent_compare_cancellation_wins_before_fallback() -> None:

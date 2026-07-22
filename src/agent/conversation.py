@@ -45,6 +45,11 @@ class ConversationSession:
         repr=False,
         compare=False,
     )
+    _market_context_revision: int = field(
+        default=0,
+        repr=False,
+        compare=False,
+    )
 
     def add_message(self, role: str, content: str) -> int:
         """Add a message to the session history."""
@@ -57,6 +62,8 @@ class ConversationSession:
         """Update session context."""
         with self._context_lock:
             self.context[key] = value
+            if key in MARKET_CONTEXT_KEYS:
+                self._market_context_revision += 1
             self.last_active = datetime.now()
 
     def update_market_context(
@@ -68,39 +75,68 @@ class ConversationSession:
         """Replace cached market fields and optionally anchor them to a user turn."""
         selected = _select_market_context(context)
         with self._context_lock:
+            if (
+                isinstance(anchor_user_message_id, int)
+                and isinstance(self._market_context_user_message_id, int)
+                and anchor_user_message_id < self._market_context_user_message_id
+            ):
+                return
             for key in MARKET_CONTEXT_KEYS:
                 self.context.pop(key, None)
             self.context.update(selected)
             if anchor_user_message_id is not None:
                 self._market_context_user_message_id = anchor_user_message_id
+            self._market_context_revision += 1
             self.last_active = datetime.now()
 
     def _replace_recovered_market_context(
         self,
         context: Optional[Dict[str, Any]],
         anchor_user_message_id: Optional[int],
-    ) -> None:
-        """Atomically replace replayed market fields and their persistence anchor."""
+        *,
+        expected_revision: int,
+    ) -> Dict[str, Any]:
+        """Apply replayed state only when no newer cache write has won."""
         selected = _select_market_context(context)
         with self._context_lock:
+            if self._market_context_revision != expected_revision:
+                return _select_market_context(self.context)
+            if (
+                isinstance(anchor_user_message_id, int)
+                and isinstance(self._market_context_user_message_id, int)
+                and anchor_user_message_id < self._market_context_user_message_id
+            ):
+                return _select_market_context(self.context)
             for key in MARKET_CONTEXT_KEYS:
                 self.context.pop(key, None)
             self.context.update(selected)
             self._market_context_user_message_id = anchor_user_message_id
+            self._market_context_revision += 1
             self.last_active = datetime.now()
+            return dict(selected)
 
     def get_market_context(self) -> Dict[str, Any]:
         """Rebuild the active stock context from persisted visible user turns.
 
-        Persisted history is authoritative for symbol switches and survives a
-        process restart. The in-memory cache only restores explicit request
-        fields such as a report-provided stock name. An empty database history
-        clears the cache, matching session deletion semantics.
+        Symbol evidence written in user messages survives a process restart.
+        Request-only fields, such as a report-provided stock code or name, stay
+        authoritative in the in-memory cache while their message anchor remains
+        visible; callers must resend them after process restart or cache loss.
+        An empty database history clears the cache, matching session deletion
+        semantics.
         """
+        with self._context_lock:
+            cached = _select_market_context(self.context)
+            cached_anchor = self._market_context_user_message_id
+            cached_revision = self._market_context_revision
+
         messages = get_db().get_visible_conversation_messages(self.session_id)
         if not messages:
-            self._replace_recovered_market_context({}, None)
-            return {}
+            return self._replace_recovered_market_context(
+                {},
+                None,
+                expected_revision=cached_revision,
+            )
 
         from src.agent.stock_scope import resolve_stock_scope
 
@@ -112,10 +148,6 @@ class ConversationSession:
             and isinstance(message.get("content"), str)
             and bool(message.get("content"))
         ]
-        with self._context_lock:
-            cached = _select_market_context(self.context)
-            cached_anchor = self._market_context_user_message_id
-
         user_message_ids = [
             message.get("id")
             for message in user_messages
@@ -168,8 +200,11 @@ class ConversationSession:
             if all_user_messages_are_versioned and user_message_ids
             else None
         )
-        self._replace_recovered_market_context(replayed, recovered_anchor)
-        return dict(replayed)
+        return self._replace_recovered_market_context(
+            replayed,
+            recovered_anchor,
+            expected_revision=cached_revision,
+        )
 
     def get_history(self) -> List[Dict[str, Any]]:
         """Get message history."""
