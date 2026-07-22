@@ -4,6 +4,11 @@ import { toCamelCase } from './utils';
 
 const ALPHASIFT_SCREEN_TIMEOUT_MS = 180000;
 const ALPHASIFT_INSTALL_TIMEOUT_MS = 300000;
+const REPRODUCIBLE_SOURCE_INSTALL_GUIDANCE = [
+  'python -m pip install --upgrade --constraint constraints.txt pip',
+  'python -m pip install --build-constraint build-constraints.txt -r requirements.txt',
+  'python -m pip check',
+].join('\n');
 export const ALPHASIFT_CONFIG_CHANGED_EVENT = 'alphasift-config-changed';
 export const SYSTEM_CONFIG_CHANGED_EVENT = 'dsa-system-config-changed';
 
@@ -347,7 +352,9 @@ export const alphasiftApi = {
       const status = await alphasiftApi.getStatus();
       if (!status.available) {
         const reason = status.diagnostics?.reason ? `（${status.diagnostics.reason}）` : '';
-        throw new Error(`AlphaSift 适配层不可用${reason}。请确认后端已安装项目依赖，必要时执行 pip install -r requirements.txt 或重建 Docker/桌面后端。`);
+        throw new Error(
+          `AlphaSift 适配层不可用${reason}。请在仓库根目录运行受约束的安装流程：\n${REPRODUCIBLE_SOURCE_INSTALL_GUIDANCE}\n或重建 Docker/桌面后端。`,
+        );
       }
     } catch (error) {
       try {

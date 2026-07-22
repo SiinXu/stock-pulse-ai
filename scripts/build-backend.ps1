@@ -42,7 +42,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 & $pythonBin -m pip install --build-constraint build-constraints.txt -r requirements-desktop.txt
 if ($LASTEXITCODE -ne 0) {
-  throw "pip install -r requirements-desktop.txt failed with exit code $LASTEXITCODE."
+  throw "Dependency installation from requirements-desktop.txt failed with exit code $LASTEXITCODE."
 }
 & $pythonBin -m pip check
 if ($LASTEXITCODE -ne 0) {

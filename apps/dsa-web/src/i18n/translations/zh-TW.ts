@@ -2311,7 +2311,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_ENABLED.notes.0": "AlphaSift 初篩候選，StockPulse 補充行情、基本面和新聞上下文；關閉時不影響原有分析、報告和通知流程。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_ENABLED.summary": "控制是否啟用內建 AlphaSift 選股頁。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_ENABLED.title": "AlphaSift 選股",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_ENABLED.usage": "預設為停用。設為 true 後，Web 應用程式會檢查是否已隨後端相依套件安裝 alphasift.dsa_adapter；若缺少此模組，請執行 pip install -r requirements.txt 或重新建置後端產物。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_ENABLED.usage": "預設為停用。設為 true 後，Web 應用程式會檢查是否已隨後端相依套件安裝 alphasift.dsa_adapter；若缺少此模組，請在儲存庫根目錄依序執行 python -m pip install --upgrade --constraint constraints.txt pip、python -m pip install --build-constraint build-constraints.txt -r requirements.txt 和 python -m pip check，或重新建置後端產物。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_ENABLED.valueNotes.0": "AlphaSift 作為 StockPulse 後端依賴安裝，/install 僅作為顯式修復入口保留。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_ENABLED.valueNotes.1": "選股結果僅用於研究輔助，不構成投資建議。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_INSTALL_SPEC.impact.0": "影響 AlphaSift 適配層來源校驗和顯式修復安裝。",

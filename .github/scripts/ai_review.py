@@ -238,7 +238,13 @@ def review_with_gemini(prompt):
         return response.text
     except ImportError as e:
         print(f"❌ Gemini dependency is not installed: {_escape_non_ascii(e)}")
-        print("   Install review tools with: pip install -r .github/requirements-review.txt")
+        print("   In a trusted local checkout only, run:")
+        print("   python -m pip install --upgrade --constraint constraints.txt pip")
+        print(
+            "   python -m pip install --build-constraint build-constraints.txt "
+            "-r .github/requirements-review.txt"
+        )
+        print("   python -m pip check")
         return None
     except Exception as e:
         _log_exception("❌ Gemini review failed", e)
@@ -271,7 +277,13 @@ def review_with_openai(prompt):
         return response.choices[0].message.content
     except ImportError as e:
         print(f"❌ OpenAI dependency is not installed: {_escape_non_ascii(e)}")
-        print("   Install review tools with: pip install -r .github/requirements-review.txt")
+        print("   In a trusted local checkout only, run:")
+        print("   python -m pip install --upgrade --constraint constraints.txt pip")
+        print(
+            "   python -m pip install --build-constraint build-constraints.txt "
+            "-r .github/requirements-review.txt"
+        )
+        print("   python -m pip check")
         return None
     except Exception as e:
         _log_exception("❌ OpenAI-compatible review failed", e)
