@@ -12,7 +12,7 @@ integration is not yet wired.
 | Surface | Current authority | Track X delivery |
 | --- | --- | --- |
 | Plugin lifecycle, manifest, registry | `src/plugins/` core; Data Provider native adapter wired, other points fail closed | #273 X2a core implemented |
-| Built-in/external startup wiring | `src/application_services.py` composition root | #273 X2b, only after GATE-P3 |
+| Built-in/external startup wiring | `src/application_services.py` composition root | #273 X2b implemented |
 | Data Providers | `DataProvider`, `BaseFetcher`, and `DataFetcherManager` | #276 X3 implemented |
 | Analysis Strategies | `Skill`, `SkillManager`, `StrategyEngine` | Contract only in this batch |
 | Agent Tools | `ToolDefinition`, `ToolRegistry`, Tool Surface | Contract only; `src/agent/**` stays untouched |
@@ -24,19 +24,58 @@ integration is not yet wired.
 extension point. It does not mean the existing core path is deprecated.
 
 The X2a core validates manifests, owns lifecycle transitions and registrations,
-and exposes an explicit external-directory loader. It does not scan a directory
-or import external code during application startup. A caller first uses
-`ExternalPluginLoader.register_from_directory(...)` to import and register
-plugins, then invokes `PluginManager.load(...)` or `load_all()` separately.
-Startup composition and its opt-in configuration remain X2b work behind
-GATE-P3.
+and exposes an explicit external-directory loader. X2b wires that core into
+`ApplicationServices`: after a root is installed and therefore discoverable,
+the root registers its explicitly supplied built-in plugin catalog, scans an
+external directory only when `PLUGINS_DIR` is non-empty, and loads the resulting
+manager snapshot. Root replacement and process exit disable the snapshot in
+reverse registration order. Registration, discovery, load, and unload results
+remain available on the root for diagnostics and deterministic tests.
 
 X3 exposes its configured unified registry as
 `DataFetcherManager.plugin_registry`. Programmatic composition may pass that
 exact registry to `PluginManager`; the provider manager and plugin manager must
-not be given separate registries. This makes dynamic registration available
-without claiming that external-directory startup is wired. Automatic built-in
-and opt-in external startup remains X2b work.
+not be given separate registries. The default process plugin manager does not
+invent a process-wide `DataFetcherManager`, because current provider consumers
+own distinct managers. A composition caller that activates Data Provider
+plugins must inject a `PluginManager` bound to the exact target manager registry.
+X2b does not silently redirect or replace those existing provider-manager
+ownership boundaries.
+
+## Startup Composition
+
+`main.py` and `server.py` already install an `ApplicationServices` root after
+environment setup. Installing the root now starts plugin composition without an
+entrypoint edit:
+
+1. register caller-supplied built-in `Plugin` objects with `source="builtin"`;
+2. when and only when `PLUGINS_DIR` is non-empty, scan its direct child
+   directories in deterministic name order and register valid external plugins;
+3. load the complete registration snapshot in registration order, continuing
+   after every isolated plugin failure; and
+4. disable that snapshot in reverse order when the root is replaced, reset, or
+   closed at process exit.
+
+There is currently no default lifecycle-style built-in catalog to fabricate:
+existing Data Provider built-ins remain owned by each `DataFetcherManager`, and
+the other five extension points are contract-only. `ApplicationServices`
+therefore accepts an explicit built-in iterable while its default is empty.
+Adding a real built-in later must use that seam rather than a parallel startup
+hook.
+
+`PLUGINS_DIR` is read once for each root startup. Unset, empty, or whitespace-only
+values do not instantiate the external loader and do not probe a default path.
+Changing the value requires a process restart; there is no hot reload. Relative
+paths use the process working directory, so production deployments should use a
+reviewed absolute path. Missing, unreadable, invalid, incompatible, or failing
+candidates produce isolated result codes and never abort later candidates or
+the core application. Because this setting authorizes arbitrary startup code, it
+is read only from the process environment or startup `ENV_FILE`; it is not a
+runtime-mutable Web setting.
+
+Manifest `minAppVersion` is checked against the current released StockPulse
+compatibility line (`3.26.3` for this delivery). That value is maintained with
+the release line; it is not an operator override that can bypass compatibility.
 
 Default extension-point contracts enforce canonical identity but reject every
 implementation until composition supplies that point's concrete validator.
@@ -593,6 +632,7 @@ is safe.
 
 Operators must review and trust external plugin code and dependencies. Keeping
 `PLUGINS_DIR` unset or blank is the safe default and loads no external code.
+Setting it is a startup-time trust decision and requires a process restart.
 There is no remote marketplace, automatic update, dependency installation,
 signature verification, sandbox, subprocess boundary, or hot reload in scope.
 
