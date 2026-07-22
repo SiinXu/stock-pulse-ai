@@ -288,6 +288,10 @@ removes only its exact provider instance, and the manager applies the new
 registration snapshot before its next route selection. Existing fresh/stale
 cache entries and process-local health observations keep their normal TTL/reset
 semantics; disabling a provider does not rewrite cached market data.
+The manager pins the validated factory-time runtime name for routing, health,
+cache attribution, and diagnostics. Later mutation of the provider object's
+`name` cannot rename the active registration or impersonate a fixed built-in
+route.
 
 Built-ins use stable IDs `efinance`, `tencent`, `akshare`, `tushare`, `tickflow`,
 `pytdx`, `baostock`, `yfinance`, `longbridge`, `finnhub`, and `alphavantage`.

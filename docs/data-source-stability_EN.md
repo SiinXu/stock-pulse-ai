@@ -125,6 +125,9 @@ Unloading removes the exact owned provider. Numeric plugin priority affects only
 routes already governed by priority. U.S. index, U.S. stock,
 Longbridge-preferred, and realtime built-in chains retain their fixed order and
 try eligible plugins only as tail fallbacks.
+The manager pins the factory-time runtime name for routing, health state, cache
+attribution, and diagnostics. Later mutation of the provider object's `name`
+cannot rename the active registration or impersonate a fixed built-in route.
 Unload does not rewrite unexpired daily-cache entries or process-local health
 observations; they keep their existing TTL, stale, and reset semantics.
 

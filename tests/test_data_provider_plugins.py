@@ -509,11 +509,17 @@ def test_unload_uses_captured_runtime_name_and_retains_call_guard() -> None:
     )
     assert plugins.register(first, source="external").success is True
     assert plugins.load(first.manifest.id).success is True
-    original_call_guard = manager._get_fetcher_call_lock(first_provider)
+    routed_first_provider = manager._get_fetcher_by_name("MutableFetcher")
+    assert routed_first_provider is not None
+    assert routed_first_provider is not first_provider
+    original_call_guard = manager._get_fetcher_call_lock(routed_first_provider)
 
     assert plugins.disable(first.manifest.id).success is True
     assert manager.available_fetchers == ["FallbackFetcher"]
-    assert manager._get_fetcher_call_lock(first_provider) is original_call_guard
+    assert (
+        manager._get_fetcher_call_lock(routed_first_provider)
+        is original_call_guard
+    )
 
     second_provider = _DailyProvider("MutableFetcher", 10, _daily_frame())
     second = _ProviderPlugin(
@@ -524,6 +530,50 @@ def test_unload_uses_captured_runtime_name_and_retains_call_guard() -> None:
     assert plugins.register(second, source="external").success is True
     assert plugins.load(second.manifest.id).success is True
     assert manager.available_fetchers == ["MutableFetcher", "FallbackFetcher"]
+
+
+def test_enabled_plugin_runtime_name_is_pinned_before_fixed_route_lookup() -> None:
+    yfinance = _DailyProvider("YfinanceFetcher", 4, _daily_frame(20.0))
+    plugin_provider = _DailyProvider("MutablePluginFetcher", 999, _daily_frame(30.0))
+    manager = DataFetcherManager(fetchers=[yfinance])
+    plugins = _plugin_manager(manager)
+    plugin = _ProviderPlugin(
+        "mutable-active-provider",
+        _registration(
+            "mutable-active-provider",
+            lambda: plugin_provider,
+            markets={"cn", "us"},
+        ),
+        priority=-100,
+    )
+    assert plugins.register(plugin, source="external").success is True
+    assert plugins.load(plugin.manifest.id).success is True
+
+    plugin_provider.name = "YfinanceFetcher"
+
+    assert manager.available_fetchers == [
+        "MutablePluginFetcher",
+        "YfinanceFetcher",
+    ]
+    assert manager._get_fetcher_by_name("YfinanceFetcher") is yfinance
+    routed_plugin = manager._get_fetcher_by_name("MutablePluginFetcher")
+    assert routed_plugin is not None
+    assert routed_plugin is not plugin_provider
+
+    plugin_frame, plugin_source = manager.get_daily_data("600519")
+
+    assert plugin_source == "MutablePluginFetcher"
+    assert plugin_frame.iloc[-1]["close"] == 30.0
+    assert manager._daily_health_key(routed_plugin, "cn") == (
+        "daily_data:cn:MutablePluginFetcher"
+    )
+
+    frame, source = manager.get_daily_data("AAPL")
+
+    assert source == "YfinanceFetcher"
+    assert frame.iloc[-1]["close"] == 20.0
+    assert yfinance.calls == 1
+    assert plugin_provider.calls == 1
 
 
 def test_stock_list_plugin_enforces_market_before_call_and_result_acceptance() -> None:

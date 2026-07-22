@@ -136,6 +136,43 @@ class _LegacyDataProviderAdapter(DataProvider):
         return getattr(self._fetcher, attribute)
 
 
+class _RegisteredDataProviderAdapter(DataProvider):
+    """Pin a plugin's validated runtime name while delegating its behavior."""
+
+    def __init__(self, provider: DataProvider, provider_name: str) -> None:
+        self._provider = provider
+        self._provider_name = provider_name
+
+    @property
+    def name(self) -> str:
+        return self._provider_name
+
+    @property
+    def priority(self) -> int:
+        return self._provider.priority
+
+    @property
+    def allow_empty_daily_data(self) -> bool:
+        return getattr(self._provider, "allow_empty_daily_data", False)
+
+    def get_daily_data(
+        self,
+        stock_code: str,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        days: int = 30,
+    ):
+        return self._provider.get_daily_data(
+            stock_code=stock_code,
+            start_date=start_date,
+            end_date=end_date,
+            days=days,
+        )
+
+    def __getattr__(self, attribute: str):
+        return getattr(self._provider, attribute)
+
+
 def _adapt_builtin_provider(fetcher: object) -> DataProvider:
     if isinstance(fetcher, DataProvider):
         return fetcher
@@ -287,9 +324,14 @@ class _DataProviderBackend:
                 or provider_name in self._provider_names
             ):
                 raise ValueError("provider name already exists")
+            routed_provider = (
+                provider
+                if builtin_allowed
+                else _RegisteredDataProviderAdapter(provider, provider_name)
+            )
             self._entries[registration_id] = _NativeProviderEntry(
                 registration=implementation,
-                provider=provider,
+                provider=routed_provider,
                 provider_name=provider_name,
             )
             self._provider_names[provider_name] = registration_id
