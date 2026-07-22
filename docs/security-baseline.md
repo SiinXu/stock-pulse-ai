@@ -124,7 +124,7 @@ Current anchors include redacted Agent tool audit records in [`src/agent/tools/e
 | `SUPPLY-04` | MUST | Release and publish jobs must separate build from credentialed publication, validate artifact provenance and expected paths, and require the narrowest practical token scope. |
 | `SUPPLY-05` | SHOULD | CI should detect known vulnerable dependencies, stale immutable pins, unexpected lock changes, and permission expansion while providing an explicit exception workflow. |
 
-Current anchors: [`requirements.txt`](../requirements.txt), [`requirements-pydanticai.txt`](../requirements-pydanticai.txt), the npm lockfiles under [`apps/`](../apps/), and [`.github/workflows/`](../.github/workflows/). The optional PydanticAI closure is exactly versioned and npm installs use lockfiles, while the default Python environment and most workflow Action references are not immutable. B2 must create and link a dedicated public remediation issue before #228 closes.
+Current anchors: [`requirements.txt`](../requirements.txt), [`requirements-pydanticai.txt`](../requirements-pydanticai.txt), the npm lockfiles under [`apps/`](../apps/), and [`.github/workflows/`](../.github/workflows/). The optional PydanticAI closure is exactly versioned and npm installs use lockfiles, while the default Python environment and most workflow Action references are not immutable. The remaining reproducibility and least-privilege work is tracked in [#326](https://github.com/SiinXu/stock-pulse-ai/issues/326).
 
 ### Financial and privacy compliance
 
@@ -166,7 +166,7 @@ This table is a scope and ownership map, not an exploit guide. Sensitive impleme
 | Structured Agent observability is not yet a complete queryable cross-stage event and trace foundation. | `AUDIT-01` through `AUDIT-03` | [#222](https://github.com/SiinXu/stock-pulse-ai/issues/222) |
 | Analysis reports do not yet provide a complete exportable, redacted evidence chain and audit package. | `AUDIT-05` | [#127](https://github.com/SiinXu/stock-pulse-ai/issues/127) |
 | High-risk Agent actions do not yet have configurable, attributable human approval gates. | `AUDIT-04` | [#251](https://github.com/SiinXu/stock-pulse-ai/issues/251) |
-| Default Python dependency resolution, third-party Action pinning, and explicit workflow permission coverage do not yet meet the reproducibility and least-privilege baseline. | `SUPPLY-01` through `SUPPLY-05` | B2 audit: create a dedicated public issue before closing #228 |
+| Default Python dependency resolution, third-party Action pinning, and explicit workflow permission coverage do not yet meet the reproducibility and least-privilege baseline. | `SUPPLY-01` through `SUPPLY-05` | [#326](https://github.com/SiinXu/stock-pulse-ai/issues/326) |
 | Product-level investment and limitation disclosures are not yet guaranteed consistently across every report, notification, Web surface, and supported language. | `COMP-01` through `COMP-03`, `COMP-05` | [#144](https://github.com/SiinXu/stock-pulse-ai/issues/144) |
 
 ## Review Cadence
