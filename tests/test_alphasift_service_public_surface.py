@@ -44,6 +44,9 @@ EXPECTED_SERVICE_SURFACE = (
 EXPECTED_SERVICE_METHOD_METADATA_SHA256 = (
     "59fe497d1cb6108972453543476f6e47abc535c2eeab3f4ec9cffbf5cbc95baf"
 )
+EXPECTED_SERVICE_METHOD_AST_SHA256 = (
+    "691fc2e8765cddee2c2a088f51f2da633b1f92ad7ea5ada07d58ec7a5b3975d5"
+)
 EXPECTED_PROVIDER_SURFACE = (
     "_BASE_URL",
     "_HTTP_TIMEOUT_SECONDS",
@@ -198,6 +201,96 @@ def test_alphasift_service_and_provider_class_surfaces_are_stable():
     assert _digest(_class_method_metadata(provider)) == (
         EXPECTED_PROVIDER_METHOD_METADATA_SHA256
     )
+
+
+def test_alphasift_service_method_ast_is_unchanged():
+    source_path = (
+        Path(service_module.__file__).parent
+        / "alphasift_service_parts"
+        / "service.py"
+    )
+    tree = ast.parse(source_path.read_text(encoding="utf-8"))
+    service = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.ClassDef)
+        and node.name == "AlphaSiftService"
+    )
+    methods = [
+        node
+        for node in service.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    ]
+    payload = "\n".join(
+        _stable_ast_dump(method)
+        for method in methods
+    ).encode()
+    assert len(methods) == 8
+    assert hashlib.sha256(payload).hexdigest() == EXPECTED_SERVICE_METHOD_AST_SHA256
+
+
+def test_alphasift_service_uses_facade_patch_seams(monkeypatch):
+    config = object()
+    calls = []
+    strategies = [{"id": "patched"}]
+    monkeypatch.setattr(
+        service_module,
+        "_ensure_alphasift_enabled",
+        lambda value: calls.append(("enabled", value)),
+    )
+    monkeypatch.setattr(
+        service_module,
+        "_ensure_alphasift_available_for_use",
+        lambda: calls.append(("available", None)),
+    )
+    monkeypatch.setattr(service_module, "_list_strategies", lambda: strategies)
+
+    result = service_module.AlphaSiftService(config).strategies()
+
+    assert result == {
+        "enabled": True,
+        "strategies": strategies,
+        "strategy_count": 1,
+    }
+    assert calls == [("enabled", config), ("available", None)]
+
+
+def test_alphasift_service_reload_recreates_facade_bound_service():
+    script = r'''
+import importlib
+import src.services.alphasift_service as module
+import src.services.alphasift_service_parts.service as service_part
+
+old_class = module.AlphaSiftService
+old_method = old_class.strategies
+service_part.AlphaSiftService.strategies = lambda *_args: "stale"
+
+first = importlib.reload(module)
+first_class = first.AlphaSiftService
+first_method = first_class.strategies
+first_source_class = service_part.AlphaSiftService
+assert first_class is not old_class
+assert first_method is not old_method
+assert first_method.__module__ == first.__name__
+assert first_method.__qualname__ == "AlphaSiftService.strategies"
+assert first_method.__globals__ is vars(first)
+assert first_method.__code__ is first_source_class.strategies.__code__
+assert first_method.__code__.co_name == "strategies"
+
+second = importlib.reload(first)
+assert second.AlphaSiftService is not first_class
+assert second.AlphaSiftService.strategies is not first_method
+assert service_part.AlphaSiftService is not first_source_class
+assert second.AlphaSiftService.strategies.__globals__ is vars(second)
+assert second.AlphaSiftService.strategies.__code__ is service_part.AlphaSiftService.strategies.__code__
+'''
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
 
 
 def test_alphasift_provider_method_ast_is_unchanged():
