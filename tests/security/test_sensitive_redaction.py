@@ -10,6 +10,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
 from api.middlewares.error_handler import add_error_handlers
+from api.v1.errors import error_body
 from src.agent.provider_trace import extract_provider_trace_turns
 from src.agent.public_contract import sanitize_stream_event
 from src.agent.tools.execution import redact_diagnostic_value
@@ -98,6 +99,222 @@ def test_central_redaction_masks_supported_shapes_and_preserves_public_values() 
     assert redacted["encoded_callback"] == "[REDACTED_URL]"
     assert redacted["public_url"] == "https://example.com/docs?lang=en"
     assert redacted["stock_code"] == "600519"
+
+
+def test_cookie_redaction_masks_empty_and_quoted_delimiter_pairs_at_boundaries() -> None:
+    empty_middle_pair = (
+        f"Cookie: first=public; empty=; session={PLAIN_SECRET}; "
+        f"csrf={BEARER_SECRET}"
+    )
+    quoted_delimiter_pair = (
+        f'Cookie: marker="public;split"; csrf={WEBHOOK_SECRET} public=401'
+    )
+    quoted_next_pair = (
+        f'Cookie: marker="public; next remains private"; '
+        f"csrf={PLAIN_SECRET} public=401"
+    )
+    public_named_cookie_pair = (
+        f"Cookie: session={PLAIN_SECRET}; public={BEARER_SECRET}"
+    )
+    quoted_assignment = (
+        f'cookie=marker="public; next remains private"; '
+        f"csrf={WEBHOOK_SECRET} next"
+    )
+    folded_cookie = (
+        f"Cookie: session={PLAIN_SECRET};\r\n csrf={BEARER_SECRET}"
+    )
+    quoted_set_cookie = (
+        f'Set-Cookie: marker="public;split;{WEBHOOK_SECRET}"; Path=/ next'
+    )
+    malformed_cookie = (
+        f'Cookie: marker="open; next hidden; csrf={WEBHOOK_SECRET}'
+    )
+    malformed_set_cookie = (
+        f'Set-Cookie: session={PLAIN_SECRET} public={WEBHOOK_SECRET}'
+    )
+    escaped_next_cookie = (
+        f"Cookie: marker=public\\; next hidden; csrf={BEARER_SECRET}"
+    )
+    cookie_header_assignment = (
+        f'cookie_header=marker="public; next remains private"; '
+        f"csrf={PLAIN_SECRET} next"
+    )
+    set_cookie_header_assignment = (
+        f'set_cookie_header=marker="public;split;{WEBHOOK_SECRET}"; '
+        "Path=/ next"
+    )
+    prefixed_cookie_assignment = (
+        f"provider_cookie_header=session={PLAIN_SECRET}; "
+        f"csrf={BEARER_SECRET} next"
+    )
+    prefixed_set_cookie_assignment = (
+        f"provider_set_cookie_header=session={PLAIN_SECRET}; Path=/; "
+        f"private_session={WEBHOOK_SECRET} next"
+    )
+
+    assert redact_sensitive_text(empty_middle_pair) == "Cookie: [REDACTED]"
+    assert redact_sensitive_text(quoted_delimiter_pair) == (
+        "Cookie: [REDACTED] public=401"
+    )
+    assert redact_sensitive_text(quoted_next_pair) == (
+        "Cookie: [REDACTED] public=401"
+    )
+    assert redact_sensitive_text(public_named_cookie_pair) == (
+        "Cookie: [REDACTED]"
+    )
+    assert redact_sensitive_text(quoted_assignment) == (
+        "cookie=[REDACTED] next"
+    )
+    assert redact_sensitive_text(folded_cookie) == "Cookie: [REDACTED]"
+    assert redact_sensitive_text(quoted_set_cookie) == (
+        "Set-Cookie: [REDACTED]; Path=/ next"
+    )
+    assert redact_sensitive_text(malformed_cookie) == "Cookie: [REDACTED]"
+    assert redact_sensitive_text(malformed_set_cookie) == (
+        "Set-Cookie: [REDACTED]"
+    )
+    assert redact_sensitive_text(escaped_next_cookie) == "Cookie: [REDACTED]"
+    assert redact_sensitive_text(cookie_header_assignment) == (
+        "cookie_header=[REDACTED] next"
+    )
+    assert redact_sensitive_text(set_cookie_header_assignment) == (
+        "set_cookie_header=[REDACTED]; Path=/ next"
+    )
+    assert redact_sensitive_text(prefixed_cookie_assignment) == (
+        "provider_cookie_header=[REDACTED] next"
+    )
+    assert redact_sensitive_text(prefixed_set_cookie_assignment) == (
+        "provider_set_cookie_header=[REDACTED]"
+    )
+
+    api_payload = error_body(
+        "provider_rejected",
+        empty_middle_pair,
+        details={"provider_diagnostic": quoted_delimiter_pair},
+    )
+    stream_payload = sanitize_stream_event(
+        {
+            "type": "tool_progress",
+            "details": {
+                "empty_diagnostic": empty_middle_pair,
+                "quoted_diagnostic": quoted_delimiter_pair,
+            },
+        },
+        trace_id="trace-cookie-grammar",
+    )
+
+    _assert_no_secret({"api": api_payload, "stream": stream_payload})
+    assert api_payload["message"] == "Cookie: [REDACTED]"
+    assert api_payload["details"]["provider_diagnostic"] == (
+        "Cookie: [REDACTED] public=401"
+    )
+    assert stream_payload["details"] == {
+        "empty_diagnostic": "Cookie: [REDACTED]",
+        "quoted_diagnostic": "Cookie: [REDACTED] public=401",
+    }
+
+
+def test_digest_redaction_masks_extended_parameters_and_assignment_labels() -> None:
+    digest_header = (
+        "Authorization: Digest username*=UTF-8''operator, "
+        f"realm={PLAIN_SECRET}, nonce={BEARER_SECRET}, "
+        f"response={WEBHOOK_SECRET} public_status=401"
+    )
+    digest_assignment = (
+        "authorization_header=Digest username*=UTF-8''operator, "
+        f"realm={PLAIN_SECRET}, nonce={BEARER_SECRET}, "
+        f"response={WEBHOOK_SECRET} public_status=401"
+    )
+    quoted_digest_assignment = (
+        'authorization_header="Digest username*=UTF-8\'\'operator, '
+        f"realm={PLAIN_SECRET}, response={WEBHOOK_SECRET}" + '" public_status=401'
+    )
+    quoted_basic_assignment = (
+        f"provider_proxy_authorization_header='Basic {BEARER_SECRET}' next"
+    )
+    quoted_authorization_before_cookie = (
+        f"provider_proxy_authorization_header='Basic {BEARER_SECRET}' next "
+        f"Cookie: session={WEBHOOK_SECRET}"
+    )
+    malformed_quoted_assignment = (
+        'authorization_header="Digest username=operator, '
+        f"response={WEBHOOK_SECRET}"
+    )
+    quoted_public_marker = (
+        'Authorization: Digest username="operator '
+        f'public_status={PLAIN_SECRET}", realm={BEARER_SECRET}, '
+        f"response={WEBHOOK_SECRET} public_status=401"
+    )
+    public_named_digest_parameter = (
+        "Authorization: Digest username=operator, "
+        f"public={PLAIN_SECRET}, response={WEBHOOK_SECRET}"
+    )
+    folded_digest_header = (
+        "Authorization: Digest username=operator,\r\n "
+        f"response={WEBHOOK_SECRET}"
+    )
+    malformed_digest_header = (
+        'Authorization: Digest username="open '
+        f"public_status={PLAIN_SECRET}, response={WEBHOOK_SECRET}"
+    )
+
+    assert redact_sensitive_text(digest_header) == (
+        "Authorization: [REDACTED] public_status=401"
+    )
+    assert redact_sensitive_text(digest_assignment) == (
+        "authorization_header=[REDACTED] public_status=401"
+    )
+    assert redact_sensitive_text(quoted_digest_assignment) == (
+        "authorization_header=[REDACTED] public_status=401"
+    )
+    assert redact_sensitive_text(quoted_basic_assignment) == (
+        "provider_proxy_authorization_header=[REDACTED] next"
+    )
+    assert redact_sensitive_text(quoted_authorization_before_cookie) == (
+        "provider_proxy_authorization_header=[REDACTED] next "
+        "Cookie: [REDACTED]"
+    )
+    assert redact_sensitive_text(malformed_quoted_assignment) == (
+        "authorization_header=[REDACTED]"
+    )
+    assert redact_sensitive_text(quoted_public_marker) == (
+        "Authorization: [REDACTED] public_status=401"
+    )
+    assert redact_sensitive_text(public_named_digest_parameter) == (
+        "Authorization: [REDACTED]"
+    )
+    assert redact_sensitive_text(folded_digest_header) == (
+        "Authorization: [REDACTED]"
+    )
+    assert redact_sensitive_text(malformed_digest_header) == (
+        "Authorization: [REDACTED]"
+    )
+
+    api_payload = error_body(
+        "provider_rejected",
+        digest_header,
+        details={"provider_diagnostic": digest_assignment},
+    )
+    formatter = RelativePathFormatter("%(levelname)s %(message)s")
+    record = logging.LogRecord(
+        name="tests.security.digest",
+        level=logging.DEBUG,
+        pathname=__file__,
+        lineno=1,
+        msg=quoted_digest_assignment,
+        args=(),
+        exc_info=None,
+    )
+    rendered_log = formatter.format(record)
+
+    _assert_no_secret({"api": api_payload, "log": rendered_log})
+    assert api_payload["message"] == (
+        "Authorization: [REDACTED] public_status=401"
+    )
+    assert api_payload["details"]["provider_diagnostic"] == (
+        "authorization_header=[REDACTED] public_status=401"
+    )
+    assert "authorization_header=[REDACTED] public_status=401" in rendered_log
 
 
 def test_central_redaction_fails_closed_for_recursive_and_hostile_values() -> None:
