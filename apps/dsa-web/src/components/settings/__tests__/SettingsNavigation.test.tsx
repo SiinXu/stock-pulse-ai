@@ -51,7 +51,7 @@ describe('SettingsSectionNav', () => {
     expect(select).toHaveClass('min-h-11');
     // Every section is reachable in one tap from the current section.
     fireEvent.click(select);
-    expect(screen.getAllByRole('option')).toHaveLength(11);
+    expect(screen.getAllByRole('option')).toHaveLength(12);
     fireEvent.click(screen.getByRole('option', { name: '通知' }));
     expect(onSelect).toHaveBeenCalledWith('notifications');
   });

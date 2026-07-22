@@ -29,7 +29,9 @@ source venv/bin/activate  # Linux/Mac
 # venv\Scripts\activate   # Windows
 
 # Install dependencies
-pip install -r requirements.txt
+python -m pip install --upgrade --constraint constraints.txt pip
+python -m pip install --build-constraint build-constraints.txt -r requirements.txt
+python -m pip check
 
 # Configure environment variables
 cp .env.example .env
@@ -112,8 +114,9 @@ Separately, the repository also has a non-blocking `network-smoke` workflow in `
 
 ```bash
 # Backend gate (recommended)
-pip install -r requirements.txt
-pip install flake8 pytest
+python -m pip install --upgrade --constraint constraints.txt pip
+python -m pip install --build-constraint build-constraints.txt -r .github/requirements-ci.txt
+python -m pip check
 ./scripts/ci_gate.sh
 
 # Frontend gate (only if you changed apps/dsa-web/)

@@ -150,6 +150,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.system_security.views.runtime.label": "スケジュール",
   "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.system_security.views.security.label": "認証とセキュリティ",
   "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.system_security.views.service.label": "Webとログ",
+  "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.usage.label": "使用量とコスト",
   "i18n.uiText.UI_TEXT.chat.actionFailed": "操作に失敗しました。もう一度お試しください。",
   "i18n.uiText.UI_TEXT.chat.addWatchlist": "ウォッチリストに追加",
   "i18n.uiText.UI_TEXT.chat.aiReplyHeading": "AIの返信",

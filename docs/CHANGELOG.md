@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Changed] Moved Token Usage into Settings > Usage & cost and retained `/usage` as a query- and hash-preserving compatibility redirect.
 - [Fixed] Corrected English developer comments to preserve financial terminology and localized fixture literals without changing runtime behavior.
 - [Chore] Added a dev-only Web API mock switch (`?mock=ready|empty|error|slow` or `VITE_MOCK_API`) with larger deterministic fixtures for UI walkthroughs; gated behind `import.meta.env.DEV` and tree-shaken from production builds.
 - [Changed] Added unified Web page and Router patterns with `AppPage`, `WorkspacePage`, `ResponsiveRail`, `PageHeader`, `Toolbar`, `Tabs`, `TabPanel`, `SummaryStrip`, and `WorkspaceNavigation`, plus focus restoration and guards against duplicate navigation primitives.
@@ -290,8 +291,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Added one reviewable universal Python dependency lock across source, CI, Docker, desktop, static review tooling, and optional runtime paths with resolver reproduction, constrained source builds, bounded exceptions, and vulnerability auditing.
 - [Added] Added stable Data Provider plugin contracts and priority-aware dynamic registration while preserving existing routing, fallback, health, cache, and diagnostics policies.
 - [Fixed] Anchored coarse-pointer Web hit-target expansions to their owning controls so compact links cannot intercept taps across a surrounding drawer.
+- [Changed] Split notification routing, rendering, report setup, and dispatch methods into focused private modules while preserving the `src.notification` facade and delivery behavior.
 - [Fixed] Applied one recursive sensitive-data redaction policy to logs, API errors, Agent traces and audits, diagnostics exports, and provider errors, with debug-safe defaults and fail-closed protocol-trace handling.
 - [Fixed] Preserved Data Provider plugin market, capability, and priority eligibility in in-flight snapshots during concurrent unload.
+- [Docs] Aligned maintained Markdown source-install guidance with the constrained pip bootstrap, PEP 517 build constraint, and pip check required by the reproducible dependency contract.
 
 ## [3.26.3] - 2026-07-15
 

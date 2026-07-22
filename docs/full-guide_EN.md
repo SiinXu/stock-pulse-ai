@@ -594,12 +594,16 @@ docker run -d \
 
 ```bash
 # Python 3.10+ recommended
-pip install -r requirements.txt
+python -m pip install --upgrade --constraint constraints.txt pip
+python -m pip install --build-constraint build-constraints.txt -r requirements.txt
+python -m pip check
 
 # Or use conda
 conda create -n stock python=3.10
 conda activate stock
-pip install -r requirements.txt
+python -m pip install --upgrade --constraint constraints.txt pip
+python -m pip install --build-constraint build-constraints.txt -r requirements.txt
+python -m pip check
 ```
 
 On Windows PowerShell, if Python or pip still uses the system default code page, enable UTF-8 before the first dependency install or environment check. This keeps terminal output and third-party tooling from failing on non-ASCII text:
@@ -607,7 +611,9 @@ On Windows PowerShell, if Python or pip still uses the system default code page,
 ```powershell
 $env:PYTHONUTF8='1'
 $env:PYTHONIOENCODING='utf-8'
-python -m pip install -r requirements.txt
+python -m pip install --upgrade --constraint constraints.txt pip
+python -m pip install --build-constraint build-constraints.txt -r requirements.txt
+python -m pip check
 python scripts/check_env.py --config
 ```
 
@@ -884,7 +890,7 @@ FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/your_hook_token
    - **IP allowlist enabled**: make sure the outbound IP of your runtime (local / Docker / GitHub Actions each have different IPs) is on the allowlist.
 4. `FEISHU_APP_ID` / `FEISHU_APP_SECRET` are for Feishu app / Stream Bot / cloud document flows only. They do **not** trigger group webhook notifications and must not be used alone instead of `FEISHU_WEBHOOK_URL`.
 5. If `FEISHU_APP_ID` / `FEISHU_APP_SECRET` are configured together with `FEISHU_CHAT_ID`, the Feishu App Bot can push notifications directly to a specified chat or user, no group webhook required. `FEISHU_RECEIVE_ID_TYPE` defaults to `chat_id`; set it to `open_id` for P2P delivery. This uses the Feishu OpenAPI Bot session route, independent of the group webhook path.
-6. The App Bot send path reuses the existing `lark-oapi>=1.0.0` dependency already listed in `requirements.txt`; standard source installs, Docker, the GitHub Actions daily workflow, and desktop builds all install it through `pip install -r requirements.txt`. References: [Feishu message create OpenAPI](https://open.feishu.cn/document/server-docs/im-v1/message/create), [lark-oapi PyPI](https://pypi.org/project/lark-oapi/), [SDK repo](https://github.com/larksuite/oapi-sdk-python).
+6. The App Bot send path reuses the existing `lark-oapi>=1.0.0` dependency already listed in `requirements.txt`; standard source installs, Docker, the GitHub Actions daily workflow, and desktop builds all install it from requirements inputs constrained by `constraints.txt`. References: [Feishu message create OpenAPI](https://open.feishu.cn/document/server-docs/im-v1/message/create), [lark-oapi PyPI](https://pypi.org/project/lark-oapi/), [SDK repo](https://github.com/larksuite/oapi-sdk-python).
 
 **Common failure causes:**
 - Only `FEISHU_APP_ID` / `FEISHU_APP_SECRET` were set, with neither `FEISHU_WEBHOOK_URL` nor the App Bot active-delivery target `FEISHU_CHAT_ID` configured
@@ -1406,7 +1412,7 @@ For this feature, the product behavior is:
 | `/api/v1/decision-signals/{signal_id}/status` | PATCH | Update a decision signal status and optional metadata |
 | `/api/v1/decision-signals/latest/{stock_code}` | GET | Query the latest active decision signals for a stock |
 | `/api/v1/usage/summary?period=today|month|all` | GET | Query LLM call counts and token usage grouped by call type and model |
-| `/api/v1/usage/dashboard?period=today|month|all&limit=50` | GET | Return token-usage dashboard data: totals, prompt/completion split, model usage, call-type breakdown, and recent call records; the Web entry is the sidebar Usage page |
+| `/api/v1/usage/dashboard?period=today|month|all&limit=50` | GET | Return token-usage dashboard data: totals, prompt/completion split, model usage, call-type breakdown, and recent call records; the Web entry is Settings > Usage & cost, with legacy `/usage` links redirected for compatibility |
 | `/api/v1/backtest/run` | POST | Trigger backtest |
 | `/api/v1/backtest/results` | GET | Query backtest results (paginated) |
 | `/api/v1/backtest/performance` | GET | Get overall backtest performance |

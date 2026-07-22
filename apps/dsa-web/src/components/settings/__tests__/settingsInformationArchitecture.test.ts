@@ -1,6 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
+import { SETTINGS_SECTION_IDS } from '../../../routing/routes';
 import {
   SETTINGS_SECTIONS,
   getDefaultView,
@@ -14,7 +15,7 @@ import {
 } from '../settingsInformationArchitecture';
 
 describe('settingsInformationArchitecture', () => {
-  it('defines the 11 top-level sections in order', () => {
+  it('defines the 12 top-level sections in order', () => {
     expect(SETTINGS_SECTIONS.map((section) => section.id)).toEqual([
       'overview',
       'ai_models',
@@ -24,10 +25,22 @@ describe('settingsInformationArchitecture', () => {
       'reports',
       'alerts',
       'notifications',
+      SETTINGS_SECTION_IDS.usage,
       'backtesting',
       'system_security',
       'advanced',
     ]);
+  });
+
+  it('defines Usage & cost as a leaf section owned by TokenUsagePage', () => {
+    expect(isSettingsSectionId(SETTINGS_SECTION_IDS.usage)).toBe(true);
+    expect(sectionLabel(SETTINGS_SECTION_IDS.usage, 'en')).toBe('Usage & cost');
+    expect(getSectionViews(SETTINGS_SECTION_IDS.usage)).toEqual([]);
+    expect(getDefaultView(SETTINGS_SECTION_IDS.usage)).toBe('');
+    expect(sectionViewToLegacy(SETTINGS_SECTION_IDS.usage, null))
+      .toEqual({ category: 'base', sub: null });
+    expect(normalizeSectionView(SETTINGS_SECTION_IDS.usage, 'unknown'))
+      .toEqual({ section: SETTINGS_SECTION_IDS.usage, view: '' });
   });
 
   it('splits AI & Models into the four expected views with a default', () => {

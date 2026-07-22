@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { loginAsE2eAdmin } from './auth-fixture';
+import { LEGACY_ROUTE_PATHS } from '../src/routing/routes';
 
 const usageDashboard = {
   period: 'month',
@@ -96,7 +97,7 @@ test.describe('surface and task-state foundation', () => {
       await fulfillJson(route, emptyUsageDashboard);
     });
 
-    await page.goto('/usage');
+    await page.goto(LEGACY_ROUTE_PATHS.usage);
     const loading = page.locator('[data-state-panel="loading"]');
     await expect(loading).toHaveCount(1);
     await expect(loading).toHaveAttribute('role', 'status');
@@ -140,7 +141,7 @@ test.describe('surface and task-state foundation', () => {
       }, 503);
     });
 
-    await page.goto('/usage');
+    await page.goto(LEGACY_ROUTE_PATHS.usage);
     const initialError = page.locator('[data-state-panel="error"]');
     await expect(initialError).toHaveCount(1);
     await expect(initialError).toHaveAttribute('role', 'alert');
@@ -179,7 +180,7 @@ test.describe('surface and task-state foundation', () => {
       await fulfillJson(route, usageDashboard);
     });
 
-    await page.goto('/usage');
+    await page.goto(LEGACY_ROUTE_PATHS.usage);
     await expect(page.getByText('400', { exact: true })).toBeVisible();
     await expect(page.getByRole('table')).toBeVisible();
     await page.getByRole('tab', { name: '今日' }).click();
@@ -194,7 +195,7 @@ test.describe('surface and task-state foundation', () => {
     await page.route('**/api/v1/usage/dashboard**', async (route) => {
       await fulfillJson(route, usageDashboard);
     });
-    await page.goto('/usage');
+    await page.goto(LEGACY_ROUTE_PATHS.usage);
     await expect(page.getByText('400', { exact: true })).toBeVisible();
 
     const modelSection = page.getByRole('region', { name: '模型用量' });

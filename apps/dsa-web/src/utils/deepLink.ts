@@ -1,6 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { StockHistoryPeriod } from '../types/stocks';
+import { APP_ROUTE_PATHS, LEGACY_ROUTE_PATHS } from '../routing/routes';
 import { normalizeStockCode } from './stockCode';
 import { validateStockCode } from './validation';
 
@@ -493,7 +494,13 @@ export function parseDeepLink(input: string, origin = DEFAULT_ORIGIN): ParsedDee
         }
         target = { page: 'stock', stockCode, period, days };
       }
-    } else if (!['/alerts', '/backtest', '/screening', '/settings', '/usage'].includes(url.pathname)) {
+    } else if (![
+      '/alerts',
+      '/backtest',
+      '/screening',
+      APP_ROUTE_PATHS.settings,
+      LEGACY_ROUTE_PATHS.usage,
+    ].includes(url.pathname)) {
       issues.push({ code: 'unsupported_route' });
     }
   }

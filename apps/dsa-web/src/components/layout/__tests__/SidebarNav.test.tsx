@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { APP_ROUTE_PATHS, LEGACY_ROUTE_PATHS } from '../../../routing/routes';
 import { recordSessionLocation } from '../../../utils/sessionContinuity';
 import { SidebarNav } from '../SidebarNav';
 
@@ -313,6 +314,19 @@ describe('SidebarNav', () => {
     const markers = Array.from(document.querySelectorAll('[data-route-focus-key]'))
       .map((element) => element.getAttribute('data-route-focus-key'));
     expect(new Set(markers).size).toBe(markers.length);
+  });
+
+  it('keeps Usage nested under Settings instead of exposing a legacy sidebar entry', () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.settings]}>
+        <SidebarNav />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole('link', { name: '用量' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '设置' }))
+      .toHaveAttribute('href', APP_ROUTE_PATHS.settings);
+    expect(container.querySelector(`a[href="${LEGACY_ROUTE_PATHS.usage}"]`)).toBeNull();
   });
 
   it('renders the alerts navigation item and marks it active', () => {

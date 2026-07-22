@@ -125,7 +125,9 @@ source /opt/stock-analyzer/venv/bin/activate
 
 ```bash
 cd /opt/stock-analyzer
-pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+python -m pip install --upgrade --constraint constraints.txt pip -i https://pypi.tuna.tsinghua.edu.cn/simple
+python -m pip install --build-constraint build-constraints.txt -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+python -m pip check
 ```
 
 ### 3. 配置环境变量
