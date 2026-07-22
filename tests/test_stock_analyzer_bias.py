@@ -176,7 +176,7 @@ class StockAnalyzerBiasTestCase(unittest.TestCase):
         # Let me re-read: elif bias < base_threshold -> 5 < 5 is False
         # elif bias > effective_threshold -> 5 > 5 is False
         # elif bias > base_threshold and is_strong_trend -> 5 > 5 is False
-        # else: risks.append 严禁追高 - so we get 严禁追高
+        # else: risks.append Absolutely no chasing high prices - so we get Absolutely no chasing high prices
         # Because 5.0 is not < 5.0, not > 5.0 when effective=base=5. So we hit the else.
         self._assert_contains(result.risk_factors, "严禁追高")
 

@@ -55,7 +55,7 @@ class DiscordSender:
     
     def _is_discord_configured(self) -> bool:
         """检查 Discord 配置是否完整（支持 Bot 或 Webhook）"""
-        # 只要配置了 Webhook 或完整的 Bot Token+Channel，即视为可用
+        # If the Webhook or complete Bot Token+Channel is configured, it's considered available.
         bot_ok = bool(self._discord_config['bot_token'] and self._discord_config['channel_id'])
         webhook_ok = bool(self._discord_config['webhook_url'])
         return bot_ok or webhook_ok
@@ -70,10 +70,10 @@ class DiscordSender:
         Returns:
             是否发送成功
         """
-        # 分割内容，避免单条消息超过 Discord 限制
+        # Split content to avoid a single message exceeding Discord limits
         chunks = self._split_discord_content(content)
 
-        # 优先使用 Webhook（配置简单，权限低）
+        # Prioritize using Webhook (simple configuration, low permissions)
         if self._discord_config['webhook_url']:
             return self._send_discord_chunks(
                 chunks,
@@ -82,7 +82,7 @@ class DiscordSender:
                 timeout_seconds=timeout_seconds,
             )
 
-        # 其次使用 Bot API（权限高，需要 channel_id）
+        # Then use Bot API (high permission, requires channel_id).
         if self._discord_config['bot_token'] and self._discord_config['channel_id']:
             return self._send_discord_chunks(
                 chunks,

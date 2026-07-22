@@ -438,14 +438,14 @@ class AnalysisTaskQueue:
         return cls._instance
     
     def __init__(self, max_workers: int = 3):
-        # 防止重复初始化
+        # Prevent repeated initialization.
         if hasattr(self, '_initialized') and self._initialized:
             return
         
         self._max_workers = max_workers
         self._executor: Optional[ThreadPoolExecutor] = None
         
-        # 核心数据结构
+        # Core Data Structure
         self._tasks: Dict[str, TaskInfo] = {}           # task_id -> TaskInfo
         self._analyzing_stocks: Dict[str, str] = {}     # dedupe_key -> task_id
         self._futures: Dict[str, Future] = {}           # task_id -> Future
@@ -464,10 +464,10 @@ class AnalysisTaskQueue:
         self._event_stream_queue_size = 256
         self._shutdown = False
         
-        # 线程安全锁
+        # Thread-safe lock
         self._data_lock = threading.RLock()
         
-        # 任务历史保留数量（内存中）
+        # Task Historical Retention Quantity (In Memory)
         self._max_history = 100
         self._max_flow_events_per_task = 200
         
@@ -688,7 +688,7 @@ class AnalysisTaskQueue:
             logger.info("[TaskQueue] 最大并发已更新: %s -> %s", previous, target)
         return "applied"
     
-    # ========== 任务提交与查询 ==========
+    # ========== Task Submission and Query ==========
     
     def is_analyzing(self, stock_code: str) -> bool:
         """
@@ -1867,7 +1867,7 @@ class AnalysisTaskQueue:
         self._cleanup_old_tasks()
 
 
-# ========== 便捷函数 ==========
+# ========== Convenience Functions ==========
 
 def get_task_queue() -> AnalysisTaskQueue:
     """

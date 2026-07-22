@@ -265,7 +265,7 @@
   --chat-bubble-ai-bg: hsl(var(--card) / 0.85);
   --chat-bubble-ai-border: hsl(var(--foreground) / 0.2);
 
-  /* Backtest专用 */
+  /* Backtest only */
   --backtest-border-dim: hsl(var(--foreground) / 0.05);
   --backtest-border-subtle: hsl(var(--foreground) / 0.06);
   --backtest-border-light: hsl(var(--foreground) / 0.10);
@@ -512,7 +512,7 @@
   --chat-bubble-ai-bg: hsl(var(--card) / 0.72);
   --chat-bubble-ai-border: hsl(var(--neutral-white) / 0.12); /* Semi-transparent border for dark mode */
 
-  /* Backtest专用 */
+  /* Backtest only */
   --backtest-border-dim: hsl(var(--foreground) / 0.06);
   --backtest-border-subtle: hsl(var(--foreground) / 0.08);
   --backtest-border-light: hsl(var(--foreground) / 0.12);

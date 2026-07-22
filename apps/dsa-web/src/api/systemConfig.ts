@@ -357,7 +357,7 @@ export const systemConfigApi = {
   },
 
   /**
-   * 获取自选队列股票代码列表
+   * Get a list of codes for watchlist stocks
    */
   getWatchlist: async (): Promise<string[]> => {
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/stocks/watchlist');
@@ -366,7 +366,7 @@ export const systemConfigApi = {
   },
 
   /**
-   * 添加股票到自选队列
+   * Add stocks to watchlist queue
    */
   addToWatchlist: async (stockCode: string): Promise<string[]> => {
     const response = await apiClient.post<Record<string, unknown>>('/api/v1/stocks/watchlist/add', {
@@ -377,7 +377,7 @@ export const systemConfigApi = {
   },
 
   /**
-   * 从自选队列移除股票
+   * Remove stocks from watchlist queue.
    */
   removeFromWatchlist: async (stockCode: string): Promise<string[]> => {
     const response = await apiClient.post<Record<string, unknown>>('/api/v1/stocks/watchlist/remove', {

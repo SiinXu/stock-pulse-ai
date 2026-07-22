@@ -769,7 +769,7 @@ class HistoryService:
             if item.fetched_at and start_time <= item.fetched_at <= end_time
         ]
 
-        # 历史兜底链路也做发布时间硬过滤，避免旧库脏数据重新冒出。
+        # fallback historical link is also performed with hard filtering of publish time to avoid old library dirty data reappearing.
         cfg = get_config()
         window_days = resolve_news_window_days(
             news_max_age_days=getattr(cfg, "news_max_age_days", 3),
@@ -1023,40 +1023,40 @@ class HistoryService:
             "",
         ]
 
-        # ========== 舆情与基本面概览（放在最前面）==========
+        # ========== Sentiment and Fundamentals Overview (Placed at the front) ==========
         intel = dashboard.get('intelligence', {}) if dashboard else {}
         if intel:
             report_lines.extend([
                 f"### 📰 {labels['info_heading']}",
                 "",
             ])
-            # 舆情情绪总结
+            # Sentiment analysis summary
             if intel.get('sentiment_summary'):
                 report_lines.append(f"**💭 {labels['sentiment_summary_label']}**: {intel['sentiment_summary']}")
-            # 业绩预期
+            # Performance Expectations
             if intel.get('earnings_outlook'):
                 report_lines.append(f"**📊 {labels['earnings_outlook_label']}**: {intel['earnings_outlook']}")
-            # 风险警报（醒目显示）
+            # Risk alarm (prominent display)
             risk_alerts = intel.get('risk_alerts', [])
             if risk_alerts:
                 report_lines.append("")
                 report_lines.append(f"**🚨 {labels['risk_alerts_label']}**:")
                 for alert in risk_alerts:
                     report_lines.append(f"- {alert}")
-            # 利好催化
+            # Positive catalyst.
             catalysts = intel.get('positive_catalysts', [])
             if catalysts:
                 report_lines.append("")
                 report_lines.append(f"**✨ {labels['positive_catalysts_label']}**:")
                 for cat in catalysts:
                     report_lines.append(f"- {cat}")
-            # 最新消息
+            # Latest news
             if intel.get('latest_news'):
                 report_lines.append("")
                 report_lines.append(f"**📢 {labels['latest_news_label']}**: {intel['latest_news']}")
             report_lines.append("")
 
-        # ========== 核心结论 ==========
+        # ========== Key Conclusions ==========
         core = dashboard.get('core_conclusion', {}) if dashboard else {}
         one_sentence = core.get('one_sentence', result.analysis_summary)
         time_sense = core.get('time_sensitivity', labels['default_time_sensitivity'])
@@ -1072,7 +1072,7 @@ class HistoryService:
             f"⏰ **{labels['time_sensitivity_label']}**: {time_sense}",
             "",
         ])
-        # 持仓分类建议
+        # Position classification recommendation
         if pos_advice:
             report_lines.extend([
                 f"| {labels['position_status_label']} | {labels['action_advice_label']} |",
@@ -1082,10 +1082,10 @@ class HistoryService:
                 "",
             ])
 
-        # ========== 行情快照 ==========
+        # ========== Market Snapshot ==========
         self._append_market_snapshot_to_report(report_lines, result, labels)
 
-        # ========== 数据透视 ==========
+        # ========== Data Pivot ==========
         data_persp = dashboard.get('data_perspective', {}) if dashboard else {}
         if data_persp:
             trend_data = data_persp.get('trend_status', {})
@@ -1097,7 +1097,7 @@ class HistoryService:
                 f"### 📊 {labels['data_perspective_heading']}",
                 "",
             ])
-            # 趋势状态
+            # Trend status
             if trend_data:
                 is_bullish = (
                     f"✅ {labels['yes_label']}"
@@ -1110,7 +1110,7 @@ class HistoryService:
                     f"{labels['trend_strength_label']}: {trend_data.get('trend_score', 'N/A')}/100",
                     "",
                 ])
-            # 价格位置
+            # Price Level
             if price_data:
                 raw_bias_status = price_data.get('bias_status', 'N/A')
                 bias_status = localize_bias_status(raw_bias_status, report_language)
@@ -1127,7 +1127,7 @@ class HistoryService:
                     f"| {labels['resistance_level_label']} | {price_data.get('resistance_level', 'N/A')} |",
                     "",
                 ])
-            # 量能分析
+            # Momentum Analysis
             if vol_data:
                 report_lines.extend([
                     f"**{labels['volume_label']}**: {labels['volume_ratio_label']} {vol_data.get('volume_ratio', 'N/A')} "
@@ -1135,7 +1135,7 @@ class HistoryService:
                     f"💡 *{vol_data.get('volume_meaning', '')}*",
                     "",
                 ])
-            # 筹码结构
+            # Chip structure
             if chip_data:
                 if is_chip_structure_unavailable(chip_data):
                     report_lines.extend([
@@ -1165,14 +1165,14 @@ class HistoryService:
                         "",
                     ])
 
-        # ========== 作战计划 ==========
+        # ========== Operation Plan ==========
         battle = dashboard.get('battle_plan', {}) if dashboard else {}
         if battle:
             report_lines.extend([
                 f"### 🎯 {labels['battle_plan_heading']}",
                 "",
             ])
-            # 狙击点位
+            # Sniper positions
             sniper = battle.get('sniper_points', {})
             if sniper:
                 report_lines.extend([
@@ -1186,7 +1186,7 @@ class HistoryService:
                     f"| 🎊 {labels['take_profit_label']} | {self._clean_sniper_value(sniper.get('take_profit', 'N/A'))} |",
                     "",
                 ])
-            # 仓位策略
+            # Position Strategy
             position = battle.get('position_strategy', {})
             if position:
                 report_lines.extend([
@@ -1195,7 +1195,7 @@ class HistoryService:
                     f"- {labels['risk_control_label']}: {position.get('risk_control', 'N/A')}",
                     "",
                 ])
-            # 检查清单
+            # Check the checklist
             checklist = battle.get('action_checklist', []) if battle else []
             if checklist:
                 report_lines.extend([
@@ -1206,7 +1206,7 @@ class HistoryService:
                     report_lines.append(f"- {item}")
                 report_lines.append("")
 
-        # ========== 信号归因分析 ==========
+        # ========== Signal Attribution Analysis ==========
         signal_attr = dashboard.get('signal_attribution', {}) if dashboard else {}
         if signal_attribution_has_content(signal_attr):
             report_lines.extend([
@@ -1279,21 +1279,21 @@ class HistoryService:
                 report_lines.append(f"- {invalid_text}")
             report_lines.append("")
 
-        # ========== 如果没有 dashboard，显示传统格式 ==========
+        # ========== If no dashboard, display traditional format ==========
         if not dashboard:
-            # 操作理由
+            # Reason for Operation
             if result.buy_reason:
                 report_lines.extend([
                     f"**💡 {reason_label}**: {result.buy_reason}",
                     "",
                 ])
-            # 风险提示
+            # Risk prompt
             if result.risk_warning:
                 report_lines.extend([
                     f"**⚠️ {risk_warning_label}**: {result.risk_warning}",
                     "",
                 ])
-            # 技术面分析
+            # Technical view analysis
             if result.ma_analysis or result.volume_analysis:
                 report_lines.extend([
                     f"### 📊 {technical_heading}",
@@ -1304,7 +1304,7 @@ class HistoryService:
                 if result.volume_analysis:
                     report_lines.append(f"**{volume_analysis_label}**: {result.volume_analysis}")
                 report_lines.append("")
-            # 消息面
+            # Message face
             if result.news_summary:
                 report_lines.extend([
                     f"### 📰 {news_heading}",
@@ -1312,7 +1312,7 @@ class HistoryService:
                     "",
                 ])
 
-        # ========== 底部 ==========
+        # ========== Bottom ==========
         report_lines.extend([
             "---",
             "",

@@ -101,7 +101,7 @@ class _AnalysisContextStageMixin:
         enhanced = context.copy()
         enhanced["report_language"] = normalize_report_language(getattr(self.config, "report_language", "zh"))
 
-        # 添加股票名称
+        # Add stock name
         if stock_name:
             enhanced['stock_name'] = stock_name
         elif realtime_quote and getattr(realtime_quote, 'name', None):
@@ -109,12 +109,12 @@ class _AnalysisContextStageMixin:
         if isinstance(portfolio_context, dict):
             enhanced["portfolio_context"] = dict(portfolio_context)
 
-        # 将运行时搜索窗口透传给 analyzer，避免与全局配置重新读取产生窗口不一致
+        # Pass runtime search window transmission to analyzer to avoid window inconsistency when re-reading global configuration
         enhanced['news_window_days'] = getattr(self.search_service, "news_window_days", 3)
 
-        # 添加实时行情（兼容不同数据源的字段差异）
+        # Add real-time quotes (compatible with different data source fields)
         if realtime_quote:
-            # 使用 getattr 安全获取字段，缺失字段返回 None 或默认值
+            # Use `getattr` safely to access fields; missing fields return None or a default value.
             volume_ratio = getattr(realtime_quote, 'volume_ratio', None)
             quote_source = getattr(realtime_quote, 'source', None)
             quote_source_name = getattr(quote_source, 'value', quote_source)
@@ -138,10 +138,10 @@ class _AnalysisContextStageMixin:
                 'stale_seconds': getattr(realtime_quote, 'stale_seconds', None),
                 'fallback_from': getattr(realtime_quote, 'fallback_from', None),
             }
-            # 移除 None 值以减少上下文大小
+            # Remove None values to reduce context size
             enhanced['realtime'] = {k: v for k, v in enhanced['realtime'].items() if v is not None}
 
-        # 添加筹码分布
+        # Add chip-distribution data.
         if chip_data:
             current_price = getattr(realtime_quote, 'price', 0) if realtime_quote else 0
             enhanced['chip'] = {
@@ -152,7 +152,7 @@ class _AnalysisContextStageMixin:
                 'chip_status': chip_data.get_chip_status(current_price or 0),
             }
 
-        # 添加趋势分析结果
+        # Add trend analysis results
         if trend_result:
             enhanced['trend_analysis'] = {
                 'trend_status': trend_result.trend_status.value,
@@ -168,8 +168,8 @@ class _AnalysisContextStageMixin:
                 'risk_factors': trend_result.risk_factors,
             }
 
-        # Issue #234：盘中分析使用实时 OHLC 与趋势 MA 覆盖 today。
-        # 防护条件：trend_result.ma5 > 0 表示 MA 计算已成功且数据量充足。
+        # Issue #234: Intra-day analysis uses real-time OHLC and trend MA coverage today.
+        # Protection condition: trend_result.ma5 > 0 indicates MA calculation succeeded and data volume is sufficient.
         if realtime_quote and trend_result and trend_result.ma5 > 0:
             price = getattr(realtime_quote, 'price', None)
             if price is not None and price > 0:
@@ -323,7 +323,7 @@ class _AnalysisContextStageMixin:
 
         # For HK/US: the offshore adapter already populates belong_boards from
         # yfinance sector/industry. Don't overwrite it (and we have no AkShare
-        # 板块 endpoint for those markets anyway). Default to [] when callers
+        # Sector endpoint for those markets anyway). Default to [] when callers
         # pass a minimal context without the key.
         if market != "cn":
             enriched_context["belong_boards"] = existing_board_list or []

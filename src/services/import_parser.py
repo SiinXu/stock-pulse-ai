@@ -109,7 +109,7 @@ def _parse_dataframe(df: pd.DataFrame) -> List[Tuple[Optional[str], Optional[str
         if code_val:
             code = normalize_code(code_val)
             # If code_val is not a valid code, treat as name only when name_val is empty
-            # (do not overwrite valid name with dirty code_val, e.g. INVALID,贵州茅台)
+            # Do not overwrite a valid name with a dirty code value such as `INVALID,贵州茅台`.
             if not code and not is_code_like(code_val):
                 if name_val:
                     code = resolve_name_to_code(name_val)

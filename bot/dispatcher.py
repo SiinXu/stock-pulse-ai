@@ -56,17 +56,17 @@ class RateLimiter:
         now = time.time()
         window_start = now - self.window_seconds
 
-        # 清理过期记录
+        # Clean expired records
         self._requests[user_id] = [
             t for t in self._requests[user_id]
             if t > window_start
         ]
 
-        # 检查是否超限
+        # Check if out-of-the-range condition is met.
         if len(self._requests[user_id]) >= self.max_requests:
             return False
 
-        # 记录本次请求
+        # Record this request
         self._requests[user_id].append(now)
         return True
 
@@ -75,7 +75,7 @@ class RateLimiter:
         now = time.time()
         window_start = now - self.window_seconds
 
-        # 清理过期记录
+        # Clean expired records
         self._requests[user_id] = [
             t for t in self._requests[user_id]
             if t > window_start
@@ -123,7 +123,7 @@ class CommandDispatcher:
         self._aliases: Dict[str, str] = {}
         self._rate_limiter = RateLimiter(rate_limit_requests, rate_limit_window)
 
-        # 回调函数：获取帮助命令的命令列表
+        # Callback function: Get a list of commands for the help command
         self._help_command_getter: Optional[Callable] = None
 
     def register(self, command: BotCommand) -> None:
@@ -144,7 +144,7 @@ class CommandDispatcher:
         self._commands[name] = command
         logger.debug("[Dispatcher] Registered command: %s", name)
 
-        # 注册别名
+        # Register Alias
         for alias in command.aliases:
             alias_lower = alias.lower()
             if alias_lower in self._aliases:
@@ -185,7 +185,7 @@ class CommandDispatcher:
 
         command = self._commands.pop(name)
 
-        # 移除别名
+        # Remove alias
         for alias in command.aliases:
             self._aliases.pop(alias.lower(), None)
 
@@ -206,11 +206,11 @@ class CommandDispatcher:
         """
         name = name.lower()
 
-        # 先查命令名
+        # Check command name
         if name in self._commands:
             return self._commands[name]
 
-        # 再查别名
+        # Check aliases again
         if name in self._aliases:
             return self._commands.get(self._aliases[name])
 
@@ -364,13 +364,13 @@ class CommandDispatcher:
                     "你好！我是股票分析助手。\n"
                     f"发送 `{self.command_prefix}help` 查看可用命令。"
                 )
-            # 非命令消息，不处理
+            # Non-command message, do not handle
             return BotResponse.text_response("")
 
         if command is None:
             return BotResponse.error_response("命令执行失败")
 
-        # 6. 执行命令
+        # 6. Execute command
         try:
             response = await command.execute_async(message, args)
             logger.info("[Dispatcher] Command completed: command=%s", cmd_name)
@@ -785,7 +785,7 @@ User: "analyze TSLA and NVDA using trend strategy"
         return None
 
 
-# 全局分发器实例
+# Global distributor instance
 _dispatcher: Optional[CommandDispatcher] = None
 
 
@@ -802,7 +802,7 @@ def get_dispatcher() -> CommandDispatcher:
 
         config = get_config()
 
-        # 创建分发器
+        # Create a distributor
         _dispatcher = CommandDispatcher(
             command_prefix=getattr(config, 'bot_command_prefix', '/'),
             rate_limit_requests=getattr(config, 'bot_rate_limit_requests', 10),
@@ -810,7 +810,7 @@ def get_dispatcher() -> CommandDispatcher:
             admin_users=getattr(config, 'bot_admin_users', []),
         )
 
-        # 自动注册所有命令
+        # Automatically register all commands
         from bot.commands import ALL_COMMANDS
         for command_class in ALL_COMMANDS:
             _dispatcher.register_class(command_class)

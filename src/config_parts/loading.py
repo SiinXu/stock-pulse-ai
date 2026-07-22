@@ -78,52 +78,52 @@ class _ConfigLoadingMethods:
         cls._capture_bootstrap_runtime_env_overrides()
         preexisting_report_language = os.environ.get("REPORT_LANGUAGE")
 
-        # 确保环境变量已加载
+        # Ensure environment variables have been loaded
         setup_env()
 
-        # === 智能代理配置 (关键修复) ===
-        # 如果配置了代理，自动设置 NO_PROXY 以排除国内数据源，避免行情获取失败
+        # Smart Agent Configuration (Critical Fix)
+        # If a proxy is configured, Automatically set NO_PROXY To exclude domestic data sources, Avoid failed market data acquisition
         http_proxy = os.getenv('HTTP_PROXY') or os.getenv('http_proxy')
         if http_proxy:
-            # 国内金融数据源域名列表
+            # Domestic financial data source domain list
             domestic_domains = [
-                'eastmoney.com',   # 东方财富 (Efinance/Akshare)
-                'sina.com.cn',     # 新浪财经 (Akshare)
-                '163.com',         # 网易财经 (Akshare)
+                'eastmoney.com',   # Eastmoney (efinance/AkShare)
+                'sina.com.cn',     # Sina Finance (Akshare)
+                '163.com',         # NetEase Finance (Akshare)
                 'tushare.pro',     # Tushare
                 'baostock.com',    # Baostock
-                'sse.com.cn',      # 上交所
-                'szse.cn',         # 深交所
-                'csindex.com.cn',  # 中证指数
-                'cninfo.com.cn',   # 巨潮资讯
+                'sse.com.cn',      # Shanghai Stock Exchange
+                'szse.cn',         # Shenzhen Stock Exchange
+                'csindex.com.cn',  # Shanghai Composite Index
+                'cninfo.com.cn',   # JiuDaoXinZhiYun
                 'localhost',
                 '127.0.0.1'
             ]
 
-            # 获取现有的 no_proxy
+            # Get existing no_proxy
             current_no_proxy = os.getenv('NO_PROXY') or os.getenv('no_proxy') or ''
             existing_domains = current_no_proxy.split(',') if current_no_proxy else []
 
-            # 合并去重
+            # Merge and deduplicate
             final_domains = list(set(existing_domains + domestic_domains))
             final_no_proxy = ','.join(filter(None, final_domains))
 
-            # 设置环境变量 (requests/urllib3/aiohttp 都会遵守此设置)
+            # Set environment variables (requests/urllib3/aiohttp will comply with this setting)
             os.environ['NO_PROXY'] = final_no_proxy
             os.environ['no_proxy'] = final_no_proxy
 
-            # 确保 HTTP_PROXY 也被正确设置（以防仅在 .env 中定义但未导出）
+            # Ensure HTTP_PROXY is also correctly set (to prevent only defined in .env but not exported)
             os.environ['HTTP_PROXY'] = http_proxy
             os.environ['http_proxy'] = http_proxy
 
-            # HTTPS_PROXY 同理
+            # HTTPS_PROXY similarly
             https_proxy = os.getenv('HTTPS_PROXY') or os.getenv('https_proxy')
             if https_proxy:
                 os.environ['HTTPS_PROXY'] = https_proxy
                 os.environ['https_proxy'] = https_proxy
 
 
-        # 解析自选股列表（逗号分隔，统一为大写 Issue #355）
+        # Parse watchlist stocks (comma-separated, convert to uppercase - Issue #355)
         stock_list_str = cls._resolve_env_value(
             'STOCK_LIST',
             default='',
@@ -422,7 +422,7 @@ class _ConfigLoadingMethods:
             maximum=20,
         )
 
-        # 解析搜索引擎 API Keys（支持多个 key，逗号分隔）
+        # Parse search engine API Keys (supports multiple keys, comma-separated)
         bocha_keys_str = os.getenv('BOCHA_API_KEYS', '')
         bocha_api_keys = [k.strip() for k in bocha_keys_str.split(',') if k.strip()]
 
@@ -457,7 +457,7 @@ class _ConfigLoadingMethods:
             default=True,
         )
 
-        # 企微消息类型与最大字节数逻辑
+        # WeCom Message Type and Maximum Byte Count Logic
         wechat_msg_type = os.getenv('WECHAT_MSG_TYPE', 'markdown')
         wechat_msg_type_lower = wechat_msg_type.lower()
         wechat_max_bytes_env = os.getenv('WECHAT_MAX_BYTES')
@@ -469,7 +469,7 @@ class _ConfigLoadingMethods:
                 minimum=1,
             )
         else:
-            # 未显式配置时，根据消息类型选择默认字节数
+            # Select default byte size based on message type when no explicit configuration is provided.
             wechat_max_bytes = 2048 if wechat_msg_type_lower == 'text' else 4000
 
         # Preserve historical semantics for startup flags: only an explicit
@@ -899,42 +899,42 @@ class _ConfigLoadingMethods:
             webui_enabled=os.getenv('WEBUI_ENABLED', 'false').lower() == 'true',
             webui_host=os.getenv('WEBUI_HOST', '127.0.0.1'),
             webui_port=parse_env_int(os.getenv('WEBUI_PORT'), 8000, field_name='WEBUI_PORT', minimum=1, maximum=65535),
-            # 机器人配置
+            # Robot configuration
             bot_enabled=os.getenv('BOT_ENABLED', 'true').lower() == 'true',
             bot_command_prefix=os.getenv('BOT_COMMAND_PREFIX', '/'),
             bot_rate_limit_requests=parse_env_int(os.getenv('BOT_RATE_LIMIT_REQUESTS'), 10, field_name='BOT_RATE_LIMIT_REQUESTS', minimum=1),
             bot_rate_limit_window=parse_env_int(os.getenv('BOT_RATE_LIMIT_WINDOW'), 60, field_name='BOT_RATE_LIMIT_WINDOW', minimum=1),
             bot_admin_users=[u.strip() for u in os.getenv('BOT_ADMIN_USERS', '').split(',') if u.strip()],
-            # 飞书机器人
+            # Feishu robot
             feishu_verification_token=os.getenv('FEISHU_VERIFICATION_TOKEN'),
             feishu_encrypt_key=os.getenv('FEISHU_ENCRYPT_KEY'),
             feishu_stream_enabled=os.getenv('FEISHU_STREAM_ENABLED', 'false').lower() == 'true',
-            # 钉钉机器人
+            # DingTalk robot
             dingtalk_app_key=os.getenv('DINGTALK_APP_KEY'),
             dingtalk_app_secret=os.getenv('DINGTALK_APP_SECRET'),
             dingtalk_stream_enabled=os.getenv('DINGTALK_STREAM_ENABLED', 'false').lower() == 'true',
-            # 企业微信机器人
+            # WeCom bot
             wecom_corpid=os.getenv('WECOM_CORPID'),
             wecom_token=os.getenv('WECOM_TOKEN'),
             wecom_encoding_aes_key=os.getenv('WECOM_ENCODING_AES_KEY'),
             wecom_agent_id=os.getenv('WECOM_AGENT_ID'),
             # Telegram
             telegram_webhook_secret=os.getenv('TELEGRAM_WEBHOOK_SECRET'),
-            # Discord 机器人扩展配置
+            # Discord Bot extension configuration
             discord_bot_status=os.getenv('DISCORD_BOT_STATUS', 'A股智能分析 | /help'),
-            # 实时行情增强数据配置
+            # Enhanced real-time quote configuration.
             enable_realtime_quote=os.getenv('ENABLE_REALTIME_QUOTE', 'true').lower() == 'true',
             enable_realtime_technical_indicators=os.getenv(
                 'ENABLE_REALTIME_TECHNICAL_INDICATORS', 'true'
             ).lower() == 'true',
             enable_chip_distribution=os.getenv('ENABLE_CHIP_DISTRIBUTION', 'true').lower() == 'true',
-            # 东财接口补丁开关
+            # Eastmoney API patch switch
             enable_eastmoney_patch=os.getenv('ENABLE_EASTMONEY_PATCH', 'false').lower() == 'true',
-            # 实时行情数据源优先级：
-            # - tencent: 腾讯财经，有量比/换手率/PE/PB等，单股查询稳定（推荐）
-            # - akshare_sina: 新浪财经，基本行情稳定，但无量比
-            # - efinance/akshare_em: 东财全量接口，数据最全但容易被封
-            # - tushare: Tushare Pro，需要2000积分，数据全面
+            # Real-time quote data source priority:
+            # - tencent: Tencent Finance; provides volume ratio, turnover rate, P/E, and P/B (recommended)
+            # - akshare_sina: Sina Finance; stable basic quotes without volume ratio
+            # - efinance/akshare_em: Eastmoney full-data APIs; most complete, but prone to blocking
+            # - tushare: Tushare Pro; requires 2,000 points and provides comprehensive data
             realtime_source_priority=cls._resolve_realtime_source_priority(),
             realtime_cache_ttl=parse_env_int(os.getenv('REALTIME_CACHE_TTL'), 600, field_name='REALTIME_CACHE_TTL', minimum=0),
             circuit_breaker_cooldown=parse_env_int(os.getenv('CIRCUIT_BREAKER_COOLDOWN'), 300, field_name='CIRCUIT_BREAKER_COOLDOWN', minimum=0),

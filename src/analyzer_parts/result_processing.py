@@ -600,11 +600,11 @@ def _sanitize_trend_analysis_for_prompt(
 def _derive_chip_health(profit_ratio: float, concentration_90: float, language: str = "zh") -> str:
     """Derive chip_health from profit_ratio and concentration_90."""
     if profit_ratio >= 0.9:
-        return localize_chip_health("警惕", language)  # 获利盘极高
+        return localize_chip_health("警惕", language)  # Very high proportion of profitable chips
     if concentration_90 >= 0.25:
-        return localize_chip_health("警惕", language)  # 筹码分散
+        return localize_chip_health("警惕", language)  # Chip dispersion
     if concentration_90 < 0.15 and 0.3 <= profit_ratio < 0.9:
-        return localize_chip_health("健康", language)  # 集中且获利比例适中
+        return localize_chip_health("健康", language)  # Concentrated and profit ratio is moderate
     return localize_chip_health("一般", language)
 
 
@@ -1411,23 +1411,23 @@ def get_stock_name_multi_source(
     Returns:
         股票中文名称
     """
-    # 1. 从上下文获取（实时行情数据）
+    # 1. Get (realtime market data) from context
     if context:
-        # 优先从 stock_name 字段获取
+        # Prioritize fetching stock name from stock_name field
         if context.get('stock_name'):
             name = context['stock_name']
             if name and not name.startswith('股票'):
                 return name
 
-        # 其次从 realtime 数据获取
+        # Then get data from realtime data.
         if 'realtime' in context and context['realtime'].get('name'):
             return context['realtime']['name']
 
-    # 2. 从静态映射表获取
+    # 2. Retrieve from static mapping table
     if stock_code in STOCK_NAME_MAP:
         return STOCK_NAME_MAP[stock_code]
 
-    # 3. 从数据源获取
+    # 3. Fetch data from data source.
     if data_manager is None:
         try:
             from data_provider.base import DataFetcherManager
@@ -1446,7 +1446,7 @@ def get_stock_name_multi_source(
         try:
             name = data_manager.get_stock_name(stock_code)
             if name:
-                # 更新缓存
+                # Update cache
                 STOCK_NAME_MAP[stock_code] = name
                 return name
         except Exception as e:  # broad-exception: fallback_recorded - Optional provider name lookup failure is logged before the default-name fallback.
@@ -1459,5 +1459,5 @@ def get_stock_name_multi_source(
                 context={"symbol": stock_code},
             )
 
-    # 4. 返回默认名称
+    # 4. Return default name
     return f'股票{stock_code}'

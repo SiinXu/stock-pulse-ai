@@ -1402,7 +1402,7 @@ function initLogging() {
   const appDir = resolveAppDir();
   logFilePath = path.join(appDir, 'logs', 'desktop.log');
   
-  // 确保日志目录存在
+  // Ensure the log directory exists
   const logDir = path.dirname(logFilePath);
   ensureDirectory(logDir);
   
@@ -1432,7 +1432,7 @@ function decodeBackendOutput(data, decoder) {
 
   let decoded = decoder.decode(data, { stream: true });
 
-  // Windows 控制台 / 子进程有时仍会吐出本地代码页字节，优先在明显乱码时回退到 GBK。
+  // Windows consoles and subprocesses may emit local-code-page bytes; fall back to GBK when replacement characters indicate a decode failure.
   if (isWindows && decoded.includes('\uFFFD')) {
     try {
       decoded = new TextDecoder('gbk', { fatal: false }).decode(data, { stream: true });

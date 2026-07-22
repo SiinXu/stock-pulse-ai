@@ -65,13 +65,13 @@ class Serverchan3Sender:
             logger.warning("Server酱3 SendKey 未配置，跳过推送")
             return False
 
-        # 处理消息标题
+        # Process message titles
         if title is None:
             date_str = datetime.now().strftime('%Y-%m-%d')
             title = f"📈 股票分析报告 - {date_str}"
 
         try:
-            # 根据 sendkey 格式构造 URL
+            # Construct URL based on sendkey
             sendkey = self._serverchan3_sendkey
             if sendkey.startswith('sctp'):
                 match = re.match(r'sctp(\d+)t', sendkey)
@@ -84,14 +84,14 @@ class Serverchan3Sender:
             else:
                 url = f"https://sctapi.ftqq.com/{sendkey}.send"
 
-            # 构建请求参数
+            # Build request parameters
             params = {
                 'title': title,
                 'desp': content,
                 'options': {}
             }
 
-            # 发送请求
+            # Send request
             headers = {
                 'Content-Type': 'application/json;charset=utf-8'
             }

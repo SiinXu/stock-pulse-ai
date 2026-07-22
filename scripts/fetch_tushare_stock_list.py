@@ -36,7 +36,7 @@ from typing import Optional, List, Dict
 import pandas as pd
 from dotenv import load_dotenv
 
-# 添加项目根目录到路径
+# Add project root directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
@@ -47,14 +47,14 @@ except ImportError:
     sys.exit(1)
 
 
-# 配置
+# Configuration
 load_dotenv()
 
 TUSHARE_TOKEN = os.getenv('TUSHARE_TOKEN')
 OUTPUT_DIR = Path(__file__).parent.parent / "data"
-PAGE_SIZE = 5000  # 美股每页读取数量（API 最大6000，设置5000留余量）
-SLEEP_MIN = 5     # 最小睡眠时间（秒）
-SLEEP_MAX = 10    # 最大睡眠时间（秒）
+PAGE_SIZE = 5000  # Number of records read per page from U.S. stocks (API max 6000, set 5000 with margin)
+SLEEP_MIN = 5     # Minimum sleep time (seconds)
+SLEEP_MAX = 10    # Maximum sleep time (seconds)
 A_RK_BATCH_SIZE = 200
 A_RK_FIELDS = "ts_code,name,close,pre_close,trade_time"
 A_RK_NAME_PREFIX_RE = re.compile(r"^(XD|XR|DR|N|C)")
@@ -74,7 +74,7 @@ def get_tushare_api() -> Optional[ts.pro_api]:
 
     try:
         api = ts.pro_api(TUSHARE_TOKEN)
-        # 测试连接
+        # Test connection.
         api.trade_cal(exchange='SSE', start_date='20240101', end_date='20240101')
         print("✓ Tushare API 连接成功")
         return api
@@ -115,10 +115,10 @@ def fetch_a_stock_list(api: ts.pro_api) -> Optional[pd.DataFrame]:
     print("\n[1/3] 正在获取 A股列表...")
 
     try:
-        # 获取所有正常上市的股票
+        # Get all normally listed stocks
         df = api.stock_basic(
-            exchange='',        # 空：全部交易所
-            list_status='L',    # L: 上市, D: 退市, P: 暂停上市
+            exchange='',        # Empty: All exchanges.
+            list_status='L',    # L: Listed, D: Delisted, P: Suspended Listing
             fields='ts_code,symbol,name,area,industry,fullname,enname,cnspell,market,exchange,curr_type,list_status,list_date,delist_date,is_hs,act_name,act_ent_type'
         )
 
@@ -275,9 +275,9 @@ def fetch_hk_stock_list(api: ts.pro_api) -> Optional[pd.DataFrame]:
     print("\n[2/3] 正在获取港股列表...")
 
     try:
-        # 获取所有正常上市的港股
+        # Get all normally listed Hong Kong stocks
         df = api.hk_basic(
-            list_status='L'    # L: 上市, D: 退市
+            list_status='L'    # L: Listed, D: Delisted
         )
 
         if df is not None and len(df) > 0:
@@ -327,21 +327,21 @@ def fetch_us_stock_list(api: ts.pro_api) -> Optional[pd.DataFrame]:
             all_data.append(df)
             print(f"  ✓ 第 {page} 页获取 {len(df)} 只股票")
 
-            # 如果返回数据少于页大小，说明已经到最后一页
+            # If the returned data is less than page size, it indicates reaching the last page.
             if len(df) < PAGE_SIZE:
                 break
 
             offset += PAGE_SIZE
             page += 1
 
-            # 随机休息（最后一页不需要休息）
+            # Random pause (last page does not need to pause)
             random_sleep()
 
         if all_data:
             result_df = pd.concat(all_data, ignore_index=True)
             print(f"✓ 美股列表获取成功，共 {len(result_df)} 只股票（{page} 页）")
 
-            # 按分类统计
+            # Statistics by category.
             if 'classify' in result_df.columns:
                 print("  - 分类分布：")
                 for classify, count in result_df['classify'].value_counts().items():
@@ -606,12 +606,12 @@ def main(argv: Optional[List[str]] = None):
     print("=" * 60)
     print(f"[信息] A股名称修正模式：{'开启' if args.a_rk else '关闭'}")
 
-    # 1. 获取 API 实例
+    # 1. Get API instance
     api = get_tushare_api()
     if not api:
         return 1
 
-    # 2. 获取 A股数据
+    # 2. Get A-shares data
     a_df = fetch_a_stock_list(api)
     if a_df is not None:
         a_filename = 'stock_list_a.csv'
@@ -624,25 +624,25 @@ def main(argv: Optional[List[str]] = None):
 
         save_to_csv(a_df, a_filename, a_market_name)
 
-    # 3. 获取港股数据
-    random_sleep()  # 休息后再获取港股
+    # 3. Get Hong Kong stock data
+    random_sleep()  # Rest after getting Hong Kong stocks
     hk_df = fetch_hk_stock_list(api)
     if hk_df is not None:
         save_to_csv(hk_df, 'stock_list_hk.csv', '港股')
 
-    # 4. 获取美股数据（分页）
-    random_sleep()  # 休息后再获取美股
+    # 4. Get US stock data (pagination)
+    random_sleep()  # Get US stocks after rest
     us_df = fetch_us_stock_list(api)
     if us_df is not None:
         save_to_csv(us_df, 'stock_list_us.csv', '美股')
 
-    # 5. 生成数据说明文档
+    # 5. Generate data documentation
     print("\n正在生成数据说明文档...")
     a_filename = 'stock_list_a.csv'
     a_title = 'A股列表（修正后）' if args.a_rk else 'A股列表'
     generate_data_documentation(a_df, hk_df, us_df, a_filename=a_filename, a_title=a_title)
 
-    # 6. 总结
+    # 6. Summary
     print("\n" + "=" * 60)
     print("任务完成！")
     print("=" * 60)

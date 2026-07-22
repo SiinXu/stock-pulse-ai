@@ -73,9 +73,9 @@ class DingtalkPlatform(BotPlatform):
         
         if not timestamp or not sign:
             logger.warning("[DingTalk] Signature parameters are missing")
-            return True  # 可能是不需要签名的请求
+            return True  # May be an unsigned request.
         
-        # 验证时间戳（1小时内有效）
+        # Validation timestamp (valid for 1 hour)
         try:
             request_time = int(timestamp)
             current_time = int(time.time() * 1000)
@@ -86,7 +86,7 @@ class DingtalkPlatform(BotPlatform):
             logger.warning("[DingTalk] Request timestamp is invalid")
             return False
         
-        # 计算签名
+        # Calculate signature
         string_to_sign = f"{timestamp}\n{self._app_secret}"
         hmac_code = hmac.new(
             self._app_secret.encode('utf-8'),
@@ -131,7 +131,7 @@ class DingtalkPlatform(BotPlatform):
             "sessionWebhookExpiredTime": 1234567890
         }
         """
-        # 检查消息类型
+        # Check the message type
         msg_type = data.get('msgtype', '')
         if msg_type != 'text':
             logger.debug(
@@ -140,18 +140,18 @@ class DingtalkPlatform(BotPlatform):
             )
             return None
         
-        # 获取消息内容
+        # Get message content
         text_content = data.get('text', {})
         raw_content = text_content.get('content', '')
         
-        # 提取命令（去除 @机器人）
+        # Extracts command (excluding @robot)
         content = self._extract_command(raw_content)
         
-        # 检查是否 @了机器人
+        # Check if a robot was mentioned (@ed)
         at_users = data.get('atUsers', [])
         mentioned = len(at_users) > 0
         
-        # 会话类型
+        # Session type
         conversation_type = data.get('conversationType', '')
         if conversation_type == '1':
             chat_type = ChatType.PRIVATE
@@ -160,14 +160,14 @@ class DingtalkPlatform(BotPlatform):
         else:
             chat_type = ChatType.UNKNOWN
         
-        # 创建时间
+        # Create timestamp
         create_at = data.get('createAt', '')
         try:
             timestamp = datetime.fromtimestamp(int(create_at) / 1000)
         except (ValueError, TypeError):
             timestamp = datetime.now()
         
-        # 保存 session webhook 用于回复
+        # Save the session webhook for replying
         session_webhook = data.get('sessionWebhook', '')
         
         return BotMessage(
@@ -194,9 +194,9 @@ class DingtalkPlatform(BotPlatform):
         
         钉钉的 @用户 格式通常是 @昵称 后跟空格
         """
-        # 简单处理：移除开头的 @xxx 部分
+        # Simple processing: remove the leading @xxx part
         import re
-        # 匹配开头的 @xxx（中英文都可能）
+        # Matches the beginning of @xxx (can be Chinese or English)
         text = re.sub(r'^@[\S]+\s*', '', text.strip())
         return text.strip()
     
@@ -222,7 +222,7 @@ class DingtalkPlatform(BotPlatform):
         if not response.text:
             return WebhookResponse.success()
         
-        # 构建响应
+        # Build the response
         if response.markdown:
             body = {
                 "msgtype": "markdown",
@@ -239,7 +239,7 @@ class DingtalkPlatform(BotPlatform):
                 }
             }
         
-        # @发送者
+        # Sender
         if response.at_user and message.user_id:
             body["at"] = {
                 "atUserIds": [message.user_id],
@@ -272,7 +272,7 @@ class DingtalkPlatform(BotPlatform):
             return False
 
         try:
-            # 构建消息
+            # Build message
             if response.markdown:
                 payload = {
                     "msgtype": "markdown",
@@ -289,14 +289,14 @@ class DingtalkPlatform(BotPlatform):
                     }
                 }
             
-            # @发送者
+            # Sender
             if response.at_user and message.user_id:
                 payload["at"] = {
                     "atUserIds": [message.user_id],
                     "isAtAll": False,
                 }
             
-            # 发送请求
+            # Send the request through the outbound safety policy.
             resp = safe_post(
                 session_webhook,
                 json=payload,

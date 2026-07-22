@@ -71,7 +71,7 @@ class _LifecycleMethods:
             self._sqlite_write_retry_max = config.sqlite_write_retry_max
             self._sqlite_write_retry_base_delay = config.sqlite_write_retry_base_delay
 
-            # 创建数据库引擎
+            # Create the database engine
             created_engine = create_database_engine(
                 db_url,
                 sqlite_busy_timeout_ms=self._sqlite_busy_timeout_ms,
@@ -82,7 +82,7 @@ class _LifecycleMethods:
             self._sqlite_file_db = self._is_sqlite_engine and self._is_file_sqlite_database()
             self._install_sqlite_pragma_handler()
 
-            # 创建 Session 工厂
+            # Create the Session factory
             self._SessionLocal = sessionmaker(
                 bind=self._engine,
                 autocommit=False,
@@ -137,7 +137,7 @@ class _LifecycleMethods:
                 self._engine.url.get_backend_name(),
             )
 
-            # 注册退出钩子，确保程序退出时关闭数据库连接
+            # Register an exit hook to close the database connection when the process exits
             atexit.register(DatabaseManager._cleanup_engine, self._engine)
         except Exception:
             self._initialized = False

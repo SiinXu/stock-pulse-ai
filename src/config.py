@@ -212,7 +212,7 @@ Config = _config_model_module.Config
 _config_model_module._bind_config_facade(globals())
 
 
-# === 便捷的配置访问函数 ===
+# === Convenient Configuration Access Function ===
 def get_config() -> Config:
     """获取全局配置实例的快捷方式"""
     return Config.get_instance()

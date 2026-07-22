@@ -84,7 +84,7 @@ PORTFOLIO_LEGACY_IDEMPOTENCY_GUARD_TRIGGER = (
     "trg_portfolio_idempotency_legacy_key_guard"
 )
 
-# SQLAlchemy ORM 基类
+# SQLAlchemy ORM base class
 Base = declarative_base()
 
 _STORAGE_FACADE_COMPAT_GLOBALS = (
@@ -140,7 +140,7 @@ def to_utc_naive_datetime(value: datetime) -> datetime:
     return value
 
 
-# === 数据模型定义 ===
+# === Data model definitions ===
 
 class DatabaseSchemaMigration(Base):
     """Applied database schema version marker."""
@@ -162,40 +162,40 @@ class StockDaily(Base):
     """
     __tablename__ = 'stock_daily'
     
-    # 主键
+    # Primary key
     id = Column(Integer, primary_key=True, autoincrement=True)
     
-    # 股票代码（如 600519, 000001）
+    # Stock code (for example, 600519 or 000001)
     code = Column(String(10), nullable=False, index=True)
     
-    # 交易日期
+    # Trading date
     date = Column(Date, nullable=False, index=True)
     
-    # OHLC 数据
+    # OHLC data
     open = Column(Float)
     high = Column(Float)
     low = Column(Float)
     close = Column(Float)
     
-    # 成交数据
-    volume = Column(Float)  # 成交量（股）
-    amount = Column(Float)  # 成交额（元）
-    pct_chg = Column(Float)  # 涨跌幅（%）
+    # Trading data
+    volume = Column(Float)  # Volume (shares)
+    amount = Column(Float)  # Trading amount (CNY)
+    pct_chg = Column(Float)  # Percentage change (%)
     
-    # 技术指标
+    # Technical indicators
     ma5 = Column(Float)
     ma10 = Column(Float)
     ma20 = Column(Float)
-    volume_ratio = Column(Float)  # 量比
+    volume_ratio = Column(Float)  # Relative volume
     
-    # 数据来源
-    data_source = Column(String(50))  # 记录数据来源（如 AkshareFetcher）
+    # Data source
+    data_source = Column(String(50))  # Records the source (for example, AkshareFetcher)
     
-    # 更新时间
+    # Updated at
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     
-    # 唯一约束：同一股票同一日期只能有一条数据
+    # Unique constraint: one row per stock and trading date
     __table_args__ = (
         UniqueConstraint('code', 'date', name='uix_code_date'),
         Index('ix_code_date', 'code', 'date'),
@@ -234,26 +234,26 @@ class NewsIntel(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
-    # 关联用户查询操作
+    # Associated user query
     query_id = Column(String(64), index=True)
 
-    # 股票信息
+    # Stock metadata
     code = Column(String(10), nullable=False, index=True)
     name = Column(String(50))
 
-    # 搜索上下文
+    # Search context
     dimension = Column(String(32), index=True)  # latest_news / risk_check / earnings / market_analysis / industry
     query = Column(String(255))
     provider = Column(String(32), index=True)
 
-    # 新闻内容
+    # News content
     title = Column(String(300), nullable=False)
     snippet = Column(Text)
     url = Column(String(1000), nullable=False)
     source = Column(String(100))
     published_date = Column(DateTime, index=True)
 
-    # 入库时间
+    # Ingested at
     fetched_at = Column(DateTime, default=datetime.now, index=True)
     query_source = Column(String(32), index=True)  # bot/web/cli/system
     requester_platform = Column(String(20))
@@ -366,26 +366,26 @@ class AnalysisHistory(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
-    # 关联查询链路
+    # Associated query chain
     query_id = Column(String(64), index=True)
 
-    # 股票信息
+    # Stock metadata
     code = Column(String(10), nullable=False, index=True)
     name = Column(String(50))
     report_type = Column(String(16), index=True)
 
-    # 核心结论
+    # Core conclusion
     sentiment_score = Column(Integer)
     operation_advice = Column(String(20))
     trend_prediction = Column(String(50))
     analysis_summary = Column(Text)
 
-    # 详细数据
+    # Detailed data
     raw_result = Column(Text)
     news_content = Column(Text)
     context_snapshot = Column(Text)
 
-    # 狙击点位（用于回测）
+    # Sniper levels (for backtesting)
     ideal_buy = Column(Float)
     secondary_buy = Column(Float)
     stop_loss = Column(Float)
@@ -434,35 +434,35 @@ class BacktestResult(Base):
         index=True,
     )
 
-    # 冗余字段，便于按股票筛选
+    # Redundant field for filtering by stock
     code = Column(String(10), nullable=False, index=True)
     analysis_date = Column(Date, index=True)
 
-    # 回测参数
+    # Backtest parameters
     eval_window_days = Column(Integer, nullable=False, default=10)
     engine_version = Column(String(16), nullable=False, default='v1')
 
-    # 状态
+    # Status
     eval_status = Column(String(16), nullable=False, default='pending')
     evaluated_at = Column(DateTime, default=datetime.now, index=True)
 
-    # 建议快照（避免未来分析字段变化导致回测不可解释）
+    # Recommendation snapshot keeps backtests interpretable if analysis fields change later
     operation_advice = Column(String(20))
     position_recommendation = Column(String(8))  # long/cash
 
-    # 价格与收益
+    # Prices and returns
     start_price = Column(Float)
     end_close = Column(Float)
     max_high = Column(Float)
     min_low = Column(Float)
     stock_return_pct = Column(Float)
 
-    # 方向与结果
+    # Direction and outcome
     direction_expected = Column(String(16))  # up/down/flat/not_down
     direction_correct = Column(Boolean, nullable=True)
     outcome = Column(String(16))  # win/loss/neutral
 
-    # 目标价命中（仅 long 且配置了止盈/止损时有意义）
+    # Target-price hit (meaningful only for long positions with take-profit/stop-loss configured)
     stop_loss = Column(Float)
     take_profit = Column(Float)
     hit_stop_loss = Column(Boolean)
@@ -471,7 +471,7 @@ class BacktestResult(Base):
     first_hit_date = Column(Date)
     first_hit_trading_days = Column(Integer)
 
-    # 模拟执行（long-only）
+    # Simulated execution (long-only)
     simulated_entry_price = Column(Float)
     simulated_exit_price = Column(Float)
     simulated_exit_reason = Column(String(24))  # stop_loss/take_profit/window_end/cash/ambiguous_stop_loss
@@ -502,7 +502,7 @@ class BacktestSummary(Base):
     engine_version = Column(String(16), nullable=False, default='v1')
     computed_at = Column(DateTime, default=datetime.now, index=True)
 
-    # 计数
+    # Counts
     total_evaluations = Column(Integer, default=0)
     completed_count = Column(Integer, default=0)
     insufficient_count = Column(Integer, default=0)
@@ -513,22 +513,22 @@ class BacktestSummary(Base):
     loss_count = Column(Integer, default=0)
     neutral_count = Column(Integer, default=0)
 
-    # 准确率/胜率
+    # Accuracy/win rate
     direction_accuracy_pct = Column(Float)
     win_rate_pct = Column(Float)
     neutral_rate_pct = Column(Float)
 
-    # 收益
+    # Returns
     avg_stock_return_pct = Column(Float)
     avg_simulated_return_pct = Column(Float)
 
-    # 目标价触发统计（仅 long 且配置止盈/止损时统计）
+    # Target-price trigger statistics (long positions with take-profit/stop-loss only)
     stop_loss_trigger_rate = Column(Float)
     take_profit_trigger_rate = Column(Float)
     ambiguous_rate = Column(Float)
     avg_days_to_first_hit = Column(Float)
 
-    # 诊断字段（JSON 字符串）
+    # Diagnostic fields (JSON strings)
     advice_breakdown_json = Column(Text)
     diagnostics_json = Column(Text)
 
@@ -1281,7 +1281,7 @@ _USAGE_METHOD_NAMES = _bind_storage_facade_methods(
 )
 
 
-# 便捷函数
+# Convenience functions
 def get_db() -> DatabaseManager:
     """Return the process-wide DatabaseManager via the application composition root.
 
@@ -1392,7 +1392,7 @@ def _coerce_llm_usage_non_negative_int(value: Any) -> Optional[int]:
 
 
 if __name__ == "__main__":
-    # 测试代码
+    # Test code
     logging.basicConfig(level=logging.DEBUG)
     
     db = get_db()
@@ -1400,11 +1400,11 @@ if __name__ == "__main__":
     print("=== 数据库测试 ===")
     print(f"数据库初始化成功")
     
-    # 测试检查今日数据
+    # Test today's-data lookup
     has_data = db.has_today_data('600519')
     print(f"茅台今日是否有数据: {has_data}")
     
-    # 测试保存数据
+    # Test saving data
     test_df = pd.DataFrame({
         'date': [date.today()],
         'open': [1800.0],
@@ -1423,6 +1423,6 @@ if __name__ == "__main__":
     saved = db.save_daily_data(test_df, '600519', 'TestSource')
     print(f"保存测试数据: {saved} 条")
     
-    # 测试获取上下文
+    # Test context retrieval
     context = db.get_analysis_context('600519')
     print(f"分析上下文: {context}")

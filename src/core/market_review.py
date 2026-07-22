@@ -231,7 +231,7 @@ def run_market_review(
 
     try:
         if len(run_markets) > 1:
-            # 多市场顺序执行，合并报告
+            # Execute multiple markets in sequence, merging the report
             parts = []
             market_light_snapshots: Dict[str, Dict[str, Any]] = {}
             market_review_payloads: Dict[str, Dict[str, Any]] = {}
@@ -323,7 +323,7 @@ def run_market_review(
                 review_report=review_report,
             )
             if save_report_file:
-                # 保存报告到文件
+                # Save report to file
                 date_str = datetime.now().strftime('%Y%m%d')
                 report_filename = f"market_review_{date_str}.md"
                 filepath = notifier.save_report_to_file(
@@ -350,7 +350,7 @@ def run_market_review(
                     market_review_payload=market_review_payload,
                 )
             
-            # 推送通知（合并模式下跳过，由 main 层统一发送）
+            # Send notifications (skipped in merged mode, unified sending by the main layer)
             if merge_notification and send_notification:
                 logger.info(
                     "[MarketReview] component=market_review action=skip_standalone_notification "
@@ -367,7 +367,7 @@ def run_market_review(
                     attempts=0,
                 )
             elif send_notification and notifier.is_available():
-                # 添加标题
+                # Add title
                 report_content = _render_market_review_payload_markdown(
                     market_review_payload,
                     wrapper_title=review_text["push_title"],

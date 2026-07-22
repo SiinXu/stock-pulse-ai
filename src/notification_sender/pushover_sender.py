@@ -76,25 +76,25 @@ class PushoverSender:
         user_key = self._pushover_config['user_key']
         api_token = self._pushover_config['api_token']
         
-        # Pushover API 端点
+        # Pushover API Endpoint
         api_url = "https://api.pushover.net/1/messages.json"
         
-        # 处理消息标题
+        # Process message titles
         if title is None:
             date_str = datetime.now().strftime('%Y-%m-%d')
             title = f"📈 股票分析报告 - {date_str}"
         
-        # Pushover 消息限制 1024 字符
+        # Pushover Message Limit 1024 Characters
         max_length = 1024
         
-        # 转换 Markdown 为纯文本（Pushover 支持 HTML，但纯文本更通用）
+        # Convert Markdown to plain text (Pushover supports HTML, but plain text is more universal)
         plain_content = markdown_to_plain_text(content)
         
         if len(plain_content) <= max_length:
-            # 单条消息发送
+            # Single message sending
             return self._send_pushover_message(api_url, user_key, api_token, plain_content, title, timeout_seconds=timeout_seconds)
         else:
-            # 分段发送长消息
+            # Segment long messages
             return self._send_pushover_chunked(
                 api_url,
                 user_key,
@@ -184,7 +184,7 @@ class PushoverSender:
         """
         import time
         
-        # 按段落（分隔线或双换行）分割
+        # Split by paragraphs (lines or double newlines).
         if "────────" in content:
             sections = content.split("────────")
             separator = "────────"
@@ -197,14 +197,14 @@ class PushoverSender:
         current_length = 0
         
         for section in sections:
-            # 计算添加这个 section 后的实际长度
-            # join() 只在元素之间放置分隔符，不是每个元素后面
-            # 所以：第一个元素不需要分隔符，后续元素需要一个分隔符连接
+            # Calculate the actual length after adding this section
+            # join() only places delimiters between elements, not after each element
+            # So: the first element does not need a delimiter, subsequent elements require a delimiter to connect.
             if current_chunk:
-                # 已有元素，添加新元素需要：当前长度 + 分隔符 + 新 section
+                # Existing elements, adding a new element requires: current length + separator + new section
                 new_length = current_length + len(separator) + len(section)
             else:
-                # 第一个元素，不需要分隔符
+                # First element, no delimiter.
                 new_length = len(section)
             
             if new_length > max_length:
@@ -225,7 +225,7 @@ class PushoverSender:
         logger.info(f"Pushover 分批发送：共 {total_chunks} 批")
         
         for i, chunk in enumerate(chunks):
-            # 添加分页标记到标题
+            # Add pagination markers to titles
             chunk_title = f"{title} ({i+1}/{total_chunks})" if total_chunks > 1 else title
             
             if self._send_pushover_message(
@@ -241,7 +241,7 @@ class PushoverSender:
             else:
                 logger.error(f"Pushover 第 {i+1}/{total_chunks} 批发送失败")
             
-            # 批次间隔，避免触发频率限制
+            # Batch interval to avoid rate limits
             if i < total_chunks - 1:
                 time.sleep(1)
 

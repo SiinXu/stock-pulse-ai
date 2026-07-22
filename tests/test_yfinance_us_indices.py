@@ -12,11 +12,11 @@ import unittest
 from unittest.mock import MagicMock, patch
 import pandas as pd
 
-# 在导入 data_provider 前 mock 可能缺失的依赖，避免环境差异导致测试无法运行
+# Mock missing dependencies before importing data_provider to avoid environment differences causing tests to fail.
 if 'fake_useragent' not in sys.modules:
     sys.modules['fake_useragent'] = MagicMock()
 
-# 确保能导入项目模块
+# Ensure the project modules can be imported
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 

@@ -141,19 +141,19 @@ class _StockAnalysisStageMixin:
             )
 
             self._emit_progress(18, f"{code}：正在获取行情与筹码数据")
-            # 获取股票名称（先走轻量名称路径，后续若 realtime_quote 有 name 再覆盖）
+            # Get stock name (first try light name path, then overwrite with realtime_quote.name if available)
             stock_name = self.fetcher_manager.get_stock_name(code, allow_realtime=False)
 
-            # Step 1: 获取实时行情（量比、换手率等）- 使用统一入口，自动故障切换
+            # Step 1: Get real-time quotes (volume ratio, turnover rate, etc.) - Use a unified entry with automatic failover
             realtime_quote = None
             try:
                 if self.config.enable_realtime_quote:
                     realtime_quote = self.fetcher_manager.get_realtime_quote(code, log_final_failure=False)
                     if realtime_quote:
-                        # 使用实时行情返回的真实股票名称
+                        # Use the actual stock name returned from real-time market data.
                         if realtime_quote.name:
                             stock_name = realtime_quote.name
-                        # 兼容不同数据源的字段（有些数据源可能没有 volume_ratio）
+                        # Compatible with fields from different data sources (some data sources may not have volume_ratio).
                         volume_ratio = getattr(realtime_quote, 'volume_ratio', None)
                         turnover_rate = getattr(realtime_quote, 'turnover_rate', None)
                         logger.info(
@@ -190,11 +190,11 @@ class _StockAnalysisStageMixin:
                     context={"stock_code": code},
                 )
 
-            # 如果还是没有名称，使用代码作为名称
+            # If a name is still not available, use the code as the name.
             if not stock_name:
                 stock_name = f'股票{code}'
 
-            # Step 2: 获取筹码分布 - 使用统一入口，带熔断保护
+            # Step 2: Get Position Distribution - Using a Unified Entry with Circuit Protection
             chip_data = None
             try:
                 chip_data = self.fetcher_manager.get_chip_distribution(code)
@@ -241,9 +241,9 @@ class _StockAnalysisStageMixin:
 
             self._emit_progress(32, f"{stock_name}：正在聚合基本面与趋势数据")
 
-            # Step 2.5: 基本面能力聚合（统一入口，异常降级）
-            # - 失败时返回 partial/failed，不影响既有技术面/新闻链路
-            # - 关闭开关时仍返回 not_supported 结构
+            # Step 2.5: Fundamental Capability Aggregation (unified entry, exception degradation)
+            # - Return partial/failed if timeout, does not affect existing technical indicator/news link
+            # - Return not_supported structure when the switch is closed.
             fundamental_context = None
             try:
                 fundamental_context = self.fetcher_manager.get_fundamental_context(
@@ -297,7 +297,7 @@ class _StockAnalysisStageMixin:
                     context={"stock_code": code},
                 )
 
-            # Step 3: 趋势分析（基于交易理念）— 在 Agent 分支之前执行，供两条路径共用
+            # Step 3: Trend Analysis (Based on Trading Philosophy) – Execute before the Agent branch, shared by two paths
             trend_result: Optional[TrendAnalysisResult] = None
             try:
                 from src.services.history_loader import get_frozen_target_date
@@ -409,7 +409,7 @@ class _StockAnalysisStageMixin:
                     market_structure_context=market_structure_context,
                 )
 
-            # Step 4: 多维度情报搜索（最新消息+风险排查+业绩预期）
+            # Step 4: Multi-Dimensional Intelligence Search (Latest News + Risk Assessment + Earnings Expectations)
             active_stage = observe_pipeline_stage(
                 "intelligence",
                 input_summary={
@@ -434,14 +434,14 @@ class _StockAnalysisStageMixin:
             if self.search_service is not None and self.search_service.is_available:
                 logger.info("%s(%s) starting multi-dimensional intelligence search", stock_name, code)
 
-                # 使用多维度搜索（最多5次搜索）
+                # Use multi-dimensional search (up to 5 searches)
                 intel_results = self.search_service.search_comprehensive_intel(
                     stock_code=code,
                     stock_name=stock_name,
                     max_searches=5
                 )
 
-                # 格式化情报报告
+                # Format the intelligence report
                 if intel_results:
                     news_context = self.search_service.format_intel_report(intel_results, stock_name)
                     total_results = sum(
@@ -464,7 +464,7 @@ class _StockAnalysisStageMixin:
                         len(news_context or ""),
                     )
 
-                    # 保存新闻情报到数据库（用于后续复盘与查询）
+                    # Save news intelligence to database (for subsequent review and querying)
                     try:
                         query_context = self._build_query_context(query_id=query_id)
                         for dim_name, response in intel_results.items():
@@ -584,7 +584,7 @@ class _StockAnalysisStageMixin:
             )
             active_stage = None
 
-            # Step 5: 获取分析上下文（技术面数据）
+            # Step 5: Get Analytical Context (Technical Face Data)
             active_stage = observe_pipeline_stage(
                 "context",
                 input_summary={
@@ -618,13 +618,13 @@ class _StockAnalysisStageMixin:
                     'yesterday': {}
                 }
 
-            # Step 6: 增强上下文数据（添加实时行情、筹码、趋势分析结果、股票名称）
+            # Step 6: Add real-time quotes, chip distribution, trend analysis, and the stock name to the context.
             enhanced_context = self._enhance_context(
                 context,
                 realtime_quote,
                 chip_data,
                 trend_result,
-                stock_name,  # 传入股票名称
+                stock_name,  # Pass in stock name
                 fundamental_context,
                 market_phase_context=market_phase_context_dict,
                 portfolio_context=portfolio_context,
@@ -640,7 +640,7 @@ class _StockAnalysisStageMixin:
             if isinstance(market_structure_context, dict):
                 enhanced_context["market_structure_context"] = market_structure_context
 
-            # Step 7: 调用 AI 分析（传入增强的上下文和新闻）
+            # Step 7: Call AI Analysis (Pass in Enhanced Context and News)
             (
                 analysis_context_pack_summary,
                 analysis_context_pack_overview,
@@ -785,7 +785,7 @@ class _StockAnalysisStageMixin:
                 )
                 raise
 
-            # Step 7.5: 填充分析时的价格信息到 result
+            # Step 7.5: Populate Price Information into result during analysis
             if result:
                 self._emit_progress(94, f"{stock_name}：正在校验并整理分析结果")
                 result.query_id = query_id
@@ -862,7 +862,7 @@ class _StockAnalysisStageMixin:
             )
             active_stage = None
 
-            # Step 8: 保存分析历史记录
+            # Step 8: Save analysis history records
             if result and result.success:
                 active_stage = observe_pipeline_stage(
                     "persist",

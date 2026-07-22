@@ -1,4 +1,4 @@
-# Volume Breakout Strategy / 放量突破
+# Volume Breakout Strategy
 # Price breaks above resistance on heavy volume (>2x average).
 
 name: volume_breakout

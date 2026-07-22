@@ -191,8 +191,8 @@ _PIPELINE_COMPAT_EXPORTS = (
     _SINGLE_STOCK_NOTIFY_LOCK_INIT_GUARD,
 )
 
-# 防御性 guard：当实例绕过 __init__（如测试中 __new__）构造时，
-# double-check 初始化 _single_stock_notify_lock 仍然线程安全。
+# Defensive guard: When the instance bypasses __init__ (such as in testing using __new__) construction
+# double-check Initialization _single_stock_notify_lock Thread-safe.
 _DAILY_MARKET_CONTEXT_SERVICE_LOCK_INIT_GUARD = threading.Lock()
 _PIPELINE_STAGE_RUNNER_INIT_GUARD = threading.Lock()
 _DEFER_PIPELINE_DELIVERY_OBSERVATION: ContextVar[bool] = ContextVar(
@@ -254,11 +254,11 @@ class StockAnalysisPipeline(_DeliveryStageMixin):
         )
         self.daily_market_context_allow_generate = daily_market_context_allow_generate
         
-        # 初始化各模块
+        # Initialize modules
         self.db = get_db()
         self.fetcher_manager = DataFetcherManager()
-        # 不再单独创建 akshare_fetcher，统一使用 fetcher_manager 获取增强数据
-        self.trend_analyzer = StockTrendAnalyzer()  # 技术分析器
+        # No longer create akshare_fetcher separately, use fetcher_manager to get enhanced data
+        self.trend_analyzer = StockTrendAnalyzer()  # Technical analyzer
         self.analyzer = GeminiAnalyzer(config=self.config, skills=self.analysis_skills)
         self.notifier = NotificationService(request_context=request_context)
         self.market_structure_service = MarketStructureService(fetcher_manager=self.fetcher_manager)
@@ -281,7 +281,7 @@ class StockAnalysisPipeline(_DeliveryStageMixin):
         self._concept_rankings_cache_lock = threading.Lock()
         self._concept_rankings_cache: Dict[str, Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]] = {}
         
-        # 初始化搜索服务（可选，初始化失败不应阻断主分析流程）
+        # Initialize the search service (optional, failure should not block the main analysis process)
         try:
             self.search_service = SearchService(
                 bocha_keys=self.config.bocha_api_keys,
@@ -307,7 +307,7 @@ class StockAnalysisPipeline(_DeliveryStageMixin):
         
         logger.info("Analysis scheduler initialized: max_workers=%s", self.max_workers)
         logger.info("Technical analysis engine enabled (moving averages, trend, volume and price)")
-        # 打印实时行情/筹码配置状态
+        # Log the real-time quote and chip-distribution configuration status.
         if self.config.enable_realtime_quote:
             logger.info(
                 "Realtime quotes enabled: source_priority=%s",
@@ -326,7 +326,7 @@ class StockAnalysisPipeline(_DeliveryStageMixin):
         else:
             logger.warning("Search service is unavailable because no search capability is configured")
 
-        # 初始化社交舆情服务（仅美股，可选）
+        # Initialize social sentiment service (for US stocks, optional)
         try:
             self.social_sentiment_service = SocialSentimentService(
                 api_key=self.config.social_sentiment_api_key,

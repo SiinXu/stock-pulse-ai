@@ -49,7 +49,7 @@ class _ConversationMethods:
             ).order_by(ConversationMessage.created_at.desc()).limit(limit)
             messages = session.execute(stmt).scalars().all()
 
-            # 倒序返回，保证时间顺序
+            # Return in reverse order to preserve chronological order
             return [
                 {
                     "role": msg.role,
@@ -309,7 +309,7 @@ class _ConversationMethods:
                 normalized_prefix = session_prefix if session_prefix.endswith(":") else f"{session_prefix}:"
             exact_ids = [sid for sid in (extra_session_ids or []) if sid]
 
-            # 聚合每个 session 的消息数和最后活跃时间
+            # Aggregate the message count and last activity time for each session
             base = (
                 select(
                     ConversationMessage.session_id,
@@ -336,7 +336,7 @@ class _ConversationMethods:
             results = []
             for row in rows:
                 sid = row.session_id
-                # 取该会话第一条 user 消息作为标题
+                # Use the conversation's first user message as its title
                 first_user_msg = session.execute(
                     select(ConversationMessage.content)
                     .where(

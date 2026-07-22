@@ -43,21 +43,21 @@ def analyze_stock(
     if config is None:
         config = get_config()
 
-    # 创建分析流水线
+    # Create an analysis pipeline
     pipeline = StockAnalysisPipeline(
         config=config,
         query_id=uuid.uuid4().hex,
         query_source="cli"
     )
 
-    # 使用通知服务（如果提供）
+    # Use notification service (if available)
     if notifier:
         pipeline.notifier = notifier
 
-    # 根据full_report参数设置报告类型
+    # Set report type based on full_report parameter
     report_type = ReportType.FULL if full_report else ReportType.SIMPLE
 
-    # 运行单只股票分析
+    # Run single stock analysis
     result = pipeline.process_single_stock(
         code=stock_code,
         skip_analysis=False,
@@ -115,17 +115,17 @@ def perform_market_review(
     if config is None:
         config = get_config()
 
-    # 创建分析流水线以获取analyzer和search_service
+    # Create an analysis pipeline to get analyzer and search_service
     pipeline = StockAnalysisPipeline(
         config=config,
         query_id=uuid.uuid4().hex,
         query_source="cli",
     )
 
-    # 使用提供的通知服务或创建新的
+    # Use the provided notification service or create a new one.
     review_notifier = notifier or pipeline.notifier
 
-    # 调用大盘复盘函数
+    # Call the market review function
     return run_market_review(
         notifier=review_notifier,
         analyzer=pipeline.analyzer,

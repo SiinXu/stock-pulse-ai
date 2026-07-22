@@ -38,10 +38,10 @@ from src.config import setup_env
 _INITIAL_PROCESS_ENV = dict(os.environ)
 setup_env()
 
-# 代理配置 - 通过 USE_PROXY 环境变量控制，默认关闭
-# GitHub Actions 环境自动跳过代理配置
+# Proxy configuration - Controlled by the USE_PROXY environment variable, default is disabled
+# GitHub Actions automatically skips proxy configuration
 if os.getenv("GITHUB_ACTIONS") != "true" and os.getenv("USE_PROXY", "false").lower() == "true":
-    # 本地开发环境，启用代理（可在 .env 中配置 PROXY_HOST 和 PROXY_PORT）
+    # Local development environment, enable proxy (can be configured in .env with PROXY_HOST and PROXY_PORT).
     proxy_host = os.getenv("PROXY_HOST", "127.0.0.1")
     proxy_port = os.getenv("PROXY_PORT", "10809")
     proxy_url = f"http://{proxy_host}:{proxy_port}"
@@ -597,11 +597,11 @@ def run_full_analysis(
             logger.info("Skipped stocks whose markets are closed today: %s", skipped)
         stock_codes = filtered_codes
 
-        # 命令行参数 --single-notify 覆盖配置（#55）
+        # Command line argument --single-notify overrides configuration (#55)
         if getattr(args, 'single_notify', False):
             config.single_stock_notify = True
 
-        # Issue #190: 个股与大盘复盘合并推送
+        # Issue #190: Merge push for individual stocks and market reviews
         merge_notification = (
             getattr(config, 'merge_email_notification', False)
             and config.market_review_enabled
@@ -609,7 +609,7 @@ def run_full_analysis(
             and not config.single_stock_notify
         )
 
-        # 创建调度器
+        # Create scheduler
         save_context_snapshot = None
         if getattr(args, 'no_context_snapshot', False):
             save_context_snapshot = False
@@ -674,7 +674,7 @@ def run_full_analysis(
                 require_current_query_match=True,
             )
 
-        # 1. 运行个股分析
+        # 1. Run individual stock analysis
         results = pipeline.run(
             stock_codes=stock_codes,
             dry_run=args.dry_run,
@@ -699,10 +699,10 @@ def run_full_analysis(
             )
             market_context_generated_during_stock = bool(market_context_summary)
 
-        # Issue #128: 分析间隔 - 在个股分析和大盘分析之间添加延迟
+        # Issue #128: Analysis interval - Add delay between individual stock and market review analysis
         analysis_delay = getattr(config, 'analysis_delay', 0)
 
-        # 2. 运行大盘复盘（如果启用且不是仅个股模式）
+        # 2. Run market review (if enabled and not in individual stock mode)
         if should_run_market_review:
             schedule_mode = bool(
                 getattr(args, 'schedule', False)
@@ -771,7 +771,7 @@ def run_full_analysis(
                     query_id=query_id,
                     trigger_source=review_trigger_source,
                 )
-                # 如果复盘仍未执行成功，再做一次复用历史/缓存读取（防止与并发运行竞态）。
+                # If replay is still not executed successfully, perform a second read from history/cache (to prevent race conditions with concurrent execution).
                 if not review_result and should_use_daily_market_context:
                     (
                         market_context_summary,
@@ -793,13 +793,13 @@ def run_full_analysis(
                 elif not review_result:
                     can_reuse_market_context = False
 
-            # 如果有结果，赋值给 market_report 用于后续飞书文档生成
+            # If there is a result, assign it to market_report for subsequent Feishu document generation
             if review_result:
                 market_report = _market_review_report_text(review_result)
             elif can_reuse_market_context:
                 market_report = market_context_full_report or market_context_summary
 
-        # Issue #190: 合并推送（个股+大盘复盘）
+        # Issue #190: Merge push (individual stocks + market review)
         if merge_notification and (results or market_report) and not args.no_notify:
             parts = []
             if market_report:
@@ -818,7 +818,7 @@ def run_full_analysis(
                     else:
                         logger.warning("Failed to deliver the combined analysis report")
 
-        # 输出摘要
+        # Output summary
         if results:
             logger.info("\n===== Analysis result summary =====")
             for r in sorted(results, key=lambda x: x.sentiment_score, reverse=True):
@@ -830,7 +830,7 @@ def run_full_analysis(
 
         logger.info("\nAnalysis run completed")
 
-        # === 新增：生成飞书云文档 ===
+        # New: Generate Feishu Cloud Documents
         try:
             from src.feishu_doc import FeishuDocManager
 
@@ -838,19 +838,19 @@ def run_full_analysis(
             if feishu_doc.is_configured() and (results or market_report):
                 logger.info("Creating a Feishu document")
 
-                # 1. 准备标题 "01-01 13:01大盘复盘"
+                # 1. Prepare title "01-01 13:01大盘复盘"
                 tz_cn = timezone(timedelta(hours=8))
                 now = datetime.now(tz_cn)
                 doc_title = f"{now.strftime('%Y-%m-%d %H:%M')} 大盘复盘"
 
-                # 2. 准备内容 (拼接个股分析和大盘复盘)
+                # 2. Prepare content (concatenate individual stock analysis and market review)
                 full_content = ""
 
-                # 添加大盘复盘内容（如果有）
+                # Add market-review content when available.
                 if market_report:
                     full_content += f"# 📈 大盘复盘\n\n{market_report}\n\n---\n\n"
 
-                # 添加个股决策仪表盘（使用 NotificationService 生成，按 report_type 分支）
+                # Add individual stock decision dashboard (generated using NotificationService, branched by report_type)
                 if results:
                     dashboard_content = pipeline.notifier.generate_aggregate_report(
                         results,
@@ -858,11 +858,11 @@ def run_full_analysis(
                     )
                     full_content += f"# 🚀 个股决策仪表盘\n\n{dashboard_content}"
 
-                # 3. 创建文档
+                # 3. Create document
                 doc_url = feishu_doc.create_daily_doc(doc_title, full_content)
                 if doc_url:
                     logger.info("Feishu document created: %s", doc_url)
-                    # 可选：将文档链接也推送到群里
+                    # Optional: Also push the document link to the group
                     if not args.no_notify:
                         pipeline.notifier.send(
                             f"[{now.strftime('%Y-%m-%d %H:%M')}] 复盘文档创建成功: {doc_url}",
@@ -1048,7 +1048,7 @@ def _is_truthy_env(var_name: str, default: str = "true") -> bool:
 
 def start_bot_stream_clients(config: Config) -> None:
     """Start bot stream clients when enabled in config."""
-    # 启动钉钉 Stream 客户端
+    # Start the DingTalk Stream client.
     if config.dingtalk_stream_enabled:
         try:
             from bot.platforms import start_dingtalk_stream_background, DINGTALK_STREAM_AVAILABLE
@@ -1068,7 +1068,7 @@ def start_bot_stream_clients(config: Config) -> None:
                 error_code="main_dingtalk_stream_start_failed",
             )
 
-    # 启动飞书 Stream 客户端
+    # Start the Feishu Stream client.
     if getattr(config, 'feishu_stream_enabled', False):
         try:
             from bot.platforms import start_feishu_stream_background, FEISHU_SDK_AVAILABLE
@@ -1170,10 +1170,10 @@ def main() -> int:
     Returns:
         退出码（0 表示成功）
     """
-    # 解析命令行参数
+    # Parse command-line arguments
     args = parse_arguments()
 
-    # 在配置加载前先初始化 bootstrap 日志，确保早期失败也能落盘
+    # Initialize bootstrap logs before loading, ensuring early failures are logged.
     try:
         _setup_bootstrap_logging(debug=args.debug)
     except Exception as exc:
@@ -1196,7 +1196,7 @@ def main() -> int:
             level=logging.WARNING,
         )
 
-    # 加载配置（在 bootstrap logging 之后执行，确保异常有日志）
+    # Load configuration (execute after bootstrap logging, ensure exceptions are logged)
     try:
         config = get_config()
     except Exception as exc:
@@ -1212,7 +1212,7 @@ def main() -> int:
     # config is available and before config-dependent services are used.
     set_application_services(ApplicationServices())
 
-    # 配置日志（输出到控制台和文件）
+    # Configure logging (output to console and file)
     try:
         _setup_runtime_logging(config.log_dir, debug=args.debug)
     except Exception as exc:

@@ -230,7 +230,7 @@ def parse_arguments() -> argparse.Namespace:
 def _dispatch_cli(config: Config, args: argparse.Namespace) -> int:
     """Dispatch the configured CLI mode after startup bootstrap completes."""
 
-    # 验证配置
+    # Verification Configuration
     warnings = config.validate()
     for warning in warnings:
         logger.warning(warning)
@@ -245,7 +245,7 @@ def _dispatch_cli(config: Config, args: argparse.Namespace) -> int:
         print(format_notification_diagnostics(result))
         return 0 if result.ok else 1
 
-    # 解析股票列表（统一为大写 Issue #355）
+    # Parse stock lists (convert to uppercase - Issue #355)
     stock_codes = None
     if args.stocks:
         stock_codes = [
@@ -255,17 +255,17 @@ def _dispatch_cli(config: Config, args: argparse.Namespace) -> int:
         ]
         logger.info("Using the stock list supplied on the command line: %s", stock_codes)
 
-    # === 处理 --webui / --webui-only 参数，映射到 --serve / --serve-only ===
+    # === Handle --webui / --webui-only Parameters, Map To --serve / --serve-only ===
     if args.webui:
         args.serve = True
     if args.webui_only:
         args.serve_only = True
 
-    # 兼容旧版 WEBUI_ENABLED 环境变量
+    # Compatible with the old WEBUI_ENABLED environment variable.
     if config.webui_enabled and not (args.serve or args.serve_only):
         args.serve = True
 
-    # === 启动 Web 服务 (如果启用) ===
+    # === Start Web Service (if enabled) ===
     start_serve = (args.serve or args.serve_only) and os.getenv("GITHUB_ACTIONS") != "true"
 
     if start_serve:
@@ -336,7 +336,7 @@ def _dispatch_cli(config: Config, args: argparse.Namespace) -> int:
     if bot_clients_started:
         start_bot_stream_clients(config)
 
-    # === 仅 Web 服务模式：不自动执行分析 ===
+    # === Only Web Service Mode: No automatic analysis ===
     if args.serve_only:
         logger.info("Mode: Web service only")
         logger.info("Web service running at http://%s:%s", args.host, args.port)
@@ -351,7 +351,7 @@ def _dispatch_cli(config: Config, args: argparse.Namespace) -> int:
         return 0
 
     try:
-        # 模式0: 回测
+        # Mode 0: Backtesting
         if getattr(args, 'backtest', False):
             logger.info("Mode: backtest")
             from src.services.backtest_service import BacktestService
@@ -368,7 +368,7 @@ def _dispatch_cli(config: Config, args: argparse.Namespace) -> int:
             )
             return 0
 
-        # 模式1: 仅大盘复盘
+        # Mode 1: Market review for major indices only
         if args.market_review:
             from src.core.market_review import run_market_review
             from src.core.market_review_runtime import build_market_review_runtime
@@ -406,7 +406,7 @@ def _dispatch_cli(config: Config, args: argparse.Namespace) -> int:
             )
             return 0
 
-        # 模式2: 定时任务模式
+        # Mode 2: Scheduled task mode
         if args.schedule or config.schedule_enabled:
             if start_serve:
                 logger.info("Mode: Web/API runtime scheduler")
@@ -477,7 +477,7 @@ def _dispatch_cli(config: Config, args: argparse.Namespace) -> int:
             run_with_schedule(**schedule_kwargs)
             return 0
 
-        # 模式3: 正常单次运行
+        # Mode 3: Normal single run
         if config.run_immediately:
             _run_analysis_with_runtime_scheduler_lock(config, args, stock_codes)
         else:
@@ -485,7 +485,7 @@ def _dispatch_cli(config: Config, args: argparse.Namespace) -> int:
 
         logger.info("\nProgram execution completed")
 
-        # 如果启用了服务且是非定时任务模式，保持程序运行
+        # If the service is enabled and not in scheduled task mode, keep the program running.
         keep_running = start_serve and not (args.schedule or config.schedule_enabled)
         if keep_running:
             logger.info("API service is running (press Ctrl+C to exit)")
