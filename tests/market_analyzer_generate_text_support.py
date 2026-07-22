@@ -27,6 +27,30 @@ class RotatingGenerationError(RuntimeError):
         return "first render" if self.render_count == 1 else self.secret
 
 
+class _AnalyzerFactoryMixin:
+    def _make_analyzer(self):
+        """Return a minimally configured GeminiAnalyzer with _call_litellm mocked."""
+        with patch("src.analyzer.get_config") as mock_cfg:
+            cfg = MagicMock()
+            cfg.litellm_model = "gemini/gemini-2.0-flash"
+            cfg.litellm_fallback_models = []
+            cfg.gemini_api_keys = ["sk-gemini-testkey-1234"]
+            cfg.anthropic_api_keys = []
+            cfg.openai_api_keys = []
+            cfg.deepseek_api_keys = []
+            cfg.llm_model_list = []
+            cfg.openai_base_url = None
+            cfg.generation_backend = "litellm"
+            cfg.generation_fallback_backend = "litellm"
+            mock_cfg.return_value = cfg
+            from src.analyzer import GeminiAnalyzer
+            analyzer = GeminiAnalyzer.__new__(GeminiAnalyzer)
+            analyzer._router = None
+            analyzer._litellm_available = True
+            analyzer._config_override = cfg
+            return analyzer
+
+
 @pytest.fixture(autouse=True)
 def _llm_usage_hmac_env(monkeypatch):
     monkeypatch.setenv("LLM_USAGE_HMAC_SECRET", "test-usage-hmac-secret")
@@ -92,6 +116,7 @@ _OPENAI_COMPATIBILITY_PAYLOAD_FIXTURES = [
 
 
 __all__ = (
+    "_AnalyzerFactoryMixin",
     "MagicMock",
     "RotatingGenerationError",
     "SimpleNamespace",
