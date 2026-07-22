@@ -21,6 +21,7 @@ if TYPE_CHECKING:
         Set,
         SystemConfigService,
         Tuple,
+        _RuntimeConfigTransaction,
         build_schema_response,
         canonicalize_hermes_base_url,
         get_category_definitions,
@@ -53,6 +54,10 @@ class _SystemConfigCoreMethods:
         # Keep the provider rather than a Config object so Config.reset_instance()
         # is reflected on the next read.
         self._runtime_config_provider = runtime_config_provider or get_runtime_config
+        self._runtime_config_transaction = _RuntimeConfigTransaction(
+            manager=self._manager,
+            reload_runtime_singletons=lambda: self._reload_runtime_singletons(),
+        )
 
     def get_schema(self) -> Dict[str, Any]:
         """Return grouped schema metadata for UI rendering."""
@@ -533,7 +538,12 @@ class _SystemConfigCoreMethods:
         return {"channels": channels}
 
     def apply_legacy_channels_migration(
-        self, config_version: str, mask_token: str = "******"
+        self,
+        config_version: str,
+        mask_token: str = "******",
+        validate_connectivity: bool = False,
+        connectivity_timeout_seconds: float = 20.0,
+        actor: str = "system_config_service",
     ) -> Dict[str, Any]:
         """Copy detected legacy provider config into channels and switch mode."""
         raw_map = {str(key).upper(): value for key, value in self._manager.read_config_map().items()}
@@ -547,7 +557,14 @@ class _SystemConfigCoreMethods:
                 "expected": "at least one legacy provider key",
                 "actual": "none",
             }])
-        return self.update(config_version=config_version, items=items, mask_token=mask_token)
+        return self.update(
+            config_version=config_version,
+            items=items,
+            mask_token=mask_token,
+            validate_connectivity=validate_connectivity,
+            connectivity_timeout_seconds=connectivity_timeout_seconds,
+            actor=actor,
+        )
 
     def get_generation_backend_status(self) -> Dict[str, Any]:
         """Return cheap generation backend status for saved/runtime config only."""
@@ -630,6 +647,9 @@ class _SystemConfigCoreMethods:
         config_version: str,
         content: str,
         reload_now: bool = True,
+        validate_connectivity: bool = False,
+        connectivity_timeout_seconds: float = 20.0,
+        actor: str = "system_config_service",
     ) -> Dict[str, Any]:
         """Merge imported `.env` assignments into the active config."""
         self._conflict.guard_version(config_version)
@@ -640,6 +660,9 @@ class _SystemConfigCoreMethods:
             items=updates,
             mask_token="__DSA_IMPORT_LITERAL_MASK__",
             reload_now=reload_now,
+            validate_connectivity=validate_connectivity,
+            connectivity_timeout_seconds=connectivity_timeout_seconds,
+            actor=actor,
         )
 
     def import_desktop_env(

@@ -18,6 +18,7 @@ from api.v1.schemas.system_config import (
     GenerationBackendStatusResponse,
     ImportSystemConfigRequest,
     LLMProviderCatalogResponse,
+    RollbackSystemConfigRequest,
     SystemConfigConflictResponse,
     SystemConfigResponse,
     SystemConfigSchemaResponse,
@@ -38,6 +39,7 @@ from src.auth import COOKIE_NAME, is_auth_enabled, refresh_auth_state, verify_se
 from src.services.system_config_service import (
     ConfigConflictError,
     ConfigImportError,
+    ConfigRollbackError,
     ConfigValidationError,
     SystemConfigService,
 )
@@ -47,6 +49,15 @@ from src.utils.sanitize import log_safe_exception
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _config_audit_actor() -> str:
+    """Return the attributable operator class available in the single-admin model."""
+    if os.getenv("DSA_DESKTOP_MODE") == "true":
+        return "desktop_operator"
+    if is_auth_enabled():
+        return "authenticated_admin"
+    return "local_operator"
 
 
 def _log_config_exception(
@@ -375,7 +386,12 @@ def apply_legacy_channels_migration(
 ) -> dict:
     """Apply the Legacy -> Channels migration atomically."""
     try:
-        return service.apply_legacy_channels_migration(config_version=payload.config_version)
+        return service.apply_legacy_channels_migration(
+            config_version=payload.config_version,
+            validate_connectivity=payload.validate_connectivity,
+            connectivity_timeout_seconds=payload.connectivity_timeout_seconds,
+            actor=_config_audit_actor(),
+        )
     except ConfigValidationError as exc:
         raise HTTPException(status_code=400, detail={"error": "validation_error", "issues": exc.issues})
     except ConfigConflictError as exc:
@@ -383,8 +399,13 @@ def apply_legacy_channels_migration(
             status_code=409,
             detail={"error": "config_conflict", "current_config_version": exc.current_version},
         )
-    except Exception as exc:
-        _log_config_exception("Legacy channel migration apply failed", exc)
+    except Exception as exc:  # broad-exception: fallback_recorded - map migration failures to a sanitized API error
+        log_safe_exception(
+            logger,
+            "Legacy channel migration apply failed",
+            exc,
+            error_code="internal_error",
+        )
         raise HTTPException(
             status_code=500,
             detail={"error": "internal_error", "message": "Failed to apply legacy channel migration"},
@@ -502,6 +523,9 @@ def update_system_config(
             items=[item.model_dump() for item in request.items],
             mask_token=request.mask_token,
             reload_now=request.reload_now,
+            validate_connectivity=request.validate_connectivity,
+            connectivity_timeout_seconds=request.connectivity_timeout_seconds,
+            actor=_config_audit_actor(),
         )
         return UpdateSystemConfigResponse.model_validate(payload)
     except ConfigValidationError as exc:
@@ -522,13 +546,86 @@ def update_system_config(
                 "current_config_version": exc.current_version,
             },
         )
-    except Exception as exc:
-        _log_config_exception("System configuration update failed", exc)
+    except Exception as exc:  # broad-exception: fallback_recorded - map update failures to a sanitized API error
+        log_safe_exception(
+            logger,
+            "System configuration update failed",
+            exc,
+            error_code="internal_error",
+        )
         raise HTTPException(
             status_code=500,
             detail={
                 "error": "internal_error",
                 "message": "Failed to update system configuration",
+            },
+        )
+
+
+@router.post(
+    "/config/rollback",
+    response_model=UpdateSystemConfigResponse,
+    responses={
+        200: {"description": "Last-known-good configuration restored"},
+        400: {"description": "Rollback validation failed", "model": SystemConfigValidationErrorResponse},
+        409: {"description": "Rollback unavailable or version conflict", "model": ErrorResponse},
+        500: {"description": "Internal server error", "model": ErrorResponse},
+    },
+    summary="Roll back system configuration",
+    description=(
+        "Atomically restore and activate the previous last-known-good runtime "
+        "configuration without changing administrator authentication state."
+    ),
+)
+def rollback_system_config(
+    request: RollbackSystemConfigRequest,
+    service: SystemConfigService = Depends(get_system_config_service),
+) -> UpdateSystemConfigResponse:
+    """Restore the previous runtime configuration in one authenticated action."""
+    try:
+        payload = service.restore_last_good_config(
+            config_version=request.config_version,
+            actor=_config_audit_actor(),
+        )
+        return UpdateSystemConfigResponse.model_validate(payload)
+    except ConfigValidationError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "validation_failed",
+                "message": "System configuration rollback validation failed",
+                "issues": exc.issues,
+            },
+        )
+    except ConfigConflictError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "config_version_conflict",
+                "message": "Configuration has changed, please reload and retry",
+                "current_config_version": exc.current_version,
+            },
+        )
+    except ConfigRollbackError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "rollback_unavailable",
+                "message": exc.message,
+            },
+        )
+    except Exception as exc:  # broad-exception: fallback_recorded - map rollback failures to a sanitized API error
+        log_safe_exception(
+            logger,
+            "System configuration rollback failed",
+            exc,
+            error_code="internal_error",
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "message": "Failed to roll back system configuration",
             },
         )
 
@@ -625,6 +722,9 @@ def import_system_config(
             config_version=request.config_version,
             content=request.content,
             reload_now=request.reload_now,
+            validate_connectivity=request.validate_connectivity,
+            connectivity_timeout_seconds=request.connectivity_timeout_seconds,
+            actor=_config_audit_actor(),
         )
         return UpdateSystemConfigResponse.model_validate(payload)
     except ConfigImportError as exc:
@@ -653,8 +753,13 @@ def import_system_config(
                 "current_config_version": exc.current_version,
             },
         )
-    except Exception as exc:
-        _log_config_exception("System configuration import failed", exc)
+    except Exception as exc:  # broad-exception: fallback_recorded - map import failures to a sanitized API error
+        log_safe_exception(
+            logger,
+            "System configuration import failed",
+            exc,
+            error_code="internal_error",
+        )
         raise HTTPException(
             status_code=500,
             detail={

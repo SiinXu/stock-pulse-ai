@@ -299,6 +299,8 @@ class UpdateSystemConfigRequest(BaseModel):
     config_version: str
     mask_token: str = "******"
     reload_now: bool = True
+    validate_connectivity: bool = False
+    connectivity_timeout_seconds: float = Field(default=20.0, ge=1.0, le=120.0)
     items: List[SystemConfigUpdateItem] = Field(..., min_length=1)
 
 
@@ -326,6 +328,14 @@ class ImportSystemConfigRequest(BaseModel):
     config_version: str
     content: str
     reload_now: bool = True
+    validate_connectivity: bool = False
+    connectivity_timeout_seconds: float = Field(default=20.0, ge=1.0, le=120.0)
+
+
+class RollbackSystemConfigRequest(BaseModel):
+    """Request one-step restoration of the last-known-good runtime config."""
+
+    config_version: str
 
 
 class ConfigValidationIssue(BaseModel):

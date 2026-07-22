@@ -161,6 +161,16 @@ LITELLM_MODEL=ollama/qwen3:8b
 
 后端提供只读状态接口 `GET /api/v1/system/config/setup/status`，用于判断首次启动闭环中最基础的几类配置是否已经就绪：LLM 主连接、Agent 模型、自选股、通知渠道和本地存储。首次向导与日常模型接入共用同一份 `connection_fields` 字段契约；Provider Catalog 权威提供 Provider 身份、标签、初始化默认值、发现能力与相关链接，但不权威决定字段 requirement。按当前内置 Schema，Ollama 免 Key，官方默认地址无需手填，Custom 才要求 Base URL。向导会写入显式 `_PROVIDER`，不会覆盖已有 Connection，也不会保存裸模型名或自动全选发现结果。状态接口本身只读取已保存的 `.env` 与当前进程环境变量，不会重载运行时配置、写入 `.env`、测试真实模型或创建数据库文件。
 
+### 事务化热加载与一步回退
+
+`PUT /api/v1/system/config` 会在持久化前校验完整候选配置，并且只在新的 `Config` 对象成功构建后才发布到运行时。旧客户端 payload 行为不变：`reload_now` 默认 `true`，`validate_connectivity` 默认 `false`，因此普通保存不会新增外部请求。调用方显式开启连通性探测时，会复用固定 prompt/schema 的 generation-backend smoke test；`connectivity_timeout_seconds` 可设为 1 到 120 秒。失败返回 `connectivity_probe_failed`，其 `details.error_code` 区分认证、额度、模型不可用、网络或后端契约错误，且不会回显凭据。
+
+持久化写入与运行时激活由同一事务锁串行化。候选构建或运行时重置失败时，服务会恢复原始 `.env` 内容、受影响的进程环境变量和旧的全局 `Config` 对象，并以 `runtime_activation_failed` 拒绝本次更新。激活成功后，会在 `ENV_FILE` 同目录生成权限为 `0600` 的 `.env.last-good-*` 本地快照。该文件含上一版原始配置与 secret，受仓库 `.env.*` ignore 规则保护，严禁上传、附到 issue 或提交到 Git。
+
+调用 `POST /api/v1/system/config/rollback` 并提交当前 `config_version`，即可原子激活该快照。它复用普通配置写入的 optimistic conflict 和应用级认证中间件，且绝不会修改 `ADMIN_AUTH_ENABLED`；如果快照中的该字段不同，会返回 `auth_settings_endpoint_required`，仍必须通过 `/api/v1/auth/settings` 完成再认证。回退成功后，被替换的有效版本会成为下一份 last-known-good，因此再回退一次可以撤销本次操作。`reload_now=false` 继续作为只持久化兼容模式：不发布运行时状态，也不替换 last-known-good。
+
+分析 worker 在 `AnalysisService` 启动任务时读取当前 singleton，随后 `StockAnalysisPipeline` 在整次运行中持有该对象。因此运行中的任务不会被后续热加载中途改写；尚未启动的排队任务会在 worker 启动时获得最新有效配置。运维审计日志只记录操作者类别、UTC 时间、操作、结果、变更键名和配置版本，不记录任何值。当前单管理员模型只能归因为 `authenticated_admin`、`desktop_operator` 或 `local_operator`，不声明逐用户身份或持久化安全审计存储。
+
 ### Web 模型连接编辑器的兼容性 / 迁移 / 回退规则
 
 - Provider / Base URL 只用于**初始化表单**；真正落盘时包含 `LLM_{CONNECTION}_PROVIDER`、`LLM_{CONNECTION}_PROTOCOL`、`LLM_{CONNECTION}_BASE_URL`、`LLM_{CONNECTION}_MODELS` 和 `LLM_{CONNECTION}_API_KEY(S)`。Provider ID 与 Connection 名称分离；旧配置只在名称精确等于 Catalog ID 时兼容推断，不按 `openai2` 等前缀猜测，也不静默迁移。
