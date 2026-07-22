@@ -229,7 +229,7 @@ test.describe('surface and task-state foundation', () => {
 
     for (const viewport of viewports) {
       await page.setViewportSize(viewport);
-      await expect(page.getByRole('heading', { level: 1, name: 'Token 用量监控' })).toBeVisible();
+      await expect(page.getByRole('heading', { level: 2, name: 'Token 用量监控' })).toBeVisible();
       await expectNoDocumentOverflow(page, `${viewport.width}x${viewport.height}`);
     }
 
