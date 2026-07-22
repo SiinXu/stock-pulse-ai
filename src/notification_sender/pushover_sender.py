@@ -9,6 +9,7 @@ import logging
 from typing import Optional
 from datetime import datetime
 import requests
+from src.security.outbound_policy import safe_post
 
 from src.config import Config
 from src.utils.sanitize import log_safe_exception
@@ -135,7 +136,12 @@ class PushoverSender:
                 "priority": priority,
             }
             
-            response = requests.post(api_url, data=payload, timeout=timeout_seconds or 30)
+            response = safe_post(
+                api_url,
+                data=payload,
+                timeout=timeout_seconds or 30,
+                transport=requests,
+            )
             
             if response.status_code == 200:
                 result = response.json()
@@ -151,7 +157,7 @@ class PushoverSender:
                 logger.debug(f"响应内容: {response.text}")
                 return False
                 
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Channel failure is safely logged and isolated.
             log_safe_exception(
                 logger,
                 "Pushover message delivery failed",

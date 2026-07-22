@@ -10,6 +10,7 @@ import logging
 import base64
 import hashlib
 import requests
+from src.security.outbound_policy import safe_post
 import time
 from typing import Optional
 
@@ -89,7 +90,7 @@ class WechatSender:
         
         try:
             return self._send_wechat_message(content, timeout_seconds=timeout_seconds)
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Message failure is safely logged and isolated.
             log_safe_exception(
                 logger,
                 "WeChat Work message delivery failed",
@@ -115,8 +116,12 @@ class WechatSender:
                 "msgtype": "image",
                 "image": {"base64": b64, "md5": md5_hash},
             }
-            response = requests.post(
-                self._wechat_url, json=payload, timeout=30, verify=self._webhook_verify_ssl
+            response = safe_post(
+                self._wechat_url,
+                json=payload,
+                timeout=30,
+                verify=self._webhook_verify_ssl,
+                transport=requests,
             )
             if response.status_code == 200:
                 result = response.json()
@@ -127,7 +132,7 @@ class WechatSender:
             else:
                 logger.error("企业微信请求失败: HTTP %s", response.status_code)
             return False
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Image failure is safely logged and isolated.
             log_safe_exception(
                 logger,
                 "WeChat Work image delivery failed",
@@ -140,11 +145,12 @@ class WechatSender:
         """发送企业微信消息"""
         payload = self._gen_wechat_payload(content)
         
-        response = requests.post(
+        response = safe_post(
             self._wechat_url,
             json=payload,
             timeout=timeout_seconds or 10,
-            verify=self._webhook_verify_ssl
+            verify=self._webhook_verify_ssl,
+            transport=requests,
         )
         
         if response.status_code == 200:

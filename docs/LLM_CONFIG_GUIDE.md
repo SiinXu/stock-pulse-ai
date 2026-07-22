@@ -142,6 +142,8 @@ LITELLM_MODEL=ollama/qwen3:8b
 ```
 
 > **重要**：Ollama 必须使用 `OLLAMA_API_BASE` 配置，**不要**使用 `OPENAI_BASE_URL`，否则系统会错误拼接 URL（如 404、`api/generate/api/show`）。远程 Ollama 时，将 `OLLAMA_API_BASE` 设为实际地址（如 `http://192.168.1.100:11434`）。当前依赖约束为 `litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0`（与 requirements.txt 一致）。
+>
+> **出站安全**：loopback 与私网地址默认拒绝。使用本地/私有 Ollama 时，还需在 `.env` 中设置精确目标，例如 `OUTBOUND_HTTP_ALLOWLIST=localhost:11434`；Hermes 同理使用 `127.0.0.1:8642`。规则与限制见 [出站 HTTP 安全策略](security-outbound-policy.md)。
 
 > **恭喜！小白读到这里就可以去运行程序了！**
 > 想测测看通没通？在主目录打开命令行输入：`python scripts/check_env.py --llm`
@@ -344,6 +346,7 @@ LLM_CHANNELS=hermes
 LLM_HERMES_PROVIDER=custom
 LLM_HERMES_PROTOCOL=openai
 LLM_HERMES_BASE_URL=http://127.0.0.1:8642/v1
+OUTBOUND_HTTP_ALLOWLIST=127.0.0.1:8642
 LLM_HERMES_API_KEY=sk-local-hermes
 LLM_HERMES_MODELS=hermes-agent
 LITELLM_MODEL=openai/hermes-agent

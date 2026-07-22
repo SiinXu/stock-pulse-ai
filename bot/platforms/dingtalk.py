@@ -15,12 +15,14 @@ import hmac
 import base64
 import time
 import logging
+import requests
 from datetime import datetime
 from typing import Dict, Any, Optional
 from urllib.parse import quote_plus
 
 from bot.platforms.base import BotPlatform
 from bot.models import BotMessage, BotResponse, WebhookResponse, ChatType
+from src.security.outbound_policy import safe_post
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -268,9 +270,7 @@ class DingtalkPlatform(BotPlatform):
         if not session_webhook:
             logger.warning("[DingTalk] No sessionWebhook is available")
             return False
-        
-        import requests
-        
+
         try:
             # 构建消息
             if response.markdown:
@@ -297,10 +297,11 @@ class DingtalkPlatform(BotPlatform):
                 }
             
             # 发送请求
-            resp = requests.post(
+            resp = safe_post(
                 session_webhook,
                 json=payload,
-                timeout=10
+                timeout=10,
+                transport=requests,
             )
             
             if resp.status_code == 200:
@@ -323,7 +324,7 @@ class DingtalkPlatform(BotPlatform):
                 )
                 return False
                 
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Session reply failure is safely logged and isolated.
             log_safe_exception(
                 logger,
                 "[DingTalk] sessionWebhook delivery failed",

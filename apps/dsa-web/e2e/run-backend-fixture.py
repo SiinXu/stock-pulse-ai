@@ -76,13 +76,18 @@ def _resolve_output_child(raw_value: str, default_name: str) -> Path:
     return resolved
 
 
-def _runtime_values(runtime_dir: Path, log_dir: Path) -> Dict[str, str]:
+def _runtime_values(
+    runtime_dir: Path,
+    log_dir: Path,
+    fake_provider_port: int,
+) -> Dict[str, str]:
     """Build the deterministic application configuration for Playwright."""
     return {
         "ADMIN_AUTH_ENABLED": "true",
         "DATABASE_PATH": str(runtime_dir / "stock_analysis.db"),
         "LOG_DIR": str(log_dir / "backend-app"),
         "LLM_CONFIG_MODE": "auto",
+        "OUTBOUND_HTTP_ALLOWLIST": f"127.0.0.1:{fake_provider_port}",
         "PREFETCH_REALTIME_QUOTES": "false",
         "SCHEDULE_ENABLED": "false",
         "STOCK_INDEX_REMOTE_UPDATE_ENABLED": "false",
@@ -141,14 +146,19 @@ def _assert_isolated_environment(
         raise RuntimeError("Playwright backend authentication must be explicitly enabled")
 
 
-def _prepare_runtime(runtime_dir: Path, log_dir: Path, log: IO[str]) -> Dict[str, str]:
+def _prepare_runtime(
+    runtime_dir: Path,
+    log_dir: Path,
+    fake_provider_port: int,
+    log: IO[str],
+) -> Dict[str, str]:
     """Create isolated auth/data state and seed a deterministic report."""
     shutil.rmtree(runtime_dir, ignore_errors=True)
     runtime_dir.mkdir(parents=True, exist_ok=True)
     (runtime_dir / "home").mkdir(parents=True, exist_ok=True)
     log_dir.mkdir(parents=True, exist_ok=True)
 
-    values = _runtime_values(runtime_dir, log_dir)
+    values = _runtime_values(runtime_dir, log_dir, fake_provider_port)
     env_file = runtime_dir / "playwright.env"
     env_file.write_text(
         "\n".join(f"{key}={_quoted_env_value(value)}" for key, value in values.items()) + "\n",
@@ -222,7 +232,10 @@ def main() -> int:
     """Run the isolated backend until Playwright stops the fixture."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, required=True)
+    parser.add_argument("--fake-provider-port", type=int, required=True)
     args = parser.parse_args()
+    if not 1 <= args.fake_provider_port <= 65535:
+        parser.error("--fake-provider-port must be between 1 and 65535")
 
     runtime_dir = _resolve_output_child(
         os.getenv("DSA_WEB_E2E_RUNTIME_DIR", ""),
@@ -239,7 +252,12 @@ def main() -> int:
     stopping = False
     with backend_log_path.open("a", encoding="utf-8", buffering=1) as log:
         try:
-            child_env = _prepare_runtime(runtime_dir, log_dir, log)
+            child_env = _prepare_runtime(
+                runtime_dir,
+                log_dir,
+                args.fake_provider_port,
+                log,
+            )
             command = [
                 sys.executable,
                 str(REPO_ROOT / "main.py"),

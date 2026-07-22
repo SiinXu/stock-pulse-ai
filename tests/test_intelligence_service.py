@@ -68,7 +68,7 @@ class IntelligenceServiceTestCase(unittest.TestCase):
         IntelligenceService.reset_auto_fetch_state()
         self.service = IntelligenceService()
         self._dns_patcher = patch(
-            "src.services.intelligence_service.socket.getaddrinfo",
+            "src.security.outbound_policy.socket.getaddrinfo",
             side_effect=self._mock_getaddrinfo,
         )
         self._dns_patcher.start()
@@ -224,7 +224,8 @@ class IntelligenceServiceTestCase(unittest.TestCase):
 
         def fake_get(url, **kwargs):
             self.assertNotIn("trust_env", kwargs)
-            self.assertEqual(kwargs.get("proxies"), {"http": None, "https": None})
+            self.assertEqual(kwargs.get("proxies"), {"http": "", "https": "", "all": ""})
+            self.assertFalse(kwargs.get("allow_redirects"))
             if "bad" in url:
                 raise RuntimeError("network token=secret should not leak")
             return self._mock_response()

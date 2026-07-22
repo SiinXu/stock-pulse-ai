@@ -1,10 +1,17 @@
 # -*- coding: utf-8 -*-
 """Tests for LiteLLM generation-parameter recovery."""
 
+import socket
+from unittest.mock import Mock, patch
+
+import pytest
+
 from src.llm.errors import (
     call_litellm_with_param_recovery,
     classify_litellm_generation_param_error,
 )
+from src.security import outbound_policy
+from src.security.outbound_policy import OutboundPolicyError
 from src.llm.generation_params import (
     apply_litellm_generation_params,
     clear_litellm_generation_param_recovery_cache,
@@ -200,3 +207,45 @@ def test_streaming_retry_does_not_cache_before_stream_is_consumed() -> None:
 
     assert "temperature" not in calls[1]
     assert future_kwargs["temperature"] == 0.7
+
+
+def test_litellm_call_rejects_explicit_private_base_before_dispatch() -> None:
+    call = Mock(return_value="unexpected")
+
+    with pytest.raises(OutboundPolicyError, match="private_ip_blocked"):
+        call_litellm_with_param_recovery(
+            call,
+            model="openai/custom-model",
+            call_kwargs={
+                "model": "openai/custom-model",
+                "messages": [],
+                "api_base": "http://127.0.0.1:8080/v1",
+            },
+        )
+
+    call.assert_not_called()
+
+
+def test_litellm_call_checks_custom_base_dns_at_sdk_connection_time() -> None:
+    private_answer = [
+        (socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("10.0.0.7", 443))
+    ]
+
+    def connect(_kwargs):
+        outbound_policy.socket.getaddrinfo("model.example", 443)
+        raise AssertionError("private model endpoint must not be connected")
+
+    with patch(
+        "src.security.outbound_policy.socket.getaddrinfo",
+        return_value=private_answer,
+    ):
+        with pytest.raises(OutboundPolicyError, match="private_dns_address"):
+            call_litellm_with_param_recovery(
+                connect,
+                model="openai/custom-model",
+                call_kwargs={
+                    "model": "openai/custom-model",
+                    "messages": [],
+                    "api_base": "https://model.example/v1",
+                },
+            )

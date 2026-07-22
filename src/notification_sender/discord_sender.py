@@ -11,6 +11,8 @@ from typing import Optional
 
 import requests
 
+from src.security.outbound_policy import safe_post
+
 from src.config import Config
 from src.utils.sanitize import log_safe_exception
 from src.formatters import MIN_MAX_WORDS, chunk_content_by_max_words
@@ -221,7 +223,7 @@ class DiscordSender:
 
         for attempt in range(1, DISCORD_MAX_RETRIES + 1):
             try:
-                response = requests.post(url, **request_kwargs)
+                response = safe_post(url, transport=requests, **request_kwargs)
             except requests.exceptions.RequestException as exc:
                 if attempt < DISCORD_MAX_RETRIES:
                     delay = 2 ** attempt

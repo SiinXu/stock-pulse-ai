@@ -10,6 +10,7 @@ import time
 from typing import Optional
 from datetime import datetime
 import requests
+from src.security.outbound_policy import safe_post
 
 from src.config import Config
 from src.utils.sanitize import log_safe_exception
@@ -116,7 +117,12 @@ class PushplusSender:
         if self._pushplus_topic:
             payload["topic"] = self._pushplus_topic
 
-        response = requests.post(api_url, json=payload, timeout=timeout_seconds or 10)
+        response = safe_post(
+            api_url,
+            json=payload,
+            timeout=timeout_seconds or 10,
+            transport=requests,
+        )
 
         if response.status_code == 200:
             result = response.json()

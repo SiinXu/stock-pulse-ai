@@ -12,6 +12,8 @@ from typing import Optional
 
 import requests
 
+from src.security.outbound_policy import safe_post
+
 from src.config import Config
 from src.formatters import chunk_content_by_max_bytes
 from src.utils.sanitize import log_safe_exception
@@ -63,7 +65,7 @@ class SlackSender:
         # 按字节分块，避免单条消息超限
         try:
             chunks = chunk_content_by_max_bytes(content, _TEXT_LIMIT, add_page_marker=True)
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Chunking failure is logged before whole-message fallback.
             log_safe_exception(
                 logger,
                 "Slack message chunking failed; using the complete message",
@@ -119,19 +121,20 @@ class SlackSender:
                 "text": content,
                 "blocks": self._build_blocks(content),
             }
-            response = requests.post(
+            response = safe_post(
                 self._slack_webhook_url,
                 data=json.dumps(payload, ensure_ascii=False).encode('utf-8'),
                 headers={'Content-Type': 'application/json; charset=utf-8'},
                 timeout=timeout_seconds or 15,
                 verify=self._webhook_verify_ssl,
+                transport=requests,
             )
             if response.status_code == 200 and response.text == "ok":
                 logger.info("Slack Webhook 消息发送成功")
                 return True
             logger.error(f"Slack Webhook 发送失败: HTTP {response.status_code} {response.text[:200]}")
             return False
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Webhook failure is safely logged and isolated.
             log_safe_exception(
                 logger,
                 "Slack webhook delivery failed",
@@ -160,11 +163,12 @@ class SlackSender:
                 "text": content,
                 "blocks": self._build_blocks(content),
             }
-            response = requests.post(
+            response = safe_post(
                 'https://slack.com/api/chat.postMessage',
                 data=json.dumps(payload, ensure_ascii=False).encode('utf-8'),
                 headers=headers,
                 timeout=timeout_seconds or 15,
+                transport=requests,
             )
             result = response.json()
             if result.get("ok"):
@@ -172,7 +176,7 @@ class SlackSender:
                 return True
             logger.error(f"Slack Bot 发送失败: {result.get('error', 'unknown')}")
             return False
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Bot failure is safely logged and isolated.
             log_safe_exception(
                 logger,
                 "Slack Bot delivery failed",
@@ -200,7 +204,7 @@ class SlackSender:
             headers = {'Authorization': f'Bearer {self._slack_bot_token}'}
             try:
                 # Step 1: 获取上传 URL
-                resp1 = requests.post(
+                resp1 = safe_post(
                     'https://slack.com/api/files.getUploadURLExternal',
                     headers=headers,
                     data={
@@ -208,6 +212,7 @@ class SlackSender:
                         'length': len(image_bytes),
                     },
                     timeout=30,
+                    transport=requests,
                 )
                 result1 = resp1.json()
                 if not result1.get("ok"):
@@ -218,18 +223,19 @@ class SlackSender:
                 file_id = result1['file_id']
 
                 # Step 2: 上传文件内容（raw body，不能用 multipart）
-                resp2 = requests.post(
+                resp2 = safe_post(
                     upload_url,
                     data=image_bytes,
                     headers={'Content-Type': 'application/octet-stream'},
                     timeout=30,
+                    transport=requests,
                 )
                 if resp2.status_code != 200:
                     logger.error("Slack 文件上传失败: HTTP %s", resp2.status_code)
                     raise RuntimeError(f"HTTP {resp2.status_code}")
 
                 # Step 3: 完成上传并分享到频道
-                resp3 = requests.post(
+                resp3 = safe_post(
                     'https://slack.com/api/files.completeUploadExternal',
                     headers={**headers, 'Content-Type': 'application/json'},
                     json={
@@ -237,13 +243,14 @@ class SlackSender:
                         'channel_id': self._slack_channel_id,
                     },
                     timeout=30,
+                    transport=requests,
                 )
                 result3 = resp3.json()
                 if result3.get("ok"):
                     logger.info("Slack Bot 图片发送成功")
                     return True
                 logger.error("Slack 完成上传失败: %s", result3.get('error', 'unknown'))
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: fallback_recorded - Image failure is safely logged before fallback.
                 log_safe_exception(
                     logger,
                     "Slack Bot image delivery failed",

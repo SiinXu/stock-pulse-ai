@@ -26,6 +26,7 @@ except ModuleNotFoundError:
 
 from api.v1.endpoints import alphasift as alphasift_endpoint
 from src.config import Config, DEFAULT_ALPHASIFT_INSTALL_SPEC
+from src.security.outbound_policy import OutboundPolicyError
 from src.services import alphasift_service
 from src.services.task_queue import TaskInfo, TaskStatus as QueueTaskStatus
 
@@ -2825,6 +2826,42 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertEqual(context["llm"]["channels"], [])
         self.assertEqual(context["llm"]["model_list"], [])
         self.assertEqual(payload["candidate_count"], 0)
+
+    def test_screen_rejects_private_legacy_openai_base_before_litellm_call(self) -> None:
+        config = Config(
+            alphasift_enabled=True,
+            alphasift_install_spec=DEFAULT_ALPHASIFT_TEST_SPEC,
+            litellm_model="openai/gpt-4o-mini",
+            openai_api_keys=["dsa-openai-key"],
+            openai_base_url="http://127.0.0.1:8080/v1",
+        )
+        completion_calls: list[Dict[str, Any]] = []
+
+        def completion_impl(**kwargs: Any) -> Any:
+            completion_calls.append(kwargs)
+            return SimpleNamespace(choices=[])
+
+        fake_litellm = SimpleNamespace(completion=completion_impl)
+
+        def screen_impl(_strategy: str, **_kwargs):
+            fake_litellm.completion(
+                model="openai/gpt-4o-mini",
+                api_key="dsa-openai-key",
+                messages=[{"role": "user", "content": "rank"}],
+            )
+            return {"candidates": []}
+
+        fake_module = _make_adapter_module(screen=MagicMock(side_effect=screen_impl))
+        with (
+            patch.dict(sys.modules, {"litellm": fake_litellm}, clear=False),
+            patch("src.services.alphasift_service._import_alphasift", return_value=fake_module),
+            self.assertRaises(HTTPException) as caught,
+        ):
+            self._screen(config, market="cn", strategy="dual_low", max_results=5)
+
+        self.assertEqual(caught.exception.status_code, 424)
+        self.assertIsInstance(caught.exception.__cause__, OutboundPolicyError)
+        self.assertEqual(completion_calls, [])
 
     def test_screen_injects_openai_compatible_model_headers_into_alphasift_litellm_calls(self) -> None:
         config = Config(
