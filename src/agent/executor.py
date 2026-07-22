@@ -578,11 +578,11 @@ class AgentExecutor:
 
 
 _RUN_METHOD_NAMES = _bind_facade_methods(
-    AgentExecutor, _RunMethods, globals()
+    AgentExecutor, _RunMethods, globals(), evaluate_annotations=True
 )
 _CHAT_METHOD_NAMES = _bind_facade_methods(
-    AgentExecutor, _ChatMethods, globals()
+    AgentExecutor, _ChatMethods, globals(), evaluate_annotations=True
 )
 _LOOP_METHOD_NAMES = _bind_facade_methods(
-    AgentExecutor, _LoopMethods, globals()
+    AgentExecutor, _LoopMethods, globals(), evaluate_annotations=True
 )

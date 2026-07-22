@@ -152,7 +152,12 @@ def test_executor_extracted_descriptors_preserve_facade_contract():
             assert function.__code__ is source_function.__code__
             assert function.__defaults__ == source_function.__defaults__
             assert function.__kwdefaults__ == source_function.__kwdefaults__
-            assert function.__annotations__ == source_function.__annotations__
+            assert function.__annotations__ == inspect.get_annotations(
+                source_function,
+                globals=facade_globals,
+                locals=facade_globals,
+                eval_str=True,
+            )
             assert function.__closure__ == source_function.__closure__
             assert function.__dict__ == source_function.__dict__
             assert function.__doc__ == source_function.__doc__
@@ -180,6 +185,63 @@ def test_executor_type_hints_and_method_order_match_pre_split_contract():
         assert isinstance(typing.get_type_hints(function), dict)
 
 
+def test_executor_runtime_annotations_match_pre_split_contract():
+    module = importlib.import_module("src.agent.executor")
+    expected = {
+        "run": {
+            "task": str,
+            "context": typing.Optional[typing.Dict[str, typing.Any]],
+            "cancelled_check": typing.Optional[typing.Callable[[], bool]],
+            "return": module.AgentResult,
+        },
+        "build_run_messages": {
+            "task": str,
+            "context": typing.Optional[typing.Dict[str, typing.Any]],
+            "return": typing.Tuple[
+                str,
+                str,
+                typing.List[typing.Dict[str, typing.Any]],
+            ],
+        },
+        "chat": {
+            "message": str,
+            "session_id": str,
+            "progress_callback": typing.Optional[typing.Callable],
+            "context": typing.Optional[typing.Dict[str, typing.Any]],
+            "cancelled_check": typing.Optional[typing.Callable[[], bool]],
+            "return": module.AgentResult,
+        },
+        "_persist_provider_trace": {
+            "session_id": str,
+            "run_id": str,
+            "messages": typing.List[typing.Dict[str, typing.Any]],
+            "baseline_len": int,
+            "user_message_id": int,
+            "assistant_message_id": int,
+            "return": None,
+        },
+        "_run_loop": {
+            "messages": typing.List[typing.Dict[str, typing.Any]],
+            "tool_decls": typing.List[typing.Dict[str, typing.Any]],
+            "parse_dashboard": bool,
+            "progress_callback": typing.Optional[typing.Callable],
+            "stock_scope": typing.Optional[module.StockScope],
+            "cancelled_check": typing.Optional[typing.Callable[[], bool]],
+            "return": module.AgentResult,
+        },
+        "_build_user_message": {
+            "task": str,
+            "context": typing.Optional[typing.Dict[str, typing.Any]],
+            "return": str,
+        },
+    }
+
+    assert {
+        name: _descriptor_function(module.AgentExecutor.__dict__[name]).__annotations__
+        for name in expected
+    } == expected
+
+
 def test_executor_dataclass_contextvar_and_reload_ownership_stay_on_facade():
     module = importlib.import_module("src.agent.executor")
     old_class = module.AgentExecutor
@@ -200,5 +262,7 @@ def test_executor_dataclass_contextvar_and_reload_ownership_stay_on_facade():
     assert reloaded._CHAT_TOOL_REGISTRY is not old_registry
     assert reloaded.AgentExecutor.chat is not old_method
     assert reloaded.AgentExecutor.chat.__globals__ is vars(reloaded)
+    assert reloaded.AgentExecutor.chat.__annotations__["return"] is reloaded.AgentResult
+    assert reloaded.AgentExecutor.chat.__annotations__["return"] is not old_result
     assert reloaded.AgentResult.__module__ == "src.agent.executor"
     assert reloaded.AgentResult.__init__.__globals__ is vars(reloaded)
