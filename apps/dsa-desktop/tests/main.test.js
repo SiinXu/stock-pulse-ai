@@ -279,6 +279,7 @@ test('floating assistant BrowserWindow is fixed, isolated, and hides instead of 
   let browserWindowOptions = null;
   let loadedPath = '';
   let openHandler = null;
+  const navigationHandlers = new Map();
   let hidden = false;
   let centered = false;
 
@@ -288,6 +289,9 @@ test('floating assistant BrowserWindow is fixed, isolated, and hides instead of 
       browserWindowOptions = options;
       this.webContents = {
         send: () => undefined,
+        on: (eventName, handler) => {
+          navigationHandlers.set(eventName, handler);
+        },
         setWindowOpenHandler: (handler) => {
           openHandler = handler;
         },
@@ -325,6 +329,16 @@ test('floating assistant BrowserWindow is fixed, isolated, and hides instead of 
   assert.match(browserWindowOptions.webPreferences.preload, /assistant-preload\.js$/);
   assert.match(loadedPath, /renderer\/assistant\.html$/);
   assert.deepEqual(openHandler({ url: 'https://evil.example' }), { action: 'deny' });
+  for (const eventName of ['will-navigate', 'will-redirect']) {
+    assert.equal(typeof navigationHandlers.get(eventName), 'function', eventName);
+    let navigationPrevented = false;
+    navigationHandlers.get(eventName)({
+      preventDefault: () => {
+        navigationPrevented = true;
+      },
+    }, 'https://evil.example');
+    assert.equal(navigationPrevented, true, eventName);
+  }
   assert.equal(centered, true);
 
   let prevented = false;
@@ -394,6 +408,272 @@ test('desktop assistant IPC rejects other renderers and routes validated stock a
     { ok: false, error: 'invalid-action' }
   );
   assert.equal(lifecycle.filter((entry) => entry.startsWith('load:')).length, loadCount);
+});
+
+test('desktop assistant stays visible when a validated shortcut cannot navigate', async (t) => {
+  const mainModule = loadMainModule(t);
+  const assistantWebContents = {
+    send: () => undefined,
+  };
+  let assistantHidden = false;
+  mainModule.__setAssistantWindowForTest({
+    isDestroyed: () => false,
+    hide: () => {
+      assistantHidden = true;
+    },
+    webContents: assistantWebContents,
+  });
+  mainModule.__setMainWindowForTest({
+    isDestroyed: () => false,
+    isMinimized: () => false,
+    isVisible: () => true,
+    show: () => undefined,
+    focus: () => undefined,
+    loadURL: async () => {
+      throw new Error('navigation failed');
+    },
+  });
+  mainModule.__setDesktopDeepLinkStateForTest({
+    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=3.21.0&cache_bust=123',
+    ready: true,
+  });
+
+  const openAction = mainModule.__getIpcMainHandler(
+    mainModule.DESKTOP_ASSISTANT_OPEN_ACTION_CHANNEL
+  );
+  assert.deepEqual(
+    await openAction({ sender: assistantWebContents }, { action: 'portfolio' }),
+    { ok: false, error: 'navigation-failed' }
+  );
+  assert.equal(assistantHidden, false);
+});
+
+test('desktop assistant preserves navigation failure when readiness drops during load', async (t) => {
+  const mainModule = loadMainModule(t);
+  const assistantWebContents = {
+    send: () => undefined,
+  };
+  let assistantHidden = false;
+  let rejectNavigation = null;
+  let markNavigationStarted = null;
+  const navigationStarted = new Promise((resolve) => {
+    markNavigationStarted = resolve;
+  });
+  mainModule.__setAssistantWindowForTest({
+    isDestroyed: () => false,
+    hide: () => {
+      assistantHidden = true;
+    },
+    webContents: assistantWebContents,
+  });
+  mainModule.__setMainWindowForTest({
+    isDestroyed: () => false,
+    isMinimized: () => false,
+    isVisible: () => true,
+    show: () => undefined,
+    focus: () => undefined,
+    loadURL: () => new Promise((_resolve, reject) => {
+      rejectNavigation = reject;
+      markNavigationStarted();
+    }),
+  });
+  mainModule.__setDesktopDeepLinkStateForTest({
+    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=3.21.0&cache_bust=123',
+    ready: true,
+  });
+
+  const openAction = mainModule.__getIpcMainHandler(
+    mainModule.DESKTOP_ASSISTANT_OPEN_ACTION_CHANNEL
+  );
+  const actionResult = openAction(
+    { sender: assistantWebContents },
+    { action: 'portfolio' }
+  );
+  await navigationStarted;
+  assert.equal(typeof rejectNavigation, 'function');
+  mainModule.__setDesktopAssistantStateForTest({
+    webReady: false,
+    startError: new Error('backend exited'),
+  });
+  rejectNavigation(new Error('navigation failed'));
+
+  assert.deepEqual(await actionResult, { ok: false, error: 'navigation-failed' });
+  assert.equal(mainModule.__getPendingDesktopDeepLinkRouteForTest(), null);
+  assert.equal(assistantHidden, false);
+});
+
+test('desktop assistant observes failure when queued behind an active OS navigation', async (t) => {
+  const mainModule = loadMainModule(t);
+  const assistantWebContents = {
+    send: () => undefined,
+  };
+  let assistantHidden = false;
+  const navigationAttempts = [];
+  let markFirstNavigationStarted = null;
+  const firstNavigationStarted = new Promise((resolve) => {
+    markFirstNavigationStarted = resolve;
+  });
+  let markSecondNavigationStarted = null;
+  const secondNavigationStarted = new Promise((resolve) => {
+    markSecondNavigationStarted = resolve;
+  });
+  mainModule.__setAssistantWindowForTest({
+    isDestroyed: () => false,
+    hide: () => {
+      assistantHidden = true;
+    },
+    webContents: assistantWebContents,
+  });
+  mainModule.__setMainWindowForTest({
+    isDestroyed: () => false,
+    isMinimized: () => false,
+    isVisible: () => true,
+    show: () => undefined,
+    focus: () => undefined,
+    loadURL: (url) => new Promise((resolve, reject) => {
+      navigationAttempts.push({ url, resolve, reject });
+      if (navigationAttempts.length === 1) {
+        markFirstNavigationStarted();
+      }
+      if (navigationAttempts.length === 2) {
+        markSecondNavigationStarted();
+      }
+    }),
+  });
+  mainModule.__setDesktopDeepLinkStateForTest({
+    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=3.21.0&cache_bust=123',
+    ready: true,
+  });
+
+  assert.equal(mainModule.queueDesktopDeepLink('stockpulse://app/stocks/MSFT'), true);
+  const osNavigation = mainModule.flushPendingDesktopDeepLink();
+  await firstNavigationStarted;
+  assert.equal(navigationAttempts.length, 1);
+
+  const openAction = mainModule.__getIpcMainHandler(
+    mainModule.DESKTOP_ASSISTANT_OPEN_ACTION_CHANNEL
+  );
+  const actionResult = openAction(
+    { sender: assistantWebContents },
+    { action: 'portfolio' }
+  );
+  assert.equal(navigationAttempts.length, 1);
+
+  navigationAttempts[0].resolve();
+  await secondNavigationStarted;
+  assert.equal(new URL(navigationAttempts[1].url).pathname, '/portfolio');
+  navigationAttempts[1].reject(new Error('navigation failed'));
+
+  assert.equal(await osNavigation, true);
+  assert.deepEqual(await actionResult, { ok: false, error: 'navigation-failed' });
+  assert.equal(mainModule.__getPendingDesktopDeepLinkRouteForTest(), null);
+  assert.equal(assistantHidden, false);
+});
+
+test('desktop assistant stays visible when a queued route remains pending after readiness loss', async (t) => {
+  const mainModule = loadMainModule(t);
+  const assistantWebContents = {
+    send: () => undefined,
+  };
+  let assistantHidden = false;
+  let resolveOsNavigation = null;
+  let markOsNavigationStarted = null;
+  const osNavigationStarted = new Promise((resolve) => {
+    markOsNavigationStarted = resolve;
+  });
+  mainModule.__setAssistantWindowForTest({
+    isDestroyed: () => false,
+    hide: () => {
+      assistantHidden = true;
+    },
+    webContents: assistantWebContents,
+  });
+  mainModule.__setMainWindowForTest({
+    isDestroyed: () => false,
+    isMinimized: () => false,
+    isVisible: () => true,
+    show: () => undefined,
+    focus: () => undefined,
+    loadURL: () => new Promise((resolve) => {
+      resolveOsNavigation = resolve;
+      markOsNavigationStarted();
+    }),
+  });
+  mainModule.__setDesktopDeepLinkStateForTest({
+    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=3.21.0&cache_bust=123',
+    ready: true,
+  });
+
+  assert.equal(mainModule.queueDesktopDeepLink('stockpulse://app/stocks/MSFT'), true);
+  const osNavigation = mainModule.flushPendingDesktopDeepLink();
+  await osNavigationStarted;
+  const openAction = mainModule.__getIpcMainHandler(
+    mainModule.DESKTOP_ASSISTANT_OPEN_ACTION_CHANNEL
+  );
+  const actionResult = openAction(
+    { sender: assistantWebContents },
+    { action: 'portfolio' }
+  );
+
+  mainModule.__setDesktopAssistantStateForTest({
+    webReady: false,
+    startError: new Error('backend exited'),
+  });
+  resolveOsNavigation();
+
+  assert.equal(await osNavigation, true);
+  assert.deepEqual(await actionResult, { ok: true, pending: true });
+  assert.equal(mainModule.__getPendingDesktopDeepLinkRouteForTest(), '/portfolio');
+  assert.equal(assistantHidden, false);
+});
+
+test('older deep-link flush cleanup cannot deregister a newer flush generation', async (t) => {
+  const mainModule = loadMainModule(t);
+  const navigationAttempts = [];
+  let markThirdNavigationStarted = null;
+  const thirdNavigationStarted = new Promise((resolve) => {
+    markThirdNavigationStarted = resolve;
+  });
+  mainModule.__setMainWindowForTest({
+    isDestroyed: () => false,
+    loadURL: (url) => new Promise((resolve) => {
+      navigationAttempts.push({ url, resolve });
+      if (navigationAttempts.length === 3) {
+        markThirdNavigationStarted();
+      }
+    }),
+  });
+  mainModule.__setDesktopDeepLinkStateForTest({
+    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=3.21.0&cache_bust=123',
+    ready: true,
+    pendingRoute: '/stocks/MSFT',
+  });
+  const firstFlush = mainModule.flushPendingDesktopDeepLink();
+  await Promise.resolve();
+  assert.equal(navigationAttempts.length, 1);
+
+  mainModule.__setDesktopDeepLinkStateForTest({
+    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=3.21.0&cache_bust=456',
+    ready: true,
+    pendingRoute: '/alerts',
+  });
+  const secondFlush = mainModule.flushPendingDesktopDeepLink();
+  await Promise.resolve();
+  assert.equal(navigationAttempts.length, 2);
+
+  navigationAttempts[0].resolve();
+  await firstFlush;
+  assert.equal(mainModule.queueDesktopDeepLink('stockpulse://app/screening'), true);
+  const joinedFlush = mainModule.flushPendingDesktopDeepLink();
+  await Promise.resolve();
+  assert.equal(navigationAttempts.length, 2);
+
+  navigationAttempts[1].resolve();
+  await thirdNavigationStarted;
+  assert.equal(new URL(navigationAttempts[2].url).pathname, '/screening');
+  navigationAttempts[2].resolve();
+  assert.equal(await secondFlush, true);
+  assert.equal(await joinedFlush, true);
 });
 
 test('desktop tray exposes assistant, main-window, and explicit quit commands', (t) => {

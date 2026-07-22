@@ -35,7 +35,9 @@ let electronUpdateCheckInFlight = false;
 let desktopMainPageUrl = '';
 let desktopWebReady = false;
 let pendingDesktopDeepLinkRoute = null;
+let pendingDesktopDeepLinkOutcome = null;
 let desktopDeepLinkNavigationInFlight = false;
+let desktopDeepLinkFlushPromise = null;
 
 function resolveWindowBackgroundColor() {
   return nativeTheme.shouldUseDarkColors ? '#08080c' : '#f4f7fb';
@@ -321,50 +323,71 @@ function assertDesktopAssistantSender(event) {
   }
 }
 
-function queueDesktopDeepLink(rawUrl) {
+function queueDesktopDeepLink(rawUrl, { outcome = null } = {}) {
   const route = parseDesktopDeepLink(rawUrl);
   if (!route) {
     logLine('[deep-link] rejected inbound protocol URL');
     return false;
   }
+  if (pendingDesktopDeepLinkOutcome) {
+    pendingDesktopDeepLinkOutcome.status = 'superseded';
+  }
   pendingDesktopDeepLinkRoute = route;
+  pendingDesktopDeepLinkOutcome = outcome;
   logLine(`[deep-link] accepted route path=${new URL(route, 'http://stockpulse.local').pathname}`);
   return true;
 }
 
 async function flushPendingDesktopDeepLink() {
+  if (desktopDeepLinkNavigationInFlight && desktopDeepLinkFlushPromise) {
+    return desktopDeepLinkFlushPromise;
+  }
   if (!desktopWebReady
     || !desktopMainPageUrl
     || !pendingDesktopDeepLinkRoute
-    || desktopDeepLinkNavigationInFlight
     || !mainWindow
     || mainWindow.isDestroyed()) {
     return false;
   }
 
   desktopDeepLinkNavigationInFlight = true;
-  let navigated = false;
-  try {
+  const flushPromise = Promise.resolve().then(async () => {
+    let navigated = false;
     while (desktopWebReady
       && pendingDesktopDeepLinkRoute
       && mainWindow
       && !mainWindow.isDestroyed()) {
       const route = pendingDesktopDeepLinkRoute;
+      const outcome = pendingDesktopDeepLinkOutcome;
       pendingDesktopDeepLinkRoute = null;
+      pendingDesktopDeepLinkOutcome = null;
       const targetUrl = buildDesktopDeepLinkTargetUrl(desktopMainPageUrl, route);
       try {
         await mainWindow.loadURL(targetUrl);
         navigated = true;
+        if (outcome) {
+          outcome.status = 'navigated';
+        }
         logLine(`[deep-link] routed path=${new URL(targetUrl).pathname}`);
       } catch (error) {
+        if (outcome) {
+          outcome.status = 'failed';
+        }
         const errorName = error instanceof Error && error.name ? error.name : 'unknown_error';
         logLine(`[deep-link] route failed type=${errorName}`);
       }
     }
+    return navigated;
+  });
+  desktopDeepLinkFlushPromise = flushPromise;
+  try {
+    return await flushPromise;
   } finally {
-    desktopDeepLinkNavigationInFlight = false;
+    if (desktopDeepLinkFlushPromise === flushPromise) {
+      desktopDeepLinkNavigationInFlight = false;
+      desktopDeepLinkFlushPromise = null;
+    }
   }
-  return navigated;
 }
 
 function registerDesktopProtocolClient({
@@ -2393,15 +2416,22 @@ async function openDesktopAssistantAction(action, rawStockCode = '') {
   }
 
   const rawUrl = `${DESKTOP_PROTOCOL}://${DESKTOP_PROTOCOL_HOST}${route}`;
-  if (!queueDesktopDeepLink(rawUrl)) {
+  const navigationOutcome = { status: 'pending' };
+  if (!queueDesktopDeepLink(rawUrl, { outcome: navigationOutcome })) {
     return { ok: false, error: 'route-rejected' };
   }
 
   focusExistingMainWindow();
-  const navigated = await flushPendingDesktopDeepLink();
+  await flushPendingDesktopDeepLink();
+  if (navigationOutcome.status === 'failed') {
+    return { ok: false, error: 'navigation-failed' };
+  }
+  if (navigationOutcome.status === 'superseded') {
+    return { ok: false, error: 'navigation-superseded' };
+  }
   return {
     ok: true,
-    pending: !navigated && !desktopWebReady,
+    pending: navigationOutcome.status === 'pending',
   };
 }
 
@@ -2437,6 +2467,11 @@ async function createDesktopAssistantWindow({ BrowserWindowClass = BrowserWindow
   assistantWindow = createdWindow;
 
   createdWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  const denyRendererNavigation = (event) => {
+    event.preventDefault();
+  };
+  createdWindow.webContents.on('will-navigate', denyRendererNavigation);
+  createdWindow.webContents.on('will-redirect', denyRendererNavigation);
   createdWindow.on('close', (event) => {
     if (desktopIsQuitting) {
       return;
@@ -2571,7 +2606,7 @@ ipcMain.handle(DESKTOP_ASSISTANT_GET_STATE_CHANNEL, (event) => {
 ipcMain.handle(DESKTOP_ASSISTANT_OPEN_ACTION_CHANNEL, async (event, payload = {}) => {
   assertDesktopAssistantSender(event);
   const result = await openDesktopAssistantAction(payload.action, payload.stockCode);
-  if (result.ok && isDesktopWindowAvailable(assistantWindow)) {
+  if (result.ok && !result.pending && isDesktopWindowAvailable(assistantWindow)) {
     assistantWindow.hide();
   }
   return result;
@@ -2820,14 +2855,22 @@ async function createWindow(brandMigrationResult) {
     const mainPageUrl = buildMainPageUrl(port, Date.now(), backendConnectHost);
     desktopMainPageUrl = mainPageUrl;
     const initialDeepLinkRoute = pendingDesktopDeepLinkRoute;
+    const initialDeepLinkOutcome = pendingDesktopDeepLinkOutcome;
     pendingDesktopDeepLinkRoute = null;
+    pendingDesktopDeepLinkOutcome = null;
     const initialPageUrl = initialDeepLinkRoute
       ? buildDesktopDeepLinkTargetUrl(mainPageUrl, initialDeepLinkRoute)
       : mainPageUrl;
     try {
       await mainWindow.loadURL(initialPageUrl);
+      if (initialDeepLinkOutcome) {
+        initialDeepLinkOutcome.status = 'navigated';
+      }
     } catch (error) {
       if (initialDeepLinkRoute) {
+        if (initialDeepLinkOutcome) {
+          initialDeepLinkOutcome.status = 'failed';
+        }
         throw new Error('Desktop deep-link navigation failed');
       }
       throw error;
@@ -3034,6 +3077,7 @@ module.exports = {
     desktopMainPageUrl = mainPageUrl;
     desktopWebReady = ready;
     pendingDesktopDeepLinkRoute = pendingRoute;
+    pendingDesktopDeepLinkOutcome = null;
     desktopDeepLinkNavigationInFlight = false;
   },
   __getPendingDesktopDeepLinkRouteForTest() {
