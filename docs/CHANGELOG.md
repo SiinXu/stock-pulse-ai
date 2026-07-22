@@ -306,6 +306,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Converged analysis context pack prompt and overview modules into `src/analysis_context_pack/` with strict legacy facades and compatibility guards.
 - [Changed] Split search provider implementations and shared result contracts into focused private modules while preserving the `src.search_service` facade, fallback, and outbound-policy behavior.
 - [Docs] Defined repository directory ownership, the retained `webui.py` compatibility role, and the separate backend package-root decision.
+- [Changed] Split `SearchService` state, news processing, and orchestration methods into focused private modules while preserving the `src.search_service` facade and search behavior.
 
 ## [3.26.3] - 2026-07-15
 
