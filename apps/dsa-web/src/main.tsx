@@ -6,11 +6,15 @@ import App from './App.tsx'
 import { ThemeProvider } from './components/theme/ThemeProvider'
 import { prepareInitialUiLanguage } from './i18n/prepareUiLanguage'
 import { applyUiLanguageToDocument, getRuntimeInitialLanguage } from './utils/uiLanguage'
+import { installApiMockIfEnabled } from './dev/apiMock/apiMockSwitch'
 
 const initialUiLanguage = await prepareInitialUiLanguage(getRuntimeInitialLanguage())
 applyUiLanguageToDocument(initialUiLanguage)
 
 if (import.meta.env.DEV) {
+  // Temporary dev API mock switch; no-op unless enabled via ?mock / VITE_MOCK_API.
+  await installApiMockIfEnabled()
+
   // Loupe dev annotator is an optional local tool; skip silently if not installed.
   try {
     // Resolved via vite alias when present, or the catch below when absent.
