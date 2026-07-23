@@ -83,12 +83,55 @@ export function registerSettingsPageOverviewTests(): void {
 
     const lastSection = () => routerSearchParamsMock.setParams.mock.calls.at(-1)?.[0].get('section');
 
+    fireEvent.click(screen.getByRole('button', { name: '配置数据源' }));
+    expect(lastSection()).toBe('data_sources');
     fireEvent.click(screen.getByRole('button', { name: '配置模型' }));
     expect(lastSection()).toBe('ai_models');
     fireEvent.click(screen.getByRole('button', { name: '维护自选股' }));
     expect(lastSection()).toBe('overview');
     fireEvent.click(screen.getByRole('button', { name: '配置通知' }));
     expect(lastSection()).toBe('notifications');
+  });
+
+  it('opens the LLM wizard for an onboarding deep link only when primary setup is missing', async () => {
+    routerSearchParamsMock.params = new URLSearchParams({
+      section: 'overview',
+      view: 'readiness',
+      from: 'onboarding',
+    });
+    getSetupStatus.mockResolvedValue({
+      isComplete: false,
+      readyForSmoke: false,
+      requiredMissingKeys: ['llm_primary'],
+      nextStepKey: 'llm_primary',
+      checks: [],
+    });
+
+    const view = render(<SettingsPage />);
+
+    expect(await screen.findByRole('dialog', { name: 'first-run-wizard' })).toBeInTheDocument();
+    view.unmount();
+
+    getSetupStatus.mockResolvedValue({
+      isComplete: false,
+      readyForSmoke: false,
+      requiredMissingKeys: ['stock_list'],
+      nextStepKey: 'stock_list',
+      checks: [{
+        key: 'llm_primary',
+        title: 'LLM 主渠道',
+        category: 'ai_model',
+        required: true,
+        status: 'configured',
+        message: '主模型已配置',
+        nextStep: null,
+      }],
+    });
+
+    render(<SettingsPage />);
+
+    await waitFor(() => expect(getSetupStatus).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole('dialog', { name: 'first-run-wizard' })).not.toBeInTheDocument();
   });
 
   it('keeps first-run setup summary neutral while setup status is loading', async () => {
