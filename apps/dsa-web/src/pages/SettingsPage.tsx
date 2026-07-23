@@ -1669,7 +1669,6 @@ const SettingsPage: React.FC = () => {
       return { success: false, error };
     }
     applyPostSaveEffects();
-    setIsWizardOpen(false);
     return { success: true };
   };
   const existingChannelNames = useMemo(
@@ -2197,6 +2196,10 @@ const SettingsPage: React.FC = () => {
                   selectSectionView(target.section, target.view);
                 }}
                 onRunSmoke={handleRunSetupSmoke}
+                showStartWizard={Boolean(setupStatus?.isComplete)}
+                canStartWizard={!isProviderCatalogLoading && providerCatalog.length > 0}
+                startWizardLabel={settingsText.startWizard}
+                onStartWizard={() => setIsWizardOpen(true)}
                 listSeparator={getUiListSeparator(uiLanguage)}
                 t={t}
               />
@@ -2872,6 +2875,17 @@ const SettingsPage: React.FC = () => {
           providers={providerCatalog}
           connectionFields={providerConnectionFields}
           emptyApiKeyHosts={providerEmptyApiKeyHosts}
+          routingOptions={modelSelectorOptions}
+          initialFallbackModels={(allValuesByKey.LITELLM_FALLBACK_MODELS || '')
+            .split(',')
+            .map((entry) => resolveConfiguredModelRef(entry))
+            .filter(Boolean)
+            .join(',')}
+          initialVisionModel={resolveConfiguredModelRef(allValuesByKey.VISION_MODEL || '')}
+          onViewRouting={() => {
+            setIsWizardOpen(false);
+            selectSectionView('ai_models', 'task_routing');
+          }}
         />
       ) : null}
     </AppPage>

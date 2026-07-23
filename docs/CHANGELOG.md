@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Added] Extended the Web LLM setup wizard with ordered fallback and Vision routing, a secret-free saved summary, direct Task Routing access, and a persistent re-entry action.
 - [Fixed] Unified Research URL sanitization across page, deep-link, and session consumers so explicit Discover filters survive active-task restoration and malformed Backtest filters never reach API requests.
 - [Tests] Added a blocking hosted `python-minimum` job that runs the full backend gate on Python 3.10, with portable timeout and exception-group guard fixtures, while retaining the Python 3.11 gate.
 - [Fixed] Removed false disclosure cues from always-expanded Web navigation, aligned the Discover empty-state accessible name with its visible action, and centralized Research URL state constants.

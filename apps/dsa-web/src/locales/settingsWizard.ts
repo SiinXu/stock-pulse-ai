@@ -39,7 +39,10 @@ const zh = {
   add: '添加',
   modelSourceHint: '模型来自自动发现或手动逐个添加；不预填示例模型。发现失败时可手动添加。',
   reportModel: '报告主要模型',
-  inheritanceHint: 'Agent、Vision 与备用模型默认继承报告主要模型，可稍后在任务路由与可靠性中单独调整。',
+  fallbackModels: '备用模型顺序',
+  visionModel: 'Vision 模型',
+  inheritPrimary: '继承报告主要模型',
+  inheritanceHint: 'Agent 默认继承报告主要模型；可在此配置备用模型顺序和 Vision 路由。',
   reviewDescription: '将应用以下最小可运行配置，保存后可继续在设置中完善。',
   execution: '执行方式',
   modelService: '模型服务',
@@ -56,6 +59,11 @@ const zh = {
   capabilityPassed: '支持',
   capabilityFailed: '不支持',
   capabilitySkipped: '已跳过',
+  savedTitle: '配置已保存并应用',
+  savedDescription: '以下是刚刚持久化的有效模型路由，可继续查看完整任务路由。',
+  none: '未设置',
+  viewRouting: '查看任务路由',
+  done: '完成',
 } as const;
 
 const en: Record<keyof typeof zh, string> = {
@@ -94,7 +102,10 @@ const en: Record<keyof typeof zh, string> = {
   add: 'Add',
   modelSourceHint: 'Models come from discovery or manual entry. No example models are prefilled.',
   reportModel: 'Report primary model',
-  inheritanceHint: 'Agent, Vision, and fallback models inherit this by default. Adjust them later in Task Routing and Reliability.',
+  fallbackModels: 'Fallback model order',
+  visionModel: 'Vision model',
+  inheritPrimary: 'Inherit report primary model',
+  inheritanceHint: 'Agent inherits the report primary model by default. Configure fallback order and Vision routing here.',
   reviewDescription: 'The following minimal runnable configuration will be applied. You can refine it later in Settings.',
   execution: 'Execution',
   modelService: 'Model service',
@@ -111,6 +122,11 @@ const en: Record<keyof typeof zh, string> = {
   capabilityPassed: 'Supported',
   capabilityFailed: 'Not supported',
   capabilitySkipped: 'Skipped',
+  savedTitle: 'Configuration saved and applied',
+  savedDescription: 'These effective model routes were just persisted. You can continue to the full Task Routing view.',
+  none: 'Not set',
+  viewRouting: 'View Task Routing',
+  done: 'Done',
 };
 
 export const SETTINGS_WIZARD_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = createUiLanguageRecord("locales.settingsWizard.SETTINGS_WIZARD_TEXT", { zh, en });

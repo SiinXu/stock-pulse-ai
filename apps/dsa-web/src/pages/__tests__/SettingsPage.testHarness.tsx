@@ -451,11 +451,22 @@ vi.mock('../../components/settings', async () => {
   FirstRunWizard: ({
     onComplete,
     onClose,
+    onViewRouting,
+    routingOptions,
+    initialFallbackModels,
+    initialVisionModel,
   }: {
     onComplete: (items: Array<{ key: string; value: string }>) => void;
     onClose: () => void;
+    onViewRouting?: () => void;
+    routingOptions?: Array<{ value: string }>;
+    initialFallbackModels?: string;
+    initialVisionModel?: string;
   }) => createPortal((
     <div role="dialog" aria-label="first-run-wizard">
+      <div data-testid="wizard-routing-props">
+        {`${routingOptions?.length ?? 0}|${initialFallbackModels ?? ''}|${initialVisionModel ?? ''}`}
+      </div>
       <button
         type="button"
         onClick={() => onComplete([
@@ -487,6 +498,7 @@ vi.mock('../../components/settings', async () => {
       >
         wizard apply unknown provider
       </button>
+      <button type="button" onClick={onViewRouting}>wizard view routing</button>
       <button type="button" onClick={onClose}>wizard close</button>
     </div>
   ), document.body),

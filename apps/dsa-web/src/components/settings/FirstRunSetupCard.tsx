@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type React from 'react';
-import { CheckCircle2, CircleAlert, CircleDashed, Play, RefreshCw } from 'lucide-react';
+import { CheckCircle2, CircleAlert, CircleDashed, Play, RefreshCw, WandSparkles } from 'lucide-react';
 import type { ParsedApiError } from '../../api/error';
 import type {
   SetupStatusCheck,
@@ -24,6 +24,10 @@ type FirstRunSetupCardProps = {
   onRefresh: () => void | Promise<void>;
   onSelectCategory: (category: SystemConfigCategory) => void;
   onRunSmoke: () => void | Promise<void>;
+  showStartWizard: boolean;
+  canStartWizard: boolean;
+  startWizardLabel: string;
+  onStartWizard: () => void;
   listSeparator: string;
   t: (key: UiTextKey, params?: Record<string, string | number>) => string;
 };
@@ -60,6 +64,10 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
   onRefresh,
   onSelectCategory,
   onRunSmoke,
+  showStartWizard,
+  canStartWizard,
+  startWizardLabel,
+  onStartWizard,
   listSeparator,
   t,
 }) => {
@@ -118,6 +126,18 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {showStartWizard ? (
+              <Button
+                type="button"
+                variant="primary"
+                size="default"
+                disabled={!canStartWizard}
+                onClick={onStartWizard}
+              >
+                <WandSparkles className="h-4 w-4" aria-hidden="true" />
+                {startWizardLabel}
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="secondary"
