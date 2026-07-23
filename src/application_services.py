@@ -580,8 +580,6 @@ def _set_application_services(
                 if drained_target_to_close is not None:
                     drained_target_to_close._close_plugins()
                     with _services_lock:
-                        if _services is drained_target_to_close:
-                            _services = None
                         (
                             has_pending,
                             pending_target,
@@ -592,6 +590,11 @@ def _set_application_services(
                         target = pending_target if has_pending else None
                         _services_transition_target = target
                         restart_transition = has_pending or bool(cleanup_targets)
+                        if (
+                            not restart_transition
+                            and _services is drained_target_to_close
+                        ):
+                            _services = None
 
                 if restart_transition:
                     continue

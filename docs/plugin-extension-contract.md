@@ -103,7 +103,8 @@ pending request. A superseded target finishes complete cleanup before any
 successor starts; selecting the latest request retains cleanup debt for every
 older or already-closing queued root instead of discarding it. If a published
 target requests shutdown during that drain, it remains discoverable through its
-complete unload and is unpublished only after cleanup finishes.
+complete unload and continues to anchor lookups while superseded cleanup debt
+runs. It is unpublished only after those callbacks finish.
 Each `PluginManager` is owned by exactly one `ApplicationServices` root and
 cannot be rebound to another root. Once that root starts shutdown, manager
 `load`, `load_all`, and `enable` operations fail closed with
