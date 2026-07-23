@@ -2,6 +2,8 @@ import { getParsedApiError } from '../../api/error';
 import { systemConfigApi } from '../../api/systemConfig';
 import type {
   AvailableModelEntry,
+  LLMCapabilityCheck,
+  LLMCapabilityCheckResult,
   LlmConnectionFieldSchema,
   LlmProviderCatalogEntry,
 } from '../../types/systemConfig';
@@ -123,6 +125,42 @@ export interface ChannelTestState {
   status: 'idle' | 'loading' | 'success' | 'error';
   text?: string;
   hint?: string;
+}
+
+/** Primitive inputs for a connectivity check shared by the editor and wizard. */
+export interface LlmConnectionCheckInput {
+  name: string;
+  providerId: string;
+  protocol: string;
+  baseUrl?: string;
+  apiKey?: string;
+  models: string[];
+  enabled?: boolean;
+  useSavedSecret?: boolean;
+  capabilityChecks?: LLMCapabilityCheck[];
+}
+
+/**
+ * Full connectivity-test outcome. Extends the editor's `ChannelTestState`
+ * presentation (status/text/hint) with the resolved effective configuration and
+ * per-capability results so callers can surface transparent diagnostics.
+ */
+export interface LlmConnectionCheckOutcome {
+  status: 'success' | 'error';
+  text: string;
+  hint?: string;
+  resolvedModel?: string | null;
+  resolvedProtocol?: string | null;
+  latencyMs?: number | null;
+  capabilityResults?: Partial<Record<LLMCapabilityCheck, LLMCapabilityCheckResult>>;
+}
+
+/** Localized label for a capability check, reusing the shared stage labels. */
+export function getLlmCapabilityLabel(
+  capability: LLMCapabilityCheck,
+  language: UiLanguage,
+): string {
+  return MODEL_ACCESS_STAGE_LABELS[language][`capability_${capability}`] || capability;
 }
 
 export interface ChannelDiscoveryState {
@@ -584,6 +622,52 @@ export function describeProviderOption(entry: LlmProviderCatalogEntry, connected
   return `${protocolLabel} · ${purpose}${connectedCount > 0 ? ` · ${formatUiText(text.connectedCount, { count: connectedCount })}` : ''}`;
 }
 
+// Shared connectivity-test runner. Both the editor and the first-run wizard call
+// it so failure diagnostics, resolved config, and capability results stay
+// consistent. Callers that want capability checks pass `capabilityChecks`; the
+// backend runs them only after a successful base test and never lets them flip
+// the overall connectivity verdict.
+export async function runLlmConnectionCheck(
+  input: LlmConnectionCheckInput,
+  language: UiLanguage,
+): Promise<LlmConnectionCheckOutcome> {
+  const text = MODEL_ACCESS_TEXT[language];
+  try {
+    const result = await systemConfigApi.testLLMChannel({
+      name: input.name,
+      providerId: input.providerId,
+      protocol: input.protocol,
+      baseUrl: input.baseUrl,
+      apiKey: input.apiKey,
+      models: input.models,
+      enabled: input.enabled,
+      useSavedSecret: input.useSavedSecret,
+      capabilityChecks: input.capabilityChecks,
+    });
+    if (result.success) {
+      return {
+        status: 'success',
+        text: `${text.connectionSucceeded}${result.resolvedModel ? ` · ${result.resolvedModel}` : ''}${result.latencyMs ? ` · ${result.latencyMs} ms` : ''}`,
+        resolvedModel: result.resolvedModel ?? null,
+        resolvedProtocol: result.resolvedProtocol ?? null,
+        latencyMs: result.latencyMs ?? null,
+        capabilityResults: result.capabilityResults,
+      };
+    }
+    return {
+      status: 'error',
+      text: buildLlmFailureText(result, language),
+      hint: buildLlmTestHint(result, language),
+      resolvedModel: result.resolvedModel ?? null,
+      resolvedProtocol: result.resolvedProtocol ?? null,
+      capabilityResults: result.capabilityResults,
+    };
+  } catch (error: unknown) {
+    const parsed = getParsedApiError(error, language);
+    return { status: 'error', text: parsed.message || text.testFailed };
+  }
+}
+
 // Shared connectivity-test runner used by the card quick action and the
 // connection dialog (the dialog must keep failures inline without closing).
 export async function runChannelConnectionTest(
@@ -591,29 +675,17 @@ export async function runChannelConnectionTest(
   useSavedSecret: boolean,
   language: UiLanguage,
 ): Promise<ChannelTestState> {
-  const text = MODEL_ACCESS_TEXT[language];
-  try {
-    const result = await systemConfigApi.testLLMChannel({
-      name: channel.name,
-      providerId: channel.providerId,
-      protocol: channel.protocol,
-      baseUrl: channel.baseUrl,
-      apiKey: channel.apiKey,
-      models: splitModels(channel.models),
-      enabled: channel.enabled,
-      useSavedSecret,
-    });
-    if (result.success) {
-      return {
-        status: 'success',
-        text: `${text.connectionSucceeded}${result.resolvedModel ? ` · ${result.resolvedModel}` : ''}${result.latencyMs ? ` · ${result.latencyMs} ms` : ''}`,
-      };
-    }
-    return { status: 'error', text: buildLlmFailureText(result, language), hint: buildLlmTestHint(result, language) };
-  } catch (error: unknown) {
-    const parsed = getParsedApiError(error, language);
-    return { status: 'error', text: parsed.message || text.testFailed };
-  }
+  const outcome = await runLlmConnectionCheck({
+    name: channel.name,
+    providerId: channel.providerId,
+    protocol: channel.protocol,
+    baseUrl: channel.baseUrl,
+    apiKey: channel.apiKey,
+    models: splitModels(channel.models),
+    enabled: channel.enabled,
+    useSavedSecret,
+  }, language);
+  return { status: outcome.status, text: outcome.text, hint: outcome.hint };
 }
 
 // Shared model-discovery runner. A successful call with an empty list is a
