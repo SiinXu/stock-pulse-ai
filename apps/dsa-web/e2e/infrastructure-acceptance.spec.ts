@@ -833,7 +833,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
 
   test('05 application routes render English chrome and localized document titles', async ({ page }) => {
     await login(page, 'en');
-    await assertRouteChrome(page, APP_ROUTE_PATHS.home, UI_TEXT.en['home.analyze'], UI_TEXT.en['home.pageTitle']);
+    await assertRouteChrome(page, APP_ROUTE_PATHS.home, UI_TEXT.en['home.strategy'], UI_TEXT.en['home.pageTitle']);
     await assertRouteChrome(page, APP_ROUTE_PATHS.agent, UI_TEXT.en['chat.title'], UI_TEXT.en['chat.pageTitle']);
     await assertRouteChrome(page, APP_ROUTE_PATHS.researchMarket, UI_TEXT.en['home.marketReview'], UI_TEXT.en['home.marketReviewPageTitle']);
     const navigation = page.getByRole('navigation', { name: UI_TEXT.en['layout.mainNav'] });
