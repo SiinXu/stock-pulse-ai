@@ -257,6 +257,7 @@ class _ChatMethods:
             turns, diagnostics = extract_provider_trace_turns(
                 messages,
                 baseline_len=baseline_len,
+                session_id=session_id,
                 run_id=run_id,
                 anchor_user_message_id=user_message_id,
                 anchor_assistant_message_id=assistant_message_id,
@@ -298,8 +299,8 @@ class _ChatMethods:
         for turn in turns:
             try:
                 db.save_agent_provider_turn(
-                    session_id=session_id,
-                    run_id=run_id,
+                    session_id=turn.session_id,
+                    run_id=turn.run_id,
                     provider=turn.provider,
                     model=turn.model,
                     anchor_user_message_id=user_message_id,

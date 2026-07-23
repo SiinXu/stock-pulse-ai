@@ -347,4 +347,4 @@ def build_tool_audit(
     }
     if ctx.audit_context:
         payload["audit_context"] = redact_diagnostic_value(ctx.audit_context)
-    return payload
+    return redact_sensitive_data(payload)
