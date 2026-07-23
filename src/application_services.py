@@ -381,6 +381,28 @@ def _take_latest_installable_pending_services() -> tuple[
     return False, None
 
 
+def _validate_direct_install_target(
+    services: Optional[ApplicationServices],
+) -> None:
+    """Reject terminal or locally active roots before starting a transition.
+
+    The caller must hold ``_services_lock``.
+    """
+
+    if services is None:
+        return
+    if services.is_closed:
+        raise RuntimeError("Cannot install closed application services")
+    if services._plugin_close_requested:
+        raise RuntimeError(
+            "Cannot install application services after shutdown begins"
+        )
+    if services._local_lifecycle_ops:
+        raise RuntimeError(
+            "Cannot install application services during local plugin lifecycle"
+        )
+
+
 def get_application_services() -> ApplicationServices:
     """Return the installed composition root, creating a default one lazily."""
     while True:
@@ -397,7 +419,7 @@ def get_application_services() -> ApplicationServices:
                 if _services_shutdown:
                     raise RuntimeError("Application services are shutting down")
                 services = _services
-            if services is None or services.is_closed:
+            if services is None or services._plugin_close_requested:
                 services = ApplicationServices()
             set_application_services(services)
             with _services_lock:
@@ -420,8 +442,7 @@ def set_application_services(services: Optional[ApplicationServices]) -> None:
         if _services_transition_active:
             _services_transition_pending.append(services)
             return
-        if services is not None and services.is_closed:
-            raise RuntimeError("Cannot install closed application services")
+        _validate_direct_install_target(services)
 
     with _services_transition_lock:
         with _services_lock:
@@ -430,8 +451,7 @@ def set_application_services(services: Optional[ApplicationServices]) -> None:
             if _services_transition_active:
                 _services_transition_pending.append(services)
                 return
-            if services is not None and services.is_closed:
-                raise RuntimeError("Cannot install closed application services")
+            _validate_direct_install_target(services)
             _services_transition_active = True
             _services_transition_pending.clear()
 
@@ -458,6 +478,9 @@ def set_application_services(services: Optional[ApplicationServices]) -> None:
                         # An in-flight local lifecycle operation must fully
                         # complete before this root's plugins may start.
                         _services_local_ops.wait()
+                    if target is not None and target._plugin_close_requested:
+                        target = None
+                        _services = None
 
                 if target is not None:
                     target.start_plugins()
@@ -467,7 +490,7 @@ def set_application_services(services: Optional[ApplicationServices]) -> None:
                         _take_latest_installable_pending_services()
                     )
                     if not has_pending:
-                        if target is not None and target.is_closed:
+                        if target is not None and target._plugin_close_requested:
                             _services = None
                         _services_transition_active = False
                         return

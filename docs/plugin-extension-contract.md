@@ -88,15 +88,21 @@ deferred until the complete manager operation returns; the old root then
 finishes reverse-order shutdown before any successor starts. A root that is
 not installed runs manager lifecycle operations and its own close outside the
 transition authority, so its callback-owned workers may keep using the module
-accessors; an installer instead drains any in-flight local operation before
-starting that root's plugins, so an operation never straddles installation.
+accessors. A direct installer rejects a target whose local lifecycle operation
+is already in flight, so a callback or its worker cannot wait on itself. If a
+local operation races after the installer owns the global transition, that
+transition drains the complete operation before starting the target, so an
+operation never straddles installation.
 Each `PluginManager` is owned by exactly one `ApplicationServices` root and
 cannot be rebound to another root. Once that root starts shutdown, manager
 `load`, `load_all`, and `enable` operations fail closed with
 `plugin_owner_closed`; `disable` and `disable_all` remain available for
 idempotent cleanup and cleanup-debt retries. The close request is terminal as
 soon as it is made: queued activation is rejected, and a callback cannot
-supersede its own close by requesting the same root again.
+supersede its own close by requesting the same root again. A direct installer
+also rejects that root. If an already-authorized transition races with the
+shutdown request, it drains cleanup and clears the target without making it
+stable.
 Closing a local root also disables plugins activated directly through its
 manager, even when composition startup was never invoked. A close requested by
 a local manager callback or its worker is deferred until that outer operation
