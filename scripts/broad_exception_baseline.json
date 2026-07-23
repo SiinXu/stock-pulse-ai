@@ -402,7 +402,6 @@
     {"path":"src/notification_sender/feishu_sender.py","scope":"<module>.FeishuSender._send_file_via_app_bot","caught":["Exception"],"digest":"0cef577a0e25b17bbddd1b7418a02461dba7523a6e43b8978953016253e7ac4a"},
     {"path":"src/notification_sender/feishu_sender.py","scope":"<module>.FeishuSender._send_file_via_app_bot","caught":["Exception"],"digest":"728381abfcd1c88752e1054051e389ac9c7a9eeb78580ef92bd884663365b444"},
     {"path":"src/notification_sender/feishu_sender.py","scope":"<module>.FeishuSender._send_via_webhook","caught":["Exception"],"digest":"1c333632c71717e84d7819c6e23d20ff9b1505cc7cea8e83b4ec0778a238bfcf"},
-    {"path":"src/notification_sender/pushplus_sender.py","scope":"<module>.PushplusSender.send_to_pushplus","caught":["Exception"],"digest":"421d9d73234b4a8dca48f8009b6d29fc45ab2a820656409dd814ac6100b9ac93"},
     {"path":"src/repositories/analysis_repo.py","scope":"<module>.AnalysisRepository.count_by_code","caught":["Exception"],"digest":"f5decda09b68614b05b89883443fdb211c112735c25fa9124f9bed646a97f705"},
     {"path":"src/repositories/analysis_repo.py","scope":"<module>.AnalysisRepository.get_by_query_id","caught":["Exception"],"digest":"754ccfea4e8edb81b6dd689f06279e546bd06628934bf8d6776193d7c5049850"},
     {"path":"src/repositories/analysis_repo.py","scope":"<module>.AnalysisRepository.get_list","caught":["Exception"],"digest":"fc374715dd284fcfb8838b06c8b055f0a9b21d0e99ed74847772baf5237fa832"},

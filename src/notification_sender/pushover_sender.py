@@ -1,248 +1,33 @@
 # -*- coding: utf-8 -*-
-"""
-Pushover 发送提醒服务
+"""Compatibility facade for :mod:`src.notification_parts.senders.pushover_sender`."""
 
-职责：
-1. 通过 Pushover API 发送 Pushover 消息
-"""
-import logging
-from typing import Optional
-from datetime import datetime
-import requests
-from src.security.outbound_policy import safe_post
-
-from src.config import Config
-from src.utils.sanitize import log_safe_exception
-from src.formatters import markdown_to_plain_text
-
-
-logger = logging.getLogger(__name__)
+from src.notification_parts._facade import load_legacy_module as _load_legacy_module
+from src.notification_parts.senders.pushover_sender import (
+    Config,
+    Optional,
+    PushoverSender,
+    datetime,
+    log_safe_exception,
+    logger,
+    logging,
+    markdown_to_plain_text,
+    requests,
+    safe_post,
+)
 
 
-class PushoverSender:
-    
-    def __init__(self, config: Config):
-        """
-        初始化 Pushover 配置
+__all__ = (
+    "Config",
+    "Optional",
+    "PushoverSender",
+    "datetime",
+    "log_safe_exception",
+    "logger",
+    "logging",
+    "markdown_to_plain_text",
+    "requests",
+    "safe_post",
+)
 
-        Args:
-            config: 配置对象
-        """
-        self._pushover_config = {
-            'user_key': getattr(config, 'pushover_user_key', None),
-            'api_token': getattr(config, 'pushover_api_token', None),
-        }
-        
-    def _is_pushover_configured(self) -> bool:
-        """检查 Pushover 配置是否完整"""
-        return bool(self._pushover_config['user_key'] and self._pushover_config['api_token'])
-
-    def send_to_pushover(
-        self,
-        content: str,
-        title: Optional[str] = None,
-        *,
-        timeout_seconds: Optional[float] = None,
-    ) -> bool:
-        """
-        推送消息到 Pushover
-        
-        Pushover API 格式：
-        POST https://api.pushover.net/1/messages.json
-        {
-            "token": "应用 API Token",
-            "user": "用户 Key",
-            "message": "消息内容",
-            "title": "标题（可选）"
-        }
-        
-        Pushover 特点：
-        - 支持 iOS/Android/桌面多平台推送
-        - 消息限制 1024 字符
-        - 支持优先级设置
-        - 支持 HTML 格式
-        
-        Args:
-            content: 消息内容（Markdown 格式，会转为纯文本）
-            title: 消息标题（可选，默认为"股票分析报告"）
-
-        Returns:
-            是否发送成功
-        """
-        if not self._is_pushover_configured():
-            logger.warning("Pushover 配置不完整，跳过推送")
-            return False
-        
-        user_key = self._pushover_config['user_key']
-        api_token = self._pushover_config['api_token']
-        
-        # Pushover API Endpoint
-        api_url = "https://api.pushover.net/1/messages.json"
-        
-        # Process message titles
-        if title is None:
-            date_str = datetime.now().strftime('%Y-%m-%d')
-            title = f"📈 股票分析报告 - {date_str}"
-        
-        # Pushover Message Limit 1024 Characters
-        max_length = 1024
-        
-        # Convert Markdown to plain text (Pushover supports HTML, but plain text is more universal)
-        plain_content = markdown_to_plain_text(content)
-        
-        if len(plain_content) <= max_length:
-            # Single message sending
-            return self._send_pushover_message(api_url, user_key, api_token, plain_content, title, timeout_seconds=timeout_seconds)
-        else:
-            # Segment long messages
-            return self._send_pushover_chunked(
-                api_url,
-                user_key,
-                api_token,
-                plain_content,
-                title,
-                max_length,
-                timeout_seconds=timeout_seconds,
-            )
-      
-    def _send_pushover_message(
-        self, 
-        api_url: str, 
-        user_key: str, 
-        api_token: str, 
-        message: str, 
-        title: str,
-        priority: int = 0,
-        *,
-        timeout_seconds: Optional[float] = None,
-    ) -> bool:
-        """
-        发送单条 Pushover 消息
-        
-        Args:
-            api_url: Pushover API 端点
-            user_key: 用户 Key
-            api_token: 应用 API Token
-            message: 消息内容
-            title: 消息标题
-            priority: 优先级 (-2 ~ 2，默认 0)
-        """
-        try:
-            payload = {
-                "token": api_token,
-                "user": user_key,
-                "message": message,
-                "title": title,
-                "priority": priority,
-            }
-            
-            response = safe_post(
-                api_url,
-                data=payload,
-                timeout=timeout_seconds or 30,
-                transport=requests,
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                if result.get('status') == 1:
-                    logger.info("Pushover 消息发送成功")
-                    return True
-                else:
-                    errors = result.get('errors', ['未知错误'])
-                    logger.error(f"Pushover 返回错误: {errors}")
-                    return False
-            else:
-                logger.error(f"Pushover 请求失败: HTTP {response.status_code}")
-                logger.debug(f"响应内容: {response.text}")
-                return False
-                
-        except Exception as exc:  # broad-exception: fallback_recorded - Channel failure is safely logged and isolated.
-            log_safe_exception(
-                logger,
-                "Pushover message delivery failed",
-                exc,
-                error_code="pushover_delivery_failed",
-            )
-            return False
-    
-    def _send_pushover_chunked(
-        self, 
-        api_url: str, 
-        user_key: str, 
-        api_token: str, 
-        content: str, 
-        title: str,
-        max_length: int,
-        *,
-        timeout_seconds: Optional[float] = None,
-    ) -> bool:
-        """
-        分段发送长 Pushover 消息
-        
-        按段落分割，确保每段不超过最大长度
-        """
-        import time
-        
-        # Split by paragraphs (lines or double newlines).
-        if "────────" in content:
-            sections = content.split("────────")
-            separator = "────────"
-        else:
-            sections = content.split("\n\n")
-            separator = "\n\n"
-        
-        chunks = []
-        current_chunk = []
-        current_length = 0
-        
-        for section in sections:
-            # Calculate the actual length after adding this section
-            # join() only places delimiters between elements, not after each element
-            # So: the first element does not need a delimiter, subsequent elements require a delimiter to connect.
-            if current_chunk:
-                # Existing elements, adding a new element requires: current length + separator + new section
-                new_length = current_length + len(separator) + len(section)
-            else:
-                # First element, no delimiter.
-                new_length = len(section)
-            
-            if new_length > max_length:
-                if current_chunk:
-                    chunks.append(separator.join(current_chunk))
-                current_chunk = [section]
-                current_length = len(section)
-            else:
-                current_chunk.append(section)
-                current_length = new_length
-        
-        if current_chunk:
-            chunks.append(separator.join(current_chunk))
-        
-        total_chunks = len(chunks)
-        success_count = 0
-        
-        logger.info(f"Pushover 分批发送：共 {total_chunks} 批")
-        
-        for i, chunk in enumerate(chunks):
-            # Add pagination markers to titles
-            chunk_title = f"{title} ({i+1}/{total_chunks})" if total_chunks > 1 else title
-            
-            if self._send_pushover_message(
-                api_url,
-                user_key,
-                api_token,
-                chunk,
-                chunk_title,
-                timeout_seconds=timeout_seconds,
-            ):
-                success_count += 1
-                logger.info(f"Pushover 第 {i+1}/{total_chunks} 批发送成功")
-            else:
-                logger.error(f"Pushover 第 {i+1}/{total_chunks} 批发送失败")
-            
-            # Batch interval to avoid rate limits
-            if i < total_chunks - 1:
-                time.sleep(1)
-
-        return success_count == total_chunks
+_load_legacy_module("src.notification_parts.senders.pushover_sender", globals(), __all__)
+del _load_legacy_module
