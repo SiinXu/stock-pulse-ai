@@ -1195,6 +1195,20 @@ class _RenderingMethods:
                 lines.append(f"**🐻 {labels.get('strongest_bearish_signal_label', '最强看空信号')}**: {bearish}")
             lines.append("")
 
+        # ========== Historical decision reflection (Issue #118) ==========
+        decision_reflection = getattr(result, "decision_reflection", None)
+        if decision_reflection is not None:
+            from src.services.decision_memory_service import (
+                render_decision_memory_report_section,
+            )
+
+            memory_section = render_decision_memory_report_section(
+                decision_reflection,
+                report_language=report_language,
+            )
+            if memory_section:
+                lines.extend([memory_section, ""])
+
         # ========== Strategy synthesis ==========
         strategy_synthesis = normalize_strategy_synthesis_payload(
             dashboard.get('strategy_synthesis') if dashboard else None

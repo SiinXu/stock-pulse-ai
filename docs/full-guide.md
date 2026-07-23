@@ -459,6 +459,10 @@ stock-pulse-ai/
 | `MAX_WORKERS` | 并发线程数 | `3` |
 | `MARKET_REVIEW_ENABLED` | 启用大盘复盘 | `true` |
 | `DAILY_MARKET_CONTEXT_ENABLED` | 将当日大盘环境摘要注入个股分析 Prompt，并在高风险/退潮环境下软化激进买入建议；默认开启，设为 `false` 后仍可运行大盘复盘 | `true` |
+| `DECISION_MEMORY_ENABLED` | 将“历史决策复盘”（该股过往信号的命中战绩与同类判断校准）注入分析 Prompt 与个股报告；仅用于校准置信度，永不翻转方向；关闭或无历史时零额外开销。可用请求参数 `use_memory` 单次覆盖 | `true` |
+| `DECISION_MEMORY_LOOKBACK` | 复盘时纳入的该股最近“已产生结果”的信号条数上限 | `5` |
+| `DECISION_MEMORY_MIN_AGE_DAYS` | 仅复盘创建时间早于该天数的信号（确保其结果已结算） | `3` |
+| `DECISION_MEMORY_MIN_SAMPLES` | 展示胜率前所需的最小“已判定”样本数（命中+偏离）；小于该阈值的桶视为噪声不展示比率 | `5` |
 | `MARKET_REVIEW_REGION` | 大盘复盘市场区域：cn(A股)、hk(港股)、us(美股)、jp(日股)、kr(韩股)、both(五市场)，us/jp/kr 适合仅关注单区域用户 | `cn` |
 | `MARKET_REVIEW_COLOR_SCHEME` | 大盘复盘指数涨跌颜色：`green_up`=绿涨红跌（默认），`red_up`=红涨绿跌 | `green_up` |
 | `TRADING_DAY_CHECK_ENABLED` | 交易日检查：默认 `true`，非交易日跳过执行；设为 `false` 或使用 `--force-run` 可强制执行（Issue #373） | `true` |

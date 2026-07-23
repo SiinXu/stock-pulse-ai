@@ -359,6 +359,10 @@ class AnalysisResult:
     fundamental_context: Optional[Dict[str, Any]] = None
     market_structure_context: Optional[Dict[str, Any]] = None
 
+    # ========== Historical Decision Reflection (Issue #118; runtime only, not persisted to to_dict) ==========
+    # Carries a DecisionReflection so the report renderer can emit its section.
+    decision_reflection: Optional[Any] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         return {
