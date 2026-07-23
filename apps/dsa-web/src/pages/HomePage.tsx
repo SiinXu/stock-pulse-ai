@@ -229,6 +229,7 @@ const HomePage: React.FC = () => {
     };
   }, []);
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
+  const [isSetupStatusResolved, setIsSetupStatusResolved] = useState(false);
   const [experiencePreference, setExperiencePreference] = useState<{
     mode: ExperienceMode;
     explicit: boolean;
@@ -364,19 +365,17 @@ const HomePage: React.FC = () => {
         if (active) {
           setSetupStatus(null);
         }
+      })
+      .finally(() => {
+        if (active) {
+          setIsSetupStatusResolved(true);
+        }
       });
 
     return () => {
       active = false;
     };
   }, []);
-
-  useEffect(() => {
-    if (!setupStatus || setupStatus.isComplete || experiencePreference.explicit) {
-      return;
-    }
-    setExperiencePreference({ mode: 'beginner', explicit: false });
-  }, [experiencePreference.explicit, setupStatus]);
 
   useEffect(() => {
     let active = true;
@@ -569,7 +568,12 @@ const HomePage: React.FC = () => {
       .map((check) => check.title);
     return requiredNeedsAction.slice(0, 3).join(getUiListSeparator(uiLanguage));
   }, [setupStatus, uiLanguage]);
-  const experienceMode = experiencePreference.mode;
+  const experienceMode = experiencePreference.explicit
+    ? experiencePreference.mode
+    : setupStatus && !setupStatus.isComplete
+      ? 'beginner'
+      : 'professional';
+  const isExperienceModeReady = experiencePreference.explicit || isSetupStatusResolved;
   const handleExperienceModeChange = useCallback((mode: ExperienceMode) => {
     if (mode === 'beginner') {
       closeHistoryTrend();
@@ -872,6 +876,9 @@ const HomePage: React.FC = () => {
       stockName?: string,
       selectionSource?: 'manual' | 'autocomplete' | 'import' | 'image',
     ) => {
+      if (!isExperienceModeReady) {
+        return;
+      }
       void submitAnalysis({
         stockCode,
         stockName,
@@ -881,7 +888,7 @@ const HomePage: React.FC = () => {
         skills: selectedAnalysisSkills,
       });
     },
-    [experienceMode, query, selectedAnalysisSkills, submitAnalysis],
+    [experienceMode, isExperienceModeReady, query, selectedAnalysisSkills, submitAnalysis],
   );
 
   useEffect(() => {
@@ -900,6 +907,9 @@ const HomePage: React.FC = () => {
     if (!stockCode) {
       return;
     }
+    if (state?.autoAnalyze && !isExperienceModeReady) {
+      return;
+    }
     const stockName = typeof state?.stockName === 'string' ? state.stockName.trim() : '';
     setQuery(stockCode);
     navigate(`${location.pathname}${location.search}${location.hash}`, {
@@ -909,7 +919,7 @@ const HomePage: React.FC = () => {
     if (state?.autoAnalyze) {
       handleSubmitAnalysis(stockCode, stockName || undefined, 'import');
     }
-  }, [handleSubmitAnalysis, location.hash, location.pathname, location.search, location.state, navigate, setQuery]);
+  }, [handleSubmitAnalysis, isExperienceModeReady, location.hash, location.pathname, location.search, location.state, navigate, setQuery]);
 
   useEffect(() => {
     setQuery(homeUrlState.stockCode ?? '');
@@ -932,7 +942,7 @@ const HomePage: React.FC = () => {
   }, [navigate, selectedReport]);
 
   const handleReanalyze = useCallback(() => {
-    if (!selectedReport || selectedReport.meta.reportType === 'market_review') {
+    if (!isExperienceModeReady || !selectedReport || selectedReport.meta.reportType === 'market_review') {
       return;
     }
 
@@ -945,7 +955,7 @@ const HomePage: React.FC = () => {
       reportType: experienceMode === 'beginner' ? 'brief' : 'detailed',
       skills: selectedAnalysisSkills,
     });
-  }, [experienceMode, selectedAnalysisSkills, selectedReport, submitAnalysis]);
+  }, [experienceMode, isExperienceModeReady, selectedAnalysisSkills, selectedReport, submitAnalysis]);
 
   const openTaskRunFlow = useCallback((task: TaskInfo) => {
     setRunFlowRestoreError(null);
@@ -1140,6 +1150,9 @@ const HomePage: React.FC = () => {
   }, [todayDateKey, todayHistoryItems]);
 
   const handleAnalyzeWatchlist = useCallback(async (mode: WatchlistAnalyzeMode) => {
+    if (!isExperienceModeReady) {
+      return;
+    }
     if (mode === 'pending' && watchlistTodayStatusBlocked) {
       setBatchAnalyzeStatus({
         variant: 'warning',
@@ -1178,7 +1191,7 @@ const HomePage: React.FC = () => {
         try {
           const result = await analysisApi.analyzeAsync({
             stockCodes: chunk,
-            reportType: 'detailed',
+            reportType: experienceMode === 'beginner' ? 'brief' : 'detailed',
             notify,
             skills: selectedAnalysisSkills,
           });
@@ -1247,6 +1260,8 @@ const HomePage: React.FC = () => {
       setIsBatchAnalyzingWatchlist(false);
     }
   }, [
+    experienceMode,
+    isExperienceModeReady,
     notify,
     pendingWatchlistCodes,
     refreshActiveTasks,
@@ -1443,7 +1458,7 @@ const HomePage: React.FC = () => {
                   variant="primary"
                   size="comfortable"
                   className="whitespace-nowrap"
-                  disabled={!query || isAnalyzing}
+                  disabled={!query || isAnalyzing || !isExperienceModeReady}
                   isLoading={isAnalyzing}
                   loadingText={t('home.analyzing')}
                   onClick={() => handleSubmitAnalysis()}
@@ -1594,7 +1609,7 @@ const HomePage: React.FC = () => {
                   <Button
                     variant="secondary"
                     size="default"
-                    disabled={isAnalyzing || selectedReport.meta.id === undefined}
+                    disabled={isAnalyzing || !isExperienceModeReady || selectedReport.meta.id === undefined}
                     onClick={handleReanalyze}
                   >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
