@@ -1043,6 +1043,7 @@ def test_manifest_callback_worker_cannot_install_starting_root_without_deadlock(
                 self._install_from_manifest = False
 
                 def install_starting_root() -> None:
+                    root_holder[0].close()
                     try:
                         set_application_services(root_holder[0])
                     except RuntimeError as exc:
@@ -1066,18 +1067,17 @@ def test_manifest_callback_worker_cannot_install_starting_root_without_deadlock(
 
     results = services.start_plugins()
 
-    assert [result.success for result in results] == [True]
+    assert [result.error_code for result in results] == ["plugin_owner_closed"]
     assert worker_returned.is_set()
     assert all(not worker.is_alive() for worker in workers)
     assert install_errors == [
-        "Cannot install application services during local plugin lifecycle"
+        "Cannot install application services after shutdown begins"
     ]
+    assert services.is_closed is True
+    assert services.plugin_shutdown_results == ()
+    assert services.plugin_manager.snapshot("test.manifest-worker").state == "registered"
     assert get_application_services() is not services
-    services.close()
-    assert events == [
-        "load:test.manifest-worker",
-        "unload:test.manifest-worker",
-    ]
+    assert events == []
 
 
 def test_installer_race_drains_deferred_local_cleanup(monkeypatch):

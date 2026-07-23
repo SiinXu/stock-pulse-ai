@@ -209,10 +209,24 @@ class ApplicationServices:
                 self._plugin_load_results = self._plugin_manager.load_all()
                 self._plugins_started = True
                 if self._plugins_closed:
-                    self._plugin_shutdown_results = self._plugin_manager.disable_all()
+                    shutdown_ids = self._plugin_manager._shutdown_plugin_ids()
+                    if shutdown_ids:
+                        self._plugin_shutdown_results = (
+                            self._plugin_manager.disable_all(shutdown_ids)
+                        )
                 return self._plugin_load_results
             finally:
                 self._plugins_starting = False
+                close_after_start = False
+                with _services_lock:
+                    if (
+                        self._local_close_requested
+                        and not self._local_lifecycle_ops
+                    ):
+                        self._local_close_requested = False
+                        close_after_start = True
+                if close_after_start:
+                    self._close_plugins()
 
     def close(self) -> tuple["PluginOperationResult", ...]:
         """Disable the owned plugin snapshot once in reverse registration order.
@@ -235,7 +249,9 @@ class ApplicationServices:
                 _services_transition_pending.append(None)
                 return self._plugin_shutdown_results
             installed = _services is self
-            if not installed and self._local_lifecycle_ops:
+            if not installed and (
+                self._plugins_starting or self._local_lifecycle_ops
+            ):
                 self._local_close_requested = True
                 return self._plugin_shutdown_results
 

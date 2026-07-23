@@ -105,10 +105,10 @@ shutdown request, it drains cleanup and clears the target without making it
 stable.
 Closing a local root also disables plugins activated directly through its
 manager, even when composition startup was never invoked. A close requested by
-a local manager callback or its worker is deferred until that outer operation
-finishes, then the root performs the same state-based cleanup exactly once. The
-installer drain remains active through that deferred cleanup, including every
-`onunload()` callback, before a successor may start.
+a local startup or manager callback, or by its worker, is deferred until that
+outer operation finishes; the root then performs the same state-based cleanup
+exactly once. The installer drain remains active through that deferred cleanup,
+including every `onunload()` callback, before a successor may start.
 
 There is currently no default lifecycle-style built-in catalog to fabricate:
 existing Data Provider built-ins remain owned by each `DataFetcherManager`, and
