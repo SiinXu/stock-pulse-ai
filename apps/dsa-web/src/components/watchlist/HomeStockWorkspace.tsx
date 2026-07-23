@@ -22,10 +22,10 @@ import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../../utils
 import { formatDateTime } from '../../utils/format';
 import { truncateStockName } from '../../utils/stockName';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
-import type { HomeWorkspaceView } from '../../utils/deepLink';
 import type { UiTextKey, UiTextParams } from '../../i18n/uiText';
+import { HOME_WORKSPACE_VALUES, type HomeWorkspaceValue } from '../../routing/routes';
 
-export type HomeWorkspaceTab = HomeWorkspaceView;
+export type HomeWorkspaceTab = HomeWorkspaceValue;
 export type WatchlistAnalyzeMode = 'all' | 'pending';
 
 export interface HomeWatchlistRow {
@@ -236,9 +236,9 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
   const isTodayStatusUnavailable = watchlistRows.some((row) => row.isTodayStatusLoading || row.isTodayStatusUnknown);
   const topTodayItem = todayItems[0];
   const tabs: Array<{ value: HomeWorkspaceTab; label: string }> = [
-    { value: 'history', label: t('watchlist.tabHistory') },
-    { value: 'watchlist', label: t('watchlist.tabWatchlist') },
-    { value: 'today', label: t('watchlist.tabToday') },
+    { value: HOME_WORKSPACE_VALUES.history, label: t('watchlist.tabHistory') },
+    { value: HOME_WORKSPACE_VALUES.watchlist, label: t('watchlist.tabWatchlist') },
+    { value: HOME_WORKSPACE_VALUES.today, label: t('watchlist.tabToday') },
   ];
   const activeTabLabel = tabs.find((tab) => tab.value === activeTab)?.label ?? tabs[0].label;
 
@@ -318,7 +318,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
     </div>
   );
 
-  if (activeTab === 'history') {
+  if (activeTab === HOME_WORKSPACE_VALUES.history) {
     return workspaceShell(
       <StockBar
         items={filteredHistoryItems}
@@ -336,7 +336,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
   return workspaceShell(
     <Surface as="aside" level="interactive" className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="space-y-3 border-b border-subtle px-4 py-4">
-        {activeTab === 'watchlist' ? (
+        {activeTab === HOME_WORKSPACE_VALUES.watchlist ? (
           <>
             <DashboardPanelHeader
               className="mb-0"
@@ -436,7 +436,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
       </div>
 
       <ScrollArea viewportClassName="p-4" className="min-h-0 flex-1">
-        {activeTab === 'watchlist' ? (
+        {activeTab === HOME_WORKSPACE_VALUES.watchlist ? (
           watchlistLoading ? (
             <DashboardStateBlock loading compact title={t('watchlist.loading')} />
           ) : watchlistLoadError ? (
@@ -502,7 +502,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
         )}
       </ScrollArea>
 
-      {activeTab === 'watchlist' ? (
+      {activeTab === HOME_WORKSPACE_VALUES.watchlist ? (
         <div className="border-t border-subtle px-4 py-3">
           <Button
             type="button"

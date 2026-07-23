@@ -42,9 +42,15 @@ import { AppPage, Button, DataTable, type DataTableColumn, InlineAlert, Input, M
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import {
+  RESEARCH_DISCOVER_LIMITS,
   RESEARCH_DISCOVER_MARKET_VALUES,
-  RESEARCH_DISCOVER_ROUTE_QUERY_KEYS,
 } from '../routing/routes';
+import {
+  DEFAULT_RESEARCH_DISCOVER_ROUTE_STATE,
+  resolveResearchDiscoverRouteState,
+  setResearchDiscoverRouteState,
+  type ResearchDiscoverRouteState,
+} from '../routing/researchRouteState';
 import { SCREENING_TEXT } from '../locales/screening';
 import { formatUiDateTime, formatUiNumber, getUiListSeparator } from '../utils/uiLocale';
 import { formatTaskMessage } from '../utils/taskMessage';
@@ -60,58 +66,19 @@ type PersistedScreenTask = {
   maxResults: number;
 };
 
-type ScreeningRunParameters = Omit<PersistedScreenTask, 'taskId'>;
-
-const DEFAULT_SCREENING_RUN_PARAMETERS: ScreeningRunParameters = {
-  market: RESEARCH_DISCOVER_MARKET_VALUES.china,
-  strategy: 'dual_low',
-  maxResults: 3,
-};
+type ScreeningRunParameters = ResearchDiscoverRouteState;
 
 const readScreeningRunParameters = (
   restoredTask: PersistedScreenTask | null,
   search = typeof window === 'undefined' ? '' : window.location.search,
 ): ScreeningRunParameters => {
-  if (restoredTask) {
-    return {
-      market: restoredTask.market,
-      strategy: restoredTask.strategy,
-      maxResults: restoredTask.maxResults,
-    };
-  }
-  const params = new URLSearchParams(search);
-  const count = Number(params.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count));
-  const strategy = params.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy)?.trim();
-  return {
-    market: params.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market)
-      === RESEARCH_DISCOVER_MARKET_VALUES.china
-      ? RESEARCH_DISCOVER_MARKET_VALUES.china
-      : DEFAULT_SCREENING_RUN_PARAMETERS.market,
-    strategy: strategy || DEFAULT_SCREENING_RUN_PARAMETERS.strategy,
-    maxResults: Number.isInteger(count) && count >= 1 && count <= 100
-      ? count
-      : DEFAULT_SCREENING_RUN_PARAMETERS.maxResults,
-  };
+  return resolveResearchDiscoverRouteState(search, restoredTask).state;
 };
 
 const getScreeningRunParametersLocation = ({ market, strategy, maxResults }: ScreeningRunParameters) => {
   if (typeof window === 'undefined') return null;
   const url = new URL(window.location.href);
-  const values: Record<string, string | undefined> = {
-    [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market]: market === DEFAULT_SCREENING_RUN_PARAMETERS.market
-      ? undefined
-      : market,
-    [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: strategy === DEFAULT_SCREENING_RUN_PARAMETERS.strategy
-      ? undefined
-      : strategy,
-    [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: maxResults === DEFAULT_SCREENING_RUN_PARAMETERS.maxResults
-      ? undefined
-      : String(maxResults),
-  };
-  Object.entries(values).forEach(([key, value]) => {
-    if (value) url.searchParams.set(key, value);
-    else url.searchParams.delete(key);
-  });
+  url.search = setResearchDiscoverRouteState(url.searchParams, { market, strategy, maxResults }).toString();
   return `${url.pathname}${url.search}${url.hash}`;
 };
 
@@ -133,9 +100,13 @@ const readPersistedScreenTask = (): PersistedScreenTask | null => {
       taskId: parsed.taskId,
       market: typeof parsed.market === 'string' && parsed.market.trim()
         ? parsed.market
-        : RESEARCH_DISCOVER_MARKET_VALUES.china,
-      strategy: typeof parsed.strategy === 'string' && parsed.strategy.trim() ? parsed.strategy : 'dual_low',
-      maxResults: Number.isFinite(restoredMaxResults) ? Math.min(100, Math.max(1, restoredMaxResults)) : 3,
+        : DEFAULT_RESEARCH_DISCOVER_ROUTE_STATE.market,
+      strategy: typeof parsed.strategy === 'string' && parsed.strategy.trim()
+        ? parsed.strategy
+        : DEFAULT_RESEARCH_DISCOVER_ROUTE_STATE.strategy,
+      maxResults: Number.isFinite(restoredMaxResults)
+        ? Math.min(RESEARCH_DISCOVER_LIMITS.maxCount, Math.max(1, restoredMaxResults))
+        : DEFAULT_RESEARCH_DISCOVER_ROUTE_STATE.maxResults,
     };
   } catch {
     return null;
@@ -981,7 +952,11 @@ const StockScreeningPage: React.FC = () => {
 
   const handleSubmit = async (): Promise<boolean> => {
     const parsedMaxResults = Number(maxResultsDraft);
-    if (!Number.isInteger(parsedMaxResults) || parsedMaxResults < 1 || parsedMaxResults > 100) {
+    if (
+      !Number.isInteger(parsedMaxResults)
+      || parsedMaxResults < 1
+      || parsedMaxResults > RESEARCH_DISCOVER_LIMITS.maxCount
+    ) {
       setMaxResultsError(text.resultCountError);
       document.getElementById('screening-max-results')?.focus();
       return false;
@@ -1611,7 +1586,7 @@ const StockScreeningPage: React.FC = () => {
               label={text.resultCount}
               type="number"
               min={1}
-              max={100}
+              max={RESEARCH_DISCOVER_LIMITS.maxCount}
               step={1}
               value={maxResultsDraft}
               error={maxResultsError}

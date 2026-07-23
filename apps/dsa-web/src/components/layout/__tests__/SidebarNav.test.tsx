@@ -360,7 +360,7 @@ describe('SidebarNav', () => {
     }
   });
 
-  it('exposes exactly one current-page link for each Research route', () => {
+  it('exposes the visible Research child as the only current-page link in expanded and compact navigation', async () => {
     const marketRender = render(
       <MemoryRouter initialEntries={[APP_ROUTE_PATHS.researchMarket]}>
         <SidebarNav />
@@ -380,6 +380,23 @@ describe('SidebarNav', () => {
     currentLinks = discoverRender.container.querySelectorAll('a[aria-current="page"]');
     expect(currentLinks).toHaveLength(1);
     expect(currentLinks[0]).toHaveAttribute('href', APP_ROUTE_PATHS.researchDiscover);
+    discoverRender.unmount();
+
+    const compactRender = render(
+      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.researchMarket]}>
+        <SidebarNav collapsed />
+      </MemoryRouter>,
+    );
+    const research = screen.getByRole('link', { name: '研究' });
+    fireEvent.mouseEnter(research);
+    const menu = await screen.findByRole('menu', { name: '研究' });
+    const marketChild = within(menu).getByRole('menuitem', { name: '大盘复盘' });
+    expect(research).not.toHaveAttribute('aria-current', 'page');
+    expect(marketChild).toHaveAttribute('aria-current', 'page');
+    currentLinks = document.querySelectorAll('a[aria-current="page"]');
+    expect(currentLinks).toHaveLength(1);
+    expect(currentLinks[0]).toBe(marketChild);
+    compactRender.unmount();
   });
 
   it('opens compact groups with ArrowRight and restores the trigger with ArrowLeft or Escape', async () => {

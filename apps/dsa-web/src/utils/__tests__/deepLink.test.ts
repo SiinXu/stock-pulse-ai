@@ -1,7 +1,12 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
-import { APP_ROUTE_PATHS, LEGACY_ROUTE_PATHS } from '../../routing/routes';
+import {
+  APP_ROUTE_PATHS,
+  LEGACY_ROUTE_PATHS,
+  RESEARCH_BACKTEST_ROUTE_QUERY_KEYS,
+  RESEARCH_DISCOVER_ROUTE_QUERY_KEYS,
+} from '../../routing/routes';
 import { buildDeepLink, parseDeepLink } from '../deepLink';
 
 describe('deepLink', () => {
@@ -177,6 +182,29 @@ describe('deepLink', () => {
       expect(parsed.normalizedHref).toBe(`${pathname}?keep=yes#section`);
       expect(parsed.issues).toEqual([]);
     }
+  });
+
+  it('normalizes canonical and legacy Research filters through the shared codec', () => {
+    for (const pathname of [APP_ROUTE_PATHS.researchBacktest, LEGACY_ROUTE_PATHS.backtest]) {
+      const parsed = parseDeepLink(
+        `${pathname}?${RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code}=aapl&${RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.window}=30&${RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.from}=2026-99-99&keep=yes#results`,
+      );
+
+      expect(parsed.normalizedHref).toBe(
+        `${pathname}?${RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code}=AAPL&${RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.window}=30&keep=yes#results`,
+      );
+      expect(parsed.issues).toEqual([
+        { code: 'invalid_filter', parameter: RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.from },
+      ]);
+    }
+
+    const discover = parseDeepLink(
+      `${APP_ROUTE_PATHS.researchDiscover}?${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market}=cn&${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy}=quality&${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count}=20&keep=yes#details`,
+    );
+    expect(discover.normalizedHref).toBe(
+      `${APP_ROUTE_PATHS.researchDiscover}?${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy}=quality&${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count}=20&keep=yes#details`,
+    );
+    expect(discover.issues).toEqual([]);
   });
 
   it('fails closed when an internal caller tries to build an unsafe link', () => {

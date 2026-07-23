@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
@@ -261,7 +261,7 @@ describe('App routing behavior', () => {
     expect(window.location.pathname).toBe(canonicalPath);
     expect(window.location.search).toBe('?keep=yes');
     expect(window.location.hash).toBe('#results');
-    expect(setCurrentRoute).toHaveBeenLastCalledWith(canonicalPath);
+    await waitFor(() => expect(setCurrentRoute).toHaveBeenLastCalledWith(canonicalPath));
   });
 
   it('routes /decision-signals to the AI signals page after auth is ready', async () => {

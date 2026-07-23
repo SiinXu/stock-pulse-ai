@@ -34,6 +34,7 @@ import type { UiTextKey } from '../i18n/uiText';
 import { formatUiDateTime, getUiListSeparator } from '../utils/uiLocale';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
 import { getChatMessageDisplayContent } from '../utils/chatMessage';
+import { REPORT_ROUTE_QUERY_KEYS } from '../routing/routes';
 
 // Quick question examples shown on empty state
 const QUICK_QUESTION_DEFINITIONS: Array<{ labelKey: UiTextKey; skill: string }> = [
@@ -362,7 +363,7 @@ const ChatPage: React.FC = () => {
       if (clearFollowUpContext) {
         next.delete('stock');
         next.delete('name');
-        next.delete('recordId');
+        next.delete(REPORT_ROUTE_QUERY_KEYS.recordId);
         next.delete(CHAT_CONTEXT_STATE_QUERY_KEY);
       }
       return next;
@@ -378,7 +379,7 @@ const ChatPage: React.FC = () => {
       if (!context) {
         next.delete('stock');
         next.delete('name');
-        next.delete('recordId');
+        next.delete(REPORT_ROUTE_QUERY_KEYS.recordId);
         next.delete(CHAT_CONTEXT_STATE_QUERY_KEY);
         return next;
       }
@@ -387,7 +388,9 @@ const ChatPage: React.FC = () => {
       next.set('stock', context.stock_code);
       if (context.stock_name) next.set('name', context.stock_name);
       else next.delete('name');
-      if (previousStock !== context.stock_code) next.delete('recordId');
+      if (previousStock !== context.stock_code) {
+        next.delete(REPORT_ROUTE_QUERY_KEYS.recordId);
+      }
       next.set(CHAT_CONTEXT_STATE_QUERY_KEY, CHAT_ACTIVE_CONTEXT_STATE);
       return next;
     }, { replace: true });
@@ -678,7 +681,7 @@ const ChatPage: React.FC = () => {
   useEffect(() => {
     const stock = sanitizeFollowUpStockCode(searchParams.get('stock'));
     const name = sanitizeFollowUpStockName(searchParams.get('name'));
-    const recordId = parseFollowUpRecordId(searchParams.get('recordId'));
+    const recordId = parseFollowUpRecordId(searchParams.get(REPORT_ROUTE_QUERY_KEYS.recordId));
     const contextIsActive = searchParams.get(CHAT_CONTEXT_STATE_QUERY_KEY) === CHAT_ACTIVE_CONTEXT_STATE;
 
     if (!stock) {

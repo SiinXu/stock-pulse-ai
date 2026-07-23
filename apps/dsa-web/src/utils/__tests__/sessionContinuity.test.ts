@@ -156,7 +156,7 @@ describe('sessionContinuity', () => {
     }));
 
     expect(resolveInitialSessionHref(APP_ROUTE_PATHS.researchDiscover)).toBe(
-      `${APP_ROUTE_PATHS.researchDiscover}?${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market}=${RESEARCH_DISCOVER_MARKET_VALUES.china}&${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy}=quality&${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count}=20`,
+      `${APP_ROUTE_PATHS.researchDiscover}?${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy}=quality&${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count}=20`,
     );
     expect(resolveInitialSessionHref(APP_ROUTE_PATHS.researchBacktest)).toBe(
       `${APP_ROUTE_PATHS.researchBacktest}?${RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code}=AAPL&${RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.window}=30`,
@@ -166,6 +166,20 @@ describe('sessionContinuity', () => {
     expect(persisted).toContain('research-backtest');
     expect(persisted).not.toContain('"screening"');
     expect(persisted).not.toContain('"backtest"');
+  });
+
+  it('uses the page codec to sanitize Backtest snapshots and drops non-allowlisted context', () => {
+    recordSessionLocation(
+      `${APP_ROUTE_PATHS.researchBacktest}?${RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code}=aapl&${RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.window}=30&${RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.from}=2026-99-99&keep=yes#results`,
+    );
+
+    expect(resolveInitialSessionHref(APP_ROUTE_PATHS.researchBacktest)).toBe(
+      `${APP_ROUTE_PATHS.researchBacktest}?${RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code}=AAPL&${RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.window}=30`,
+    );
+    const persisted = window.sessionStorage.getItem(WEB_SESSION_CONTINUITY_STORAGE_KEY) ?? '';
+    expect(persisted).not.toContain('2026-99-99');
+    expect(persisted).not.toContain('keep=yes');
+    expect(persisted).not.toContain('#results');
   });
 
   it('restores market review record and Run Flow state on the canonical route', () => {

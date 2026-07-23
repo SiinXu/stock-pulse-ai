@@ -8,6 +8,7 @@ import type { Message, ProgressStep } from '../../stores/agentChatStore';
 import ChatPage from '../ChatPage';
 import { extractStockCodeFromMessage, extractStockCodesFromMessage } from '../../utils/chatStockCode';
 import { UiLanguageProvider, useUiLanguage } from '../../contexts/UiLanguageContext';
+import { APP_ROUTE_PATHS, REPORT_ROUTE_QUERY_KEYS } from '../../routing/routes';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
 
 function createDeferred<T>() {
@@ -1153,7 +1154,7 @@ describe('ChatPage', () => {
       },
     });
 
-    const entry = '/chat?stock=AAPL&name=Apple&recordId=2';
+    const entry = `${APP_ROUTE_PATHS.agent}?stock=AAPL&name=Apple&${REPORT_ROUTE_QUERY_KEYS.recordId}=2`;
     const firstRouter = createMemoryRouter(
       [{ path: '/chat', element: <ChatPage /> }],
       { initialEntries: [entry] },
@@ -1166,7 +1167,7 @@ describe('ChatPage', () => {
     const persistedParams = new URLSearchParams(firstRouter.state.location.search);
     expect(persistedParams.get('stock')).toBe('AAPL');
     expect(persistedParams.get('name')).toBe('Apple');
-    expect(persistedParams.get('recordId')).toBe('2');
+    expect(persistedParams.get(REPORT_ROUTE_QUERY_KEYS.recordId)).toBe('2');
     firstRender.unmount();
 
     const refreshedRouter = createMemoryRouter(

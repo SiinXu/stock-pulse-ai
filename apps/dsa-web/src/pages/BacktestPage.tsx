@@ -9,9 +9,14 @@ import { ApiErrorAlert, AppPage, Badge, Button, Card, DataTable, type DataTableC
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import {
+  RESEARCH_BACKTEST_LIMITS,
   RESEARCH_BACKTEST_PHASE_VALUES,
-  RESEARCH_BACKTEST_ROUTE_QUERY_KEYS,
 } from '../routing/routes';
+import {
+  parseResearchBacktestRouteState,
+  setResearchBacktestRouteState,
+  type ResearchBacktestRouteState,
+} from '../routing/researchRouteState';
 import {
   BACKTEST_DIRECTION_EXPECTED_LABELS,
   BACKTEST_MOVEMENT_LABELS,
@@ -35,58 +40,16 @@ const BACKTEST_COMPACT_INPUT_CLASS =
   'h-8 rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
 type BacktestText = (typeof BACKTEST_TEXT)[UiLanguage];
 
-type BacktestFilterSnapshot = {
-  code: string;
-  windowDays?: number;
-  startDate: string;
-  endDate: string;
-  phase: BacktestPhaseFilter;
-  page: number;
-};
-
-const BACKTEST_PHASES = new Set<BacktestPhaseFilter>(
-  Object.values(RESEARCH_BACKTEST_PHASE_VALUES),
-);
+type BacktestFilterSnapshot = ResearchBacktestRouteState;
 
 function getInitialBacktestFilters(search = typeof window === 'undefined' ? '' : window.location.search): BacktestFilterSnapshot {
-  const params = new URLSearchParams(search);
-  const rawWindow = params.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.window) ?? '';
-  const parsedWindow = parseEvalWindowDays(rawWindow);
-  const rawPage = Number(params.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.page));
-  const rawPhase = params.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.phase) as BacktestPhaseFilter | null;
-  return {
-    code: normalizeBacktestCode(params.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code) ?? '') ?? '',
-    windowDays: parsedWindow && parsedWindow <= 120 ? parsedWindow : undefined,
-    startDate: params.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.from) ?? '',
-    endDate: params.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.to) ?? '',
-    phase: rawPhase && BACKTEST_PHASES.has(rawPhase)
-      ? rawPhase
-      : RESEARCH_BACKTEST_PHASE_VALUES.all,
-    page: Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1,
-  };
+  return parseResearchBacktestRouteState(search).state;
 }
 
 function getBacktestFiltersLocation(filters: BacktestFilterSnapshot): string | null {
   if (typeof window === 'undefined') return null;
   const url = new URL(window.location.href);
-  const values: Record<string, string | undefined> = {
-    [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code]: normalizeBacktestCode(filters.code),
-    [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.window]: filters.windowDays
-      ? String(filters.windowDays)
-      : undefined,
-    [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.from]: filters.startDate || undefined,
-    [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.to]: filters.endDate || undefined,
-    [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.phase]: filters.phase === RESEARCH_BACKTEST_PHASE_VALUES.all
-      ? undefined
-      : filters.phase,
-    [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.page]: filters.page > 1
-      ? String(filters.page)
-      : undefined,
-  };
-  Object.entries(values).forEach(([key, value]) => {
-    if (value) url.searchParams.set(key, value);
-    else url.searchParams.delete(key);
-  });
+  url.search = setResearchBacktestRouteState(url.searchParams, filters).toString();
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
@@ -118,7 +81,7 @@ function parseEvalWindowDays(value: string): number | undefined {
   }
 
   const parsed = Number(trimmed);
-  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 120) {
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > RESEARCH_BACKTEST_LIMITS.maxWindowDays) {
     return undefined;
   }
 
@@ -325,6 +288,10 @@ const BacktestPage: React.FC = () => {
   useEffect(() => {
     document.title = text.documentTitle;
   }, [text.documentTitle]);
+
+  useEffect(() => {
+    syncBacktestFiltersToUrl(initialFilters);
+  }, [initialFilters, syncBacktestFiltersToUrl]);
 
   // Input state
   const [codeFilter, setCodeFilter] = useState(initialFilters.code);
@@ -744,7 +711,7 @@ const BacktestPage: React.FC = () => {
             type="number"
             size="default"
             min={1}
-            max={120}
+            max={RESEARCH_BACKTEST_LIMITS.maxWindowDays}
             value={evalDays}
             onChange={(e) => {
               const nextValue = e.target.value;
