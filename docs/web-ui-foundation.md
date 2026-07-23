@@ -129,7 +129,8 @@ separate desktop-owned change.
 
 The Router URL remains the primary state owner. A tab-scoped continuity layer
 stores only allowlisted, normalized route snapshots for Home, Chat, Portfolio,
-Decision Signals, Screening, Backtest, and stock details. On a fresh document
+Decision Signals, Research Market, Research Discover, Research Backtest, and
+stock details. On a fresh document
 load, a bare major-route URL may replace itself once with the last snapshot for
 that route. Explicit URL state always wins, and later in-app navigation is not
 overridden by the initial restore guard.
@@ -141,9 +142,10 @@ proven. The current explicit route also wins immediately over a stale snapshot,
 so clearing a destination filter cannot be undone by its own Sidebar link.
 
 Application navigation carries the current validated stock context into Home,
-Chat, Decision Signals, and Backtest. Destination-specific state such as a
-Chat session, Portfolio account, Decision Signals tab/filter set, Screening
-parameters, or Backtest range remains scoped to that destination. Clearing a
+Chat, Decision Signals, and Research Backtest. Destination-specific state such
+as a Chat session, Portfolio account, Decision Signals tab/filter set, Research
+Discover parameters, or Research Backtest range remains scoped to that
+destination. Clearing a
 route's URL-owned state overwrites its snapshot, so the persistence layer
 cannot resurrect filters or selections the user intentionally removed.
 Decision Signal details with a source report provide a one-click handoff to the

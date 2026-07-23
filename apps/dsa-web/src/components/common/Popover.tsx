@@ -29,6 +29,8 @@ interface PopoverProps {
   align?: 'start' | 'end';
   autoFocusContent?: boolean;
   onContentKeyDown?: React.KeyboardEventHandler<HTMLDivElement>;
+  onContentMouseEnter?: React.MouseEventHandler<HTMLDivElement>;
+  onContentMouseLeave?: React.MouseEventHandler<HTMLDivElement>;
 }
 
 export const Popover = ({
@@ -48,6 +50,8 @@ export const Popover = ({
   align = 'start',
   autoFocusContent = true,
   onContentKeyDown,
+  onContentMouseEnter,
+  onContentMouseLeave,
 }: PopoverProps) => {
   const rootRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -227,6 +231,8 @@ export const Popover = ({
               data-dialog-popup="true"
               style={popupStyle}
               onKeyDown={handleContentKeyDown}
+              onMouseEnter={onContentMouseEnter}
+              onMouseLeave={onContentMouseLeave}
               className={cn(
                 'fixed overflow-hidden rounded-xl border border-border bg-elevated shadow-lg',
                 contentClassName,

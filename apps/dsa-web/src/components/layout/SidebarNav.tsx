@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { BarChart3, ChevronDown, ChevronRight, LogOut, PanelLeft, PanelRight, Search } from 'lucide-react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { BarChart3, ChevronRight, LogOut, PanelLeft, PanelRight, Search } from 'lucide-react';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAgentChatStore } from '../../stores/agentChatStore';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -29,6 +29,8 @@ type SidebarNavProps = {
   profileTriggerRef?: React.Ref<HTMLButtonElement>;
   profilePresentation?: 'mobile' | 'desktop' | 'drawer';
 };
+
+const SIDEBAR_GROUP_CLOSE_DELAY_MS = 120;
 
 export const SidebarNav: React.FC<SidebarNavProps> = ({
   collapsed = false,
@@ -94,7 +96,10 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
   }, [cancelGroupClose]);
   const scheduleGroupClose = useCallback(() => {
     cancelGroupClose();
-    groupCloseTimerRef.current = window.setTimeout(closeGroup, 120);
+    groupCloseTimerRef.current = window.setTimeout(
+      closeGroup,
+      SIDEBAR_GROUP_CLOSE_DELAY_MS,
+    );
   }, [cancelGroupClose, closeGroup]);
   useEffect(() => cancelGroupClose, [cancelGroupClose]);
 
@@ -244,9 +249,6 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                 <>
                   <Icon className={cn(itemIconClass, active ? 'text-[var(--nav-icon-active)]' : 'text-current')} />
                   {!collapsed ? <span className={itemLabelClass}>{label}</span> : null}
-                  {!collapsed && children ? (
-                    <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-muted-text" aria-hidden="true" />
-                  ) : null}
                   {badge === 'completion' && completionBadge ? (
                     <StatusDot
                       tone="info"
@@ -282,6 +284,8 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                 placement="right"
                 autoFocusContent={focusFlyoutGroupKey === key}
                 contentClassName="w-56 p-1.5"
+                onContentMouseEnter={cancelGroupClose}
+                onContentMouseLeave={scheduleGroupClose}
                 onContentKeyDown={(event) => {
                   if (event.key === 'Tab') {
                     closeGroup();
@@ -330,7 +334,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                 )}
               >
                 {() => (
-                  <div onMouseEnter={cancelGroupClose} onMouseLeave={scheduleGroupClose}>
+                  <div>
                     <div className="px-2.5 pb-1.5 pt-1 text-xs font-medium text-muted-text">
                       {label}
                     </div>
@@ -339,13 +343,13 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                       const childLabel = t(child.labelKey);
                       const childActive = isRouteActive(child.to, child.exact);
                       return (
-                        <NavLink
+                        <Link
                           key={child.key}
                           role="menuitem"
                           tabIndex={-1}
                           to={resolveContextAwareNavigationTarget(child.to, currentHref)}
-                          end={child.exact}
                           aria-label={childLabel}
+                          aria-current={childActive && child.to !== to ? 'page' : undefined}
                           data-route-focus-key={`${focusKeyPrefix}:${child.key}`}
                           data-route-focus-return-key={triggerFocusKey}
                           onClick={(event) => {
@@ -361,7 +365,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                         >
                           <ChildIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
                           <span className="truncate">{childLabel}</span>
-                        </NavLink>
+                        </Link>
                       );
                     })}
                   </div>
@@ -379,31 +383,34 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                     const ChildIcon = child.icon;
                     const childLabel = t(child.labelKey);
                     return (
-                      <NavLink
+                      <Link
                         key={child.key}
                         to={resolveContextAwareNavigationTarget(child.to, currentHref)}
-                        end={child.exact}
                         onClick={(event) => {
                           if (shouldDelegateCurrentDocumentNavigation(event)) {
                             onNavigate?.();
                           }
                         }}
                         aria-label={childLabel}
+                        aria-current={isRouteActive(child.to, child.exact) && child.to !== to
+                          ? 'page'
+                          : undefined}
                         data-route-focus-key={`${focusKeyPrefix}:${child.key}`}
                         data-route-focus-return-key={returnFocusKey}
-                        className={({ isActive }) => cn(
+                        className={cn(
                           itemInteractiveClass,
                           'min-h-10 gap-2.5 px-2.5 text-xs',
-                          isActive ? itemActiveClass : '',
+                          isRouteActive(child.to, child.exact) ? itemActiveClass : '',
                         )}
                       >
-                        {({ isActive }) => (
-                          <>
-                            <ChildIcon className={cn('h-4 w-4 shrink-0', isActive ? 'text-[var(--nav-icon-active)]' : 'text-current')} />
-                            <span className="truncate">{childLabel}</span>
-                          </>
-                        )}
-                      </NavLink>
+                        <ChildIcon className={cn(
+                          'h-4 w-4 shrink-0',
+                          isRouteActive(child.to, child.exact)
+                            ? 'text-[var(--nav-icon-active)]'
+                            : 'text-current',
+                        )} />
+                        <span className="truncate">{childLabel}</span>
+                      </Link>
                     );
                   })}
                 </div>
