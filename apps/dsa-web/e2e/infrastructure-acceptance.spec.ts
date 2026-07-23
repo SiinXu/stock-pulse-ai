@@ -18,6 +18,7 @@ import { UI_TEXT } from '../src/i18n/uiText';
 import {
   APP_ROUTE_PATHS,
   LEGACY_ROUTE_PATHS,
+  RESEARCH_DISCOVER_DEFAULT_VALUES,
   RESEARCH_DISCOVER_ROUTE_QUERY_KEYS,
   SETTINGS_ROUTE_QUERY_KEYS,
   SETTINGS_SECTION_IDS,
@@ -789,9 +790,9 @@ test.describe('infrastructure interaction acceptance matrix', () => {
         key: screeningTaskStorageKey,
         value: {
           taskId: 'stored-explicit-task',
-          market: 'cn',
-          strategy: 'dual_low',
-          maxResults: 3,
+          market: RESEARCH_DISCOVER_DEFAULT_VALUES.market,
+          strategy: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
+          maxResults: RESEARCH_DISCOVER_DEFAULT_VALUES.count,
         },
       });
       const requestsBeforeNavigation = restorationRequests;
@@ -814,6 +815,49 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       expect(await page.evaluate((key) => sessionStorage.getItem(key), screeningTaskStorageKey))
         .toContain('stored-explicit-task');
     }
+
+    await page.evaluate(({ key, value }) => sessionStorage.setItem(key, JSON.stringify(value)), {
+      key: screeningTaskStorageKey,
+      value: {
+        taskId: 'stored-explicit-task',
+        market: RESEARCH_DISCOVER_DEFAULT_VALUES.market,
+        strategy: 'quality',
+        maxResults: 20,
+      },
+    });
+    const explicitDefaults = new URLSearchParams({
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: String(RESEARCH_DISCOVER_DEFAULT_VALUES.count),
+      source: 'notification',
+    });
+    await page.goto(`${APP_ROUTE_PATHS.researchDiscover}?${explicitDefaults.toString()}#details`);
+
+    await expect.poll(() => new URL(page.url()).pathname).toBe(APP_ROUTE_PATHS.researchDiscover);
+    await expect(page.getByRole('combobox', { name: SCREENING_TEXT.en.selectStrategy }))
+      .toHaveAttribute('data-value', RESEARCH_DISCOVER_DEFAULT_VALUES.strategy);
+    let defaultOwnedUrl = new URL(page.url());
+    expect(defaultOwnedUrl.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy))
+      .toBe(RESEARCH_DISCOVER_DEFAULT_VALUES.strategy);
+    expect(defaultOwnedUrl.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count))
+      .toBe(String(RESEARCH_DISCOVER_DEFAULT_VALUES.count));
+    await page.getByRole('button', { name: SCREENING_TEXT.en.parameters }).click();
+    await expect(page.getByRole('dialog', { name: SCREENING_TEXT.en.parameters })
+      .getByLabel(SCREENING_TEXT.en.resultCount))
+      .toHaveValue(String(RESEARCH_DISCOVER_DEFAULT_VALUES.count));
+
+    await page.reload();
+
+    await expect(page.getByRole('combobox', { name: SCREENING_TEXT.en.selectStrategy }))
+      .toHaveAttribute('data-value', RESEARCH_DISCOVER_DEFAULT_VALUES.strategy);
+    defaultOwnedUrl = new URL(page.url());
+    expect(defaultOwnedUrl.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy))
+      .toBe(RESEARCH_DISCOVER_DEFAULT_VALUES.strategy);
+    expect(defaultOwnedUrl.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count))
+      .toBe(String(RESEARCH_DISCOVER_DEFAULT_VALUES.count));
+    await page.getByRole('button', { name: SCREENING_TEXT.en.parameters }).click();
+    await expect(page.getByRole('dialog', { name: SCREENING_TEXT.en.parameters })
+      .getByLabel(SCREENING_TEXT.en.resultCount))
+      .toHaveValue(String(RESEARCH_DISCOVER_DEFAULT_VALUES.count));
   });
 
   test('06 Chinese UI with Chinese report keeps both report body and system actions Chinese', async ({ page }) => {

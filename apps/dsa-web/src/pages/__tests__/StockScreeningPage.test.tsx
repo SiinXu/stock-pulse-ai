@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import {
   APP_ROUTE_PATHS,
+  RESEARCH_DISCOVER_DEFAULT_VALUES,
   RESEARCH_DISCOVER_MARKET_VALUES,
   RESEARCH_DISCOVER_ROUTE_QUERY_KEYS,
 } from '../../routing/routes';
@@ -967,6 +968,55 @@ describe('StockScreeningPage', () => {
     );
     expect(window.sessionStorage.getItem(SCREEN_TASK_SESSION_STORAGE_KEY))
       .toContain('stored-screen-task');
+  });
+
+  it('keeps explicit default-valued URL state authoritative after a refresh with a stale task', async () => {
+    window.sessionStorage.setItem(SCREEN_TASK_SESSION_STORAGE_KEY, JSON.stringify({
+      taskId: 'stored-default-task',
+      market: RESEARCH_DISCOVER_DEFAULT_VALUES.market,
+      strategy: 'quality',
+      maxResults: 20,
+    }));
+    const explicitQuery = new URLSearchParams({
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: String(RESEARCH_DISCOVER_DEFAULT_VALUES.count),
+      source: 'notification',
+    });
+    const explicitHref = `${APP_ROUTE_PATHS.researchDiscover}?${explicitQuery.toString()}#details`;
+    window.history.pushState({}, '', explicitHref);
+    getAlphaSiftStatus.mockResolvedValue({
+      enabled: true,
+      available: true,
+      installSpecIsDefault: true,
+    });
+    getScreenTask.mockResolvedValue({
+      taskId: 'stored-default-task',
+      traceId: 'stored-default-task',
+      status: 'processing',
+      progress: 40,
+      message: '任务执行中',
+      result: null,
+    });
+
+    const firstLoad = render(<StockScreeningPage />);
+
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    await waitFor(() => expect(getScreenTask).toHaveBeenCalledWith('stored-default-task'));
+    openScreeningConfiguration();
+    expect(screen.getByLabelText('策略参数')).toHaveValue(RESEARCH_DISCOVER_DEFAULT_VALUES.strategy);
+    expect(screen.getByLabelText('返回数量')).toHaveValue(RESEARCH_DISCOVER_DEFAULT_VALUES.count);
+    expect(navigate).toHaveBeenLastCalledWith(explicitHref, { replace: true });
+
+    firstLoad.unmount();
+    window.history.pushState({}, '', explicitHref);
+    navigate.mockClear();
+    render(<StockScreeningPage />);
+
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    openScreeningConfiguration();
+    expect(screen.getByLabelText('策略参数')).toHaveValue(RESEARCH_DISCOVER_DEFAULT_VALUES.strategy);
+    expect(screen.getByLabelText('返回数量')).toHaveValue(RESEARCH_DISCOVER_DEFAULT_VALUES.count);
+    expect(navigate).toHaveBeenLastCalledWith(explicitHref, { replace: true });
   });
 
   it('keeps the parameter modal open and focuses an invalid result count', async () => {
