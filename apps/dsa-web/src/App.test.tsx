@@ -6,6 +6,8 @@ import * as AuthContext from './contexts/AuthContext';
 import {
   APP_ROUTE_PATHS,
   LEGACY_ROUTE_PATHS,
+  RESEARCH_DISCOVER_DEFAULT_VALUES,
+  RESEARCH_DISCOVER_ROUTE_QUERY_KEYS,
   SETTINGS_ROUTE_QUERY_KEYS,
   SETTINGS_SECTION_IDS,
 } from './routing/routes';
@@ -140,6 +142,25 @@ describe('App routing behavior', () => {
     expect(await screen.findByTestId('login-page')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/login');
     expect(window.location.search).toBe('?redirect=%2Fportfolio');
+  });
+
+  it('preserves explicit Discover default ownership in an authentication redirect', async () => {
+    vi.mocked(AuthContext.useAuth).mockReturnValue(makeAuthState({
+      authEnabled: true,
+      loggedIn: false,
+      setupState: 'enabled',
+    }));
+    const discoverSearch = new URLSearchParams({
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: String(RESEARCH_DISCOVER_DEFAULT_VALUES.count),
+    }).toString();
+    const discoverHref = `${APP_ROUTE_PATHS.researchDiscover}?${discoverSearch}`;
+    window.history.pushState({}, '', discoverHref);
+
+    render(<App />);
+
+    expect(await screen.findByTestId('login-page')).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get('redirect')).toBe(discoverHref);
   });
 
   it('redirects an explicit logout to plain login without retaining workflow identity', async () => {
@@ -301,6 +322,74 @@ describe('App routing behavior', () => {
     expect(await screen.findByTestId('settings-page')).toBeInTheDocument();
     expect(window.location.pathname).toBe(APP_ROUTE_PATHS.settings);
     expect(window.location.search).toBe('?section=ai_models');
+    expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    {
+      name: 'canonical custom Discover state',
+      href: `${APP_ROUTE_PATHS.researchDiscover}?${new URLSearchParams({
+        [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: 'custom_strategy_alpha',
+        [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: '17',
+      }).toString()}#details`,
+    },
+    {
+      name: 'legacy explicit default Discover state',
+      href: `${LEGACY_ROUTE_PATHS.screening}?${new URLSearchParams({
+        [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
+        [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: String(RESEARCH_DISCOVER_DEFAULT_VALUES.count),
+      }).toString()}#details`,
+    },
+    {
+      name: 'legacy malformed Discover state',
+      href: `${LEGACY_ROUTE_PATHS.screening}?${new URLSearchParams({
+        [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: '<bad>',
+        [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: '999',
+      }).toString()}#details`,
+      sanitizedHref: `${LEGACY_ROUTE_PATHS.screening}?${new URLSearchParams({
+        [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
+        [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: String(RESEARCH_DISCOVER_DEFAULT_VALUES.count),
+      }).toString()}#details`,
+    },
+  ])('encodes the full $name URL for authentication return', async (testCase) => {
+    const { href } = testCase;
+    vi.mocked(AuthContext.useAuth).mockReturnValue(makeAuthState({
+      authEnabled: true,
+      loggedIn: false,
+      setupState: 'enabled',
+    }));
+    window.history.pushState({}, '', href);
+
+    render(<App />);
+
+    expect(await screen.findByTestId('login-page')).toBeInTheDocument();
+    const loginUrl = new URL(window.location.href);
+    expect(loginUrl.pathname).toBe(APP_ROUTE_PATHS.login);
+    expect(loginUrl.searchParams.get('redirect')).toBe(
+      'sanitizedHref' in testCase ? testCase.sanitizedHref : href,
+    );
+  });
+
+  it('restores explicit Discover default ownership after authentication', async () => {
+    vi.mocked(AuthContext.useAuth).mockReturnValue(makeAuthState({
+      authEnabled: true,
+      loggedIn: true,
+      setupState: 'enabled',
+    }));
+    const discoverSearch = new URLSearchParams({
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: String(RESEARCH_DISCOVER_DEFAULT_VALUES.count),
+    }).toString();
+    const discoverHref = `${APP_ROUTE_PATHS.researchDiscover}?${discoverSearch}#details`;
+    const loginSearch = new URLSearchParams({ redirect: discoverHref }).toString();
+    window.history.pushState({}, '', `${APP_ROUTE_PATHS.login}?${loginSearch}`);
+
+    render(<App />);
+
+    expect(await screen.findByTestId('screening-page')).toBeInTheDocument();
+    expect(window.location.pathname).toBe(APP_ROUTE_PATHS.researchDiscover);
+    expect(window.location.search).toBe(`?${discoverSearch}`);
+    expect(window.location.hash).toBe('#details');
     expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
   });
 

@@ -95,6 +95,36 @@ function replaceOwnedParams(
   return next;
 }
 
+function encodeResearchDiscoverOwnedParams(
+  state: ResearchDiscoverRouteState,
+  explicitSource?: URLSearchParams,
+): URLSearchParams {
+  const ownedParams = new URLSearchParams();
+  if (state.market !== DEFAULT_RESEARCH_DISCOVER_ROUTE_STATE.market) {
+    ownedParams.set(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market, state.market);
+  }
+  if (state.strategy !== DEFAULT_RESEARCH_DISCOVER_ROUTE_STATE.strategy) {
+    ownedParams.set(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy, state.strategy);
+  }
+  if (state.maxResults !== DEFAULT_RESEARCH_DISCOVER_ROUTE_STATE.maxResults) {
+    ownedParams.set(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count, String(state.maxResults));
+  }
+
+  // Keep explicit default-valued state distinguishable from a bare URL so a
+  // stale active-task fallback cannot reclaim ownership after refresh.
+  if (ownedParams.toString() || !explicitSource) return ownedParams;
+  if (explicitSource.has(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market)) {
+    ownedParams.set(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market, state.market);
+  }
+  if (explicitSource.has(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy)) {
+    ownedParams.set(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy, state.strategy);
+  }
+  if (explicitSource.has(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count)) {
+    ownedParams.set(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count, String(state.maxResults));
+  }
+  return ownedParams;
+}
+
 export function parseResearchDiscoverRouteState(
   search: string | URLSearchParams,
 ): ParsedResearchRouteState<ResearchDiscoverRouteState> {
@@ -130,19 +160,11 @@ export function parseResearchDiscoverRouteState(
     }
   }
 
-  const ownedParams = new URLSearchParams();
-  if (market !== DEFAULT_RESEARCH_DISCOVER_ROUTE_STATE.market) {
-    ownedParams.set(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market, market);
-  }
-  if (strategy !== DEFAULT_RESEARCH_DISCOVER_ROUTE_STATE.strategy) {
-    ownedParams.set(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy, strategy);
-  }
-  if (maxResults !== DEFAULT_RESEARCH_DISCOVER_ROUTE_STATE.maxResults) {
-    ownedParams.set(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count, String(maxResults));
-  }
+  const state = { market, strategy, maxResults };
+  const ownedParams = encodeResearchDiscoverOwnedParams(state, source);
 
   return {
-    state: { market, strategy, maxResults },
+    state,
     ownedParams,
     normalizedParams: replaceOwnedParams(source, ownedKeys, ownedParams),
     hasOwnedParameters,
@@ -174,16 +196,12 @@ export function setResearchDiscoverRouteState(
   search: string | URLSearchParams,
   state: ResearchDiscoverRouteState,
 ): URLSearchParams {
+  const source = toSearchParams(search);
   const normalized = normalizeResearchDiscoverRouteState(state);
-  const encoded = parseResearchDiscoverRouteState(new URLSearchParams({
-    [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market]: normalized.market,
-    [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: normalized.strategy,
-    [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: String(normalized.maxResults),
-  }));
   return replaceOwnedParams(
-    toSearchParams(search),
+    source,
     Object.values(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS),
-    encoded.ownedParams,
+    encodeResearchDiscoverOwnedParams(normalized, source),
   );
 }
 

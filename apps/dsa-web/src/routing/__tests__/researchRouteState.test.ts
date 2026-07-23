@@ -6,10 +6,12 @@ import {
   RESEARCH_DISCOVER_ROUTE_QUERY_KEYS,
 } from '../routes';
 import {
+  DEFAULT_RESEARCH_DISCOVER_ROUTE_STATE,
   parseResearchBacktestRouteState,
   parseResearchDiscoverRouteState,
   resolveResearchDiscoverRouteState,
   setResearchBacktestRouteState,
+  setResearchDiscoverRouteState,
 } from '../researchRouteState';
 
 describe('Research route state codec', () => {
@@ -29,8 +31,15 @@ describe('Research route state codec', () => {
       maxResults: 20,
     });
     expect(parsed.hasOwnedParameters).toBe(true);
-    expect(parsed.ownedParams.toString()).toBe('strategy=quality&count=20');
-    expect(parsed.normalizedParams.toString()).toBe('strategy=quality&count=20&source=report');
+    expect(parsed.ownedParams.toString()).toBe(new URLSearchParams({
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: 'quality',
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: '20',
+    }).toString());
+    expect(parsed.normalizedParams.toString()).toBe(new URLSearchParams({
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: 'quality',
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: '20',
+      source: 'report',
+    }).toString());
     expect(parsed.invalidKeys).toEqual([]);
   });
 
@@ -82,9 +91,15 @@ describe('Research route state codec', () => {
   });
 
   it('normalizes and writes valid Backtest state without deleting unrelated parameters', () => {
-    const parsed = parseResearchBacktestRouteState(
-      '?code=aapl&window=30&from=2026-03-01&to=2026-03-31&phase=intraday&page=2&ref=report',
-    );
+    const parsed = parseResearchBacktestRouteState(new URLSearchParams({
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code]: 'aapl',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.window]: '30',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.from]: '2026-03-01',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.to]: '2026-03-31',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.phase]: RESEARCH_BACKTEST_PHASE_VALUES.intraday,
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.page]: '2',
+      ref: 'report',
+    }));
 
     expect(parsed.state).toEqual({
       code: 'AAPL',
@@ -94,16 +109,33 @@ describe('Research route state codec', () => {
       phase: RESEARCH_BACKTEST_PHASE_VALUES.intraday,
       page: 2,
     });
-    expect(parsed.normalizedParams.toString()).toBe(
-      'code=AAPL&window=30&from=2026-03-01&to=2026-03-31&phase=intraday&page=2&ref=report',
-    );
+    expect(parsed.normalizedParams.toString()).toBe(new URLSearchParams({
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code]: 'AAPL',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.window]: '30',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.from]: '2026-03-01',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.to]: '2026-03-31',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.phase]: RESEARCH_BACKTEST_PHASE_VALUES.intraday,
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.page]: '2',
+      ref: 'report',
+    }).toString());
     expect(setResearchBacktestRouteState('?ref=report', parsed.state).toString()).toBe(
-      'ref=report&code=AAPL&window=30&from=2026-03-01&to=2026-03-31&phase=intraday&page=2',
+      new URLSearchParams({
+        ref: 'report',
+        [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code]: 'AAPL',
+        [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.window]: '30',
+        [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.from]: '2026-03-01',
+        [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.to]: '2026-03-31',
+        [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.phase]: RESEARCH_BACKTEST_PHASE_VALUES.intraday,
+        [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.page]: '2',
+      }).toString(),
     );
   });
 
   it('treats malformed explicit Discover state as authoritative defaults instead of stale fallback', () => {
-    const parsed = resolveResearchDiscoverRouteState('?strategy=%3Cbad%3E&count=999', {
+    const parsed = resolveResearchDiscoverRouteState(new URLSearchParams({
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: '<bad>',
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: '999',
+    }), {
       market: RESEARCH_DISCOVER_DEFAULT_VALUES.market,
       strategy: 'stale_task_strategy',
       maxResults: 8,
@@ -118,13 +150,81 @@ describe('Research route state codec', () => {
       RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy,
       RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count,
     ]);
+    expect(parsed.ownedParams.toString()).toBe(new URLSearchParams({
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: String(RESEARCH_DISCOVER_DEFAULT_VALUES.count),
+    }).toString());
+  });
+
+  it('keeps wholly malformed Discover intent explicit after canonical cleanup and refresh', () => {
+    const staleTask = {
+      market: RESEARCH_DISCOVER_DEFAULT_VALUES.market,
+      strategy: 'quality',
+      maxResults: 8,
+    };
+    const parsed = resolveResearchDiscoverRouteState(new URLSearchParams({
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market]: 'unsupported',
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: '<bad>',
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: '999',
+      source: 'notification',
+    }), staleTask);
+    const expectedNormalized = new URLSearchParams({
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market]: RESEARCH_DISCOVER_DEFAULT_VALUES.market,
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: String(RESEARCH_DISCOVER_DEFAULT_VALUES.count),
+      source: 'notification',
+    });
+
+    expect(parsed.state).toEqual(DEFAULT_RESEARCH_DISCOVER_ROUTE_STATE);
+    expect(parsed.normalizedParams.toString()).toBe(expectedNormalized.toString());
+    expect(resolveResearchDiscoverRouteState(parsed.normalizedParams, staleTask).state)
+      .toEqual(DEFAULT_RESEARCH_DISCOVER_ROUTE_STATE);
   });
 
   it('canonicalizes valid Discover state through the same owned-parameter set', () => {
-    const parsed = parseResearchDiscoverRouteState('?market=cn&strategy=quality&count=20&keep=yes');
+    const parsed = parseResearchDiscoverRouteState(new URLSearchParams({
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market]: RESEARCH_DISCOVER_DEFAULT_VALUES.market,
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: 'quality',
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: '20',
+      keep: 'yes',
+    }));
 
-    expect(parsed.state).toEqual({ market: 'cn', strategy: 'quality', maxResults: 20 });
-    expect(parsed.ownedParams.toString()).toBe('strategy=quality&count=20');
-    expect(parsed.normalizedParams.toString()).toBe('strategy=quality&count=20&keep=yes');
+    expect(parsed.state).toEqual({
+      market: RESEARCH_DISCOVER_DEFAULT_VALUES.market,
+      strategy: 'quality',
+      maxResults: 20,
+    });
+    expect(parsed.ownedParams.toString()).toBe(new URLSearchParams({
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: 'quality',
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: '20',
+    }).toString());
+    expect(parsed.normalizedParams.toString()).toBe(new URLSearchParams({
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: 'quality',
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: '20',
+      keep: 'yes',
+    }).toString());
+  });
+
+  it('retains explicit default-valued Discover ownership across normalization and refresh', () => {
+    const staleTask = {
+      market: RESEARCH_DISCOVER_DEFAULT_VALUES.market,
+      strategy: 'quality',
+      maxResults: 20,
+    };
+    const explicitDefaults = new URLSearchParams({
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: String(RESEARCH_DISCOVER_DEFAULT_VALUES.count),
+      source: 'notification',
+    });
+
+    const firstLoad = resolveResearchDiscoverRouteState(explicitDefaults, staleTask);
+    const refreshed = resolveResearchDiscoverRouteState(firstLoad.normalizedParams, staleTask);
+
+    expect(firstLoad.state).toEqual(DEFAULT_RESEARCH_DISCOVER_ROUTE_STATE);
+    expect(firstLoad.normalizedParams.toString()).toBe(explicitDefaults.toString());
+    expect(setResearchDiscoverRouteState(explicitDefaults, firstLoad.state).toString())
+      .toBe(explicitDefaults.toString());
+    expect(refreshed.state).toEqual(DEFAULT_RESEARCH_DISCOVER_ROUTE_STATE);
+    expect(refreshed.hasOwnedParameters).toBe(true);
   });
 });

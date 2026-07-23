@@ -574,6 +574,16 @@ const StockScreeningPage: React.FC = () => {
   );
   const selectedStrategyTag = selectedStrategyDisplay?.category || text.custom;
   const displayedStrategy = selectedStrategyDisplay?.name ?? `${text.customStrategy} (${strategy})`;
+  const strategyOptions = useMemo(() => {
+    const catalogOptions = strategies.map((item) => ({
+      value: item.id,
+      label: getStrategyDisplay(item, language).name,
+    }));
+    if (selectedStrategy || strategy === DEFAULT_RESEARCH_DISCOVER_ROUTE_STATE.strategy) {
+      return catalogOptions;
+    }
+    return [{ value: strategy, label: displayedStrategy }, ...catalogOptions];
+  }, [displayedStrategy, language, selectedStrategy, strategies, strategy]);
   const screenMessages = useMemo(() => getScreenMessages(screenMeta, text), [screenMeta, text]);
   const llmDegraded = screenMeta?.llmRanked === false;
   const alertMessages = llmDegraded
@@ -655,13 +665,7 @@ const StockScreeningPage: React.FC = () => {
     try {
       const result = await alphasiftApi.getStrategies();
       if (!isLatestRequest()) return;
-      const loadedStrategies = result.strategies || [];
-      setStrategies(loadedStrategies);
-      if (loadedStrategies.length > 0) {
-        setStrategy((currentStrategy) =>
-          loadedStrategies.some((item) => item.id === currentStrategy) ? currentStrategy : loadedStrategies[0].id,
-        );
-      }
+      setStrategies(result.strategies || []);
     } catch (err) {
       if (!isLatestRequest()) return;
       setStrategyLoadError(getParsedApiError(err, language).message || text.strategyLoadFailed);
@@ -1496,13 +1500,10 @@ const StockScreeningPage: React.FC = () => {
             <Select
               value={strategy}
               onChange={handleStrategyChange}
-              options={strategies.map((item) => ({
-                value: item.id,
-                label: getStrategyDisplay(item, language).name,
-              }))}
+              options={strategyOptions}
               ariaLabel={text.selectStrategy}
               placeholder={loadingStrategies ? text.loadingStrategies : text.strategiesUnavailable}
-              disabled={loading || loadingStrategies || strategies.length === 0}
+              disabled={loading || loadingStrategies || strategyOptions.length === 0}
               className="w-full sm:w-72 [&>div]:w-full"
             />
             <span className="shrink-0 rounded-lg border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
