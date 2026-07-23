@@ -425,6 +425,7 @@ const SettingsPage: React.FC = () => {
   const [llmChannelAddSignal, setLlmChannelAddSignal] = useState(0);
   const envBackupImportRef = useRef<HTMLInputElement | null>(null);
   const setupStatusRequestIdRef = useRef(0);
+  const onboardingWizardOpenedRef = useRef(false);
   const desktopRuntimeApi = getDesktopRuntimeApi();
   const isDesktopRuntime = Boolean(desktopRuntimeApi);
   const canCheckDesktopUpdate = Boolean(
@@ -790,6 +791,31 @@ const SettingsPage: React.FC = () => {
   useEffect(() => {
     void refreshSetupStatus();
   }, [refreshSetupStatus]);
+
+  useEffect(() => {
+    if (
+      onboardingWizardOpenedRef.current
+      || searchParams.get(SETTINGS_ROUTE_QUERY_KEYS.source) !== 'onboarding'
+      || !setupStatus
+    ) {
+      return;
+    }
+    const needsLlmSetup = setupStatus.requiredMissingKeys.includes('llm_primary')
+      || setupStatus.checks.some((check) => (
+        check.key === 'llm_primary' && check.status === 'needs_action'
+      ));
+    if (!needsLlmSetup) {
+      onboardingWizardOpenedRef.current = true;
+      return;
+    }
+    if (isProviderCatalogLoading) {
+      return;
+    }
+    onboardingWizardOpenedRef.current = true;
+    if (providerCatalog.length > 0) {
+      setIsWizardOpen(true);
+    }
+  }, [isProviderCatalogLoading, providerCatalog.length, searchParams, setupStatus]);
 
   useEffect(() => {
     if (!toast || toast.type !== 'success' || isToastPaused) {

@@ -1539,6 +1539,30 @@ describe('stockPoolStore', () => {
     expect(task?.progress).toBe(0);
   });
 
+  it('uses the requested report type for both the API request and optimistic task', async () => {
+    vi.mocked(analysisApi.analyzeAsync).mockResolvedValue({
+      taskId: 'task-brief-1',
+      status: 'pending',
+    } as never);
+
+    await useStockPoolStore.getState().submitAnalysis({
+      stockCode: '600519',
+      stockName: '贵州茅台',
+      reportType: 'brief',
+    });
+
+    expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(expect.objectContaining({
+      stockCode: '600519',
+      reportType: 'brief',
+    }));
+    expect(useStockPoolStore.getState().activeTasks).toContainEqual(
+      expect.objectContaining({
+        taskId: 'task-brief-1',
+        reportType: 'brief',
+      }),
+    );
+  });
+
   it('does not duplicate a task when the SSE created event arrives after submit', async () => {
     vi.mocked(analysisApi.analyzeAsync).mockResolvedValue({
       taskId: 'task-immediate-2',

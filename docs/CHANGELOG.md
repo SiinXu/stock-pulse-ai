@@ -325,6 +325,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Made secondary sidebar groups collapsible with visible current-page ownership and preserved explicit Discover URL ownership across default, non-default, malformed, refreshed, legacy, authenticated, and safe custom-strategy links.
 - [Added] Added a desktop-only local model center that discovers, starts/stops, downloads recommended Ollama models, and registers them into the desktop `.env`, using whitelisted process launches, strict model-name validation, an isolated sandboxed renderer, and secret-free logs.
 - [Changed] Unified Web decision signals, alert rules, delivery history, and outcome review under `/signals` with URL-scoped filters and legacy redirects.
+- [Added] Added a persistent Beginner Web mode with guided first-run setup, brief quick analysis, simplified risk-aware report summaries, and progressive access to professional report controls.
 
 ## [3.26.3] - 2026-07-15
 
