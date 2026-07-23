@@ -10,7 +10,7 @@
 
 ## 当前文档范围（本轮）
 
-- 本文件为 Phase 0 合同与验收边界文档，当前 PR 为 docs + runtime fix，本轮同步补齐 `baostock_fetcher.py`、`pytdx_fetcher.py`、`tushare_fetcher.py` 的 A 股代码归属边界，并配套由 `tests/test_a_share_fetcher_code_conversion.py` 做回归验证。
+- 本文件为 Phase 0 合同与验收边界文档，当前 PR 为 docs + runtime fix，本轮同步补齐 `baostock_fetcher.py`、`pytdx_fetcher.py`、`tushare_fetcher.py` 的 A 股代码归属边界，并配套由 `tests/data_provider/test_a_share_fetcher_code_conversion.py` 做回归验证。
 - 归属边界必须覆盖裸码与前缀码（如 `000001`、`000001.SZ`、`SH000001`、`SH.000001`、`SZ000001`、`SZ.000001`），避免把 SH/SZ 前缀语义误归类。
 - 若无新增 LLM 相关 provider/model/Base URL 语义迁移需求，本轮收敛 Tushare A 股归属范围至：`600/601/603/605/688`、`000/001/002/003/300/301`，并同步回归 `605`、`001`、`003`、`301` 场景；该范围变更不视为 provider 配置/路由策略扩展。
 
@@ -27,8 +27,8 @@
 - `data_provider/baostock_fetcher.py`、`data_provider/pytdx_fetcher.py`、`data_provider/tushare_fetcher.py` 本轮只处理：
   - 裸码与后缀码：`000001`、`000001.SH`、`000001.SZ`
   - 前缀码：`SH000001`、`SH.000001`、`SZ000001`、`SZ.000001`
-- `SH000001`/`SH.000001`/`SZ000001`/`SZ.000001` 场景为 correctness blocker，需由 `tests/test_a_share_fetcher_code_conversion.py` 覆盖回归。
-- 回归最小口径为 `python -m pytest tests/test_a_share_fetcher_code_conversion.py` 与 `./scripts/ci_gate.sh`，并在 PR 描述同步结果与阻塞。
+- `SH000001`/`SH.000001`/`SZ000001`/`SZ.000001` 场景为 correctness blocker，需由 `tests/data_provider/test_a_share_fetcher_code_conversion.py` 覆盖回归。
+- 回归最小口径为 `python -m pytest tests/data_provider/test_a_share_fetcher_code_conversion.py` 与 `./scripts/ci_gate.sh`，并在 PR 描述同步结果与阻塞。
 - 回滚优先级为恢复本轮三文件变更到合并前提交；其余范围不应一并回退。
 
 ## 术语与契约（P0 草案）
