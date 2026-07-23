@@ -323,6 +323,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Reused the shared connection-test runner in the first-run LLM setup wizard so its optional test reports actionable stage and error-code diagnostics, the resolved effective model and protocol, and JSON and vision capability results instead of a binary pass/fail.
 - [Fixed] Serialized root-owned plugin lifecycle operations with composition-root close, replacement, and reset so roots with shutdown requested cannot activate or be republished, callback-owned workers cannot deadlock, and terminal process shutdown cannot recreate the root.
 - [Changed] Made secondary sidebar groups collapsible with visible current-page ownership and preserved explicit Discover URL ownership across default, non-default, malformed, refreshed, legacy, authenticated, and safe custom-strategy links.
+- [Added] Added a desktop-only local model center that discovers, starts/stops, downloads recommended Ollama models, and registers them into the desktop `.env`, using whitelisted process launches, strict model-name validation, an isolated sandboxed renderer, and secret-free logs.
 
 ## [3.26.3] - 2026-07-15
 
