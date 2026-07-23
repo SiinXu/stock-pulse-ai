@@ -134,11 +134,17 @@ function collectSourceFiles(directory: string): string[] {
   });
 }
 
-function productionCandidates() {
-  return collectSourceFiles(sourceRoot).flatMap((filename) => {
+let productionCandidateCache: ReturnType<typeof collectHardcodedUiStrings> | null = null;
+
+function productionCandidates(): ReturnType<typeof collectHardcodedUiStrings> {
+  if (productionCandidateCache) {
+    return productionCandidateCache;
+  }
+  productionCandidateCache = collectSourceFiles(sourceRoot).flatMap((filename) => {
     const relative = path.relative(sourceRoot, filename);
     return collectHardcodedUiStrings(relative, fs.readFileSync(filename, 'utf8'));
   });
+  return productionCandidateCache;
 }
 
 describe('hardcoded UI string scanner', () => {
