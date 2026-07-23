@@ -1108,3 +1108,20 @@ class DecisionSignalFeedbackRecord(Base):
     source = Column(String(16), nullable=False, default='api', index=True)
     created_at = Column(DateTime, default=utc_naive_now, index=True)
     updated_at = Column(DateTime, default=utc_naive_now, onupdate=utc_naive_now, index=True)
+
+
+class DecisionSignalMemoryFlagRecord(Base):
+    """User curation of a signal for decision memory (Issue #118).
+
+    ``memorable`` highlights a call in the reflection; ``ignored`` excludes it
+    from the reflection entirely. Additive sidecar, one row per signal.
+    """
+
+    __tablename__ = 'decision_signal_memory_flags'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    signal_id = Column(Integer, nullable=False, unique=True, index=True)
+    memorable = Column(Boolean, nullable=False, default=False, index=True)
+    ignored = Column(Boolean, nullable=False, default=False, index=True)
+    created_at = Column(DateTime, default=utc_naive_now, index=True)
+    updated_at = Column(DateTime, default=utc_naive_now, onupdate=utc_naive_now, index=True)

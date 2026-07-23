@@ -2571,16 +2571,27 @@ class TestAgentConstructionChain(unittest.TestCase):
         adapter = LLMToolAdapter(config=mock_cfg)
 
         timeouts = []
+        # Stable clock instead of a fixed side_effect list: the time.time patch is
+        # process-global, so failure-path logging on the primary attempt can consume
+        # extra ticks and exhaust a fixed list, causing StopIteration under full-suite
+        # ordering. A callable clock keeps the timeout assertions call-count agnostic.
+        clock = {"value": 0.0}
+
+        def fake_time():
+            return clock["value"]
 
         def fake_call(_messages, _tools, model, **kwargs):
             timeouts.append((model, kwargs.get("timeout")))
             if model == "openai/gpt-4o-mini":
+                # Primary attempt burns 7s of the budget before failing, so the
+                # fallback must receive only the remaining 3s.
+                clock["value"] += 7.0
                 raise RuntimeError("primary failed")
             return MagicMock(content="ok")
 
         adapter._call_litellm_model = MagicMock(side_effect=fake_call)
 
-        with patch("src.agent.llm_adapter.time.time", side_effect=[0.0, 0.0, 7.0, 7.0]):
+        with patch("src.agent.llm_adapter.time.time", side_effect=fake_time):
             result = adapter.call_completion(
                 messages=[{"role": "user", "content": "hi"}],
                 tools=[],
