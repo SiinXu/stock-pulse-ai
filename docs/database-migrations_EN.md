@@ -187,7 +187,7 @@ The ordered migration registry above governs the **DB schema layer**. In additio
 | Runtime event | `RUNTIME_EVENT_SCHEMA_VERSION` | `1` | `schema_version` | Agent runtime events |
 | Provider usage | `PROVIDER_USAGE_SCHEMA_VERSION` (+ `PROVIDER_USAGE_SCHEMA_NAME`) | `2026-06-10` (`provider_usage_v1`) | `provider_usage_schema_version` | `llm_usage.provider_usage_schema_version` column |
 
-The inventory is bound to the actual constants by the guard test `tests/test_data_model_versioning_guard.py`; any constant drift or dropping a version field during serialization is caught.
+The inventory is bound to the actual constants by the guard test `tests/schemas/test_data_model_versioning_guard.py`; any constant drift or dropping a version field during serialization is caught.
 
 ### Backward / forward compatibility rules
 
@@ -200,7 +200,7 @@ The inventory is bound to the actual constants by the guard test `tests/test_dat
 ### Bumping a serialized version
 
 1. Raise the corresponding version constant to a new value and keep a read/degrade branch for the old value.
-2. Update this inventory table and the guard test `tests/test_data_model_versioning_guard.py`.
+2. Update this inventory table and the guard test `tests/schemas/test_data_model_versioning_guard.py`.
 3. If the artifact's persisted column/table shape changes at the same time, add a higher-ID DB migration as well (see "Adding a Migration" above).
 4. Go through the normal source review and complete backend gate.
 

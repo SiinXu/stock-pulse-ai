@@ -187,7 +187,7 @@ CI Docker smoke 除了导入 `src.migrations.registry`、调用 `get_migrations(
 | Runtime event | `RUNTIME_EVENT_SCHEMA_VERSION` | `1` | `schema_version` | Agent runtime 事件 |
 | Provider usage | `PROVIDER_USAGE_SCHEMA_VERSION`（+ `PROVIDER_USAGE_SCHEMA_NAME`） | `2026-06-10`（`provider_usage_v1`） | `provider_usage_schema_version` | `llm_usage.provider_usage_schema_version` 列 |
 
-清单与实际常量由守护测试 `tests/test_data_model_versioning_guard.py` 绑定，任何常量漂移或序列化时丢弃版本字段都会被捕获。
+清单与实际常量由守护测试 `tests/schemas/test_data_model_versioning_guard.py` 绑定，任何常量漂移或序列化时丢弃版本字段都会被捕获。
 
 ### 向后 / 向前兼容规则
 
@@ -200,7 +200,7 @@ CI Docker smoke 除了导入 `src.migrations.registry`、调用 `get_migrations(
 ### 升级某个序列化版本的流程
 
 1. 把对应版本常量升到新值，保留旧值的读取 / 降级分支。
-2. 更新本清单表与守护测试 `tests/test_data_model_versioning_guard.py`。
+2. 更新本清单表与守护测试 `tests/schemas/test_data_model_versioning_guard.py`。
 3. 若该 artifact 的持久化列 / 表形状同时变化，另配一个更高 ID 的 DB migration（见上文「新增 migration」）。
 4. 走常规源码审查与完整 backend gate。
 
