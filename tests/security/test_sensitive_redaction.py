@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
@@ -25,6 +26,7 @@ from src.services.run_diagnostics import (
     reset_run_diagnostic_context,
 )
 from src.services.alphasift_service import _sanitize_public_alphasift_diagnostics
+from src.utils import sanitize as sanitize_module
 from src.utils.sanitize import redact_sensitive_data, redact_sensitive_text
 
 
@@ -132,6 +134,18 @@ def test_cookie_redaction_masks_empty_and_quoted_delimiter_pairs_at_boundaries()
     malformed_set_cookie = (
         f'Set-Cookie: session={PLAIN_SECRET} public={WEBHOOK_SECRET}'
     )
+    malformed_structural_cookie = (
+        f"Cookie: session={PLAIN_SECRET}}} other={WEBHOOK_SECRET}"
+    )
+    injected_marker_cookie = (
+        f"Cookie: [REDACTED]; session={PLAIN_SECRET}"
+    )
+    injected_marker_cookie_closer = (
+        f"Cookie: [REDACTED]}} session={BEARER_SECRET}"
+    )
+    injected_set_cookie_marker = (
+        f"Set-Cookie: [REDACTED]; session={WEBHOOK_SECRET}"
+    )
     escaped_next_cookie = (
         f"Cookie: marker=public\\; next hidden; csrf={BEARER_SECRET}"
     )
@@ -173,6 +187,16 @@ def test_cookie_redaction_masks_empty_and_quoted_delimiter_pairs_at_boundaries()
     assert redact_sensitive_text(malformed_set_cookie) == (
         "Set-Cookie: [REDACTED]"
     )
+    assert redact_sensitive_text(malformed_structural_cookie) == (
+        "Cookie: [REDACTED]"
+    )
+    assert redact_sensitive_text(injected_marker_cookie) == "Cookie: [REDACTED]"
+    assert redact_sensitive_text(injected_marker_cookie_closer) == (
+        "Cookie: [REDACTED]"
+    )
+    assert redact_sensitive_text(injected_set_cookie_marker) == (
+        "Set-Cookie: [REDACTED]"
+    )
     assert redact_sensitive_text(escaped_next_cookie) == "Cookie: [REDACTED]"
     assert redact_sensitive_text(cookie_header_assignment) == (
         "cookie_header=[REDACTED] next"
@@ -184,7 +208,7 @@ def test_cookie_redaction_masks_empty_and_quoted_delimiter_pairs_at_boundaries()
         "provider_cookie_header=[REDACTED] next"
     )
     assert redact_sensitive_text(prefixed_set_cookie_assignment) == (
-        "provider_set_cookie_header=[REDACTED]"
+        "provider_set_cookie_header=[REDACTED] next"
     )
 
     api_payload = error_body(
@@ -265,17 +289,17 @@ def test_digest_redaction_masks_extended_parameters_and_assignment_labels() -> N
         "authorization_header=[REDACTED] public_status=401"
     )
     assert redact_sensitive_text(quoted_digest_assignment) == (
-        "authorization_header=[REDACTED] public_status=401"
+        'authorization_header="[REDACTED]" public_status=401'
     )
     assert redact_sensitive_text(quoted_basic_assignment) == (
-        "provider_proxy_authorization_header=[REDACTED] next"
+        "provider_proxy_authorization_header='[REDACTED]' next"
     )
     assert redact_sensitive_text(quoted_authorization_before_cookie) == (
-        "provider_proxy_authorization_header=[REDACTED] next "
+        "provider_proxy_authorization_header='[REDACTED]' next "
         "Cookie: [REDACTED]"
     )
     assert redact_sensitive_text(malformed_quoted_assignment) == (
-        "authorization_header=[REDACTED]"
+        'authorization_header="[REDACTED]"'
     )
     assert redact_sensitive_text(quoted_public_marker) == (
         "Authorization: [REDACTED] public_status=401"
@@ -314,7 +338,423 @@ def test_digest_redaction_masks_extended_parameters_and_assignment_labels() -> N
     assert api_payload["details"]["provider_diagnostic"] == (
         "authorization_header=[REDACTED] public_status=401"
     )
-    assert "authorization_header=[REDACTED] public_status=401" in rendered_log
+    assert 'authorization_header="[REDACTED]" public_status=401' in rendered_log
+
+
+def test_authorization_redaction_handles_escaped_and_unknown_schemes() -> None:
+    escaped_assignment = (
+        rf'authorization_header=\"Basic {PLAIN_SECRET}\" next'
+    )
+    escaped_json_fragment = (
+        rf'{{\"authorization_header\":\"Basic {BEARER_SECRET}\"}}'
+    )
+    unknown_scheme = (
+        "Authorization: AWS4-HMAC-SHA256 "
+        "Credential=operator/20260722/us-east-1/service/aws4_request, "
+        "SignedHeaders=host;x-date, "
+        f"Signature={WEBHOOK_SECRET} public_status=403"
+    )
+
+    assert redact_sensitive_text(escaped_assignment) == (
+        "authorization_header=[REDACTED] next"
+    )
+    escaped_json_redacted = redact_sensitive_text(escaped_json_fragment)
+    assert escaped_json_redacted == redact_sensitive_text(escaped_json_redacted)
+    assert "authorization_header" in escaped_json_redacted
+    assert "[REDACTED]" in escaped_json_redacted
+    assert redact_sensitive_text(unknown_scheme) == (
+        "Authorization: [REDACTED] public_status=403"
+    )
+
+    api_payload = error_body(
+        "provider_rejected",
+        escaped_assignment,
+        details={"provider_diagnostic": escaped_json_fragment},
+    )
+    stream_payload = sanitize_stream_event(
+        {
+            "type": "tool_progress",
+            "details": {"provider_diagnostic": unknown_scheme},
+        },
+        trace_id="trace-authorization-grammar",
+    )
+    formatter = RelativePathFormatter("%(levelname)s %(message)s")
+    record = logging.LogRecord(
+        name="tests.security.authorization",
+        level=logging.DEBUG,
+        pathname=__file__,
+        lineno=1,
+        msg=unknown_scheme,
+        args=(),
+        exc_info=None,
+    )
+    rendered_log = formatter.format(record)
+
+    _assert_no_secret(
+        {"api": api_payload, "stream": stream_payload, "log": rendered_log}
+    )
+    assert api_payload["message"] == "authorization_header=[REDACTED] next"
+    assert stream_payload["details"]["provider_diagnostic"] == (
+        "Authorization: [REDACTED] public_status=403"
+    )
+    assert "Authorization: [REDACTED] public_status=403" in rendered_log
+
+
+def test_authorization_review_counterexamples_fail_closed_across_boundaries() -> None:
+    spaced_parameters = (
+        'Authorization: Digest username = "operator", '
+        f'response = "{WEBHOOK_SECRET}"'
+    )
+    injected_marker = (
+        "Authorization: Digest realm=public [REDACTED_URL] "
+        f"response={WEBHOOK_SECRET}"
+    )
+    injected_structural_closer = (
+        "Authorization: Digest realm=public} "
+        f"response={WEBHOOK_SECRET}"
+    )
+    escaped_public_label = (
+        rf'{{\"authorization_header\":\"Basic dG9rZW4 '
+        rf'public_status={WEBHOOK_SECRET}\"}}'
+    )
+    twice_escaped = (
+        rf'{{\\"authorization_header\\":\\"Basic {WEBHOOK_SECRET}\\"}}'
+    )
+    escaped_with_sibling = (
+        rf'{{\"authorization_header\":\"Basic {WEBHOOK_SECRET}\", '
+        r'\"note\":\"public\"}'
+    )
+    escaped_array_fragment = (
+        rf'[\"authorization_header\":\"Basic {WEBHOOK_SECRET}\"]'
+    )
+    unknown_scheme = "Authorization: Weird alpha beta gamma"
+    marker_prefix_assignment = f"api_key=[REDACTED]{WEBHOOK_SECRET}"
+    punctuated_marker_assignment = (
+        f"api_key=[REDACTED].{WEBHOOK_SECRET}"
+    )
+    escaped_marker_assignment = (
+        rf'api_key=\"[REDACTED]/{WEBHOOK_SECRET}\"'
+    )
+    escaped_sensitive_key = (
+        rf'{{\"api_key\":\"{WEBHOOK_SECRET}\"}}'
+    )
+    injected_redaction_marker = (
+        f"Authorization: [REDACTED], response={WEBHOOK_SECRET}"
+    )
+    bare_marker_suffix = (
+        f"Authorization: [REDACTED] {WEBHOOK_SECRET}"
+    )
+    punctuated_marker_suffix = (
+        f"Authorization: [REDACTED]. {WEBHOOK_SECRET}"
+    )
+    url_marker_parameter_suffix = (
+        "Authorization: [REDACTED] [REDACTED_URL] "
+        f"response={WEBHOOK_SECRET}"
+    )
+    token_parameter_names = (
+        "Authorization: Weird 1foo=public, "
+        f"2bar={WEBHOOK_SECRET}"
+    )
+    malformed_multiword = (
+        f"Authorization: Weird alpha beta={WEBHOOK_SECRET}"
+    )
+    malformed_public_boundary = (
+        "Authorization: Digest realm=public "
+        f"public_status={WEBHOOK_SECRET}"
+    )
+    malformed_cookie_boundary = (
+        f"Cookie: session=first-token next {WEBHOOK_SECRET}"
+    )
+
+    expected = {
+        spaced_parameters: "Authorization: [REDACTED]",
+        injected_marker: "Authorization: [REDACTED]",
+        injected_structural_closer: "Authorization: [REDACTED]",
+        escaped_public_label: (
+            r'{\"authorization_header\":[REDACTED]}'
+        ),
+        twice_escaped: (
+            r'{\\"authorization_header\\":[REDACTED]}'
+        ),
+        escaped_with_sibling: (
+            r'{\"authorization_header\":[REDACTED], '
+            r'\"note\":\"public\"}'
+        ),
+        escaped_array_fragment: (
+            r'[\"authorization_header\":[REDACTED]]'
+        ),
+        unknown_scheme: "Authorization: [REDACTED]",
+        marker_prefix_assignment: "api_key=[REDACTED]",
+        punctuated_marker_assignment: "api_key=[REDACTED]",
+        escaped_marker_assignment: "api_key=[REDACTED]",
+        escaped_sensitive_key: r'{\"api_key\":[REDACTED]}',
+        injected_redaction_marker: "Authorization: [REDACTED]",
+        bare_marker_suffix: "Authorization: [REDACTED]",
+        punctuated_marker_suffix: "Authorization: [REDACTED]",
+        url_marker_parameter_suffix: "Authorization: [REDACTED]",
+        token_parameter_names: "Authorization: [REDACTED]",
+        malformed_multiword: "Authorization: [REDACTED]",
+        malformed_public_boundary: "Authorization: [REDACTED]",
+        malformed_cookie_boundary: "Cookie: [REDACTED]",
+    }
+    for raw, redacted in expected.items():
+        assert redact_sensitive_text(raw) == redacted
+        assert redact_sensitive_text(redacted) == redacted
+
+    api_payload = error_body(
+        "provider_rejected",
+        spaced_parameters,
+        details={"provider_diagnostic": twice_escaped},
+    )
+    stream_payload = sanitize_stream_event(
+        {
+            "type": "tool_progress",
+            "details": {
+                "marker_diagnostic": injected_marker,
+                "escaped_diagnostic": escaped_public_label,
+            },
+        },
+        trace_id="trace-authorization-review-counterexamples",
+    )
+    formatter = RelativePathFormatter("%(levelname)s %(message)s")
+    record = logging.LogRecord(
+        name="tests.security.authorization_review",
+        level=logging.DEBUG,
+        pathname=__file__,
+        lineno=1,
+        msg=escaped_public_label,
+        args=(),
+        exc_info=None,
+    )
+
+    _assert_no_secret(
+        {
+            "api": api_payload,
+            "stream": stream_payload,
+            "log": formatter.format(record),
+        }
+    )
+
+
+def test_marker_punctuation_cannot_hide_labelled_secrets_across_boundaries() -> None:
+    marker_injection = f"api_key=[REDACTED].{PLAIN_SECRET}"
+    escaped_injection = rf'api_key=\"[REDACTED]/{BEARER_SECRET}\"'
+    serialized = json.dumps({"diagnostic": marker_injection})
+
+    redacted = redact_sensitive_text(marker_injection)
+    escaped_redacted = redact_sensitive_text(escaped_injection)
+    serialized_redacted = redact_sensitive_text(serialized)
+    api_payload = error_body(
+        "provider_rejected",
+        marker_injection,
+        details={"provider_diagnostic": escaped_injection},
+    )
+    stream_payload = sanitize_stream_event(
+        {
+            "type": "tool_progress",
+            "details": {"provider_diagnostic": marker_injection},
+        },
+        trace_id="trace-marker-punctuation",
+    )
+    formatter = RelativePathFormatter("%(levelname)s %(message)s")
+    record = logging.LogRecord(
+        name="tests.security.marker_punctuation",
+        level=logging.DEBUG,
+        pathname=__file__,
+        lineno=1,
+        msg=escaped_injection,
+        args=(),
+        exc_info=None,
+    )
+    tool_audit = redact_diagnostic_value({"diagnostic": marker_injection})
+    local_cli = redact_local_cli_text(marker_injection, limit=1000)
+    messages = [
+        {"role": "user", "content": "current"},
+        {
+            "role": "assistant",
+            "_trace_provider": "deepseek",
+            "_trace_model": "deepseek/deepseek-chat",
+            "reasoning_content": marker_injection,
+            "tool_calls": [
+                {
+                    "id": "call-marker",
+                    "name": "echo",
+                    "arguments": {"message": "public"},
+                }
+            ],
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "call-marker",
+            "content": "public result",
+        },
+    ]
+    turns, diagnostics = extract_provider_trace_turns(messages, baseline_len=1)
+
+    _assert_no_secret(
+        {
+            "redacted": redacted,
+            "escaped": escaped_redacted,
+            "serialized": serialized_redacted,
+            "api": api_payload,
+            "stream": stream_payload,
+            "log": formatter.format(record),
+            "tool": tool_audit,
+            "local_cli": local_cli,
+        }
+    )
+    assert redacted == "api_key=[REDACTED]"
+    assert escaped_redacted == "api_key=[REDACTED]"
+    assert redact_sensitive_text(
+        f"api_key={PLAIN_SECRET} operation=context-probe"
+    ) == "api_key=[REDACTED] operation=context-probe"
+    assert redact_sensitive_text(serialized_redacted) == serialized_redacted
+    assert turns == []
+    assert diagnostics.trace_dropped_reason == "sensitive_data_redacted"
+
+
+def test_authorization_redaction_preserves_public_url_markers_on_repeated_passes() -> None:
+    diagnostic = "Authorization: [REDACTED] [REDACTED_URL]"
+    punctuated_diagnostic = "Authorization: [REDACTED]. diagnostic=public"
+    canonical = (
+        "Authorization: [REDACTED] [REDACTED_URL]. "
+        "public_diagnostic=provider_unavailable"
+    )
+    localized = (
+        "Authorization: [REDACTED] <redacted-url>. "
+        "public_diagnostic=provider_unavailable"
+    )
+    parameterized = (
+        "Authorization: Digest realm=public, "
+        f"note=[REDACTED_URL], response={WEBHOOK_SECRET}"
+    )
+
+    for _ in range(3):
+        diagnostic = sanitize_module.sanitize_diagnostic_text(diagnostic)
+        punctuated_diagnostic = redact_sensitive_text(punctuated_diagnostic)
+        canonical = redact_sensitive_text(canonical)
+        localized = redact_sensitive_text(localized)
+
+    assert diagnostic == "Authorization: [REDACTED] [REDACTED_URL]"
+    assert punctuated_diagnostic == (
+        "Authorization: [REDACTED]"
+    )
+    assert canonical == (
+        "Authorization: [REDACTED] [REDACTED_URL]. "
+        "public_diagnostic=provider_unavailable"
+    )
+    assert localized == (
+        "Authorization: [REDACTED] <redacted-url>. "
+        "public_diagnostic=provider_unavailable"
+    )
+    assert redact_sensitive_text(parameterized) == "Authorization: [REDACTED]"
+
+
+def test_set_cookie_redaction_handles_folded_and_combined_fields() -> None:
+    folded_sensitive_attribute = (
+        "Set-Cookie: id=PUBLIC;\r\n Path=/;\r\n "
+        f"private_session={PLAIN_SECRET}"
+    )
+    comma_combined_cookie = (
+        f"Set-Cookie: id=PUBLIC; Path=/, session={BEARER_SECRET} next"
+    )
+    folded_safe_attributes = (
+        f"Set-Cookie: session={WEBHOOK_SECRET};\r\n Path=/;\r\n "
+        "HttpOnly next"
+    )
+    expires_attribute = (
+        f"Set-Cookie: session={PLAIN_SECRET}; "
+        "Expires=Wed, 21 Oct 2026 07:28:00 GMT; Path=/; Secure next"
+    )
+
+    assert redact_sensitive_text(folded_sensitive_attribute) == (
+        "Set-Cookie: [REDACTED]"
+    )
+    assert redact_sensitive_text(comma_combined_cookie) == (
+        "Set-Cookie: [REDACTED] next"
+    )
+    assert redact_sensitive_text(folded_safe_attributes) == (
+        "Set-Cookie: [REDACTED];\r\n Path=/;\r\n HttpOnly next"
+    )
+    assert redact_sensitive_text(expires_attribute) == (
+        "Set-Cookie: [REDACTED]; "
+        "Expires=Wed, 21 Oct 2026 07:28:00 GMT; Path=/; Secure next"
+    )
+
+    api_payload = error_body(
+        "provider_rejected",
+        folded_sensitive_attribute,
+        details={"provider_diagnostic": comma_combined_cookie},
+    )
+    stream_payload = sanitize_stream_event(
+        {
+            "type": "tool_progress",
+            "details": {"provider_diagnostic": folded_sensitive_attribute},
+        },
+        trace_id="trace-set-cookie-grammar",
+    )
+    formatter = RelativePathFormatter("%(levelname)s %(message)s")
+    record = logging.LogRecord(
+        name="tests.security.set_cookie",
+        level=logging.DEBUG,
+        pathname=__file__,
+        lineno=1,
+        msg=comma_combined_cookie,
+        args=(),
+        exc_info=None,
+    )
+    rendered_log = formatter.format(record)
+
+    _assert_no_secret(
+        {"api": api_payload, "stream": stream_payload, "log": rendered_log}
+    )
+    assert api_payload["message"] == "Set-Cookie: [REDACTED]"
+    assert stream_payload["details"]["provider_diagnostic"] == (
+        "Set-Cookie: [REDACTED]"
+    )
+    assert "Set-Cookie: [REDACTED] next" in rendered_log
+
+
+def test_field_scanner_checks_one_public_boundary_per_whitespace_run(
+    monkeypatch,
+) -> None:
+    original_pattern = sanitize_module._PUBLIC_DIAGNOSTIC_FIELD_PATTERN
+
+    class CountingPattern:
+        def __init__(self) -> None:
+            self.match_calls = 0
+
+        def match(self, text, index=0):
+            self.match_calls += 1
+            return original_pattern.match(text, index)
+
+    counting_pattern = CountingPattern()
+    monkeypatch.setattr(
+        sanitize_module,
+        "_PUBLIC_DIAGNOSTIC_FIELD_PATTERN",
+        counting_pattern,
+    )
+    raw_text = f"Cookie: session={PLAIN_SECRET}" + (" " * 32_000) + "public=401"
+
+    redacted = redact_sensitive_text(raw_text)
+
+    assert redacted == "Cookie: [REDACTED]" + (" " * 32_000) + "public=401"
+    assert counting_pattern.match_calls == 1
+
+    for near_match in (
+        "authorizatioX: value",
+        "set_cookiX: value",
+        "cookiX: value",
+        "api_keX=value",
+        "postgresqlX://value",
+    ):
+        hostile_text = ("a-" * 4_000) + near_match
+        started = time.perf_counter()
+        hostile_redacted = redact_sensitive_text(hostile_text)
+        elapsed = time.perf_counter() - started
+
+        assert hostile_redacted == hostile_text
+        assert elapsed < 0.5
 
 
 def test_central_redaction_fails_closed_for_recursive_and_hostile_values() -> None:
@@ -374,6 +814,28 @@ def test_serialized_json_redaction_is_structural_and_idempotent() -> None:
         "api_key": "[REDACTED]",
         "headers": "[REDACTED]",
     }
+
+    nested = json.dumps(
+        {
+            "wrapped": json.dumps(
+                {
+                    "diagnostic": (
+                        "Authorization: Odd "
+                        f"Signature={WEBHOOK_SECRET}"
+                    )
+                }
+            )
+        }
+    )
+    nested_once = redact_sensitive_text(nested)
+    nested_twice = redact_sensitive_text(nested_once)
+    nested_thrice = redact_sensitive_text(nested_twice)
+    nested_inner = json.loads(json.loads(nested_once)["wrapped"])
+
+    _assert_no_secret(nested_once)
+    assert nested_twice == nested_once
+    assert nested_thrice == nested_once
+    assert nested_inner == {"diagnostic": "Authorization: [REDACTED]"}
 
 
 def test_api_client_error_payload_uses_central_recursive_redaction() -> None:
