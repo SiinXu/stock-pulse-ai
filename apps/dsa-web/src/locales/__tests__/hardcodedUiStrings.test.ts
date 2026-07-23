@@ -61,7 +61,7 @@ const exactAllowedStrings: HardcodedUiStringAllowance[] = [
     purpose: 'SI-compatible milliseconds unit next to a numeric latency.',
   },
   {
-    file: 'components/settings/LLMChannelEditor.tsx',
+    file: 'components/settings/LLMConnectionModal.tsx',
     text: 'https://api.example.com/v1',
     context: 'placeholder',
     purpose: 'Protocol-neutral example URL rather than interface copy.',
