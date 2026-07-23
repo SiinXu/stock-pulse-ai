@@ -1018,6 +1018,12 @@ class _ConfigLoadingMethods:
             decision_memory_min_samples=parse_env_int(
                 os.getenv('DECISION_MEMORY_MIN_SAMPLES'), 5, field_name='DECISION_MEMORY_MIN_SAMPLES', minimum=1
             ),
+            signal_scorecard_public_enabled=parse_env_bool(
+                os.getenv('SIGNAL_SCORECARD_PUBLIC_ENABLED'), default=False
+            ),
+            signal_scorecard_min_samples=parse_env_int(
+                os.getenv('SIGNAL_SCORECARD_MIN_SAMPLES'), 10, field_name='SIGNAL_SCORECARD_MIN_SAMPLES', minimum=1
+            ),
         )
 
 

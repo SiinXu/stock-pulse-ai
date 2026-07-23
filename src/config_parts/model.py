@@ -77,6 +77,10 @@ class Config:
     decision_memory_min_age_days: int = 3
     decision_memory_min_samples: int = 5
 
+    # === Public signal scorecard (Issue #379) ===
+    signal_scorecard_public_enabled: bool = False
+    signal_scorecard_min_samples: int = 10
+
     # == AI Analysis Configuration ===
     generation_backend: str = LITELLM_BACKEND_ID
     generation_fallback_backend: str = LITELLM_BACKEND_ID
