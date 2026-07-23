@@ -141,6 +141,7 @@ def extract_provider_trace_turns(
     messages: Sequence[Dict[str, Any]],
     *,
     baseline_len: int,
+    session_id: str = "",
     run_id: str = "",
     anchor_user_message_id: int = 0,
     anchor_assistant_message_id: int = 0,
@@ -160,11 +161,28 @@ def extract_provider_trace_turns(
     contains_thinking_blocks = False
     contains_provider_specific_fields = False
 
+    if any(
+        _trace_value_requires_redaction(value)
+        for value in (session_id, run_id)
+    ):
+        diagnostics.trace_dropped_reason = "sensitive_data_redacted"
+        diagnostics.dropped_trace_count = 1
+        return [], diagnostics
+
     for raw_msg in list(messages)[max(0, int(baseline_len)) :]:
         role = raw_msg.get("role")
         if role == "assistant" and raw_msg.get("tool_calls"):
-            provider = normalize_model_name(raw_msg.get(TRACE_PROVIDER_KEY))
-            model = normalize_model_name(raw_msg.get(TRACE_MODEL_KEY))
+            raw_provider = raw_msg.get(TRACE_PROVIDER_KEY)
+            raw_model = raw_msg.get(TRACE_MODEL_KEY)
+            if any(
+                _trace_value_requires_redaction(value)
+                for value in (raw_provider, raw_model)
+            ):
+                diagnostics.trace_dropped_reason = "sensitive_data_redacted"
+                diagnostics.dropped_trace_count = 1
+                return [], diagnostics
+            provider = normalize_model_name(raw_provider)
+            model = normalize_model_name(raw_model)
             if provider:
                 providers.add(provider)
             if model:
@@ -218,6 +236,7 @@ def extract_provider_trace_turns(
         return [], diagnostics
 
     trace = ProviderTraceTurn(
+        session_id=session_id,
         run_id=run_id,
         provider=provider,
         model=model,
@@ -286,18 +305,22 @@ def _strip_trace_metadata_value(value: Any) -> Any:
     return value
 
 
-def _protocol_message_requires_redaction(message: Dict[str, Any]) -> bool:
-    """Fail closed when the persisted protocol representation would change."""
+def _trace_value_requires_redaction(value: Any) -> bool:
+    """Fail closed when a byte-sensitive persisted value would change."""
 
-    redacted_message = redact_sensitive_data(message)
-    if not isinstance(redacted_message, dict):
-        return True
+    redacted_value = redact_sensitive_data(value)
     try:
-        original_json = json.dumps(message, ensure_ascii=False)
+        original_json = json.dumps(value, ensure_ascii=False)
         redacted_json = json.dumps(
-            redacted_message,
+            redacted_value,
             ensure_ascii=False,
         )
         return redacted_json != original_json
     except BaseException:  # broad-exception: optional_metadata - Opaque provider values drop the trace.
         return True
+
+
+def _protocol_message_requires_redaction(message: Dict[str, Any]) -> bool:
+    """Fail closed when the persisted protocol representation would change."""
+
+    return _trace_value_requires_redaction(message)

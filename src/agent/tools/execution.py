@@ -246,6 +246,8 @@ def execute_runner_tool_call_via_session(
     t0 = time.time()
     name = tool_call.name
     arguments = tool_call.arguments
+    safe_name = redact_sensitive_text(name) if isinstance(name, str) else ""
+    tool_call.name = safe_name
     safe_arguments = redact_sensitive_data(arguments)
     tool_call.arguments = (
         safe_arguments if isinstance(safe_arguments, dict) else {}

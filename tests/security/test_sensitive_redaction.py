@@ -6,14 +6,18 @@ from __future__ import annotations
 import json
 import logging
 import time
+from urllib.parse import quote
 
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
 from api.middlewares.error_handler import add_error_handlers
 from api.v1.errors import error_body
+from src.agent import executor as executor_module
+from src.agent.llm_adapter import ToolCall
 from src.agent.provider_trace import extract_provider_trace_turns
 from src.agent.public_contract import sanitize_stream_event
+from src.agent.runner import _execute_tools
 from src.agent.tools.execution import (
     ToolAccessContext,
     build_tool_audit,
@@ -952,6 +956,139 @@ def test_http_credentials_include_delimiters_before_sensitivity_is_evaluated() -
     ) == "[REDACTED_URL]"
 
 
+def test_http_urls_classify_structural_suffixes_and_nested_encoding() -> None:
+    for delimiter in ",;)]}":
+        raw = (
+            "https://example.invalid/docs"
+            f"{delimiter}api_key={PLAIN_SECRET}"
+        )
+
+        assert redact_sensitive_text(raw) == "[REDACTED_URL]"
+        assert redact_sensitive_text(redact_sensitive_text(raw)) == (
+            "[REDACTED_URL]"
+        )
+
+    cases = (
+        f"https://example.invalid/docs;private.key={BEARER_SECRET}",
+        f"https://example.invalid/docs)webhook.url={WEBHOOK_SECRET}",
+        f"https://example.test/callback?public=1;api_key={PLAIN_SECRET}",
+        f"https://example.test/callback#public=1;access_token={BEARER_SECRET}",
+        f"https://example.test/callback?%25252561pi_key={DSN_SECRET}",
+        f"https://example.test/%252577ebhook/{WEBHOOK_SECRET}",
+    )
+
+    for raw in cases:
+        assert redact_sensitive_text(raw) == "[REDACTED_URL]"
+        assert sanitize_module.sanitize_diagnostic_text(
+            raw,
+            max_length=1000,
+        ) == "[REDACTED_URL]"
+
+    encoded_key = "%61pi_key"
+    for _ in range(sanitize_module._URL_COMPONENT_DECODE_LIMIT + 1):
+        encoded_key = quote(encoded_key, safe="")
+    over_encoded = (
+        f"https://example.test/callback?{encoded_key}={PREFIXED_API_KEY}"
+    )
+
+    assert redact_sensitive_text(over_encoded) == "[REDACTED_URL]"
+    assert redact_sensitive_text(
+        "https://example.test/docs;version=1,stable"
+    ) == "https://example.test/docs;version=1,stable"
+
+
+def test_url_review_counterexamples_are_closed_at_final_output_boundaries() -> None:
+    hostile_urls = (
+        f"https://example.invalid/docs,api_key={PLAIN_SECRET}",
+        f"https://example.test/callback?public=1;access_token={BEARER_SECRET}",
+        f"https://example.test/%252577ebhook/{WEBHOOK_SECRET}",
+    )
+    diagnostic = " ".join(hostile_urls)
+    api_payload = error_body(
+        "provider_rejected",
+        diagnostic,
+        details={"provider_urls": list(hostile_urls)},
+    )
+    stream_payload = sanitize_stream_event(
+        {
+            "type": "tool_progress",
+            "details": {"provider_urls": list(hostile_urls)},
+        },
+        trace_id="trace-url-review-counterexamples",
+    )
+    formatter = RelativePathFormatter("%(levelname)s %(message)s")
+    record = logging.LogRecord(
+        name="tests.security.url_review",
+        level=logging.DEBUG,
+        pathname=__file__,
+        lineno=1,
+        msg=diagnostic,
+        args=(),
+        exc_info=None,
+    )
+    tool_preview = redact_diagnostic_value({"provider_urls": list(hostile_urls)})
+    local_cli = redact_local_cli_text(diagnostic, limit=2000)
+    hermes = sanitize_hermes_error_text(diagnostic)
+    alphasift = _sanitize_public_alphasift_diagnostics(
+        {"provider_error": diagnostic}
+    )
+
+    diagnostic_token = activate_run_diagnostic_context(
+        trace_id="trace-url-review-diagnostics",
+        query_id="query-url-review-diagnostics",
+        stock_code="600519",
+    )
+    try:
+        record_llm_run(
+            success=False,
+            provider="test-provider",
+            model="test-model",
+            error_type="ProviderError",
+            error_message=diagnostic,
+        )
+        snapshot = current_diagnostic_snapshot()
+    finally:
+        reset_run_diagnostic_context(diagnostic_token)
+
+    messages = [
+        {"role": "user", "content": "current"},
+        {
+            "role": "assistant",
+            "_trace_provider": "deepseek",
+            "_trace_model": "deepseek/deepseek-chat",
+            "reasoning_content": diagnostic,
+            "tool_calls": [
+                {
+                    "id": "call-url-review",
+                    "name": "echo",
+                    "arguments": {"message": "public"},
+                }
+            ],
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "call-url-review",
+            "content": "public result",
+        },
+    ]
+    turns, diagnostics = extract_provider_trace_turns(messages, baseline_len=1)
+
+    _assert_no_secret(
+        {
+            "api": api_payload,
+            "stream": stream_payload,
+            "log": formatter.format(record),
+            "tool": tool_preview,
+            "local_cli": local_cli,
+            "hermes": hermes,
+            "alphasift": alphasift,
+            "snapshot": snapshot,
+        }
+    )
+    assert turns == []
+    assert diagnostics.trace_dropped_reason == "sensitive_data_redacted"
+
+
 def test_tool_audit_recursively_redacts_identity_and_error_fields() -> None:
     audit = build_tool_audit(
         tool_name=f"api.key={PLAIN_SECRET}",
@@ -970,6 +1107,203 @@ def test_tool_audit_recursively_redacts_identity_and_error_fields() -> None:
     assert audit["error_code"] == "private.key=[REDACTED]"
     assert audit["backend"] == "proxy.url=[REDACTED]"
     assert audit["session_id"] == "raw.response=[REDACTED]"
+
+
+def test_provider_trace_drops_every_secret_bearing_identity_before_persistence(
+    monkeypatch,
+) -> None:
+    def messages_for(
+        *,
+        provider: str = "deepseek",
+        model: str = "deepseek/deepseek-chat",
+        tool_call_id: str = "call-public",
+        tool_name: str = "echo",
+        tool_result_id: str | None = None,
+    ) -> list[dict]:
+        return [
+            {"role": "user", "content": "current"},
+            {
+                "role": "assistant",
+                "_trace_provider": provider,
+                "_trace_model": model,
+                "reasoning_content": "public reasoning",
+                "tool_calls": [
+                    {
+                        "id": tool_call_id,
+                        "name": tool_name,
+                        "arguments": {"message": "public"},
+                    }
+                ],
+            },
+            {
+                "role": "tool",
+                "tool_call_id": tool_result_id or tool_call_id,
+                "content": "public result",
+            },
+        ]
+
+    cases = (
+        (
+            messages_for(provider=f"deepseek/api_key={PLAIN_SECRET}"),
+            "session-public",
+            "run-public",
+        ),
+        (
+            messages_for(model=f"deepseek/model/api_key={BEARER_SECRET}"),
+            "session-public",
+            "run-public",
+        ),
+        (
+            messages_for(),
+            f"api_key={DSN_SECRET}",
+            "run-public",
+        ),
+        (
+            messages_for(),
+            "session-public",
+            f"access_token={WEBHOOK_SECRET}",
+        ),
+        (
+            messages_for(tool_call_id=f"api_key={PLAIN_SECRET}"),
+            "session-public",
+            "run-public",
+        ),
+        (
+            messages_for(tool_name=f"access_token={BEARER_SECRET}"),
+            "session-public",
+            "run-public",
+        ),
+        (
+            messages_for(tool_result_id=f"private_key={DSN_SECRET}"),
+            "session-public",
+            "run-public",
+        ),
+    )
+
+    for messages, session_id, run_id in cases:
+        turns, diagnostics = extract_provider_trace_turns(
+            messages,
+            baseline_len=1,
+            session_id=session_id,
+            run_id=run_id,
+        )
+
+        assert turns == []
+        assert diagnostics.trace_dropped_reason == "sensitive_data_redacted"
+        assert diagnostics.dropped_trace_count == 1
+
+    safe_turns, safe_diagnostics = extract_provider_trace_turns(
+        messages_for(),
+        baseline_len=1,
+        session_id="session-public",
+        run_id="run-public",
+    )
+
+    assert safe_diagnostics.trace_dropped_reason == ""
+    assert len(safe_turns) == 1
+    assert safe_turns[0].session_id == "session-public"
+    assert safe_turns[0].run_id == "run-public"
+
+    persistence_calls: list[dict] = []
+
+    class CapturingDb:
+        def save_agent_provider_turn(self, **kwargs) -> None:
+            persistence_calls.append(kwargs)
+
+    monkeypatch.setattr(executor_module, "get_db", lambda: CapturingDb())
+    executor_module.AgentExecutor._persist_provider_trace(
+        object(),
+        session_id=f"api_key={PLAIN_SECRET}",
+        run_id="run-public",
+        messages=messages_for(),
+        baseline_len=1,
+        user_message_id=1,
+        assistant_message_id=2,
+    )
+
+    assert persistence_calls == []
+
+
+def test_native_tool_trace_redacts_name_without_changing_dispatch() -> None:
+    dispatched_names: list[str] = []
+
+    class RecordingSession:
+        execution_id = "native-redaction-test"
+
+        @staticmethod
+        def is_non_retriable_cached(_cache_key: str) -> bool:
+            return False
+
+        @staticmethod
+        def execute(name: str, arguments: dict, **_kwargs) -> dict:
+            dispatched_names.append(name)
+            return {
+                "result_text": json.dumps({"echo": arguments.get("message")}),
+                "ok": True,
+            }
+
+    tool_call = ToolCall(
+        id="call-public",
+        name=PREFIXED_API_KEY,
+        arguments={"message": "public"},
+    )
+    events: list[dict] = []
+    tool_calls_log: list[dict] = []
+
+    results = _execute_tools(
+        [tool_call],
+        RecordingSession(),
+        step=1,
+        progress_callback=events.append,
+        tool_calls_log=tool_calls_log,
+    )
+
+    assert dispatched_names == [PREFIXED_API_KEY]
+    assert tool_call.name == "[REDACTED]"
+    assert results[0]["tc"].name == "[REDACTED]"
+    assert tool_calls_log[0]["tool"] == "[REDACTED]"
+    public_events = [
+        sanitize_stream_event(event, trace_id="trace-native-tool-name")
+        for event in events
+    ]
+    assert [event["tool"] for event in public_events] == [
+        "[REDACTED]",
+        "[REDACTED]",
+    ]
+    _assert_no_secret({
+        "events": public_events,
+        "tool_calls_log": tool_calls_log,
+    })
+
+    class BlockingSession(RecordingSession):
+        @staticmethod
+        def execute(name: str, arguments: dict, **_kwargs) -> dict:
+            time.sleep(0.05)
+            return {
+                "result_text": json.dumps({"echo": arguments.get("message")}),
+                "ok": True,
+            }
+
+    timed_out_call = ToolCall(
+        id="call-timeout",
+        name=PREFIXED_API_KEY,
+        arguments={"message": "public"},
+    )
+    timed_out_log: list[dict] = []
+
+    _execute_tools(
+        [timed_out_call],
+        BlockingSession(),
+        step=2,
+        progress_callback=None,
+        tool_calls_log=timed_out_log,
+        tool_wait_timeout_seconds=0.01,
+    )
+
+    assert timed_out_call.name == "[REDACTED]"
+    assert timed_out_log[0]["tool"] == "[REDACTED]"
+    assert timed_out_log[0]["timeout"] is True
+    _assert_no_secret(timed_out_log)
 
 
 def test_exception_chain_reapplies_exact_values_across_joined_parts() -> None:

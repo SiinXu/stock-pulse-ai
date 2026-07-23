@@ -67,6 +67,7 @@ _SENSITIVE_COMPACT_KEY_PATTERN = re.compile(
     r"sendkey|token(?!s)|webhook"
 )
 _URL_PATTERN = re.compile(r"https?://[^\s\"'\\]+", re.IGNORECASE)
+_URL_COMPONENT_DECODE_LIMIT = 8
 # Credentials in the userinfo of a connection-string URL of any scheme
 # (postgresql://, mysql://, redis://, mongodb://, amqp://, ...). _URL_PATTERN
 # only covers http(s), so a password embedded in a non-HTTP connection string
@@ -2041,10 +2042,12 @@ def _is_sensitive_url(url: str) -> bool:
         parsed = urlsplit(url)
         username = parsed.username
         password = parsed.password
-        hostname = parsed.hostname or ""
-        path = unquote(unquote(parsed.path))
-        query = parsed.query
-        fragment = parsed.fragment
+        hostname, hostname_stable = _decode_url_component(parsed.hostname or "")
+        path, path_stable = _decode_url_component(parsed.path)
+        query, query_stable = _decode_url_component(parsed.query)
+        fragment, fragment_stable = _decode_url_component(parsed.fragment)
+        if not all((hostname_stable, path_stable, query_stable, fragment_stable)):
+            return True
         if (
             (username or password)
             and not (
@@ -2052,6 +2055,8 @@ def _is_sensitive_url(url: str) -> bool:
                 and password is None
             )
         ):
+            return True
+        if _has_sensitive_url_assignment(path):
             return True
         if _is_webhook_url(hostname, path):
             return True
@@ -2061,6 +2066,35 @@ def _is_sensitive_url(url: str) -> bool:
         )
     except (TypeError, UnicodeError, ValueError):
         return True
+
+
+def _decode_url_component(value: Any) -> tuple[str, bool]:
+    """Repeatedly decode one URL component within a fixed linear-work bound."""
+
+    current = str(value or "")
+    for _ in range(_URL_COMPONENT_DECODE_LIMIT):
+        decoded = unquote(current)
+        if decoded == current:
+            return current, True
+        current = decoded
+    return current, False
+
+
+def _has_sensitive_url_assignment(component: str) -> bool:
+    """Classify field-like URL suffixes through the central key semantics."""
+
+    match, _, _ = _next_sensitive_text_field_match(
+        component,
+        0,
+        field_kinds=frozenset({
+            "authorization",
+            "cookie",
+            "set_cookie",
+            "generic",
+        }),
+        http_url_spans=(),
+    )
+    return match is not None
 
 
 def _is_webhook_url(hostname: str, path: str) -> bool:
@@ -2090,19 +2124,27 @@ def _is_webhook_url(hostname: str, path: str) -> bool:
 def _has_sensitive_url_params(params_text: str) -> bool:
     if not params_text:
         return False
+    if _has_sensitive_url_assignment(params_text):
+        return True
+    if _TOKEN_LIKE_PATTERN.search(params_text):
+        return True
     try:
         params = parse_qsl(
-            params_text,
+            params_text.replace(";", "&"),
             keep_blank_values=True,
             max_num_fields=100,
         )
     except (TypeError, UnicodeError, ValueError):
         return True
     for key, value in params:
-        key_text = unquote(unquote(str(key or ""))).strip().lower()
+        key_text, key_stable = _decode_url_component(key)
+        value_text, value_stable = _decode_url_component(value)
+        if not key_stable or not value_stable:
+            return True
+        key_text = key_text.strip().lower()
         if _is_sensitive_mapping_key(key_text):
             return True
-        if _TOKEN_LIKE_PATTERN.search(str(value or "")):
+        if _TOKEN_LIKE_PATTERN.search(value_text):
             return True
     return False
 
