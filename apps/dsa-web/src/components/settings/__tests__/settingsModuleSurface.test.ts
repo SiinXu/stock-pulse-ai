@@ -12,6 +12,9 @@ import * as connectionUpdateContractModule from '../settingsConnectionUpdateCont
 import * as llmChannelEditorModelModule from '../llmChannelEditorModel';
 import * as llmConnectionCardModule from '../LLMConnectionCard';
 import * as llmConnectionModalModule from '../LLMConnectionModal';
+import * as settingsHelpTypesModule from '../../../locales/settingsHelpTypes';
+import * as settingsHelpZhModule from '../../../locales/settingsHelp.zh';
+import * as settingsHelpEnModule from '../../../locales/settingsHelp.en';
 
 const SOURCE_EXPORT_SURFACES = {
   'src/pages/SettingsPage.tsx': ['default'],
@@ -75,6 +78,12 @@ const SOURCE_EXPORT_SURFACES = {
     'type:SettingsHelpContent',
     'value:getSettingsHelpContent',
   ],
+  'src/locales/settingsHelpTypes.ts': [
+    'type:SettingsHelpContent',
+    'type:SettingsHelpMap',
+  ],
+  'src/locales/settingsHelp.zh.ts': ['default'],
+  'src/locales/settingsHelp.en.ts': ['default'],
   'src/components/settings/FirstRunSetupCard.tsx': ['default'],
   'src/components/settings/SchedulerSettingsCard.tsx': ['default'],
   'src/components/settings/settingsConfigItems.ts': ['value:getConfigItem'],
@@ -159,6 +168,9 @@ describe('Settings module surfaces', () => {
     expect(runtimeExportNames(settingsPageModule)).toEqual(['default']);
     expect(runtimeExportNames(llmChannelEditorModule)).toEqual(['LLMChannelEditor']);
     expect(runtimeExportNames(settingsHelpModule)).toEqual(['getSettingsHelpContent']);
+    expect(runtimeExportNames(settingsHelpTypesModule)).toEqual([]);
+    expect(runtimeExportNames(settingsHelpZhModule)).toEqual(['default']);
+    expect(runtimeExportNames(settingsHelpEnModule)).toEqual(['default']);
     expect(runtimeExportNames(firstRunSetupCardModule)).toEqual(['default']);
     expect(runtimeExportNames(schedulerSettingsCardModule)).toEqual(['default']);
     expect(runtimeExportNames(settingsConfigItemsModule)).toEqual(['getConfigItem']);
