@@ -1167,6 +1167,160 @@ def test_installer_race_drains_deferred_local_cleanup(monkeypatch):
     ]
 
 
+def test_queued_target_waits_for_in_flight_local_startup():
+    events: list[str] = []
+    target_holder: list[ApplicationServices] = []
+    manifest_started = threading.Event()
+    release_manifest = threading.Event()
+    target_start_results: list[tuple] = []
+    owner_results: list = []
+
+    class _BlockingManifestPlugin(_RecordingPlugin):
+        def __init__(self, plugin_id: str, plugin_events: list[str]) -> None:
+            super().__init__(plugin_id, plugin_events)
+            self._block_manifest = True
+
+        @property
+        def manifest(self) -> PluginManifest:
+            if self._block_manifest:
+                self._block_manifest = False
+                events.append("target-manifest-begin")
+                manifest_started.set()
+                if not release_manifest.wait(timeout=5):
+                    raise AssertionError("test did not release the target manifest")
+                events.append("target-manifest-end")
+            return super().manifest
+
+    class _InstallingOwnerPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("owner-load-begin")
+            set_application_services(target_holder[0])
+            events.append("owner-load-end")
+
+    target = ApplicationServices(
+        builtin_plugins=(_BlockingManifestPlugin("test.target", events),),
+        plugins_dir="",
+    )
+    target_holder.append(target)
+    owner = ApplicationServices(plugins_dir="")
+    set_application_services(owner)
+    assert owner.plugin_manager.register(
+        _InstallingOwnerPlugin("test.owner", events),
+        source="builtin",
+    ).success
+
+    target_start = threading.Thread(
+        target=lambda: target_start_results.append(target.start_plugins()),
+    )
+    target_start.start()
+    assert manifest_started.wait(timeout=5)
+    owner_load = threading.Thread(
+        target=lambda: owner_results.append(
+            owner.plugin_manager.load("test.owner")
+        ),
+    )
+    owner_load.start()
+    try:
+        owner_load.join(timeout=0.5)
+        assert owner_load.is_alive()
+    finally:
+        release_manifest.set()
+        target_start.join(timeout=5)
+        owner_load.join(timeout=5)
+
+    assert not target_start.is_alive()
+    assert not owner_load.is_alive()
+    assert target_start_results and target_start_results[0][0].success is True
+    assert owner_results and owner_results[0].success is True
+    assert owner.is_closed is True
+    assert get_application_services() is target
+    assert events == [
+        "target-manifest-begin",
+        "owner-load-begin",
+        "owner-load-end",
+        "unload:test.owner",
+        "target-manifest-end",
+        "load:test.target",
+    ]
+
+
+def test_installer_waits_for_local_startup_close_cleanup(monkeypatch):
+    events: list[str] = []
+    target_holder: list[ApplicationServices] = []
+    previous_close_started = threading.Event()
+    release_previous_close = threading.Event()
+    unload_started = threading.Event()
+    release_unload = threading.Event()
+    start_results: list[tuple] = []
+
+    class _ClosingStartupPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("target-load")
+            target_holder[0].close()
+
+        def onunload(self) -> None:
+            events.append("target-unload-begin")
+            unload_started.set()
+            if not release_unload.wait(timeout=5):
+                raise AssertionError("test did not release startup cleanup")
+            events.append("target-unload-end")
+
+    previous = ApplicationServices(plugins_dir="")
+    set_application_services(previous)
+    original_previous_close = previous._close_plugins
+
+    def delayed_previous_close():
+        previous_close_started.set()
+        if not release_previous_close.wait(timeout=5):
+            raise AssertionError("test did not release the previous root close")
+        return original_previous_close()
+
+    monkeypatch.setattr(previous, "_close_plugins", delayed_previous_close)
+    target = ApplicationServices(
+        builtin_plugins=(_ClosingStartupPlugin("test.target", events),),
+        plugins_dir="",
+    )
+    target_holder.append(target)
+    installer = threading.Thread(target=lambda: set_application_services(target))
+    installer.start()
+    assert previous_close_started.wait(timeout=5)
+    local_start = threading.Thread(
+        target=lambda: start_results.append(target.start_plugins()),
+    )
+    local_start.start()
+    assert unload_started.wait(timeout=5)
+    release_previous_close.set()
+    installer.join(timeout=0.5)
+    assert installer.is_alive()
+
+    unrelated_root = ApplicationServices(plugins_dir="")
+    unrelated_root.plugin_manager.load("missing")
+    installer.join(timeout=0.5)
+    assert installer.is_alive()
+
+    release_unload.set()
+    local_start.join(timeout=5)
+    installer.join(timeout=5)
+    assert not local_start.is_alive()
+    assert not installer.is_alive()
+    successor = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.successor", events),),
+        plugins_dir="",
+    )
+    set_application_services(successor)
+
+    assert start_results and start_results[0][0].success is True
+    assert target.is_closed is True
+    assert target.plugin_manager.snapshot("test.target").state == "disabled"
+    assert get_application_services() is successor
+    assert events == [
+        "target-load",
+        "target-unload-begin",
+        "target-unload-end",
+        "load:test.successor",
+    ]
+
+
 def test_get_replaces_a_directly_closed_installed_root():
     services = ApplicationServices(plugins_dir="")
     set_application_services(services)
@@ -1559,9 +1713,10 @@ def test_public_manager_load_defers_callback_requested_replacement():
     ]
 
 
-def test_queued_replacement_drains_its_in_flight_local_lifecycle_operation():
+def test_queued_replacement_yields_to_newer_target_after_local_drain():
     events: list[str] = []
     replacement_holder: list[ApplicationServices] = []
+    final_holder: list[ApplicationServices] = []
     replacement_load_started = threading.Event()
     release_replacement_load = threading.Event()
     replacement_results: list = []
@@ -1573,6 +1728,7 @@ def test_queued_replacement_drains_its_in_flight_local_lifecycle_operation():
             replacement_load_started.set()
             if not release_replacement_load.wait(timeout=5):
                 raise AssertionError("test did not release the replacement load")
+            set_application_services(final_holder[0])
             events.append("replacement-load-end")
 
     class _ReplacingOwnerPlugin(_RecordingPlugin):
@@ -1582,8 +1738,16 @@ def test_queued_replacement_drains_its_in_flight_local_lifecycle_operation():
             events.append("owner-load-end")
 
     owner = ApplicationServices(plugins_dir="")
-    replacement = ApplicationServices(plugins_dir="")
+    replacement = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.superseded-builtin", events),),
+        plugins_dir="",
+    )
+    final = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.final", events),),
+        plugins_dir="",
+    )
     replacement_holder.append(replacement)
+    final_holder.append(final)
     assert replacement.plugin_manager.register(
         _BlockingReplacementPlugin("test.replacement", events),
         source="builtin",
@@ -1620,14 +1784,18 @@ def test_queued_replacement_drains_its_in_flight_local_lifecycle_operation():
     assert replacement_results and replacement_results[0].success is True
     assert owner_results and owner_results[0].success is True
     assert owner.is_closed is True
-    assert get_application_services() is replacement
-    assert replacement.plugin_manager.snapshot("test.replacement").state == "enabled"
+    assert replacement.is_closed is True
+    assert get_application_services() is final
+    assert replacement.plugin_manager.snapshot("test.replacement").state == "disabled"
+    assert replacement.plugin_manager.snapshot("test.superseded-builtin") is None
     assert events == [
         "replacement-load-begin",
         "owner-load-begin",
         "owner-load-end",
         "unload:test.owner",
         "replacement-load-end",
+        "unload:test.replacement",
+        "load:test.final",
     ]
 
 

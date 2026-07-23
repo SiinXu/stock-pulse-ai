@@ -184,7 +184,8 @@ class ApplicationServices:
                 or self._plugins_closed
             ):
                 return self._plugin_load_results
-            self._plugins_starting = True
+            with _services_lock:
+                self._plugins_starting = True
             try:
                 self._builtin_plugin_results = tuple(
                     self._plugin_manager.register(plugin, source="builtin")
@@ -216,7 +217,6 @@ class ApplicationServices:
                         )
                 return self._plugin_load_results
             finally:
-                self._plugins_starting = False
                 close_after_start = False
                 with _services_lock:
                     if (
@@ -224,9 +224,18 @@ class ApplicationServices:
                         and not self._local_lifecycle_ops
                     ):
                         self._local_close_requested = False
+                        self._local_lifecycle_ops += 1
                         close_after_start = True
+                    self._plugins_starting = False
+                    if not close_after_start:
+                        _services_local_ops.notify_all()
                 if close_after_start:
-                    self._close_plugins()
+                    try:
+                        self._close_plugins()
+                    finally:
+                        with _services_lock:
+                            self._local_lifecycle_ops -= 1
+                            _services_local_ops.notify_all()
 
     def close(self) -> tuple["PluginOperationResult", ...]:
         """Disable the owned plugin snapshot once in reverse registration order.
@@ -490,6 +499,7 @@ def _set_application_services(
         target = services
         try:
             while True:
+                restart_transition = False
                 with _services_lock:
                     previous = _services
 
@@ -505,7 +515,10 @@ def _set_application_services(
                     _services = target
                     while (
                         target is not None
-                        and target._local_lifecycle_ops
+                        and (
+                            target._plugins_starting
+                            or target._local_lifecycle_ops
+                        )
                     ):
                         # An in-flight local lifecycle operation must fully
                         # complete before this root's plugins may start.
@@ -513,6 +526,15 @@ def _set_application_services(
                     if target is not None and target._plugin_close_requested:
                         target = None
                         _services = None
+                    has_pending, pending_target = (
+                        _take_latest_installable_pending_services()
+                    )
+                    if has_pending:
+                        target = pending_target
+                        restart_transition = True
+
+                if restart_transition:
+                    continue
 
                 if target is not None:
                     target.start_plugins()
