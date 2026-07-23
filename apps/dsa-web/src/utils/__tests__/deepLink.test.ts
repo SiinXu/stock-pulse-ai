@@ -1,7 +1,13 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
-import { APP_ROUTE_PATHS, LEGACY_ROUTE_PATHS } from '../../routing/routes';
+import {
+  APP_ROUTE_PATHS,
+  HOME_ROUTE_QUERY_KEYS,
+  HOME_WORKSPACE_ROUTE_QUERY_VALUES,
+  LEGACY_ROUTE_PATHS,
+  REPORT_ROUTE_QUERY_KEYS,
+} from '../../routing/routes';
 import { buildDeepLink, parseDeepLink } from '../deepLink';
 
 describe('deepLink', () => {
@@ -32,6 +38,29 @@ describe('deepLink', () => {
       period: 'weekly',
       days: 120,
     })).toBe('/stocks/7203.T?period=weekly&days=120');
+  });
+
+  it('applies the shared query contract in Home and Chat deep-link consumers', () => {
+    const homeParams = new URLSearchParams(buildDeepLink({
+      page: 'home',
+      workspace: HOME_WORKSPACE_ROUTE_QUERY_VALUES.watchlist,
+    }).slice(2));
+    expect(homeParams.get(HOME_ROUTE_QUERY_KEYS.workspace)).toBe(
+      HOME_WORKSPACE_ROUTE_QUERY_VALUES.watchlist,
+    );
+
+    const chatHref = buildDeepLink({
+      page: 'chat',
+      stockCode: 'AAPL',
+      recordId: 17,
+    });
+    const chatParams = new URL(chatHref, 'http://stockpulse.local').searchParams;
+    expect(chatParams.get(REPORT_ROUTE_QUERY_KEYS.recordId)).toBe('17');
+
+    const parsed = parseDeepLink(
+      `${APP_ROUTE_PATHS.agent}?stock=AAPL&${REPORT_ROUTE_QUERY_KEYS.recordId}=17`,
+    );
+    expect(parsed.target).toMatchObject({ page: 'chat', recordId: 17 });
   });
 
   it('parses and canonicalizes Home state while preserving unrelated parameters', () => {

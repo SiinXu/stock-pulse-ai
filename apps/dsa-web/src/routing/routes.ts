@@ -40,6 +40,16 @@ export const HOME_ROUTE_QUERY_KEYS = {
   workspace: 'workspace',
 } as const;
 
+export const HOME_WORKSPACE_ROUTE_QUERY_VALUES = {
+  history: 'history',
+  watchlist: 'watchlist',
+  today: 'today',
+} as const;
+
+export type HomeWorkspaceRouteQueryValue = (
+  typeof HOME_WORKSPACE_ROUTE_QUERY_VALUES
+)[keyof typeof HOME_WORKSPACE_ROUTE_QUERY_VALUES];
+
 export const RESEARCH_DISCOVER_ROUTE_QUERY_KEYS = {
   market: 'market',
   strategy: 'strategy',

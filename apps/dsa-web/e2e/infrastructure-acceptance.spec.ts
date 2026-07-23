@@ -18,6 +18,7 @@ import { UI_TEXT } from '../src/i18n/uiText';
 import {
   APP_ROUTE_PATHS,
   LEGACY_ROUTE_PATHS,
+  REPORT_ROUTE_QUERY_KEYS,
   SETTINGS_ROUTE_QUERY_KEYS,
   SETTINGS_SECTION_IDS,
   buildSettingsHref,
@@ -847,7 +848,9 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       body: 'data: {"type":"done","success":true,"content":"context preserved"}\n\n',
     }));
     await login(page);
-    await page.goto('/chat?stock=AAPL&name=Apple&recordId=1');
+    await page.goto(
+      `/chat?stock=AAPL&name=Apple&${REPORT_ROUTE_QUERY_KEYS.recordId}=1`,
+    );
 
     const composer = page.getByRole('textbox', { name: '消息输入框' });
     await expect(composer).toHaveValue('请深入分析 Apple(AAPL)');
@@ -857,18 +860,30 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page.getByText('context preserved', { exact: true })).toBeVisible();
     await expect.poll(() => {
       const url = new URL(page.url());
-      return Object.fromEntries(['stock', 'name', 'recordId', 'context'].map((key) => [
+      return Object.fromEntries([
+        'stock',
+        'name',
+        REPORT_ROUTE_QUERY_KEYS.recordId,
+        'context',
+      ].map((key) => [
         key,
         url.searchParams.get(key),
       ]));
     }).toEqual({ stock: 'AAPL', name: 'Apple', recordId: '1', context: 'active' });
 
     const homeLink = page.getByRole('link', { name: '首页' });
-    await expect(homeLink).toHaveAttribute('href', /recordId=1/);
+    await expect(homeLink).toHaveAttribute(
+      'href',
+      new RegExp(`${REPORT_ROUTE_QUERY_KEYS.recordId}=1`),
+    );
     await homeLink.click();
     await expect.poll(() => {
       const url = new URL(page.url());
-      return { pathname: url.pathname, stock: url.searchParams.get('stock'), recordId: url.searchParams.get('recordId') };
+      return {
+        pathname: url.pathname,
+        stock: url.searchParams.get('stock'),
+        recordId: url.searchParams.get(REPORT_ROUTE_QUERY_KEYS.recordId),
+      };
     }).toEqual({ pathname: '/', stock: 'AAPL', recordId: '1' });
   });
 

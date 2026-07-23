@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Tests] Added a blocking hosted `python-minimum` job that runs the full backend gate on Python 3.10, with portable timeout and exception-group guard fixtures, while retaining the Python 3.11 gate.
+- [Fixed] Completed Web route-query centralization across Home workspace state and Chat report-context consumers.
 - [Fixed] Removed false disclosure cues from always-expanded Web navigation, aligned the Discover empty-state accessible name with its visible action, and centralized Research URL state constants.
 - [Changed] Grouped Web navigation into five primary domains and moved market review, screening, and backtesting into Research with query- and hash-preserving legacy redirects.
 - [Tests] Aligned the Usage settings browser contract with the single-page-heading hierarchy.

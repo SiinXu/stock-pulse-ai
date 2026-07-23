@@ -71,7 +71,7 @@ const ALLOWED_QUERY_KEYS: Record<PersistedRouteKey, readonly string[]> = {
     REPORT_ROUTE_QUERY_KEYS.runFlowRecordId,
     REPORT_ROUTE_QUERY_KEYS.runFlowTaskId,
   ],
-  chat: ['session', 'stock', 'name', 'recordId', 'context'],
+  chat: ['session', 'stock', 'name', REPORT_ROUTE_QUERY_KEYS.recordId, 'context'],
   portfolio: ['account'],
   'decision-signals': [
     'stock',

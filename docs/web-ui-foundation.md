@@ -99,7 +99,10 @@ so every major route consumes the same validation and sensitive-key policy.
 The current shareable state contract includes Home report and Run Flow
 identity, Home stock prefill and workspace view, Chat session/report context,
 Portfolio account scope, stock-details period/range, Decision Signals stock,
-signal, view, and filter context, and the existing page-owned filter codecs.
+signal, view, and filter context, Research page state, and the existing
+page-owned filter codecs. Shared report query names and legal Home workspace
+values are defined in `routing/routes.ts`; Deep Link, Home URL, Chat, and
+session-continuity consumers use that single route contract.
 Stable view choices create history entries when Back/Forward should restore
 them. Canonicalization, missing-resource fallback, and default-value removal
 use Router replace navigation so they do not create dead history entries. A

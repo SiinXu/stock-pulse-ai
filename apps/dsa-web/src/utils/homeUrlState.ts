@@ -3,6 +3,7 @@
 import type { RunFlowSnapshotSource } from '../types/runFlow';
 import {
   HOME_ROUTE_QUERY_KEYS,
+  HOME_WORKSPACE_ROUTE_QUERY_VALUES,
   REPORT_ROUTE_QUERY_KEYS,
   RUN_FLOW_ROUTE_QUERY_VALUES,
 } from '../routing/routes';
@@ -99,7 +100,7 @@ export function parseHomeUrlState(search: string): HomeUrlState {
     recordId: normalized.recordId,
     runFlow: normalized.runFlow,
     stockCode: homeTarget?.stockCode ?? null,
-    workspace: homeTarget?.workspace ?? 'history',
+    workspace: homeTarget?.workspace ?? HOME_WORKSPACE_ROUTE_QUERY_VALUES.history,
     invalidRecordId: parsedDeepLink.issues.some((issue) => issue.code === 'invalid_record_id'),
     invalidRunFlow: (
       deepLinkParams.has(REPORT_ROUTE_QUERY_KEYS.runFlow)
@@ -170,7 +171,7 @@ export function clearHomeRunFlow(search: string): string {
 
 export function setHomeWorkspace(search: string, workspace: HomeWorkspaceView): string {
   const params = getNormalizedParams(search);
-  if (workspace === 'history') {
+  if (workspace === HOME_WORKSPACE_ROUTE_QUERY_VALUES.history) {
     params.delete(HOME_ROUTE_QUERY_KEYS.workspace);
   } else {
     params.set(HOME_ROUTE_QUERY_KEYS.workspace, workspace);

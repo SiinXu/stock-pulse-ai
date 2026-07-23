@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
 import {
+  HOME_ROUTE_QUERY_KEYS,
+  HOME_WORKSPACE_ROUTE_QUERY_VALUES,
+} from '../../routing/routes';
+import {
   buildHomeHistoryRunFlowHref,
   clearHomeRunFlow,
   parseHomeUrlState,
@@ -97,8 +101,17 @@ describe('homeUrlState', () => {
   });
 
   it('pushes non-default workspace state and removes the default from the URL', () => {
-    const watchlistSearch = setHomeWorkspace('?recordId=3&keep=yes', 'watchlist');
+    const watchlistSearch = setHomeWorkspace(
+      '?recordId=3&keep=yes',
+      HOME_WORKSPACE_ROUTE_QUERY_VALUES.watchlist,
+    );
     expect(watchlistSearch).toBe('?recordId=3&keep=yes&workspace=watchlist');
-    expect(setHomeWorkspace(watchlistSearch, 'history')).toBe('?recordId=3&keep=yes');
+    expect(new URLSearchParams(watchlistSearch).get(HOME_ROUTE_QUERY_KEYS.workspace)).toBe(
+      HOME_WORKSPACE_ROUTE_QUERY_VALUES.watchlist,
+    );
+    expect(setHomeWorkspace(
+      watchlistSearch,
+      HOME_WORKSPACE_ROUTE_QUERY_VALUES.history,
+    )).toBe('?recordId=3&keep=yes');
   });
 });

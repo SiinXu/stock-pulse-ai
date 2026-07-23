@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   APP_ROUTE_PATHS,
+  HOME_WORKSPACE_ROUTE_QUERY_VALUES,
   LEGACY_ROUTE_PATHS,
   REPORT_ROUTE_QUERY_KEYS,
   RESEARCH_BACKTEST_PHASE_VALUES,
@@ -77,6 +78,11 @@ describe('application navigation descriptor', () => {
       'unknown',
     ]);
     expect(Object.values(RUN_FLOW_ROUTE_QUERY_VALUES)).toEqual(['history', 'task']);
+    expect(Object.values(HOME_WORKSPACE_ROUTE_QUERY_VALUES)).toEqual([
+      'history',
+      'watchlist',
+      'today',
+    ]);
   });
 
   it('delegates only unmodified primary same-window link activation', () => {
