@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 import threading
 from dataclasses import dataclass, field
-from typing import Iterable, Literal
+from typing import Any, Callable, Iterable, Literal
 
 from src.utils.sanitize import log_safe_exception
 
@@ -78,6 +78,37 @@ class PluginManager:
         self._registry = registry or ExtensionRegistry()
         self._plugins: dict[str, _ManagedPlugin] = {}
         self._lock = threading.RLock()
+        self._lifecycle_boundary: (
+            Callable[[Callable[[], Any]], Any] | None
+        ) = None
+        self._lifecycle_boundary_state = threading.local()
+
+    def _bind_lifecycle_boundary(
+        self,
+        boundary: Callable[[Callable[[], Any]], Any],
+    ) -> None:
+        """Bind the owning composition root's outer lifecycle authority."""
+
+        if not callable(boundary):
+            raise TypeError("plugin lifecycle boundary must be callable")
+        with self._lock:
+            self._lifecycle_boundary = boundary
+
+    def _run_lifecycle_boundary(self, operation: Callable[[], Any]) -> Any:
+        """Run only the outermost lifecycle operation through the root hook."""
+
+        boundary = self._lifecycle_boundary
+        if boundary is None or getattr(
+            self._lifecycle_boundary_state,
+            "active",
+            False,
+        ):
+            return operation()
+        self._lifecycle_boundary_state.active = True
+        try:
+            return boundary(operation)
+        finally:
+            self._lifecycle_boundary_state.active = False
 
     @property
     def registry(self) -> ExtensionRegistry:
@@ -212,12 +243,24 @@ class PluginManager:
     def load(self, plugin_id: str) -> PluginOperationResult:
         """Perform the first ``registered -> enabled`` transition."""
 
-        return self._enable(plugin_id, operation="load", required_state="registered")
+        return self._run_lifecycle_boundary(
+            lambda: self._enable(
+                plugin_id,
+                operation="load",
+                required_state="registered",
+            )
+        )
 
     def enable(self, plugin_id: str) -> PluginOperationResult:
         """Perform ``disabled -> enabled`` and remain idempotent when enabled."""
 
-        return self._enable(plugin_id, operation="enable", required_state="disabled")
+        return self._run_lifecycle_boundary(
+            lambda: self._enable(
+                plugin_id,
+                operation="enable",
+                required_state="disabled",
+            )
+        )
 
     def _enable(
         self,
@@ -313,6 +356,11 @@ class PluginManager:
     def disable(self, plugin_id: str) -> PluginOperationResult:
         """Unload an enabled plugin or converge a failed plugin after cleanup."""
 
+        return self._run_lifecycle_boundary(lambda: self._disable(plugin_id))
+
+    def _disable(self, plugin_id: str) -> PluginOperationResult:
+        """Perform one disable transition inside the outer lifecycle boundary."""
+
         with self._lock:
             record = self._plugins.get(plugin_id)
             if record is None:
@@ -407,13 +455,17 @@ class PluginManager:
         """Load a snapshot of plugins, continuing after every isolated failure."""
 
         selected = self.plugin_ids() if plugin_ids is None else tuple(plugin_ids)
-        return tuple(self.load(plugin_id) for plugin_id in selected)
+        return self._run_lifecycle_boundary(
+            lambda: tuple(self.load(plugin_id) for plugin_id in selected)
+        )
 
     def disable_all(self, plugin_ids: Iterable[str] | None = None) -> tuple[PluginOperationResult, ...]:
         """Disable a reverse-order snapshot, continuing after every failure."""
 
         selected = self.plugin_ids() if plugin_ids is None else tuple(plugin_ids)
-        return tuple(self.disable(plugin_id) for plugin_id in reversed(selected))
+        return self._run_lifecycle_boundary(
+            lambda: tuple(self.disable(plugin_id) for plugin_id in reversed(selected))
+        )
 
     def _cleanup_handles(
         self,

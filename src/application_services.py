@@ -34,7 +34,7 @@ import atexit
 import os
 import threading
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional
 
 if TYPE_CHECKING:  # import for typing only; avoids runtime import cycles
     from src.config import Config
@@ -83,6 +83,9 @@ class ApplicationServices:
                 application_version=plugin_application_version,
             )
         self._plugin_manager = plugin_manager
+        self._plugin_manager._bind_lifecycle_boundary(
+            self._run_plugin_manager_lifecycle,
+        )
         self._builtin_plugins = tuple(builtin_plugins)
         self._plugins_dir = plugins_dir
         self._builtin_plugin_results: tuple["PluginOperationResult", ...] = ()
@@ -90,6 +93,7 @@ class ApplicationServices:
         self._plugin_load_results: tuple["PluginOperationResult", ...] = ()
         self._plugin_shutdown_results: tuple["PluginOperationResult", ...] = ()
         self._plugin_lifecycle_lock = threading.RLock()
+        self._local_lifecycle_ops = 0
         self._plugins_starting = False
         self._plugins_started = False
         self._plugins_closed = False
@@ -156,6 +160,16 @@ class ApplicationServices:
 
         return self._plugin_shutdown_results
 
+    @property
+    def is_closed(self) -> bool:
+        """Return whether this one-shot root has entered terminal shutdown.
+
+        The flag is monotonic and intentionally lock-free so callback-owned
+        workers can reject a closing root without waiting on its lifecycle lock.
+        """
+
+        return self._plugins_closed
+
     def start_plugins(self) -> tuple["PluginOperationResult", ...]:
         """Compose and load plugins once after this root becomes discoverable."""
 
@@ -193,7 +207,110 @@ class ApplicationServices:
                 self._plugins_starting = False
 
     def close(self) -> tuple["PluginOperationResult", ...]:
-        """Disable the owned plugin snapshot once in reverse registration order."""
+        """Disable the owned plugin snapshot once in reverse registration order.
+
+        Closing the installed process root enters the same transition authority
+        as replacement and reset. This keeps the owning root discoverable until
+        its complete unload finishes and defers callback-requested successors.
+        A request made while that transition is active is queued without waiting
+        so a lifecycle callback may safely join its requesting worker; the
+        transition owner completes shutdown through ``_close_plugins()``. A
+        root that is not installed shuts down outside the transition authority
+        so its callback-owned workers can keep using the module accessors; the
+        lifecycle boundary around the unload re-checks installation and rescues
+        the race with a concurrent install of this root.
+        """
+
+        with _services_lock:
+            if _services is self and _services_transition_active:
+                _services_transition_pending.append(None)
+                return self._plugin_shutdown_results
+            installed = _services is self
+
+        if not installed:
+            # A root that is not installed must never wait on the transition
+            # authority: a lifecycle callback running while another root's
+            # installation drains local operations may close this root, and
+            # taking the transition lock here would deadlock that drain.
+            return self._close_plugins()
+
+        with _services_transition_lock:
+            with _services_lock:
+                close_installed_root = _services is self
+            if close_installed_root:
+                set_application_services(None)
+                return self._plugin_shutdown_results
+
+        return self._close_plugins()
+
+    def _run_plugin_manager_lifecycle(
+        self,
+        operation: Callable[[], Any],
+    ) -> Any:
+        """Serialize public manager callbacks with process-root transitions.
+
+        The installed root outside an active transition runs the operation as
+        the transition owner, so overlapping install, replace, and close
+        requests defer into the pending queue until the operation completes.
+        Any other operation -- on a root that is not installed, or on the
+        installed root while its transition is already active -- runs without
+        holding any module lock and is only tracked in a drain counter;
+        callback-owned workers can therefore use the module accessors without
+        deadlocking, while an installer waits for in-flight tracked
+        operations to finish before starting the root's plugins.
+        """
+        global _services_transition_active
+
+        with _services_lock:
+            # Operations inside an already-active transition must not
+            # re-enter the authority, and operation() must never run while
+            # this non-reentrant lock is held: its callbacks may call the
+            # module accessors, which take the lock again.
+            run_local = _services is not self or _services_transition_active
+            if run_local:
+                self._local_lifecycle_ops += 1
+
+        if not run_local:
+            with _services_transition_lock:
+                with _services_lock:
+                    owns_installed_root = _services is self
+                    if owns_installed_root:
+                        _services_transition_active = True
+                        _services_transition_pending.clear()
+                    else:
+                        # Lost the root between the unlocked check and the
+                        # transition lock; fall back to a local operation.
+                        self._local_lifecycle_ops += 1
+
+                if owns_installed_root:
+                    try:
+                        return operation()
+                    finally:
+                        with _services_lock:
+                            has_pending, pending_target = (
+                                _take_latest_installable_pending_services()
+                            )
+                            if (
+                                not has_pending
+                                and self._plugins_closed
+                                and _services is self
+                            ):
+                                # A closed root must not remain published as
+                                # the stable root once its transition ends.
+                                has_pending, pending_target = True, None
+                            _services_transition_active = False
+                        if has_pending:
+                            set_application_services(pending_target)
+
+        try:
+            return operation()
+        finally:
+            with _services_lock:
+                self._local_lifecycle_ops -= 1
+                _services_local_ops.notify_all()
+
+    def _close_plugins(self) -> tuple["PluginOperationResult", ...]:
+        """Perform root-local shutdown for the global transition owner."""
 
         with self._plugin_lifecycle_lock:
             if self._plugins_closed:
@@ -206,35 +323,125 @@ class ApplicationServices:
 
 _services: Optional[ApplicationServices] = None
 _services_lock = threading.Lock()
+_services_local_ops = threading.Condition(_services_lock)
+_services_transition_lock = threading.RLock()
+_services_transition_active = False
+_services_transition_pending: list[Optional[ApplicationServices]] = []
+_services_shutdown = False
+
+
+def _take_latest_installable_pending_services() -> tuple[
+    bool,
+    Optional[ApplicationServices],
+]:
+    """Consume the latest pending target that has not already been closed.
+
+    The caller must hold ``_services_lock``.
+    """
+
+    while _services_transition_pending:
+        candidate = _services_transition_pending.pop()
+        if candidate is None or not candidate.is_closed:
+            _services_transition_pending.clear()
+            return True, candidate
+    return False, None
 
 
 def get_application_services() -> ApplicationServices:
     """Return the installed composition root, creating a default one lazily."""
-    global _services
     while True:
         with _services_lock:
-            if _services is None:
-                _services = ApplicationServices()
-            services = _services
-        services.start_plugins()
-        with _services_lock:
-            if _services is services:
-                return services
+            if _services_transition_active and _services is not None:
+                # Lifecycle callbacks must resolve the root whose transition
+                # they belong to without starting or resurrecting a successor.
+                return _services
+            if _services_shutdown:
+                raise RuntimeError("Application services are shutting down")
+
+        with _services_transition_lock:
+            with _services_lock:
+                if _services_shutdown:
+                    raise RuntimeError("Application services are shutting down")
+                services = _services
+            if services is None or services.is_closed:
+                services = ApplicationServices()
+            set_application_services(services)
+            with _services_lock:
+                if _services is services:
+                    return services
 
 
 def set_application_services(services: Optional[ApplicationServices]) -> None:
-    """Install a composition root. Pass ``None`` to clear the installed root.
+    """Install a root after fully shutting down the previous root.
 
-    Intended for the startup layer and for tests that need isolated instances.
+    Pass ``None`` to clear the installed root. Overlapping replacement requests
+    from plugin callbacks are deferred until the active lifecycle transition
+    finishes, with the most recent request winning.
     """
-    global _services
+    global _services, _services_transition_active
+
     with _services_lock:
-        previous = _services
-        _services = services
-    if previous is not None and previous is not services:
-        previous.close()
-    if services is not None:
-        services.start_plugins()
+        if _services_shutdown and services is not None:
+            raise RuntimeError("Application services are shutting down")
+        if _services_transition_active:
+            _services_transition_pending.append(services)
+            return
+        if services is not None and services.is_closed:
+            raise RuntimeError("Cannot install closed application services")
+
+    with _services_transition_lock:
+        with _services_lock:
+            if _services_shutdown and services is not None:
+                raise RuntimeError("Application services are shutting down")
+            if _services_transition_active:
+                _services_transition_pending.append(services)
+                return
+            if services is not None and services.is_closed:
+                raise RuntimeError("Cannot install closed application services")
+            _services_transition_active = True
+            _services_transition_pending.clear()
+
+        target = services
+        try:
+            while True:
+                with _services_lock:
+                    previous = _services
+
+                if previous is not None and previous is not target:
+                    previous._close_plugins()
+
+                with _services_lock:
+                    has_pending, pending_target = (
+                        _take_latest_installable_pending_services()
+                    )
+                    if has_pending:
+                        target = pending_target
+                    _services = target
+                    while (
+                        target is not None
+                        and target._local_lifecycle_ops
+                    ):
+                        # An in-flight local lifecycle operation must fully
+                        # complete before this root's plugins may start.
+                        _services_local_ops.wait()
+
+                if target is not None:
+                    target.start_plugins()
+
+                with _services_lock:
+                    has_pending, pending_target = (
+                        _take_latest_installable_pending_services()
+                    )
+                    if not has_pending:
+                        if target is not None and target.is_closed:
+                            _services = None
+                        _services_transition_active = False
+                        return
+                    target = pending_target
+        finally:
+            with _services_lock:
+                _services_transition_active = False
+                _services_transition_pending.clear()
 
 
 def reset_application_services() -> None:
@@ -242,4 +449,17 @@ def reset_application_services() -> None:
     set_application_services(None)
 
 
-atexit.register(reset_application_services)
+def _shutdown_application_services() -> None:
+    """Enter terminal process shutdown and close the installed root."""
+    global _services_shutdown
+    with _services_lock:
+        _services_shutdown = True
+    set_application_services(None)
+    # A concurrent transition queues the terminal reset without waiting so its
+    # callback-owned workers cannot deadlock. The exit handler itself must wait
+    # until that transition consumes the reset before later atexit handlers run.
+    with _services_transition_lock:
+        pass
+
+
+atexit.register(_shutdown_application_services)

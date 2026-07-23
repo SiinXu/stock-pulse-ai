@@ -1,6 +1,10 @@
 """Tests for the ApplicationServices composition root."""
 
 import json
+import subprocess
+import sys
+import textwrap
+import threading
 from pathlib import Path
 
 import pytest
@@ -374,3 +378,1006 @@ def test_plugin_load_can_resolve_the_already_installed_root():
 
     assert observed_roots == [services]
     assert events == ["load:test.root-aware"]
+
+
+def test_reset_does_not_recreate_root_from_unload_lookup():
+    observed_roots: list[ApplicationServices] = []
+    events: list[str] = []
+
+    class _UnloadLookupPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("unload-begin")
+            observed_roots.append(get_application_services())
+            events.append("unload-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(_UnloadLookupPlugin("test.reset-lookup", events),),
+        plugins_dir="",
+    )
+    set_application_services(services)
+
+    reset_application_services()
+
+    assert observed_roots == [services]
+    assert events == ["load:test.reset-lookup", "unload-begin", "unload-end"]
+    assert get_application_services() is not services
+
+
+def test_replacement_finishes_old_unload_before_new_root_load():
+    observed_roots: list[ApplicationServices] = []
+    events: list[str] = []
+
+    class _UnloadLookupPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("old-unload-begin")
+            observed_roots.append(get_application_services())
+            events.append("old-unload-end")
+
+    first = ApplicationServices(
+        builtin_plugins=(_UnloadLookupPlugin("test.old", events),),
+        plugins_dir="",
+    )
+    second = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.new", events),),
+        plugins_dir="",
+    )
+
+    set_application_services(first)
+    set_application_services(second)
+
+    assert observed_roots == [first]
+    assert events == [
+        "load:test.old",
+        "old-unload-begin",
+        "old-unload-end",
+        "load:test.new",
+    ]
+
+
+def test_concurrent_get_during_replacement_keeps_old_root_until_unload_finishes():
+    unload_started = threading.Event()
+    release_unload = threading.Event()
+    observed_roots: list[ApplicationServices] = []
+    events: list[str] = []
+
+    class _BlockingUnloadPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("old-unload-begin")
+            unload_started.set()
+            if not release_unload.wait(timeout=5):
+                raise AssertionError("test did not release the unload callback")
+            events.append("old-unload-end")
+
+    first = ApplicationServices(
+        builtin_plugins=(_BlockingUnloadPlugin("test.old", events),),
+        plugins_dir="",
+    )
+    second = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.new", events),),
+        plugins_dir="",
+    )
+    set_application_services(first)
+
+    replacement = threading.Thread(
+        target=set_application_services,
+        args=(second,),
+    )
+    lookup = threading.Thread(
+        target=lambda: observed_roots.append(get_application_services()),
+    )
+    replacement.start()
+    assert unload_started.wait(timeout=5)
+
+    try:
+        lookup.start()
+        lookup.join(timeout=5)
+        assert not lookup.is_alive()
+        assert observed_roots == [first]
+        assert "load:test.new" not in events
+    finally:
+        release_unload.set()
+        replacement.join(timeout=5)
+        lookup.join(timeout=5)
+
+    assert not replacement.is_alive()
+    assert not lookup.is_alive()
+    assert events == [
+        "load:test.old",
+        "old-unload-begin",
+        "old-unload-end",
+        "load:test.new",
+    ]
+
+
+def test_reentrant_replacement_is_deferred_until_old_unload_finishes():
+    events: list[str] = []
+    final_root_holder: list[ApplicationServices] = []
+
+    class _ReplacingUnloadPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("old-unload-begin")
+            set_application_services(final_root_holder[0])
+            events.append("old-unload-end")
+
+    first = ApplicationServices(
+        builtin_plugins=(_ReplacingUnloadPlugin("test.old", events),),
+        plugins_dir="",
+    )
+    superseded = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.superseded", events),),
+        plugins_dir="",
+    )
+    final = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.final", events),),
+        plugins_dir="",
+    )
+    final_root_holder.append(final)
+
+    set_application_services(first)
+    set_application_services(superseded)
+
+    assert get_application_services() is final
+    assert superseded.plugin_manager.plugin_ids() == ()
+    assert events == [
+        "load:test.old",
+        "old-unload-begin",
+        "old-unload-end",
+        "load:test.final",
+    ]
+
+
+def test_concurrent_replacement_request_does_not_deadlock_unload_callback():
+    events: list[str] = []
+    final_root_holder: list[ApplicationServices] = []
+    worker_returned = threading.Event()
+    workers: list[threading.Thread] = []
+
+    class _WorkerReplacingUnloadPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("old-unload-begin")
+
+            def request_final_root() -> None:
+                set_application_services(final_root_holder[0])
+                worker_returned.set()
+
+            worker = threading.Thread(target=request_final_root)
+            workers.append(worker)
+            worker.start()
+            if not worker_returned.wait(timeout=5):
+                raise AssertionError("replacement worker deadlocked during unload")
+            worker.join(timeout=5)
+            events.append("old-unload-end")
+
+    first = ApplicationServices(
+        builtin_plugins=(_WorkerReplacingUnloadPlugin("test.old", events),),
+        plugins_dir="",
+    )
+    superseded = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.superseded", events),),
+        plugins_dir="",
+    )
+    final = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.final", events),),
+        plugins_dir="",
+    )
+    final_root_holder.append(final)
+
+    set_application_services(first)
+    set_application_services(superseded)
+
+    assert worker_returned.is_set()
+    assert all(not worker.is_alive() for worker in workers)
+    assert get_application_services() is final
+    assert superseded.plugin_manager.plugin_ids() == ()
+    assert events == [
+        "load:test.old",
+        "old-unload-begin",
+        "old-unload-end",
+        "load:test.final",
+    ]
+
+
+def test_concurrent_replacement_request_does_not_deadlock_load_callback():
+    events: list[str] = []
+    final_root_holder: list[ApplicationServices] = []
+    worker_returned = threading.Event()
+    workers: list[threading.Thread] = []
+
+    class _WorkerReplacingLoadPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("intermediate-load-begin")
+
+            def request_final_root() -> None:
+                set_application_services(final_root_holder[0])
+                worker_returned.set()
+
+            worker = threading.Thread(target=request_final_root)
+            workers.append(worker)
+            worker.start()
+            if not worker_returned.wait(timeout=5):
+                raise AssertionError("replacement worker deadlocked during load")
+            worker.join(timeout=5)
+            events.append("intermediate-load-end")
+
+    intermediate = ApplicationServices(
+        builtin_plugins=(_WorkerReplacingLoadPlugin("test.intermediate", events),),
+        plugins_dir="",
+    )
+    final = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.final", events),),
+        plugins_dir="",
+    )
+    final_root_holder.append(final)
+
+    set_application_services(intermediate)
+
+    assert worker_returned.is_set()
+    assert all(not worker.is_alive() for worker in workers)
+    assert get_application_services() is final
+    assert events == [
+        "intermediate-load-begin",
+        "intermediate-load-end",
+        "unload:test.intermediate",
+        "load:test.final",
+    ]
+
+
+def test_latest_reentrant_request_can_retain_the_current_root():
+    events: list[str] = []
+    current_root_holder: list[ApplicationServices] = []
+    superseded_root = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.superseded", events),),
+        plugins_dir="",
+    )
+
+    class _RetainingLoadPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("current-load-begin")
+            set_application_services(superseded_root)
+            set_application_services(current_root_holder[0])
+            events.append("current-load-end")
+
+    current_root = ApplicationServices(
+        builtin_plugins=(_RetainingLoadPlugin("test.current", events),),
+        plugins_dir="",
+    )
+    current_root_holder.append(current_root)
+
+    set_application_services(current_root)
+
+    assert get_application_services() is current_root
+    assert superseded_root.plugin_manager.plugin_ids() == ()
+    assert current_root.plugin_manager.snapshot("test.current").state == "enabled"
+    assert events == ["current-load-begin", "current-load-end"]
+
+
+def test_terminal_atexit_shutdown_blocks_late_root_recreation():
+    script = textwrap.dedent(
+        """
+        import atexit
+        import os
+
+        os.environ.pop("PLUGINS_DIR", None)
+
+        def late_callback():
+            from src.application_services import get_application_services
+
+            try:
+                get_application_services()
+            except RuntimeError:
+                print("LATE_ROOT_BLOCKED")
+            else:
+                print("LATE_ROOT_RECREATED")
+
+        atexit.register(late_callback)
+
+        from src.application_services import get_application_services
+
+        get_application_services()
+        """
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "LATE_ROOT_BLOCKED" in result.stdout
+    assert "LATE_ROOT_RECREATED" not in result.stdout
+
+
+def test_unload_request_cannot_republish_the_closing_root():
+    events: list[str] = []
+    old_root_holder: list[ApplicationServices] = []
+
+    class _RetainingUnloadPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("old-unload-begin")
+            set_application_services(old_root_holder[0])
+            events.append("old-unload-end")
+
+    old_root = ApplicationServices(
+        builtin_plugins=(_RetainingUnloadPlugin("test.old", events),),
+        plugins_dir="",
+    )
+    new_root = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.new", events),),
+        plugins_dir="",
+    )
+    old_root_holder.append(old_root)
+
+    set_application_services(old_root)
+    set_application_services(new_root)
+
+    assert old_root.is_closed is True
+    assert get_application_services() is new_root
+    assert events == [
+        "load:test.old",
+        "old-unload-begin",
+        "old-unload-end",
+        "load:test.new",
+    ]
+
+
+def test_latest_installable_unload_request_wins_after_closing_root_request():
+    events: list[str] = []
+    roots: dict[str, ApplicationServices] = {}
+
+    class _MultipleRequestUnloadPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("old-unload-begin")
+            set_application_services(roots["final"])
+            set_application_services(roots["old"])
+            events.append("old-unload-end")
+
+    roots["old"] = ApplicationServices(
+        builtin_plugins=(_MultipleRequestUnloadPlugin("test.old", events),),
+        plugins_dir="",
+    )
+    superseded = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.superseded", events),),
+        plugins_dir="",
+    )
+    roots["final"] = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.final", events),),
+        plugins_dir="",
+    )
+
+    set_application_services(roots["old"])
+    set_application_services(superseded)
+
+    assert get_application_services() is roots["final"]
+    assert superseded.plugin_manager.plugin_ids() == ()
+    assert events == [
+        "load:test.old",
+        "old-unload-begin",
+        "old-unload-end",
+        "load:test.final",
+    ]
+
+
+def test_closed_root_cannot_be_installed_again():
+    services = ApplicationServices(plugins_dir="")
+    set_application_services(services)
+    reset_application_services()
+
+    assert services.is_closed is True
+    with pytest.raises(RuntimeError, match="Cannot install closed"):
+        set_application_services(services)
+
+
+def test_get_replaces_a_directly_closed_installed_root():
+    services = ApplicationServices(plugins_dir="")
+    set_application_services(services)
+    services.close()
+
+    replacement = get_application_services()
+
+    assert services.is_closed is True
+    assert replacement is not services
+    assert replacement.is_closed is False
+
+
+def test_direct_close_keeps_installed_root_visible_during_unload():
+    observed_roots: list[ApplicationServices] = []
+    events: list[str] = []
+
+    class _UnloadLookupPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("unload-begin")
+            observed_roots.append(get_application_services())
+            events.append("unload-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(_UnloadLookupPlugin("test.direct-close", events),),
+        plugins_dir="",
+    )
+    set_application_services(services)
+
+    services.close()
+
+    assert observed_roots == [services]
+    assert events == ["load:test.direct-close", "unload-begin", "unload-end"]
+    assert get_application_services() is not services
+
+
+def test_direct_close_defers_reentrant_replacement_until_reverse_unload_finishes():
+    events: list[str] = []
+    replacement_holder: list[ApplicationServices] = []
+
+    class _ReplacingUnloadPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("replacer-unload-begin")
+            set_application_services(replacement_holder[0])
+            events.append("replacer-unload-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(
+            _RecordingPlugin("test.first", events),
+            _ReplacingUnloadPlugin("test.replacer", events),
+        ),
+        plugins_dir="",
+    )
+    replacement = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.new", events),),
+        plugins_dir="",
+    )
+    replacement_holder.append(replacement)
+    set_application_services(services)
+
+    services.close()
+
+    assert get_application_services() is replacement
+    assert events == [
+        "load:test.first",
+        "load:test.replacer",
+        "replacer-unload-begin",
+        "replacer-unload-end",
+        "unload:test.first",
+        "load:test.new",
+    ]
+
+
+def test_direct_close_callback_worker_can_lookup_and_replace_without_deadlock():
+    events: list[str] = []
+    observed_roots: list[ApplicationServices] = []
+    replacement_holder: list[ApplicationServices] = []
+    worker_returned = threading.Event()
+    workers: list[threading.Thread] = []
+
+    class _WorkerReplacingUnloadPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("replacer-unload-begin")
+
+            def request_replacement() -> None:
+                observed_roots.append(get_application_services())
+                set_application_services(replacement_holder[0])
+                worker_returned.set()
+
+            worker = threading.Thread(target=request_replacement)
+            workers.append(worker)
+            worker.start()
+            if not worker_returned.wait(timeout=5):
+                raise AssertionError("replacement worker deadlocked during direct close")
+            worker.join(timeout=5)
+            events.append("replacer-unload-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(
+            _RecordingPlugin("test.first", events),
+            _WorkerReplacingUnloadPlugin("test.replacer", events),
+        ),
+        plugins_dir="",
+    )
+    replacement = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.new", events),),
+        plugins_dir="",
+    )
+    replacement_holder.append(replacement)
+    set_application_services(services)
+
+    services.close()
+
+    assert worker_returned.is_set()
+    assert all(not worker.is_alive() for worker in workers)
+    assert observed_roots == [services]
+    assert get_application_services() is replacement
+    assert events == [
+        "load:test.first",
+        "load:test.replacer",
+        "replacer-unload-begin",
+        "replacer-unload-end",
+        "unload:test.first",
+        "load:test.new",
+    ]
+
+
+def test_load_callback_worker_can_close_installed_root_without_deadlock():
+    events: list[str] = []
+    root_holder: list[ApplicationServices] = []
+    worker_returned = threading.Event()
+    workers: list[threading.Thread] = []
+
+    class _WorkerClosingLoadPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("load-begin")
+
+            def close_root() -> None:
+                root_holder[0].close()
+                worker_returned.set()
+
+            worker = threading.Thread(target=close_root)
+            workers.append(worker)
+            worker.start()
+            if not worker_returned.wait(timeout=5):
+                raise AssertionError("close worker deadlocked during load")
+            worker.join(timeout=5)
+            events.append("load-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(_WorkerClosingLoadPlugin("test.worker-close", events),),
+        plugins_dir="",
+    )
+    root_holder.append(services)
+
+    set_application_services(services)
+
+    assert worker_returned.is_set()
+    assert all(not worker.is_alive() for worker in workers)
+    assert services.is_closed is True
+    assert get_application_services() is not services
+    assert events == ["load-begin", "load-end", "unload:test.worker-close"]
+
+
+def test_unload_callback_worker_can_close_installed_root_without_deadlock():
+    events: list[str] = []
+    root_holder: list[ApplicationServices] = []
+    worker_returned = threading.Event()
+    workers: list[threading.Thread] = []
+
+    class _WorkerClosingUnloadPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("unload-begin")
+
+            def close_root() -> None:
+                root_holder[0].close()
+                worker_returned.set()
+
+            worker = threading.Thread(target=close_root)
+            workers.append(worker)
+            worker.start()
+            if not worker_returned.wait(timeout=5):
+                raise AssertionError("close worker deadlocked during unload")
+            worker.join(timeout=5)
+            events.append("unload-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(
+            _WorkerClosingUnloadPlugin("test.worker-close", events),
+        ),
+        plugins_dir="",
+    )
+    root_holder.append(services)
+    set_application_services(services)
+
+    services.close()
+
+    assert worker_returned.is_set()
+    assert all(not worker.is_alive() for worker in workers)
+    assert services.is_closed is True
+    assert get_application_services() is not services
+    assert events == ["load:test.worker-close", "unload-begin", "unload-end"]
+
+
+def test_overlapping_direct_close_returns_current_snapshot_without_waiting():
+    events: list[str] = []
+    unload_started = threading.Event()
+    release_unload = threading.Event()
+    first_results: list[tuple] = []
+
+    class _BlockingUnloadPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("unload-begin")
+            unload_started.set()
+            if not release_unload.wait(timeout=5):
+                raise AssertionError("test did not release direct close")
+            events.append("unload-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(_BlockingUnloadPlugin("test.blocking-close", events),),
+        plugins_dir="",
+    )
+    set_application_services(services)
+    first_close = threading.Thread(
+        target=lambda: first_results.append(services.close()),
+    )
+    first_close.start()
+    assert unload_started.wait(timeout=5)
+
+    try:
+        queued_result = services.close()
+        assert queued_result == ()
+        assert services.plugin_shutdown_results == ()
+        assert first_close.is_alive()
+    finally:
+        release_unload.set()
+        first_close.join(timeout=5)
+
+    assert not first_close.is_alive()
+    assert first_results == [services.plugin_shutdown_results]
+    assert [result.success for result in first_results[0]] == [True]
+    assert events == [
+        "load:test.blocking-close",
+        "unload-begin",
+        "unload-end",
+    ]
+
+
+def test_root_closed_during_plugin_start_is_not_left_installed():
+    events: list[str] = []
+    root_holder: list[ApplicationServices] = []
+
+    class _ClosingLoadPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("load-begin")
+            root_holder[0].close()
+            events.append("load-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(_ClosingLoadPlugin("test.closing", events),),
+        plugins_dir="",
+    )
+    root_holder.append(services)
+
+    set_application_services(services)
+    replacement = get_application_services()
+
+    assert services.is_closed is True
+    assert replacement is not services
+    assert events == ["load-begin", "load-end", "unload:test.closing"]
+
+
+def test_local_root_load_callback_worker_can_resolve_root_without_deadlock():
+    events: list[str] = []
+    worker_returned = threading.Event()
+    workers: list[threading.Thread] = []
+    observed_roots: list[ApplicationServices] = []
+
+    class _WorkerResolvingLoadPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("local-load-begin")
+
+            def resolve_root() -> None:
+                observed_roots.append(get_application_services())
+                worker_returned.set()
+
+            worker = threading.Thread(target=resolve_root)
+            workers.append(worker)
+            worker.start()
+            if not worker_returned.wait(timeout=5):
+                raise AssertionError("lookup worker deadlocked during local load")
+            worker.join(timeout=5)
+            events.append("local-load-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(
+            _WorkerResolvingLoadPlugin("test.local-worker", events),
+        ),
+        plugins_dir="",
+    )
+
+    results = services.start_plugins()
+
+    assert worker_returned.is_set()
+    assert all(not worker.is_alive() for worker in workers)
+    assert [result.success for result in results] == [True]
+    assert observed_roots and observed_roots[0] is not services
+    assert events == ["local-load-begin", "local-load-end"]
+
+
+def test_public_manager_load_defers_callback_requested_replacement():
+    events: list[str] = []
+    replacement_holder: list[ApplicationServices] = []
+    observed_roots: list[ApplicationServices] = []
+
+    class _ReplacingLoadPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("late-load-begin")
+            set_application_services(replacement_holder[0])
+            observed_roots.append(get_application_services())
+            events.append("late-load-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.first", events),),
+        plugins_dir="",
+    )
+    replacement = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.new", events),),
+        plugins_dir="",
+    )
+    replacement_holder.append(replacement)
+    set_application_services(services)
+
+    register_result = services.plugin_manager.register(
+        _ReplacingLoadPlugin("test.late", events),
+        source="builtin",
+    )
+    assert register_result.success is True
+
+    load_result = services.plugin_manager.load("test.late")
+
+    assert load_result.success is True
+    assert observed_roots == [services]
+    assert services.is_closed is True
+    assert get_application_services() is replacement
+    assert events == [
+        "load:test.first",
+        "late-load-begin",
+        "late-load-end",
+        "unload:test.late",
+        "unload:test.first",
+        "load:test.new",
+    ]
+
+
+def test_public_manager_disable_defers_callback_requested_replacement():
+    events: list[str] = []
+    observed_roots: list[ApplicationServices] = []
+    replacement_holder: list[ApplicationServices] = []
+
+    class _ReplacingUnloadPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("replacer-unload-begin")
+            set_application_services(replacement_holder[0])
+            observed_roots.append(get_application_services())
+            events.append("replacer-unload-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(
+            _RecordingPlugin("test.first", events),
+            _ReplacingUnloadPlugin("test.replacer", events),
+        ),
+        plugins_dir="",
+    )
+    replacement = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.new", events),),
+        plugins_dir="",
+    )
+    replacement_holder.append(replacement)
+    set_application_services(services)
+
+    result = services.plugin_manager.disable("test.replacer")
+
+    assert result.success is True
+    assert observed_roots == [services]
+    assert services.is_closed is True
+    assert get_application_services() is replacement
+    assert events == [
+        "load:test.first",
+        "load:test.replacer",
+        "replacer-unload-begin",
+        "replacer-unload-end",
+        "unload:test.first",
+        "load:test.new",
+    ]
+
+
+def test_public_manager_enable_defers_callback_requested_replacement():
+    events: list[str] = []
+    observed_roots: list[ApplicationServices] = []
+    replacement_holder: list[ApplicationServices] = []
+
+    class _ReplacingEnablePlugin(_RecordingPlugin):
+        def __init__(self, plugin_id: str, plugin_events: list[str]) -> None:
+            super().__init__(plugin_id, plugin_events)
+            self.replace_on_load = False
+
+        def onload(self, context: PluginContext) -> None:
+            if not self.replace_on_load:
+                events.append("initial-load")
+                return
+            events.append("enable-begin")
+            set_application_services(replacement_holder[0])
+            observed_roots.append(get_application_services())
+            events.append("enable-end")
+
+    plugin = _ReplacingEnablePlugin("test.reenabled", events)
+    services = ApplicationServices(
+        builtin_plugins=(
+            _RecordingPlugin("test.first", events),
+            plugin,
+        ),
+        plugins_dir="",
+    )
+    replacement = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.new", events),),
+        plugins_dir="",
+    )
+    replacement_holder.append(replacement)
+    set_application_services(services)
+    assert services.plugin_manager.disable("test.reenabled").success is True
+    events.clear()
+    plugin.replace_on_load = True
+
+    result = services.plugin_manager.enable("test.reenabled")
+
+    assert result.success is True
+    assert observed_roots == [services]
+    assert services.is_closed is True
+    assert services.plugin_manager.snapshot("test.reenabled").state == "disabled"
+    assert get_application_services() is replacement
+    assert events == [
+        "enable-begin",
+        "enable-end",
+        "unload:test.reenabled",
+        "unload:test.first",
+        "load:test.new",
+    ]
+
+
+def test_installer_waits_for_in_flight_local_lifecycle_operation():
+    events: list[str] = []
+    load_started = threading.Event()
+    release_load = threading.Event()
+    start_results: list[tuple] = []
+
+    class _BlockingLoadPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("local-load-begin")
+            load_started.set()
+            if not release_load.wait(timeout=5):
+                raise AssertionError("test did not release the local load")
+            events.append("local-load-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(_BlockingLoadPlugin("test.blocking-local", events),),
+        plugins_dir="",
+    )
+    local_start = threading.Thread(
+        target=lambda: start_results.append(services.start_plugins()),
+    )
+    local_start.start()
+    assert load_started.wait(timeout=5)
+
+    installer = threading.Thread(
+        target=lambda: set_application_services(services),
+    )
+    installer.start()
+    try:
+        installer.join(timeout=0.5)
+        assert installer.is_alive()
+        events.append("release-local-load")
+    finally:
+        release_load.set()
+        local_start.join(timeout=5)
+        installer.join(timeout=5)
+
+    assert not local_start.is_alive()
+    assert not installer.is_alive()
+    assert get_application_services() is services
+    assert [result.success for result in start_results[0]] == [True]
+    assert events == [
+        "local-load-begin",
+        "release-local-load",
+        "local-load-end",
+    ]
+
+
+def test_local_root_close_during_installer_drain_does_not_deadlock():
+    events: list[str] = []
+    load_started = threading.Event()
+    release_load = threading.Event()
+    side_close_results: list[tuple] = []
+
+    class _SideClosingPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("local-load-begin")
+            load_started.set()
+            if not release_load.wait(timeout=5):
+                raise AssertionError("test did not release the local load")
+            side_close_results.append(side_root.close())
+            events.append("local-load-end")
+
+    side_root = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.side", events),),
+        plugins_dir="",
+    )
+    side_root.start_plugins()
+
+    services = ApplicationServices(
+        builtin_plugins=(_SideClosingPlugin("test.blocking-local", events),),
+        plugins_dir="",
+    )
+    local_start = threading.Thread(target=services.start_plugins)
+    local_start.start()
+    assert load_started.wait(timeout=5)
+
+    installer = threading.Thread(
+        target=lambda: set_application_services(services),
+    )
+    installer.start()
+    try:
+        installer.join(timeout=0.5)
+        assert installer.is_alive()
+    finally:
+        release_load.set()
+        local_start.join(timeout=5)
+        installer.join(timeout=5)
+
+    assert not local_start.is_alive()
+    assert not installer.is_alive()
+    assert side_root.is_closed is True
+    assert get_application_services() is services
+    assert [result.success for result in side_close_results[0]] == [True]
+    assert events == [
+        "load:test.side",
+        "local-load-begin",
+        "unload:test.side",
+        "local-load-end",
+    ]
+
+
+def test_local_close_rechecks_boundary_after_concurrent_install(monkeypatch):
+    events: list[str] = []
+    observed_roots: list[ApplicationServices] = []
+    close_ready = threading.Event()
+    release_close = threading.Event()
+    close_results: list[tuple] = []
+
+    class _LookupUnloadPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("local-unload-begin")
+            observed_roots.append(get_application_services())
+            events.append("local-unload-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(
+            _LookupUnloadPlugin("test.concurrent-local-close", events),
+        ),
+        plugins_dir="",
+    )
+    services.start_plugins()
+    original_close_plugins = services._close_plugins
+
+    def delayed_close_plugins():
+        close_ready.set()
+        if not release_close.wait(timeout=5):
+            raise AssertionError("test did not release the local close")
+        return original_close_plugins()
+
+    monkeypatch.setattr(services, "_close_plugins", delayed_close_plugins)
+    local_close = threading.Thread(
+        target=lambda: close_results.append(services.close()),
+    )
+    local_close.start()
+    assert close_ready.wait(timeout=5)
+
+    installer = threading.Thread(
+        target=lambda: set_application_services(services),
+    )
+    installer.start()
+    try:
+        installer.join(timeout=5)
+        assert not installer.is_alive()
+        assert get_application_services() is services
+    finally:
+        release_close.set()
+        local_close.join(timeout=5)
+        installer.join(timeout=5)
+
+    assert not local_close.is_alive()
+    assert not installer.is_alive()
+    assert services.is_closed is True
+    assert observed_roots == [services]
+    assert get_application_services() is not services
+    assert [result.success for result in close_results[0]] == [True]
+    assert events == [
+        "load:test.concurrent-local-close",
+        "local-unload-begin",
+        "local-unload-end",
+    ]

@@ -56,6 +56,41 @@ entrypoint edit:
 4. disable that snapshot in reverse order when the root is replaced, reset, or
    closed at process exit.
 
+Composition-root transitions are serialized around that shutdown boundary. The
+previous root remains the discoverable root until its complete reverse-order
+unload finishes; only then is a successor published and started. A lifecycle
+callback that resolves `get_application_services()` during the transition sees
+the root that owns the callback, so reset and process-exit cleanup cannot
+implicitly create a fresh root. Re-entrant or concurrent replacement requests
+made during a lifecycle callback are queued without waiting for that callback;
+the most recent installable explicit request becomes the next root after the
+active transition finishes. A root is one-shot once shutdown begins: requests
+for that closing root are skipped in favor of the next-latest installable target,
+and a closed root cannot be installed again or remain the stable global root. A
+retain-current request remains valid during load, before shutdown starts. If a
+root closes itself during startup, the next stable lookup creates a fresh root.
+Normal reset remains reusable, but the process-exit handler first enters a
+terminal shutdown state: unload callbacks can still resolve their owning root,
+while later atexit callbacks cannot lazily create or install another root.
+Calling `close()` directly on the installed process root uses this same
+serialized boundary; it cannot expose or start a callback-requested successor
+until the complete reverse-order unload has finished. If a lifecycle callback
+or its worker requests that close while a transition is already active, the
+request is queued without waiting; the returned tuple is the current immutable
+shutdown-result snapshot, and the transition owner completes the shutdown after
+the callback returns. This non-blocking overlap rule prevents callback-worker
+joins from deadlocking the root-local lifecycle lock.
+
+The same boundary wraps public lifecycle operations invoked through the
+installed root's `PluginManager` (`load`, `load_all`, `enable`, `disable`, and
+`disable_all`). A root replacement requested by one of those callbacks is
+deferred until the complete manager operation returns; the old root then
+finishes reverse-order shutdown before any successor starts. A root that is
+not installed runs manager lifecycle operations and its own close outside the
+transition authority, so its callback-owned workers may keep using the module
+accessors; an installer instead drains any in-flight local operation before
+starting that root's plugins, so an operation never straddles installation.
+
 There is currently no default lifecycle-style built-in catalog to fabricate:
 existing Data Provider built-ins remain owned by each `DataFetcherManager`, and
 the other five extension points are contract-only. `ApplicationServices`
