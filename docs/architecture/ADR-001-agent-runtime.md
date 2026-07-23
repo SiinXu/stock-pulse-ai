@@ -74,7 +74,7 @@ Contract and parity coverage
   取消、审计和 late-result fence；
 - `runtime/lifecycle.py` 与 `runtime/events.py`: 终态分类、usage 和事件边界；
 - `public_contract.py::sanitize_agent_diagnostic`: 有界、安全的公开诊断；
-- `tests/test_agent_runtime_compatibility.py`、`tests/agent_runtime_replay.py` 和
+- `tests/agent/test_agent_runtime_compatibility.py`、`tests/agent_runtime_replay.py` 和
   全部 36 个 replay fixture。
 
 历史实验 leak scan 中有通用价值的断言迁移到 Native 异常路径：API key、带凭据
