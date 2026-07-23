@@ -1008,6 +1008,16 @@ class _ConfigLoadingMethods:
                 if os.getenv('ALPHASIFT_INSTALL_SPEC') is None
                 else os.getenv('ALPHASIFT_INSTALL_SPEC', '').strip()
             ),
+            decision_memory_enabled=parse_env_bool(os.getenv('DECISION_MEMORY_ENABLED'), default=True),
+            decision_memory_lookback=parse_env_int(
+                os.getenv('DECISION_MEMORY_LOOKBACK'), 5, field_name='DECISION_MEMORY_LOOKBACK', minimum=0
+            ),
+            decision_memory_min_age_days=parse_env_int(
+                os.getenv('DECISION_MEMORY_MIN_AGE_DAYS'), 3, field_name='DECISION_MEMORY_MIN_AGE_DAYS', minimum=0
+            ),
+            decision_memory_min_samples=parse_env_int(
+                os.getenv('DECISION_MEMORY_MIN_SAMPLES'), 5, field_name='DECISION_MEMORY_MIN_SAMPLES', minimum=1
+            ),
         )
 
 

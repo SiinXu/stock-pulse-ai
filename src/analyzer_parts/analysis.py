@@ -465,6 +465,9 @@ class GeminiAnalyzer:
             prompt += market_structure_section
         if isinstance(analysis_context_pack_summary, str) and analysis_context_pack_summary:
             prompt += analysis_context_pack_summary
+        decision_memory_prompt = context.get("decision_memory_reflection_prompt")
+        if isinstance(decision_memory_prompt, str) and decision_memory_prompt:
+            prompt += decision_memory_prompt
         prompt += f"""
 
 ## 📈 技术面数据

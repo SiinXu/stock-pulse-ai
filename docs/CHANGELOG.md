@@ -315,12 +315,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Converged notification capability, contract, noise-control, and route-configuration helpers into `src/notification_parts/` with strict legacy facades.
 - [Chore] Converged compact notification sender adapters into `src/notification_parts/senders/` with strict legacy facades.
 - [Chore] Converged the remaining extended notification sender adapters and package exports into `src/notification_parts/senders/` with strict legacy facades.
-- [Fixed] Serialized public plugin lifecycle operations with composition-root close, replacement, and reset so closed roots cannot be republished, callback-owned workers cannot deadlock, and terminal process shutdown cannot recreate the root.
 - [Docs] Moved the design contract into `docs/` and added compact repository maps to all homepage language variants.
 - [Chore] Permanently disabled secret access from pull-request AI review, rejected secret inheritance and tag/default-ref confusion, and hardened install guidance against nested commands, redirection decoys, dynamic paths, launcher/module entry points, Docker exec form, and explicit YAML indentation.
+- [Added] Injected a Historical Decision Reflection (same-stock hit-rate and pattern-level calibration from past signal outcomes) into analysis prompts and single-stock reports, guarded by a minimum-sample threshold, a stated statistics window, and a confidence-only rule that never flips signal direction; configurable via `DECISION_MEMORY_ENABLED`/`DECISION_MEMORY_LOOKBACK`/`DECISION_MEMORY_MIN_AGE_DAYS`/`DECISION_MEMORY_MIN_SAMPLES` with a per-request `use_memory` override, and zero overhead when disabled or without history.
 - [Tests] Fixed the settings help locale contract test to read the per-language help sources introduced by the settings-help split, restoring the backend gate.
 - [Changed] Reused the shared connection-test runner in the first-run LLM setup wizard so its optional test reports actionable stage and error-code diagnostics, the resolved effective model and protocol, and JSON and vision capability results instead of a binary pass/fail.
 - [Changed] Made secondary sidebar groups collapsible with visible current-page ownership and preserved explicit Discover URL ownership across default, non-default, malformed, refreshed, legacy, authenticated, and safe custom-strategy links.
+- [Fixed] Serialized root-owned plugin lifecycle operations with composition-root close, replacement, and reset so roots with shutdown requested cannot activate or be republished, callback-owned workers cannot deadlock, and terminal process shutdown cannot recreate the root.
 
 ## [3.26.3] - 2026-07-15
 

@@ -88,8 +88,40 @@ deferred until the complete manager operation returns; the old root then
 finishes reverse-order shutdown before any successor starts. A root that is
 not installed runs manager lifecycle operations and its own close outside the
 transition authority, so its callback-owned workers may keep using the module
-accessors; an installer instead drains any in-flight local operation before
-starting that root's plugins, so an operation never straddles installation.
+accessors. A direct installer rejects a target whose local startup or manager
+lifecycle operation is already in flight, so a callback or its worker cannot
+wait on itself. If a local operation races after the installer owns the global
+transition, that transition drains the complete operation before starting the
+target, so an operation never straddles installation. A target accepted into
+the pending queue retains that transition authority during handoff and drains
+any existing local lifecycle operation instead of re-entering direct-install
+validation. When no previous root exists, the authorized transition target is
+lookup-visible before publication so its callback workers never wait on their
+own installer. The drain covers pre-manager startup and its final close cleanup;
+only after the current target drains does the transition consume the latest
+pending request. A superseded target finishes complete cleanup before any
+successor starts; selecting the latest request retains cleanup debt for every
+older or already-closing queued root instead of discarding it. If a published
+target requests shutdown during that drain, it remains discoverable through its
+complete unload and continues to anchor lookups while superseded cleanup debt
+runs, including cleanup queued by those callbacks. It is unpublished only after
+the transition reaches that cleanup fixed point.
+Each `PluginManager` is owned by exactly one `ApplicationServices` root and
+cannot be rebound to another root. Once that root starts shutdown, manager
+`load`, `load_all`, and `enable` operations fail closed with
+`plugin_owner_closed`; `disable` and `disable_all` remain available for
+idempotent cleanup and cleanup-debt retries. The close request is terminal as
+soon as it is made: queued activation is rejected, and a callback cannot
+supersede its own close by requesting the same root again. A direct installer
+also rejects that root. If an already-authorized transition races with the
+shutdown request, it drains cleanup and clears the target without making it
+stable.
+Closing a local root also disables plugins activated directly through its
+manager, even when composition startup was never invoked. A close requested by
+a local startup or manager callback, or by its worker, is deferred until that
+outer operation finishes; the root then performs the same state-based cleanup
+exactly once. The installer drain remains active through that deferred cleanup,
+including every `onunload()` callback, before a successor may start.
 
 There is currently no default lifecycle-style built-in catalog to fabricate:
 existing Data Provider built-ins remain owned by each `DataFetcherManager`, and

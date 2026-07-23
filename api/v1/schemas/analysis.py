@@ -81,6 +81,11 @@ class AnalyzeRequest(BaseModel):
         description="本次分析使用的策略 skill ID 列表；兼容 legacy strategies 字段",
         json_schema_extra={"example": ["bull_trend", "growth_quality"]},
     )
+    use_memory: Optional[bool] = Field(
+        None,
+        validation_alias=AliasChoices("use_memory", "useMemory"),
+        description="本次分析是否注入历史决策复盘；未传时使用全局 DECISION_MEMORY_ENABLED",
+    )
 
     model_config = ConfigDict(json_schema_extra={
         "example": {

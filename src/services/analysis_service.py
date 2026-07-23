@@ -67,6 +67,7 @@ class AnalysisService:
         query_source: str = "api",
         portfolio_context: Optional[Dict[str, Any]] = None,
         report_language: Optional[str] = None,
+        use_memory: Optional[bool] = None,
         request_context: Optional[AnalysisRequestContext] = None,
     ) -> Optional[Dict[str, Any]]:
         """
@@ -112,9 +113,13 @@ class AnalysisService:
             # Get configuration
             config = get_config()
             normalized_report_language = normalize_report_language(report_language, default="")
-            if normalized_report_language:
+            if normalized_report_language or use_memory is not None:
+                # Copy once before mutating so the shared singleton is untouched.
                 config = copy.copy(config)
+            if normalized_report_language:
                 config.report_language = normalized_report_language
+            if use_memory is not None:
+                config.decision_memory_enabled = bool(use_memory)
             
             # Create an analysis pipeline
             pipeline = StockAnalysisPipeline(
