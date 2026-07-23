@@ -327,7 +327,15 @@ class DecisionMemoryService:
         try:
             stats = self.outcome_service.get_stats()
         except Exception as exc:  # broad-exception: fallback_recorded - pattern calibration is optional; same-stock memory still stands.
-            logger.debug("Pattern calibration stats unavailable: %s", exc)
+            from src.utils.sanitize import log_safe_exception
+
+            log_safe_exception(
+                logger,
+                "Pattern calibration stats unavailable",
+                exc,
+                error_code="decision_memory_pattern_stats_failed",
+                level=logging.DEBUG,
+            )
             return tuple()
 
         threshold = max(1, int(min_samples))

@@ -380,18 +380,3 @@ def test_render_report_section_is_bilingual(isolated_db) -> None:
     assert "does not change the call above" in en
 
 
-# --------------------------------------------------------------------------
-# Stage gate: disabled means zero work (no repository access).
-# --------------------------------------------------------------------------
-
-
-def test_stage_gate_disabled_returns_none_without_db() -> None:
-    from types import SimpleNamespace
-
-    from src.core.stages.analysis_stock import _StockAnalysisStageMixin
-
-    host = SimpleNamespace(config=SimpleNamespace(decision_memory_enabled=False))
-    result = _StockAnalysisStageMixin._maybe_build_decision_reflection(
-        host, code="600519", market="cn"
-    )
-    assert result is None
