@@ -195,7 +195,7 @@ Phase 1 涉及的入口：
 - `src/agent/disagreement.py`：`build_agent_disagreement_summary()` 直接消费 `ctx.opinions`（因 StrategyEngine 已完成分拣并由 Orchestrator 写回），Invalid 完全不出现在 `bullish_agents` / `bearish_agents` / `neutral_agents` 三桶中。
 - `src/services/report_renderer.py`、`templates/report_markdown.j2`、`templates/report_wechat.j2`、`src/notification.py`、`src/services/history_service.py`：读取 `strategy_synthesis` 的确定性字段；支持/反方列表只经共享 `format_strategy_skill_items` 输出，空列表使用 `labels.none_label`，且不消费 `neutral_skills`。Notification fallback WeChat 是明确的紧凑例外，不展示列表与 conflict 明细。所有渲染前先经 `normalize_strategy_synthesis_payload` 防腐。
 - `src/report_language.py`：`labels.none_label` 在 zh/en/ko 三语中完备；共识度、诊断计数文案完备；新增策略信号/共识/冲突/技能四类 canonical/translation 表与对应 `localize_*` helper。
-- `tests/test_multi_agent.py`、`tests/test_report_language.py`、`tests/test_notification.py`、`tests/test_analysis_history.py`、`tests/test_report_renderer.py`：反例矩阵，从 SkillAgent 输入 → StrategyEngine 分拣/聚合 → DecisionAgent prompt → dashboard payload → renderer 实际文本全链路断言。
+- `tests/test_multi_agent.py`、`tests/test_report_language.py`、`tests/test_notification.py`、`tests/services/test_analysis_history.py`、`tests/test_report_renderer.py`：反例矩阵，从 SkillAgent 输入 → StrategyEngine 分拣/聚合 → DecisionAgent prompt → dashboard payload → renderer 实际文本全链路断言。
 
 Phase 1 不改变 `AgentOpinion` 字段、不改变 API 返回结构、不改变数据库 schema、不新增配置项、不改变现有 skill 的执行方式。
 
@@ -319,7 +319,7 @@ Phase 1 提供如下反例覆盖，从 SkillAgent 输入进，穿过 StrategyEng
 | Renderer · Notification | `src/notification.py::_append_strategy_synthesis_block` |
 | Renderer · History | `src/services/history_service.py::_generate_single_stock_markdown`（历史详情策略综合块） |
 | 多语言与宽松 payload 防腐 | `src/report_language.py::_REPORT_LABELS`, `normalize_strategy_synthesis_payload`, `format_strategy_skill_items`, `strategy_invalid_opinion_count`, `localize_strategy_synthesis_summary`, `localize_strategy_signal`, `localize_consensus_level`, `localize_conflict_severity`, `localize_strategy_skill`, `localize_strategy_conflict_description`, `labels.none_label` |
-| 反例矩阵 | `tests/test_multi_agent.py`, `tests/test_report_language.py`, `tests/test_notification.py`, `tests/test_analysis_history.py`, `tests/test_report_renderer.py` |
+| 反例矩阵 | `tests/test_multi_agent.py`, `tests/test_report_language.py`, `tests/test_notification.py`, `tests/services/test_analysis_history.py`, `tests/test_report_renderer.py` |
 
 ## 兼容与回滚
 

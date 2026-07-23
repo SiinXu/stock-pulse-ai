@@ -223,7 +223,7 @@ stock-pulse-ai/
 ### AI 模型配置
 
 > 完整说明见 [LLM 配置指南](LLM_CONFIG_GUIDE.md)（三层配置、渠道模式、Vision、Agent、排错）；常用服务商预设、Actions 变量对照和错误排障见 [LLM 服务商配置指南](llm-providers.md)。
-> 兼容性说明（Issue #1306/#1391，顺带确认 #1381）：本节相关改动只复用已有历史写入链路展示大盘复盘结果，不新增 API/API 参数、Web 阶段结果独立展示、日报四阶段结构化持久化或日报状态表，不修改 `provider` / `model` / `base_url` 运行时路由与默认模型行为；#1381 同样仅为后端 runtime 复用，不新增配置迁移/清理/回写分支。若 Issue #1381 的 API/Web/日报结构化验收未同步落地，本 PR 不应作为完整交付收口，需留待后续 PR 继续交付。回退路径为发布回滚（可直接 revert 当前提交，或按现有配置回退链路）。兼容验证主要沿用既有约束检查（`requirements.txt`：`litellm` 版本约束）与既有配置回归测试：`tests/test_system_config_service.py`、`tests/test_system_config_api.py`、`tests/test_llm_channel_config.py`、`tests/test_market_review_runtime.py`；官方源参考：[LiteLLM OpenAI-compatible](https://docs.litellm.ai/docs/providers/openai_compatible)、[OpenAI Chat Completion API](https://platform.openai.com/docs/api-reference/chat)。
+> 兼容性说明（Issue #1306/#1391，顺带确认 #1381）：本节相关改动只复用已有历史写入链路展示大盘复盘结果，不新增 API/API 参数、Web 阶段结果独立展示、日报四阶段结构化持久化或日报状态表，不修改 `provider` / `model` / `base_url` 运行时路由与默认模型行为；#1381 同样仅为后端 runtime 复用，不新增配置迁移/清理/回写分支。若 Issue #1381 的 API/Web/日报结构化验收未同步落地，本 PR 不应作为完整交付收口，需留待后续 PR 继续交付。回退路径为发布回滚（可直接 revert 当前提交，或按现有配置回退链路）。兼容验证主要沿用既有约束检查（`requirements.txt`：`litellm` 版本约束）与既有配置回归测试：`tests/services/system_config/test_system_config_service.py`、`tests/test_system_config_api.py`、`tests/config/test_llm_channel_config.py`、`tests/market/test_market_review_runtime.py`；官方源参考：[LiteLLM OpenAI-compatible](https://docs.litellm.ai/docs/providers/openai_compatible)、[OpenAI Chat Completion API](https://platform.openai.com/docs/api-reference/chat)。
 > #1391 Phase 2 的结构化检测风险来自 `src/agent/factory.py` 的 `agent_max_steps` / `agent_orchestrator_timeout_s` int 安全兜底，属于配置读取侧的类型兼容增强，不会改写 `litellm_model`、`agent_litellm_model`、`openai_base_url` 或 `LLM_*` 路由状态；回归可复核 `tests/test_agent_pipeline.py::TestAgentConfig::test_build_agent_executor_does_not_mutate_llm_route_config` 与 `tests/test_agent_pipeline.py::TestAgentConfig::test_build_agent_executor_multi_arch_does_not_mutate_llm_route_config`。当配置值非法（如非数字）时，`src.agent.factory` 会记录 warning 并回退到默认值，便于排障与避免误判配置已生效。
 > #1815 Phase 3 的兼容边界说明：本轮仅收敛 JP/KR 与 Market Light 的服务边界，不新增 LLM provider/model/base_url 迁移逻辑，不改写 `.env` 主路由模型持久化语义。`MarketSymbol`、告警枚举与快照 `data_quality/limitations` 调整按已有 `.env` 原子 upsert 语义写入保存配置；未显示提交的键不会被清空。
 > 本节仅同步模型/渠道配置清单，不额外引入新的外部 provider / Base URL 兼容约定；兼容语义以当前仓库 `requirements.txt` 依赖约束和相关测试为准，历史回退路径见上述两份文档中“回退/恢复”说明。
@@ -793,7 +793,7 @@ docker run -e SCHEDULE_ENABLED=true -e SCHEDULE_RUN_IMMEDIATELY=false ...
 > 兼容说明（Issue #1815）：`MARKET_REVIEW_REGION=cn|hk|us|jp|kr|both` 仅扩展大盘复盘输入集合；JP/KR 仅供复盘上下文消费，不会放开 Market Light 告警。
 > - `src/config.py`、`src/core/config_registry.py`、`src/services/system_config_service.py` 的改动仅是配置语义扩展，不改 `provider`/`model`/`base_url` 的运行时路由，也不触发 provider/model/base URL 迁移或清理逻辑。
 > - 本轮实际受控配置项：`MARKET_REVIEW_REGION`、`MARKET_REVIEW_COLOR_SCHEME`；`LITELLM_MODEL`、`AGENT_LITELLM_MODEL`、`LITELLM_FALLBACK_MODELS`、`VISION_MODEL`、`OPENAI_BASE_URL` 等旧值保持原子 upsert 语义，不会在更新其他字段时被静默清空或覆盖。
-> - 可核验证据摘要：官方 provider / Base URL / 模型命名来源沿用 [LLM 配置指南](LLM_CONFIG_GUIDE.md#常用官方文档来源用于核对预设-provider--base-url--模型命名)，当前运行时依赖窗口沿用 `requirements.txt` 中的 `litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0`；本轮不新增配置迁移脚本或清理分支，保存/导入仍只写本次提交键。`tests/test_system_config_service.py::SystemConfigServiceTestCase::test_update_market_review_region_does_not_trigger_runtime_model_cleanup` 覆盖只保存 `MARKET_REVIEW_REGION` 时不清空或改写 `LITELLM_CONFIG`、`LLM_CHANNELS`、`LLM_OPENAI_*`、`LITELLM_MODEL`、`AGENT_LITELLM_MODEL`、`LITELLM_FALLBACK_MODELS`、`VISION_MODEL`、`OPENAI_*` 等旧配置。
+> - 可核验证据摘要：官方 provider / Base URL / 模型命名来源沿用 [LLM 配置指南](LLM_CONFIG_GUIDE.md#常用官方文档来源用于核对预设-provider--base-url--模型命名)，当前运行时依赖窗口沿用 `requirements.txt` 中的 `litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0`；本轮不新增配置迁移脚本或清理分支，保存/导入仍只写本次提交键。`tests/services/system_config/test_system_config_service.py::SystemConfigServiceTestCase::test_update_market_review_region_does_not_trigger_runtime_model_cleanup` 覆盖只保存 `MARKET_REVIEW_REGION` 时不清空或改写 `LITELLM_CONFIG`、`LLM_CHANNELS`、`LLM_OPENAI_*`、`LITELLM_MODEL`、`AGENT_LITELLM_MODEL`、`LITELLM_FALLBACK_MODELS`、`VISION_MODEL`、`OPENAI_*` 等旧配置。
 > - 旧值回退策略：先恢复备份 `MARKET_REVIEW_REGION` 与配置文件即可回到旧边界，未提交的模型/路由键保留原值；必要时 `revert` PR 并按 `.env` 备份完成回退。
 > - 可回滚路径：恢复提交前 `.env` / 配置备份中的 `MARKET_REVIEW_REGION` 与相关运行时变量，或直接 revert 本 PR。
 
@@ -1393,7 +1393,7 @@ python main.py --debug
 个股报告的操作建议会结合支撑位、压力位、量能/筹码、主力资金流向和风险事件进行校准，避免仅因单日涨跌或评分跨线在“买入/卖出”之间剧烈切换。若价格处在支撑与压力之间且资金流不明确，报告会优先给出“持有、震荡观望、洗盘观察”等中性可执行建议；只有接近支撑确认、有效突破压力且量价/资金配合时才给出买入，跌破关键支撑或主力资金持续流出时才给出卖出/减仓。
 该项调整会影响可操作决策的运行时落盘与提示词约束链路，但不变更 LLM 模型、LiteLLM 路由、Provider/Key 及其兼容边界，不影响配置保存/清理语义。
 兼容性核验结论：除配置和模型侧语义外，该决策稳定性链路覆盖 `src/analyzer.py`、`src/core/pipeline.py`、`src/core/backtest_engine.py`、`src/report_language.py` 及 `src/agent` 决策路径的运行时行为，建议复核报告决策类型映射与回测入口联动。
-核验路径：相关逻辑在上述运行时路径与对应测试（`tests/test_backtest_engine.py`、`tests/test_analyzer_news_prompt.py`、`tests/test_decision_stability.py`、`tests/test_agent_pipeline.py` 等）中生效；未在 `src/config.py`、`src/report.py`、存储/持久化链路新增配置字段或清理逻辑。
+核验路径：相关逻辑在上述运行时路径与对应测试（`tests/core/test_backtest_engine.py`、`tests/analyzer/test_analyzer_news_prompt.py`、`tests/analyzer/test_decision_stability.py`、`tests/test_agent_pipeline.py` 等）中生效；未在 `src/config.py`、`src/report.py`、存储/持久化链路新增配置字段或清理逻辑。
 
 ### 建议动作 Taxonomy（#1390 P0）
 
@@ -1601,7 +1601,7 @@ FastAPI 提供 RESTful API 服务，支持配置管理和触发分析。
 > 说明：`POST /api/v1/analysis/market-review` 采用后端与 CLI/Bot 共用的配置路径（`GeminiAnalyzer(config=...)` 与同样的搜索/提示词构造入口）。Provider 兼容路由会优先识别并使用 `litellm_model`、`llm_model_list`，若未配置则回退 legacy `GEMINI_*`、`OPENAI_*`、`ANTHROPIC_*`、`DEEPSEEK_*` 键；不会新增/调整 provider、Base URL 或 LiteLLM 路由语义。
 > 说明：`POST /api/v1/analysis/market-review` 额外支持 `report_language=zh|en|ko`（支持别名 `reportLanguage`）。未传时同样回退到全局 `REPORT_LANGUAGE`。该参数仅影响本次复盘报告文本与结构化返回字段中的语言相关内容；Bot、schedule、CLI 或按钮触发的 `main.py --market-review` 仍沿用全局配置，未新增请求级覆盖能力。
 > 说明：`POST /api/v1/analysis/market-review` 是 Web / 桌面端的人工触发入口，点击后会直接提交大盘复盘任务，不会因 `TRADING_DAY_CHECK_ENABLED=true` 或当日相关市场休市而短路跳过；定时任务、GitHub Actions 手动运行和 CLI 默认入口仍遵循交易日检查，可用 `--force-run` 或 workflow `force_run` 覆盖。
-> 审计依据：优先级与回退语义以 `src/config.py` 的 `Config._load_from_env()` 为准（`LITELLM_CONFIG` > `LLM_CHANNELS` > legacy）。配套回归见 `tests/test_llm_channel_config.py`（配置源解析）与 `tests/test_market_review_runtime.py`（共享装配路径）。该接口当前仅提供单进程/单机级防重复能力，若为多实例部署需通过外部任务队列或分布式锁补齐全局幂等。
+> 审计依据：优先级与回退语义以 `src/config.py` 的 `Config._load_from_env()` 为准（`LITELLM_CONFIG` > `LLM_CHANNELS` > legacy）。配套回归见 `tests/config/test_llm_channel_config.py`（配置源解析）与 `tests/market/test_market_review_runtime.py`（共享装配路径）。该接口当前仅提供单进程/单机级防重复能力，若为多实例部署需通过外部任务队列或分布式锁补齐全局幂等。
 > 说明：`POST /api/v1/analysis/market-review` 触发后，报告会以 `report_type=market_review` 写入历史库；你可直接查询 `/api/v1/history` 或 `/api/v1/history/{record_id}` 获取历史 Markdown，避免再次触发分析重算。
 > 说明：历史列表新增 `report_type` 查询参数；通过 `stock_code=MARKET&report_type=market_review` 可单独读取大盘复盘历史集合，与普通个股历史逻辑完全隔离。
 > 说明：`POST /api/v1/analysis/market-review` 的返回与历史持久化都会包含 `market_review_payload`：`market_scope`、`sections`、`sectors`、`concepts`、`news`、`market_light`、`indices` 等结构化字段。Web 端 Markdown 渲染与历史详情会复用该结构化字段；若结构化字段为空则回退到原始 Markdown。
@@ -1622,8 +1622,8 @@ FastAPI 提供 RESTful API 服务，支持配置管理和触发分析。
 > - 官方来源：LiteLLM OpenAI-compatible provider 文档 <https://docs.litellm.ai/docs/providers/openai_compatible>；OpenAI Chat API 文档 <https://platform.openai.com/docs/api-reference/chat/create>；DeepSeek API 文档 <https://api-docs.deepseek.com/>。
 > - 依赖版本：项目约束为 `litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0`（见 `requirements.txt`），以上兼容语义回归测试在该版本窗口内执行。
 > - 可复核测试：
->   - `tests/test_llm_channel_config.py`（配置源优先级与 provider/base url 映射）
->   - `tests/test_market_review_runtime.py`（`build_market_review_runtime` 复用装配路径）
+>   - `tests/config/test_llm_channel_config.py`（配置源优先级与 provider/base url 映射）
+>   - `tests/market/test_market_review_runtime.py`（`build_market_review_runtime` 复用装配路径）
 >   - `tests/test_analysis_api_contract.py`（`/api/v1/analysis/market-review` 合约与任务状态链路）
 > - 回滚/回退：若新路径有问题，可先恢复历史 `LITELLM_MODEL`、`LITELLM_FALLBACK_MODELS` 与 legacy `GEMINI_*` / `OPENAI_*` / `ANTHROPIC_*` / `DEEPSEEK_*`，或通过桌面端备份或已启用管理员鉴权的 Web 端 `POST /api/v1/system/config/import` 回滚并重启；在运行时级别可暂时清空 `LITELLM_CONFIG` / `LLM_CHANNELS` 触发 legacy 回退。
 

@@ -8,7 +8,7 @@
 
 > 本页的 provider/model/Base URL 说明本次未新增外部兼容语义，仅用于同步现网约定；实际兼容判断仍按当前仓库锁定依赖与运行时实现执行：
 > - 依赖边界：`litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0`（与 `requirements.txt` 一致）。
-> - 兼容验证入口：`tests/test_system_config_service.py`、`tests/test_system_config_api.py` 以及现有前端模型配置页回归用例。
+> - 兼容验证入口：`tests/services/system_config/test_system_config_service.py`、`tests/test_system_config_api.py` 以及现有前端模型配置页回归用例。
 > - 回退路径：优先使用 `.env` 配置备份 + `POST /api/v1/system/config/import` 恢复；也可在重启前手动回填旧 `LITELLM_MODEL` / `LLM_*` / `AGENT_LITELLM_MODEL` / `VISION_MODEL` / `LLM_TEMPERATURE` / `LLM_USAGE_HMAC_*`。
 
 > **说明**：本页对 provider/model/base URL 的说明同步沿用当前依赖约束与历史约定，仅做文档补充，不引入新的运行时 provider、模型或 Base URL 行为变更。
@@ -162,7 +162,11 @@ LITELLM_MODEL=ollama/qwen3:8b
 
 ### 首次启动配置状态
 
-后端提供只读状态接口 `GET /api/v1/system/config/setup/status`，用于判断首次启动闭环中最基础的几类配置是否已经就绪：LLM 主连接、Agent 模型、自选股、通知渠道和本地存储。首次向导与日常模型接入共用同一份 `connection_fields` 字段契约；Provider Catalog 权威提供 Provider 身份、标签、初始化默认值、发现能力与相关链接，但不权威决定字段 requirement。按当前内置 Schema，Ollama 免 Key，官方默认地址无需手填，Custom 才要求 Base URL。向导会写入显式 `_PROVIDER`，不会覆盖已有 Connection，也不会保存裸模型名或自动全选发现结果。状态接口本身只读取已保存的 `.env` 与当前进程环境变量，不会重载运行时配置、写入 `.env`、测试真实模型或创建数据库文件。
+后端提供只读状态接口 `GET /api/v1/system/config/setup/status`，用于判断首次启动闭环中最基础的几类配置是否已经就绪：LLM 主连接、Agent 模型、自选股、通知渠道和本地存储。首次向导与日常模型接入共用同一份 `connection_fields` 字段契约；Provider Catalog 权威提供 Provider 身份、标签、初始化默认值、发现能力与相关链接，但不权威决定字段 requirement。按当前内置 Schema，Ollama 免 Key，官方默认地址无需手填，Custom 才要求 Base URL。向导会写入显式 `_PROVIDER`，不会覆盖已有 Connection，也不会保存裸模型名或自动全选发现结果。
+
+云 API 向导在选择 Provider、填写凭据和确认模型后，还可以配置主模型、按顺序执行的备用模型以及可选的 Vision 模型；这些选择分别写入 connection-aware 的 `LITELLM_MODEL`、`LITELLM_FALLBACK_MODELS` 和 `VISION_MODEL`。保存成功后，向导会留在完成页展示实际保存的执行方式与路由摘要，不回显 API Key，并可直接进入“任务模型”继续调整。即使首次配置已经完成，也可以从首次配置状态卡重新打开向导新增 Connection。状态接口本身只读取已保存的 `.env` 与当前进程环境变量，不会重载运行时配置、写入 `.env`、测试真实模型或创建数据库文件。
+
+自动发现和连接测试都绑定发起时的 Provider、凭据与传输参数；这些输入改变后，已显示或尚未返回的旧结果都会失效。连接测试会优先测试当前选择的报告主模型，但不会逐一探测其它 Connection 提供的备用模型或 Vision 路由；这些独立路由需要在对应 Connection 中分别测试。
 
 ### 事务化热加载与一步回退
 
@@ -263,7 +267,7 @@ GENERATION_FALLBACK_BACKEND=
 - 保存连接时，只会更新这次提交的 key；不会因为切换配置模式而静默迁移整个旧配置。删除仍被报告、Agent、Vision 或 fallback 引用的单个模型会返回 `model_in_use` 与全部 `details.referenced_by`；Web 可在模型管理弹窗中选择替代模型，使引用替换与删除进入同一页面草稿并原子保存。未替换的历史失效引用仍以 `unknown_model` 拒绝，且不会被静默清理。`cohere/*`、`google/*`、`xai/*` 这类直连模型仅用于说明历史 `direct-env` 兼容保留语义，不等于可用性承诺。
 - 后端一致性依据：配置校验链路在 `SystemConfigService._validate_llm_runtime_selection`（`src/services/system_config_service.py`）中通过 `_uses_direct_env_provider`（`src/config.py`）判断运行时来源；当前仅 `gemini`、`vertex_ai`、`anthropic`、`openai`、`deepseek` 属于托管 key provider，`cohere`、`google`、`xai` 不在该白名单中，因此会保留为直连模型。
 - 回退方式也保持最小：把对应连接的模型列表改回去后重新选择主模型 / 备用模型，或直接用桌面端导出备份 / 手动 `.env` 还原之前的 `LLM_*`、`LITELLM_MODEL`、`AGENT_LITELLM_MODEL`、`VISION_MODEL`、`LLM_TEMPERATURE`、`LLM_USAGE_HMAC_*` 即可，不需要额外跑迁移脚本。Web 端如需恢复配置，也可在启用管理员鉴权（`ADMIN_AUTH_ENABLED=true`）后通过 `POST /api/v1/system/config/import` 回滚。
-- 当前仓库对此链路的依赖约束是 `litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0`（见 `requirements.txt`）；回归覆盖包括 `tests/test_system_config_service.py`、`tests/test_system_config_api.py` 和 `apps/dsa-web/src/components/settings/__tests__/LLMChannelEditor.test.tsx`。
+- 当前仓库对此链路的依赖约束是 `litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0`（见 `requirements.txt`）；回归覆盖包括 `tests/services/system_config/test_system_config_service.py`、`tests/test_system_config_api.py` 和 `apps/dsa-web/src/components/settings/__tests__/LLMChannelEditor.test.tsx`。
 
 > **外部 provider 示例模型说明**：`cohere/*`、`google/*`、`xai/*` 等 provider 前缀值仅用于说明当前保存保留语义，**不代表该依赖约束内的逐型号可用性保证**。文档或测试中的具体模型名都是配置保留行为样例，不是生产推荐；实际可用性请以对应官方模型文档为准，并结合仓库依赖约束 `litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0` 复核。
 
@@ -271,8 +275,8 @@ GENERATION_FALLBACK_BACKEND=
 
 - 依赖约束与运行时引用保护：在 `litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0` 下，使 runtime 模型引用（`LITELLM_MODEL`、`AGENT_LITELLM_MODEL`、`VISION_MODEL`、`LITELLM_FALLBACK_MODELS`）失效的保存会被后端校验拒绝而不是静默清理，`cohere/*`、`google/*`、`xai/*` 等非渠道直连模型会被保留。
 - 回退方式：可直接用桌面端导出备份后通过 `POST /api/v1/system/config/import` 恢复；也可手动把 `.env` 中历史 `LITELLM_* / AGENT_LITELLM_MODEL / VISION_MODEL / LLM_TEMPERATURE / LLM_USAGE_HMAC_*` 回填后重启生效。Web 端执行导入前请先开启管理员鉴权（`ADMIN_AUTH_ENABLED=true`）。
-- 回退回归证据：`tests/test_system_config_service.py::test_import_desktop_env_restores_runtime_models_after_cleanup` 覆盖“清理后用桌面导出备份恢复 runtime 引用”。
-- 直连 provider 回归证据：`tests/test_system_config_service.py::SystemConfigServiceTestCase::test_validate_accepts_minimax_model_as_direct_env_provider`、`test_validate_accepts_cohere_model_as_direct_env_provider`、`test_validate_accepts_google_model_as_direct_env_provider`、`test_validate_accepts_xai_model_as_direct_env_provider` 覆盖直连 provider 保留语义。
+- 回退回归证据：`tests/services/system_config/test_system_config_service.py::test_import_desktop_env_restores_runtime_models_after_cleanup` 覆盖“清理后用桌面导出备份恢复 runtime 引用”。
+- 直连 provider 回归证据：`tests/services/system_config/test_system_config_service.py::SystemConfigServiceTestCase::test_validate_accepts_minimax_model_as_direct_env_provider`、`test_validate_accepts_cohere_model_as_direct_env_provider`、`test_validate_accepts_google_model_as_direct_env_provider`、`test_validate_accepts_xai_model_as_direct_env_provider` 覆盖直连 provider 保留语义。
 - 前端回归命令：`cd apps/dsa-web && npm run lint && npm run build && npm run test -- src/components/settings/__tests__/LLMChannelEditor.test.tsx`。
 - 建议回退操作链路（含设置页刷新）：先导出桌面备份，`POST /api/v1/system/config/import` 导入后，再通过 `GET /api/v1/system/config` 刷新页面配置，再确认 `LITELLM_MODEL / AGENT_LITELLM_MODEL / VISION_MODEL / LLM_TEMPERATURE / LLM_USAGE_HMAC_*` 与模型列表一致后再继续使用。
 
@@ -396,15 +400,15 @@ AGENT_CONTEXT_PROTECTED_TURNS=
 - 对已经产生部分内容的流式响应，系统不会在半截输出后切换参数；仍沿用原有“同模型非流式重试 / fallback 模型”的稳定路径，避免拼接出不一致的回答。
 - `SystemConfigService` 在 Web 设置保存 / 桌面端 `.env` 导入时只更新你提交的 key，不会因为切到严格 temperature 模型静默清空、迁移或重写已有 `LLM_TEMPERATURE`；渠道测试请求里的临时参数策略也不会回写到配置文件。
 - 非严格主模型、非严格 fallback 以及切回普通模型后的请求，仍继续使用你配置的温度；也就是说旧配置无需迁移，切换模型即可自动恢复原行为。
-- 本仓库兼容性回归覆盖见：`tests/test_llm_channel_config.py`、`tests/test_market_analyzer_generate_text.py`、`tests/test_agent_pipeline.py`、`tests/test_system_config_service.py`。
+- 本仓库兼容性回归覆盖见：`tests/config/test_llm_channel_config.py`、`tests/market/test_market_analyzer_generate_text.py`、`tests/test_agent_pipeline.py`、`tests/services/system_config/test_system_config_service.py`。
 - 最小回滚方式：直接回退本次 LLM 参数适配相关改动，无需单独迁移已有 `LLM_TEMPERATURE` 配置。
 
 ### 兼容性与回退复核清单（按 PR 审核口径）
 
 - 运行时依赖约束：`litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0`（与 `requirements.txt` 一致）。
 - 回归验证入口：
-  - 渠道模型发现与连接：`tests/test_llm_channel_config.py`
-  - 运行时源清理与恢复（含桌面导出备份链路）：`tests/test_system_config_service.py`
+  - 渠道模型发现与连接：`tests/config/test_llm_channel_config.py`
+  - 运行时源清理与恢复（含桌面导出备份链路）：`tests/services/system_config/test_system_config_service.py`
   - 接口校验与问题面向字段：`tests/test_system_config_api.py`
   - 设置页交互与保存后提示：`apps/dsa-web/src/components/settings/__tests__/LLMChannelEditor.test.tsx`
 - 旧配置回退路径：`桌面端导出备份 -> /api/v1/system/config/import`，或手动恢复 `LLM_* / LITELLM_* / AGENT_LITELLM_MODEL / VISION_MODEL / LLM_TEMPERATURE / LLM_USAGE_HMAC_*`；Web 导入备份前同样要求 `ADMIN_AUTH_ENABLED=true`，否则会返回 403。
@@ -416,7 +420,7 @@ AGENT_CONTEXT_PROTECTED_TURNS=
 
 - 官方与运行时兼容依据采用两层：第一层为官方接口语义（LiteLLM OpenAI-compatible 路由、OpenAI Chat Completions、Moonshot/Kimi 文档与官方模型说明）；第二层为本仓库当前运行时语义（`litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0`）下的实际错误归类。
 - 本次兼容恢复只使用“本地运行时错误归类 + 单请求修正重试 + 进程内缓存”策略，不写入 `.env`、不做配置迁移，仅在执行路径上动态规避不支持参数（`temperature`、`top_p`、`presence_penalty`、`frequency_penalty`、`seed`）。若要回退，不需要额外迁移命令，恢复旧值即可。
-- 回归与证据：`tests/test_llm_param_recovery.py`、`tests/test_system_config_service.py`、`tests/test_llm_channel_config.py`、`tests/test_system_config_api.py`、`tests/test_market_analyzer_generate_text.py`、`tests/test_agent_pipeline.py`；桌面导入与运行时清理回退另有 `test_import_desktop_env_restores_runtime_models_after_cleanup` 直接覆盖。
+- 回归与证据：`tests/llm/test_llm_param_recovery.py`、`tests/services/system_config/test_system_config_service.py`、`tests/config/test_llm_channel_config.py`、`tests/test_system_config_api.py`、`tests/market/test_market_analyzer_generate_text.py`、`tests/test_agent_pipeline.py`；桌面导入与运行时清理回退另有 `test_import_desktop_env_restores_runtime_models_after_cleanup` 直接覆盖。
 
 ---
 

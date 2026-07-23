@@ -1,8 +1,16 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
-import { useMemo, useState } from 'react';
-import { Button, CredentialInput, InlineAlert, Input, Modal, Select } from '../common';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import {
+  Button,
+  CredentialInput,
+  InlineAlert,
+  Input,
+  Modal,
+  Select,
+  type SearchableSelectOption,
+} from '../common';
 import { systemConfigApi } from '../../api/systemConfig';
 import type {
   LLMCapabilityCheck,
@@ -11,6 +19,7 @@ import type {
   LlmProviderCatalogEntry,
 } from '../../types/systemConfig';
 import { ModelMultiSelect } from './ModelMultiSelect';
+import { ModelFallbackEditor } from './ModelFallbackEditor';
 import {
   getLlmCapabilityLabel,
   type LlmConnectionCheckOutcome,
@@ -32,7 +41,7 @@ import {
 } from './llmConnectionContract';
 import { formatUiText } from '../../i18n/uiText';
 import { SETTINGS_WIZARD_TEXT } from '../../locales/settingsWizard';
-import { encodeModelRef } from '../../utils/modelRef';
+import { decodeModelRef, encodeModelRef } from '../../utils/modelRef';
 import { ProviderQuickLinks } from './ProviderQuickLinks';
 import { SETTINGS_CONTROL_WIDTH_CLASS } from './settingsControlLayout';
 
@@ -69,10 +78,24 @@ interface FirstRunWizardProps {
   providers: LlmProviderCatalogEntry[];
   connectionFields?: LlmConnectionFieldSchema[];
   emptyApiKeyHosts?: string[];
+  /** Existing saved models that can be reused for fallback and vision routes. */
+  routingOptions?: SearchableSelectOption[];
+  initialFallbackModels?: string;
+  initialVisionModel?: string;
+  /** Opens the persistent Task Routing view after a successful save. */
+  onViewRouting?: () => void;
 }
 
 type WizardMode = 'cloud' | 'cli';
 type StepId = 'mode' | 'connection' | 'models' | 'model' | 'review';
+
+interface SavedWizardSummary {
+  mode: WizardMode;
+  execution: string;
+  primaryModelRef: string;
+  fallbackModels: string[];
+  visionModel: string;
+}
 
 const CLI_BACKENDS: Array<{ value: string; label: string }> = [
   { value: 'claude_code_cli', label: 'Claude Code CLI' },
@@ -112,6 +135,10 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   providers,
   connectionFields,
   emptyApiKeyHosts = [],
+  routingOptions: existingRoutingOptions = [],
+  initialFallbackModels = '',
+  initialVisionModel = '',
+  onViewRouting,
 }) => {
   const text = SETTINGS_WIZARD_TEXT[language];
   const [step, setStep] = useState<StepId>('mode');
@@ -124,6 +151,8 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   const [models, setModels] = useState('');
   const [modelDraft, setModelDraft] = useState('');
   const [reportModel, setReportModel] = useState('');
+  const [fallbackModels, setFallbackModels] = useState(initialFallbackModels);
+  const [visionModel, setVisionModel] = useState(initialVisionModel);
   const [cliBackend, setCliBackend] = useState('');
   // Discovery results are candidates only: the user confirms which ones to
   // enable via the multi-select — never auto-selected wholesale.
@@ -133,6 +162,9 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<LlmConnectionCheckOutcome | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [savedSummary, setSavedSummary] = useState<SavedWizardSummary | null>(null);
+  const connectionTestVersionRef = useRef(0);
+  const discoveryVersionRef = useRef(0);
 
   // Resolve the selected provider against the backend catalog. If the stored id
   // is stale (catalog re-loaded), fall back to the first available provider.
@@ -145,6 +177,46 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     () => provider ? suggestConnectionName(existingChannelNames, provider.id) : '',
     [existingChannelNames, provider],
   );
+  const modelRefFor = useCallback((model: string): string => {
+    const route = canonicalModelRoute(protocol, model);
+    return route ? encodeModelRef(suggestedConnectionName, route) : '';
+  }, [protocol, suggestedConnectionName]);
+  const effectivePrimaryModel = reportModel || modelOptions[0] || '';
+  const effectivePrimaryModelRef = modelRefFor(effectivePrimaryModel);
+  const draftRoutingOptions = useMemo<SearchableSelectOption[]>(() => modelOptions.map((model) => ({
+    value: modelRefFor(model),
+    label: model,
+    sublabel: [
+      provider ? getProviderDisplayLabel(provider, language) : '',
+      suggestedConnectionName,
+    ].filter(Boolean).join(' · ') || undefined,
+    group: suggestedConnectionName || undefined,
+    keywords: [model, protocol, suggestedConnectionName].filter(Boolean),
+  })).filter((option) => Boolean(option.value)), [
+    language,
+    modelRefFor,
+    modelOptions,
+    protocol,
+    provider,
+    suggestedConnectionName,
+  ]);
+  const routingOptions = useMemo<SearchableSelectOption[]>(() => {
+    const byValue = new Map<string, SearchableSelectOption>();
+    for (const option of [...existingRoutingOptions, ...draftRoutingOptions]) {
+      byValue.set(option.value, option);
+    }
+    for (const value of [...parseModels(initialFallbackModels), initialVisionModel].filter(Boolean)) {
+      if (!byValue.has(value)) {
+        const decoded = decodeModelRef(value);
+        byValue.set(value, {
+          value,
+          label: decoded?.runtimeRoute ?? value,
+          sublabel: decoded?.connectionId,
+        });
+      }
+    }
+    return Array.from(byValue.values());
+  }, [draftRoutingOptions, existingRoutingOptions, initialFallbackModels, initialVisionModel]);
   const hasConnectionSchema = connectionFields !== undefined;
   const connectionSchemaFields = connectionFields ?? [];
   const requirements = useMemo(() => !hasConnectionSchema && provider ? resolveConnectionRequirements({
@@ -239,6 +311,17 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     new Map(providers.map((entry) => [entry.protocol, entry.protocol])).entries(),
   ).map(([value, label]) => ({ value, label })), [providers]);
 
+  const clearConnectionTest = () => {
+    connectionTestVersionRef.current += 1;
+    setTestResult(null);
+  };
+  const clearConnectionEvidence = () => {
+    clearConnectionTest();
+    discoveryVersionRef.current += 1;
+    setDiscoveredModels([]);
+    setDiscoverNote(null);
+  };
+
   // One model per Enter/click, but pasted comma/whitespace-separated lists are
   // split, trimmed and deduped in one pass.
   const addModelToken = (raw: string) => {
@@ -247,10 +330,20 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     if (tokens.length === 0) return;
     setModels(Array.from(new Set([...modelOptions, ...tokens])).join(','));
     setModelDraft('');
+    clearConnectionTest();
   };
   const removeModelToken = (model: string) => {
     if (modelsAreReadOnly) return;
+    const removedRef = modelRefFor(model);
     setModels(modelOptions.filter((entry) => entry !== model).join(','));
+    if (reportModel === model) {
+      setReportModel('');
+    }
+    setFallbackModels((current) => parseModels(current)
+      .filter((entry) => entry !== removedRef)
+      .join(','));
+    setVisionModel((current) => current === removedRef ? '' : current);
+    clearConnectionTest();
   };
 
   const order = mode ? STEP_ORDER[mode] : STEP_ORDER.cloud;
@@ -289,6 +382,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
       || proposedFieldCanWrite(key);
     const proposedWritableCredentials = (['api_key', 'api_keys'] as ConnectionCredentialField[])
       .filter(proposedFieldCanWrite);
+    const previousDraftRefs = new Set(modelOptions.map((model) => modelRefFor(model)));
 
     setProviderId(nextProviderId);
     if (canAdoptProviderDefault('protocol')) {
@@ -305,15 +399,18 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     if (canAdoptProviderDefault('models')) {
       setModels('');
       setReportModel('');
+      setFallbackModels((current) => parseModels(current)
+        .filter((entry) => !previousDraftRefs.has(entry))
+        .join(','));
+      setVisionModel((current) => previousDraftRefs.has(current) ? '' : current);
     }
-    setDiscoveredModels([]);
-    setDiscoverNote(null);
-    setTestResult(null);
+    clearConnectionEvidence();
   };
 
   const handleApiKeyChange = (nextValue: string) => {
     if (!hasConnectionSchema) {
       setApiKey(nextValue);
+      clearConnectionEvidence();
       return;
     }
     const preferred: ConnectionCredentialField = parseModels(nextValue).length > 1
@@ -329,6 +426,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     }
     setCredentialField(nextCredentialField);
     setApiKey(nextValue);
+    clearConnectionEvidence();
   };
 
   const handleDiscover = async () => {
@@ -342,6 +440,8 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     }
     setIsDiscovering(true);
     setDiscoverNote(null);
+    const requestVersion = discoveryVersionRef.current + 1;
+    discoveryVersionRef.current = requestVersion;
     try {
       const result = await systemConfigApi.discoverLLMChannelModels({
         name: suggestedConnectionName,
@@ -350,6 +450,9 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
         baseUrl: baseUrl.trim(),
         apiKey: apiKey.trim(),
       });
+      if (discoveryVersionRef.current !== requestVersion) {
+        return;
+      }
       if (result.success && result.models.length > 0) {
         // Present the results for explicit confirmation — never enable all of
         // them automatically.
@@ -359,7 +462,9 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
         setDiscoverNote({ ok: false, message: text.noDiscovered });
       }
     } catch {
-      setDiscoverNote({ ok: false, message: text.discoveryFailed });
+      if (discoveryVersionRef.current === requestVersion) {
+        setDiscoverNote({ ok: false, message: text.discoveryFailed });
+      }
     } finally {
       setIsDiscovering(false);
     }
@@ -371,6 +476,8 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     }
     setIsTesting(true);
     setTestResult(null);
+    const requestVersion = connectionTestVersionRef.current + 1;
+    connectionTestVersionRef.current = requestVersion;
     // Reuse the shared runner so the wizard surfaces the same actionable
     // diagnostics, resolved effective config, and capability results as the
     // Model Access editor instead of a binary pass/fail.
@@ -380,15 +487,21 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
       protocol,
       baseUrl: baseUrl.trim(),
       apiKey: apiKey.trim(),
-      models: modelOptions,
+      models: [
+        effectivePrimaryModel,
+        ...modelOptions.filter((model) => model !== effectivePrimaryModel),
+      ].filter(Boolean),
       enabled: true,
       capabilityChecks: WIZARD_CAPABILITY_CHECKS,
     }, language);
-    setTestResult(outcome);
+    if (connectionTestVersionRef.current === requestVersion) {
+      setTestResult(outcome);
+    }
     setIsTesting(false);
   };
 
   const chooseMode = (nextMode: WizardMode) => {
+    clearConnectionTest();
     setMode(nextMode);
     if (nextMode === 'cloud' && !baseUrl) {
       applyProvider(providerId);
@@ -466,8 +579,20 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     const result = await onComplete(buildItems());
     if (!result.success) {
       // Keep the modal open and surface the failure in place.
-      setSaveError(language === 'zh' && result.error ? result.error : text.saveFailedMessage);
+      setSaveError(result.error?.trim() || text.saveFailedMessage);
+      return;
     }
+    const normalizedFallbacks = parseModels(fallbackModels)
+      .filter((entry) => entry !== effectivePrimaryModelRef);
+    setSavedSummary({
+      mode: mode ?? 'cloud',
+      execution: mode === 'cli'
+        ? CLI_BACKENDS.find((entry) => entry.value === cliBackend)?.label ?? text.localCli
+        : text.cloudApi,
+      primaryModelRef: mode === 'cloud' ? effectivePrimaryModelRef : '',
+      fallbackModels: mode === 'cloud' ? normalizedFallbacks : [],
+      visionModel: mode === 'cloud' ? visionModel : '',
+    });
   };
 
   const buildItems = (): WizardDraftItem[] => {
@@ -479,10 +604,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     }
     const name = suggestedConnectionName;
     const up = name.toUpperCase();
-    const primaryModel = reportModel || modelOptions[0] || '';
-    // Persist Connection-aware identity; execution resolves it to this route.
-    const primaryRoute = canonicalModelRoute(protocol, primaryModel);
-    const primaryModelRef = primaryRoute ? encodeModelRef(name, primaryRoute) : '';
+    const primaryModelRef = effectivePrimaryModelRef;
     // Merge into any existing channels instead of replacing the whole list.
     const mergedChannels = Array.from(new Set([...existingChannelNames, name])).filter(Boolean).join(',');
     const items: WizardDraftItem[] = [
@@ -507,6 +629,13 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     if (primaryModelRef) {
       items.push({ key: 'LITELLM_MODEL', value: primaryModelRef });
     }
+    items.push({
+      key: 'LITELLM_FALLBACK_MODELS',
+      value: parseModels(fallbackModels)
+        .filter((entry) => entry !== primaryModelRef)
+        .join(','),
+    });
+    items.push({ key: 'VISION_MODEL', value: visionModel });
     // Base URL: official providers with a blank template endpoint use the SDK
     // default; only emit an explicit endpoint when one is provided.
     if (baseUrl.trim() && (!hasConnectionSchema || fieldCanWrite('base_url'))) {
@@ -550,6 +679,83 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     undefined,
     language,
   )?.summary;
+  const fallbackHelpSummary = getSettingsHelpContent(
+    'settings.ai_model.LITELLM_FALLBACK_MODELS',
+    undefined,
+    language,
+  )?.summary;
+  const visionHelpSummary = getSettingsHelpContent(
+    'settings.ai_model.VISION_MODEL',
+    undefined,
+    language,
+  )?.summary;
+  const routingLabel = (value: string): string => {
+    const option = routingOptions.find((entry) => entry.value === value);
+    if (option) {
+      return option.sublabel ? `${option.label} · ${option.sublabel}` : option.label;
+    }
+    const decoded = decodeModelRef(value);
+    return decoded ? `${decoded.runtimeRoute} · ${decoded.connectionId}` : value;
+  };
+
+  if (savedSummary) {
+    return (
+      <Modal isOpen onClose={onClose} title={text.title}>
+        <div data-testid="first-run-wizard" className="space-y-5">
+          <InlineAlert
+            variant="success"
+            title={text.savedTitle}
+            message={text.savedDescription}
+          />
+          <dl
+            className="space-y-2 rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-3 text-sm"
+            data-testid="wizard-saved-routing"
+          >
+            <div className="flex justify-between gap-3">
+              <dt className="text-muted-text">{text.execution}</dt>
+              <dd className="font-medium text-foreground">{savedSummary.execution}</dd>
+            </div>
+            {savedSummary.mode === 'cloud' ? (
+              <>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-text">{text.reportModel}</dt>
+                  <dd className="min-w-0 text-right font-medium text-foreground">
+                    {routingLabel(savedSummary.primaryModelRef)}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-text">{text.fallbackModels}</dt>
+                  <dd className="min-w-0 text-right font-medium text-foreground">
+                    {savedSummary.fallbackModels.length > 0
+                      ? savedSummary.fallbackModels.map(routingLabel).join(' -> ')
+                      : text.none}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-text">{text.visionModel}</dt>
+                  <dd className="min-w-0 text-right font-medium text-foreground">
+                    {savedSummary.visionModel
+                      ? routingLabel(savedSummary.visionModel)
+                      : text.inheritPrimary}
+                  </dd>
+                </div>
+              </>
+            ) : null}
+          </dl>
+          <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--settings-border)] pt-4">
+            {savedSummary.mode === 'cloud' && onViewRouting ? (
+              <Button type="button" variant="secondary" size="default" onClick={onViewRouting}>
+                {text.viewRouting}
+              </Button>
+            ) : null}
+            <Button type="button" variant="primary" size="default" onClick={onClose}>
+              {text.done}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
 
   return (
     <Modal isOpen onClose={onClose} title={text.title}>
@@ -619,6 +825,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                   onChange={(nextProtocol) => {
                     if (!fieldIsReadOnly('protocol')) {
                       setProtocol(nextProtocol);
+                      clearConnectionEvidence();
                     }
                   }}
                   options={protocolOptions}
@@ -666,6 +873,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                   onChange={(event) => {
                     if (!fieldIsReadOnly('base_url')) {
                       setBaseUrl(event.target.value);
+                      clearConnectionEvidence();
                     }
                   }}
                   disabled={fieldIsReadOnly('base_url')}
@@ -816,20 +1024,63 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
         ) : null}
 
         {step === 'model' ? (
-          <div className="space-y-2">
-            <label htmlFor="wizard-report-model" className="block text-sm text-foreground">
-              {text.reportModel}
-            </label>
-            <Select
-              id="wizard-report-model"
-              value={reportModel || modelOptions[0] || ''}
-              onChange={setReportModel}
-              options={modelOptions.map((model) => ({ value: model, label: model }))}
-              className={SETTINGS_CONTROL_WIDTH_CLASS}
-            />
-            <p className="text-xs text-muted-text">
-              {text.inheritanceHint}
-            </p>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="wizard-report-model" className="block text-sm text-foreground">
+                {text.reportModel}
+              </label>
+              <Select
+                id="wizard-report-model"
+                value={effectivePrimaryModel}
+                onChange={(nextModel) => {
+                  setReportModel(nextModel);
+                  clearConnectionTest();
+                  const nextPrimaryRef = modelRefFor(nextModel);
+                  setFallbackModels((current) => parseModels(current)
+                    .filter((entry) => entry !== nextPrimaryRef)
+                    .join(','));
+                }}
+                options={modelOptions.map((model) => ({ value: model, label: model }))}
+                className={SETTINGS_CONTROL_WIDTH_CLASS}
+              />
+              <p className="text-xs text-muted-text">
+                {text.inheritanceHint}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm text-foreground">{text.fallbackModels}</p>
+              <ModelFallbackEditor
+                value={fallbackModels}
+                onChange={setFallbackModels}
+                options={routingOptions}
+                primaryRoute={effectivePrimaryModelRef}
+                language={language}
+              />
+              {fallbackHelpSummary ? (
+                <p className="text-xs text-muted-text">{fallbackHelpSummary}</p>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="wizard-vision-model" className="block text-sm text-foreground">
+                {text.visionModel}
+              </label>
+              <Select
+                id="wizard-vision-model"
+                value={visionModel}
+                onChange={setVisionModel}
+                options={[
+                  { value: '', label: text.inheritPrimary },
+                  ...routingOptions.map((option) => ({
+                    value: option.value,
+                    label: option.sublabel ? `${option.label} · ${option.sublabel}` : option.label,
+                  })),
+                ]}
+                className={SETTINGS_CONTROL_WIDTH_CLASS}
+              />
+              {visionHelpSummary ? (
+                <p className="text-xs text-muted-text">{visionHelpSummary}</p>
+              ) : null}
+            </div>
           </div>
         ) : null}
 
@@ -865,7 +1116,23 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                   </div>
                   <div className="flex justify-between gap-3">
                     <dt className="text-muted-text">{text.reportModel}</dt>
-                    <dd className="min-w-0 truncate font-medium text-foreground">{reportModel || modelOptions[0] || '—'}</dd>
+                    <dd className="min-w-0 text-right font-medium text-foreground">
+                      {effectivePrimaryModelRef ? routingLabel(effectivePrimaryModelRef) : '—'}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-text">{text.fallbackModels}</dt>
+                    <dd className="min-w-0 text-right font-medium text-foreground">
+                      {parseModels(fallbackModels).length > 0
+                        ? parseModels(fallbackModels).map(routingLabel).join(' -> ')
+                        : text.none}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-text">{text.visionModel}</dt>
+                    <dd className="min-w-0 text-right font-medium text-foreground">
+                      {visionModel ? routingLabel(visionModel) : text.inheritPrimary}
+                    </dd>
                   </div>
                 </>
               ) : null}
