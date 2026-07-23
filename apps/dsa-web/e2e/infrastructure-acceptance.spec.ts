@@ -832,9 +832,9 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(homeParent).not.toHaveAttribute('aria-current', 'page');
     await expect(signalChild).toHaveAttribute('aria-current', 'page');
     await homeToggle.click();
-    await expect(homeParent).toHaveAttribute('aria-current', 'location');
+    await expect(homeParent).toHaveAttribute('aria-current', 'page');
     await expect(signalChild).toBeHidden();
-    await expect(navigation.locator('a[aria-current]')).toHaveCount(1);
+    await expect(navigation.locator('a[aria-current="page"]')).toHaveCount(1);
     await homeToggle.click();
     await expect(signalChild).toHaveAttribute('aria-current', 'page');
 
@@ -846,9 +846,9 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     const drawerSignal = drawerNavigation.getByRole('link', { name: UI_TEXT.en['layout.nav.decisionSignals'] });
     await expect(drawerSignal).toHaveAttribute('aria-current', 'page');
     await drawerNavigation.getByRole('button', { name: UI_TEXT.en['layout.nav.home'] }).click();
-    await expect(drawerHome).toHaveAttribute('aria-current', 'location');
+    await expect(drawerHome).toHaveAttribute('aria-current', 'page');
     await expect(drawerSignal).toBeHidden();
-    await expect(drawerNavigation.locator('a[aria-current]')).toHaveCount(1);
+    await expect(drawerNavigation.locator('a[aria-current="page"]')).toHaveCount(1);
     await page.getByRole('button', { name: UI_TEXT.en['common.closeDrawer'] }).click();
     await page.setViewportSize({ width: 1280, height: 720 });
     await assertRouteChrome(page, APP_ROUTE_PATHS.researchBacktest, BACKTEST_TEXT.en.runBacktest, BACKTEST_TEXT.en.documentTitle);
@@ -956,6 +956,19 @@ test.describe('infrastructure interaction acceptance matrix', () => {
         expectedCount: String(RESEARCH_DISCOVER_DEFAULT_VALUES.count),
       },
       {
+        name: 'known preset with non-default values',
+        input: {
+          [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market]: RESEARCH_DISCOVER_DEFAULT_VALUES.market,
+          [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: 'quality',
+          [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: '23',
+          source: 'notification',
+        },
+        expectedMarket: null,
+        expectedStrategy: 'quality',
+        expectedStrategyLabel: 'Quality',
+        expectedCount: '23',
+      },
+      {
         name: 'wholly malformed owned values',
         input: {
           [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market]: 'unsupported',
@@ -978,7 +991,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
             value: {
               taskId: 'stored-explicit-task',
               market: RESEARCH_DISCOVER_DEFAULT_VALUES.market,
-              strategy: 'quality',
+              strategy: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
               maxResults: 8,
             },
           });
@@ -1012,7 +1025,9 @@ test.describe('infrastructure interaction acceptance matrix', () => {
           await expect.poll(() => new URL(page.url()).pathname).toBe(APP_ROUTE_PATHS.researchDiscover);
           await expect.poll(() => restorationRequests).toBeGreaterThan(requestsBeforeNavigation);
           await assertIntentState();
+          const requestsBeforeReload = restorationRequests;
           await page.reload();
+          await expect.poll(() => restorationRequests).toBeGreaterThan(requestsBeforeReload);
           await assertIntentState();
         });
       }

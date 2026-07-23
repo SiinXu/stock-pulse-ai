@@ -199,8 +199,8 @@ describe('SidebarNav', () => {
       expect(groupLink).not.toHaveAttribute('aria-expanded');
       expect(groupLink.querySelectorAll('svg')).toHaveLength(1);
       expect(screen.getByRole('button', { name })).toHaveAttribute('aria-expanded', 'true');
-      expect(screen.getByRole('button', { name })).toHaveClass('h-11', 'w-11');
       expect(screen.getByRole('button', { name })).toHaveAttribute('data-control', 'icon-button');
+      expect(screen.getByRole('button', { name })).toHaveAttribute('data-size', 'navigation');
     }
     expect(screen.getByRole('link', { name: '大盘复盘' })).toBeVisible();
     expect(screen.getByRole('link', { name: '发现' })).toBeVisible();
@@ -218,42 +218,6 @@ describe('SidebarNav', () => {
     expect(researchToggle).toHaveAttribute('aria-controls', 'shell-nav-research-children');
     expect(screen.getByRole('link', { name: '大盘复盘' })).toBeVisible();
     expect(screen.getByRole('link', { name: '发现' })).toBeVisible();
-  });
-
-  it('promotes hidden active-child context to the group parent until children are visible', async () => {
-    const expandedRender = render(
-      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.researchDiscover]}>
-        <SidebarNav />
-      </MemoryRouter>,
-    );
-
-    let researchParent = screen.getByRole('link', { name: '研究' });
-    let discoverChild = screen.getByRole('link', { name: '发现' });
-    expect(researchParent).not.toHaveAttribute('aria-current');
-    expect(discoverChild).toHaveAttribute('aria-current', 'page');
-
-    fireEvent.click(screen.getByRole('button', { name: '研究' }));
-    expect(screen.queryByRole('link', { name: '发现' })).not.toBeInTheDocument();
-    expect(researchParent).toHaveAttribute('aria-current', 'location');
-    expect(expandedRender.container.querySelectorAll('a[aria-current]')).toHaveLength(1);
-    expandedRender.unmount();
-
-    const compactRender = render(
-      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.researchDiscover]}>
-        <SidebarNav collapsed />
-      </MemoryRouter>,
-    );
-    researchParent = screen.getByRole('link', { name: '研究' });
-    expect(researchParent).toHaveAttribute('aria-current', 'location');
-    expect(compactRender.container.querySelectorAll('a[aria-current]')).toHaveLength(1);
-
-    fireEvent.mouseEnter(researchParent);
-    const menu = await screen.findByRole('menu', { name: '研究' });
-    discoverChild = within(menu).getByRole('menuitem', { name: '发现' });
-    expect(researchParent).not.toHaveAttribute('aria-current');
-    expect(discoverChild).toHaveAttribute('aria-current', 'page');
-    expect(document.querySelectorAll('a[aria-current]')).toHaveLength(1);
-    compactRender.unmount();
   });
 
   it('keeps the Discover navigation item stable after config save events', () => {
@@ -451,9 +415,9 @@ describe('SidebarNav', () => {
     expect(homeParent).not.toHaveAttribute('aria-current', 'page');
     expect(signalsChild).toHaveAttribute('aria-current', 'page');
     fireEvent.click(screen.getByRole('button', { name: '首页' }));
-    expect(homeParent).toHaveAttribute('aria-current', 'location');
+    expect(homeParent).toHaveAttribute('aria-current', 'page');
     expect(screen.queryByRole('link', { name: 'AI 建议' })).not.toBeInTheDocument();
-    currentLinks = signalsRender.container.querySelectorAll('a[aria-current]');
+    currentLinks = signalsRender.container.querySelectorAll('a[aria-current="page"]');
     expect(currentLinks).toHaveLength(1);
     expect(currentLinks[0]).toBe(homeParent);
     signalsRender.unmount();

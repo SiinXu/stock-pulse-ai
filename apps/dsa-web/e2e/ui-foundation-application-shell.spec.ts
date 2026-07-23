@@ -296,7 +296,7 @@ test.describe('application shell foundation', () => {
     await expect(researchMenu.getByRole('menuitem', { name: 'Backtest' })).toBeVisible();
     await researchMenu.getByRole('menuitem', { name: 'Discover' }).click();
     await expect(page).toHaveURL(/\/research\/discover$/);
-    await expect(compactResearch).toHaveAttribute('aria-current', 'location');
+    await expect(compactResearch).toHaveAttribute('aria-current', 'page');
     const compactNavigation = sidebar.getByRole('navigation', { name: 'Main navigation' });
     const compactRoutes = await compactNavigation.getByRole('link').all();
     expect(compactRoutes).toHaveLength(5);
@@ -315,7 +315,7 @@ test.describe('application shell foundation', () => {
     await researchToggle.click();
     await expect(researchToggle).toHaveAttribute('aria-expanded', 'false');
     await expect(navigation.getByRole('link', { name: 'Discover' })).toBeHidden();
-    await expect(researchParent).toHaveAttribute('aria-current', 'location');
+    await expect(researchParent).toHaveAttribute('aria-current', 'page');
     await researchToggle.click();
     await expect(researchToggle).toHaveAttribute('aria-expanded', 'true');
     await expect(navigation.getByRole('link', { name: 'Discover' })).toBeVisible();

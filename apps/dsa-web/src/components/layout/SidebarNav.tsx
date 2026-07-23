@@ -240,9 +240,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
             ? activeChild
               ? childrenExpanded
                 ? undefined
-                : parentActive
-                  ? 'page'
-                  : 'location'
+                : 'page'
               : parentActive
                 ? 'page'
                 : undefined
@@ -345,9 +343,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                     aria-current={activeChild
                       ? open
                         ? undefined
-                        : parentActive
-                          ? 'page'
-                          : 'location'
+                        : 'page'
                       : parentActive
                         ? 'page'
                         : undefined}

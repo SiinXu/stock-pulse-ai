@@ -398,9 +398,8 @@ navigation opens the same children in a right-side hover or keyboard flyout;
 Right Arrow enters the flyout and Left Arrow or Escape restores its parent
 trigger. While a secondary subtree is visible, its active child is the sole
 `aria-current="page"` link. When that subtree is collapsed or its compact flyout
-is closed, the visible parent link carries `aria-current="page"` when its own
-destination is current and `aria-current="location"` when it represents an
-active descendant.
+is closed, the visible parent link becomes the sole `aria-current="page"` owner
+for either its own destination or an active descendant.
 
 Canonical Research paths are `/research/market`, `/research/discover`, and
 `/research/backtest`. The legacy `/screening` and `/backtest` URLs use the shared
