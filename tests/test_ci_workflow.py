@@ -19,6 +19,11 @@ def test_python_minimum_job_runs_full_backend_gate_on_python_3_10():
     assert job["name"] == "python-minimum"
     assert job["needs"] == ["ai-governance"]
     assert job["permissions"] == {"contents": "read"}
+    assert "if" not in job
+    assert job.get("continue-on-error", False) is False
+    assert all(
+        step.get("continue-on-error", False) is False for step in job["steps"]
+    )
 
     setup_steps = [
         step
@@ -37,6 +42,17 @@ def test_python_minimum_job_runs_full_backend_gate_on_python_3_10():
     assert backend_setup_steps[0]["with"]["python-version"] == "3.11"
 
     run_commands = [step["run"] for step in job["steps"] if "run" in step]
+    assert any("--constraint constraints.txt" in command for command in run_commands)
+    assert any(
+        "--build-constraint build-constraints.txt" in command
+        for command in run_commands
+    )
     assert any("-r .github/requirements-ci.txt" in command for command in run_commands)
     assert any("python -m pip check" in command for command in run_commands)
-    assert any(command.strip() == "./scripts/ci_gate.sh" for command in run_commands)
+    gate_steps = [
+        step
+        for step in job["steps"]
+        if step.get("run", "").strip() == "./scripts/ci_gate.sh"
+    ]
+    assert len(gate_steps) == 1
+    assert "if" not in gate_steps[0]
