@@ -10,9 +10,14 @@ import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import { useTaskStream } from '../../hooks/useTaskStream';
 import { useStockPoolStore } from '../../stores/stockPoolStore';
 import type { RunFlowSnapshot } from '../../types/runFlow';
+import type { SetupStatusResponse } from '../../types/systemConfig';
+import {
+  EXPERIENCE_MODE_STORAGE_KEY,
+  ONBOARDING_DISMISSED_STORAGE_KEY,
+} from '../../utils/onboardingPreferences';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
-import { APP_ROUTE_PATHS } from '../../routing/routes';
+import { buildSettingsHref } from '../../routing/routes';
 import HomePage from '../HomePage';
 
 const navigateMock = vi.fn();
@@ -126,6 +131,16 @@ function configureWatchlistBatch(count: number): string[] {
     items: [],
   });
   return codes;
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
 }
 
 function duplicateTaskFailure() {
@@ -274,6 +289,8 @@ describe('HomePage', () => {
     expect(screen.getByTestId('home-dashboard-scroll')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '分析' })).toHaveAttribute('data-variant', 'primary');
+    expect(screen.getByRole('tab', { name: '专业' })).toHaveAttribute('aria-selected', 'true');
+    expect(window.localStorage.getItem(EXPERIENCE_MODE_STORAGE_KEY)).toBeNull();
     expect(screen.getByRole('checkbox', { name: '推送通知' }).closest('label')).toHaveClass('h-9');
     expect(await screen.findByText('趋势维持强势')).toBeInTheDocument();
     expect(
@@ -1153,7 +1170,38 @@ describe('HomePage', () => {
     expect(analysisApi.analyzeAsync).toHaveBeenCalledTimes(2);
     expect(vi.mocked(analysisApi.analyzeAsync).mock.calls[0]?.[0].stockCodes).toHaveLength(50);
     expect(vi.mocked(analysisApi.analyzeAsync).mock.calls[1]?.[0].stockCodes).toHaveLength(1);
+    expect(vi.mocked(analysisApi.analyzeAsync).mock.calls[0]?.[0].reportType).toBe('detailed');
+    expect(vi.mocked(analysisApi.analyzeAsync).mock.calls[1]?.[0].reportType).toBe('detailed');
     expect(vi.mocked(analysisApi.getTasks).mock.calls.length).toBeGreaterThan(taskRefreshCallsBeforeSubmit);
+  });
+
+  it('submits beginner watchlist analysis as brief reports', async () => {
+    window.localStorage.setItem(EXPERIENCE_MODE_STORAGE_KEY, 'beginner');
+    configureWatchlistBatch(1);
+    vi.mocked(analysisApi.analyzeAsync).mockImplementation(async ({ stockCodes = [] }) => ({
+      accepted: stockCodes.map((stockCode) => ({
+        taskId: `task-${stockCode}`,
+        stockCode,
+        status: 'pending' as const,
+      })),
+      duplicates: [],
+      message: 'accepted',
+    }));
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    await switchWorkspaceView('自选');
+    fireEvent.click(screen.getByRole('button', { name: '分析全部' }));
+
+    expect(await screen.findByText('已提交 1 个任务，0 个正在运行')).toBeInTheDocument();
+    expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(expect.objectContaining({
+      stockCodes: ['T001'],
+      reportType: 'brief',
+    }));
   });
 
   it('reports partial watchlist submission and refreshes accepted tasks after a later chunk fails', async () => {
@@ -1484,15 +1532,22 @@ describe('HomePage', () => {
     await waitFor(() => {
       expect(analysisApi.analyzeAsync).toHaveBeenCalled();
     });
+    expect(vi.mocked(analysisApi.analyzeAsync).mock.calls[0]?.[0]).toMatchObject({
+      reportType: 'detailed',
+    });
     expect(vi.mocked(analysisApi.analyzeAsync).mock.calls[0]?.[0]).not.toHaveProperty('reportLanguage');
   });
 
-  it('shows first-run setup gaps and links to settings', async () => {
+  it('defaults incomplete first-run setup to beginner analysis and links to guided settings', async () => {
     vi.mocked(historyApi.getList).mockResolvedValue({
       total: 0,
       page: 1,
       limit: 20,
       items: [],
+    });
+    vi.mocked(analysisApi.analyzeAsync).mockResolvedValue({
+      taskId: 'task-beginner-1',
+      status: 'pending',
     });
     vi.mocked(systemConfigApi.getSetupStatus).mockResolvedValue({
       isComplete: false,
@@ -1527,8 +1582,148 @@ describe('HomePage', () => {
 
     expect(await screen.findByText('基础配置未完成')).toBeInTheDocument();
     expect(screen.getByText(/LLM 主渠道、自选股/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '去配置' }));
-    expect(navigateMock).toHaveBeenCalledWith(APP_ROUTE_PATHS.settings);
+    expect(screen.getByRole('tab', { name: '新手' })).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.change(screen.getByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL'), {
+      target: { value: '600519' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '快速分析' }));
+    await waitFor(() => {
+      expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(expect.objectContaining({
+        stockCode: '600519',
+        reportType: 'brief',
+      }));
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '开始引导配置' }));
+    expect(navigateMock).toHaveBeenCalledWith(buildSettingsHref({
+      section: 'overview',
+      view: 'readiness',
+      source: 'onboarding',
+    }));
+  });
+
+  it('defers navigation auto-analysis until first-run mode is resolved', async () => {
+    const setupStatus = createDeferred<SetupStatusResponse>();
+    vi.mocked(systemConfigApi.getSetupStatus).mockReturnValue(setupStatus.promise);
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    vi.mocked(analysisApi.analyzeAsync).mockResolvedValue({
+      taskId: 'task-deferred-beginner',
+      status: 'pending',
+    });
+
+    render(
+      <MemoryRouter initialEntries={[{
+        pathname: '/',
+        state: {
+          stockCode: '600519',
+          stockName: '贵州茅台',
+          autoAnalyze: true,
+        },
+      }]}
+      >
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
+
+    await act(async () => {
+      setupStatus.resolve({
+        isComplete: false,
+        readyForSmoke: false,
+        requiredMissingKeys: ['llm_primary'],
+        nextStepKey: 'llm_primary',
+        checks: [],
+      });
+      await setupStatus.promise;
+    });
+
+    await waitFor(() => {
+      expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(expect.objectContaining({
+        stockCode: '600519',
+        reportType: 'brief',
+      }));
+    });
+    expect(screen.getByRole('tab', { name: '新手' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('persists explicit experience mode and onboarding dismissal for later visits', async () => {
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    vi.mocked(systemConfigApi.getSetupStatus).mockResolvedValue({
+      isComplete: false,
+      readyForSmoke: false,
+      requiredMissingKeys: ['llm_primary'],
+      nextStepKey: 'llm_primary',
+      checks: [{
+        key: 'llm_primary',
+        title: 'LLM 主渠道',
+        category: 'ai_model',
+        required: true,
+        status: 'needs_action',
+        message: '缺少主模型配置',
+      }],
+    });
+
+    const firstVisit = render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('button', { name: '快速分析' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '专业' }));
+    expect(window.localStorage.getItem(EXPERIENCE_MODE_STORAGE_KEY)).toBe('professional');
+
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }));
+    expect(window.localStorage.getItem(ONBOARDING_DISMISSED_STORAGE_KEY)).toBe('true');
+    expect(screen.queryByText('基础配置未完成')).not.toBeInTheDocument();
+
+    firstVisit.unmount();
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('button', { name: '分析' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '专业' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByText('基础配置未完成')).not.toBeInTheDocument();
+  });
+
+  it('reveals professional report controls from the beginner summary', async () => {
+    window.localStorage.setItem(EXPERIENCE_MODE_STORAGE_KEY, 'beginner');
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 1,
+      page: 1,
+      limit: 20,
+      items: [historyItem],
+    });
+    vi.mocked(historyApi.getDetail).mockResolvedValue(historyReport);
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('beginner-report-summary')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '历史趋势' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '查看专业详情' }));
+
+    expect(await screen.findByRole('button', { name: '历史趋势' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '专业' })).toHaveAttribute('aria-selected', 'true');
+    expect(window.localStorage.getItem(EXPERIENCE_MODE_STORAGE_KEY)).toBe('professional');
   });
 
   it('navigates to chat with report context when asking a follow-up question', async () => {

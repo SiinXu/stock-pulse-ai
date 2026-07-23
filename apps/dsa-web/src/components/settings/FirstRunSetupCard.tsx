@@ -189,6 +189,9 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
         ) : null}
 
         <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" variant="secondary" size="default" onClick={() => onSelectCategory('data_source')}>
+            {t('settings.setupGuideConfigureDataSources')}
+          </Button>
           <Button type="button" variant="secondary" size="default" onClick={() => onSelectCategory('ai_model')}>
             {t('settings.setupGuideConfigureLlm')}
           </Button>
