@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Added] Extended the Web LLM setup wizard with ordered fallback and Vision routing, a secret-free saved summary, direct Task Routing access, and a persistent re-entry action.
 - [Fixed] Unified Research URL sanitization across page, deep-link, and session consumers so explicit Discover filters survive active-task restoration and malformed Backtest filters never reach API requests.
 - [Tests] Added a blocking hosted `python-minimum` job that runs the full backend gate on Python 3.10, with portable timeout and exception-group guard fixtures, while retaining the Python 3.11 gate.
 - [Fixed] Removed false disclosure cues from always-expanded Web navigation, aligned the Discover empty-state accessible name with its visible action, and centralized Research URL state constants.
@@ -315,13 +316,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Converged notification capability, contract, noise-control, and route-configuration helpers into `src/notification_parts/` with strict legacy facades.
 - [Chore] Converged compact notification sender adapters into `src/notification_parts/senders/` with strict legacy facades.
 - [Chore] Converged the remaining extended notification sender adapters and package exports into `src/notification_parts/senders/` with strict legacy facades.
-- [Fixed] Serialized public plugin lifecycle operations with composition-root close, replacement, and reset so closed roots cannot be republished, callback-owned workers cannot deadlock, and terminal process shutdown cannot recreate the root.
 - [Docs] Moved the design contract into `docs/` and added compact repository maps to all homepage language variants.
 - [Chore] Permanently disabled secret access from pull-request AI review, rejected secret inheritance and tag/default-ref confusion, and hardened install guidance against nested commands, redirection decoys, dynamic paths, launcher/module entry points, Docker exec form, and explicit YAML indentation.
 - [Added] Injected a Historical Decision Reflection (same-stock hit-rate and pattern-level calibration from past signal outcomes) into analysis prompts and single-stock reports, guarded by a minimum-sample threshold, a stated statistics window, and a confidence-only rule that never flips signal direction; configurable via `DECISION_MEMORY_ENABLED`/`DECISION_MEMORY_LOOKBACK`/`DECISION_MEMORY_MIN_AGE_DAYS`/`DECISION_MEMORY_MIN_SAMPLES` with a per-request `use_memory` override, and zero overhead when disabled or without history.
 - [Tests] Fixed the settings help locale contract test to read the per-language help sources introduced by the settings-help split, restoring the backend gate.
 - [Changed] Reused the shared connection-test runner in the first-run LLM setup wizard so its optional test reports actionable stage and error-code diagnostics, the resolved effective model and protocol, and JSON and vision capability results instead of a binary pass/fail.
 - [Added] Let users curate decision memory by marking a signal as memorable or ignored via `GET`/`PATCH /api/v1/decision-signals/{signal_id}/memory-flag`; ignored signals are excluded from the Historical Decision Reflection entirely and memorable ones are highlighted and ordered first, backed by an additive `decision_signal_memory_flags` sidecar table.
+- [Fixed] Serialized root-owned plugin lifecycle operations with composition-root close, replacement, and reset so roots with shutdown requested cannot activate or be republished, callback-owned workers cannot deadlock, and terminal process shutdown cannot recreate the root.
+- [Changed] Made secondary sidebar groups collapsible with visible current-page ownership and preserved explicit Discover URL ownership across default, non-default, malformed, refreshed, legacy, authenticated, and safe custom-strategy links.
+- [Added] Added a desktop-only local model center that discovers, starts/stops, downloads recommended Ollama models, and registers them into the desktop `.env`, using whitelisted process launches, strict model-name validation, an isolated sandboxed renderer, and secret-free logs.
 
 ## [3.26.3] - 2026-07-15
 
@@ -504,7 +507,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Tests
 
 - Added Taiwan stocks, JP/KR market review, GenerationBackend, `codex_cli`, Hermes, local CLI, runtime scheduler, backtesting and concept sector ranking regression tests.
-- Enhanced temporary `.env` isolation for `tests/test_analysis_api_contract.py`, `tests/test_analysis_history.py` and `tests/test_backtest_service.py` to prevent contamination of system configuration tests with local real `.env` files.
+- Enhanced temporary `.env` isolation for `tests/test_analysis_api_contract.py`, `tests/services/test_analysis_history.py` and `tests/services/test_backtest_service.py` to prevent contamination of system configuration tests with local real `.env` files.
 
 ## [3.23.0] - 2026-06-20
 
@@ -619,8 +622,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Tests
 
-- Covered backend runtime and compatibility verification after #1381: `tests/test_main_schedule_mode.py`、`tests/test_pipeline_daily_market_context.py`、`tests/test_daily_market_context.py`、`tests/test_daily_market_context_guardrail.py`、`tests/test_agent_executor.py`、`tests/test_config_env_compat.py`、`tests/test_config_registry.py` and `apps/dsa-web/tests/system_config_i18n.test.ts`.
-- Added/Updated AlphaSift backend regression tests: `python -m pytest tests/test_alphasift_api.py -q`, `python -m pytest tests/test_docker_entrypoint.py -q`, `python -m pytest tests/test_main_schedule_mode.py -q -k "start_api_server_fails_before_thread_when_port_is_busy"`.
+- Covered backend runtime and compatibility verification after #1381: `tests/app/test_main_schedule_mode.py`、`tests/core/test_pipeline_daily_market_context.py`、`tests/services/test_daily_market_context.py`、`tests/market/test_daily_market_context_guardrail.py`、`tests/test_agent_executor.py`、`tests/test_config_env_compat.py`、`tests/test_config_registry.py` and `apps/dsa-web/tests/system_config_i18n.test.ts`.
+- Added/Updated AlphaSift backend regression tests: `python -m pytest tests/api/alphasift/test_alphasift_api.py -q`, `python -m pytest tests/test_docker_entrypoint.py -q`, `python -m pytest tests/app/test_main_schedule_mode.py -q -k "start_api_server_fails_before_thread_when_port_is_busy"`.
 
 ## [3.21.0] - 2026-06-07
 
@@ -1006,8 +1009,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Tests
 
-- Added `tests/test_bot_market_command.py`, covering `MARKET_REVIEW_REGION=both` + open markets `{"cn","us"}` / `{"cn","hk"}` of `override_region` through assertions, and covering paths to skip closed market trading days and close trading day checks. Added `tests/test_yfinance_hk_indices.py` covering Hong Kong stocks index symbol mapping and partial/full failure downgrade paths.
-- Completed lightweight import stub stock code standardization functions for the `task_queue`; Restored `tests/test_task_queue_config_sync.py` collection and execution.
+- Added `tests/bot/commands/test_bot_market_command.py`, covering `MARKET_REVIEW_REGION=both` + open markets `{"cn","us"}` / `{"cn","hk"}` of `override_region` through assertions, and covering paths to skip closed market trading days and close trading day checks. Added `tests/test_yfinance_hk_indices.py` covering Hong Kong stocks index symbol mapping and partial/full failure downgrade paths.
+- Completed lightweight import stub stock code standardization functions for the `task_queue`; Restored `tests/services/test_task_queue_config_sync.py` collection and execution.
 
 ## [3.14.1] - 2026-04-26
 - [Test] Fixed market review prompt testing assertion for "tomorrow's trading plan" title, and synchronized desktop version number, restored release gate.
@@ -1274,8 +1277,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - 🧪 **Dashboard Component Test Coverage Expansion (PR7-2)** — Added tests for `ReportNews` and `TaskPanel`. Enhanced assertions in `HistoryList`, `ReportDetails`, `HomePage`, `useDashboardLifecycle`, and `stockPoolStore`, including rollback, mobile drawer, and task lifecycle scenarios.
 - 🧪 **Multi-Market Index Generation Test Completion** — Added `tests/test_generate_index_from_csv.py`, covering Tushare/AkShare dual data source parsing, multi-market judgment, U.S. stocks DUMMY filtering and duplicate ticker deduplication core paths.
-- 🧪 **Sector Association Writing & API Contract Regression** — Added `tests/test_pipeline_related_boards.py`, and supplemented historical and analytical interface contract testing to ensure `belong_boards` / `sector_rankings` only perform incremental expansion while maintaining fail-open.
-- 🧪 **Scheduled Mode Stock List Semantic Regression Test** — Added `tests/test_main_schedule_mode.py`, covering scenarios where the scheduled mode ignores the `--stocks` snapshot at startup and single runs retain CLI stock coverage.
+- 🧪 **Sector Association Writing & API Contract Regression** — Added `tests/core/test_pipeline_related_boards.py`, and supplemented historical and analytical interface contract testing to ensure `belong_boards` / `sector_rankings` only perform incremental expansion while maintaining fail-open.
+- 🧪 **Scheduled Mode Stock List Semantic Regression Test** — Added `tests/app/test_main_schedule_mode.py`, covering scenarios where the scheduled mode ignores the `--stocks` snapshot at startup and single runs retain CLI stock coverage.
 
 ### Docs
 

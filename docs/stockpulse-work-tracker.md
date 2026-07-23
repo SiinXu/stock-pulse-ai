@@ -19,7 +19,7 @@
 
 | 阶段 | 主题 | 状态 | 证据 |
 | --- | --- | --- | --- |
-| AR-01 | Replay characterization suite(36 fixtures + ReplayLLMAdapter) | **Done** | PR #11 合入主线;`tests/test_agent_runtime_compatibility.py`、`tests/agent_runtime_replay.py`、`tests/fixtures/agent_runtime/`(36 fixture:24 financial + 12 contract) |
+| AR-01 | Replay characterization suite(36 fixtures + ReplayLLMAdapter) | **Done** | PR #11 合入主线;`tests/agent/test_agent_runtime_compatibility.py`、`tests/agent_runtime_replay.py`、`tests/fixtures/agent_runtime/`(36 fixture:24 financial + 12 contract) |
 | AR-PY-00 | 决策与基线收敛(docs-only) | **Done** | 开发计划 `Approved`;ADR-001 `Accepted`(2026-07-17,含 D2 裁决);framework comparison 与本文档首版创建 |
 | AR-PY-01 | Runtime Contract + Native Adapter | **Done** | 已随 PR #18 合入契约与 Native adapter;RF-02(PR #22,commit cc3a8e30)将 `execute()` 改造为运行中 `start() -> ExecutionHandle` 并深层冻结 `ExecutionContext`(`_deep_freeze`),关闭 AR-RF-01/02;缺口清零 |
 | AR-PY-02 | BoundToolSession | **Done** | 已随 PR #18 合入 `tool_session.py`(allowlist/权限/预算/deadline/审计/late-result fence);RF-03(PR #23,commit 4e0e820c;deadline 绝对单调化 9f4a7882)使 Native 经同一 `BoundToolSession`(`enforce_access_policy=False`)分发,消除第二套工具权威,关闭 AR-RF-03 |

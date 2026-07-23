@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Regression tests for Taiwan (台股) suffix-only market support.
 
-Mirrors tests/test_jp_kr_market_support.py (Issue #1718). Taiwan stocks use the
+Mirrors tests/data_provider/test_jp_kr_market_support.py (Issue #1718). Taiwan stocks use the
 Yahoo Finance suffix forms ``NNNN.TW`` (TWSE-listed) and ``NNNN.TWO`` (TPEx/OTC),
 with a 4-6 digit base (wider than JP ``.T``'s 4-5 to cover ETFs like 00878 /
 006208). Bare numeric codes keep their existing A-share semantics.

@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+import src.application_services as application_services_mod
 import src.config
 import src.search_service
 import src.services.task_queue as task_queue_mod
@@ -771,6 +772,1051 @@ def test_closed_root_cannot_be_installed_again():
         set_application_services(services)
 
 
+def test_plugin_manager_cannot_be_shared_between_application_roots():
+    first = ApplicationServices(plugins_dir="")
+
+    with pytest.raises(RuntimeError, match="already belongs"):
+        ApplicationServices(
+            plugin_manager=first.plugin_manager,
+            plugins_dir="",
+        )
+
+
+def test_closed_root_manager_rejects_activation_but_allows_disable():
+    events: list[str] = []
+    services = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.closed-owner", events),),
+        plugins_dir="",
+    )
+    set_application_services(services)
+    services.close()
+    late_plugin = _RecordingPlugin("test.late", events)
+    assert services.plugin_manager.register(late_plugin, source="builtin").success
+
+    enable_result = services.plugin_manager.enable("test.closed-owner")
+    load_result = services.plugin_manager.load("test.late")
+    load_all_results = services.plugin_manager.load_all()
+    disable_result = services.plugin_manager.disable("test.closed-owner")
+
+    assert enable_result.success is False
+    assert enable_result.error_code == "plugin_owner_closed"
+    assert load_result.success is False
+    assert load_result.error_code == "plugin_owner_closed"
+    assert [result.error_code for result in load_all_results] == [
+        "plugin_owner_closed",
+        "plugin_owner_closed",
+    ]
+    assert disable_result.success is True
+    assert services.plugin_manager.snapshot("test.closed-owner").state == "disabled"
+    assert services.plugin_manager.snapshot("test.late").state == "registered"
+    assert events == ["load:test.closed-owner", "unload:test.closed-owner"]
+
+
+def test_local_root_close_disables_plugin_loaded_directly_through_manager():
+    events: list[str] = []
+    services = ApplicationServices(plugins_dir="")
+    plugin = _RecordingPlugin("test.local-direct", events)
+    assert services.plugin_manager.register(plugin, source="builtin").success
+    assert services.plugin_manager.load("test.local-direct").success
+
+    results = services.close()
+
+    assert [result.success for result in results] == [True]
+    assert services.is_closed is True
+    assert services.plugin_manager.snapshot("test.local-direct").state == "disabled"
+    assert events == ["load:test.local-direct", "unload:test.local-direct"]
+
+
+def test_local_manager_callback_worker_can_defer_root_close_without_deadlock():
+    events: list[str] = []
+    root_holder: list[ApplicationServices] = []
+    worker_returned = threading.Event()
+    workers: list[threading.Thread] = []
+
+    class _WorkerClosingLoadPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("local-load-begin")
+
+            def close_root() -> None:
+                root_holder[0].close()
+                worker_returned.set()
+
+            worker = threading.Thread(target=close_root)
+            workers.append(worker)
+            worker.start()
+            if not worker_returned.wait(timeout=5):
+                raise AssertionError("local manager close worker deadlocked")
+            worker.join(timeout=5)
+            events.append("local-load-end")
+
+    services = ApplicationServices(plugins_dir="")
+    root_holder.append(services)
+    plugin = _WorkerClosingLoadPlugin("test.local-worker-close", events)
+    assert services.plugin_manager.register(plugin, source="builtin").success
+
+    result = services.plugin_manager.load("test.local-worker-close")
+
+    assert result.success is True
+    assert worker_returned.is_set()
+    assert all(not worker.is_alive() for worker in workers)
+    assert services.is_closed is True
+    assert services.plugin_manager.snapshot("test.local-worker-close").state == "disabled"
+    assert events == [
+        "local-load-begin",
+        "local-load-end",
+        "unload:test.local-worker-close",
+    ]
+
+
+def test_local_close_request_rejects_queued_plugin_activation():
+    events: list[str] = []
+    root_holder: list[ApplicationServices] = []
+    close_requested = threading.Event()
+    release_first_load = threading.Event()
+    first_results: list = []
+    late_results: list = []
+
+    class _ClosingLoadPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("first-load-begin")
+            root_holder[0].close()
+            close_requested.set()
+            if not release_first_load.wait(timeout=5):
+                raise AssertionError("test did not release the first local load")
+            events.append("first-load-end")
+
+    services = ApplicationServices(plugins_dir="")
+    root_holder.append(services)
+    assert services.plugin_manager.register(
+        _ClosingLoadPlugin("test.first", events),
+        source="builtin",
+    ).success
+    assert services.plugin_manager.register(
+        _RecordingPlugin("test.late", events),
+        source="builtin",
+    ).success
+
+    first_load = threading.Thread(
+        target=lambda: first_results.append(
+            services.plugin_manager.load("test.first")
+        ),
+    )
+    first_load.start()
+    assert close_requested.wait(timeout=5)
+    late_load = threading.Thread(
+        target=lambda: late_results.append(
+            services.plugin_manager.load("test.late")
+        ),
+    )
+    late_load.start()
+    try:
+        for _ in range(500):
+            if services._local_lifecycle_ops == 2:
+                break
+            late_load.join(timeout=0.01)
+        assert services._local_lifecycle_ops == 2
+    finally:
+        release_first_load.set()
+        first_load.join(timeout=5)
+        late_load.join(timeout=5)
+
+    assert not first_load.is_alive()
+    assert not late_load.is_alive()
+    assert first_results and first_results[0].success is True
+    assert late_results and late_results[0].success is False
+    assert late_results[0].error_code == "plugin_owner_closed"
+    assert services.is_closed is True
+    assert services.plugin_manager.snapshot("test.first").state == "disabled"
+    assert services.plugin_manager.snapshot("test.late").state == "registered"
+    assert events == [
+        "first-load-begin",
+        "first-load-end",
+        "unload:test.first",
+    ]
+
+
+def test_local_close_callback_reinstall_is_rejected_without_deadlock():
+    events: list[str] = []
+    root_holder: list[ApplicationServices] = []
+    install_errors: list[str] = []
+
+    class _ClosingAndReinstallingPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("local-load-begin")
+            root_holder[0].close()
+            try:
+                set_application_services(root_holder[0])
+            except RuntimeError as exc:
+                install_errors.append(str(exc))
+            events.append("local-load-end")
+
+    services = ApplicationServices(plugins_dir="")
+    root_holder.append(services)
+    assert services.plugin_manager.register(
+        _ClosingAndReinstallingPlugin("test.local-reinstall", events),
+        source="builtin",
+    ).success
+
+    result = services.plugin_manager.load("test.local-reinstall")
+
+    assert result.success is True
+    assert install_errors == [
+        "Cannot install application services after shutdown begins"
+    ]
+    assert services.is_closed is True
+    assert services.plugin_manager.snapshot("test.local-reinstall").state == "disabled"
+    assert events == [
+        "local-load-begin",
+        "local-load-end",
+        "unload:test.local-reinstall",
+    ]
+
+
+def test_local_callback_worker_reinstall_is_rejected_without_deadlock():
+    events: list[str] = []
+    root_holder: list[ApplicationServices] = []
+    install_errors: list[str] = []
+    worker_returned = threading.Event()
+    workers: list[threading.Thread] = []
+
+    class _WorkerClosingAndReinstallingPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("local-load-begin")
+
+            def close_and_reinstall() -> None:
+                root_holder[0].close()
+                try:
+                    set_application_services(root_holder[0])
+                except RuntimeError as exc:
+                    install_errors.append(str(exc))
+                worker_returned.set()
+
+            worker = threading.Thread(target=close_and_reinstall)
+            workers.append(worker)
+            worker.start()
+            if not worker_returned.wait(timeout=5):
+                raise AssertionError("local reinstall worker deadlocked")
+            worker.join(timeout=5)
+            events.append("local-load-end")
+
+    services = ApplicationServices(plugins_dir="")
+    root_holder.append(services)
+    assert services.plugin_manager.register(
+        _WorkerClosingAndReinstallingPlugin("test.local-worker-reinstall", events),
+        source="builtin",
+    ).success
+
+    result = services.plugin_manager.load("test.local-worker-reinstall")
+
+    assert result.success is True
+    assert worker_returned.is_set()
+    assert all(not worker.is_alive() for worker in workers)
+    assert install_errors == [
+        "Cannot install application services after shutdown begins"
+    ]
+    assert services.is_closed is True
+    assert (
+        services.plugin_manager.snapshot("test.local-worker-reinstall").state
+        == "disabled"
+    )
+    assert events == [
+        "local-load-begin",
+        "local-load-end",
+        "unload:test.local-worker-reinstall",
+    ]
+
+
+def test_manifest_callback_worker_cannot_install_starting_root_without_deadlock():
+    events: list[str] = []
+    root_holder: list[ApplicationServices] = []
+    install_errors: list[str] = []
+    worker_returned = threading.Event()
+    workers: list[threading.Thread] = []
+
+    class _WorkerInstallingManifestPlugin(_RecordingPlugin):
+        def __init__(self, plugin_id: str, plugin_events: list[str]) -> None:
+            super().__init__(plugin_id, plugin_events)
+            self._install_from_manifest = True
+
+        @property
+        def manifest(self) -> PluginManifest:
+            if self._install_from_manifest:
+                self._install_from_manifest = False
+
+                def install_starting_root() -> None:
+                    root_holder[0].close()
+                    try:
+                        set_application_services(root_holder[0])
+                    except RuntimeError as exc:
+                        install_errors.append(str(exc))
+                    worker_returned.set()
+
+                worker = threading.Thread(target=install_starting_root)
+                workers.append(worker)
+                worker.start()
+                if not worker_returned.wait(timeout=5):
+                    raise AssertionError("manifest install worker deadlocked")
+                worker.join(timeout=5)
+            return super().manifest
+
+    plugin = _WorkerInstallingManifestPlugin("test.manifest-worker", events)
+    services = ApplicationServices(
+        builtin_plugins=(plugin,),
+        plugins_dir="",
+    )
+    root_holder.append(services)
+
+    results = services.start_plugins()
+
+    assert [result.error_code for result in results] == ["plugin_owner_closed"]
+    assert worker_returned.is_set()
+    assert all(not worker.is_alive() for worker in workers)
+    assert install_errors == [
+        "Cannot install application services after shutdown begins"
+    ]
+    assert services.is_closed is True
+    assert services.plugin_shutdown_results == ()
+    assert services.plugin_manager.snapshot("test.manifest-worker").state == "registered"
+    assert get_application_services() is not services
+    assert events == []
+
+
+def test_initial_installer_exposes_target_to_racing_callback_worker():
+    events: list[str] = []
+    observed_roots: list[ApplicationServices] = []
+    installer_paused = threading.Event()
+    release_installer = threading.Event()
+    worker_started = threading.Event()
+    worker_returned = threading.Event()
+    abort_callback = threading.Event()
+    workers: list[threading.Thread] = []
+    load_results: list = []
+
+    class _WorkerResolvingPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("local-load-begin")
+
+            def resolve_root() -> None:
+                observed_roots.append(get_application_services())
+                worker_returned.set()
+
+            worker = threading.Thread(target=resolve_root)
+            workers.append(worker)
+            worker.start()
+            worker_started.set()
+            while worker.is_alive() and not abort_callback.is_set():
+                worker.join(timeout=0.01)
+            events.append("local-load-end")
+
+    target = ApplicationServices(plugins_dir="")
+    assert target.plugin_manager.register(
+        _WorkerResolvingPlugin("test.initial-race", events),
+        source="builtin",
+    ).success
+
+    def pause_before_publication(frame, event, _arg):
+        if (
+            event == "line"
+            and frame.f_code
+            is application_services_mod._set_application_services.__code__
+            and application_services_mod._services_transition_active
+            and application_services_mod._services is None
+            and not installer_paused.is_set()
+            and application_services_mod._services_lock.acquire(blocking=False)
+        ):
+            application_services_mod._services_lock.release()
+            installer_paused.set()
+            release_installer.wait(timeout=5)
+            sys.settrace(None)
+        return pause_before_publication
+
+    def install_target() -> None:
+        sys.settrace(pause_before_publication)
+        try:
+            set_application_services(target)
+        finally:
+            sys.settrace(None)
+
+    installer = threading.Thread(target=install_target)
+    installer.start()
+    local_load: threading.Thread | None = None
+    resolved_before_installer_release = False
+    try:
+        assert installer_paused.wait(timeout=5)
+        local_load = threading.Thread(
+            target=lambda: load_results.append(
+                target.plugin_manager.load("test.initial-race")
+            ),
+        )
+        local_load.start()
+        assert worker_started.wait(timeout=5)
+        resolved_before_installer_release = worker_returned.wait(timeout=0.5)
+    finally:
+        abort_callback.set()
+        release_installer.set()
+        if local_load is not None:
+            local_load.join(timeout=5)
+        installer.join(timeout=5)
+        for worker in workers:
+            worker.join(timeout=5)
+
+    assert resolved_before_installer_release is True
+    assert local_load is not None and not local_load.is_alive()
+    assert not installer.is_alive()
+    assert all(not worker.is_alive() for worker in workers)
+    assert load_results and load_results[0].success is True
+    assert observed_roots == [target]
+    assert get_application_services() is target
+    assert events == ["local-load-begin", "local-load-end"]
+
+
+def test_newer_pending_target_waits_for_authorized_local_drain(monkeypatch):
+    events: list[str] = []
+    previous_close_started = threading.Event()
+    release_previous_close = threading.Event()
+    target_load_started = threading.Event()
+    release_target_load = threading.Event()
+    target_unload_started = threading.Event()
+    release_target_unload = threading.Event()
+    middle_load_started = threading.Event()
+    final_load_started = threading.Event()
+    poll_interval = threading.Event()
+    start_results: list[tuple] = []
+
+    class _DrainedTargetPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("target-load-begin")
+            target_load_started.set()
+            if not release_target_load.wait(timeout=5):
+                raise AssertionError("test did not release target load")
+            events.append("target-load-end")
+
+        def onunload(self) -> None:
+            events.append("target-unload-begin")
+            target_unload_started.set()
+            if not release_target_unload.wait(timeout=5):
+                raise AssertionError("test did not release target unload")
+            events.append("target-unload-end")
+
+    class _SignallingPlugin(_RecordingPlugin):
+        def __init__(
+            self,
+            plugin_id: str,
+            plugin_events: list[str],
+            started: threading.Event,
+        ) -> None:
+            super().__init__(plugin_id, plugin_events)
+            self._started = started
+
+        def onload(self, context: PluginContext) -> None:
+            self._started.set()
+            super().onload(context)
+
+    previous = ApplicationServices(plugins_dir="")
+    set_application_services(previous)
+    original_previous_close = previous._close_plugins
+
+    def delayed_previous_close():
+        previous_close_started.set()
+        if not release_previous_close.wait(timeout=5):
+            raise AssertionError("test did not release previous close")
+        return original_previous_close()
+
+    monkeypatch.setattr(previous, "_close_plugins", delayed_previous_close)
+    target = ApplicationServices(
+        builtin_plugins=(_DrainedTargetPlugin("test.drained", events),),
+        plugins_dir="",
+    )
+    middle = ApplicationServices(
+        builtin_plugins=(
+            _SignallingPlugin("test.middle", events, middle_load_started),
+        ),
+        plugins_dir="",
+    )
+    final = ApplicationServices(
+        builtin_plugins=(
+            _SignallingPlugin("test.final", events, final_load_started),
+        ),
+        plugins_dir="",
+    )
+
+    installer = threading.Thread(target=lambda: set_application_services(target))
+    installer.start()
+    assert previous_close_started.wait(timeout=5)
+    local_start = threading.Thread(
+        target=lambda: start_results.append(target.start_plugins()),
+    )
+    local_start.start()
+    assert target_load_started.wait(timeout=5)
+    set_application_services(middle)
+
+    target_was_published = False
+    try:
+        release_previous_close.set()
+        for _ in range(500):
+            if get_application_services() is target:
+                target_was_published = True
+                break
+            if not installer.is_alive():
+                break
+            poll_interval.wait(timeout=0.01)
+
+        set_application_services(final)
+        release_target_load.set()
+        if target_was_published:
+            assert target_unload_started.wait(timeout=5)
+            assert installer.is_alive()
+            assert get_application_services() is target
+            assert middle_load_started.is_set() is False
+            assert final_load_started.is_set() is False
+    finally:
+        release_previous_close.set()
+        release_target_load.set()
+        release_target_unload.set()
+        local_start.join(timeout=5)
+        installer.join(timeout=5)
+
+    assert target_was_published is True
+    assert not local_start.is_alive()
+    assert not installer.is_alive()
+    assert start_results and start_results[0][0].success is True
+    assert target.is_closed is True
+    assert target.plugin_manager.snapshot("test.drained").state == "disabled"
+    assert middle_load_started.is_set() is False
+    assert final_load_started.is_set() is True
+    assert get_application_services() is final
+    assert events == [
+        "target-load-begin",
+        "target-load-end",
+        "target-unload-begin",
+        "target-unload-end",
+        "load:test.final",
+    ]
+
+
+def test_installer_race_drains_deferred_local_cleanup(monkeypatch):
+    events: list[str] = []
+    root_holder: list[ApplicationServices] = []
+    previous_close_started = threading.Event()
+    release_previous_close = threading.Event()
+    load_callback_ready = threading.Event()
+    release_load_callback = threading.Event()
+    unload_started = threading.Event()
+    release_unload = threading.Event()
+    load_results: list = []
+
+    class _DeferredClosePlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("local-load-begin")
+            root_holder[0].close()
+            load_callback_ready.set()
+            if not release_load_callback.wait(timeout=5):
+                raise AssertionError("test did not release the local load callback")
+            events.append("local-load-end")
+
+        def onunload(self) -> None:
+            events.append("local-unload-begin")
+            unload_started.set()
+            if not release_unload.wait(timeout=5):
+                raise AssertionError("test did not release the deferred unload")
+            events.append("local-unload-end")
+
+    previous = ApplicationServices(plugins_dir="")
+    set_application_services(previous)
+    original_previous_close = previous._close_plugins
+
+    def delayed_previous_close():
+        previous_close_started.set()
+        if not release_previous_close.wait(timeout=5):
+            raise AssertionError("test did not release the previous root close")
+        return original_previous_close()
+
+    monkeypatch.setattr(previous, "_close_plugins", delayed_previous_close)
+    services = ApplicationServices(plugins_dir="")
+    root_holder.append(services)
+    plugin = _DeferredClosePlugin("test.deferred-local-close", events)
+    assert services.plugin_manager.register(plugin, source="builtin").success
+    installer = threading.Thread(target=lambda: set_application_services(services))
+    installer.start()
+    assert previous_close_started.wait(timeout=5)
+
+    local_load = threading.Thread(
+        target=lambda: load_results.append(
+            services.plugin_manager.load("test.deferred-local-close")
+        ),
+    )
+    local_load.start()
+    assert load_callback_ready.wait(timeout=5)
+    release_previous_close.set()
+    installer.join(timeout=0.5)
+    assert installer.is_alive()
+    release_load_callback.set()
+    assert unload_started.wait(timeout=5)
+
+    unrelated_root = ApplicationServices(plugins_dir="")
+    unrelated_root.plugin_manager.load("missing")
+    installer.join(timeout=0.5)
+    assert installer.is_alive()
+
+    release_unload.set()
+    local_load.join(timeout=5)
+    installer.join(timeout=5)
+    assert not local_load.is_alive()
+    assert not installer.is_alive()
+    successor = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.successor", events),),
+        plugins_dir="",
+    )
+    set_application_services(successor)
+
+    assert load_results and load_results[0].success is True
+    assert services.is_closed is True
+    assert services.plugin_manager.snapshot("test.deferred-local-close").state == "disabled"
+    assert events == [
+        "local-load-begin",
+        "local-load-end",
+        "local-unload-begin",
+        "local-unload-end",
+        "load:test.successor",
+    ]
+
+
+def test_queued_target_waits_for_in_flight_local_startup():
+    events: list[str] = []
+    target_holder: list[ApplicationServices] = []
+    manifest_started = threading.Event()
+    release_manifest = threading.Event()
+    target_start_results: list[tuple] = []
+    owner_results: list = []
+
+    class _BlockingManifestPlugin(_RecordingPlugin):
+        def __init__(self, plugin_id: str, plugin_events: list[str]) -> None:
+            super().__init__(plugin_id, plugin_events)
+            self._block_manifest = True
+
+        @property
+        def manifest(self) -> PluginManifest:
+            if self._block_manifest:
+                self._block_manifest = False
+                events.append("target-manifest-begin")
+                manifest_started.set()
+                if not release_manifest.wait(timeout=5):
+                    raise AssertionError("test did not release the target manifest")
+                events.append("target-manifest-end")
+            return super().manifest
+
+    class _InstallingOwnerPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("owner-load-begin")
+            set_application_services(target_holder[0])
+            events.append("owner-load-end")
+
+    target = ApplicationServices(
+        builtin_plugins=(_BlockingManifestPlugin("test.target", events),),
+        plugins_dir="",
+    )
+    target_holder.append(target)
+    owner = ApplicationServices(plugins_dir="")
+    set_application_services(owner)
+    assert owner.plugin_manager.register(
+        _InstallingOwnerPlugin("test.owner", events),
+        source="builtin",
+    ).success
+
+    target_start = threading.Thread(
+        target=lambda: target_start_results.append(target.start_plugins()),
+    )
+    target_start.start()
+    assert manifest_started.wait(timeout=5)
+    owner_load = threading.Thread(
+        target=lambda: owner_results.append(
+            owner.plugin_manager.load("test.owner")
+        ),
+    )
+    owner_load.start()
+    try:
+        owner_load.join(timeout=0.5)
+        assert owner_load.is_alive()
+    finally:
+        release_manifest.set()
+        target_start.join(timeout=5)
+        owner_load.join(timeout=5)
+
+    assert not target_start.is_alive()
+    assert not owner_load.is_alive()
+    assert target_start_results and target_start_results[0][0].success is True
+    assert owner_results and owner_results[0].success is True
+    assert owner.is_closed is True
+    assert get_application_services() is target
+    assert events == [
+        "target-manifest-begin",
+        "owner-load-begin",
+        "owner-load-end",
+        "unload:test.owner",
+        "target-manifest-end",
+        "load:test.target",
+    ]
+
+
+def test_installer_waits_for_local_startup_close_cleanup(monkeypatch):
+    events: list[str] = []
+    target_holder: list[ApplicationServices] = []
+    previous_close_started = threading.Event()
+    release_previous_close = threading.Event()
+    unload_started = threading.Event()
+    release_unload = threading.Event()
+    start_results: list[tuple] = []
+
+    class _ClosingStartupPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("target-load")
+            target_holder[0].close()
+
+        def onunload(self) -> None:
+            events.append("target-unload-begin")
+            unload_started.set()
+            if not release_unload.wait(timeout=5):
+                raise AssertionError("test did not release startup cleanup")
+            events.append("target-unload-end")
+
+    previous = ApplicationServices(plugins_dir="")
+    set_application_services(previous)
+    original_previous_close = previous._close_plugins
+
+    def delayed_previous_close():
+        previous_close_started.set()
+        if not release_previous_close.wait(timeout=5):
+            raise AssertionError("test did not release the previous root close")
+        return original_previous_close()
+
+    monkeypatch.setattr(previous, "_close_plugins", delayed_previous_close)
+    target = ApplicationServices(
+        builtin_plugins=(_ClosingStartupPlugin("test.target", events),),
+        plugins_dir="",
+    )
+    target_holder.append(target)
+    installer = threading.Thread(target=lambda: set_application_services(target))
+    installer.start()
+    assert previous_close_started.wait(timeout=5)
+    local_start = threading.Thread(
+        target=lambda: start_results.append(target.start_plugins()),
+    )
+    local_start.start()
+    assert unload_started.wait(timeout=5)
+    release_previous_close.set()
+    installer.join(timeout=0.5)
+    assert installer.is_alive()
+
+    unrelated_root = ApplicationServices(plugins_dir="")
+    unrelated_root.plugin_manager.load("missing")
+    installer.join(timeout=0.5)
+    assert installer.is_alive()
+
+    release_unload.set()
+    local_start.join(timeout=5)
+    installer.join(timeout=5)
+    assert not local_start.is_alive()
+    assert not installer.is_alive()
+    successor = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.successor", events),),
+        plugins_dir="",
+    )
+    set_application_services(successor)
+
+    assert start_results and start_results[0][0].success is True
+    assert target.is_closed is True
+    assert target.plugin_manager.snapshot("test.target").state == "disabled"
+    assert get_application_services() is successor
+    assert events == [
+        "target-load",
+        "target-unload-begin",
+        "target-unload-end",
+        "load:test.successor",
+    ]
+
+
+def test_published_target_closing_during_local_startup_is_unloaded(monkeypatch):
+    events: list[str] = []
+    target_holder: list[ApplicationServices] = []
+    previous_close_started = threading.Event()
+    release_previous_close = threading.Event()
+    target_load_started = threading.Event()
+    request_target_close = threading.Event()
+    target_unload_started = threading.Event()
+    release_target_unload = threading.Event()
+    poll_interval = threading.Event()
+    start_results: list[tuple] = []
+
+    class _ClosingPublishedTargetPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("target-load-begin")
+            target_load_started.set()
+            if not request_target_close.wait(timeout=5):
+                raise AssertionError("test did not request target close")
+            target_holder[0].close()
+            events.append("target-load-end")
+
+        def onunload(self) -> None:
+            events.append("target-unload-begin")
+            target_unload_started.set()
+            if not release_target_unload.wait(timeout=5):
+                raise AssertionError("test did not release target unload")
+            events.append("target-unload-end")
+
+    previous = ApplicationServices(plugins_dir="")
+    set_application_services(previous)
+    original_previous_close = previous._close_plugins
+
+    def delayed_previous_close():
+        previous_close_started.set()
+        if not release_previous_close.wait(timeout=5):
+            raise AssertionError("test did not release the previous root close")
+        return original_previous_close()
+
+    monkeypatch.setattr(previous, "_close_plugins", delayed_previous_close)
+    target = ApplicationServices(
+        builtin_plugins=(
+            _ClosingPublishedTargetPlugin("test.published-target", events),
+        ),
+        plugins_dir="",
+    )
+    target_holder.append(target)
+
+    installer = threading.Thread(target=lambda: set_application_services(target))
+    installer.start()
+    assert previous_close_started.wait(timeout=5)
+
+    local_start = threading.Thread(
+        target=lambda: start_results.append(target.start_plugins()),
+    )
+    local_start.start()
+    assert target_load_started.wait(timeout=5)
+    try:
+        release_previous_close.set()
+        for _ in range(500):
+            if get_application_services() is target:
+                break
+            poll_interval.wait(timeout=0.01)
+        else:
+            raise AssertionError(
+                "installer did not publish the target before its drain"
+            )
+
+        request_target_close.set()
+        assert target_unload_started.wait(timeout=5)
+        assert installer.is_alive()
+        assert get_application_services() is target
+    finally:
+        release_previous_close.set()
+        request_target_close.set()
+        release_target_unload.set()
+        local_start.join(timeout=5)
+        installer.join(timeout=5)
+
+    assert not local_start.is_alive()
+    assert not installer.is_alive()
+    assert start_results and start_results[0][0].success is True
+    assert target.is_closed is True
+    assert target.plugin_manager.snapshot("test.published-target").state == "disabled"
+    assert get_application_services() is not target
+    assert events == [
+        "target-load-begin",
+        "target-load-end",
+        "target-unload-begin",
+        "target-unload-end",
+    ]
+
+
+def test_recursive_closing_cleanup_debt_keeps_lookup_anchor(monkeypatch):
+    events: list[str] = []
+    target_holder: list[ApplicationServices] = []
+    second_debt_holder: list[ApplicationServices] = []
+    previous_close_started = threading.Event()
+    release_previous_close = threading.Event()
+    first_load_started = threading.Event()
+    release_first_load = threading.Event()
+    first_cleanup_started = threading.Event()
+    second_debt_queued = threading.Event()
+    second_load_started = threading.Event()
+    release_second_load = threading.Event()
+    second_cleanup_started = threading.Event()
+    second_unload_worker_started = threading.Event()
+    second_unload_worker_returned = threading.Event()
+    abort_unload_callback = threading.Event()
+    observed_roots: list[ApplicationServices] = []
+    workers: list[threading.Thread] = []
+    first_results: list = []
+    second_results: list = []
+
+    class _ClosingTargetPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("target-load")
+            target_holder[0].close()
+
+    class _FirstClosingDebtPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("first-debt-load-begin")
+            first_load_started.set()
+            if not release_first_load.wait(timeout=5):
+                raise AssertionError("test did not release first debt load")
+            events.append("first-debt-load-end")
+
+        def onunload(self) -> None:
+            events.append("first-debt-unload-begin")
+            set_application_services(second_debt_holder[0])
+            second_debt_queued.set()
+            events.append("first-debt-unload-end")
+
+    class _SecondClosingDebtPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("second-debt-load-begin")
+            second_load_started.set()
+            if not release_second_load.wait(timeout=5):
+                raise AssertionError("test did not release second debt load")
+            events.append("second-debt-load-end")
+
+        def onunload(self) -> None:
+            events.append("second-debt-unload-begin")
+
+            def resolve_root() -> None:
+                observed_roots.append(get_application_services())
+                second_unload_worker_returned.set()
+
+            worker = threading.Thread(target=resolve_root)
+            workers.append(worker)
+            worker.start()
+            second_unload_worker_started.set()
+            while worker.is_alive() and not abort_unload_callback.is_set():
+                worker.join(timeout=0.01)
+            events.append("second-debt-unload-end")
+
+    previous = ApplicationServices(plugins_dir="")
+    set_application_services(previous)
+    original_previous_close = previous._close_plugins
+
+    def delayed_previous_close():
+        previous_close_started.set()
+        if not release_previous_close.wait(timeout=5):
+            raise AssertionError("test did not release previous close")
+        return original_previous_close()
+
+    monkeypatch.setattr(previous, "_close_plugins", delayed_previous_close)
+    target = ApplicationServices(
+        builtin_plugins=(_ClosingTargetPlugin("test.visible-target", events),),
+        plugins_dir="",
+    )
+    target_holder.append(target)
+    first_debt = ApplicationServices(plugins_dir="")
+    assert first_debt.plugin_manager.register(
+        _FirstClosingDebtPlugin("test.first-closing-debt", events),
+        source="builtin",
+    ).success
+    second_debt = ApplicationServices(plugins_dir="")
+    second_debt_holder.append(second_debt)
+    assert second_debt.plugin_manager.register(
+        _SecondClosingDebtPlugin("test.second-closing-debt", events),
+        source="builtin",
+    ).success
+
+    installer = threading.Thread(target=lambda: set_application_services(target))
+    original_first_close = first_debt._close_plugins
+    original_second_close = second_debt._close_plugins
+
+    def observed_first_close():
+        if threading.current_thread() is installer:
+            first_cleanup_started.set()
+        return original_first_close()
+
+    def observed_second_close():
+        if threading.current_thread() is installer:
+            second_cleanup_started.set()
+        return original_second_close()
+
+    monkeypatch.setattr(first_debt, "_close_plugins", observed_first_close)
+    monkeypatch.setattr(second_debt, "_close_plugins", observed_second_close)
+    installer.start()
+    assert previous_close_started.wait(timeout=5)
+    target_start = threading.Thread(target=target.start_plugins)
+    target_start.start()
+    target_start.join(timeout=5)
+    assert not target_start.is_alive()
+    assert target.is_closed is True
+
+    first_load = threading.Thread(
+        target=lambda: first_results.append(
+            first_debt.plugin_manager.load("test.first-closing-debt")
+        ),
+    )
+    first_load.start()
+    assert first_load_started.wait(timeout=5)
+    first_debt.close()
+    second_load = threading.Thread(
+        target=lambda: second_results.append(
+            second_debt.plugin_manager.load("test.second-closing-debt")
+        ),
+    )
+    second_load.start()
+    assert second_load_started.wait(timeout=5)
+    second_debt.close()
+    set_application_services(first_debt)
+
+    resolved_before_abort = False
+    try:
+        release_previous_close.set()
+        assert first_cleanup_started.wait(timeout=5)
+        release_first_load.set()
+        assert second_debt_queued.wait(timeout=5)
+        assert second_cleanup_started.wait(timeout=5)
+        release_second_load.set()
+        assert second_unload_worker_started.wait(timeout=5)
+        resolved_before_abort = second_unload_worker_returned.wait(timeout=0.5)
+    finally:
+        abort_unload_callback.set()
+        release_previous_close.set()
+        release_first_load.set()
+        release_second_load.set()
+        first_load.join(timeout=5)
+        second_load.join(timeout=5)
+        installer.join(timeout=5)
+        for worker in workers:
+            worker.join(timeout=5)
+
+    assert resolved_before_abort is True
+    assert not first_load.is_alive()
+    assert not second_load.is_alive()
+    assert not installer.is_alive()
+    assert all(not worker.is_alive() for worker in workers)
+    assert first_results and first_results[0].success is True
+    assert second_results and second_results[0].success is True
+    assert observed_roots == [target]
+    assert first_debt.is_closed is True
+    assert second_debt.is_closed is True
+    assert (
+        first_debt.plugin_manager.snapshot("test.first-closing-debt").state
+        == "disabled"
+    )
+    assert (
+        second_debt.plugin_manager.snapshot("test.second-closing-debt").state
+        == "disabled"
+    )
+    replacement = get_application_services()
+    assert replacement is not target
+    assert replacement is not first_debt
+    assert replacement is not second_debt
+    assert events == [
+        "target-load",
+        "unload:test.visible-target",
+        "first-debt-load-begin",
+        "second-debt-load-begin",
+        "first-debt-load-end",
+        "first-debt-unload-begin",
+        "first-debt-unload-end",
+        "second-debt-load-end",
+        "second-debt-unload-begin",
+        "second-debt-unload-end",
+    ]
+
+
 def test_get_replaces_a_directly_closed_installed_root():
     services = ApplicationServices(plugins_dir="")
     set_application_services(services)
@@ -1042,6 +2088,44 @@ def test_root_closed_during_plugin_start_is_not_left_installed():
     assert events == ["load-begin", "load-end", "unload:test.closing"]
 
 
+def test_close_request_cannot_be_superseded_by_reinstalling_the_same_root():
+    events: list[str] = []
+    root_holder: list[ApplicationServices] = []
+
+    class _ClosingAndRetainingLoadPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("closing-load-begin")
+            root_holder[0].close()
+            set_application_services(root_holder[0])
+            events.append("closing-load-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(
+            _ClosingAndRetainingLoadPlugin("test.closing", events),
+            _RecordingPlugin("test.late", events),
+        ),
+        plugins_dir="",
+    )
+    root_holder.append(services)
+
+    set_application_services(services)
+    replacement = get_application_services()
+
+    assert services.is_closed is True
+    assert replacement is not services
+    assert [result.error_code for result in services.plugin_load_results] == [
+        None,
+        "plugin_owner_closed",
+    ]
+    assert services.plugin_manager.snapshot("test.closing").state == "disabled"
+    assert services.plugin_manager.snapshot("test.late").state == "registered"
+    assert events == [
+        "closing-load-begin",
+        "closing-load-end",
+        "unload:test.closing",
+    ]
+
+
 def test_local_root_load_callback_worker_can_resolve_root_without_deadlock():
     events: list[str] = []
     worker_returned = threading.Event()
@@ -1122,6 +2206,213 @@ def test_public_manager_load_defers_callback_requested_replacement():
         "unload:test.late",
         "unload:test.first",
         "load:test.new",
+    ]
+
+
+def test_queued_replacement_yields_to_newer_target_after_local_drain():
+    events: list[str] = []
+    replacement_holder: list[ApplicationServices] = []
+    final_holder: list[ApplicationServices] = []
+    replacement_load_started = threading.Event()
+    release_replacement_load = threading.Event()
+    replacement_results: list = []
+    owner_results: list = []
+
+    class _BlockingReplacementPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("replacement-load-begin")
+            replacement_load_started.set()
+            if not release_replacement_load.wait(timeout=5):
+                raise AssertionError("test did not release the replacement load")
+            set_application_services(final_holder[0])
+            events.append("replacement-load-end")
+
+    class _ReplacingOwnerPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("owner-load-begin")
+            set_application_services(replacement_holder[0])
+            events.append("owner-load-end")
+
+    owner = ApplicationServices(plugins_dir="")
+    replacement = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.superseded-builtin", events),),
+        plugins_dir="",
+    )
+    final = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.final", events),),
+        plugins_dir="",
+    )
+    replacement_holder.append(replacement)
+    final_holder.append(final)
+    assert replacement.plugin_manager.register(
+        _BlockingReplacementPlugin("test.replacement", events),
+        source="builtin",
+    ).success
+    set_application_services(owner)
+    assert owner.plugin_manager.register(
+        _ReplacingOwnerPlugin("test.owner", events),
+        source="builtin",
+    ).success
+
+    replacement_load = threading.Thread(
+        target=lambda: replacement_results.append(
+            replacement.plugin_manager.load("test.replacement")
+        ),
+    )
+    replacement_load.start()
+    assert replacement_load_started.wait(timeout=5)
+    owner_load = threading.Thread(
+        target=lambda: owner_results.append(
+            owner.plugin_manager.load("test.owner")
+        ),
+    )
+    owner_load.start()
+    try:
+        owner_load.join(timeout=0.5)
+        assert owner_load.is_alive()
+    finally:
+        release_replacement_load.set()
+        replacement_load.join(timeout=5)
+        owner_load.join(timeout=5)
+
+    assert not replacement_load.is_alive()
+    assert not owner_load.is_alive()
+    assert replacement_results and replacement_results[0].success is True
+    assert owner_results and owner_results[0].success is True
+    assert owner.is_closed is True
+    assert replacement.is_closed is True
+    assert get_application_services() is final
+    assert replacement.plugin_manager.snapshot("test.replacement").state == "disabled"
+    assert replacement.plugin_manager.snapshot("test.superseded-builtin") is None
+    assert events == [
+        "replacement-load-begin",
+        "owner-load-begin",
+        "owner-load-end",
+        "unload:test.owner",
+        "replacement-load-end",
+        "unload:test.replacement",
+        "load:test.final",
+    ]
+
+
+def test_superseded_pending_root_is_drained_before_latest_target_starts():
+    events: list[str] = []
+    intermediate_holder: list[ApplicationServices] = []
+    intermediate_load_started = threading.Event()
+    release_intermediate_load = threading.Event()
+    intermediate_unload_started = threading.Event()
+    release_intermediate_unload = threading.Event()
+    intermediate_queued = threading.Event()
+    release_owner_callback = threading.Event()
+    final_load_started = threading.Event()
+    intermediate_results: list = []
+    owner_results: list = []
+
+    class _BlockingIntermediatePlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("intermediate-load-begin")
+            intermediate_load_started.set()
+            if not release_intermediate_load.wait(timeout=5):
+                raise AssertionError("test did not release intermediate load")
+            events.append("intermediate-load-end")
+
+        def onunload(self) -> None:
+            events.append("intermediate-unload-begin")
+            intermediate_unload_started.set()
+            if not release_intermediate_unload.wait(timeout=5):
+                raise AssertionError("test did not release intermediate unload")
+            events.append("intermediate-unload-end")
+
+    class _QueuingOwnerPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("owner-load-begin")
+            set_application_services(intermediate_holder[0])
+            intermediate_queued.set()
+            if not release_owner_callback.wait(timeout=5):
+                raise AssertionError("test did not release owner callback")
+            events.append("owner-load-end")
+
+    class _FinalPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            final_load_started.set()
+            super().onload(context)
+
+    owner = ApplicationServices(plugins_dir="")
+    intermediate = ApplicationServices(plugins_dir="")
+    final = ApplicationServices(
+        builtin_plugins=(_FinalPlugin("test.final-pending", events),),
+        plugins_dir="",
+    )
+    intermediate_holder.append(intermediate)
+    assert intermediate.plugin_manager.register(
+        _BlockingIntermediatePlugin("test.intermediate-pending", events),
+        source="builtin",
+    ).success
+    set_application_services(owner)
+    assert owner.plugin_manager.register(
+        _QueuingOwnerPlugin("test.owner-pending", events),
+        source="builtin",
+    ).success
+
+    intermediate_load = threading.Thread(
+        target=lambda: intermediate_results.append(
+            intermediate.plugin_manager.load("test.intermediate-pending")
+        ),
+    )
+    intermediate_load.start()
+    assert intermediate_load_started.wait(timeout=5)
+    owner_load = threading.Thread(
+        target=lambda: owner_results.append(
+            owner.plugin_manager.load("test.owner-pending")
+        ),
+    )
+    owner_load.start()
+    assert intermediate_queued.wait(timeout=5)
+    set_application_services(final)
+
+    transition_waited_for_intermediate = False
+    try:
+        release_owner_callback.set()
+        owner_load.join(timeout=0.5)
+        transition_waited_for_intermediate = (
+            owner_load.is_alive() and not final_load_started.is_set()
+        )
+        release_intermediate_load.set()
+        if transition_waited_for_intermediate:
+            assert intermediate_unload_started.wait(timeout=5)
+            assert owner_load.is_alive()
+            assert final_load_started.is_set() is False
+    finally:
+        release_owner_callback.set()
+        release_intermediate_load.set()
+        release_intermediate_unload.set()
+        intermediate_load.join(timeout=5)
+        owner_load.join(timeout=5)
+        if not intermediate.is_closed:
+            intermediate.close()
+
+    assert transition_waited_for_intermediate is True
+    assert not intermediate_load.is_alive()
+    assert not owner_load.is_alive()
+    assert intermediate_results and intermediate_results[0].success is True
+    assert owner_results and owner_results[0].success is True
+    assert owner.is_closed is True
+    assert intermediate.is_closed is True
+    assert (
+        intermediate.plugin_manager.snapshot("test.intermediate-pending").state
+        == "disabled"
+    )
+    assert final_load_started.is_set() is True
+    assert get_application_services() is final
+    assert events == [
+        "intermediate-load-begin",
+        "owner-load-begin",
+        "owner-load-end",
+        "unload:test.owner-pending",
+        "intermediate-load-end",
+        "intermediate-unload-begin",
+        "intermediate-unload-end",
+        "load:test.final-pending",
     ]
 
 
@@ -1220,11 +2511,12 @@ def test_public_manager_enable_defers_callback_requested_replacement():
     ]
 
 
-def test_installer_waits_for_in_flight_local_lifecycle_operation():
+def test_installer_rejects_root_with_in_flight_local_lifecycle_operation():
     events: list[str] = []
     load_started = threading.Event()
     release_load = threading.Event()
     start_results: list[tuple] = []
+    install_errors: list[str] = []
 
     class _BlockingLoadPlugin(_RecordingPlugin):
         def onload(self, context: PluginContext) -> None:
@@ -1244,14 +2536,20 @@ def test_installer_waits_for_in_flight_local_lifecycle_operation():
     local_start.start()
     assert load_started.wait(timeout=5)
 
-    installer = threading.Thread(
-        target=lambda: set_application_services(services),
-    )
+    def install_active_root() -> None:
+        try:
+            set_application_services(services)
+        except RuntimeError as exc:
+            install_errors.append(str(exc))
+
+    installer = threading.Thread(target=install_active_root)
     installer.start()
     try:
-        installer.join(timeout=0.5)
-        assert installer.is_alive()
-        events.append("release-local-load")
+        installer.join(timeout=5)
+        assert not installer.is_alive()
+        assert install_errors == [
+            "Cannot install application services during local plugin lifecycle"
+        ]
     finally:
         release_load.set()
         local_start.join(timeout=5)
@@ -1259,20 +2557,21 @@ def test_installer_waits_for_in_flight_local_lifecycle_operation():
 
     assert not local_start.is_alive()
     assert not installer.is_alive()
+    set_application_services(services)
     assert get_application_services() is services
     assert [result.success for result in start_results[0]] == [True]
     assert events == [
         "local-load-begin",
-        "release-local-load",
         "local-load-end",
     ]
 
 
-def test_local_root_close_during_installer_drain_does_not_deadlock():
+def test_rejected_install_does_not_block_local_callback_side_root_close():
     events: list[str] = []
     load_started = threading.Event()
     release_load = threading.Event()
     side_close_results: list[tuple] = []
+    install_errors: list[str] = []
 
     class _SideClosingPlugin(_RecordingPlugin):
         def onload(self, context: PluginContext) -> None:
@@ -1297,13 +2596,20 @@ def test_local_root_close_during_installer_drain_does_not_deadlock():
     local_start.start()
     assert load_started.wait(timeout=5)
 
-    installer = threading.Thread(
-        target=lambda: set_application_services(services),
-    )
+    def install_active_root() -> None:
+        try:
+            set_application_services(services)
+        except RuntimeError as exc:
+            install_errors.append(str(exc))
+
+    installer = threading.Thread(target=install_active_root)
     installer.start()
     try:
-        installer.join(timeout=0.5)
-        assert installer.is_alive()
+        installer.join(timeout=5)
+        assert not installer.is_alive()
+        assert install_errors == [
+            "Cannot install application services during local plugin lifecycle"
+        ]
     finally:
         release_load.set()
         local_start.join(timeout=5)
@@ -1312,6 +2618,7 @@ def test_local_root_close_during_installer_drain_does_not_deadlock():
     assert not local_start.is_alive()
     assert not installer.is_alive()
     assert side_root.is_closed is True
+    set_application_services(services)
     assert get_application_services() is services
     assert [result.success for result in side_close_results[0]] == [True]
     assert events == [
@@ -1322,26 +2629,14 @@ def test_local_root_close_during_installer_drain_does_not_deadlock():
     ]
 
 
-def test_local_close_rechecks_boundary_after_concurrent_install(monkeypatch):
-    events: list[str] = []
-    observed_roots: list[ApplicationServices] = []
+def test_shutdown_requested_empty_root_cannot_race_into_installation(monkeypatch):
     close_ready = threading.Event()
     release_close = threading.Event()
     close_results: list[tuple] = []
+    install_errors: list[str] = []
+    replacement_roots: list[ApplicationServices] = []
 
-    class _LookupUnloadPlugin(_RecordingPlugin):
-        def onunload(self) -> None:
-            events.append("local-unload-begin")
-            observed_roots.append(get_application_services())
-            events.append("local-unload-end")
-
-    services = ApplicationServices(
-        builtin_plugins=(
-            _LookupUnloadPlugin("test.concurrent-local-close", events),
-        ),
-        plugins_dir="",
-    )
-    services.start_plugins()
+    services = ApplicationServices(plugins_dir="")
     original_close_plugins = services._close_plugins
 
     def delayed_close_plugins():
@@ -1357,14 +2652,22 @@ def test_local_close_rechecks_boundary_after_concurrent_install(monkeypatch):
     local_close.start()
     assert close_ready.wait(timeout=5)
 
-    installer = threading.Thread(
-        target=lambda: set_application_services(services),
-    )
+    def install_closing_root() -> None:
+        try:
+            set_application_services(services)
+        except RuntimeError as exc:
+            install_errors.append(str(exc))
+
+    installer = threading.Thread(target=install_closing_root)
     installer.start()
     try:
         installer.join(timeout=5)
         assert not installer.is_alive()
-        assert get_application_services() is services
+        assert install_errors == [
+            "Cannot install application services after shutdown begins"
+        ]
+        replacement_roots.append(get_application_services())
+        assert replacement_roots[0] is not services
     finally:
         release_close.set()
         local_close.join(timeout=5)
@@ -1373,11 +2676,5 @@ def test_local_close_rechecks_boundary_after_concurrent_install(monkeypatch):
     assert not local_close.is_alive()
     assert not installer.is_alive()
     assert services.is_closed is True
-    assert observed_roots == [services]
-    assert get_application_services() is not services
-    assert [result.success for result in close_results[0]] == [True]
-    assert events == [
-        "load:test.concurrent-local-close",
-        "local-unload-begin",
-        "local-unload-end",
-    ]
+    assert get_application_services() is replacement_roots[0]
+    assert close_results == [()]

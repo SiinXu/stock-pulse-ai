@@ -8,6 +8,7 @@ import { cn } from '../../utils/cn';
 import { resolveContextAwareNavigationTarget } from '../../utils/sessionContinuity';
 import { APP_ROUTE_PATHS } from '../../routing/routes';
 import { ConfirmDialog } from '../common/ConfirmDialog';
+import { IconButton } from '../common/IconButton';
 import { Popover } from '../common/Popover';
 import { StatusDot } from '../common/StatusDot';
 import { Tooltip } from '../common/Tooltip';
@@ -60,6 +61,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [openGroupKey, setOpenGroupKey] = useState<string | null>(null);
   const [focusFlyoutGroupKey, setFocusFlyoutGroupKey] = useState<string | null>(null);
+  const [closedGroupKeys, setClosedGroupKeys] = useState<ReadonlySet<string>>(() => new Set());
   const groupCloseTimerRef = useRef<number | null>(null);
   const navItems = APPLICATION_NAVIGATION_ITEMS;
   const isRail = variant === 'rail';
@@ -101,6 +103,14 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
       SIDEBAR_GROUP_CLOSE_DELAY_MS,
     );
   }, [cancelGroupClose, closeGroup]);
+  const toggleGroupChildren = useCallback((key: string) => {
+    setClosedGroupKeys((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
   useEffect(() => cancelGroupClose, [cancelGroupClose]);
 
   const isRouteActive = useCallback((to: string, exact = false) => (
@@ -222,13 +232,57 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
           const label = t(labelKey);
           const navigationTarget = resolveContextAwareNavigationTarget(to, currentHref);
           const activeChild = children?.find((child) => isRouteActive(child.to, child.exact));
-          const groupActive = isRouteActive(to, exact)
+          const parentActive = isRouteActive(to, exact);
+          const groupActive = parentActive
             || Boolean(activeChild);
-          const link = (
+          const childrenExpanded = children ? !closedGroupKeys.has(key) : false;
+          const groupParentAriaCurrent = children
+            ? activeChild
+              ? childrenExpanded
+                ? undefined
+                : 'page'
+              : parentActive
+                ? 'page'
+                : undefined
+            : undefined;
+          const renderItemContent = (active: boolean) => (
+            <>
+              <Icon className={cn(itemIconClass, active ? 'text-[var(--nav-icon-active)]' : 'text-current')} />
+              {!collapsed ? <span className={itemLabelClass}>{label}</span> : null}
+              {badge === 'completion' && completionBadge ? (
+                <StatusDot
+                  tone="info"
+                  data-testid="chat-completion-badge"
+                  className={cn(
+                    'absolute right-3 border-2 border-background shadow-soft-card',
+                    collapsed ? 'right-2 top-2' : ''
+                  )}
+                  aria-label={t('layout.newChatMessage')}
+                />
+              ) : null}
+            </>
+          );
+          const link = children ? (
+            <Link
+              to={navigationTarget}
+              aria-current={groupParentAriaCurrent}
+              onClick={(event) => {
+                if (shouldDelegateCurrentDocumentNavigation(event)) {
+                  onNavigate?.();
+                }
+              }}
+              aria-label={label}
+              data-route-focus-key={`${focusKeyPrefix}:${key}`}
+              data-route-focus-return-key={returnFocusKey}
+              className={cn(itemInteractiveClass, groupActive ? itemActiveClass : '')}
+            >
+              {renderItemContent(groupActive)}
+            </Link>
+          ) : (
             <NavLink
               to={navigationTarget}
               end={exact}
-              aria-current={children && activeChild ? false : 'page'}
+              aria-current="page"
               onClick={(event) => {
                 if (shouldDelegateCurrentDocumentNavigation(event)) {
                   onNavigate?.();
@@ -244,26 +298,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                 )
               }
             >
-              {({ isActive }) => {
-                const active = isActive || groupActive;
-                return (
-                <>
-                  <Icon className={cn(itemIconClass, active ? 'text-[var(--nav-icon-active)]' : 'text-current')} />
-                  {!collapsed ? <span className={itemLabelClass}>{label}</span> : null}
-                  {badge === 'completion' && completionBadge ? (
-                    <StatusDot
-                      tone="info"
-                      data-testid="chat-completion-badge"
-                      className={cn(
-                        'absolute right-3 border-2 border-background shadow-soft-card',
-                        collapsed ? 'right-2 top-2' : ''
-                      )}
-                      aria-label={t('layout.newChatMessage')}
-                    />
-                  ) : null}
-                </>
-                );
-              }}
+              {({ isActive }) => renderItemContent(isActive || groupActive)}
             </NavLink>
           );
 
@@ -302,11 +337,16 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                   });
                 }}
                 trigger={({ open }) => (
-                  <NavLink
+                  <Link
                     to={navigationTarget}
-                    end={exact}
                     aria-label={label}
-                    aria-current={open && activeChild ? false : 'page'}
+                    aria-current={activeChild
+                      ? open
+                        ? undefined
+                        : 'page'
+                      : parentActive
+                        ? 'page'
+                        : undefined}
                     aria-haspopup="menu"
                     aria-expanded={open}
                     aria-controls={open ? contentId : undefined}
@@ -327,12 +367,12 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                     }}
                     className={cn(itemInteractiveClass, groupActive ? itemActiveClass : '')}
                   >
-                    <Icon className={cn(itemIconClass, groupActive ? 'text-[var(--nav-icon-active)]' : 'text-current')} />
+                    {renderItemContent(groupActive)}
                     <ChevronRight
                       className="absolute bottom-1.5 right-1.5 h-3 w-3 text-muted-text"
                       aria-hidden="true"
                     />
-                  </NavLink>
+                  </Link>
                 )}
               >
                 {() => (
@@ -377,10 +417,31 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
           }
 
           if (children) {
+            const childrenId = `${focusKeyPrefix}-${key}-children`;
             return (
               <div key={key} className="flex shrink-0 flex-col gap-1">
-                {link}
-                <div className="ml-4 flex flex-col gap-1 border-l border-border pl-3">
+                <div className="flex items-center gap-1">
+                  <div className="min-w-0 flex-1">{link}</div>
+                  <IconButton
+                    aria-label={label}
+                    size="navigation"
+                    variant="ghost"
+                    tooltip={false}
+                    aria-expanded={childrenExpanded}
+                    aria-controls={childrenExpanded ? childrenId : undefined}
+                    data-sidebar-group-toggle={key}
+                    onClick={() => toggleGroupChildren(key)}
+                  >
+                    <ChevronRight
+                      className={cn(
+                        'h-4 w-4 transition-transform motion-reduce:transition-none',
+                        childrenExpanded && 'rotate-90',
+                      )}
+                      aria-hidden="true"
+                    />
+                  </IconButton>
+                </div>
+                {childrenExpanded ? <div id={childrenId} className="ml-4 flex flex-col gap-1 border-l border-border pl-3">
                   {children.map((child) => {
                     const ChildIcon = child.icon;
                     const childLabel = t(child.labelKey);
@@ -415,7 +476,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                       </Link>
                     );
                   })}
-                </div>
+                </div> : null}
               </div>
             );
           }

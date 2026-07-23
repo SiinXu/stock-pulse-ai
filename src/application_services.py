@@ -83,9 +83,6 @@ class ApplicationServices:
                 application_version=plugin_application_version,
             )
         self._plugin_manager = plugin_manager
-        self._plugin_manager._bind_lifecycle_boundary(
-            self._run_plugin_manager_lifecycle,
-        )
         self._builtin_plugins = tuple(builtin_plugins)
         self._plugins_dir = plugins_dir
         self._builtin_plugin_results: tuple["PluginOperationResult", ...] = ()
@@ -94,9 +91,15 @@ class ApplicationServices:
         self._plugin_shutdown_results: tuple["PluginOperationResult", ...] = ()
         self._plugin_lifecycle_lock = threading.RLock()
         self._local_lifecycle_ops = 0
+        self._local_close_requested = False
         self._plugins_starting = False
         self._plugins_started = False
+        self._plugin_close_requested = False
         self._plugins_closed = False
+        self._plugin_manager._bind_lifecycle_boundary(
+            self._run_plugin_manager_lifecycle,
+            self._plugin_activation_allowed,
+        )
 
     @property
     def config(self) -> "Config":
@@ -174,9 +177,15 @@ class ApplicationServices:
         """Compose and load plugins once after this root becomes discoverable."""
 
         with self._plugin_lifecycle_lock:
-            if self._plugins_started or self._plugins_starting or self._plugins_closed:
+            if (
+                self._plugins_started
+                or self._plugins_starting
+                or self._plugin_close_requested
+                or self._plugins_closed
+            ):
                 return self._plugin_load_results
-            self._plugins_starting = True
+            with _services_lock:
+                self._plugins_starting = True
             try:
                 self._builtin_plugin_results = tuple(
                     self._plugin_manager.register(plugin, source="builtin")
@@ -201,10 +210,32 @@ class ApplicationServices:
                 self._plugin_load_results = self._plugin_manager.load_all()
                 self._plugins_started = True
                 if self._plugins_closed:
-                    self._plugin_shutdown_results = self._plugin_manager.disable_all()
+                    shutdown_ids = self._plugin_manager._shutdown_plugin_ids()
+                    if shutdown_ids:
+                        self._plugin_shutdown_results = (
+                            self._plugin_manager.disable_all(shutdown_ids)
+                        )
                 return self._plugin_load_results
             finally:
-                self._plugins_starting = False
+                close_after_start = False
+                with _services_lock:
+                    if (
+                        self._local_close_requested
+                        and not self._local_lifecycle_ops
+                    ):
+                        self._local_close_requested = False
+                        self._local_lifecycle_ops += 1
+                        close_after_start = True
+                    self._plugins_starting = False
+                    if not close_after_start:
+                        _services_local_ops.notify_all()
+                if close_after_start:
+                    try:
+                        self._close_plugins()
+                    finally:
+                        with _services_lock:
+                            self._local_lifecycle_ops -= 1
+                            _services_local_ops.notify_all()
 
     def close(self) -> tuple["PluginOperationResult", ...]:
         """Disable the owned plugin snapshot once in reverse registration order.
@@ -222,10 +253,16 @@ class ApplicationServices:
         """
 
         with _services_lock:
+            self._plugin_close_requested = True
             if _services is self and _services_transition_active:
                 _services_transition_pending.append(None)
                 return self._plugin_shutdown_results
             installed = _services is self
+            if not installed and (
+                self._plugins_starting or self._local_lifecycle_ops
+            ):
+                self._local_close_requested = True
+                return self._plugin_shutdown_results
 
         if not installed:
             # A root that is not installed must never wait on the transition
@@ -259,7 +296,7 @@ class ApplicationServices:
         deadlocking, while an installer waits for in-flight tracked
         operations to finish before starting the root's plugins.
         """
-        global _services_transition_active
+        global _services_transition_active, _services_transition_target
 
         with _services_lock:
             # Operations inside an already-active transition must not
@@ -275,6 +312,7 @@ class ApplicationServices:
                 with _services_lock:
                     owns_installed_root = _services is self
                     if owns_installed_root:
+                        _services_transition_target = self
                         _services_transition_active = True
                         _services_transition_pending.clear()
                     else:
@@ -287,37 +325,68 @@ class ApplicationServices:
                         return operation()
                     finally:
                         with _services_lock:
-                            has_pending, pending_target = (
+                            (
+                                has_pending,
+                                pending_target,
+                                superseded_targets,
+                            ) = (
                                 _take_latest_installable_pending_services()
                             )
                             if (
                                 not has_pending
-                                and self._plugins_closed
+                                and self._plugin_close_requested
                                 and _services is self
                             ):
-                                # A closed root must not remain published as
-                                # the stable root once its transition ends.
+                                # A root with shutdown requested must not remain
+                                # published once its transition ends.
                                 has_pending, pending_target = True, None
+                            _services_transition_target = None
                             _services_transition_active = False
-                        if has_pending:
-                            set_application_services(pending_target)
+                        if has_pending or superseded_targets:
+                            _set_application_services(
+                                pending_target if has_pending else self,
+                                validate_direct_target=False,
+                                superseded_services=superseded_targets,
+                            )
 
         try:
             return operation()
         finally:
+            close_after_operation = False
             with _services_lock:
-                self._local_lifecycle_ops -= 1
-                _services_local_ops.notify_all()
+                if self._local_lifecycle_ops == 1 and self._local_close_requested:
+                    self._local_close_requested = False
+                    close_after_operation = True
+                else:
+                    self._local_lifecycle_ops -= 1
+                    _services_local_ops.notify_all()
+            if close_after_operation:
+                try:
+                    self._close_plugins()
+                finally:
+                    with _services_lock:
+                        self._local_lifecycle_ops -= 1
+                        _services_local_ops.notify_all()
+
+    def _plugin_activation_allowed(self) -> bool:
+        """Reject activation after this one-shot root begins shutdown."""
+
+        return not self._plugin_close_requested
 
     def _close_plugins(self) -> tuple["PluginOperationResult", ...]:
         """Perform root-local shutdown for the global transition owner."""
 
+        self._plugin_close_requested = True
         with self._plugin_lifecycle_lock:
             if self._plugins_closed:
                 return self._plugin_shutdown_results
             self._plugins_closed = True
-            if self._plugins_started and not self._plugins_starting:
-                self._plugin_shutdown_results = self._plugin_manager.disable_all()
+            if not self._plugins_starting:
+                shutdown_ids = self._plugin_manager._shutdown_plugin_ids()
+                if shutdown_ids:
+                    self._plugin_shutdown_results = self._plugin_manager.disable_all(
+                        shutdown_ids,
+                    )
             return self._plugin_shutdown_results
 
 
@@ -326,6 +395,7 @@ _services_lock = threading.Lock()
 _services_local_ops = threading.Condition(_services_lock)
 _services_transition_lock = threading.RLock()
 _services_transition_active = False
+_services_transition_target: Optional[ApplicationServices] = None
 _services_transition_pending: list[Optional[ApplicationServices]] = []
 _services_shutdown = False
 
@@ -333,28 +403,73 @@ _services_shutdown = False
 def _take_latest_installable_pending_services() -> tuple[
     bool,
     Optional[ApplicationServices],
+    tuple[ApplicationServices, ...],
 ]:
-    """Consume the latest pending target that has not already been closed.
+    """Select the latest installable target and retain superseded cleanup debt.
 
     The caller must hold ``_services_lock``.
     """
 
-    while _services_transition_pending:
-        candidate = _services_transition_pending.pop()
-        if candidate is None or not candidate.is_closed:
-            _services_transition_pending.clear()
-            return True, candidate
-    return False, None
+    candidates = tuple(_services_transition_pending)
+    _services_transition_pending.clear()
+    has_target = False
+    target: Optional[ApplicationServices] = None
+    for candidate in reversed(candidates):
+        if candidate is None or not candidate._plugin_close_requested:
+            has_target = True
+            target = candidate
+            break
+
+    superseded: list[ApplicationServices] = []
+    for candidate in candidates:
+        if (
+            candidate is None
+            or candidate is target
+            or candidate is _services
+            or candidate is _services_transition_target
+            or any(candidate is retained for retained in superseded)
+        ):
+            continue
+        superseded.append(candidate)
+    return has_target, target, tuple(superseded)
+
+
+def _validate_direct_install_target(
+    services: Optional[ApplicationServices],
+) -> None:
+    """Reject terminal or locally active roots before starting a transition.
+
+    The caller must hold ``_services_lock``.
+    """
+
+    if services is None:
+        return
+    if services.is_closed:
+        raise RuntimeError("Cannot install closed application services")
+    if services._plugin_close_requested:
+        raise RuntimeError(
+            "Cannot install application services after shutdown begins"
+        )
+    if services._plugins_starting or services._local_lifecycle_ops:
+        raise RuntimeError(
+            "Cannot install application services during local plugin lifecycle"
+        )
 
 
 def get_application_services() -> ApplicationServices:
     """Return the installed composition root, creating a default one lazily."""
     while True:
         with _services_lock:
-            if _services_transition_active and _services is not None:
-                # Lifecycle callbacks must resolve the root whose transition
-                # they belong to without starting or resurrecting a successor.
-                return _services
+            if _services_transition_active:
+                visible_services = (
+                    _services
+                    if _services is not None
+                    else _services_transition_target
+                )
+                if visible_services is not None:
+                    # Lifecycle callbacks must resolve their transition's
+                    # visible root without waiting on that same transition.
+                    return visible_services
             if _services_shutdown:
                 raise RuntimeError("Application services are shutting down")
 
@@ -363,7 +478,7 @@ def get_application_services() -> ApplicationServices:
                 if _services_shutdown:
                     raise RuntimeError("Application services are shutting down")
                 services = _services
-            if services is None or services.is_closed:
+            if services is None or services._plugin_close_requested:
                 services = ApplicationServices()
             set_application_services(services)
             with _services_lock:
@@ -378,7 +493,19 @@ def set_application_services(services: Optional[ApplicationServices]) -> None:
     from plugin callbacks are deferred until the active lifecycle transition
     finishes, with the most recent request winning.
     """
-    global _services, _services_transition_active
+
+    _set_application_services(services, validate_direct_target=True)
+
+
+def _set_application_services(
+    services: Optional[ApplicationServices],
+    *,
+    validate_direct_target: bool,
+    superseded_services: Iterable[ApplicationServices] = (),
+) -> None:
+    """Install a target while draining every superseded root accepted earlier."""
+
+    global _services, _services_transition_active, _services_transition_target
 
     with _services_lock:
         if _services_shutdown and services is not None:
@@ -386,8 +513,8 @@ def set_application_services(services: Optional[ApplicationServices]) -> None:
         if _services_transition_active:
             _services_transition_pending.append(services)
             return
-        if services is not None and services.is_closed:
-            raise RuntimeError("Cannot install closed application services")
+        if validate_direct_target:
+            _validate_direct_install_target(services)
 
     with _services_transition_lock:
         with _services_lock:
@@ -396,51 +523,116 @@ def set_application_services(services: Optional[ApplicationServices]) -> None:
             if _services_transition_active:
                 _services_transition_pending.append(services)
                 return
-            if services is not None and services.is_closed:
-                raise RuntimeError("Cannot install closed application services")
+            if validate_direct_target:
+                _validate_direct_install_target(services)
+            _services_transition_target = services
             _services_transition_active = True
             _services_transition_pending.clear()
 
         target = services
+        cleanup_targets = tuple(superseded_services)
         try:
             while True:
+                restart_transition = False
+                drained_target_to_close: Optional[ApplicationServices] = None
+                cleanup_batch = cleanup_targets
+                cleanup_targets = ()
                 with _services_lock:
                     previous = _services
 
                 if previous is not None and previous is not target:
                     previous._close_plugins()
+                for cleanup_target in cleanup_batch:
+                    if cleanup_target is previous or cleanup_target is target:
+                        continue
+                    cleanup_target._close_plugins()
 
                 with _services_lock:
-                    has_pending, pending_target = (
-                        _take_latest_installable_pending_services()
+                    _services_transition_target = target
+                    retain_visibility_anchor = (
+                        target is None and previous is not None
                     )
-                    if has_pending:
-                        target = pending_target
-                    _services = target
+                    if not retain_visibility_anchor:
+                        _services = target
                     while (
                         target is not None
-                        and target._local_lifecycle_ops
+                        and (
+                            target._plugins_starting
+                            or target._local_lifecycle_ops
+                        )
                     ):
                         # An in-flight local lifecycle operation must fully
                         # complete before this root's plugins may start.
                         _services_local_ops.wait()
+                    if target is not None and target._plugin_close_requested:
+                        drained_target_to_close = target
+                    else:
+                        (
+                            has_pending,
+                            pending_target,
+                            cleanup_targets,
+                        ) = (
+                            _take_latest_installable_pending_services()
+                        )
+                        if has_pending:
+                            target = pending_target
+                            _services_transition_target = target
+                            restart_transition = True
+                        elif cleanup_targets:
+                            restart_transition = True
+
+                if drained_target_to_close is not None:
+                    drained_target_to_close._close_plugins()
+                    with _services_lock:
+                        (
+                            has_pending,
+                            pending_target,
+                            cleanup_targets,
+                        ) = (
+                            _take_latest_installable_pending_services()
+                        )
+                        target = pending_target if has_pending else None
+                        _services_transition_target = target
+                        restart_transition = has_pending or bool(cleanup_targets)
+                        if (
+                            not restart_transition
+                            and _services is drained_target_to_close
+                        ):
+                            _services = None
+
+                if restart_transition:
+                    continue
 
                 if target is not None:
                     target.start_plugins()
 
                 with _services_lock:
-                    has_pending, pending_target = (
+                    (
+                        has_pending,
+                        pending_target,
+                        cleanup_targets,
+                    ) = (
                         _take_latest_installable_pending_services()
                     )
-                    if not has_pending:
-                        if target is not None and target.is_closed:
+                    if (
+                        not has_pending
+                        and target is not None
+                        and target._plugin_close_requested
+                    ):
+                        has_pending, pending_target = True, None
+                    if not has_pending and not cleanup_targets:
+                        if target is None:
                             _services = None
                         _services_transition_active = False
+                        _services_transition_target = None
                         return
-                    target = pending_target
+                    if has_pending:
+                        target = pending_target
+                    _services_transition_target = target
         finally:
             with _services_lock:
                 _services_transition_active = False
+                _services_transition_target = None
                 _services_transition_pending.clear()
 
 

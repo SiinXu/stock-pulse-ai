@@ -92,7 +92,7 @@ const AppLayout: React.FC = () => {
     if (logoutRedirectPending) {
       return <Navigate to={APP_ROUTE_PATHS.login} replace />;
     }
-    const redirect = encodeURIComponent(location.pathname + location.search);
+    const redirect = encodeURIComponent(location.pathname + location.search + location.hash);
     return <Navigate to={`${APP_ROUTE_PATHS.login}?redirect=${redirect}`} replace />;
   }
 

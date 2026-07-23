@@ -1,6 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FirstRunWizard } from '../FirstRunWizard';
 import type { LlmConnectionFieldSchema } from '../../../types/systemConfig';
@@ -709,7 +709,7 @@ describe('FirstRunWizard', () => {
 
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
     const items: Array<{ key: string; value: string }> = onComplete.mock.calls[0][0];
-    expect(items).toHaveLength(11);
+    expect(items).toHaveLength(13);
     expect(new Set(items.map((item) => item.key)).size).toBe(items.length);
     const byKey = new Map(items.map((item) => [item.key, item.value]));
     expect(byKey.get('LLM_CONFIG_MODE')).toBe('channels');
@@ -724,6 +724,8 @@ describe('FirstRunWizard', () => {
     expect(byKey.get('LLM_OPENAI2_MODELS')).toBe('gpt-4o-mini');
     expect(byKey.get('LLM_OPENAI2_ENABLED')).toBe('true');
     expect(byKey.get('LITELLM_MODEL')).toBe('modelref:v1:openai2:openai%2Fgpt-4o-mini');
+    expect(byKey.get('LITELLM_FALLBACK_MODELS')).toBe('');
+    expect(byKey.get('VISION_MODEL')).toBe('');
   });
 
   it('does not let a Provider selection rewrite schema-read-only transport fields', () => {
@@ -811,6 +813,40 @@ describe('FirstRunWizard', () => {
     ));
   });
 
+  it('discards in-flight discovery results after transport inputs change', async () => {
+    let resolveDiscovery!: (value: { success: boolean; message: string; models: string[] }) => void;
+    discoverLLMChannelModels.mockImplementation(() => new Promise((resolve) => {
+      resolveDiscovery = resolve;
+    }));
+    render(
+      <FirstRunWizard
+        onComplete={okComplete()}
+        onClose={() => {}}
+        isSaving={false}
+        language="zh"
+        providers={[CATALOG.find((entry) => entry.id === 'openai')!]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'sk-before-discovery' } });
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '自动发现模型' }));
+    await waitFor(() => expect(discoverLLMChannelModels).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole('button', { name: '上一步' }));
+    fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'sk-after-discovery' } });
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    await act(async () => {
+      resolveDiscovery({ success: true, message: 'old config models', models: ['stale-model'] });
+    });
+
+    await waitFor(() => expect(screen.getByRole('button', { name: '自动发现模型' })).toBeEnabled());
+    expect(screen.queryByText(/发现 1 个模型/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '选择模型' })).not.toBeInTheDocument();
+  });
+
   it('requests capability checks and surfaces resolved config plus per-capability results', async () => {
     testLLMChannel.mockResolvedValue({
       success: true,
@@ -856,6 +892,114 @@ describe('FirstRunWizard', () => {
     expect(within(capabilities).getByText('不支持')).toBeInTheDocument();
     // The provider secret must never surface in the rendered diagnostics.
     expect(screen.getByTestId('wizard-test-result').textContent).not.toContain('sk-secret-xyz');
+  });
+
+  it('invalidates a successful connection test when tested credentials or models change', async () => {
+    testLLMChannel.mockResolvedValue({ success: true, message: 'ok' });
+    render(
+      <FirstRunWizard
+        onComplete={okComplete()}
+        onClose={() => {}}
+        isSaving={false}
+        language="zh"
+        providers={[CATALOG.find((entry) => entry.id === 'openai')!]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'sk-before-test' } });
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    addWizardModels(['gpt-4o-mini']);
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: /测试连接/ }));
+    expect(await screen.findByTestId('wizard-test-result')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '上一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '上一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '上一步' }));
+    fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'sk-after-test' } });
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    expect(screen.queryByTestId('wizard-test-result')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /测试连接/ }));
+    expect(await screen.findByTestId('wizard-test-result')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '上一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '上一步' }));
+    addWizardModels(['gpt-4o']);
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    expect(screen.queryByTestId('wizard-test-result')).not.toBeInTheDocument();
+  });
+
+  it('discards an in-flight connection result after the tested credential changes', async () => {
+    let resolveTest!: (value: { success: boolean; message: string }) => void;
+    testLLMChannel.mockImplementation(() => new Promise((resolve) => {
+      resolveTest = resolve;
+    }));
+    render(
+      <FirstRunWizard
+        onComplete={okComplete()}
+        onClose={() => {}}
+        isSaving={false}
+        language="zh"
+        providers={[CATALOG.find((entry) => entry.id === 'openai')!]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'sk-before-test' } });
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    addWizardModels(['gpt-4o-mini']);
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: /测试连接/ }));
+    await waitFor(() => expect(testLLMChannel).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole('button', { name: '上一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '上一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '上一步' }));
+    fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'sk-after-test' } });
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+
+    await act(async () => {
+      resolveTest({ success: true, message: 'old config ok' });
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: /测试连接/ })).toBeEnabled());
+    expect(screen.queryByTestId('wizard-test-result')).not.toBeInTheDocument();
+  });
+
+  it('tests the selected primary model first instead of model insertion order', async () => {
+    testLLMChannel.mockResolvedValue({ success: true, message: 'ok' });
+    render(
+      <FirstRunWizard
+        onComplete={okComplete()}
+        onClose={() => {}}
+        isSaving={false}
+        language="zh"
+        providers={[CATALOG.find((entry) => entry.id === 'openai')!]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'sk-test' } });
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    addWizardModels(['gpt-4o-mini', 'gpt-4o']);
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    chooseOption(screen.getByLabelText('报告主要模型'), 'gpt-4o');
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: /测试连接/ }));
+
+    await waitFor(() => expect(testLLMChannel).toHaveBeenCalledWith(
+      expect.objectContaining({ models: ['gpt-4o', 'gpt-4o-mini'] }),
+    ));
   });
 
   it('renders an actionable failure with the stage, error code, and a troubleshooting hint', async () => {
@@ -932,6 +1076,67 @@ describe('FirstRunWizard', () => {
     expect(byKey.get('LITELLM_MODEL')).toBe(
       'modelref:v1:deepseek:deepseek%2Fdeepseek-v4-flash',
     );
+    expect(byKey.get('LITELLM_FALLBACK_MODELS')).toBe('');
+    expect(byKey.get('VISION_MODEL')).toBe('');
+  });
+
+  it('persists fallback and vision routing and shows the saved effective configuration', async () => {
+    const onComplete = okComplete();
+    const onViewRouting = vi.fn();
+    render(
+      <FirstRunWizard
+        onComplete={onComplete}
+        onClose={() => {}}
+        onViewRouting={onViewRouting}
+        isSaving={false}
+        language="zh"
+        providers={CATALOG}
+        routingOptions={[{
+          value: 'modelref:v1:existing:openai%2Fgpt-4o-mini',
+          label: 'gpt-4o-mini',
+          sublabel: 'Existing OpenAI',
+        }]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    chooseOption(screen.getByLabelText('服务商'), 'deepseek');
+    fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'sk-routing' } });
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    addWizardModels(['deepseek-v4-flash', 'deepseek-v4-pro']);
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+
+    fireEvent.click(screen.getByRole('button', { name: '选择备用模型' }));
+    fireEvent.click(screen.getByLabelText(/deepseek-v4-pro/));
+    chooseOption(
+      screen.getByLabelText('Vision 模型'),
+      'modelref:v1:existing:openai%2Fgpt-4o-mini',
+    );
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存并应用' }));
+
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
+    const items: Array<{ key: string; value: string }> = onComplete.mock.calls[0][0];
+    const byKey = new Map(items.map((item) => [item.key, item.value]));
+    expect(byKey.get('LITELLM_MODEL')).toBe(
+      'modelref:v1:deepseek:deepseek%2Fdeepseek-v4-flash',
+    );
+    expect(byKey.get('LITELLM_FALLBACK_MODELS')).toBe(
+      'modelref:v1:deepseek:deepseek%2Fdeepseek-v4-pro',
+    );
+    expect(byKey.get('VISION_MODEL')).toBe(
+      'modelref:v1:existing:openai%2Fgpt-4o-mini',
+    );
+
+    const savedRouting = await screen.findByTestId('wizard-saved-routing');
+    expect(savedRouting).toHaveTextContent('deepseek-v4-flash · DeepSeek 官方 · deepseek');
+    expect(savedRouting).toHaveTextContent('deepseek-v4-pro');
+    expect(savedRouting).toHaveTextContent('gpt-4o-mini');
+    expect(savedRouting.textContent).not.toContain('sk-routing');
+
+    fireEvent.click(screen.getByRole('button', { name: '查看任务路由' }));
+    expect(onViewRouting).toHaveBeenCalledTimes(1);
   });
 
   it('creates a second connection for the same provider without overwriting the existing one', async () => {
@@ -1158,6 +1363,36 @@ describe('FirstRunWizard', () => {
 
     // The error is shown in place; the wizard is still mounted.
     await waitFor(() => expect(screen.getByText('主模型未被启用渠道声明')).toBeInTheDocument());
+    expect(screen.getByTestId('first-run-wizard')).toBeInTheDocument();
+  });
+
+  it('keeps an actionable backend save error in the English wizard', async () => {
+    const onComplete = vi.fn().mockResolvedValue({
+      success: false,
+      error: 'Primary model is not declared by an enabled Connection',
+    });
+    render(
+      <FirstRunWizard
+        onComplete={onComplete}
+        onClose={() => {}}
+        isSaving={false}
+        language="en"
+        providers={BILINGUAL_CATALOG}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Cloud API/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    chooseOption(screen.getByLabelText('Provider'), 'deepseek');
+    fireEvent.change(screen.getByLabelText('API key'), { target: { value: 'sk-test' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.change(screen.getByLabelText('Add model'), { target: { value: 'deepseek-v4-flash' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save & Apply' }));
+
+    expect(await screen.findByText('Primary model is not declared by an enabled Connection')).toBeInTheDocument();
     expect(screen.getByTestId('first-run-wizard')).toBeInTheDocument();
   });
 

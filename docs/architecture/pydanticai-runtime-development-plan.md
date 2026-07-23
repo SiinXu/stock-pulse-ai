@@ -118,7 +118,7 @@ StockPulse 拥有一套完整的 Native Agent 实现:Single(`AgentExecutor`)、M
 
 - `tests/agent_runtime_replay.py:92-150` `ReplayLLMAdapter` 注入替换 `LLMToolAdapter`,严格按序消费录制转录,超出即 `AssertionError`(`:117-119`),并校验 `allowed_stage`(`:131-135`)。
 - `tests/fixtures/agent_runtime/manifest.json:1-42`:36 个 fixture = 24 financial(A/HK/US 各 8:`single_run`/`single_chat`/`quick`/`standard`/`full`/`specialist` 6 模式 + 2 partial/degraded)+ 12 contract(modelref/fallback/toolscope/timeout/cancelrace/malformed 6 profile × 2)。
-- `tests/test_agent_runtime_compatibility.py` 断言输出、工具调用序列与 factory 契约。这是**现有行为基线**,不代表 Runtime Contract、生命周期或 PydanticAI Adapter 已实现。
+- `tests/agent/test_agent_runtime_compatibility.py` 断言输出、工具调用序列与 factory 契约。这是**现有行为基线**,不代表 Runtime Contract、生命周期或 PydanticAI Adapter 已实现。
 - 事件契约:`docs/agent-stream-events.md:41-54` 冻结 9 种事件(`stage_start`/`stage_done`/`thinking`/`tool_start`/`tool_done`/`generating`/`pipeline_timeout`/`pipeline_budget_skipped`/`done`/`error`),additive 演进;`src/agent/stream_events.py:13-22` 事件为无版本、无 sequence 的 dict。
 - CI:`.github/workflows/ci.yml:54-90` `backend-gate` 执行 `./scripts/ci_gate.sh` 四阶段(syntax/flake8/deterministic/offline-tests,`:84-90`);replay 兼容测试包含在 offline-tests(`pytest -m "not network"`,`scripts/ci_gate.sh:25-34`)中;`web-gate`(`:220-246`)与 `web-e2e`(`:294-307`,`npm run test:smoke`)按前端改动触发。
 
@@ -423,10 +423,10 @@ AR-PY-00 ADR Accepted
 ### 10.1 每个编码阶段的最低命令集(当前真实存在的路径)
 
 ```bash
-python -m pytest tests/test_agent_runtime_compatibility.py -q
+python -m pytest tests/agent/test_agent_runtime_compatibility.py -q
 python -m pytest tests/test_agent_executor.py tests/test_multi_agent.py -q
-python -m pytest tests/test_agent_tool_surface.py -q
-python -m pytest tests/test_agent_chat_api.py tests/test_agent_stream_events.py tests/test_agent_sse_cleanup.py -q
+python -m pytest tests/agent/tools/test_agent_tool_surface.py -q
+python -m pytest tests/agent/test_agent_chat_api.py tests/test_agent_stream_events.py tests/test_agent_sse_cleanup.py -q
 python -m pytest -m "not network"
 ./scripts/ci_gate.sh
 python scripts/check_ai_assets.py
@@ -472,7 +472,7 @@ git status --short
 ## 11. 配置、API、数据库、Web、Desktop 与 Bot 兼容性说明
 
 - 配置:AR-PY-00~05 不新增任何配置字段与 `.env` 语义;`AGENT_ARCH` 语义不变(仍是业务 Architecture 选择)。AR-PY-06 若获批新增配置,必须走现有配置注册表、API Schema、统一设置事务、409 语义、帮助文案与删除引用保护,并同步 `.env.example` 与文档(遵循 `AGENTS.md`)。
-- API:公开端点、请求/响应 Schema、SSE 事件(9 种,additive)全程不变;AR-PY-03 的 SSE compatibility adapter 只改内部实现,`tests/test_agent_chat_api.py`/`test_agent_stream_events.py`/`test_agent_sse_cleanup.py` 零修改通过是硬验收。
+- API:公开端点、请求/响应 Schema、SSE 事件(9 种,additive)全程不变;AR-PY-03 的 SSE compatibility adapter 只改内部实现,`tests/agent/test_agent_chat_api.py`/`test_agent_stream_events.py`/`test_agent_sse_cleanup.py` 零修改通过是硬验收。
 - 数据库:全程无迁移、无新表;Conversation/Provider trace/Usage 持久化路径不变(`conversation.py:26-30`、`executor.py:722-803`、`runner.py:458-459`)。
 - Web:`apps/dsa-web` 全程零改动;停止按钮行为的真实化(后端真取消)对 Web 是透明增强,不改前端契约。
 - Desktop:AR-PY-04 起可选依赖不得进入默认打包清单;PyInstaller hidden imports 与体积影响在 AR-PY-05 出证据;Desktop 开放是 AR-PY-06 的显式审批项。
