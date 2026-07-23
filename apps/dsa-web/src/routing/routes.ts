@@ -10,6 +10,7 @@ export const APP_ROUTE_PATHS = {
   portfolio: '/portfolio',
   signals: '/signals',
   stockDetails: '/stocks/:stockCode',
+  researchAnalysis: '/research/analysis',
   researchMarket: '/research/market',
   researchDiscover: '/research/discover',
   researchBacktest: '/research/backtest',
@@ -184,6 +185,70 @@ export const RESEARCH_BACKTEST_PHASE_VALUES = {
 export const RESEARCH_BACKTEST_LIMITS = {
   maxWindowDays: 120,
 } as const;
+
+export const ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS = {
+  segment: 'segment',
+  recordId: 'recordId',
+  runFlow: 'runFlow',
+  runFlowRecordId: 'runFlowRecordId',
+  runFlowTaskId: 'runFlowTaskId',
+} as const;
+
+export const ANALYSIS_WORKBENCH_SEGMENT_VALUES = {
+  launch: 'launch',
+  tasks: 'tasks',
+  history: 'history',
+} as const;
+
+export type AnalysisWorkbenchSegment =
+  (typeof ANALYSIS_WORKBENCH_SEGMENT_VALUES)[keyof typeof ANALYSIS_WORKBENCH_SEGMENT_VALUES];
+
+export type AnalysisWorkbenchHrefOptions = {
+  segment?: AnalysisWorkbenchSegment;
+  recordId?: number | null;
+  runFlow?: 'history' | 'task';
+  runFlowRecordId?: number | null;
+  runFlowTaskId?: string | null;
+};
+
+export function buildAnalysisWorkbenchHref(
+  options: AnalysisWorkbenchHrefOptions = {},
+): string {
+  const searchParams = new URLSearchParams();
+  if (options.segment) {
+    searchParams.set(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment, options.segment);
+  }
+  if (typeof options.recordId === 'number' && Number.isFinite(options.recordId) && options.recordId > 0) {
+    searchParams.set(
+      ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId,
+      String(Math.trunc(options.recordId)),
+    );
+  }
+  if (options.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.history || options.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.task) {
+    searchParams.set(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow, options.runFlow);
+    if (options.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.history
+      && typeof options.runFlowRecordId === 'number'
+      && Number.isFinite(options.runFlowRecordId)
+      && options.runFlowRecordId > 0) {
+      searchParams.set(
+        ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowRecordId,
+        String(Math.trunc(options.runFlowRecordId)),
+      );
+    }
+    if (options.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.task
+      && typeof options.runFlowTaskId === 'string'
+      && options.runFlowTaskId.trim()) {
+      searchParams.set(
+        ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowTaskId,
+        options.runFlowTaskId.trim(),
+      );
+    }
+  }
+  const search = searchParams.toString();
+  return search
+    ? `${APP_ROUTE_PATHS.researchAnalysis}?${search}`
+    : APP_ROUTE_PATHS.researchAnalysis;
+}
 
 export const SETTINGS_ROUTE_QUERY_KEYS = {
   section: 'section',

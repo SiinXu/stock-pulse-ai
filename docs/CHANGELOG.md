@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Added] Introduced the Analysis Workbench route contract at `/research/analysis` with `?segment=launch|tasks|history` plus the existing `recordId` / `runFlow` / `runFlowRecordId` / `runFlowTaskId` params, exposed `buildAnalysisWorkbenchHref`, and added a `mapLegacyHomeAnalysisSearchParams` helper that infers the segment for legacy Home links ahead of the workbench extraction.
 - [Tests] Stabilized Agent LLM fallback and orchestrator timeout tests by replacing fixed-length `time.time` side_effect lists with call-count-agnostic clocks, preventing StopIteration under full-suite collection ordering.
 - [Added] Extended the Web LLM setup wizard with ordered fallback and Vision routing, a secret-free saved summary, direct Task Routing access, and a persistent re-entry action.
 - [Fixed] Unified Research URL sanitization across page, deep-link, and session consumers so explicit Discover filters survive active-task restoration and malformed Backtest filters never reach API requests.
