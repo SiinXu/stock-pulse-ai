@@ -1,6 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
+import { APP_ROUTE_PATHS, LEGACY_ROUTE_PATHS } from '../../routing/routes';
 import { buildDeepLink, parseDeepLink } from '../deepLink';
 
 describe('deepLink', () => {
@@ -162,6 +163,20 @@ describe('deepLink', () => {
   it('rejects external and unsupported destinations', () => {
     expect(parseDeepLink('https://example.com/chat').issues).toEqual([{ code: 'external_origin' }]);
     expect(parseDeepLink('/admin').issues).toEqual([{ code: 'unsupported_route' }]);
+  });
+
+  it('accepts canonical and legacy Research routes without rewriting their state', () => {
+    for (const pathname of [
+      APP_ROUTE_PATHS.researchMarket,
+      APP_ROUTE_PATHS.researchDiscover,
+      APP_ROUTE_PATHS.researchBacktest,
+      LEGACY_ROUTE_PATHS.screening,
+      LEGACY_ROUTE_PATHS.backtest,
+    ]) {
+      const parsed = parseDeepLink(`${pathname}?keep=yes#section`);
+      expect(parsed.normalizedHref).toBe(`${pathname}?keep=yes#section`);
+      expect(parsed.issues).toEqual([]);
+    }
   });
 
   it('fails closed when an internal caller tries to build an unsafe link', () => {

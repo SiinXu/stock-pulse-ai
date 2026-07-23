@@ -121,4 +121,30 @@ describe('LegacyRouteRedirect', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
     expect(await screen.findByText('Home route')).toBeInTheDocument();
   });
+
+  it.each([
+    [LEGACY_ROUTE_PATHS.screening, APP_ROUTE_PATHS.researchDiscover],
+    [LEGACY_ROUTE_PATHS.backtest, APP_ROUTE_PATHS.researchBacktest],
+  ])('replaces %s with %s while preserving query and hash', async (legacyPath, canonicalPath) => {
+    render(
+      <MemoryRouter
+        initialEntries={[
+          '/',
+          `${legacyPath}?code=AAPL&keep=yes#results`,
+        ]}
+        initialIndex={1}
+      >
+        <Routes>
+          <Route path="/" element={<div>Home route</div>} />
+          <Route path={legacyPath} element={<LegacyRouteRedirect to={canonicalPath} />} />
+          <Route path={canonicalPath} element={<SettingsLocationProbe />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('settings-location'))
+      .toHaveTextContent(`${canonicalPath}?code=AAPL&keep=yes#results`);
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(await screen.findByText('Home route')).toBeInTheDocument();
+  });
 });

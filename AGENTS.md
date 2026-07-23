@@ -63,18 +63,22 @@ python scripts/check_ai_assets.py
 - Key entry points:
   - `main.py`: The main entry point for analysis tasks
   - `server.py`: FastAPI service entry point
+  - `webui.py`: Retained compatibility launcher for direct FastAPI startup
   - `apps/dsa-web/`: Web frontend
   - `apps/dsa-desktop/`: Electron desktop app
   - `.github/workflows/`: CI, release, and daily tasks
 - Core responsibilities:
   - `src/core/`: Main workflow orchestration
+  - `src/market/`: Market analysis, context, phase, and structure implementations
+  - `src/analysis_context_pack/`: Analysis-context projection and prompt implementations
   - `src/services/`: Business service layer
   - `src/repositories/`: Data access layer
-  - `src/reports/`: Report generation
   - `src/schemas/`: Schemas and data structures
   - `data_provider/`: Multi-provider adapters and fallback logic
   - `api/`: FastAPI API
   - `bot/`: Bot integrations
+  - `strategies/`: Built-in natural-language trading Skill definitions in YAML
+  - `templates/`: Jinja report presentation templates
   - `scripts/`: Local scripts
   - `.github/scripts/`: GitHub automation scripts
   - `tests/`: pytest tests

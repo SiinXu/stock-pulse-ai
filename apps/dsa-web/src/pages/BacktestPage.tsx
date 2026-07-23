@@ -832,6 +832,17 @@ const BacktestPage: React.FC = () => {
           title={text.noResultsTitle}
           description={text.noResultsDescription}
           icon={<Inbox className="h-6 w-6" aria-hidden="true" />}
+          action={(
+            <Button
+              type="button"
+              variant="primary"
+              size="default"
+              aria-label={`${text.runBacktest} · ${text.noResultsTitle}`}
+              onClick={handleRun}
+            >
+              {text.runBacktest}
+            </Button>
+          )}
           className="min-h-40"
         />
       ) : (
@@ -847,6 +858,17 @@ const BacktestPage: React.FC = () => {
             <EmptyState
               title={text.noMetricsTitle}
               description={text.noMetricsDescription}
+              action={(
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="default"
+                  aria-label={`${text.runBacktest} · ${text.noMetricsTitle}`}
+                  onClick={handleRun}
+                >
+                  {text.runBacktest}
+                </Button>
+              )}
               className="h-full min-h-[12rem]"
             />
           )}
@@ -882,6 +904,17 @@ const BacktestPage: React.FC = () => {
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
+              )}
+              action={(
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="default"
+                  aria-label={`${text.runBacktest} · ${text.noResultsTitle}`}
+                  onClick={handleRun}
+                >
+                  {text.runBacktest}
+                </Button>
               )}
             />
           ) : results.length > 0 ? (

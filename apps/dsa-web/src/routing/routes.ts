@@ -3,11 +3,24 @@
 
 export const APP_ROUTE_PATHS = {
   home: '/',
+  login: '/login',
+  playground: '/playground',
+  playgroundRender: '/playground/render/:componentId/:scenarioId',
+  agent: '/chat',
+  portfolio: '/portfolio',
+  decisionSignals: '/decision-signals',
+  alerts: '/alerts',
+  stockDetails: '/stocks/:stockCode',
+  researchMarket: '/research/market',
+  researchDiscover: '/research/discover',
+  researchBacktest: '/research/backtest',
   settings: '/settings',
 } as const;
 
 export const LEGACY_ROUTE_PATHS = {
   usage: '/usage',
+  screening: '/screening',
+  backtest: '/backtest',
 } as const;
 
 export const SETTINGS_ROUTE_QUERY_KEYS = {

@@ -8,6 +8,7 @@ import { analysisApi } from '../../api/analysis';
 import { agentApi } from '../../api/agent';
 import { historyApi } from '../../api/history';
 import { systemConfigApi } from '../../api/systemConfig';
+import { APP_ROUTE_PATHS } from '../../routing/routes';
 import { useStockPoolStore } from '../../stores/stockPoolStore';
 import type { UseTaskStreamOptions } from '../../hooks/useTaskStream';
 import type { AnalysisReport } from '../../types/analysis';
@@ -560,11 +561,10 @@ describe('HomePage URL state', () => {
     unsubscribe();
   });
 
-  it('opens a persisted market review through URL history without rendering raw task output', async () => {
-    const marketTaskId = 'market-task-5';
+  it('moves a persisted market-review deep link to the canonical Research route', async () => {
     const marketHistoryItem = {
       id: 5,
-      queryId: marketTaskId,
+      queryId: 'market-task-5',
       stockCode: 'MARKET',
       stockName: '大盘复盘',
       reportType: 'market_review' as const,
@@ -582,60 +582,17 @@ describe('HomePage URL state', () => {
         sentimentScore: 50,
       },
     };
-    let marketRecordPersisted = false;
-    vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string } = {}) => Promise.resolve({
-      total: params.reportType === 'market_review'
-        ? (marketRecordPersisted ? 1 : 0)
-        : currentHistoryItems.length,
-      page: 1,
-      limit: params.reportType === 'market_review' ? 10 : 20,
-      items: params.reportType === 'market_review'
-        ? (marketRecordPersisted ? [marketHistoryItem] : [])
-        : currentHistoryItems,
-    }));
     vi.mocked(historyApi.getDetail).mockImplementation((recordId) => Promise.resolve(
       recordId === marketHistoryItem.id ? marketHistoryReport : reports[recordId],
     ));
-    vi.mocked(historyApi.getMarkdown).mockResolvedValue('# 持久化大盘复盘正文');
-    vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
-      status: 'accepted',
-      sendNotification: true,
-      message: '大盘复盘任务已提交',
-      taskId: marketTaskId,
+    const router = renderHome('/?recordId=5&keep=yes#snapshot');
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe(APP_ROUTE_PATHS.researchMarket);
     });
-    vi.mocked(analysisApi.getStatus).mockImplementation(async () => {
-      marketRecordPersisted = true;
-      return {
-        taskId: marketTaskId,
-        status: 'completed',
-        marketReviewReport: 'RAW_TASK_OUTPUT_MUST_NOT_RENDER',
-      };
-    });
-    const router = renderHome('/?keep=yes&recordId=1');
-
-    expect(await screen.findByText('报告一摘要')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '大盘复盘' }));
-
-    await waitFor(() => expect(router.state.location.search).toBe('?keep=yes&recordId=5'));
-    expect(await screen.findByText('持久化大盘复盘摘要')).toBeInTheDocument();
-    expect(screen.queryByText('RAW_TASK_OUTPUT_MUST_NOT_RENDER')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Apple AAPL 历史记录' }));
-    expect(await screen.findByText('报告二摘要')).toBeInTheDocument();
-    expect(router.state.location.search).toBe('?keep=yes&recordId=2');
-
-    await act(async () => {
-      await router.navigate(-1);
-    });
-    expect(await screen.findByText('持久化大盘复盘摘要')).toBeInTheDocument();
-    expect(router.state.location.search).toBe('?keep=yes&recordId=5');
-
-    await act(async () => {
-      await router.navigate(1);
-    });
-    expect(await screen.findByText('报告二摘要')).toBeInTheDocument();
-    expect(router.state.location.search).toBe('?keep=yes&recordId=2');
-    expect(screen.queryByText('RAW_TASK_OUTPUT_MUST_NOT_RENDER')).not.toBeInTheDocument();
+    expect(router.state.location.search).toBe('?recordId=5&keep=yes');
+    expect(router.state.location.hash).toBe('#snapshot');
+    expect(screen.queryByText('持久化大盘复盘摘要')).not.toBeInTheDocument();
   });
 
   it('does not let a completed-task refresh replace a newer user URL selection', async () => {

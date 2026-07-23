@@ -6,30 +6,36 @@ import {
 } from '../navigation';
 
 describe('application navigation descriptor', () => {
-  it('retains the approved flat route order without the nested usage utility', () => {
+  it('converges to five primary domains with approved secondary routes', () => {
     expect(APPLICATION_NAVIGATION_ITEMS.map(({ key, to }) => [key, to])).toEqual([
-      ['home', '/'],
-      ['chat', '/chat'],
-      ['screening', '/screening'],
-      ['portfolio', '/portfolio'],
-      ['decision-signals', '/decision-signals'],
-      ['backtest', '/backtest'],
-      ['alerts', '/alerts'],
+      ['home', APP_ROUTE_PATHS.home],
+      ['research', APP_ROUTE_PATHS.researchMarket],
+      ['portfolio', APP_ROUTE_PATHS.portfolio],
+      ['agent', APP_ROUTE_PATHS.agent],
       ['settings', APP_ROUTE_PATHS.settings],
+    ]);
+    expect(APPLICATION_NAVIGATION_ITEMS[0]?.children?.map(({ key, to }) => [key, to])).toEqual([
+      ['decision-signals', APP_ROUTE_PATHS.decisionSignals],
+      ['alerts', APP_ROUTE_PATHS.alerts],
+    ]);
+    expect(APPLICATION_NAVIGATION_ITEMS[1]?.children?.map(({ key, to }) => [key, to])).toEqual([
+      ['research-market', APP_ROUTE_PATHS.researchMarket],
+      ['research-discover', APP_ROUTE_PATHS.researchDiscover],
+      ['research-backtest', APP_ROUTE_PATHS.researchBacktest],
     ]);
   });
 
-  it('has unique keys and targets without unapproved Research or More entries', () => {
-    const keys = APPLICATION_NAVIGATION_ITEMS.map(({ key }) => key);
-    const targets = APPLICATION_NAVIGATION_ITEMS.map(({ to }) => to);
+  it('has unique descriptor keys and no legacy or dead utility targets', () => {
+    const entries = APPLICATION_NAVIGATION_ITEMS.flatMap((item) => [item, ...(item.children ?? [])]);
+    const keys = entries.map(({ key }) => key);
+    const targets = entries.map(({ to }) => to);
 
     expect(new Set(keys).size).toBe(keys.length);
-    expect(new Set(targets).size).toBe(targets.length);
-    expect(keys).not.toContain('research');
     expect(keys).not.toContain('more');
     expect(keys).not.toContain('usage');
     expect(targets).not.toContain(LEGACY_ROUTE_PATHS.usage);
-    expect(targets).not.toContain('/research');
+    expect(targets).not.toContain(LEGACY_ROUTE_PATHS.screening);
+    expect(targets).not.toContain(LEGACY_ROUTE_PATHS.backtest);
     expect(targets).not.toContain('/more');
   });
 

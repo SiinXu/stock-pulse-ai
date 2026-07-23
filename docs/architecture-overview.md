@@ -1,7 +1,7 @@
 # StockPulse Architecture Overview
 
 - Status: `Living`
-- Last verified: 2026-07-21
+- Last verified: 2026-07-22
 - Scope: current technical component boundaries, process entrypoints, and analysis data flow
 
 This document is the technical view of the current implementation. For
@@ -59,10 +59,35 @@ resolve -> fetch -> intelligence -> context -> analyze -> persist -> render -> d
 | `main.py` | Process bootstrap, analysis and scheduling coordination, optional API serving, Bot stream startup, and compatibility exports | Runtime helpers and direct analysis remain here; parsing and mode dispatch are rebound from `src/app/cli.py` to preserve the existing import surface. |
 | `src/app/cli.py` | CLI argument parsing and mode dispatch | Dispatches through `main.py` runtime helpers; it does not own a second analysis or service lifecycle. |
 | `server.py` | Direct ASGI/uvicorn entry | Installs `ApplicationServices` and exports the FastAPI application; it does not start Bot stream clients. |
+| `webui.py` | Retained compatibility launcher for direct FastAPI startup | Reads `WEBUI_HOST` / `WEBUI_PORT` with legacy `API_HOST` / `API_PORT` fallback and starts `api.app:app`. Primary documentation and Docker startup use `main.py`; this entrypoint is not deprecated. |
 | `api/app.py` | FastAPI factory and lifespan | Owns auth/CORS/errors, routes, static Web hosting, `RuntimeSchedulerService`, and app-scoped `SystemConfigService`. |
 | `bot/` | Platform adapters, dispatcher, and commands | Bot `/analyze` submits to the shared process-local queue. Stream clients are started by `main.py`; Bot webhooks are not FastAPI routes. |
 | `apps/dsa-web/` | React/Vite product client | Calls `/api/v1` and observes analysis state through polling and task SSE. The production build is served by FastAPI. |
 | `apps/dsa-desktop/` | Electron packaging and desktop process coordination | Starts the packaged or local Python backend, waits for `/api/health`, then loads the FastAPI-hosted Web UI. |
+
+## Repository Directory Boundary
+
+| Path | Responsibility |
+| --- | --- |
+| `src/` | Primary application package for orchestration, services, schemas, persistence, report rendering, and shared runtime logic. |
+| `src/market/` | Canonical market-analysis, market-context, phase-prompt, phase-summary, and structure-prompt implementations. The top-level `src/market_analyzer.py`, `src/market_context.py`, `src/market_phase_prompt.py`, `src/market_phase_summary.py`, and `src/market_structure_prompt.py` modules remain compatibility facades. |
+| `src/analysis_context_pack/` | Canonical context projection and prompt-rendering implementations. `src/analysis_context_pack_overview.py` and `src/analysis_context_pack_prompt.py` remain compatibility facades. |
+| `data_provider/` | Provider adapters, capability routing, normalization, caching, fallback, and health control. |
+| `api/` | FastAPI transport, middleware, lifecycle, and public HTTP schemas. |
+| `bot/` | Messaging-platform adapters, dispatch, commands, and stream integrations. |
+| `strategies/` | Built-in natural-language trading Skill definitions loaded from top-level YAML files. |
+| `templates/` | Jinja report presentation templates consumed by the report renderer. |
+
+`src/`, `data_provider/`, `api/`, and `bot/` intentionally remain separate
+top-level Python packages. They are stable ownership boundaries, not an
+unfinished migration into a single umbrella namespace. GitHub Actions path
+filters name the current `api/**` and selected `src/**` surfaces, CI and Docker
+smoke checks import all four roots directly, and imports plus documentation
+reference these paths throughout the repository. Rehousing them for namespace
+aesthetics would create a broad workflow, container, test, and documentation
+migration without changing product behavior. Any future unification therefore
+requires a separately reviewed migration plan with explicit compatibility,
+path-filter, container-smoke, and reference-update coverage.
 
 ## Ownership Boundaries
 

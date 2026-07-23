@@ -39,12 +39,6 @@ import { getStrategyDisplay } from '../utils/strategyDisplay';
 import { getUiListSeparator } from '../utils/uiLocale';
 import { APP_ROUTE_PATHS } from '../routing/routes';
 
-type MarketReviewNotice = {
-  variant: 'success' | 'warning' | 'danger';
-  title: string;
-  message: string;
-} | null;
-
 type RunFlowDrawerState =
   | { open: false }
   | { open: true; source: RunFlowSnapshotSource; title: string };
@@ -194,9 +188,6 @@ const HomePage: React.FC = () => {
   const location = useLocation();
   const { language: uiLanguage, t } = useUiLanguage();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isSubmittingMarketReview, setIsSubmittingMarketReview] = useState(false);
-  const [marketReviewNotice, setMarketReviewNotice] = useState<MarketReviewNotice>(null);
-  const [marketReviewError, setMarketReviewError] = useState<ParsedApiError | null>(null);
   const [analysisSkills, setAnalysisSkills] = useState<SkillInfo[]>([]);
   const [selectedStrategyId, setSelectedStrategyId] = useState('');
   const [strategyMenuOpen, setStrategyMenuOpen] = useState(false);
@@ -216,47 +207,19 @@ const HomePage: React.FC = () => {
   const [todayAnalysisRefreshVersion, setTodayAnalysisRefreshVersion] = useState(0);
   const [isStockBarInitialLoadSettled, setIsStockBarInitialLoadSettled] = useState(false);
   const duplicateBannerTimer = useRef<number | null>(null);
-  const marketReviewPollTimer = useRef<number | null>(null);
-  const marketReviewPollGeneration = useRef(0);
   const homeUrlOwnerActiveRef = useRef(false);
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
   const stockBarLoadStartedRef = useRef(false);
-  const dashboardScrollRef = useRef<HTMLElement | null>(null);
   const strategyButtonRef = useRef<HTMLButtonElement | null>(null);
   const strategyItemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const strategyInitialFocusIndexRef = useRef<number | null>(null);
-
-  const stopMarketReviewPolling = useCallback(() => {
-    // Bump the generation so any in-flight poll from the previous run is
-    // discarded when it resolves, and cancel the next scheduled tick.
-    marketReviewPollGeneration.current += 1;
-    if (marketReviewPollTimer.current !== null) {
-      window.clearTimeout(marketReviewPollTimer.current);
-      marketReviewPollTimer.current = null;
-    }
-  }, []);
-
-  const scrollMarketReviewFeedbackIntoView = useCallback(() => {
-    const scrollContainer = dashboardScrollRef.current;
-    if (!scrollContainer) {
-      return;
-    }
-
-    if (typeof scrollContainer.scrollTo === 'function') {
-      scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-
-    scrollContainer.scrollTop = 0;
-  }, []);
 
   useEffect(() => {
     homeUrlOwnerActiveRef.current = true;
     return () => {
       homeUrlOwnerActiveRef.current = false;
-      stopMarketReviewPolling();
     };
-  }, [stopMarketReviewPolling]);
+  }, []);
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
 
   const {
@@ -274,7 +237,6 @@ const HomePage: React.FC = () => {
     selectedRecordId,
     isLoadingReport,
     isHistoryTrendOpen,
-    marketReviewHistoryItems,
     stockHistoryItems,
     stockHistoryTotal,
     stockHistoryHasMore,
@@ -289,8 +251,6 @@ const HomePage: React.FC = () => {
     loadInitialHistory,
     refreshHistory,
     refreshHistoryForCompletedTask,
-    loadMarketReviewHistory,
-    refreshMarketReviewHistory,
     selectHistoryItem,
     retrySelectedRecord,
     clearSelectedRecord,
@@ -316,8 +276,13 @@ const HomePage: React.FC = () => {
     refreshStockBar,
   } = useHomeDashboardState();
 
+  const analysisHistoryItems = useMemo(
+    () => historyItems.filter((item) => item.reportType !== 'market_review' && item.stockCode !== 'MARKET'),
+    [historyItems],
+  );
+
   const homeUrlState = useHomeUrlState({
-    defaultRecordId: historyItems[0]?.id ?? null,
+    defaultRecordId: analysisHistoryItems[0]?.id ?? null,
     isHistoryLoading: isLoadingHistory,
     selectedRecordId,
     selectedReportId: selectedReport?.meta.id ?? null,
@@ -417,6 +382,30 @@ const HomePage: React.FC = () => {
 
   const reportLanguage = normalizeReportLanguage(selectedReport?.meta.reportLanguage);
   const isMarketReviewHistoryReport = selectedReport?.meta.reportType === 'market_review';
+  useEffect(() => {
+    if (
+      !isMarketReviewHistoryReport
+      || homeUrlState.recordId === null
+      || selectedReport?.meta.id !== homeUrlState.recordId
+    ) {
+      return;
+    }
+    navigate(
+      {
+        pathname: APP_ROUTE_PATHS.researchMarket,
+        search: location.search,
+        hash: location.hash,
+      },
+      { replace: true },
+    );
+  }, [
+    homeUrlState.recordId,
+    isMarketReviewHistoryReport,
+    location.hash,
+    location.search,
+    navigate,
+    selectedReport?.meta.id,
+  ]);
   const isHistoryTrendUnavailable = !selectedReport || !selectedReport.meta.stockCode;
   const homeUrlIssueTitle = homeUrlState.urlIssue === 'invalid_record'
     ? t('home.invalidRecordLinkTitle')
@@ -602,8 +591,6 @@ const HomePage: React.FC = () => {
     loadInitialHistory,
     refreshHistory,
     refreshHistoryForCompletedTask: refreshCompletedTaskHistory,
-    loadMarketReviewHistory,
-    refreshMarketReviewHistory,
     loadStockBar,
     refreshStockBar,
     syncTaskCreated,
@@ -743,17 +730,10 @@ const HomePage: React.FC = () => {
     };
   }, [canLookupWatchlistHistory, watchlistMissingHistoryEntries, watchlistMissingHistorySignature]);
 
-  const clearMarketReviewState = useCallback(() => {
-    stopMarketReviewPolling();
-    setMarketReviewNotice(null);
-    setMarketReviewError(null);
-  }, [stopMarketReviewPolling]);
-
   const handleHistoryItemClick = useCallback((recordId: number) => {
-    clearMarketReviewState();
     homeUrlState.navigateToRecord(recordId);
     setSidebarOpen(false);
-  }, [clearMarketReviewState, homeUrlState]);
+  }, [homeUrlState]);
 
   const [isDeletingStock, setIsDeletingStock] = useState(false);
   const handleDeleteStock = useCallback(async (stockCode: string) => {
@@ -767,18 +747,14 @@ const HomePage: React.FC = () => {
       }
     };
     rememberRecord(selectedReport?.meta);
-    historyItems.forEach(rememberRecord);
-    marketReviewHistoryItems.forEach(rememberRecord);
+    analysisHistoryItems.forEach(rememberRecord);
     stockHistoryItems.forEach(rememberRecord);
     stockBarItems.forEach(rememberRecord);
     todayHistoryItems.forEach(rememberRecord);
 
-    const matchesDeletedStock = (record: HomeRecordIdentity | null): boolean => Boolean(record) && (
-      stockCode === 'MARKET'
-        ? record?.reportType === 'market_review'
-        : record?.reportType !== 'market_review'
-          && getStockCodeKey(record?.stockCode) === deletedStockCode
-    );
+    const matchesDeletedStock = (record: HomeRecordIdentity | null): boolean => Boolean(record)
+      && record?.reportType !== 'market_review'
+      && getStockCodeKey(record?.stockCode) === deletedStockCode;
     const resolveRecordIdentity = async (recordId: number): Promise<HomeRecordIdentityResolution> => {
       const currentReport = selectedReportRef.current;
       if (currentReport?.meta.id === recordId) {
@@ -810,15 +786,13 @@ const HomePage: React.FC = () => {
       const [freshHistory] = await Promise.all([
         refreshHistory(false),
         refreshStockBar(),
-        stockCode === 'MARKET' ? refreshMarketReviewHistory(false) : Promise.resolve(),
       ]);
       if (!homeUrlOwnerActiveRef.current) {
         return;
       }
       const nextItem = freshHistory?.items.find((item) => (
-        stockCode === 'MARKET'
-          ? item.reportType !== 'market_review'
-          : getStockCodeKey(item.stockCode) !== deletedStockCode
+        item.reportType !== 'market_review'
+        && getStockCodeKey(item.stockCode) !== deletedStockCode
       ));
       const preserveError = freshHistory === null;
 
@@ -846,11 +820,9 @@ const HomePage: React.FC = () => {
       }
     }
   }, [
-    historyItems,
+    analysisHistoryItems,
     isDeletingStock,
-    marketReviewHistoryItems,
     refreshHistory,
-    refreshMarketReviewHistory,
     refreshStockBar,
     selectedReport,
     stockBarItems,
@@ -974,7 +946,7 @@ const HomePage: React.FC = () => {
     }
 
     const reportMeta = selectedReport?.meta.id === source.recordId ? selectedReport.meta : null;
-    const historyItem = historyItems.find((item) => item.id === source.recordId);
+    const historyItem = analysisHistoryItems.find((item) => item.id === source.recordId);
     const stock = reportMeta?.stockName
       || reportMeta?.stockCode
       || historyItem?.stockName
@@ -985,155 +957,7 @@ const HomePage: React.FC = () => {
       source,
       title: t('runFlow.historyDrawerTitle', { stock }),
     };
-  }, [activeTasks, historyItems, homeUrlState.runFlowSource, selectedReport, t]);
-
-  const pollMarketReviewStatus = useCallback(
-    async (taskId: string) => {
-      stopMarketReviewPolling();
-      // Capture this run's generation after stop bumped it; results are only
-      // applied while this stays the current generation (single-flight).
-      const generation = marketReviewPollGeneration.current;
-      const isCurrent = () => generation === marketReviewPollGeneration.current;
-
-      const maxAttempts = 120;
-      const intervalMs = 2000;
-      let attempts = 0;
-
-      const poll = async (): Promise<boolean> => {
-        if (attempts >= maxAttempts) {
-          setMarketReviewNotice({
-            variant: 'danger',
-            title: t('home.marketReviewTimeout'),
-            message: t('home.marketReviewTimeoutMessage'),
-          });
-          scrollMarketReviewFeedbackIntoView();
-          return false;
-        }
-
-        attempts += 1;
-
-        try {
-          const status = await analysisApi.getStatus(taskId);
-          // Discard results from a superseded run (page left or a newer review).
-          if (!isCurrent()) {
-            return false;
-          }
-          if (status.status === 'pending' || status.status === 'processing') {
-            const progress = typeof status.progress === 'number'
-              ? `${status.progress}%`
-              : t('home.progressActive');
-            setMarketReviewNotice({
-              variant: 'warning',
-              title: t('home.marketReviewInProgress'),
-              message: t('home.taskStatus', { status: status.status, progress }),
-            });
-            return true;
-          }
-
-          if (status.status === 'completed') {
-            const refreshedHistory = await refreshMarketReviewHistory(true);
-            if (!isCurrent() || !homeUrlOwnerActiveRef.current) {
-              return false;
-            }
-            const persistedItem = refreshedHistory?.items.find((item) => (
-              item.reportType === 'market_review' && item.queryId === taskId
-            ));
-            setMarketReviewNotice({
-              variant: 'success',
-              title: t('home.marketReviewCompleted'),
-              message: persistedItem
-                ? t('home.marketReviewCompletedWithReport')
-                : t('home.marketReviewCompletedWithoutReport'),
-            });
-            setMarketReviewError(null);
-            if (persistedItem) {
-              homeUrlStateRef.current.replaceRecord(persistedItem.id);
-            }
-            scrollMarketReviewFeedbackIntoView();
-            return false;
-          }
-
-          if (status.status === 'failed') {
-            setMarketReviewError(
-              getParsedApiError({
-                response: {
-                  status: 500,
-                  data: {
-                    error: 'market_review_failed',
-                    message: status.error || t('home.marketReviewFailed'),
-                  },
-                },
-              }),
-            );
-            setMarketReviewNotice(null);
-            scrollMarketReviewFeedbackIntoView();
-            return false;
-          }
-
-          setMarketReviewNotice({
-            variant: 'danger',
-            title: t('home.marketReviewUnknownStatus'),
-            message: t('home.unknownTaskStatus', { status: status.status }),
-          });
-          scrollMarketReviewFeedbackIntoView();
-          return false;
-        } catch (err: unknown) {
-          if (!isCurrent()) {
-            return false;
-          }
-          const parsed = getParsedApiError(err);
-          if (attempts >= maxAttempts) {
-            setMarketReviewError(parsed);
-            setMarketReviewNotice(null);
-            scrollMarketReviewFeedbackIntoView();
-            return false;
-          }
-          return true;
-        }
-      };
-
-      // Single-flight recursive scheduler: the next tick is only scheduled
-      // after the current poll settles, so slow requests never overlap.
-      const runPoll = async (): Promise<void> => {
-        const shouldContinue = await poll();
-        if (!isCurrent() || !shouldContinue) {
-          return;
-        }
-        marketReviewPollTimer.current = window.setTimeout(() => {
-          void runPoll();
-        }, intervalMs);
-      };
-
-      await runPoll();
-    },
-    [refreshMarketReviewHistory, scrollMarketReviewFeedbackIntoView, stopMarketReviewPolling, t],
-  );
-
-  const handleTriggerMarketReview = useCallback(async () => {
-    setIsSubmittingMarketReview(true);
-    setMarketReviewNotice(null);
-    setMarketReviewError(null);
-    scrollMarketReviewFeedbackIntoView();
-    try {
-      const result = await analysisApi.triggerMarketReview({ sendNotification: notify });
-      setMarketReviewNotice({
-        variant: 'success',
-        title: t('home.marketReviewSubmitted'),
-        message: result.message,
-      });
-      scrollMarketReviewFeedbackIntoView();
-
-      if (result.taskId) {
-        void pollMarketReviewStatus(result.taskId);
-      }
-    } catch (err: unknown) {
-      setMarketReviewError(getParsedApiError(err));
-      setMarketReviewNotice(null);
-      scrollMarketReviewFeedbackIntoView();
-    } finally {
-      setIsSubmittingMarketReview(false);
-    }
-  }, [notify, pollMarketReviewStatus, scrollMarketReviewFeedbackIntoView, t]);
+  }, [activeTasks, analysisHistoryItems, homeUrlState.runFlowSource, selectedReport, t]);
 
   const todayDateKey = getTodayInShanghai();
   useEffect(() => {
@@ -1396,32 +1220,12 @@ const HomePage: React.FC = () => {
     watchlistState.watchlistCodes,
   ]);
 
-  const mergedStockBarItems = useMemo<StockBarItem[]>(() => {
-    const latestMarketReview = marketReviewHistoryItems[0];
-    const stockItems = stockBarItems.filter((item) => item.stockCode !== 'MARKET');
-    if (!latestMarketReview) {
-      return stockItems;
-    }
-
-    const marketReviewItem: StockBarItem = {
-      id: latestMarketReview.id,
-      stockCode: 'MARKET',
-      stockName: latestMarketReview.stockName || t('home.marketReview'),
-      reportType: 'market_review',
-      sentimentScore: latestMarketReview.sentimentScore,
-      operationAdvice: latestMarketReview.operationAdvice,
-      analysisCount: Math.max(marketReviewHistoryItems.length, 1),
-      lastAnalysisTime: latestMarketReview.createdAt,
-      modelUsed: latestMarketReview.modelUsed,
-      marketPhaseSummary: latestMarketReview.marketPhaseSummary,
-    };
-
-    return [marketReviewItem, ...stockItems].sort((left, right) => {
-      const leftTime = left.lastAnalysisTime ? Date.parse(left.lastAnalysisTime) : 0;
-      const rightTime = right.lastAnalysisTime ? Date.parse(right.lastAnalysisTime) : 0;
-      return rightTime - leftTime;
-    });
-  }, [marketReviewHistoryItems, stockBarItems, t]);
+  const homeStockBarItems = useMemo<StockBarItem[]>(
+    () => stockBarItems.filter((item) => (
+      item.stockCode !== 'MARKET' && item.reportType !== 'market_review'
+    )),
+    [stockBarItems],
+  );
 
   const sidebarContent = useMemo(
     () => (
@@ -1448,7 +1252,7 @@ const HomePage: React.FC = () => {
           isLoadingTodayItems={isLoadingTodayAnalysisItems}
           todayLoadError={todayAnalysisLoadFailed}
           watchlistAnalyzedTodayCount={watchlistAnalyzedTodayCount}
-          historyItems={mergedStockBarItems}
+          historyItems={homeStockBarItems}
           isLoadingHistory={isLoadingStockBar}
           selectedStockCode={selectedReport?.meta.stockCode}
           selectedRecordId={selectedRecordId ?? selectedReport?.meta.id}
@@ -1470,7 +1274,7 @@ const HomePage: React.FC = () => {
       isLoadingStockBar,
       isLoadingTodayAnalysisItems,
       todayAnalysisLoadFailed,
-      mergedStockBarItems,
+      homeStockBarItems,
       openTaskRunFlow,
       removeTask,
       selectedRecordId,
@@ -1588,18 +1392,6 @@ const HomePage: React.FC = () => {
                 containerClassName="h-9 flex-shrink-0 gap-1.5 rounded-lg border border-subtle bg-subtle px-2 text-xs text-secondary-text transition-colors hover:border-subtle-hover hover:text-foreground"
                 label={<span className="text-xs font-normal text-secondary-text">{t('home.notify')}</span>}
               />
-              <Button
-                type="button"
-                variant="secondary"
-                size="comfortable"
-                isLoading={isSubmittingMarketReview}
-                loadingText={t('home.submitMarketReview')}
-                onClick={() => void handleTriggerMarketReview()}
-                className="whitespace-nowrap"
-              >
-                <BarChart3 className="h-4 w-4" aria-hidden="true" />
-                {t('home.marketReview')}
-              </Button>
               <div className="grid flex-1 basis-32 md:flex-none md:basis-auto">
                 <Button
                   variant="primary"
@@ -1690,31 +1482,9 @@ const HomePage: React.FC = () => {
           </Drawer>
 
           <section
-            ref={dashboardScrollRef}
             data-testid="home-dashboard-scroll"
             className="flex-1 min-w-0 min-h-0 overflow-x-auto overflow-y-auto px-3 pb-4 md:px-6 touch-pan-y"
           >
-            {marketReviewNotice ? (
-              <div className="mb-3">
-                <InlineAlert
-                  variant={marketReviewNotice.variant}
-                  size="compact"
-                  title={marketReviewNotice.title}
-                  message={marketReviewNotice.message}
-                />
-              </div>
-            ) : null}
-
-            {marketReviewError ? (
-              <div className="mb-3">
-                <ApiErrorAlert
-                  error={marketReviewError}
-                  className="mb-1"
-                  onDismiss={() => setMarketReviewError(null)}
-                />
-              </div>
-            ) : null}
-
             {homeUrlState.urlIssue ? (
               <div className="mb-3">
                 <InlineAlert
@@ -1757,47 +1527,31 @@ const HomePage: React.FC = () => {
               <div className="flex h-full flex-col items-center justify-center">
                 <DashboardStateBlock title={t('home.loadingReport')} loading />
               </div>
-            ) : selectedReport ? (
+            ) : selectedReport && !isMarketReviewHistoryReport ? (
               <div className="space-y-4 pb-8">
                 <div className="flex flex-wrap items-center justify-end gap-2">
-                  {!isMarketReviewHistoryReport ? (
-                    <>
-                      <Button
-                        variant="secondary"
-                        size="default"
-                        disabled={isAnalyzing || selectedReport.meta.id === undefined}
-                        onClick={handleReanalyze}
-                      >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                        {t('home.reanalyze')}
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="default"
-                        disabled={selectedReport.meta.id === undefined}
-                        onClick={handleAskFollowUp}
-                      >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                        </svg>
-                        {t('home.askAi')}
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      variant="secondary"
-                      size="default"
-                      disabled={isSubmittingMarketReview}
-                      isLoading={isSubmittingMarketReview}
-                      loadingText={t('home.submitMarketReview')}
-                      onClick={() => void handleTriggerMarketReview()}
-                    >
-                      <BarChart3 className="h-4 w-4" />
-                      {t('home.rerunMarketReview')}
-                    </Button>
-                  )}
+                  <Button
+                    variant="secondary"
+                    size="default"
+                    disabled={isAnalyzing || selectedReport.meta.id === undefined}
+                    onClick={handleReanalyze}
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    {t('home.reanalyze')}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="default"
+                    disabled={selectedReport.meta.id === undefined}
+                    onClick={handleAskFollowUp}
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                    {t('home.askAi')}
+                  </Button>
                   <Button
                     variant="secondary"
                     size="default"
@@ -1887,6 +1641,7 @@ const HomePage: React.FC = () => {
 
       {markdownDrawerOpen
       && !isLoadingReport
+      && !isMarketReviewHistoryReport
       && selectedReport?.meta.id
       && selectedReport.meta.id === homeUrlState.recordId ? (
         <ReportMarkdownDrawer
@@ -1899,7 +1654,7 @@ const HomePage: React.FC = () => {
         />
       ) : null}
 
-      {runFlowDrawer.open ? (
+      {runFlowDrawer.open && !isMarketReviewHistoryReport ? (
         <Modal
           isOpen={runFlowDrawer.open}
           onClose={closeRunFlowDrawer}

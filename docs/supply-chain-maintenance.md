@@ -91,8 +91,14 @@ secrets. The secret-bearing AI job instead checks out the manifest,
 immutable pull-request base commit (or the current commit for a manual dispatch)
 before installing dependencies. It never installs pull-request-controlled
 dependency inputs before injecting review secrets. The
-workflow guard enforces this trust boundary, rejects additional sparse-checkout
-paths or install steps, and prevents secrets from being injected before install.
+workflow guard enforces this trust boundary as an exact seven-step contract:
+step order, Action identities, inputs, commands, runner, job gate, and the
+secret-bearing environment are all reviewed. Extra local Actions, package
+installs, execution settings, or secret references outside the AI step fail.
+Before the trusted script runs, the job removes any pull-request-provided result
+node. A result is accepted only as a regular file, moved into the runner-owned
+temporary directory, and uploaded from that trusted path; an unavailable
+provider therefore cannot expose a pre-seeded pull-request artifact.
 
 ## GitHub Actions
 
@@ -238,6 +244,11 @@ update, conventionally formatted and flow-mapped movable references, floating
 release comments, missing permission declarations, top-level write access,
 active/expired/overlong exceptions, unapproved read or write scopes, and the
 immutable trusted-base dependency boundary for the secret-bearing review job.
+Counterexamples cover inserted steps, local Actions, pip global-option
+install commands, job or step environment injection, and dot or bracket-form
+secret references outside the single reviewed AI step. They also require
+pull-request result cleanup, regular-file validation, and runner-owned artifact
+upload before the write-capable comment job can consume review output.
 The dependency self-tests separately cover source and lock drift, lock and direct
 movable Git sources, non-exact versions, future cutoffs, overlapping markers,
 runtime install contracts, active/expired/overlong exceptions, resolver-output
@@ -245,14 +256,23 @@ drift, and a representative reviewed dependency update. Vulnerability self-tests
 cover findings, exact active exceptions, expired/overlong/unused exceptions,
 allowed versus unexpected audit skips, and complete multi-version audit planning.
 
-The install-guidance guard scans git-tracked text for raw requirements-file
-install hints. A temporary cross-track exception must identify the exact path,
-line-text SHA-256, occurrence count, owner, issue, reason, and an expiry no more
-than 30 days away. Text or count drift, unused entries, and expired or overlong
-exceptions fail CI. Issue #400 owns removal of the current runtime, Web, CLI,
-and tool-diagnostic exceptions; maintained Markdown setup instructions are
-converged separately by #394. Historical Changelog entries are not executable
-guidance and are excluded from this scan.
+The install-guidance guard scans every non-binary git-tracked path, including
+extensionless files and all text suffixes, for raw requirements-file install
+hints as logical commands. It joins shell backslash and PowerShell backtick
+continuations, CMD caret continuations, and GitHub Actions folded YAML scalars.
+It recognizes compact `-rrequirements.txt` syntax and pip global options before
+`install`. Quote-aware shell tokenization accepts a build constraint only when
+the same command contains a complete `--build-constraint` option or an exact
+preceding `PIP_BUILD_CONSTRAINT=...` assignment before any comment; option text
+embedded in another environment variable does not satisfy the policy. A
+temporary cross-track exception must identify the exact path,
+normalized logical-command SHA-256, occurrence count, owner, issue, reason, and
+an expiry no more than 30 days away. Text or count drift, unused entries, and
+expired or overlong exceptions fail CI. Issue #400 and PR #415 removed the
+runtime, Web, CLI, and tool-diagnostic debt, so the install-guidance exception
+registry is empty. Maintained Markdown setup instructions were converged by
+#394. Historical Changelog entries are not executable guidance and are excluded
+from this scan.
 
 For a bad Action update, revert the affected workflow file to its last reviewed
 SHA and release comment, then rerun the same checks. For a permission regression,
