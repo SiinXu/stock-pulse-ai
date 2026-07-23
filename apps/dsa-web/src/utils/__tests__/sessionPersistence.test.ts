@@ -9,6 +9,10 @@ import {
   clearPersistedWebSession,
   readSessionItemWithLegacyLocal,
 } from '../sessionPersistence';
+import {
+  EXPERIENCE_MODE_STORAGE_KEY,
+  ONBOARDING_DISMISSED_STORAGE_KEY,
+} from '../onboardingPreferences';
 
 describe('sessionPersistence', () => {
   beforeEach(() => {
@@ -41,6 +45,8 @@ describe('sessionPersistence', () => {
     window.localStorage.setItem(`${DEEP_RESEARCH_SESSION_STORAGE_PREFIX}legacy`, '{}');
     window.localStorage.setItem('dsa.uiLanguage', 'en');
     window.localStorage.setItem('stockpulse-theme', 'dark');
+    window.localStorage.setItem(EXPERIENCE_MODE_STORAGE_KEY, 'beginner');
+    window.localStorage.setItem(ONBOARDING_DISMISSED_STORAGE_KEY, 'true');
 
     clearPersistedWebSession();
 
@@ -49,5 +55,7 @@ describe('sessionPersistence', () => {
     expect(window.localStorage.getItem(`${DEEP_RESEARCH_SESSION_STORAGE_PREFIX}legacy`)).toBeNull();
     expect(window.localStorage.getItem('dsa.uiLanguage')).toBe('en');
     expect(window.localStorage.getItem('stockpulse-theme')).toBe('dark');
+    expect(window.localStorage.getItem(EXPERIENCE_MODE_STORAGE_KEY)).toBe('beginner');
+    expect(window.localStorage.getItem(ONBOARDING_DISMISSED_STORAGE_KEY)).toBe('true');
   });
 });
