@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { beforeEach, describe, expect, it } from 'vitest';
-import { APP_ROUTE_PATHS } from '../../routing/routes';
+import { APP_ROUTE_PATHS, LEGACY_ROUTE_PATHS } from '../../routing/routes';
 import { WEB_SESSION_CONTINUITY_STORAGE_KEY } from '../sessionPersistence';
 import {
   recordSessionLocation,
@@ -61,8 +61,8 @@ describe('sessionContinuity', () => {
     expect(resolveContextAwareNavigationTarget('/decision-signals', APP_ROUTE_PATHS.settings)).toBe(
       '/decision-signals?stock=HK00700&view=timeline&market=us',
     );
-    expect(resolveContextAwareNavigationTarget('/backtest', APP_ROUTE_PATHS.settings)).toBe(
-      '/backtest?code=HK00700',
+    expect(resolveContextAwareNavigationTarget(APP_ROUTE_PATHS.researchBacktest, APP_ROUTE_PATHS.settings)).toBe(
+      `${APP_ROUTE_PATHS.researchBacktest}?code=HK00700`,
     );
   });
 
@@ -127,13 +127,47 @@ describe('sessionContinuity', () => {
   it('rewrites tampered stored state without unsafe names or invalid dates', () => {
     window.sessionStorage.setItem(WEB_SESSION_CONTINUITY_STORAGE_KEY, JSON.stringify({
       version: 1,
-      routes: { backtest: '/backtest?code=AAPL&from=2026-99-99' },
+      routes: { backtest: `${LEGACY_ROUTE_PATHS.backtest}?code=AAPL&from=2026-99-99` },
       stockContext: { stockCode: 'AAPL', stockName: 'Bad\u0000Name' },
     }));
 
-    expect(resolveInitialSessionHref('/backtest')).toBe('/backtest?code=AAPL');
+    expect(resolveInitialSessionHref(APP_ROUTE_PATHS.researchBacktest)).toBe(
+      `${APP_ROUTE_PATHS.researchBacktest}?code=AAPL`,
+    );
     expect(window.sessionStorage.getItem(WEB_SESSION_CONTINUITY_STORAGE_KEY)).not.toContain('Bad');
     expect(window.sessionStorage.getItem(WEB_SESSION_CONTINUITY_STORAGE_KEY)).not.toContain('2026-99-99');
+  });
+
+  it('migrates legacy Research snapshots to canonical route keys and paths', () => {
+    window.sessionStorage.setItem(WEB_SESSION_CONTINUITY_STORAGE_KEY, JSON.stringify({
+      version: 1,
+      routes: {
+        screening: `${LEGACY_ROUTE_PATHS.screening}?market=cn&strategy=quality&count=20`,
+        backtest: `${LEGACY_ROUTE_PATHS.backtest}?code=aapl&window=30`,
+      },
+    }));
+
+    expect(resolveInitialSessionHref(APP_ROUTE_PATHS.researchDiscover)).toBe(
+      `${APP_ROUTE_PATHS.researchDiscover}?market=cn&strategy=quality&count=20`,
+    );
+    expect(resolveInitialSessionHref(APP_ROUTE_PATHS.researchBacktest)).toBe(
+      `${APP_ROUTE_PATHS.researchBacktest}?code=AAPL&window=30`,
+    );
+    const persisted = window.sessionStorage.getItem(WEB_SESSION_CONTINUITY_STORAGE_KEY) ?? '';
+    expect(persisted).toContain('research-discover');
+    expect(persisted).toContain('research-backtest');
+    expect(persisted).not.toContain('"screening"');
+    expect(persisted).not.toContain('"backtest"');
+  });
+
+  it('restores market review record and Run Flow state on the canonical route', () => {
+    recordSessionLocation(
+      `${APP_ROUTE_PATHS.researchMarket}?recordId=42&runFlow=history&runFlowRecordId=42`,
+    );
+
+    expect(resolveInitialSessionHref(APP_ROUTE_PATHS.researchMarket)).toBe(
+      `${APP_ROUTE_PATHS.researchMarket}?recordId=42&runFlow=history&runFlowRecordId=42`,
+    );
   });
 
   it('removes malformed Home pipeline identities from tampered storage', () => {

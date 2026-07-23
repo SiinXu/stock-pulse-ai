@@ -1,6 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { APP_ROUTE_PATHS } from '../src/routing/routes';
 import { loginAsE2eAdmin } from './auth-fixture';
 
 const buttonHeights: Record<string, number> = {
@@ -195,7 +196,7 @@ test.describe('touch-capable foundation controls', () => {
     await expect(deleteDialog).toHaveCount(0);
 
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/backtest');
+    await page.goto(APP_ROUTE_PATHS.researchBacktest);
     await expect(page.locator('[data-control="input"]:visible').first()).toBeVisible();
     await expectVisibleHeights(page.locator('[data-control="input"]:visible'), inputHeights);
     await expectVisibleHeights(page.locator('[data-control="button"]:visible'), buttonHeights);

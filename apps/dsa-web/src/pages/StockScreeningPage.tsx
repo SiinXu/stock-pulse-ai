@@ -1671,7 +1671,23 @@ const StockScreeningPage: React.FC = () => {
           columns={candidateColumns}
           rows={candidates}
           getRowKey={(item) => `${item.rank}-${item.code}`}
-          emptyState={{ title: text.noResults, description: text.noResultsDescription }}
+          emptyState={{
+            title: text.noResults,
+            description: text.noResultsDescription,
+            action: (
+              <Button
+                type="button"
+                variant="primary"
+                size="default"
+                disabled={loading}
+                aria-label={text.waitingRun}
+                onClick={handleOpenConfiguration}
+              >
+                <Play className="h-4 w-4" aria-hidden="true" />
+                {text.run}
+              </Button>
+            ),
+          }}
           minWidth="wide"
           isRowDetailVisible={(item) => expandedCode === item.code}
           renderRowDetail={renderCandidateDetail}

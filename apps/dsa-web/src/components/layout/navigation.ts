@@ -20,6 +20,7 @@ export type ApplicationNavigationItem = {
   icon: LucideIcon;
   exact?: boolean;
   badge?: 'completion';
+  children?: readonly ApplicationNavigationItem[];
 };
 
 export function shouldDelegateCurrentDocumentNavigation(
@@ -38,14 +39,32 @@ export function shouldDelegateCurrentDocumentNavigation(
   );
 }
 
-// Current flat routes remain canonical until an approved IA tuple replaces them.
+// Keep the five primary domains stable while secondary routes remain discoverable
+// in both expanded navigation and the compact flyout.
 export const APPLICATION_NAVIGATION_ITEMS: readonly ApplicationNavigationItem[] = [
-  { key: 'home', labelKey: 'layout.nav.home', to: '/', icon: Home, exact: true },
-  { key: 'chat', labelKey: 'layout.nav.chat', to: '/chat', icon: MessageSquareQuote, badge: 'completion' },
-  { key: 'screening', labelKey: 'layout.nav.screening', to: '/screening', icon: Search },
-  { key: 'portfolio', labelKey: 'layout.nav.portfolio', to: '/portfolio', icon: BriefcaseBusiness },
-  { key: 'decision-signals', labelKey: 'layout.nav.decisionSignals', to: '/decision-signals', icon: Activity },
-  { key: 'backtest', labelKey: 'layout.nav.backtest', to: '/backtest', icon: BarChart3 },
-  { key: 'alerts', labelKey: 'layout.nav.alerts', to: '/alerts', icon: Bell },
+  {
+    key: 'home',
+    labelKey: 'layout.nav.home',
+    to: APP_ROUTE_PATHS.home,
+    icon: Home,
+    exact: true,
+    children: [
+      { key: 'decision-signals', labelKey: 'layout.nav.decisionSignals', to: APP_ROUTE_PATHS.decisionSignals, icon: Activity },
+      { key: 'alerts', labelKey: 'layout.nav.alerts', to: APP_ROUTE_PATHS.alerts, icon: Bell },
+    ],
+  },
+  {
+    key: 'research',
+    labelKey: 'layout.nav.research',
+    to: APP_ROUTE_PATHS.researchMarket,
+    icon: Search,
+    children: [
+      { key: 'research-market', labelKey: 'home.marketReview', to: APP_ROUTE_PATHS.researchMarket, icon: BarChart3 },
+      { key: 'research-discover', labelKey: 'layout.nav.discover', to: APP_ROUTE_PATHS.researchDiscover, icon: Search },
+      { key: 'research-backtest', labelKey: 'layout.nav.backtest', to: APP_ROUTE_PATHS.researchBacktest, icon: Activity },
+    ],
+  },
+  { key: 'portfolio', labelKey: 'layout.nav.portfolio', to: APP_ROUTE_PATHS.portfolio, icon: BriefcaseBusiness },
+  { key: 'agent', labelKey: 'layout.nav.agent', to: APP_ROUTE_PATHS.agent, icon: MessageSquareQuote, badge: 'completion' },
   { key: 'settings', labelKey: 'layout.nav.settings', to: APP_ROUTE_PATHS.settings, icon: Settings2 },
 ];

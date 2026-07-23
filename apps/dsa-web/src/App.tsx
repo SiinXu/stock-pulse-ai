@@ -32,6 +32,7 @@ import { resolveLoginRedirect } from './utils/loginRedirect';
 import './App.css';
 
 const HomePage = lazy(() => import('./pages/HomePage'));
+const MarketReviewPage = lazy(() => import('./pages/MarketReviewPage'));
 const BacktestPage = lazy(() => import('./pages/BacktestPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
@@ -82,17 +83,17 @@ const AppLayout: React.FC = () => {
     );
   }
 
-  const isLoginRoute = location.pathname === '/login';
+  const isLoginRoute = location.pathname === APP_ROUTE_PATHS.login;
 
   if (authEnabled && !loggedIn) {
     if (isLoginRoute) {
       return <Outlet />;
     }
     if (logoutRedirectPending) {
-      return <Navigate to="/login" replace />;
+      return <Navigate to={APP_ROUTE_PATHS.login} replace />;
     }
     const redirect = encodeURIComponent(location.pathname + location.search);
-    return <Navigate to={`/login?redirect=${redirect}`} replace />;
+    return <Navigate to={`${APP_ROUTE_PATHS.login}?redirect=${redirect}`} replace />;
   }
 
   if (isLoginRoute) {
@@ -123,7 +124,7 @@ const routes = [
     ),
     children: [
       {
-        path: '/login',
+        path: APP_ROUTE_PATHS.login,
         element: (
           <StandaloneRouteBoundary>
             <LoginPage />
@@ -131,7 +132,7 @@ const routes = [
         ),
       },
       {
-        path: '/playground',
+        path: APP_ROUTE_PATHS.playground,
         element: (
           <StandaloneRouteBoundary>
             <ComponentPlaygroundPage />
@@ -139,7 +140,7 @@ const routes = [
         ),
       },
       {
-        path: '/playground/render/:componentId/:scenarioId',
+        path: APP_ROUTE_PATHS.playgroundRender,
         element: (
           <StandaloneRouteBoundary>
             <PlaygroundRenderPage />
@@ -153,14 +154,23 @@ const routes = [
           </Shell>
         ),
         children: [
-          { path: '/', element: <HomePage /> },
-          { path: '/chat', element: <ChatPage /> },
-          { path: '/portfolio', element: <PortfolioPage /> },
-          { path: '/decision-signals', element: <DecisionSignalsPage /> },
-          { path: '/stocks/:stockCode', element: <StockDetailsPage /> },
-          { path: '/screening', element: <StockScreeningPage /> },
-          { path: '/backtest', element: <BacktestPage /> },
-          { path: '/alerts', element: <AlertsPage /> },
+          { path: APP_ROUTE_PATHS.home, element: <HomePage /> },
+          { path: APP_ROUTE_PATHS.agent, element: <ChatPage /> },
+          { path: APP_ROUTE_PATHS.portfolio, element: <PortfolioPage /> },
+          { path: APP_ROUTE_PATHS.decisionSignals, element: <DecisionSignalsPage /> },
+          { path: APP_ROUTE_PATHS.stockDetails, element: <StockDetailsPage /> },
+          { path: APP_ROUTE_PATHS.researchMarket, element: <MarketReviewPage /> },
+          { path: APP_ROUTE_PATHS.researchDiscover, element: <StockScreeningPage /> },
+          { path: APP_ROUTE_PATHS.researchBacktest, element: <BacktestPage /> },
+          { path: APP_ROUTE_PATHS.alerts, element: <AlertsPage /> },
+          {
+            path: LEGACY_ROUTE_PATHS.screening,
+            element: <LegacyRouteRedirect to={APP_ROUTE_PATHS.researchDiscover} />,
+          },
+          {
+            path: LEGACY_ROUTE_PATHS.backtest,
+            element: <LegacyRouteRedirect to={APP_ROUTE_PATHS.researchBacktest} />,
+          },
           {
             path: LEGACY_ROUTE_PATHS.usage,
             element: (

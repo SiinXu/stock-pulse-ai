@@ -136,8 +136,8 @@ test.describe('application shell foundation', () => {
     const opener = page.getByRole('button', { name: 'Open navigation' });
     await opener.click();
     const drawer = page.getByRole('dialog', { name: 'Navigation' });
-    const chatLink = drawer.getByRole('link', { name: 'Ask' });
-    await expect(chatLink).toHaveAttribute('data-route-focus-key', 'shell-nav-mobile:chat');
+    const chatLink = drawer.getByRole('link', { name: 'Agent' });
+    await expect(chatLink).toHaveAttribute('data-route-focus-key', 'shell-nav-mobile:agent');
     await expect(chatLink).toHaveAttribute('data-route-focus-return-key', 'shell:mobile-navigation');
     await chatLink.focus();
     await chatLink.click({ modifiers: ['Control'] });
@@ -279,12 +279,25 @@ test.describe('application shell foundation', () => {
     await expect(page.getByRole('tooltip')).toHaveText('Search');
     const compactHome = sidebar.getByRole('link', { name: 'Home' });
     await compactHome.focus();
-    await expect(page.getByRole('tooltip')).toHaveText('Home');
+    await compactHome.press('ArrowRight');
+    const homeMenu = page.getByRole('menu', { name: 'Home' });
+    await expect(homeMenu).toBeVisible();
+    await expect(homeMenu.getByRole('menuitem', { name: 'AI signals' })).toBeVisible();
+    await expect(homeMenu.getByRole('menuitem', { name: 'Alerts' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(homeMenu).toBeHidden();
+    await expect(compactHome).toBeFocused();
+
+    const compactResearch = sidebar.getByRole('link', { name: 'Research' });
+    await compactResearch.hover();
+    const researchMenu = page.getByRole('menu', { name: 'Research' });
+    await expect(researchMenu.getByRole('menuitem', { name: 'Market review' })).toBeVisible();
+    await expect(researchMenu.getByRole('menuitem', { name: 'Discover' })).toBeVisible();
+    await expect(researchMenu.getByRole('menuitem', { name: 'Backtest' })).toBeVisible();
     const compactNavigation = sidebar.getByRole('navigation', { name: 'Main navigation' });
-    expect(await compactNavigation.evaluate((element) => element.scrollHeight)).toBeGreaterThan(
-      await compactNavigation.evaluate((element) => element.clientHeight),
-    );
-    for (const route of await compactNavigation.getByRole('link').all()) {
+    const compactRoutes = await compactNavigation.getByRole('link').all();
+    expect(compactRoutes).toHaveLength(5);
+    for (const route of compactRoutes) {
       expect((await route.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
     }
     await sidebar.getByRole('button', { name: 'Expand sidebar' }).click();

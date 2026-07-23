@@ -150,24 +150,6 @@ const marketReviewHistoryItem = {
   createdAt: '2026-03-18T08:00:00Z',
 };
 
-const marketReviewHistoryReport = {
-  meta: {
-    id: 2,
-    queryId: 'market-review-q-1',
-    stockCode: 'MARKET',
-    stockName: '大盘复盘',
-    reportType: 'market_review' as const,
-    reportLanguage: 'zh' as const,
-    createdAt: '2026-03-18T08:00:00Z',
-  },
-  summary: {
-    analysisSummary: '大盘复盘摘要',
-    operationAdvice: '查看复盘',
-    trendPrediction: '大盘复盘',
-    sentimentScore: 50,
-  },
-};
-
 const runFlowSnapshot: RunFlowSnapshot = {
   taskId: 'task-1',
   traceId: 'trace-1',
@@ -417,7 +399,7 @@ describe('HomePage', () => {
     expect(screen.getByText('贵州茅台 历史运行流')).toBeInTheDocument();
   });
 
-  it('shows market review history in the stock bar', async () => {
+  it('keeps market review records out of the Home stock workspace', async () => {
     vi.mocked(historyApi.getStockBarList).mockResolvedValue({
       total: 1,
       items: [{
@@ -431,45 +413,26 @@ describe('HomePage', () => {
         lastAnalysisTime: '2026-03-19T08:00:00Z',
       }],
     });
-    vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string } = {}) => {
-      if (params.reportType === 'market_review') {
-        return Promise.resolve({
-          total: 1,
-          page: 1,
-          limit: 10,
-          items: [marketReviewHistoryItem],
-        });
-      }
-      return Promise.resolve({
-        total: 0,
-        page: 1,
-        limit: 20,
-        items: [],
-      });
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 1,
+      page: 1,
+      limit: 20,
+      items: [marketReviewHistoryItem],
     });
-    vi.mocked(historyApi.getDetail).mockResolvedValue(marketReviewHistoryReport);
-
     render(
       <MemoryRouter>
         <HomePage />
       </MemoryRouter>,
     );
 
-    expect(await screen.findByRole('button', { name: /MARKET/ })).toBeInTheDocument();
-    const newerStockButton = await screen.findByRole('button', { name: /AAPL/ });
-    const marketButton = await screen.findByRole('button', { name: /MARKET/ });
-    expect(newerStockButton.compareDocumentPosition(marketButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /AAPL/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /MARKET/ })).not.toBeInTheDocument();
     expect(screen.queryByText('大盘复盘历史')).not.toBeInTheDocument();
-    expect(historyApi.getList).toHaveBeenCalledWith({
-      stockCode: 'MARKET',
+    expect(historyApi.getList).not.toHaveBeenCalledWith(expect.objectContaining({
       reportType: 'market_review',
-      page: 1,
-      limit: 10,
-    });
-
-    fireEvent.click(await screen.findByRole('button', { name: /MARKET/ }));
-
-    expect(await screen.findByText('大盘复盘摘要')).toBeInTheDocument();
+    }));
+    expect(historyApi.getDetail).not.toHaveBeenCalledWith(marketReviewHistoryItem.id);
+    expect(screen.queryByRole('button', { name: '大盘复盘' })).not.toBeInTheDocument();
   });
 
   it('treats timezone-less stock-bar timestamps as Shanghai local time for watchlist pending state', async () => {
@@ -1296,31 +1259,19 @@ describe('HomePage', () => {
     expect(analysisApi.analyzeAsync).toHaveBeenCalledTimes(1);
   });
 
-  it('removes the MARKET stock bar item after deleting market review history', async () => {
-    let isMarketReviewDeleted = false;
+  it('filters a legacy MARKET stock-bar row without exposing deletion controls', async () => {
     vi.mocked(historyApi.getStockBarList).mockResolvedValue({
-      total: 0,
-      items: [],
-    });
-    vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string } = {}) => {
-      if (params.reportType === 'market_review') {
-        return Promise.resolve({
-          total: isMarketReviewDeleted ? 0 : 1,
-          page: 1,
-          limit: 10,
-          items: isMarketReviewDeleted ? [] : [marketReviewHistoryItem],
-        });
-      }
-      return Promise.resolve({
-        total: 0,
-        page: 1,
-        limit: 20,
-        items: [],
-      });
-    });
-    vi.mocked(historyApi.deleteByCode).mockImplementation(async () => {
-      isMarketReviewDeleted = true;
-      return { deleted: 1 };
+      total: 1,
+      items: [{
+        id: marketReviewHistoryItem.id,
+        stockCode: 'MARKET',
+        stockName: '大盘复盘',
+        reportType: 'market_review',
+        sentimentScore: 50,
+        operationAdvice: '查看复盘',
+        analysisCount: 1,
+        lastAnalysisTime: marketReviewHistoryItem.createdAt,
+      }],
     });
 
     render(
@@ -1329,20 +1280,11 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByRole('button', { name: /MARKET/ })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: '删除 大盘复盘 历史记录' }));
-
-    const dialogTitle = await screen.findByText('删除历史记录');
+    await waitFor(() => expect(historyApi.getStockBarList).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: /MARKET/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '删除 大盘复盘 历史记录' }))
+      .not.toBeInTheDocument();
     expect(historyApi.deleteByCode).not.toHaveBeenCalled();
-
-    const dialogCard = dialogTitle.parentElement as HTMLElement;
-    fireEvent.click(within(dialogCard).getByRole('button', { name: '删除' }));
-
-    await waitFor(() => {
-      expect(screen.queryByRole('button', { name: /MARKET/ })).not.toBeInTheDocument();
-    });
-    expect(historyApi.deleteByCode).toHaveBeenCalledWith('MARKET');
   });
 
   it('surfaces duplicate task warnings from dashboard submission', async () => {
@@ -1495,24 +1437,13 @@ describe('HomePage', () => {
     }
   });
 
-  it('submits market review from the home toolbar', async () => {
+  it('does not submit market review from the Home toolbar', async () => {
     vi.mocked(historyApi.getList).mockResolvedValue({
       total: 0,
       page: 1,
       limit: 20,
       items: [],
     });
-    vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
-      status: 'accepted',
-      sendNotification: true,
-      message: '大盘复盘任务已提交',
-      taskId: 'task-1',
-    });
-    vi.mocked(analysisApi.getStatus).mockResolvedValue({
-      taskId: 'task-1',
-      status: 'completed',
-      marketReviewReport: '市场复盘报告示例文本',
-    });
 
     render(
       <MemoryRouter>
@@ -1520,102 +1451,9 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('button', { name: '大盘复盘' }));
-
-    await waitFor(() => {
-      expect(analysisApi.triggerMarketReview).toHaveBeenCalledWith({ sendNotification: true });
-    });
-    expect(await screen.findByText('大盘复盘已完成')).toBeInTheDocument();
-    expect(screen.getByText('大盘复盘任务已完成，结果已生成并按配置推送。')).toBeInTheDocument();
-    expect(screen.queryByText('市场复盘报告示例文本')).not.toBeInTheDocument();
-    expect(historyApi.getDetail).not.toHaveBeenCalled();
-    expect(analysisApi.getStatus).toHaveBeenCalledWith('task-1');
-  });
-
-  it('re-enables Market Review after acceptance and ignores the superseded poll result', async () => {
-    const newMarketItem = {
-      ...marketReviewHistoryItem,
-      id: 3,
-      queryId: 'new-task',
-    };
-    const newMarketReport = {
-      ...marketReviewHistoryReport,
-      meta: {
-        ...marketReviewHistoryReport.meta,
-        id: 3,
-        queryId: 'new-task',
-      },
-      summary: {
-        ...marketReviewHistoryReport.summary,
-        analysisSummary: '新任务持久化复盘',
-      },
-    };
-    vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string } = {}) => Promise.resolve({
-      total: params.reportType === 'market_review' ? 1 : 0,
-      page: 1,
-      limit: params.reportType === 'market_review' ? 10 : 20,
-      items: params.reportType === 'market_review' ? [newMarketItem] : [],
-    }));
-    vi.mocked(historyApi.getDetail).mockResolvedValue(newMarketReport);
-    vi.mocked(historyApi.getMarkdown).mockResolvedValue('# 新任务持久化复盘正文');
-    vi.mocked(analysisApi.triggerMarketReview)
-      .mockResolvedValueOnce({
-        status: 'accepted',
-        sendNotification: true,
-        message: '旧任务已提交',
-        taskId: 'old-task',
-      })
-      .mockResolvedValueOnce({
-        status: 'accepted',
-        sendNotification: true,
-        message: '新任务已提交',
-        taskId: 'new-task',
-      });
-
-    let resolveOldStatus!: (status: Awaited<ReturnType<typeof analysisApi.getStatus>>) => void;
-    const oldStatus = new Promise<Awaited<ReturnType<typeof analysisApi.getStatus>>>((resolve) => {
-      resolveOldStatus = resolve;
-    });
-    vi.mocked(analysisApi.getStatus).mockImplementation((taskId) => {
-      if (taskId === 'old-task') {
-        return oldStatus;
-      }
-      return Promise.resolve({
-        taskId: 'new-task',
-        status: 'completed',
-        marketReviewReport: 'NEW_GENERATION_RENDERED',
-      });
-    });
-
-    render(
-      <MemoryRouter>
-        <HomePage />
-      </MemoryRouter>,
-    );
-
-    fireEvent.click(await screen.findByRole('button', { name: '大盘复盘' }));
-    await waitFor(() => {
-      expect(analysisApi.getStatus).toHaveBeenCalledWith('old-task');
-      expect(screen.getByRole('button', { name: '大盘复盘' })).toBeEnabled();
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: '大盘复盘' }));
-    expect(await screen.findByText('新任务持久化复盘')).toBeInTheDocument();
-    expect(analysisApi.getStatus).toHaveBeenCalledWith('new-task');
-    expect(screen.getByText('大盘复盘任务已完成，结果如下：')).toBeInTheDocument();
-    expect(screen.queryByText('NEW_GENERATION_RENDERED')).not.toBeInTheDocument();
-
-    await act(async () => {
-      resolveOldStatus({
-        taskId: 'old-task',
-        status: 'completed',
-        marketReviewReport: 'OLD_GENERATION_SHOULD_NOT_RENDER',
-      });
-    });
-
-    expect(screen.getByText('新任务持久化复盘')).toBeInTheDocument();
-    expect(screen.getByText('大盘复盘任务已完成，结果如下：')).toBeInTheDocument();
-    expect(screen.queryByText('OLD_GENERATION_SHOULD_NOT_RENDER')).not.toBeInTheDocument();
+    await screen.findByRole('button', { name: '分析' });
+    expect(screen.queryByRole('button', { name: '大盘复盘' })).not.toBeInTheDocument();
+    expect(analysisApi.triggerMarketReview).not.toHaveBeenCalled();
   });
 
   it('keeps report language unset when only the UI language is English', async () => {
@@ -1630,24 +1468,6 @@ describe('HomePage', () => {
       taskId: 'task-1',
       status: 'pending',
     });
-    vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
-      status: 'accepted',
-      sendNotification: true,
-      message: 'Market review task submitted',
-      taskId: 'market-task-1',
-    });
-    vi.mocked(analysisApi.getStatus).mockResolvedValue({
-      taskId: 'market-task-1',
-      status: 'completed',
-      marketReviewReport: 'Market review report',
-      marketReviewPayload: {
-        kind: 'market_review',
-        language: 'en',
-        title: 'Market review',
-        sections: [],
-      },
-    });
-
     render(
       <UiLanguageProvider>
         <MemoryRouter>
@@ -1660,215 +1480,11 @@ describe('HomePage', () => {
       target: { value: 'AAPL' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Analyze' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Market review' }));
 
     await waitFor(() => {
       expect(analysisApi.analyzeAsync).toHaveBeenCalled();
-      expect(analysisApi.triggerMarketReview).toHaveBeenCalledWith({ sendNotification: true });
     });
     expect(vi.mocked(analysisApi.analyzeAsync).mock.calls[0]?.[0]).not.toHaveProperty('reportLanguage');
-  });
-
-  it('keeps persisted market review controls in the UI language', async () => {
-    const persistedMarketItem = {
-      ...marketReviewHistoryItem,
-      queryId: 'task-1',
-    };
-    const persistedMarketReport = {
-      ...marketReviewHistoryReport,
-      meta: {
-        ...marketReviewHistoryReport.meta,
-        queryId: 'task-1',
-        reportLanguage: 'en' as const,
-      },
-    };
-    vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string } = {}) => Promise.resolve({
-      total: params.reportType === 'market_review' ? 1 : 0,
-      page: 1,
-      limit: params.reportType === 'market_review' ? 10 : 20,
-      items: params.reportType === 'market_review' ? [persistedMarketItem] : [],
-    }));
-    vi.mocked(historyApi.getDetail).mockResolvedValue(persistedMarketReport);
-    vi.mocked(historyApi.getMarkdown).mockResolvedValue('# US Market Recap\n\n## Summary\n\nPersisted market review body');
-    vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
-      status: 'accepted',
-      sendNotification: true,
-      message: 'Market review task submitted',
-      taskId: 'task-1',
-    });
-    vi.mocked(analysisApi.getStatus).mockResolvedValue({
-      taskId: 'task-1',
-      status: 'completed',
-      marketReviewReport: 'RAW_TASK_OUTPUT_MUST_NOT_RENDER',
-      marketReviewPayload: {
-        kind: 'market_review',
-        region: 'us',
-        language: 'en',
-        title: 'US Market Recap',
-        sections: [
-          {
-            key: 'summary',
-            title: 'Summary',
-            markdown: 'US market review body',
-          },
-        ],
-      },
-    });
-
-    render(
-      <MemoryRouter>
-        <HomePage />
-      </MemoryRouter>,
-    );
-
-    fireEvent.click(await screen.findByRole('button', { name: '大盘复盘' }));
-
-    expect(await screen.findByRole('button', { name: '复制 Markdown 源码' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '复制纯文本' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Copy Markdown Source' })).not.toBeInTheDocument();
-    expect(screen.queryByText('RAW_TASK_OUTPUT_MUST_NOT_RENDER')).not.toBeInTheDocument();
-  });
-
-  it('scrolls the dashboard to market review feedback after toolbar clicks', async () => {
-    vi.mocked(historyApi.getList).mockResolvedValue({
-      total: 1,
-      page: 1,
-      limit: 20,
-      items: [historyItem],
-    });
-    vi.mocked(historyApi.getDetail).mockResolvedValue(historyReport);
-    vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
-      status: 'accepted',
-      sendNotification: true,
-      message: '大盘复盘任务已提交',
-      taskId: 'task-1',
-    });
-    vi.mocked(analysisApi.getStatus).mockResolvedValue({
-      taskId: 'task-1',
-      status: 'completed',
-      marketReviewReport: '市场复盘报告示例文本',
-    });
-
-    render(
-      <MemoryRouter>
-        <HomePage />
-      </MemoryRouter>,
-    );
-
-    await screen.findByText('趋势维持强势');
-    const dashboardScroll = screen.getByTestId('home-dashboard-scroll');
-    const scrollToMock = vi.fn(function scrollTo(this: HTMLElement, options?: ScrollToOptions) {
-      if (typeof options?.top === 'number') {
-        this.scrollTop = options.top;
-      }
-    });
-    Object.defineProperty(dashboardScroll, 'scrollTo', {
-      configurable: true,
-      value: scrollToMock,
-    });
-    dashboardScroll.scrollTop = 480;
-
-    fireEvent.click(screen.getByRole('button', { name: '大盘复盘' }));
-
-    await waitFor(() => {
-      expect(scrollToMock).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
-    });
-    expect(dashboardScroll.scrollTop).toBe(0);
-    expect(await screen.findByText('大盘复盘已完成')).toBeInTheDocument();
-  });
-
-  it('keeps market review results in the main dashboard scroll area', async () => {
-    const persistedMarketItem = {
-      ...marketReviewHistoryItem,
-      queryId: 'task-1',
-    };
-    const persistedMarketReport = {
-      ...marketReviewHistoryReport,
-      meta: {
-        ...marketReviewHistoryReport.meta,
-        queryId: 'task-1',
-      },
-      details: {
-        contextSnapshot: {
-          marketReviewPayload: {
-            kind: 'market_review',
-            region: 'cn',
-            title: 'A股市场复盘',
-            breadth: {
-              upCount: 3200,
-              downCount: 1700,
-              limitUpCount: 60,
-              limitDownCount: 8,
-              totalAmount: 9800,
-              turnoverUnit: '亿',
-            },
-            indices: [
-              {
-                code: '000001',
-                name: '上证指数',
-                current: 3150.2,
-                changePct: 0.62,
-                high: 3168.4,
-                low: 3120.8,
-              },
-            ],
-            sections: [
-              {
-                key: 'index_overview',
-                title: '指数概览',
-                markdown: '| 指数 | 表现 |\n| --- | --- |\n| 上证指数 | 震荡走强 |',
-              },
-              {
-                key: 'risk',
-                title: '风险提示',
-                markdown: '- 资金回流核心资产',
-              },
-            ],
-          },
-        },
-      },
-    };
-    vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string } = {}) => Promise.resolve({
-      total: params.reportType === 'market_review' ? 1 : 0,
-      page: 1,
-      limit: params.reportType === 'market_review' ? 10 : 20,
-      items: params.reportType === 'market_review' ? [persistedMarketItem] : [],
-    }));
-    vi.mocked(historyApi.getDetail).mockResolvedValue(persistedMarketReport);
-    vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
-      status: 'accepted',
-      sendNotification: true,
-      message: '大盘复盘任务已提交',
-      taskId: 'task-1',
-    });
-    vi.mocked(analysisApi.getStatus).mockResolvedValue({
-      taskId: 'task-1',
-      status: 'completed',
-      marketReviewReport: 'RAW_TASK_OUTPUT_MUST_NOT_RENDER',
-    });
-
-    render(
-      <MemoryRouter>
-        <HomePage />
-      </MemoryRouter>,
-    );
-
-    fireEvent.click(await screen.findByRole('button', { name: '大盘复盘' }));
-
-    const dashboardScroll = screen.getByTestId('home-dashboard-scroll');
-    const marketReviewReport = await screen.findByTestId('market-review-report');
-    expect(dashboardScroll).toContainElement(marketReviewReport);
-    expect(marketReviewReport.className).not.toContain('max-h-64');
-    expect(marketReviewReport.className).not.toContain('overflow-y-auto');
-    expect(screen.getByRole('heading', { name: '结构化大盘数据' })).toBeInTheDocument();
-    expect(screen.getByText('3200')).toBeInTheDocument();
-    expect(screen.getByText('3150.20')).toBeInTheDocument();
-    expect(marketReviewReport.querySelector('h2, h3')?.textContent).not.toBe('A股市场复盘');
-    expect(screen.getByRole('heading', { name: '指数概览' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '风险提示' })).toBeInTheDocument();
-    expect(screen.getAllByRole('table').length).toBeGreaterThanOrEqual(2);
-    expect(screen.queryByText('# A股市场复盘')).not.toBeInTheDocument();
-    expect(screen.queryByText('开始分析')).not.toBeInTheDocument();
   });
 
   it('shows first-run setup gaps and links to settings', async () => {
@@ -2210,143 +1826,4 @@ describe('HomePage', () => {
     expect(trigger).toHaveFocus();
   });
 
-  it('renders market review history reports with a dedicated markdown view', async () => {
-    vi.mocked(historyApi.getList).mockResolvedValue({
-      total: 1,
-      page: 1,
-      limit: 20,
-      items: [marketReviewHistoryItem],
-    });
-    vi.mocked(historyApi.getDetail).mockResolvedValue(marketReviewHistoryReport);
-    vi.mocked(historyApi.getMarkdown).mockResolvedValue([
-      '# 大盘复盘详情',
-      '',
-      '## 市场情绪与赚钱效应',
-      '',
-      '**赚钱效应** 改善',
-      '',
-      '## 行业/主题轮动',
-      '',
-      '| 方向 | 状态 |',
-      '| --- | --- |',
-      '| 半导体 | 轮动增强 |',
-    ].join('\n'));
-
-    render(
-      <MemoryRouter>
-        <HomePage />
-      </MemoryRouter>,
-    );
-
-    await screen.findByText('大盘复盘摘要');
-    expect(screen.queryByRole('heading', { name: '大盘复盘详情' })).not.toBeInTheDocument();
-    expect(await screen.findByRole('heading', { name: '市场情绪与赚钱效应' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '行业/主题轮动' })).toBeInTheDocument();
-    expect(screen.getByText('赚钱效应')).toBeInTheDocument();
-    expect(screen.getByRole('table')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '重新分析' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '追问 AI' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '重新复盘' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '历史趋势' })).toBeInTheDocument();
-    expect(historyApi.getMarkdown).toHaveBeenCalledWith(marketReviewHistoryReport.meta.id);
-
-    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
-    expect(navigateMock).toHaveBeenCalledTimes(1);
-    expect(navigateMock).toHaveBeenCalledWith(
-      {
-        pathname: '/',
-        search: `?recordId=${marketReviewHistoryReport.meta.id}`,
-        hash: '',
-      },
-      { replace: true, state: null },
-    );
-  });
-
-  it('clears market review completion feedback when switching to a stock report', async () => {
-    vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string } = {}) => {
-      if (params.reportType === 'market_review') {
-        return Promise.resolve({
-          total: 1,
-          page: 1,
-          limit: 10,
-          items: [marketReviewHistoryItem],
-        });
-      }
-      return Promise.resolve({
-        total: 1,
-        page: 1,
-        limit: 20,
-        items: [historyItem],
-      });
-    });
-    vi.mocked(historyApi.getStockBarList).mockResolvedValue({
-      total: 1,
-      items: [
-        {
-          id: 1,
-          stockCode: '600519',
-          stockName: '贵州茅台',
-          sentimentScore: 82,
-          operationAdvice: '买入',
-          analysisCount: 1,
-          lastAnalysisTime: '2026-03-18T08:00:00Z',
-          reportType: 'detailed',
-        },
-      ],
-    });
-    vi.mocked(historyApi.getDetail).mockImplementation((recordId: number) => {
-      if (recordId === 2) {
-        return Promise.resolve(marketReviewHistoryReport);
-      }
-      return Promise.resolve(historyReport);
-    });
-    vi.mocked(historyApi.getMarkdown).mockResolvedValue([
-      '# 大盘复盘详情',
-      '',
-      '## 市场情绪与赚钱效应',
-      '',
-      '**赚钱效应** 改善',
-      '',
-      '## 行业/主题轮动',
-      '',
-      '| 方向 | 状态 |',
-      '| --- | --- |',
-      '| 半导体 | 轮动增强 |',
-    ].join('\n'));
-    vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
-      status: 'accepted',
-      sendNotification: true,
-      message: '大盘复盘任务已提交',
-      taskId: 'market-review-q-1',
-    });
-    vi.mocked(analysisApi.getStatus).mockResolvedValue({
-      taskId: 'market-review-q-1',
-      status: 'completed',
-      marketReviewReport: 'RAW_TASK_OUTPUT_MUST_NOT_RENDER',
-    });
-
-    render(
-      <MemoryRouter>
-        <HomePage />
-      </MemoryRouter>,
-    );
-
-    await screen.findByText('趋势维持强势');
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '大盘复盘' }));
-    });
-
-    expect(screen.getByText('大盘复盘摘要')).toBeInTheDocument();
-    expect(screen.getByText('大盘复盘已完成')).toBeInTheDocument();
-    expect(screen.queryByText('RAW_TASK_OUTPUT_MUST_NOT_RENDER')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: '贵州茅台 600519 历史记录' }));
-
-    await waitFor(() => {
-      expect(screen.queryByText('大盘复盘已完成')).not.toBeInTheDocument();
-    });
-    expect(await screen.findByText('趋势维持强势')).toBeInTheDocument();
-    expect(vi.mocked(historyApi.getDetail)).toHaveBeenCalledWith(1);
-  });
 });

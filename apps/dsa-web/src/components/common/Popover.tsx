@@ -25,8 +25,9 @@ interface PopoverProps {
   ariaLabel?: string;
   ariaLabelledBy?: string;
   closeOnEscape?: boolean;
-  placement?: 'auto' | 'top' | 'bottom';
+  placement?: 'auto' | 'top' | 'bottom' | 'right';
   align?: 'start' | 'end';
+  autoFocusContent?: boolean;
   onContentKeyDown?: React.KeyboardEventHandler<HTMLDivElement>;
 }
 
@@ -45,6 +46,7 @@ export const Popover = ({
   closeOnEscape = true,
   placement = 'auto',
   align = 'start',
+  autoFocusContent = true,
   onContentKeyDown,
 }: PopoverProps) => {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -123,7 +125,11 @@ export const Popover = ({
   }, [open, shouldRestoreFocus]);
 
   useEffect(() => {
-    if (!open || (contentRole !== 'menu' && contentRole !== 'dialog')) return;
+    if (
+      !open
+      || !autoFocusContent
+      || (contentRole !== 'menu' && contentRole !== 'dialog')
+    ) return;
     const frame = requestAnimationFrame(() => {
       const content = contentRef.current;
       if (!content || content.contains(document.activeElement)) return;
@@ -142,7 +148,7 @@ export const Popover = ({
       target?.focus();
     });
     return () => cancelAnimationFrame(frame);
-  }, [contentRole, open, portalHost]);
+  }, [autoFocusContent, contentRole, open, portalHost]);
 
   useEffect(() => {
     if (!open) return;
