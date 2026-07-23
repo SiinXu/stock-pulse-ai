@@ -312,16 +312,19 @@ class ApplicationServices:
         finally:
             close_after_operation = False
             with _services_lock:
-                self._local_lifecycle_ops -= 1
-                if not self._local_lifecycle_ops and self._local_close_requested:
+                if self._local_lifecycle_ops == 1 and self._local_close_requested:
                     self._local_close_requested = False
                     close_after_operation = True
-                if not close_after_operation:
+                else:
+                    self._local_lifecycle_ops -= 1
                     _services_local_ops.notify_all()
             if close_after_operation:
-                self._close_plugins()
-                with _services_lock:
-                    _services_local_ops.notify_all()
+                try:
+                    self._close_plugins()
+                finally:
+                    with _services_lock:
+                        self._local_lifecycle_ops -= 1
+                        _services_local_ops.notify_all()
 
     def _plugin_activation_allowed(self) -> bool:
         """Reject activation after this one-shot root begins shutdown."""

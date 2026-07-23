@@ -867,6 +867,78 @@ def test_local_manager_callback_worker_can_defer_root_close_without_deadlock():
     ]
 
 
+def test_installer_drain_stays_active_through_deferred_local_cleanup():
+    events: list[str] = []
+    root_holder: list[ApplicationServices] = []
+    load_callback_ready = threading.Event()
+    release_load_callback = threading.Event()
+    unload_started = threading.Event()
+    release_unload = threading.Event()
+    load_results: list = []
+
+    class _DeferredClosePlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("local-load-begin")
+            root_holder[0].close()
+            load_callback_ready.set()
+            if not release_load_callback.wait(timeout=5):
+                raise AssertionError("test did not release the local load callback")
+            events.append("local-load-end")
+
+        def onunload(self) -> None:
+            events.append("local-unload-begin")
+            unload_started.set()
+            if not release_unload.wait(timeout=5):
+                raise AssertionError("test did not release the deferred unload")
+            events.append("local-unload-end")
+
+    services = ApplicationServices(plugins_dir="")
+    root_holder.append(services)
+    plugin = _DeferredClosePlugin("test.deferred-local-close", events)
+    assert services.plugin_manager.register(plugin, source="builtin").success
+    local_load = threading.Thread(
+        target=lambda: load_results.append(
+            services.plugin_manager.load("test.deferred-local-close")
+        ),
+    )
+    local_load.start()
+    assert load_callback_ready.wait(timeout=5)
+
+    installer = threading.Thread(target=lambda: set_application_services(services))
+    installer.start()
+    installer.join(timeout=0.5)
+    assert installer.is_alive()
+    release_load_callback.set()
+    assert unload_started.wait(timeout=5)
+
+    unrelated_root = ApplicationServices(plugins_dir="")
+    unrelated_root.plugin_manager.load("missing")
+    installer.join(timeout=0.5)
+    assert installer.is_alive()
+
+    release_unload.set()
+    local_load.join(timeout=5)
+    installer.join(timeout=5)
+    assert not local_load.is_alive()
+    assert not installer.is_alive()
+    successor = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.successor", events),),
+        plugins_dir="",
+    )
+    set_application_services(successor)
+
+    assert load_results and load_results[0].success is True
+    assert services.is_closed is True
+    assert services.plugin_manager.snapshot("test.deferred-local-close").state == "disabled"
+    assert events == [
+        "local-load-begin",
+        "local-load-end",
+        "local-unload-begin",
+        "local-unload-end",
+        "load:test.successor",
+    ]
+
+
 def test_get_replaces_a_directly_closed_installed_root():
     services = ApplicationServices(plugins_dir="")
     set_application_services(services)
