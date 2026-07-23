@@ -498,9 +498,11 @@ export function registerSettingsPageIntegrationTests(): void {
       { key: 'LLM_CHANNELS', value: 'deepseek' },
       { key: 'LLM_DEEPSEEK_API_KEY', value: 'sk-wizard' },
     ]));
-    // The wizard closes once the save succeeds.
-    await waitFor(() =>
-      expect(screen.queryByRole('dialog', { name: 'first-run-wizard' })).not.toBeInTheDocument());
+    // The page keeps the wizard mounted so the real component can show its
+    // post-save effective-routing summary before the user closes it.
+    expect(screen.getByRole('dialog', { name: 'first-run-wizard' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'wizard close' }));
+    expect(screen.queryByRole('dialog', { name: 'first-run-wizard' })).not.toBeInTheDocument();
   });
 
   it('rejects a Wizard Connection payload at the page adapter under a partial schema', async () => {
@@ -596,22 +598,62 @@ export function registerSettingsPageIntegrationTests(): void {
     expect(screen.getByRole('dialog', { name: 'first-run-wizard' })).toBeInTheDocument();
   });
 
-  it('hides the first-run wizard entry once setup is complete', async () => {
+  it('keeps the guided wizard available after setup and passes persisted routing context', async () => {
     getSetupStatus.mockResolvedValue({
       isComplete: true,
       readyForSmoke: true,
       requiredMissingKeys: [],
       checks: [],
     });
-    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'base' }));
+    const configState = buildSystemConfigState({ activeCategory: 'base' });
+    const routingField = (key: string, value: string, displayOrder: number) => ({
+      key,
+      value,
+      rawValueExists: Boolean(value),
+      isMasked: false,
+      schema: {
+        key,
+        category: 'ai_model',
+        dataType: 'string',
+        uiControl: 'select',
+        isSensitive: false,
+        isRequired: false,
+        isEditable: true,
+        options: [],
+        validation: {},
+        displayOrder,
+        uiPlacement: 'task_routing' as const,
+      },
+    });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'base',
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        ai_model: [
+          ...configState.itemsByCategory.ai_model,
+          routingField('LITELLM_FALLBACK_MODELS', 'deepseek/deepseek-v4-pro', 2),
+          routingField('VISION_MODEL', 'deepseek/deepseek-v4-flash', 3),
+        ],
+      },
+    }));
 
     render(<SettingsPage />);
 
-    // Configured users no longer see the first-run "Start wizard" entry — they
-    // add a service from the model-access cards instead.
     await waitFor(() => expect(getSetupStatus).toHaveBeenCalled());
-    await waitFor(() =>
-      expect(screen.queryByRole('button', { name: '启动向导' })).not.toBeInTheDocument());
+    const startWizard = await screen.findByRole('button', { name: '启动向导' });
+    await waitFor(() => expect(startWizard).toBeEnabled());
+    fireEvent.click(startWizard);
+
+    expect(screen.getByRole('dialog', { name: 'first-run-wizard' })).toBeInTheDocument();
+    expect(screen.getByTestId('wizard-routing-props')).toHaveTextContent(
+      '2|deepseek/deepseek-v4-pro|deepseek/deepseek-v4-flash',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'wizard view routing' }));
+    const [nextParams] = routerSearchParamsMock.setParams.mock.calls.at(-1) ?? [];
+    expect(nextParams.get('section')).toBe('ai_models');
+    expect(nextParams.get('view')).toBe('task_routing');
+    expect(screen.queryByRole('dialog', { name: 'first-run-wizard' })).not.toBeInTheDocument();
   });
 
   it('routes prompt cache settings to their explicit developer diagnostics placement', () => {

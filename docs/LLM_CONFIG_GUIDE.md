@@ -162,7 +162,9 @@ LITELLM_MODEL=ollama/qwen3:8b
 
 ### 首次启动配置状态
 
-后端提供只读状态接口 `GET /api/v1/system/config/setup/status`，用于判断首次启动闭环中最基础的几类配置是否已经就绪：LLM 主连接、Agent 模型、自选股、通知渠道和本地存储。首次向导与日常模型接入共用同一份 `connection_fields` 字段契约；Provider Catalog 权威提供 Provider 身份、标签、初始化默认值、发现能力与相关链接，但不权威决定字段 requirement。按当前内置 Schema，Ollama 免 Key，官方默认地址无需手填，Custom 才要求 Base URL。向导会写入显式 `_PROVIDER`，不会覆盖已有 Connection，也不会保存裸模型名或自动全选发现结果。状态接口本身只读取已保存的 `.env` 与当前进程环境变量，不会重载运行时配置、写入 `.env`、测试真实模型或创建数据库文件。
+后端提供只读状态接口 `GET /api/v1/system/config/setup/status`，用于判断首次启动闭环中最基础的几类配置是否已经就绪：LLM 主连接、Agent 模型、自选股、通知渠道和本地存储。首次向导与日常模型接入共用同一份 `connection_fields` 字段契约；Provider Catalog 权威提供 Provider 身份、标签、初始化默认值、发现能力与相关链接，但不权威决定字段 requirement。按当前内置 Schema，Ollama 免 Key，官方默认地址无需手填，Custom 才要求 Base URL。向导会写入显式 `_PROVIDER`，不会覆盖已有 Connection，也不会保存裸模型名或自动全选发现结果。
+
+云 API 向导在选择 Provider、填写凭据和确认模型后，还可以配置主模型、按顺序执行的备用模型以及可选的 Vision 模型；这些选择分别写入 connection-aware 的 `LITELLM_MODEL`、`LITELLM_FALLBACK_MODELS` 和 `VISION_MODEL`。保存成功后，向导会留在完成页展示实际保存的执行方式与路由摘要，不回显 API Key，并可直接进入“任务模型”继续调整。即使首次配置已经完成，也可以从首次配置状态卡重新打开向导新增 Connection。状态接口本身只读取已保存的 `.env` 与当前进程环境变量，不会重载运行时配置、写入 `.env`、测试真实模型或创建数据库文件。
 
 ### 事务化热加载与一步回退
 
