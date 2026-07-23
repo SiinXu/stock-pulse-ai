@@ -80,52 +80,74 @@ _BEARER_PATTERN = re.compile(
     r"\b(bearer\s+)[^\s,;&\"']+",
     re.IGNORECASE,
 )
-_DIGEST_AUTH_PARAM_PATTERN = (
-    r"[A-Za-z][A-Za-z0-9_-]*\s*=\s*"
-    r'(?:"(?:\\.|[^"\\])*"|[^,;\s]+)'
+_AUTHORIZATION_FIELD_NAME_PATTERN = (
+    r"(?:[A-Za-z0-9]+[_-])*?(?:proxy[_-]?)?"
+    r"authorization(?:[_-]?header)?"
 )
-_DIGEST_AUTHORIZATION_HEADER_PATTERN = re.compile(
-    r"\b(authorization|proxy[_-]?authorization)(\s*[:=]\s*)"
-    rf"Digest\s+{_DIGEST_AUTH_PARAM_PATTERN}"
-    rf"(?:\s*,\s*{_DIGEST_AUTH_PARAM_PATTERN})*",
+_PUBLIC_DIAGNOSTIC_FIELD_PATTERN = re.compile(
+    r"\s+public[A-Za-z0-9_-]*\s*=",
+    re.IGNORECASE,
+)
+_QUOTED_AUTHORIZATION_FIELD_START_PATTERN = re.compile(
+    rf"\b({_AUTHORIZATION_FIELD_NAME_PATTERN})(\s*[:=]\s*)(?=['\"])",
+    re.IGNORECASE,
+)
+_DIGEST_AUTHORIZATION_START_PATTERN = re.compile(
+    rf"\b({_AUTHORIZATION_FIELD_NAME_PATTERN})(\s*[:=]\s*)"
+    r"Digest\b",
     re.IGNORECASE,
 )
 _AUTHORIZATION_HEADER_PATTERN = re.compile(
-    r"\b(authorization|proxy[_-]?authorization)(\s*[:=]\s*)"
+    rf"\b({_AUTHORIZATION_FIELD_NAME_PATTERN})(\s*[:=]\s*)"
     r"(?:(?:Bearer|Basic|Token|Digest|ApiKey|Api-Key|HMAC|Negotiate|OAuth)\s+)?"
     r"[^\s,;&\"']+",
     re.IGNORECASE,
 )
 _OPAQUE_AUTHORIZATION_SCHEME_PATTERN = re.compile(
-    r"\b(authorization|proxy[_-]?authorization)(\s*[:=]\s*)"
+    rf"\b({_AUTHORIZATION_FIELD_NAME_PATTERN})(\s*[:=]\s*)"
     r"[A-Za-z][A-Za-z0-9._~-]{0,31}\s+"
     r"[A-Za-z0-9._~+/=-]{12,}(?=$|[\s,;&\"'])",
     re.IGNORECASE,
 )
-_COOKIE_VALUE_PATTERN = r'(?:"(?:\\.|[^"\\])*"|[^,;\s]+)'
-_COOKIE_PAIR_PATTERN = rf"[^=,;\s]+={_COOKIE_VALUE_PATTERN}"
-_COOKIE_HEADER_PATTERN = re.compile(
-    r"(?<!set-)(?<!set_)\b(cookie)(\s*:\s*)"
-    rf"{_COOKIE_VALUE_PATTERN}(?:\s*;\s*{_COOKIE_PAIR_PATTERN})*",
+_COOKIE_FIELD_NAME_PATTERN = (
+    r"(?!(?:[A-Za-z0-9]+[_-])*set[_-]?cookie(?:[_-]?header)?\b)"
+    r"(?:[A-Za-z0-9]+[_-])*cookie(?:[_-]?header)?"
+)
+_SET_COOKIE_FIELD_NAME_PATTERN = (
+    r"(?:[A-Za-z0-9]+[_-])*set[_-]?cookie(?:[_-]?header)?"
+)
+_COOKIE_HEADER_START_PATTERN = re.compile(
+    rf"(?<!set-)(?<!set_)\b({_COOKIE_FIELD_NAME_PATTERN})(\s*:\s*)",
     re.IGNORECASE,
 )
-_SET_COOKIE_HEADER_PATTERN = re.compile(
-    r"\b(set[_-]?cookie)(\s*:\s*)"
-    rf"{_COOKIE_VALUE_PATTERN}",
+_SET_COOKIE_HEADER_START_PATTERN = re.compile(
+    rf"\b({_SET_COOKIE_FIELD_NAME_PATTERN})(\s*:\s*)",
     re.IGNORECASE,
 )
 _SET_COOKIE_SENSITIVE_ATTRIBUTE_PATTERN = re.compile(
-    r"\b(set[_-]?cookie)(\s*:\s*)\[REDACTED\]"
+    rf"\b({_SET_COOKIE_FIELD_NAME_PATTERN})(\s*[:=]\s*)\[REDACTED\]"
     r"(?=[^\r\n]*;\s*[A-Za-z0-9_-]*"
     r"(?:auth|credential|key|password|secret|session|token)"
     r"[A-Za-z0-9_-]*\s*=)[^\r\n]+",
     re.IGNORECASE,
 )
-_COOKIE_ASSIGNMENT_PATTERN = re.compile(
-    r"\b(cookie|set[_-]?cookie)(\s*=\s*)"
-    rf"{_COOKIE_VALUE_PATTERN}(?:\s*;\s*{_COOKIE_PAIR_PATTERN})*",
+_COOKIE_ASSIGNMENT_START_PATTERN = re.compile(
+    rf"(?<!set-)(?<!set_)\b({_COOKIE_FIELD_NAME_PATTERN})(\s*=\s*)",
     re.IGNORECASE,
 )
+_COOKIE_HEADER_NEXT_FIELD_PATTERN = re.compile(
+    r";\s*next(?=\s|$)",
+    re.IGNORECASE,
+)
+_COOKIE_ASSIGNMENT_NEXT_FIELD_PATTERN = re.compile(
+    r"\s+next(?=\s|$)",
+    re.IGNORECASE,
+)
+_SET_COOKIE_ASSIGNMENT_START_PATTERN = re.compile(
+    rf"\b({_SET_COOKIE_FIELD_NAME_PATTERN})(\s*=\s*)",
+    re.IGNORECASE,
+)
+_SET_COOKIE_ATTRIBUTE_BOUNDARY_PATTERN = re.compile(r";")
 _SENSITIVE_ASSIGNMENT_KEY_PATTERN = (
     r"(?:[a-z0-9]+[_-])*?(?:"
     r"token|secret|passwd|password|credential|credentials|sendkey|x[_-]?api[_-]?key|"
@@ -473,6 +495,147 @@ def _redact_exact_values(text: str, redaction_values: tuple[str, ...]) -> str:
     return redacted
 
 
+def _is_public_diagnostic_boundary(
+    text: str,
+    index: int,
+    *,
+    has_field_value: bool,
+    previous_non_whitespace: Optional[str],
+) -> bool:
+    """Return whether a public field begins outside a credential list."""
+
+    if _PUBLIC_DIAGNOSTIC_FIELD_PATTERN.match(text, index) is None:
+        return False
+    if not has_field_value:
+        return False
+    return previous_non_whitespace not in {";", ","}
+
+
+def _sensitive_field_end(
+    text: str,
+    field_value_start: int,
+    *,
+    next_field_pattern: Optional[re.Pattern[str]] = None,
+    preserve_public_diagnostic: bool = True,
+    stop_after_outer_quote: bool = False,
+) -> int:
+    """Scan one secret-bearing field without trusting delimiters inside quotes."""
+
+    outer_quote_char = (
+        text[field_value_start]
+        if (
+            stop_after_outer_quote
+            and field_value_start < len(text)
+            and text[field_value_start] in {'"', "'"}
+        )
+        else None
+    )
+    quote_char: Optional[str] = None
+    escaped = False
+    outside_escaped = False
+    has_field_value = False
+    previous_non_whitespace: Optional[str] = None
+    index = field_value_start
+    while index < len(text):
+        char = text[index]
+        if char in "\r\n":
+            continuation = index + 1
+            if char == "\r" and continuation < len(text) and text[continuation] == "\n":
+                continuation += 1
+            if (
+                quote_char is not None
+                or outside_escaped
+                or (
+                    continuation < len(text)
+                    and text[continuation] in " \t"
+                )
+            ):
+                outside_escaped = False
+                index = continuation
+                continue
+            return index
+        if quote_char is not None:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == quote_char:
+                quote_char = None
+                previous_non_whitespace = char
+                if char == outer_quote_char:
+                    return index + 1
+            index += 1
+            continue
+        if outside_escaped:
+            outside_escaped = False
+            if not char.isspace():
+                has_field_value = True
+                previous_non_whitespace = char
+            index += 1
+            continue
+        if char == "\\":
+            outside_escaped = True
+            has_field_value = True
+            previous_non_whitespace = char
+            index += 1
+            continue
+        if char in {'"', "'"}:
+            quote_char = char
+            has_field_value = True
+            previous_non_whitespace = char
+            index += 1
+            continue
+        if (
+            preserve_public_diagnostic
+            and _is_public_diagnostic_boundary(
+                text,
+                index,
+                has_field_value=has_field_value,
+                previous_non_whitespace=previous_non_whitespace,
+            )
+        ):
+            return index
+        if (
+            next_field_pattern is not None
+            and next_field_pattern.match(text, index) is not None
+        ):
+            return index
+        if not char.isspace():
+            has_field_value = True
+            previous_non_whitespace = char
+        index += 1
+    return len(text)
+
+
+def _redact_sensitive_field_spans(
+    text: str,
+    start_pattern: re.Pattern[str],
+    *,
+    next_field_pattern: Optional[re.Pattern[str]] = None,
+    preserve_public_diagnostic: bool = True,
+    stop_after_outer_quote: bool = False,
+) -> str:
+    """Redact complete field spans while preserving explicit public suffixes."""
+
+    parts: list[str] = []
+    cursor = 0
+    while True:
+        match = start_pattern.search(text, cursor)
+        if match is None:
+            parts.append(text[cursor:])
+            return "".join(parts)
+        parts.append(text[cursor:match.start()])
+        field_end = _sensitive_field_end(
+            text,
+            match.end(),
+            next_field_pattern=next_field_pattern,
+            preserve_public_diagnostic=preserve_public_diagnostic,
+            stop_after_outer_quote=stop_after_outer_quote,
+        )
+        parts.append(f"{match.group(1)}{match.group(2)}{_REDACTED}")
+        cursor = field_end
+
+
 def _redact_common_secret_patterns(
     text: str,
     *,
@@ -500,22 +663,46 @@ def _redact_common_secret_patterns(
         f"{_URL_USERINFO_REDACTION}@",
         "[REDACTED]@",
     )
-    sanitized = _DIGEST_AUTHORIZATION_HEADER_PATTERN.sub(
-        r"\1\2[REDACTED]",
+    sanitized = _redact_sensitive_field_spans(
         sanitized,
+        _QUOTED_AUTHORIZATION_FIELD_START_PATTERN,
+        stop_after_outer_quote=True,
+    )
+    sanitized = _redact_sensitive_field_spans(
+        sanitized,
+        _DIGEST_AUTHORIZATION_START_PATTERN,
     )
     sanitized = _OPAQUE_AUTHORIZATION_SCHEME_PATTERN.sub(
         r"\1\2[REDACTED]",
         sanitized,
     )
     sanitized = _AUTHORIZATION_HEADER_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
-    sanitized = _COOKIE_HEADER_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
-    sanitized = _SET_COOKIE_HEADER_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
+    sanitized = _redact_sensitive_field_spans(
+        sanitized,
+        _COOKIE_HEADER_START_PATTERN,
+        next_field_pattern=_COOKIE_HEADER_NEXT_FIELD_PATTERN,
+    )
+    sanitized = _redact_sensitive_field_spans(
+        sanitized,
+        _SET_COOKIE_HEADER_START_PATTERN,
+        next_field_pattern=_SET_COOKIE_ATTRIBUTE_BOUNDARY_PATTERN,
+        preserve_public_diagnostic=False,
+    )
+    sanitized = _redact_sensitive_field_spans(
+        sanitized,
+        _COOKIE_ASSIGNMENT_START_PATTERN,
+        next_field_pattern=_COOKIE_ASSIGNMENT_NEXT_FIELD_PATTERN,
+    )
+    sanitized = _redact_sensitive_field_spans(
+        sanitized,
+        _SET_COOKIE_ASSIGNMENT_START_PATTERN,
+        next_field_pattern=_SET_COOKIE_ATTRIBUTE_BOUNDARY_PATTERN,
+        preserve_public_diagnostic=False,
+    )
     sanitized = _SET_COOKIE_SENSITIVE_ATTRIBUTE_PATTERN.sub(
         r"\1\2[REDACTED]",
         sanitized,
     )
-    sanitized = _COOKIE_ASSIGNMENT_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
     sanitized = _BEARER_PATTERN.sub(r"\1[REDACTED]", sanitized)
     sanitized = _QUOTED_SECRET_ASSIGNMENT_PATTERN.sub(
         r"\g<key_quote>\g<key>\g<key_quote>\g<separator>"

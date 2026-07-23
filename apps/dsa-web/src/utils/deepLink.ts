@@ -1,7 +1,12 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { StockHistoryPeriod } from '../types/stocks';
-import { APP_ROUTE_PATHS, LEGACY_ROUTE_PATHS } from '../routing/routes';
+import {
+  APP_ROUTE_PATHS,
+  HOME_ROUTE_QUERY_KEYS,
+  LEGACY_ROUTE_PATHS,
+  REPORT_ROUTE_QUERY_KEYS,
+} from '../routing/routes';
 import { normalizeStockCode } from './stockCode';
 import { validateStockCode } from './validation';
 
@@ -259,19 +264,21 @@ function toHref(url: URL): string {
 
 export function buildDeepLink(target: DeepLinkTarget): string {
   const params = new URLSearchParams();
-  let pathname = '/';
+  let pathname: string = APP_ROUTE_PATHS.home;
 
   switch (target.page) {
     case 'home':
-      setPositiveInteger(params, 'recordId', target.recordId);
-      if (target.stockCode) params.set('stock', requireStockCode(target.stockCode));
+      setPositiveInteger(params, REPORT_ROUTE_QUERY_KEYS.recordId, target.recordId);
+      if (target.stockCode) {
+        params.set(HOME_ROUTE_QUERY_KEYS.stock, requireStockCode(target.stockCode));
+      }
       if (target.workspace && target.workspace !== 'history') {
         if (!HOME_WORKSPACE_VIEWS.has(target.workspace)) throw new TypeError('Unsupported Home workspace');
-        params.set('workspace', target.workspace);
+        params.set(HOME_ROUTE_QUERY_KEYS.workspace, target.workspace);
       }
       break;
     case 'chat': {
-      pathname = '/chat';
+      pathname = APP_ROUTE_PATHS.agent;
       if (target.sessionId) params.set('session', requireSessionId(target.sessionId));
       if (target.stockCode) {
         params.set('stock', requireStockCode(target.stockCode));
@@ -293,11 +300,11 @@ export function buildDeepLink(target: DeepLinkTarget): string {
       break;
     }
     case 'portfolio':
-      pathname = '/portfolio';
+      pathname = APP_ROUTE_PATHS.portfolio;
       setPositiveInteger(params, 'account', target.accountId);
       break;
     case 'decision-signals':
-      pathname = '/decision-signals';
+      pathname = APP_ROUTE_PATHS.decisionSignals;
       if (target.stockCode) params.set('stock', requireStockCode(target.stockCode));
       setPositiveInteger(params, 'signal', target.signalId);
       if (target.view && target.view !== (target.stockCode ? 'latest' : 'signals')) {
@@ -353,22 +360,27 @@ export function parseDeepLink(input: string, origin = DEFAULT_ORIGIN): ParsedDee
   stripSensitiveHash(url, issues);
   let target: DeepLinkTarget | null = null;
 
-  if (url.pathname === '/') {
-    const recordId = parsePositiveIntegerParam(params, issues, 'recordId', 'invalid_record_id');
-    const stockCode = parseStockParam(params, issues);
-    const rawWorkspace = params.get('workspace');
+  if (url.pathname === APP_ROUTE_PATHS.home) {
+    const recordId = parsePositiveIntegerParam(
+      params,
+      issues,
+      REPORT_ROUTE_QUERY_KEYS.recordId,
+      'invalid_record_id',
+    );
+    const stockCode = parseStockParam(params, issues, HOME_ROUTE_QUERY_KEYS.stock);
+    const rawWorkspace = params.get(HOME_ROUTE_QUERY_KEYS.workspace);
     let workspace: HomeWorkspaceView = 'history';
     if (rawWorkspace !== null) {
       if (HOME_WORKSPACE_VIEWS.has(rawWorkspace as HomeWorkspaceView)) {
         workspace = rawWorkspace as HomeWorkspaceView;
-        if (workspace === 'history') params.delete('workspace');
+        if (workspace === 'history') params.delete(HOME_ROUTE_QUERY_KEYS.workspace);
       } else {
-        params.delete('workspace');
-        issues.push({ code: 'invalid_workspace', parameter: 'workspace' });
+        params.delete(HOME_ROUTE_QUERY_KEYS.workspace);
+        issues.push({ code: 'invalid_workspace', parameter: HOME_ROUTE_QUERY_KEYS.workspace });
       }
     }
     target = { page: 'home', recordId, stockCode, workspace };
-  } else if (url.pathname === '/chat') {
+  } else if (url.pathname === APP_ROUTE_PATHS.agent) {
     const rawSessionId = params.get('session');
     let sessionId: string | undefined;
     if (rawSessionId !== null) {
@@ -413,10 +425,10 @@ export function parseDeepLink(input: string, origin = DEFAULT_ORIGIN): ParsedDee
       recordId: stockCode ? recordId : undefined,
       ...(stockCode && contextState ? { contextState } : {}),
     };
-  } else if (url.pathname === '/portfolio') {
+  } else if (url.pathname === APP_ROUTE_PATHS.portfolio) {
     const accountId = parsePositiveIntegerParam(params, issues, 'account', 'invalid_account_id');
     target = { page: 'portfolio', accountId };
-  } else if (url.pathname === '/decision-signals') {
+  } else if (url.pathname === APP_ROUTE_PATHS.decisionSignals) {
     const stockCode = parseStockParam(params, issues);
     const signalId = parsePositiveIntegerParam(params, issues, 'signal', 'invalid_signal_id');
     parseEnumParam(params, issues, 'market', DECISION_SIGNAL_MARKETS);
@@ -494,13 +506,16 @@ export function parseDeepLink(input: string, origin = DEFAULT_ORIGIN): ParsedDee
         }
         target = { page: 'stock', stockCode, period, days };
       }
-    } else if (![
-      '/alerts',
-      '/backtest',
-      '/screening',
+    } else if (!new Set<string>([
+      APP_ROUTE_PATHS.alerts,
+      APP_ROUTE_PATHS.researchMarket,
+      APP_ROUTE_PATHS.researchBacktest,
+      APP_ROUTE_PATHS.researchDiscover,
       APP_ROUTE_PATHS.settings,
+      LEGACY_ROUTE_PATHS.backtest,
+      LEGACY_ROUTE_PATHS.screening,
       LEGACY_ROUTE_PATHS.usage,
-    ].includes(url.pathname)) {
+    ]).has(url.pathname)) {
       issues.push({ code: 'unsupported_route' });
     }
   }

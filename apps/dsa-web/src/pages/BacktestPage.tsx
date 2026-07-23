@@ -9,6 +9,10 @@ import { ApiErrorAlert, AppPage, Badge, Button, Card, DataTable, type DataTableC
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import {
+  RESEARCH_BACKTEST_PHASE_VALUES,
+  RESEARCH_BACKTEST_ROUTE_QUERY_KEYS,
+} from '../routing/routes';
+import {
   BACKTEST_DIRECTION_EXPECTED_LABELS,
   BACKTEST_MOVEMENT_LABELS,
   BACKTEST_OUTCOME_LABELS,
@@ -40,20 +44,24 @@ type BacktestFilterSnapshot = {
   page: number;
 };
 
-const BACKTEST_PHASES = new Set<BacktestPhaseFilter>(['all', 'premarket', 'intraday', 'postmarket', 'unknown']);
+const BACKTEST_PHASES = new Set<BacktestPhaseFilter>(
+  Object.values(RESEARCH_BACKTEST_PHASE_VALUES),
+);
 
 function getInitialBacktestFilters(search = typeof window === 'undefined' ? '' : window.location.search): BacktestFilterSnapshot {
   const params = new URLSearchParams(search);
-  const rawWindow = params.get('window') ?? '';
+  const rawWindow = params.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.window) ?? '';
   const parsedWindow = parseEvalWindowDays(rawWindow);
-  const rawPage = Number(params.get('page'));
-  const rawPhase = params.get('phase') as BacktestPhaseFilter | null;
+  const rawPage = Number(params.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.page));
+  const rawPhase = params.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.phase) as BacktestPhaseFilter | null;
   return {
-    code: normalizeBacktestCode(params.get('code') ?? '') ?? '',
+    code: normalizeBacktestCode(params.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code) ?? '') ?? '',
     windowDays: parsedWindow && parsedWindow <= 120 ? parsedWindow : undefined,
-    startDate: params.get('from') ?? '',
-    endDate: params.get('to') ?? '',
-    phase: rawPhase && BACKTEST_PHASES.has(rawPhase) ? rawPhase : 'all',
+    startDate: params.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.from) ?? '',
+    endDate: params.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.to) ?? '',
+    phase: rawPhase && BACKTEST_PHASES.has(rawPhase)
+      ? rawPhase
+      : RESEARCH_BACKTEST_PHASE_VALUES.all,
     page: Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1,
   };
 }
@@ -62,12 +70,18 @@ function getBacktestFiltersLocation(filters: BacktestFilterSnapshot): string | n
   if (typeof window === 'undefined') return null;
   const url = new URL(window.location.href);
   const values: Record<string, string | undefined> = {
-    code: normalizeBacktestCode(filters.code),
-    window: filters.windowDays ? String(filters.windowDays) : undefined,
-    from: filters.startDate || undefined,
-    to: filters.endDate || undefined,
-    phase: filters.phase === 'all' ? undefined : filters.phase,
-    page: filters.page > 1 ? String(filters.page) : undefined,
+    [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code]: normalizeBacktestCode(filters.code),
+    [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.window]: filters.windowDays
+      ? String(filters.windowDays)
+      : undefined,
+    [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.from]: filters.startDate || undefined,
+    [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.to]: filters.endDate || undefined,
+    [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.phase]: filters.phase === RESEARCH_BACKTEST_PHASE_VALUES.all
+      ? undefined
+      : filters.phase,
+    [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.page]: filters.page > 1
+      ? String(filters.page)
+      : undefined,
   };
   Object.entries(values).forEach(([key, value]) => {
     if (value) url.searchParams.set(key, value);
@@ -404,7 +418,9 @@ const BacktestPage: React.FC = () => {
         evalWindowDays: windowDays,
         analysisDateFrom: startDate || undefined,
         analysisDateTo: endDate || undefined,
-        analysisPhase: phase && phase !== 'all' ? phase : undefined,
+        analysisPhase: phase && phase !== RESEARCH_BACKTEST_PHASE_VALUES.all
+          ? phase
+          : undefined,
         page,
         limit: pageSize,
       });
@@ -439,7 +455,9 @@ const BacktestPage: React.FC = () => {
         evalWindowDays: windowDays,
         analysisDateFrom: startDate || undefined,
         analysisDateTo: endDate || undefined,
-        analysisPhase: phase && phase !== 'all' ? phase : undefined,
+        analysisPhase: phase && phase !== RESEARCH_BACKTEST_PHASE_VALUES.all
+          ? phase
+          : undefined,
       };
       const [overall, stock] = await Promise.all([
         backtestApi.getOverallPerformance(query),
@@ -832,6 +850,17 @@ const BacktestPage: React.FC = () => {
           title={text.noResultsTitle}
           description={text.noResultsDescription}
           icon={<Inbox className="h-6 w-6" aria-hidden="true" />}
+          action={(
+            <Button
+              type="button"
+              variant="primary"
+              size="default"
+              aria-label={`${text.runBacktest} · ${text.noResultsTitle}`}
+              onClick={handleRun}
+            >
+              {text.runBacktest}
+            </Button>
+          )}
           className="min-h-40"
         />
       ) : (
@@ -847,6 +876,17 @@ const BacktestPage: React.FC = () => {
             <EmptyState
               title={text.noMetricsTitle}
               description={text.noMetricsDescription}
+              action={(
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="default"
+                  aria-label={`${text.runBacktest} · ${text.noMetricsTitle}`}
+                  onClick={handleRun}
+                >
+                  {text.runBacktest}
+                </Button>
+              )}
               className="h-full min-h-[12rem]"
             />
           )}
@@ -883,6 +923,17 @@ const BacktestPage: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
               )}
+              action={(
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="default"
+                  aria-label={`${text.runBacktest} · ${text.noResultsTitle}`}
+                  onClick={handleRun}
+                >
+                  {text.runBacktest}
+                </Button>
+              )}
             />
           ) : results.length > 0 ? (
             <div className="animate-fade-in">
@@ -892,7 +943,9 @@ const BacktestPage: React.FC = () => {
                   <span className="text-xs text-secondary-text">
                     {codeFilter.trim() ? formatUiText(text.filteredStock, { code: codeFilter.trim() }) : text.allStocks}
                     {evalDays ? ` · ${formatUiText(text.dayWindow, { days: evalDays })}` : ''}
-                    {phaseFilter !== 'all' ? ` · ${phaseFilterOptions.find((item) => item.value === phaseFilter)?.label ?? phaseFilter}` : ''}
+                    {phaseFilter !== RESEARCH_BACKTEST_PHASE_VALUES.all
+                      ? ` · ${phaseFilterOptions.find((item) => item.value === phaseFilter)?.label ?? phaseFilter}`
+                      : ''}
                     {analysisDateFrom ? ` · ${formatUiText(text.fromDate, { date: analysisDateFrom })}` : ''}
                     {analysisDateTo ? ` · ${formatUiText(text.toDate, { date: analysisDateTo })}` : ''}
                   </span>

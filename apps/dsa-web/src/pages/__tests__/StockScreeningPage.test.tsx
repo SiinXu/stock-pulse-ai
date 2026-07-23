@@ -1,6 +1,11 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
+import {
+  APP_ROUTE_PATHS,
+  RESEARCH_DISCOVER_MARKET_VALUES,
+  RESEARCH_DISCOVER_ROUTE_QUERY_KEYS,
+} from '../../routing/routes';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
 import StockScreeningPage from '../StockScreeningPage';
 
@@ -164,7 +169,28 @@ describe('StockScreeningPage', () => {
     getHotspots.mockResolvedValue({ enabled: true, provider: 'akshare', hotspots: [], hotspotCount: 0 });
     window.localStorage.clear();
     window.sessionStorage.clear();
-    window.history.pushState({}, '', '/screening');
+    window.history.pushState({}, '', APP_ROUTE_PATHS.researchDiscover);
+  });
+
+  it('offers a primary configuration action from the empty results state', async () => {
+    getAlphaSiftStatus.mockResolvedValueOnce({
+      enabled: true,
+      available: true,
+      installSpecIsDefault: true,
+    });
+
+    render(<StockScreeningPage />);
+
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    const emptyTitle = screen.getByText('暂无结果');
+    const emptyPanel = emptyTitle.closest('[data-state-panel="empty"]');
+    expect(emptyPanel).not.toBeNull();
+    const emptyAction = within(emptyPanel as HTMLElement).getByRole('button', {
+      name: '运行选股 · 暂无结果',
+    });
+    expect(emptyAction).toHaveAttribute('data-variant', 'primary');
+    fireEvent.click(emptyAction);
+    expect(screen.getByRole('dialog', { name: '参数设置' })).toBeInTheDocument();
   });
 
   it('re-syncs enabled state when AlphaSift availability check fails after config is enabled', async () => {
@@ -837,7 +863,17 @@ describe('StockScreeningPage', () => {
   });
 
   it('restores strategy, market, and result count run parameters from the URL', async () => {
-    window.history.pushState({}, '', '/screening?strategy=shrink_pullback&market=cn&count=25&source=report#details');
+    const search = new URLSearchParams({
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: 'shrink_pullback',
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market]: RESEARCH_DISCOVER_MARKET_VALUES.china,
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: '25',
+      source: 'report',
+    });
+    window.history.pushState(
+      {},
+      '',
+      `${APP_ROUTE_PATHS.researchDiscover}?${search}#details`,
+    );
     getStrategies.mockResolvedValueOnce({
       enabled: true,
       strategies: [
@@ -877,7 +913,7 @@ describe('StockScreeningPage', () => {
       });
     });
     expect(navigate).toHaveBeenLastCalledWith(
-      '/screening?strategy=shrink_pullback&count=25&source=report#details',
+      `${APP_ROUTE_PATHS.researchDiscover}?${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy}=shrink_pullback&${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count}=25&source=report#details`,
       { replace: true },
     );
   });

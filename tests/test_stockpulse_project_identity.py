@@ -113,8 +113,8 @@ def test_external_defaults_use_stockpulse_identity() -> None:
         (ROOT_DIR / path).read_text(encoding="utf-8")
         for path in (
             "apps/dsa-desktop/main.js",
-            "src/notification_sender/gotify_sender.py",
-            "src/notification_sender/ntfy_sender.py",
+            "src/notification_parts/senders/gotify_sender.py",
+            "src/notification_parts/senders/ntfy_sender.py",
             "src/services/intelligence_service.py",
         )
     )

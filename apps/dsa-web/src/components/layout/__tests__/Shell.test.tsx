@@ -84,7 +84,7 @@ describe('Shell', () => {
   it('renders the shared navigation, profile controls, and completion badge', () => {
     renderShell();
 
-    expect(screen.getByRole('link', { name: '问股' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Agent' })).toBeInTheDocument();
     expect(screen.getByTestId('chat-completion-badge')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'StockPulse' }).length).toBeGreaterThan(0);
     expect(screen.getByText('page content')).toBeInTheDocument();
@@ -126,11 +126,11 @@ describe('Shell', () => {
 
     const drawer = screen.getByRole('dialog', { name: '导航菜单' });
     expect(opener).toHaveAttribute('data-route-focus-key', 'shell:mobile-navigation');
-    expect(within(drawer).getByRole('link', { name: '问股' })).toHaveAttribute(
+    expect(within(drawer).getByRole('link', { name: 'Agent' })).toHaveAttribute(
       'data-route-focus-key',
-      'shell-nav-mobile:chat',
+      'shell-nav-mobile:agent',
     );
-    expect(within(drawer).getByRole('link', { name: '问股' })).toHaveAttribute(
+    expect(within(drawer).getByRole('link', { name: 'Agent' })).toHaveAttribute(
       'data-route-focus-return-key',
       'shell:mobile-navigation',
     );
@@ -165,7 +165,7 @@ describe('Shell', () => {
     act(() => setMediaMatch(DESKTOP_SIDEBAR_QUERY, true));
 
     expect(screen.queryByRole('dialog', { name: '导航菜单' })).not.toBeInTheDocument();
-    await waitFor(() => expect(screen.getByRole('link', { name: '问股' })).toHaveFocus());
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Agent' })).toHaveFocus());
   });
 
   it('does not move content focus when the desktop breakpoint changes with navigation closed', async () => {

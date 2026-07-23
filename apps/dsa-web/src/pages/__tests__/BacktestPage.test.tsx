@@ -2,6 +2,11 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { BrowserRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
+import {
+  APP_ROUTE_PATHS,
+  RESEARCH_BACKTEST_PHASE_VALUES,
+  RESEARCH_BACKTEST_ROUTE_QUERY_KEYS,
+} from '../../routing/routes';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
 import BacktestPage from '../BacktestPage';
 
@@ -96,7 +101,7 @@ const baseResultItem = {
 beforeEach(() => {
   vi.clearAllMocks();
   window.localStorage.clear();
-  window.history.replaceState({}, '', '/backtest');
+  window.history.replaceState({}, '', APP_ROUTE_PATHS.researchBacktest);
   mockGetOverallPerformance.mockResolvedValue(basePerformance);
   mockGetStockPerformance.mockResolvedValue(null);
   mockGetResults.mockResolvedValue({
@@ -187,6 +192,8 @@ describe('BacktestPage', () => {
 
     expect(await screen.findByRole('heading', { name: '暂无结果' })).toBeInTheDocument();
     expect(screen.getAllByText('暂无结果')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: '运行回测 · 暂无结果' }))
+      .toHaveAttribute('data-variant', 'primary');
     expect(screen.queryByLabelText('结果筛选 · 阶段')).not.toBeInTheDocument();
     expect(screen.queryByText('暂无指标')).not.toBeInTheDocument();
   });
@@ -302,7 +309,11 @@ describe('BacktestPage', () => {
   });
 
   it('filters results with stock code, window, phase, and analysis date range when clicking Filter', async () => {
-    window.history.replaceState({}, '', '/backtest?ref=dashboard#results');
+    window.history.replaceState(
+      {},
+      '',
+      `${APP_ROUTE_PATHS.researchBacktest}?ref=dashboard#results`,
+    );
     renderPage();
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
@@ -508,7 +519,19 @@ describe('BacktestPage', () => {
   });
 
   it('restores applied filters and pagination from the URL', async () => {
-    window.history.replaceState({}, '', '/backtest?code=aapl&window=20&from=2026-03-01&to=2026-03-31&phase=intraday&page=3');
+    const search = new URLSearchParams({
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code]: 'aapl',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.window]: '20',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.from]: '2026-03-01',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.to]: '2026-03-31',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.phase]: RESEARCH_BACKTEST_PHASE_VALUES.intraday,
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.page]: '3',
+    });
+    window.history.replaceState(
+      {},
+      '',
+      `${APP_ROUTE_PATHS.researchBacktest}?${search}`,
+    );
     mockGetResults.mockResolvedValueOnce({
       total: 45,
       page: 3,

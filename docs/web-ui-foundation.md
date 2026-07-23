@@ -129,7 +129,8 @@ separate desktop-owned change.
 
 The Router URL remains the primary state owner. A tab-scoped continuity layer
 stores only allowlisted, normalized route snapshots for Home, Chat, Portfolio,
-Decision Signals, Screening, Backtest, and stock details. On a fresh document
+Decision Signals, Research Market, Research Discover, Research Backtest, and
+stock details. On a fresh document
 load, a bare major-route URL may replace itself once with the last snapshot for
 that route. Explicit URL state always wins, and later in-app navigation is not
 overridden by the initial restore guard.
@@ -141,9 +142,10 @@ proven. The current explicit route also wins immediately over a stale snapshot,
 so clearing a destination filter cannot be undone by its own Sidebar link.
 
 Application navigation carries the current validated stock context into Home,
-Chat, Decision Signals, and Backtest. Destination-specific state such as a
-Chat session, Portfolio account, Decision Signals tab/filter set, Screening
-parameters, or Backtest range remains scoped to that destination. Clearing a
+Chat, Decision Signals, and Research Backtest. Destination-specific state such
+as a Chat session, Portfolio account, Decision Signals tab/filter set, Research
+Discover parameters, or Research Backtest range remains scoped to that
+destination. Clearing a
 route's URL-owned state overwrites its snapshot, so the persistence layer
 cannot resurrect filters or selections the user intentionally removed.
 Decision Signal details with a source report provide a one-click handoff to the
@@ -364,14 +366,22 @@ background, border, radius, shadow, and responsive outer gutter around page
 content. Wide page content remains reachable through the `main` scroll
 container instead of being clipped or widening the document. UI-N01 does not
 replace or reinterpret the separately owned UI4 L-09 target. The typed
-application navigation descriptor exposes eight flat routes after Token Usage
-moved into Settings as the `Usage & cost` section. The legacy `/usage` URL uses
-the shared replace-redirect contract to preserve unrelated query parameters
-and the hash while the destination-owned `section=usage` value wins conflicts.
-Redirect destinations suppress tab-session restoration, and route paths plus
-Settings query keys come from the centralized route contract. Research, More,
-or another top-level destination requires a separate information-architecture
-decision.
+application navigation descriptor exposes five stable primary domains: Home,
+Research, Portfolio, Agent, and Settings. Home temporarily owns Decision Signals
+and Alerts until their dedicated IA migration, while Research owns Market
+Review, Discover, and Backtest. Expanded navigation keeps these secondary
+destinations visible beneath their parent. Compact navigation opens the same
+children in a right-side hover or keyboard flyout; Right Arrow enters the
+flyout and Left Arrow or Escape restores its parent trigger.
+
+Canonical Research paths are `/research/market`, `/research/discover`, and
+`/research/backtest`. The legacy `/screening` and `/backtest` URLs use the shared
+replace-redirect contract and preserve query parameters and hash state. Token
+Usage remains in Settings as the `Usage & cost` section, with `/usage` using the
+same compatibility contract while the destination-owned `section=usage` value
+wins conflicts. Redirect destinations suppress tab-session restoration, and
+all product paths plus Settings query keys come from the centralized route
+contract.
 
 The responsive contract has three states:
 

@@ -70,7 +70,7 @@ interface UseFixedPopupOptions<
   /** Stable value that changes whenever popup content can affect its geometry. */
   contentVersion: unknown;
   constrainWidthToViewport?: boolean;
-  placement?: 'auto' | 'top' | 'bottom';
+  placement?: 'auto' | 'top' | 'bottom' | 'right';
   align?: 'start' | 'end';
 }
 
@@ -131,9 +131,13 @@ export const useFixedPopup = <
       - FIXED_POPUP_VIEWPORT_MARGIN_PX;
     const openAbove = placement === 'top'
       || (placement === 'auto' && popupHeight > availableBelow && availableAbove > availableBelow);
-    const preferredTop = openAbove
-      ? triggerRect.top - FIXED_POPUP_GAP_PX - popupHeight
-      : triggerRect.bottom + FIXED_POPUP_GAP_PX;
+    const preferredTop = placement === 'right'
+      ? align === 'end'
+        ? triggerRect.bottom - popupHeight
+        : triggerRect.top
+      : openAbove
+        ? triggerRect.top - FIXED_POPUP_GAP_PX - popupHeight
+        : triggerRect.bottom + FIXED_POPUP_GAP_PX;
     const maxTop = Math.max(
       viewportHeight - FIXED_POPUP_VIEWPORT_MARGIN_PX - popupHeight,
       FIXED_POPUP_VIEWPORT_MARGIN_PX,
@@ -146,9 +150,23 @@ export const useFixedPopup = <
       viewportWidth - FIXED_POPUP_VIEWPORT_MARGIN_PX - popupRect.width,
       FIXED_POPUP_VIEWPORT_MARGIN_PX,
     );
-    const preferredLeft = align === 'end'
-      ? triggerRect.right - popupRect.width
-      : triggerRect.left;
+    const availableRight = viewportWidth
+      - triggerRect.right
+      - FIXED_POPUP_GAP_PX
+      - FIXED_POPUP_VIEWPORT_MARGIN_PX;
+    const availableLeft = triggerRect.left
+      - FIXED_POPUP_GAP_PX
+      - FIXED_POPUP_VIEWPORT_MARGIN_PX;
+    const openLeft = placement === 'right'
+      && popupRect.width > availableRight
+      && availableLeft > availableRight;
+    const preferredLeft = placement === 'right'
+      ? openLeft
+        ? triggerRect.left - FIXED_POPUP_GAP_PX - popupRect.width
+        : triggerRect.right + FIXED_POPUP_GAP_PX
+      : align === 'end'
+        ? triggerRect.right - popupRect.width
+        : triggerRect.left;
     const left = Math.min(
       Math.max(preferredLeft, FIXED_POPUP_VIEWPORT_MARGIN_PX),
       maxLeft,
@@ -189,8 +207,12 @@ export const useFixedPopup = <
 
   const popupStyle: CSSProperties | undefined = triggerRect
     ? getOverlayStyle('popover', {
-        top: popupPosition?.top ?? triggerRect.bottom + FIXED_POPUP_GAP_PX,
-        left: popupPosition?.left ?? triggerRect.left,
+        top: popupPosition?.top ?? (
+          placement === 'right' ? triggerRect.top : triggerRect.bottom + FIXED_POPUP_GAP_PX
+        ),
+        left: popupPosition?.left ?? (
+          placement === 'right' ? triggerRect.right + FIXED_POPUP_GAP_PX : triggerRect.left
+        ),
         minWidth: triggerRect.width,
         maxWidth: constrainWidthToViewport
           ? `calc(100vw - ${FIXED_POPUP_VIEWPORT_MARGIN_PX * 2}px)`

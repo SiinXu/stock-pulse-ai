@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Tests] Added a blocking hosted `python-minimum` job that runs the full backend gate on Python 3.10, with portable timeout and exception-group guard fixtures, while retaining the Python 3.11 gate.
+- [Fixed] Removed false disclosure cues from always-expanded Web navigation, aligned the Discover empty-state accessible name with its visible action, and centralized Research URL state constants.
+- [Changed] Grouped Web navigation into five primary domains and moved market review, screening, and backtesting into Research with query- and hash-preserving legacy redirects.
 - [Tests] Aligned the Usage settings browser contract with the single-page-heading hierarchy.
 - [Changed] Moved Token Usage into Settings > Usage & cost and retained `/usage` as a query- and hash-preserving compatibility redirect.
 - [Fixed] Corrected English developer comments to preserve financial terminology and localized fixture literals without changing runtime behavior.
@@ -304,10 +307,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Prevented stale Desktop backend process events from marking a replacement generation unavailable during rapid macOS close and reactivate fallback.
 - [Fixed] Aligned runtime, Web, CLI, and review-tool dependency-install guidance with the constrained bootstrap and removed the temporary #400 tracked-text exceptions.
 - [Chore] Converged analysis context pack prompt and overview modules into `src/analysis_context_pack/` with strict legacy facades and compatibility guards.
+- [Chore] Made PR review execution, runner-owned review artifacts, and install-guidance parsing fail closed against injected steps, decoy options, compact requirements, folded YAML, continuation, and comment bypasses.
 - [Changed] Split search provider implementations and shared result contracts into focused private modules while preserving the `src.search_service` facade, fallback, and outbound-policy behavior.
 - [Docs] Defined repository directory ownership, the retained `webui.py` compatibility role, and the separate backend package-root decision.
 - [Changed] Split `SearchService` state, news processing, and orchestration methods into focused private modules while preserving the `src.search_service` facade and search behavior.
 - [Fixed] Serialized public plugin lifecycle operations with composition-root close, replacement, and reset so closed roots cannot be republished, callback-owned workers cannot deadlock, and terminal process shutdown cannot recreate the root.
+- [Chore] Converged notification capability, contract, noise-control, and route-configuration helpers into `src/notification_parts/` with strict legacy facades.
+- [Chore] Converged compact notification sender adapters into `src/notification_parts/senders/` with strict legacy facades.
+- [Chore] Converged the remaining extended notification sender adapters and package exports into `src/notification_parts/senders/` with strict legacy facades.
 
 ## [3.26.3] - 2026-07-15
 

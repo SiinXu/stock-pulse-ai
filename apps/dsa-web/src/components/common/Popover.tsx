@@ -25,9 +25,12 @@ interface PopoverProps {
   ariaLabel?: string;
   ariaLabelledBy?: string;
   closeOnEscape?: boolean;
-  placement?: 'auto' | 'top' | 'bottom';
+  placement?: 'auto' | 'top' | 'bottom' | 'right';
   align?: 'start' | 'end';
+  autoFocusContent?: boolean;
   onContentKeyDown?: React.KeyboardEventHandler<HTMLDivElement>;
+  onContentMouseEnter?: React.MouseEventHandler<HTMLDivElement>;
+  onContentMouseLeave?: React.MouseEventHandler<HTMLDivElement>;
 }
 
 export const Popover = ({
@@ -45,7 +48,10 @@ export const Popover = ({
   closeOnEscape = true,
   placement = 'auto',
   align = 'start',
+  autoFocusContent = true,
   onContentKeyDown,
+  onContentMouseEnter,
+  onContentMouseLeave,
 }: PopoverProps) => {
   const rootRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -123,7 +129,11 @@ export const Popover = ({
   }, [open, shouldRestoreFocus]);
 
   useEffect(() => {
-    if (!open || (contentRole !== 'menu' && contentRole !== 'dialog')) return;
+    if (
+      !open
+      || !autoFocusContent
+      || (contentRole !== 'menu' && contentRole !== 'dialog')
+    ) return;
     const frame = requestAnimationFrame(() => {
       const content = contentRef.current;
       if (!content || content.contains(document.activeElement)) return;
@@ -142,7 +152,7 @@ export const Popover = ({
       target?.focus();
     });
     return () => cancelAnimationFrame(frame);
-  }, [contentRole, open, portalHost]);
+  }, [autoFocusContent, contentRole, open, portalHost]);
 
   useEffect(() => {
     if (!open) return;
@@ -221,6 +231,8 @@ export const Popover = ({
               data-dialog-popup="true"
               style={popupStyle}
               onKeyDown={handleContentKeyDown}
+              onMouseEnter={onContentMouseEnter}
+              onMouseLeave={onContentMouseLeave}
               className={cn(
                 'fixed overflow-hidden rounded-xl border border-border bg-elevated shadow-lg',
                 contentClassName,

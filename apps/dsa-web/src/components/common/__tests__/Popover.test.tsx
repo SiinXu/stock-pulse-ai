@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
+import { APP_ROUTE_PATHS } from '../../../routing/routes';
 import { Modal } from '../Modal';
 import { OVERLAY_Z } from '../overlayZ';
 import { Popover } from '../Popover';
@@ -26,6 +27,101 @@ describe('Popover', () => {
 
     fireEvent.mouseDown(document.body);
     expect(screen.queryByRole('menu', { name: '操作' })).not.toBeInTheDocument();
+  });
+
+  it('positions a right-side flyout against the trigger without stealing hover focus', async () => {
+    const rect = (left: number, top: number, width: number, height: number): DOMRect => ({
+      bottom: top + height,
+      height,
+      left,
+      right: left + width,
+      top,
+      width,
+      x: left,
+      y: top,
+      toJSON: () => ({}),
+    });
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function getBoundingClientRect(this: HTMLElement) {
+        return this.getAttribute('role') === 'menu'
+          ? rect(0, 0, 180, 100)
+          : rect(20, 50, 44, 44);
+      });
+    try {
+      render(
+        <Popover
+          defaultOpen
+          placement="right"
+          autoFocusContent={false}
+          contentRole="menu"
+          ariaLabel="Research"
+          trigger={() => <button type="button">Research</button>}
+        >
+          <a href={APP_ROUTE_PATHS.researchMarket} role="menuitem">Market review</a>
+        </Popover>,
+      );
+
+      const trigger = screen.getByRole('button', { name: 'Research' });
+      trigger.focus();
+      const menu = await screen.findByRole('menu', { name: 'Research' });
+      await waitFor(() => {
+        expect(menu.style.left).toBe('68px');
+        expect(menu.style.top).toBe('50px');
+        expect(menu.style.visibility).toBe('visible');
+      });
+      expect(trigger).toHaveFocus();
+    } finally {
+      rectSpy.mockRestore();
+    }
+  });
+
+  it('falls back to the left and stays inside the viewport near the right edge', async () => {
+    const rect = (left: number, top: number, width: number, height: number): DOMRect => ({
+      bottom: top + height,
+      height,
+      left,
+      right: left + width,
+      top,
+      width,
+      x: left,
+      y: top,
+      toJSON: () => ({}),
+    });
+    const originalInnerWidth = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1_024 });
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function getBoundingClientRect(this: HTMLElement) {
+        return this.getAttribute('role') === 'menu'
+          ? rect(0, 0, 180, 100)
+          : rect(970, 50, 44, 44);
+      });
+    try {
+      render(
+        <Popover
+          defaultOpen
+          placement="right"
+          autoFocusContent={false}
+          contentRole="menu"
+          ariaLabel="Research"
+          trigger={() => <button type="button">Research</button>}
+        >
+          <a href={APP_ROUTE_PATHS.researchMarket} role="menuitem">Market review</a>
+        </Popover>,
+      );
+
+      const menu = await screen.findByRole('menu', { name: 'Research' });
+      await waitFor(() => expect(menu.style.visibility).toBe('visible'));
+      const left = Number.parseFloat(menu.style.left);
+      expect(left).toBeLessThan(970);
+      expect(left).toBeGreaterThanOrEqual(8);
+      expect(left + 180).toBeLessThanOrEqual(window.innerWidth - 8);
+    } finally {
+      rectSpy.mockRestore();
+      Object.defineProperty(window, 'innerWidth', {
+        configurable: true,
+        value: originalInnerWidth,
+      });
+    }
   });
 
   it('supports controlled state and Escape closing', () => {

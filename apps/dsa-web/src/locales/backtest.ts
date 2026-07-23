@@ -3,6 +3,7 @@
 import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import type { BacktestPhaseFilter } from '../types/backtest';
 import type { UiLanguage } from '../i18n/uiText';
+import { RESEARCH_BACKTEST_PHASE_VALUES } from '../routing/routes';
 
 type Option<T extends string = string> = { value: T; label: string };
 
@@ -25,10 +26,10 @@ export const BACKTEST_VALIDATION_TEXT = createUiLanguageRecord("locales.backtest
 });
 
 export const BACKTEST_PHASE_FILTER_OPTIONS: Record<UiLanguage, Array<Option<BacktestPhaseFilter>>> = createUiLanguageRecord("locales.backtest.BACKTEST_PHASE_FILTER_OPTIONS", {
-  zh: [{ value: 'all', label: '全部阶段' }, { value: 'premarket', label: '盘前' }, { value: 'intraday', label: '盘中' }, { value: 'postmarket', label: '盘后' }, { value: 'unknown', label: '未知' }],
-  en: [{ value: 'all', label: 'All phases' }, { value: 'premarket', label: 'Pre-market' }, { value: 'intraday', label: 'Intraday' }, { value: 'postmarket', label: 'Post-market' }, { value: 'unknown', label: 'Unknown' }],
+  zh: [{ value: RESEARCH_BACKTEST_PHASE_VALUES.all, label: '全部阶段' }, { value: RESEARCH_BACKTEST_PHASE_VALUES.premarket, label: '盘前' }, { value: RESEARCH_BACKTEST_PHASE_VALUES.intraday, label: '盘中' }, { value: RESEARCH_BACKTEST_PHASE_VALUES.postmarket, label: '盘后' }, { value: RESEARCH_BACKTEST_PHASE_VALUES.unknown, label: '未知' }],
+  en: [{ value: RESEARCH_BACKTEST_PHASE_VALUES.all, label: 'All phases' }, { value: RESEARCH_BACKTEST_PHASE_VALUES.premarket, label: 'Pre-market' }, { value: RESEARCH_BACKTEST_PHASE_VALUES.intraday, label: 'Intraday' }, { value: RESEARCH_BACKTEST_PHASE_VALUES.postmarket, label: 'Post-market' }, { value: RESEARCH_BACKTEST_PHASE_VALUES.unknown, label: 'Unknown' }],
 });
-export const BACKTEST_PHASE_LABELS: Record<UiLanguage, Record<string, string>> = createUiLanguageRecord("locales.backtest.BACKTEST_PHASE_LABELS", { zh: { premarket: '盘前', intraday: '盘中', postmarket: '盘后', unknown: '未知' }, en: { premarket: 'Pre-market', intraday: 'Intraday', postmarket: 'Post-market', unknown: 'Unknown' } });
+export const BACKTEST_PHASE_LABELS: Record<UiLanguage, Record<string, string>> = createUiLanguageRecord("locales.backtest.BACKTEST_PHASE_LABELS", { zh: { [RESEARCH_BACKTEST_PHASE_VALUES.premarket]: '盘前', [RESEARCH_BACKTEST_PHASE_VALUES.intraday]: '盘中', [RESEARCH_BACKTEST_PHASE_VALUES.postmarket]: '盘后', [RESEARCH_BACKTEST_PHASE_VALUES.unknown]: '未知' }, en: { [RESEARCH_BACKTEST_PHASE_VALUES.premarket]: 'Pre-market', [RESEARCH_BACKTEST_PHASE_VALUES.intraday]: 'Intraday', [RESEARCH_BACKTEST_PHASE_VALUES.postmarket]: 'Post-market', [RESEARCH_BACKTEST_PHASE_VALUES.unknown]: 'Unknown' } });
 export const BACKTEST_OUTCOME_LABELS: Record<UiLanguage, Record<string, string>> = createUiLanguageRecord("locales.backtest.BACKTEST_OUTCOME_LABELS", { zh: { win: '盈利', loss: '亏损', neutral: '中性' }, en: { win: 'Win', loss: 'Loss', neutral: 'Neutral' } });
 export const BACKTEST_STATUS_LABELS: Record<UiLanguage, Record<string, string>> = createUiLanguageRecord("locales.backtest.BACKTEST_STATUS_LABELS", { zh: { completed: '已完成', insufficient: '数据不足', insufficient_data: '数据不足', error: '错误' }, en: { completed: 'Completed', insufficient: 'Insufficient data', insufficient_data: 'Insufficient data', error: 'Error' } });
 export const BACKTEST_MOVEMENT_LABELS: Record<UiLanguage, Record<string, string>> = createUiLanguageRecord("locales.backtest.BACKTEST_MOVEMENT_LABELS", { zh: { up: '上涨', down: '下跌', flat: '持平' }, en: { up: 'Up', down: 'Down', flat: 'Flat' } });
