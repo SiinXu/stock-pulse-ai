@@ -153,7 +153,8 @@ task parameters cannot rewrite a canonical or legacy-redirect deep link. Safe
 custom strategy IDs remain URL-owned when absent from the current preset
 catalog, including when that catalog is empty. The primary strategy selector
 presents that retained value as the active custom option instead of an
-unavailable-catalog placeholder. Wholly
+unavailable-catalog placeholder. With an empty catalog, the selector remains
+disabled only when there is no safe retained custom ID to present. Wholly
 malformed owned input normalizes to explicit canonical defaults
 instead of becoming bare, preserving the same precedence across refresh.
 
