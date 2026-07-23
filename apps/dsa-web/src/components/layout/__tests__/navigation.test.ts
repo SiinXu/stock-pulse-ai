@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   APP_ROUTE_PATHS,
+  HOME_WORKSPACE_VALUES,
   LEGACY_ROUTE_PATHS,
   REPORT_ROUTE_QUERY_KEYS,
+  RESEARCH_BACKTEST_LIMITS,
   RESEARCH_BACKTEST_PHASE_VALUES,
   RESEARCH_BACKTEST_ROUTE_QUERY_KEYS,
+  RESEARCH_DISCOVER_DEFAULT_VALUES,
+  RESEARCH_DISCOVER_LIMITS,
   RESEARCH_DISCOVER_MARKET_VALUES,
   RESEARCH_DISCOVER_ROUTE_QUERY_KEYS,
   RUN_FLOW_ROUTE_QUERY_VALUES,
@@ -77,6 +81,14 @@ describe('application navigation descriptor', () => {
       'unknown',
     ]);
     expect(Object.values(RUN_FLOW_ROUTE_QUERY_VALUES)).toEqual(['history', 'task']);
+    expect(Object.values(HOME_WORKSPACE_VALUES)).toEqual(['history', 'watchlist', 'today']);
+    expect(RESEARCH_DISCOVER_DEFAULT_VALUES).toEqual({
+      market: RESEARCH_DISCOVER_MARKET_VALUES.china,
+      strategy: 'dual_low',
+      count: 3,
+    });
+    expect(RESEARCH_DISCOVER_LIMITS.maxCount).toBe(100);
+    expect(RESEARCH_BACKTEST_LIMITS.maxWindowDays).toBe(120);
   });
 
   it('delegates only unmodified primary same-window link activation', () => {

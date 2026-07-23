@@ -100,6 +100,11 @@ The current shareable state contract includes Home report and Run Flow
 identity, Home stock prefill and workspace view, Chat session/report context,
 Portfolio account scope, stock-details period/range, Decision Signals stock,
 signal, view, and filter context, and the existing page-owned filter codecs.
+Research Discover and Research Backtest use one typed route-state codec across
+their page initialization, the deep-link guard, and session continuity. The
+codec removes malformed owned values before page effects can issue API calls,
+replace-normalizes the URL, and preserves unrelated non-sensitive query and
+hash state.
 Stable view choices create history entries when Back/Forward should restore
 them. Canonicalization, missing-resource fallback, and default-value removal
 use Router replace navigation so they do not create dead history entries. A
@@ -134,6 +139,11 @@ stock details. On a fresh document
 load, a bare major-route URL may replace itself once with the last snapshot for
 that route. Explicit URL state always wins, and later in-app navigation is not
 overridden by the initial restore guard.
+
+An active Screening task keeps its opaque task ID for status recovery, but its
+stored run parameters are only a fallback for a bare Discover URL. Any explicit
+Discover-owned parameter selects the complete URL-owned run state, so stale
+task parameters cannot rewrite a canonical or legacy-redirect deep link.
 
 Home continuity includes the validated task/history Run Flow identity owned by
 the Home URL. A same-stock return restores the active process drawer; carrying a

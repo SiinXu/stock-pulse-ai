@@ -7,11 +7,13 @@ import {
   HOME_ROUTE_QUERY_KEYS,
   LEGACY_ROUTE_PATHS,
   REPORT_ROUTE_QUERY_KEYS,
-  RESEARCH_BACKTEST_PHASE_VALUES,
   RESEARCH_BACKTEST_ROUTE_QUERY_KEYS,
-  RESEARCH_DISCOVER_MARKET_VALUES,
   RESEARCH_DISCOVER_ROUTE_QUERY_KEYS,
 } from '../routing/routes';
+import {
+  parseResearchBacktestRouteState,
+  parseResearchDiscoverRouteState,
+} from '../routing/researchRouteState';
 import { parseHomeUrlState } from './homeUrlState';
 import {
   WEB_SESSION_CONTINUITY_STORAGE_KEY,
@@ -71,7 +73,7 @@ const ALLOWED_QUERY_KEYS: Record<PersistedRouteKey, readonly string[]> = {
     REPORT_ROUTE_QUERY_KEYS.runFlowRecordId,
     REPORT_ROUTE_QUERY_KEYS.runFlowTaskId,
   ],
-  chat: ['session', 'stock', 'name', 'recordId', 'context'],
+  chat: ['session', 'stock', 'name', REPORT_ROUTE_QUERY_KEYS.recordId, 'context'],
   portfolio: ['account'],
   'decision-signals': [
     'stock',
@@ -95,10 +97,6 @@ const ALLOWED_QUERY_KEYS: Record<PersistedRouteKey, readonly string[]> = {
   'research-backtest': Object.values(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS),
   'research-market': Object.values(REPORT_ROUTE_QUERY_KEYS),
 };
-const BACKTEST_PHASES = new Set<string>(Object.values(RESEARCH_BACKTEST_PHASE_VALUES));
-const SAFE_IDENTIFIER_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
-const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-
 type SanitizedRoute = {
   href: string;
   key: PersistedRouteKey;
@@ -141,45 +139,16 @@ function normalizeSafeStockName(value: unknown): string | null {
   }) ? null : normalized;
 }
 
-function isValidIsoDate(value: string): boolean {
-  if (!ISO_DATE_PATTERN.test(value)) return false;
-  const parsed = new Date(`${value}T00:00:00Z`);
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
-}
-
-function positiveInteger(value: string | null, maximum = Number.MAX_SAFE_INTEGER): string | null {
-  if (!value || !/^\d+$/.test(value)) return null;
-  const parsed = Number(value);
-  return Number.isSafeInteger(parsed) && parsed > 0 && parsed <= maximum ? String(parsed) : null;
-}
-
 function sanitizeStandaloneRoute(url: URL): SanitizedRoute | null {
   const params = new URLSearchParams();
   if (
     url.pathname === APP_ROUTE_PATHS.researchDiscover
     || url.pathname === LEGACY_ROUTE_PATHS.screening
   ) {
-    if (
-      url.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market)
-      === RESEARCH_DISCOVER_MARKET_VALUES.china
-    ) {
-      params.set(
-        RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market,
-        RESEARCH_DISCOVER_MARKET_VALUES.china,
-      );
-    }
-    const strategy = url.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy);
-    if (strategy && SAFE_IDENTIFIER_PATTERN.test(strategy)) {
-      params.set(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy, strategy);
-    }
-    const count = positiveInteger(
-      url.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count),
-      100,
-    );
-    if (count) params.set(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count, count);
+    const normalized = parseResearchDiscoverRouteState(url.searchParams).ownedParams;
     return {
       key: 'research-discover',
-      href: `${APP_ROUTE_PATHS.researchDiscover}${params.size ? `?${params}` : ''}`,
+      href: `${APP_ROUTE_PATHS.researchDiscover}${normalized.size ? `?${normalized}` : ''}`,
       target: null,
     };
   }
@@ -187,27 +156,10 @@ function sanitizeStandaloneRoute(url: URL): SanitizedRoute | null {
     url.pathname === APP_ROUTE_PATHS.researchBacktest
     || url.pathname === LEGACY_ROUTE_PATHS.backtest
   ) {
-    const code = url.searchParams.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code);
-    const normalizedCode = code ? normalizeSafeStockCode(code) : null;
-    if (normalizedCode) params.set(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code, normalizedCode);
-    const windowDays = positiveInteger(
-      url.searchParams.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.window),
-      120,
-    );
-    if (windowDays) params.set(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.window, windowDays);
-    const from = url.searchParams.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.from);
-    const to = url.searchParams.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.to);
-    if (from && isValidIsoDate(from)) params.set(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.from, from);
-    if (to && isValidIsoDate(to)) params.set(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.to, to);
-    const phase = url.searchParams.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.phase);
-    if (phase && phase !== RESEARCH_BACKTEST_PHASE_VALUES.all && BACKTEST_PHASES.has(phase)) {
-      params.set(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.phase, phase);
-    }
-    const page = positiveInteger(url.searchParams.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.page));
-    if (page) params.set(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.page, page);
+    const normalized = parseResearchBacktestRouteState(url.searchParams).ownedParams;
     return {
       key: 'research-backtest',
-      href: `${APP_ROUTE_PATHS.researchBacktest}${params.size ? `?${params}` : ''}`,
+      href: `${APP_ROUTE_PATHS.researchBacktest}${normalized.size ? `?${normalized}` : ''}`,
       target: null,
     };
   }

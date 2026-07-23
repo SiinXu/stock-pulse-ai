@@ -356,6 +356,51 @@ describe('BacktestPage', () => {
     expect(window.location.hash).toBe('#results');
   });
 
+  it('removes malformed URL filters before API requests while preserving unrelated query and hash state', async () => {
+    const search = new URLSearchParams({
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code]: '<bad>',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.window]: '999',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.from]: '2026-99-99',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.to]: 'not-a-date',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.phase]: 'after-hours',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.page]: '0',
+      ref: 'dashboard',
+    });
+    window.history.replaceState(
+      {},
+      '',
+      `${APP_ROUTE_PATHS.researchBacktest}?${search}#results`,
+    );
+
+    renderPage();
+
+    await waitFor(() => expect(mockGetResults).toHaveBeenCalled());
+    expect(mockGetStockPerformance).not.toHaveBeenCalled();
+    expect(mockGetOverallPerformance).toHaveBeenCalledWith({
+      evalWindowDays: undefined,
+      analysisDateFrom: undefined,
+      analysisDateTo: undefined,
+      analysisPhase: undefined,
+    });
+    expect(mockGetResults).toHaveBeenCalledWith({
+      code: undefined,
+      evalWindowDays: basePerformance.evalWindowDays,
+      analysisDateFrom: undefined,
+      analysisDateTo: undefined,
+      analysisPhase: undefined,
+      page: 1,
+      limit: 20,
+    });
+    await waitFor(() => {
+      const normalized = new URLSearchParams(window.location.search);
+      expect(normalized.get('ref')).toBe('dashboard');
+      Object.values(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS).forEach((key) => {
+        expect(normalized.has(key)).toBe(false);
+      });
+    });
+    expect(window.location.hash).toBe('#results');
+  });
+
   it('applies the phase filter immediately without waiting for Filter or Run', async () => {
     renderPage();
 

@@ -18,6 +18,7 @@ import { UI_TEXT } from '../src/i18n/uiText';
 import {
   APP_ROUTE_PATHS,
   LEGACY_ROUTE_PATHS,
+  RESEARCH_DISCOVER_ROUTE_QUERY_KEYS,
   SETTINGS_ROUTE_QUERY_KEYS,
   SETTINGS_SECTION_IDS,
   buildSettingsHref,
@@ -748,6 +749,70 @@ test.describe('infrastructure interaction acceptance matrix', () => {
 
       await page.goBack();
       await expect.poll(() => new URL(page.url()).pathname).toBe(APP_ROUTE_PATHS.home);
+    }
+  });
+
+  test('05c explicit Discover URLs override stale active-task parameters on canonical and legacy entry', async ({ page }) => {
+    await mockScreeningBase(page, [
+      {
+        id: 'dual_low',
+        name: 'Dual low',
+        name_en: 'Dual low',
+        description_en: 'Stale task strategy',
+        category_en: 'Value',
+      },
+      {
+        id: 'quality',
+        name: 'Quality',
+        name_en: 'Quality',
+        description_en: 'Explicit URL strategy',
+        category_en: 'Quality',
+      },
+    ]);
+    let restorationRequests = 0;
+    await page.route('**/api/v1/alphasift/screen/tasks/stored-explicit-task', async (route) => {
+      restorationRequests += 1;
+      await fulfillJson(route, {
+        task_id: 'stored-explicit-task',
+        trace_id: 'stored-explicit-task',
+        status: 'processing',
+        progress: 40,
+        message_code: 'task_processing',
+        message_params: {},
+        result: null,
+      });
+    });
+    await login(page, 'en');
+
+    for (const entryPath of [APP_ROUTE_PATHS.researchDiscover, LEGACY_ROUTE_PATHS.screening]) {
+      await page.evaluate(({ key, value }) => sessionStorage.setItem(key, JSON.stringify(value)), {
+        key: screeningTaskStorageKey,
+        value: {
+          taskId: 'stored-explicit-task',
+          market: 'cn',
+          strategy: 'dual_low',
+          maxResults: 3,
+        },
+      });
+      const requestsBeforeNavigation = restorationRequests;
+      await page.goto(
+        `${entryPath}?${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy}=quality&${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count}=20&source=notification#details`,
+      );
+
+      await expect.poll(() => new URL(page.url()).pathname).toBe(APP_ROUTE_PATHS.researchDiscover);
+      await expect.poll(() => restorationRequests).toBeGreaterThan(requestsBeforeNavigation);
+      const redirectedUrl = new URL(page.url());
+      expect(redirectedUrl.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy)).toBe('quality');
+      expect(redirectedUrl.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count)).toBe('20');
+      expect(redirectedUrl.searchParams.get('source')).toBe('notification');
+      expect(redirectedUrl.hash).toBe('#details');
+      await expect(page.getByRole('combobox', { name: SCREENING_TEXT.en.selectStrategy }))
+        .toHaveAttribute('data-value', 'quality');
+      await page.getByRole('button', { name: SCREENING_TEXT.en.parameters }).click();
+      await expect(page.getByRole('dialog', { name: SCREENING_TEXT.en.parameters })
+        .getByLabel(SCREENING_TEXT.en.resultCount)).toHaveValue('20');
+      expect(await page.evaluate((key) => sessionStorage.getItem(key), screeningTaskStorageKey))
+        .toContain('stored-explicit-task');
     }
   });
 

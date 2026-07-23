@@ -37,7 +37,7 @@ import { buildDeepLink } from '../utils/deepLink';
 import { normalizeStockCode } from '../utils/stockCode';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
 import { getUiListSeparator } from '../utils/uiLocale';
-import { APP_ROUTE_PATHS } from '../routing/routes';
+import { APP_ROUTE_PATHS, HOME_WORKSPACE_VALUES } from '../routing/routes';
 
 type RunFlowDrawerState =
   | { open: false }
@@ -961,7 +961,7 @@ const HomePage: React.FC = () => {
 
   const todayDateKey = getTodayInShanghai();
   useEffect(() => {
-    if (sidebarWorkspaceTab !== 'today') {
+    if (sidebarWorkspaceTab !== HOME_WORKSPACE_VALUES.today) {
       return undefined;
     }
 
@@ -1171,7 +1171,7 @@ const HomePage: React.FC = () => {
       // Reconcile even after a failed request: a timeout or disconnect may occur
       // after the server has accepted tasks, and earlier chunks may be running.
       await refreshActiveTasks();
-      setSidebarWorkspaceTab('watchlist');
+      setSidebarWorkspaceTab(HOME_WORKSPACE_VALUES.watchlist);
 
       if (submissionError) {
         if (acceptedCount > 0 || duplicateCount > 0) {

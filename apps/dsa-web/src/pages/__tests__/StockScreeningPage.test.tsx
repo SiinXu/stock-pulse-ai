@@ -6,6 +6,7 @@ import {
   RESEARCH_DISCOVER_MARKET_VALUES,
   RESEARCH_DISCOVER_ROUTE_QUERY_KEYS,
 } from '../../routing/routes';
+import { SCREEN_TASK_SESSION_STORAGE_KEY } from '../../utils/sessionPersistence';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
 import StockScreeningPage from '../StockScreeningPage';
 
@@ -916,6 +917,56 @@ describe('StockScreeningPage', () => {
       `${APP_ROUTE_PATHS.researchDiscover}?${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy}=shrink_pullback&${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count}=25&source=report#details`,
       { replace: true },
     );
+  });
+
+  it('keeps an active task identity while explicit URL parameters replace its stale run parameters', async () => {
+    window.sessionStorage.setItem(SCREEN_TASK_SESSION_STORAGE_KEY, JSON.stringify({
+      taskId: 'stored-screen-task',
+      market: RESEARCH_DISCOVER_MARKET_VALUES.china,
+      strategy: 'dual_low',
+      maxResults: 3,
+    }));
+    window.history.pushState(
+      {},
+      '',
+      `${APP_ROUTE_PATHS.researchDiscover}?${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy}=quality&${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count}=20&source=notification#details`,
+    );
+    getStrategies.mockResolvedValueOnce({
+      enabled: true,
+      strategies: [
+        { id: 'dual_low', name: '双低', description: 'desc', category: '价值' },
+        { id: 'quality', name: '质量', description: 'desc', category: '质量' },
+      ],
+      strategyCount: 2,
+    });
+    getAlphaSiftStatus.mockResolvedValueOnce({
+      enabled: true,
+      available: true,
+      installSpecIsDefault: true,
+    });
+    getScreenTask.mockResolvedValue({
+      taskId: 'stored-screen-task',
+      traceId: 'stored-screen-task',
+      status: 'processing',
+      progress: 40,
+      message: '任务执行中',
+      result: null,
+    });
+
+    render(<StockScreeningPage />);
+
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    await waitFor(() => expect(getScreenTask).toHaveBeenCalledWith('stored-screen-task'));
+    openScreeningConfiguration();
+    expect(screen.getByLabelText('市场')).toHaveAttribute('data-value', RESEARCH_DISCOVER_MARKET_VALUES.china);
+    expect(screen.getByLabelText('策略参数')).toHaveValue('quality');
+    expect(screen.getByLabelText('返回数量')).toHaveValue(20);
+    expect(navigate).toHaveBeenLastCalledWith(
+      `${APP_ROUTE_PATHS.researchDiscover}?${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy}=quality&${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count}=20&source=notification#details`,
+      { replace: true },
+    );
+    expect(window.sessionStorage.getItem(SCREEN_TASK_SESSION_STORAGE_KEY))
+      .toContain('stored-screen-task');
   });
 
   it('keeps the parameter modal open and focuses an invalid result count', async () => {

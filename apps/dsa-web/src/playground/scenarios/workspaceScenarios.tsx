@@ -10,6 +10,7 @@ import {
 } from '../../components/watchlist/HomeStockWorkspace';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { PLAYGROUND_TEXT } from '../../locales/playground';
+import { HOME_WORKSPACE_VALUES } from '../../routing/routes';
 import type { TaskInfo } from '../../types/analysis';
 import { fixtureStockBarItems, fixtureSuggestions, fixtureTasks } from '../fixtures';
 import { usePlaygroundScenario } from '../scenarioContext';
@@ -73,7 +74,7 @@ const TaskPanelStory = () => {
 
 const HomeStockWorkspaceStory = () => {
   const { scenario, profile } = usePlaygroundScenario();
-  const [activeTab, setActiveTab] = useState<HomeWorkspaceTab>('watchlist');
+  const [activeTab, setActiveTab] = useState<HomeWorkspaceTab>(HOME_WORKSPACE_VALUES.watchlist);
   const [codes, setCodes] = useState(['600519', 'AAPL']);
   const isEmpty = scenario === 'empty' || profile === 'empty';
   const isError = scenario === 'error' || profile === 'error';

@@ -221,13 +221,14 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
           const { key, labelKey, to, icon: Icon, exact, badge, children } = item;
           const label = t(labelKey);
           const navigationTarget = resolveContextAwareNavigationTarget(to, currentHref);
+          const activeChild = children?.find((child) => isRouteActive(child.to, child.exact));
           const groupActive = isRouteActive(to, exact)
-            || children?.some((child) => isRouteActive(child.to, child.exact))
-            || false;
+            || Boolean(activeChild);
           const link = (
             <NavLink
               to={navigationTarget}
               end={exact}
+              aria-current={children && activeChild ? false : 'page'}
               onClick={(event) => {
                 if (shouldDelegateCurrentDocumentNavigation(event)) {
                   onNavigate?.();
@@ -305,6 +306,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                     to={navigationTarget}
                     end={exact}
                     aria-label={label}
+                    aria-current={open && activeChild ? false : 'page'}
                     aria-haspopup="menu"
                     aria-expanded={open}
                     aria-controls={open ? contentId : undefined}
@@ -349,7 +351,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                           tabIndex={-1}
                           to={resolveContextAwareNavigationTarget(child.to, currentHref)}
                           aria-label={childLabel}
-                          aria-current={childActive && child.to !== to ? 'page' : undefined}
+                          aria-current={childActive ? 'page' : undefined}
                           data-route-focus-key={`${focusKeyPrefix}:${child.key}`}
                           data-route-focus-return-key={triggerFocusKey}
                           onClick={(event) => {
@@ -392,7 +394,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                           }
                         }}
                         aria-label={childLabel}
-                        aria-current={isRouteActive(child.to, child.exact) && child.to !== to
+                        aria-current={isRouteActive(child.to, child.exact)
                           ? 'page'
                           : undefined}
                         data-route-focus-key={`${focusKeyPrefix}:${child.key}`}

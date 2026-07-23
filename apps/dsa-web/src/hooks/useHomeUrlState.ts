@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import type { ParsedApiError } from '../api/error';
+import type { HomeWorkspaceValue } from '../routing/routes';
 import type { RunFlowSnapshotSource } from '../types/runFlow';
-import type { HomeWorkspaceView } from '../utils/deepLink';
 import {
   clearHomeRecord,
   clearHomeRunFlow,
@@ -31,7 +31,7 @@ type UseHomeUrlStateResult = {
   recordId: number | null;
   runFlowSource: RunFlowSnapshotSource | null;
   stockCode: string | null;
-  workspace: HomeWorkspaceView;
+  workspace: HomeWorkspaceValue;
   urlIssue: HomeUrlIssue | null;
   dismissUrlIssue: () => void;
   navigateToRecord: (recordId: number) => void;
@@ -40,7 +40,7 @@ type UseHomeUrlStateResult = {
   openHistoryRunFlow: (recordId: number) => void;
   closeRunFlow: () => void;
   removeUnavailableRunFlow: () => void;
-  setWorkspace: (workspace: HomeWorkspaceView) => void;
+  setWorkspace: (workspace: HomeWorkspaceValue) => void;
 };
 
 type HomeUrlIssue =
@@ -358,7 +358,7 @@ export function useHomeUrlState({
     navigateSearch(location.search, true, { clear: true });
   }, [location.search, navigateSearch]);
 
-  const setWorkspace = useCallback((workspace: HomeWorkspaceView) => {
+  const setWorkspace = useCallback((workspace: HomeWorkspaceValue) => {
     const nextSearch = setHomeWorkspace(location.search, workspace);
     if (nextSearch !== location.search) {
       navigateSearch(nextSearch, false, { clear: true });

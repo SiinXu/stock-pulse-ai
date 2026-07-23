@@ -40,6 +40,14 @@ export const HOME_ROUTE_QUERY_KEYS = {
   workspace: 'workspace',
 } as const;
 
+export const HOME_WORKSPACE_VALUES = {
+  history: 'history',
+  watchlist: 'watchlist',
+  today: 'today',
+} as const;
+
+export type HomeWorkspaceValue = (typeof HOME_WORKSPACE_VALUES)[keyof typeof HOME_WORKSPACE_VALUES];
+
 export const RESEARCH_DISCOVER_ROUTE_QUERY_KEYS = {
   market: 'market',
   strategy: 'strategy',
@@ -48,6 +56,16 @@ export const RESEARCH_DISCOVER_ROUTE_QUERY_KEYS = {
 
 export const RESEARCH_DISCOVER_MARKET_VALUES = {
   china: 'cn',
+} as const;
+
+export const RESEARCH_DISCOVER_DEFAULT_VALUES = {
+  market: RESEARCH_DISCOVER_MARKET_VALUES.china,
+  strategy: 'dual_low',
+  count: 3,
+} as const;
+
+export const RESEARCH_DISCOVER_LIMITS = {
+  maxCount: 100,
 } as const;
 
 export const RESEARCH_BACKTEST_ROUTE_QUERY_KEYS = {
@@ -65,6 +83,10 @@ export const RESEARCH_BACKTEST_PHASE_VALUES = {
   intraday: 'intraday',
   postmarket: 'postmarket',
   unknown: 'unknown',
+} as const;
+
+export const RESEARCH_BACKTEST_LIMITS = {
+  maxWindowDays: 120,
 } as const;
 
 export const SETTINGS_ROUTE_QUERY_KEYS = {
