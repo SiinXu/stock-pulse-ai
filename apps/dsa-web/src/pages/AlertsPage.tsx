@@ -20,6 +20,7 @@ import type {
   AlertRuleItem,
   AlertRuleTestResponse,
   AlertTriggerItem,
+  AlertTargetScope,
   AlertType,
 } from '../types/alerts';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
@@ -33,9 +34,23 @@ import {
   ALERT_TRIGGER_TEXT,
 } from '../locales/alerts';
 import { formatUiDateTime } from '../utils/uiLocale';
+import {
+  SIGNAL_CENTER_SCOPE_VALUES,
+  type SignalCenterScope,
+} from '../routing/routes';
 
 const PAGE_SIZE = 20;
-type AlertsView = 'rules' | 'history' | 'notifications';
+export type AlertsView = 'rules' | 'history' | 'notifications';
+
+export type AlertsPageProps = {
+  activeView?: AlertsView;
+  onActiveViewChange?: (view: AlertsView) => void;
+  embedded?: boolean;
+  scope?: SignalCenterScope;
+  createRuleRequested?: boolean;
+  onCreateRuleRequestHandled?: () => void;
+  ruleStock?: string;
+};
 
 function enabledFilterToQuery(value: AlertRuleEnabledFilter): boolean | undefined {
   if (value === 'enabled') return true;
@@ -100,7 +115,15 @@ function formatNotificationStatus(notification: AlertNotificationItem, language:
   return (notification.errorCode && labels[notification.errorCode]) || labels.failure;
 }
 
-const AlertsPage: React.FC = () => {
+const AlertsPage: React.FC<AlertsPageProps> = ({
+  activeView: controlledActiveView,
+  onActiveViewChange,
+  embedded = false,
+  scope = SIGNAL_CENTER_SCOPE_VALUES.all,
+  createRuleRequested = false,
+  onCreateRuleRequestHandled,
+  ruleStock,
+}) => {
   const { language, t } = useUiLanguage();
   const text = ALERT_PAGE_TEXT[language];
   const controlsText = ALERT_HISTORY_CONTROLS_TEXT[language];
@@ -109,7 +132,12 @@ const AlertsPage: React.FC = () => {
   }, [text.documentTitle]);
 
   const [createRuleModalOpen, setCreateRuleModalOpen] = useState(false);
-  const [activeView, setActiveView] = useState<AlertsView>('rules');
+  const [uncontrolledActiveView, setUncontrolledActiveView] = useState<AlertsView>('rules');
+  const activeView = controlledActiveView ?? uncontrolledActiveView;
+  const setActiveView = useCallback((view: AlertsView) => {
+    if (controlledActiveView === undefined) setUncontrolledActiveView(view);
+    onActiveViewChange?.(view);
+  }, [controlledActiveView, onActiveViewChange]);
   const [rules, setRules] = useState<AlertRuleItem[]>([]);
   const [rulesTotal, setRulesTotal] = useState(0);
   const [rulesPage, setRulesPage] = useState(1);
@@ -157,6 +185,13 @@ const AlertsPage: React.FC = () => {
   const busyRulesRef = useRef<Map<number, AlertRuleBusyAction>>(new Map());
   const mountedRef = useRef(true);
 
+  useEffect(() => {
+    if (!createRuleRequested) return;
+    setCreateError(null);
+    setCreateRuleModalOpen(true);
+    onCreateRuleRequestHandled?.();
+  }, [createRuleRequested, onCreateRuleRequestHandled]);
+
   const beginRuleOperation = useCallback((ruleId: number, action: AlertRuleBusyAction): boolean => {
     if (busyRulesRef.current.has(ruleId)) return false;
     busyRulesRef.current.set(ruleId, action);
@@ -175,9 +210,15 @@ const AlertsPage: React.FC = () => {
     rulesRequestIdRef.current = requestId;
     const isLatestRequest = () => rulesRequestIdRef.current === requestId;
     const requestedPage = pageOverride ?? rulesPage;
+    const targetScope: AlertTargetScope | undefined = scope === SIGNAL_CENTER_SCOPE_VALUES.holdings
+      ? 'portfolio_holdings'
+      : scope === SIGNAL_CENTER_SCOPE_VALUES.watchlist
+        ? 'watchlist'
+        : undefined;
     const baseQuery = {
       enabled: enabledFilterToQuery(enabledFilter),
       alertType: alertTypeFilterToQuery(alertTypeFilter),
+      targetScope,
       pageSize: PAGE_SIZE,
     };
     setRulesLoading(true);
@@ -206,7 +247,7 @@ const AlertsPage: React.FC = () => {
         setRulesLoading(false);
       }
     }
-  }, [alertTypeFilter, enabledFilter, rulesPage]);
+  }, [alertTypeFilter, enabledFilter, rulesPage, scope]);
 
   const loadTriggers = useCallback(async (page = 1) => {
     const requestId = triggersRequestIdRef.current + 1;
@@ -416,9 +457,16 @@ const AlertsPage: React.FC = () => {
     },
   ];
 
+  const Root: React.ElementType = embedded ? 'div' : AppPage;
+  const initialRuleScope: AlertTargetScope = scope === SIGNAL_CENTER_SCOPE_VALUES.holdings
+    ? 'portfolio_holdings'
+    : scope === SIGNAL_CENTER_SCOPE_VALUES.watchlist
+      ? 'watchlist'
+      : 'single_symbol';
+
   return (
-    <AppPage className="max-w-none space-y-5">
-      <PageHeader
+    <Root className="max-w-none space-y-5">
+      {!embedded ? <PageHeader
         title={text.title}
         description={text.description}
         actions={(
@@ -434,7 +482,21 @@ const AlertsPage: React.FC = () => {
             {text.createRule}
           </Button>
         )}
-      />
+      /> : activeView === 'rules' ? (
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            variant="primary"
+            size="default"
+            onClick={() => {
+              setCreateError(null);
+              setCreateRuleModalOpen(true);
+            }}
+          >
+            {text.createRule}
+          </Button>
+        </div>
+      ) : null}
 
       {createSuccess ? (
         <InlineAlert
@@ -469,6 +531,9 @@ const AlertsPage: React.FC = () => {
       >
         {createError ? <ApiErrorAlert error={createError} onDismiss={() => setCreateError(null)} className="mb-4" /> : null}
         <AlertRuleForm
+          key={`${initialRuleScope}:${ruleStock ?? ''}`}
+          initialTargetScope={initialRuleScope}
+          initialTarget={ruleStock}
           onSubmit={async (payload) => {
             const ok = await handleCreateRule(payload);
             if (ok) {
@@ -512,7 +577,7 @@ const AlertsPage: React.FC = () => {
         ) : null}
       </Modal>
 
-      <SegmentedControl
+      {!embedded ? <SegmentedControl
         value={activeView}
         options={[
           { value: 'rules', label: ALERT_LIST_TEXT[language].title },
@@ -522,7 +587,18 @@ const AlertsPage: React.FC = () => {
         onChange={setActiveView}
         ariaLabel={text.title}
         getPanelId={(view) => `alerts-${view}-panel`}
-      />
+      /> : activeView !== 'rules' ? (
+        <SegmentedControl
+          value={activeView}
+          options={[
+            { value: 'history', label: ALERT_TRIGGER_TEXT[language].title },
+            { value: 'notifications', label: text.notificationAttempts },
+          ]}
+          onChange={setActiveView}
+          ariaLabel={text.notificationAttempts}
+          getPanelId={(view) => `alerts-${view}-panel`}
+        />
+      ) : null}
 
       {activeView === 'rules' ? (
         <section
@@ -699,7 +775,7 @@ const AlertsPage: React.FC = () => {
           </Card>
         </section>
       ) : null}
-    </AppPage>
+    </Root>
   );
 };
 
