@@ -724,6 +724,7 @@ test('desktop tray exposes assistant, main-window, and explicit quit commands', 
     menuTemplate.filter((item) => item.label).map((item) => item.label),
     [
       'Open Floating Assistant',
+      'Local Models…',
       'Show Main Window',
       'Hide Main Window',
       'Quit StockPulse',
@@ -2785,4 +2786,479 @@ test('stopBackend uses taskkill on Windows and clears after backend exit', async
     },
   ]);
   assert.equal(mainModule.__getBackendProcessForTest(), null);
+});
+
+// ===== Local model lifecycle (issue #203) =====
+
+function makeStagedJsonRequest(stages) {
+  let index = 0;
+  const calls = [];
+  const impl = (target, options, cb) => {
+    const stage = stages[Math.min(index, stages.length - 1)];
+    calls.push({ target, options });
+    index += 1;
+    const req = new EventEmitter();
+    req.setTimeout = () => req;
+    req.write = () => true;
+    req.destroy = () => undefined;
+    req.end = () => {
+      setImmediate(() => {
+        if (stage && stage.connectionError) {
+          req.emit('error', new Error('ECONNREFUSED'));
+          return;
+        }
+        const response = new EventEmitter();
+        response.statusCode = (stage && stage.statusCode) || 200;
+        response.setEncoding = () => undefined;
+        response.resume = () => undefined;
+        cb(response);
+        setImmediate(() => {
+          if (stage && stage.jsonBody != null) {
+            response.emit('data', Buffer.from(JSON.stringify(stage.jsonBody)));
+          }
+          if (stage && Array.isArray(stage.ndjson)) {
+            for (const line of stage.ndjson) {
+              response.emit('data', `${JSON.stringify(line)}\n`);
+            }
+          }
+          response.emit('end');
+        });
+      });
+    };
+    return req;
+  };
+  impl.calls = calls;
+  return impl;
+}
+
+function makeLocalModelSpawn(records, { serveStaysAlive = true } = {}) {
+  return (command, args, options) => {
+    const call = { command, args: Array.isArray(args) ? [...args] : args, options };
+    records.push(call);
+    const child = new EventEmitter();
+    child.pid = 4242;
+    child.exitCode = null;
+    child.signalCode = null;
+    child.killed = false;
+    child.kill = () => {
+      child.killed = true;
+      child.exitCode = 0;
+      return true;
+    };
+    if (Array.isArray(args) && args.includes('--version')) {
+      setImmediate(() => {
+        child.exitCode = 0;
+        child.emit('exit', 0);
+      });
+    } else if (Array.isArray(args) && args.includes('serve') && !serveStaysAlive) {
+      setImmediate(() => {
+        child.exitCode = 1;
+        child.emit('exit', 1);
+      });
+    }
+    return child;
+  };
+}
+
+test('local model names accept curated tags and reject injection payloads', (t) => {
+  const mainModule = loadMainModule(t);
+
+  for (const valid of ['qwen3:8b', 'llama3.2:3b', 'llama3.2', 'qwen2.5-coder:7b']) {
+    assert.equal(mainModule.normalizeLocalModelName(valid), valid);
+  }
+  assert.equal(mainModule.normalizeLocalModelName(' qwen3:8b '), 'qwen3:8b');
+
+  for (const invalid of [
+    '',
+    '   ',
+    'qwen3:8b; rm -rf /',
+    'qwen3 8b',
+    '../etc/passwd',
+    'model$(whoami)',
+    'foo/bar',
+    'foo|bar',
+    'foo&&bar',
+    'a'.repeat(200),
+  ]) {
+    assert.equal(mainModule.normalizeLocalModelName(invalid), null);
+  }
+});
+
+test('only curated presets are allowed for download', (t) => {
+  const mainModule = loadMainModule(t);
+
+  assert.equal(mainModule.isAllowedLocalModelPreset('qwen3:8b'), true);
+  assert.equal(mainModule.isAllowedLocalModelPreset('llama3.2:3b'), true);
+  assert.equal(mainModule.isAllowedLocalModelPreset('mistral:latest'), false);
+  assert.equal(mainModule.isAllowedLocalModelPreset('qwen3:8b; ls'), false);
+});
+
+test('installed model names are parsed and sanitized from the tags payload', (t) => {
+  const mainModule = loadMainModule(t);
+
+  assert.deepEqual(
+    mainModule.extractLocalModelNames({
+      models: [
+        { name: 'qwen3:8b' },
+        { name: 'llama3.2:3b' },
+        { name: '../evil' },
+        { name: '' },
+        { name: 'qwen3:8b' },
+      ],
+    }),
+    ['llama3.2:3b', 'qwen3:8b']
+  );
+  assert.deepEqual(mainModule.extractLocalModelNames(null), []);
+  assert.deepEqual(mainModule.extractLocalModelNames({ models: 'nope' }), []);
+});
+
+test('detection reports running with installed models when the runtime answers', async (t) => {
+  const mainModule = loadMainModule(t);
+  mainModule.__setLocalModelStateForTest(null);
+  const requestImpl = makeStagedJsonRequest([
+    { statusCode: 200, jsonBody: { models: [{ name: 'qwen3:8b' }] } },
+  ]);
+
+  const detection = await mainModule.detectLocalModelRuntime({
+    baseUrl: 'http://127.0.0.1:11434',
+    requestImpl,
+    spawnImpl: () => {
+      throw new Error('spawn must not run when the runtime already answers');
+    },
+  });
+
+  assert.equal(detection.status, mainModule.DESKTOP_LOCAL_MODEL_STATUS.RUNNING);
+  assert.deepEqual(detection.installedModels, ['qwen3:8b']);
+});
+
+test('detection distinguishes stopped runtime from a missing install', async (t) => {
+  const mainModule = loadMainModule(t);
+
+  const stoppedRecords = [];
+  const stopped = await mainModule.detectLocalModelRuntime({
+    baseUrl: 'http://127.0.0.1:11434',
+    requestImpl: makeStagedJsonRequest([{ connectionError: true }]),
+    spawnImpl: makeLocalModelSpawn(stoppedRecords),
+  });
+  assert.equal(stopped.status, mainModule.DESKTOP_LOCAL_MODEL_STATUS.STOPPED);
+  assert.equal(stopped.installed, true);
+  assert.deepEqual(stoppedRecords[0].args, ['--version']);
+
+  const missing = await mainModule.detectLocalModelRuntime({
+    baseUrl: 'http://127.0.0.1:11434',
+    requestImpl: makeStagedJsonRequest([{ connectionError: true }]),
+    spawnImpl: (command, args) => {
+      const child = new EventEmitter();
+      child.kill = () => undefined;
+      setImmediate(() => child.emit('error', new Error('ENOENT')));
+      return child;
+    },
+  });
+  assert.equal(missing.status, mainModule.DESKTOP_LOCAL_MODEL_STATUS.NOT_INSTALLED);
+  assert.equal(missing.installed, false);
+});
+
+test('starting the runtime spawns a whitelisted daemon with array arguments only', async (t) => {
+  const mainModule = loadMainModule(t);
+  mainModule.__setLocalModelStateForTest(null);
+  const records = [];
+  const requestImpl = makeStagedJsonRequest([
+    { connectionError: true },
+    { statusCode: 200, jsonBody: { models: [{ name: 'qwen3:8b' }] } },
+  ]);
+
+  const state = await mainModule.startManagedLocalModelRuntime({
+    requestImpl,
+    spawnImpl: makeLocalModelSpawn(records),
+    startTimeoutMs: 3000,
+  });
+
+  const serveCall = records.find((call) => Array.isArray(call.args) && call.args.includes('serve'));
+  assert.ok(serveCall, 'expected a serve spawn');
+  assert.equal(serveCall.command, 'ollama');
+  assert.deepEqual(serveCall.args, ['serve']);
+  assert.notEqual(serveCall.options.shell, true);
+  assert.equal(state.status, mainModule.DESKTOP_LOCAL_MODEL_STATUS.RUNNING);
+  assert.equal(state.managed, true);
+
+  mainModule.__setLocalModelServeProcessForTest(null);
+});
+
+test('starting a missing runtime degrades gracefully without throwing', async (t) => {
+  const mainModule = loadMainModule(t);
+  mainModule.__setLocalModelStateForTest(null);
+
+  const state = await mainModule.startManagedLocalModelRuntime({
+    requestImpl: makeStagedJsonRequest([{ connectionError: true }]),
+    spawnImpl: (command, args) => {
+      const child = new EventEmitter();
+      child.kill = () => undefined;
+      setImmediate(() => child.emit('error', new Error('ENOENT')));
+      return child;
+    },
+    startTimeoutMs: 1000,
+  });
+
+  assert.equal(state.status, mainModule.DESKTOP_LOCAL_MODEL_STATUS.NOT_INSTALLED);
+  assert.match(state.message, /not installed/i);
+});
+
+test('stopping the runtime only terminates the desktop-managed process', (t) => {
+  const mainModule = loadMainModule(t);
+  mainModule.__setLocalModelStateForTest(null);
+  const managed = new EventEmitter();
+  managed.pid = 9191;
+  managed.exitCode = null;
+  managed.signalCode = null;
+  let killed = false;
+  managed.kill = () => {
+    killed = true;
+    managed.exitCode = 0;
+    return true;
+  };
+  mainModule.__setLocalModelServeProcessForTest(managed);
+
+  const state = mainModule.stopManagedLocalModelRuntime();
+  assert.equal(killed, true);
+  assert.equal(state.status, mainModule.DESKTOP_LOCAL_MODEL_STATUS.STOPPED);
+  assert.equal(mainModule.__getLocalModelServeProcessForTest(), null);
+});
+
+test('pull refuses names outside the curated allowlist before any network call', async (t) => {
+  const mainModule = loadMainModule(t);
+  mainModule.__setLocalModelStateForTest(null);
+  const requestImpl = makeStagedJsonRequest([{ statusCode: 200, jsonBody: {} }]);
+
+  const injection = await mainModule.pullLocalModel('qwen3:8b; rm -rf /', { requestImpl });
+  assert.equal(injection.ok, false);
+  assert.equal(injection.error, 'model-not-allowed');
+
+  const unlisted = await mainModule.pullLocalModel('mistral:latest', { requestImpl });
+  assert.equal(unlisted.ok, false);
+  assert.equal(unlisted.error, 'model-not-allowed');
+
+  assert.equal(requestImpl.calls.length, 0);
+});
+
+test('pull streams a curated model and reports progress', async (t) => {
+  const mainModule = loadMainModule(t);
+  mainModule.__setLocalModelStateForTest(null);
+  const requestImpl = makeStagedJsonRequest([
+    { statusCode: 200, ndjson: [
+      { status: 'pulling manifest' },
+      { status: 'downloading', total: 100, completed: 50 },
+      { status: 'success', total: 100, completed: 100 },
+    ] },
+    { statusCode: 200, jsonBody: { models: [{ name: 'qwen3:8b' }] } },
+  ]);
+
+  const result = await mainModule.pullLocalModel('qwen3:8b', { requestImpl });
+  assert.equal(result.ok, true);
+  assert.equal(result.modelId, 'qwen3:8b');
+});
+
+test('csv and env line helpers merge additively without duplicates', (t) => {
+  const mainModule = loadMainModule(t);
+
+  assert.equal(mainModule.composeCsvValue('deepseek', ['ollama']), 'deepseek,ollama');
+  assert.equal(mainModule.composeCsvValue('deepseek,ollama', ['ollama']), 'deepseek,ollama');
+  assert.equal(mainModule.composeCsvValue('', ['ollama']), 'ollama');
+
+  const updated = mainModule.upsertEnvLine(['# comment', 'LLM_CHANNELS=deepseek'], 'LLM_CHANNELS', 'deepseek,ollama');
+  assert.deepEqual(updated, ['# comment', 'LLM_CHANNELS=deepseek,ollama']);
+  const appended = mainModule.upsertEnvLine(['A=1'], 'LLM_OLLAMA_PROVIDER', 'ollama');
+  assert.deepEqual(appended, ['A=1', 'LLM_OLLAMA_PROVIDER=ollama']);
+});
+
+test('registration preserves existing secrets and stays idempotent', (t) => {
+  const mainModule = loadMainModule(t);
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-localmodel-reg-'));
+  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+  const envFile = path.join(tmpDir, '.env');
+  fs.writeFileSync(envFile, 'OPENAI_API_KEY=sk-secret-value\nLLM_CHANNELS=deepseek\n');
+
+  const first = mainModule.applyLocalModelRegistration(envFile, 'qwen3:8b', {
+    baseUrl: 'http://127.0.0.1:11434',
+  });
+  assert.equal(first.changed, true);
+  const written = fs.readFileSync(envFile, 'utf-8');
+  assert.match(written, /OPENAI_API_KEY=sk-secret-value/);
+  assert.match(written, /LLM_CHANNELS=deepseek,ollama/);
+  assert.match(written, /LLM_OLLAMA_PROVIDER=ollama/);
+  assert.match(written, /LLM_OLLAMA_MODELS=qwen3:8b/);
+  assert.match(written, /LLM_OLLAMA_BASE_URL=http:\/\/127\.0\.0\.1:11434/);
+
+  mainModule.applyLocalModelRegistration(envFile, 'qwen3:8b', {
+    baseUrl: 'http://127.0.0.1:11434',
+  });
+  const rewritten = fs.readFileSync(envFile, 'utf-8');
+  assert.equal((rewritten.match(/^LLM_OLLAMA_MODELS=/gm) || []).length, 1);
+  assert.equal((rewritten.match(/^LLM_CHANNELS=/gm) || []).length, 1);
+  assert.match(rewritten, /LLM_CHANNELS=deepseek,ollama/);
+
+  mainModule.applyLocalModelRegistration(envFile, 'llama3.2:3b', {
+    baseUrl: 'http://127.0.0.1:11434',
+  });
+  assert.match(fs.readFileSync(envFile, 'utf-8'), /LLM_OLLAMA_MODELS=qwen3:8b,llama3\.2:3b/);
+});
+
+test('registerLocalModel never writes secrets into the desktop log', (t) => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-localmodel-log-'));
+  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(tmpDir, '.env'), 'OPENAI_API_KEY=sk-supersecret\n');
+  const mainModule = loadMainModule(t, { app: { getPath: () => tmpDir } });
+
+  const logs = [];
+  const originalLog = console.log;
+  console.log = (message) => {
+    logs.push(String(message));
+  };
+  t.after(() => {
+    console.log = originalLog;
+  });
+
+  const result = mainModule.registerLocalModel('qwen3:8b');
+  assert.equal(result.ok, true);
+  assert.equal(result.restartRequired, true);
+  assert.ok(logs.some((line) => line.includes('registered model=qwen3:8b')));
+  assert.ok(logs.every((line) => !line.includes('sk-supersecret')));
+});
+
+test('registerLocalModel rejects invalid names', (t) => {
+  const mainModule = loadMainModule(t);
+  const result = mainModule.registerLocalModel('bad name; rm -rf /');
+  assert.equal(result.ok, false);
+  assert.equal(result.error, 'invalid-model');
+});
+
+test('local model IPC rejects foreign renderers and serves the owning window', async (t) => {
+  const mainModule = loadMainModule(t);
+  mainModule.__setLocalModelStateForTest(null);
+
+  const detectHandler = mainModule.__getIpcMainHandler('desktop-local-model:detect');
+  await assert.rejects(
+    async () => detectHandler({ sender: { id: 'other' } }),
+    /Unauthorized local model IPC sender/
+  );
+
+  const ownerWebContents = { send: () => undefined, isDestroyed: () => false };
+  const ownerWindow = {
+    isDestroyed: () => false,
+    webContents: ownerWebContents,
+  };
+  mainModule.__setLocalModelWindowForTest(ownerWindow);
+  t.after(() => mainModule.__setLocalModelWindowForTest(null));
+
+  const stateHandler = mainModule.__getIpcMainHandler('desktop-local-model:get-state');
+  const state = stateHandler({ sender: ownerWebContents });
+  assert.equal(typeof state.status, 'string');
+  assert.ok(Array.isArray(state.registeredModels));
+});
+
+test('local model window is isolated, sandboxed, and denies renderer navigation', async (t) => {
+  const mainModule = loadMainModule(t);
+  const navigationHandlers = {};
+  let windowOpenHandler = null;
+  class FakeModelWindow extends EventEmitter {
+    constructor(options) {
+      super();
+      this.options = options;
+      this.destroyed = false;
+      this.webContents = {
+        on: (event, handler) => {
+          navigationHandlers[event] = handler;
+        },
+        setWindowOpenHandler: (handler) => {
+          windowOpenHandler = handler;
+        },
+        send: () => undefined,
+        isDestroyed: () => false,
+      };
+    }
+
+    isDestroyed() {
+      return this.destroyed;
+    }
+
+    loadFile() {
+      return Promise.resolve();
+    }
+
+    show() {}
+
+    focus() {}
+
+    destroy() {
+      this.destroyed = true;
+    }
+  }
+
+  const windowRef = await mainModule.createLocalModelWindow({ BrowserWindowClass: FakeModelWindow });
+  t.after(() => mainModule.__setLocalModelWindowForTest(null));
+
+  assert.equal(windowRef.options.webPreferences.contextIsolation, true);
+  assert.equal(windowRef.options.webPreferences.nodeIntegration, false);
+  assert.equal(windowRef.options.webPreferences.sandbox, true);
+  assert.match(String(windowRef.options.webPreferences.preload), /model-preload\.js$/);
+  assert.deepEqual(windowOpenHandler(), { action: 'deny' });
+  let prevented = false;
+  navigationHandlers['will-navigate']({ preventDefault: () => { prevented = true; } });
+  assert.equal(prevented, true);
+});
+
+test('desktop package ships the isolated local model surface', () => {
+  const packageMetadata = JSON.parse(
+    fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf-8')
+  );
+  const modelPage = fs.readFileSync(
+    path.join(__dirname, '..', 'renderer', 'local-models.html'),
+    'utf-8'
+  );
+  const modelScript = fs.readFileSync(
+    path.join(__dirname, '..', 'renderer', 'local-models.js'),
+    'utf-8'
+  );
+
+  assert.ok(packageMetadata.build.files.includes('model-preload.js'));
+  assert.match(modelPage, /connect-src 'none'/);
+  assert.match(modelPage, /script-src 'self'/);
+  assert.match(modelPage, /id="presetList"/);
+  assert.doesNotMatch(modelScript, /\bfetch\s*\(/);
+  assert.doesNotMatch(modelScript, /innerHTML/);
+});
+
+test('starting never leaves more than one managed daemon alive', async (t) => {
+  const mainModule = loadMainModule(t);
+  mainModule.__setLocalModelStateForTest(null);
+
+  const priorProcess = new EventEmitter();
+  priorProcess.pid = 5150;
+  priorProcess.exitCode = null;
+  priorProcess.signalCode = null;
+  let priorKilled = false;
+  priorProcess.kill = () => {
+    priorKilled = true;
+    priorProcess.exitCode = 0;
+    return true;
+  };
+  mainModule.__setLocalModelServeProcessForTest(priorProcess);
+
+  const records = [];
+  const requestImpl = makeStagedJsonRequest([
+    { connectionError: true },
+    { statusCode: 200, jsonBody: { models: [] } },
+  ]);
+
+  const state = await mainModule.startManagedLocalModelRuntime({
+    requestImpl,
+    spawnImpl: makeLocalModelSpawn(records),
+    startTimeoutMs: 3000,
+  });
+
+  assert.equal(priorKilled, true);
+  assert.equal(state.status, mainModule.DESKTOP_LOCAL_MODEL_STATUS.RUNNING);
+  const tracked = mainModule.__getLocalModelServeProcessForTest();
+  assert.notEqual(tracked, priorProcess);
+
+  mainModule.__setLocalModelServeProcessForTest(null);
 });

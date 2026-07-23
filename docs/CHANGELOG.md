@@ -324,6 +324,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Serialized root-owned plugin lifecycle operations with composition-root close, replacement, and reset so roots with shutdown requested cannot activate or be republished, callback-owned workers cannot deadlock, and terminal process shutdown cannot recreate the root.
 - [Changed] Made secondary sidebar groups collapsible with visible current-page ownership and preserved explicit Discover URL ownership across default, non-default, malformed, refreshed, legacy, authenticated, and safe custom-strategy links.
 - [Changed] Unified Web decision signals, alert rules, delivery history, and outcome review under `/signals` with URL-scoped filters and legacy redirects.
+- [Added] Added a desktop-only local model center that discovers, starts/stops, downloads recommended Ollama models, and registers them into the desktop `.env`, using whitelisted process launches, strict model-name validation, an isolated sandboxed renderer, and secret-free logs.
 
 ## [3.26.3] - 2026-07-15
 
@@ -621,7 +622,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Tests
 
-- Covered backend runtime and compatibility verification after #1381: `tests/app/test_main_schedule_mode.py`、`tests/core/test_pipeline_daily_market_context.py`、`tests/market/test_daily_market_context.py`、`tests/market/test_daily_market_context_guardrail.py`、`tests/test_agent_executor.py`、`tests/test_config_env_compat.py`、`tests/test_config_registry.py` and `apps/dsa-web/tests/system_config_i18n.test.ts`.
+- Covered backend runtime and compatibility verification after #1381: `tests/app/test_main_schedule_mode.py`、`tests/core/test_pipeline_daily_market_context.py`、`tests/services/test_daily_market_context.py`、`tests/test_daily_market_context_guardrail.py`、`tests/test_agent_executor.py`、`tests/test_config_env_compat.py`、`tests/test_config_registry.py` and `apps/dsa-web/tests/system_config_i18n.test.ts`.
 - Added/Updated AlphaSift backend regression tests: `python -m pytest tests/api/alphasift/test_alphasift_api.py -q`, `python -m pytest tests/test_docker_entrypoint.py -q`, `python -m pytest tests/app/test_main_schedule_mode.py -q -k "start_api_server_fails_before_thread_when_port_is_busy"`.
 
 ## [3.21.0] - 2026-06-07
