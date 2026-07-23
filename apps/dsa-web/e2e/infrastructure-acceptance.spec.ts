@@ -32,7 +32,7 @@ import {
   buildSettingsHref,
   buildSettingsSectionHref,
 } from '../src/routing/routes';
-import { loginAsE2eAdmin, updateE2eConfigOutsidePlaywrightTrace } from './auth-fixture';
+import { loginAsE2eAdmin, mockCompletedSetupStatus, updateE2eConfigOutsidePlaywrightTrace } from './auth-fixture';
 
 type JsonObject = Record<string, unknown>;
 
@@ -176,6 +176,10 @@ async function expectMinimumTouchTarget(locator: Locator, minimum = 44) {
 }
 
 async function login(page: Page, language: 'zh' | 'en' = 'zh') {
+  // Force professional-mode HomePage so downstream assertions on report
+  // surface, canonical action buttons, and Home reachability at 320px keep
+  // seeing the full-experience UI instead of BeginnerReportSummary.
+  await mockCompletedSetupStatus(page);
   await loginAsE2eAdmin(page);
   if (language === 'en') {
     await page.evaluate((key) => localStorage.setItem(key, 'en'), uiLanguageStorageKey);

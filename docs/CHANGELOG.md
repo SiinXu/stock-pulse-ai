@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Tests] Added a shared `mockCompletedSetupStatus` Playwright helper and applied it to the `smoke`, `report-markdown`, and `infrastructure-acceptance` specs so the new default-on beginner HomePage experience no longer forces professional-mode assertions off `分析` / `完整分析报告` / full report body.
 - [Tests] Stabilized Agent LLM fallback and orchestrator timeout tests by replacing fixed-length `time.time` side_effect lists with call-count-agnostic clocks, preventing StopIteration under full-suite collection ordering.
 - [Added] Extended the Web LLM setup wizard with ordered fallback and Vision routing, a secret-free saved summary, direct Task Routing access, and a persistent re-entry action.
 - [Fixed] Unified Research URL sanitization across page, deep-link, and session consumers so explicit Discover filters survive active-task restoration and malformed Backtest filters never reach API requests.

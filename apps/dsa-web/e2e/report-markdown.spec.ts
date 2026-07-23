@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { loginAsE2eAdmin } from './auth-fixture';
+import { loginAsE2eAdmin, mockCompletedSetupStatus } from './auth-fixture';
 
 test.use({ locale: 'zh-CN' });
 
@@ -10,6 +10,9 @@ async function login(page: Page) {
   await page.addInitScript((storageKey) => {
     window.localStorage.setItem(storageKey, 'zh');
   }, UI_LANGUAGE_STORAGE_KEY);
+  // Force professional-mode HomePage: without a completed setup-status the
+  // `完整分析报告` button falls back to BeginnerReportSummary and never renders.
+  await mockCompletedSetupStatus(page);
   await loginAsE2eAdmin(page);
   // Wait for page to stabilize by checking for stock input
   const stockInput = page.getByPlaceholder('输入股票代码或名称，如 600519、贵州茅台、AAPL');
