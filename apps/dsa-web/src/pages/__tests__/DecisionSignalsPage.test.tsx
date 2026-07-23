@@ -563,6 +563,30 @@ describe('DecisionSignalsPage', () => {
     expect(new URLSearchParams(window.location.search).get('page')).toBe('6');
   });
 
+  it('discovers the real last page before expanding a large watchlist page request', async () => {
+    window.history.pushState({}, '', `${buildSignalCenterHref({
+      scope: SIGNAL_CENTER_SCOPE_VALUES.watchlist,
+    })}&page=10000`);
+    vi.mocked(decisionSignalsApi.list).mockImplementation(async (params) => listResponse([
+      makeSignal({
+        id: params?.stockCode === 'AAPL' ? 2 : 1,
+        stockCode: params?.stockCode ?? signal.stockCode,
+      }),
+    ], 1));
+
+    renderPage();
+
+    await waitFor(() => expect(new URLSearchParams(window.location.search).has('page')).toBe(false));
+    const watchlistCalls = vi.mocked(decisionSignalsApi.list).mock.calls.filter(([params]) => (
+      params?.stockCode === '600519' || params?.stockCode === 'AAPL'
+    ));
+    expect(watchlistCalls.length).toBeGreaterThan(0);
+    expect(watchlistCalls.length).toBeLessThanOrEqual(4);
+    expect(watchlistCalls.every(([params]) => (
+      params?.page === 1 && params.pageSize === 100
+    ))).toBe(true);
+  });
+
   it('queries equivalent watchlist stock-code variants only once', async () => {
     watchlistCodes = ['00700', 'HK00700', '00700.HK'];
     vi.mocked(decisionSignalsApi.list).mockResolvedValue(listResponse([]));
@@ -683,7 +707,7 @@ describe('DecisionSignalsPage', () => {
     });
   });
 
-  it('keeps scope in the URL while switching Rules and push-history panels without reload', async () => {
+  it('keeps scope context but hides the filter on globally scoped history and review panels', async () => {
     window.history.pushState({}, '', buildSignalCenterHref({
       scope: SIGNAL_CENTER_SCOPE_VALUES.holdings,
       tab: SIGNAL_CENTER_TAB_VALUES.rules,
@@ -692,6 +716,7 @@ describe('DecisionSignalsPage', () => {
     renderPage();
 
     expect(await screen.findByRole('button', { name: '创建告警规则' })).toBeInTheDocument();
+    expect(screen.getByRole('tablist', { name: '信号范围' })).toBeInTheDocument();
     await waitFor(() => expect(alertsApi.listRules).toHaveBeenCalledWith(expect.objectContaining({
       targetScope: 'portfolio_holdings',
     })));
@@ -704,6 +729,7 @@ describe('DecisionSignalsPage', () => {
     }), window.location.origin).search));
     expect(await screen.findByRole('tab', { name: '触发历史' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('heading', { name: '信号中心' })).toBeInTheDocument();
+    expect(screen.queryByRole('tablist', { name: '信号范围' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('tab', { name: '通知尝试记录' }));
     await waitFor(() => expect(window.location.search).toBe(new URL(buildSignalCenterHref({
@@ -712,6 +738,36 @@ describe('DecisionSignalsPage', () => {
       history: SIGNAL_CENTER_HISTORY_VALUES.notifications,
     }), window.location.origin).search));
     expect(screen.getByRole('tabpanel', { name: '通知尝试记录' })).toBeVisible();
+
+    fireEvent.click(screen.getByRole('tab', { name: '再评估与统计' }));
+    expect(screen.queryByRole('tablist', { name: '信号范围' })).not.toBeInTheDocument();
+    expect(await screen.findByText('当前统计为全局已复盘 outcome 口径，不等于当前可见信号数量，也不随当前股票过滤。')).toBeInTheDocument();
+  });
+
+  it('uses the shared nested tab keyboard contract and hides scope for stock-owned feed views', async () => {
+    renderPage();
+
+    const signalCenterTabs = await screen.findByRole('tablist', { name: '信号中心' });
+    const feedTab = within(signalCenterTabs).getByRole('tab', { name: '信号流' });
+    feedTab.focus();
+    fireEvent.keyDown(feedTab, { key: 'End' });
+
+    const reviewTab = within(signalCenterTabs).getByRole('tab', { name: '再评估与统计' });
+    await waitFor(() => expect(reviewTab).toHaveAttribute('aria-selected', 'true'));
+    expect(reviewTab).toHaveFocus();
+
+    fireEvent.keyDown(reviewTab, { key: 'Home' });
+    await waitFor(() => expect(feedTab).toHaveAttribute('aria-selected', 'true'));
+
+    const feedTabs = screen.getByRole('tablist', { name: '信号流' });
+    const allSignalsTab = within(feedTabs).getByRole('tab', { name: '全部信号' });
+    allSignalsTab.focus();
+    fireEvent.keyDown(allSignalsTab, { key: 'End' });
+
+    const timelineTab = within(feedTabs).getByRole('tab', { name: '股票信号时间线' });
+    await waitFor(() => expect(timelineTab).toHaveAttribute('aria-selected', 'true'));
+    expect(timelineTab).toHaveFocus();
+    expect(screen.queryByRole('tablist', { name: '信号范围' })).not.toBeInTheDocument();
   });
 
   it('loads active signals by default', async () => {
@@ -727,7 +783,7 @@ describe('DecisionSignalsPage', () => {
     });
     expect(screen.getByText('贵州茅台')).toBeInTheDocument();
     openSignalsView('信号表现统计');
-    expect(screen.getByRole('tabpanel', { name: '信号表现统计' })).toBeVisible();
+    expect(screen.getByRole('tabpanel', { name: '再评估与统计' })).toBeVisible();
     expect(screen.getByText('50%')).toBeInTheDocument();
     expect(screen.getByText('当前统计为全局已复盘 outcome 口径，不等于当前可见信号数量，也不随当前股票过滤。')).toBeInTheDocument();
     expect(screen.getByText('全局')).toBeInTheDocument();
@@ -2316,7 +2372,7 @@ describe('DecisionSignalsPage', () => {
       SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab,
     )).toBe(SIGNAL_CENTER_TAB_VALUES.review));
     expect(new URLSearchParams(window.location.search).get('view')).toBe('timeline');
-    expect(screen.getByRole('tabpanel', { name: '信号表现统计' })).toBeVisible();
+    expect(screen.getByRole('tabpanel', { name: '再评估与统计' })).toBeVisible();
 
     act(() => window.history.back());
     await waitFor(() => expect(new URLSearchParams(window.location.search).get(

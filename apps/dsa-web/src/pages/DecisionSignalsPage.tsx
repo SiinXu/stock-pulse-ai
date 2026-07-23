@@ -39,6 +39,8 @@ import {
   SelectionChip,
   StatCard,
   Surface,
+  TabPanel,
+  Tabs,
   ToastViewport,
 } from '../components/common';
 import {
@@ -52,7 +54,7 @@ import {
   type ManualSignalDraft,
 } from '../components/decision-signals/manualSignalDraft';
 import { DecisionSignalTimeline } from '../components/decision-signals/DecisionSignalTimeline';
-import AlertsWorkspace, { type AlertsView } from '../components/alerts/AlertsWorkspace';
+import { AlertsWorkspace, type AlertsView } from '../components/alerts/AlertsWorkspace';
 import { StockAutocomplete } from '../components/StockAutocomplete';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { useStockIndex } from '../hooks/useStockIndex';
@@ -94,6 +96,7 @@ import {
   SIGNAL_CENTER_ROUTE_QUERY_KEYS,
   SIGNAL_CENTER_SCOPE_VALUES,
   SIGNAL_CENTER_TAB_VALUES,
+  SIGNAL_FEED_VIEW_VALUES,
   type SignalCenterScope,
   type SignalCenterTab,
 } from '../routing/routes';
@@ -107,6 +110,8 @@ const TIMELINE_PAGE_SIZE = 100;
 const WATCHLIST_SIGNAL_LOOKUP_CONCURRENCY = 6;
 const STOCK_CANDIDATE_LIMIT = 8;
 const DAY_MS = 86400_000;
+const SIGNAL_CENTER_TABS_ID = 'signal-center-tabs';
+const SIGNAL_FEED_TABS_ID = 'signal-center-feed-tabs';
 
 type ListFilters = {
   market: '' | DecisionSignalMarket;
@@ -627,6 +632,13 @@ const DecisionSignalsPage: React.FC = () => {
   );
   const activeViewRef = useRef(activeView);
   activeViewRef.current = activeView;
+  const activeFeedView = activeView === SIGNAL_FEED_VIEW_VALUES.stats
+    ? SIGNAL_FEED_VIEW_VALUES.signals
+    : activeView;
+  const scopeControlVisible = (
+    signalCenterTab === SIGNAL_CENTER_TAB_VALUES.feed
+    && activeFeedView === SIGNAL_FEED_VIEW_VALUES.signals
+  ) || signalCenterTab === SIGNAL_CENTER_TAB_VALUES.rules;
   const updateDecisionSignalSearchParams = useCallback((
     values: DecisionSignalSearchValues,
     replace = true,
@@ -829,19 +841,10 @@ const DecisionSignalsPage: React.FC = () => {
         const uniqueCodes = scopedCodes.filter((code, index) => (
           scopedCodes.findIndex((candidate) => areStockCodesEquivalent(candidate, code)) === index
         ));
-        const requiredPerStock = Math.max(PAGE_SIZE, nextPage * PAGE_SIZE);
-        const perStockPageSize = Math.min(100, requiredPerStock);
-        const perStockPageCount = Math.ceil(requiredPerStock / perStockPageSize);
-        const requests = uniqueCodes.flatMap((stockCode) => (
-          Array.from({ length: perStockPageCount }, (_, index) => ({
-            stockCode,
-            page: index + 1,
-          }))
-        ));
+        const perStockPageSize = 100;
         const responses: Array<{ stockCode: string; response: DecisionSignalListResponse }> = [];
         let partialError: ParsedApiError | null = null;
-        for (let index = 0; index < requests.length; index += WATCHLIST_SIGNAL_LOOKUP_CONCURRENCY) {
-          const batch = requests.slice(index, index + WATCHLIST_SIGNAL_LOOKUP_CONCURRENCY);
+        const loadRequestBatch = async (batch: Array<{ stockCode: string; page: number }>) => {
           const settled = await Promise.all(batch.map(async ({ stockCode, page: stockPage }) => {
             try {
               const result = await decisionSignalsApi.list({
@@ -860,9 +863,44 @@ const DecisionSignalsPage: React.FC = () => {
           responses.push(...settled.filter((result): result is { stockCode: string; response: DecisionSignalListResponse } => (
             result !== null
           )));
+        };
+        for (let index = 0; index < uniqueCodes.length; index += WATCHLIST_SIGNAL_LOOKUP_CONCURRENCY) {
+          await loadRequestBatch(uniqueCodes
+            .slice(index, index + WATCHLIST_SIGNAL_LOOKUP_CONCURRENCY)
+            .map((stockCode) => ({ stockCode, page: 1 })));
+          if (requestIdRef.current !== requestId) return;
         }
         if (partialError && responses.length === 0) throw partialError;
-        response = mergeWatchlistSignalResponses(responses, nextPage);
+        const firstPageResponses = [...responses];
+        const observedTotal = firstPageResponses.reduce(
+          (sum, item) => sum + item.response.total,
+          0,
+        );
+        const effectivePage = Math.min(
+          nextPage,
+          Math.max(1, Math.ceil(observedTotal / PAGE_SIZE)),
+        );
+        const requiredPerStockPageCount = Math.ceil(
+          Math.max(PAGE_SIZE, effectivePage * PAGE_SIZE) / perStockPageSize,
+        );
+        let nextBatch: Array<{ stockCode: string; page: number }> = [];
+        for (const firstPage of firstPageResponses) {
+          const availablePageCount = Math.ceil(firstPage.response.total / perStockPageSize);
+          const lastRequiredPage = Math.min(requiredPerStockPageCount, availablePageCount);
+          for (let stockPage = 2; stockPage <= lastRequiredPage; stockPage += 1) {
+            nextBatch.push({ stockCode: firstPage.stockCode, page: stockPage });
+            if (nextBatch.length === WATCHLIST_SIGNAL_LOOKUP_CONCURRENCY) {
+              await loadRequestBatch(nextBatch);
+              if (requestIdRef.current !== requestId) return;
+              nextBatch = [];
+            }
+          }
+        }
+        if (nextBatch.length > 0) {
+          await loadRequestBatch(nextBatch);
+          if (requestIdRef.current !== requestId) return;
+        }
+        response = mergeWatchlistSignalResponses(responses, effectivePage);
         responseError = partialError;
       } else {
         response = await decisionSignalsApi.list(
@@ -871,15 +909,25 @@ const DecisionSignalsPage: React.FC = () => {
       }
       if (requestIdRef.current !== requestId) return;
       const lastPage = Math.max(1, Math.ceil(response.total / PAGE_SIZE));
-      if (response.total > 0 && nextPage > lastPage) {
+      if (
+        signalCenterScope !== SIGNAL_CENTER_SCOPE_VALUES.watchlist
+        && response.total > 0
+        && nextPage > lastPage
+      ) {
         setPage(lastPage);
         syncListSearchParams(appliedFilters, lastPage);
         return;
       }
+      if (
+        signalCenterScope === SIGNAL_CENTER_SCOPE_VALUES.watchlist
+        && response.page !== nextPage
+      ) {
+        setPage(response.page);
+      }
       setItems(response.items);
       setTotal(response.total);
       setError(responseError);
-      syncListSearchParams(appliedFilters, nextPage);
+      syncListSearchParams(appliedFilters, response.page);
       const restoredSelection = takePendingSelection('list', response.items);
       if (restoredSelection) {
         setSelected(restoredSelection);
@@ -1796,7 +1844,8 @@ const DecisionSignalsPage: React.FC = () => {
           ) : null}
         </Modal>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
+        {scopeControlVisible ? (
+          <div className="flex flex-wrap items-center gap-3">
           <SegmentedControl
             value={signalCenterScope}
             options={[
@@ -1807,49 +1856,47 @@ const DecisionSignalsPage: React.FC = () => {
             onChange={setSignalCenterScope}
             ariaLabel={t('decisionSignals.scopeLabel')}
           />
-          <SegmentedControl
-            value={signalCenterTab}
-            options={[
-              { value: SIGNAL_CENTER_TAB_VALUES.feed, label: t('decisionSignals.tab.feed') },
-              { value: SIGNAL_CENTER_TAB_VALUES.rules, label: t('decisionSignals.tab.rules') },
-              { value: SIGNAL_CENTER_TAB_VALUES.history, label: t('decisionSignals.tab.history') },
-              { value: SIGNAL_CENTER_TAB_VALUES.review, label: t('decisionSignals.tab.review') },
-            ]}
-            onChange={setSignalCenterTab}
-            ariaLabel={t('decisionSignals.title')}
-            getPanelId={(tab) => {
-              if (tab === SIGNAL_CENTER_TAB_VALUES.review) return 'decision-signals-stats-panel';
-              if (tab === SIGNAL_CENTER_TAB_VALUES.feed) {
-                const feedView = activeView === 'stats' ? 'signals' : activeView;
-                return `decision-signals-${feedView}-panel`;
-              }
-              return `signal-center-${tab}-panel`;
-            }}
-          />
-        </div>
-
-        {signalCenterTab === SIGNAL_CENTER_TAB_VALUES.feed ? (
-          <SegmentedControl
-            value={activeView === 'stats' ? 'signals' : activeView}
-            options={[
-              { value: 'signals', label: t('decisionSignals.scopeAllSignals') },
-              { value: 'latest', label: t('decisionSignals.stockContextTitle') },
-              { value: 'timeline', label: t('decisionSignals.timelineTitle') },
-            ]}
-            onChange={setActiveView}
-            ariaLabel={t('decisionSignals.tab.feed')}
-            getPanelId={(view) => `decision-signals-${view}-panel`}
-          />
+          </div>
         ) : null}
 
-        <section
+        <Tabs
+          id={SIGNAL_CENTER_TABS_ID}
+          value={signalCenterTab}
+          items={[
+            { id: SIGNAL_CENTER_TAB_VALUES.feed, label: t('decisionSignals.tab.feed') },
+            { id: SIGNAL_CENTER_TAB_VALUES.rules, label: t('decisionSignals.tab.rules') },
+            { id: SIGNAL_CENTER_TAB_VALUES.history, label: t('decisionSignals.tab.history') },
+            { id: SIGNAL_CENTER_TAB_VALUES.review, label: t('decisionSignals.tab.review') },
+          ]}
+          onValueChange={(tab) => setSignalCenterTab(tab as SignalCenterTab)}
+          aria-label={t('decisionSignals.title')}
+        />
+
+        <TabPanel
+          tabsId={SIGNAL_CENTER_TABS_ID}
+          value={SIGNAL_CENTER_TAB_VALUES.feed}
+          activeValue={signalCenterTab}
           data-signal-center-tab="feed"
-          id="decision-signals-signals-panel"
-          role="tabpanel"
-          aria-label={t('decisionSignals.scopeAllSignals')}
-          className="space-y-5"
-          hidden={signalCenterTab !== SIGNAL_CENTER_TAB_VALUES.feed || activeView !== 'signals'}
+          className="space-y-4"
         >
+          <Tabs
+            id={SIGNAL_FEED_TABS_ID}
+            value={activeFeedView}
+            items={[
+              { id: SIGNAL_FEED_VIEW_VALUES.signals, label: t('decisionSignals.scopeAllSignals') },
+              { id: SIGNAL_FEED_VIEW_VALUES.latest, label: t('decisionSignals.stockContextTitle') },
+              { id: SIGNAL_FEED_VIEW_VALUES.timeline, label: t('decisionSignals.timelineTitle') },
+            ]}
+            onValueChange={(view) => setActiveView(view as DecisionSignalsView)}
+            aria-label={t('decisionSignals.tab.feed')}
+          />
+
+          <TabPanel
+            tabsId={SIGNAL_FEED_TABS_ID}
+            value={SIGNAL_FEED_VIEW_VALUES.signals}
+            activeValue={activeFeedView}
+            className="space-y-5"
+          >
           <Card padding="sm" variant="bordered">
             <ResponsiveFilterPanel
               className="xl:grid xl:grid-cols-[minmax(0,3fr)_minmax(0,5fr)] xl:items-end xl:gap-2 xl:space-y-0 [&>div.hidden]:justify-center [&>div.hidden>div]:flex-none"
@@ -2005,13 +2052,12 @@ const DecisionSignalsPage: React.FC = () => {
               syncListSearchParams(appliedFilters, nextPage);
             }}
           />
-        </section>
+          </TabPanel>
 
-        <section
-          id="decision-signals-latest-panel"
-          role="tabpanel"
-          aria-label={t('decisionSignals.stockContextTitle')}
-          hidden={signalCenterTab !== SIGNAL_CENTER_TAB_VALUES.feed || activeView !== 'latest'}
+          <TabPanel
+            tabsId={SIGNAL_FEED_TABS_ID}
+            value={SIGNAL_FEED_VIEW_VALUES.latest}
+            activeValue={activeFeedView}
         >
           <Card
             title={t('decisionSignals.latestTitle')}
@@ -2053,13 +2099,12 @@ const DecisionSignalsPage: React.FC = () => {
               </div>
             ) : null}
           </Card>
-        </section>
+          </TabPanel>
 
-        <section
-          id="decision-signals-timeline-panel"
-          role="tabpanel"
-          aria-label={t('decisionSignals.timelineTitle')}
-          hidden={signalCenterTab !== SIGNAL_CENTER_TAB_VALUES.feed || activeView !== 'timeline'}
+          <TabPanel
+            tabsId={SIGNAL_FEED_TABS_ID}
+            value={SIGNAL_FEED_VIEW_VALUES.timeline}
+            activeValue={activeFeedView}
         >
           <Card
             title={t('decisionSignals.timelineTitle')}
@@ -2159,13 +2204,13 @@ const DecisionSignalsPage: React.FC = () => {
               )}
             </div>
           </Card>
-        </section>
+          </TabPanel>
+        </TabPanel>
 
-        <section
-          id="decision-signals-stats-panel"
-          role="tabpanel"
-          aria-label={t('decisionSignals.statsTitle')}
-          hidden={signalCenterTab !== SIGNAL_CENTER_TAB_VALUES.review}
+        <TabPanel
+          tabsId={SIGNAL_CENTER_TABS_ID}
+          value={SIGNAL_CENTER_TAB_VALUES.review}
+          activeValue={signalCenterTab}
         >
           <Card
             title={t('decisionSignals.statsTitle')}
@@ -2216,32 +2261,42 @@ const DecisionSignalsPage: React.FC = () => {
             )}
             <DecisionSignalOutcomeRunPanel onCompleted={() => void loadOutcomeStats()} />
           </Card>
-        </section>
+        </TabPanel>
 
-        {signalCenterTab === SIGNAL_CENTER_TAB_VALUES.rules
-          || signalCenterTab === SIGNAL_CENTER_TAB_VALUES.history ? (
-            <section
-              id={`signal-center-${signalCenterTab}-panel`}
-              role="tabpanel"
-              aria-label={signalCenterTab === SIGNAL_CENTER_TAB_VALUES.rules
-                ? t('decisionSignals.tab.rules')
-                : t('decisionSignals.tab.history')}
-            >
-              <AlertsWorkspace
-                embedded
-                scope={signalCenterScope}
-                activeView={signalCenterTab === SIGNAL_CENTER_TAB_VALUES.rules
-                  ? 'rules'
-                  : signalCenterHistory === SIGNAL_CENTER_HISTORY_VALUES.notifications
-                    ? 'notifications'
-                    : 'history'}
-                onActiveViewChange={handleAlertsViewChange}
-                createRuleRequested={signalCenterState.createRule}
-                onCreateRuleRequestHandled={handleCreateRuleRequestHandled}
-                ruleStock={ruleStock}
-              />
-            </section>
+        <TabPanel
+          tabsId={SIGNAL_CENTER_TABS_ID}
+          value={SIGNAL_CENTER_TAB_VALUES.rules}
+          activeValue={signalCenterTab}
+        >
+          {signalCenterTab === SIGNAL_CENTER_TAB_VALUES.rules ? (
+            <AlertsWorkspace
+              embedded
+              scope={signalCenterScope}
+              activeView="rules"
+              onActiveViewChange={handleAlertsViewChange}
+              createRuleRequested={signalCenterState.createRule}
+              onCreateRuleRequestHandled={handleCreateRuleRequestHandled}
+              ruleStock={ruleStock}
+            />
           ) : null}
+        </TabPanel>
+
+        <TabPanel
+          tabsId={SIGNAL_CENTER_TABS_ID}
+          value={SIGNAL_CENTER_TAB_VALUES.history}
+          activeValue={signalCenterTab}
+        >
+          {signalCenterTab === SIGNAL_CENTER_TAB_VALUES.history ? (
+            <AlertsWorkspace
+              embedded
+              scope={SIGNAL_CENTER_SCOPE_VALUES.all}
+              activeView={signalCenterHistory === SIGNAL_CENTER_HISTORY_VALUES.notifications
+                ? 'notifications'
+                : 'history'}
+              onActiveViewChange={handleAlertsViewChange}
+            />
+          ) : null}
+        </TabPanel>
       </div>
 
       <Drawer

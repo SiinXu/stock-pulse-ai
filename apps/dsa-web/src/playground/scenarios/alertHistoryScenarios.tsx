@@ -7,6 +7,7 @@ import {
   type AlertTypeFilter,
 } from '../../components/alerts/AlertRuleList';
 import { AlertTriggerHistory } from '../../components/alerts/AlertTriggerHistory';
+import { AlertsWorkspace } from '../../components/alerts/AlertsWorkspace';
 import { HistoryList } from '../../components/history/HistoryList';
 import { HistoryListItem } from '../../components/history/HistoryListItem';
 import { StockBar } from '../../components/history/StockBar';
@@ -65,6 +66,8 @@ const AlertTriggerHistoryStory = () => {
     />
   );
 };
+
+const AlertsWorkspaceStory = () => <AlertsWorkspace />;
 
 const HistoryListStory = () => {
   const { scenario } = usePlaygroundScenario();
@@ -164,6 +167,7 @@ export const ALERT_HISTORY_SCENARIOS: Record<string, PlaygroundScenarioRenderer>
   'alert-rule-form': AlertRuleFormStory,
   'alert-rule-list': AlertRuleListStory,
   'alert-trigger-history': AlertTriggerHistoryStory,
+  'alerts-workspace': AlertsWorkspaceStory,
   'history-list': HistoryListStory,
   'history-list-item': HistoryListItemStory,
   'stock-bar': StockBarStory,

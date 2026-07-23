@@ -55,10 +55,16 @@ function replaceOwnedParams(
   source.forEach((value, key) => {
     if (!ownedKeys.has(key)) next.append(key, value);
   });
-  if (state.scope !== SIGNAL_CENTER_SCOPE_VALUES.all) {
+  if (
+    state.scope !== SIGNAL_CENTER_SCOPE_VALUES.all
+    || source.has(SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope)
+  ) {
     next.set(SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope, state.scope);
   }
-  if (state.tab !== SIGNAL_CENTER_TAB_VALUES.feed) {
+  if (
+    state.tab !== SIGNAL_CENTER_TAB_VALUES.feed
+    || source.has(SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab)
+  ) {
     next.set(SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab, state.tab);
   }
   if (

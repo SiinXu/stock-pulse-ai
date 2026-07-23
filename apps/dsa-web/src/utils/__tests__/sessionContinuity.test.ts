@@ -50,6 +50,21 @@ describe('sessionContinuity', () => {
     );
   });
 
+  it('keeps explicit All and Feed ahead of a stale Signal Center snapshot', () => {
+    recordSessionLocation(buildSignalCenterHref({
+      scope: SIGNAL_CENTER_SCOPE_VALUES.watchlist,
+      tab: SIGNAL_CENTER_TAB_VALUES.rules,
+    }));
+    const explicitDefaults = buildSignalCenterHref({
+      scope: SIGNAL_CENTER_SCOPE_VALUES.all,
+      tab: SIGNAL_CENTER_TAB_VALUES.feed,
+    });
+
+    expect(resolveInitialSessionHref(explicitDefaults)).toBeNull();
+    expect(resolveContextAwareNavigationTarget(explicitDefaults, APP_ROUTE_PATHS.settings))
+      .toBe(explicitDefaults);
+  });
+
   it('restores validated task and history Run Flow context for Home', () => {
     recordSessionLocation('/?recordId=42&stock=AAPL&runFlow=history&runFlowRecordId=42');
     expect(resolveInitialSessionHref('/')).toBe(

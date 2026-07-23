@@ -13,7 +13,7 @@ import {
   type AlertTypeFilter,
 } from './AlertRuleList';
 import { AlertTriggerHistory } from './AlertTriggerHistory';
-import { ApiErrorAlert, AppPage, Button, Card, DataTable, type DataTableColumn, InlineAlert, Loading, Modal, PageHeader, Pagination, SegmentedControl, Select, Toolbar } from '../common';
+import { ApiErrorAlert, AppPage, Button, Card, DataTable, type DataTableColumn, InlineAlert, Loading, Modal, PageHeader, Pagination, Select, TabPanel, Tabs, Toolbar } from '../common';
 import type {
   AlertNotificationItem,
   AlertRuleCreateRequest,
@@ -40,6 +40,8 @@ import {
 } from '../../routing/routes';
 
 const PAGE_SIZE = 20;
+const ALERTS_TABS_ID = 'alerts-workspace-tabs';
+const SIGNAL_CENTER_HISTORY_TABS_ID = 'signal-center-history-tabs';
 export type AlertsView = 'rules' | 'history' | 'notifications';
 
 export type AlertsWorkspaceProps = {
@@ -115,7 +117,7 @@ function formatNotificationStatus(notification: AlertNotificationItem, language:
   return (notification.errorCode && labels[notification.errorCode]) || labels.failure;
 }
 
-const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
+export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
   activeView: controlledActiveView,
   onActiveViewChange,
   embedded = false,
@@ -465,6 +467,12 @@ const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
     : scope === SIGNAL_CENTER_SCOPE_VALUES.watchlist
       ? 'watchlist'
       : 'single_symbol';
+  const internalTabsId = embedded ? SIGNAL_CENTER_HISTORY_TABS_ID : ALERTS_TABS_ID;
+  const panelOwnedByParent = embedded && activeView === 'rules';
+  const ActivePanel: React.ElementType = panelOwnedByParent ? 'section' : TabPanel;
+  const activePanelProps = panelOwnedByParent
+    ? {}
+    : { tabsId: internalTabsId, value: activeView, activeValue: activeView };
 
   return (
     <Root className="max-w-none space-y-5">
@@ -579,34 +587,32 @@ const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
         ) : null}
       </Modal>
 
-      {!embedded ? <SegmentedControl
+      {!embedded ? <Tabs
+        id={internalTabsId}
         value={activeView}
-        options={[
-          { value: 'rules', label: ALERT_LIST_TEXT[language].title },
-          { value: 'history', label: ALERT_TRIGGER_TEXT[language].title },
-          { value: 'notifications', label: text.notificationAttempts },
+        items={[
+          { id: 'rules', label: ALERT_LIST_TEXT[language].title },
+          { id: 'history', label: ALERT_TRIGGER_TEXT[language].title },
+          { id: 'notifications', label: text.notificationAttempts },
         ]}
-        onChange={setActiveView}
-        ariaLabel={text.title}
-        getPanelId={(view) => `alerts-${view}-panel`}
+        onValueChange={(view) => setActiveView(view as AlertsView)}
+        aria-label={text.title}
       /> : activeView !== 'rules' ? (
-        <SegmentedControl
+        <Tabs
+          id={internalTabsId}
           value={activeView}
-          options={[
-            { value: 'history', label: ALERT_TRIGGER_TEXT[language].title },
-            { value: 'notifications', label: text.notificationAttempts },
+          items={[
+            { id: 'history', label: ALERT_TRIGGER_TEXT[language].title },
+            { id: 'notifications', label: text.notificationAttempts },
           ]}
-          onChange={setActiveView}
-          ariaLabel={text.notificationAttempts}
-          getPanelId={(view) => `alerts-${view}-panel`}
+          onValueChange={(view) => setActiveView(view as AlertsView)}
+          aria-label={text.notificationAttempts}
         />
       ) : null}
 
       {activeView === 'rules' ? (
-        <section
-          id="alerts-rules-panel"
-          role="tabpanel"
-          aria-label={ALERT_LIST_TEXT[language].title}
+        <ActivePanel
+          {...activePanelProps}
           className="flex h-full min-h-0 flex-col gap-4"
         >
           {rulesError ? <ApiErrorAlert error={rulesError} onDismiss={() => setRulesError(null)} /> : null}
@@ -645,14 +651,12 @@ const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
               )}
             />
           ) : null}
-        </section>
+        </ActivePanel>
       ) : null}
 
       {activeView === 'history' ? (
-        <section
-          id="alerts-history-panel"
-          role="tabpanel"
-          aria-label={ALERT_TRIGGER_TEXT[language].title}
+        <ActivePanel
+          {...activePanelProps}
           className="space-y-4"
         >
           {triggersError ? <ApiErrorAlert error={triggersError} onDismiss={() => setTriggersError(null)} /> : null}
@@ -666,14 +670,12 @@ const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
             onPageChange={setTriggersPage}
             onRefresh={() => void loadTriggers(triggersPage)}
           />
-        </section>
+        </ActivePanel>
       ) : null}
 
       {activeView === 'notifications' ? (
-        <section
-          id="alerts-notifications-panel"
-          role="tabpanel"
-          aria-label={text.notificationAttempts}
+        <ActivePanel
+          {...activePanelProps}
           className="space-y-4"
         >
           {notificationsError ? <ApiErrorAlert error={notificationsError} onDismiss={() => setNotificationsError(null)} /> : null}
@@ -775,10 +777,8 @@ const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
               className="mt-4"
             />
           </Card>
-        </section>
+        </ActivePanel>
       ) : null}
     </Root>
   );
 };
-
-export default AlertsWorkspace;

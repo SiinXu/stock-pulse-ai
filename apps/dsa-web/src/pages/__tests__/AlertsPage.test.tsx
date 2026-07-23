@@ -276,6 +276,17 @@ describe('AlertsPage', () => {
   });
 
   it('creates a rule through the page form and reloads rules', async () => {
+    const createdRule = {
+      ...rule,
+      id: 2,
+      name: '苹果价格突破',
+      target: 'AAPL',
+      parameters: { direction: 'above' as const, price: 200 },
+    };
+    listRules
+      .mockResolvedValueOnce({ items: [rule], total: 1, page: 1, pageSize: 20 })
+      .mockResolvedValueOnce({ items: [rule, createdRule], total: 2, page: 1, pageSize: 20 });
+    createRule.mockResolvedValueOnce(createdRule);
     render(<AlertsPage />);
 
     await screen.findByText('茅台价格突破');
@@ -292,6 +303,11 @@ describe('AlertsPage', () => {
       }));
     });
     expect(await screen.findByText(/已创建告警规则/)).toBeInTheDocument();
+    expect(await screen.findByText('苹果价格突破')).toBeInTheDocument();
+    expect(listRules).toHaveBeenLastCalledWith(expect.objectContaining({
+      page: 1,
+      targetScope: undefined,
+    }));
     expect(screen.getByRole('button', { name: '关闭' })).toHaveClass('min-h-11', 'min-w-11');
   });
 

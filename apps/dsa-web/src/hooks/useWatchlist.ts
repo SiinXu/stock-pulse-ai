@@ -29,12 +29,14 @@ export function useWatchlist({ enabled = true }: UseWatchlistOptions = {}): UseW
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<ParsedApiError | null>(null);
   const messageTimerRef = useRef<number | null>(null);
+  const refreshRequestIdRef = useRef(0);
   const mountedRef = useRef(true);
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      refreshRequestIdRef.current += 1;
       if (messageTimerRef.current !== null) {
         window.clearTimeout(messageTimerRef.current);
       }
@@ -42,30 +44,35 @@ export function useWatchlist({ enabled = true }: UseWatchlistOptions = {}): UseW
   }, []);
 
   const refresh = useCallback(async () => {
+    const requestId = refreshRequestIdRef.current + 1;
+    refreshRequestIdRef.current = requestId;
+    if (mountedRef.current) setIsLoading(true);
     try {
       const result = await systemConfigApi.getWatchlist();
-      if (mountedRef.current) {
+      if (mountedRef.current && refreshRequestIdRef.current === requestId) {
         setCodes(result);
         setLoadError(null);
       }
       return true;
     } catch (error) {
-      if (mountedRef.current) setLoadError(getParsedApiError(error));
+      if (mountedRef.current && refreshRequestIdRef.current === requestId) {
+        setLoadError(getParsedApiError(error));
+      }
       return false;
+    } finally {
+      if (mountedRef.current && refreshRequestIdRef.current === requestId) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
     if (!enabled) {
+      refreshRequestIdRef.current += 1;
       setIsLoading(false);
       return;
     }
-    setIsLoading(true);
-    void refresh().finally(() => {
-      if (mountedRef.current) {
-        setIsLoading(false);
-      }
-    });
+    void refresh();
   }, [enabled, refresh]);
 
   const showMessage = useCallback((msg: string) => {
@@ -91,7 +98,10 @@ export function useWatchlist({ enabled = true }: UseWatchlistOptions = {}): UseW
     try {
       const result = await systemConfigApi.addToWatchlist(stockCode);
       if (mountedRef.current) {
+        refreshRequestIdRef.current += 1;
         setCodes(result);
+        setLoadError(null);
+        setIsLoading(false);
         showMessage(t('chat.watchlistAdded', { stock: stockCode }));
       }
       return true;
@@ -109,7 +119,10 @@ export function useWatchlist({ enabled = true }: UseWatchlistOptions = {}): UseW
     try {
       const result = await systemConfigApi.removeFromWatchlist(stockCode);
       if (mountedRef.current) {
+        refreshRequestIdRef.current += 1;
         setCodes(result);
+        setLoadError(null);
+        setIsLoading(false);
         showMessage(t('chat.watchlistRemoved', { stock: stockCode }));
       }
       return true;

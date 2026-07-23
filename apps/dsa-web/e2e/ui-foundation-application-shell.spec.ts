@@ -282,8 +282,8 @@ test.describe('application shell foundation', () => {
     await compactHome.press('ArrowRight');
     const homeMenu = page.getByRole('menu', { name: 'Home' });
     await expect(homeMenu).toBeVisible();
-    await expect(homeMenu.getByRole('menuitem', { name: 'AI signals' })).toBeVisible();
-    await expect(homeMenu.getByRole('menuitem', { name: 'Alerts' })).toBeVisible();
+    await expect(homeMenu.getByRole('menuitem', { name: 'Signal Center' })).toBeVisible();
+    await expect(homeMenu.getByRole('menuitem')).toHaveCount(1);
     await page.keyboard.press('Escape');
     await expect(homeMenu).toBeHidden();
     await expect(compactHome).toBeFocused();

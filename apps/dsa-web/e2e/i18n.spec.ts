@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { expect, test, type Page } from '@playwright/test';
 import { UI_TEXT } from '../src/i18n/uiText';
-import { ALERT_PAGE_TEXT } from '../src/locales/alerts';
 import { BACKTEST_TEXT } from '../src/locales/backtest';
 import { PORTFOLIO_TEXT } from '../src/locales/portfolio';
 import { SCREENING_TEXT } from '../src/locales/screening';
@@ -205,9 +204,8 @@ test.describe('complete UI i18n acceptance', () => {
       { path: APP_ROUTE_PATHS.researchMarket, text: UI_TEXT.en['home.marketReview'], title: UI_TEXT.en['home.marketReviewPageTitle'] },
       { path: APP_ROUTE_PATHS.researchDiscover, text: SCREENING_TEXT.en.title, title: SCREENING_TEXT.en.documentTitle },
       { path: APP_ROUTE_PATHS.portfolio, text: PORTFOLIO_TEXT.en.title, title: PORTFOLIO_TEXT.en.documentTitle },
-      { path: APP_ROUTE_PATHS.decisionSignals, text: UI_TEXT.en['decisionSignals.title'], title: UI_TEXT.en['decisionSignals.pageTitle'] },
+      { path: APP_ROUTE_PATHS.signals, text: UI_TEXT.en['decisionSignals.title'], title: UI_TEXT.en['decisionSignals.pageTitle'] },
       { path: APP_ROUTE_PATHS.researchBacktest, text: BACKTEST_TEXT.en.runBacktest, title: BACKTEST_TEXT.en.documentTitle },
-      { path: APP_ROUTE_PATHS.alerts, text: ALERT_PAGE_TEXT.en.title, title: ALERT_PAGE_TEXT.en.documentTitle },
       { path: usageSettingsHref, text: UI_TEXT.en['usage.title'], title: UI_TEXT.en['usage.title'] },
       { path: APP_ROUTE_PATHS.settings, text: UI_TEXT.en['settings.pageTitle'], title: UI_TEXT.en['settings.pageTitle'] },
       { path: '/missing-i18n-route', text: UI_TEXT.en['notFound.title'], title: UI_TEXT.en['notFound.pageTitle'] },
@@ -218,7 +216,7 @@ test.describe('complete UI i18n acceptance', () => {
       await expect(page.getByText(route.text, { exact: true }).first()).toBeVisible({ timeout: 15_000 });
       await expect(page).toHaveTitle(new RegExp(route.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
     }
-    expect(routes).toHaveLength(11); // 16-26
+    expect(routes).toHaveLength(10); // 16-25
   });
 
   test('English Settings localizes model access, discovery success, and discovery failure', async ({ page }) => {

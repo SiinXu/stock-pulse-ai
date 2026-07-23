@@ -10,7 +10,6 @@ import {
   type Route,
 } from '@playwright/test';
 import { encodeModelRef } from '../src/utils/modelRef';
-import { ALERT_PAGE_TEXT } from '../src/locales/alerts';
 import { BACKTEST_TEXT } from '../src/locales/backtest';
 import { PORTFOLIO_TEXT } from '../src/locales/portfolio';
 import { SCREENING_TEXT } from '../src/locales/screening';
@@ -853,7 +852,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(marketChild).toHaveAttribute('aria-current', 'page');
     await assertRouteChrome(page, APP_ROUTE_PATHS.researchDiscover, SCREENING_TEXT.en.title, SCREENING_TEXT.en.documentTitle);
     await assertRouteChrome(page, APP_ROUTE_PATHS.portfolio, PORTFOLIO_TEXT.en.title, PORTFOLIO_TEXT.en.documentTitle);
-    await assertRouteChrome(page, APP_ROUTE_PATHS.decisionSignals, UI_TEXT.en['decisionSignals.title'], UI_TEXT.en['decisionSignals.pageTitle']);
+    await assertRouteChrome(page, APP_ROUTE_PATHS.signals, UI_TEXT.en['decisionSignals.title'], UI_TEXT.en['decisionSignals.pageTitle']);
     const homeParent = navigation.getByRole('link', { name: UI_TEXT.en['layout.nav.home'] });
     const signalChild = navigation.getByRole('link', { name: UI_TEXT.en['layout.nav.decisionSignals'] });
     const homeToggle = navigation.getByRole('button', { name: UI_TEXT.en['layout.nav.home'] });
@@ -880,7 +879,6 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.getByRole('button', { name: UI_TEXT.en['common.closeDrawer'] }).click();
     await page.setViewportSize({ width: 1280, height: 720 });
     await assertRouteChrome(page, APP_ROUTE_PATHS.researchBacktest, BACKTEST_TEXT.en.runBacktest, BACKTEST_TEXT.en.documentTitle);
-    await assertRouteChrome(page, APP_ROUTE_PATHS.alerts, ALERT_PAGE_TEXT.en.title, ALERT_PAGE_TEXT.en.documentTitle);
     await assertRouteChrome(page, usageSettingsHref, UI_TEXT.en['usage.title'], UI_TEXT.en['usage.title']);
     await assertRouteChrome(page, APP_ROUTE_PATHS.settings, UI_TEXT.en['settings.pageTitle'], UI_TEXT.en['settings.pageTitle']);
     await assertRouteChrome(page, '/missing-route', UI_TEXT.en['notFound.title'], UI_TEXT.en['notFound.pageTitle']);
@@ -2540,9 +2538,8 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await assertNoDocumentOverflow(page, APP_ROUTE_PATHS.researchMarket);
     await assertNoDocumentOverflow(page, APP_ROUTE_PATHS.researchDiscover);
     await assertNoDocumentOverflow(page, APP_ROUTE_PATHS.portfolio);
-    await assertNoDocumentOverflow(page, APP_ROUTE_PATHS.decisionSignals);
+    await assertNoDocumentOverflow(page, APP_ROUTE_PATHS.signals);
     await assertNoDocumentOverflow(page, APP_ROUTE_PATHS.researchBacktest);
-    await assertNoDocumentOverflow(page, APP_ROUTE_PATHS.alerts);
     await assertNoDocumentOverflow(page, usageSettingsHref);
     await assertNoDocumentOverflow(page, APP_ROUTE_PATHS.settings);
     await assertNoDocumentOverflow(page, '/missing-responsive-route');

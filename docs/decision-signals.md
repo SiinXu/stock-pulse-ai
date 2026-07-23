@@ -126,7 +126,8 @@ Web 展示必须把这些 wire value 映射为当前 UI 语言的用户可读标
 Web 的唯一信号中心入口位于 `/signals`。旧 `/decision-signals` 会保留原查询参数并映射到信号流或“再评估与统计”，旧 `/alerts` 会映射到“规则”或“推送历史”，因此已有深链仍可继续使用。
 
 - 顶层为“信号流 / 规则 / 推送历史 / 再评估与统计”四个 tab；规则、触发历史和通知尝试继续复用现有 Alert API 与组件，不新增后端数据契约。
-- `scope=all|holdings|watchlist` 可在同页切换并由 URL 表达；持仓范围复用 `holding_only=true`，自选范围复用现有 watchlist 与 stock-scoped 信号查询。最后访问的合法 scope/tab/filter 在当前浏览器会话中恢复，显式 URL 始终优先。
+- `scope=all|holdings|watchlist` 可在同页切换并由 URL 表达；它作用于“全部信号”列表与规则列表，持仓范围分别复用 `holding_only=true` 和 `target_scope=portfolio_holdings`，自选范围复用现有 watchlist、stock-scoped 信号查询与 `target_scope=watchlist`。当前股票子视图、推送历史和再评估统计使用各自的股票或全局口径，因此不显示 scope 控件；切换 tab 时仍保留 scope 上下文，返回列表后继续生效。
+- 最后访问的合法 scope/tab/filter 在当前浏览器会话中恢复，显式 URL 始终优先。`scope=all&tab=feed` 这类显式默认值会保留为所有权标记，只有裸 `/signals` 才触发会话恢复。自选列表先读取每个标的第一页并根据服务端 `total` 确定可达页，再以最多六个并发请求读取确实需要的后续页；超大 URL 页码不会直接放大为无界请求集合。
 - 信号流为空时主行动是“创建第一条规则”，会在同页切换到规则 tab 并打开现有规则表单。
 - 默认查询 `status=active`。
 - 页面顶部提供“创建信号”入口，打开手工创建抽屉：可录入基础字段（代码、名称、市场、动作、置信度、周期、市场阶段、风格）、交易计划（入场上/下沿、止损、目标价、失效条件、观察条件、过期日）和解释字段（理由、风险、催化、证据）。来源固定为 `source_type=manual`、`trigger_source=web_manual`，不会伪装成分析、Agent、告警或大盘复盘。抽屉内提供实时预览和客户端校验（必填股票代码/市场/动作，置信度限定 0–1，价格须为正，入场下沿不高于上沿）。提交前对规范化后的完整内容生成确定性 `web_manual:<hash>` trace_id，作为 source-less 手工信号的去重键：完全相同的草稿再次提交命中去重（`created=false`），任意字段变化即视为新信号（`created=true`）。创建 active 方向性信号可能触发服务端使同标的相反 active 信号失效，成功后刷新列表、统计与当前股票的 latest/时间线。草稿在关闭并重新打开抽屉后保留，去重命中或请求失败时保留，仅在创建成功后清空。

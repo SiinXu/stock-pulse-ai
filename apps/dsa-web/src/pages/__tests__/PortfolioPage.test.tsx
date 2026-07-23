@@ -396,6 +396,9 @@ describe('PortfolioPage FX refresh', () => {
     const page = heading.closest('[data-pattern="app-page"]');
     expect(page).toHaveClass('portfolio-page');
     expect(heading.closest('[data-pattern="page-header"]')).not.toBeNull();
+    const portfolioIdentity = page!.querySelector('[data-portfolio-switcher="single"]');
+    expect(portfolioIdentity).toHaveTextContent('组合');
+    expect(portfolioIdentity?.closest('button, [role="button"], select')).toBeNull();
 
     const overview = Array.from(page!.querySelectorAll('section')).find((section) => (
       section.className.includes('xl:grid-cols-3')
@@ -695,6 +698,10 @@ describe('PortfolioPage FX refresh', () => {
     await waitForInitialLoad();
 
     expect(screen.getByText('信号风险暂不可用')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '查看全部' })).toHaveAttribute(
+      'href',
+      buildSignalCenterHref({ scope: SIGNAL_CENTER_SCOPE_VALUES.holdings }),
+    );
   });
 
   it('refreshes FX for a single selected account and only reloads snapshot/risk', async () => {
@@ -1051,7 +1058,6 @@ describe('PortfolioPage FX refresh', () => {
     expect(within(firstAshareRow as HTMLTableRowElement).getByRole('link', {
       name: '从此信号创建规则',
     })).toHaveAttribute('href', buildSignalCenterHref({
-      scope: SIGNAL_CENTER_SCOPE_VALUES.holdings,
       tab: SIGNAL_CENTER_TAB_VALUES.rules,
       createRule: true,
       stock: '600519',

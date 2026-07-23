@@ -17,6 +17,7 @@ import {
   SIGNAL_CENTER_TAB_VALUES,
   SIGNAL_FEED_ROUTE_QUERY_KEYS,
   SIGNAL_FEED_VIEW_VALUES,
+  buildSignalCenterHref,
 } from './routing/routes';
 import { recordSessionLocation } from './utils/sessionContinuity';
 import { UI_LANGUAGE_STORAGE_KEY } from './utils/uiLanguage';
@@ -164,6 +165,28 @@ describe('App routing behavior', () => {
 
     expect(await screen.findByTestId('login-page')).toBeInTheDocument();
     expect(new URLSearchParams(window.location.search).get('redirect')).toBe(discoverHref);
+  });
+
+  it('preserves explicit Signal Center defaults in an authentication redirect', async () => {
+    vi.mocked(AuthContext.useAuth).mockReturnValue(makeAuthState({
+      authEnabled: true,
+      loggedIn: false,
+      setupState: 'enabled',
+    }));
+    recordSessionLocation(buildSignalCenterHref({
+      scope: SIGNAL_CENTER_SCOPE_VALUES.watchlist,
+      tab: SIGNAL_CENTER_TAB_VALUES.rules,
+    }));
+    const explicitDefaults = buildSignalCenterHref({
+      scope: SIGNAL_CENTER_SCOPE_VALUES.all,
+      tab: SIGNAL_CENTER_TAB_VALUES.feed,
+    });
+    window.history.pushState({}, '', explicitDefaults);
+
+    render(<App />);
+
+    expect(await screen.findByTestId('login-page')).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get('redirect')).toBe(explicitDefaults);
   });
 
   it('redirects an explicit logout to plain login without retaining workflow identity', async () => {
@@ -373,6 +396,32 @@ describe('App routing behavior', () => {
     expect(window.location.pathname).toBe(APP_ROUTE_PATHS.settings);
     expect(window.location.search).toBe('?section=ai_models');
     expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
+  });
+
+  it('keeps explicit Signal Center defaults after login instead of restoring stale session state', async () => {
+    vi.mocked(AuthContext.useAuth).mockReturnValue(makeAuthState({
+      authEnabled: true,
+      loggedIn: true,
+      setupState: 'enabled',
+    }));
+    recordSessionLocation(buildSignalCenterHref({
+      scope: SIGNAL_CENTER_SCOPE_VALUES.watchlist,
+      tab: SIGNAL_CENTER_TAB_VALUES.rules,
+    }));
+    const explicitDefaults = buildSignalCenterHref({
+      scope: SIGNAL_CENTER_SCOPE_VALUES.all,
+      tab: SIGNAL_CENTER_TAB_VALUES.feed,
+    });
+    window.history.pushState(
+      {},
+      '',
+      `${APP_ROUTE_PATHS.login}?${new URLSearchParams({ redirect: explicitDefaults })}`,
+    );
+
+    render(<App />);
+
+    expect(await screen.findByTestId('decision-signals-page')).toBeInTheDocument();
+    expect(`${window.location.pathname}${window.location.search}`).toBe(explicitDefaults);
   });
 
   it.each([

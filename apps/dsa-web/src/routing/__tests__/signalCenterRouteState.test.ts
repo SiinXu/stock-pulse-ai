@@ -37,6 +37,13 @@ function signalCenterHref(entries: Record<string, string> = {}): string {
 describe('Signal Center route state', () => {
   it('builds canonical scope, tab, history, and create-rule links', () => {
     expect(buildSignalCenterHref()).toBe(APP_ROUTE_PATHS.signals);
+    expect(buildSignalCenterHref({
+      scope: SIGNAL_CENTER_SCOPE_VALUES.all,
+      tab: SIGNAL_CENTER_TAB_VALUES.feed,
+    })).toBe(signalCenterHref({
+      [SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope]: SIGNAL_CENTER_SCOPE_VALUES.all,
+      [SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab]: SIGNAL_CENTER_TAB_VALUES.feed,
+    }));
     expect(buildSignalCenterHref({ scope: SIGNAL_CENTER_SCOPE_VALUES.holdings }))
       .toBe(signalCenterHref({
         [SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope]: SIGNAL_CENTER_SCOPE_VALUES.holdings,
@@ -71,6 +78,20 @@ describe('Signal Center route state', () => {
       }));
   });
 
+  it('preserves explicit default ownership while normalizing Signal Center state', () => {
+    const explicitDefaults = new URLSearchParams({
+      [SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope]: SIGNAL_CENTER_SCOPE_VALUES.all,
+      [SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab]: SIGNAL_CENTER_TAB_VALUES.feed,
+    });
+
+    const parsed = parseSignalCenterRouteState(explicitDefaults);
+
+    expect(parsed.state).toEqual(DEFAULT_SIGNAL_CENTER_ROUTE_STATE);
+    expect(parsed.normalizedParams.toString()).toBe(explicitDefaults.toString());
+    expect(setSignalCenterRouteState(explicitDefaults, parsed.state).toString())
+      .toBe(explicitDefaults.toString());
+  });
+
   it('normalizes malformed owned state without dropping unrelated context', () => {
     const parsed = parseSignalCenterRouteState(
       toSearch({
@@ -87,6 +108,8 @@ describe('Signal Center route state', () => {
     expect(parsed.normalizedParams.toString()).toBe(toQuery({
       [SIGNAL_CENTER_ROUTE_QUERY_KEYS.stock]: 'AAPL',
       keep: 'yes',
+      [SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope]: SIGNAL_CENTER_SCOPE_VALUES.all,
+      [SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab]: SIGNAL_CENTER_TAB_VALUES.feed,
     }));
     expect(parsed.invalidKeys).toEqual([
       SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope,

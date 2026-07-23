@@ -93,10 +93,10 @@ export function buildSignalCenterHref(options: SignalCenterHrefOptions = {}): st
     : options.history
       ? SIGNAL_CENTER_TAB_VALUES.history
       : options.tab;
-  if (options.scope && options.scope !== SIGNAL_CENTER_SCOPE_VALUES.all) {
+  if (options.scope) {
     searchParams.set(SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope, options.scope);
   }
-  if (tab && tab !== SIGNAL_CENTER_TAB_VALUES.feed) {
+  if (tab) {
     searchParams.set(SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab, tab);
   }
   if (

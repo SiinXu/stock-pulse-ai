@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pie, PieChart, ResponsiveContainer, Tooltip, Legend, Cell } from 'recharts';
-import { Inbox, X } from 'lucide-react';
+import { BriefcaseBusiness, Inbox, X } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { decisionSignalsApi } from '../api/decisionSignals';
 import { portfolioApi } from '../api/portfolio';
@@ -1317,7 +1317,6 @@ const PortfolioPage: React.FC = () => {
             {signal ? (
               <Link
                 to={buildSignalCenterHref({
-                  scope: SIGNAL_CENTER_SCOPE_VALUES.holdings,
                   tab: SIGNAL_CENTER_TAB_VALUES.rules,
                   createRule: true,
                   stock: row.symbol,
@@ -1359,7 +1358,19 @@ const PortfolioPage: React.FC = () => {
   return (
     <AppPage className="portfolio-page space-y-4">
       <section className="space-y-3">
-        <PageHeader title={text.title} description={text.description} />
+        <PageHeader
+          title={text.title}
+          description={text.description}
+          actions={(
+            <div
+              data-portfolio-switcher="single"
+              className="inline-flex min-h-9 items-center gap-2 text-sm font-medium text-foreground"
+            >
+              <BriefcaseBusiness className="h-4 w-4" aria-hidden="true" />
+              <span>{t('layout.nav.portfolio')}</span>
+            </div>
+          )}
+        />
       </section>
 
       {error ? (
@@ -1738,15 +1749,15 @@ const PortfolioPage: React.FC = () => {
                 ) : (
                   <div>{text.noAiRiskSignals}</div>
                 )}
-                <Link
-                  to={buildSignalCenterHref({ scope: SIGNAL_CENTER_SCOPE_VALUES.holdings })}
-                  data-control="navigation-link"
-                  className="control-hit-target mt-2 inline-flex min-h-7 items-center text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
-                >
-                  {t('decisionSignals.viewAll')}
-                </Link>
               </>
             )}
+            <Link
+              to={buildSignalCenterHref({ scope: SIGNAL_CENTER_SCOPE_VALUES.holdings })}
+              data-control="navigation-link"
+              className="control-hit-target mt-2 inline-flex min-h-7 items-center text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+            >
+              {t('decisionSignals.viewAll')}
+            </Link>
           </div>
         </Card>
       </section>
