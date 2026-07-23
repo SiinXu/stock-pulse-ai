@@ -296,7 +296,7 @@ class ApplicationServices:
         deadlocking, while an installer waits for in-flight tracked
         operations to finish before starting the root's plugins.
         """
-        global _services_transition_active
+        global _services_transition_active, _services_transition_target
 
         with _services_lock:
             # Operations inside an already-active transition must not
@@ -312,6 +312,7 @@ class ApplicationServices:
                 with _services_lock:
                     owns_installed_root = _services is self
                     if owns_installed_root:
+                        _services_transition_target = self
                         _services_transition_active = True
                         _services_transition_pending.clear()
                     else:
@@ -324,7 +325,11 @@ class ApplicationServices:
                         return operation()
                     finally:
                         with _services_lock:
-                            has_pending, pending_target = (
+                            (
+                                has_pending,
+                                pending_target,
+                                superseded_targets,
+                            ) = (
                                 _take_latest_installable_pending_services()
                             )
                             if (
@@ -335,11 +340,13 @@ class ApplicationServices:
                                 # A root with shutdown requested must not remain
                                 # published once its transition ends.
                                 has_pending, pending_target = True, None
+                            _services_transition_target = None
                             _services_transition_active = False
-                        if has_pending:
+                        if has_pending or superseded_targets:
                             _set_application_services(
-                                pending_target,
+                                pending_target if has_pending else self,
                                 validate_direct_target=False,
+                                superseded_services=superseded_targets,
                             )
 
         try:
@@ -396,18 +403,35 @@ _services_shutdown = False
 def _take_latest_installable_pending_services() -> tuple[
     bool,
     Optional[ApplicationServices],
+    tuple[ApplicationServices, ...],
 ]:
-    """Consume the latest pending target that has not begun shutdown.
+    """Select the latest installable target and retain superseded cleanup debt.
 
     The caller must hold ``_services_lock``.
     """
 
-    while _services_transition_pending:
-        candidate = _services_transition_pending.pop()
+    candidates = tuple(_services_transition_pending)
+    _services_transition_pending.clear()
+    has_target = False
+    target: Optional[ApplicationServices] = None
+    for candidate in reversed(candidates):
         if candidate is None or not candidate._plugin_close_requested:
-            _services_transition_pending.clear()
-            return True, candidate
-    return False, None
+            has_target = True
+            target = candidate
+            break
+
+    superseded: list[ApplicationServices] = []
+    for candidate in candidates:
+        if (
+            candidate is None
+            or candidate is target
+            or candidate is _services
+            or candidate is _services_transition_target
+            or any(candidate is retained for retained in superseded)
+        ):
+            continue
+        superseded.append(candidate)
+    return has_target, target, tuple(superseded)
 
 
 def _validate_direct_install_target(
@@ -477,8 +501,9 @@ def _set_application_services(
     services: Optional[ApplicationServices],
     *,
     validate_direct_target: bool,
+    superseded_services: Iterable[ApplicationServices] = (),
 ) -> None:
-    """Install a direct target or continue an already-authorized transition."""
+    """Install a target while draining every superseded root accepted earlier."""
 
     global _services, _services_transition_active, _services_transition_target
 
@@ -505,15 +530,22 @@ def _set_application_services(
             _services_transition_pending.clear()
 
         target = services
+        cleanup_targets = tuple(superseded_services)
         try:
             while True:
                 restart_transition = False
                 drained_target_to_close: Optional[ApplicationServices] = None
+                cleanup_batch = cleanup_targets
+                cleanup_targets = ()
                 with _services_lock:
                     previous = _services
 
                 if previous is not None and previous is not target:
                     previous._close_plugins()
+                for cleanup_target in cleanup_batch:
+                    if cleanup_target is previous or cleanup_target is target:
+                        continue
+                    cleanup_target._close_plugins()
 
                 with _services_lock:
                     _services_transition_target = target
@@ -531,12 +563,18 @@ def _set_application_services(
                     if target is not None and target._plugin_close_requested:
                         drained_target_to_close = target
                     else:
-                        has_pending, pending_target = (
+                        (
+                            has_pending,
+                            pending_target,
+                            cleanup_targets,
+                        ) = (
                             _take_latest_installable_pending_services()
                         )
                         if has_pending:
                             target = pending_target
                             _services_transition_target = target
+                            restart_transition = True
+                        elif cleanup_targets:
                             restart_transition = True
 
                 if drained_target_to_close is not None:
@@ -544,12 +582,16 @@ def _set_application_services(
                     with _services_lock:
                         if _services is drained_target_to_close:
                             _services = None
-                        has_pending, pending_target = (
+                        (
+                            has_pending,
+                            pending_target,
+                            cleanup_targets,
+                        ) = (
                             _take_latest_installable_pending_services()
                         )
                         target = pending_target if has_pending else None
                         _services_transition_target = target
-                        restart_transition = has_pending
+                        restart_transition = has_pending or bool(cleanup_targets)
 
                 if restart_transition:
                     continue
@@ -558,7 +600,11 @@ def _set_application_services(
                     target.start_plugins()
 
                 with _services_lock:
-                    has_pending, pending_target = (
+                    (
+                        has_pending,
+                        pending_target,
+                        cleanup_targets,
+                    ) = (
                         _take_latest_installable_pending_services()
                     )
                     if (
@@ -567,11 +613,12 @@ def _set_application_services(
                         and target._plugin_close_requested
                     ):
                         has_pending, pending_target = True, None
-                    if not has_pending:
+                    if not has_pending and not cleanup_targets:
                         _services_transition_active = False
                         _services_transition_target = None
                         return
-                    target = pending_target
+                    if has_pending:
+                        target = pending_target
                     _services_transition_target = target
         finally:
             with _services_lock:

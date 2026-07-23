@@ -2105,6 +2105,127 @@ def test_queued_replacement_yields_to_newer_target_after_local_drain():
     ]
 
 
+def test_superseded_pending_root_is_drained_before_latest_target_starts():
+    events: list[str] = []
+    intermediate_holder: list[ApplicationServices] = []
+    intermediate_load_started = threading.Event()
+    release_intermediate_load = threading.Event()
+    intermediate_unload_started = threading.Event()
+    release_intermediate_unload = threading.Event()
+    intermediate_queued = threading.Event()
+    release_owner_callback = threading.Event()
+    final_load_started = threading.Event()
+    intermediate_results: list = []
+    owner_results: list = []
+
+    class _BlockingIntermediatePlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("intermediate-load-begin")
+            intermediate_load_started.set()
+            if not release_intermediate_load.wait(timeout=5):
+                raise AssertionError("test did not release intermediate load")
+            events.append("intermediate-load-end")
+
+        def onunload(self) -> None:
+            events.append("intermediate-unload-begin")
+            intermediate_unload_started.set()
+            if not release_intermediate_unload.wait(timeout=5):
+                raise AssertionError("test did not release intermediate unload")
+            events.append("intermediate-unload-end")
+
+    class _QueuingOwnerPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("owner-load-begin")
+            set_application_services(intermediate_holder[0])
+            intermediate_queued.set()
+            if not release_owner_callback.wait(timeout=5):
+                raise AssertionError("test did not release owner callback")
+            events.append("owner-load-end")
+
+    class _FinalPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            final_load_started.set()
+            super().onload(context)
+
+    owner = ApplicationServices(plugins_dir="")
+    intermediate = ApplicationServices(plugins_dir="")
+    final = ApplicationServices(
+        builtin_plugins=(_FinalPlugin("test.final-pending", events),),
+        plugins_dir="",
+    )
+    intermediate_holder.append(intermediate)
+    assert intermediate.plugin_manager.register(
+        _BlockingIntermediatePlugin("test.intermediate-pending", events),
+        source="builtin",
+    ).success
+    set_application_services(owner)
+    assert owner.plugin_manager.register(
+        _QueuingOwnerPlugin("test.owner-pending", events),
+        source="builtin",
+    ).success
+
+    intermediate_load = threading.Thread(
+        target=lambda: intermediate_results.append(
+            intermediate.plugin_manager.load("test.intermediate-pending")
+        ),
+    )
+    intermediate_load.start()
+    assert intermediate_load_started.wait(timeout=5)
+    owner_load = threading.Thread(
+        target=lambda: owner_results.append(
+            owner.plugin_manager.load("test.owner-pending")
+        ),
+    )
+    owner_load.start()
+    assert intermediate_queued.wait(timeout=5)
+    set_application_services(final)
+
+    transition_waited_for_intermediate = False
+    try:
+        release_owner_callback.set()
+        owner_load.join(timeout=0.5)
+        transition_waited_for_intermediate = (
+            owner_load.is_alive() and not final_load_started.is_set()
+        )
+        release_intermediate_load.set()
+        if transition_waited_for_intermediate:
+            assert intermediate_unload_started.wait(timeout=5)
+            assert owner_load.is_alive()
+            assert final_load_started.is_set() is False
+    finally:
+        release_owner_callback.set()
+        release_intermediate_load.set()
+        release_intermediate_unload.set()
+        intermediate_load.join(timeout=5)
+        owner_load.join(timeout=5)
+        if not intermediate.is_closed:
+            intermediate.close()
+
+    assert transition_waited_for_intermediate is True
+    assert not intermediate_load.is_alive()
+    assert not owner_load.is_alive()
+    assert intermediate_results and intermediate_results[0].success is True
+    assert owner_results and owner_results[0].success is True
+    assert owner.is_closed is True
+    assert intermediate.is_closed is True
+    assert (
+        intermediate.plugin_manager.snapshot("test.intermediate-pending").state
+        == "disabled"
+    )
+    assert final_load_started.is_set() is True
+    assert get_application_services() is final
+    assert events == [
+        "intermediate-load-begin",
+        "owner-load-begin",
+        "owner-load-end",
+        "unload:test.owner-pending",
+        "intermediate-load-end",
+        "intermediate-unload-begin",
+        "intermediate-unload-end",
+        "load:test.final-pending",
+    ]
+
+
 def test_public_manager_disable_defers_callback_requested_replacement():
     events: list[str] = []
     observed_roots: list[ApplicationServices] = []
