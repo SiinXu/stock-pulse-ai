@@ -14,6 +14,7 @@ def test_python_minimum_job_runs_full_backend_gate_on_python_3_10():
 
     workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
     job = workflow["jobs"]["python-minimum"]
+    backend_job = workflow["jobs"]["backend-gate"]
 
     assert job["name"] == "python-minimum"
     assert job["needs"] == ["ai-governance"]
@@ -26,6 +27,14 @@ def test_python_minimum_job_runs_full_backend_gate_on_python_3_10():
     ]
     assert len(setup_steps) == 1
     assert setup_steps[0]["with"]["python-version"] == "3.10"
+
+    backend_setup_steps = [
+        step
+        for step in backend_job["steps"]
+        if step.get("uses", "").startswith("actions/setup-python@")
+    ]
+    assert len(backend_setup_steps) == 1
+    assert backend_setup_steps[0]["with"]["python-version"] == "3.11"
 
     run_commands = [step["run"] for step in job["steps"] if "run" in step]
     assert any("-r .github/requirements-ci.txt" in command for command in run_commands)
