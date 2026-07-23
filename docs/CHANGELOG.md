@@ -621,7 +621,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Tests
 
-- Covered backend runtime and compatibility verification after #1381: `tests/app/test_main_schedule_mode.py`、`tests/core/test_pipeline_daily_market_context.py`、`tests/market/test_daily_market_context.py`、`tests/market/test_daily_market_context_guardrail.py`、`tests/test_agent_executor.py`、`tests/test_config_env_compat.py`、`tests/test_config_registry.py` and `apps/dsa-web/tests/system_config_i18n.test.ts`.
+- Covered backend runtime and compatibility verification after #1381: `tests/app/test_main_schedule_mode.py`、`tests/core/test_pipeline_daily_market_context.py`、`tests/services/test_daily_market_context.py`、`tests/market/test_daily_market_context_guardrail.py`、`tests/test_agent_executor.py`、`tests/test_config_env_compat.py`、`tests/test_config_registry.py` and `apps/dsa-web/tests/system_config_i18n.test.ts`.
 - Added/Updated AlphaSift backend regression tests: `python -m pytest tests/api/alphasift/test_alphasift_api.py -q`, `python -m pytest tests/test_docker_entrypoint.py -q`, `python -m pytest tests/app/test_main_schedule_mode.py -q -k "start_api_server_fails_before_thread_when_port_is_busy"`.
 
 ## [3.21.0] - 2026-06-07
