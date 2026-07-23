@@ -19,9 +19,13 @@ from src.schemas.decision_action import (
 )
 
 
+DECISION_SIGNAL_PRESENTATION_SCHEMA_VERSION = "decision-signal-presentation-v1"
+
+
 class DecisionSignalPresentation(TypedDict):
     """Renderer-ready fields whose action mirrors the top-level signal action."""
 
+    schema_version: str
     action: DecisionAction
     label: str
     confidence: Optional[float]
@@ -54,6 +58,7 @@ def build_decision_signal_presentation(
     if label is None:
         return None
     return {
+        "schema_version": DECISION_SIGNAL_PRESENTATION_SCHEMA_VERSION,
         "action": action,
         "label": label,
         "confidence": _optional_confidence(

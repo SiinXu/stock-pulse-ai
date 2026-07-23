@@ -57,6 +57,7 @@ def test_summarize_decision_signal_keeps_only_low_sensitive_fields() -> None:
     assert summary["watch_conditions"] == ["观察量能", "password=[REDACTED]"]
     assert summary["risk_summary"] == {"drawdown": "webhook=[REDACTED_URL]"}
     assert summary["presentation"] == {
+        "schema_version": "decision-signal-presentation-v1",
         "action": "sell",
         "label": "卖出",
         "confidence": 0.84,
@@ -155,6 +156,7 @@ def test_format_decision_signal_excerpt_uses_top_level_action_when_presentation_
 
     assert summary is not None
     assert summary["presentation"] == {
+        "schema_version": "decision-signal-presentation-v1",
         "action": "buy",
         "label": "Buy",
         "confidence": 0.75,
@@ -181,6 +183,7 @@ def test_summarize_decision_signal_preserves_canonical_presentation_on_reentry()
     assert first is not None
     assert second is not None
     assert first["presentation"] == {
+        "schema_version": "decision-signal-presentation-v1",
         "action": "buy",
         "label": "Buy",
         "confidence": 0.75,
