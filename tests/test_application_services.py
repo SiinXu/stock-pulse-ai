@@ -1627,48 +1627,68 @@ def test_published_target_closing_during_local_startup_is_unloaded(monkeypatch):
     ]
 
 
-def test_closing_cleanup_debt_can_resolve_root_after_target_drain(monkeypatch):
+def test_recursive_closing_cleanup_debt_keeps_lookup_anchor(monkeypatch):
     events: list[str] = []
     target_holder: list[ApplicationServices] = []
+    second_debt_holder: list[ApplicationServices] = []
     previous_close_started = threading.Event()
     release_previous_close = threading.Event()
-    debt_load_started = threading.Event()
-    release_debt_load = threading.Event()
-    debt_cleanup_started = threading.Event()
-    debt_unload_worker_started = threading.Event()
-    debt_unload_worker_returned = threading.Event()
+    first_load_started = threading.Event()
+    release_first_load = threading.Event()
+    first_cleanup_started = threading.Event()
+    second_debt_queued = threading.Event()
+    second_load_started = threading.Event()
+    release_second_load = threading.Event()
+    second_cleanup_started = threading.Event()
+    second_unload_worker_started = threading.Event()
+    second_unload_worker_returned = threading.Event()
     abort_unload_callback = threading.Event()
     observed_roots: list[ApplicationServices] = []
     workers: list[threading.Thread] = []
-    debt_results: list = []
+    first_results: list = []
+    second_results: list = []
 
     class _ClosingTargetPlugin(_RecordingPlugin):
         def onload(self, context: PluginContext) -> None:
             events.append("target-load")
             target_holder[0].close()
 
-    class _ClosingDebtPlugin(_RecordingPlugin):
+    class _FirstClosingDebtPlugin(_RecordingPlugin):
         def onload(self, context: PluginContext) -> None:
-            events.append("debt-load-begin")
-            debt_load_started.set()
-            if not release_debt_load.wait(timeout=5):
-                raise AssertionError("test did not release debt load")
-            events.append("debt-load-end")
+            events.append("first-debt-load-begin")
+            first_load_started.set()
+            if not release_first_load.wait(timeout=5):
+                raise AssertionError("test did not release first debt load")
+            events.append("first-debt-load-end")
 
         def onunload(self) -> None:
-            events.append("debt-unload-begin")
+            events.append("first-debt-unload-begin")
+            set_application_services(second_debt_holder[0])
+            second_debt_queued.set()
+            events.append("first-debt-unload-end")
+
+    class _SecondClosingDebtPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("second-debt-load-begin")
+            second_load_started.set()
+            if not release_second_load.wait(timeout=5):
+                raise AssertionError("test did not release second debt load")
+            events.append("second-debt-load-end")
+
+        def onunload(self) -> None:
+            events.append("second-debt-unload-begin")
 
             def resolve_root() -> None:
                 observed_roots.append(get_application_services())
-                debt_unload_worker_returned.set()
+                second_unload_worker_returned.set()
 
             worker = threading.Thread(target=resolve_root)
             workers.append(worker)
             worker.start()
-            debt_unload_worker_started.set()
+            second_unload_worker_started.set()
             while worker.is_alive() and not abort_unload_callback.is_set():
                 worker.join(timeout=0.01)
-            events.append("debt-unload-end")
+            events.append("second-debt-unload-end")
 
     previous = ApplicationServices(plugins_dir="")
     set_application_services(previous)
@@ -1686,21 +1706,34 @@ def test_closing_cleanup_debt_can_resolve_root_after_target_drain(monkeypatch):
         plugins_dir="",
     )
     target_holder.append(target)
-    debt = ApplicationServices(plugins_dir="")
-    assert debt.plugin_manager.register(
-        _ClosingDebtPlugin("test.closing-debt", events),
+    first_debt = ApplicationServices(plugins_dir="")
+    assert first_debt.plugin_manager.register(
+        _FirstClosingDebtPlugin("test.first-closing-debt", events),
+        source="builtin",
+    ).success
+    second_debt = ApplicationServices(plugins_dir="")
+    second_debt_holder.append(second_debt)
+    assert second_debt.plugin_manager.register(
+        _SecondClosingDebtPlugin("test.second-closing-debt", events),
         source="builtin",
     ).success
 
     installer = threading.Thread(target=lambda: set_application_services(target))
-    original_debt_close = debt._close_plugins
+    original_first_close = first_debt._close_plugins
+    original_second_close = second_debt._close_plugins
 
-    def observed_debt_close():
+    def observed_first_close():
         if threading.current_thread() is installer:
-            debt_cleanup_started.set()
-        return original_debt_close()
+            first_cleanup_started.set()
+        return original_first_close()
 
-    monkeypatch.setattr(debt, "_close_plugins", observed_debt_close)
+    def observed_second_close():
+        if threading.current_thread() is installer:
+            second_cleanup_started.set()
+        return original_second_close()
+
+    monkeypatch.setattr(first_debt, "_close_plugins", observed_first_close)
+    monkeypatch.setattr(second_debt, "_close_plugins", observed_second_close)
     installer.start()
     assert previous_close_started.wait(timeout=5)
     target_start = threading.Thread(target=target.start_plugins)
@@ -1709,50 +1742,78 @@ def test_closing_cleanup_debt_can_resolve_root_after_target_drain(monkeypatch):
     assert not target_start.is_alive()
     assert target.is_closed is True
 
-    debt_load = threading.Thread(
-        target=lambda: debt_results.append(
-            debt.plugin_manager.load("test.closing-debt")
+    first_load = threading.Thread(
+        target=lambda: first_results.append(
+            first_debt.plugin_manager.load("test.first-closing-debt")
         ),
     )
-    debt_load.start()
-    assert debt_load_started.wait(timeout=5)
-    debt.close()
-    set_application_services(debt)
+    first_load.start()
+    assert first_load_started.wait(timeout=5)
+    first_debt.close()
+    second_load = threading.Thread(
+        target=lambda: second_results.append(
+            second_debt.plugin_manager.load("test.second-closing-debt")
+        ),
+    )
+    second_load.start()
+    assert second_load_started.wait(timeout=5)
+    second_debt.close()
+    set_application_services(first_debt)
 
     resolved_before_abort = False
     try:
         release_previous_close.set()
-        assert debt_cleanup_started.wait(timeout=5)
-        release_debt_load.set()
-        assert debt_unload_worker_started.wait(timeout=5)
-        resolved_before_abort = debt_unload_worker_returned.wait(timeout=0.5)
+        assert first_cleanup_started.wait(timeout=5)
+        release_first_load.set()
+        assert second_debt_queued.wait(timeout=5)
+        assert second_cleanup_started.wait(timeout=5)
+        release_second_load.set()
+        assert second_unload_worker_started.wait(timeout=5)
+        resolved_before_abort = second_unload_worker_returned.wait(timeout=0.5)
     finally:
         abort_unload_callback.set()
         release_previous_close.set()
-        release_debt_load.set()
-        debt_load.join(timeout=5)
+        release_first_load.set()
+        release_second_load.set()
+        first_load.join(timeout=5)
+        second_load.join(timeout=5)
         installer.join(timeout=5)
         for worker in workers:
             worker.join(timeout=5)
 
     assert resolved_before_abort is True
-    assert not debt_load.is_alive()
+    assert not first_load.is_alive()
+    assert not second_load.is_alive()
     assert not installer.is_alive()
     assert all(not worker.is_alive() for worker in workers)
-    assert debt_results and debt_results[0].success is True
+    assert first_results and first_results[0].success is True
+    assert second_results and second_results[0].success is True
     assert observed_roots == [target]
-    assert debt.is_closed is True
-    assert debt.plugin_manager.snapshot("test.closing-debt").state == "disabled"
+    assert first_debt.is_closed is True
+    assert second_debt.is_closed is True
+    assert (
+        first_debt.plugin_manager.snapshot("test.first-closing-debt").state
+        == "disabled"
+    )
+    assert (
+        second_debt.plugin_manager.snapshot("test.second-closing-debt").state
+        == "disabled"
+    )
     replacement = get_application_services()
     assert replacement is not target
-    assert replacement is not debt
+    assert replacement is not first_debt
+    assert replacement is not second_debt
     assert events == [
         "target-load",
         "unload:test.visible-target",
-        "debt-load-begin",
-        "debt-load-end",
-        "debt-unload-begin",
-        "debt-unload-end",
+        "first-debt-load-begin",
+        "second-debt-load-begin",
+        "first-debt-load-end",
+        "first-debt-unload-begin",
+        "first-debt-unload-end",
+        "second-debt-load-end",
+        "second-debt-unload-begin",
+        "second-debt-unload-end",
     ]
 
 

@@ -549,7 +549,11 @@ def _set_application_services(
 
                 with _services_lock:
                     _services_transition_target = target
-                    _services = target
+                    retain_visibility_anchor = (
+                        target is None and previous is not None
+                    )
+                    if not retain_visibility_anchor:
+                        _services = target
                     while (
                         target is not None
                         and (
@@ -617,6 +621,8 @@ def _set_application_services(
                     ):
                         has_pending, pending_target = True, None
                     if not has_pending and not cleanup_targets:
+                        if target is None:
+                            _services = None
                         _services_transition_active = False
                         _services_transition_target = None
                         return
