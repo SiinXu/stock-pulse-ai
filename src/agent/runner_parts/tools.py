@@ -43,10 +43,14 @@ def _execute_tools(
     authority — via the migration mapper.
     """
 
-    from src.utils.sanitize import redact_sensitive_text
+    from src.utils.sanitize import redact_sensitive_data, redact_sensitive_text
 
     def _safe_tool_trace_name(value: Any) -> str:
         return redact_sensitive_text(value) if isinstance(value, str) else ""
+
+    def _safe_tool_trace_arguments(value: Any) -> Dict[str, Any]:
+        redacted = redact_sensitive_data(value)
+        return redacted if isinstance(redacted, dict) else {}
 
     def _exec_single(tc_item, completion_fence=None):
         """Execute one tool with an optional per-dispatch completion fence."""
@@ -136,7 +140,9 @@ def _execute_tools(
                 duration=dur,
             ))
         log_entry = {
-            "step": step, "tool": _safe_tool_trace_name(tc.name), "arguments": tc.arguments,
+            "step": step,
+            "tool": _safe_tool_trace_name(tc.name),
+            "arguments": _safe_tool_trace_arguments(tc.arguments),
             "success": success, "duration": dur, "result_length": len(result_str),
             "cached": cached,
         }
@@ -170,7 +176,7 @@ def _execute_tools(
             log_entry = {
                 "step": step,
                 "tool": _safe_tool_trace_name(tc_item.name),
-                "arguments": tc_item.arguments,
+                "arguments": _safe_tool_trace_arguments(tc_item.arguments),
                 "success": success,
                 "duration": dur,
                 "result_length": len(result_str),

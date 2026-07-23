@@ -1283,7 +1283,7 @@ def test_native_tool_trace_redacts_name_without_changing_dispatch() -> None:
     timed_out_call = ToolCall(
         id="call-timeout",
         name=PREFIXED_API_KEY,
-        arguments={"message": "public"},
+        arguments={"message": "public", "api_key": PLAIN_SECRET},
     )
     timed_out_log: list[dict] = []
 
@@ -1298,8 +1298,36 @@ def test_native_tool_trace_redacts_name_without_changing_dispatch() -> None:
 
     assert timed_out_call.name == PREFIXED_API_KEY
     assert timed_out_log[0]["tool"] == "[REDACTED]"
+    assert timed_out_log[0]["arguments"]["api_key"] == "[REDACTED]"
     assert timed_out_log[0]["timeout"] is True
     _assert_no_secret(timed_out_log)
+
+    queued_calls = [
+        ToolCall(
+            id=f"call-queued-{index}",
+            name="echo",
+            arguments={"message": "public", "api_key": PLAIN_SECRET},
+        )
+        for index in range(6)
+    ]
+    queued_log: list[dict] = []
+
+    _execute_tools(
+        queued_calls,
+        BlockingSession(),
+        step=3,
+        progress_callback=None,
+        tool_calls_log=queued_log,
+        tool_wait_timeout_seconds=0.01,
+    )
+
+    assert len(queued_log) == 6
+    assert all(entry["timeout"] is True for entry in queued_log)
+    assert all(
+        entry["arguments"]["api_key"] == "[REDACTED]"
+        for entry in queued_log
+    )
+    _assert_no_secret(queued_log)
 
 
 def test_exception_chain_reapplies_exact_values_across_joined_parts() -> None:
