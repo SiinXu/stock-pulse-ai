@@ -169,7 +169,7 @@ test.describe('web smoke', () => {
     const stockInput = page.getByPlaceholder('输入股票代码或名称，如 600519、贵州茅台、AAPL');
     await expect(stockInput).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('link', { name: '首页' })).toBeVisible();
-    await expect(page.getByRole('link', { name: '问股' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Agent' })).toBeVisible();
     await expect(page.getByRole('combobox', { name: '工作台视图切换' })).toBeVisible();
     await expect(page.getByRole('heading', { name: '个股栏' })).toBeVisible();
 
@@ -183,7 +183,7 @@ test.describe('web smoke', () => {
     await login(page);
 
     // Navigate to chat page by clicking the link
-    await page.getByRole('link', { name: '问股' }).click();
+    await page.getByRole('link', { name: 'Agent' }).click();
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(1000);
 
@@ -205,7 +205,7 @@ test.describe('web smoke', () => {
   test('chat page uses accessible labels instead of native title attributes for key actions', async ({ page }) => {
     await login(page);
 
-    await page.getByRole('link', { name: '问股' }).click();
+    await page.getByRole('link', { name: 'Agent' }).click();
     await page.waitForLoadState('domcontentloaded');
 
     const sendButton = page.getByRole('button', { name: '发送' });
@@ -296,7 +296,7 @@ test.describe('web smoke', () => {
     const filterInput = page.getByPlaceholder('按股票代码筛选（留空表示全部）');
     await expect(filterInput).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('button', { name: '筛选' })).toBeVisible();
-    await expect(page.getByRole('button', { name: '运行回测' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '运行回测', exact: true })).toBeVisible();
 
   });
 });

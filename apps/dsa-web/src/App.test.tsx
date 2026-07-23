@@ -38,6 +38,14 @@ vi.mock('./pages/HomePage', () => ({
   default: () => <div data-testid="home-page">Home</div>,
 }));
 
+vi.mock('./pages/MarketReviewPage', () => ({
+  default: () => <div data-testid="market-review-page">Market review</div>,
+}));
+
+vi.mock('./pages/StockScreeningPage', () => ({
+  default: () => <div data-testid="screening-page">Screening</div>,
+}));
+
 vi.mock('./pages/ChatPage', () => ({
   default: () => {
     if (chatPageShouldThrow.value) {
@@ -230,6 +238,30 @@ describe('App routing behavior', () => {
       .toBe(SETTINGS_SECTION_IDS.usage);
     expect(setCurrentRoute).toHaveBeenLastCalledWith(APP_ROUTE_PATHS.settings);
     expect(screen.queryByTestId('home-page')).not.toBeInTheDocument();
+  });
+
+  it('routes the canonical market-review path after auth is ready', async () => {
+    window.history.pushState({}, '', APP_ROUTE_PATHS.researchMarket);
+
+    render(<App />);
+
+    expect(await screen.findByTestId('market-review-page')).toBeInTheDocument();
+    expect(setCurrentRoute).toHaveBeenLastCalledWith(APP_ROUTE_PATHS.researchMarket);
+  });
+
+  it.each([
+    [LEGACY_ROUTE_PATHS.screening, APP_ROUTE_PATHS.researchDiscover, 'screening-page'],
+    [LEGACY_ROUTE_PATHS.backtest, APP_ROUTE_PATHS.researchBacktest, 'backtest-page'],
+  ])('redirects %s to %s while preserving query and hash', async (legacyPath, canonicalPath, testId) => {
+    window.history.pushState({}, '', `${legacyPath}?keep=yes#results`);
+
+    render(<App />);
+
+    expect(await screen.findByTestId(testId)).toBeInTheDocument();
+    expect(window.location.pathname).toBe(canonicalPath);
+    expect(window.location.search).toBe('?keep=yes');
+    expect(window.location.hash).toBe('#results');
+    expect(setCurrentRoute).toHaveBeenLastCalledWith(canonicalPath);
   });
 
   it('routes /decision-signals to the AI signals page after auth is ready', async () => {

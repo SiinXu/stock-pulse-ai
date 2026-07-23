@@ -23,12 +23,6 @@ export function useHomeDashboardState() {
       isLoadingHistory: state.isLoadingHistory,
       isLoadingMore: state.isLoadingMore,
       hasMore: state.hasMore,
-      marketReviewHistoryItems: state.marketReviewHistoryItems,
-      selectedMarketReviewHistoryIds: state.selectedMarketReviewHistoryIds,
-      isLoadingMarketReviewHistory: state.isLoadingMarketReviewHistory,
-      isLoadingMoreMarketReviewHistory: state.isLoadingMoreMarketReviewHistory,
-      isDeletingMarketReviewHistory: state.isDeletingMarketReviewHistory,
-      marketReviewHistoryHasMore: state.marketReviewHistoryHasMore,
       selectedReport: state.selectedReport,
       selectedRecordId: state.selectedRecordId,
       isLoadingReport: state.isLoadingReport,
@@ -50,18 +44,12 @@ export function useHomeDashboardState() {
       refreshHistory: state.refreshHistory,
       refreshHistoryForCompletedTask: state.refreshHistoryForCompletedTask,
       loadMoreHistory: state.loadMoreHistory,
-      loadMarketReviewHistory: state.loadMarketReviewHistory,
-      refreshMarketReviewHistory: state.refreshMarketReviewHistory,
-      loadMoreMarketReviewHistory: state.loadMoreMarketReviewHistory,
       selectHistoryItem: state.selectHistoryItem,
       retrySelectedRecord: state.retrySelectedRecord,
       clearSelectedRecord: state.clearSelectedRecord,
       toggleHistorySelection: state.toggleHistorySelection,
       toggleSelectAllVisible: state.toggleSelectAllVisible,
       deleteSelectedHistory: state.deleteSelectedHistory,
-      toggleMarketReviewHistorySelection: state.toggleMarketReviewHistorySelection,
-      toggleSelectAllVisibleMarketReviewHistory: state.toggleSelectAllVisibleMarketReviewHistory,
-      deleteSelectedMarketReviewHistory: state.deleteSelectedMarketReviewHistory,
       submitAnalysis: state.submitAnalysis,
       syncTaskCreated: state.syncTaskCreated,
       syncTaskUpdated: state.syncTaskUpdated,
@@ -87,15 +75,9 @@ export function useHomeDashboardState() {
     () => new Set(dashboardState.selectedHistoryIds),
     [dashboardState.selectedHistoryIds],
   );
-  const selectedMarketReviewHistoryIds = useMemo(
-    () => new Set(dashboardState.selectedMarketReviewHistoryIds),
-    [dashboardState.selectedMarketReviewHistoryIds],
-  );
-
   return {
     ...dashboardState,
     selectedIds,
-    selectedMarketReviewHistoryIds,
   };
 }
 

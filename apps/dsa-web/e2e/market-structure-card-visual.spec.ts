@@ -8,13 +8,14 @@ import {
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer, type ViteDevServer } from 'vite';
+import { APP_ROUTE_PATHS } from '../src/routing/routes';
 
 /**
  * Visual regression / integration smoke for MarketStructureCard on the REAL
  * application page path (not a standalone fixture page):
  *
- *   HomePage -> ReportSummary (market_review early-return)
- *            -> MarketReviewReportView -> MarketStructureCard
+ *   MarketReviewPage -> ReportSummary (market_review early-return)
+ *                    -> MarketReviewReportView -> MarketStructureCard
  *
  * The real dsa-web app is served by a programmatically started Vite dev
  * server (using the repo's own vite.config.ts). All `/api/v1/**` requests are
@@ -324,7 +325,9 @@ test.describe('MarketStructureCard on the real market review page', () => {
 
         const page = await context.newPage();
         await installApiMocks(page);
-        await page.goto(appUrl, { waitUntil: 'domcontentloaded' });
+        await page.goto(new URL(APP_ROUTE_PATHS.researchMarket, appUrl).toString(), {
+          waitUntil: 'domcontentloaded',
+        });
 
         // The real chain must complete: history list auto-select -> detail
         // fetch -> MarketReviewReportView -> MarketStructureCard section.
@@ -392,7 +395,9 @@ test.describe('MarketStructureCard on the real market review page', () => {
           body: JSON.stringify(legacyDetail),
         });
       });
-      await page.goto(appUrl, { waitUntil: 'domcontentloaded' });
+      await page.goto(new URL(APP_ROUTE_PATHS.researchMarket, appUrl).toString(), {
+        waitUntil: 'domcontentloaded',
+      });
 
       // The market review report itself renders...
       await expect(page.getByText('市场概览').first()).toBeVisible({ timeout: 90_000 });

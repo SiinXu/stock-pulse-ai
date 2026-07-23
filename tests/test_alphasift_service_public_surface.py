@@ -47,6 +47,12 @@ EXPECTED_SERVICE_METHOD_METADATA_SHA256 = (
 EXPECTED_SERVICE_METHOD_AST_SHA256 = (
     "691fc2e8765cddee2c2a088f51f2da633b1f92ad7ea5ada07d58ec7a5b3975d5"
 )
+EXPECTED_HOTSPOT_SUPPORT_FUNCTION_AST_SHA256 = (
+    "73977f1171ee78ffcc14859fd31ce83ef56c64580c88c9615bbc147609b6903b"
+)
+EXPECTED_RUNTIME_SUPPORT_FUNCTION_AST_SHA256 = (
+    "4c0b6df4e1c627f52d21ebf0d7089e017dc18291ecf7185889384ef981073675"
+)
 EXPECTED_PROVIDER_SURFACE = (
     "_BASE_URL",
     "_HTTP_TIMEOUT_SECONDS",
@@ -201,6 +207,145 @@ def test_alphasift_service_and_provider_class_surfaces_are_stable():
     assert _digest(_class_method_metadata(provider)) == (
         EXPECTED_PROVIDER_METHOD_METADATA_SHA256
     )
+
+
+def test_alphasift_hotspot_support_function_ast_is_unchanged():
+    source_path = (
+        Path(service_module.__file__).parent
+        / "alphasift_service_parts"
+        / "hotspot_support.py"
+    )
+    tree = ast.parse(source_path.read_text(encoding="utf-8"))
+    functions = [
+        node
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    ]
+    payload = "\n".join(
+        _stable_ast_dump(function)
+        for function in functions
+    ).encode()
+    assert len(functions) == 52
+    assert hashlib.sha256(payload).hexdigest() == (
+        EXPECTED_HOTSPOT_SUPPORT_FUNCTION_AST_SHA256
+    )
+
+
+def test_alphasift_hotspot_support_uses_facade_patch_seams(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        service_module,
+        "_env_text",
+        lambda value: calls.append(value) or f"patched:{value}",
+    )
+
+    assert service_module._list_text_values(["raw"]) == ["patched:raw"]
+    assert calls == ["raw"]
+
+
+def test_alphasift_hotspot_support_reload_recreates_facade_functions():
+    script = r'''
+import importlib
+import src.services.alphasift_service as module
+import src.services.alphasift_service_parts.hotspot_support as support_part
+
+old_function = module._safe_float
+support_part._safe_float = lambda *_args: "stale"
+
+first = importlib.reload(module)
+first_function = first._safe_float
+first_source_function = support_part._safe_float
+assert first_function is not old_function
+assert first_function.__module__ == first.__name__
+assert first_function.__qualname__ == "_safe_float"
+assert first_function.__globals__ is vars(first)
+assert first_function.__code__ is first_source_function.__code__
+assert first_function.__code__.co_name == "_safe_float"
+
+support_part._safe_float = lambda *_args: "stale-again"
+second = importlib.reload(first)
+assert second._safe_float is not first_function
+assert support_part._safe_float is not first_source_function
+assert second._safe_float.__globals__ is vars(second)
+assert second._safe_float.__code__ is support_part._safe_float.__code__
+'''
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
+def test_alphasift_runtime_support_function_ast_is_unchanged():
+    source_path = (
+        Path(service_module.__file__).parent
+        / "alphasift_service_parts"
+        / "runtime_support.py"
+    )
+    tree = ast.parse(source_path.read_text(encoding="utf-8"))
+    functions = [
+        node
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    ]
+    payload = "\n".join(
+        _stable_ast_dump(function)
+        for function in functions
+    ).encode()
+    assert len(functions) == 31
+    assert hashlib.sha256(payload).hexdigest() == (
+        EXPECTED_RUNTIME_SUPPORT_FUNCTION_AST_SHA256
+    )
+
+
+def test_alphasift_runtime_support_uses_facade_patch_seams(monkeypatch):
+    calls = []
+    snapshot = ({"status": "patched"}, True, None)
+    monkeypatch.setattr(
+        service_module,
+        "_get_alphasift_status_snapshot",
+        lambda: calls.append("status") or snapshot,
+    )
+
+    assert service_module._is_alphasift_available() is True
+    assert calls == ["status"]
+
+
+def test_alphasift_runtime_support_reload_recreates_facade_functions():
+    script = r'''
+import importlib
+import src.services.alphasift_service as module
+import src.services.alphasift_service_parts.runtime_support as runtime_part
+
+old_function = module._is_adapter_available
+runtime_part._is_adapter_available = lambda *_args: "stale"
+
+first = importlib.reload(module)
+first_function = first._is_adapter_available
+first_source_function = runtime_part._is_adapter_available
+assert first_function is not old_function
+assert first_function.__module__ == first.__name__
+assert first_function.__qualname__ == "_is_adapter_available"
+assert first_function.__globals__ is vars(first)
+assert first_function.__code__ is first_source_function.__code__
+assert first_function.__code__.co_name == "_is_adapter_available"
+
+runtime_part._is_adapter_available = lambda *_args: "stale-again"
+second = importlib.reload(first)
+assert second._is_adapter_available is not first_function
+assert runtime_part._is_adapter_available is not first_source_function
+assert second._is_adapter_available.__globals__ is vars(second)
+assert second._is_adapter_available.__code__ is runtime_part._is_adapter_available.__code__
+'''
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
 
 
 def test_alphasift_service_method_ast_is_unchanged():

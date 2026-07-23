@@ -364,14 +364,22 @@ background, border, radius, shadow, and responsive outer gutter around page
 content. Wide page content remains reachable through the `main` scroll
 container instead of being clipped or widening the document. UI-N01 does not
 replace or reinterpret the separately owned UI4 L-09 target. The typed
-application navigation descriptor exposes eight flat routes after Token Usage
-moved into Settings as the `Usage & cost` section. The legacy `/usage` URL uses
-the shared replace-redirect contract to preserve unrelated query parameters
-and the hash while the destination-owned `section=usage` value wins conflicts.
-Redirect destinations suppress tab-session restoration, and route paths plus
-Settings query keys come from the centralized route contract. Research, More,
-or another top-level destination requires a separate information-architecture
-decision.
+application navigation descriptor exposes five stable primary domains: Home,
+Research, Portfolio, Agent, and Settings. Home temporarily owns Decision Signals
+and Alerts until their dedicated IA migration, while Research owns Market
+Review, Discover, and Backtest. Expanded navigation keeps these secondary
+destinations visible beneath their parent. Compact navigation opens the same
+children in a right-side hover or keyboard flyout; Right Arrow enters the
+flyout and Left Arrow or Escape restores its parent trigger.
+
+Canonical Research paths are `/research/market`, `/research/discover`, and
+`/research/backtest`. The legacy `/screening` and `/backtest` URLs use the shared
+replace-redirect contract and preserve query parameters and hash state. Token
+Usage remains in Settings as the `Usage & cost` section, with `/usage` using the
+same compatibility contract while the destination-owned `section=usage` value
+wins conflicts. Redirect destinations suppress tab-session restoration, and
+all product paths plus Settings query keys come from the centralized route
+contract.
 
 The responsive contract has three states:
 
