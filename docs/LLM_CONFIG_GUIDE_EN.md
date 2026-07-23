@@ -362,7 +362,7 @@ For the single-agent ask-stock path, the backend also keeps a provider-aware tra
 - For streaming responses that already produced partial content, the runtime does not switch parameters mid-output. It keeps the existing same-model non-stream retry / fallback-model path to avoid stitching inconsistent answers together.
 - `SystemConfigService` only updates keys that you actually submit when saving from the Web settings page or importing a desktop `.env`; switching to a strict-temperature model does not silently clear, migrate, or rewrite an existing `LLM_TEMPERATURE`. Temporary request-time parameter strategies are not persisted back into the config file.
 - Non-strict primary models, non-strict fallbacks, and any request after switching back to a regular model still use your configured temperature. Existing configs do not need migration; changing the model restores the original behavior automatically.
-- Repository-side compatibility coverage lives in `tests/config/test_llm_channel_config.py`, `tests/test_market_analyzer_generate_text.py`, `tests/test_agent_pipeline.py`, and `tests/test_system_config_service.py`.
+- Repository-side compatibility coverage lives in `tests/config/test_llm_channel_config.py`, `tests/market/test_market_analyzer_generate_text.py`, `tests/test_agent_pipeline.py`, and `tests/test_system_config_service.py`.
 - Minimal rollback: revert only the LLM generation-parameter adaptation change set; no separate `LLM_TEMPERATURE` migration is required.
 
 > **Critical Warning**: If you enable `LLM_CHANNELS`, any standard `DEEPSEEK_API_KEY` or `OPENAI_API_KEY` declared independently will be **completely ignored**. **Use only one mode** to prevent configuration conflicts.
@@ -372,7 +372,7 @@ For the single-agent ask-stock path, the backend also keeps a provider-aware tra
 
 - Compatibility is validated in two layers: first-party provider/API contract references (LiteLLM OpenAI-compatible routing, OpenAI Chat Completions, Moonshot/Kimi docs and model notes), and second the current runtime implementation in this repository under `litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0`.
 - This recovery path is runtime-only and intentionally local: exception classification + one in-request repair retry + in-process cache. It does not rewrite `.env`, migrate saved config keys, or alter legacy values; it only omits/adjusts request parameters (`temperature`, `top_p`, `presence_penalty`, `frequency_penalty`, `seed`) for the current call. Rolling back requires no migration; restore previous settings and model/provider selection.
-- Regression evidence for this path is in `tests/llm/test_llm_param_recovery.py`, `tests/test_system_config_service.py`, `tests/config/test_llm_channel_config.py`, `tests/test_system_config_api.py`, `tests/test_market_analyzer_generate_text.py`, `tests/test_agent_pipeline.py`; desktop backup import restore is directly covered by `test_import_desktop_env_restores_runtime_models_after_cleanup`.
+- Regression evidence for this path is in `tests/llm/test_llm_param_recovery.py`, `tests/test_system_config_service.py`, `tests/config/test_llm_channel_config.py`, `tests/test_system_config_api.py`, `tests/market/test_market_analyzer_generate_text.py`, `tests/test_agent_pipeline.py`; desktop backup import restore is directly covered by `test_import_desktop_env_restores_runtime_models_after_cleanup`.
 
 ---
 
