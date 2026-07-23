@@ -496,7 +496,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Tests
 
 - Added Taiwan stocks, JP/KR market review, GenerationBackend, `codex_cli`, Hermes, local CLI, runtime scheduler, backtesting and concept sector ranking regression tests.
-- Enhanced temporary `.env` isolation for `tests/test_analysis_api_contract.py`, `tests/test_analysis_history.py` and `tests/test_backtest_service.py` to prevent contamination of system configuration tests with local real `.env` files.
+- Enhanced temporary `.env` isolation for `tests/test_analysis_api_contract.py`, `tests/services/test_analysis_history.py` and `tests/test_backtest_service.py` to prevent contamination of system configuration tests with local real `.env` files.
 
 ## [3.23.0] - 2026-06-20
 
