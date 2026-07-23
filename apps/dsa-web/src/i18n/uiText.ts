@@ -70,7 +70,7 @@ const zh = {
   'layout.nav.decisionSignals': 'AI 建议',
   'layout.nav.discover': '发现',
   'layout.nav.home': '首页',
-  'layout.nav.portfolio': '持仓',
+  'layout.nav.portfolio': '组合',
   'layout.nav.research': '研究',
   'layout.nav.settings': '设置',
   'layout.nav.screening': '选股',

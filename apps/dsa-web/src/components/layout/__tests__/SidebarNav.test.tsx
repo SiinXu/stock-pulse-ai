@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTE_PATHS, LEGACY_ROUTE_PATHS } from '../../../routing/routes';
@@ -129,7 +129,7 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole('link', { name: '持仓' })).toHaveAttribute('href', `${APP_ROUTE_PATHS.portfolio}?account=12`);
+    expect(screen.getByRole('link', { name: '组合' })).toHaveAttribute('href', `${APP_ROUTE_PATHS.portfolio}?account=12`);
     expect(screen.getByRole('link', { name: '发现' }))
       .toHaveAttribute('href', `${APP_ROUTE_PATHS.researchDiscover}?strategy=quality&count=20`);
   });
@@ -142,11 +142,11 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole('link', { name: '持仓' })).toHaveAttribute('href', `${APP_ROUTE_PATHS.portfolio}?account=12`);
+    expect(screen.getByRole('link', { name: '组合' })).toHaveAttribute('href', `${APP_ROUTE_PATHS.portfolio}?account=12`);
     fireEvent.click(screen.getByRole('button', { name: 'All accounts' }));
 
     await waitFor(() => {
-      expect(screen.getByRole('link', { name: '持仓' })).toHaveAttribute('href', APP_ROUTE_PATHS.portfolio);
+      expect(screen.getByRole('link', { name: '组合' })).toHaveAttribute('href', APP_ROUTE_PATHS.portfolio);
     });
   });
 
@@ -185,6 +185,22 @@ describe('SidebarNav', () => {
       APP_ROUTE_PATHS.portfolio,
       APP_ROUTE_PATHS.agent,
     ]);
+  });
+
+  it('keeps expanded group children visible without a false disclosure affordance', () => {
+    render(
+      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.home]}>
+        <SidebarNav />
+      </MemoryRouter>,
+    );
+
+    for (const name of ['首页', '研究']) {
+      const groupLink = screen.getByRole('link', { name });
+      expect(groupLink).not.toHaveAttribute('aria-expanded');
+      expect(groupLink.querySelectorAll('svg')).toHaveLength(1);
+    }
+    expect(screen.getByRole('link', { name: '大盘复盘' })).toBeVisible();
+    expect(screen.getByRole('link', { name: '发现' })).toBeVisible();
   });
 
   it('keeps the Discover navigation item stable after config save events', () => {
@@ -290,6 +306,7 @@ describe('SidebarNav', () => {
   it('shows grouped flyouts and shared tooltips for compact navigation controls', async () => {
     render(
       <MemoryRouter initialEntries={['/']}>
+        <button type="button">Before navigation</button>
         <SidebarNav collapsed onToggleCollapse={vi.fn()} />
       </MemoryRouter>,
     );
@@ -301,7 +318,8 @@ describe('SidebarNav', () => {
     await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
 
     const research = screen.getByRole('link', { name: '研究' });
-    research.focus();
+    const beforeNavigation = screen.getByRole('button', { name: 'Before navigation' });
+    beforeNavigation.focus();
     fireEvent.mouseEnter(research);
     const menu = await screen.findByRole('menu', { name: '研究' });
     expect(within(menu).getByRole('menuitem', { name: '大盘复盘' }))
@@ -309,7 +327,59 @@ describe('SidebarNav', () => {
     expect(within(menu).getByRole('menuitem', { name: '发现' }))
       .toHaveAttribute('href', APP_ROUTE_PATHS.researchDiscover);
     expect(research).toHaveAttribute('aria-expanded', 'true');
-    expect(research).toHaveFocus();
+    expect(beforeNavigation).toHaveFocus();
+  });
+
+  it('keeps a compact group open across the hover bridge and closes after leaving it', async () => {
+    vi.useFakeTimers();
+    try {
+      render(
+        <MemoryRouter initialEntries={[APP_ROUTE_PATHS.home]}>
+          <SidebarNav collapsed />
+        </MemoryRouter>,
+      );
+
+      const research = screen.getByRole('link', { name: '研究' });
+      fireEvent.mouseEnter(research);
+      const menu = screen.getByRole('menu', { name: '研究' });
+      fireEvent.mouseLeave(research);
+      fireEvent.mouseEnter(menu);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(150);
+      });
+      expect(menu).toBeInTheDocument();
+
+      fireEvent.mouseLeave(menu);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(150);
+      });
+      expect(screen.queryByRole('menu', { name: '研究' })).not.toBeInTheDocument();
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
+  it('exposes exactly one current-page link for each Research route', () => {
+    const marketRender = render(
+      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.researchMarket]}>
+        <SidebarNav />
+      </MemoryRouter>,
+    );
+
+    let currentLinks = marketRender.container.querySelectorAll('a[aria-current="page"]');
+    expect(currentLinks).toHaveLength(1);
+    expect(currentLinks[0]).toHaveAttribute('href', APP_ROUTE_PATHS.researchMarket);
+    marketRender.unmount();
+
+    const discoverRender = render(
+      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.researchDiscover]}>
+        <SidebarNav />
+      </MemoryRouter>,
+    );
+    currentLinks = discoverRender.container.querySelectorAll('a[aria-current="page"]');
+    expect(currentLinks).toHaveLength(1);
+    expect(currentLinks[0]).toHaveAttribute('href', APP_ROUTE_PATHS.researchDiscover);
   });
 
   it('opens compact groups with ArrowRight and restores the trigger with ArrowLeft or Escape', async () => {

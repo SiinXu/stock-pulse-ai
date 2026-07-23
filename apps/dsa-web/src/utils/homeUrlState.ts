@@ -1,13 +1,13 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { RunFlowSnapshotSource } from '../types/runFlow';
+import {
+  HOME_ROUTE_QUERY_KEYS,
+  REPORT_ROUTE_QUERY_KEYS,
+  RUN_FLOW_ROUTE_QUERY_VALUES,
+} from '../routing/routes';
 import { buildDeepLink, parseDeepLink, type HomeWorkspaceView } from './deepLink';
 
-const HOME_RECORD_ID_PARAM = 'recordId';
-const HOME_WORKSPACE_PARAM = 'workspace';
-const HOME_RUN_FLOW_PARAM = 'runFlow';
-const HOME_RUN_FLOW_RECORD_ID_PARAM = 'runFlowRecordId';
-const HOME_RUN_FLOW_TASK_ID_PARAM = 'runFlowTaskId';
 const STABLE_TASK_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
 export type HomeUrlState = {
@@ -52,37 +52,37 @@ function normalizeCoreParams(params: URLSearchParams): {
   runFlow: RunFlowSnapshotSource | null;
 } {
   const normalized = new URLSearchParams(params);
-  const recordId = parsePositiveInteger(params.get(HOME_RECORD_ID_PARAM));
+  const recordId = parsePositiveInteger(params.get(REPORT_ROUTE_QUERY_KEYS.recordId));
   if (recordId === null) {
-    normalized.delete(HOME_RECORD_ID_PARAM);
+    normalized.delete(REPORT_ROUTE_QUERY_KEYS.recordId);
   } else {
-    normalized.set(HOME_RECORD_ID_PARAM, String(recordId));
+    normalized.set(REPORT_ROUTE_QUERY_KEYS.recordId, String(recordId));
   }
 
   let runFlow: RunFlowSnapshotSource | null = null;
-  const runFlowType = params.get(HOME_RUN_FLOW_PARAM);
-  if (runFlowType === 'history') {
-    const runFlowRecordId = parsePositiveInteger(params.get(HOME_RUN_FLOW_RECORD_ID_PARAM));
+  const runFlowType = params.get(REPORT_ROUTE_QUERY_KEYS.runFlow);
+  if (runFlowType === RUN_FLOW_ROUTE_QUERY_VALUES.history) {
+    const runFlowRecordId = parsePositiveInteger(params.get(REPORT_ROUTE_QUERY_KEYS.runFlowRecordId));
     if (runFlowRecordId !== null) {
       runFlow = { type: 'history', recordId: runFlowRecordId };
-      normalized.set(HOME_RUN_FLOW_PARAM, 'history');
-      normalized.set(HOME_RUN_FLOW_RECORD_ID_PARAM, String(runFlowRecordId));
-      normalized.delete(HOME_RUN_FLOW_TASK_ID_PARAM);
+      normalized.set(REPORT_ROUTE_QUERY_KEYS.runFlow, RUN_FLOW_ROUTE_QUERY_VALUES.history);
+      normalized.set(REPORT_ROUTE_QUERY_KEYS.runFlowRecordId, String(runFlowRecordId));
+      normalized.delete(REPORT_ROUTE_QUERY_KEYS.runFlowTaskId);
     }
-  } else if (runFlowType === 'task') {
-    const taskId = parseStableTaskId(params.get(HOME_RUN_FLOW_TASK_ID_PARAM));
+  } else if (runFlowType === RUN_FLOW_ROUTE_QUERY_VALUES.task) {
+    const taskId = parseStableTaskId(params.get(REPORT_ROUTE_QUERY_KEYS.runFlowTaskId));
     if (taskId !== null) {
       runFlow = { type: 'task', taskId };
-      normalized.set(HOME_RUN_FLOW_PARAM, 'task');
-      normalized.set(HOME_RUN_FLOW_TASK_ID_PARAM, taskId);
-      normalized.delete(HOME_RUN_FLOW_RECORD_ID_PARAM);
+      normalized.set(REPORT_ROUTE_QUERY_KEYS.runFlow, RUN_FLOW_ROUTE_QUERY_VALUES.task);
+      normalized.set(REPORT_ROUTE_QUERY_KEYS.runFlowTaskId, taskId);
+      normalized.delete(REPORT_ROUTE_QUERY_KEYS.runFlowRecordId);
     }
   }
 
   if (runFlow === null) {
-    normalized.delete(HOME_RUN_FLOW_PARAM);
-    normalized.delete(HOME_RUN_FLOW_RECORD_ID_PARAM);
-    normalized.delete(HOME_RUN_FLOW_TASK_ID_PARAM);
+    normalized.delete(REPORT_ROUTE_QUERY_KEYS.runFlow);
+    normalized.delete(REPORT_ROUTE_QUERY_KEYS.runFlowRecordId);
+    normalized.delete(REPORT_ROUTE_QUERY_KEYS.runFlowTaskId);
   }
 
   return { params: normalized, recordId, runFlow };
@@ -102,9 +102,9 @@ export function parseHomeUrlState(search: string): HomeUrlState {
     workspace: homeTarget?.workspace ?? 'history',
     invalidRecordId: parsedDeepLink.issues.some((issue) => issue.code === 'invalid_record_id'),
     invalidRunFlow: (
-      deepLinkParams.has(HOME_RUN_FLOW_PARAM)
-      || deepLinkParams.has(HOME_RUN_FLOW_RECORD_ID_PARAM)
-      || deepLinkParams.has(HOME_RUN_FLOW_TASK_ID_PARAM)
+      deepLinkParams.has(REPORT_ROUTE_QUERY_KEYS.runFlow)
+      || deepLinkParams.has(REPORT_ROUTE_QUERY_KEYS.runFlowRecordId)
+      || deepLinkParams.has(REPORT_ROUTE_QUERY_KEYS.runFlowTaskId)
     ) && normalized.runFlow === null,
     invalidStockCode: parsedDeepLink.issues.some((issue) => issue.code === 'invalid_stock_code'),
     invalidWorkspace: parsedDeepLink.issues.some((issue) => issue.code === 'invalid_workspace'),
@@ -120,13 +120,13 @@ function getNormalizedParams(search: string): URLSearchParams {
 
 export function setHomeRecord(search: string, recordId: number): string {
   const params = getNormalizedParams(search);
-  params.set(HOME_RECORD_ID_PARAM, String(recordId));
+  params.set(REPORT_ROUTE_QUERY_KEYS.recordId, String(recordId));
   return toSearch(params);
 }
 
 export function clearHomeRecord(search: string): string {
   const params = getNormalizedParams(search);
-  params.delete(HOME_RECORD_ID_PARAM);
+  params.delete(REPORT_ROUTE_QUERY_KEYS.recordId);
   return toSearch(params);
 }
 
@@ -136,21 +136,21 @@ export function setHomeTaskRunFlow(search: string, taskId: string): string {
     return clearHomeRunFlow(search);
   }
   const params = getNormalizedParams(search);
-  params.delete(HOME_RUN_FLOW_PARAM);
-  params.delete(HOME_RUN_FLOW_RECORD_ID_PARAM);
-  params.delete(HOME_RUN_FLOW_TASK_ID_PARAM);
-  params.set(HOME_RUN_FLOW_PARAM, 'task');
-  params.set(HOME_RUN_FLOW_TASK_ID_PARAM, parsedTaskId);
+  params.delete(REPORT_ROUTE_QUERY_KEYS.runFlow);
+  params.delete(REPORT_ROUTE_QUERY_KEYS.runFlowRecordId);
+  params.delete(REPORT_ROUTE_QUERY_KEYS.runFlowTaskId);
+  params.set(REPORT_ROUTE_QUERY_KEYS.runFlow, RUN_FLOW_ROUTE_QUERY_VALUES.task);
+  params.set(REPORT_ROUTE_QUERY_KEYS.runFlowTaskId, parsedTaskId);
   return toSearch(params);
 }
 
 export function setHomeHistoryRunFlow(search: string, recordId: number): string {
   const params = getNormalizedParams(search);
-  params.delete(HOME_RUN_FLOW_PARAM);
-  params.delete(HOME_RUN_FLOW_RECORD_ID_PARAM);
-  params.delete(HOME_RUN_FLOW_TASK_ID_PARAM);
-  params.set(HOME_RUN_FLOW_PARAM, 'history');
-  params.set(HOME_RUN_FLOW_RECORD_ID_PARAM, String(recordId));
+  params.delete(REPORT_ROUTE_QUERY_KEYS.runFlow);
+  params.delete(REPORT_ROUTE_QUERY_KEYS.runFlowRecordId);
+  params.delete(REPORT_ROUTE_QUERY_KEYS.runFlowTaskId);
+  params.set(REPORT_ROUTE_QUERY_KEYS.runFlow, RUN_FLOW_ROUTE_QUERY_VALUES.history);
+  params.set(REPORT_ROUTE_QUERY_KEYS.runFlowRecordId, String(recordId));
   return toSearch(params);
 }
 
@@ -162,18 +162,18 @@ export function buildHomeHistoryRunFlowHref(recordId: number, stockCode?: string
 
 export function clearHomeRunFlow(search: string): string {
   const params = getNormalizedParams(search);
-  params.delete(HOME_RUN_FLOW_PARAM);
-  params.delete(HOME_RUN_FLOW_RECORD_ID_PARAM);
-  params.delete(HOME_RUN_FLOW_TASK_ID_PARAM);
+  params.delete(REPORT_ROUTE_QUERY_KEYS.runFlow);
+  params.delete(REPORT_ROUTE_QUERY_KEYS.runFlowRecordId);
+  params.delete(REPORT_ROUTE_QUERY_KEYS.runFlowTaskId);
   return toSearch(params);
 }
 
 export function setHomeWorkspace(search: string, workspace: HomeWorkspaceView): string {
   const params = getNormalizedParams(search);
   if (workspace === 'history') {
-    params.delete(HOME_WORKSPACE_PARAM);
+    params.delete(HOME_ROUTE_QUERY_KEYS.workspace);
   } else {
-    params.set(HOME_WORKSPACE_PARAM, workspace);
+    params.set(HOME_ROUTE_QUERY_KEYS.workspace, workspace);
   }
   return toSearch(params);
 }

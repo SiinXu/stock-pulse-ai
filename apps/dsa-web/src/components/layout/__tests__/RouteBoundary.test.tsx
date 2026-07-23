@@ -53,7 +53,7 @@ describe('RouteOutletBoundary', () => {
       expect(screen.getByRole('button', { name: '重新加载页面' })).toHaveAttribute('data-variant', 'primary');
       expect(screen.getByRole('button', { name: '返回首页' })).toHaveAttribute('data-variant', 'secondary');
 
-      fireEvent.click(screen.getByRole('link', { name: '持仓' }));
+      fireEvent.click(screen.getByRole('link', { name: '组合' }));
 
       expect(await screen.findByTestId('portfolio-page')).toBeInTheDocument();
       expect(screen.queryByRole('heading', { name: '页面加载失败' })).not.toBeInTheDocument();

@@ -53,6 +53,9 @@ EXPECTED_HOTSPOT_SUPPORT_FUNCTION_AST_SHA256 = (
 EXPECTED_RUNTIME_SUPPORT_FUNCTION_AST_SHA256 = (
     "4c0b6df4e1c627f52d21ebf0d7089e017dc18291ecf7185889384ef981073675"
 )
+EXPECTED_CONTEXT_SUPPORT_FUNCTION_AST_SHA256 = (
+    "8a798e2861eab5a4eb04a62ed650e4731587777b14d3e75393c61a30fcd13f67"
+)
 EXPECTED_PROVIDER_SURFACE = (
     "_BASE_URL",
     "_HTTP_TIMEOUT_SECONDS",
@@ -338,6 +341,90 @@ assert second._is_adapter_available is not first_function
 assert runtime_part._is_adapter_available is not first_source_function
 assert second._is_adapter_available.__globals__ is vars(second)
 assert second._is_adapter_available.__code__ is runtime_part._is_adapter_available.__code__
+'''
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
+def test_alphasift_context_support_function_ast_is_unchanged():
+    source_path = (
+        Path(service_module.__file__).parent
+        / "alphasift_service_parts"
+        / "context_support.py"
+    )
+    tree = ast.parse(source_path.read_text(encoding="utf-8"))
+    functions = [
+        node
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    ]
+    payload = "\n".join(
+        _stable_ast_dump(function)
+        for function in functions
+    ).encode()
+    assert len(functions) == 41
+    assert hashlib.sha256(payload).hexdigest() == (
+        EXPECTED_CONTEXT_SUPPORT_FUNCTION_AST_SHA256
+    )
+
+
+def test_alphasift_context_support_uses_facade_patch_seams(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        service_module,
+        "_env_text",
+        lambda value: calls.append(value) or f"patched:{value}",
+    )
+
+    assert service_module._dedupe_strings(["first", "second"]) == [
+        "patched:first",
+        "patched:second",
+    ]
+    assert calls == ["first", "second"]
+
+
+def test_alphasift_context_support_reload_recreates_facade_functions():
+    script = r'''
+import importlib
+import src.services.alphasift_service as module
+import src.services.alphasift_service_parts.context_support as context_part
+
+old_context_function = module._build_alphasift_context
+old_dedupe_function = module._dedupe_strings
+context_part._build_alphasift_context = lambda *_args, **_kwargs: "stale"
+context_part._dedupe_strings = lambda *_args: "stale"
+
+first = importlib.reload(module)
+first_context_function = first._build_alphasift_context
+first_dedupe_function = first._dedupe_strings
+first_source_context_function = context_part._build_alphasift_context
+first_source_dedupe_function = context_part._dedupe_strings
+assert first_context_function is not old_context_function
+assert first_dedupe_function is not old_dedupe_function
+assert first_context_function.__module__ == first.__name__
+assert first_dedupe_function.__module__ == first.__name__
+assert first_context_function.__qualname__ == "_build_alphasift_context"
+assert first_dedupe_function.__qualname__ == "_dedupe_strings"
+assert first_context_function.__globals__ is vars(first)
+assert first_dedupe_function.__globals__ is vars(first)
+assert first_context_function.__code__ is first_source_context_function.__code__
+assert first_dedupe_function.__code__ is first_source_dedupe_function.__code__
+
+context_part._dedupe_strings = lambda *_args: "stale-again"
+second = importlib.reload(first)
+assert second._build_alphasift_context is not first_context_function
+assert second._dedupe_strings is not first_dedupe_function
+assert context_part._build_alphasift_context is not first_source_context_function
+assert context_part._dedupe_strings is not first_source_dedupe_function
+assert second._build_alphasift_context.__globals__ is vars(second)
+assert second._dedupe_strings.__globals__ is vars(second)
+assert second._build_alphasift_context.__code__ is context_part._build_alphasift_context.__code__
+assert second._dedupe_strings.__code__ is context_part._dedupe_strings.__code__
 '''
     completed = subprocess.run(
         [sys.executable, "-c", script],

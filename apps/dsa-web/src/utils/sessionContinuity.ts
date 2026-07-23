@@ -2,7 +2,16 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { DeepLinkTarget } from './deepLink';
 import { buildDeepLink, parseDeepLink } from './deepLink';
-import { APP_ROUTE_PATHS, LEGACY_ROUTE_PATHS } from '../routing/routes';
+import {
+  APP_ROUTE_PATHS,
+  HOME_ROUTE_QUERY_KEYS,
+  LEGACY_ROUTE_PATHS,
+  REPORT_ROUTE_QUERY_KEYS,
+  RESEARCH_BACKTEST_PHASE_VALUES,
+  RESEARCH_BACKTEST_ROUTE_QUERY_KEYS,
+  RESEARCH_DISCOVER_MARKET_VALUES,
+  RESEARCH_DISCOVER_ROUTE_QUERY_KEYS,
+} from '../routing/routes';
 import { parseHomeUrlState } from './homeUrlState';
 import {
   WEB_SESSION_CONTINUITY_STORAGE_KEY,
@@ -55,12 +64,12 @@ const DEEP_LINK_ROUTE_KEYS = new Map<DeepLinkTarget['page'], PersistedRouteKey>(
 ]);
 const ALLOWED_QUERY_KEYS: Record<PersistedRouteKey, readonly string[]> = {
   home: [
-    'recordId',
-    'stock',
-    'workspace',
-    'runFlow',
-    'runFlowRecordId',
-    'runFlowTaskId',
+    REPORT_ROUTE_QUERY_KEYS.recordId,
+    HOME_ROUTE_QUERY_KEYS.stock,
+    HOME_ROUTE_QUERY_KEYS.workspace,
+    REPORT_ROUTE_QUERY_KEYS.runFlow,
+    REPORT_ROUTE_QUERY_KEYS.runFlowRecordId,
+    REPORT_ROUTE_QUERY_KEYS.runFlowTaskId,
   ],
   chat: ['session', 'stock', 'name', 'recordId', 'context'],
   portfolio: ['account'],
@@ -82,11 +91,11 @@ const ALLOWED_QUERY_KEYS: Record<PersistedRouteKey, readonly string[]> = {
     'sourceReportId',
   ],
   stock: ['period', 'days'],
-  'research-discover': ['market', 'strategy', 'count'],
-  'research-backtest': ['code', 'window', 'from', 'to', 'phase', 'page'],
-  'research-market': ['recordId', 'runFlow', 'runFlowRecordId', 'runFlowTaskId'],
+  'research-discover': Object.values(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS),
+  'research-backtest': Object.values(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS),
+  'research-market': Object.values(REPORT_ROUTE_QUERY_KEYS),
 };
-const BACKTEST_PHASES = new Set(['premarket', 'intraday', 'postmarket', 'unknown']);
+const BACKTEST_PHASES = new Set<string>(Object.values(RESEARCH_BACKTEST_PHASE_VALUES));
 const SAFE_IDENTIFIER_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -150,11 +159,24 @@ function sanitizeStandaloneRoute(url: URL): SanitizedRoute | null {
     url.pathname === APP_ROUTE_PATHS.researchDiscover
     || url.pathname === LEGACY_ROUTE_PATHS.screening
   ) {
-    if (url.searchParams.get('market') === 'cn') params.set('market', 'cn');
-    const strategy = url.searchParams.get('strategy');
-    if (strategy && SAFE_IDENTIFIER_PATTERN.test(strategy)) params.set('strategy', strategy);
-    const count = positiveInteger(url.searchParams.get('count'), 100);
-    if (count) params.set('count', count);
+    if (
+      url.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market)
+      === RESEARCH_DISCOVER_MARKET_VALUES.china
+    ) {
+      params.set(
+        RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market,
+        RESEARCH_DISCOVER_MARKET_VALUES.china,
+      );
+    }
+    const strategy = url.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy);
+    if (strategy && SAFE_IDENTIFIER_PATTERN.test(strategy)) {
+      params.set(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy, strategy);
+    }
+    const count = positiveInteger(
+      url.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count),
+      100,
+    );
+    if (count) params.set(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count, count);
     return {
       key: 'research-discover',
       href: `${APP_ROUTE_PATHS.researchDiscover}${params.size ? `?${params}` : ''}`,
@@ -165,19 +187,24 @@ function sanitizeStandaloneRoute(url: URL): SanitizedRoute | null {
     url.pathname === APP_ROUTE_PATHS.researchBacktest
     || url.pathname === LEGACY_ROUTE_PATHS.backtest
   ) {
-    const code = url.searchParams.get('code');
+    const code = url.searchParams.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code);
     const normalizedCode = code ? normalizeSafeStockCode(code) : null;
-    if (normalizedCode) params.set('code', normalizedCode);
-    const windowDays = positiveInteger(url.searchParams.get('window'), 120);
-    if (windowDays) params.set('window', windowDays);
-    const from = url.searchParams.get('from');
-    const to = url.searchParams.get('to');
-    if (from && isValidIsoDate(from)) params.set('from', from);
-    if (to && isValidIsoDate(to)) params.set('to', to);
-    const phase = url.searchParams.get('phase');
-    if (phase && BACKTEST_PHASES.has(phase)) params.set('phase', phase);
-    const page = positiveInteger(url.searchParams.get('page'));
-    if (page) params.set('page', page);
+    if (normalizedCode) params.set(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code, normalizedCode);
+    const windowDays = positiveInteger(
+      url.searchParams.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.window),
+      120,
+    );
+    if (windowDays) params.set(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.window, windowDays);
+    const from = url.searchParams.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.from);
+    const to = url.searchParams.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.to);
+    if (from && isValidIsoDate(from)) params.set(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.from, from);
+    if (to && isValidIsoDate(to)) params.set(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.to, to);
+    const phase = url.searchParams.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.phase);
+    if (phase && phase !== RESEARCH_BACKTEST_PHASE_VALUES.all && BACKTEST_PHASES.has(phase)) {
+      params.set(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.phase, phase);
+    }
+    const page = positiveInteger(url.searchParams.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.page));
+    if (page) params.set(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.page, page);
     return {
       key: 'research-backtest',
       href: `${APP_ROUTE_PATHS.researchBacktest}${params.size ? `?${params}` : ''}`,
@@ -281,7 +308,9 @@ function stockContextFromRoute(route: SanitizedRoute | null): PersistedStockCont
   const targetContext = stockContextFromTarget(route?.target ?? null);
   if (targetContext) return targetContext;
   if (route?.key !== 'research-backtest') return null;
-  const code = new URL(route.href, 'http://stockpulse.local').searchParams.get('code');
+  const code = new URL(route.href, 'http://stockpulse.local').searchParams.get(
+    RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code,
+  );
   return code ? { stockCode: code } : null;
 }
 
@@ -369,7 +398,7 @@ export function resolveContextAwareNavigationTarget(to: string, currentHref: str
         destinationKey,
         sameStock
           ? new Set()
-          : new Set(['recordId', 'runFlow', 'runFlowRecordId', 'runFlowTaskId']),
+          : new Set(Object.values(REPORT_ROUTE_QUERY_KEYS)),
       );
     }
     case 'chat': {
@@ -401,7 +430,7 @@ export function resolveContextAwareNavigationTarget(to: string, currentHref: str
     }
     case 'research-backtest': {
       const url = new URL(savedHref, 'http://stockpulse.local');
-      url.searchParams.set('code', sourceContext.stockCode);
+      url.searchParams.set(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code, sourceContext.stockCode);
       return `${url.pathname}${url.search}`;
     }
     default:

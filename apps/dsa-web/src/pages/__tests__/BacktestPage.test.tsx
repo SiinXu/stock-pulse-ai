@@ -2,7 +2,11 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { BrowserRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
-import { APP_ROUTE_PATHS } from '../../routing/routes';
+import {
+  APP_ROUTE_PATHS,
+  RESEARCH_BACKTEST_PHASE_VALUES,
+  RESEARCH_BACKTEST_ROUTE_QUERY_KEYS,
+} from '../../routing/routes';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
 import BacktestPage from '../BacktestPage';
 
@@ -515,10 +519,18 @@ describe('BacktestPage', () => {
   });
 
   it('restores applied filters and pagination from the URL', async () => {
+    const search = new URLSearchParams({
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code]: 'aapl',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.window]: '20',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.from]: '2026-03-01',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.to]: '2026-03-31',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.phase]: RESEARCH_BACKTEST_PHASE_VALUES.intraday,
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.page]: '3',
+    });
     window.history.replaceState(
       {},
       '',
-      `${APP_ROUTE_PATHS.researchBacktest}?code=aapl&window=20&from=2026-03-01&to=2026-03-31&phase=intraday&page=3`,
+      `${APP_ROUTE_PATHS.researchBacktest}?${search}`,
     );
     mockGetResults.mockResolvedValueOnce({
       total: 45,

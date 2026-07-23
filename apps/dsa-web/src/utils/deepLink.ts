@@ -1,7 +1,12 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { StockHistoryPeriod } from '../types/stocks';
-import { APP_ROUTE_PATHS, LEGACY_ROUTE_PATHS } from '../routing/routes';
+import {
+  APP_ROUTE_PATHS,
+  HOME_ROUTE_QUERY_KEYS,
+  LEGACY_ROUTE_PATHS,
+  REPORT_ROUTE_QUERY_KEYS,
+} from '../routing/routes';
 import { normalizeStockCode } from './stockCode';
 import { validateStockCode } from './validation';
 
@@ -263,11 +268,13 @@ export function buildDeepLink(target: DeepLinkTarget): string {
 
   switch (target.page) {
     case 'home':
-      setPositiveInteger(params, 'recordId', target.recordId);
-      if (target.stockCode) params.set('stock', requireStockCode(target.stockCode));
+      setPositiveInteger(params, REPORT_ROUTE_QUERY_KEYS.recordId, target.recordId);
+      if (target.stockCode) {
+        params.set(HOME_ROUTE_QUERY_KEYS.stock, requireStockCode(target.stockCode));
+      }
       if (target.workspace && target.workspace !== 'history') {
         if (!HOME_WORKSPACE_VIEWS.has(target.workspace)) throw new TypeError('Unsupported Home workspace');
-        params.set('workspace', target.workspace);
+        params.set(HOME_ROUTE_QUERY_KEYS.workspace, target.workspace);
       }
       break;
     case 'chat': {
@@ -354,17 +361,22 @@ export function parseDeepLink(input: string, origin = DEFAULT_ORIGIN): ParsedDee
   let target: DeepLinkTarget | null = null;
 
   if (url.pathname === APP_ROUTE_PATHS.home) {
-    const recordId = parsePositiveIntegerParam(params, issues, 'recordId', 'invalid_record_id');
-    const stockCode = parseStockParam(params, issues);
-    const rawWorkspace = params.get('workspace');
+    const recordId = parsePositiveIntegerParam(
+      params,
+      issues,
+      REPORT_ROUTE_QUERY_KEYS.recordId,
+      'invalid_record_id',
+    );
+    const stockCode = parseStockParam(params, issues, HOME_ROUTE_QUERY_KEYS.stock);
+    const rawWorkspace = params.get(HOME_ROUTE_QUERY_KEYS.workspace);
     let workspace: HomeWorkspaceView = 'history';
     if (rawWorkspace !== null) {
       if (HOME_WORKSPACE_VIEWS.has(rawWorkspace as HomeWorkspaceView)) {
         workspace = rawWorkspace as HomeWorkspaceView;
-        if (workspace === 'history') params.delete('workspace');
+        if (workspace === 'history') params.delete(HOME_ROUTE_QUERY_KEYS.workspace);
       } else {
-        params.delete('workspace');
-        issues.push({ code: 'invalid_workspace', parameter: 'workspace' });
+        params.delete(HOME_ROUTE_QUERY_KEYS.workspace);
+        issues.push({ code: 'invalid_workspace', parameter: HOME_ROUTE_QUERY_KEYS.workspace });
       }
     }
     target = { page: 'home', recordId, stockCode, workspace };
