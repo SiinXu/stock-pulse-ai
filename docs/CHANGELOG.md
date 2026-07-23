@@ -318,6 +318,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Serialized public plugin lifecycle operations with composition-root close, replacement, and reset so closed roots cannot be republished, callback-owned workers cannot deadlock, and terminal process shutdown cannot recreate the root.
 - [Docs] Moved the design contract into `docs/` and added compact repository maps to all homepage language variants.
 - [Chore] Permanently disabled secret access from pull-request AI review, rejected secret inheritance and tag/default-ref confusion, and hardened install guidance against nested commands, redirection decoys, dynamic paths, launcher/module entry points, Docker exec form, and explicit YAML indentation.
+- [Tests] Fixed the settings help locale contract test to read the per-language help sources introduced by the settings-help split, restoring the backend gate.
 
 ## [3.26.3] - 2026-07-15
 

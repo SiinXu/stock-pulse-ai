@@ -657,7 +657,14 @@ class TestSettingsHelpContract(unittest.TestCase):
     """
 
     _LLM_CHANNEL_HELP_PREFIX = "settings.llm_channel."
-    _SETTINGS_HELP_FILE = Path(__file__).resolve().parents[1] / "apps/dsa-web/src/locales/settingsHelp.ts"
+    _LOCALE_DIR = Path(__file__).resolve().parents[1] / "apps/dsa-web/src/locales"
+    # Help entries were split per language (#477); the aggregator
+    # settingsHelp.ts now only re-exports, so the literal key map lives in the
+    # per-language sources.
+    _SETTINGS_HELP_FILES = (
+        _LOCALE_DIR / "settingsHelp.en.ts",
+        _LOCALE_DIR / "settingsHelp.zh.ts",
+    )
 
     @classmethod
     def _collect_registry_help_keys(cls) -> set[str]:
@@ -671,8 +678,13 @@ class TestSettingsHelpContract(unittest.TestCase):
 
     @classmethod
     def _collect_locale_help_keys(cls) -> set[str]:
-        content = cls._SETTINGS_HELP_FILE.read_text(encoding="utf-8")
-        return set(re.findall(r"^\s*'([^']+)'\s*:\s*\{", content, flags=re.MULTILINE))
+        keys: set[str] = set()
+        for path in cls._SETTINGS_HELP_FILES:
+            content = path.read_text(encoding="utf-8")
+            keys.update(
+                re.findall(r"^\s*'([^']+)'\s*:\s*\{", content, flags=re.MULTILINE)
+            )
+        return keys
 
     def test_registry_help_keys_exist_in_locales(self) -> None:
         locale_keys = self._collect_locale_help_keys()
