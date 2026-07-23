@@ -327,7 +327,9 @@ class AlphaSiftOpportunitiesApiTestCase(_AlphaSiftApiTestCaseBase):
                 "src.services.alphasift_service._call_alphasift_status",
                 return_value={"available": True, "supported_markets": ["cn"], "contract_version": "1", "version": "0.2.0", "strategy_count": 1},
             ),
-            patch("src.services.alphasift_service._resolve_repair_constraint_args", return_value=[]),
+            # Simulate the packaged desktop artifact: no constraints.txt / build-constraints.txt
+            # exists above the runtime file, so the constraint flags are omitted.
+            patch("pathlib.Path.is_file", return_value=False),
             patch("src.services.alphasift_service.subprocess.run", return_value=completed) as run_mock,
             patch("src.services.alphasift_service._get_dsa_adapter", return_value=_make_adapter_module()),
         ):
