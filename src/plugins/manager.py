@@ -252,6 +252,16 @@ class PluginManager:
 
         return self._registry.registrations(extension_point)
 
+    def _shutdown_plugin_ids(self) -> tuple[str, ...]:
+        """Return plugins whose owned lifecycle state still needs shutdown."""
+
+        with self._lock:
+            return tuple(
+                plugin_id
+                for plugin_id, record in self._plugins.items()
+                if record.state in {"enabled", "failed"}
+            )
+
     def load(self, plugin_id: str) -> PluginOperationResult:
         """Perform the first ``registered -> enabled`` transition."""
 

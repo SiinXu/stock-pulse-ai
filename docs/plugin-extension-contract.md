@@ -95,6 +95,10 @@ cannot be rebound to another root. Once that root starts shutdown, manager
 `load`, `load_all`, and `enable` operations fail closed with
 `plugin_owner_closed`; `disable` and `disable_all` remain available for
 idempotent cleanup and cleanup-debt retries.
+Closing a local root also disables plugins activated directly through its
+manager, even when composition startup was never invoked. A close requested by
+a local manager callback or its worker is deferred until that outer operation
+finishes, then the root performs the same state-based cleanup exactly once.
 
 There is currently no default lifecycle-style built-in catalog to fabricate:
 existing Data Provider built-ins remain owned by each `DataFetcherManager`, and

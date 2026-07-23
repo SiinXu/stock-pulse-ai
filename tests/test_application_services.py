@@ -811,6 +811,62 @@ def test_closed_root_manager_rejects_activation_but_allows_disable():
     assert events == ["load:test.closed-owner", "unload:test.closed-owner"]
 
 
+def test_local_root_close_disables_plugin_loaded_directly_through_manager():
+    events: list[str] = []
+    services = ApplicationServices(plugins_dir="")
+    plugin = _RecordingPlugin("test.local-direct", events)
+    assert services.plugin_manager.register(plugin, source="builtin").success
+    assert services.plugin_manager.load("test.local-direct").success
+
+    results = services.close()
+
+    assert [result.success for result in results] == [True]
+    assert services.is_closed is True
+    assert services.plugin_manager.snapshot("test.local-direct").state == "disabled"
+    assert events == ["load:test.local-direct", "unload:test.local-direct"]
+
+
+def test_local_manager_callback_worker_can_defer_root_close_without_deadlock():
+    events: list[str] = []
+    root_holder: list[ApplicationServices] = []
+    worker_returned = threading.Event()
+    workers: list[threading.Thread] = []
+
+    class _WorkerClosingLoadPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("local-load-begin")
+
+            def close_root() -> None:
+                root_holder[0].close()
+                worker_returned.set()
+
+            worker = threading.Thread(target=close_root)
+            workers.append(worker)
+            worker.start()
+            if not worker_returned.wait(timeout=5):
+                raise AssertionError("local manager close worker deadlocked")
+            worker.join(timeout=5)
+            events.append("local-load-end")
+
+    services = ApplicationServices(plugins_dir="")
+    root_holder.append(services)
+    plugin = _WorkerClosingLoadPlugin("test.local-worker-close", events)
+    assert services.plugin_manager.register(plugin, source="builtin").success
+
+    result = services.plugin_manager.load("test.local-worker-close")
+
+    assert result.success is True
+    assert worker_returned.is_set()
+    assert all(not worker.is_alive() for worker in workers)
+    assert services.is_closed is True
+    assert services.plugin_manager.snapshot("test.local-worker-close").state == "disabled"
+    assert events == [
+        "local-load-begin",
+        "local-load-end",
+        "unload:test.local-worker-close",
+    ]
+
+
 def test_get_replaces_a_directly_closed_installed_root():
     services = ApplicationServices(plugins_dir="")
     set_application_services(services)

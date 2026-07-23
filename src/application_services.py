@@ -91,6 +91,7 @@ class ApplicationServices:
         self._plugin_shutdown_results: tuple["PluginOperationResult", ...] = ()
         self._plugin_lifecycle_lock = threading.RLock()
         self._local_lifecycle_ops = 0
+        self._local_close_requested = False
         self._plugins_starting = False
         self._plugins_started = False
         self._plugins_closed = False
@@ -227,6 +228,9 @@ class ApplicationServices:
                 _services_transition_pending.append(None)
                 return self._plugin_shutdown_results
             installed = _services is self
+            if not installed and self._local_lifecycle_ops:
+                self._local_close_requested = True
+                return self._plugin_shutdown_results
 
         if not installed:
             # A root that is not installed must never wait on the transition
@@ -306,9 +310,18 @@ class ApplicationServices:
         try:
             return operation()
         finally:
+            close_after_operation = False
             with _services_lock:
                 self._local_lifecycle_ops -= 1
-                _services_local_ops.notify_all()
+                if not self._local_lifecycle_ops and self._local_close_requested:
+                    self._local_close_requested = False
+                    close_after_operation = True
+                if not close_after_operation:
+                    _services_local_ops.notify_all()
+            if close_after_operation:
+                self._close_plugins()
+                with _services_lock:
+                    _services_local_ops.notify_all()
 
     def _plugin_activation_allowed(self) -> bool:
         """Reject activation after this one-shot root begins shutdown."""
@@ -322,8 +335,12 @@ class ApplicationServices:
             if self._plugins_closed:
                 return self._plugin_shutdown_results
             self._plugins_closed = True
-            if self._plugins_started and not self._plugins_starting:
-                self._plugin_shutdown_results = self._plugin_manager.disable_all()
+            if not self._plugins_starting:
+                shutdown_ids = self._plugin_manager._shutdown_plugin_ids()
+                if shutdown_ids:
+                    self._plugin_shutdown_results = self._plugin_manager.disable_all(
+                        shutdown_ids,
+                    )
             return self._plugin_shutdown_results
 
 
