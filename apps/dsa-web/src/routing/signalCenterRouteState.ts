@@ -1,16 +1,24 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import {
+  LEGACY_ALERTS_VIEW_VALUES,
+  SIGNAL_CENTER_CREATE_RULE_VALUES,
   SIGNAL_CENTER_HISTORY_VALUES,
   SIGNAL_CENTER_ROUTE_QUERY_KEYS,
   SIGNAL_CENTER_SCOPE_VALUES,
   SIGNAL_CENTER_TAB_VALUES,
+  SIGNAL_FEED_ROUTE_QUERY_KEYS,
+  SIGNAL_FEED_VIEW_VALUES,
   type SignalCenterHistoryView,
   type SignalCenterScope,
   type SignalCenterTab,
 } from './routes';
 
-const LEGACY_DECISION_SIGNAL_VIEW_VALUES = new Set(['signals', 'latest', 'timeline']);
+const LEGACY_DECISION_SIGNAL_VIEW_VALUES = new Set<string>([
+  SIGNAL_FEED_VIEW_VALUES.signals,
+  SIGNAL_FEED_VIEW_VALUES.latest,
+  SIGNAL_FEED_VIEW_VALUES.timeline,
+]);
 
 export type SignalCenterRouteState = {
   scope: SignalCenterScope;
@@ -60,7 +68,10 @@ function replaceOwnedParams(
     next.set(SIGNAL_CENTER_ROUTE_QUERY_KEYS.history, state.history);
   }
   if (state.tab === SIGNAL_CENTER_TAB_VALUES.rules && state.createRule) {
-    next.set(SIGNAL_CENTER_ROUTE_QUERY_KEYS.createRule, '1');
+    next.set(
+      SIGNAL_CENTER_ROUTE_QUERY_KEYS.createRule,
+      SIGNAL_CENTER_CREATE_RULE_VALUES.requested,
+    );
   }
   return next;
 }
@@ -82,7 +93,8 @@ export function parseSignalCenterRouteState(
   }
 
   const rawTab = source.get(SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab);
-  const legacyStatsView = source.get('view') === 'stats';
+  const legacyStatsView = source.get(SIGNAL_FEED_ROUTE_QUERY_KEYS.view)
+    === SIGNAL_FEED_VIEW_VALUES.stats;
   const tabs = new Set<SignalCenterTab>(Object.values(SIGNAL_CENTER_TAB_VALUES));
   const tab = tabs.has(rawTab as SignalCenterTab)
     ? rawTab as SignalCenterTab
@@ -103,13 +115,17 @@ export function parseSignalCenterRouteState(
   }
 
   const rawCreateRule = source.get(SIGNAL_CENTER_ROUTE_QUERY_KEYS.createRule);
-  const createRule = tab === SIGNAL_CENTER_TAB_VALUES.rules && rawCreateRule === '1';
-  if (rawCreateRule !== null && rawCreateRule !== '1') {
+  const createRule = tab === SIGNAL_CENTER_TAB_VALUES.rules
+    && rawCreateRule === SIGNAL_CENTER_CREATE_RULE_VALUES.requested;
+  if (
+    rawCreateRule !== null
+    && rawCreateRule !== SIGNAL_CENTER_CREATE_RULE_VALUES.requested
+  ) {
     invalidKeys.push(SIGNAL_CENTER_ROUTE_QUERY_KEYS.createRule);
   }
 
   const state = { scope, tab, history, createRule };
-  if (legacyStatsView) normalizedSource.delete('view');
+  if (legacyStatsView) normalizedSource.delete(SIGNAL_FEED_ROUTE_QUERY_KEYS.view);
   return {
     state,
     normalizedParams: replaceOwnedParams(normalizedSource, state),
@@ -134,13 +150,19 @@ function replaceSearchParams(target: URLSearchParams, source: URLSearchParams): 
 }
 
 export function mapLegacyDecisionSignalsSearchParams(searchParams: URLSearchParams): void {
-  const view = searchParams.get('view');
-  const tab = view === 'stats'
+  const view = searchParams.get(SIGNAL_FEED_ROUTE_QUERY_KEYS.view);
+  const tab = view === SIGNAL_FEED_VIEW_VALUES.stats
     ? SIGNAL_CENTER_TAB_VALUES.review
     : SIGNAL_CENTER_TAB_VALUES.feed;
-  if (view === 'stats') searchParams.delete('view');
-  if (view !== null && view !== 'stats' && !LEGACY_DECISION_SIGNAL_VIEW_VALUES.has(view)) {
-    searchParams.delete('view');
+  if (view === SIGNAL_FEED_VIEW_VALUES.stats) {
+    searchParams.delete(SIGNAL_FEED_ROUTE_QUERY_KEYS.view);
+  }
+  if (
+    view !== null
+    && view !== SIGNAL_FEED_VIEW_VALUES.stats
+    && !LEGACY_DECISION_SIGNAL_VIEW_VALUES.has(view)
+  ) {
+    searchParams.delete(SIGNAL_FEED_ROUTE_QUERY_KEYS.view);
   }
   const normalized = setSignalCenterRouteState(searchParams, {
     ...DEFAULT_SIGNAL_CENTER_ROUTE_STATE,
@@ -151,14 +173,15 @@ export function mapLegacyDecisionSignalsSearchParams(searchParams: URLSearchPara
 }
 
 export function mapLegacyAlertsSearchParams(searchParams: URLSearchParams): void {
-  const legacyView = searchParams.get('view');
-  const history = legacyView === 'notifications'
+  const legacyView = searchParams.get(SIGNAL_FEED_ROUTE_QUERY_KEYS.view);
+  const history = legacyView === LEGACY_ALERTS_VIEW_VALUES.notifications
     ? SIGNAL_CENTER_HISTORY_VALUES.notifications
     : SIGNAL_CENTER_HISTORY_VALUES.triggers;
-  const tab = legacyView === 'history' || legacyView === 'notifications'
+  const tab = legacyView === LEGACY_ALERTS_VIEW_VALUES.history
+    || legacyView === LEGACY_ALERTS_VIEW_VALUES.notifications
     ? SIGNAL_CENTER_TAB_VALUES.history
     : SIGNAL_CENTER_TAB_VALUES.rules;
-  searchParams.delete('view');
+  searchParams.delete(SIGNAL_FEED_ROUTE_QUERY_KEYS.view);
   const normalized = setSignalCenterRouteState(searchParams, {
     ...DEFAULT_SIGNAL_CENTER_ROUTE_STATE,
     scope: normalizeLegacyScope(searchParams),

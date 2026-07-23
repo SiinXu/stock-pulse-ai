@@ -10,6 +10,7 @@ import {
   RESEARCH_BACKTEST_ROUTE_QUERY_KEYS,
   RESEARCH_DISCOVER_ROUTE_QUERY_KEYS,
   SIGNAL_CENTER_ROUTE_QUERY_KEYS,
+  SIGNAL_FEED_ROUTE_QUERY_KEYS,
 } from '../routing/routes';
 import {
   parseResearchBacktestRouteState,
@@ -82,7 +83,7 @@ const ALLOWED_QUERY_KEYS: Record<PersistedRouteKey, readonly string[]> = {
     SIGNAL_CENTER_ROUTE_QUERY_KEYS.history,
     'stock',
     'signal',
-    'view',
+    SIGNAL_FEED_ROUTE_QUERY_KEYS.view,
     'market',
     'listStock',
     'action',

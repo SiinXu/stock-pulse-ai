@@ -17,12 +17,16 @@ import { SCREENING_TEXT } from '../src/locales/screening';
 import { UI_TEXT } from '../src/i18n/uiText';
 import {
   APP_ROUTE_PATHS,
+  LEGACY_ALERTS_VIEW_VALUES,
   LEGACY_ROUTE_PATHS,
   RESEARCH_DISCOVER_DEFAULT_VALUES,
   RESEARCH_DISCOVER_ROUTE_QUERY_KEYS,
   SIGNAL_CENTER_HISTORY_VALUES,
+  SIGNAL_CENTER_ROUTE_QUERY_KEYS,
   SIGNAL_CENTER_SCOPE_VALUES,
   SIGNAL_CENTER_TAB_VALUES,
+  SIGNAL_FEED_ROUTE_QUERY_KEYS,
+  SIGNAL_FEED_VIEW_VALUES,
   SETTINGS_ROUTE_QUERY_KEYS,
   SETTINGS_SECTION_IDS,
   buildSignalCenterHref,
@@ -1429,14 +1433,19 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await mockSignalCenterCollections(page);
     await login(page);
 
-    await page.goto(`${LEGACY_ROUTE_PATHS.alerts}?view=notifications&scope=watchlist&keep=yes#delivery`);
+    const legacyAlertsSearch = new URLSearchParams({
+      [SIGNAL_FEED_ROUTE_QUERY_KEYS.view]: LEGACY_ALERTS_VIEW_VALUES.notifications,
+      [SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope]: SIGNAL_CENTER_SCOPE_VALUES.watchlist,
+      keep: 'yes',
+    });
+    await page.goto(`${LEGACY_ROUTE_PATHS.alerts}?${legacyAlertsSearch}#delivery`);
     await expect.poll(() => {
       const url = new URL(page.url());
       return {
         pathname: url.pathname,
-        scope: url.searchParams.get('scope'),
-        tab: url.searchParams.get('tab'),
-        history: url.searchParams.get('history'),
+        scope: url.searchParams.get(SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope),
+        tab: url.searchParams.get(SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab),
+        history: url.searchParams.get(SIGNAL_CENTER_ROUTE_QUERY_KEYS.history),
         keep: url.searchParams.get('keep'),
         hash: url.hash,
       };
@@ -1451,14 +1460,19 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page.getByRole('tab', { name: '通知尝试记录', exact: true }))
       .toHaveAttribute('aria-selected', 'true');
 
-    await page.goto(`${LEGACY_ROUTE_PATHS.decisionSignals}?view=stats&scope=holdings&keep=yes`);
+    const legacyDecisionSignalsSearch = new URLSearchParams({
+      [SIGNAL_FEED_ROUTE_QUERY_KEYS.view]: SIGNAL_FEED_VIEW_VALUES.stats,
+      [SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope]: SIGNAL_CENTER_SCOPE_VALUES.holdings,
+      keep: 'yes',
+    });
+    await page.goto(`${LEGACY_ROUTE_PATHS.decisionSignals}?${legacyDecisionSignalsSearch}`);
     await expect.poll(() => {
       const url = new URL(page.url());
       return {
         pathname: url.pathname,
-        scope: url.searchParams.get('scope'),
-        tab: url.searchParams.get('tab'),
-        view: url.searchParams.get('view'),
+        scope: url.searchParams.get(SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope),
+        tab: url.searchParams.get(SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab),
+        view: url.searchParams.get(SIGNAL_FEED_ROUTE_QUERY_KEYS.view),
         keep: url.searchParams.get('keep'),
       };
     }).toEqual({

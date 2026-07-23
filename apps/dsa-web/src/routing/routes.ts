@@ -32,6 +32,27 @@ export const SIGNAL_CENTER_ROUTE_QUERY_KEYS = {
   stock: 'stock',
 } as const;
 
+export const SIGNAL_CENTER_CREATE_RULE_VALUES = {
+  requested: '1',
+} as const;
+
+export const SIGNAL_FEED_ROUTE_QUERY_KEYS = {
+  view: 'view',
+} as const;
+
+export const SIGNAL_FEED_VIEW_VALUES = {
+  signals: 'signals',
+  latest: 'latest',
+  timeline: 'timeline',
+  stats: 'stats',
+} as const;
+
+export const LEGACY_ALERTS_VIEW_VALUES = {
+  rules: 'rules',
+  history: 'history',
+  notifications: 'notifications',
+} as const;
+
 export const SIGNAL_CENTER_SCOPE_VALUES = {
   all: 'all',
   holdings: 'holdings',
@@ -86,7 +107,10 @@ export function buildSignalCenterHref(options: SignalCenterHrefOptions = {}): st
     searchParams.set(SIGNAL_CENTER_ROUTE_QUERY_KEYS.history, options.history);
   }
   if (options.createRule) {
-    searchParams.set(SIGNAL_CENTER_ROUTE_QUERY_KEYS.createRule, '1');
+    searchParams.set(
+      SIGNAL_CENTER_ROUTE_QUERY_KEYS.createRule,
+      SIGNAL_CENTER_CREATE_RULE_VALUES.requested,
+    );
   }
   if (options.stock?.trim()) {
     searchParams.set(SIGNAL_CENTER_ROUTE_QUERY_KEYS.stock, options.stock.trim());

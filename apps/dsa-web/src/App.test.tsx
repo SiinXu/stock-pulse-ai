@@ -5,6 +5,7 @@ import App from './App';
 import * as AuthContext from './contexts/AuthContext';
 import {
   APP_ROUTE_PATHS,
+  LEGACY_ALERTS_VIEW_VALUES,
   LEGACY_ROUTE_PATHS,
   RESEARCH_DISCOVER_DEFAULT_VALUES,
   RESEARCH_DISCOVER_ROUTE_QUERY_KEYS,
@@ -14,6 +15,8 @@ import {
   SIGNAL_CENTER_ROUTE_QUERY_KEYS,
   SIGNAL_CENTER_SCOPE_VALUES,
   SIGNAL_CENTER_TAB_VALUES,
+  SIGNAL_FEED_ROUTE_QUERY_KEYS,
+  SIGNAL_FEED_VIEW_VALUES,
 } from './routing/routes';
 import { recordSessionLocation } from './utils/sessionContinuity';
 import { UI_LANGUAGE_STORAGE_KEY } from './utils/uiLanguage';
@@ -297,7 +300,7 @@ describe('App routing behavior', () => {
 
   it('redirects legacy Decision Signals state into the Signal Center review tab', async () => {
     const legacySearch = new URLSearchParams({
-      view: 'stats',
+      [SIGNAL_FEED_ROUTE_QUERY_KEYS.view]: SIGNAL_FEED_VIEW_VALUES.stats,
       [SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope]: SIGNAL_CENTER_SCOPE_VALUES.holdings,
       keep: 'yes',
     });
@@ -322,7 +325,7 @@ describe('App routing behavior', () => {
 
   it('redirects legacy alert notification history into the Signal Center history tab', async () => {
     const legacySearch = new URLSearchParams({
-      view: 'notifications',
+      [SIGNAL_FEED_ROUTE_QUERY_KEYS.view]: LEGACY_ALERTS_VIEW_VALUES.notifications,
       [SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope]: SIGNAL_CENTER_SCOPE_VALUES.watchlist,
     });
     window.history.pushState(

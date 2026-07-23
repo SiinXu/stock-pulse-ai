@@ -2312,12 +2312,16 @@ describe('DecisionSignalsPage', () => {
 
     expect(screen.getByRole('tabpanel', { name: '股票信号时间线' })).toBeVisible();
     openSignalsView('信号表现统计');
-    await waitFor(() => expect(new URLSearchParams(window.location.search).get('tab')).toBe('review'));
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get(
+      SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab,
+    )).toBe(SIGNAL_CENTER_TAB_VALUES.review));
     expect(new URLSearchParams(window.location.search).get('view')).toBe('timeline');
     expect(screen.getByRole('tabpanel', { name: '信号表现统计' })).toBeVisible();
 
     act(() => window.history.back());
-    await waitFor(() => expect(new URLSearchParams(window.location.search).get('tab')).toBeNull());
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get(
+      SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab,
+    )).toBeNull());
     expect(new URLSearchParams(window.location.search).get('view')).toBe('timeline');
     await waitFor(() => expect(
       screen.getByRole('tabpanel', { name: '股票信号时间线' }),
