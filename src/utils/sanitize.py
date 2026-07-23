@@ -575,16 +575,26 @@ def _classify_text_field_match(
 
 
 def _contains_prose_join_whitespace(text: str) -> bool:
-    """Return True when the compound key text contains a bare ASCII space or tab."""
+    """Return True when the compound key spans bare ASCII whitespace.
 
-    return any(
-        char.isascii() and char.isspace() and char not in "\r\n"
-        for char in text
-    )
+    ASCII whitespace here means space, tab, vertical tab, and form feed. CR
+    and LF are already excluded upstream by ``_is_text_field_key_joiner``
+    because they mark record boundaries; the character-class check below
+    stays whitespace-based so future joiner tweaks cannot silently widen
+    this classification.
+    """
+
+    return any(char in " \t\v\f" for char in text)
 
 
 def _matches_multi_word_sensitive_phrase(candidate: str) -> bool:
-    """Match canonical multi-word sensitive phrases without loose single-word fallback."""
+    """Match canonical multi-word sensitive phrases without loose single-word fallback.
+
+    Intentionally omits the ``_SENSITIVE_COMPACT_KEY_PATTERN`` substring
+    check from ``_has_sensitive_phrase``: that path matches any single
+    sensitive word (``webhook``, ``token``, ...) and is the exact source of
+    the prose false positive this helper guards against.
+    """
 
     parts = _mapping_key_parts(candidate)
     if not parts:
