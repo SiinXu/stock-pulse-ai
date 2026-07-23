@@ -221,6 +221,21 @@ class DecisionSignalFeedbackItem(BaseModel):
     updated_at: Optional[str] = None
 
 
+class DecisionSignalMemoryFlagRequest(BaseModel):
+    """Curate a signal for decision memory; omitted fields keep their value."""
+
+    memorable: Optional[bool] = None
+    ignored: Optional[bool] = None
+
+
+class DecisionSignalMemoryFlagItem(BaseModel):
+    signal_id: int
+    memorable: bool = False
+    ignored: bool = False
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
 class DecisionSignalPresentation(BaseModel):
     """Renderer-ready fields whose action mirrors the top-level signal action."""
 

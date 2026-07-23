@@ -104,11 +104,13 @@ class DecisionMemoryService:
         signal_repo: Any = None,
         outcome_repo: Any = None,
         outcome_service: Any = None,
+        flag_repo: Any = None,
     ):
         # Lazy defaults keep import cost off the analyzer/prompt import path.
         self._signal_repo = signal_repo
         self._outcome_repo = outcome_repo
         self._outcome_service = outcome_service
+        self._flag_repo = flag_repo
 
     # ---- dependency accessors (lazily constructed) ----
 
@@ -139,6 +141,74 @@ class DecisionMemoryService:
 
             self._outcome_service = DecisionSignalOutcomeService()
         return self._outcome_service
+
+    @property
+    def flag_repo(self) -> Any:
+        if self._flag_repo is None:
+            from src.repositories.decision_signal_memory_flag_repo import (
+                DecisionSignalMemoryFlagRepository,
+            )
+
+            self._flag_repo = DecisionSignalMemoryFlagRepository()
+        return self._flag_repo
+
+    # ---- signal memory curation flags (memorable / ignored) ----
+
+    def get_flag(self, signal_id: int) -> Dict[str, Any]:
+        """Return the curation flags for a signal (defaults when unset)."""
+        signal_id_norm = self._require_signal_id(signal_id)
+        row = self.flag_repo.get(signal_id=signal_id_norm)
+        return self._serialize_flag(signal_id_norm, row)
+
+    def set_flag(
+        self,
+        signal_id: int,
+        *,
+        memorable: Optional[bool] = None,
+        ignored: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        """Upsert the curation flags for a signal.
+
+        Only the provided fields change; omitted fields keep their stored value
+        (or default False when no row exists yet).
+        """
+        signal_id_norm = self._require_signal_id(signal_id)
+        existing = self.flag_repo.get(signal_id=signal_id_norm)
+        current_memorable = bool(getattr(existing, "memorable", False))
+        current_ignored = bool(getattr(existing, "ignored", False))
+        row = self.flag_repo.upsert(
+            {
+                "signal_id": signal_id_norm,
+                "memorable": current_memorable if memorable is None else bool(memorable),
+                "ignored": current_ignored if ignored is None else bool(ignored),
+            }
+        )
+        return self._serialize_flag(signal_id_norm, row)
+
+    def _require_signal_id(self, signal_id: int) -> int:
+        from src.services.decision_signal_service import DecisionSignalNotFoundError
+
+        try:
+            signal_id_int = int(signal_id)
+        except (TypeError, ValueError):
+            raise DecisionSignalNotFoundError(f"Decision signal not found: {signal_id}")
+        if signal_id_int <= 0:
+            raise DecisionSignalNotFoundError(f"Decision signal not found: {signal_id}")
+        if self.signal_repo.get(signal_id_int) is None:
+            raise DecisionSignalNotFoundError(f"Decision signal not found: {signal_id_int}")
+        return signal_id_int
+
+    @staticmethod
+    def _serialize_flag(signal_id: int, row: Any) -> Dict[str, Any]:
+        created_at = getattr(row, "created_at", None)
+        updated_at = getattr(row, "updated_at", None)
+        return {
+            "signal_id": signal_id,
+            "memorable": bool(getattr(row, "memorable", False)),
+            "ignored": bool(getattr(row, "ignored", False)),
+            "created_at": created_at.isoformat() if created_at is not None else None,
+            "updated_at": updated_at.isoformat() if updated_at is not None else None,
+        }
 
     # ---- core ----
 
@@ -190,8 +260,18 @@ class DecisionMemoryService:
             return None
 
         signal_by_id = {int(s.id): s for s in signals}
+
+        # User curation: ignored signals are excluded from memory entirely;
+        # memorable signals are highlighted and preferred in the recall list.
+        flags = self.flag_repo.list_for_signals(signal_ids=list(signal_by_id.keys()))
+        ignored_ids = {int(f.signal_id) for f in flags if getattr(f, "ignored", False)}
+        memorable_ids = {int(f.signal_id) for f in flags if getattr(f, "memorable", False)}
+        eligible_ids = [sid for sid in signal_by_id if sid not in ignored_ids]
+        if not eligible_ids:
+            return None
+
         outcome_rows = self.outcome_repo.list_outcomes_for_signals(
-            signal_ids=list(signal_by_id.keys()),
+            signal_ids=eligible_ids,
             engine_version=DECISION_SIGNAL_OUTCOME_ENGINE_VERSION,
         )
         decided_rows = [
@@ -217,7 +297,7 @@ class DecisionMemoryService:
         )
 
         window_start, window_end = self._window_bounds(decided_rows, signal_by_id)
-        recent_calls = self._recent_calls(decided_rows, signal_by_id)
+        recent_calls = self._recent_calls(decided_rows, signal_by_id, memorable_ids)
         actions_present = {call.action for call in recent_calls}
         pattern = self._pattern_calibration(actions_present, min_samples)
 
@@ -271,13 +351,16 @@ class DecisionMemoryService:
         self,
         decided_rows: Sequence[Any],
         signal_by_id: Dict[int, Any],
+        memorable_ids: Optional[set] = None,
     ) -> Tuple[PastSignalRecall, ...]:
-        """One representative decided outcome per signal, newest first.
+        """One representative decided outcome per signal.
 
         When a signal has outcomes across multiple horizons, keep the longest
         evaluated window so the recall reflects the most complete forward view.
+        Memorable-flagged calls are ordered first, then most recent first.
         """
 
+        memorable = memorable_ids or set()
         horizon_rank = {"1d": 1, "3d": 3, "5d": 5, "10d": 10}
         best_by_signal: Dict[int, Any] = {}
         for row in decided_rows:
@@ -304,10 +387,10 @@ class DecisionMemoryService:
                     horizon=getattr(row, "horizon", None),
                     outcome=str(getattr(row, "outcome", "") or ""),
                     stock_return_pct=getattr(row, "stock_return_pct", None),
-                    memorable=bool(getattr(signal, "memorable", False)),
+                    memorable=sid in memorable,
                 )
             )
-        calls.sort(key=lambda c: c.created_at, reverse=True)
+        calls.sort(key=lambda c: (not c.memorable, -c.created_at.timestamp()))
         return tuple(calls)
 
     def _pattern_calibration(
