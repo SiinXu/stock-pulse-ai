@@ -7,6 +7,11 @@ import { createApiError, createParsedApiError } from '../../api/error';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import type { DecisionSignalItem } from '../../types/decisionSignals';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
+import {
+  SIGNAL_CENTER_SCOPE_VALUES,
+  SIGNAL_CENTER_TAB_VALUES,
+  buildSignalCenterHref,
+} from '../../routing/routes';
 import PortfolioPage from '../PortfolioPage';
 
 // jsdom does not implement scrollIntoView, while Select calls it to keep the active item visible when opening a dropdown.
@@ -391,6 +396,9 @@ describe('PortfolioPage FX refresh', () => {
     const page = heading.closest('[data-pattern="app-page"]');
     expect(page).toHaveClass('portfolio-page');
     expect(heading.closest('[data-pattern="page-header"]')).not.toBeNull();
+    const portfolioIdentity = page!.querySelector('[data-portfolio-switcher="single"]');
+    expect(portfolioIdentity).toHaveTextContent('组合');
+    expect(portfolioIdentity?.closest('button, [role="button"], select')).toBeNull();
 
     const overview = Array.from(page!.querySelectorAll('section')).find((section) => (
       section.className.includes('xl:grid-cols-3')
@@ -690,6 +698,10 @@ describe('PortfolioPage FX refresh', () => {
     await waitForInitialLoad();
 
     expect(screen.getByText('信号风险暂不可用')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '查看全部' })).toHaveAttribute(
+      'href',
+      buildSignalCenterHref({ scope: SIGNAL_CENTER_SCOPE_VALUES.holdings }),
+    );
   });
 
   it('refreshes FX for a single selected account and only reloads snapshot/risk', async () => {
@@ -1041,6 +1053,19 @@ describe('PortfolioPage FX refresh', () => {
 
     expect(await screen.findAllByText('A 股风险')).toHaveLength(2);
     expect(screen.getByText('港股风险')).toBeInTheDocument();
+    const firstAshareRow = screen.getAllByText('600519')[0].closest('tr');
+    expect(firstAshareRow).not.toBeNull();
+    expect(within(firstAshareRow as HTMLTableRowElement).getByRole('link', {
+      name: '从此信号创建规则',
+    })).toHaveAttribute('href', buildSignalCenterHref({
+      tab: SIGNAL_CENTER_TAB_VALUES.rules,
+      createRule: true,
+      stock: '600519',
+    }));
+    expect(screen.getByRole('link', { name: '查看全部' })).toHaveAttribute(
+      'href',
+      buildSignalCenterHref({ scope: SIGNAL_CENTER_SCOPE_VALUES.holdings }),
+    );
     const latestLookupSymbols = getLatestDecisionSignals.mock.calls.map(([stockCode]) => String(stockCode));
     expect(latestLookupSymbols.filter((stockCode) => stockCode.includes('600519'))).toEqual(['600519']);
     expect(getLatestDecisionSignals).toHaveBeenCalledTimes(3);

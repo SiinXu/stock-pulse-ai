@@ -5,11 +5,19 @@ import App from './App';
 import * as AuthContext from './contexts/AuthContext';
 import {
   APP_ROUTE_PATHS,
+  LEGACY_ALERTS_VIEW_VALUES,
   LEGACY_ROUTE_PATHS,
   RESEARCH_DISCOVER_DEFAULT_VALUES,
   RESEARCH_DISCOVER_ROUTE_QUERY_KEYS,
   SETTINGS_ROUTE_QUERY_KEYS,
   SETTINGS_SECTION_IDS,
+  SIGNAL_CENTER_HISTORY_VALUES,
+  SIGNAL_CENTER_ROUTE_QUERY_KEYS,
+  SIGNAL_CENTER_SCOPE_VALUES,
+  SIGNAL_CENTER_TAB_VALUES,
+  SIGNAL_FEED_ROUTE_QUERY_KEYS,
+  SIGNAL_FEED_VIEW_VALUES,
+  buildSignalCenterHref,
 } from './routing/routes';
 import { recordSessionLocation } from './utils/sessionContinuity';
 import { UI_LANGUAGE_STORAGE_KEY } from './utils/uiLanguage';
@@ -67,10 +75,6 @@ vi.mock('./pages/DecisionSignalsPage', () => ({
 
 vi.mock('./pages/BacktestPage', () => ({
   default: () => <div data-testid="backtest-page">Backtest</div>,
-}));
-
-vi.mock('./pages/AlertsPage', () => ({
-  default: () => <div data-testid="alerts-page">Alerts</div>,
 }));
 
 vi.mock('./pages/SettingsPage', () => ({
@@ -161,6 +165,28 @@ describe('App routing behavior', () => {
 
     expect(await screen.findByTestId('login-page')).toBeInTheDocument();
     expect(new URLSearchParams(window.location.search).get('redirect')).toBe(discoverHref);
+  });
+
+  it('preserves explicit Signal Center defaults in an authentication redirect', async () => {
+    vi.mocked(AuthContext.useAuth).mockReturnValue(makeAuthState({
+      authEnabled: true,
+      loggedIn: false,
+      setupState: 'enabled',
+    }));
+    recordSessionLocation(buildSignalCenterHref({
+      scope: SIGNAL_CENTER_SCOPE_VALUES.watchlist,
+      tab: SIGNAL_CENTER_TAB_VALUES.rules,
+    }));
+    const explicitDefaults = buildSignalCenterHref({
+      scope: SIGNAL_CENTER_SCOPE_VALUES.all,
+      tab: SIGNAL_CENTER_TAB_VALUES.feed,
+    });
+    window.history.pushState({}, '', explicitDefaults);
+
+    render(<App />);
+
+    expect(await screen.findByTestId('login-page')).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get('redirect')).toBe(explicitDefaults);
   });
 
   it('redirects an explicit logout to plain login without retaining workflow identity', async () => {
@@ -285,14 +311,61 @@ describe('App routing behavior', () => {
     await waitFor(() => expect(setCurrentRoute).toHaveBeenLastCalledWith(canonicalPath));
   });
 
-  it('routes /decision-signals to the AI signals page after auth is ready', async () => {
-    window.history.pushState({}, '', '/decision-signals');
+  it('routes /signals to the Signal Center page after auth is ready', async () => {
+    window.history.pushState({}, '', APP_ROUTE_PATHS.signals);
 
     render(<App />);
 
     expect(await screen.findByTestId('decision-signals-page')).toBeInTheDocument();
-    expect(setCurrentRoute).toHaveBeenCalledWith('/decision-signals');
+    expect(setCurrentRoute).toHaveBeenCalledWith(APP_ROUTE_PATHS.signals);
     expect(screen.queryByTestId('home-page')).not.toBeInTheDocument();
+  });
+
+  it('redirects legacy Decision Signals state into the Signal Center review tab', async () => {
+    const legacySearch = new URLSearchParams({
+      [SIGNAL_FEED_ROUTE_QUERY_KEYS.view]: SIGNAL_FEED_VIEW_VALUES.stats,
+      [SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope]: SIGNAL_CENTER_SCOPE_VALUES.holdings,
+      keep: 'yes',
+    });
+    window.history.pushState(
+      {},
+      '',
+      `${LEGACY_ROUTE_PATHS.decisionSignals}?${legacySearch}#review`,
+    );
+
+    render(<App />);
+
+    expect(await screen.findByTestId('decision-signals-page')).toBeInTheDocument();
+    expect(window.location.pathname).toBe(APP_ROUTE_PATHS.signals);
+    expect(window.location.search).toBe(`?${new URLSearchParams({
+      keep: 'yes',
+      [SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope]: SIGNAL_CENTER_SCOPE_VALUES.holdings,
+      [SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab]: SIGNAL_CENTER_TAB_VALUES.review,
+    })}`);
+    expect(window.location.hash).toBe('#review');
+    await waitFor(() => expect(setCurrentRoute).toHaveBeenLastCalledWith(APP_ROUTE_PATHS.signals));
+  });
+
+  it('redirects legacy alert notification history into the Signal Center history tab', async () => {
+    const legacySearch = new URLSearchParams({
+      [SIGNAL_FEED_ROUTE_QUERY_KEYS.view]: LEGACY_ALERTS_VIEW_VALUES.notifications,
+      [SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope]: SIGNAL_CENTER_SCOPE_VALUES.watchlist,
+    });
+    window.history.pushState(
+      {},
+      '',
+      `${LEGACY_ROUTE_PATHS.alerts}?${legacySearch}`,
+    );
+
+    render(<App />);
+
+    expect(await screen.findByTestId('decision-signals-page')).toBeInTheDocument();
+    expect(window.location.pathname).toBe(APP_ROUTE_PATHS.signals);
+    expect(window.location.search).toBe(`?${new URLSearchParams({
+      [SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope]: SIGNAL_CENTER_SCOPE_VALUES.watchlist,
+      [SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab]: SIGNAL_CENTER_TAB_VALUES.history,
+      [SIGNAL_CENTER_ROUTE_QUERY_KEYS.history]: SIGNAL_CENTER_HISTORY_VALUES.notifications,
+    })}`);
   });
 
   it('redirects authenticated login visits back to the home page', async () => {
@@ -323,6 +396,32 @@ describe('App routing behavior', () => {
     expect(window.location.pathname).toBe(APP_ROUTE_PATHS.settings);
     expect(window.location.search).toBe('?section=ai_models');
     expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
+  });
+
+  it('keeps explicit Signal Center defaults after login instead of restoring stale session state', async () => {
+    vi.mocked(AuthContext.useAuth).mockReturnValue(makeAuthState({
+      authEnabled: true,
+      loggedIn: true,
+      setupState: 'enabled',
+    }));
+    recordSessionLocation(buildSignalCenterHref({
+      scope: SIGNAL_CENTER_SCOPE_VALUES.watchlist,
+      tab: SIGNAL_CENTER_TAB_VALUES.rules,
+    }));
+    const explicitDefaults = buildSignalCenterHref({
+      scope: SIGNAL_CENTER_SCOPE_VALUES.all,
+      tab: SIGNAL_CENTER_TAB_VALUES.feed,
+    });
+    window.history.pushState(
+      {},
+      '',
+      `${APP_ROUTE_PATHS.login}?${new URLSearchParams({ redirect: explicitDefaults })}`,
+    );
+
+    render(<App />);
+
+    expect(await screen.findByTestId('decision-signals-page')).toBeInTheDocument();
+    expect(`${window.location.pathname}${window.location.search}`).toBe(explicitDefaults);
   });
 
   it.each([

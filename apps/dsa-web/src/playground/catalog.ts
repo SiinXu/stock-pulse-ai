@@ -119,6 +119,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('alerts', 'alert-rule-form', 'AlertRuleForm', 'components/alerts/AlertRuleForm.tsx', ['interactive', 'states']),
   entry('alerts', 'alert-rule-list', 'AlertRuleList', 'components/alerts/AlertRuleList.tsx', ['default', 'loading', 'empty']),
   entry('alerts', 'alert-trigger-history', 'AlertTriggerHistory', 'components/alerts/AlertTriggerHistory.tsx', ['default', 'loading', 'empty']),
+  entry('alerts', 'alerts-workspace', 'AlertsWorkspace', 'components/alerts/AlertsWorkspace.tsx', ['default'], 'full'),
 
   entry('history', 'history-list', 'HistoryList', 'components/history/HistoryList.tsx', ['default', 'loading', 'empty']),
   entry('history', 'history-list-item', 'HistoryListItem', 'components/history/HistoryListItem.tsx', ['default', 'states']),

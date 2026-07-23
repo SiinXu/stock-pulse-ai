@@ -3,6 +3,7 @@ import AxiosMockAdapter from 'axios-mock-adapter';
 import apiClient from '../api';
 import {
   FIXTURE_TIMESTAMP,
+  fixtureAlertNotifications,
   fixtureAlertRules,
   fixtureAlertTriggers,
   fixtureConnectionFields,
@@ -715,6 +716,12 @@ export function installPlaygroundApiMock(
   mock.onGet('/api/v1/alerts/triggers').reply(() => responseFor(profile, {
     items: fixtureAlertTriggers,
     total: fixtureAlertTriggers.length,
+    page: 1,
+    pageSize: 20,
+  }, { items: [], total: 0, page: 1, pageSize: 20 }));
+  mock.onGet('/api/v1/alerts/notifications').reply(() => responseFor(profile, {
+    items: fixtureAlertNotifications,
+    total: fixtureAlertNotifications.length,
     page: 1,
     pageSize: 20,
   }, { items: [], total: 0, page: 1, pageSize: 20 }));

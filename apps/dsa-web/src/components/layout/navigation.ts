@@ -3,7 +3,6 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Activity,
   BarChart3,
-  Bell,
   BriefcaseBusiness,
   Home,
   MessageSquareQuote,
@@ -49,8 +48,7 @@ export const APPLICATION_NAVIGATION_ITEMS: readonly ApplicationNavigationItem[] 
     icon: Home,
     exact: true,
     children: [
-      { key: 'decision-signals', labelKey: 'layout.nav.decisionSignals', to: APP_ROUTE_PATHS.decisionSignals, icon: Activity },
-      { key: 'alerts', labelKey: 'layout.nav.alerts', to: APP_ROUTE_PATHS.alerts, icon: Bell },
+      { key: 'signals', labelKey: 'layout.nav.decisionSignals', to: APP_ROUTE_PATHS.signals, icon: Activity },
     ],
   },
   {

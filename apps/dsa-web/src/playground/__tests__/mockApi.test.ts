@@ -30,6 +30,7 @@ describe('playground API sandbox', () => {
     const research = await agentApi.research({ question: 'Fixture question' });
     const intelligence = await intelligenceApi.listSources();
     const outcomeRun = await decisionSignalsApi.runOutcomes({ status: 'active', force: false, limit: 100 });
+    const notifications = await alertsApi.listNotifications();
 
     expect(history.items[0]).toMatchObject({ stockCode: '600519', stockName: 'Kweichow Moutai' });
     expect(news.items[0]).toMatchObject({ title: 'Earnings visibility improves' });
@@ -37,6 +38,11 @@ describe('playground API sandbox', () => {
     expect(research).toMatchObject({ success: true, token_usage: 128 });
     expect(intelligence.items[0]).toMatchObject({ name: 'Market fixture feed', sourceType: 'rss' });
     expect(outcomeRun).toMatchObject({ evaluated: 25, created: 15, engineVersion: 'playground-v1' });
+    expect(notifications.items[0]).toMatchObject({
+      channel: 'email',
+      success: true,
+      diagnostics: 'fixture-notification-701',
+    });
   });
 
   it('returns deterministic empty fixtures', async () => {

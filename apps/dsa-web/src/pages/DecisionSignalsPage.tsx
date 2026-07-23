@@ -34,17 +34,19 @@ import {
   PageHeader,
   Pagination,
   ResponsiveFilterPanel,
-  SegmentedControl,
   Select,
   SelectionChip,
   StatCard,
   Surface,
+  TabPanel,
+  Tabs,
   ToastViewport,
 } from '../components/common';
 import {
   DecisionSignalCard,
   DecisionSignalDetails,
 } from '../components/decision-signals/DecisionSignalDisplay';
+import { useRouteFocusTarget } from '../components/routing';
 import { DecisionSignalCreateDrawer } from '../components/decision-signals/DecisionSignalCreateDrawer';
 import { DecisionSignalOutcomeRunPanel } from '../components/decision-signals/DecisionSignalOutcomeRunPanel';
 import {
@@ -52,9 +54,11 @@ import {
   type ManualSignalDraft,
 } from '../components/decision-signals/manualSignalDraft';
 import { DecisionSignalTimeline } from '../components/decision-signals/DecisionSignalTimeline';
+import { AlertsWorkspace, type AlertsView } from '../components/alerts/AlertsWorkspace';
 import { StockAutocomplete } from '../components/StockAutocomplete';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { useStockIndex } from '../hooks/useStockIndex';
+import { useWatchlist } from '../hooks/useWatchlist';
 import type { UiTextKey } from '../i18n/uiText';
 import type { DecisionAction, MarketPhaseValue, StockBarItem } from '../types/analysis';
 import type {
@@ -62,6 +66,7 @@ import type {
   DecisionSignalFeedbackItem,
   DecisionSignalFeedbackValue,
   DecisionSignalListParams,
+  DecisionSignalListResponse,
   DecisionSignalMarket,
   DecisionSignalMutationResponse,
   DecisionSignalOutcomeItem,
@@ -86,11 +91,33 @@ import { getDecisionSignalPresentation } from '../utils/decisionSignalPresentati
 import { parseDeepLink, type DecisionSignalsView } from '../utils/deepLink';
 import { buildHomeHistoryRunFlowHref } from '../utils/homeUrlState';
 import { areStockCodesEquivalent } from '../utils/stockCode';
+import {
+  APP_ROUTE_PATHS,
+  SIGNAL_CENTER_HISTORY_VALUES,
+  SIGNAL_CENTER_ROUTE_QUERY_KEYS,
+  SIGNAL_CENTER_SCOPE_VALUES,
+  SIGNAL_CENTER_TAB_VALUES,
+  SIGNAL_FEED_VIEW_VALUES,
+  type SignalCenterScope,
+  type SignalCenterTab,
+} from '../routing/routes';
+import {
+  parseSignalCenterRouteState,
+  setSignalCenterRouteState,
+} from '../routing/signalCenterRouteState';
 
 const PAGE_SIZE = 20;
 const TIMELINE_PAGE_SIZE = 100;
+const WATCHLIST_SIGNAL_LOOKUP_CONCURRENCY = 6;
 const STOCK_CANDIDATE_LIMIT = 8;
 const DAY_MS = 86400_000;
+const SIGNAL_CENTER_TABS_ID = 'signal-center-tabs';
+const SIGNAL_FEED_TABS_ID = 'signal-center-feed-tabs';
+
+type RequestSlotQueue = {
+  active: number;
+  waiters: Array<() => void>;
+};
 
 type ListFilters = {
   market: '' | DecisionSignalMarket;
@@ -294,18 +321,23 @@ function getTimelineSearchValues(filters: TimelineFilters): DecisionSignalSearch
   };
 }
 
-// Reflect the current-stock scope in the URL (without a new history entry) so
-// the page can be shared/refreshed and restore the same stock.
+// Reflect current-stock selection in URL history so shared links, refresh, and
+// browser navigation restore the same context.
 function getStockSearchValues(code: string | null): DecisionSignalSearchValues {
   return { stock: code };
 }
 
-function toListParams(filters: ListFilters, page: number): DecisionSignalListParams {
+function toListParams(
+  filters: ListFilters,
+  page: number,
+  scope: SignalCenterScope = SIGNAL_CENTER_SCOPE_VALUES.all,
+): DecisionSignalListParams {
   const sourceReportId = parseSourceReportId(filters.sourceReportId);
   if (sourceReportId !== undefined) {
     return {
       sourceReportId,
       sourceType: 'analysis',
+      holdingOnly: scope === SIGNAL_CENTER_SCOPE_VALUES.holdings || undefined,
       page,
       pageSize: PAGE_SIZE,
     };
@@ -318,6 +350,31 @@ function toListParams(filters: ListFilters, page: number): DecisionSignalListPar
     marketPhase: filters.marketPhase || undefined,
     sourceType: filters.sourceType || undefined,
     status: filters.status || undefined,
+    holdingOnly: scope === SIGNAL_CENTER_SCOPE_VALUES.holdings || undefined,
+    page,
+    pageSize: PAGE_SIZE,
+  };
+}
+
+function mergeWatchlistSignalResponses(
+  responses: Array<{ stockCode: string; response: DecisionSignalListResponse }>,
+  page: number,
+): DecisionSignalListResponse {
+  const byId = new Map<number, DecisionSignalItem>();
+  const totalByStock = new Map<string, number>();
+  responses.forEach(({ stockCode, response }) => {
+    response.items.forEach((item) => byId.set(item.id, item));
+    totalByStock.set(stockCode, Math.max(totalByStock.get(stockCode) ?? 0, response.total));
+  });
+  const merged = [...byId.values()].sort((left, right) => {
+    const leftTime = parseDecisionSignalDate(getDecisionSignalPresentation(left).timestamp)?.getTime() ?? 0;
+    const rightTime = parseDecisionSignalDate(getDecisionSignalPresentation(right).timestamp)?.getTime() ?? 0;
+    return rightTime - leftTime;
+  });
+  const start = (page - 1) * PAGE_SIZE;
+  return {
+    items: merged.slice(start, start + PAGE_SIZE),
+    total: Math.max(merged.length, [...totalByStock.values()].reduce((sum, total) => sum + total, 0)),
     page,
     pageSize: PAGE_SIZE,
   };
@@ -500,11 +557,99 @@ function formatStatPercent(value: number | null | undefined): string {
   return formatted === '-' ? formatted : `${formatted}%`;
 }
 
+async function runWithRequestSlot<T>(
+  queue: RequestSlotQueue,
+  limit: number,
+  operation: () => Promise<T>,
+): Promise<T> {
+  await new Promise<void>((resolve) => {
+    const start = () => {
+      queue.active += 1;
+      resolve();
+    };
+    if (queue.active < limit) start();
+    else queue.waiters.push(start);
+  });
+  try {
+    return await operation();
+  } finally {
+    queue.active -= 1;
+    queue.waiters.shift()?.();
+  }
+}
+
 const DecisionSignalsPage: React.FC = () => {
   const navigate = useNavigate();
   const routeLocation = useLocation();
   const navigationType = useNavigationType();
   const { t } = useUiLanguage();
+  const pageHeadingRef = useRef<HTMLHeadingElement>(null);
+  useRouteFocusTarget({
+    routeId: APP_ROUTE_PATHS.signals,
+    headingRef: pageHeadingRef,
+    ready: true,
+  });
+  const parsedSignalCenterRoute = useMemo(
+    () => parseSignalCenterRouteState(routeLocation.search),
+    [routeLocation.search],
+  );
+  const signalCenterState = parsedSignalCenterRoute.state;
+  const signalCenterScope = signalCenterState.scope;
+  const signalCenterTab = signalCenterState.tab;
+  const signalCenterHistory = signalCenterState.history;
+  const ruleStock = new URLSearchParams(routeLocation.search).get(
+    SIGNAL_CENTER_ROUTE_QUERY_KEYS.stock,
+  ) ?? undefined;
+  const updateSignalCenterRoute = useCallback((
+    nextState: typeof signalCenterState,
+    replace = false,
+  ) => {
+    const nextParams = setSignalCenterRouteState(routeLocation.search, nextState);
+    const search = nextParams.toString();
+    navigate({
+      pathname: routeLocation.pathname,
+      search: search ? `?${search}` : '',
+      hash: routeLocation.hash,
+    }, { replace });
+  }, [navigate, routeLocation.hash, routeLocation.pathname, routeLocation.search]);
+  useEffect(() => {
+    const current = new URLSearchParams(routeLocation.search).toString();
+    const normalized = parsedSignalCenterRoute.normalizedParams.toString();
+    if (current === normalized) return;
+    navigate({
+      pathname: routeLocation.pathname,
+      search: normalized ? `?${normalized}` : '',
+      hash: routeLocation.hash,
+    }, { replace: true });
+  }, [navigate, parsedSignalCenterRoute.normalizedParams, routeLocation.hash, routeLocation.pathname, routeLocation.search]);
+  const setSignalCenterTab = useCallback((tab: SignalCenterTab) => {
+    updateSignalCenterRoute({
+      ...signalCenterState,
+      tab,
+      createRule: false,
+    });
+  }, [signalCenterState, updateSignalCenterRoute]);
+  const setSignalCenterScope = useCallback((scope: SignalCenterScope) => {
+    updateSignalCenterRoute({ ...signalCenterState, scope });
+  }, [signalCenterState, updateSignalCenterRoute]);
+  const handleAlertsViewChange = useCallback((view: AlertsView) => {
+    if (view === 'rules') {
+      setSignalCenterTab(SIGNAL_CENTER_TAB_VALUES.rules);
+      return;
+    }
+    updateSignalCenterRoute({
+      ...signalCenterState,
+      tab: SIGNAL_CENTER_TAB_VALUES.history,
+      history: view === 'notifications'
+        ? SIGNAL_CENTER_HISTORY_VALUES.notifications
+        : SIGNAL_CENTER_HISTORY_VALUES.triggers,
+      createRule: false,
+    });
+  }, [setSignalCenterTab, signalCenterState, updateSignalCenterRoute]);
+  const handleCreateRuleRequestHandled = useCallback(() => {
+    if (!signalCenterState.createRule) return;
+    updateSignalCenterRoute({ ...signalCenterState, createRule: false }, true);
+  }, [signalCenterState, updateSignalCenterRoute]);
   const parsedDecisionSignalsLink = useMemo(
     () => parseDeepLink(
       `${routeLocation.pathname}${routeLocation.search}${routeLocation.hash}`,
@@ -520,6 +665,13 @@ const DecisionSignalsPage: React.FC = () => {
   );
   const activeViewRef = useRef(activeView);
   activeViewRef.current = activeView;
+  const activeFeedView = activeView === SIGNAL_FEED_VIEW_VALUES.stats
+    ? SIGNAL_FEED_VIEW_VALUES.signals
+    : activeView;
+  const scopeControlVisible = (
+    signalCenterTab === SIGNAL_CENTER_TAB_VALUES.feed
+    && activeFeedView === SIGNAL_FEED_VIEW_VALUES.signals
+  ) || signalCenterTab === SIGNAL_CENTER_TAB_VALUES.rules;
   const updateDecisionSignalSearchParams = useCallback((
     values: DecisionSignalSearchValues,
     replace = true,
@@ -542,10 +694,14 @@ const DecisionSignalsPage: React.FC = () => {
   const syncTimelineSearchParams = useCallback((filters: TimelineFilters) => {
     updateDecisionSignalSearchParams(getTimelineSearchValues(filters));
   }, [updateDecisionSignalSearchParams]);
-  const syncStockContextSearchParams = useCallback((code: string | null) => {
+  const syncStockContextSearchParams = useCallback((
+    code: string | null,
+    timelineSnapshot?: TimelineFilters,
+  ) => {
     const defaultView: DecisionSignalsView = code ? 'latest' : 'signals';
     updateDecisionSignalSearchParams({
       ...getStockSearchValues(code),
+      ...(timelineSnapshot ? getTimelineSearchValues(timelineSnapshot) : {}),
       view: activeViewRef.current === defaultView ? null : activeViewRef.current,
     }, false);
   }, [updateDecisionSignalSearchParams]);
@@ -557,6 +713,9 @@ const DecisionSignalsPage: React.FC = () => {
   }, [decisionSignalsTarget?.stockCode, updateDecisionSignalSearchParams]);
   const actionLabels = useMemo(() => buildDecisionActionLabelMap(t), [t]);
   const { index: stockIndex } = useStockIndex();
+  const watchlistState = useWatchlist({
+    enabled: signalCenterScope === SIGNAL_CENTER_SCOPE_VALUES.watchlist,
+  });
   const [filters, setFilters] = useState<ListFilters>(() => getInitialFilters());
   const [appliedFilters, setAppliedFilters] = useState<ListFilters>(() => getInitialFilters());
   const [page, setPage] = useState(() => getInitialPage());
@@ -604,6 +763,7 @@ const DecisionSignalsPage: React.FC = () => {
   const [reassessPersistBlocked, setReassessPersistBlocked] = useState<DecisionSignalReassessBlockedError | null>(null);
   const [reassessError, setReassessError] = useState<ParsedApiError | null>(null);
   const requestIdRef = useRef(0);
+  const signalListQueueRef = useRef<RequestSlotQueue>({ active: 0, waiters: [] });
   const statsRequestIdRef = useRef(0);
   const latestRequestIdRef = useRef(0);
   const timelineRequestIdRef = useRef(0);
@@ -699,19 +859,135 @@ const DecisionSignalsPage: React.FC = () => {
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
     setLoading(true);
+    if (signalCenterScope === SIGNAL_CENTER_SCOPE_VALUES.watchlist && watchlistState.isLoading) {
+      return;
+    }
     try {
-      const response = await decisionSignalsApi.list(toListParams(appliedFilters, nextPage));
+      let response: DecisionSignalListResponse;
+      let responseError: ParsedApiError | null = null;
+      if (signalCenterScope === SIGNAL_CENTER_SCOPE_VALUES.watchlist) {
+        if (watchlistState.loadError) {
+          setError(watchlistState.loadError);
+          setItems([]);
+          setTotal(0);
+          return;
+        }
+        const requestedStock = appliedFilters.stockCode.trim();
+        const scopedCodes = requestedStock
+          ? watchlistState.watchlistCodes.filter((code) => areStockCodesEquivalent(code, requestedStock))
+          : watchlistState.watchlistCodes;
+        const uniqueCodes = scopedCodes.filter((code, index) => (
+          scopedCodes.findIndex((candidate) => areStockCodesEquivalent(candidate, code)) === index
+        ));
+        const perStockPageSize = 100;
+        const responses: Array<{ stockCode: string; response: DecisionSignalListResponse }> = [];
+        let partialError: ParsedApiError | null = null;
+        const loadRequestBatch = async (batch: Array<{ stockCode: string; page: number }>) => {
+          const settled = await Promise.all(batch.map(async ({ stockCode, page: stockPage }) => {
+            try {
+              const result = await runWithRequestSlot(
+                signalListQueueRef.current,
+                WATCHLIST_SIGNAL_LOOKUP_CONCURRENCY,
+                async () => {
+                  if (requestIdRef.current !== requestId) return null;
+                  return decisionSignalsApi.list({
+                    ...toListParams(appliedFilters, stockPage),
+                    stockCode,
+                    holdingOnly: undefined,
+                    page: stockPage,
+                    pageSize: perStockPageSize,
+                  });
+                },
+              );
+              if (!result) return null;
+              return { stockCode, response: result };
+            } catch (requestError) {
+              if (requestIdRef.current === requestId) {
+                partialError ??= getParsedApiError(requestError);
+              }
+              return null;
+            }
+          }));
+          responses.push(...settled.filter((result): result is {
+            stockCode: string;
+            response: DecisionSignalListResponse;
+          } => (
+            result !== null
+          )));
+        };
+        for (let index = 0; index < uniqueCodes.length; index += WATCHLIST_SIGNAL_LOOKUP_CONCURRENCY) {
+          await loadRequestBatch(uniqueCodes
+            .slice(index, index + WATCHLIST_SIGNAL_LOOKUP_CONCURRENCY)
+            .map((stockCode) => ({ stockCode, page: 1 })));
+          if (requestIdRef.current !== requestId) return;
+        }
+        if (partialError && responses.length === 0) throw partialError;
+        const firstPageResponses = [...responses];
+        const observedTotal = firstPageResponses.reduce(
+          (sum, item) => sum + item.response.total,
+          0,
+        );
+        const effectivePage = Math.min(
+          nextPage,
+          Math.max(1, Math.ceil(observedTotal / PAGE_SIZE)),
+        );
+        const requiredPerStockPageCount = Math.ceil(
+          Math.max(PAGE_SIZE, effectivePage * PAGE_SIZE) / perStockPageSize,
+        );
+        let nextBatch: Array<{ stockCode: string; page: number }> = [];
+        for (const firstPage of firstPageResponses) {
+          const availablePageCount = Math.ceil(firstPage.response.total / perStockPageSize);
+          const lastRequiredPage = Math.min(requiredPerStockPageCount, availablePageCount);
+          for (let stockPage = 2; stockPage <= lastRequiredPage; stockPage += 1) {
+            nextBatch.push({ stockCode: firstPage.stockCode, page: stockPage });
+            if (nextBatch.length === WATCHLIST_SIGNAL_LOOKUP_CONCURRENCY) {
+              await loadRequestBatch(nextBatch);
+              if (requestIdRef.current !== requestId) return;
+              nextBatch = [];
+            }
+          }
+        }
+        if (nextBatch.length > 0) {
+          await loadRequestBatch(nextBatch);
+          if (requestIdRef.current !== requestId) return;
+        }
+        response = mergeWatchlistSignalResponses(responses, effectivePage);
+        responseError = partialError;
+      } else {
+        const nextResponse = await runWithRequestSlot(
+          signalListQueueRef.current,
+          WATCHLIST_SIGNAL_LOOKUP_CONCURRENCY,
+          async () => {
+            if (requestIdRef.current !== requestId) return null;
+            return decisionSignalsApi.list(
+              toListParams(appliedFilters, nextPage, signalCenterScope),
+            );
+          },
+        );
+        if (!nextResponse) return;
+        response = nextResponse;
+      }
       if (requestIdRef.current !== requestId) return;
       const lastPage = Math.max(1, Math.ceil(response.total / PAGE_SIZE));
-      if (response.total > 0 && nextPage > lastPage) {
+      if (
+        signalCenterScope !== SIGNAL_CENTER_SCOPE_VALUES.watchlist
+        && response.total > 0
+        && nextPage > lastPage
+      ) {
         setPage(lastPage);
         syncListSearchParams(appliedFilters, lastPage);
         return;
       }
+      if (
+        signalCenterScope === SIGNAL_CENTER_SCOPE_VALUES.watchlist
+        && response.page !== nextPage
+      ) {
+        setPage(response.page);
+      }
       setItems(response.items);
       setTotal(response.total);
-      setError(null);
-      syncListSearchParams(appliedFilters, nextPage);
+      setError(responseError);
+      syncListSearchParams(appliedFilters, response.page);
       const restoredSelection = takePendingSelection('list', response.items);
       if (restoredSelection) {
         setSelected(restoredSelection);
@@ -734,7 +1010,15 @@ const DecisionSignalsPage: React.FC = () => {
         setLoading(false);
       }
     }
-  }, [appliedFilters, syncListSearchParams, takePendingSelection]);
+  }, [
+    appliedFilters,
+    signalCenterScope,
+    syncListSearchParams,
+    takePendingSelection,
+    watchlistState.isLoading,
+    watchlistState.loadError,
+    watchlistState.watchlistCodes,
+  ]);
 
   const loadSignals = useCallback(async () => {
     await loadSignalsForPage(page);
@@ -963,6 +1247,7 @@ const DecisionSignalsPage: React.FC = () => {
   const loadTimelineForContext = useCallback(async (
     context: StockContext,
     filtersSnapshot: TimelineFilters,
+    syncUrl = true,
   ) => {
     const stockCode = context.code.trim();
     if (!stockCode) return;
@@ -975,7 +1260,7 @@ const DecisionSignalsPage: React.FC = () => {
     setTimelineTruncated(false);
     setAppliedTimelineContext(null);
     setSelected((current) => (current?.source === 'timeline' ? null : current));
-    syncTimelineSearchParams(filtersSnapshot);
+    if (syncUrl) syncTimelineSearchParams(filtersSnapshot);
     const nextAppliedContext: AppliedTimelineContext = {
       ...filtersSnapshot,
       stockCode,
@@ -1100,9 +1385,9 @@ const DecisionSignalsPage: React.FC = () => {
     }
     setStockDraft(nextContext.displayCode ?? nextContext.code);
     setTimelineFilters(nextTimeline.filters);
-    if (syncUrl) syncStockContextSearchParams(nextContext.code);
+    if (syncUrl) syncStockContextSearchParams(nextContext.code, nextTimeline.filters);
     void loadLatestForContext(nextContext);
-    void loadTimelineForContext(nextContext, nextTimeline.filters);
+    void loadTimelineForContext(nextContext, nextTimeline.filters, false);
   }, [
     activeStockContext,
     loadLatestForContext,
@@ -1139,27 +1424,43 @@ const DecisionSignalsPage: React.FC = () => {
     handleStockSubmit(code);
   }, [activeStockContext, applyStockContext, handleStockSubmit]);
 
-  const handleClearStockContext = useCallback(() => {
+  const clearStockContext = useCallback((syncUrl: boolean) => {
     setStockDraft('');
     setActiveStockContext(null);
     timelineMarketSourceRef.current = null;
     setTimelineFilters((current) => ({ ...current, market: '' }));
-    syncStockContextSearchParams(null);
+    if (syncUrl) syncStockContextSearchParams(null);
     resetLatestView();
     resetTimelineView();
   }, [resetLatestView, resetTimelineView, syncStockContextSearchParams]);
 
-  // Restore the current-stock scope from the URL once on mount so a shared or
-  // refreshed link reopens the same stock context.
-  const didRestoreStockFromUrlRef = useRef(false);
+  const handleClearStockContext = useCallback(() => {
+    clearStockContext(true);
+  }, [clearStockContext]);
+
+  const stockLocationKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    if (didRestoreStockFromUrlRef.current) return;
-    didRestoreStockFromUrlRef.current = true;
-    const urlStock = decisionSignalsTarget?.stockCode ?? '';
+    if (stockLocationKeyRef.current === routeLocation.key) return;
+    stockLocationKeyRef.current = routeLocation.key;
+    const urlStock = new URLSearchParams(routeLocation.search)
+      .get(SIGNAL_CENTER_ROUTE_QUERY_KEYS.stock)
+      ?.trim() ?? '';
     if (urlStock) {
+      if (
+        activeStockContext
+        && areStockCodesEquivalent(activeStockContext.code, urlStock)
+      ) return;
       applyStockContext({ code: urlStock }, false);
+      return;
     }
-  }, [applyStockContext, decisionSignalsTarget?.stockCode]);
+    if (activeStockContext) clearStockContext(false);
+  }, [
+    activeStockContext,
+    applyStockContext,
+    clearStockContext,
+    routeLocation.key,
+    routeLocation.search,
+  ]);
 
   const handleTimelineSearch = useCallback(() => {
     if (!activeStockContext) return;
@@ -1480,14 +1781,21 @@ const DecisionSignalsPage: React.FC = () => {
     ].filter(Boolean).join(' / ')
     : null;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const signalScopeLabel = signalCenterScope === SIGNAL_CENTER_SCOPE_VALUES.holdings
+    ? t('decisionSignals.scopeHoldings')
+    : signalCenterScope === SIGNAL_CENTER_SCOPE_VALUES.watchlist
+      ? t('decisionSignals.scopeWatchlist')
+      : t('decisionSignals.scopeAllSignals');
 
   return (
     <AppPage className="max-w-none">
       <div className="space-y-5">
         <PageHeader
-          className="[&>div>div:first-child]:sr-only"
+          ref={pageHeadingRef}
           title={t('decisionSignals.title')}
-          actions={(
+          description={t('decisionSignals.signalCenterDescription')}
+          actions={signalCenterTab === SIGNAL_CENTER_TAB_VALUES.feed
+            || signalCenterTab === SIGNAL_CENTER_TAB_VALUES.review ? (
             <>
               <Button
                 type="button"
@@ -1525,7 +1833,7 @@ const DecisionSignalsPage: React.FC = () => {
                 {t('decisionSignals.refresh')}
               </Button>
             </>
-          )}
+          ) : undefined}
         />
 
         <DecisionSignalCreateDrawer
@@ -1614,26 +1922,65 @@ const DecisionSignalsPage: React.FC = () => {
           ) : null}
         </Modal>
 
-        <SegmentedControl
-          value={activeView}
-          options={[
-            { value: 'signals', label: t('decisionSignals.scopeAllSignals') },
-            { value: 'latest', label: t('decisionSignals.stockContextTitle') },
-            { value: 'timeline', label: t('decisionSignals.timelineTitle') },
-            { value: 'stats', label: t('decisionSignals.statsTitle') },
+        {scopeControlVisible ? (
+          <div
+            role="group"
+            aria-label={t('decisionSignals.scopeLabel')}
+            className="flex flex-wrap items-center gap-2"
+          >
+            {([
+              { value: SIGNAL_CENTER_SCOPE_VALUES.all, label: t('decisionSignals.scopeAll') },
+              { value: SIGNAL_CENTER_SCOPE_VALUES.holdings, label: t('decisionSignals.scopeHoldings') },
+              { value: SIGNAL_CENTER_SCOPE_VALUES.watchlist, label: t('decisionSignals.scopeWatchlist') },
+            ] as const).map((option) => (
+              <SelectionChip
+                key={option.value}
+                label={option.label}
+                selected={signalCenterScope === option.value}
+                onClick={() => setSignalCenterScope(option.value)}
+              />
+            ))}
+          </div>
+        ) : null}
+
+        <Tabs
+          id={SIGNAL_CENTER_TABS_ID}
+          value={signalCenterTab}
+          items={[
+            { id: SIGNAL_CENTER_TAB_VALUES.feed, label: t('decisionSignals.tab.feed') },
+            { id: SIGNAL_CENTER_TAB_VALUES.rules, label: t('decisionSignals.tab.rules') },
+            { id: SIGNAL_CENTER_TAB_VALUES.history, label: t('decisionSignals.tab.history') },
+            { id: SIGNAL_CENTER_TAB_VALUES.review, label: t('decisionSignals.tab.review') },
           ]}
-          onChange={setActiveView}
-          ariaLabel={t('decisionSignals.title')}
-          getPanelId={(view) => `decision-signals-${view}-panel`}
+          onValueChange={(tab) => setSignalCenterTab(tab as SignalCenterTab)}
+          aria-label={t('decisionSignals.title')}
         />
 
-        <section
-          id="decision-signals-signals-panel"
-          role="tabpanel"
-          aria-label={t('decisionSignals.scopeAllSignals')}
-          className="space-y-5"
-          hidden={activeView !== 'signals'}
+        <TabPanel
+          tabsId={SIGNAL_CENTER_TABS_ID}
+          value={SIGNAL_CENTER_TAB_VALUES.feed}
+          activeValue={signalCenterTab}
+          data-signal-center-tab="feed"
+          className="space-y-4"
         >
+          <Tabs
+            id={SIGNAL_FEED_TABS_ID}
+            value={activeFeedView}
+            items={[
+              { id: SIGNAL_FEED_VIEW_VALUES.signals, label: t('decisionSignals.scopeAllSignals') },
+              { id: SIGNAL_FEED_VIEW_VALUES.latest, label: t('decisionSignals.stockContextTitle') },
+              { id: SIGNAL_FEED_VIEW_VALUES.timeline, label: t('decisionSignals.timelineTitle') },
+            ]}
+            onValueChange={(view) => setActiveView(view as DecisionSignalsView)}
+            aria-label={t('decisionSignals.tab.feed')}
+          />
+
+          <TabPanel
+            tabsId={SIGNAL_FEED_TABS_ID}
+            value={SIGNAL_FEED_VIEW_VALUES.signals}
+            activeValue={activeFeedView}
+            className="space-y-5"
+          >
           <Card padding="sm" variant="bordered">
             <ResponsiveFilterPanel
               className="xl:grid xl:grid-cols-[minmax(0,3fr)_minmax(0,5fr)] xl:items-end xl:gap-2 xl:space-y-0 [&>div.hidden]:justify-center [&>div.hidden>div]:flex-none"
@@ -1742,7 +2089,7 @@ const DecisionSignalsPage: React.FC = () => {
               <Badge variant="default" size="sm">
                 {appliedSourceReportId
                   ? t('decisionSignals.scopeFromReport', { reportId: appliedSourceReportId })
-                  : t('decisionSignals.scopeAllSignals')}
+                  : signalScopeLabel}
               </Badge>
             </div>
             {loading ? <span className="text-xs text-secondary-text">{t('common.loading')}...</span> : null}
@@ -1753,6 +2100,20 @@ const DecisionSignalsPage: React.FC = () => {
               title={t('decisionSignals.emptyTitle')}
               description={t('decisionSignals.emptyDescription')}
               icon={<Activity className="h-7 w-7" />}
+              action={(
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="comfortable"
+                  onClick={() => updateSignalCenterRoute({
+                    ...signalCenterState,
+                    tab: SIGNAL_CENTER_TAB_VALUES.rules,
+                    createRule: true,
+                  })}
+                >
+                  {t('decisionSignals.createFirstRule')}
+                </Button>
+              )}
             />
           ) : (
             <div className="grid gap-3 xl:grid-cols-2">
@@ -1775,13 +2136,12 @@ const DecisionSignalsPage: React.FC = () => {
               syncListSearchParams(appliedFilters, nextPage);
             }}
           />
-        </section>
+          </TabPanel>
 
-        <section
-          id="decision-signals-latest-panel"
-          role="tabpanel"
-          aria-label={t('decisionSignals.stockContextTitle')}
-          hidden={activeView !== 'latest'}
+          <TabPanel
+            tabsId={SIGNAL_FEED_TABS_ID}
+            value={SIGNAL_FEED_VIEW_VALUES.latest}
+            activeValue={activeFeedView}
         >
           <Card
             title={t('decisionSignals.latestTitle')}
@@ -1823,13 +2183,12 @@ const DecisionSignalsPage: React.FC = () => {
               </div>
             ) : null}
           </Card>
-        </section>
+          </TabPanel>
 
-        <section
-          id="decision-signals-timeline-panel"
-          role="tabpanel"
-          aria-label={t('decisionSignals.timelineTitle')}
-          hidden={activeView !== 'timeline'}
+          <TabPanel
+            tabsId={SIGNAL_FEED_TABS_ID}
+            value={SIGNAL_FEED_VIEW_VALUES.timeline}
+            activeValue={activeFeedView}
         >
           <Card
             title={t('decisionSignals.timelineTitle')}
@@ -1929,13 +2288,13 @@ const DecisionSignalsPage: React.FC = () => {
               )}
             </div>
           </Card>
-        </section>
+          </TabPanel>
+        </TabPanel>
 
-        <section
-          id="decision-signals-stats-panel"
-          role="tabpanel"
-          aria-label={t('decisionSignals.statsTitle')}
-          hidden={activeView !== 'stats'}
+        <TabPanel
+          tabsId={SIGNAL_CENTER_TABS_ID}
+          value={SIGNAL_CENTER_TAB_VALUES.review}
+          activeValue={signalCenterTab}
         >
           <Card
             title={t('decisionSignals.statsTitle')}
@@ -1986,7 +2345,42 @@ const DecisionSignalsPage: React.FC = () => {
             )}
             <DecisionSignalOutcomeRunPanel onCompleted={() => void loadOutcomeStats()} />
           </Card>
-        </section>
+        </TabPanel>
+
+        <TabPanel
+          tabsId={SIGNAL_CENTER_TABS_ID}
+          value={SIGNAL_CENTER_TAB_VALUES.rules}
+          activeValue={signalCenterTab}
+        >
+          {signalCenterTab === SIGNAL_CENTER_TAB_VALUES.rules ? (
+            <AlertsWorkspace
+              embedded
+              scope={signalCenterScope}
+              activeView="rules"
+              onActiveViewChange={handleAlertsViewChange}
+              createRuleRequested={signalCenterState.createRule}
+              onCreateRuleRequestHandled={handleCreateRuleRequestHandled}
+              ruleStock={ruleStock}
+            />
+          ) : null}
+        </TabPanel>
+
+        <TabPanel
+          tabsId={SIGNAL_CENTER_TABS_ID}
+          value={SIGNAL_CENTER_TAB_VALUES.history}
+          activeValue={signalCenterTab}
+        >
+          {signalCenterTab === SIGNAL_CENTER_TAB_VALUES.history ? (
+            <AlertsWorkspace
+              embedded
+              scope={SIGNAL_CENTER_SCOPE_VALUES.all}
+              activeView={signalCenterHistory === SIGNAL_CENTER_HISTORY_VALUES.notifications
+                ? 'notifications'
+                : 'history'}
+              onActiveViewChange={handleAlertsViewChange}
+            />
+          ) : null}
+        </TabPanel>
       </div>
 
       <Drawer

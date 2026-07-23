@@ -8,6 +8,7 @@ import { PlaygroundScenarioProvider } from '../scenarioContext';
 import { COMMON_SCENARIOS } from '../scenarios/commonScenarios';
 import { DECISION_REPORT_RUN_FLOW_SCENARIOS } from '../scenarios/decisionReportRunFlowScenarios';
 import { SETTINGS_SCENARIOS } from '../scenarios/settingsScenarios';
+import { ALERT_HISTORY_SCENARIOS } from '../scenarios/alertHistoryScenarios';
 
 let sandbox: ReturnType<typeof installPlaygroundApiMock> | null = null;
 
@@ -70,5 +71,18 @@ describe('representative playground scenarios', () => {
 
     expect(await screen.findByText('Earnings visibility improves')).toBeInTheDocument();
     expect(screen.getByText('Sector breadth expands')).toBeInTheDocument();
+  });
+
+  it('renders the complete Alerts workspace from deterministic playground APIs', async () => {
+    sandbox = installPlaygroundApiMock('ready', { delayResponse: 0 });
+    const Story = ALERT_HISTORY_SCENARIOS['alerts-workspace'];
+    renderStory(Story);
+
+    expect(await screen.findByText('Price breakout')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Trigger history' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Notification attempts' }));
+
+    expect(await screen.findByText('fixture-notification-701')).toBeInTheDocument();
+    expect(screen.queryByText('playground_mock_not_registered')).not.toBeInTheDocument();
   });
 });

@@ -115,7 +115,7 @@ describe('SidebarNav', () => {
 
     expect(screen.getByRole('link', { name: '首页' })).toHaveAttribute('href', '/?stock=AAPL');
     expect(screen.getByRole('link', { name: 'Agent' })).toHaveAttribute('href', `${APP_ROUTE_PATHS.agent}?stock=AAPL`);
-    expect(screen.getByRole('link', { name: 'AI 建议' })).toHaveAttribute('href', `${APP_ROUTE_PATHS.decisionSignals}?stock=AAPL`);
+    expect(screen.getByRole('link', { name: '信号中心' })).toHaveAttribute('href', `${APP_ROUTE_PATHS.signals}?stock=AAPL`);
     expect(screen.getByRole('link', { name: '回测' })).toHaveAttribute('href', `${APP_ROUTE_PATHS.researchBacktest}?code=AAPL`);
   });
 
@@ -176,14 +176,14 @@ describe('SidebarNav', () => {
     const hrefs = screen.getAllByRole('link').map((link) => link.getAttribute('href'));
     expect(hrefs.slice(0, 9)).toEqual([
       APP_ROUTE_PATHS.home,
-      APP_ROUTE_PATHS.decisionSignals,
-      APP_ROUTE_PATHS.alerts,
+      APP_ROUTE_PATHS.signals,
       APP_ROUTE_PATHS.researchMarket,
       APP_ROUTE_PATHS.researchMarket,
       APP_ROUTE_PATHS.researchDiscover,
       APP_ROUTE_PATHS.researchBacktest,
       APP_ROUTE_PATHS.portfolio,
       APP_ROUTE_PATHS.agent,
+      APP_ROUTE_PATHS.settings,
     ]);
   });
 
@@ -211,7 +211,7 @@ describe('SidebarNav', () => {
     expect(researchToggle).not.toHaveAttribute('aria-controls');
     expect(screen.queryByRole('link', { name: '大盘复盘' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '发现' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'AI 建议' })).toBeVisible();
+    expect(screen.getByRole('link', { name: '信号中心' })).toBeVisible();
 
     fireEvent.click(researchToggle);
     expect(researchToggle).toHaveAttribute('aria-expanded', 'true');
@@ -406,17 +406,17 @@ describe('SidebarNav', () => {
     marketRender.unmount();
 
     const signalsRender = render(
-      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.decisionSignals]}>
+      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.signals]}>
         <SidebarNav />
       </MemoryRouter>,
     );
     const homeParent = screen.getByRole('link', { name: '首页' });
-    const signalsChild = screen.getByRole('link', { name: 'AI 建议' });
+    const signalsChild = screen.getByRole('link', { name: '信号中心' });
     expect(homeParent).not.toHaveAttribute('aria-current', 'page');
     expect(signalsChild).toHaveAttribute('aria-current', 'page');
     fireEvent.click(screen.getByRole('button', { name: '首页' }));
     expect(homeParent).toHaveAttribute('aria-current', 'page');
-    expect(screen.queryByRole('link', { name: 'AI 建议' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '信号中心' })).not.toBeInTheDocument();
     currentLinks = signalsRender.container.querySelectorAll('a[aria-current="page"]');
     expect(currentLinks).toHaveLength(1);
     expect(currentLinks[0]).toBe(homeParent);
@@ -481,7 +481,7 @@ describe('SidebarNav', () => {
 
   it('renders stable, unique route focus markers from the navigation descriptor', () => {
     render(
-      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.alerts]}>
+      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.signals]}>
         <SidebarNav focusKeyPrefix="shell-nav-desktop" />
       </MemoryRouter>,
     );
@@ -494,9 +494,9 @@ describe('SidebarNav', () => {
       'data-route-focus-key',
       'shell-nav-desktop:home',
     );
-    expect(screen.getByRole('link', { name: '告警' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '信号中心' })).toHaveAttribute(
       'data-route-focus-key',
-      'shell-nav-desktop:alerts',
+      'shell-nav-desktop:signals',
     );
     screen.getAllByRole('link').forEach((link) => expect(link).toHaveClass('shrink-0'));
 
@@ -518,28 +518,18 @@ describe('SidebarNav', () => {
     expect(container.querySelector(`a[href="${LEGACY_ROUTE_PATHS.usage}"]`)).toBeNull();
   });
 
-  it('renders the alerts navigation item and marks it active', () => {
-    render(
-      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.alerts]}>
+  it('renders the temporary Signal Center navigation item and marks it active', () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.signals]}>
         <SidebarNav />
       </MemoryRouter>,
     );
 
-    const alertsLink = screen.getByRole('link', { name: '告警' });
-    expect(alertsLink).toHaveAttribute('href', APP_ROUTE_PATHS.alerts);
-    expect(alertsLink).toHaveClass('font-medium');
-  });
-
-  it('renders the AI signals navigation item and marks it active', () => {
-    render(
-      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.decisionSignals]}>
-        <SidebarNav />
-      </MemoryRouter>,
-    );
-
-    const signalsLink = screen.getByRole('link', { name: 'AI 建议' });
-    expect(signalsLink).toHaveAttribute('href', APP_ROUTE_PATHS.decisionSignals);
+    const signalsLink = screen.getByRole('link', { name: '信号中心' });
+    expect(signalsLink).toHaveAttribute('href', APP_ROUTE_PATHS.signals);
     expect(signalsLink).toHaveClass('font-medium');
+    expect(container.querySelector(`a[href="${LEGACY_ROUTE_PATHS.decisionSignals}"]`)).toBeNull();
+    expect(container.querySelector(`a[href="${LEGACY_ROUTE_PATHS.alerts}"]`)).toBeNull();
   });
 
   it('does not expose the component playground in product navigation', () => {

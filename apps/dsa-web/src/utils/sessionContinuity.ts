@@ -9,6 +9,8 @@ import {
   REPORT_ROUTE_QUERY_KEYS,
   RESEARCH_BACKTEST_ROUTE_QUERY_KEYS,
   RESEARCH_DISCOVER_ROUTE_QUERY_KEYS,
+  SIGNAL_CENTER_ROUTE_QUERY_KEYS,
+  SIGNAL_FEED_ROUTE_QUERY_KEYS,
 } from '../routing/routes';
 import {
   parseResearchBacktestRouteState,
@@ -51,7 +53,7 @@ const MAX_PERSISTED_HREF_LENGTH = 2_048;
 const INITIAL_RESTORE_PATHS = new Map<string, PersistedRouteKey>([
   [APP_ROUTE_PATHS.home, 'home'],
   [APP_ROUTE_PATHS.agent, 'chat'],
-  [APP_ROUTE_PATHS.decisionSignals, 'decision-signals'],
+  [APP_ROUTE_PATHS.signals, 'decision-signals'],
   [APP_ROUTE_PATHS.portfolio, 'portfolio'],
   [APP_ROUTE_PATHS.researchBacktest, 'research-backtest'],
   [APP_ROUTE_PATHS.researchDiscover, 'research-discover'],
@@ -76,9 +78,12 @@ const ALLOWED_QUERY_KEYS: Record<PersistedRouteKey, readonly string[]> = {
   chat: ['session', 'stock', 'name', REPORT_ROUTE_QUERY_KEYS.recordId, 'context'],
   portfolio: ['account'],
   'decision-signals': [
+    SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope,
+    SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab,
+    SIGNAL_CENTER_ROUTE_QUERY_KEYS.history,
     'stock',
     'signal',
-    'view',
+    SIGNAL_FEED_ROUTE_QUERY_KEYS.view,
     'market',
     'listStock',
     'action',
