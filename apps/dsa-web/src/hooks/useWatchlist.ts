@@ -17,10 +17,14 @@ export interface UseWatchlistReturn {
   refresh: () => Promise<boolean>;
 }
 
-export function useWatchlist(): UseWatchlistReturn {
+export interface UseWatchlistOptions {
+  enabled?: boolean;
+}
+
+export function useWatchlist({ enabled = true }: UseWatchlistOptions = {}): UseWatchlistReturn {
   const { t } = useUiLanguage();
   const [codes, setCodes] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(enabled);
   const [isActioning, setIsActioning] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<ParsedApiError | null>(null);
@@ -52,13 +56,17 @@ export function useWatchlist(): UseWatchlistReturn {
   }, []);
 
   useEffect(() => {
+    if (!enabled) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     void refresh().finally(() => {
       if (mountedRef.current) {
         setIsLoading(false);
       }
     });
-  }, [refresh]);
+  }, [enabled, refresh]);
 
   const showMessage = useCallback((msg: string) => {
     if (messageTimerRef.current !== null) {

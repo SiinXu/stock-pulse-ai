@@ -73,7 +73,7 @@ const exactAllowedStrings: HardcodedUiStringAllowance[] = [
     purpose: 'Locale-independent examples of supported stock-code formats.',
   },
   {
-    file: 'pages/AlertsPage.tsx',
+    file: 'components/alerts/AlertsWorkspace.tsx',
     text: 'ms',
     context: 'jsx-expression',
     purpose: 'SI-compatible milliseconds unit appended to a numeric latency.',

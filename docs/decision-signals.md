@@ -123,8 +123,11 @@ Web 展示必须把这些 wire value 映射为当前 UI 语言的用户可读标
 
 ## Web 展示
 
-Web 入口位于 `/decision-signals`：
+Web 的唯一信号中心入口位于 `/signals`。旧 `/decision-signals` 会保留原查询参数并映射到信号流或“再评估与统计”，旧 `/alerts` 会映射到“规则”或“推送历史”，因此已有深链仍可继续使用。
 
+- 顶层为“信号流 / 规则 / 推送历史 / 再评估与统计”四个 tab；规则、触发历史和通知尝试继续复用现有 Alert API 与组件，不新增后端数据契约。
+- `scope=all|holdings|watchlist` 可在同页切换并由 URL 表达；持仓范围复用 `holding_only=true`，自选范围复用现有 watchlist 与 stock-scoped 信号查询。最后访问的合法 scope/tab/filter 在当前浏览器会话中恢复，显式 URL 始终优先。
+- 信号流为空时主行动是“创建第一条规则”，会在同页切换到规则 tab 并打开现有规则表单。
 - 默认查询 `status=active`。
 - 页面顶部提供“创建信号”入口，打开手工创建抽屉：可录入基础字段（代码、名称、市场、动作、置信度、周期、市场阶段、风格）、交易计划（入场上/下沿、止损、目标价、失效条件、观察条件、过期日）和解释字段（理由、风险、催化、证据）。来源固定为 `source_type=manual`、`trigger_source=web_manual`，不会伪装成分析、Agent、告警或大盘复盘。抽屉内提供实时预览和客户端校验（必填股票代码/市场/动作，置信度限定 0–1，价格须为正，入场下沿不高于上沿）。提交前对规范化后的完整内容生成确定性 `web_manual:<hash>` trace_id，作为 source-less 手工信号的去重键：完全相同的草稿再次提交命中去重（`created=false`），任意字段变化即视为新信号（`created=true`）。创建 active 方向性信号可能触发服务端使同标的相反 active 信号失效，成功后刷新列表、统计与当前股票的 latest/时间线。草稿在关闭并重新打开抽屉后保留，去重命中或请求失败时保留，仅在创建成功后清空。
 - 页面顶部提供页面级“当前股票”主路径，独立于高级列表筛选。用户提交主股票、选择自动补全候选或点击候选 chip 后，latest active 与时间线共用同一个已应用股票上下文；只修改输入草稿不会触发 latest 或时间线查询。
@@ -146,7 +149,7 @@ Web 入口位于 `/decision-signals`：
 - 保存时的 guardrail 调整 warning 会保留显示。如果 persist 重算被 guardrail 阻断，Web 会显示 `blocked_reason` 和结构化 warning，保留 preview 供用户理解，且不会把失败结果加入时间线。
 - 首页分析表单不提供 `decision_profile`；默认自动生成路径仍只使用 `balanced`。
 - Web 只能把信号标记为 `closed`、`invalidated` 或 `archived`，不提供 terminal 状态恢复为 active。
-- 历史报告详情不再内嵌展示报告绑定的 `source_type=analysis` 信号，也不会因打开报告详情触发 `source_report_id` 信号查询；需要查看报告来源信号时统一进入 `/decision-signals` 页面按来源报告 ID 精确筛选，或打开 `/decision-signals?sourceReportId=<recordId>` deep link。该筛选和 deep link 都会使用 `source_type=analysis + source_report_id` 的精确查询，以保留旧报告的 best-effort 懒回填入口。
+- 历史报告详情不再内嵌展示报告绑定的 `source_type=analysis` 信号，也不会因打开报告详情触发 `source_report_id` 信号查询；需要查看报告来源信号时统一进入 `/signals` 页面按来源报告 ID 精确筛选，或打开 `/signals?sourceReportId=<recordId>` deep link。该筛选和 deep link 都会使用 `source_type=analysis + source_report_id` 的精确查询，以保留旧报告的 best-effort 懒回填入口。
 - 持仓页异步查询每个唯一持仓的 latest active 信号，单只查询失败只显示降级提示，不阻断组合快照或其他持仓信号。
 
 所有用户可见枚举必须使用 i18n 标签；技术 ID、股票代码、API 字段名、env key、URL 示例可以保留英文。

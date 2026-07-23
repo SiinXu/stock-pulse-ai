@@ -1,11 +1,16 @@
 import type React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import StockDetailsPage from '../StockDetailsPage';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import { stocksApi } from '../../api/stocks';
 import { systemConfigApi } from '../../api/systemConfig';
+import {
+  APP_ROUTE_PATHS,
+  SIGNAL_CENTER_TAB_VALUES,
+  buildSignalCenterHref,
+} from '../../routing/routes';
 import type { StockHistoryResponse, StockQuote } from '../../types/stocks';
 
 vi.mock('../../api/stocks', () => ({
@@ -29,6 +34,11 @@ vi.mock('recharts', () => ({
 const getQuoteMock = vi.mocked(stocksApi.getQuote);
 const getHistoryMock = vi.mocked(stocksApi.getDailyHistory);
 const addWatchlistMock = vi.mocked(systemConfigApi.addToWatchlist);
+
+function SignalLocationProbe() {
+  const location = useLocation();
+  return <output data-testid="signal-location">{`${location.pathname}${location.search}`}</output>;
+}
 
 function makeQuote(overrides: Partial<StockQuote> = {}): StockQuote {
   return {
@@ -67,7 +77,7 @@ function renderPage(code = '600519') {
         <Routes>
           <Route path="/stocks/:stockCode" element={<StockDetailsPage />} />
           <Route path="/" element={<div>home-route</div>} />
-          <Route path="/decision-signals" element={<div>signals-route</div>} />
+          <Route path={APP_ROUTE_PATHS.signals} element={<SignalLocationProbe />} />
         </Routes>
       </MemoryRouter>
     </UiLanguageProvider>,
@@ -118,6 +128,23 @@ describe('StockDetailsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add to watchlist' }));
     await waitFor(() => expect(addWatchlistMock).toHaveBeenCalledWith('600519'));
     await waitFor(() => expect(screen.getByRole('button', { name: 'In watchlist' })).toBeTruthy());
+  });
+
+  it('deep-links rule creation from the current stock into the Signal Center', async () => {
+    getQuoteMock.mockResolvedValue(makeQuote());
+    getHistoryMock.mockResolvedValue(makeHistory());
+
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Kweichow Moutai')).toBeTruthy());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create rule from this signal' }));
+
+    expect(await screen.findByTestId('signal-location'))
+      .toHaveTextContent(buildSignalCenterHref({
+        tab: SIGNAL_CENTER_TAB_VALUES.rules,
+        createRule: true,
+        stock: '600519',
+      }));
   });
 
   it('canonicalizes an equivalent stock-code spelling in the route', async () => {

@@ -10,6 +10,10 @@ import {
   RESEARCH_DISCOVER_ROUTE_QUERY_KEYS,
   SETTINGS_ROUTE_QUERY_KEYS,
   SETTINGS_SECTION_IDS,
+  SIGNAL_CENTER_HISTORY_VALUES,
+  SIGNAL_CENTER_ROUTE_QUERY_KEYS,
+  SIGNAL_CENTER_SCOPE_VALUES,
+  SIGNAL_CENTER_TAB_VALUES,
 } from './routing/routes';
 import { recordSessionLocation } from './utils/sessionContinuity';
 import { UI_LANGUAGE_STORAGE_KEY } from './utils/uiLanguage';
@@ -67,10 +71,6 @@ vi.mock('./pages/DecisionSignalsPage', () => ({
 
 vi.mock('./pages/BacktestPage', () => ({
   default: () => <div data-testid="backtest-page">Backtest</div>,
-}));
-
-vi.mock('./pages/AlertsPage', () => ({
-  default: () => <div data-testid="alerts-page">Alerts</div>,
 }));
 
 vi.mock('./pages/SettingsPage', () => ({
@@ -285,14 +285,61 @@ describe('App routing behavior', () => {
     await waitFor(() => expect(setCurrentRoute).toHaveBeenLastCalledWith(canonicalPath));
   });
 
-  it('routes /decision-signals to the AI signals page after auth is ready', async () => {
-    window.history.pushState({}, '', '/decision-signals');
+  it('routes /signals to the Signal Center page after auth is ready', async () => {
+    window.history.pushState({}, '', APP_ROUTE_PATHS.signals);
 
     render(<App />);
 
     expect(await screen.findByTestId('decision-signals-page')).toBeInTheDocument();
-    expect(setCurrentRoute).toHaveBeenCalledWith('/decision-signals');
+    expect(setCurrentRoute).toHaveBeenCalledWith(APP_ROUTE_PATHS.signals);
     expect(screen.queryByTestId('home-page')).not.toBeInTheDocument();
+  });
+
+  it('redirects legacy Decision Signals state into the Signal Center review tab', async () => {
+    const legacySearch = new URLSearchParams({
+      view: 'stats',
+      [SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope]: SIGNAL_CENTER_SCOPE_VALUES.holdings,
+      keep: 'yes',
+    });
+    window.history.pushState(
+      {},
+      '',
+      `${LEGACY_ROUTE_PATHS.decisionSignals}?${legacySearch}#review`,
+    );
+
+    render(<App />);
+
+    expect(await screen.findByTestId('decision-signals-page')).toBeInTheDocument();
+    expect(window.location.pathname).toBe(APP_ROUTE_PATHS.signals);
+    expect(window.location.search).toBe(`?${new URLSearchParams({
+      keep: 'yes',
+      [SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope]: SIGNAL_CENTER_SCOPE_VALUES.holdings,
+      [SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab]: SIGNAL_CENTER_TAB_VALUES.review,
+    })}`);
+    expect(window.location.hash).toBe('#review');
+    await waitFor(() => expect(setCurrentRoute).toHaveBeenLastCalledWith(APP_ROUTE_PATHS.signals));
+  });
+
+  it('redirects legacy alert notification history into the Signal Center history tab', async () => {
+    const legacySearch = new URLSearchParams({
+      view: 'notifications',
+      [SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope]: SIGNAL_CENTER_SCOPE_VALUES.watchlist,
+    });
+    window.history.pushState(
+      {},
+      '',
+      `${LEGACY_ROUTE_PATHS.alerts}?${legacySearch}`,
+    );
+
+    render(<App />);
+
+    expect(await screen.findByTestId('decision-signals-page')).toBeInTheDocument();
+    expect(window.location.pathname).toBe(APP_ROUTE_PATHS.signals);
+    expect(window.location.search).toBe(`?${new URLSearchParams({
+      [SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope]: SIGNAL_CENTER_SCOPE_VALUES.watchlist,
+      [SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab]: SIGNAL_CENTER_TAB_VALUES.history,
+      [SIGNAL_CENTER_ROUTE_QUERY_KEYS.history]: SIGNAL_CENTER_HISTORY_VALUES.notifications,
+    })}`);
   });
 
   it('redirects authenticated login visits back to the home page', async () => {

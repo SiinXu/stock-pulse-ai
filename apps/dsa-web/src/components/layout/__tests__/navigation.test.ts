@@ -12,6 +12,10 @@ import {
   RESEARCH_DISCOVER_MARKET_VALUES,
   RESEARCH_DISCOVER_ROUTE_QUERY_KEYS,
   RUN_FLOW_ROUTE_QUERY_VALUES,
+  SIGNAL_CENTER_HISTORY_VALUES,
+  SIGNAL_CENTER_ROUTE_QUERY_KEYS,
+  SIGNAL_CENTER_SCOPE_VALUES,
+  SIGNAL_CENTER_TAB_VALUES,
 } from '../../../routing/routes';
 import {
   APPLICATION_NAVIGATION_ITEMS,
@@ -28,8 +32,7 @@ describe('application navigation descriptor', () => {
       ['settings', APP_ROUTE_PATHS.settings],
     ]);
     expect(APPLICATION_NAVIGATION_ITEMS[0]?.children?.map(({ key, to }) => [key, to])).toEqual([
-      ['decision-signals', APP_ROUTE_PATHS.decisionSignals],
-      ['alerts', APP_ROUTE_PATHS.alerts],
+      ['signals', APP_ROUTE_PATHS.signals],
     ]);
     expect(APPLICATION_NAVIGATION_ITEMS[1]?.children?.map(({ key, to }) => [key, to])).toEqual([
       ['research-market', APP_ROUTE_PATHS.researchMarket],
@@ -49,6 +52,8 @@ describe('application navigation descriptor', () => {
     expect(targets).not.toContain(LEGACY_ROUTE_PATHS.usage);
     expect(targets).not.toContain(LEGACY_ROUTE_PATHS.screening);
     expect(targets).not.toContain(LEGACY_ROUTE_PATHS.backtest);
+    expect(targets).not.toContain(LEGACY_ROUTE_PATHS.decisionSignals);
+    expect(targets).not.toContain(LEGACY_ROUTE_PATHS.alerts);
     expect(targets).not.toContain('/more');
   });
 
@@ -89,6 +94,16 @@ describe('application navigation descriptor', () => {
     });
     expect(RESEARCH_DISCOVER_LIMITS.maxCount).toBe(100);
     expect(RESEARCH_BACKTEST_LIMITS.maxWindowDays).toBe(120);
+    expect(Object.values(SIGNAL_CENTER_ROUTE_QUERY_KEYS)).toEqual([
+      'scope',
+      'tab',
+      'history',
+      'createRule',
+      'stock',
+    ]);
+    expect(Object.values(SIGNAL_CENTER_SCOPE_VALUES)).toEqual(['all', 'holdings', 'watchlist']);
+    expect(Object.values(SIGNAL_CENTER_TAB_VALUES)).toEqual(['feed', 'rules', 'history', 'review']);
+    expect(Object.values(SIGNAL_CENTER_HISTORY_VALUES)).toEqual(['triggers', 'notifications']);
   });
 
   it('delegates only unmodified primary same-window link activation', () => {

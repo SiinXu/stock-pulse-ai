@@ -28,6 +28,22 @@ describe('useWatchlist', () => {
     mockRemoveFromWatchlist.mockResolvedValue([]);
   });
 
+  it('defers the initial request until the consumer enables watchlist scope', async () => {
+    mockGetWatchlist.mockResolvedValue(['AAPL']);
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useWatchlist({ enabled }),
+      { initialProps: { enabled: false } },
+    );
+
+    expect(result.current.isLoading).toBe(false);
+    expect(mockGetWatchlist).not.toHaveBeenCalled();
+
+    rerender({ enabled: true });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(mockGetWatchlist).toHaveBeenCalledOnce();
+    expect(result.current.watchlistCodes).toEqual(['AAPL']);
+  });
+
   it('matches raw HK watchlist entries against prefixed and suffixed variants', async () => {
     mockGetWatchlist.mockResolvedValue(['00700']);
 

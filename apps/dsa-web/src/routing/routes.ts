@@ -67,16 +67,21 @@ export type SignalCenterHrefOptions = {
 
 export function buildSignalCenterHref(options: SignalCenterHrefOptions = {}): string {
   const searchParams = new URLSearchParams();
+  const tab = options.createRule
+    ? SIGNAL_CENTER_TAB_VALUES.rules
+    : options.history
+      ? SIGNAL_CENTER_TAB_VALUES.history
+      : options.tab;
   if (options.scope && options.scope !== SIGNAL_CENTER_SCOPE_VALUES.all) {
     searchParams.set(SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope, options.scope);
   }
-  if (options.tab && options.tab !== SIGNAL_CENTER_TAB_VALUES.feed) {
-    searchParams.set(SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab, options.tab);
+  if (tab && tab !== SIGNAL_CENTER_TAB_VALUES.feed) {
+    searchParams.set(SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab, tab);
   }
   if (
     options.history
     && options.history !== SIGNAL_CENTER_HISTORY_VALUES.triggers
-    && options.tab === SIGNAL_CENTER_TAB_VALUES.history
+    && tab === SIGNAL_CENTER_TAB_VALUES.history
   ) {
     searchParams.set(SIGNAL_CENTER_ROUTE_QUERY_KEYS.history, options.history);
   }

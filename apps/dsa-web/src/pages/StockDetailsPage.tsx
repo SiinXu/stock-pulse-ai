@@ -38,6 +38,10 @@ import type {
 } from '../types/stocks';
 import { aggregateCandles, summarizeCandles } from '../utils/klineAggregate';
 import { buildDeepLink } from '../utils/deepLink';
+import {
+  SIGNAL_CENTER_TAB_VALUES,
+  buildSignalCenterHref,
+} from '../routing/routes';
 import { normalizeStockCode } from '../utils/stockCode';
 
 const PERIOD_OPTIONS: StockHistoryPeriod[] = ['daily', 'weekly', 'monthly'];
@@ -293,9 +297,18 @@ const StockDetailsPage: React.FC = () => {
             <Sparkles className="h-4 w-4" aria-hidden="true" />
             {t('stocks.workspace.analyze')}
           </Button>
-          <Button type="button" variant="secondary" size="comfortable" onClick={() => navigate(buildDeepLink({ page: 'decision-signals', stockCode: canonicalCode }))}>
+          <Button
+            type="button"
+            variant="secondary"
+            size="comfortable"
+            onClick={() => navigate(buildSignalCenterHref({
+              tab: SIGNAL_CENTER_TAB_VALUES.rules,
+              createRule: true,
+              stock: canonicalCode,
+            }))}
+          >
             <BellPlus className="h-4 w-4" aria-hidden="true" />
-            {t('stocks.workspace.manualSignal')}
+            {t('decisionSignals.createRuleFromSignal')}
           </Button>
         </div>
         {watchState === 'error' && watchError ? <ApiErrorAlert error={watchError} /> : null}

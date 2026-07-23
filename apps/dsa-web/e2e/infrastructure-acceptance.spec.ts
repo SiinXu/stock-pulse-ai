@@ -20,8 +20,12 @@ import {
   LEGACY_ROUTE_PATHS,
   RESEARCH_DISCOVER_DEFAULT_VALUES,
   RESEARCH_DISCOVER_ROUTE_QUERY_KEYS,
+  SIGNAL_CENTER_HISTORY_VALUES,
+  SIGNAL_CENTER_SCOPE_VALUES,
+  SIGNAL_CENTER_TAB_VALUES,
   SETTINGS_ROUTE_QUERY_KEYS,
   SETTINGS_SECTION_IDS,
+  buildSignalCenterHref,
   buildSettingsHref,
   buildSettingsSectionHref,
 } from '../src/routing/routes';
@@ -506,6 +510,40 @@ async function mockEmptyAlertCollections(page: Page, rules: unknown[] = []) {
   await page.route('**/api/v1/alerts/notifications**', (route) => fulfillJson(route, {
     items: [], total: 0, page: 1, page_size: 20,
   }));
+}
+
+async function mockSignalCenterCollections(page: Page, signals: unknown[] = []) {
+  await mockEmptyAlertCollections(page);
+  await page.route('**/api/v1/history/stocks**', (route) => fulfillJson(route, {
+    items: [], total: 0,
+  }));
+  await page.route('**/api/v1/decision-signals**', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname.endsWith('/outcomes/stats')) {
+      await fulfillJson(route, {
+        engine_version: 'e2e',
+        horizons: null,
+        statuses: ['active', 'expired', 'invalidated', 'closed'],
+        total: 0,
+        completed: 0,
+        unable: 0,
+        hit: 0,
+        miss: 0,
+        neutral: 0,
+        hit_rate_pct: null,
+        avg_stock_return_pct: null,
+        unable_reasons: {},
+        breakdowns: {},
+      });
+      return;
+    }
+    await fulfillJson(route, {
+      items: signals,
+      total: signals.length,
+      page: 1,
+      page_size: 20,
+    });
+  });
 }
 
 async function createPortfolioAccount(page: Page, suffix: string) {
@@ -1303,7 +1341,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       await route.fallback();
     });
     await login(page);
-    await page.goto('/alerts');
+    await page.goto(LEGACY_ROUTE_PATHS.alerts);
     await page.getByRole('button', { name: '创建告警规则' }).click();
     const dialog = page.getByRole('dialog', { name: '创建告警规则' });
     await dialog.getByLabel('规则名称').fill('保留输入的失败规则');
@@ -1327,7 +1365,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       await fulfillJson(route, { ...alertRule(id, id === 1 ? 'Rule One' : 'Rule Two'), enabled: false });
     });
     await login(page);
-    await page.goto('/alerts');
+    await page.goto(LEGACY_ROUTE_PATHS.alerts);
     const rowOne = page.getByRole('row').filter({ hasText: 'Rule One' });
     const rowTwo = page.getByRole('row').filter({ hasText: 'Rule Two' });
     await rowOne.getByRole('button', { name: '停用' }).click();
@@ -1346,6 +1384,144 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(secondToggle).toHaveAttribute('aria-busy', 'true');
     second.resolve();
     await expect(rowTwo.locator('button[aria-busy="true"]')).toHaveCount(0);
+  });
+
+  test('16a Signal Center exposes four tabs and keeps scope in the URL', async ({ page }) => {
+    await mockSignalCenterCollections(page);
+    await login(page);
+    await page.goto(APP_ROUTE_PATHS.signals);
+
+    await expect(page.getByRole('heading', { name: '信号中心' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: '信号流', exact: true })).toBeVisible();
+    await expect(page.getByRole('tab', { name: '规则', exact: true })).toBeVisible();
+    await expect(page.getByRole('tab', { name: '推送历史', exact: true })).toBeVisible();
+    await expect(page.getByRole('tab', { name: '再评估与统计', exact: true })).toBeVisible();
+
+    await page.getByRole('tab', { name: '持仓', exact: true }).click();
+    await expect(page).toHaveURL(buildSignalCenterHref({
+      scope: SIGNAL_CENTER_SCOPE_VALUES.holdings,
+    }));
+
+    await page.getByRole('tab', { name: '规则', exact: true }).click();
+    await expect(page).toHaveURL(buildSignalCenterHref({
+      scope: SIGNAL_CENTER_SCOPE_VALUES.holdings,
+      tab: SIGNAL_CENTER_TAB_VALUES.rules,
+    }));
+    await expect(page.getByRole('button', { name: '创建告警规则' })).toBeVisible();
+
+    await page.getByRole('tab', { name: '推送历史', exact: true }).click();
+    await expect(page).toHaveURL(buildSignalCenterHref({
+      scope: SIGNAL_CENTER_SCOPE_VALUES.holdings,
+      tab: SIGNAL_CENTER_TAB_VALUES.history,
+    }));
+    await expect(page.getByRole('tab', { name: '触发历史', exact: true })).toBeVisible();
+    await expect(page.getByRole('tab', { name: '通知尝试记录', exact: true })).toBeVisible();
+
+    await page.getByRole('tab', { name: '再评估与统计', exact: true }).click();
+    await expect(page).toHaveURL(buildSignalCenterHref({
+      scope: SIGNAL_CENTER_SCOPE_VALUES.holdings,
+      tab: SIGNAL_CENTER_TAB_VALUES.review,
+    }));
+    await expect(page.getByText('后验引擎', { exact: true })).toBeVisible();
+  });
+
+  test('16b Signal Center maps legacy signal and alert URL state', async ({ page }) => {
+    await mockSignalCenterCollections(page);
+    await login(page);
+
+    await page.goto(`${LEGACY_ROUTE_PATHS.alerts}?view=notifications&scope=watchlist&keep=yes#delivery`);
+    await expect.poll(() => {
+      const url = new URL(page.url());
+      return {
+        pathname: url.pathname,
+        scope: url.searchParams.get('scope'),
+        tab: url.searchParams.get('tab'),
+        history: url.searchParams.get('history'),
+        keep: url.searchParams.get('keep'),
+        hash: url.hash,
+      };
+    }).toEqual({
+      pathname: APP_ROUTE_PATHS.signals,
+      scope: SIGNAL_CENTER_SCOPE_VALUES.watchlist,
+      tab: SIGNAL_CENTER_TAB_VALUES.history,
+      history: SIGNAL_CENTER_HISTORY_VALUES.notifications,
+      keep: 'yes',
+      hash: '#delivery',
+    });
+    await expect(page.getByRole('tab', { name: '通知尝试记录', exact: true }))
+      .toHaveAttribute('aria-selected', 'true');
+
+    await page.goto(`${LEGACY_ROUTE_PATHS.decisionSignals}?view=stats&scope=holdings&keep=yes`);
+    await expect.poll(() => {
+      const url = new URL(page.url());
+      return {
+        pathname: url.pathname,
+        scope: url.searchParams.get('scope'),
+        tab: url.searchParams.get('tab'),
+        view: url.searchParams.get('view'),
+        keep: url.searchParams.get('keep'),
+      };
+    }).toEqual({
+      pathname: APP_ROUTE_PATHS.signals,
+      scope: SIGNAL_CENTER_SCOPE_VALUES.holdings,
+      tab: SIGNAL_CENTER_TAB_VALUES.review,
+      view: null,
+      keep: 'yes',
+    });
+    await expect(page.getByRole('tab', { name: '再评估与统计', exact: true }))
+      .toHaveAttribute('aria-selected', 'true');
+  });
+
+  test('16c Signal Center empty feed opens the existing rule form', async ({ page }) => {
+    await mockSignalCenterCollections(page);
+    await login(page);
+    await page.goto(APP_ROUTE_PATHS.signals);
+
+    await page.getByRole('button', { name: '创建第一条规则' }).click();
+
+    const dialog = page.getByRole('dialog', { name: '创建告警规则' });
+    await expect(dialog).toBeVisible();
+    await expect(page).toHaveURL(buildSignalCenterHref({
+      tab: SIGNAL_CENTER_TAB_VALUES.rules,
+    }));
+    await dialog.getByRole('button', { name: '关闭' }).click();
+    await expect(page.getByRole('tab', { name: '规则', exact: true }))
+      .toHaveAttribute('aria-selected', 'true');
+  });
+
+  test('16d Portfolio signal summary deep-links to holdings scope', async ({ page }) => {
+    await mockSignalCenterCollections(page);
+    await login(page);
+    await page.route('**/api/v1/portfolio/risk**', async (route) => {
+      const response = await route.fetch();
+      const body = await response.json() as JsonObject;
+      await route.fulfill({
+        response,
+        json: {
+          ...body,
+          decision_signal_risk: {
+            available: true,
+            total: 0,
+            actions: { sell: 0, reduce: 0, alert: 0 },
+            items: [],
+          },
+        },
+      });
+    });
+    const account = await createPortfolioAccount(page, 'signal-center-link');
+    await selectPortfolioAccount(page, account.id);
+
+    const holdingsHref = buildSignalCenterHref({
+      scope: SIGNAL_CENTER_SCOPE_VALUES.holdings,
+    });
+    const signalSummaryLink = page.locator(`a[href="${holdingsHref}"]`);
+    await expect(signalSummaryLink).toHaveText('查看全部');
+    await signalSummaryLink.click();
+
+    await expect(page).toHaveURL(holdingsHref);
+    await expect(page.getByRole('heading', { name: '信号中心' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: '持仓', exact: true }))
+      .toHaveAttribute('aria-selected', 'true');
   });
 
   test('17 Portfolio timeout-after-commit retry reuses the operation ID and creates only one ledger row', async ({ page }) => {
@@ -1990,7 +2166,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       await fulfillJson(route, { items: [], total: 0, page: 1, page_size: 20 });
     });
     await login(page);
-    await page.goto('/decision-signals');
+    await page.goto(LEGACY_ROUTE_PATHS.decisionSignals);
     await page.getByRole('button', { name: '当前股票' }).click();
     let dialog = page.getByRole('dialog', { name: '当前股票' });
     await dialog.getByRole('combobox', { name: '当前股票' }).fill('OLD');
@@ -2071,7 +2247,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     };
 
     await login(page, 'en');
-    await page.goto('/decision-signals');
+    await page.goto(LEGACY_ROUTE_PATHS.decisionSignals);
     await applyStockContext();
     const latestPanel = page.getByRole('tabpanel', { name: 'Current stock' });
     await expect(latestPanel.getByText('Canonical momentum confirmed', { exact: true }).first()).toBeVisible();

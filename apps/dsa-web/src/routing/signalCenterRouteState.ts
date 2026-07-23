@@ -40,7 +40,7 @@ function replaceOwnedParams(
   source: URLSearchParams,
   state: SignalCenterRouteState,
 ): URLSearchParams {
-  const ownedKeys = new Set(Object.values(SIGNAL_CENTER_ROUTE_QUERY_KEYS).filter(
+  const ownedKeys = new Set<string>(Object.values(SIGNAL_CENTER_ROUTE_QUERY_KEYS).filter(
     (key) => key !== SIGNAL_CENTER_ROUTE_QUERY_KEYS.stock,
   ));
   const next = new URLSearchParams();
@@ -69,6 +69,7 @@ export function parseSignalCenterRouteState(
   search: string | URLSearchParams,
 ): ParsedSignalCenterRouteState {
   const source = toSearchParams(search);
+  const normalizedSource = new URLSearchParams(source);
   const invalidKeys: string[] = [];
 
   const rawScope = source.get(SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope);
@@ -81,10 +82,13 @@ export function parseSignalCenterRouteState(
   }
 
   const rawTab = source.get(SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab);
+  const legacyStatsView = source.get('view') === 'stats';
   const tabs = new Set<SignalCenterTab>(Object.values(SIGNAL_CENTER_TAB_VALUES));
   const tab = tabs.has(rawTab as SignalCenterTab)
     ? rawTab as SignalCenterTab
-    : DEFAULT_SIGNAL_CENTER_ROUTE_STATE.tab;
+    : legacyStatsView
+      ? SIGNAL_CENTER_TAB_VALUES.review
+      : DEFAULT_SIGNAL_CENTER_ROUTE_STATE.tab;
   if (rawTab !== null && !tabs.has(rawTab as SignalCenterTab)) {
     invalidKeys.push(SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab);
   }
@@ -105,9 +109,10 @@ export function parseSignalCenterRouteState(
   }
 
   const state = { scope, tab, history, createRule };
+  if (legacyStatsView) normalizedSource.delete('view');
   return {
     state,
-    normalizedParams: replaceOwnedParams(source, state),
+    normalizedParams: replaceOwnedParams(normalizedSource, state),
     invalidKeys,
   };
 }
