@@ -165,13 +165,13 @@ AlphaSift 侧已在 `ZhuLinsen/alphasift@9f522747caafd3c0b1ddb7e14d5cf44c8580b6c
 - 旧配置保留证据：
   - `src/services/alphasift_service.py` 的 `_alphasift_runtime_env()` 会在调用前保存同名 `os.environ` 值，并在调用后逐项恢复或删除本次临时新增键；该路径不调用 `dotenv_values()` 写回，也不修改 `.env` 文件。
   - `src/services/alphasift_service.py` 的 `_build_alphasift_runtime_env()` 只从当前 `Config` 生成临时 env dict；未声明渠道不会生成 `LLM_<NAME>_*`，已有自定义 provider/model/base URL 不会被重命名或清理。
-  - `tests/test_alphasift_api.py` 覆盖 `test_screen_bridges_dsa_llm_config_into_alphasift_runtime`、`test_screen_bridges_legacy_openai_fields_into_alphasift_runtime_env`、`test_screen_injects_openai_compatible_model_headers_into_alphasift_litellm_calls`、`test_screen_disabled_preserves_existing_llm_env_state` 和 `test_screen_filters_undeclared_managed_fallbacks_for_dsa_routes`，用于证明注入、OpenAI-compatible header/base URL、关闭状态和未声明 fallback 均不改写用户原始配置。
+  - `tests/api/alphasift/test_alphasift_api.py` 覆盖 `test_screen_bridges_dsa_llm_config_into_alphasift_runtime`、`test_screen_bridges_legacy_openai_fields_into_alphasift_runtime_env`、`test_screen_injects_openai_compatible_model_headers_into_alphasift_litellm_calls`、`test_screen_disabled_preserves_existing_llm_env_state` 和 `test_screen_filters_undeclared_managed_fallbacks_for_dsa_routes`，用于证明注入、OpenAI-compatible header/base URL、关闭状态和未声明 fallback 均不改写用户原始配置。
 - 失败可见性：`status`/`screen` 接口返回明确错误码与 `message`，前端在设置页或选股页会将 `403/424/400/422` 等错误直接提示给用户，便于定位并回退到“关闭 AlphaSift + 保持原有 LLM 运行链路”。
 
 ## 兼容验收索引（发布前核验）
 
 - 依赖与源码约束核验：`requirements.txt` 中的 `litellm` 约束与 `src/config.py`/`requirements.txt` 一致。
-- Hotspot 契约兼容核验：`docs/alphasift-integration.md` 与 `api/v1/endpoints/alphasift.py`、`src/services/alphasift_service.py` 保持 `hotspots`/`hotspots/{topic}` 字段与 `tests/test_alphasift_api.py` 一致，调用前后默认使用 `snapshot.last_good` 缓存兜底。
+- Hotspot 契约兼容核验：`docs/alphasift-integration.md` 与 `api/v1/endpoints/alphasift.py`、`src/services/alphasift_service.py` 保持 `hotspots`/`hotspots/{topic}` 字段与 `tests/api/alphasift/test_alphasift_api.py` 一致，调用前后默认使用 `snapshot.last_good` 缓存兜底。
 - 外部版本来源：本次集成依赖来源为 `https://github.com/ZhuLinsen/alphasift/commit/9f522747caafd3c0b1ddb7e14d5cf44c8580b6cf`，需在复验时按该 commit pin 回放导入与接口契约。
 - 行为核验：`src/services/alphasift_service.py` 的 `_build_alphasift_runtime_env` 与 `_build_alphasift_context` 仅在调用期写入进程环境；`/api/v1/alphasift/screen`、`strategies`、`status` 在运行期不回写 `.env`。
 - 回退核验：关闭 `ALPHASIFT_ENABLED` 并重启配置链路后，系统恢复原始 `LITELLM_MODEL/FALLBACK_MODELS`、`LLM_CHANNELS` 与 `LLM_*` 运行语义，不执行迁移清理脚本。
@@ -210,9 +210,9 @@ Docker 镜像与桌面发布包保持一致：`docker/Dockerfile` 会通过 `req
 
 ## 验证记录
 
-- `python -m pytest tests/test_alphasift_api.py -q`
+- `python -m pytest tests/api/alphasift/test_alphasift_api.py -q`
 - `python -m pytest tests/test_main_schedule_mode.py -q -k "start_api_server_fails_before_thread_when_port_is_busy"`
-- `python -m py_compile api/v1/endpoints/alphasift.py src/services/alphasift_service.py tests/test_alphasift_api.py src/config.py src/core/config_registry.py`
+- `python -m py_compile api/v1/endpoints/alphasift.py src/services/alphasift_service.py tests/api/alphasift/test_alphasift_api.py src/config.py src/core/config_registry.py`
 - `cd apps/dsa-web && npm run test -- alphasift.test.ts StockScreeningPage.test.tsx SettingsPage.test.tsx --run`
 - `cd apps/dsa-web && npm run lint`
 - `cd apps/dsa-web && npm run build`
