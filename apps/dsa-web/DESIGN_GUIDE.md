@@ -4,7 +4,7 @@
 > 权威。[UI 信息架构审计](../../docs/stockpulse-ui-information-architecture.md) 的 HITL-H1～H8
 > 已于 2026-07-17 由维护者批准（结论见其 §18.1），自此是导航、页面归属、URL、状态与交互
 > 契约的已批准目标；实施仍须按其 §17 顺序、tracker 登记与各 slice 门禁推进，不得越序启动
-> UI-02～UI-07 父任务。Coinstax/Figma 仅是外部模式参考；只有根目录 `DESIGN.md` 明确批准并
+> UI-02～UI-07 父任务。Coinstax/Figma 仅是外部模式参考；只有 `docs/DESIGN.md` 明确批准并
 > 完成 StockPulse 语义映射的颜色变量值可作为目标 token，外部变量名、raw fill、产品需求、
 > 组件 API、页面 IA 和像素细节均不是权威。
 
@@ -178,7 +178,7 @@
 - Coinstax/Figma 可用于评估中性基底、紧凑侧栏、数据密度、Dashboard、Portfolio、
   Empty State 和 light/dark 对称等模式。
 - 不复制钱包、转账、兑换、交易等未批准 Web3 能力。
-- 除根目录 `DESIGN.md` 已批准并映射的颜色变量值外，不从外部文件或截图复制/猜测 raw
+- 除 `docs/DESIGN.md` 已批准并映射的颜色变量值外，不从外部文件或截图复制/猜测 raw
   color、shadow、spacing、token 名或组件 API。
 - 先复用 `components/common`、`components/layout` 和现有领域组件；确有语义缺口时，
   先提出规则与公共组件扩展，由对应 UI slice 负责。

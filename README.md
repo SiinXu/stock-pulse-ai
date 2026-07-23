@@ -19,6 +19,20 @@
 > [!NOTE]
 > **StockPulse** 是 [ZhuLinsen/daily_stock_analysis](https://github.com/ZhuLinsen/daily_stock_analysis) 的独立维护 fork。上游原始代码遵循 MIT License，StockPulse 新增与大幅修改的代码遵循 AGPL-3.0。StockPulse 不是上游团队发布的官方版本。感谢原作者和贡献者；完整授权条款见 [LICENSE](LICENSE)。
 
+## 🗂️ 目录导览
+
+| 区域 | 位置与职责 |
+| --- | --- |
+| 核心后端 | `src/` 承载业务与编排，`data_provider/` 适配数据源，`api/` 提供 FastAPI 路由，`bot/` 集成机器人。 |
+| 客户端 | `apps/dsa-web/` 是 Web 工作台，`apps/dsa-desktop/` 是 Electron 桌面客户端。 |
+| 产品资源 | `strategies/` 保存内置 YAML 策略，`templates/` 保存 Jinja 报告模板。 |
+| 文档与测试 | `docs/` 保存指南与架构说明，`tests/` 按后端领域组织测试。 |
+| 自动化 | `scripts/`、`docker/`、`.github/workflows/` 与 `.claude/` 分别承载脚本、容器、CI 和 AI 协作资产。 |
+| 运行入口 | `main.py` 启动分析、CLI 与调度，`server.py` 启动 FastAPI，`webui.py` 保留兼容 Web 启动方式。 |
+| 依赖策略 | `requirements*.txt` 声明运行时与可选依赖；`constraints.txt` 和 `build-constraints.txt` 约束运行时与构建解析。 |
+
+详细边界与数据流见 [架构总览](docs/architecture-overview.md)。
+
 ## 🖥️ 产品预览
 
 <p align="center">

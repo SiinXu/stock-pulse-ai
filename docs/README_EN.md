@@ -21,6 +21,20 @@ English | [简体中文](../README.md) | [繁體中文](README_CHT.md)
 > [!NOTE]
 > **StockPulse** is an independently maintained fork of [ZhuLinsen/daily_stock_analysis](https://github.com/ZhuLinsen/daily_stock_analysis). Upstream original code is under the MIT License; new contributions and substantial modifications by StockPulse are under AGPL-3.0. StockPulse is not an official upstream release. Thanks to the original author and contributors; see [LICENSE](../LICENSE) for the full copyright and license terms.
 
+## 🗂️ Repository Map
+
+| Area | Location and responsibility |
+| --- | --- |
+| Core backend | `src/` owns business logic and orchestration, `data_provider/` adapts market data, `api/` exposes FastAPI routes, and `bot/` integrates chat platforms. |
+| Clients | `apps/dsa-web/` is the Web workspace and `apps/dsa-desktop/` is the Electron desktop client. |
+| Product assets | `strategies/` stores built-in YAML strategies and `templates/` stores Jinja report templates. |
+| Docs and tests | `docs/` contains guides and architecture decisions; `tests/` follows backend domain ownership. |
+| Automation | `scripts/`, `docker/`, `.github/workflows/`, and `.claude/` contain scripts, containers, CI, and AI collaboration assets. |
+| Entrypoints | `main.py` runs analysis, CLI, and scheduling; `server.py` starts FastAPI; `webui.py` remains the compatibility Web launcher. |
+| Dependency policy | `requirements*.txt` declares runtime and optional dependencies; `constraints.txt` and `build-constraints.txt` constrain runtime and build resolution. |
+
+See the [architecture overview](./architecture-overview.md) for detailed boundaries and data flow.
+
 ## 🖥️ Product Preview
 
 <p align="center">
