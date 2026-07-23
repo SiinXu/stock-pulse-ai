@@ -998,7 +998,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Tests
 
-- Added `tests/test_bot_market_command.py`, covering `MARKET_REVIEW_REGION=both` + open markets `{"cn","us"}` / `{"cn","hk"}` of `override_region` through assertions, and covering paths to skip closed market trading days and close trading day checks. Added `tests/test_yfinance_hk_indices.py` covering Hong Kong stocks index symbol mapping and partial/full failure downgrade paths.
+- Added `tests/bot/commands/test_bot_market_command.py`, covering `MARKET_REVIEW_REGION=both` + open markets `{"cn","us"}` / `{"cn","hk"}` of `override_region` through assertions, and covering paths to skip closed market trading days and close trading day checks. Added `tests/test_yfinance_hk_indices.py` covering Hong Kong stocks index symbol mapping and partial/full failure downgrade paths.
 - Completed lightweight import stub stock code standardization functions for the `task_queue`; Restored `tests/test_task_queue_config_sync.py` collection and execution.
 
 ## [3.14.1] - 2026-04-26
