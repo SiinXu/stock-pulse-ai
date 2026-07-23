@@ -451,9 +451,9 @@ describe('SidebarNav', () => {
     expect(homeParent).not.toHaveAttribute('aria-current', 'page');
     expect(signalsChild).toHaveAttribute('aria-current', 'page');
     fireEvent.click(screen.getByRole('button', { name: '首页' }));
-    expect(homeParent).toHaveAttribute('aria-current', 'page');
+    expect(homeParent).toHaveAttribute('aria-current', 'location');
     expect(screen.queryByRole('link', { name: 'AI 建议' })).not.toBeInTheDocument();
-    currentLinks = signalsRender.container.querySelectorAll('a[aria-current="page"]');
+    currentLinks = signalsRender.container.querySelectorAll('a[aria-current]');
     expect(currentLinks).toHaveLength(1);
     expect(currentLinks[0]).toBe(homeParent);
     signalsRender.unmount();

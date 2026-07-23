@@ -832,9 +832,9 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(homeParent).not.toHaveAttribute('aria-current', 'page');
     await expect(signalChild).toHaveAttribute('aria-current', 'page');
     await homeToggle.click();
-    await expect(homeParent).toHaveAttribute('aria-current', 'page');
+    await expect(homeParent).toHaveAttribute('aria-current', 'location');
     await expect(signalChild).toBeHidden();
-    await expect(navigation.locator('a[aria-current="page"]')).toHaveCount(1);
+    await expect(navigation.locator('a[aria-current]')).toHaveCount(1);
     await homeToggle.click();
     await expect(signalChild).toHaveAttribute('aria-current', 'page');
 
@@ -846,9 +846,9 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     const drawerSignal = drawerNavigation.getByRole('link', { name: UI_TEXT.en['layout.nav.decisionSignals'] });
     await expect(drawerSignal).toHaveAttribute('aria-current', 'page');
     await drawerNavigation.getByRole('button', { name: UI_TEXT.en['layout.nav.home'] }).click();
-    await expect(drawerHome).toHaveAttribute('aria-current', 'page');
+    await expect(drawerHome).toHaveAttribute('aria-current', 'location');
     await expect(drawerSignal).toBeHidden();
-    await expect(drawerNavigation.locator('a[aria-current="page"]')).toHaveCount(1);
+    await expect(drawerNavigation.locator('a[aria-current]')).toHaveCount(1);
     await page.getByRole('button', { name: UI_TEXT.en['common.closeDrawer'] }).click();
     await page.setViewportSize({ width: 1280, height: 720 });
     await assertRouteChrome(page, APP_ROUTE_PATHS.researchBacktest, BACKTEST_TEXT.en.runBacktest, BACKTEST_TEXT.en.documentTitle);
