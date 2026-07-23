@@ -101,10 +101,8 @@ _PUBLIC_REDACTION_FIELD_VALUES = frozenset(
 _PUBLIC_AUTHORIZATION_PUNCTUATION = frozenset(".,:!?)]}")
 _SENSITIVE_FIELD_SEPARATOR_PATTERN = r"(?:\\+['\"]|['\"])?\s*[:=]\s*"
 _TEXT_FIELD_KEY_PATTERN = r"[A-Za-z][A-Za-z0-9_-]*"
-_TEXT_FIELD_KEY_JOINERS = frozenset(
-    " \t\f\v.!#$%&()*+,./:;?@[]^`{|}~"
-)
 _TEXT_FIELD_KEY_PART_LIMIT = 16
+_TEXT_FIELD_BOUNDARY_LOOKAHEAD = 512
 _TEXT_FIELD_START_PATTERN = re.compile(
     rf"((?<![A-Za-z0-9_-]){_TEXT_FIELD_KEY_PATTERN})"
     rf"({_SENSITIVE_FIELD_SEPARATOR_PATTERN})",
@@ -468,6 +466,18 @@ def _sensitive_text_field_kind(key_text: str) -> Optional[str]:
     return "generic"
 
 
+def _is_text_field_key_joiner(char: str) -> bool:
+    """Match the structured-key splitter without crossing record boundaries."""
+
+    return (
+        char not in "\r\n"
+        and not (
+            char.isascii()
+            and (char.isalnum() or char in "_-")
+        )
+    )
+
+
 def _text_field_key_starts(
     text: str,
     immediate_start: int,
@@ -482,7 +492,7 @@ def _text_field_key_starts(
         joiner_end = cursor
         while (
             cursor > lower_bound
-            and text[cursor - 1] in _TEXT_FIELD_KEY_JOINERS
+            and _is_text_field_key_joiner(text[cursor - 1])
         ):
             cursor -= 1
         if cursor == joiner_end:
@@ -501,7 +511,7 @@ def _text_field_key_starts(
         probe = cursor
         while (
             probe > lower_bound
-            and text[probe - 1] in _TEXT_FIELD_KEY_JOINERS
+            and _is_text_field_key_joiner(text[probe - 1])
         ):
             probe -= 1
         truncated = (
@@ -590,8 +600,16 @@ def _encoded_field_key_start(text: str, index: int) -> int:
 def _sensitive_text_field_kind_at(text: str, index: int) -> Optional[str]:
     key_start = _encoded_field_key_start(text, index)
     cursor = key_start
-    while True:
-        match = _TEXT_FIELD_START_PATTERN.search(text, cursor)
+    boundary_end = min(
+        len(text),
+        key_start + _TEXT_FIELD_BOUNDARY_LOOKAHEAD,
+    )
+    while cursor < boundary_end:
+        match = _TEXT_FIELD_START_PATTERN.search(
+            text,
+            cursor,
+            boundary_end,
+        )
         if match is None:
             return None
         kind, sensitive_start = _classify_text_field_match(
@@ -602,6 +620,7 @@ def _sensitive_text_field_kind_at(text: str, index: int) -> Optional[str]:
         if sensitive_start is not None:
             return kind if sensitive_start == key_start else None
         cursor = match.end()
+    return None
 
 
 def _sensitive_text_field_starts_at(text: str, index: int) -> bool:
@@ -702,13 +721,15 @@ def _is_structured_field_suffix(text: str, index: int) -> bool:
         cursor += 1
     if cursor == len(text):
         return True
-    if text[cursor] in ")]}":
+    has_closers = text[cursor] in ")]}"
+    if has_closers:
         while cursor < len(text) and text[cursor] in ")]}":
             cursor += 1
         while cursor < len(text) and text[cursor] in " \t\f\v":
             cursor += 1
         if cursor == len(text):
             return True
+        return False
     if text[cursor] != ",":
         return False
     cursor += 1
@@ -870,6 +891,7 @@ def _sensitive_field_end(
     previous_non_whitespace: Optional[str] = outer_quote_char
     authorization_has_equals = False
     authorization_has_comma = False
+    ambiguous_structural_closer = False
     index = field_value_start + len(outer_quote)
     while index < len(text):
         char = text[index]
@@ -1019,10 +1041,18 @@ def _sensitive_field_end(
                 field_value_start,
                 whitespace_start,
             )
-            if field_kind == "generic" and not marker_prefix:
+            if (
+                field_kind == "generic"
+                and not marker_prefix
+                and not ambiguous_structural_closer
+            ):
                 return whitespace_start
             if (
                 previous_non_whitespace not in {";", ","}
+                and not (
+                    field_kind == "generic"
+                    and ambiguous_structural_closer
+                )
                 and _is_verified_field_boundary(
                     text,
                     index,
@@ -1037,7 +1067,11 @@ def _sensitive_field_end(
                 return whitespace_start
             continue
         if char in ",;&":
-            if structured_key and _is_structured_field_suffix(text, index):
+            if (
+                structured_key
+                and not ambiguous_structural_closer
+                and _is_structured_field_suffix(text, index)
+            ):
                 return index
             candidate = index + 1
             while candidate < len(text) and text[candidate] in " \t\f\v":
@@ -1047,7 +1081,7 @@ def _sensitive_field_end(
                 field_value_start,
                 index,
             )
-            if _is_next_diagnostic_field(
+            if not ambiguous_structural_closer and _is_next_diagnostic_field(
                 text,
                 candidate,
                 redact_all_http_urls=redact_all_http_urls,
@@ -1055,6 +1089,7 @@ def _sensitive_field_end(
                 return index
             if (
                 field_kind == "generic"
+                and not ambiguous_structural_closer
                 and _is_verified_field_boundary(
                     text,
                     candidate,
@@ -1083,11 +1118,8 @@ def _sensitive_field_end(
                 previous_non_whitespace = char
                 index += 1
                 continue
-            marker_prefix = _starts_with_public_redaction_marker(
-                text,
-                field_value_start,
-                index,
-            )
+            if field_kind == "generic":
+                ambiguous_structural_closer = True
             if (
                 structured_key
                 and (
@@ -1099,11 +1131,6 @@ def _sensitive_field_end(
                         index,
                     )
                 )
-                and _is_structured_field_suffix(text, index)
-            ) or (
-                not structured_key
-                and field_kind == "generic"
-                and not marker_prefix
                 and _is_structured_field_suffix(text, index)
             ):
                 return index

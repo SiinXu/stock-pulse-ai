@@ -785,6 +785,10 @@ def test_composite_text_labels_share_mapping_classification_across_boundaries() 
         "api:key": BEARER_SECRET,
         "api(key": DSN_SECRET,
         "api]key": WEBHOOK_SECRET,
+        r"api\key": PREFIXED_API_KEY,
+        "api\u00a0key": PLAIN_SECRET,
+        "api·key": BEARER_SECRET,
+        "api🔐key": DSN_SECRET,
     }
 
     for label, secret in labelled_secrets.items():
@@ -805,7 +809,7 @@ def test_composite_text_labels_share_mapping_classification_across_boundaries() 
         f"{long_label}=alpha {PLAIN_SECRET}"
     ) == f"{long_label}=[REDACTED]"
 
-    raw = f"api.key={PLAIN_SECRET}"
+    raw = rf"api\key={PLAIN_SECRET}"
     spaced = f"private key={BEARER_SECRET}"
     api_payload = error_body(
         "provider_rejected",
@@ -903,6 +907,16 @@ def test_generic_fields_reject_ambiguous_delimiter_suffixes() -> None:
         assert redacted == "password=[REDACTED]"
         assert redact_sensitive_text(redacted) == redacted
         _assert_no_secret(redacted)
+
+    for closer in ")]}":
+        raw = f"password={closer},note={PLAIN_SECRET}"
+        structured = f'{{"password":{closer},note={BEARER_SECRET}'
+
+        assert redact_sensitive_text(raw) == "password=[REDACTED]"
+        assert redact_sensitive_text(structured) == '{"password":[REDACTED]'
+        assert redact_sensitive_text(
+            redact_sensitive_text(raw)
+        ) == "password=[REDACTED]"
 
     assert redact_sensitive_text(
         f"api_key={PLAIN_SECRET} operation=context-probe"
@@ -1144,6 +1158,36 @@ def test_field_scanner_checks_one_public_boundary_per_whitespace_run(
 
         assert hostile_redacted == hostile_text
         assert elapsed < 0.5
+
+
+def test_sensitive_field_boundary_search_uses_bounded_lookahead(
+    monkeypatch,
+) -> None:
+    original_pattern = sanitize_module._TEXT_FIELD_START_PATTERN
+    bounded_spans: list[int] = []
+
+    class CountingPattern:
+        def search(self, text, start=0, end=None):
+            if end is None:
+                return original_pattern.search(text, start)
+            bounded_spans.append(end - start)
+            return original_pattern.search(text, start, end)
+
+        def match(self, text, start=0):
+            return original_pattern.match(text, start)
+
+    monkeypatch.setattr(
+        sanitize_module,
+        "_TEXT_FIELD_START_PATTERN",
+        CountingPattern(),
+    )
+    word_count = 4096
+    raw = "Authorization: BENIGN " + ("word " * word_count) + "END"
+
+    assert redact_sensitive_text(raw) == "Authorization: [REDACTED]"
+    assert bounded_spans
+    assert max(bounded_spans) <= sanitize_module._TEXT_FIELD_BOUNDARY_LOOKAHEAD
+    assert len(bounded_spans) <= word_count + 8
 
 
 def test_structured_closer_runs_are_checked_a_constant_number_of_times(
