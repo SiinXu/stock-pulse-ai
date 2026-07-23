@@ -655,13 +655,7 @@ const StockScreeningPage: React.FC = () => {
     try {
       const result = await alphasiftApi.getStrategies();
       if (!isLatestRequest()) return;
-      const loadedStrategies = result.strategies || [];
-      setStrategies(loadedStrategies);
-      if (loadedStrategies.length > 0) {
-        setStrategy((currentStrategy) =>
-          loadedStrategies.some((item) => item.id === currentStrategy) ? currentStrategy : loadedStrategies[0].id,
-        );
-      }
+      setStrategies(result.strategies || []);
     } catch (err) {
       if (!isLatestRequest()) return;
       setStrategyLoadError(getParsedApiError(err, language).message || text.strategyLoadFailed);

@@ -106,8 +106,14 @@ codec removes malformed owned values before page effects can issue API calls,
 replace-normalizes the URL, and preserves unrelated non-sensitive query and
 hash state.
 Stable view choices create history entries when Back/Forward should restore
-them. Canonicalization, missing-resource fallback, and default-value removal
-use Router replace navigation so they do not create dead history entries. A
+them. Canonicalization, missing-resource fallback, and ordinary default-value
+removal use Router replace navigation so they do not create dead history
+entries. Discover keeps a deliberate exception: when explicit owned input
+normalizes entirely to defaults, the canonical default-valued keys remain in
+the URL as durable ownership markers. If any non-default owned value remains,
+redundant defaults are still omitted. This conditional encoding keeps compact
+URLs where possible without letting refresh, authentication, or a legacy
+redirect mistake explicit intent for a bare route. A
 valid but unavailable Portfolio account falls back to the first available
 account (or all accounts) and displays the shared invalid-link warning.
 Chat keeps validated stock/name/report identity in the URL until the prepared
@@ -143,7 +149,10 @@ overridden by the initial restore guard.
 An active Screening task keeps its opaque task ID for status recovery, but its
 stored run parameters are only a fallback for a bare Discover URL. Any explicit
 Discover-owned parameter selects the complete URL-owned run state, so stale
-task parameters cannot rewrite a canonical or legacy-redirect deep link.
+task parameters cannot rewrite a canonical or legacy-redirect deep link. Safe
+custom strategy IDs remain URL-owned even when absent from the current preset
+catalog. Wholly malformed owned input normalizes to explicit canonical defaults
+instead of becoming bare, preserving the same precedence across refresh.
 
 Home continuity includes the validated task/history Run Flow identity owned by
 the Home URL. A same-stock return restores the active process drawer; carrying a
@@ -379,10 +388,13 @@ replace or reinterpret the separately owned UI4 L-09 target. The typed
 application navigation descriptor exposes five stable primary domains: Home,
 Research, Portfolio, Agent, and Settings. Home temporarily owns Decision Signals
 and Alerts until their dedicated IA migration, while Research owns Market
-Review, Discover, and Backtest. Expanded navigation keeps these secondary
-destinations visible beneath their parent. Compact navigation opens the same
-children in a right-side hover or keyboard flyout; Right Arrow enters the
-flyout and Left Arrow or Escape restores its parent trigger.
+Review, Discover, and Backtest. Expanded desktop navigation and the mobile
+drawer expose a separate 44px disclosure button for each secondary group, keep
+the groups open by default, and allow users to collapse or reopen their child
+routes without turning the parent route link into a false toggle. Compact
+navigation opens the same children in a right-side hover or keyboard flyout;
+Right Arrow enters the flyout and Left Arrow or Escape restores its parent
+trigger.
 
 Canonical Research paths are `/research/market`, `/research/discover`, and
 `/research/backtest`. The legacy `/screening` and `/backtest` URLs use the shared

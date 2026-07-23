@@ -40,7 +40,7 @@ export function shouldDelegateCurrentDocumentNavigation(
 }
 
 // Keep the five primary domains stable while secondary routes remain discoverable
-// in both expanded navigation and the compact flyout.
+// in collapsible expanded groups and the compact flyout.
 export const APPLICATION_NAVIGATION_ITEMS: readonly ApplicationNavigationItem[] = [
   {
     key: 'home',

@@ -970,6 +970,57 @@ describe('StockScreeningPage', () => {
       .toContain('stored-screen-task');
   });
 
+  it('keeps a safe URL-owned custom strategy that is absent from the preset catalog', async () => {
+    window.sessionStorage.setItem(SCREEN_TASK_SESSION_STORAGE_KEY, JSON.stringify({
+      taskId: 'stored-custom-task',
+      market: RESEARCH_DISCOVER_DEFAULT_VALUES.market,
+      strategy: 'quality',
+      maxResults: 8,
+    }));
+    const customQuery = new URLSearchParams({
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: 'custom_strategy_alpha',
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: '17',
+      source: 'notification',
+    });
+    const customHref = `${APP_ROUTE_PATHS.researchDiscover}?${customQuery.toString()}#details`;
+    window.history.pushState({}, '', customHref);
+    getStrategies.mockResolvedValueOnce({
+      enabled: true,
+      strategies: [
+        { id: 'dual_low', name: '双低', description: 'desc', category: '价值' },
+        { id: 'quality', name: '质量', description: 'desc', category: '质量' },
+      ],
+      strategyCount: 2,
+    });
+    getAlphaSiftStatus.mockResolvedValueOnce({
+      enabled: true,
+      available: true,
+      installSpecIsDefault: true,
+    });
+    getScreenTask.mockResolvedValue({
+      taskId: 'stored-custom-task',
+      traceId: 'stored-custom-task',
+      status: 'processing',
+      progress: 40,
+      message: '任务执行中',
+      result: null,
+    });
+
+    render(<StockScreeningPage />);
+
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    await waitFor(() => expect(getStrategies).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(getScreenTask).toHaveBeenCalledWith('stored-custom-task'));
+    expect(screen.getByRole('combobox', { name: '选择策略' }))
+      .toHaveAttribute('data-value', 'custom_strategy_alpha');
+    openScreeningConfiguration();
+    expect(screen.getByLabelText('策略参数')).toHaveValue('custom_strategy_alpha');
+    expect(screen.getByLabelText('返回数量')).toHaveValue(17);
+    expect(navigate).toHaveBeenLastCalledWith(customHref, { replace: true });
+    expect(window.sessionStorage.getItem(SCREEN_TASK_SESSION_STORAGE_KEY))
+      .toContain('stored-custom-task');
+  });
+
   it('keeps explicit default-valued URL state authoritative after a refresh with a stale task', async () => {
     window.sessionStorage.setItem(SCREEN_TASK_SESSION_STORAGE_KEY, JSON.stringify({
       taskId: 'stored-default-task',

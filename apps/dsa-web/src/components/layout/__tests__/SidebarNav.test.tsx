@@ -187,7 +187,7 @@ describe('SidebarNav', () => {
     ]);
   });
 
-  it('keeps expanded group children visible without a false disclosure affordance', () => {
+  it('collapses and expands secondary groups with accessible disclosure controls', () => {
     render(
       <MemoryRouter initialEntries={[APP_ROUTE_PATHS.home]}>
         <SidebarNav />
@@ -198,7 +198,23 @@ describe('SidebarNav', () => {
       const groupLink = screen.getByRole('link', { name });
       expect(groupLink).not.toHaveAttribute('aria-expanded');
       expect(groupLink.querySelectorAll('svg')).toHaveLength(1);
+      expect(screen.getByRole('button', { name })).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByRole('button', { name })).toHaveClass('h-11', 'w-11');
     }
+    expect(screen.getByRole('link', { name: '大盘复盘' })).toBeVisible();
+    expect(screen.getByRole('link', { name: '发现' })).toBeVisible();
+
+    const researchToggle = screen.getByRole('button', { name: '研究' });
+    fireEvent.click(researchToggle);
+    expect(researchToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(researchToggle).not.toHaveAttribute('aria-controls');
+    expect(screen.queryByRole('link', { name: '大盘复盘' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '发现' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'AI 建议' })).toBeVisible();
+
+    fireEvent.click(researchToggle);
+    expect(researchToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(researchToggle).toHaveAttribute('aria-controls', 'shell-nav-research-children');
     expect(screen.getByRole('link', { name: '大盘复盘' })).toBeVisible();
     expect(screen.getByRole('link', { name: '发现' })).toBeVisible();
   });
@@ -367,9 +383,13 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
+    const researchParent = screen.getByRole('link', { name: '研究' });
+    const expandedMarketChild = screen.getByRole('link', { name: '大盘复盘' });
+    expect(researchParent).not.toHaveAttribute('aria-current', 'page');
+    expect(expandedMarketChild).toHaveAttribute('aria-current', 'page');
     let currentLinks = marketRender.container.querySelectorAll('a[aria-current="page"]');
     expect(currentLinks).toHaveLength(1);
-    expect(currentLinks[0]).toHaveAttribute('href', APP_ROUTE_PATHS.researchMarket);
+    expect(currentLinks[0]).toBe(expandedMarketChild);
     marketRender.unmount();
 
     const discoverRender = render(
@@ -390,12 +410,12 @@ describe('SidebarNav', () => {
     const research = screen.getByRole('link', { name: '研究' });
     fireEvent.mouseEnter(research);
     const menu = await screen.findByRole('menu', { name: '研究' });
-    const marketChild = within(menu).getByRole('menuitem', { name: '大盘复盘' });
+    const compactMarketChild = within(menu).getByRole('menuitem', { name: '大盘复盘' });
     expect(research).not.toHaveAttribute('aria-current', 'page');
-    expect(marketChild).toHaveAttribute('aria-current', 'page');
+    expect(compactMarketChild).toHaveAttribute('aria-current', 'page');
     currentLinks = document.querySelectorAll('a[aria-current="page"]');
     expect(currentLinks).toHaveLength(1);
-    expect(currentLinks[0]).toBe(marketChild);
+    expect(currentLinks[0]).toBe(compactMarketChild);
     compactRender.unmount();
   });
 

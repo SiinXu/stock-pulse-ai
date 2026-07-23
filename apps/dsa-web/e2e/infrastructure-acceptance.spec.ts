@@ -704,6 +704,12 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await assertRouteChrome(page, APP_ROUTE_PATHS.home, UI_TEXT.en['home.analyze'], UI_TEXT.en['home.pageTitle']);
     await assertRouteChrome(page, APP_ROUTE_PATHS.agent, UI_TEXT.en['chat.title'], UI_TEXT.en['chat.pageTitle']);
     await assertRouteChrome(page, APP_ROUTE_PATHS.researchMarket, UI_TEXT.en['home.marketReview'], UI_TEXT.en['home.marketReviewPageTitle']);
+    const navigation = page.getByRole('navigation', { name: UI_TEXT.en['layout.mainNav'] });
+    const researchParent = navigation.getByRole('link', { name: UI_TEXT.en['layout.nav.research'] });
+    const marketChild = navigation.getByRole('link', { name: UI_TEXT.en['home.marketReview'] });
+    await expect(researchParent).not.toHaveAttribute('aria-current', 'page');
+    await expect(marketChild).toHaveAttribute('aria-current', 'page');
+    await expect(navigation.locator('a[aria-current="page"]')).toHaveCount(1);
     await assertRouteChrome(page, APP_ROUTE_PATHS.researchDiscover, SCREENING_TEXT.en.title, SCREENING_TEXT.en.documentTitle);
     await assertRouteChrome(page, APP_ROUTE_PATHS.portfolio, PORTFOLIO_TEXT.en.title, PORTFOLIO_TEXT.en.documentTitle);
     await assertRouteChrome(page, APP_ROUTE_PATHS.decisionSignals, UI_TEXT.en['decisionSignals.title'], UI_TEXT.en['decisionSignals.pageTitle']);
@@ -753,20 +759,20 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     }
   });
 
-  test('05c explicit Discover URLs override stale active-task parameters on canonical and legacy entry', async ({ page }) => {
+  test('05c every explicit Discover URL intent survives canonical and legacy entry plus refresh', async ({ page }) => {
     await mockScreeningBase(page, [
       {
         id: 'dual_low',
         name: 'Dual low',
         name_en: 'Dual low',
-        description_en: 'Stale task strategy',
+        description_en: 'Default strategy',
         category_en: 'Value',
       },
       {
         id: 'quality',
         name: 'Quality',
         name_en: 'Quality',
-        description_en: 'Explicit URL strategy',
+        description_en: 'Stale task strategy',
         category_en: 'Quality',
       },
     ]);
@@ -785,79 +791,90 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     });
     await login(page, 'en');
 
-    for (const entryPath of [APP_ROUTE_PATHS.researchDiscover, LEGACY_ROUTE_PATHS.screening]) {
-      await page.evaluate(({ key, value }) => sessionStorage.setItem(key, JSON.stringify(value)), {
-        key: screeningTaskStorageKey,
-        value: {
-          taskId: 'stored-explicit-task',
-          market: RESEARCH_DISCOVER_DEFAULT_VALUES.market,
-          strategy: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
-          maxResults: RESEARCH_DISCOVER_DEFAULT_VALUES.count,
+    const intentCases = [
+      {
+        name: 'safe custom strategy outside the preset catalog',
+        input: {
+          [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: 'custom_strategy_alpha',
+          [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: '17',
+          source: 'notification',
         },
-      });
-      const requestsBeforeNavigation = restorationRequests;
-      await page.goto(
-        `${entryPath}?${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy}=quality&${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count}=20&source=notification#details`,
-      );
-
-      await expect.poll(() => new URL(page.url()).pathname).toBe(APP_ROUTE_PATHS.researchDiscover);
-      await expect.poll(() => restorationRequests).toBeGreaterThan(requestsBeforeNavigation);
-      const redirectedUrl = new URL(page.url());
-      expect(redirectedUrl.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy)).toBe('quality');
-      expect(redirectedUrl.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count)).toBe('20');
-      expect(redirectedUrl.searchParams.get('source')).toBe('notification');
-      expect(redirectedUrl.hash).toBe('#details');
-      await expect(page.getByRole('combobox', { name: SCREENING_TEXT.en.selectStrategy }))
-        .toHaveAttribute('data-value', 'quality');
-      await page.getByRole('button', { name: SCREENING_TEXT.en.parameters }).click();
-      await expect(page.getByRole('dialog', { name: SCREENING_TEXT.en.parameters })
-        .getByLabel(SCREENING_TEXT.en.resultCount)).toHaveValue('20');
-      expect(await page.evaluate((key) => sessionStorage.getItem(key), screeningTaskStorageKey))
-        .toContain('stored-explicit-task');
-    }
-
-    await page.evaluate(({ key, value }) => sessionStorage.setItem(key, JSON.stringify(value)), {
-      key: screeningTaskStorageKey,
-      value: {
-        taskId: 'stored-explicit-task',
-        market: RESEARCH_DISCOVER_DEFAULT_VALUES.market,
-        strategy: 'quality',
-        maxResults: 20,
+        expectedMarket: null,
+        expectedStrategy: 'custom_strategy_alpha',
+        expectedCount: '17',
       },
-    });
-    const explicitDefaults = new URLSearchParams({
-      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
-      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: String(RESEARCH_DISCOVER_DEFAULT_VALUES.count),
-      source: 'notification',
-    });
-    await page.goto(`${APP_ROUTE_PATHS.researchDiscover}?${explicitDefaults.toString()}#details`);
+      {
+        name: 'explicit default values',
+        input: {
+          [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market]: RESEARCH_DISCOVER_DEFAULT_VALUES.market,
+          [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
+          [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: String(RESEARCH_DISCOVER_DEFAULT_VALUES.count),
+          source: 'notification',
+        },
+        expectedMarket: RESEARCH_DISCOVER_DEFAULT_VALUES.market,
+        expectedStrategy: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
+        expectedCount: String(RESEARCH_DISCOVER_DEFAULT_VALUES.count),
+      },
+      {
+        name: 'wholly malformed owned values',
+        input: {
+          [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market]: 'unsupported',
+          [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: '<bad>',
+          [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: '999',
+          source: 'notification',
+        },
+        expectedMarket: RESEARCH_DISCOVER_DEFAULT_VALUES.market,
+        expectedStrategy: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
+        expectedCount: String(RESEARCH_DISCOVER_DEFAULT_VALUES.count),
+      },
+    ] as const;
 
-    await expect.poll(() => new URL(page.url()).pathname).toBe(APP_ROUTE_PATHS.researchDiscover);
-    await expect(page.getByRole('combobox', { name: SCREENING_TEXT.en.selectStrategy }))
-      .toHaveAttribute('data-value', RESEARCH_DISCOVER_DEFAULT_VALUES.strategy);
-    let defaultOwnedUrl = new URL(page.url());
-    expect(defaultOwnedUrl.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy))
-      .toBe(RESEARCH_DISCOVER_DEFAULT_VALUES.strategy);
-    expect(defaultOwnedUrl.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count))
-      .toBe(String(RESEARCH_DISCOVER_DEFAULT_VALUES.count));
-    await page.getByRole('button', { name: SCREENING_TEXT.en.parameters }).click();
-    await expect(page.getByRole('dialog', { name: SCREENING_TEXT.en.parameters })
-      .getByLabel(SCREENING_TEXT.en.resultCount))
-      .toHaveValue(String(RESEARCH_DISCOVER_DEFAULT_VALUES.count));
+    for (const entryPath of [APP_ROUTE_PATHS.researchDiscover, LEGACY_ROUTE_PATHS.screening]) {
+      for (const intentCase of intentCases) {
+        await test.step(`${entryPath}: ${intentCase.name}`, async () => {
+          await page.evaluate(({ key, value }) => sessionStorage.setItem(key, JSON.stringify(value)), {
+            key: screeningTaskStorageKey,
+            value: {
+              taskId: 'stored-explicit-task',
+              market: RESEARCH_DISCOVER_DEFAULT_VALUES.market,
+              strategy: 'quality',
+              maxResults: 8,
+            },
+          });
+          const requestsBeforeNavigation = restorationRequests;
+          const inputSearch = new URLSearchParams(intentCase.input).toString();
+          await page.goto(`${entryPath}?${inputSearch}#details`);
 
-    await page.reload();
+          const assertIntentState = async () => {
+            const currentUrl = new URL(page.url());
+            expect(currentUrl.pathname).toBe(APP_ROUTE_PATHS.researchDiscover);
+            expect(currentUrl.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market))
+              .toBe(intentCase.expectedMarket);
+            expect(currentUrl.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy))
+              .toBe(intentCase.expectedStrategy);
+            expect(currentUrl.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count))
+              .toBe(intentCase.expectedCount);
+            expect(currentUrl.searchParams.get('source')).toBe('notification');
+            expect(currentUrl.hash).toBe('#details');
+            await expect(page.getByRole('combobox', { name: SCREENING_TEXT.en.selectStrategy }))
+              .toHaveAttribute('data-value', intentCase.expectedStrategy);
+            await page.getByRole('button', { name: SCREENING_TEXT.en.parameters }).click();
+            await expect(page.getByRole('dialog', { name: SCREENING_TEXT.en.parameters })
+              .getByLabel(SCREENING_TEXT.en.resultCount)).toHaveValue(intentCase.expectedCount);
+            expect(await page.evaluate((key) => {
+              const raw = sessionStorage.getItem(key);
+              return raw ? JSON.parse(raw) : null;
+            }, screeningTaskStorageKey)).toMatchObject({ taskId: 'stored-explicit-task' });
+          };
 
-    await expect(page.getByRole('combobox', { name: SCREENING_TEXT.en.selectStrategy }))
-      .toHaveAttribute('data-value', RESEARCH_DISCOVER_DEFAULT_VALUES.strategy);
-    defaultOwnedUrl = new URL(page.url());
-    expect(defaultOwnedUrl.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy))
-      .toBe(RESEARCH_DISCOVER_DEFAULT_VALUES.strategy);
-    expect(defaultOwnedUrl.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count))
-      .toBe(String(RESEARCH_DISCOVER_DEFAULT_VALUES.count));
-    await page.getByRole('button', { name: SCREENING_TEXT.en.parameters }).click();
-    await expect(page.getByRole('dialog', { name: SCREENING_TEXT.en.parameters })
-      .getByLabel(SCREENING_TEXT.en.resultCount))
-      .toHaveValue(String(RESEARCH_DISCOVER_DEFAULT_VALUES.count));
+          await expect.poll(() => new URL(page.url()).pathname).toBe(APP_ROUTE_PATHS.researchDiscover);
+          await expect.poll(() => restorationRequests).toBeGreaterThan(requestsBeforeNavigation);
+          await assertIntentState();
+          await page.reload();
+          await assertIntentState();
+        });
+      }
+    }
   });
 
   test('06 Chinese UI with Chinese report keeps both report body and system actions Chinese', async ({ page }) => {

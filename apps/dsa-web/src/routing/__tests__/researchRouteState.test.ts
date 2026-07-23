@@ -156,6 +156,31 @@ describe('Research route state codec', () => {
     }).toString());
   });
 
+  it('keeps wholly malformed Discover intent explicit after canonical cleanup and refresh', () => {
+    const staleTask = {
+      market: RESEARCH_DISCOVER_DEFAULT_VALUES.market,
+      strategy: 'quality',
+      maxResults: 8,
+    };
+    const parsed = resolveResearchDiscoverRouteState(new URLSearchParams({
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market]: 'unsupported',
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: '<bad>',
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: '999',
+      source: 'notification',
+    }), staleTask);
+    const expectedNormalized = new URLSearchParams({
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market]: RESEARCH_DISCOVER_DEFAULT_VALUES.market,
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
+      [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: String(RESEARCH_DISCOVER_DEFAULT_VALUES.count),
+      source: 'notification',
+    });
+
+    expect(parsed.state).toEqual(DEFAULT_RESEARCH_DISCOVER_ROUTE_STATE);
+    expect(parsed.normalizedParams.toString()).toBe(expectedNormalized.toString());
+    expect(resolveResearchDiscoverRouteState(parsed.normalizedParams, staleTask).state)
+      .toEqual(DEFAULT_RESEARCH_DISCOVER_ROUTE_STATE);
+  });
+
   it('canonicalizes valid Discover state through the same owned-parameter set', () => {
     const parsed = parseResearchDiscoverRouteState(new URLSearchParams({
       [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market]: RESEARCH_DISCOVER_DEFAULT_VALUES.market,

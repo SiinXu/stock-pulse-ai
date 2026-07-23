@@ -60,6 +60,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [openGroupKey, setOpenGroupKey] = useState<string | null>(null);
   const [focusFlyoutGroupKey, setFocusFlyoutGroupKey] = useState<string | null>(null);
+  const [closedGroupKeys, setClosedGroupKeys] = useState<ReadonlySet<string>>(() => new Set());
   const groupCloseTimerRef = useRef<number | null>(null);
   const navItems = APPLICATION_NAVIGATION_ITEMS;
   const isRail = variant === 'rail';
@@ -101,6 +102,14 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
       SIDEBAR_GROUP_CLOSE_DELAY_MS,
     );
   }, [cancelGroupClose, closeGroup]);
+  const toggleGroupChildren = useCallback((key: string) => {
+    setClosedGroupKeys((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
   useEffect(() => cancelGroupClose, [cancelGroupClose]);
 
   const isRouteActive = useCallback((to: string, exact = false) => (
@@ -377,10 +386,31 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
           }
 
           if (children) {
+            const childrenExpanded = !closedGroupKeys.has(key);
+            const childrenId = `${focusKeyPrefix}-${key}-children`;
             return (
               <div key={key} className="flex shrink-0 flex-col gap-1">
-                {link}
-                <div className="ml-4 flex flex-col gap-1 border-l border-border pl-3">
+                <div className="flex items-center gap-1">
+                  <div className="min-w-0 flex-1">{link}</div>
+                  <button
+                    type="button"
+                    aria-label={label}
+                    aria-expanded={childrenExpanded}
+                    aria-controls={childrenExpanded ? childrenId : undefined}
+                    data-sidebar-group-toggle={key}
+                    onClick={() => toggleGroupChildren(key)}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-transparent text-secondary-text transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-foreground motion-reduce:transition-none"
+                  >
+                    <ChevronRight
+                      className={cn(
+                        'h-4 w-4 transition-transform motion-reduce:transition-none',
+                        childrenExpanded && 'rotate-90',
+                      )}
+                      aria-hidden="true"
+                    />
+                  </button>
+                </div>
+                {childrenExpanded ? <div id={childrenId} className="ml-4 flex flex-col gap-1 border-l border-border pl-3">
                   {children.map((child) => {
                     const ChildIcon = child.icon;
                     const childLabel = t(child.labelKey);
@@ -415,7 +445,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                       </Link>
                     );
                   })}
-                </div>
+                </div> : null}
               </div>
             );
           }
