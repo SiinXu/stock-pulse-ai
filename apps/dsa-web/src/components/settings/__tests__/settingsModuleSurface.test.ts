@@ -10,6 +10,8 @@ import * as schedulerSettingsCardModule from '../SchedulerSettingsCard';
 import * as settingsConfigItemsModule from '../settingsConfigItems';
 import * as connectionUpdateContractModule from '../settingsConnectionUpdateContract';
 import * as llmChannelEditorModelModule from '../llmChannelEditorModel';
+import * as llmConnectionCardModule from '../LLMConnectionCard';
+import * as llmConnectionModalModule from '../LLMConnectionModal';
 
 const SOURCE_EXPORT_SURFACES = {
   'src/pages/SettingsPage.tsx': ['default'],
@@ -67,6 +69,8 @@ const SOURCE_EXPORT_SURFACES = {
     'value:splitModels',
     'value:toggleModelSelection',
   ],
+  'src/components/settings/LLMConnectionCard.tsx': ['default'],
+  'src/components/settings/LLMConnectionModal.tsx': ['default'],
   'src/locales/settingsHelp.ts': [
     'type:SettingsHelpContent',
     'value:getSettingsHelpContent',
@@ -164,6 +168,8 @@ describe('Settings module surfaces', () => {
         .filter((entry) => entry.startsWith('value:'))
         .map((entry) => entry.slice('value:'.length)),
     );
+    expect(runtimeExportNames(llmConnectionCardModule)).toEqual(['default']);
+    expect(runtimeExportNames(llmConnectionModalModule)).toEqual(['default']);
   });
 
   it('freezes default, type, and value exports for every split Settings module', () => {
