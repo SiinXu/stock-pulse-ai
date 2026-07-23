@@ -1479,8 +1479,15 @@ class TestOrchestratorExecution(unittest.TestCase):
         agent = MagicMock(agent_name="technical")
         agent.run.return_value = self._stage_result("technical")
 
+        # Stable clock: next()'s default absorbs the repeated tail so a process-global
+        # time.time patch cannot be exhausted by failure-path logging ticks.
+        stage_times = iter([0.0, 0.1])
+
+        def _clock():
+            return next(stage_times, 1.2)
+
         with patch.object(orch, "_build_agent_chain", return_value=[agent]):
-            with patch("src.agent.orchestrator.time.time", side_effect=[0.0, 0.1, 1.2, 1.2, 1.2, 1.2]):
+            with patch("src.agent.orchestrator.time.time", side_effect=_clock):
                 result = orch._execute_pipeline(AgentContext(query="test"))
 
         self.assertFalse(result.success)
@@ -1521,8 +1528,15 @@ class TestOrchestratorExecution(unittest.TestCase):
 
         decision.run.side_effect = _run_decision
 
+        # Stable clock: next()'s default absorbs the repeated tail so a process-global
+        # time.time patch cannot be exhausted by failure-path logging ticks.
+        stage_times = iter([0.0, 0.1])
+
+        def _clock():
+            return next(stage_times, 1.2)
+
         with patch.object(orch, "_build_agent_chain", return_value=[decision]):
-            with patch("src.agent.orchestrator.time.time", side_effect=[0.0, 0.1, 1.2, 1.2, 1.2]):
+            with patch("src.agent.orchestrator.time.time", side_effect=_clock):
                 result = orch._execute_pipeline(ctx, parse_dashboard=True)
 
         self.assertTrue(result.success)
@@ -1557,8 +1571,15 @@ class TestOrchestratorExecution(unittest.TestCase):
         technical.run.side_effect = _run_technical
         intel.run.return_value = self._stage_result("intel")
 
+        # Stable clock: next()'s default absorbs the repeated tail so a process-global
+        # time.time patch cannot be exhausted by failure-path logging ticks.
+        stage_times = iter([0.0, 0.1, 0.2, 0.3])
+
+        def _clock():
+            return next(stage_times, 1.2)
+
         with patch.object(orch, "_build_agent_chain", return_value=[technical, intel]):
-            with patch("src.agent.orchestrator.time.time", side_effect=[0.0, 0.1, 0.2, 0.3, 1.2, 1.2, 1.2]):
+            with patch("src.agent.orchestrator.time.time", side_effect=_clock):
                 result = orch._execute_pipeline(ctx, parse_dashboard=True)
 
         self.assertTrue(result.success)
