@@ -237,7 +237,13 @@ async function installMockAuth(page: Page, options: {
     loggedIn = true;
     await fulfillJson(route, { success: true });
   });
-  return { submitted: () => submitted };
+  return {
+    submitted: () => submitted,
+    reset: () => {
+      loggedIn = false;
+      submitted = null;
+    },
+  };
 }
 
 async function openSeededReport(page: Page, uiLanguage: 'zh' | 'en', reportLanguage: 'zh' | 'en') {
@@ -682,6 +688,105 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page.getByText(/password|credentials/i).last()).toBeVisible();
     await expect(page.getByText('服务器中文诊断：密码哈希不匹配', { exact: true })).toHaveCount(0);
     await expect(page).toHaveURL(/\/login/);
+  });
+
+  test('03a authentication preserves canonical and legacy Discover URL ownership plus hash state', async ({ page }) => {
+    const auth = await installMockAuth(page, {
+      language: 'en',
+      passwordSet: true,
+    });
+    await mockScreeningBase(page, [
+      {
+        id: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
+        name: 'Dual low',
+        name_en: 'Dual low',
+        description_en: 'Default strategy',
+        category_en: 'Value',
+      },
+      {
+        id: 'quality',
+        name: 'Quality',
+        name_en: 'Quality',
+        description_en: 'Alternate strategy',
+        category_en: 'Quality',
+      },
+    ]);
+    const intentCases = [
+      {
+        entryPath: APP_ROUTE_PATHS.researchDiscover,
+        input: {
+          [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: 'custom_strategy_alpha',
+          [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: '17',
+          source: 'notification',
+        },
+        expectedMarket: null,
+        expectedStrategy: 'custom_strategy_alpha',
+        expectedCount: '17',
+      },
+      {
+        entryPath: LEGACY_ROUTE_PATHS.screening,
+        input: {
+          [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market]: RESEARCH_DISCOVER_DEFAULT_VALUES.market,
+          [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
+          [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: String(RESEARCH_DISCOVER_DEFAULT_VALUES.count),
+          source: 'notification',
+        },
+        expectedMarket: RESEARCH_DISCOVER_DEFAULT_VALUES.market,
+        expectedStrategy: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
+        expectedCount: String(RESEARCH_DISCOVER_DEFAULT_VALUES.count),
+      },
+      {
+        entryPath: LEGACY_ROUTE_PATHS.screening,
+        input: {
+          [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market]: 'unsupported',
+          [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: '<bad>',
+          [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: '999',
+          source: 'notification',
+        },
+        expectedMarket: RESEARCH_DISCOVER_DEFAULT_VALUES.market,
+        expectedStrategy: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
+        expectedCount: String(RESEARCH_DISCOVER_DEFAULT_VALUES.count),
+      },
+    ] as const;
+
+    for (const intentCase of intentCases) {
+      auth.reset();
+      const entryHref = `${intentCase.entryPath}?${new URLSearchParams(intentCase.input).toString()}#details`;
+      await page.goto(entryHref);
+      await expect(page).toHaveURL(/\/login\?redirect=/);
+      const loginUrl = new URL(page.url());
+      const redirectTarget = new URL(loginUrl.searchParams.get('redirect')!, loginUrl.origin);
+      expect(redirectTarget.pathname).toBe(intentCase.entryPath);
+      expect(redirectTarget.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market))
+        .toBe(intentCase.expectedMarket);
+      expect(redirectTarget.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy))
+        .toBe(intentCase.expectedStrategy);
+      expect(redirectTarget.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count))
+        .toBe(intentCase.expectedCount);
+      expect(redirectTarget.searchParams.get('source')).toBe('notification');
+      expect(redirectTarget.hash).toBe('#details');
+
+      await page.locator('#password').fill('returning-user-password');
+      await page.getByRole('button', { name: 'Enter workspace' }).click();
+      await expect.poll(() => new URL(page.url()).pathname)
+        .toBe(APP_ROUTE_PATHS.researchDiscover);
+
+      const restoredUrl = new URL(page.url());
+      expect(restoredUrl.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market))
+        .toBe(intentCase.expectedMarket);
+      expect(restoredUrl.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy))
+        .toBe(intentCase.expectedStrategy);
+      expect(restoredUrl.searchParams.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count))
+        .toBe(intentCase.expectedCount);
+      expect(restoredUrl.searchParams.get('source')).toBe('notification');
+      expect(restoredUrl.hash).toBe('#details');
+      const strategyControl = page.getByRole('combobox', { name: SCREENING_TEXT.en.selectStrategy });
+      await expect(strategyControl).toHaveAttribute('data-value', intentCase.expectedStrategy);
+      if (intentCase.expectedStrategy === 'custom_strategy_alpha') {
+        await expect(strategyControl)
+          .toContainText(`${SCREENING_TEXT.en.customStrategy} (custom_strategy_alpha)`);
+      }
+    }
   });
 
   test('04 UI language switch persists through refresh and browser back-forward navigation', async ({ page }) => {

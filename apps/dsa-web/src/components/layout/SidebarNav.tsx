@@ -8,6 +8,7 @@ import { cn } from '../../utils/cn';
 import { resolveContextAwareNavigationTarget } from '../../utils/sessionContinuity';
 import { APP_ROUTE_PATHS } from '../../routing/routes';
 import { ConfirmDialog } from '../common/ConfirmDialog';
+import { IconButton } from '../common/IconButton';
 import { Popover } from '../common/Popover';
 import { StatusDot } from '../common/StatusDot';
 import { Tooltip } from '../common/Tooltip';
@@ -231,8 +232,21 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
           const label = t(labelKey);
           const navigationTarget = resolveContextAwareNavigationTarget(to, currentHref);
           const activeChild = children?.find((child) => isRouteActive(child.to, child.exact));
-          const groupActive = isRouteActive(to, exact)
+          const parentActive = isRouteActive(to, exact);
+          const groupActive = parentActive
             || Boolean(activeChild);
+          const childrenExpanded = children ? !closedGroupKeys.has(key) : false;
+          const groupParentAriaCurrent = children
+            ? activeChild
+              ? childrenExpanded
+                ? undefined
+                : parentActive
+                  ? 'page'
+                  : 'location'
+              : parentActive
+                ? 'page'
+                : undefined
+            : undefined;
           const renderItemContent = (active: boolean) => (
             <>
               <Icon className={cn(itemIconClass, active ? 'text-[var(--nav-icon-active)]' : 'text-current')} />
@@ -250,7 +264,23 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               ) : null}
             </>
           );
-          const link = (
+          const link = children ? (
+            <Link
+              to={navigationTarget}
+              aria-current={groupParentAriaCurrent}
+              onClick={(event) => {
+                if (shouldDelegateCurrentDocumentNavigation(event)) {
+                  onNavigate?.();
+                }
+              }}
+              aria-label={label}
+              data-route-focus-key={`${focusKeyPrefix}:${key}`}
+              data-route-focus-return-key={returnFocusKey}
+              className={cn(itemInteractiveClass, groupActive ? itemActiveClass : '')}
+            >
+              {renderItemContent(groupActive)}
+            </Link>
+          ) : (
             <NavLink
               to={navigationTarget}
               end={exact}
@@ -312,7 +342,15 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                   <Link
                     to={navigationTarget}
                     aria-label={label}
-                    aria-current={groupActive && !(open && activeChild) ? 'page' : undefined}
+                    aria-current={activeChild
+                      ? open
+                        ? undefined
+                        : parentActive
+                          ? 'page'
+                          : 'location'
+                      : parentActive
+                        ? 'page'
+                        : undefined}
                     aria-haspopup="menu"
                     aria-expanded={open}
                     aria-controls={open ? contentId : undefined}
@@ -383,36 +421,20 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
           }
 
           if (children) {
-            const childrenExpanded = !closedGroupKeys.has(key);
             const childrenId = `${focusKeyPrefix}-${key}-children`;
             return (
               <div key={key} className="flex shrink-0 flex-col gap-1">
                 <div className="flex items-center gap-1">
-                  <div className="min-w-0 flex-1">
-                    <Link
-                      to={navigationTarget}
-                      aria-current={groupActive && !childrenExpanded ? 'page' : undefined}
-                      onClick={(event) => {
-                        if (shouldDelegateCurrentDocumentNavigation(event)) {
-                          onNavigate?.();
-                        }
-                      }}
-                      aria-label={label}
-                      data-route-focus-key={`${focusKeyPrefix}:${key}`}
-                      data-route-focus-return-key={returnFocusKey}
-                      className={cn(itemInteractiveClass, groupActive ? itemActiveClass : '')}
-                    >
-                      {renderItemContent(groupActive)}
-                    </Link>
-                  </div>
-                  <button
-                    type="button"
+                  <div className="min-w-0 flex-1">{link}</div>
+                  <IconButton
                     aria-label={label}
+                    size="navigation"
+                    variant="ghost"
+                    tooltip={false}
                     aria-expanded={childrenExpanded}
                     aria-controls={childrenExpanded ? childrenId : undefined}
                     data-sidebar-group-toggle={key}
                     onClick={() => toggleGroupChildren(key)}
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-transparent text-secondary-text transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-foreground motion-reduce:transition-none"
                   >
                     <ChevronRight
                       className={cn(
@@ -421,7 +443,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                       )}
                       aria-hidden="true"
                     />
-                  </button>
+                  </IconButton>
                 </div>
                 {childrenExpanded ? <div id={childrenId} className="ml-4 flex flex-col gap-1 border-l border-border pl-3">
                   {children.map((child) => {

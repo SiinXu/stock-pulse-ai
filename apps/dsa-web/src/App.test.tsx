@@ -325,6 +325,51 @@ describe('App routing behavior', () => {
     expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
   });
 
+  it.each([
+    {
+      name: 'canonical custom Discover state',
+      href: `${APP_ROUTE_PATHS.researchDiscover}?${new URLSearchParams({
+        [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: 'custom_strategy_alpha',
+        [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: '17',
+      }).toString()}#details`,
+    },
+    {
+      name: 'legacy explicit default Discover state',
+      href: `${LEGACY_ROUTE_PATHS.screening}?${new URLSearchParams({
+        [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
+        [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: String(RESEARCH_DISCOVER_DEFAULT_VALUES.count),
+      }).toString()}#details`,
+    },
+    {
+      name: 'legacy malformed Discover state',
+      href: `${LEGACY_ROUTE_PATHS.screening}?${new URLSearchParams({
+        [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: '<bad>',
+        [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: '999',
+      }).toString()}#details`,
+      sanitizedHref: `${LEGACY_ROUTE_PATHS.screening}?${new URLSearchParams({
+        [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
+        [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: String(RESEARCH_DISCOVER_DEFAULT_VALUES.count),
+      }).toString()}#details`,
+    },
+  ])('encodes the full $name URL for authentication return', async (testCase) => {
+    const { href } = testCase;
+    vi.mocked(AuthContext.useAuth).mockReturnValue(makeAuthState({
+      authEnabled: true,
+      loggedIn: false,
+      setupState: 'enabled',
+    }));
+    window.history.pushState({}, '', href);
+
+    render(<App />);
+
+    expect(await screen.findByTestId('login-page')).toBeInTheDocument();
+    const loginUrl = new URL(window.location.href);
+    expect(loginUrl.pathname).toBe(APP_ROUTE_PATHS.login);
+    expect(loginUrl.searchParams.get('redirect')).toBe(
+      'sanitizedHref' in testCase ? testCase.sanitizedHref : href,
+    );
+  });
+
   it('restores explicit Discover default ownership after authentication', async () => {
     vi.mocked(AuthContext.useAuth).mockReturnValue(makeAuthState({
       authEnabled: true,
@@ -335,7 +380,7 @@ describe('App routing behavior', () => {
       [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
       [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: String(RESEARCH_DISCOVER_DEFAULT_VALUES.count),
     }).toString();
-    const discoverHref = `${APP_ROUTE_PATHS.researchDiscover}?${discoverSearch}`;
+    const discoverHref = `${APP_ROUTE_PATHS.researchDiscover}?${discoverSearch}#details`;
     const loginSearch = new URLSearchParams({ redirect: discoverHref }).toString();
     window.history.pushState({}, '', `${APP_ROUTE_PATHS.login}?${loginSearch}`);
 
@@ -344,6 +389,7 @@ describe('App routing behavior', () => {
     expect(await screen.findByTestId('screening-page')).toBeInTheDocument();
     expect(window.location.pathname).toBe(APP_ROUTE_PATHS.researchDiscover);
     expect(window.location.search).toBe(`?${discoverSearch}`);
+    expect(window.location.hash).toBe('#details');
     expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
   });
 

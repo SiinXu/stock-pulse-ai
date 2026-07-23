@@ -320,6 +320,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Permanently disabled secret access from pull-request AI review, rejected secret inheritance and tag/default-ref confusion, and hardened install guidance against nested commands, redirection decoys, dynamic paths, launcher/module entry points, Docker exec form, and explicit YAML indentation.
 - [Tests] Fixed the settings help locale contract test to read the per-language help sources introduced by the settings-help split, restoring the backend gate.
 - [Changed] Made secondary sidebar groups collapsible with visible current-page ownership and preserved explicit Discover URL ownership across default, malformed, refreshed, legacy, and safe custom-strategy links.
+- [Changed] Made secondary sidebar groups collapsible and preserved explicit Discover URL ownership across default, malformed, refreshed, legacy, authenticated, and safe custom-strategy links.
 
 ## [3.26.3] - 2026-07-15
 

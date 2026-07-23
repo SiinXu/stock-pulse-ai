@@ -294,6 +294,9 @@ test.describe('application shell foundation', () => {
     await expect(researchMenu.getByRole('menuitem', { name: 'Market review' })).toBeVisible();
     await expect(researchMenu.getByRole('menuitem', { name: 'Discover' })).toBeVisible();
     await expect(researchMenu.getByRole('menuitem', { name: 'Backtest' })).toBeVisible();
+    await researchMenu.getByRole('menuitem', { name: 'Discover' }).click();
+    await expect(page).toHaveURL(/\/research\/discover$/);
+    await expect(compactResearch).toHaveAttribute('aria-current', 'location');
     const compactNavigation = sidebar.getByRole('navigation', { name: 'Main navigation' });
     const compactRoutes = await compactNavigation.getByRole('link').all();
     expect(compactRoutes).toHaveLength(5);
@@ -304,13 +307,20 @@ test.describe('application shell foundation', () => {
     await expectSidebarWidth(sidebar, 240);
     const navigation = sidebar.getByRole('navigation', { name: 'Main navigation' });
     const researchToggle = navigation.getByRole('button', { name: 'Research' });
+    const researchParent = navigation.getByRole('link', { name: 'Research' });
+    const discoverChild = navigation.getByRole('link', { name: 'Discover' });
     await expect(researchToggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(researchParent).not.toHaveAttribute('aria-current');
+    await expect(discoverChild).toHaveAttribute('aria-current', 'page');
     await researchToggle.click();
     await expect(researchToggle).toHaveAttribute('aria-expanded', 'false');
     await expect(navigation.getByRole('link', { name: 'Discover' })).toBeHidden();
+    await expect(researchParent).toHaveAttribute('aria-current', 'location');
     await researchToggle.click();
     await expect(researchToggle).toHaveAttribute('aria-expanded', 'true');
     await expect(navigation.getByRole('link', { name: 'Discover' })).toBeVisible();
+    await expect(researchParent).not.toHaveAttribute('aria-current');
+    await expect(discoverChild).toHaveAttribute('aria-current', 'page');
     expect(await navigation.evaluate((element) => element.scrollHeight)).toBeGreaterThan(
       await navigation.evaluate((element) => element.clientHeight),
     );
