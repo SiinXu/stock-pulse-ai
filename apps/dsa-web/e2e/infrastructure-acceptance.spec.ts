@@ -1399,7 +1399,9 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page.getByRole('tab', { name: '推送历史', exact: true })).toBeVisible();
     await expect(page.getByRole('tab', { name: '再评估与统计', exact: true })).toBeVisible();
 
-    await page.getByRole('tab', { name: '持仓', exact: true }).click();
+    await page.getByRole('button', { name: '持仓', exact: true }).click();
+    await expect(page.getByRole('button', { name: '持仓', exact: true }))
+      .toHaveAttribute('aria-pressed', 'true');
     await expect(page).toHaveURL(buildSignalCenterHref({
       scope: SIGNAL_CENTER_SCOPE_VALUES.holdings,
     }));
@@ -1418,6 +1420,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     }));
     await expect(page.getByRole('tab', { name: '触发历史', exact: true })).toBeVisible();
     await expect(page.getByRole('tab', { name: '通知尝试记录', exact: true })).toBeVisible();
+    await expect(page.getByRole('group', { name: '信号范围' })).toHaveCount(0);
 
     await page.getByRole('tab', { name: '再评估与统计', exact: true }).click();
     await expect(page).toHaveURL(buildSignalCenterHref({
@@ -1425,6 +1428,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       tab: SIGNAL_CENTER_TAB_VALUES.review,
     }));
     await expect(page.getByText('后验引擎', { exact: true })).toBeVisible();
+    await expect(page.getByRole('group', { name: '信号范围' })).toHaveCount(0);
   });
 
   test('16b Signal Center maps legacy signal and alert URL state', async ({ page }) => {
@@ -1535,9 +1539,33 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await signalSummaryLink.click();
 
     await expect(page).toHaveURL(holdingsHref);
-    await expect(page.getByRole('heading', { name: '信号中心' })).toBeVisible();
-    await expect(page.getByRole('tab', { name: '持仓', exact: true }))
-      .toHaveAttribute('aria-selected', 'true');
+    const signalCenterHeading = page.getByRole('heading', { name: '信号中心' });
+    await expect(signalCenterHeading).toBeVisible();
+    await expect(signalCenterHeading).toBeFocused();
+    await expect(page.getByRole('button', { name: '持仓', exact: true }))
+      .toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('16e Signal Center reconciles stock context across browser history', async ({ page }) => {
+    await mockSignalCenterCollections(page);
+    await login(page);
+    await page.goto(buildSignalCenterHref({ stock: 'AAPL' }));
+
+    await expect(page.getByRole('button', { name: '当前查看：AAPL' })).toBeVisible();
+    await page.getByRole('button', { name: '当前查看：AAPL' }).click();
+    const dialog = page.getByRole('dialog', { name: '当前股票' });
+    await dialog.getByRole('combobox', { name: '当前股票' }).fill('MSFT');
+    await dialog.getByRole('button', { name: '查看股票' }).click();
+    await expect(page).toHaveURL(buildSignalCenterHref({ stock: 'MSFT' }));
+    await expect(page.getByRole('button', { name: '当前查看：MSFT' })).toBeVisible();
+
+    await page.goBack();
+    await expect(page).toHaveURL(buildSignalCenterHref({ stock: 'AAPL' }));
+    await expect(page.getByRole('button', { name: '当前查看：AAPL' })).toBeVisible();
+
+    await page.goForward();
+    await expect(page).toHaveURL(buildSignalCenterHref({ stock: 'MSFT' }));
+    await expect(page.getByRole('button', { name: '当前查看：MSFT' })).toBeVisible();
   });
 
   test('17 Portfolio timeout-after-commit retry reuses the operation ID and creates only one ledger row', async ({ page }) => {

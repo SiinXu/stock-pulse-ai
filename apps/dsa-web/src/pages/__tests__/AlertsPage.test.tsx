@@ -183,6 +183,11 @@ describe('AlertsPage', () => {
 
     expect(screen.getByText('管理事件告警、日线技术指标、自选股、持仓/账户联动和大盘红绿灯规则，执行一次性测试，并查看后台评估任务记录的触发历史。')).toBeInTheDocument();
     expect(await screen.findByText('茅台价格突破')).toBeInTheDocument();
+    const workspaceTabs = screen.getByRole('tablist', { name: '告警中心' });
+    for (const tab of within(workspaceTabs).getAllByRole('tab')) {
+      const panel = document.getElementById(tab.getAttribute('aria-controls') ?? '');
+      expect(panel).toHaveAttribute('aria-labelledby', tab.id);
+    }
     fireEvent.click(screen.getByRole('tab', { name: '触发历史' }));
     expect(await screen.findByText('600519 price above 1800')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: '通知尝试记录' }));

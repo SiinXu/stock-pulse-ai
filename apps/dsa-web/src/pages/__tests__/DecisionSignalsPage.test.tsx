@@ -1,6 +1,6 @@
 import type React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, Link } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   decisionSignalsApi,
@@ -10,12 +10,17 @@ import { historyApi } from '../../api/history';
 import { alertsApi } from '../../api/alerts';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import {
+  RouteFocusRegistrationContext,
+  type RouteFocusTarget,
+} from '../../contexts/routeFocusContext';
+import {
   APP_ROUTE_PATHS,
   LEGACY_ROUTE_PATHS,
   SIGNAL_CENTER_HISTORY_VALUES,
   SIGNAL_CENTER_ROUTE_QUERY_KEYS,
   SIGNAL_CENTER_SCOPE_VALUES,
   SIGNAL_CENTER_TAB_VALUES,
+  SIGNAL_FEED_VIEW_VALUES,
   buildSignalCenterHref,
 } from '../../routing/routes';
 import type { StockBarResponse } from '../../types/analysis';
@@ -60,6 +65,10 @@ let stockIndexState: {
   loaded: boolean;
 };
 let watchlistCodes: string[];
+const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
+  void target;
+  return () => {};
+});
 
 vi.mock('../../api/decisionSignals', () => ({
   getDecisionSignalReassessBlockedError: vi.fn(),
@@ -388,13 +397,16 @@ const persistedReassessResponse: DecisionSignalReassessResponse = {
   blockedReason: null,
 };
 
-function renderPage() {
+function renderPage(navigationFixture?: React.ReactNode) {
   return render(
-    <BrowserRouter>
-      <UiLanguageProvider>
-        <DecisionSignalsPage />
-      </UiLanguageProvider>
-    </BrowserRouter>,
+    <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+      <BrowserRouter>
+        <UiLanguageProvider>
+          {navigationFixture}
+          <DecisionSignalsPage />
+        </UiLanguageProvider>
+      </BrowserRouter>
+    </RouteFocusRegistrationContext.Provider>,
   );
 }
 
@@ -497,6 +509,18 @@ beforeEach(() => {
 });
 
 describe('DecisionSignalsPage', () => {
+  it('registers the canonical Signal Center heading with route-focus coordination', async () => {
+    renderPage();
+
+    const heading = await screen.findByRole('heading', { name: '信号中心' });
+    expect(routeFocusRegister).toHaveBeenCalledWith(expect.objectContaining({
+      routeId: APP_ROUTE_PATHS.signals,
+      ready: true,
+    }));
+    const registration = routeFocusRegister.mock.calls.at(-1)?.[0];
+    expect(registration?.headingRef.current).toBe(heading);
+  });
+
   it('applies the holdings scope through the existing Decision Signal API', async () => {
     window.history.pushState({}, '', buildSignalCenterHref({
       scope: SIGNAL_CENTER_SCOPE_VALUES.holdings,
@@ -511,7 +535,7 @@ describe('DecisionSignalsPage', () => {
         page: 1,
       }));
     });
-    expect(screen.getByRole('tab', { name: '持仓' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('button', { name: '持仓' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('loads watchlist signals from existing stock-scoped list calls', async () => {
@@ -587,6 +611,50 @@ describe('DecisionSignalsPage', () => {
     ))).toBe(true);
   });
 
+  it('caps overlapping signal-list generations at six requests', async () => {
+    watchlistCodes = Array.from({ length: 12 }, (_, index) => `WATCH-${index + 1}`);
+    const pendingStockRequests = deferredPromise<void>();
+    let activeRequests = 0;
+    let peakRequests = 0;
+    vi.mocked(decisionSignalsApi.list).mockImplementation(async (params) => {
+      activeRequests += 1;
+      peakRequests = Math.max(peakRequests, activeRequests);
+      try {
+        if (params?.stockCode) await pendingStockRequests.promise;
+        return listResponse([]);
+      } finally {
+        activeRequests -= 1;
+      }
+    });
+    window.history.pushState({}, '', buildSignalCenterHref({
+      scope: SIGNAL_CENTER_SCOPE_VALUES.watchlist,
+    }));
+
+    renderPage();
+
+    await waitFor(() => expect(decisionSignalsApi.list).toHaveBeenCalledTimes(6));
+    fireEvent.click(screen.getByRole('button', { name: '全部' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '全部' }))
+      .toHaveAttribute('aria-pressed', 'true'));
+    fireEvent.click(screen.getByRole('button', { name: '自选' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '自选' }))
+      .toHaveAttribute('aria-pressed', 'true'));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(decisionSignalsApi.list).toHaveBeenCalledTimes(6);
+    expect(peakRequests).toBe(6);
+
+    await act(async () => {
+      pendingStockRequests.resolve();
+      await pendingStockRequests.promise;
+    });
+    await waitFor(() => expect(vi.mocked(decisionSignalsApi.list).mock.calls.length)
+      .toBeGreaterThan(6));
+    expect(peakRequests).toBe(6);
+  });
+
   it('queries equivalent watchlist stock-code variants only once', async () => {
     watchlistCodes = ['00700', 'HK00700', '00700.HK'];
     vi.mocked(decisionSignalsApi.list).mockResolvedValue(listResponse([]));
@@ -650,9 +718,9 @@ describe('DecisionSignalsPage', () => {
         stockCode: 'NEW',
       }));
     });
-    fireEvent.click(screen.getByRole('tab', { name: '全部' }));
-    await waitFor(() => expect(screen.getByRole('tab', { name: '全部' }))
-      .toHaveAttribute('aria-selected', 'true'));
+    fireEvent.click(screen.getByRole('button', { name: '全部' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '全部' }))
+      .toHaveAttribute('aria-pressed', 'true'));
     await waitFor(() => expect(decisionSignalsApi.list).toHaveBeenCalledWith(expect.objectContaining({
       stockCode: undefined,
     })));
@@ -663,8 +731,8 @@ describe('DecisionSignalsPage', () => {
     });
 
     await waitFor(() => expect(screen.queryByText('决策信号加载失败')).not.toBeInTheDocument());
-    expect(screen.getByRole('tab', { name: '全部' }))
-      .toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('button', { name: '全部' }))
+      .toHaveAttribute('aria-pressed', 'true');
   });
 
   it('switches the empty feed primary action to Rules and opens the existing rule form', async () => {
@@ -716,7 +784,7 @@ describe('DecisionSignalsPage', () => {
     renderPage();
 
     expect(await screen.findByRole('button', { name: '创建告警规则' })).toBeInTheDocument();
-    expect(screen.getByRole('tablist', { name: '信号范围' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: '信号范围' })).toBeInTheDocument();
     await waitFor(() => expect(alertsApi.listRules).toHaveBeenCalledWith(expect.objectContaining({
       targetScope: 'portfolio_holdings',
     })));
@@ -729,7 +797,7 @@ describe('DecisionSignalsPage', () => {
     }), window.location.origin).search));
     expect(await screen.findByRole('tab', { name: '触发历史' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('heading', { name: '信号中心' })).toBeInTheDocument();
-    expect(screen.queryByRole('tablist', { name: '信号范围' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: '信号范围' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('tab', { name: '通知尝试记录' }));
     await waitFor(() => expect(window.location.search).toBe(new URL(buildSignalCenterHref({
@@ -740,7 +808,7 @@ describe('DecisionSignalsPage', () => {
     expect(screen.getByRole('tabpanel', { name: '通知尝试记录' })).toBeVisible();
 
     fireEvent.click(screen.getByRole('tab', { name: '再评估与统计' }));
-    expect(screen.queryByRole('tablist', { name: '信号范围' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: '信号范围' })).not.toBeInTheDocument();
     expect(await screen.findByText('当前统计为全局已复盘 outcome 口径，不等于当前可见信号数量，也不随当前股票过滤。')).toBeInTheDocument();
   });
 
@@ -755,6 +823,8 @@ describe('DecisionSignalsPage', () => {
     const reviewTab = within(signalCenterTabs).getByRole('tab', { name: '再评估与统计' });
     await waitFor(() => expect(reviewTab).toHaveAttribute('aria-selected', 'true'));
     expect(reviewTab).toHaveFocus();
+    expect(document.getElementById(reviewTab.getAttribute('aria-controls') ?? ''))
+      .toHaveAttribute('aria-labelledby', reviewTab.id);
 
     fireEvent.keyDown(reviewTab, { key: 'Home' });
     await waitFor(() => expect(feedTab).toHaveAttribute('aria-selected', 'true'));
@@ -764,10 +834,13 @@ describe('DecisionSignalsPage', () => {
     allSignalsTab.focus();
     fireEvent.keyDown(allSignalsTab, { key: 'End' });
 
-    const timelineTab = within(feedTabs).getByRole('tab', { name: '股票信号时间线' });
-    await waitFor(() => expect(timelineTab).toHaveAttribute('aria-selected', 'true'));
-    expect(timelineTab).toHaveFocus();
-    expect(screen.queryByRole('tablist', { name: '信号范围' })).not.toBeInTheDocument();
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get('view'))
+      .toBe(SIGNAL_FEED_VIEW_VALUES.timeline));
+    const selectedTimelineTab = within(screen.getByRole('tablist', { name: '信号流' }))
+      .getByRole('tab', { name: '股票信号时间线' });
+    await waitFor(() => expect(selectedTimelineTab).toHaveAttribute('aria-selected', 'true'));
+    expect(selectedTimelineTab).toHaveFocus();
+    expect(screen.queryByRole('group', { name: '信号范围' })).not.toBeInTheDocument();
   });
 
   it('loads active signals by default', async () => {
@@ -1442,6 +1515,74 @@ describe('DecisionSignalsPage', () => {
     await waitFor(() => {
       expect(screen.getAllByText('当前股票 · 600519').length).toBeGreaterThan(0);
     });
+  });
+
+  it('reconciles the displayed stock after browser Back and Forward navigation', async () => {
+    vi.mocked(decisionSignalsApi.getLatest).mockImplementation(async (stockCode) => listResponse([
+      makeSignal({
+        id: stockCode === 'MSFT' ? 9 : 8,
+        stockCode,
+        stockName: stockCode,
+      }),
+    ]));
+    window.history.pushState({}, '', buildSignalCenterHref({ stock: 'AAPL' }));
+
+    renderPage();
+
+    await waitFor(() => expect(decisionSignalsApi.getLatest).toHaveBeenLastCalledWith('AAPL', {
+      market: undefined,
+      limit: 5,
+    }));
+    expect(await screen.findByText('当前查看：AAPL')).toBeInTheDocument();
+
+    submitCurrentStock('MSFT');
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get(
+      SIGNAL_CENTER_ROUTE_QUERY_KEYS.stock,
+    )).toBe('MSFT'));
+    await waitFor(() => expect(decisionSignalsApi.getLatest).toHaveBeenLastCalledWith('MSFT', {
+      market: undefined,
+      limit: 5,
+    }));
+    expect(screen.getByText('当前查看：MSFT')).toBeInTheDocument();
+
+    act(() => window.history.back());
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get(
+      SIGNAL_CENTER_ROUTE_QUERY_KEYS.stock,
+    )).toBe('AAPL'));
+    await waitFor(() => expect(decisionSignalsApi.getLatest).toHaveBeenLastCalledWith('AAPL', {
+      market: undefined,
+      limit: 5,
+    }));
+    expect(screen.getByText('当前查看：AAPL')).toBeInTheDocument();
+
+    act(() => window.history.forward());
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get(
+      SIGNAL_CENTER_ROUTE_QUERY_KEYS.stock,
+    )).toBe('MSFT'));
+    await waitFor(() => expect(decisionSignalsApi.getLatest).toHaveBeenLastCalledWith('MSFT', {
+      market: undefined,
+      limit: 5,
+    }));
+    expect(screen.getByText('当前查看：MSFT')).toBeInTheDocument();
+  });
+
+  it('reconciles the displayed stock after a same-page deep-link push', async () => {
+    window.history.pushState({}, '', buildSignalCenterHref({ stock: 'AAPL' }));
+    renderPage(
+      <Link to={buildSignalCenterHref({ stock: 'MSFT' })}>打开 MSFT 信号</Link>,
+    );
+
+    await waitFor(() => expect(decisionSignalsApi.getLatest).toHaveBeenLastCalledWith('AAPL', {
+      market: undefined,
+      limit: 5,
+    }));
+    fireEvent.click(screen.getByRole('link', { name: '打开 MSFT 信号' }));
+
+    await waitFor(() => expect(decisionSignalsApi.getLatest).toHaveBeenLastCalledWith('MSFT', {
+      market: undefined,
+      limit: 5,
+    }));
+    expect(screen.getByText('当前查看：MSFT')).toBeInTheDocument();
   });
 
   it('submits the main stock context once and keeps the applied context separate from the draft', async () => {

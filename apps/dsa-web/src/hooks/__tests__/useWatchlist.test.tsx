@@ -104,6 +104,32 @@ describe('useWatchlist', () => {
     expect(result.current.isLoading).toBe(false);
   });
 
+  it('keeps the newest watchlist error when an older refresh succeeds later', async () => {
+    const older = deferredPromise<string[]>();
+    const newer = deferredPromise<string[]>();
+    mockGetWatchlist
+      .mockReturnValueOnce(older.promise)
+      .mockReturnValueOnce(newer.promise);
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useWatchlist({ enabled }),
+      { initialProps: { enabled: true } },
+    );
+
+    await waitFor(() => expect(mockGetWatchlist).toHaveBeenCalledTimes(1));
+    rerender({ enabled: false });
+    rerender({ enabled: true });
+    await waitFor(() => expect(mockGetWatchlist).toHaveBeenCalledTimes(2));
+
+    await act(async () => newer.reject(new Error('current watchlist failure')));
+    await waitFor(() => expect(result.current.loadError).not.toBeNull());
+    const latestError = result.current.loadError;
+    await act(async () => older.resolve(['OLD']));
+
+    expect(result.current.watchlistCodes).toEqual([]);
+    expect(result.current.loadError).toBe(latestError);
+    expect(result.current.isLoading).toBe(false);
+  });
+
   it('matches raw HK watchlist entries against prefixed and suffixed variants', async () => {
     mockGetWatchlist.mockResolvedValue(['00700']);
 

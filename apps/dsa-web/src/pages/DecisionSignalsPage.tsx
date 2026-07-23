@@ -34,7 +34,6 @@ import {
   PageHeader,
   Pagination,
   ResponsiveFilterPanel,
-  SegmentedControl,
   Select,
   SelectionChip,
   StatCard,
@@ -47,6 +46,7 @@ import {
   DecisionSignalCard,
   DecisionSignalDetails,
 } from '../components/decision-signals/DecisionSignalDisplay';
+import { useRouteFocusTarget } from '../components/routing';
 import { DecisionSignalCreateDrawer } from '../components/decision-signals/DecisionSignalCreateDrawer';
 import { DecisionSignalOutcomeRunPanel } from '../components/decision-signals/DecisionSignalOutcomeRunPanel';
 import {
@@ -92,6 +92,7 @@ import { parseDeepLink, type DecisionSignalsView } from '../utils/deepLink';
 import { buildHomeHistoryRunFlowHref } from '../utils/homeUrlState';
 import { areStockCodesEquivalent } from '../utils/stockCode';
 import {
+  APP_ROUTE_PATHS,
   SIGNAL_CENTER_HISTORY_VALUES,
   SIGNAL_CENTER_ROUTE_QUERY_KEYS,
   SIGNAL_CENTER_SCOPE_VALUES,
@@ -112,6 +113,11 @@ const STOCK_CANDIDATE_LIMIT = 8;
 const DAY_MS = 86400_000;
 const SIGNAL_CENTER_TABS_ID = 'signal-center-tabs';
 const SIGNAL_FEED_TABS_ID = 'signal-center-feed-tabs';
+
+type RequestSlotQueue = {
+  active: number;
+  waiters: Array<() => void>;
+};
 
 type ListFilters = {
   market: '' | DecisionSignalMarket;
@@ -315,8 +321,8 @@ function getTimelineSearchValues(filters: TimelineFilters): DecisionSignalSearch
   };
 }
 
-// Reflect the current-stock scope in the URL (without a new history entry) so
-// the page can be shared/refreshed and restore the same stock.
+// Reflect current-stock selection in URL history so shared links, refresh, and
+// browser navigation restore the same context.
 function getStockSearchValues(code: string | null): DecisionSignalSearchValues {
   return { stock: code };
 }
@@ -551,11 +557,38 @@ function formatStatPercent(value: number | null | undefined): string {
   return formatted === '-' ? formatted : `${formatted}%`;
 }
 
+async function runWithRequestSlot<T>(
+  queue: RequestSlotQueue,
+  limit: number,
+  operation: () => Promise<T>,
+): Promise<T> {
+  await new Promise<void>((resolve) => {
+    const start = () => {
+      queue.active += 1;
+      resolve();
+    };
+    if (queue.active < limit) start();
+    else queue.waiters.push(start);
+  });
+  try {
+    return await operation();
+  } finally {
+    queue.active -= 1;
+    queue.waiters.shift()?.();
+  }
+}
+
 const DecisionSignalsPage: React.FC = () => {
   const navigate = useNavigate();
   const routeLocation = useLocation();
   const navigationType = useNavigationType();
   const { t } = useUiLanguage();
+  const pageHeadingRef = useRef<HTMLHeadingElement>(null);
+  useRouteFocusTarget({
+    routeId: APP_ROUTE_PATHS.signals,
+    headingRef: pageHeadingRef,
+    ready: true,
+  });
   const parsedSignalCenterRoute = useMemo(
     () => parseSignalCenterRouteState(routeLocation.search),
     [routeLocation.search],
@@ -661,10 +694,14 @@ const DecisionSignalsPage: React.FC = () => {
   const syncTimelineSearchParams = useCallback((filters: TimelineFilters) => {
     updateDecisionSignalSearchParams(getTimelineSearchValues(filters));
   }, [updateDecisionSignalSearchParams]);
-  const syncStockContextSearchParams = useCallback((code: string | null) => {
+  const syncStockContextSearchParams = useCallback((
+    code: string | null,
+    timelineSnapshot?: TimelineFilters,
+  ) => {
     const defaultView: DecisionSignalsView = code ? 'latest' : 'signals';
     updateDecisionSignalSearchParams({
       ...getStockSearchValues(code),
+      ...(timelineSnapshot ? getTimelineSearchValues(timelineSnapshot) : {}),
       view: activeViewRef.current === defaultView ? null : activeViewRef.current,
     }, false);
   }, [updateDecisionSignalSearchParams]);
@@ -726,6 +763,7 @@ const DecisionSignalsPage: React.FC = () => {
   const [reassessPersistBlocked, setReassessPersistBlocked] = useState<DecisionSignalReassessBlockedError | null>(null);
   const [reassessError, setReassessError] = useState<ParsedApiError | null>(null);
   const requestIdRef = useRef(0);
+  const signalListQueueRef = useRef<RequestSlotQueue>({ active: 0, waiters: [] });
   const statsRequestIdRef = useRef(0);
   const latestRequestIdRef = useRef(0);
   const timelineRequestIdRef = useRef(0);
@@ -847,20 +885,33 @@ const DecisionSignalsPage: React.FC = () => {
         const loadRequestBatch = async (batch: Array<{ stockCode: string; page: number }>) => {
           const settled = await Promise.all(batch.map(async ({ stockCode, page: stockPage }) => {
             try {
-              const result = await decisionSignalsApi.list({
-                ...toListParams(appliedFilters, stockPage),
-                stockCode,
-                holdingOnly: undefined,
-                page: stockPage,
-                pageSize: perStockPageSize,
-              });
+              const result = await runWithRequestSlot(
+                signalListQueueRef.current,
+                WATCHLIST_SIGNAL_LOOKUP_CONCURRENCY,
+                async () => {
+                  if (requestIdRef.current !== requestId) return null;
+                  return decisionSignalsApi.list({
+                    ...toListParams(appliedFilters, stockPage),
+                    stockCode,
+                    holdingOnly: undefined,
+                    page: stockPage,
+                    pageSize: perStockPageSize,
+                  });
+                },
+              );
+              if (!result) return null;
               return { stockCode, response: result };
             } catch (requestError) {
-              partialError ??= getParsedApiError(requestError);
+              if (requestIdRef.current === requestId) {
+                partialError ??= getParsedApiError(requestError);
+              }
               return null;
             }
           }));
-          responses.push(...settled.filter((result): result is { stockCode: string; response: DecisionSignalListResponse } => (
+          responses.push(...settled.filter((result): result is {
+            stockCode: string;
+            response: DecisionSignalListResponse;
+          } => (
             result !== null
           )));
         };
@@ -903,9 +954,18 @@ const DecisionSignalsPage: React.FC = () => {
         response = mergeWatchlistSignalResponses(responses, effectivePage);
         responseError = partialError;
       } else {
-        response = await decisionSignalsApi.list(
-          toListParams(appliedFilters, nextPage, signalCenterScope),
+        const nextResponse = await runWithRequestSlot(
+          signalListQueueRef.current,
+          WATCHLIST_SIGNAL_LOOKUP_CONCURRENCY,
+          async () => {
+            if (requestIdRef.current !== requestId) return null;
+            return decisionSignalsApi.list(
+              toListParams(appliedFilters, nextPage, signalCenterScope),
+            );
+          },
         );
+        if (!nextResponse) return;
+        response = nextResponse;
       }
       if (requestIdRef.current !== requestId) return;
       const lastPage = Math.max(1, Math.ceil(response.total / PAGE_SIZE));
@@ -1187,6 +1247,7 @@ const DecisionSignalsPage: React.FC = () => {
   const loadTimelineForContext = useCallback(async (
     context: StockContext,
     filtersSnapshot: TimelineFilters,
+    syncUrl = true,
   ) => {
     const stockCode = context.code.trim();
     if (!stockCode) return;
@@ -1199,7 +1260,7 @@ const DecisionSignalsPage: React.FC = () => {
     setTimelineTruncated(false);
     setAppliedTimelineContext(null);
     setSelected((current) => (current?.source === 'timeline' ? null : current));
-    syncTimelineSearchParams(filtersSnapshot);
+    if (syncUrl) syncTimelineSearchParams(filtersSnapshot);
     const nextAppliedContext: AppliedTimelineContext = {
       ...filtersSnapshot,
       stockCode,
@@ -1324,9 +1385,9 @@ const DecisionSignalsPage: React.FC = () => {
     }
     setStockDraft(nextContext.displayCode ?? nextContext.code);
     setTimelineFilters(nextTimeline.filters);
-    if (syncUrl) syncStockContextSearchParams(nextContext.code);
+    if (syncUrl) syncStockContextSearchParams(nextContext.code, nextTimeline.filters);
     void loadLatestForContext(nextContext);
-    void loadTimelineForContext(nextContext, nextTimeline.filters);
+    void loadTimelineForContext(nextContext, nextTimeline.filters, false);
   }, [
     activeStockContext,
     loadLatestForContext,
@@ -1363,27 +1424,43 @@ const DecisionSignalsPage: React.FC = () => {
     handleStockSubmit(code);
   }, [activeStockContext, applyStockContext, handleStockSubmit]);
 
-  const handleClearStockContext = useCallback(() => {
+  const clearStockContext = useCallback((syncUrl: boolean) => {
     setStockDraft('');
     setActiveStockContext(null);
     timelineMarketSourceRef.current = null;
     setTimelineFilters((current) => ({ ...current, market: '' }));
-    syncStockContextSearchParams(null);
+    if (syncUrl) syncStockContextSearchParams(null);
     resetLatestView();
     resetTimelineView();
   }, [resetLatestView, resetTimelineView, syncStockContextSearchParams]);
 
-  // Restore the current-stock scope from the URL once on mount so a shared or
-  // refreshed link reopens the same stock context.
-  const didRestoreStockFromUrlRef = useRef(false);
+  const handleClearStockContext = useCallback(() => {
+    clearStockContext(true);
+  }, [clearStockContext]);
+
+  const stockLocationKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    if (didRestoreStockFromUrlRef.current) return;
-    didRestoreStockFromUrlRef.current = true;
-    const urlStock = decisionSignalsTarget?.stockCode ?? '';
+    if (stockLocationKeyRef.current === routeLocation.key) return;
+    stockLocationKeyRef.current = routeLocation.key;
+    const urlStock = new URLSearchParams(routeLocation.search)
+      .get(SIGNAL_CENTER_ROUTE_QUERY_KEYS.stock)
+      ?.trim() ?? '';
     if (urlStock) {
+      if (
+        activeStockContext
+        && areStockCodesEquivalent(activeStockContext.code, urlStock)
+      ) return;
       applyStockContext({ code: urlStock }, false);
+      return;
     }
-  }, [applyStockContext, decisionSignalsTarget?.stockCode]);
+    if (activeStockContext) clearStockContext(false);
+  }, [
+    activeStockContext,
+    applyStockContext,
+    clearStockContext,
+    routeLocation.key,
+    routeLocation.search,
+  ]);
 
   const handleTimelineSearch = useCallback(() => {
     if (!activeStockContext) return;
@@ -1714,6 +1791,7 @@ const DecisionSignalsPage: React.FC = () => {
     <AppPage className="max-w-none">
       <div className="space-y-5">
         <PageHeader
+          ref={pageHeadingRef}
           title={t('decisionSignals.title')}
           description={t('decisionSignals.signalCenterDescription')}
           actions={signalCenterTab === SIGNAL_CENTER_TAB_VALUES.feed
@@ -1845,17 +1923,23 @@ const DecisionSignalsPage: React.FC = () => {
         </Modal>
 
         {scopeControlVisible ? (
-          <div className="flex flex-wrap items-center gap-3">
-          <SegmentedControl
-            value={signalCenterScope}
-            options={[
+          <div
+            role="group"
+            aria-label={t('decisionSignals.scopeLabel')}
+            className="flex flex-wrap items-center gap-2"
+          >
+            {([
               { value: SIGNAL_CENTER_SCOPE_VALUES.all, label: t('decisionSignals.scopeAll') },
               { value: SIGNAL_CENTER_SCOPE_VALUES.holdings, label: t('decisionSignals.scopeHoldings') },
               { value: SIGNAL_CENTER_SCOPE_VALUES.watchlist, label: t('decisionSignals.scopeWatchlist') },
-            ]}
-            onChange={setSignalCenterScope}
-            ariaLabel={t('decisionSignals.scopeLabel')}
-          />
+            ] as const).map((option) => (
+              <SelectionChip
+                key={option.value}
+                label={option.label}
+                selected={signalCenterScope === option.value}
+                onClick={() => setSignalCenterScope(option.value)}
+              />
+            ))}
           </div>
         ) : null}
 

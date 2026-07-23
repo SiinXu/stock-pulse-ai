@@ -8,7 +8,7 @@ import type {
   StockBarItem,
   TaskInfo,
 } from '../types/analysis';
-import type { AlertRuleItem, AlertTriggerItem } from '../types/alerts';
+import type { AlertNotificationItem, AlertRuleItem, AlertTriggerItem } from '../types/alerts';
 import type {
   DecisionSignalFeedbackItem,
   DecisionSignalItem,
@@ -451,6 +451,20 @@ export const fixtureAlertTriggers: AlertTriggerItem[] = [
     dataTimestamp: FIXTURE_TIMESTAMP,
     triggeredAt: FIXTURE_TIMESTAMP,
     status: 'skipped',
+  },
+];
+
+export const fixtureAlertNotifications: AlertNotificationItem[] = [
+  {
+    id: 701,
+    triggerId: 601,
+    channel: 'email',
+    attempt: 1,
+    success: true,
+    retryable: false,
+    latencyMs: 128,
+    diagnostics: 'fixture-notification-701',
+    createdAt: FIXTURE_TIMESTAMP,
   },
 ];
 

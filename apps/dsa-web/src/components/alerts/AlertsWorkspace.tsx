@@ -469,6 +469,7 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
       : 'single_symbol';
   const internalTabsId = embedded ? SIGNAL_CENTER_HISTORY_TABS_ID : ALERTS_TABS_ID;
   const panelOwnedByParent = embedded && activeView === 'rules';
+  const internalTabsVisible = !embedded || activeView !== 'rules';
   const ActivePanel: React.ElementType = panelOwnedByParent ? 'section' : TabPanel;
   const activePanelProps = panelOwnedByParent
     ? {}
@@ -778,6 +779,28 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
             />
           </Card>
         </ActivePanel>
+      ) : null}
+
+      {!embedded && activeView !== 'rules' ? (
+        <TabPanel
+          tabsId={internalTabsId}
+          value="rules"
+          activeValue={activeView}
+        />
+      ) : null}
+      {internalTabsVisible && activeView !== 'history' ? (
+        <TabPanel
+          tabsId={internalTabsId}
+          value="history"
+          activeValue={activeView}
+        />
+      ) : null}
+      {internalTabsVisible && activeView !== 'notifications' ? (
+        <TabPanel
+          tabsId={internalTabsId}
+          value="notifications"
+          activeValue={activeView}
+        />
       ) : null}
     </Root>
   );

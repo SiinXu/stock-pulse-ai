@@ -319,9 +319,11 @@ translated labels or array indexes, provide stable focus markers.
 
 The owner-selected PR #35 page restoration keeps Settings, Portfolio, Signal
 Center, and Backtest on the full-width `AppPage` canvas. Each exposes the shared
-visible `PageHeader`. Signal Center provides four top-level tabs and composes
-the existing decision-signal and alert surfaces without creating a second page
-identity. Portfolio renders one
+visible `PageHeader`. Signal Center provides four top-level shared `Tabs` /
+`TabPanel` views and composes the existing decision-signal and alert surfaces
+without creating a second page identity. Its scope selector is a pressed-button
+group, not another tablist, and is only rendered for the signal and rule views
+that apply that scope to their requests. Portfolio renders one
 page-level onboarding state when no account exists, and Backtest renders one
 page-level loading, error, or empty state before results exist. Alert-rule
 filters belong to the Card header at `sm` and wider and stack full-width below
