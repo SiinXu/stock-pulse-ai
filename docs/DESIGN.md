@@ -75,7 +75,7 @@ architecture, wallet flows, crypto terminology, component APIs, or business beha
 Use these sources in this order:
 
 1. Product semantics, `AGENTS.md`, API contracts, accessibility, and financial-domain rules.
-2. This `DESIGN.md` for the target visual language and approved color values.
+2. This `docs/DESIGN.md` for the target visual language and approved color values.
 3. `apps/dsa-web/DESIGN_GUIDE.md` for detailed implementation and delivery guardrails.
 4. `apps/dsa-web/src/index.css` and public components for the current executable state.
 
