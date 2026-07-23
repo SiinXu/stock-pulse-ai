@@ -7,11 +7,12 @@ import { analysisApi, DuplicateTaskError } from '../api/analysis';
 import { historyApi } from '../api/history';
 import { agentApi, type SkillInfo } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Button, Checkbox, Drawer, EmptyState, IconButton, InlineAlert, Modal, Popover } from '../components/common';
+import { ApiErrorAlert, Button, Checkbox, Drawer, EmptyState, IconButton, InlineAlert, Modal, Popover, SegmentedControl } from '../components/common';
 import { DashboardStateBlock } from '../components/dashboard';
 import { StockAutocomplete } from '../components/StockAutocomplete';
 import { StockHistoryTrendDrawer } from '../components/history';
 import { ReportMarkdownDrawer } from '../components/report/ReportMarkdownDrawer';
+import BeginnerReportSummary from '../components/report/BeginnerReportSummary';
 import { ReportSummary } from '../components/report/ReportSummary';
 import { RunFlowPanel } from '../components/run-flow';
 import { TaskPanel } from '../components/tasks';
@@ -37,7 +38,14 @@ import { buildDeepLink } from '../utils/deepLink';
 import { normalizeStockCode } from '../utils/stockCode';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
 import { getUiListSeparator } from '../utils/uiLocale';
-import { APP_ROUTE_PATHS, HOME_WORKSPACE_VALUES } from '../routing/routes';
+import {
+  dismissOnboarding,
+  readExperienceMode,
+  readOnboardingDismissed,
+  writeExperienceMode,
+  type ExperienceMode,
+} from '../utils/onboardingPreferences';
+import { APP_ROUTE_PATHS, buildSettingsHref, HOME_WORKSPACE_VALUES } from '../routing/routes';
 
 type RunFlowDrawerState =
   | { open: false }
@@ -221,6 +229,14 @@ const HomePage: React.FC = () => {
     };
   }, []);
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
+  const [experiencePreference, setExperiencePreference] = useState<{
+    mode: ExperienceMode;
+    explicit: boolean;
+  }>(() => {
+    const storedMode = readExperienceMode();
+    return { mode: storedMode ?? 'professional', explicit: storedMode !== null };
+  });
+  const [onboardingDismissed, setOnboardingDismissed] = useState(readOnboardingDismissed);
 
   const {
     query,
@@ -354,6 +370,13 @@ const HomePage: React.FC = () => {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!setupStatus || setupStatus.isComplete || experiencePreference.explicit) {
+      return;
+    }
+    setExperiencePreference({ mode: 'beginner', explicit: false });
+  }, [experiencePreference.explicit, setupStatus]);
 
   useEffect(() => {
     let active = true;
@@ -546,6 +569,18 @@ const HomePage: React.FC = () => {
       .map((check) => check.title);
     return requiredNeedsAction.slice(0, 3).join(getUiListSeparator(uiLanguage));
   }, [setupStatus, uiLanguage]);
+  const experienceMode = experiencePreference.mode;
+  const handleExperienceModeChange = useCallback((mode: ExperienceMode) => {
+    if (mode === 'beginner') {
+      closeHistoryTrend();
+    }
+    writeExperienceMode(mode);
+    setExperiencePreference({ mode, explicit: true });
+  }, [closeHistoryTrend]);
+  const handleDismissOnboarding = useCallback(() => {
+    dismissOnboarding();
+    setOnboardingDismissed(true);
+  }, []);
 
   const handleCompletedTaskDataRefreshed = useCallback((task: TaskInfo) => {
     if (task.reportType !== 'market_review') {
@@ -842,10 +877,11 @@ const HomePage: React.FC = () => {
         stockName,
         originalQuery: query,
         selectionSource: selectionSource ?? 'manual',
+        reportType: experienceMode === 'beginner' ? 'brief' : 'detailed',
         skills: selectedAnalysisSkills,
       });
     },
-    [query, selectedAnalysisSkills, submitAnalysis],
+    [experienceMode, query, selectedAnalysisSkills, submitAnalysis],
   );
 
   useEffect(() => {
@@ -906,9 +942,10 @@ const HomePage: React.FC = () => {
       originalQuery: selectedReport.meta.stockCode,
       selectionSource: 'manual',
       forceRefresh: true,
+      reportType: experienceMode === 'beginner' ? 'brief' : 'detailed',
       skills: selectedAnalysisSkills,
     });
-  }, [selectedAnalysisSkills, selectedReport, submitAnalysis]);
+  }, [experienceMode, selectedAnalysisSkills, selectedReport, submitAnalysis]);
 
   const openTaskRunFlow = useCallback((task: TaskInfo) => {
     setRunFlowRestoreError(null);
@@ -1386,6 +1423,15 @@ const HomePage: React.FC = () => {
               ) : null}
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-2 md:flex-nowrap md:flex-shrink-0">
+              <SegmentedControl
+                value={experienceMode}
+                onChange={handleExperienceModeChange}
+                ariaLabel={t('home.experienceModeLabel')}
+                options={[
+                  { value: 'beginner', label: t('home.beginnerMode') },
+                  { value: 'professional', label: t('home.professionalMode') },
+                ]}
+              />
               <Checkbox
                 checked={notify}
                 onChange={(event) => setNotify(event.target.checked)}
@@ -1402,7 +1448,7 @@ const HomePage: React.FC = () => {
                   loadingText={t('home.analyzing')}
                   onClick={() => handleSubmitAnalysis()}
                 >
-                  {t('home.analyze')}
+                  {experienceMode === 'beginner' ? t('home.quickAnalyze') : t('home.analyze')}
                 </Button>
               </div>
             </div>
@@ -1442,7 +1488,7 @@ const HomePage: React.FC = () => {
           </div>
         ) : null}
 
-        {setupNeedsAction ? (
+        {setupNeedsAction && !onboardingDismissed ? (
           <div className="px-3 pb-2 md:px-4">
             <InlineAlert
               variant="warning"
@@ -1454,14 +1500,29 @@ const HomePage: React.FC = () => {
                   : t('home.setupMissingGeneric')
               }
               action={(
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="default"
-                  onClick={() => navigate(APP_ROUTE_PATHS.settings)}
-                >
-                  {t('home.goSettings')}
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="default"
+                    onClick={() => navigate(buildSettingsHref({
+                      section: 'overview',
+                      view: 'readiness',
+                      source: 'onboarding',
+                    }))}
+                  >
+                    {t('home.startGuidedSetup')}
+                  </Button>
+                  <IconButton
+                    type="button"
+                    variant="ghost"
+                    size="default"
+                    aria-label={t('common.close')}
+                    onClick={handleDismissOnboarding}
+                  >
+                    <X className="h-4 w-4" aria-hidden="true" />
+                  </IconButton>
+                </div>
               )}
             />
           </div>
@@ -1552,35 +1613,40 @@ const HomePage: React.FC = () => {
                     </svg>
                     {t('home.askAi')}
                   </Button>
-                  <Button
-                    variant="secondary"
-                    size="default"
-                    disabled={selectedReport.meta.id === undefined || isHistoryTrendUnavailable}
-                    className={isHistoryTrendOpen ? 'border-primary/70 bg-primary/15 text-primary shadow-soft-card' : undefined}
-                    onClick={() => {
-                      if (isHistoryTrendOpen) {
-                        closeHistoryTrend();
-                        return;
-                      }
-                      void openHistoryTrend();
-                    }}
-                  >
-                    <BarChart3 className="h-4 w-4" />
-                    {t('home.historyTrend')}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="default"
-                    disabled={selectedReport.meta.id === undefined}
-                    onClick={openMarkdownDrawer}
-                  >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    {t('home.fullReport')}
-                  </Button>
+                  {experienceMode === 'professional' ? (
+                    <>
+                      <Button
+                        variant="secondary"
+                        size="default"
+                        disabled={selectedReport.meta.id === undefined || isHistoryTrendUnavailable}
+                        className={isHistoryTrendOpen ? 'border-primary/70 bg-primary/15 text-primary shadow-soft-card' : undefined}
+                        onClick={() => {
+                          if (isHistoryTrendOpen) {
+                            closeHistoryTrend();
+                            return;
+                          }
+                          void openHistoryTrend();
+                        }}
+                      >
+                        <BarChart3 className="h-4 w-4" />
+                        {t('home.historyTrend')}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="default"
+                        disabled={selectedReport.meta.id === undefined}
+                        onClick={openMarkdownDrawer}
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        {t('home.fullReport')}
+                      </Button>
+                    </>
+                  ) : null}
                 </div>
-                {isHistoryTrendOpen ? (
+                <InlineAlert variant="info" size="compact" message={t('home.researchDisclaimer')} />
+                {experienceMode === 'professional' && isHistoryTrendOpen ? (
                   <StockHistoryTrendDrawer
                     key={`stock-history-${selectedReport.meta.id}`}
                     report={selectedReport}
@@ -1596,6 +1662,11 @@ const HomePage: React.FC = () => {
                     onLoadMore={() => void loadMoreStockHistory()}
                     onSelectRecord={handleHistoryItemClick}
                     onRetry={() => void openHistoryTrend()}
+                  />
+                ) : experienceMode === 'beginner' ? (
+                  <BeginnerReportSummary
+                    data={selectedReport}
+                    onShowProfessional={() => handleExperienceModeChange('professional')}
                   />
                 ) : (
                   <ReportSummary

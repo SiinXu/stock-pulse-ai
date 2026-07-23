@@ -3,7 +3,7 @@ import { analysisApi, DuplicateTaskError } from '../api/analysis';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
 import { historyApi } from '../api/history';
-import type { AnalysisReport, AnalyzeAsyncResponse, HistoryItem, HistoryListResponse, ReportLanguage, StockBarItem, StockHistoryFilters, StockHistoryRange, TaskInfo } from '../types/analysis';
+import type { AnalysisReport, AnalyzeAsyncResponse, HistoryItem, HistoryListResponse, ReportLanguage, StockBarItem, StockHistoryFilters, StockHistoryRange, StockReportType, TaskInfo } from '../types/analysis';
 import { getRecentStartDate, getTodayInShanghai } from '../utils/format';
 import { normalizeStockCode } from '../utils/stockCode';
 import { isObviouslyInvalidStockQuery, looksLikeStockCode, validateStockCode } from '../utils/validation';
@@ -44,6 +44,7 @@ type SubmitAnalysisOptions = {
   selectionSource?: SelectionSource;
   notify?: boolean;
   forceRefresh?: boolean;
+  reportType?: StockReportType;
   skills?: string[];
   reportLanguage?: ReportLanguage;
 };
@@ -924,6 +925,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
     const originalQuery = (options?.originalQuery ?? state.query).trim();
     const notify = options?.notify ?? state.notify;
     const forceRefresh = options?.forceRefresh ?? false;
+    const reportType = options?.reportType ?? 'detailed';
     const skills = options?.skills;
 
     if (!stockCodeInput) {
@@ -958,7 +960,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
     try {
       const response = await analysisApi.analyzeAsync({
         stockCode: normalizedStockCode,
-        reportType: 'detailed',
+        reportType,
         stockName,
         originalQuery: originalQuery || stockCodeInput,
         selectionSource,
@@ -991,7 +993,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
           stockName,
           status,
           progress: 0,
-          reportType: 'detailed',
+          reportType,
           createdAt,
           messageCode: messageCode || 'task.queued',
           messageParams: messageParams || { stockCode: taskStockCode },
