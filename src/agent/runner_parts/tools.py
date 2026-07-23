@@ -43,6 +43,11 @@ def _execute_tools(
     authority — via the migration mapper.
     """
 
+    from src.utils.sanitize import redact_sensitive_text
+
+    def _safe_tool_trace_name(value: Any) -> str:
+        return redact_sensitive_text(value) if isinstance(value, str) else ""
+
     def _exec_single(tc_item, completion_fence=None):
         """Execute one tool with an optional per-dispatch completion fence."""
         if completion_fence is None:
@@ -63,7 +68,7 @@ def _execute_tools(
             "tool_timeout",
             scope="tool",
             execution_id=tool_session.execution_id,
-            tool=tc_item.name,
+            tool=_safe_tool_trace_name(tc_item.name),
             step=step,
             limit_seconds=round(timeout_value, 3),
             action="result_fenced",
@@ -85,7 +90,11 @@ def _execute_tools(
     if len(tool_calls) == 1:
         tc = tool_calls[0]
         if progress_callback:
-            progress_callback(stream_event("tool_start", step=step, tool=tc.name))
+            progress_callback(stream_event(
+                "tool_start",
+                step=step,
+                tool=_safe_tool_trace_name(tc.name),
+            ))
         timeout_triggered = False
         if tool_wait_timeout_seconds and tool_wait_timeout_seconds > 0:
             pool = ThreadPoolExecutor(max_workers=1)
@@ -119,9 +128,15 @@ def _execute_tools(
         else:
             _, result_str, success, dur, cached, guard_result = _exec_single(tc)
         if progress_callback:
-            progress_callback(stream_event("tool_done", step=step, tool=tc.name, success=success, duration=dur))
+            progress_callback(stream_event(
+                "tool_done",
+                step=step,
+                tool=_safe_tool_trace_name(tc.name),
+                success=success,
+                duration=dur,
+            ))
         log_entry = {
-            "step": step, "tool": tc.name, "arguments": tc.arguments,
+            "step": step, "tool": _safe_tool_trace_name(tc.name), "arguments": tc.arguments,
             "success": success, "duration": dur, "result_length": len(result_str),
             "cached": cached,
         }
@@ -148,13 +163,13 @@ def _execute_tools(
                 progress_callback(stream_event(
                     "tool_done",
                     step=step,
-                    tool=tc_item.name,
+                    tool=_safe_tool_trace_name(tc_item.name),
                     success=success,
                     duration=dur,
                 ))
             log_entry = {
                 "step": step,
-                "tool": tc_item.name,
+                "tool": _safe_tool_trace_name(tc_item.name),
                 "arguments": tc_item.arguments,
                 "success": success,
                 "duration": dur,
@@ -175,7 +190,11 @@ def _execute_tools(
 
         for tc in tool_calls:
             if progress_callback:
-                progress_callback(stream_event("tool_start", step=step, tool=tc.name))
+                progress_callback(stream_event(
+                    "tool_start",
+                    step=step,
+                    tool=_safe_tool_trace_name(tc.name),
+                ))
 
         pool = ThreadPoolExecutor(max_workers=min(len(tool_calls), 5))
         timeout_triggered = False

@@ -1259,19 +1259,15 @@ def test_native_tool_trace_redacts_name_without_changing_dispatch() -> None:
     )
 
     assert dispatched_names == [PREFIXED_API_KEY]
-    assert tool_call.name == "[REDACTED]"
-    assert results[0]["tc"].name == "[REDACTED]"
+    assert tool_call.name == PREFIXED_API_KEY
+    assert results[0]["tc"].name == PREFIXED_API_KEY
     assert tool_calls_log[0]["tool"] == "[REDACTED]"
-    public_events = [
-        sanitize_stream_event(event, trace_id="trace-native-tool-name")
-        for event in events
-    ]
-    assert [event["tool"] for event in public_events] == [
+    assert [event["tool"] for event in events] == [
         "[REDACTED]",
         "[REDACTED]",
     ]
     _assert_no_secret({
-        "events": public_events,
+        "events": events,
         "tool_calls_log": tool_calls_log,
     })
 
@@ -1300,7 +1296,7 @@ def test_native_tool_trace_redacts_name_without_changing_dispatch() -> None:
         tool_wait_timeout_seconds=0.01,
     )
 
-    assert timed_out_call.name == "[REDACTED]"
+    assert timed_out_call.name == PREFIXED_API_KEY
     assert timed_out_log[0]["tool"] == "[REDACTED]"
     assert timed_out_log[0]["timeout"] is True
     _assert_no_secret(timed_out_log)
