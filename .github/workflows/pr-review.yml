@@ -1,5 +1,5 @@
-# Automated pull request review with syntax checks and AI-assisted semantic review.
-# Fork pull requests run only read-only static checks; trusted pull requests retain the full review flow.
+# Automated pull request review with syntax checks and advisory reporting.
+# The legacy AI job remains disabled until privileged work moves to base-controlled execution.
 
 name: PR Review
 
@@ -45,14 +45,23 @@ jobs:
       safe_to_run: ${{ steps.check_sensitive.outputs.safe_to_run }}
       sensitive_files_changed: ${{ steps.check_sensitive.outputs.sensitive_files_changed }}
       is_fork: ${{ steps.trust.outputs.is_fork }}
+      is_default_branch: ${{ steps.trust.outputs.is_default_branch }}
     
     steps:
       - name: 🔐 Classify Pull Request Trust
         id: trust
         env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           IS_FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.id != github.event.repository.id }}
+          REF_TYPE: ${{ github.ref_type }}
+          TARGET_REF: ${{ github.event_name == 'pull_request' && github.base_ref || github.ref_name }}
         run: |
           echo "is_fork=$IS_FORK" >> "$GITHUB_OUTPUT"
+          if [ "$REF_TYPE" = "branch" ] && [ "$TARGET_REF" = "$DEFAULT_BRANCH" ]; then
+            echo "is_default_branch=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_default_branch=false" >> "$GITHUB_OUTPUT"
+          fi
           if [ "$IS_FORK" = "true" ]; then
             echo "## Fork Pull Request Policy" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
@@ -66,16 +75,19 @@ jobs:
           fetch-depth: 0
       
       - name: 🔄 Fetch Base Branch
-        run: git fetch origin ${{ github.base_ref || 'main' }}:refs/remotes/origin/${{ github.base_ref || 'main' }}
+        env:
+          BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
+        run: git fetch origin "$BASE_REF:refs/remotes/origin/$BASE_REF"
       
       - name: 🔒 Check Sensitive File Changes
         id: check_sensitive
+        env:
+          BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
         run: |
           escape_dynamic_text() {
             perl -CSDA -pe 's/([^\x00-\x7F]|&)/sprintf("\\u{%X}", ord($1))/ge'
           }
-          BASE_REF="${{ github.base_ref || 'main' }}"
-          SENSITIVE_FILES=$(git diff --name-only origin/$BASE_REF...HEAD | grep -E '^(\.github/workflows/.*\.yml|\.github/scripts/.*\.py)$' || echo "")
+          SENSITIVE_FILES=$(git diff --name-only "origin/$BASE_REF...HEAD" | grep -E '^(\.github/workflows/.*\.yml|\.github/scripts/.*\.py)$' || echo "")
           
           if [ -n "$SENSITIVE_FILES" ]; then
             echo "⚠️ **Sensitive files changed; manual review is required.**" >> $GITHUB_STEP_SUMMARY
@@ -114,7 +126,9 @@ jobs:
           fetch-depth: 0
       
       - name: 🔄 Fetch Base Branch
-        run: git fetch origin ${{ github.base_ref || 'main' }}:refs/remotes/origin/${{ github.base_ref || 'main' }}
+        env:
+          BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
+        run: git fetch origin "$BASE_REF:refs/remotes/origin/$BASE_REF"
       
       - name: 🐍 Set Up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
@@ -133,10 +147,11 @@ jobs:
       
       - name: 📋 Identify Changed Files
         id: check_files
+        env:
+          BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
         run: |
-          BASE_REF="${{ github.base_ref || 'main' }}"
-          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMRT origin/$BASE_REF...HEAD -- '*.py' 2>/dev/null || echo "")
-          REVIEWABLE_FILES=$(git diff --name-only origin/$BASE_REF...HEAD -- '*.py' '*.md' 'docs/**' 'README.md' 'AGENTS.md' 'requirements.txt' '.github/requirements-ci.txt' 'pyproject.toml' 'setup.cfg' '.github/PULL_REQUEST_TEMPLATE.md' '.github/workflows/**' '.github/scripts/**' 2>/dev/null || echo "")
+          CHANGED_FILES=$(git diff --name-only --diff-filter=ACMRT "origin/$BASE_REF...HEAD" -- '*.py' 2>/dev/null || echo "")
+          REVIEWABLE_FILES=$(git diff --name-only "origin/$BASE_REF...HEAD" -- '*.py' '*.md' 'docs/**' 'README.md' 'AGENTS.md' 'requirements.txt' '.github/requirements-ci.txt' 'pyproject.toml' 'setup.cfg' '.github/PULL_REQUEST_TEMPLATE.md' '.github/workflows/**' '.github/scripts/**' 2>/dev/null || echo "")
 
           if [ -z "$REVIEWABLE_FILES" ]; then
             echo "has_reviewable_changes=false" >> $GITHUB_OUTPUT
@@ -206,27 +221,29 @@ jobs:
           fi
       
       - name: 📊 Summarize Changes
+        env:
+          BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
         run: |
           escape_dynamic_text() {
             perl -CSDA -pe 's/([^\x00-\x7F]|&)/sprintf("\\u{%X}", ord($1))/ge'
           }
-          BASE_REF="${{ github.base_ref || 'main' }}"
           echo "## 📊 Change Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          STATS=$(git diff --stat origin/$BASE_REF...HEAD 2>/dev/null | tail -1)
+          STATS=$(git diff --stat "origin/$BASE_REF...HEAD" 2>/dev/null | tail -1)
           echo "$STATS" | escape_dynamic_text >> $GITHUB_STEP_SUMMARY
 
-  # ==================== AI review after static checks pass ====================
+  # ==================== Disabled legacy AI review ====================
   ai-review:
     name: 🤖 AI Code Review
     runs-on: ubuntu-latest
     needs: [security-check, auto-check]
     if: |
+      false &&
       needs.security-check.outputs.safe_to_run == 'true' &&
       needs.security-check.outputs.is_fork != 'true' &&
+      needs.security-check.outputs.is_default_branch == 'true' &&
       needs.auto-check.result == 'success' &&
-      needs.auto-check.outputs.has_reviewable_changes == 'true' &&
-      vars.ENABLE_AI_REVIEW != 'false'
+      needs.auto-check.outputs.has_reviewable_changes == 'true'
     permissions:
       contents: read
     
@@ -257,7 +274,9 @@ jobs:
       - name: 🔄 Fetch Base Branch
         id: fetch-analysis-base
         working-directory: pr-code
-        run: git fetch origin ${{ github.base_ref || 'main' }}:refs/remotes/origin/${{ github.base_ref || 'main' }}
+        env:
+          BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
+        run: git fetch origin "$BASE_REF:refs/remotes/origin/$BASE_REF"
       
       - name: 🐍 Set Up Python
         id: setup-review-python
@@ -276,11 +295,9 @@ jobs:
         id: run-ai-review
         working-directory: pr-code
         env:
-          GITHUB_BASE_REF: ${{ github.base_ref || 'main' }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
           GEMINI_MODEL_FALLBACK: ${{ vars.GEMINI_MODEL_FALLBACK || 'gemini-2.5-flash' }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_BASE_URL: ${{ vars.OPENAI_BASE_URL }}
           OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           AI_REVIEW_STRICT: ${{ vars.AI_REVIEW_STRICT || 'false' }}
@@ -314,7 +331,10 @@ jobs:
     name: 🏷️ Automatic Labels
     runs-on: ubuntu-latest
     needs: [security-check]
-    if: github.event_name == 'pull_request' && needs.security-check.outputs.is_fork != 'true'
+    if: |
+      github.event_name == 'pull_request' &&
+      needs.security-check.outputs.is_fork != 'true' &&
+      needs.security-check.outputs.is_default_branch == 'true'
     permissions:
       pull-requests: write
     
@@ -398,7 +418,8 @@ jobs:
       always() &&
       github.event_name == 'pull_request' &&
       needs.security-check.outputs.safe_to_run == 'true' &&
-      needs.security-check.outputs.is_fork != 'true'
+      needs.security-check.outputs.is_fork != 'true' &&
+      needs.security-check.outputs.is_default_branch == 'true'
     permissions:
       pull-requests: write
     

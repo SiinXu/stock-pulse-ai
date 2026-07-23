@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import tempfile
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -28,9 +29,13 @@ PIP_INSTALL_RE = re.compile(
     r"(?:(?![;&|#\r\n]).){0,256}?\binstall\b",
     re.IGNORECASE,
 )
-SECRET_EXPRESSION_RE = re.compile(r"\$\{\{[\s\S]*?\bsecrets\b[\s\S]*?\}\}")
+SECRET_EXPRESSION_RE = re.compile(
+    r"\$\{\{[\s\S]*?\bsecrets\b[\s\S]*?\}\}",
+    re.IGNORECASE,
+)
 
 PR_REVIEW_WORKFLOW = ".github/workflows/pr-review.yml"
+TRUST_CLASSIFIER_ID = "trust"
 TRUSTED_REVIEW_CHECKOUT_ID = "trusted-review-inputs"
 PULL_REQUEST_REVIEW_CHECKOUT_ID = "pull-request-analysis-inputs"
 FETCH_REVIEW_BASE_ID = "fetch-analysis-base"
@@ -76,23 +81,71 @@ TRUSTED_REVIEW_RUN_LINES = (
 )
 TRUSTED_REVIEW_REF = "${{ github.event.pull_request.base.sha || github.sha }}"
 PULL_REQUEST_REVIEW_REF = "${{ github.event.pull_request.head.sha || github.sha }}"
+TRUSTED_REVIEW_BASE_ENV = {
+    "BASE_REF": "${{ github.base_ref || github.event.repository.default_branch }}",
+}
 FETCH_REVIEW_BASE_COMMAND = (
-    "git fetch origin ${{ github.base_ref || 'main' }}:"
-    "refs/remotes/origin/${{ github.base_ref || 'main' }}"
+    'git fetch origin "$BASE_REF:refs/remotes/origin/$BASE_REF"'
+)
+SECURITY_CHECK_OUTPUTS = {
+    "safe_to_run": "${{ steps.check_sensitive.outputs.safe_to_run }}",
+    "sensitive_files_changed": "${{ steps.check_sensitive.outputs.sensitive_files_changed }}",
+    "is_fork": "${{ steps.trust.outputs.is_fork }}",
+    "is_default_branch": "${{ steps.trust.outputs.is_default_branch }}",
+}
+TRUST_CLASSIFIER_ENV = {
+    "DEFAULT_BRANCH": "${{ github.event.repository.default_branch }}",
+    "IS_FORK": (
+        "${{ github.event_name == 'pull_request' && "
+        "github.event.pull_request.head.repo.id != github.event.repository.id }}"
+    ),
+    "REF_TYPE": "${{ github.ref_type }}",
+    "TARGET_REF": (
+        "${{ github.event_name == 'pull_request' && github.base_ref || github.ref_name }}"
+    ),
+}
+TRUST_CLASSIFIER_RUN_LINES = (
+    'echo "is_fork=$IS_FORK" >> "$GITHUB_OUTPUT"',
+    'if [ "$REF_TYPE" = "branch" ] && [ "$TARGET_REF" = "$DEFAULT_BRANCH" ]; then',
+    'echo "is_default_branch=true" >> "$GITHUB_OUTPUT"',
+    "else",
+    'echo "is_default_branch=false" >> "$GITHUB_OUTPUT"',
+    "fi",
+    'if [ "$IS_FORK" = "true" ]; then',
+    'echo "## Fork Pull Request Policy" >> "$GITHUB_STEP_SUMMARY"',
+    'echo "" >> "$GITHUB_STEP_SUMMARY"',
+    'echo "This run is limited to read-only static checks." >> "$GITHUB_STEP_SUMMARY"',
+    (
+        'echo "AI review, automatic labels, and review comments are skipped because fork '
+        'workflows do not receive repository secrets or write permissions." '
+        '>> "$GITHUB_STEP_SUMMARY"'
+    ),
+    "fi",
 )
 TRUSTED_REVIEW_JOB_IF_LINES = (
+    "false &&",
     "needs.security-check.outputs.safe_to_run == 'true' &&",
     "needs.security-check.outputs.is_fork != 'true' &&",
+    "needs.security-check.outputs.is_default_branch == 'true' &&",
     "needs.auto-check.result == 'success' &&",
-    "needs.auto-check.outputs.has_reviewable_changes == 'true' &&",
-    "vars.ENABLE_AI_REVIEW != 'false'",
+    "needs.auto-check.outputs.has_reviewable_changes == 'true'",
+)
+LABELER_JOB_IF_LINES = (
+    "github.event_name == 'pull_request' &&",
+    "needs.security-check.outputs.is_fork != 'true' &&",
+    "needs.security-check.outputs.is_default_branch == 'true'",
+)
+COMMENT_JOB_IF_LINES = (
+    "always() &&",
+    "github.event_name == 'pull_request' &&",
+    "needs.security-check.outputs.safe_to_run == 'true' &&",
+    "needs.security-check.outputs.is_fork != 'true' &&",
+    "needs.security-check.outputs.is_default_branch == 'true'",
 )
 TRUSTED_REVIEW_ENV = {
-    "GITHUB_BASE_REF": "${{ github.base_ref || 'main' }}",
-    "GEMINI_API_KEY": "${{ secrets.GEMINI_API_KEY }}",
+    "GITHUB_BASE_REF": "${{ github.base_ref || github.event.repository.default_branch }}",
     "GEMINI_MODEL": "${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}",
     "GEMINI_MODEL_FALLBACK": "${{ vars.GEMINI_MODEL_FALLBACK || 'gemini-2.5-flash' }}",
-    "OPENAI_API_KEY": "${{ secrets.OPENAI_API_KEY }}",
     "OPENAI_BASE_URL": "${{ vars.OPENAI_BASE_URL }}",
     "OPENAI_MODEL": "${{ vars.OPENAI_MODEL }}",
     "AI_REVIEW_STRICT": "${{ vars.AI_REVIEW_STRICT || 'false' }}",
@@ -266,17 +319,56 @@ def _pinned_action(step: MappingNode, expected_action: str) -> bool:
     return bool(separator and action == expected_action and SHA_RE.fullmatch(ref))
 
 
-def _contains_secret_expression(node: Node) -> bool:
-    """Report whether a YAML node contains a GitHub secret expression."""
+def _contains_secret_outside(
+    node: Node,
+    allowed_path: tuple[str, ...] | None,
+    path: tuple[str, ...] = (),
+) -> bool:
+    """Report a secret expression outside one exact workflow AST path."""
     if isinstance(node, ScalarNode):
-        return bool(SECRET_EXPRESSION_RE.search(node.value))
-    if isinstance(node, MappingNode):
-        return any(
-            _contains_secret_expression(key) or _contains_secret_expression(value)
-            for key, value in node.value
+        within_allowed_path = bool(
+            allowed_path is not None and path[: len(allowed_path)] == allowed_path
         )
+        return not within_allowed_path and bool(SECRET_EXPRESSION_RE.search(node.value))
+    if isinstance(node, MappingNode):
+        for index, (key, value) in enumerate(node.value):
+            key_path = path + (f"<key:{index}>",)
+            if _contains_secret_outside(key, allowed_path, key_path):
+                return True
+            value_name = key.value if isinstance(key, ScalarNode) else f"<value:{index}>"
+            if _contains_secret_outside(value, allowed_path, path + (value_name,)):
+                return True
+        return False
     if isinstance(node, SequenceNode):
-        return any(_contains_secret_expression(value) for value in node.value)
+        return any(
+            _contains_secret_outside(value, allowed_path, path + (str(index),))
+            for index, value in enumerate(node.value)
+        )
+    return False
+
+
+def _contains_mapping_key(
+    node: Node,
+    forbidden_key: str,
+    seen: set[int] | None = None,
+) -> bool:
+    """Report a forbidden YAML key, including through anchors and aliases."""
+    visited = seen if seen is not None else set()
+    identity = id(node)
+    if identity in visited:
+        return False
+    visited.add(identity)
+    if isinstance(node, MappingNode):
+        for key, value in node.value:
+            if isinstance(key, ScalarNode) and key.value.lower() == forbidden_key.lower():
+                return True
+            if _contains_mapping_key(key, forbidden_key, visited) or _contains_mapping_key(
+                value, forbidden_key, visited
+            ):
+                return True
+        return False
+    if isinstance(node, SequenceNode):
+        return any(_contains_mapping_key(value, forbidden_key, visited) for value in node.value)
     return False
 
 
@@ -404,9 +496,81 @@ def _trusted_review_dependency_errors(document: Node, relative_path: str) -> lis
             errors.append(f"{relative_path}: workflow-level '{forbidden_key}' is not allowed")
 
     jobs = _named_mapping_value(document, "jobs")
+    security_check = _named_mapping_value(jobs, "security-check") if jobs is not None else None
+    if security_check is None:
+        errors.append(f"{relative_path}: missing the reviewed 'security-check' job")
+    else:
+        errors.extend(
+            _mapping_shape_errors(
+                security_check,
+                {"name", "runs-on", "permissions", "outputs", "steps"},
+                f"{relative_path}: security-check job",
+            )
+        )
+        if _scalar_value(security_check, "runs-on") != "ubuntu-latest":
+            errors.append(f"{relative_path}: security-check must use the reviewed ubuntu-latest runner")
+        if _scalar_mapping(security_check, "outputs") != SECURITY_CHECK_OUTPUTS:
+            errors.append(
+                f"{relative_path}: security-check must expose the exact reviewed trust outputs"
+            )
+        security_steps_values = _mapping_values(security_check, "steps")
+        if len(security_steps_values) != 1 or not isinstance(
+            security_steps_values[0], SequenceNode
+        ):
+            errors.append(f"{relative_path}: security-check must declare one steps sequence")
+        else:
+            trust_steps = [
+                step
+                for step in security_steps_values[0].value
+                if isinstance(step, MappingNode)
+                and _scalar_value(step, "id") == TRUST_CLASSIFIER_ID
+            ]
+            if len(trust_steps) != 1:
+                errors.append(
+                    f"{relative_path}: security-check must declare one reviewed trust classifier"
+                )
+            else:
+                trust_step = trust_steps[0]
+                errors.extend(
+                    _mapping_shape_errors(
+                        trust_step,
+                        {"name", "id", "env", "run"},
+                        f"{relative_path}: trust classifier step",
+                    )
+                )
+                trust_run = _scalar_value(trust_step, "run") or ""
+                trust_run_lines = tuple(
+                    line.strip() for line in trust_run.splitlines() if line.strip()
+                )
+                if (
+                    _scalar_mapping(trust_step, "env") != TRUST_CLASSIFIER_ENV
+                    or trust_run_lines != TRUST_CLASSIFIER_RUN_LINES
+                ):
+                    errors.append(
+                        f"{relative_path}: trust classifier must retain its exact case-sensitive contract"
+                    )
+
+    for job_name, expected_condition in (
+        ("labeler", LABELER_JOB_IF_LINES),
+        ("comment", COMMENT_JOB_IF_LINES),
+    ):
+        write_job = _named_mapping_value(jobs, job_name) if jobs is not None else None
+        if write_job is None:
+            errors.append(f"{relative_path}: missing the reviewed '{job_name}' job")
+            continue
+        condition = _scalar_value(write_job, "if") or ""
+        condition_lines = tuple(
+            line.strip() for line in condition.splitlines() if line.strip()
+        )
+        if condition_lines != expected_condition:
+            errors.append(
+                f"{relative_path}: {job_name} must retain its exact default-branch write gate"
+            )
+
     ai_review = _named_mapping_value(jobs, "ai-review") if jobs is not None else None
     if ai_review is None:
-        return [f"{relative_path}: missing the reviewed 'ai-review' job"]
+        errors.append(f"{relative_path}: missing the reviewed 'ai-review' job")
+        return errors
     errors.extend(
         _mapping_shape_errors(
             ai_review,
@@ -421,7 +585,10 @@ def _trusted_review_dependency_errors(document: Node, relative_path: str) -> lis
     job_if = _scalar_value(ai_review, "if") or ""
     job_if_lines = tuple(line.strip() for line in job_if.splitlines() if line.strip())
     if job_if_lines != TRUSTED_REVIEW_JOB_IF_LINES:
-        errors.append(f"{relative_path}: ai-review must retain its exact fork and static-check gate")
+        errors.append(
+            f"{relative_path}: ai-review must retain its exact fork, default-branch, "
+            "static-check, and disabled gate"
+        )
 
     steps_values = _mapping_values(ai_review, "steps")
     if len(steps_values) != 1 or not isinstance(steps_values[0], SequenceNode):
@@ -498,12 +665,13 @@ def _trusted_review_dependency_errors(document: Node, relative_path: str) -> lis
         errors.extend(
             _mapping_shape_errors(
                 fetch_step,
-                {"name", "id", "working-directory", "run"},
+                {"name", "id", "working-directory", "env", "run"},
                 f"{relative_path}: fetch analysis base step",
             )
         )
         if (
             _scalar_value(fetch_step, "working-directory") != "pr-code"
+            or _scalar_mapping(fetch_step, "env") != TRUSTED_REVIEW_BASE_ENV
             or _scalar_value(fetch_step, "run") != FETCH_REVIEW_BASE_COMMAND
         ):
             errors.append(f"{relative_path}: base fetch must retain its exact analysis-only command")
@@ -545,7 +713,7 @@ def _trusted_review_dependency_errors(document: Node, relative_path: str) -> lis
             _mapping_shape_errors(
                 review_step,
                 {"name", "id", "working-directory", "env", "run"},
-                f"{relative_path}: secret-bearing review step",
+                f"{relative_path}: disabled AI review step",
             )
         )
         if _scalar_value(review_step, "working-directory") != "pr-code":
@@ -558,8 +726,10 @@ def _trusted_review_dependency_errors(document: Node, relative_path: str) -> lis
             errors.append(
                 f"{relative_path}: AI review must execute the trusted-base script and isolate its output"
             )
-        if not _contains_secret_expression(review_step):
-            errors.append(f"{relative_path}: reviewed AI step no longer contains the expected secret boundary")
+    if _contains_secret_outside(document, None):
+        errors.append(f"{relative_path}: PR Review must not reference repository secrets")
+    if _contains_mapping_key(document, "secrets"):
+        errors.append(f"{relative_path}: PR Review must not forward repository secrets")
 
     upload_step = identified_steps.get(UPLOAD_REVIEW_RESULT_ID)
     if upload_step is not None:
@@ -585,8 +755,6 @@ def _trusted_review_dependency_errors(document: Node, relative_path: str) -> lis
         uses = _scalar_value(step, "uses") or ""
         if uses.startswith("./"):
             errors.append(f"{relative_path}: ai-review must not execute local Actions")
-        if step_id != TRUSTED_REVIEW_STEP_ID and _contains_secret_expression(step):
-            errors.append(f"{relative_path}: only the reviewed AI step may reference secrets")
         run = _scalar_value(step, "run") or ""
         if PIP_INSTALL_RE.search(run) and step_id != TRUSTED_REVIEW_INSTALL_ID:
             errors.append(
@@ -749,13 +917,48 @@ jobs:
         raise AssertionError(f"approved write fixture failed: {errors!r}")
 
     trusted_path = PR_REVIEW_WORKFLOW
-    trusted_permissions = frozenset({(trusted_path, "ai-review", "contents", "read")})
+    trusted_permissions = frozenset(
+        {
+            (trusted_path, "security-check", "contents", "read"),
+            (trusted_path, "ai-review", "contents", "read"),
+            (trusted_path, "labeler", "pull-requests", "write"),
+            (trusted_path, "comment", "pull-requests", "write"),
+        }
+    )
+    security_output_lines = "\n".join(
+        f"      {key}: {value}" for key, value in SECURITY_CHECK_OUTPUTS.items()
+    )
+    trust_classifier_env_lines = "\n".join(
+        f"          {key}: {value}" for key, value in TRUST_CLASSIFIER_ENV.items()
+    )
+    trust_classifier_run_lines = "\n".join(
+        f"          {line}" for line in TRUST_CLASSIFIER_RUN_LINES
+    )
     trusted_if_lines = "\n".join(f"      {line}" for line in TRUSTED_REVIEW_JOB_IF_LINES)
+    labeler_if_lines = "\n".join(f"      {line}" for line in LABELER_JOB_IF_LINES)
+    comment_if_lines = "\n".join(f"      {line}" for line in COMMENT_JOB_IF_LINES)
+    trusted_base_env_lines = "\n".join(
+        f"          {key}: {value}" for key, value in TRUSTED_REVIEW_BASE_ENV.items()
+    )
     trusted_env_lines = "\n".join(f"          {key}: {value}" for key, value in TRUSTED_REVIEW_ENV.items())
     trusted_review = f"""name: PR Review
 permissions: {{}}
 on: pull_request
 jobs:
+  security-check:
+    name: Security check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+{security_output_lines}
+    steps:
+      - name: Classify pull request trust
+        id: {TRUST_CLASSIFIER_ID}
+        env:
+{trust_classifier_env_lines}
+        run: |
+{trust_classifier_run_lines}
   ai-review:
     name: AI review
     runs-on: ubuntu-latest
@@ -787,6 +990,8 @@ jobs:
       - name: Fetch base branch
         id: {FETCH_REVIEW_BASE_ID}
         working-directory: pr-code
+        env:
+{trusted_base_env_lines}
         run: {FETCH_REVIEW_BASE_COMMAND}
       - name: Set up Python
         id: {SETUP_REVIEW_PYTHON_ID}
@@ -824,19 +1029,85 @@ jobs:
           name: ai-review-result
           path: ${{{{ runner.temp }}}}/ai_review_result.txt
           if-no-files-found: ignore
+  labeler:
+    name: Label pull request
+    runs-on: ubuntu-latest
+    needs: [security-check]
+    if: |
+{labeler_if_lines}
+    permissions:
+      pull-requests: write
+    steps:
+      - run: echo label
+  comment:
+    name: Comment on pull request
+    runs-on: ubuntu-latest
+    needs: [security-check, ai-review]
+    if: |
+{comment_if_lines}
+    permissions:
+      pull-requests: write
+    steps:
+      - run: echo comment
 """
 
-    def trusted_errors(workflow: str) -> list[str]:
+    def trusted_errors(
+        workflow: str,
+        *,
+        approved_permissions: frozenset[tuple[str, str, str, str]] = trusted_permissions,
+    ) -> list[str]:
         """Validate one isolated secret-bearing review workflow fixture."""
         return _fixture_errors(
             workflow,
             today=today,
-            approved_permissions=trusted_permissions,
+            approved_permissions=approved_permissions,
             workflow_name="pr-review.yml",
         )
 
     if errors := trusted_errors(trusted_review):
         raise AssertionError(f"trusted review fixture failed: {errors!r}")
+
+    def classifier_result(ref_type: str, target_ref: str, default_branch: str) -> str:
+        """Execute the guarded classifier exactly as GitHub Actions does."""
+        with tempfile.TemporaryDirectory() as classifier_directory:
+            output_path = Path(classifier_directory) / "output"
+            summary_path = Path(classifier_directory) / "summary"
+            completed = subprocess.run(
+                ["bash", "-eu", "-c", "\n".join(TRUST_CLASSIFIER_RUN_LINES)],
+                check=False,
+                capture_output=True,
+                text=True,
+                env={
+                    "DEFAULT_BRANCH": default_branch,
+                    "GITHUB_OUTPUT": str(output_path),
+                    "GITHUB_STEP_SUMMARY": str(summary_path),
+                    "IS_FORK": "false",
+                    "REF_TYPE": ref_type,
+                    "TARGET_REF": target_ref,
+                },
+            )
+            if completed.returncode != 0:
+                raise AssertionError(
+                    "trust classifier fixture failed: "
+                    f"stdout={completed.stdout!r}, stderr={completed.stderr!r}"
+                )
+            outputs = dict(
+                line.split("=", 1)
+                for line in output_path.read_text(encoding="utf-8").splitlines()
+            )
+            return outputs["is_default_branch"]
+
+    classifier_cases = {
+        ("branch", "main", "main"): "true",
+        ("tag", "main", "main"): "false",
+        ("branch", "MAIN", "main"): "false",
+    }
+    for inputs, expected in classifier_cases.items():
+        actual = classifier_result(*inputs)
+        if actual != expected:
+            raise AssertionError(
+                f"trust classifier returned {actual!r} for {inputs!r}; expected {expected!r}"
+            )
     _expect_failure(
         trusted_errors(
             trusted_review.replace(
@@ -863,6 +1134,86 @@ jobs:
         trusted_errors(trusted_review.replace("          sparse-checkout-cone-mode: false\n", "")),
         "declare exact inputs",
     )
+    default_branch_gate = (
+        "      needs.security-check.outputs.is_default_branch == 'true' &&\n"
+    )
+    _expect_failure(
+        trusted_errors(trusted_review.replace(default_branch_gate, "")),
+        "default-branch",
+    )
+    _expect_failure(
+        trusted_errors(
+            trusted_review.replace(
+                '          if [ "$REF_TYPE" = "branch" ] && '
+                '[ "$TARGET_REF" = "$DEFAULT_BRANCH" ]; then\n',
+                '          if [ "$REF_TYPE" = "branch" ] && '
+                '[ "${TARGET_REF,,}" = "${DEFAULT_BRANCH,,}" ]; then\n',
+            )
+        ),
+        "exact case-sensitive contract",
+    )
+    _expect_failure(
+        trusted_errors(
+            trusted_review.replace(
+                '          if [ "$REF_TYPE" = "branch" ] && '
+                '[ "$TARGET_REF" = "$DEFAULT_BRANCH" ]; then\n',
+                '          if [ "$TARGET_REF" = "$DEFAULT_BRANCH" ]; then\n',
+            )
+        ),
+        "exact case-sensitive contract",
+    )
+    _expect_failure(
+        trusted_errors(trusted_review.replace("      false &&\n", "", 1)),
+        "disabled gate",
+    )
+    _expect_failure(
+        trusted_errors(
+            trusted_review.replace(
+                f"          TARGET_REF: {TRUST_CLASSIFIER_ENV['TARGET_REF']}\n",
+                "          TARGET_REF: ${{ github.base_ref || "
+                "github.event.repository.default_branch }}\n",
+            )
+        ),
+        "exact case-sensitive contract",
+    )
+    _expect_failure(
+        trusted_errors(
+            trusted_review.replace(
+                f"    if: |\n{labeler_if_lines}\n",
+                "    if: |\n"
+                + "\n".join(
+                    f"      {line}" for line in LABELER_JOB_IF_LINES[:-1]
+                )
+                + "\n",
+                1,
+            )
+        ),
+        "labeler must retain its exact default-branch write gate",
+    )
+    _expect_failure(
+        trusted_errors(
+            trusted_review.replace(
+                f"    if: |\n{comment_if_lines}\n",
+                "    if: |\n"
+                + "\n".join(
+                    f"      {line}" for line in COMMENT_JOB_IF_LINES[:-1]
+                )
+                + "\n",
+                1,
+            )
+        ),
+        "comment must retain its exact default-branch write gate",
+    )
+    _expect_failure(
+        trusted_errors(
+            trusted_review.replace(
+                f"        run: {FETCH_REVIEW_BASE_COMMAND}\n",
+                "        run: git fetch origin ${{ github.base_ref }}:"
+                "refs/remotes/origin/${{ github.base_ref }}\n",
+            )
+        ),
+        "exact analysis-only command",
+    )
     _expect_failure(
         trusted_errors(
             trusted_review.replace(
@@ -874,7 +1225,101 @@ jobs:
                 "      - name: Install trusted dependencies\n",
             )
         ),
-        "only the reviewed AI step may reference secrets",
+        "PR Review must not reference repository secrets",
+    )
+    non_ai_permissions = trusted_permissions | frozenset(
+        {(trusted_path, "auto-check", "contents", "read")}
+    )
+    non_ai_secret = trusted_review.replace(
+        "  ai-review:\n",
+        "  auto-check:\n"
+        "    name: Static checks\n"
+        "    runs-on: ubuntu-latest\n"
+        "    permissions:\n"
+        "      contents: read\n"
+        "    steps:\n"
+        "      - name: Leak secret\n"
+        "        env:\n"
+        "          LEAK: ${{ secrets.OPENAI_API_KEY }}\n"
+        "        run: echo static\n"
+        "  ai-review:\n",
+    )
+    _expect_failure(
+        trusted_errors(non_ai_secret, approved_permissions=non_ai_permissions),
+        "PR Review must not reference repository secrets",
+    )
+    mixed_case_non_ai_secret = non_ai_secret.replace(
+        "${{ secrets.OPENAI_API_KEY }}",
+        "${{ SECRETS.OPENAI_API_KEY }}",
+        1,
+    )
+    _expect_failure(
+        trusted_errors(mixed_case_non_ai_secret, approved_permissions=non_ai_permissions),
+        "PR Review must not reference repository secrets",
+    )
+    inherited_permissions = trusted_permissions | frozenset(
+        {(trusted_path, "inherited-secrets", "contents", "read")}
+    )
+    inherited_secrets_job = (
+        trusted_review
+        + "  inherited-secrets:\n"
+        "    uses: ./.github/workflows/leak.yml\n"
+        "    secrets: inherit\n"
+        "    permissions:\n"
+        "      contents: read\n"
+    )
+    _expect_failure(
+        trusted_errors(
+            inherited_secrets_job,
+            approved_permissions=inherited_permissions,
+        ),
+        "PR Review must not forward repository secrets",
+    )
+    _expect_failure(
+        trusted_errors(
+            inherited_secrets_job.replace("    secrets: inherit\n", "    SeCrEtS: inherit\n"),
+            approved_permissions=inherited_permissions,
+        ),
+        "PR Review must not forward repository secrets",
+    )
+    aliased_secret_forwarding = trusted_review.replace(
+        "permissions: {}\n",
+        "permissions: {}\nx-forward: &forwarding\n  secrets: inherit\n",
+        1,
+    )
+    _expect_failure(
+        trusted_errors(aliased_secret_forwarding),
+        "PR Review must not forward repository secrets",
+    )
+    aliased_review_env = trusted_review.replace(
+        "        env:\n" + trusted_env_lines + "\n        run: |\n",
+        "        env: &review-env\n"
+        + trusted_env_lines
+        + "\n          LEAK: ${{ secrets.GEMINI_API_KEY }}\n        run: |\n",
+    )
+    non_ai_secret_alias = (
+        aliased_review_env
+        + "  auto-check:\n"
+        "    name: Static checks\n"
+        "    runs-on: ubuntu-latest\n"
+        "    permissions:\n"
+        "      contents: read\n"
+        "    env: *review-env\n"
+        "    steps:\n"
+        "      - run: echo static\n"
+    )
+    _expect_failure(
+        trusted_errors(non_ai_secret_alias, approved_permissions=non_ai_permissions),
+        "PR Review must not reference repository secrets",
+    )
+    mixed_case_secret_alias = non_ai_secret_alias.replace(
+        "${{ secrets.GEMINI_API_KEY }}",
+        "${{ Secrets['GEMINI_API_KEY'] }}",
+        1,
+    )
+    _expect_failure(
+        trusted_errors(mixed_case_secret_alias, approved_permissions=non_ai_permissions),
+        "PR Review must not reference repository secrets",
     )
     _expect_failure(
         trusted_errors(
@@ -899,7 +1344,7 @@ jobs:
                 "      - name: Install trusted dependencies\n",
             )
         ),
-        "only the reviewed AI step may reference secrets",
+        "PR Review must not reference repository secrets",
     )
     _expect_failure(
         trusted_errors(
@@ -948,7 +1393,7 @@ jobs:
                 "          TOKEN: ${{ secrets.REVIEW_TOKEN }}\n",
             )
         ),
-        "only the reviewed AI step may reference secrets",
+        "PR Review must not reference repository secrets",
     )
     _expect_failure(
         trusted_errors(
@@ -995,7 +1440,7 @@ jobs:
         trusted_errors(trusted_review.replace(f"id: {FETCH_REVIEW_BASE_ID}", f"id: {SETUP_REVIEW_PYTHON_ID}")),
         "exact reviewed step order",
     )
-    print("Workflow supply-chain self-tests passed (33 cases).")
+    print("Workflow supply-chain self-tests passed (51 cases).")
 
 
 def parse_args() -> argparse.Namespace:

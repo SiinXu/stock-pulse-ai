@@ -86,15 +86,29 @@ because they are not present in the PyPI advisory database; all other skips fail
 
 `.github/requirements-review.txt` is the reviewed review-tool manifest. The
 read-only static job consumes the pull-request copy because it receives no
-secrets. The secret-bearing AI job instead checks out the manifest,
-`constraints.txt`, `build-constraints.txt`, and the review script from the
-immutable pull-request base commit (or the current commit for a manual dispatch)
-before installing dependencies. It never installs pull-request-controlled
-dependency inputs before injecting review secrets. The
-workflow guard enforces this trust boundary as an exact seven-step contract:
-step order, Action identities, inputs, commands, runner, job gate, and the
-secret-bearing environment are all reviewed. Extra local Actions, package
-installs, execution settings, or secret references outside the AI step fail.
+secrets. The legacy `ai-review` job remains in the workflow only to preserve the
+existing job topology and is disabled by a literal `false` condition. The whole
+PR Review workflow is repository-secret-free, and the executable guard rejects
+every `${{ secrets.* }}` expression regardless of job, step, key casing, or YAML
+alias use. It also rejects every `secrets:` forwarding key, including
+`secrets: inherit` on local or reusable workflow jobs.
+
+This is required even for same-repository pull requests. A `pull_request`
+workflow from the proposed head executes before merge, so default-branch
+protection does not make its workflow definition or reviewed code
+base-controlled. A future privileged AI review must first move secret use to a
+base-controlled workflow or an approval-protected secret boundary; repository
+variables or branch protection alone must not re-enable this job.
+
+A read-only classifier compares the PR base or dispatched ref with the default
+branch case-sensitively and also requires a branch ref, so a tag named after the
+default branch is untrusted. Write-capable label and comment jobs consume that
+exact output and do not run for another branch or tag. Base refs enter shell
+commands only through quoted environment variables. The workflow guard locks
+the literal AI disable, zero-secret contract, classifier, write-job gates, and
+the retained seven-step AI job shape, including Action identities, inputs,
+commands, runner, and step order. Extra local Actions, package installs, or
+execution settings fail closed.
 Before the trusted script runs, the job removes any pull-request-provided result
 node. A result is accepted only as a regular file, moved into the runner-owned
 temporary directory, and uploaded from that trusted path; an unavailable
@@ -152,10 +166,12 @@ contains every read-only job permission. Docker publish
 jobs do not request `id-token: write` because they authenticate with registry
 credentials and do not perform OIDC attestation.
 
-The PR Review workflow remains a `pull_request` workflow. Fork runs receive no
-repository secrets, and its secret- or write-dependent jobs retain explicit
-same-repository conditions. Pinning and permission declarations must not weaken
-that isolation.
+The PR Review workflow remains a `pull_request` workflow and contains no
+repository-secret references or forwarding keys. Fork and same-repository runs
+both keep the AI job disabled. Write-capable jobs require a same-repository
+head, a branch ref, and an exact, case-sensitive default-branch match. Pinning,
+permission declarations, base-ref handling, the literal disable, and the
+zero-secret contract must not weaken that isolation.
 
 ## Time-Bounded Exceptions
 
@@ -243,12 +259,16 @@ The self-tests cover compliant manifests, a representative immutable pin
 update, conventionally formatted and flow-mapped movable references, floating
 release comments, missing permission declarations, top-level write access,
 active/expired/overlong exceptions, unapproved read or write scopes, and the
-immutable trusted-base dependency boundary for the secret-bearing review job.
+immutable trusted-base dependency boundary retained by the disabled review job.
 Counterexamples cover inserted steps, local Actions, pip global-option
-install commands, job or step environment injection, and dot or bracket-form
-secret references outside the single reviewed AI step. They also require
-pull-request result cleanup, regular-file validation, and runner-owned artifact
-upload before the write-capable comment job can consume review output.
+install commands, job or step environment injection, any direct or aliased
+secret expression, mixed-case secret contexts, inherited secret forwarding,
+removal of the literal AI disable, a tag named after the default branch, a
+case-variant pull-request base, missing label or comment job gates, and direct
+shell interpolation of a base ref.
+They also require pull-request result cleanup, regular-file validation, and
+runner-owned artifact upload before the write-capable comment job can consume
+review output.
 The dependency self-tests separately cover source and lock drift, lock and direct
 movable Git sources, non-exact versions, future cutoffs, overlapping markers,
 runtime install contracts, active/expired/overlong exceptions, resolver-output
@@ -260,11 +280,32 @@ The install-guidance guard scans every non-binary git-tracked path, including
 extensionless files and all text suffixes, for raw requirements-file install
 hints as logical commands. It joins shell backslash and PowerShell backtick
 continuations, CMD caret continuations, and GitHub Actions folded YAML scalars.
-It recognizes compact `-rrequirements.txt` syntax and pip global options before
-`install`. Quote-aware shell tokenization accepts a build constraint only when
-the same command contains a complete `--build-constraint` option or an exact
-preceding `PIP_BUILD_CONSTRAINT=...` assignment before any comment; option text
-embedded in another environment variable does not satisfy the policy. A
+The folded-scalar parser supports either legal chomping/indent-indicator order,
+inline or next-line block indicators, value anchors or tags on the mapping or
+separate property lines, explicit indentation indicators, and intervening YAML
+comments or blank lines. It preserves blank scalar paragraphs and more-indented
+content as command boundaries.
+An unbounded lexical parser recognizes bare, Unix-path, virtual-environment, and
+Windows `.exe` pip executables; `python -m pip`, `python -mpip`, and
+`python -m pip.__main__` with supported interpreter or `py` launcher options;
+Docker JSON `RUN`; compact `-rrequirements.txt` and combined short options such
+as `-qr`; and pip global options before `install`.
+It evaluates both POSIX backslash escapes and Windows path separators. Every
+non-empty `-r` or `--requirement` value is treated as a requirements-file
+install regardless of its literal filename or variable use. The parser splits
+only on unquoted shell separators, comments, and preserved newlines. Nested
+command and process substitution bodies are scanned recursively but replaced in
+their outer command, so an option in a nested command cannot constrain its
+caller. Shell redirection operators and their targets are removed from the pip
+argument view, preventing an output filename from acting as constraint evidence.
+A build constraint is accepted only when that exact command contains a complete
+`--build-constraint` token or an exact command-prefix
+`PIP_BUILD_CONSTRAINT=...` assignment with a literal non-option path. Values
+containing environment interpolation, command or process substitution, Windows
+environment, positional, or batch-loop expansion, or a nested-command marker
+are dynamic and do not satisfy the policy. Quoted decoys, later commands,
+unrelated environment variables, and option text after pip's `--` terminator
+also fail closed. A
 temporary cross-track exception must identify the exact path,
 normalized logical-command SHA-256, occurrence count, owner, issue, reason, and
 an expiry no more than 30 days away. Text or count drift, unused entries, and
