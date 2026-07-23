@@ -75,8 +75,8 @@ import {
   shouldMarkDirtyOnConflict,
 } from '../components/settings/autosaveMachine';
 import { IntelligenceSourcesPanel } from '../components/settings/IntelligenceSourcesPanel';
-import { FirstRunSetupCard } from '../components/settings/FirstRunSetupCard';
-import { SchedulerSettingsCard } from '../components/settings/SchedulerSettingsCard';
+import FirstRunSetupCard from '../components/settings/FirstRunSetupCard';
+import SchedulerSettingsCard from '../components/settings/SchedulerSettingsCard';
 import { getConfigItem } from '../components/settings/settingsConfigItems';
 import { WEB_BUILD_INFO } from '../utils/constants';
 import { decodeModelRef } from '../utils/modelRef';

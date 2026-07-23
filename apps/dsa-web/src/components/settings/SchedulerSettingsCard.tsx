@@ -85,7 +85,7 @@ type SchedulerSettingsCardProps = {
   language: UiLanguage;
 };
 
-export const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
+const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
   items,
   disabled,
   issueByKey,
@@ -380,3 +380,5 @@ export const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
     </SettingsSectionCard>
   );
 };
+
+export default SchedulerSettingsCard;

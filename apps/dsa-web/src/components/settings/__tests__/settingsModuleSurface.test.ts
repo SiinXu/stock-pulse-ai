@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import * as settingsPageModule from '../../../pages/SettingsPage';
 import * as llmChannelEditorModule from '../LLMChannelEditor';
 import * as settingsHelpModule from '../../../locales/settingsHelp';
+import * as firstRunSetupCardModule from '../FirstRunSetupCard';
+import * as schedulerSettingsCardModule from '../SchedulerSettingsCard';
 
 function runtimeExportNames(module: Record<string, unknown>): string[] {
   return Object.keys(module).sort();
@@ -12,5 +14,7 @@ describe('Settings module surfaces', () => {
     expect(runtimeExportNames(settingsPageModule)).toEqual(['default']);
     expect(runtimeExportNames(llmChannelEditorModule)).toEqual(['LLMChannelEditor']);
     expect(runtimeExportNames(settingsHelpModule)).toEqual(['getSettingsHelpContent']);
+    expect(runtimeExportNames(firstRunSetupCardModule)).toEqual(['default']);
+    expect(runtimeExportNames(schedulerSettingsCardModule)).toEqual(['default']);
   });
 });

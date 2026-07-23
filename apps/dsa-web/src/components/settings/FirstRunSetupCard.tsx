@@ -48,7 +48,7 @@ function getSetupCheckStatusLabel(
   return t('settings.setupStatusOptional');
 }
 
-export const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
+const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
   status,
   isLoading,
   error,
@@ -206,3 +206,5 @@ export const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
     </SettingsSectionCard>
   );
 };
+
+export default FirstRunSetupCard;
