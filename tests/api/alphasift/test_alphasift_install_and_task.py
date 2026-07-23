@@ -5,6 +5,8 @@ from __future__ import annotations
 
 from tests.alphasift_api_test_support import (
     os,
+    sys,
+    Path,
     SimpleNamespace,
     MagicMock,
     patch,
@@ -285,9 +287,31 @@ class AlphaSiftOpportunitiesApiTestCase(_AlphaSiftApiTestCaseBase):
         self.assertNotIn("install_spec", payload)
         run_mock.assert_called_once()
         install_command = run_mock.call_args.args[0]
-        self.assertIn("--upgrade", install_command)
-        self.assertIn("--force-reinstall", install_command)
-        self.assertIn(DEFAULT_ALPHASIFT_TEST_SPEC, install_command)
+        repo_root = Path(alphasift_service.__file__).resolve().parents[2]
+        constraint_path = str(repo_root / "constraints.txt")
+        build_constraint_path = str(repo_root / "build-constraints.txt")
+        self.assertEqual(
+            install_command,
+            [
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
+                "--upgrade",
+                "--force-reinstall",
+                "--no-deps",
+                "--constraint",
+                constraint_path,
+                "--build-constraint",
+                build_constraint_path,
+                DEFAULT_ALPHASIFT_TEST_SPEC,
+            ],
+        )
+        # Dependency-isolation boundary: --no-deps blocks transitive resolution and both
+        # constraint flags resolve to the committed lock files on disk.
+        self.assertIn("--no-deps", install_command)
+        self.assertTrue((repo_root / "constraints.txt").is_file())
+        self.assertTrue((repo_root / "build-constraints.txt").is_file())
 
     def test_install_start_failure_hides_raw_diagnostic(self) -> None:
         config = self._config(enabled=True)

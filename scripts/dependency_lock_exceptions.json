@@ -1,12 +1,3 @@
 {
-  "exceptions": [
-    {
-      "kind": "unconstrained-install",
-      "package": "alphasift",
-      "path": "src/services/alphasift_service_parts/runtime_support.py",
-      "expires": "2026-08-20",
-      "owner": "security-maintainers",
-      "reason": "Tracked by #359; Track OPS cannot modify the runtime-owned repair endpoint."
-    }
-  ]
+  "exceptions": []
 }

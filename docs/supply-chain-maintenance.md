@@ -205,12 +205,13 @@ For a dependency, add one exact entry to
 
 The dependency `kind` is `unpinned-version`, `mutable-source`, or
 `unconstrained-install`, and the package name is canonical. Runtime-install
-exceptions also include the exact repository-relative `path`. The sole current
-runtime exception covers the AlphaSift repair endpoint through 2026-08-20 and is
-tracked by #359; it exists because Track OPS cannot edit `src/**`. A dependency
-exception does not waive source/lock digest synchronization, resolver
-reproduction, platform-marker exclusivity, other install-entry contracts, or the
-exact optional PydanticAI closure.
+exceptions also include the exact repository-relative `path`. There is no current
+runtime exception: the AlphaSift repair install is constrained to the reviewed
+lock (`--no-deps` plus the runtime `constraints.txt` and PEP 517
+`build-constraints.txt`), so it can no longer resolve or upgrade dependencies
+outside the lock. A dependency exception does not waive source/lock digest
+synchronization, resolver reproduction, platform-marker exclusivity, other
+install-entry contracts, or the exact optional PydanticAI closure.
 
 Known-vulnerability exceptions use the separate
 `scripts/dependency_vulnerability_exceptions.json` registry:

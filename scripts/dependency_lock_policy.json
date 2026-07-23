@@ -76,7 +76,9 @@
     "src/services/alphasift_service_parts/runtime_support.py": {
       "package": "alphasift",
       "required_flags": [
-        "--no-deps"
+        "--no-deps",
+        "--constraint",
+        "--build-constraint"
       ]
     }
   },
