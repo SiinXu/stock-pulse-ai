@@ -311,10 +311,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Split search provider implementations and shared result contracts into focused private modules while preserving the `src.search_service` facade, fallback, and outbound-policy behavior.
 - [Docs] Defined repository directory ownership, the retained `webui.py` compatibility role, and the separate backend package-root decision.
 - [Changed] Split `SearchService` state, news processing, and orchestration methods into focused private modules while preserving the `src.search_service` facade and search behavior.
-- [Fixed] Serialized public plugin lifecycle operations with composition-root close, replacement, and reset so closed roots cannot be republished, callback-owned workers cannot deadlock, and terminal process shutdown cannot recreate the root.
 - [Chore] Converged notification capability, contract, noise-control, and route-configuration helpers into `src/notification_parts/` with strict legacy facades.
 - [Chore] Converged compact notification sender adapters into `src/notification_parts/senders/` with strict legacy facades.
 - [Chore] Converged the remaining extended notification sender adapters and package exports into `src/notification_parts/senders/` with strict legacy facades.
+- [Fixed] Serialized public plugin lifecycle operations with composition-root close, replacement, and reset so closed roots cannot be republished, callback-owned workers cannot deadlock, and terminal process shutdown cannot recreate the root.
 
 ## [3.26.3] - 2026-07-15
 
