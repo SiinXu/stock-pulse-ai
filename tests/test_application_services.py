@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+import src.application_services as application_services_mod
 import src.config
 import src.search_service
 import src.services.task_queue as task_queue_mod
@@ -1078,6 +1079,219 @@ def test_manifest_callback_worker_cannot_install_starting_root_without_deadlock(
     assert services.plugin_manager.snapshot("test.manifest-worker").state == "registered"
     assert get_application_services() is not services
     assert events == []
+
+
+def test_initial_installer_exposes_target_to_racing_callback_worker():
+    events: list[str] = []
+    observed_roots: list[ApplicationServices] = []
+    installer_paused = threading.Event()
+    release_installer = threading.Event()
+    worker_started = threading.Event()
+    worker_returned = threading.Event()
+    abort_callback = threading.Event()
+    workers: list[threading.Thread] = []
+    load_results: list = []
+
+    class _WorkerResolvingPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("local-load-begin")
+
+            def resolve_root() -> None:
+                observed_roots.append(get_application_services())
+                worker_returned.set()
+
+            worker = threading.Thread(target=resolve_root)
+            workers.append(worker)
+            worker.start()
+            worker_started.set()
+            while worker.is_alive() and not abort_callback.is_set():
+                worker.join(timeout=0.01)
+            events.append("local-load-end")
+
+    target = ApplicationServices(plugins_dir="")
+    assert target.plugin_manager.register(
+        _WorkerResolvingPlugin("test.initial-race", events),
+        source="builtin",
+    ).success
+
+    def pause_before_publication(frame, event, _arg):
+        if (
+            event == "line"
+            and frame.f_code
+            is application_services_mod._set_application_services.__code__
+            and application_services_mod._services_transition_active
+            and application_services_mod._services is None
+            and not installer_paused.is_set()
+            and application_services_mod._services_lock.acquire(blocking=False)
+        ):
+            application_services_mod._services_lock.release()
+            installer_paused.set()
+            release_installer.wait(timeout=5)
+            sys.settrace(None)
+        return pause_before_publication
+
+    def install_target() -> None:
+        sys.settrace(pause_before_publication)
+        try:
+            set_application_services(target)
+        finally:
+            sys.settrace(None)
+
+    installer = threading.Thread(target=install_target)
+    installer.start()
+    local_load: threading.Thread | None = None
+    resolved_before_installer_release = False
+    try:
+        assert installer_paused.wait(timeout=5)
+        local_load = threading.Thread(
+            target=lambda: load_results.append(
+                target.plugin_manager.load("test.initial-race")
+            ),
+        )
+        local_load.start()
+        assert worker_started.wait(timeout=5)
+        resolved_before_installer_release = worker_returned.wait(timeout=0.5)
+    finally:
+        abort_callback.set()
+        release_installer.set()
+        if local_load is not None:
+            local_load.join(timeout=5)
+        installer.join(timeout=5)
+        for worker in workers:
+            worker.join(timeout=5)
+
+    assert resolved_before_installer_release is True
+    assert local_load is not None and not local_load.is_alive()
+    assert not installer.is_alive()
+    assert all(not worker.is_alive() for worker in workers)
+    assert load_results and load_results[0].success is True
+    assert observed_roots == [target]
+    assert get_application_services() is target
+    assert events == ["local-load-begin", "local-load-end"]
+
+
+def test_newer_pending_target_waits_for_authorized_local_drain(monkeypatch):
+    events: list[str] = []
+    previous_close_started = threading.Event()
+    release_previous_close = threading.Event()
+    target_load_started = threading.Event()
+    release_target_load = threading.Event()
+    target_unload_started = threading.Event()
+    release_target_unload = threading.Event()
+    middle_load_started = threading.Event()
+    final_load_started = threading.Event()
+    poll_interval = threading.Event()
+    start_results: list[tuple] = []
+
+    class _DrainedTargetPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("target-load-begin")
+            target_load_started.set()
+            if not release_target_load.wait(timeout=5):
+                raise AssertionError("test did not release target load")
+            events.append("target-load-end")
+
+        def onunload(self) -> None:
+            events.append("target-unload-begin")
+            target_unload_started.set()
+            if not release_target_unload.wait(timeout=5):
+                raise AssertionError("test did not release target unload")
+            events.append("target-unload-end")
+
+    class _SignallingPlugin(_RecordingPlugin):
+        def __init__(
+            self,
+            plugin_id: str,
+            plugin_events: list[str],
+            started: threading.Event,
+        ) -> None:
+            super().__init__(plugin_id, plugin_events)
+            self._started = started
+
+        def onload(self, context: PluginContext) -> None:
+            self._started.set()
+            super().onload(context)
+
+    previous = ApplicationServices(plugins_dir="")
+    set_application_services(previous)
+    original_previous_close = previous._close_plugins
+
+    def delayed_previous_close():
+        previous_close_started.set()
+        if not release_previous_close.wait(timeout=5):
+            raise AssertionError("test did not release previous close")
+        return original_previous_close()
+
+    monkeypatch.setattr(previous, "_close_plugins", delayed_previous_close)
+    target = ApplicationServices(
+        builtin_plugins=(_DrainedTargetPlugin("test.drained", events),),
+        plugins_dir="",
+    )
+    middle = ApplicationServices(
+        builtin_plugins=(
+            _SignallingPlugin("test.middle", events, middle_load_started),
+        ),
+        plugins_dir="",
+    )
+    final = ApplicationServices(
+        builtin_plugins=(
+            _SignallingPlugin("test.final", events, final_load_started),
+        ),
+        plugins_dir="",
+    )
+
+    installer = threading.Thread(target=lambda: set_application_services(target))
+    installer.start()
+    assert previous_close_started.wait(timeout=5)
+    local_start = threading.Thread(
+        target=lambda: start_results.append(target.start_plugins()),
+    )
+    local_start.start()
+    assert target_load_started.wait(timeout=5)
+    set_application_services(middle)
+
+    target_was_published = False
+    try:
+        release_previous_close.set()
+        for _ in range(500):
+            if get_application_services() is target:
+                target_was_published = True
+                break
+            if not installer.is_alive():
+                break
+            poll_interval.wait(timeout=0.01)
+
+        set_application_services(final)
+        release_target_load.set()
+        if target_was_published:
+            assert target_unload_started.wait(timeout=5)
+            assert installer.is_alive()
+            assert get_application_services() is target
+            assert middle_load_started.is_set() is False
+            assert final_load_started.is_set() is False
+    finally:
+        release_previous_close.set()
+        release_target_load.set()
+        release_target_unload.set()
+        local_start.join(timeout=5)
+        installer.join(timeout=5)
+
+    assert target_was_published is True
+    assert not local_start.is_alive()
+    assert not installer.is_alive()
+    assert start_results and start_results[0][0].success is True
+    assert target.is_closed is True
+    assert target.plugin_manager.snapshot("test.drained").state == "disabled"
+    assert middle_load_started.is_set() is False
+    assert final_load_started.is_set() is True
+    assert get_application_services() is final
+    assert events == [
+        "target-load-begin",
+        "target-load-end",
+        "target-unload-begin",
+        "target-unload-end",
+        "load:test.final",
+    ]
 
 
 def test_installer_race_drains_deferred_local_cleanup(monkeypatch):

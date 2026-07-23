@@ -388,6 +388,7 @@ _services_lock = threading.Lock()
 _services_local_ops = threading.Condition(_services_lock)
 _services_transition_lock = threading.RLock()
 _services_transition_active = False
+_services_transition_target: Optional[ApplicationServices] = None
 _services_transition_pending: list[Optional[ApplicationServices]] = []
 _services_shutdown = False
 
@@ -435,10 +436,16 @@ def get_application_services() -> ApplicationServices:
     """Return the installed composition root, creating a default one lazily."""
     while True:
         with _services_lock:
-            if _services_transition_active and _services is not None:
-                # Lifecycle callbacks must resolve the root whose transition
-                # they belong to without starting or resurrecting a successor.
-                return _services
+            if _services_transition_active:
+                visible_services = (
+                    _services
+                    if _services is not None
+                    else _services_transition_target
+                )
+                if visible_services is not None:
+                    # Lifecycle callbacks must resolve their transition's
+                    # visible root without waiting on that same transition.
+                    return visible_services
             if _services_shutdown:
                 raise RuntimeError("Application services are shutting down")
 
@@ -473,7 +480,7 @@ def _set_application_services(
 ) -> None:
     """Install a direct target or continue an already-authorized transition."""
 
-    global _services, _services_transition_active
+    global _services, _services_transition_active, _services_transition_target
 
     with _services_lock:
         if _services_shutdown and services is not None:
@@ -493,6 +500,7 @@ def _set_application_services(
                 return
             if validate_direct_target:
                 _validate_direct_install_target(services)
+            _services_transition_target = services
             _services_transition_active = True
             _services_transition_pending.clear()
 
@@ -508,11 +516,7 @@ def _set_application_services(
                     previous._close_plugins()
 
                 with _services_lock:
-                    has_pending, pending_target = (
-                        _take_latest_installable_pending_services()
-                    )
-                    if has_pending:
-                        target = pending_target
+                    _services_transition_target = target
                     _services = target
                     while (
                         target is not None
@@ -532,6 +536,7 @@ def _set_application_services(
                         )
                         if has_pending:
                             target = pending_target
+                            _services_transition_target = target
                             restart_transition = True
 
                 if drained_target_to_close is not None:
@@ -543,6 +548,7 @@ def _set_application_services(
                             _take_latest_installable_pending_services()
                         )
                         target = pending_target if has_pending else None
+                        _services_transition_target = target
                         restart_transition = has_pending
 
                 if restart_transition:
@@ -555,15 +561,22 @@ def _set_application_services(
                     has_pending, pending_target = (
                         _take_latest_installable_pending_services()
                     )
+                    if (
+                        not has_pending
+                        and target is not None
+                        and target._plugin_close_requested
+                    ):
+                        has_pending, pending_target = True, None
                     if not has_pending:
-                        if target is not None and target._plugin_close_requested:
-                            _services = None
                         _services_transition_active = False
+                        _services_transition_target = None
                         return
                     target = pending_target
+                    _services_transition_target = target
         finally:
             with _services_lock:
                 _services_transition_active = False
+                _services_transition_target = None
                 _services_transition_pending.clear()
 
 
