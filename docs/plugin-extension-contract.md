@@ -81,6 +81,16 @@ shutdown-result snapshot, and the transition owner completes the shutdown after
 the callback returns. This non-blocking overlap rule prevents callback-worker
 joins from deadlocking the root-local lifecycle lock.
 
+The same boundary wraps public lifecycle operations invoked through the
+installed root's `PluginManager` (`load`, `load_all`, `enable`, `disable`, and
+`disable_all`). A root replacement requested by one of those callbacks is
+deferred until the complete manager operation returns; the old root then
+finishes reverse-order shutdown before any successor starts. A root that is
+not installed runs manager lifecycle operations and its own close outside the
+transition authority, so its callback-owned workers may keep using the module
+accessors; an installer instead drains any in-flight local operation before
+starting that root's plugins, so an operation never straddles installation.
+
 There is currently no default lifecycle-style built-in catalog to fabricate:
 existing Data Provider built-ins remain owned by each `DataFetcherManager`, and
 the other five extension points are contract-only. `ApplicationServices`

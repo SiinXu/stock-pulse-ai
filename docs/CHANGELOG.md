@@ -307,7 +307,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Split search provider implementations and shared result contracts into focused private modules while preserving the `src.search_service` facade, fallback, and outbound-policy behavior.
 - [Docs] Defined repository directory ownership, the retained `webui.py` compatibility role, and the separate backend package-root decision.
 - [Changed] Split `SearchService` state, news processing, and orchestration methods into focused private modules while preserving the `src.search_service` facade and search behavior.
-- [Fixed] Serialized direct composition-root close, replacement, and reset so closed roots cannot be republished, callback-owned replacement workers cannot deadlock, and terminal process shutdown cannot recreate the root.
+- [Fixed] Serialized public plugin lifecycle operations with composition-root close, replacement, and reset so closed roots cannot be republished, callback-owned workers cannot deadlock, and terminal process shutdown cannot recreate the root.
 
 ## [3.26.3] - 2026-07-15
 

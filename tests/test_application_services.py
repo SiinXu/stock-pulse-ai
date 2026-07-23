@@ -1040,3 +1040,188 @@ def test_root_closed_during_plugin_start_is_not_left_installed():
     assert services.is_closed is True
     assert replacement is not services
     assert events == ["load-begin", "load-end", "unload:test.closing"]
+
+
+def test_local_root_load_callback_worker_can_resolve_root_without_deadlock():
+    events: list[str] = []
+    worker_returned = threading.Event()
+    workers: list[threading.Thread] = []
+    observed_roots: list[ApplicationServices] = []
+
+    class _WorkerResolvingLoadPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("local-load-begin")
+
+            def resolve_root() -> None:
+                observed_roots.append(get_application_services())
+                worker_returned.set()
+
+            worker = threading.Thread(target=resolve_root)
+            workers.append(worker)
+            worker.start()
+            if not worker_returned.wait(timeout=5):
+                raise AssertionError("lookup worker deadlocked during local load")
+            worker.join(timeout=5)
+            events.append("local-load-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(
+            _WorkerResolvingLoadPlugin("test.local-worker", events),
+        ),
+        plugins_dir="",
+    )
+
+    results = services.start_plugins()
+
+    assert worker_returned.is_set()
+    assert all(not worker.is_alive() for worker in workers)
+    assert [result.success for result in results] == [True]
+    assert observed_roots and observed_roots[0] is not services
+    assert events == ["local-load-begin", "local-load-end"]
+
+
+def test_public_manager_load_defers_callback_requested_replacement():
+    events: list[str] = []
+    replacement_holder: list[ApplicationServices] = []
+    observed_roots: list[ApplicationServices] = []
+
+    class _ReplacingLoadPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("late-load-begin")
+            set_application_services(replacement_holder[0])
+            observed_roots.append(get_application_services())
+            events.append("late-load-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.first", events),),
+        plugins_dir="",
+    )
+    replacement = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.new", events),),
+        plugins_dir="",
+    )
+    replacement_holder.append(replacement)
+    set_application_services(services)
+
+    register_result = services.plugin_manager.register(
+        _ReplacingLoadPlugin("test.late", events),
+        source="builtin",
+    )
+    assert register_result.success is True
+
+    load_result = services.plugin_manager.load("test.late")
+
+    assert load_result.success is True
+    assert observed_roots == [services]
+    assert services.is_closed is True
+    assert get_application_services() is replacement
+    assert events == [
+        "load:test.first",
+        "late-load-begin",
+        "late-load-end",
+        "unload:test.late",
+        "unload:test.first",
+        "load:test.new",
+    ]
+
+
+def test_installer_waits_for_in_flight_local_lifecycle_operation():
+    events: list[str] = []
+    load_started = threading.Event()
+    release_load = threading.Event()
+    start_results: list[tuple] = []
+
+    class _BlockingLoadPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("local-load-begin")
+            load_started.set()
+            if not release_load.wait(timeout=5):
+                raise AssertionError("test did not release the local load")
+            events.append("local-load-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(_BlockingLoadPlugin("test.blocking-local", events),),
+        plugins_dir="",
+    )
+    local_start = threading.Thread(
+        target=lambda: start_results.append(services.start_plugins()),
+    )
+    local_start.start()
+    assert load_started.wait(timeout=5)
+
+    installer = threading.Thread(
+        target=lambda: set_application_services(services),
+    )
+    installer.start()
+    try:
+        installer.join(timeout=0.5)
+        assert installer.is_alive()
+        events.append("release-local-load")
+    finally:
+        release_load.set()
+        local_start.join(timeout=5)
+        installer.join(timeout=5)
+
+    assert not local_start.is_alive()
+    assert not installer.is_alive()
+    assert get_application_services() is services
+    assert [result.success for result in start_results[0]] == [True]
+    assert events == [
+        "local-load-begin",
+        "release-local-load",
+        "local-load-end",
+    ]
+
+
+def test_local_root_close_during_installer_drain_does_not_deadlock():
+    events: list[str] = []
+    load_started = threading.Event()
+    release_load = threading.Event()
+    side_close_results: list[tuple] = []
+
+    class _SideClosingPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("local-load-begin")
+            load_started.set()
+            if not release_load.wait(timeout=5):
+                raise AssertionError("test did not release the local load")
+            side_close_results.append(side_root.close())
+            events.append("local-load-end")
+
+    side_root = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.side", events),),
+        plugins_dir="",
+    )
+    side_root.start_plugins()
+
+    services = ApplicationServices(
+        builtin_plugins=(_SideClosingPlugin("test.blocking-local", events),),
+        plugins_dir="",
+    )
+    local_start = threading.Thread(target=services.start_plugins)
+    local_start.start()
+    assert load_started.wait(timeout=5)
+
+    installer = threading.Thread(
+        target=lambda: set_application_services(services),
+    )
+    installer.start()
+    try:
+        installer.join(timeout=0.5)
+        assert installer.is_alive()
+    finally:
+        release_load.set()
+        local_start.join(timeout=5)
+        installer.join(timeout=5)
+
+    assert not local_start.is_alive()
+    assert not installer.is_alive()
+    assert side_root.is_closed is True
+    assert get_application_services() is services
+    assert [result.success for result in side_close_results[0]] == [True]
+    assert events == [
+        "load:test.side",
+        "local-load-begin",
+        "unload:test.side",
+        "local-load-end",
+    ]
