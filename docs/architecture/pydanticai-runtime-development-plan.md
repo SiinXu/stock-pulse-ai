@@ -425,8 +425,8 @@ AR-PY-00 ADR Accepted
 ```bash
 python -m pytest tests/agent/test_agent_runtime_compatibility.py -q
 python -m pytest tests/test_agent_executor.py tests/test_multi_agent.py -q
-python -m pytest tests/test_agent_tool_surface.py -q
-python -m pytest tests/test_agent_chat_api.py tests/test_agent_stream_events.py tests/test_agent_sse_cleanup.py -q
+python -m pytest tests/agent/tools/test_agent_tool_surface.py -q
+python -m pytest tests/agent/test_agent_chat_api.py tests/test_agent_stream_events.py tests/test_agent_sse_cleanup.py -q
 python -m pytest -m "not network"
 ./scripts/ci_gate.sh
 python scripts/check_ai_assets.py
@@ -472,7 +472,7 @@ git status --short
 ## 11. 配置、API、数据库、Web、Desktop 与 Bot 兼容性说明
 
 - 配置:AR-PY-00~05 不新增任何配置字段与 `.env` 语义;`AGENT_ARCH` 语义不变(仍是业务 Architecture 选择)。AR-PY-06 若获批新增配置,必须走现有配置注册表、API Schema、统一设置事务、409 语义、帮助文案与删除引用保护,并同步 `.env.example` 与文档(遵循 `AGENTS.md`)。
-- API:公开端点、请求/响应 Schema、SSE 事件(9 种,additive)全程不变;AR-PY-03 的 SSE compatibility adapter 只改内部实现,`tests/test_agent_chat_api.py`/`test_agent_stream_events.py`/`test_agent_sse_cleanup.py` 零修改通过是硬验收。
+- API:公开端点、请求/响应 Schema、SSE 事件(9 种,additive)全程不变;AR-PY-03 的 SSE compatibility adapter 只改内部实现,`tests/agent/test_agent_chat_api.py`/`test_agent_stream_events.py`/`test_agent_sse_cleanup.py` 零修改通过是硬验收。
 - 数据库:全程无迁移、无新表;Conversation/Provider trace/Usage 持久化路径不变(`conversation.py:26-30`、`executor.py:722-803`、`runner.py:458-459`)。
 - Web:`apps/dsa-web` 全程零改动;停止按钮行为的真实化(后端真取消)对 Web 是透明增强,不改前端契约。
 - Desktop:AR-PY-04 起可选依赖不得进入默认打包清单;PyInstaller hidden imports 与体积影响在 AR-PY-05 出证据;Desktop 开放是 AR-PY-06 的显式审批项。

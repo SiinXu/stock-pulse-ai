@@ -435,8 +435,8 @@ RF-01 可以在 RF-00 获批后立即执行；RF-02～05 共享核心文件，�
 python -m pytest tests/agent/test_agent_runtime_compatibility.py -q
 python -m pytest tests/agent/runtime -q
 python -m pytest tests/test_agent_executor.py tests/test_multi_agent.py -q
-python -m pytest tests/test_agent_tool_surface.py -q
-python -m pytest tests/test_agent_chat_api.py tests/test_agent_stream_events.py tests/test_agent_sse_cleanup.py -q
+python -m pytest tests/agent/tools/test_agent_tool_surface.py -q
+python -m pytest tests/agent/test_agent_chat_api.py tests/test_agent_stream_events.py tests/test_agent_sse_cleanup.py -q
 python -m pytest -m "not network"
 ./scripts/ci_gate.sh
 python scripts/check_ai_assets.py
