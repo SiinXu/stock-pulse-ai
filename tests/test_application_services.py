@@ -771,6 +771,46 @@ def test_closed_root_cannot_be_installed_again():
         set_application_services(services)
 
 
+def test_plugin_manager_cannot_be_shared_between_application_roots():
+    first = ApplicationServices(plugins_dir="")
+
+    with pytest.raises(RuntimeError, match="already belongs"):
+        ApplicationServices(
+            plugin_manager=first.plugin_manager,
+            plugins_dir="",
+        )
+
+
+def test_closed_root_manager_rejects_activation_but_allows_disable():
+    events: list[str] = []
+    services = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.closed-owner", events),),
+        plugins_dir="",
+    )
+    set_application_services(services)
+    services.close()
+    late_plugin = _RecordingPlugin("test.late", events)
+    assert services.plugin_manager.register(late_plugin, source="builtin").success
+
+    enable_result = services.plugin_manager.enable("test.closed-owner")
+    load_result = services.plugin_manager.load("test.late")
+    load_all_results = services.plugin_manager.load_all()
+    disable_result = services.plugin_manager.disable("test.closed-owner")
+
+    assert enable_result.success is False
+    assert enable_result.error_code == "plugin_owner_closed"
+    assert load_result.success is False
+    assert load_result.error_code == "plugin_owner_closed"
+    assert [result.error_code for result in load_all_results] == [
+        "plugin_owner_closed",
+        "plugin_owner_closed",
+    ]
+    assert disable_result.success is True
+    assert services.plugin_manager.snapshot("test.closed-owner").state == "disabled"
+    assert services.plugin_manager.snapshot("test.late").state == "registered"
+    assert events == ["load:test.closed-owner", "unload:test.closed-owner"]
+
+
 def test_get_replaces_a_directly_closed_installed_root():
     services = ApplicationServices(plugins_dir="")
     set_application_services(services)

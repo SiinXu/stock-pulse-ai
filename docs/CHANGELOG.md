@@ -315,7 +315,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Converged notification capability, contract, noise-control, and route-configuration helpers into `src/notification_parts/` with strict legacy facades.
 - [Chore] Converged compact notification sender adapters into `src/notification_parts/senders/` with strict legacy facades.
 - [Chore] Converged the remaining extended notification sender adapters and package exports into `src/notification_parts/senders/` with strict legacy facades.
-- [Fixed] Serialized public plugin lifecycle operations with composition-root close, replacement, and reset so closed roots cannot be republished, callback-owned workers cannot deadlock, and terminal process shutdown cannot recreate the root.
+- [Fixed] Serialized root-owned plugin lifecycle operations with composition-root close, replacement, and reset so closed roots cannot reactivate or be republished, callback-owned workers cannot deadlock, and terminal process shutdown cannot recreate the root.
 
 ## [3.26.3] - 2026-07-15
 

@@ -90,6 +90,11 @@ not installed runs manager lifecycle operations and its own close outside the
 transition authority, so its callback-owned workers may keep using the module
 accessors; an installer instead drains any in-flight local operation before
 starting that root's plugins, so an operation never straddles installation.
+Each `PluginManager` is owned by exactly one `ApplicationServices` root and
+cannot be rebound to another root. Once that root starts shutdown, manager
+`load`, `load_all`, and `enable` operations fail closed with
+`plugin_owner_closed`; `disable` and `disable_all` remain available for
+idempotent cleanup and cleanup-debt retries.
 
 There is currently no default lifecycle-style built-in catalog to fabricate:
 existing Data Provider built-ins remain owned by each `DataFetcherManager`, and

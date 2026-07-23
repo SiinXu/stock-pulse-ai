@@ -83,9 +83,6 @@ class ApplicationServices:
                 application_version=plugin_application_version,
             )
         self._plugin_manager = plugin_manager
-        self._plugin_manager._bind_lifecycle_boundary(
-            self._run_plugin_manager_lifecycle,
-        )
         self._builtin_plugins = tuple(builtin_plugins)
         self._plugins_dir = plugins_dir
         self._builtin_plugin_results: tuple["PluginOperationResult", ...] = ()
@@ -97,6 +94,10 @@ class ApplicationServices:
         self._plugins_starting = False
         self._plugins_started = False
         self._plugins_closed = False
+        self._plugin_manager._bind_lifecycle_boundary(
+            self._run_plugin_manager_lifecycle,
+            self._plugin_activation_allowed,
+        )
 
     @property
     def config(self) -> "Config":
@@ -308,6 +309,11 @@ class ApplicationServices:
             with _services_lock:
                 self._local_lifecycle_ops -= 1
                 _services_local_ops.notify_all()
+
+    def _plugin_activation_allowed(self) -> bool:
+        """Reject activation after this one-shot root begins shutdown."""
+
+        return not self._plugins_closed
 
     def _close_plugins(self) -> tuple["PluginOperationResult", ...]:
         """Perform root-local shutdown for the global transition owner."""

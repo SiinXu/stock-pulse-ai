@@ -81,18 +81,30 @@ class PluginManager:
         self._lifecycle_boundary: (
             Callable[[Callable[[], Any]], Any] | None
         ) = None
+        self._activation_allowed: Callable[[], bool] | None = None
         self._lifecycle_boundary_state = threading.local()
 
     def _bind_lifecycle_boundary(
         self,
         boundary: Callable[[Callable[[], Any]], Any],
+        activation_allowed: Callable[[], bool],
     ) -> None:
         """Bind the owning composition root's outer lifecycle authority."""
 
-        if not callable(boundary):
-            raise TypeError("plugin lifecycle boundary must be callable")
+        if not callable(boundary) or not callable(activation_allowed):
+            raise TypeError("plugin lifecycle boundary and guard must be callable")
         with self._lock:
+            if self._lifecycle_boundary is not None:
+                if (
+                    self._lifecycle_boundary == boundary
+                    and self._activation_allowed == activation_allowed
+                ):
+                    return
+                raise RuntimeError(
+                    "plugin manager already belongs to an application root"
+                )
             self._lifecycle_boundary = boundary
+            self._activation_allowed = activation_allowed
 
     def _run_lifecycle_boundary(self, operation: Callable[[], Any]) -> Any:
         """Run only the outermost lifecycle operation through the root hook."""
@@ -273,6 +285,17 @@ class PluginManager:
             record = self._plugins.get(plugin_id)
             if record is None:
                 return self._not_found(plugin_id, operation)
+            if (
+                self._activation_allowed is not None
+                and not self._activation_allowed()
+            ):
+                return PluginOperationResult(
+                    plugin_id=plugin_id,
+                    operation=operation,
+                    success=False,
+                    state=record.state,
+                    error_code="plugin_owner_closed",
+                )
             if record.transition is not None:
                 return PluginOperationResult(
                     plugin_id=plugin_id,
