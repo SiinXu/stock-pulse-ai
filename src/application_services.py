@@ -500,6 +500,7 @@ def _set_application_services(
         try:
             while True:
                 restart_transition = False
+                drained_target_to_close: Optional[ApplicationServices] = None
                 with _services_lock:
                     previous = _services
 
@@ -524,14 +525,25 @@ def _set_application_services(
                         # complete before this root's plugins may start.
                         _services_local_ops.wait()
                     if target is not None and target._plugin_close_requested:
-                        target = None
-                        _services = None
-                    has_pending, pending_target = (
-                        _take_latest_installable_pending_services()
-                    )
-                    if has_pending:
-                        target = pending_target
-                        restart_transition = True
+                        drained_target_to_close = target
+                    else:
+                        has_pending, pending_target = (
+                            _take_latest_installable_pending_services()
+                        )
+                        if has_pending:
+                            target = pending_target
+                            restart_transition = True
+
+                if drained_target_to_close is not None:
+                    drained_target_to_close._close_plugins()
+                    with _services_lock:
+                        if _services is drained_target_to_close:
+                            _services = None
+                        has_pending, pending_target = (
+                            _take_latest_installable_pending_services()
+                        )
+                        target = pending_target if has_pending else None
+                        restart_transition = has_pending
 
                 if restart_transition:
                     continue

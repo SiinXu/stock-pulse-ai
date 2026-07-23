@@ -97,7 +97,9 @@ the pending queue retains that transition authority during handoff and drains
 any existing local lifecycle operation instead of re-entering direct-install
 validation. The drain covers pre-manager startup and its final close cleanup,
 and the transition consumes the pending queue again after every drain before it
-authorizes target startup.
+authorizes target startup. If a published target requests shutdown during that
+drain, it remains discoverable through its complete unload and is unpublished
+only after cleanup finishes.
 Each `PluginManager` is owned by exactly one `ApplicationServices` root and
 cannot be rebound to another root. Once that root starts shutdown, manager
 `load`, `load_all`, and `enable` operations fail closed with

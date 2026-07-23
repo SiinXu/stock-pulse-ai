@@ -1321,6 +1321,98 @@ def test_installer_waits_for_local_startup_close_cleanup(monkeypatch):
     ]
 
 
+def test_published_target_closing_during_local_startup_is_unloaded(monkeypatch):
+    events: list[str] = []
+    target_holder: list[ApplicationServices] = []
+    previous_close_started = threading.Event()
+    release_previous_close = threading.Event()
+    target_load_started = threading.Event()
+    request_target_close = threading.Event()
+    target_unload_started = threading.Event()
+    release_target_unload = threading.Event()
+    poll_interval = threading.Event()
+    start_results: list[tuple] = []
+
+    class _ClosingPublishedTargetPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("target-load-begin")
+            target_load_started.set()
+            if not request_target_close.wait(timeout=5):
+                raise AssertionError("test did not request target close")
+            target_holder[0].close()
+            events.append("target-load-end")
+
+        def onunload(self) -> None:
+            events.append("target-unload-begin")
+            target_unload_started.set()
+            if not release_target_unload.wait(timeout=5):
+                raise AssertionError("test did not release target unload")
+            events.append("target-unload-end")
+
+    previous = ApplicationServices(plugins_dir="")
+    set_application_services(previous)
+    original_previous_close = previous._close_plugins
+
+    def delayed_previous_close():
+        previous_close_started.set()
+        if not release_previous_close.wait(timeout=5):
+            raise AssertionError("test did not release the previous root close")
+        return original_previous_close()
+
+    monkeypatch.setattr(previous, "_close_plugins", delayed_previous_close)
+    target = ApplicationServices(
+        builtin_plugins=(
+            _ClosingPublishedTargetPlugin("test.published-target", events),
+        ),
+        plugins_dir="",
+    )
+    target_holder.append(target)
+
+    installer = threading.Thread(target=lambda: set_application_services(target))
+    installer.start()
+    assert previous_close_started.wait(timeout=5)
+
+    local_start = threading.Thread(
+        target=lambda: start_results.append(target.start_plugins()),
+    )
+    local_start.start()
+    assert target_load_started.wait(timeout=5)
+    try:
+        release_previous_close.set()
+        for _ in range(500):
+            if get_application_services() is target:
+                break
+            poll_interval.wait(timeout=0.01)
+        else:
+            raise AssertionError(
+                "installer did not publish the target before its drain"
+            )
+
+        request_target_close.set()
+        assert target_unload_started.wait(timeout=5)
+        assert installer.is_alive()
+        assert get_application_services() is target
+    finally:
+        release_previous_close.set()
+        request_target_close.set()
+        release_target_unload.set()
+        local_start.join(timeout=5)
+        installer.join(timeout=5)
+
+    assert not local_start.is_alive()
+    assert not installer.is_alive()
+    assert start_results and start_results[0][0].success is True
+    assert target.is_closed is True
+    assert target.plugin_manager.snapshot("test.published-target").state == "disabled"
+    assert get_application_services() is not target
+    assert events == [
+        "target-load-begin",
+        "target-load-end",
+        "target-unload-begin",
+        "target-unload-end",
+    ]
+
+
 def test_get_replaces_a_directly_closed_installed_root():
     services = ApplicationServices(plugins_dir="")
     set_application_services(services)
