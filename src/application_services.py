@@ -397,7 +397,7 @@ def _validate_direct_install_target(
         raise RuntimeError(
             "Cannot install application services after shutdown begins"
         )
-    if services._local_lifecycle_ops:
+    if services._plugins_starting or services._local_lifecycle_ops:
         raise RuntimeError(
             "Cannot install application services during local plugin lifecycle"
         )

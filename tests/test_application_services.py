@@ -1025,6 +1025,61 @@ def test_local_callback_worker_reinstall_is_rejected_without_deadlock():
     ]
 
 
+def test_manifest_callback_worker_cannot_install_starting_root_without_deadlock():
+    events: list[str] = []
+    root_holder: list[ApplicationServices] = []
+    install_errors: list[str] = []
+    worker_returned = threading.Event()
+    workers: list[threading.Thread] = []
+
+    class _WorkerInstallingManifestPlugin(_RecordingPlugin):
+        def __init__(self, plugin_id: str, plugin_events: list[str]) -> None:
+            super().__init__(plugin_id, plugin_events)
+            self._install_from_manifest = True
+
+        @property
+        def manifest(self) -> PluginManifest:
+            if self._install_from_manifest:
+                self._install_from_manifest = False
+
+                def install_starting_root() -> None:
+                    try:
+                        set_application_services(root_holder[0])
+                    except RuntimeError as exc:
+                        install_errors.append(str(exc))
+                    worker_returned.set()
+
+                worker = threading.Thread(target=install_starting_root)
+                workers.append(worker)
+                worker.start()
+                if not worker_returned.wait(timeout=5):
+                    raise AssertionError("manifest install worker deadlocked")
+                worker.join(timeout=5)
+            return super().manifest
+
+    plugin = _WorkerInstallingManifestPlugin("test.manifest-worker", events)
+    services = ApplicationServices(
+        builtin_plugins=(plugin,),
+        plugins_dir="",
+    )
+    root_holder.append(services)
+
+    results = services.start_plugins()
+
+    assert [result.success for result in results] == [True]
+    assert worker_returned.is_set()
+    assert all(not worker.is_alive() for worker in workers)
+    assert install_errors == [
+        "Cannot install application services during local plugin lifecycle"
+    ]
+    assert get_application_services() is not services
+    services.close()
+    assert events == [
+        "load:test.manifest-worker",
+        "unload:test.manifest-worker",
+    ]
+
+
 def test_installer_race_drains_deferred_local_cleanup(monkeypatch):
     events: list[str] = []
     root_holder: list[ApplicationServices] = []

@@ -88,11 +88,11 @@ deferred until the complete manager operation returns; the old root then
 finishes reverse-order shutdown before any successor starts. A root that is
 not installed runs manager lifecycle operations and its own close outside the
 transition authority, so its callback-owned workers may keep using the module
-accessors. A direct installer rejects a target whose local lifecycle operation
-is already in flight, so a callback or its worker cannot wait on itself. If a
-local operation races after the installer owns the global transition, that
-transition drains the complete operation before starting the target, so an
-operation never straddles installation.
+accessors. A direct installer rejects a target whose local startup or manager
+lifecycle operation is already in flight, so a callback or its worker cannot
+wait on itself. If a local operation races after the installer owns the global
+transition, that transition drains the complete operation before starting the
+target, so an operation never straddles installation.
 Each `PluginManager` is owned by exactly one `ApplicationServices` root and
 cannot be rebound to another root. Once that root starts shutdown, manager
 `load`, `load_all`, and `enable` operations fail closed with
