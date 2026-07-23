@@ -166,6 +166,8 @@ LITELLM_MODEL=ollama/qwen3:8b
 
 云 API 向导在选择 Provider、填写凭据和确认模型后，还可以配置主模型、按顺序执行的备用模型以及可选的 Vision 模型；这些选择分别写入 connection-aware 的 `LITELLM_MODEL`、`LITELLM_FALLBACK_MODELS` 和 `VISION_MODEL`。保存成功后，向导会留在完成页展示实际保存的执行方式与路由摘要，不回显 API Key，并可直接进入“任务模型”继续调整。即使首次配置已经完成，也可以从首次配置状态卡重新打开向导新增 Connection。状态接口本身只读取已保存的 `.env` 与当前进程环境变量，不会重载运行时配置、写入 `.env`、测试真实模型或创建数据库文件。
 
+自动发现和连接测试都绑定发起时的 Provider、凭据与传输参数；这些输入改变后，已显示或尚未返回的旧结果都会失效。连接测试会优先测试当前选择的报告主模型，但不会逐一探测其它 Connection 提供的备用模型或 Vision 路由；这些独立路由需要在对应 Connection 中分别测试。
+
 ### 事务化热加载与一步回退
 
 `PUT /api/v1/system/config` 会在持久化前校验完整候选配置，并且只在新的 `Config` 对象成功构建后才发布到运行时。旧客户端 payload 行为不变：`reload_now` 默认 `true`，`validate_connectivity` 默认 `false`，因此普通保存不会新增外部请求。调用方显式开启连通性探测时，会复用固定 prompt/schema 的 generation-backend smoke test；`connectivity_timeout_seconds` 可设为 1 到 120 秒。失败返回 `connectivity_probe_failed`，其 `details.error_code` 区分认证、额度、模型不可用、网络或后端契约错误，且不会回显凭据。
