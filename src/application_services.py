@@ -34,7 +34,7 @@ import atexit
 import os
 import threading
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional
 
 if TYPE_CHECKING:  # import for typing only; avoids runtime import cycles
     from src.config import Config
@@ -243,7 +243,10 @@ class ApplicationServices:
 
         return self._close_plugins()
 
-    def _run_plugin_manager_lifecycle(self, operation):
+    def _run_plugin_manager_lifecycle(
+        self,
+        operation: Callable[[], Any],
+    ) -> Any:
         """Serialize public manager callbacks with process-root transitions.
 
         The installed root outside an active transition runs the operation as

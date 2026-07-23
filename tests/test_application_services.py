@@ -1125,6 +1125,101 @@ def test_public_manager_load_defers_callback_requested_replacement():
     ]
 
 
+def test_public_manager_disable_defers_callback_requested_replacement():
+    events: list[str] = []
+    observed_roots: list[ApplicationServices] = []
+    replacement_holder: list[ApplicationServices] = []
+
+    class _ReplacingUnloadPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("replacer-unload-begin")
+            set_application_services(replacement_holder[0])
+            observed_roots.append(get_application_services())
+            events.append("replacer-unload-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(
+            _RecordingPlugin("test.first", events),
+            _ReplacingUnloadPlugin("test.replacer", events),
+        ),
+        plugins_dir="",
+    )
+    replacement = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.new", events),),
+        plugins_dir="",
+    )
+    replacement_holder.append(replacement)
+    set_application_services(services)
+
+    result = services.plugin_manager.disable("test.replacer")
+
+    assert result.success is True
+    assert observed_roots == [services]
+    assert services.is_closed is True
+    assert get_application_services() is replacement
+    assert events == [
+        "load:test.first",
+        "load:test.replacer",
+        "replacer-unload-begin",
+        "replacer-unload-end",
+        "unload:test.first",
+        "load:test.new",
+    ]
+
+
+def test_public_manager_enable_defers_callback_requested_replacement():
+    events: list[str] = []
+    observed_roots: list[ApplicationServices] = []
+    replacement_holder: list[ApplicationServices] = []
+
+    class _ReplacingEnablePlugin(_RecordingPlugin):
+        def __init__(self, plugin_id: str, plugin_events: list[str]) -> None:
+            super().__init__(plugin_id, plugin_events)
+            self.replace_on_load = False
+
+        def onload(self, context: PluginContext) -> None:
+            if not self.replace_on_load:
+                events.append("initial-load")
+                return
+            events.append("enable-begin")
+            set_application_services(replacement_holder[0])
+            observed_roots.append(get_application_services())
+            events.append("enable-end")
+
+    plugin = _ReplacingEnablePlugin("test.reenabled", events)
+    services = ApplicationServices(
+        builtin_plugins=(
+            _RecordingPlugin("test.first", events),
+            plugin,
+        ),
+        plugins_dir="",
+    )
+    replacement = ApplicationServices(
+        builtin_plugins=(_RecordingPlugin("test.new", events),),
+        plugins_dir="",
+    )
+    replacement_holder.append(replacement)
+    set_application_services(services)
+    assert services.plugin_manager.disable("test.reenabled").success is True
+    events.clear()
+    plugin.replace_on_load = True
+
+    result = services.plugin_manager.enable("test.reenabled")
+
+    assert result.success is True
+    assert observed_roots == [services]
+    assert services.is_closed is True
+    assert services.plugin_manager.snapshot("test.reenabled").state == "disabled"
+    assert get_application_services() is replacement
+    assert events == [
+        "enable-begin",
+        "enable-end",
+        "unload:test.reenabled",
+        "unload:test.first",
+        "load:test.new",
+    ]
+
+
 def test_installer_waits_for_in_flight_local_lifecycle_operation():
     events: list[str] = []
     load_started = threading.Event()
@@ -1224,4 +1319,65 @@ def test_local_root_close_during_installer_drain_does_not_deadlock():
         "local-load-begin",
         "unload:test.side",
         "local-load-end",
+    ]
+
+
+def test_local_close_rechecks_boundary_after_concurrent_install(monkeypatch):
+    events: list[str] = []
+    observed_roots: list[ApplicationServices] = []
+    close_ready = threading.Event()
+    release_close = threading.Event()
+    close_results: list[tuple] = []
+
+    class _LookupUnloadPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            events.append("local-unload-begin")
+            observed_roots.append(get_application_services())
+            events.append("local-unload-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(
+            _LookupUnloadPlugin("test.concurrent-local-close", events),
+        ),
+        plugins_dir="",
+    )
+    services.start_plugins()
+    original_close_plugins = services._close_plugins
+
+    def delayed_close_plugins():
+        close_ready.set()
+        if not release_close.wait(timeout=5):
+            raise AssertionError("test did not release the local close")
+        return original_close_plugins()
+
+    monkeypatch.setattr(services, "_close_plugins", delayed_close_plugins)
+    local_close = threading.Thread(
+        target=lambda: close_results.append(services.close()),
+    )
+    local_close.start()
+    assert close_ready.wait(timeout=5)
+
+    installer = threading.Thread(
+        target=lambda: set_application_services(services),
+    )
+    installer.start()
+    try:
+        installer.join(timeout=5)
+        assert not installer.is_alive()
+        assert get_application_services() is services
+    finally:
+        release_close.set()
+        local_close.join(timeout=5)
+        installer.join(timeout=5)
+
+    assert not local_close.is_alive()
+    assert not installer.is_alive()
+    assert services.is_closed is True
+    assert observed_roots == [services]
+    assert get_application_services() is not services
+    assert [result.success for result in close_results[0]] == [True]
+    assert events == [
+        "load:test.concurrent-local-close",
+        "local-unload-begin",
+        "local-unload-end",
     ]
