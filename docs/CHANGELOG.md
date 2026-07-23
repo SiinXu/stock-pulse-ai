@@ -319,8 +319,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Docs] Moved the design contract into `docs/` and added compact repository maps to all homepage language variants.
 - [Chore] Permanently disabled secret access from pull-request AI review, rejected secret inheritance and tag/default-ref confusion, and hardened install guidance against nested commands, redirection decoys, dynamic paths, launcher/module entry points, Docker exec form, and explicit YAML indentation.
 - [Tests] Fixed the settings help locale contract test to read the per-language help sources introduced by the settings-help split, restoring the backend gate.
-- [Changed] Made secondary sidebar groups collapsible with visible current-page ownership and preserved explicit Discover URL ownership across default, non-default, malformed, refreshed, legacy, authenticated, and safe custom-strategy links.
 - [Changed] Reused the shared connection-test runner in the first-run LLM setup wizard so its optional test reports actionable stage and error-code diagnostics, the resolved effective model and protocol, and JSON and vision capability results instead of a binary pass/fail.
+- [Changed] Made secondary sidebar groups collapsible with visible current-page ownership and preserved explicit Discover URL ownership across default, non-default, malformed, refreshed, legacy, authenticated, and safe custom-strategy links.
 
 ## [3.26.3] - 2026-07-15
 
