@@ -867,6 +867,73 @@ def test_local_manager_callback_worker_can_defer_root_close_without_deadlock():
     ]
 
 
+def test_local_close_request_rejects_queued_plugin_activation():
+    events: list[str] = []
+    root_holder: list[ApplicationServices] = []
+    close_requested = threading.Event()
+    release_first_load = threading.Event()
+    first_results: list = []
+    late_results: list = []
+
+    class _ClosingLoadPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("first-load-begin")
+            root_holder[0].close()
+            close_requested.set()
+            if not release_first_load.wait(timeout=5):
+                raise AssertionError("test did not release the first local load")
+            events.append("first-load-end")
+
+    services = ApplicationServices(plugins_dir="")
+    root_holder.append(services)
+    assert services.plugin_manager.register(
+        _ClosingLoadPlugin("test.first", events),
+        source="builtin",
+    ).success
+    assert services.plugin_manager.register(
+        _RecordingPlugin("test.late", events),
+        source="builtin",
+    ).success
+
+    first_load = threading.Thread(
+        target=lambda: first_results.append(
+            services.plugin_manager.load("test.first")
+        ),
+    )
+    first_load.start()
+    assert close_requested.wait(timeout=5)
+    late_load = threading.Thread(
+        target=lambda: late_results.append(
+            services.plugin_manager.load("test.late")
+        ),
+    )
+    late_load.start()
+    try:
+        for _ in range(500):
+            if services._local_lifecycle_ops == 2:
+                break
+            late_load.join(timeout=0.01)
+        assert services._local_lifecycle_ops == 2
+    finally:
+        release_first_load.set()
+        first_load.join(timeout=5)
+        late_load.join(timeout=5)
+
+    assert not first_load.is_alive()
+    assert not late_load.is_alive()
+    assert first_results and first_results[0].success is True
+    assert late_results and late_results[0].success is False
+    assert late_results[0].error_code == "plugin_owner_closed"
+    assert services.is_closed is True
+    assert services.plugin_manager.snapshot("test.first").state == "disabled"
+    assert services.plugin_manager.snapshot("test.late").state == "registered"
+    assert events == [
+        "first-load-begin",
+        "first-load-end",
+        "unload:test.first",
+    ]
+
+
 def test_installer_drain_stays_active_through_deferred_local_cleanup():
     events: list[str] = []
     root_holder: list[ApplicationServices] = []
@@ -1208,6 +1275,44 @@ def test_root_closed_during_plugin_start_is_not_left_installed():
     assert services.is_closed is True
     assert replacement is not services
     assert events == ["load-begin", "load-end", "unload:test.closing"]
+
+
+def test_close_request_cannot_be_superseded_by_reinstalling_the_same_root():
+    events: list[str] = []
+    root_holder: list[ApplicationServices] = []
+
+    class _ClosingAndRetainingLoadPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("closing-load-begin")
+            root_holder[0].close()
+            set_application_services(root_holder[0])
+            events.append("closing-load-end")
+
+    services = ApplicationServices(
+        builtin_plugins=(
+            _ClosingAndRetainingLoadPlugin("test.closing", events),
+            _RecordingPlugin("test.late", events),
+        ),
+        plugins_dir="",
+    )
+    root_holder.append(services)
+
+    set_application_services(services)
+    replacement = get_application_services()
+
+    assert services.is_closed is True
+    assert replacement is not services
+    assert [result.error_code for result in services.plugin_load_results] == [
+        None,
+        "plugin_owner_closed",
+    ]
+    assert services.plugin_manager.snapshot("test.closing").state == "disabled"
+    assert services.plugin_manager.snapshot("test.late").state == "registered"
+    assert events == [
+        "closing-load-begin",
+        "closing-load-end",
+        "unload:test.closing",
+    ]
 
 
 def test_local_root_load_callback_worker_can_resolve_root_without_deadlock():

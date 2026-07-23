@@ -94,6 +94,7 @@ class ApplicationServices:
         self._local_close_requested = False
         self._plugins_starting = False
         self._plugins_started = False
+        self._plugin_close_requested = False
         self._plugins_closed = False
         self._plugin_manager._bind_lifecycle_boundary(
             self._run_plugin_manager_lifecycle,
@@ -176,7 +177,12 @@ class ApplicationServices:
         """Compose and load plugins once after this root becomes discoverable."""
 
         with self._plugin_lifecycle_lock:
-            if self._plugins_started or self._plugins_starting or self._plugins_closed:
+            if (
+                self._plugins_started
+                or self._plugins_starting
+                or self._plugin_close_requested
+                or self._plugins_closed
+            ):
                 return self._plugin_load_results
             self._plugins_starting = True
             try:
@@ -224,6 +230,7 @@ class ApplicationServices:
         """
 
         with _services_lock:
+            self._plugin_close_requested = True
             if _services is self and _services_transition_active:
                 _services_transition_pending.append(None)
                 return self._plugin_shutdown_results
@@ -297,11 +304,11 @@ class ApplicationServices:
                             )
                             if (
                                 not has_pending
-                                and self._plugins_closed
+                                and self._plugin_close_requested
                                 and _services is self
                             ):
-                                # A closed root must not remain published as
-                                # the stable root once its transition ends.
+                                # A root with shutdown requested must not remain
+                                # published once its transition ends.
                                 has_pending, pending_target = True, None
                             _services_transition_active = False
                         if has_pending:
@@ -329,11 +336,12 @@ class ApplicationServices:
     def _plugin_activation_allowed(self) -> bool:
         """Reject activation after this one-shot root begins shutdown."""
 
-        return not self._plugins_closed
+        return not self._plugin_close_requested
 
     def _close_plugins(self) -> tuple["PluginOperationResult", ...]:
         """Perform root-local shutdown for the global transition owner."""
 
+        self._plugin_close_requested = True
         with self._plugin_lifecycle_lock:
             if self._plugins_closed:
                 return self._plugin_shutdown_results
@@ -360,14 +368,14 @@ def _take_latest_installable_pending_services() -> tuple[
     bool,
     Optional[ApplicationServices],
 ]:
-    """Consume the latest pending target that has not already been closed.
+    """Consume the latest pending target that has not begun shutdown.
 
     The caller must hold ``_services_lock``.
     """
 
     while _services_transition_pending:
         candidate = _services_transition_pending.pop()
-        if candidate is None or not candidate.is_closed:
+        if candidate is None or not candidate._plugin_close_requested:
             _services_transition_pending.clear()
             return True, candidate
     return False, None

@@ -94,7 +94,9 @@ Each `PluginManager` is owned by exactly one `ApplicationServices` root and
 cannot be rebound to another root. Once that root starts shutdown, manager
 `load`, `load_all`, and `enable` operations fail closed with
 `plugin_owner_closed`; `disable` and `disable_all` remain available for
-idempotent cleanup and cleanup-debt retries.
+idempotent cleanup and cleanup-debt retries. The close request is terminal as
+soon as it is made: queued activation is rejected, and a callback cannot
+supersede its own close by requesting the same root again.
 Closing a local root also disables plugins activated directly through its
 manager, even when composition startup was never invoked. A close requested by
 a local manager callback or its worker is deferred until that outer operation
