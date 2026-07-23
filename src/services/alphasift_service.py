@@ -384,6 +384,7 @@ else:
     )
 _alphasift_runtime_support_names = (
     "_install_alphasift",
+    "_resolve_repair_constraint_args",
     "_validate_install_spec",
     "_ensure_alphasift_enabled",
     "_ensure_alphasift_ready",

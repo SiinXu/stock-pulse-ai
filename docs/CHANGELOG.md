@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [Fixed] Constrained the AlphaSift repair install to StockPulse's reviewed dependency lock (`--no-deps` plus the runtime `constraints.txt` and PEP 517 `build-constraints.txt`) so a manual repair can no longer resolve, add, upgrade, or downgrade dependencies outside the lock, and removed the now-unnecessary `unconstrained-install` exception.
+- [Fixed] Constrained the AlphaSift repair install so it can no longer resolve, add, upgrade, or downgrade dependencies outside StockPulse's reviewed lock: `--no-deps` is always applied, and `--constraint constraints.txt` / `--build-constraint build-constraints.txt` pin runtime and PEP 517 build resolution wherever the lock files ship (source and Docker), degrading to `--no-deps` only in the packaged desktop artifact instead of failing the repair; removed the now-unnecessary `unconstrained-install` exception.
 - [Tests] Stabilized Agent LLM fallback and orchestrator timeout tests by replacing fixed-length `time.time` side_effect lists with call-count-agnostic clocks, preventing StopIteration under full-suite collection ordering.
 - [Added] Extended the Web LLM setup wizard with ordered fallback and Vision routing, a secret-free saved summary, direct Task Routing access, and a persistent re-entry action.
 - [Fixed] Unified Research URL sanitization across page, deep-link, and session consumers so explicit Discover filters survive active-task restoration and malformed Backtest filters never reach API requests.
