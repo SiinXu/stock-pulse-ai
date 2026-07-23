@@ -696,22 +696,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       language: 'en',
       passwordSet: true,
     });
-    await mockScreeningBase(page, [
-      {
-        id: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
-        name: 'Dual low',
-        name_en: 'Dual low',
-        description_en: 'Default strategy',
-        category_en: 'Value',
-      },
-      {
-        id: 'quality',
-        name: 'Quality',
-        name_en: 'Quality',
-        description_en: 'Alternate strategy',
-        category_en: 'Quality',
-      },
-    ]);
+    await mockScreeningBase(page, []);
     const intentCases = [
       {
         entryPath: APP_ROUTE_PATHS.researchDiscover,

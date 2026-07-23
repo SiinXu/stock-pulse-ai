@@ -579,7 +579,9 @@ const StockScreeningPage: React.FC = () => {
       value: item.id,
       label: getStrategyDisplay(item, language).name,
     }));
-    if (selectedStrategy || catalogOptions.length === 0) return catalogOptions;
+    if (selectedStrategy || strategy === DEFAULT_RESEARCH_DISCOVER_ROUTE_STATE.strategy) {
+      return catalogOptions;
+    }
     return [{ value: strategy, label: displayedStrategy }, ...catalogOptions];
   }, [displayedStrategy, language, selectedStrategy, strategies, strategy]);
   const screenMessages = useMemo(() => getScreenMessages(screenMeta, text), [screenMeta, text]);
@@ -1501,7 +1503,7 @@ const StockScreeningPage: React.FC = () => {
               options={strategyOptions}
               ariaLabel={text.selectStrategy}
               placeholder={loadingStrategies ? text.loadingStrategies : text.strategiesUnavailable}
-              disabled={loading || loadingStrategies || strategies.length === 0}
+              disabled={loading || loadingStrategies || strategyOptions.length === 0}
               className="w-full sm:w-72 [&>div]:w-full"
             />
             <span className="shrink-0 rounded-lg border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
