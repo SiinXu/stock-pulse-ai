@@ -613,6 +613,158 @@ def test_marker_punctuation_cannot_hide_labelled_secrets_across_boundaries() -> 
     assert diagnostics.trace_dropped_reason == "sensitive_data_redacted"
 
 
+def test_final_review_field_scanner_counterexamples_fail_closed() -> None:
+    cases = {
+        (
+            f'Cookie: "first=public"; csrf={PLAIN_SECRET}'
+        ): 'Cookie: "[REDACTED]"',
+        (
+            rf'Cookie: \"first=public\"; csrf={BEARER_SECRET}'
+        ): "Cookie: [REDACTED]",
+        (
+            f'Set-Cookie: "id=public", session={WEBHOOK_SECRET}'
+        ): 'Set-Cookie: "[REDACTED]"',
+        (
+            f'Cookie: "[REDACTED]"; csrf={PLAIN_SECRET}'
+        ): 'Cookie: "[REDACTED]"',
+        (
+            f"Authorization: [REDACTED], {BEARER_SECRET}"
+        ): "Authorization: [REDACTED]",
+        (
+            f"api_key=[REDACTED],{WEBHOOK_SECRET}"
+        ): "api_key=[REDACTED]",
+        (
+            "Authorization: Digest realm=private <- RuntimeError: "
+            f"response={PLAIN_SECRET}"
+        ): "Authorization: [REDACTED]",
+        (
+            f"Cookie: first=private <- RuntimeError: csrf={BEARER_SECRET}"
+        ): "Cookie: [REDACTED]",
+        (
+            "Authorization: Weird alpha "
+            f"https://example.com/{WEBHOOK_SECRET}"
+        ): "Authorization: [REDACTED]",
+        (
+            f"dsn=1postgresql://svc:{DSN_SECRET}@db.example/prod"
+        ): "dsn=1postgresql://[REDACTED]@db.example/prod",
+        (
+            f"dsn=9-postgresql://svc:{DSN_SECRET}@db.example/prod"
+        ): "dsn=9-postgresql://[REDACTED]@db.example/prod",
+        f"asset_cookie={PLAIN_SECRET}": "asset_cookie=[REDACTED]",
+        f"offset_cookie={BEARER_SECRET}": "offset_cookie=[REDACTED]",
+        f"reset_cookie={WEBHOOK_SECRET}": "reset_cookie=[REDACTED]",
+        f"openaiApiKey={PLAIN_SECRET}": "openaiApiKey=[REDACTED]",
+        f"myAccessToken={BEARER_SECRET}": "myAccessToken=[REDACTED]",
+    }
+
+    for raw, expected in cases.items():
+        redacted = redact_sensitive_text(raw)
+
+        assert redacted == expected
+        assert redact_sensitive_text(redacted) == redacted
+        _assert_no_secret(redacted)
+
+    structural_suffix_injection = (
+        rf'{{\"authorization_header\":\"[REDACTED]\"}}; '
+        rf'csrf={WEBHOOK_SECRET}'
+    )
+    structural_redacted = redact_sensitive_text(structural_suffix_injection)
+
+    _assert_no_secret(structural_redacted)
+    assert redact_sensitive_text(structural_redacted) == structural_redacted
+
+
+def test_final_review_counterexamples_are_closed_at_every_output_boundary() -> None:
+    hostile = f'Cookie: "[REDACTED]"; csrf={WEBHOOK_SECRET}'
+    labelled = f"asset_cookie={PLAIN_SECRET}"
+    api_payload = error_body(
+        "provider_rejected",
+        hostile,
+        details={"provider_diagnostic": labelled},
+    )
+    stream_payload = sanitize_stream_event(
+        {
+            "type": "tool_progress",
+            "details": {
+                "cookie_diagnostic": hostile,
+                "labelled_diagnostic": labelled,
+            },
+        },
+        trace_id="trace-final-review-counterexamples",
+    )
+    formatter = RelativePathFormatter("%(levelname)s %(message)s")
+    record = logging.LogRecord(
+        name="tests.security.final_review",
+        level=logging.DEBUG,
+        pathname=__file__,
+        lineno=1,
+        msg=hostile,
+        args=(),
+        exc_info=None,
+    )
+    tool_audit = redact_diagnostic_value({"diagnostic": hostile})
+    local_cli = redact_local_cli_text(hostile, limit=1000)
+    hermes = sanitize_hermes_error_text(labelled)
+    alphasift = _sanitize_public_alphasift_diagnostics(
+        {"provider_error": hostile}
+    )
+
+    diagnostic_token = activate_run_diagnostic_context(
+        trace_id="trace-final-review-diagnostics",
+        query_id="query-final-review-diagnostics",
+        stock_code="600519",
+    )
+    try:
+        record_llm_run(
+            success=False,
+            provider="test-provider",
+            model="test-model",
+            error_type="ProviderError",
+            error_message=hostile,
+        )
+        snapshot = current_diagnostic_snapshot()
+    finally:
+        reset_run_diagnostic_context(diagnostic_token)
+
+    messages = [
+        {"role": "user", "content": "current"},
+        {
+            "role": "assistant",
+            "_trace_provider": "deepseek",
+            "_trace_model": "deepseek/deepseek-chat",
+            "reasoning_content": hostile,
+            "tool_calls": [
+                {
+                    "id": "call-final-review",
+                    "name": "echo",
+                    "arguments": {"message": "public"},
+                }
+            ],
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "call-final-review",
+            "content": "public result",
+        },
+    ]
+    turns, diagnostics = extract_provider_trace_turns(messages, baseline_len=1)
+
+    _assert_no_secret(
+        {
+            "api": api_payload,
+            "stream": stream_payload,
+            "log": formatter.format(record),
+            "tool": tool_audit,
+            "local_cli": local_cli,
+            "hermes": hermes,
+            "alphasift": alphasift,
+            "snapshot": snapshot,
+        }
+    )
+    assert turns == []
+    assert diagnostics.trace_dropped_reason == "sensitive_data_redacted"
+
+
 def test_authorization_redaction_preserves_public_url_markers_on_repeated_passes() -> None:
     diagnostic = "Authorization: [REDACTED] [REDACTED_URL]"
     punctuated_diagnostic = "Authorization: [REDACTED]. diagnostic=public"

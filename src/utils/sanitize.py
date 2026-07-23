@@ -74,28 +74,15 @@ _URL_PATTERN = re.compile(r"https?://[^\s,;)\]}]+", re.IGNORECASE)
 # username-only tokens and username:password credentials are redacted; the '/'
 # boundary keeps the match from spilling into the host or path.
 _URL_CREDENTIALS_PATTERN = re.compile(
-    r"(?<![A-Za-z0-9+.\-])"
-    r"(?P<scheme>[a-zA-Z][a-zA-Z0-9+.\-]*://)[^\s/?#]+@"
+    r"(?P<scheme>[a-zA-Z][a-zA-Z0-9+.\-]{0,127}://)[^\s/?#]+@"
 )
 _BEARER_PATTERN = re.compile(
     r"\b(bearer\s+)[^\s,;&\"']+",
     re.IGNORECASE,
 )
-_AUTHORIZATION_FIELD_CORE_PATTERN = (
-    r"(?:proxy[_-]?)?authorization(?:[_-]?header)?"
-)
-_AUTHORIZATION_FIELD_NAME_PATTERN = (
-    rf"(?<![A-Za-z0-9]){_AUTHORIZATION_FIELD_CORE_PATTERN}"
-)
 _PUBLIC_DIAGNOSTIC_FIELD_PATTERN = re.compile(
     r"public[A-Za-z0-9_-]*\s*=",
     re.IGNORECASE,
-)
-_EXCEPTION_CHAIN_BOUNDARY_PATTERN = re.compile(
-    r"<-\s+[A-Za-z_][A-Za-z0-9_.]{0,119}:"
-)
-_PUBLIC_REDACTED_AUTHORIZATION_VALUES = frozenset(
-    {_REDACTED.lower(), "<redacted>"}
 )
 _PUBLIC_REDACTED_URL_VALUES = frozenset(
     {"[redacted_url]", "<redacted-url>"}
@@ -110,54 +97,15 @@ _PUBLIC_REDACTION_FIELD_VALUES = frozenset(
         "__stockpulse_existing_redaction__",
     }
 )
-_PUBLIC_BRACKETED_REDACTION_VALUES = frozenset(
-    {"[redacted]", "[redacted_url]"}
-)
 _PUBLIC_AUTHORIZATION_PUNCTUATION = frozenset(".,:!?)]}")
-_COOKIE_FIELD_CORE_PATTERN = r"cookie(?:[_-]?header)?"
-_SET_COOKIE_FIELD_CORE_PATTERN = r"set[_-]?cookie(?:[_-]?header)?"
-_COOKIE_FIELD_NAME_PATTERN = (
-    rf"(?<![A-Za-z0-9])(?<!set-)(?<!set_){_COOKIE_FIELD_CORE_PATTERN}"
-)
-_SET_COOKIE_FIELD_NAME_PATTERN = (
-    rf"(?<![A-Za-z0-9]){_SET_COOKIE_FIELD_CORE_PATTERN}"
-)
-_SENSITIVE_FIELD_OPENING_QUOTE_PATTERN = r"(?:\\+['\"]|['\"])?"
 _SENSITIVE_FIELD_SEPARATOR_PATTERN = r"(?:\\+['\"]|['\"])?\s*[:=]\s*"
-_AUTHORIZATION_FIELD_START_PATTERN = re.compile(
-    rf"({_AUTHORIZATION_FIELD_NAME_PATTERN})"
+_TEXT_FIELD_KEY_PATTERN = r"[A-Za-z][A-Za-z0-9_-]*"
+_TEXT_FIELD_START_PATTERN = re.compile(
+    rf"((?<![A-Za-z0-9_-]){_TEXT_FIELD_KEY_PATTERN})"
     rf"({_SENSITIVE_FIELD_SEPARATOR_PATTERN})",
-    re.IGNORECASE,
 )
-_COOKIE_FIELD_START_PATTERN = re.compile(
-    rf"({_COOKIE_FIELD_NAME_PATTERN})"
-    rf"({_SENSITIVE_FIELD_SEPARATOR_PATTERN})",
-    re.IGNORECASE,
-)
-_SET_COOKIE_FIELD_START_PATTERN = re.compile(
-    rf"({_SET_COOKIE_FIELD_NAME_PATTERN})"
-    rf"({_SENSITIVE_FIELD_SEPARATOR_PATTERN})",
-    re.IGNORECASE,
-)
-_SENSITIVE_ASSIGNMENT_CORE_PATTERN = (
-    r"(?:"
-    r"token|secret|passwd|password|credential|credentials|sendkey|x[_-]?api[_-]?key|"
-    r"api[_-]?key|apikey|api[_-]?token|auth[_-]?token|"
-    r"access[_-]?token|refresh[_-]?token|session[_-]?token|license[_-]?key|private[_-]?key|"
-    r"secret[_-]?key|webhook[_-]?(?:url|secret)|proxy[_-]?url|headers?|"
-    r"prompt|raw[_-]?prompt|raw[_-]?response"
-    r")"
-)
-_FOLLOWING_SENSITIVE_FIELD_PATTERN = re.compile(
-    rf"{_SENSITIVE_FIELD_OPENING_QUOTE_PATTERN}"
-    rf"[A-Za-z0-9_-]*(?:{_AUTHORIZATION_FIELD_CORE_PATTERN}|"
-    rf"{_SET_COOKIE_FIELD_CORE_PATTERN}|{_COOKIE_FIELD_CORE_PATTERN}|"
-    rf"{_SENSITIVE_ASSIGNMENT_CORE_PATTERN})"
-    rf"{_SENSITIVE_FIELD_SEPARATOR_PATTERN}",
-    re.IGNORECASE,
-)
-_AUTHORIZATION_PARAMETER_PATTERN = re.compile(
-    r"[!#$%&'*+.^_`|~0-9A-Za-z-]+\s*=",
+_ORDINARY_DIAGNOSTIC_FIELD_PATTERN = re.compile(
+    rf"{_TEXT_FIELD_KEY_PATTERN}\s*=",
     re.IGNORECASE,
 )
 _SAFE_SET_COOKIE_ATTRIBUTE_PATTERN = re.compile(
@@ -173,11 +121,6 @@ _SAFE_SET_COOKIE_ATTRIBUTE_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _FOLDED_FIELD_LINE_PATTERN = re.compile(r"\r?\n[ \t]+")
-_SENSITIVE_ASSIGNMENT_FIELD_START_PATTERN = re.compile(
-    rf"((?<![A-Za-z0-9]){_SENSITIVE_ASSIGNMENT_CORE_PATTERN})"
-    rf"({_SENSITIVE_FIELD_SEPARATOR_PATTERN})",
-    re.IGNORECASE,
-)
 _TOKEN_LIKE_PATTERN = re.compile(
     r"\b(?:"
     r"sk-[a-z0-9_\-]{12,}|"
@@ -297,6 +240,7 @@ class _NormalizedRedactionValues(tuple):
     ):
         instance = super().__new__(cls, values)
         instance.exception_snapshots = tuple(exception_snapshots)
+        instance.trusted_exception_parts: set[str] = set()
         return instance
 
     def __init__(
@@ -497,24 +441,130 @@ def _redact_exact_values(text: str, redaction_values: tuple[str, ...]) -> str:
     return redacted
 
 
-def _is_field_boundary(
-    pattern: re.Pattern[str],
+def _sensitive_text_field_kind(key_text: str) -> Optional[str]:
+    """Classify text labels with the same rules used for structured mappings."""
+
+    if not _is_sensitive_mapping_key_text(key_text):
+        return None
+    parts = _mapping_key_parts(key_text)
+    compact = "".join(parts)
+    if "authorization" in compact:
+        return "authorization"
+    if (
+        "setcookie" in parts
+        or any(
+            left == "set" and right == "cookie"
+            for left, right in zip(parts, parts[1:])
+        )
+    ):
+        return "set_cookie"
+    if "cookie" in compact:
+        return "cookie"
+    return "generic"
+
+
+def _next_sensitive_text_field_match(
+    text: str,
+    cursor: int,
+    *,
+    field_kinds: frozenset[str],
+) -> tuple[Optional[re.Match[str]], Optional[str]]:
+    """Find the next assignment whose complete key is centrally sensitive."""
+
+    while True:
+        match = _TEXT_FIELD_START_PATTERN.search(text, cursor)
+        if match is None:
+            return None, None
+        kind = _sensitive_text_field_kind(match.group(1))
+        if kind in field_kinds:
+            return match, kind
+        cursor = match.end()
+
+
+def _encoded_field_key_start(text: str, index: int) -> int:
+    cursor = index
+    while cursor < len(text) and text[cursor] == "\\":
+        cursor += 1
+    if cursor < len(text) and text[cursor] in {'"', "'"}:
+        return cursor + 1
+    return index
+
+
+def _sensitive_text_field_kind_at(text: str, index: int) -> Optional[str]:
+    match = _TEXT_FIELD_START_PATTERN.match(
+        text,
+        _encoded_field_key_start(text, index),
+    )
+    if match is None:
+        return None
+    return _sensitive_text_field_kind(match.group(1))
+
+
+def _sensitive_text_field_starts_at(text: str, index: int) -> bool:
+    return _sensitive_text_field_kind_at(text, index) is not None
+
+
+def _is_public_redacted_url_boundary(text: str, index: int) -> bool:
+    """Accept an existing URL marker only with a proven public continuation."""
+
+    lowered = text[index:index + 64].lower()
+    for marker in _PUBLIC_REDACTED_URL_VALUES:
+        if not lowered.startswith(marker):
+            continue
+        cursor = index + len(marker)
+        while (
+            cursor < len(text)
+            and text[cursor] in _PUBLIC_AUTHORIZATION_PUNCTUATION
+        ):
+            cursor += 1
+        if cursor == len(text):
+            return True
+        if text[cursor] not in " \t\f\v":
+            continue
+        while cursor < len(text) and text[cursor] in " \t\f\v":
+            cursor += 1
+        return (
+            cursor == len(text)
+            or _PUBLIC_DIAGNOSTIC_FIELD_PATTERN.match(text, cursor) is not None
+            or _sensitive_text_field_starts_at(text, cursor)
+        )
+    return False
+
+
+def _is_http_url_redacted_at_boundary(
     text: str,
     index: int,
     *,
-    has_field_value: bool,
-    previous_non_whitespace: Optional[str],
+    redact_all_http_urls: bool,
 ) -> bool:
-    """Return whether a new field begins outside a credential parameter list."""
+    """Return whether the later URL pass is guaranteed to mask this boundary."""
 
-    if not has_field_value:
+    url_index = index
+    for lead_in in ("at", "from", "via"):
+        end = index + len(lead_in)
+        if text[index:end].lower() != lead_in:
+            continue
+        if end >= len(text) or text[end] not in " \t\f\v":
+            continue
+        url_index = end
+        while url_index < len(text) and text[url_index] in " \t\f\v":
+            url_index += 1
+        break
+    match = _URL_PATTERN.match(text, url_index)
+    if match is None:
         return False
-    if previous_non_whitespace in {";", ","}:
-        return False
-    return pattern.match(text, index) is not None
+    return (
+        redact_all_http_urls
+        or _redact_sensitive_url_match(match) == "[REDACTED_URL]"
+    )
 
 
-def _is_next_diagnostic_field(text: str, index: int) -> bool:
+def _is_next_diagnostic_field(
+    text: str,
+    index: int,
+    *,
+    redact_all_http_urls: bool,
+) -> bool:
     """Return whether ``next`` introduces only a verifiable public suffix."""
 
     end = index + 4
@@ -527,113 +577,44 @@ def _is_next_diagnostic_field(text: str, index: int) -> bool:
     cursor = end
     while cursor < len(text) and text[cursor] in " \t\f\v":
         cursor += 1
-    if cursor == len(text):
-        return True
     return (
-        _FOLLOWING_SENSITIVE_FIELD_PATTERN.match(text, cursor) is not None
+        cursor == len(text)
+        or _sensitive_text_field_starts_at(text, cursor)
         or _PUBLIC_DIAGNOSTIC_FIELD_PATTERN.match(text, cursor) is not None
-        or _is_public_http_diagnostic_boundary(text, cursor)
+        or _is_public_redacted_url_boundary(text, cursor)
+        or _is_http_url_redacted_at_boundary(
+            text,
+            cursor,
+            redact_all_http_urls=redact_all_http_urls,
+        )
     )
 
 
-def _is_public_http_diagnostic_boundary(text: str, index: int) -> bool:
-    """Return whether a URL or a narrow URL lead-in begins at ``index``."""
-
-    lowered = text[index:index + 32].lower()
-    for marker in _PUBLIC_REDACTED_URL_VALUES:
-        if not lowered.startswith(marker):
-            continue
-        cursor = index + len(marker)
-        while (
-            cursor < len(text)
-            and text[cursor] in _PUBLIC_AUTHORIZATION_PUNCTUATION
-        ):
-            cursor += 1
-        if cursor == len(text):
-            return True
-        if not text[cursor].isspace():
-            continue
-        while cursor < len(text) and text[cursor].isspace():
-            cursor += 1
-        if cursor == len(text):
-            return True
-        return (
-            _PUBLIC_DIAGNOSTIC_FIELD_PATTERN.match(text, cursor) is not None
-            or _FOLLOWING_SENSITIVE_FIELD_PATTERN.match(text, cursor) is not None
-            or _EXCEPTION_CHAIN_BOUNDARY_PATTERN.match(text, cursor) is not None
-        )
-    if text[index:index + 8].lower().startswith(("http://", "https://")):
-        return True
-    for lead_in in ("at", "from", "via"):
-        end = index + len(lead_in)
-        if text[index:end].lower() != lead_in:
-            continue
-        if end >= len(text) or text[end] not in " \t\f\v":
-            continue
-        cursor = end
-        while cursor < len(text) and text[cursor] in " \t\f\v":
-            cursor += 1
-        if text[cursor:cursor + 8].lower().startswith(("http://", "https://")):
-            return True
-    return False
-
-
-def _is_public_structural_suffix(text: str, index: int) -> bool:
-    """Return whether only balanced-output closers precede a public boundary."""
+def _is_structured_field_suffix(text: str, index: int) -> bool:
+    """Recognize only balanced closers or a syntactic sibling field."""
 
     cursor = index
-    while cursor < len(text) and text[cursor] in ")]}":
-        cursor += 1
-    if cursor == index:
-        return False
-    if cursor == len(text) or text[cursor] in ",;&":
-        return True
-    if not text[cursor].isspace():
-        return False
-    while cursor < len(text) and text[cursor].isspace():
+    while cursor < len(text) and text[cursor] in " \t\f\v":
         cursor += 1
     if cursor == len(text):
         return True
-    return (
-        _PUBLIC_DIAGNOSTIC_FIELD_PATTERN.match(text, cursor) is not None
-        or _FOLLOWING_SENSITIVE_FIELD_PATTERN.match(text, cursor) is not None
-        or _EXCEPTION_CHAIN_BOUNDARY_PATTERN.match(text, cursor) is not None
-        or _is_next_diagnostic_field(text, cursor)
-        or _is_public_http_diagnostic_boundary(text, cursor)
-    )
-
-
-def _public_redacted_authorization_marker_length(
-    value: Optional[str],
-) -> int:
-    """Return the public marker prefix length before ordinary punctuation."""
-
-    if value is None:
-        return 0
-    for marker in _PUBLIC_REDACTED_AUTHORIZATION_VALUES:
-        if not value.startswith(marker):
-            continue
-        suffix = value[len(marker):]
-        if all(char in _PUBLIC_AUTHORIZATION_PUNCTUATION for char in suffix):
-            return len(marker)
-    return 0
-
-
-def _matches_public_redaction_value(
-    text: str,
-    start: Optional[int],
-    end: int,
-    values: frozenset[str],
-) -> bool:
-    """Match one complete fixed marker without slicing attacker-sized spans."""
-
-    if start is None:
+    if text[cursor] in ")]}":
+        while cursor < len(text) and text[cursor] in ")]}":
+            cursor += 1
+        while cursor < len(text) and text[cursor] in " \t\f\v":
+            cursor += 1
+        if cursor == len(text):
+            return True
+    if text[cursor] != ",":
         return False
-    length = end - start
-    return any(
-        len(value) == length and text[start:end].lower() == value
-        for value in values
-    )
+    cursor += 1
+    while cursor < len(text) and text[cursor] in " \t\f\v":
+        cursor += 1
+    while cursor < len(text) and text[cursor] == "\\":
+        cursor += 1
+    if cursor < len(text) and text[cursor] in {'"', "'"}:
+        cursor += 1
+    return _TEXT_FIELD_START_PATTERN.match(text, cursor) is not None
 
 
 def _outer_quote_token(
@@ -652,16 +633,6 @@ def _outer_quote_token(
     if quote_index < len(text) and text[quote_index] in {'"', "'"}:
         return text[field_value_start:quote_index + 1]
     return ""
-
-
-def _is_structural_value_boundary(text: str, index: int) -> bool:
-    """Return whether a completed quoted value is structurally delimited."""
-
-    return (
-        index >= len(text)
-        or text[index].isspace()
-        or text[index] in ",;&)]}"
-    )
 
 
 def _is_complete_public_redaction_field_value(
@@ -686,35 +657,112 @@ def _is_complete_public_redaction_field_value(
     return value.lower() in _PUBLIC_REDACTION_FIELD_VALUES
 
 
+def _starts_with_public_redaction_marker(
+    text: str,
+    start: int,
+    end: int,
+) -> bool:
+    """Detect marker-prefix injection without examining attacker-sized spans."""
+
+    value = text[start:min(end, start + 192)].lstrip()
+    for _ in range(4):
+        outer_quote = _outer_quote_token(value, 0, enabled=True)
+        if not outer_quote:
+            break
+        value = value[len(outer_quote):]
+    lowered = value.lower()
+    return any(
+        lowered.startswith(marker)
+        for marker in _PUBLIC_REDACTION_FIELD_VALUES
+    )
+
+
+def _is_verified_field_boundary(
+    text: str,
+    index: int,
+    *,
+    field_kind: str,
+    marker_prefix: bool,
+    authorization_has_equals: bool,
+    authorization_has_comma: bool,
+    outer_quote_closed: bool,
+    redact_all_http_urls: bool,
+) -> bool:
+    """Accept only suffixes whose safety follows from explicit syntax."""
+
+    if index >= len(text):
+        return True
+    field_key_start = _encoded_field_key_start(text, index)
+    next_field_kind = _sensitive_text_field_kind_at(text, index)
+    if next_field_kind is not None:
+        if field_kind in {"authorization", "cookie", "set_cookie"}:
+            return next_field_kind in {"authorization", "cookie", "set_cookie"}
+        return True
+    authorization_can_end = (
+        field_kind != "authorization"
+        or outer_quote_closed
+        or not authorization_has_equals
+        or authorization_has_comma
+    )
+    if (
+        authorization_can_end
+        and field_kind != "set_cookie"
+        and _PUBLIC_DIAGNOSTIC_FIELD_PATTERN.match(text, field_key_start) is not None
+    ):
+        return True
+    if (
+        authorization_can_end
+        and _is_next_diagnostic_field(
+            text,
+            index,
+            redact_all_http_urls=redact_all_http_urls,
+        )
+    ):
+        return True
+    if (
+        (marker_prefix or authorization_can_end)
+        and _is_public_redacted_url_boundary(text, index)
+    ):
+        return True
+    if (
+        authorization_can_end
+        and _is_http_url_redacted_at_boundary(
+            text,
+            index,
+            redact_all_http_urls=redact_all_http_urls,
+        )
+    ):
+        return True
+    return (
+        field_kind == "generic"
+        and _ORDINARY_DIAGNOSTIC_FIELD_PATTERN.match(text, field_key_start) is not None
+    )
+
+
 def _sensitive_field_end(
     text: str,
     field_value_start: int,
     *,
-    preserve_public_diagnostic: bool = True,
-    stop_after_outer_quote: bool = False,
-    authorization_field: bool = False,
-    generic_assignment_field: bool = False,
+    field_kind: str,
+    structured_key: bool,
+    redact_all_http_urls: bool,
 ) -> int:
-    """Scan one secret-bearing field without trusting delimiters inside quotes."""
+    """Scan to a proven field boundary and fail closed on ambiguous suffixes."""
 
     outer_quote = _outer_quote_token(
         text,
         field_value_start,
-        enabled=stop_after_outer_quote,
+        enabled=True,
     )
     outer_quote_char = outer_quote[-1] if outer_quote else None
     encoded_outer_quote = len(outer_quote) > 1
     quote_char: Optional[str] = outer_quote_char
+    outer_quote_closed = False
     escaped = False
     outside_escaped = False
-    has_field_value = bool(outer_quote)
     previous_non_whitespace: Optional[str] = outer_quote_char
-    unquoted_word_count = 0
-    in_unquoted_word = False
-    unquoted_word_start: Optional[int] = None
-    first_unquoted_word: Optional[str] = None
-    parameterized_authorization = False
-    authorization_parameter_separator_seen = False
+    authorization_has_equals = False
+    authorization_has_comma = False
     index = field_value_start + len(outer_quote)
     while index < len(text):
         char = text[index]
@@ -738,11 +786,6 @@ def _sensitive_field_end(
                         and text[continuation] in " \t"
                     ):
                         continuation += 1
-                    if authorization_field:
-                        parameterized_authorization = True
-                if quote_char is None:
-                    in_unquoted_word = False
-                    unquoted_word_start = None
                 index = continuation
                 continue
             return index
@@ -754,12 +797,46 @@ def _sensitive_field_end(
                     and text.startswith(outer_quote, index)
                 ):
                     closing_end = index + len(outer_quote)
-                    if _is_structural_value_boundary(text, closing_end):
+                    outer_marker = _is_complete_public_redaction_field_value(
+                        text,
+                        field_value_start,
+                        closing_end,
+                    )
+                    if structured_key and _is_structured_field_suffix(
+                        text,
+                        closing_end,
+                    ):
                         return closing_end
                     quote_char = None
+                    outer_quote_closed = True
                     encoded_outer_quote = False
                     previous_non_whitespace = outer_quote_char
                     index = closing_end
+                    candidate = index
+                    while candidate < len(text) and text[candidate] in " \t\f\v":
+                        candidate += 1
+                    if (
+                        candidate > index
+                        and _is_verified_field_boundary(
+                            text,
+                            candidate,
+                            field_kind=field_kind,
+                            marker_prefix=outer_marker,
+                            authorization_has_equals=authorization_has_equals,
+                            authorization_has_comma=authorization_has_comma,
+                            outer_quote_closed=True,
+                            redact_all_http_urls=redact_all_http_urls,
+                        )
+                    ):
+                        return closing_end
+                    if (
+                        field_kind == "generic"
+                        and not outer_marker
+                        and candidate == index
+                        and index < len(text)
+                        and text[index] in ",;&"
+                    ):
+                        return closing_end
                     continue
                 index += 1
                 continue
@@ -772,167 +849,150 @@ def _sensitive_field_end(
                 previous_non_whitespace = char
                 if char == outer_quote_char:
                     closing_end = index + 1
-                    if _is_structural_value_boundary(text, closing_end):
+                    outer_marker = _is_complete_public_redaction_field_value(
+                        text,
+                        field_value_start,
+                        closing_end,
+                    )
+                    if structured_key and _is_structured_field_suffix(
+                        text,
+                        closing_end,
+                    ):
+                        return closing_end
+                    outer_quote_closed = True
+                    candidate = closing_end
+                    while candidate < len(text) and text[candidate] in " \t\f\v":
+                        candidate += 1
+                    if (
+                        candidate > closing_end
+                        and _is_verified_field_boundary(
+                            text,
+                            candidate,
+                            field_kind=field_kind,
+                            marker_prefix=outer_marker,
+                            authorization_has_equals=authorization_has_equals,
+                            authorization_has_comma=authorization_has_comma,
+                            outer_quote_closed=True,
+                            redact_all_http_urls=redact_all_http_urls,
+                        )
+                    ):
+                        return closing_end
+                    if (
+                        field_kind == "generic"
+                        and not outer_marker
+                        and candidate == closing_end
+                        and closing_end < len(text)
+                        and text[closing_end] in ",;&"
+                    ):
                         return closing_end
             index += 1
             continue
         if outside_escaped:
             outside_escaped = False
             if not char.isspace():
-                if not in_unquoted_word:
-                    unquoted_word_count += 1
-                    in_unquoted_word = True
-                    unquoted_word_start = index - 1
-                has_field_value = True
                 previous_non_whitespace = char
             index += 1
             continue
         if char == "\\":
-            if not in_unquoted_word:
-                unquoted_word_count += 1
-                in_unquoted_word = True
-                unquoted_word_start = index
             outside_escaped = True
-            has_field_value = True
             previous_non_whitespace = char
             index += 1
             continue
         if char in {'"', "'"}:
-            if not in_unquoted_word:
-                unquoted_word_count += 1
-                in_unquoted_word = True
-                unquoted_word_start = index
             quote_char = char
-            has_field_value = True
             previous_non_whitespace = char
             index += 1
             continue
         if char in " \t\f\v":
             whitespace_start = index
-            if (
-                first_unquoted_word is None
-                and unquoted_word_count == 1
-                and unquoted_word_start is not None
-            ):
-                first_unquoted_word = text[
-                    unquoted_word_start:whitespace_start
-                ].strip().lower()
             while index < len(text) and text[index] in " \t\f\v":
                 index += 1
-            if generic_assignment_field:
-                return whitespace_start
-            starts_parameter = (
-                authorization_field
-                and _AUTHORIZATION_PARAMETER_PATTERN.match(text, index)
-                is not None
-            )
-            public_marker_length = (
-                _public_redacted_authorization_marker_length(
-                    first_unquoted_word
-                )
-                if authorization_field and unquoted_word_count == 1
-                else 0
-            )
-            public_boundary = (
-                preserve_public_diagnostic
-                and _is_field_boundary(
-                    _PUBLIC_DIAGNOSTIC_FIELD_PATTERN,
-                    text,
-                    index,
-                    has_field_value=has_field_value,
-                    previous_non_whitespace=previous_non_whitespace,
-                )
-            )
-            if (
-                authorization_field
-                and not parameterized_authorization
-                and unquoted_word_count == 1
-                and starts_parameter
-                and not (public_marker_length and public_boundary)
-            ):
-                parameterized_authorization = True
-            authorization_boundary_allowed = (
-                not authorization_field
-                or not parameterized_authorization
-                or authorization_parameter_separator_seen
-                or previous_non_whitespace in {'"', "'"}
-            )
-            if _EXCEPTION_CHAIN_BOUNDARY_PATTERN.match(text, index) is not None:
-                return whitespace_start
-            if (
-                authorization_boundary_allowed
-                and previous_non_whitespace not in {";", ","}
-                and _is_next_diagnostic_field(text, index)
-            ):
-                return whitespace_start
-            if public_boundary and authorization_boundary_allowed:
-                return whitespace_start
-            if (
-                authorization_boundary_allowed
-                and _is_field_boundary(
-                    _FOLLOWING_SENSITIVE_FIELD_PATTERN,
-                    text,
-                    index,
-                    has_field_value=has_field_value,
-                    previous_non_whitespace=previous_non_whitespace,
-                )
-            ):
-                return whitespace_start
-            if authorization_field:
-                if (
-                    not parameterized_authorization
-                    and _is_public_http_diagnostic_boundary(text, index)
-                ):
-                    return whitespace_start
-            in_unquoted_word = False
-            unquoted_word_start = None
-            continue
-        current_word_is_redacted = _matches_public_redaction_value(
-            text,
-            unquoted_word_start,
-            index,
-            _PUBLIC_REDACTED_AUTHORIZATION_VALUES,
-        )
-        completes_public_marker = (
-            char == "]"
-            and _matches_public_redaction_value(
+            marker_prefix = _starts_with_public_redaction_marker(
                 text,
-                unquoted_word_start,
-                index + 1,
-                _PUBLIC_BRACKETED_REDACTION_VALUES,
+                field_value_start,
+                whitespace_start,
             )
-        )
-        if generic_assignment_field and (
-            char in ",;&}" or (char == "]" and not completes_public_marker)
-        ):
-            return index
-        if authorization_field and char in ",;" and current_word_is_redacted:
-            candidate = index + 1
-            while candidate < len(text) and text[candidate].isspace():
-                candidate += 1
-            if _AUTHORIZATION_PARAMETER_PATTERN.match(text, candidate) is None:
+            if field_kind == "generic" and not marker_prefix:
+                return whitespace_start
+            if (
+                previous_non_whitespace not in {";", ","}
+                and _is_verified_field_boundary(
+                    text,
+                    index,
+                    field_kind=field_kind,
+                    marker_prefix=marker_prefix,
+                    authorization_has_equals=authorization_has_equals,
+                    authorization_has_comma=authorization_has_comma,
+                    outer_quote_closed=outer_quote_closed,
+                    redact_all_http_urls=redact_all_http_urls,
+                )
+            ):
+                return whitespace_start
+            continue
+        if char in ",;&":
+            if structured_key and _is_structured_field_suffix(text, index):
                 return index
-            parameterized_authorization = True
-        if char == "," and authorization_field and parameterized_authorization:
-            authorization_parameter_separator_seen = True
-        if (
-            current_word_is_redacted
-            and char in ")]}"
-            and _is_public_structural_suffix(text, index)
-        ):
-            return index
-        if char == ";":
             candidate = index + 1
-            while candidate < len(text) and text[candidate].isspace():
+            while candidate < len(text) and text[candidate] in " \t\f\v":
                 candidate += 1
-            if _is_next_diagnostic_field(text, candidate):
+            marker_prefix = _starts_with_public_redaction_marker(
+                text,
+                field_value_start,
+                index,
+            )
+            if _is_next_diagnostic_field(
+                text,
+                candidate,
+                redact_all_http_urls=redact_all_http_urls,
+            ):
                 return index
-        has_field_value = True
+            if field_kind == "generic" and not marker_prefix:
+                return index
+            if (
+                field_kind == "generic"
+                and _is_verified_field_boundary(
+                    text,
+                    candidate,
+                    field_kind=field_kind,
+                    marker_prefix=marker_prefix,
+                    authorization_has_equals=authorization_has_equals,
+                    authorization_has_comma=authorization_has_comma,
+                    outer_quote_closed=outer_quote_closed,
+                    redact_all_http_urls=redact_all_http_urls,
+                )
+            ):
+                return index
+            if char == "," and field_kind == "authorization":
+                authorization_has_comma = True
+        elif char == "=" and field_kind == "authorization":
+            authorization_has_equals = True
+        elif char in ")]}":
+            if (
+                char == "]"
+                and _is_complete_public_redaction_field_value(
+                    text,
+                    field_value_start,
+                    index + 1,
+                )
+            ):
+                previous_non_whitespace = char
+                index += 1
+                continue
+            marker_prefix = _starts_with_public_redaction_marker(
+                text,
+                field_value_start,
+                index,
+            )
+            if (
+                structured_key
+                and _is_structured_field_suffix(text, index)
+            ) or (
+                not structured_key
+                and field_kind == "generic"
+                and not marker_prefix
+            ):
+                return index
         previous_non_whitespace = char
-        if not in_unquoted_word:
-            unquoted_word_count += 1
-            in_unquoted_word = True
-            unquoted_word_start = index
         index += 1
     return len(text)
 
@@ -986,72 +1046,50 @@ def _safe_set_cookie_suffix(field_value: str) -> str:
 
 def _redact_sensitive_field_spans(
     text: str,
-    start_pattern: re.Pattern[str],
     *,
-    preserve_public_diagnostic: bool = True,
-    stop_after_outer_quote: bool = False,
+    field_kinds: frozenset[str],
+    redact_all_http_urls: bool,
 ) -> str:
-    """Redact complete field spans while preserving explicit public suffixes."""
+    """Redact all centrally classified text fields in one lexical pass."""
 
     parts: list[str] = []
     cursor = 0
     while True:
-        match = start_pattern.search(text, cursor)
+        match, field_kind = _next_sensitive_text_field_match(
+            text,
+            cursor,
+            field_kinds=field_kinds,
+        )
         if match is None:
             parts.append(text[cursor:])
             return "".join(parts)
+        assert field_kind is not None
         parts.append(text[cursor:match.start()])
+        separator = match.group(2)
+        structured_key = separator.lstrip().startswith(("\\", "'", '"'))
         field_end = _sensitive_field_end(
             text,
             match.end(),
-            preserve_public_diagnostic=preserve_public_diagnostic,
-            stop_after_outer_quote=stop_after_outer_quote,
-            authorization_field=(
-                start_pattern is _AUTHORIZATION_FIELD_START_PATTERN
-            ),
-            generic_assignment_field=(
-                start_pattern is _SENSITIVE_ASSIGNMENT_FIELD_START_PATTERN
-            ),
+            field_kind=field_kind,
+            structured_key=structured_key,
+            redact_all_http_urls=redact_all_http_urls,
         )
-        if _is_complete_public_redaction_field_value(
-            text,
-            match.end(),
-            field_end,
+        if (
+            field_kind != "set_cookie"
+            and _is_complete_public_redaction_field_value(
+                text,
+                match.end(),
+                field_end,
+            )
         ):
             parts.append(text[match.start():field_end])
             cursor = field_end
             continue
-        outer_quote = _outer_quote_token(
-            text,
-            match.end(),
-            enabled=stop_after_outer_quote,
+        suffix = (
+            _safe_set_cookie_suffix(text[match.end():field_end])
+            if field_kind == "set_cookie"
+            else ""
         )
-        output_quote = outer_quote if len(outer_quote) == 1 else ""
-        parts.append(
-            f"{match.group(1)}{match.group(2)}"
-            f"{output_quote}{_REDACTED}{output_quote}"
-        )
-        cursor = field_end
-
-
-def _redact_set_cookie_field_spans(text: str) -> str:
-    """Redact Set-Cookie values while retaining only validated public attributes."""
-
-    parts: list[str] = []
-    cursor = 0
-    while True:
-        match = _SET_COOKIE_FIELD_START_PATTERN.search(text, cursor)
-        if match is None:
-            parts.append(text[cursor:])
-            return "".join(parts)
-        parts.append(text[cursor:match.start()])
-        field_end = _sensitive_field_end(
-            text,
-            match.end(),
-            preserve_public_diagnostic=False,
-            stop_after_outer_quote=True,
-        )
-        suffix = _safe_set_cookie_suffix(text[match.end():field_end])
         outer_quote = _outer_quote_token(
             text,
             match.end(),
@@ -1082,15 +1120,9 @@ def _redact_common_secret_patterns(
         )
     sanitized = _redact_sensitive_field_spans(
         sanitized,
-        _AUTHORIZATION_FIELD_START_PATTERN,
-        stop_after_outer_quote=True,
+        field_kinds=frozenset({"authorization", "cookie", "set_cookie"}),
+        redact_all_http_urls=redact_all_http_urls,
     )
-    sanitized = _redact_sensitive_field_spans(
-        sanitized,
-        _COOKIE_FIELD_START_PATTERN,
-        stop_after_outer_quote=True,
-    )
-    sanitized = _redact_set_cookie_field_spans(sanitized)
     if redact_all_http_urls:
         sanitized = _URL_PATTERN.sub("[REDACTED_URL]", sanitized)
     else:
@@ -1103,12 +1135,12 @@ def _redact_common_secret_patterns(
         f"{_URL_USERINFO_REDACTION}@",
         "[REDACTED]@",
     )
-    sanitized = _BEARER_PATTERN.sub(r"\1[REDACTED]", sanitized)
     sanitized = _redact_sensitive_field_spans(
         sanitized,
-        _SENSITIVE_ASSIGNMENT_FIELD_START_PATTERN,
-        stop_after_outer_quote=True,
+        field_kinds=frozenset({"generic"}),
+        redact_all_http_urls=redact_all_http_urls,
     )
+    sanitized = _BEARER_PATTERN.sub(r"\1[REDACTED]", sanitized)
     sanitized = _TOKEN_LIKE_PATTERN.sub("[REDACTED]", sanitized)
     if redact_opaque_tokens:
         sanitized = _OPAQUE_TOKEN_PATTERN.sub("[REDACTED]", sanitized)
@@ -1145,6 +1177,14 @@ def sanitize_diagnostic_text(
         )
     except BaseException:
         return _bounded_render_failure(max_length)
+    trusted_exception_parts = exact_values.trusted_exception_parts
+    if (
+        type(text) is str
+        and trusted_exception_parts
+        and len(parts := text.split(" <- ")) > 1
+        and all(part in trusted_exception_parts for part in parts)
+    ):
+        return " ".join(text.split())[:max_length]
     sanitized = _safe_structured_string(structured_text).strip()
     if not sanitized:
         return ""
@@ -1152,7 +1192,9 @@ def sanitize_diagnostic_text(
         _redact_exact_values(sanitized, exact_values),
         redact_all_http_urls=True,
     )
-    return " ".join(sanitized.split())[:max_length]
+    result = " ".join(sanitized.split())[:max_length]
+    trusted_exception_parts.add(result)
+    return result
 
 
 def safe_exception_type_name(error: Any, *, max_length: int = 120) -> str:
@@ -1377,6 +1419,41 @@ def _safe_log_context_fields(
     return fields
 
 
+def _collapse_redacted_exception_diagnostics(summary: str) -> str:
+    """Keep chain types while removing labels from already-redacted diagnostics."""
+
+    collapsed_parts = []
+    for part in summary.split(" <- "):
+        exception_type, separator, diagnostic = part.partition(": ")
+        if not separator:
+            collapsed_parts.append(part)
+            continue
+        markers = []
+        if "[REDACTED]" in diagnostic:
+            markers.append("[REDACTED]")
+        if "[REDACTED_URL]" in diagnostic:
+            markers.append("[REDACTED_URL]")
+        collapsed_parts.append(
+            f"{exception_type}: {' '.join(markers) if markers else diagnostic}"
+        )
+    return " <- ".join(collapsed_parts)
+
+
+def _collapse_log_exception_summaries(message: str) -> str:
+    prefix, summary_separator, summaries = message.rpartition(" summary=")
+    if not summary_separator:
+        return message
+    summary, diagnostic_separator, diagnostic = summaries.partition(" diagnostic=")
+    if not diagnostic_separator:
+        return message
+    return (
+        f"{prefix}{summary_separator}"
+        f"{_collapse_redacted_exception_diagnostics(summary)}"
+        f"{diagnostic_separator}"
+        f"{_collapse_redacted_exception_diagnostics(diagnostic)}"
+    )
+
+
 def log_safe_exception(
     target_logger: logging.Logger,
     event: str,
@@ -1464,6 +1541,7 @@ def log_safe_exception(
             message = " ".join(fields)
         except BaseException:
             message = _SAFE_RENDER_FAILURE
+    message = _collapse_log_exception_summaries(message)
     target_logger.log(level, message)
 
 
