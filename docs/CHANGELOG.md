@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Preserved structured diagnostic fields in prose log lines by narrowing the composite-key redaction walker to reject bare-whitespace prose joiners for the fail-closed and single-word paths, so debug messages such as retry summaries and webhook payload sizes no longer collapse `error_code=...`, `exception_type=...`, or `body_bytes=...` to `[REDACTED]` while canonical multi-word phrases (`api key`, `session token`) and structural long compounds still redact.
 - [Tests] Stabilized Agent LLM fallback and orchestrator timeout tests by replacing fixed-length `time.time` side_effect lists with call-count-agnostic clocks, preventing StopIteration under full-suite collection ordering.
 - [Added] Extended the Web LLM setup wizard with ordered fallback and Vision routing, a secret-free saved summary, direct Task Routing access, and a persistent re-entry action.
 - [Fixed] Unified Research URL sanitization across page, deep-link, and session consumers so explicit Discover filters survive active-task restoration and malformed Backtest filters never reach API requests.

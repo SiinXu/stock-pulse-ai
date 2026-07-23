@@ -489,15 +489,21 @@ def _text_field_key_starts(
 
     starts = [immediate_start]
     cursor = immediate_start
+    prose_joiner_seen = False
     while cursor > lower_bound and len(starts) < _TEXT_FIELD_KEY_PART_LIMIT:
         joiner_end = cursor
+        joiner_only_whitespace = True
         while (
             cursor > lower_bound
             and _is_text_field_key_joiner(text[cursor - 1])
         ):
+            if not (text[cursor - 1].isascii() and text[cursor - 1].isspace()):
+                joiner_only_whitespace = False
             cursor -= 1
         if cursor == joiner_end:
             break
+        if joiner_only_whitespace:
+            prose_joiner_seen = True
         part_end = cursor
         while cursor > lower_bound:
             char = text[cursor - 1]
@@ -508,7 +514,11 @@ def _text_field_key_starts(
             break
         starts.append(cursor)
     truncated = False
-    if len(starts) == _TEXT_FIELD_KEY_PART_LIMIT and cursor > lower_bound:
+    if (
+        not prose_joiner_seen
+        and len(starts) == _TEXT_FIELD_KEY_PART_LIMIT
+        and cursor > lower_bound
+    ):
         probe = cursor
         while (
             probe > lower_bound
@@ -544,17 +554,47 @@ def _classify_text_field_match(
         text[starts[-1]:match.end(1)]
     )
     for key_start in starts:
-        if _is_sensitive_mapping_key_text(text[key_start:match.end(1)]):
-            return (
-                complete_kind
-                or _sensitive_text_field_kind(
-                    text[key_start:match.end(1)]
-                ),
-                key_start,
-            )
+        candidate = text[key_start:match.end(1)]
+        if not _is_sensitive_mapping_key_text(candidate):
+            continue
+        # Compounds joined by bare whitespace are prose in most log lines
+        # (e.g., "Parsed webhook payload: body_bytes=181"). Accept them only
+        # when the normalized compound matches a canonical multi-word phrase
+        # so that structural forms like "api key" still redact while
+        # sensitive words appearing in unrelated prose do not.
+        if _contains_prose_join_whitespace(candidate) and not _matches_multi_word_sensitive_phrase(candidate):
+            continue
+        return (
+            complete_kind
+            or _sensitive_text_field_kind(candidate),
+            key_start,
+        )
     if truncated:
         return "authorization", starts[-1]
     return None, None
+
+
+def _contains_prose_join_whitespace(text: str) -> bool:
+    """Return True when the compound key text contains a bare ASCII space or tab."""
+
+    return any(
+        char.isascii() and char.isspace() and char not in "\r\n"
+        for char in text
+    )
+
+
+def _matches_multi_word_sensitive_phrase(candidate: str) -> bool:
+    """Match canonical multi-word sensitive phrases without loose single-word fallback."""
+
+    parts = _mapping_key_parts(candidate)
+    if not parts:
+        return False
+    normalized = "_".join(parts)
+    padded = f"_{normalized}_"
+    if any(f"_{phrase}_" in padded for phrase in _SENSITIVE_KEY_PHRASES):
+        return True
+    compact = normalized.replace("_", "")
+    return any(phrase in compact for phrase in _SENSITIVE_COMPACT_KEY_PHRASES)
 
 
 def _next_sensitive_text_field_match(

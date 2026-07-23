@@ -903,6 +903,63 @@ def test_composite_text_labels_share_mapping_classification_across_boundaries() 
     assert diagnostics.trace_dropped_reason == "sensitive_data_redacted"
 
 
+def test_prose_prefixed_diagnostic_fields_survive_composite_key_walk() -> None:
+    """Long prose prefixes must not swallow structured diagnostic values.
+
+    Regression: the composite-key walker previously fail-closed to
+    "authorization" whenever it hit its 16-part budget, or matched a single
+    sensitive word (``webhook``/``token``/...) across bare whitespace joiners
+    in prose. Both paths redacted the trailing ``key=value`` in ordinary log
+    lines such as debug messages and retry summaries, hiding diagnostic
+    fields the operator relies on.
+    """
+
+    prose_cases = {
+        "Vision provider call failed; retrying error_code=vision_provider_failed"
+        " model=gemini/gemini-3.1-pro-preview attempt=1/3 retry_delay_seconds=1"
+        " exception_type=RuntimeError": (
+            "error_code=vision_provider_failed",
+            "exception_type=RuntimeError",
+        ),
+        "[BotHandler] Parsed webhook payload: body_bytes=181": (
+            "body_bytes=181",
+        ),
+        "File logging initialization failed; using console output."
+        " Check Docker mount permissions, read-only mounts, rootless Docker, NFS,"
+        " or --user restrictions error_code=main_file_logging_setup_failed"
+        " log_dir=/app/logs exception_type=PermissionError": (
+            "error_code=main_file_logging_setup_failed",
+            "log_dir=/app/logs",
+            "exception_type=PermissionError",
+        ),
+    }
+    for message, expected_survivors in prose_cases.items():
+        sanitized = sanitize_module.sanitize_diagnostic_text(
+            message,
+            max_length=4000,
+        )
+        for expected in expected_survivors:
+            assert expected in sanitized, (message, expected, sanitized)
+
+    # Canonical multi-word compounds (``api key``, ``private key``, etc.) and
+    # structural long-compound keys (``api.key.filler.…value``) must still
+    # redact so PR #508's contract is not weakened.
+    assert sanitize_module.sanitize_diagnostic_text(
+        "api key=hunter2"
+    ) == "api key=[REDACTED]"
+    assert sanitize_module.sanitize_diagnostic_text(
+        "session token=hunter2"
+    ) == "session token=[REDACTED]"
+    long_label = (
+        "api.key."
+        + ".".join(["filler"] * sanitize_module._TEXT_FIELD_KEY_PART_LIMIT)
+        + ".value"
+    )
+    assert sanitize_module.sanitize_diagnostic_text(
+        f"{long_label}=hunter2"
+    ) == f"{long_label}=[REDACTED]"
+
+
 def test_generic_fields_reject_ambiguous_delimiter_suffixes() -> None:
     for delimiter in ",;&)]}":
         raw = f"password={delimiter}{PLAIN_SECRET}"
