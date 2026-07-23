@@ -5,7 +5,7 @@
 > 本页未引入新的外部 provider、模型名或 Base URL 兼容行为，仅整理配置参考与官方来源；实际兼容性仍以仓库当前运行时依赖与测试结论为准。
 
 > - 运行时基础：`requirements.txt` 当前锁定 `litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0`，兼容语义以该版本约束下实现为准。
-> - 验证闭环：系统配置链路回归见 `tests/test_system_config_service.py` 与 `tests/api/system_config/test_system_config_api.py`，`Web` 侧配置页交互回归见现有组件测试用例。
+> - 验证闭环：系统配置链路回归见 `tests/services/system_config/test_system_config_service.py` 与 `tests/api/system_config/test_system_config_api.py`，`Web` 侧配置页交互回归见现有组件测试用例。
 > - 回退路径：保留旧变量不做自动迁移；可通过 Web/桌面导出备份后 `POST /api/v1/system/config/import` 回滚，或手动恢复历史 `LLM_*` / `LITELLM_*` / `AGENT_*` / `VISION_MODEL` 配置。
 
 实际可用模型、额度、区域限制和价格以各服务商控制台为准；如果模型发现失败，可在“模型接入”的连接模型管理中手动添加模型 ID。Web 设置页展示的服务商元数据（标签、默认 Base URL、协议、凭据与地址要求、发现能力、能力标识）统一来自后端服务商目录 `GET /api/v1/system/config/llm/providers`（单一权威源，前端不再维护并行清单）；能力显示文案、官方来源链接与配置注意事项属前端 curated 展示内容，仅用于配置参考，不代表运行时能力已验证通过。
