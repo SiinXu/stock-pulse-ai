@@ -383,6 +383,7 @@ def _handle_async_analysis_batch(
     skills = getattr(request, "skills", None)
     analysis_phase = request.analysis_phase
     report_language = normalize_report_language(getattr(request, "report_language", None), default="")
+    use_memory = getattr(request, "use_memory", None)
 
     submit_kwargs = dict(
         stock_codes=stock_codes,
@@ -398,6 +399,8 @@ def _handle_async_analysis_batch(
         submit_kwargs["report_language"] = report_language
     if skills is not None:
         submit_kwargs["skills"] = skills
+    if use_memory is not None:
+        submit_kwargs["use_memory"] = use_memory
 
     accepted_tasks, duplicate_errors = task_queue.submit_tasks_batch(**submit_kwargs)
 
@@ -497,6 +500,7 @@ def _handle_sync_analysis(
             skills=getattr(request, "skills", None),
             analysis_phase=request.analysis_phase,
             report_language=getattr(request, "report_language", None),
+            use_memory=getattr(request, "use_memory", None),
         )
 
         if result is None:

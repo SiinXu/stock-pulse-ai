@@ -693,6 +693,16 @@ class DecisionSignalOutcomeService:
         return sorted(buckets, key=lambda item: (-int(item["total"]), str(item["value"])))
 
     @staticmethod
+    def aggregate_outcome_rows(rows: List[DecisionSignalOutcomeRecord]) -> Dict[str, Any]:
+        """Public wrapper over the authoritative outcome aggregation.
+
+        Exposes the same hit/(hit+miss) rate computation used by ``get_stats`` so
+        other callers (e.g. decision memory reflection) reuse a single hit
+        definition instead of re-deriving one.
+        """
+        return DecisionSignalOutcomeService._aggregate(rows)
+
+    @staticmethod
     def _aggregate(rows: List[DecisionSignalOutcomeRecord]) -> Dict[str, Any]:
         total = len(rows)
         completed = [row for row in rows if row.eval_status == "completed"]
