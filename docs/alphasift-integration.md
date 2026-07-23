@@ -211,7 +211,7 @@ Docker 镜像与桌面发布包保持一致：`docker/Dockerfile` 会通过 `req
 ## 验证记录
 
 - `python -m pytest tests/api/alphasift/test_alphasift_api.py -q`
-- `python -m pytest tests/test_main_schedule_mode.py -q -k "start_api_server_fails_before_thread_when_port_is_busy"`
+- `python -m pytest tests/app/test_main_schedule_mode.py -q -k "start_api_server_fails_before_thread_when_port_is_busy"`
 - `python -m py_compile api/v1/endpoints/alphasift.py src/services/alphasift_service.py tests/api/alphasift/test_alphasift_api.py src/config.py src/core/config_registry.py`
 - `cd apps/dsa-web && npm run test -- alphasift.test.ts StockScreeningPage.test.tsx SettingsPage.test.tsx --run`
 - `cd apps/dsa-web && npm run lint`

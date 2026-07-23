@@ -611,8 +611,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Tests
 
-- Covered backend runtime and compatibility verification after #1381: `tests/test_main_schedule_mode.py`、`tests/core/test_pipeline_daily_market_context.py`、`tests/market/test_daily_market_context.py`、`tests/market/test_daily_market_context_guardrail.py`、`tests/test_agent_executor.py`、`tests/test_config_env_compat.py`、`tests/test_config_registry.py` and `apps/dsa-web/tests/system_config_i18n.test.ts`.
-- Added/Updated AlphaSift backend regression tests: `python -m pytest tests/api/alphasift/test_alphasift_api.py -q`, `python -m pytest tests/test_docker_entrypoint.py -q`, `python -m pytest tests/test_main_schedule_mode.py -q -k "start_api_server_fails_before_thread_when_port_is_busy"`.
+- Covered backend runtime and compatibility verification after #1381: `tests/app/test_main_schedule_mode.py`、`tests/core/test_pipeline_daily_market_context.py`、`tests/market/test_daily_market_context.py`、`tests/market/test_daily_market_context_guardrail.py`、`tests/test_agent_executor.py`、`tests/test_config_env_compat.py`、`tests/test_config_registry.py` and `apps/dsa-web/tests/system_config_i18n.test.ts`.
+- Added/Updated AlphaSift backend regression tests: `python -m pytest tests/api/alphasift/test_alphasift_api.py -q`, `python -m pytest tests/test_docker_entrypoint.py -q`, `python -m pytest tests/app/test_main_schedule_mode.py -q -k "start_api_server_fails_before_thread_when_port_is_busy"`.
 
 ## [3.21.0] - 2026-06-07
 
@@ -1267,7 +1267,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - 🧪 **Dashboard Component Test Coverage Expansion (PR7-2)** — Added tests for `ReportNews` and `TaskPanel`. Enhanced assertions in `HistoryList`, `ReportDetails`, `HomePage`, `useDashboardLifecycle`, and `stockPoolStore`, including rollback, mobile drawer, and task lifecycle scenarios.
 - 🧪 **Multi-Market Index Generation Test Completion** — Added `tests/test_generate_index_from_csv.py`, covering Tushare/AkShare dual data source parsing, multi-market judgment, U.S. stocks DUMMY filtering and duplicate ticker deduplication core paths.
 - 🧪 **Sector Association Writing & API Contract Regression** — Added `tests/core/test_pipeline_related_boards.py`, and supplemented historical and analytical interface contract testing to ensure `belong_boards` / `sector_rankings` only perform incremental expansion while maintaining fail-open.
-- 🧪 **Scheduled Mode Stock List Semantic Regression Test** — Added `tests/test_main_schedule_mode.py`, covering scenarios where the scheduled mode ignores the `--stocks` snapshot at startup and single runs retain CLI stock coverage.
+- 🧪 **Scheduled Mode Stock List Semantic Regression Test** — Added `tests/app/test_main_schedule_mode.py`, covering scenarios where the scheduled mode ignores the `--stocks` snapshot at startup and single runs retain CLI stock coverage.
 
 ### Docs
 

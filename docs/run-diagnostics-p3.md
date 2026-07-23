@@ -195,7 +195,7 @@ Web 入口：
 - 后端回归覆盖：
   - `tests/test_pipeline_market_phase_context.py`
   - `tests/data_provider/test_realtime_types.py`
-  - `tests/test_scheduler_background.py`
+  - `tests/app/test_scheduler_background.py`
   - `tests/test_analysis_api_contract.py`（子集：诊断上下文入出参/状态查询契约）
   - `tests/test_analysis_history.py`（子集：历史 API 与持久化链路）
 - 覆盖关系：API 合约由 `tests/test_analysis_api_contract.py` 与 `tests/test_analysis_history.py` 覆盖；任务编排、历史保存和 `context_snapshot.diagnostics` 由 `tests/test_pipeline_market_phase_context.py` 覆盖；通知路径通过 `./scripts/ci_gate.sh` 中的既有通知回归与导入检查兜底。
@@ -203,7 +203,7 @@ Web 入口：
 
 ```bash
 ./scripts/ci_gate.sh
-python -m pytest tests/data_provider/test_realtime_types.py tests/test_scheduler_background.py tests/test_pipeline_market_phase_context.py tests/test_analysis_api_contract.py tests/test_analysis_history.py
+python -m pytest tests/data_provider/test_realtime_types.py tests/app/test_scheduler_background.py tests/test_pipeline_market_phase_context.py tests/test_analysis_api_contract.py tests/test_analysis_history.py
 cd apps/dsa-web && npm run lint && npm run build
 ```
 
