@@ -92,7 +92,10 @@ accessors. A direct installer rejects a target whose local startup or manager
 lifecycle operation is already in flight, so a callback or its worker cannot
 wait on itself. If a local operation races after the installer owns the global
 transition, that transition drains the complete operation before starting the
-target, so an operation never straddles installation.
+target, so an operation never straddles installation. A target accepted into
+the pending queue retains that transition authority during handoff and drains
+any existing local lifecycle operation instead of re-entering direct-install
+validation.
 Each `PluginManager` is owned by exactly one `ApplicationServices` root and
 cannot be rebound to another root. Once that root starts shutdown, manager
 `load`, `load_all`, and `enable` operations fail closed with

@@ -328,7 +328,10 @@ class ApplicationServices:
                                 has_pending, pending_target = True, None
                             _services_transition_active = False
                         if has_pending:
-                            set_application_services(pending_target)
+                            _set_application_services(
+                                pending_target,
+                                validate_direct_target=False,
+                            )
 
         try:
             return operation()
@@ -450,6 +453,17 @@ def set_application_services(services: Optional[ApplicationServices]) -> None:
     from plugin callbacks are deferred until the active lifecycle transition
     finishes, with the most recent request winning.
     """
+
+    _set_application_services(services, validate_direct_target=True)
+
+
+def _set_application_services(
+    services: Optional[ApplicationServices],
+    *,
+    validate_direct_target: bool,
+) -> None:
+    """Install a direct target or continue an already-authorized transition."""
+
     global _services, _services_transition_active
 
     with _services_lock:
@@ -458,7 +472,8 @@ def set_application_services(services: Optional[ApplicationServices]) -> None:
         if _services_transition_active:
             _services_transition_pending.append(services)
             return
-        _validate_direct_install_target(services)
+        if validate_direct_target:
+            _validate_direct_install_target(services)
 
     with _services_transition_lock:
         with _services_lock:
@@ -467,7 +482,8 @@ def set_application_services(services: Optional[ApplicationServices]) -> None:
             if _services_transition_active:
                 _services_transition_pending.append(services)
                 return
-            _validate_direct_install_target(services)
+            if validate_direct_target:
+                _validate_direct_install_target(services)
             _services_transition_active = True
             _services_transition_pending.clear()
 

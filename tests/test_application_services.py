@@ -1559,6 +1559,78 @@ def test_public_manager_load_defers_callback_requested_replacement():
     ]
 
 
+def test_queued_replacement_drains_its_in_flight_local_lifecycle_operation():
+    events: list[str] = []
+    replacement_holder: list[ApplicationServices] = []
+    replacement_load_started = threading.Event()
+    release_replacement_load = threading.Event()
+    replacement_results: list = []
+    owner_results: list = []
+
+    class _BlockingReplacementPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("replacement-load-begin")
+            replacement_load_started.set()
+            if not release_replacement_load.wait(timeout=5):
+                raise AssertionError("test did not release the replacement load")
+            events.append("replacement-load-end")
+
+    class _ReplacingOwnerPlugin(_RecordingPlugin):
+        def onload(self, context: PluginContext) -> None:
+            events.append("owner-load-begin")
+            set_application_services(replacement_holder[0])
+            events.append("owner-load-end")
+
+    owner = ApplicationServices(plugins_dir="")
+    replacement = ApplicationServices(plugins_dir="")
+    replacement_holder.append(replacement)
+    assert replacement.plugin_manager.register(
+        _BlockingReplacementPlugin("test.replacement", events),
+        source="builtin",
+    ).success
+    set_application_services(owner)
+    assert owner.plugin_manager.register(
+        _ReplacingOwnerPlugin("test.owner", events),
+        source="builtin",
+    ).success
+
+    replacement_load = threading.Thread(
+        target=lambda: replacement_results.append(
+            replacement.plugin_manager.load("test.replacement")
+        ),
+    )
+    replacement_load.start()
+    assert replacement_load_started.wait(timeout=5)
+    owner_load = threading.Thread(
+        target=lambda: owner_results.append(
+            owner.plugin_manager.load("test.owner")
+        ),
+    )
+    owner_load.start()
+    try:
+        owner_load.join(timeout=0.5)
+        assert owner_load.is_alive()
+    finally:
+        release_replacement_load.set()
+        replacement_load.join(timeout=5)
+        owner_load.join(timeout=5)
+
+    assert not replacement_load.is_alive()
+    assert not owner_load.is_alive()
+    assert replacement_results and replacement_results[0].success is True
+    assert owner_results and owner_results[0].success is True
+    assert owner.is_closed is True
+    assert get_application_services() is replacement
+    assert replacement.plugin_manager.snapshot("test.replacement").state == "enabled"
+    assert events == [
+        "replacement-load-begin",
+        "owner-load-begin",
+        "owner-load-end",
+        "unload:test.owner",
+        "replacement-load-end",
+    ]
+
+
 def test_public_manager_disable_defers_callback_requested_replacement():
     events: list[str] = []
     observed_roots: list[ApplicationServices] = []
