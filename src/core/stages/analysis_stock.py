@@ -640,6 +640,44 @@ class _StockAnalysisStageMixin:
             if isinstance(market_structure_context, dict):
                 enhanced_context["market_structure_context"] = market_structure_context
 
+            # Step 6.5: Historical decision memory & reflection (Issue #118).
+            # Injects past signal outcomes for this stock into the prompt so the
+            # model can calibrate confidence; never alters direction. Gated for
+            # zero overhead when disabled, and fail-open so memory never breaks
+            # analysis.
+            decision_reflection = None
+            if getattr(self.config, "decision_memory_enabled", True):
+                try:
+                    from src.services.decision_memory_service import (
+                        DecisionMemoryService,
+                        format_decision_memory_prompt_section,
+                    )
+
+                    decision_reflection = DecisionMemoryService().build_reflection(
+                        stock_code=code,
+                        market=market,
+                        lookback=int(getattr(self.config, "decision_memory_lookback", 5)),
+                        min_age_days=int(getattr(self.config, "decision_memory_min_age_days", 3)),
+                        min_samples=int(getattr(self.config, "decision_memory_min_samples", 5)),
+                    )
+                    if decision_reflection is not None:
+                        enhanced_context["decision_memory_reflection_prompt"] = (
+                            format_decision_memory_prompt_section(
+                                decision_reflection,
+                                report_language=report_language,
+                            )
+                        )
+                except Exception as exc:  # broad-exception: fallback_recorded - Decision memory is advisory; failure must not break analysis.
+                    log_safe_exception(
+                        logger,
+                        "Decision memory reflection build failed",
+                        exc,
+                        error_code="pipeline_decision_memory_failed",
+                        level=logging.WARNING,
+                        context={"stock_code": code},
+                    )
+                    decision_reflection = None
+
             # Step 7: Call AI Analysis (Pass in Enhanced Context and News)
             (
                 analysis_context_pack_summary,
@@ -792,6 +830,7 @@ class _StockAnalysisStageMixin:
                 realtime_data = enhanced_context.get('realtime', {})
                 result.current_price = realtime_data.get('price')
                 result.change_pct = realtime_data.get('change_pct')
+                result.decision_reflection = decision_reflection
 
             # Step 7.6: chip_structure fallback (Issue #589) and unavailable collapse
             if result:

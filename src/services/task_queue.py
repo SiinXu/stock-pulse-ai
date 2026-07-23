@@ -1047,6 +1047,7 @@ class AnalysisTaskQueue:
         notify: bool,
         skills: Optional[List[str]],
         report_language: Optional[str],
+        use_memory: Optional[bool] = None,
         request_context: Optional[AnalysisRequestContext] = None,
     ) -> TaskCommand:
         metadata = {
@@ -1062,6 +1063,7 @@ class AnalysisTaskQueue:
             "notify": bool(notify),
             "skills": copy.deepcopy(skills),
             "report_language": report_language,
+            "use_memory": use_memory,
             "message": "任务已加入队列",
             "message_code": "task.queued",
             "message_params": {"stock_code": stock_code},
@@ -1081,6 +1083,7 @@ class AnalysisTaskQueue:
                 notify=notify,
                 skills=copy.deepcopy(skills),
                 report_language=report_language,
+                use_memory=use_memory,
                 request_context=request_context,
             )
 
@@ -1113,6 +1116,7 @@ class AnalysisTaskQueue:
         force_refresh: bool = False,
         skills: Optional[List[str]] = None,
         report_language: Optional[str] = None,
+        use_memory: Optional[bool] = None,
         request_context: Optional[AnalysisRequestContext] = None,
     ) -> TaskInfo:
         """
@@ -1151,6 +1155,7 @@ class AnalysisTaskQueue:
             force_refresh=force_refresh,
             skills=skills,
             report_language=report_language,
+            use_memory=use_memory,
             request_context=request_context,
         )
         if duplicates:
@@ -1171,6 +1176,7 @@ class AnalysisTaskQueue:
         notify: bool = True,
         skills: Optional[List[str]] = None,
         report_language: Optional[str] = None,
+        use_memory: Optional[bool] = None,
         request_context: Optional[AnalysisRequestContext] = None,
     ) -> Tuple[List[TaskInfo], List[DuplicateTaskError]]:
         """
@@ -1206,6 +1212,7 @@ class AnalysisTaskQueue:
                 notify=notify,
                 skills=copy.deepcopy(skills),
                 report_language=report_language,
+                use_memory=use_memory,
                 request_context=request_context,
             )
             for stock_code in canonical_codes
@@ -1622,6 +1629,7 @@ class AnalysisTaskQueue:
             query_source=str(metadata.get("query_source") or "api"),
             portfolio_context=copy.deepcopy(metadata.get("portfolio_context")),
             report_language=metadata.get("report_language"),
+            use_memory=metadata.get("use_memory"),
             request_context=request_context,
         )
         if result is None:

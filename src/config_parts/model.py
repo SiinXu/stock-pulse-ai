@@ -71,6 +71,12 @@ class Config:
     alphasift_enabled: bool = False
     alphasift_install_spec: str = DEFAULT_ALPHASIFT_INSTALL_SPEC
 
+    # === Historical decision memory & reflection (Issue #118) ===
+    decision_memory_enabled: bool = True
+    decision_memory_lookback: int = 5
+    decision_memory_min_age_days: int = 3
+    decision_memory_min_samples: int = 5
+
     # == AI Analysis Configuration ===
     generation_backend: str = LITELLM_BACKEND_ID
     generation_fallback_backend: str = LITELLM_BACKEND_ID
