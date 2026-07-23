@@ -96,6 +96,75 @@ describe('SettingsSectionNav', () => {
     // No numeric field counts leak into the nav.
     expect(screen.queryByText(/\d+/)).not.toBeInTheDocument();
   });
+
+  it('hides advanced sections in beginner mode and offers a reveal', () => {
+    const onReveal = vi.fn();
+    render(
+      <SettingsSectionNav
+        activeSection="ai_models"
+        onSelectSection={() => {}}
+        language="en"
+        navLabel="Settings navigation"
+        beginnerMode
+        advancedRevealed={false}
+        onRevealAdvanced={onReveal}
+      />,
+    );
+    // Essential sections stay; an advanced one (Backtesting) is hidden.
+    expect(screen.getByRole('button', { name: /AI & Models/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Backtesting/ })).not.toBeInTheDocument();
+    const revealButtons = screen.getAllByRole('button', { name: 'Show advanced settings' });
+    fireEvent.click(revealButtons[0]);
+    expect(onReveal).toHaveBeenCalledTimes(1);
+  });
+
+  it('limits the mobile selector to essential sections in beginner mode', () => {
+    render(
+      <SettingsSectionNav
+        activeSection="ai_models"
+        onSelectSection={() => {}}
+        language="zh"
+        navLabel="设置导航"
+        beginnerMode
+        advancedRevealed={false}
+        onRevealAdvanced={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByRole('combobox', { name: '设置导航' }));
+    // Only the four essentials: Overview, AI & Models, Data Sources, Notifications.
+    expect(screen.getAllByRole('option')).toHaveLength(4);
+  });
+
+  it('keeps the active advanced section reachable in beginner mode', () => {
+    render(
+      <SettingsSectionNav
+        activeSection="backtesting"
+        onSelectSection={() => {}}
+        language="en"
+        navLabel="Settings navigation"
+        beginnerMode
+        advancedRevealed={false}
+        onRevealAdvanced={() => {}}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /Backtesting/ })).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('shows every section and no reveal once advanced is revealed', () => {
+    render(
+      <SettingsSectionNav
+        activeSection="ai_models"
+        onSelectSection={() => {}}
+        language="en"
+        navLabel="Settings navigation"
+        beginnerMode
+        advancedRevealed
+        onRevealAdvanced={() => {}}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /Backtesting/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show advanced settings' })).not.toBeInTheDocument();
+  });
 });
 
 describe('SettingsViewTabs', () => {

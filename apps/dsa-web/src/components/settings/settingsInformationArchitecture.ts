@@ -154,6 +154,49 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   },
 ];
 
+// Sections a first-time user needs to reach a runnable setup. Beginner mode
+// shows only these plus the currently-active section; everything else stays one
+// click away behind an explicit "show advanced" reveal. This is presentation
+// only — every section remains reachable by deep link and by revealing advanced.
+export const BEGINNER_ESSENTIAL_SECTION_IDS: ReadonlySet<SettingsSectionId> = new Set<SettingsSectionId>([
+  'overview',
+  'ai_models',
+  'data_sources',
+  'notifications',
+]);
+
+export function isBeginnerEssentialSection(sectionId: SettingsSectionId): boolean {
+  return BEGINNER_ESSENTIAL_SECTION_IDS.has(sectionId);
+}
+
+// The sections shown in the navigation for the current mode. In beginner mode
+// with advanced hidden, only essentials plus the active section are listed so
+// the user never loses the page they are on.
+export function getVisibleSections(
+  beginnerMode: boolean,
+  advancedRevealed: boolean,
+  activeSection: SettingsSectionId,
+): SettingsSection[] {
+  if (!beginnerMode || advancedRevealed) {
+    return SETTINGS_SECTIONS;
+  }
+  return SETTINGS_SECTIONS.filter(
+    (section) => isBeginnerEssentialSection(section.id) || section.id === activeSection,
+  );
+}
+
+// Whether any advanced (non-essential) sections are currently hidden, i.e. the
+// "show advanced" reveal should be offered.
+export function hasHiddenAdvancedSections(
+  beginnerMode: boolean,
+  advancedRevealed: boolean,
+): boolean {
+  if (!beginnerMode || advancedRevealed) {
+    return false;
+  }
+  return SETTINGS_SECTIONS.some((section) => !isBeginnerEssentialSection(section.id));
+}
+
 const SECTION_BY_ID = new Map(SETTINGS_SECTIONS.map((section) => [section.id, section]));
 
 export function getSection(sectionId: string): SettingsSection | undefined {

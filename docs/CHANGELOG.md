@@ -324,6 +324,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Serialized root-owned plugin lifecycle operations with composition-root close, replacement, and reset so roots with shutdown requested cannot activate or be republished, callback-owned workers cannot deadlock, and terminal process shutdown cannot recreate the root.
 - [Changed] Made secondary sidebar groups collapsible with visible current-page ownership and preserved explicit Discover URL ownership across default, non-default, malformed, refreshed, legacy, authenticated, and safe custom-strategy links.
 - [Added] Added a desktop-only local model center that discovers, starts/stops, downloads recommended Ollama models, and registers them into the desktop `.env`, using whitelisted process launches, strict model-name validation, an isolated sandboxed renderer, and secret-free logs.
+- [Added] Added an opt-in Settings beginner mode (persisted client preference) that simplifies the settings navigation to the essentials and reveals advanced sections on demand, keeping the active section reachable and defaulting to the full professional view.
 
 ## [3.26.3] - 2026-07-15
 
