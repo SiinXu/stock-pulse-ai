@@ -73,7 +73,7 @@
     }
   },
   "runtime_install_contracts": {
-    "src/services/alphasift_service.py": {
+    "src/services/alphasift_service_parts/runtime_support.py": {
       "package": "alphasift",
       "required_flags": [
         "--no-deps"
