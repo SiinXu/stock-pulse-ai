@@ -150,9 +150,10 @@ An active Screening task keeps its opaque task ID for status recovery, but its
 stored run parameters are only a fallback for a bare Discover URL. Any explicit
 Discover-owned parameter selects the complete URL-owned run state, so stale
 task parameters cannot rewrite a canonical or legacy-redirect deep link. Safe
-custom strategy IDs remain URL-owned even when absent from the current preset
-catalog, and the primary strategy selector presents that retained value as the
-active custom option instead of an unavailable-catalog placeholder. Wholly
+custom strategy IDs remain URL-owned when absent from the current preset
+catalog, including when that catalog is empty. The primary strategy selector
+presents that retained value as the active custom option instead of an
+unavailable-catalog placeholder. Wholly
 malformed owned input normalizes to explicit canonical defaults
 instead of becoming bare, preserving the same precedence across refresh.
 
