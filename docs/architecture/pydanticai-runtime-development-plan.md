@@ -118,7 +118,7 @@ StockPulse 拥有一套完整的 Native Agent 实现:Single(`AgentExecutor`)、M
 
 - `tests/agent_runtime_replay.py:92-150` `ReplayLLMAdapter` 注入替换 `LLMToolAdapter`,严格按序消费录制转录,超出即 `AssertionError`(`:117-119`),并校验 `allowed_stage`(`:131-135`)。
 - `tests/fixtures/agent_runtime/manifest.json:1-42`:36 个 fixture = 24 financial(A/HK/US 各 8:`single_run`/`single_chat`/`quick`/`standard`/`full`/`specialist` 6 模式 + 2 partial/degraded)+ 12 contract(modelref/fallback/toolscope/timeout/cancelrace/malformed 6 profile × 2)。
-- `tests/test_agent_runtime_compatibility.py` 断言输出、工具调用序列与 factory 契约。这是**现有行为基线**,不代表 Runtime Contract、生命周期或 PydanticAI Adapter 已实现。
+- `tests/agent/test_agent_runtime_compatibility.py` 断言输出、工具调用序列与 factory 契约。这是**现有行为基线**,不代表 Runtime Contract、生命周期或 PydanticAI Adapter 已实现。
 - 事件契约:`docs/agent-stream-events.md:41-54` 冻结 9 种事件(`stage_start`/`stage_done`/`thinking`/`tool_start`/`tool_done`/`generating`/`pipeline_timeout`/`pipeline_budget_skipped`/`done`/`error`),additive 演进;`src/agent/stream_events.py:13-22` 事件为无版本、无 sequence 的 dict。
 - CI:`.github/workflows/ci.yml:54-90` `backend-gate` 执行 `./scripts/ci_gate.sh` 四阶段(syntax/flake8/deterministic/offline-tests,`:84-90`);replay 兼容测试包含在 offline-tests(`pytest -m "not network"`,`scripts/ci_gate.sh:25-34`)中;`web-gate`(`:220-246`)与 `web-e2e`(`:294-307`,`npm run test:smoke`)按前端改动触发。
 
@@ -423,7 +423,7 @@ AR-PY-00 ADR Accepted
 ### 10.1 每个编码阶段的最低命令集(当前真实存在的路径)
 
 ```bash
-python -m pytest tests/test_agent_runtime_compatibility.py -q
+python -m pytest tests/agent/test_agent_runtime_compatibility.py -q
 python -m pytest tests/test_agent_executor.py tests/test_multi_agent.py -q
 python -m pytest tests/test_agent_tool_surface.py -q
 python -m pytest tests/test_agent_chat_api.py tests/test_agent_stream_events.py tests/test_agent_sse_cleanup.py -q
