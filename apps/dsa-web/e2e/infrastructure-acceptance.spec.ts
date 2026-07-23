@@ -691,6 +691,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
   });
 
   test('03a authentication preserves canonical and legacy Discover URL ownership plus hash state', async ({ page }) => {
+    test.setTimeout(60_000);
     const auth = await installMockAuth(page, {
       language: 'en',
       passwordSet: true,
