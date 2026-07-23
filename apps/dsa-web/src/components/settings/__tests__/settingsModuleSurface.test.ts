@@ -9,6 +9,7 @@ import * as firstRunSetupCardModule from '../FirstRunSetupCard';
 import * as schedulerSettingsCardModule from '../SchedulerSettingsCard';
 import * as settingsConfigItemsModule from '../settingsConfigItems';
 import * as connectionUpdateContractModule from '../settingsConnectionUpdateContract';
+import * as llmChannelEditorModelModule from '../llmChannelEditorModel';
 
 const SOURCE_EXPORT_SURFACES = {
   'src/pages/SettingsPage.tsx': ['default'],
@@ -16,6 +17,55 @@ const SOURCE_EXPORT_SURFACES = {
     'type:ModelReferenceReplacement',
     'type:TaskModelReference',
     'value:LLMChannelEditor',
+  ],
+  'src/components/settings/llmChannelEditorModel.ts': [
+    'type:ChannelConfig',
+    'type:ChannelDiscoveryState',
+    'type:ChannelTestState',
+    'type:LLMChannelEditorProps',
+    'type:ModelReferenceReplacement',
+    'type:TaskModelReference',
+    'value:CONNECTION_FIELD_BY_DRAFT_KEY',
+    'value:CONNECTION_SCHEMA_UNAVAILABLE_ISSUE',
+    'value:CONNECTION_SCHEMA_UNKNOWN_CONDITION_ISSUE',
+    'value:applyChannelDraftItems',
+    'value:areModelsEquivalent',
+    'value:buildChannelContractValues',
+    'value:buildChannelDraftItems',
+    'value:buildItemSourceByKey',
+    'value:buildProtocolOptions',
+    'value:canonicalizeHermesRouteModel',
+    'value:channelAllowsEmptyApiKey',
+    'value:channelConnectionNameCanWrite',
+    'value:channelFieldCanWrite',
+    'value:channelIdentityCanWrite',
+    'value:channelSchemaAllowsKnownOperations',
+    'value:channelsAreEqual',
+    'value:collectChannelRouteSet',
+    'value:countChannelsForProvider',
+    'value:describeProviderOption',
+    'value:evaluateChannelSchemaAuthority',
+    'value:findCatalogProvider',
+    'value:formatProtocolLabel',
+    'value:getChannelCompletenessIssues',
+    'value:getChannelDisplayNameIssues',
+    'value:getChannelNameIssues',
+    'value:getChannelSaveIssues',
+    'value:hasRuntimeOnlyMaskedHermesSecret',
+    'value:isHermesChannel',
+    'value:modelIdentityForConnection',
+    'value:normalizeModelForRuntime',
+    'value:normalizeProtocol',
+    'value:normalizeTaskReferenceRoute',
+    'value:parseChannelsFromItems',
+    'value:parseRuntimeConfigFromItems',
+    'value:preservesUnavailableProviderSnapshot',
+    'value:resolveChannelRouteModels',
+    'value:runChannelConnectionTest',
+    'value:runChannelModelDiscovery',
+    'value:shouldUseSavedHermesSecret',
+    'value:splitModels',
+    'value:toggleModelSelection',
   ],
   'src/locales/settingsHelp.ts': [
     'type:SettingsHelpContent',
@@ -109,6 +159,11 @@ describe('Settings module surfaces', () => {
     expect(runtimeExportNames(schedulerSettingsCardModule)).toEqual(['default']);
     expect(runtimeExportNames(settingsConfigItemsModule)).toEqual(['getConfigItem']);
     expect(runtimeExportNames(connectionUpdateContractModule)).toEqual(['connectionItemsRespectSchema']);
+    expect(runtimeExportNames(llmChannelEditorModelModule)).toEqual(
+      SOURCE_EXPORT_SURFACES['src/components/settings/llmChannelEditorModel.ts']
+        .filter((entry) => entry.startsWith('value:'))
+        .map((entry) => entry.slice('value:'.length)),
+    );
   });
 
   it('freezes default, type, and value exports for every split Settings module', () => {
