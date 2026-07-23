@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { analysisApi } from '../../api/analysis';
 import { historyApi } from '../../api/history';
-import { APP_ROUTE_PATHS } from '../../routing/routes';
+import { APP_ROUTE_PATHS, REPORT_ROUTE_QUERY_KEYS } from '../../routing/routes';
 import { useStockPoolStore } from '../../stores/stockPoolStore';
 import MarketReviewPage from '../MarketReviewPage';
 
@@ -136,7 +136,9 @@ describe('MarketReviewPage', () => {
     });
     vi.mocked(historyApi.getDetail).mockResolvedValue(marketReviewReport);
 
-    renderMarketReview(`${APP_ROUTE_PATHS.researchMarket}?recordId=2`);
+    renderMarketReview(
+      `${APP_ROUTE_PATHS.researchMarket}?${REPORT_ROUTE_QUERY_KEYS.recordId}=2`,
+    );
 
     expect(await screen.findByText('大盘复盘摘要')).toBeInTheDocument();
     expect(historyApi.getDetail).toHaveBeenCalledWith(2);
@@ -180,10 +182,12 @@ describe('MarketReviewPage', () => {
     vi.mocked(historyApi.getDetail).mockResolvedValue(stockReport);
 
     renderMarketReview(
-      `${APP_ROUTE_PATHS.researchMarket}?recordId=1&keep=yes#snapshot`,
+      `${APP_ROUTE_PATHS.researchMarket}?${REPORT_ROUTE_QUERY_KEYS.recordId}=1&keep=yes#snapshot`,
     );
 
-    expect(await screen.findByText('/?recordId=1&keep=yes#snapshot')).toBeInTheDocument();
+    expect(await screen.findByText(
+      `/?${REPORT_ROUTE_QUERY_KEYS.recordId}=1&keep=yes#snapshot`,
+    )).toBeInTheDocument();
     expect(screen.queryByText('个股报告不得留在大盘复盘页面')).not.toBeInTheDocument();
   });
 });
