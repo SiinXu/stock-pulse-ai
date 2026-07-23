@@ -1,4 +1,6 @@
 export { useAuth } from './useAuth';
+export { useBeginnerMode, BEGINNER_MODE_STORAGE_KEY } from './useBeginnerMode';
+export type { UseBeginnerModeResult } from './useBeginnerMode';
 export { useDashboardLifecycle } from './useDashboardLifecycle';
 export { useHomeDashboardState } from './useHomeDashboardState';
 export { useHomeUrlState } from './useHomeUrlState';

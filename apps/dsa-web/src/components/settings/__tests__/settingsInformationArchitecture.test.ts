@@ -6,6 +6,9 @@ import {
   SETTINGS_SECTIONS,
   getDefaultView,
   getSectionViews,
+  getVisibleSections,
+  hasHiddenAdvancedSections,
+  isBeginnerEssentialSection,
   isSettingsSectionId,
   legacyToSectionView,
   normalizeSectionView,
@@ -30,6 +33,25 @@ describe('settingsInformationArchitecture', () => {
       'system_security',
       'advanced',
     ]);
+  });
+
+  it('gates advanced sections behind beginner-mode progressive disclosure', () => {
+    // Full mode (and revealed advanced) always returns the complete list.
+    expect(getVisibleSections(false, false, 'overview')).toBe(SETTINGS_SECTIONS);
+    expect(getVisibleSections(true, true, 'overview')).toBe(SETTINGS_SECTIONS);
+    expect(hasHiddenAdvancedSections(false, false)).toBe(false);
+
+    // Beginner mode with advanced hidden shows only the essentials.
+    const visible = getVisibleSections(true, false, 'overview').map((section) => section.id);
+    expect(visible).toEqual(['overview', 'ai_models', 'data_sources', 'notifications']);
+    expect(hasHiddenAdvancedSections(true, false)).toBe(true);
+    expect(isBeginnerEssentialSection('ai_models')).toBe(true);
+    expect(isBeginnerEssentialSection('backtesting')).toBe(false);
+
+    // The currently-active advanced section is never hidden from the user.
+    const withActiveAdvanced = getVisibleSections(true, false, 'backtesting').map((section) => section.id);
+    expect(withActiveAdvanced).toContain('backtesting');
+    expect(withActiveAdvanced).toContain('overview');
   });
 
   it('defines Usage & cost as a leaf section owned by TokenUsagePage', () => {
