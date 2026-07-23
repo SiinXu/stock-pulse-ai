@@ -4,8 +4,19 @@ import type React from 'react';
 import { useMemo, useState } from 'react';
 import { Button, CredentialInput, InlineAlert, Input, Modal, Select } from '../common';
 import { systemConfigApi } from '../../api/systemConfig';
-import type { LlmConnectionFieldSchema, LlmProviderCatalogEntry } from '../../types/systemConfig';
+import type {
+  LLMCapabilityCheck,
+  LLMCapabilityCheckResult,
+  LlmConnectionFieldSchema,
+  LlmProviderCatalogEntry,
+} from '../../types/systemConfig';
 import { ModelMultiSelect } from './ModelMultiSelect';
+import {
+  getLlmCapabilityLabel,
+  type LlmConnectionCheckOutcome,
+  runLlmConnectionCheck,
+} from './llmChannelEditorModel';
+import { getSettingsHelpContent } from '../../locales/settingsHelp';
 import type { UiLang } from './settingsInformationArchitecture';
 import {
   buildConnectionContractValues,
@@ -74,6 +85,11 @@ const STEP_ORDER: Record<WizardMode, StepId[]> = {
   cli: ['mode', 'connection', 'review'],
 };
 
+// Capabilities validated during the optional connection test: JSON structured
+// output (reports/decision signals) and Vision (screenshot/image analysis).
+// The backend reports these without changing the base connectivity verdict.
+const WIZARD_CAPABILITY_CHECKS: LLMCapabilityCheck[] = ['json', 'vision'];
+
 function parseModels(models: string): string[] {
   return models
     .split(',')
@@ -115,7 +131,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [discoverNote, setDiscoverNote] = useState<{ ok: boolean; message: string } | null>(null);
   const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [testResult, setTestResult] = useState<LlmConnectionCheckOutcome | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   // Resolve the selected provider against the backend catalog. If the stored id
@@ -355,21 +371,21 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     }
     setIsTesting(true);
     setTestResult(null);
-    try {
-      const result = await systemConfigApi.testLLMChannel({
-        name: suggestedConnectionName,
-        providerId: provider.id,
-        protocol,
-        baseUrl: baseUrl.trim(),
-        apiKey: apiKey.trim(),
-        models: modelOptions,
-      });
-      setTestResult({ ok: result.success, message: result.success ? text.testSucceeded : text.testFailed });
-    } catch {
-      setTestResult({ ok: false, message: text.testFailed });
-    } finally {
-      setIsTesting(false);
-    }
+    // Reuse the shared runner so the wizard surfaces the same actionable
+    // diagnostics, resolved effective config, and capability results as the
+    // Model Access editor instead of a binary pass/fail.
+    const outcome = await runLlmConnectionCheck({
+      name: suggestedConnectionName,
+      providerId: provider.id,
+      protocol,
+      baseUrl: baseUrl.trim(),
+      apiKey: apiKey.trim(),
+      models: modelOptions,
+      enabled: true,
+      capabilityChecks: WIZARD_CAPABILITY_CHECKS,
+    }, language);
+    setTestResult(outcome);
+    setIsTesting(false);
   };
 
   const chooseMode = (nextMode: WizardMode) => {
@@ -511,6 +527,29 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   };
 
   const stepLabel = formatUiText(text.step, { current: stepIndex + 1, total: order.length });
+
+  const capabilityRows = testResult?.capabilityResults
+    ? WIZARD_CAPABILITY_CHECKS
+      .map((capability) => ({ capability, result: testResult.capabilityResults?.[capability] }))
+      .filter((row): row is { capability: LLMCapabilityCheck; result: LLMCapabilityCheckResult } => (
+        Boolean(row.result)
+      ))
+    : [];
+  const capabilityStatusLabel = (status: LLMCapabilityCheckResult['status']): string => (
+    status === 'passed' ? text.capabilityPassed
+      : status === 'failed' ? text.capabilityFailed
+        : text.capabilitySkipped
+  );
+  const capabilityStatusClass = (status: LLMCapabilityCheckResult['status']): string => (
+    status === 'passed' ? 'text-success'
+      : status === 'failed' ? 'text-warning'
+        : 'text-muted-text'
+  );
+  const capabilityHelpSummary = getSettingsHelpContent(
+    'settings.llm_channel.capability_checks',
+    undefined,
+    language,
+  )?.summary;
 
   return (
     <Modal isOpen onClose={onClose} title={text.title}>
@@ -848,7 +887,41 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                   {text.testHint}
                 </p>
                 {testResult ? (
-                  <p className={`text-xs ${testResult.ok ? 'text-success' : 'text-warning'}`}>{testResult.message}</p>
+                  <div className="space-y-1.5" data-testid="wizard-test-result">
+                    <p className={`text-xs ${testResult.status === 'success' ? 'text-success' : 'text-danger'}`}>
+                      {testResult.text}
+                    </p>
+                    {testResult.hint ? (
+                      <p className="text-xs text-secondary-text">{testResult.hint}</p>
+                    ) : null}
+                    {testResult.resolvedModel ? (
+                      <p className="text-xs text-muted-text" data-testid="wizard-resolved-config">
+                        {formatUiText(text.resolvedConfig, {
+                          value: `${testResult.resolvedModel}${testResult.resolvedProtocol ? ` · ${testResult.resolvedProtocol}` : ''}`,
+                        })}
+                      </p>
+                    ) : null}
+                    {capabilityRows.length > 0 ? (
+                      <div className="space-y-1" data-testid="wizard-capability-results">
+                        <p className="text-xs font-medium text-foreground">{text.capabilityTitle}</p>
+                        <ul className="space-y-0.5">
+                          {capabilityRows.map(({ capability, result }) => (
+                            <li key={capability} className="flex items-baseline justify-between gap-2 text-xs">
+                              <span className="min-w-0 truncate text-secondary-text">
+                                {getLlmCapabilityLabel(capability, language)}
+                              </span>
+                              <span className={`shrink-0 font-medium ${capabilityStatusClass(result.status)}`}>
+                                {capabilityStatusLabel(result.status)}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                        {capabilityHelpSummary ? (
+                          <p className="text-xs text-muted-text">{capabilityHelpSummary}</p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
             ) : null}

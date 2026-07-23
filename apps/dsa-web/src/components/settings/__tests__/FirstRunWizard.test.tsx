@@ -811,6 +811,89 @@ describe('FirstRunWizard', () => {
     ));
   });
 
+  it('requests capability checks and surfaces resolved config plus per-capability results', async () => {
+    testLLMChannel.mockResolvedValue({
+      success: true,
+      message: 'ok',
+      resolvedModel: 'gpt-4o-mini',
+      resolvedProtocol: 'openai',
+      latencyMs: 640,
+      capabilityResults: {
+        json: { status: 'passed', message: 'JSON ok', stage: 'capability_json' },
+        vision: { status: 'failed', message: 'No image support', stage: 'capability_vision' },
+      },
+    });
+    render(
+      <FirstRunWizard
+        onComplete={okComplete()}
+        onClose={() => {}}
+        isSaving={false}
+        language="zh"
+        providers={[CATALOG.find((entry) => entry.id === 'openai')!]}
+        existingChannelNames={['openai']}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'sk-secret-xyz' } });
+    fireEvent.click(screen.getByRole('button', { name: '下一步' })); // -> models
+    addWizardModels(['gpt-4o-mini']);
+    fireEvent.click(screen.getByRole('button', { name: '下一步' })); // -> model
+    fireEvent.click(screen.getByRole('button', { name: '下一步' })); // -> review
+    fireEvent.click(screen.getByRole('button', { name: /测试连接/ }));
+
+    await waitFor(() => expect(testLLMChannel).toHaveBeenCalledWith(
+      expect.objectContaining({ capabilityChecks: ['json', 'vision'], enabled: true }),
+    ));
+    const resolved = await screen.findByTestId('wizard-resolved-config');
+    expect(resolved).toHaveTextContent('gpt-4o-mini');
+    expect(resolved).toHaveTextContent('openai');
+    const capabilities = screen.getByTestId('wizard-capability-results');
+    expect(within(capabilities).getByText('JSON 能力')).toBeInTheDocument();
+    expect(within(capabilities).getByText('支持')).toBeInTheDocument();
+    expect(within(capabilities).getByText('Vision 能力')).toBeInTheDocument();
+    expect(within(capabilities).getByText('不支持')).toBeInTheDocument();
+    // The provider secret must never surface in the rendered diagnostics.
+    expect(screen.getByTestId('wizard-test-result').textContent).not.toContain('sk-secret-xyz');
+  });
+
+  it('renders an actionable failure with the stage, error code, and a troubleshooting hint', async () => {
+    testLLMChannel.mockResolvedValue({
+      success: false,
+      message: 'Invalid API key',
+      error: 'Invalid API key',
+      stage: 'chat_completion',
+      errorCode: 'auth',
+      details: {},
+    });
+    render(
+      <FirstRunWizard
+        onComplete={okComplete()}
+        onClose={() => {}}
+        isSaving={false}
+        language="zh"
+        providers={[CATALOG.find((entry) => entry.id === 'openai')!]}
+        existingChannelNames={['openai']}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'sk-bad' } });
+    fireEvent.click(screen.getByRole('button', { name: '下一步' })); // -> models
+    addWizardModels(['gpt-4o-mini']);
+    fireEvent.click(screen.getByRole('button', { name: '下一步' })); // -> model
+    fireEvent.click(screen.getByRole('button', { name: '下一步' })); // -> review
+    fireEvent.click(screen.getByRole('button', { name: /测试连接/ }));
+
+    const result = await screen.findByTestId('wizard-test-result');
+    expect(result).toHaveTextContent('聊天调用');
+    expect(result).toHaveTextContent('鉴权失败');
+    expect(result).toHaveTextContent('请检查 API 密钥是否正确');
+    expect(result.textContent).not.toContain('sk-bad');
+  });
+
   it('keeps the omitted-schema fallback and emits a backend-valid channel config', async () => {
     const onComplete = okComplete();
     render(
