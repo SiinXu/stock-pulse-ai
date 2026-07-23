@@ -5,8 +5,9 @@ import { SegmentedControl, Select } from '../common';
 import { cn } from '../../utils/cn';
 import { SETTINGS_MISC_TEXT } from '../../locales/settingsMisc';
 import {
-  SETTINGS_SECTIONS,
   getSectionViews,
+  getVisibleSections,
+  hasHiddenAdvancedSections,
   sectionLabel,
   viewLabel,
   type SettingsSectionId,
@@ -69,6 +70,12 @@ interface SettingsSectionNavProps {
   sectionStatus?: SectionStatusMap;
   language: UiLang;
   navLabel: string;
+  /** Beginner mode hides advanced sections behind an explicit reveal. */
+  beginnerMode?: boolean;
+  /** Whether the user has revealed the advanced sections this session. */
+  advancedRevealed?: boolean;
+  /** Reveal the hidden advanced sections (beginner mode only). */
+  onRevealAdvanced?: () => void;
 }
 
 /**
@@ -84,10 +91,18 @@ export const SettingsSectionNav: React.FC<SettingsSectionNavProps> = ({
   sectionStatus,
   language,
   navLabel,
-}) => (
+  beginnerMode = false,
+  advancedRevealed = false,
+  onRevealAdvanced,
+}) => {
+  const visibleSections = getVisibleSections(beginnerMode, advancedRevealed, activeSection);
+  const showRevealAdvanced = hasHiddenAdvancedSections(beginnerMode, advancedRevealed)
+    && onRevealAdvanced !== undefined;
+  const revealLabel = SETTINGS_MISC_TEXT[language].showAdvanced;
+  return (
   <nav aria-label={navLabel}>
     {/* Mobile: compact selector (short path, current section always visible). */}
-    <div className="md:hidden">
+    <div className="md:hidden space-y-2">
       <Select
         id="settings-section-select"
         ariaLabel={navLabel}
@@ -95,7 +110,7 @@ export const SettingsSectionNav: React.FC<SettingsSectionNavProps> = ({
         triggerClassName="min-h-11 rounded-md border-[var(--settings-border)] bg-[var(--settings-surface)] px-3 py-2.5 text-sm"
         value={activeSection}
         onChange={(value) => (onMobileSelectSection ?? onSelectSection)(value as SettingsSectionId)}
-        options={SETTINGS_SECTIONS.map((section) => {
+        options={visibleSections.map((section) => {
           const label = statusLabel(sectionStatus?.[section.id], language);
           return {
             value: section.id,
@@ -103,11 +118,20 @@ export const SettingsSectionNav: React.FC<SettingsSectionNavProps> = ({
           };
         })}
       />
+      {showRevealAdvanced ? (
+        <button
+          type="button"
+          className="min-h-11 w-full rounded-md border border-dashed border-[var(--settings-border)] px-3 py-2 text-left text-sm text-secondary-text hover:bg-[var(--settings-surface-hover)]"
+          onClick={onRevealAdvanced}
+        >
+          {revealLabel}
+        </button>
+      ) : null}
     </div>
 
     {/* Desktop: vertical sidebar with per-section status dots. */}
     <ul className="hidden gap-1.5 md:flex md:flex-col">
-      {SETTINGS_SECTIONS.map((section) => {
+      {visibleSections.map((section) => {
         const isActive = section.id === activeSection;
         const status = sectionStatus?.[section.id];
         const dot = statusDotClass(status);
@@ -133,9 +157,21 @@ export const SettingsSectionNav: React.FC<SettingsSectionNavProps> = ({
           </li>
         );
       })}
+      {showRevealAdvanced ? (
+        <li>
+          <button
+            type="button"
+            className="flex min-h-11 w-full items-center rounded-lg border border-dashed border-[var(--settings-border)] px-3 py-2.5 text-left text-sm text-secondary-text transition-[background-color,border-color] duration-200 hover:bg-[var(--settings-surface-hover)]"
+            onClick={onRevealAdvanced}
+          >
+            <span className="min-w-0 flex-1 truncate">{revealLabel}</span>
+          </button>
+        </li>
+      ) : null}
     </ul>
   </nav>
-);
+  );
+};
 
 interface SettingsViewTabsProps {
   section: SettingsSectionId;

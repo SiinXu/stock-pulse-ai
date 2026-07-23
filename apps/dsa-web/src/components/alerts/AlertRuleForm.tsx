@@ -110,6 +110,8 @@ interface AlertRuleFormProps {
   isSubmitting?: boolean;
   mode?: 'create' | 'edit';
   initialRule?: AlertRuleItem;
+  initialTarget?: string;
+  initialTargetScope?: AlertTargetScope;
 }
 
 function isPortfolioScope(scope: AlertTargetScope): boolean {
@@ -131,18 +133,23 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
   isSubmitting = false,
   mode = 'create',
   initialRule,
+  initialTarget,
+  initialTargetScope,
 }) => {
   const { language } = useUiLanguage();
   const text = ALERT_FORM_TEXT[language];
   const seed = useMemo(() => (initialRule ? alertRuleToFormValues(initialRule) : null), [initialRule]);
   const [name, setName] = useState(seed?.name ?? '');
-  const [targetScope, setTargetScope] = useState<AlertTargetScope>(seed?.targetScope ?? 'single_symbol');
-  const [target, setTarget] = useState(seed?.target ?? '');
+  const defaultTargetScope = seed?.targetScope ?? initialTargetScope ?? 'single_symbol';
+  const [targetScope, setTargetScope] = useState<AlertTargetScope>(defaultTargetScope);
+  const [target, setTarget] = useState(seed?.target ?? initialTarget ?? '');
   const [portfolioTarget, setPortfolioTarget] = useState(seed?.portfolioTarget ?? 'all');
   const [marketRegion, setMarketRegion] = useState<MarketRegion>(seed?.marketRegion ?? 'cn');
   const [accounts, setAccounts] = useState<PortfolioAccountItem[]>([]);
   const [accountsError, setAccountsError] = useState<string | null>(null);
-  const [alertType, setAlertType] = useState<AlertType>(seed?.alertType ?? 'price_cross');
+  const [alertType, setAlertType] = useState<AlertType>(
+    seed?.alertType ?? defaultAlertTypeForScope(defaultTargetScope),
+  );
   const [severity, setSeverity] = useState<AlertSeverity>(seed?.severity ?? 'warning');
   const [enabled, setEnabled] = useState(seed?.enabled ?? true);
   const [priceDirection, setPriceDirection] = useState<'above' | 'below'>(seed?.priceDirection ?? 'above');

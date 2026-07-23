@@ -1,6 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { expect, test } from '@playwright/test';
+import { LEGACY_ROUTE_PATHS } from '../src/routing/routes';
 import { loginAsE2eAdmin } from './auth-fixture';
 
 const uiLanguageStorageKey = 'dsa.uiLanguage';
@@ -30,7 +31,7 @@ test.describe('legacy error envelope compatibility', () => {
       });
     });
 
-    await page.goto('/alerts');
+    await page.goto(LEGACY_ROUTE_PATHS.alerts);
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
 
     const alert = page.getByRole('alert').filter({ hasText: 'Operation conflict' });

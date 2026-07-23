@@ -30,7 +30,7 @@ describe('deepLink', () => {
       stockCode: 'aapl',
       signalId: 9,
       view: 'timeline',
-    })).toBe('/decision-signals?stock=AAPL&signal=9&view=timeline');
+    })).toBe(`${APP_ROUTE_PATHS.signals}?stock=AAPL&signal=9&view=timeline`);
     expect(buildDeepLink({
       page: 'stock',
       stockCode: '7203.t',
@@ -146,7 +146,7 @@ describe('deepLink', () => {
 
   it('normalizes Decision Signals view and filter state through the shared parser', () => {
     const parsed = parseDeepLink(
-      '/decision-signals?stock=00700.HK&view=unknown&market=moon&listStock=aapl&page=0&timelineRange=30d&source_report_id=004&keep=yes',
+      `${LEGACY_ROUTE_PATHS.decisionSignals}?stock=00700.HK&view=unknown&market=moon&listStock=aapl&page=0&timelineRange=30d&source_report_id=004&keep=yes`,
     );
 
     expect(parsed.target).toEqual({
@@ -156,7 +156,7 @@ describe('deepLink', () => {
       view: 'latest',
     });
     expect(parsed.normalizedHref).toBe(
-      '/decision-signals?stock=HK00700&listStock=AAPL&timelineRange=30d&keep=yes&sourceReportId=4',
+      `${APP_ROUTE_PATHS.signals}?stock=HK00700&listStock=AAPL&timelineRange=30d&keep=yes&sourceReportId=4`,
     );
     expect(parsed.issues).toEqual([
       { code: 'invalid_filter', parameter: 'market' },

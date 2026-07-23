@@ -22,6 +22,10 @@ import { UiLanguageProvider, useUiLanguage } from './contexts/UiLanguageContext'
 import type { UiLanguage } from './i18n/uiLanguages';
 import { LegacyRouteRedirect } from './routing/LegacyRedirectRoute';
 import {
+  mapLegacyAlertsSearchParams,
+  mapLegacyDecisionSignalsSearchParams,
+} from './routing/signalCenterRouteState';
+import {
   APP_ROUTE_PATHS,
   LEGACY_ROUTE_PATHS,
   SETTINGS_ROUTE_QUERY_KEYS,
@@ -39,8 +43,7 @@ const LoginPage = lazy(() => import('./pages/LoginPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const ChatPage = lazy(() => import('./pages/ChatPage'));
 const PortfolioPage = lazy(() => import('./pages/PortfolioPage'));
-const DecisionSignalsPage = lazy(() => import('./pages/DecisionSignalsPage'));
-const AlertsPage = lazy(() => import('./pages/AlertsPage'));
+const SignalCenterPage = lazy(() => import('./pages/DecisionSignalsPage'));
 const StockScreeningPage = lazy(() => import('./pages/StockScreeningPage'));
 const StockDetailsPage = lazy(() => import('./pages/StockDetailsPage'));
 const ComponentPlaygroundPage = lazy(() => import('./playground/ComponentPlaygroundPage'));
@@ -157,12 +160,29 @@ const routes = [
           { path: APP_ROUTE_PATHS.home, element: <HomePage /> },
           { path: APP_ROUTE_PATHS.agent, element: <ChatPage /> },
           { path: APP_ROUTE_PATHS.portfolio, element: <PortfolioPage /> },
-          { path: APP_ROUTE_PATHS.decisionSignals, element: <DecisionSignalsPage /> },
+          { path: APP_ROUTE_PATHS.signals, element: <SignalCenterPage /> },
           { path: APP_ROUTE_PATHS.stockDetails, element: <StockDetailsPage /> },
           { path: APP_ROUTE_PATHS.researchMarket, element: <MarketReviewPage /> },
           { path: APP_ROUTE_PATHS.researchDiscover, element: <StockScreeningPage /> },
           { path: APP_ROUTE_PATHS.researchBacktest, element: <BacktestPage /> },
-          { path: APP_ROUTE_PATHS.alerts, element: <AlertsPage /> },
+          {
+            path: LEGACY_ROUTE_PATHS.decisionSignals,
+            element: (
+              <LegacyRouteRedirect
+                to={APP_ROUTE_PATHS.signals}
+                mapSearchParams={mapLegacyDecisionSignalsSearchParams}
+              />
+            ),
+          },
+          {
+            path: LEGACY_ROUTE_PATHS.alerts,
+            element: (
+              <LegacyRouteRedirect
+                to={APP_ROUTE_PATHS.signals}
+                mapSearchParams={mapLegacyAlertsSearchParams}
+              />
+            ),
+          },
           {
             path: LEGACY_ROUTE_PATHS.screening,
             element: <LegacyRouteRedirect to={APP_ROUTE_PATHS.researchDiscover} />,

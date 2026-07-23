@@ -2,7 +2,7 @@ import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useBlocker, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, ChevronDown, CircleAlert, Clock, RefreshCw } from 'lucide-react';
-import { useAuth, useSystemConfig } from '../hooks';
+import { useAuth, useBeginnerMode, useSystemConfig } from '../hooks';
 import { useProviderCatalog } from '../hooks/useProviderCatalog';
 import { useAvailableModels } from '../hooks/useAvailableModels';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
@@ -15,7 +15,8 @@ import { createParsedApiError, getParsedApiError, type ParsedApiError } from '..
 import { analysisApi } from '../api/analysis';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, AppPage, Button, ConfirmDialog, EmptyState, PageHeader, SearchableSelect, Surface, ToastViewport, type SearchableSelectOption } from '../components/common';
+import { ApiErrorAlert, AppPage, Button, ConfirmDialog, EmptyState, PageHeader, SearchableSelect, Surface, Switch, ToastViewport, type SearchableSelectOption } from '../components/common';
+import { SETTINGS_MISC_TEXT } from '../locales/settingsMisc';
 import {
   AuthSettingsCard,
   ChangePasswordCard,
@@ -404,6 +405,16 @@ const SettingsPage: React.FC = () => {
   const [schedulerOverrideFromUi, setSchedulerOverrideFromUi] = useState<boolean | null>(null);
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const { beginnerMode, setBeginnerMode } = useBeginnerMode();
+  // Advanced sections stay hidden until the user reveals them; re-hiding on
+  // enabling beginner mode keeps the simplified navigation predictable.
+  const [advancedRevealed, setAdvancedRevealed] = useState(false);
+  const handleBeginnerModeChange = useCallback((next: boolean) => {
+    setBeginnerMode(next);
+    if (next) {
+      setAdvancedRevealed(false);
+    }
+  }, [setBeginnerMode]);
   const [isRefreshingSetupStatus, setIsRefreshingSetupStatus] = useState(false);
   const [setupStatusError, setSetupStatusError] = useState<ParsedApiError | null>(null);
   const [isRunningSetupSmoke, setIsRunningSetupSmoke] = useState(false);
@@ -2149,7 +2160,7 @@ const SettingsPage: React.FC = () => {
         <SettingsLoading />
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
-          <aside className="lg:sticky lg:top-4 lg:self-start">
+          <aside className="lg:sticky lg:top-4 lg:self-start space-y-3">
             <SettingsSectionNav
               activeSection={activeSection}
               onSelectSection={(section) => selectSectionView(section, getDefaultView(section))}
@@ -2157,7 +2168,30 @@ const SettingsPage: React.FC = () => {
               sectionStatus={settingsSectionStatus}
               language={uiLanguage}
               navLabel={t('settings.categoryNavTitle')}
+              beginnerMode={beginnerMode}
+              advancedRevealed={advancedRevealed}
+              onRevealAdvanced={() => setAdvancedRevealed(true)}
             />
+            <Surface
+              level="interactive"
+              className="flex items-start justify-between gap-3 px-3 py-2.5"
+            >
+              <label htmlFor="settings-beginner-mode" className="min-w-0">
+                <span className="block text-sm font-medium text-foreground">
+                  {SETTINGS_MISC_TEXT[uiLanguage].beginnerModeLabel}
+                </span>
+                <span className="mt-0.5 block text-xs text-muted-text">
+                  {SETTINGS_MISC_TEXT[uiLanguage].beginnerModeHint}
+                </span>
+              </label>
+              <Switch
+                id="settings-beginner-mode"
+                testId="settings-beginner-mode"
+                checked={beginnerMode}
+                onCheckedChange={handleBeginnerModeChange}
+                aria-label={SETTINGS_MISC_TEXT[uiLanguage].beginnerModeLabel}
+              />
+            </Surface>
           </aside>
 
           <section ref={contentRegionRef} tabIndex={-1} className="space-y-4 outline-none">

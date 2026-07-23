@@ -9,6 +9,9 @@ import {
   RESEARCH_DISCOVER_MARKET_VALUES,
   RESEARCH_DISCOVER_ROUTE_QUERY_KEYS,
   RUN_FLOW_ROUTE_QUERY_VALUES,
+  SIGNAL_CENTER_SCOPE_VALUES,
+  SIGNAL_CENTER_TAB_VALUES,
+  buildSignalCenterHref,
 } from '../../routing/routes';
 import { WEB_SESSION_CONTINUITY_STORAGE_KEY } from '../sessionPersistence';
 import {
@@ -24,12 +27,42 @@ describe('sessionContinuity', () => {
   });
 
   it('restores an allowlisted route snapshot only for an initial bare route', () => {
-    recordSessionLocation('/decision-signals?stock=AAPL&view=timeline&market=us&keep=no');
+    recordSessionLocation(`${APP_ROUTE_PATHS.signals}?stock=AAPL&view=timeline&market=us&keep=no`);
 
-    expect(resolveInitialSessionHref('/decision-signals')).toBe(
-      '/decision-signals?stock=AAPL&view=timeline&market=us',
+    expect(resolveInitialSessionHref(APP_ROUTE_PATHS.signals)).toBe(
+      `${APP_ROUTE_PATHS.signals}?stock=AAPL&view=timeline&market=us`,
     );
-    expect(resolveInitialSessionHref('/decision-signals?market=cn')).toBeNull();
+    expect(resolveInitialSessionHref(`${APP_ROUTE_PATHS.signals}?market=cn`)).toBeNull();
+  });
+
+  it('restores Signal Center scope and tab but not the transient create-rule action', () => {
+    recordSessionLocation(buildSignalCenterHref({
+      scope: SIGNAL_CENTER_SCOPE_VALUES.holdings,
+      tab: SIGNAL_CENTER_TAB_VALUES.rules,
+      createRule: true,
+    }));
+
+    expect(resolveInitialSessionHref(APP_ROUTE_PATHS.signals)).toBe(
+      buildSignalCenterHref({
+        scope: SIGNAL_CENTER_SCOPE_VALUES.holdings,
+        tab: SIGNAL_CENTER_TAB_VALUES.rules,
+      }),
+    );
+  });
+
+  it('keeps explicit All and Feed ahead of a stale Signal Center snapshot', () => {
+    recordSessionLocation(buildSignalCenterHref({
+      scope: SIGNAL_CENTER_SCOPE_VALUES.watchlist,
+      tab: SIGNAL_CENTER_TAB_VALUES.rules,
+    }));
+    const explicitDefaults = buildSignalCenterHref({
+      scope: SIGNAL_CENTER_SCOPE_VALUES.all,
+      tab: SIGNAL_CENTER_TAB_VALUES.feed,
+    });
+
+    expect(resolveInitialSessionHref(explicitDefaults)).toBeNull();
+    expect(resolveContextAwareNavigationTarget(explicitDefaults, APP_ROUTE_PATHS.settings))
+      .toBe(explicitDefaults);
   });
 
   it('restores validated task and history Run Flow context for Home', () => {
@@ -60,14 +93,14 @@ describe('sessionContinuity', () => {
 
   it('carries stock context through an intermediate route and retains destination state', () => {
     recordSessionLocation('/chat?session=session-1');
-    recordSessionLocation('/decision-signals?view=timeline&market=us');
+    recordSessionLocation(`${APP_ROUTE_PATHS.signals}?view=timeline&market=us`);
     recordSessionLocation('/stocks/00700.HK?period=weekly&days=120');
 
     expect(resolveContextAwareNavigationTarget('/chat', APP_ROUTE_PATHS.settings)).toBe(
       '/chat?session=session-1&stock=HK00700',
     );
-    expect(resolveContextAwareNavigationTarget('/decision-signals', APP_ROUTE_PATHS.settings)).toBe(
-      '/decision-signals?stock=HK00700&view=timeline&market=us',
+    expect(resolveContextAwareNavigationTarget(APP_ROUTE_PATHS.signals, APP_ROUTE_PATHS.settings)).toBe(
+      `${APP_ROUTE_PATHS.signals}?stock=HK00700&view=timeline&market=us`,
     );
     expect(resolveContextAwareNavigationTarget(APP_ROUTE_PATHS.researchBacktest, APP_ROUTE_PATHS.settings)).toBe(
       `${APP_ROUTE_PATHS.researchBacktest}?code=HK00700`,

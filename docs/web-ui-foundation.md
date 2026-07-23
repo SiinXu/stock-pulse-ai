@@ -317,12 +317,13 @@ with one `aria-current="page"`, while compact layouts render a labelled native
 select that hands the selected item back to the caller. Route item IDs, not
 translated labels or array indexes, provide stable focus markers.
 
-The owner-selected PR #35 page restoration keeps Settings, Portfolio,
-Decision Signals, Backtest, and Alerts on the full-width `AppPage` canvas.
-Settings, Portfolio, Backtest, and Alerts expose the shared visible
-`PageHeader`; Decision Signals keeps the same H1 programmatically available
-while visually prioritizing its action row. Decision Signals and Alerts use
-four and three mutually exclusive tabs respectively. Portfolio renders one
+The owner-selected PR #35 page restoration keeps Settings, Portfolio, Signal
+Center, and Backtest on the full-width `AppPage` canvas. Each exposes the shared
+visible `PageHeader`. Signal Center provides four top-level shared `Tabs` /
+`TabPanel` views and composes the existing decision-signal and alert surfaces
+without creating a second page identity. Its scope selector is a pressed-button
+group, not another tablist, and is only rendered for the signal and rule views
+that apply that scope to their requests. Portfolio renders one
 page-level onboarding state when no account exists, and Backtest renders one
 page-level loading, error, or empty state before results exist. Alert-rule
 filters belong to the Card header at `sm` and wider and stack full-width below
@@ -390,9 +391,9 @@ content. Wide page content remains reachable through the `main` scroll
 container instead of being clipped or widening the document. UI-N01 does not
 replace or reinterpret the separately owned UI4 L-09 target. The typed
 application navigation descriptor exposes five stable primary domains: Home,
-Research, Portfolio, Agent, and Settings. Home temporarily owns Decision Signals
-and Alerts until their dedicated IA migration, while Research owns Market
-Review, Discover, and Backtest. Expanded desktop navigation and the mobile
+Research, Portfolio, Agent, and Settings. Home temporarily owns one Signal
+Center child until the global notification entry replaces it, while Research
+owns Market Review, Discover, and Backtest. Expanded desktop navigation and the mobile
 drawer expose a separate 44px disclosure button for each secondary group, keep
 the groups open by default, and allow users to collapse or reopen their child
 routes without turning the parent route link into a false toggle. Compact
@@ -405,7 +406,10 @@ for either its own destination or an active descendant.
 
 Canonical Research paths are `/research/market`, `/research/discover`, and
 `/research/backtest`. The legacy `/screening` and `/backtest` URLs use the shared
-replace-redirect contract and preserve query parameters and hash state. Token
+replace-redirect contract and preserve query parameters and hash state. The
+canonical Signal Center path is `/signals`; legacy `/decision-signals` and
+`/alerts` paths map their query state into its feed, rules, history, or review
+tab. Token
 Usage remains in Settings as the `Usage & cost` section, with `/usage` using the
 same compatibility contract while the destination-owned `section=usage` value
 wins conflicts. Redirect destinations suppress tab-session restoration, and

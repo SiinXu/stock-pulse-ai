@@ -7,17 +7,25 @@ import {
   HOME_WORKSPACE_VALUES,
   LEGACY_ROUTE_PATHS,
   REPORT_ROUTE_QUERY_KEYS,
+  SIGNAL_CENTER_ROUTE_QUERY_KEYS,
+  SIGNAL_CENTER_TAB_VALUES,
+  SIGNAL_FEED_ROUTE_QUERY_KEYS,
+  SIGNAL_FEED_VIEW_VALUES,
   type HomeWorkspaceValue,
 } from '../routing/routes';
 import {
   parseResearchBacktestRouteState,
   parseResearchDiscoverRouteState,
 } from '../routing/researchRouteState';
+import {
+  parseSignalCenterRouteState,
+} from '../routing/signalCenterRouteState';
 import { normalizeStockCode } from './stockCode';
 import { validateStockCode } from './validation';
 
 export type HomeWorkspaceView = HomeWorkspaceValue;
-export type DecisionSignalsView = 'signals' | 'latest' | 'timeline' | 'stats';
+export type DecisionSignalsView =
+  (typeof SIGNAL_FEED_VIEW_VALUES)[keyof typeof SIGNAL_FEED_VIEW_VALUES];
 export type ChatContextState = 'active';
 
 export type DeepLinkTarget =
@@ -82,7 +90,7 @@ export type ParsedDeepLink = {
 };
 
 const HOME_WORKSPACE_VIEWS = new Set<HomeWorkspaceView>(Object.values(HOME_WORKSPACE_VALUES));
-const DECISION_SIGNAL_VIEWS = new Set<DecisionSignalsView>(['signals', 'latest', 'timeline', 'stats']);
+const DECISION_SIGNAL_VIEWS = new Set<DecisionSignalsView>(Object.values(SIGNAL_FEED_VIEW_VALUES));
 const CHAT_CONTEXT_STATES = new Set<ChatContextState>(['active']);
 const STOCK_HISTORY_PERIODS = new Set<StockHistoryPeriod>(['daily', 'weekly', 'monthly']);
 const DECISION_SIGNAL_MARKETS = new Set(['cn', 'hk', 'us', 'jp', 'kr', 'tw']);
@@ -310,12 +318,19 @@ export function buildDeepLink(target: DeepLinkTarget): string {
       setPositiveInteger(params, 'account', target.accountId);
       break;
     case 'decision-signals':
-      pathname = APP_ROUTE_PATHS.decisionSignals;
+      pathname = APP_ROUTE_PATHS.signals;
       if (target.stockCode) params.set('stock', requireStockCode(target.stockCode));
       setPositiveInteger(params, 'signal', target.signalId);
-      if (target.view && target.view !== (target.stockCode ? 'latest' : 'signals')) {
+      if (target.view === SIGNAL_FEED_VIEW_VALUES.stats) {
+        params.set(SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab, SIGNAL_CENTER_TAB_VALUES.review);
+      } else if (
+        target.view
+        && target.view !== (
+          target.stockCode ? SIGNAL_FEED_VIEW_VALUES.latest : SIGNAL_FEED_VIEW_VALUES.signals
+        )
+      ) {
         if (!DECISION_SIGNAL_VIEWS.has(target.view)) throw new TypeError('Unsupported Decision Signals view');
-        params.set('view', target.view);
+        params.set(SIGNAL_FEED_ROUTE_QUERY_KEYS.view, target.view);
       }
       break;
     case 'stock':
@@ -441,7 +456,18 @@ export function parseDeepLink(input: string, origin = DEFAULT_ORIGIN): ParsedDee
   } else if (url.pathname === APP_ROUTE_PATHS.portfolio) {
     const accountId = parsePositiveIntegerParam(params, issues, 'account', 'invalid_account_id');
     target = { page: 'portfolio', accountId };
-  } else if (url.pathname === APP_ROUTE_PATHS.decisionSignals) {
+  } else if (
+    url.pathname === APP_ROUTE_PATHS.signals
+    || url.pathname === LEGACY_ROUTE_PATHS.decisionSignals
+  ) {
+    if (url.pathname === LEGACY_ROUTE_PATHS.decisionSignals) {
+      url.pathname = APP_ROUTE_PATHS.signals;
+    }
+    const parsedSignalCenter = parseSignalCenterRouteState(params);
+    params = parsedSignalCenter.normalizedParams;
+    parsedSignalCenter.invalidKeys.forEach((parameter) => {
+      issues.push({ code: 'invalid_filter', parameter });
+    });
     const stockCode = parseStockParam(params, issues);
     const signalId = parsePositiveIntegerParam(params, issues, 'signal', 'invalid_signal_id');
     parseEnumParam(params, issues, 'market', DECISION_SIGNAL_MARKETS);
@@ -466,17 +492,23 @@ export function parseDeepLink(input: string, origin = DEFAULT_ORIGIN): ParsedDee
       params.set('sourceReportId', String(legacySourceReportId));
     }
     params.delete('source_report_id');
-    const rawView = params.get('view');
-    const defaultView: DecisionSignalsView = stockCode ? 'latest' : 'signals';
+    const rawView = params.get(SIGNAL_FEED_ROUTE_QUERY_KEYS.view);
+    const defaultView: DecisionSignalsView = stockCode
+      ? SIGNAL_FEED_VIEW_VALUES.latest
+      : SIGNAL_FEED_VIEW_VALUES.signals;
     let view: DecisionSignalsView = defaultView;
     if (rawView !== null) {
       if (DECISION_SIGNAL_VIEWS.has(rawView as DecisionSignalsView)) {
         view = rawView as DecisionSignalsView;
-        if (view === defaultView) params.delete('view');
+        if (view === defaultView) params.delete(SIGNAL_FEED_ROUTE_QUERY_KEYS.view);
       } else {
-        params.delete('view');
-        issues.push({ code: 'invalid_view', parameter: 'view' });
+        params.delete(SIGNAL_FEED_ROUTE_QUERY_KEYS.view);
+        issues.push({ code: 'invalid_view', parameter: SIGNAL_FEED_ROUTE_QUERY_KEYS.view });
       }
+    }
+    if (view === SIGNAL_FEED_VIEW_VALUES.stats) {
+      params.delete(SIGNAL_FEED_ROUTE_QUERY_KEYS.view);
+      params.set(SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab, SIGNAL_CENTER_TAB_VALUES.review);
     }
     target = { page: 'decision-signals', stockCode, signalId, view };
   } else {
@@ -538,7 +570,7 @@ export function parseDeepLink(input: string, origin = DEFAULT_ORIGIN): ParsedDee
         issues.push({ code: 'invalid_filter', parameter });
       });
     } else if (!new Set<string>([
-      APP_ROUTE_PATHS.alerts,
+      LEGACY_ROUTE_PATHS.alerts,
       APP_ROUTE_PATHS.researchMarket,
       APP_ROUTE_PATHS.settings,
       LEGACY_ROUTE_PATHS.usage,

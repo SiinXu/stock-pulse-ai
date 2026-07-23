@@ -1,8 +1,8 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pie, PieChart, ResponsiveContainer, Tooltip, Legend, Cell } from 'recharts';
-import { Inbox, X } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { BriefcaseBusiness, Inbox, X } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { decisionSignalsApi } from '../api/decisionSignals';
 import { portfolioApi } from '../api/portfolio';
 import type { ParsedApiError } from '../api/error';
@@ -58,6 +58,11 @@ import { buildDecisionActionLabelMap } from '../utils/decisionAction';
 import { getDecisionSignalPresentation } from '../utils/decisionSignalPresentation';
 import { createOperationId } from '../utils/operationId';
 import { parseDeepLink } from '../utils/deepLink';
+import {
+  SIGNAL_CENTER_SCOPE_VALUES,
+  SIGNAL_CENTER_TAB_VALUES,
+  buildSignalCenterHref,
+} from '../routing/routes';
 
 const PIE_COLORS = [
   'hsl(var(--primary))',
@@ -1301,12 +1306,30 @@ const PortfolioPage: React.FC = () => {
       header: t('decisionSignals.portfolioColumn'),
       align: 'end',
       width: 'default',
-      cell: (row) => (
-        <PortfolioSignalSummary
-          item={signalByPositionKey.get(`${row.accountId}-${row.symbol}-${row.market}`)}
-          loading={portfolioSignalsLoading}
-        />
-      ),
+      cell: (row) => {
+        const signal = signalByPositionKey.get(`${row.accountId}-${row.symbol}-${row.market}`);
+        return (
+          <div className="flex min-w-44 flex-col items-end gap-1.5">
+            <PortfolioSignalSummary
+              item={signal}
+              loading={portfolioSignalsLoading}
+            />
+            {signal ? (
+              <Link
+                to={buildSignalCenterHref({
+                  tab: SIGNAL_CENTER_TAB_VALUES.rules,
+                  createRule: true,
+                  stock: row.symbol,
+                })}
+                data-control="navigation-link"
+                className="control-hit-target inline-flex min-h-7 items-center px-1.5 text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+              >
+                {t('decisionSignals.createRuleFromSignal')}
+              </Link>
+            ) : null}
+          </div>
+        );
+      },
     },
     {
       id: 'action',
@@ -1335,7 +1358,19 @@ const PortfolioPage: React.FC = () => {
   return (
     <AppPage className="portfolio-page space-y-4">
       <section className="space-y-3">
-        <PageHeader title={text.title} description={text.description} />
+        <PageHeader
+          title={text.title}
+          description={text.description}
+          actions={(
+            <div
+              data-portfolio-switcher="single"
+              className="inline-flex min-h-9 items-center gap-2 text-sm font-medium text-foreground"
+            >
+              <BriefcaseBusiness className="h-4 w-4" aria-hidden="true" />
+              <span>{t('layout.nav.portfolio')}</span>
+            </div>
+          )}
+        />
       </section>
 
       {error ? (
@@ -1716,6 +1751,13 @@ const PortfolioPage: React.FC = () => {
                 )}
               </>
             )}
+            <Link
+              to={buildSignalCenterHref({ scope: SIGNAL_CENTER_SCOPE_VALUES.holdings })}
+              data-control="navigation-link"
+              className="control-hit-target mt-2 inline-flex min-h-7 items-center text-xs font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+            >
+              {t('decisionSignals.viewAll')}
+            </Link>
           </div>
         </Card>
       </section>

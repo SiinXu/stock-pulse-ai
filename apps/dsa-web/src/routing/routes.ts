@@ -8,8 +8,7 @@ export const APP_ROUTE_PATHS = {
   playgroundRender: '/playground/render/:componentId/:scenarioId',
   agent: '/chat',
   portfolio: '/portfolio',
-  decisionSignals: '/decision-signals',
-  alerts: '/alerts',
+  signals: '/signals',
   stockDetails: '/stocks/:stockCode',
   researchMarket: '/research/market',
   researchDiscover: '/research/discover',
@@ -21,7 +20,104 @@ export const LEGACY_ROUTE_PATHS = {
   usage: '/usage',
   screening: '/screening',
   backtest: '/backtest',
+  decisionSignals: '/decision-signals',
+  alerts: '/alerts',
 } as const;
+
+export const SIGNAL_CENTER_ROUTE_QUERY_KEYS = {
+  scope: 'scope',
+  tab: 'tab',
+  history: 'history',
+  createRule: 'createRule',
+  stock: 'stock',
+} as const;
+
+export const SIGNAL_CENTER_CREATE_RULE_VALUES = {
+  requested: '1',
+} as const;
+
+export const SIGNAL_FEED_ROUTE_QUERY_KEYS = {
+  view: 'view',
+} as const;
+
+export const SIGNAL_FEED_VIEW_VALUES = {
+  signals: 'signals',
+  latest: 'latest',
+  timeline: 'timeline',
+  stats: 'stats',
+} as const;
+
+export const LEGACY_ALERTS_VIEW_VALUES = {
+  rules: 'rules',
+  history: 'history',
+  notifications: 'notifications',
+} as const;
+
+export const SIGNAL_CENTER_SCOPE_VALUES = {
+  all: 'all',
+  holdings: 'holdings',
+  watchlist: 'watchlist',
+} as const;
+
+export const SIGNAL_CENTER_TAB_VALUES = {
+  feed: 'feed',
+  rules: 'rules',
+  history: 'history',
+  review: 'review',
+} as const;
+
+export const SIGNAL_CENTER_HISTORY_VALUES = {
+  triggers: 'triggers',
+  notifications: 'notifications',
+} as const;
+
+export type SignalCenterScope =
+  (typeof SIGNAL_CENTER_SCOPE_VALUES)[keyof typeof SIGNAL_CENTER_SCOPE_VALUES];
+export type SignalCenterTab =
+  (typeof SIGNAL_CENTER_TAB_VALUES)[keyof typeof SIGNAL_CENTER_TAB_VALUES];
+export type SignalCenterHistoryView =
+  (typeof SIGNAL_CENTER_HISTORY_VALUES)[keyof typeof SIGNAL_CENTER_HISTORY_VALUES];
+
+export type SignalCenterHrefOptions = {
+  scope?: SignalCenterScope;
+  tab?: SignalCenterTab;
+  history?: SignalCenterHistoryView;
+  createRule?: boolean;
+  stock?: string;
+};
+
+export function buildSignalCenterHref(options: SignalCenterHrefOptions = {}): string {
+  const searchParams = new URLSearchParams();
+  const tab = options.createRule
+    ? SIGNAL_CENTER_TAB_VALUES.rules
+    : options.history
+      ? SIGNAL_CENTER_TAB_VALUES.history
+      : options.tab;
+  if (options.scope) {
+    searchParams.set(SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope, options.scope);
+  }
+  if (tab) {
+    searchParams.set(SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab, tab);
+  }
+  if (
+    options.history
+    && options.history !== SIGNAL_CENTER_HISTORY_VALUES.triggers
+    && tab === SIGNAL_CENTER_TAB_VALUES.history
+  ) {
+    searchParams.set(SIGNAL_CENTER_ROUTE_QUERY_KEYS.history, options.history);
+  }
+  if (options.createRule) {
+    searchParams.set(
+      SIGNAL_CENTER_ROUTE_QUERY_KEYS.createRule,
+      SIGNAL_CENTER_CREATE_RULE_VALUES.requested,
+    );
+  }
+  if (options.stock?.trim()) {
+    searchParams.set(SIGNAL_CENTER_ROUTE_QUERY_KEYS.stock, options.stock.trim());
+  }
+  const search = searchParams.toString();
+  return search ? `${APP_ROUTE_PATHS.signals}?${search}` : APP_ROUTE_PATHS.signals;
+}
 
 export const REPORT_ROUTE_QUERY_KEYS = {
   recordId: 'recordId',
