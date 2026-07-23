@@ -56,6 +56,7 @@ APPROVED_JOB_PERMISSIONS = frozenset(
         (".github/workflows/ci.yml", "changes", "pull-requests", "read"),
         (".github/workflows/ci.yml", "ai-governance", "contents", "read"),
         (".github/workflows/ci.yml", "backend-gate", "contents", "read"),
+        (".github/workflows/ci.yml", "python-minimum", "contents", "read"),
         (".github/workflows/ci.yml", "pydanticai-installed", "contents", "read"),
         (".github/workflows/ci.yml", "docker-build", "contents", "read"),
         (".github/workflows/ci.yml", "web-gate", "contents", "read"),

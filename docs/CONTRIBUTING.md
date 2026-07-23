@@ -100,6 +100,7 @@ docs: update the README deployment guide
 |--------|------|:--------:|
 | ai-governance | 校验 `AGENTS.md`、兼容指令和仓库协作资产 | ✅ |
 | backend-gate | `scripts/ci_gate.sh` 的 syntax、flake8、deterministic 与 offline-tests | ✅ |
+| python-minimum | 在最低支持版本 Python 3.10 上运行完整 backend gate | ✅ |
 | docker-build | Docker 镜像构建与关键模块导入 smoke | ✅ |
 | web-gate | Web 或关联 API/配置/服务契约变更时执行 `npm run lint` + `npm run test:i18n` + `npm run test` + `npm run build` | ✅（触发时） |
 | web-e2e | 同一关联路径触发；以隔离运行时启动真实后端、Vite 与本地 fake 模型端点并执行 `npm run test:smoke` | ✅（触发时） |

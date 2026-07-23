@@ -27,6 +27,9 @@ EXPECTED_PUBLIC_SURFACE_SHA256 = (
 EXPECTED_REFLECTION_SHA256 = (
     "60c033a897a4a895205d167c6445aee59a3cab5a56febc8e411b7168ffa2d6ef"
 )
+PYTHON_310_REFLECTION_SHA256 = (
+    "845d67ae77120c1b379bfddec5c465979c21ef291a4d9fcc9b7a2d8768b31e9f"
+)
 
 EXPECTED_AST_GROUPS = (
     (
@@ -366,7 +369,14 @@ print(_digest(_reflection_snapshot(module)))
     )
 
     assert completed.returncode == 0, completed.stderr
-    assert completed.stdout.strip() == EXPECTED_REFLECTION_SHA256
+    # Python 3.10 implicitly wraps Any hints with Optional when the default is
+    # None; Python 3.11 removed that get_type_hints behavior.
+    expected_hash = (
+        PYTHON_310_REFLECTION_SHA256
+        if sys.version_info[:2] == (3, 10)
+        else EXPECTED_REFLECTION_SHA256
+    )
+    assert completed.stdout.strip() == expected_hash
 
     module = importlib.import_module("src.search_service")
     for class_name in MOVED_CLASSES:

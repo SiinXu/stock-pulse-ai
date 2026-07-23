@@ -102,6 +102,7 @@ After opening a PR, CI will automatically run the following PR checks:
 |-------|-------------|:--------:|
 | `ai-governance` | Validates `AGENTS.md`, compatibility instructions, and repository collaboration assets | ✅ |
 | `backend-gate` | `scripts/ci_gate.sh` syntax, flake8, deterministic, and offline-tests stages | ✅ |
+| `python-minimum` | Runs the full backend gate on Python 3.10, the minimum supported runtime | ✅ |
 | `docker-build` | Docker image build and key module import smoke test | ✅ |
 | `web-gate` | `npm run lint` + `npm run test:i18n` + `npm run test` + `npm run build` for Web or related API/config/service contract changes | ✅ (when triggered) |
 | `web-e2e` | Uses the same related-path trigger, starts the real backend, Vite, and a local fake model endpoint in isolation, then runs `npm run test:smoke` | ✅ (when triggered) |
