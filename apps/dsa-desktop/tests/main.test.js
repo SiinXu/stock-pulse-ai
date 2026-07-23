@@ -3226,3 +3226,39 @@ test('desktop package ships the isolated local model surface', () => {
   assert.doesNotMatch(modelScript, /\bfetch\s*\(/);
   assert.doesNotMatch(modelScript, /innerHTML/);
 });
+
+test('starting never leaves more than one managed daemon alive', async (t) => {
+  const mainModule = loadMainModule(t);
+  mainModule.__setLocalModelStateForTest(null);
+
+  const priorProcess = new EventEmitter();
+  priorProcess.pid = 5150;
+  priorProcess.exitCode = null;
+  priorProcess.signalCode = null;
+  let priorKilled = false;
+  priorProcess.kill = () => {
+    priorKilled = true;
+    priorProcess.exitCode = 0;
+    return true;
+  };
+  mainModule.__setLocalModelServeProcessForTest(priorProcess);
+
+  const records = [];
+  const requestImpl = makeStagedJsonRequest([
+    { connectionError: true },
+    { statusCode: 200, jsonBody: { models: [] } },
+  ]);
+
+  const state = await mainModule.startManagedLocalModelRuntime({
+    requestImpl,
+    spawnImpl: makeLocalModelSpawn(records),
+    startTimeoutMs: 3000,
+  });
+
+  assert.equal(priorKilled, true);
+  assert.equal(state.status, mainModule.DESKTOP_LOCAL_MODEL_STATUS.RUNNING);
+  const tracked = mainModule.__getLocalModelServeProcessForTest();
+  assert.notEqual(tracked, priorProcess);
+
+  mainModule.__setLocalModelServeProcessForTest(null);
+});

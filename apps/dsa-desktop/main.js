@@ -3090,6 +3090,15 @@ async function startManagedLocalModelRuntime({
     message: '',
   });
 
+  // Never hold more than one managed daemon: if a previous unhealthy `serve`
+  // is still alive, terminate it before spawning a replacement.
+  if (localModelServeProcess
+    && localModelServeProcess.exitCode === null
+    && !localModelServeProcess.signalCode) {
+    terminateManagedLocalModelProcess(localModelServeProcess);
+    localModelServeProcess = null;
+  }
+
   let child;
   try {
     child = spawnImpl(DESKTOP_LOCAL_MODEL_BINARY, ['serve'], {
@@ -3153,16 +3162,9 @@ async function startManagedLocalModelRuntime({
   });
 }
 
-function stopManagedLocalModelRuntime() {
-  const child = localModelServeProcess;
+function terminateManagedLocalModelProcess(child) {
   if (!child || child.exitCode !== null || child.signalCode) {
-    localModelServeProcess = null;
-    return setLocalModelState({
-      status: DESKTOP_LOCAL_MODEL_STATUS.STOPPED,
-      managed: false,
-      operation: null,
-      message: '',
-    });
+    return;
   }
   try {
     if (isWindows) {
@@ -3174,6 +3176,10 @@ function stopManagedLocalModelRuntime() {
   } catch (error) {
     logLine(`[local-model] failed to stop runtime: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+function stopManagedLocalModelRuntime() {
+  terminateManagedLocalModelProcess(localModelServeProcess);
   localModelServeProcess = null;
   return setLocalModelState({
     status: DESKTOP_LOCAL_MODEL_STATUS.STOPPED,
