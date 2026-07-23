@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from bisect import bisect_right
 import inspect
 import json
 import logging
@@ -65,7 +66,7 @@ _SENSITIVE_COMPACT_KEY_PATTERN = re.compile(
     r"authorization|cookie|credential|passwd|password|rawresponse|secret|"
     r"sendkey|token(?!s)|webhook"
 )
-_URL_PATTERN = re.compile(r"https?://[^\s,;)\]}]+", re.IGNORECASE)
+_URL_PATTERN = re.compile(r"https?://[^\s\"'\\]+", re.IGNORECASE)
 # Credentials in the userinfo of a connection-string URL of any scheme
 # (postgresql://, mysql://, redis://, mongodb://, amqp://, ...). _URL_PATTERN
 # only covers http(s), so a password embedded in a non-HTTP connection string
@@ -100,6 +101,10 @@ _PUBLIC_REDACTION_FIELD_VALUES = frozenset(
 _PUBLIC_AUTHORIZATION_PUNCTUATION = frozenset(".,:!?)]}")
 _SENSITIVE_FIELD_SEPARATOR_PATTERN = r"(?:\\+['\"]|['\"])?\s*[:=]\s*"
 _TEXT_FIELD_KEY_PATTERN = r"[A-Za-z][A-Za-z0-9_-]*"
+_TEXT_FIELD_KEY_JOINERS = frozenset(
+    " \t\f\v.!#$%&()*+,./:;?@[]^`{|}~"
+)
+_TEXT_FIELD_KEY_PART_LIMIT = 16
 _TEXT_FIELD_START_PATTERN = re.compile(
     rf"((?<![A-Za-z0-9_-]){_TEXT_FIELD_KEY_PATTERN})"
     rf"({_SENSITIVE_FIELD_SEPARATOR_PATTERN})",
@@ -463,21 +468,113 @@ def _sensitive_text_field_kind(key_text: str) -> Optional[str]:
     return "generic"
 
 
+def _text_field_key_starts(
+    text: str,
+    immediate_start: int,
+    *,
+    lower_bound: int,
+) -> tuple[tuple[int, ...], bool]:
+    """Return bounded composite-key suffix starts, shortest first."""
+
+    starts = [immediate_start]
+    cursor = immediate_start
+    while cursor > lower_bound and len(starts) < _TEXT_FIELD_KEY_PART_LIMIT:
+        joiner_end = cursor
+        while (
+            cursor > lower_bound
+            and text[cursor - 1] in _TEXT_FIELD_KEY_JOINERS
+        ):
+            cursor -= 1
+        if cursor == joiner_end:
+            break
+        part_end = cursor
+        while cursor > lower_bound:
+            char = text[cursor - 1]
+            if not (char.isascii() and (char.isalnum() or char in "_-")):
+                break
+            cursor -= 1
+        if cursor == part_end:
+            break
+        starts.append(cursor)
+    truncated = False
+    if len(starts) == _TEXT_FIELD_KEY_PART_LIMIT and cursor > lower_bound:
+        probe = cursor
+        while (
+            probe > lower_bound
+            and text[probe - 1] in _TEXT_FIELD_KEY_JOINERS
+        ):
+            probe -= 1
+        truncated = (
+            probe < cursor
+            and probe > lower_bound
+            and text[probe - 1].isascii()
+            and (
+                text[probe - 1].isalnum()
+                or text[probe - 1] in "_-"
+            )
+        )
+    return tuple(starts), truncated
+
+
+def _classify_text_field_match(
+    text: str,
+    match: re.Match[str],
+    *,
+    lower_bound: int,
+) -> tuple[Optional[str], Optional[int]]:
+    """Classify the shortest sensitive suffix using the complete key's kind."""
+
+    starts, truncated = _text_field_key_starts(
+        text,
+        match.start(1),
+        lower_bound=lower_bound,
+    )
+    complete_kind = _sensitive_text_field_kind(
+        text[starts[-1]:match.end(1)]
+    )
+    for key_start in starts:
+        if _is_sensitive_mapping_key_text(text[key_start:match.end(1)]):
+            return (
+                complete_kind
+                or _sensitive_text_field_kind(
+                    text[key_start:match.end(1)]
+                ),
+                key_start,
+            )
+    if truncated:
+        return "authorization", starts[-1]
+    return None, None
+
+
 def _next_sensitive_text_field_match(
     text: str,
     cursor: int,
     *,
     field_kinds: frozenset[str],
-) -> tuple[Optional[re.Match[str]], Optional[str]]:
+    http_url_spans: tuple[tuple[int, int], ...],
+) -> tuple[Optional[re.Match[str]], Optional[str], Optional[int]]:
     """Find the next assignment whose complete key is centrally sensitive."""
 
+    lower_bound = cursor
     while True:
-        match = _TEXT_FIELD_START_PATTERN.search(text, cursor)
+        search_start = cursor
+        match = _TEXT_FIELD_START_PATTERN.search(text, search_start)
         if match is None:
-            return None, None
-        kind = _sensitive_text_field_kind(match.group(1))
+            return None, None, None
+        span_index = bisect_right(http_url_spans, (match.start(1), len(text))) - 1
+        if (
+            span_index >= 0
+            and match.start(1) < http_url_spans[span_index][1]
+        ):
+            cursor = match.end()
+            continue
+        kind, key_start = _classify_text_field_match(
+            text,
+            match,
+            lower_bound=lower_bound,
+        )
         if kind in field_kinds:
-            return match, kind
+            return match, kind, key_start
         cursor = match.end()
 
 
@@ -491,13 +588,20 @@ def _encoded_field_key_start(text: str, index: int) -> int:
 
 
 def _sensitive_text_field_kind_at(text: str, index: int) -> Optional[str]:
-    match = _TEXT_FIELD_START_PATTERN.match(
-        text,
-        _encoded_field_key_start(text, index),
-    )
-    if match is None:
-        return None
-    return _sensitive_text_field_kind(match.group(1))
+    key_start = _encoded_field_key_start(text, index)
+    cursor = key_start
+    while True:
+        match = _TEXT_FIELD_START_PATTERN.search(text, cursor)
+        if match is None:
+            return None
+        kind, sensitive_start = _classify_text_field_match(
+            text,
+            match,
+            lower_bound=key_start,
+        )
+        if sensitive_start is not None:
+            return kind if sensitive_start == key_start else None
+        cursor = match.end()
 
 
 def _sensitive_text_field_starts_at(text: str, index: int) -> bool:
@@ -614,7 +718,10 @@ def _is_structured_field_suffix(text: str, index: int) -> bool:
         cursor += 1
     if cursor < len(text) and text[cursor] in {'"', "'"}:
         cursor += 1
-    return _TEXT_FIELD_START_PATTERN.match(text, cursor) is not None
+    return (
+        _TEXT_FIELD_START_PATTERN.match(text, cursor) is not None
+        or _sensitive_text_field_starts_at(text, cursor)
+    )
 
 
 def _outer_quote_token(
@@ -946,8 +1053,6 @@ def _sensitive_field_end(
                 redact_all_http_urls=redact_all_http_urls,
             ):
                 return index
-            if field_kind == "generic" and not marker_prefix:
-                return index
             if (
                 field_kind == "generic"
                 and _is_verified_field_boundary(
@@ -985,11 +1090,21 @@ def _sensitive_field_end(
             )
             if (
                 structured_key
+                and (
+                    index == 0
+                    or text[index - 1] not in ")]}"
+                    or _is_complete_public_redaction_field_value(
+                        text,
+                        field_value_start,
+                        index,
+                    )
+                )
                 and _is_structured_field_suffix(text, index)
             ) or (
                 not structured_key
                 and field_kind == "generic"
                 and not marker_prefix
+                and _is_structured_field_suffix(text, index)
             ):
                 return index
         previous_non_whitespace = char
@@ -1054,17 +1169,22 @@ def _redact_sensitive_field_spans(
 
     parts: list[str] = []
     cursor = 0
+    http_url_spans = tuple(
+        (match.start(), match.end())
+        for match in _URL_PATTERN.finditer(text)
+    )
     while True:
-        match, field_kind = _next_sensitive_text_field_match(
+        match, field_kind, key_start = _next_sensitive_text_field_match(
             text,
             cursor,
             field_kinds=field_kinds,
+            http_url_spans=http_url_spans,
         )
         if match is None:
             parts.append(text[cursor:])
             return "".join(parts)
-        assert field_kind is not None
-        parts.append(text[cursor:match.start()])
+        assert field_kind is not None and key_start is not None
+        parts.append(text[cursor:key_start])
         separator = match.group(2)
         structured_key = separator.lstrip().startswith(("\\", "'", '"'))
         field_end = _sensitive_field_end(
@@ -1082,7 +1202,7 @@ def _redact_sensitive_field_spans(
                 field_end,
             )
         ):
-            parts.append(text[match.start():field_end])
+            parts.append(text[key_start:field_end])
             cursor = field_end
             continue
         suffix = (
@@ -1097,7 +1217,7 @@ def _redact_sensitive_field_spans(
         )
         output_quote = outer_quote if len(outer_quote) == 1 else ""
         parts.append(
-            f"{match.group(1)}{match.group(2)}"
+            f"{text[key_start:match.end(1)]}{match.group(2)}"
             f"{output_quote}{_REDACTED}{output_quote}{suffix}"
         )
         cursor = field_end
@@ -1184,7 +1304,8 @@ def sanitize_diagnostic_text(
         and len(parts := text.split(" <- ")) > 1
         and all(part in trusted_exception_parts for part in parts)
     ):
-        return " ".join(text.split())[:max_length]
+        exact_redacted = _redact_exact_values(text, exact_values)
+        return " ".join(exact_redacted.split())[:max_length]
     sanitized = _safe_structured_string(structured_text).strip()
     if not sanitized:
         return ""

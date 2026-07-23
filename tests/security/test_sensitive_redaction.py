@@ -14,7 +14,11 @@ from api.middlewares.error_handler import add_error_handlers
 from api.v1.errors import error_body
 from src.agent.provider_trace import extract_provider_trace_turns
 from src.agent.public_contract import sanitize_stream_event
-from src.agent.tools.execution import redact_diagnostic_value
+from src.agent.tools.execution import (
+    ToolAccessContext,
+    build_tool_audit,
+    redact_diagnostic_value,
+)
 from src.llm.hermes import sanitize_hermes_error_text
 from src.llm.local_cli_backend import redact_diagnostic_text as redact_local_cli_text
 from src.logging_config import RelativePathFormatter
@@ -765,6 +769,239 @@ def test_final_review_counterexamples_are_closed_at_every_output_boundary() -> N
     assert diagnostics.trace_dropped_reason == "sensitive_data_redacted"
 
 
+def test_composite_text_labels_share_mapping_classification_across_boundaries() -> None:
+    labelled_secrets = {
+        "api.key": PLAIN_SECRET,
+        "api key": BEARER_SECRET,
+        "private.key": DSN_SECRET,
+        "webhook.url": WEBHOOK_SECRET,
+        "proxy.url": PREFIXED_API_KEY,
+        "raw.response": OPAQUE_LOCAL_TOKEN,
+        "request.headers.raw": PLAIN_SECRET,
+        "license/key": BEARER_SECRET,
+        "private$key": DSN_SECRET,
+        "api&key": WEBHOOK_SECRET,
+        "api,key": PLAIN_SECRET,
+        "api:key": BEARER_SECRET,
+        "api(key": DSN_SECRET,
+        "api]key": WEBHOOK_SECRET,
+    }
+
+    for label, secret in labelled_secrets.items():
+        assert sanitize_module.is_sensitive_key(label)
+        raw = f"{label}={secret}"
+        expected = f"{label}=[REDACTED]"
+
+        assert redact_sensitive_text(raw) == expected
+        assert redact_sensitive_text(expected) == expected
+
+    long_label = (
+        "api.key."
+        + ".".join(["filler"] * sanitize_module._TEXT_FIELD_KEY_PART_LIMIT)
+        + ".value"
+    )
+    assert sanitize_module.is_sensitive_key(long_label)
+    assert redact_sensitive_text(
+        f"{long_label}=alpha {PLAIN_SECRET}"
+    ) == f"{long_label}=[REDACTED]"
+
+    raw = f"api.key={PLAIN_SECRET}"
+    spaced = f"private key={BEARER_SECRET}"
+    api_payload = error_body(
+        "provider_rejected",
+        raw,
+        details={"provider_diagnostic": spaced},
+    )
+    stream_payload = sanitize_stream_event(
+        {
+            "type": "tool_progress",
+            "details": {
+                "dotted_diagnostic": raw,
+                "spaced_diagnostic": spaced,
+            },
+        },
+        trace_id="trace-composite-labels",
+    )
+    formatter = RelativePathFormatter("%(levelname)s %(message)s")
+    record = logging.LogRecord(
+        name="tests.security.composite_labels",
+        level=logging.DEBUG,
+        pathname=__file__,
+        lineno=1,
+        msg=raw,
+        args=(),
+        exc_info=None,
+    )
+    tool_preview = redact_diagnostic_value({"diagnostic": raw})
+    local_cli = redact_local_cli_text(raw, limit=1000)
+    hermes = sanitize_hermes_error_text(spaced)
+    alphasift = _sanitize_public_alphasift_diagnostics(
+        {"provider_error": raw}
+    )
+
+    diagnostic_token = activate_run_diagnostic_context(
+        trace_id="trace-composite-label-diagnostics",
+        query_id="query-composite-label-diagnostics",
+        stock_code="600519",
+    )
+    try:
+        record_llm_run(
+            success=False,
+            provider="test-provider",
+            model="test-model",
+            error_type="ProviderError",
+            error_message=raw,
+        )
+        snapshot = current_diagnostic_snapshot()
+    finally:
+        reset_run_diagnostic_context(diagnostic_token)
+
+    messages = [
+        {"role": "user", "content": "current"},
+        {
+            "role": "assistant",
+            "_trace_provider": "deepseek",
+            "_trace_model": "deepseek/deepseek-chat",
+            "reasoning_content": raw,
+            "tool_calls": [
+                {
+                    "id": "call-composite-label",
+                    "name": "echo",
+                    "arguments": {"message": "public"},
+                }
+            ],
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "call-composite-label",
+            "content": "public result",
+        },
+    ]
+    turns, diagnostics = extract_provider_trace_turns(messages, baseline_len=1)
+
+    _assert_no_secret(
+        {
+            "api": api_payload,
+            "stream": stream_payload,
+            "log": formatter.format(record),
+            "tool": tool_preview,
+            "local_cli": local_cli,
+            "hermes": hermes,
+            "alphasift": alphasift,
+            "snapshot": snapshot,
+        }
+    )
+    assert turns == []
+    assert diagnostics.trace_dropped_reason == "sensitive_data_redacted"
+
+
+def test_generic_fields_reject_ambiguous_delimiter_suffixes() -> None:
+    for delimiter in ",;&)]}":
+        raw = f"password={delimiter}{PLAIN_SECRET}"
+        redacted = redact_sensitive_text(raw)
+
+        assert redacted == "password=[REDACTED]"
+        assert redact_sensitive_text(redacted) == redacted
+        _assert_no_secret(redacted)
+
+    assert redact_sensitive_text(
+        f"api_key={PLAIN_SECRET} operation=context-probe"
+    ) == "api_key=[REDACTED] operation=context-probe"
+
+
+def test_http_credentials_include_delimiters_before_sensitivity_is_evaluated() -> None:
+    for delimiter in ",;)]}":
+        raw = (
+            "https://example.com/callback?access_token=alpha"
+            f"{delimiter}{PLAIN_SECRET}"
+        )
+
+        assert redact_sensitive_text(raw) == "[REDACTED_URL]"
+        assert sanitize_module.sanitize_diagnostic_text(
+            raw,
+            max_length=1000,
+        ) == "[REDACTED_URL]"
+
+    userinfo = (
+        f"https://operator:alpha,{BEARER_SECRET}@example.com/path"
+    )
+    assert redact_sensitive_text(userinfo) == "[REDACTED_URL]"
+    assert sanitize_module.sanitize_diagnostic_text(
+        userinfo,
+        max_length=1000,
+    ) == "[REDACTED_URL]"
+    assert redact_sensitive_text(
+        "https://example.com/docs,"
+    ) == "https://example.com/docs,"
+    assert redact_sensitive_text(
+        "https://example.com/path?authorization=private"
+    ) == "[REDACTED_URL]"
+
+
+def test_tool_audit_recursively_redacts_identity_and_error_fields() -> None:
+    audit = build_tool_audit(
+        tool_name=f"api.key={PLAIN_SECRET}",
+        arguments={"query": "public"},
+        result={"status": "public"},
+        error_code=f"private.key={BEARER_SECRET}",
+        context=ToolAccessContext(
+            backend=f"proxy.url={DSN_SECRET}",
+            session_id=f"raw.response={WEBHOOK_SECRET}",
+            audit_context={"webhook.url": PREFIXED_API_KEY},
+        ),
+    )
+
+    _assert_no_secret(audit)
+    assert audit["tool_name"] == "api.key=[REDACTED]"
+    assert audit["error_code"] == "private.key=[REDACTED]"
+    assert audit["backend"] == "proxy.url=[REDACTED]"
+    assert audit["session_id"] == "raw.response=[REDACTED]"
+
+
+def test_exception_chain_reapplies_exact_values_across_joined_parts() -> None:
+    cause = RuntimeError("RIGHT")
+    error = ValueError("PLACEHOLDER_LEFT")
+    error.__cause__ = cause
+    declared = "PLACEHOLDER_LEFT <- RuntimeError"
+
+    summary = sanitize_module.sanitize_exception_chain(
+        error,
+        redaction_values={declared},
+    )
+
+    records: list[str] = []
+
+    class CaptureHandler(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            records.append(record.getMessage())
+
+    logger = logging.getLogger("tests.security.cross_part_exact_value")
+    old_handlers = logger.handlers[:]
+    old_level = logger.level
+    old_propagate = logger.propagate
+    logger.handlers = [CaptureHandler()]
+    logger.setLevel(logging.ERROR)
+    logger.propagate = False
+    try:
+        sanitize_module.log_safe_exception(
+            logger,
+            "provider failed",
+            error,
+            error_code="provider_failed",
+            redaction_values={declared},
+        )
+    finally:
+        logger.handlers = old_handlers
+        logger.setLevel(old_level)
+        logger.propagate = old_propagate
+
+    assert declared not in summary
+    assert "[REDACTED]" in summary
+    assert records
+    assert all(declared not in record for record in records)
+    assert any("[REDACTED]" in record for record in records)
+
+
 def test_authorization_redaction_preserves_public_url_markers_on_repeated_passes() -> None:
     diagnostic = "Authorization: [REDACTED] [REDACTED_URL]"
     punctuated_diagnostic = "Authorization: [REDACTED]. diagnostic=public"
@@ -909,6 +1146,31 @@ def test_field_scanner_checks_one_public_boundary_per_whitespace_run(
         assert elapsed < 0.5
 
 
+def test_structured_closer_runs_are_checked_a_constant_number_of_times(
+    monkeypatch,
+) -> None:
+    original = sanitize_module._is_structured_field_suffix
+    match_calls = 0
+
+    def counting_suffix(text: str, index: int) -> bool:
+        nonlocal match_calls
+        match_calls += 1
+        return original(text, index)
+
+    monkeypatch.setattr(
+        sanitize_module,
+        "_is_structured_field_suffix",
+        counting_suffix,
+    )
+    raw = '{"api_key":"BENIGN"' + (")" * 32_000) + "x"
+
+    redacted = redact_sensitive_text(raw)
+
+    assert "BENIGN" not in redacted
+    assert redacted == '{"api_key":"[REDACTED]"'
+    assert match_calls <= 2
+
+
 def test_central_redaction_fails_closed_for_recursive_and_hostile_values() -> None:
     class HostileKey:
         def __str__(self) -> str:
@@ -1009,6 +1271,7 @@ def test_api_client_error_payload_uses_central_recursive_redaction() -> None:
             },
             headers={
                 "Retry-After": "3",
+                "WWW-Authenticate": f'Bearer error="api.key={PLAIN_SECRET}"',
                 "Authorization": f"Bearer {BEARER_SECRET}",
                 "X-Api-Key": PLAIN_SECRET,
             },
@@ -1023,6 +1286,7 @@ def test_api_client_error_payload_uses_central_recursive_redaction() -> None:
     assert payload["details"] == payload["detail"]
     assert payload["details"]["dsn"] == "redis://[REDACTED]@cache.example/0"
     assert response.headers["retry-after"] == "3"
+    assert "www-authenticate" in response.headers
     assert "authorization" not in response.headers
     assert "x-api-key" not in response.headers
     _assert_no_secret(dict(response.headers))
