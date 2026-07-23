@@ -34,9 +34,11 @@ log "Verifying static asset references (source)..."
 "${PYTHON_BIN}" "${SCRIPT_DIR}/check_static_assets.py" "${ROOT_DIR}/static"
 
 log "Installing reproducible desktop backend dependencies..."
-"${PYTHON_BIN}" -m pip install --upgrade --constraint "${ROOT_DIR}/constraints.txt" pip
-"${PYTHON_BIN}" -m pip install --build-constraint "${ROOT_DIR}/build-constraints.txt" -r "${ROOT_DIR}/requirements-desktop.txt"
+pushd "${ROOT_DIR}" >/dev/null
+"${PYTHON_BIN}" -m pip install --upgrade --constraint constraints.txt pip
+"${PYTHON_BIN}" -m pip install --build-constraint build-constraints.txt -r requirements-desktop.txt
 "${PYTHON_BIN}" -m pip check
+popd >/dev/null
 
 log "Checking PyInstaller availability..."
 "${PYTHON_BIN}" -m PyInstaller --version >/dev/null

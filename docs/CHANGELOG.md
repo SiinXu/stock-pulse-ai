@@ -317,6 +317,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Chore] Converged the remaining extended notification sender adapters and package exports into `src/notification_parts/senders/` with strict legacy facades.
 - [Fixed] Serialized public plugin lifecycle operations with composition-root close, replacement, and reset so closed roots cannot be republished, callback-owned workers cannot deadlock, and terminal process shutdown cannot recreate the root.
 - [Docs] Moved the design contract into `docs/` and added compact repository maps to all homepage language variants.
+- [Chore] Permanently disabled secret access from pull-request AI review, rejected secret inheritance and tag/default-ref confusion, and hardened install guidance against nested commands, redirection decoys, dynamic paths, launcher/module entry points, Docker exec form, and explicit YAML indentation.
 
 ## [3.26.3] - 2026-07-15
 
