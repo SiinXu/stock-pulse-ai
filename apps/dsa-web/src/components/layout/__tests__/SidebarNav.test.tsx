@@ -390,7 +390,36 @@ describe('SidebarNav', () => {
     let currentLinks = marketRender.container.querySelectorAll('a[aria-current="page"]');
     expect(currentLinks).toHaveLength(1);
     expect(currentLinks[0]).toBe(expandedMarketChild);
+
+    const researchToggle = screen.getByRole('button', { name: '研究' });
+    fireEvent.click(researchToggle);
+    expect(researchParent).toHaveAttribute('aria-current', 'page');
+    expect(screen.queryByRole('link', { name: '大盘复盘' })).not.toBeInTheDocument();
+    currentLinks = marketRender.container.querySelectorAll('a[aria-current="page"]');
+    expect(currentLinks).toHaveLength(1);
+    expect(currentLinks[0]).toBe(researchParent);
+
+    fireEvent.click(researchToggle);
+    expect(researchParent).not.toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: '大盘复盘' })).toHaveAttribute('aria-current', 'page');
     marketRender.unmount();
+
+    const signalsRender = render(
+      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.decisionSignals]}>
+        <SidebarNav />
+      </MemoryRouter>,
+    );
+    const homeParent = screen.getByRole('link', { name: '首页' });
+    const signalsChild = screen.getByRole('link', { name: 'AI 建议' });
+    expect(homeParent).not.toHaveAttribute('aria-current', 'page');
+    expect(signalsChild).toHaveAttribute('aria-current', 'page');
+    fireEvent.click(screen.getByRole('button', { name: '首页' }));
+    expect(homeParent).toHaveAttribute('aria-current', 'page');
+    expect(screen.queryByRole('link', { name: 'AI 建议' })).not.toBeInTheDocument();
+    currentLinks = signalsRender.container.querySelectorAll('a[aria-current="page"]');
+    expect(currentLinks).toHaveLength(1);
+    expect(currentLinks[0]).toBe(homeParent);
+    signalsRender.unmount();
 
     const discoverRender = render(
       <MemoryRouter initialEntries={[APP_ROUTE_PATHS.researchDiscover]}>
@@ -408,6 +437,10 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
     const research = screen.getByRole('link', { name: '研究' });
+    expect(research).toHaveAttribute('aria-current', 'page');
+    currentLinks = compactRender.container.querySelectorAll('a[aria-current="page"]');
+    expect(currentLinks).toHaveLength(1);
+    expect(currentLinks[0]).toBe(research);
     fireEvent.mouseEnter(research);
     const menu = await screen.findByRole('menu', { name: '研究' });
     const compactMarketChild = within(menu).getByRole('menuitem', { name: '大盘复盘' });

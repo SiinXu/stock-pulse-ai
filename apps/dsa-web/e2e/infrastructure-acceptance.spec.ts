@@ -710,9 +710,42 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(researchParent).not.toHaveAttribute('aria-current', 'page');
     await expect(marketChild).toHaveAttribute('aria-current', 'page');
     await expect(navigation.locator('a[aria-current="page"]')).toHaveCount(1);
+    const researchToggle = navigation.getByRole('button', { name: UI_TEXT.en['layout.nav.research'] });
+    await researchToggle.click();
+    await expect(researchParent).toHaveAttribute('aria-current', 'page');
+    await expect(marketChild).toBeHidden();
+    await expect(navigation.locator('a[aria-current="page"]')).toHaveCount(1);
+    await researchToggle.click();
+    await expect(researchParent).not.toHaveAttribute('aria-current', 'page');
+    await expect(marketChild).toHaveAttribute('aria-current', 'page');
     await assertRouteChrome(page, APP_ROUTE_PATHS.researchDiscover, SCREENING_TEXT.en.title, SCREENING_TEXT.en.documentTitle);
     await assertRouteChrome(page, APP_ROUTE_PATHS.portfolio, PORTFOLIO_TEXT.en.title, PORTFOLIO_TEXT.en.documentTitle);
     await assertRouteChrome(page, APP_ROUTE_PATHS.decisionSignals, UI_TEXT.en['decisionSignals.title'], UI_TEXT.en['decisionSignals.pageTitle']);
+    const homeParent = navigation.getByRole('link', { name: UI_TEXT.en['layout.nav.home'] });
+    const signalChild = navigation.getByRole('link', { name: UI_TEXT.en['layout.nav.decisionSignals'] });
+    const homeToggle = navigation.getByRole('button', { name: UI_TEXT.en['layout.nav.home'] });
+    await expect(homeParent).not.toHaveAttribute('aria-current', 'page');
+    await expect(signalChild).toHaveAttribute('aria-current', 'page');
+    await homeToggle.click();
+    await expect(homeParent).toHaveAttribute('aria-current', 'page');
+    await expect(signalChild).toBeHidden();
+    await expect(navigation.locator('a[aria-current="page"]')).toHaveCount(1);
+    await homeToggle.click();
+    await expect(signalChild).toHaveAttribute('aria-current', 'page');
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole('button', { name: UI_TEXT.en['layout.openNav'] }).click();
+    const drawerNavigation = page.getByRole('dialog', { name: UI_TEXT.en['layout.navMenu'] })
+      .getByRole('navigation', { name: UI_TEXT.en['layout.mainNav'] });
+    const drawerHome = drawerNavigation.getByRole('link', { name: UI_TEXT.en['layout.nav.home'] });
+    const drawerSignal = drawerNavigation.getByRole('link', { name: UI_TEXT.en['layout.nav.decisionSignals'] });
+    await expect(drawerSignal).toHaveAttribute('aria-current', 'page');
+    await drawerNavigation.getByRole('button', { name: UI_TEXT.en['layout.nav.home'] }).click();
+    await expect(drawerHome).toHaveAttribute('aria-current', 'page');
+    await expect(drawerSignal).toBeHidden();
+    await expect(drawerNavigation.locator('a[aria-current="page"]')).toHaveCount(1);
+    await page.getByRole('button', { name: UI_TEXT.en['common.closeDrawer'] }).click();
+    await page.setViewportSize({ width: 1280, height: 720 });
     await assertRouteChrome(page, APP_ROUTE_PATHS.researchBacktest, BACKTEST_TEXT.en.runBacktest, BACKTEST_TEXT.en.documentTitle);
     await assertRouteChrome(page, APP_ROUTE_PATHS.alerts, ALERT_PAGE_TEXT.en.title, ALERT_PAGE_TEXT.en.documentTitle);
     await assertRouteChrome(page, usageSettingsHref, UI_TEXT.en['usage.title'], UI_TEXT.en['usage.title']);
@@ -801,6 +834,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
         },
         expectedMarket: null,
         expectedStrategy: 'custom_strategy_alpha',
+        expectedStrategyLabel: `${SCREENING_TEXT.en.customStrategy} (custom_strategy_alpha)`,
         expectedCount: '17',
       },
       {
@@ -813,6 +847,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
         },
         expectedMarket: RESEARCH_DISCOVER_DEFAULT_VALUES.market,
         expectedStrategy: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
+        expectedStrategyLabel: 'Dual low',
         expectedCount: String(RESEARCH_DISCOVER_DEFAULT_VALUES.count),
       },
       {
@@ -825,6 +860,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
         },
         expectedMarket: RESEARCH_DISCOVER_DEFAULT_VALUES.market,
         expectedStrategy: RESEARCH_DISCOVER_DEFAULT_VALUES.strategy,
+        expectedStrategyLabel: 'Dual low',
         expectedCount: String(RESEARCH_DISCOVER_DEFAULT_VALUES.count),
       },
     ] as const;
@@ -856,8 +892,9 @@ test.describe('infrastructure interaction acceptance matrix', () => {
               .toBe(intentCase.expectedCount);
             expect(currentUrl.searchParams.get('source')).toBe('notification');
             expect(currentUrl.hash).toBe('#details');
-            await expect(page.getByRole('combobox', { name: SCREENING_TEXT.en.selectStrategy }))
-              .toHaveAttribute('data-value', intentCase.expectedStrategy);
+            const strategyCombobox = page.getByRole('combobox', { name: SCREENING_TEXT.en.selectStrategy });
+            await expect(strategyCombobox).toHaveAttribute('data-value', intentCase.expectedStrategy);
+            await expect(strategyCombobox).toContainText(intentCase.expectedStrategyLabel);
             await page.getByRole('button', { name: SCREENING_TEXT.en.parameters }).click();
             await expect(page.getByRole('dialog', { name: SCREENING_TEXT.en.parameters })
               .getByLabel(SCREENING_TEXT.en.resultCount)).toHaveValue(intentCase.expectedCount);

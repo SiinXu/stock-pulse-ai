@@ -574,6 +574,14 @@ const StockScreeningPage: React.FC = () => {
   );
   const selectedStrategyTag = selectedStrategyDisplay?.category || text.custom;
   const displayedStrategy = selectedStrategyDisplay?.name ?? `${text.customStrategy} (${strategy})`;
+  const strategyOptions = useMemo(() => {
+    const catalogOptions = strategies.map((item) => ({
+      value: item.id,
+      label: getStrategyDisplay(item, language).name,
+    }));
+    if (selectedStrategy || catalogOptions.length === 0) return catalogOptions;
+    return [{ value: strategy, label: displayedStrategy }, ...catalogOptions];
+  }, [displayedStrategy, language, selectedStrategy, strategies, strategy]);
   const screenMessages = useMemo(() => getScreenMessages(screenMeta, text), [screenMeta, text]);
   const llmDegraded = screenMeta?.llmRanked === false;
   const alertMessages = llmDegraded
@@ -1490,10 +1498,7 @@ const StockScreeningPage: React.FC = () => {
             <Select
               value={strategy}
               onChange={handleStrategyChange}
-              options={strategies.map((item) => ({
-                value: item.id,
-                label: getStrategyDisplay(item, language).name,
-              }))}
+              options={strategyOptions}
               ariaLabel={text.selectStrategy}
               placeholder={loadingStrategies ? text.loadingStrategies : text.strategiesUnavailable}
               disabled={loading || loadingStrategies || strategies.length === 0}

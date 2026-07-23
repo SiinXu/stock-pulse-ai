@@ -233,11 +233,28 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
           const activeChild = children?.find((child) => isRouteActive(child.to, child.exact));
           const groupActive = isRouteActive(to, exact)
             || Boolean(activeChild);
+          const renderItemContent = (active: boolean) => (
+            <>
+              <Icon className={cn(itemIconClass, active ? 'text-[var(--nav-icon-active)]' : 'text-current')} />
+              {!collapsed ? <span className={itemLabelClass}>{label}</span> : null}
+              {badge === 'completion' && completionBadge ? (
+                <StatusDot
+                  tone="info"
+                  data-testid="chat-completion-badge"
+                  className={cn(
+                    'absolute right-3 border-2 border-background shadow-soft-card',
+                    collapsed ? 'right-2 top-2' : ''
+                  )}
+                  aria-label={t('layout.newChatMessage')}
+                />
+              ) : null}
+            </>
+          );
           const link = (
             <NavLink
               to={navigationTarget}
               end={exact}
-              aria-current={children && activeChild ? false : 'page'}
+              aria-current="page"
               onClick={(event) => {
                 if (shouldDelegateCurrentDocumentNavigation(event)) {
                   onNavigate?.();
@@ -253,26 +270,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                 )
               }
             >
-              {({ isActive }) => {
-                const active = isActive || groupActive;
-                return (
-                <>
-                  <Icon className={cn(itemIconClass, active ? 'text-[var(--nav-icon-active)]' : 'text-current')} />
-                  {!collapsed ? <span className={itemLabelClass}>{label}</span> : null}
-                  {badge === 'completion' && completionBadge ? (
-                    <StatusDot
-                      tone="info"
-                      data-testid="chat-completion-badge"
-                      className={cn(
-                        'absolute right-3 border-2 border-background shadow-soft-card',
-                        collapsed ? 'right-2 top-2' : ''
-                      )}
-                      aria-label={t('layout.newChatMessage')}
-                    />
-                  ) : null}
-                </>
-                );
-              }}
+              {({ isActive }) => renderItemContent(isActive || groupActive)}
             </NavLink>
           );
 
@@ -311,11 +309,10 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                   });
                 }}
                 trigger={({ open }) => (
-                  <NavLink
+                  <Link
                     to={navigationTarget}
-                    end={exact}
                     aria-label={label}
-                    aria-current={open && activeChild ? false : 'page'}
+                    aria-current={groupActive && !(open && activeChild) ? 'page' : undefined}
                     aria-haspopup="menu"
                     aria-expanded={open}
                     aria-controls={open ? contentId : undefined}
@@ -336,12 +333,12 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                     }}
                     className={cn(itemInteractiveClass, groupActive ? itemActiveClass : '')}
                   >
-                    <Icon className={cn(itemIconClass, groupActive ? 'text-[var(--nav-icon-active)]' : 'text-current')} />
+                    {renderItemContent(groupActive)}
                     <ChevronRight
                       className="absolute bottom-1.5 right-1.5 h-3 w-3 text-muted-text"
                       aria-hidden="true"
                     />
-                  </NavLink>
+                  </Link>
                 )}
               >
                 {() => (
@@ -391,7 +388,23 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
             return (
               <div key={key} className="flex shrink-0 flex-col gap-1">
                 <div className="flex items-center gap-1">
-                  <div className="min-w-0 flex-1">{link}</div>
+                  <div className="min-w-0 flex-1">
+                    <Link
+                      to={navigationTarget}
+                      aria-current={groupActive && !childrenExpanded ? 'page' : undefined}
+                      onClick={(event) => {
+                        if (shouldDelegateCurrentDocumentNavigation(event)) {
+                          onNavigate?.();
+                        }
+                      }}
+                      aria-label={label}
+                      data-route-focus-key={`${focusKeyPrefix}:${key}`}
+                      data-route-focus-return-key={returnFocusKey}
+                      className={cn(itemInteractiveClass, groupActive ? itemActiveClass : '')}
+                    >
+                      {renderItemContent(groupActive)}
+                    </Link>
+                  </div>
                   <button
                     type="button"
                     aria-label={label}

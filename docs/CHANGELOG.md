@@ -8,7 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [Changed] Made secondary sidebar groups collapsible and preserved explicit Discover URL ownership across default, malformed, refreshed, legacy, and safe custom-strategy links.
 - [Fixed] Unified Research URL sanitization across page, deep-link, and session consumers so explicit Discover filters survive active-task restoration and malformed Backtest filters never reach API requests.
 - [Tests] Added a blocking hosted `python-minimum` job that runs the full backend gate on Python 3.10, with portable timeout and exception-group guard fixtures, while retaining the Python 3.11 gate.
 - [Fixed] Removed false disclosure cues from always-expanded Web navigation, aligned the Discover empty-state accessible name with its visible action, and centralized Research URL state constants.
@@ -320,6 +319,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Docs] Moved the design contract into `docs/` and added compact repository maps to all homepage language variants.
 - [Chore] Permanently disabled secret access from pull-request AI review, rejected secret inheritance and tag/default-ref confusion, and hardened install guidance against nested commands, redirection decoys, dynamic paths, launcher/module entry points, Docker exec form, and explicit YAML indentation.
 - [Tests] Fixed the settings help locale contract test to read the per-language help sources introduced by the settings-help split, restoring the backend gate.
+- [Changed] Made secondary sidebar groups collapsible with visible current-page ownership and preserved explicit Discover URL ownership across default, malformed, refreshed, legacy, and safe custom-strategy links.
 
 ## [3.26.3] - 2026-07-15
 

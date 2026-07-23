@@ -784,7 +784,12 @@ describe('StockScreeningPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
     await waitFor(() => expect(screenStocks).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '参数设置' })).not.toBeInTheDocument());
-    await waitFor(() => expect(screen.getByText(/自定义策略 \(custom_strategy_alpha\)/)).toBeInTheDocument());
+    const strategyCombobox = screen.getByRole('combobox', { name: '选择策略' });
+    await waitFor(() => expect(strategyCombobox).toHaveTextContent('自定义策略 (custom_strategy_alpha)'));
+    await waitFor(() => expect(strategyCombobox).toBeEnabled());
+    fireEvent.click(strategyCombobox);
+    expect(screen.getByRole('option', { name: '自定义策略 (custom_strategy_alpha)' }))
+      .toHaveAttribute('aria-selected', 'true');
   });
 
   it('uses supported AlphaSift strategy ids and cn market', async () => {
@@ -1011,8 +1016,9 @@ describe('StockScreeningPage', () => {
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     await waitFor(() => expect(getStrategies).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(getScreenTask).toHaveBeenCalledWith('stored-custom-task'));
-    expect(screen.getByRole('combobox', { name: '选择策略' }))
-      .toHaveAttribute('data-value', 'custom_strategy_alpha');
+    const strategyCombobox = screen.getByRole('combobox', { name: '选择策略' });
+    expect(strategyCombobox).toHaveAttribute('data-value', 'custom_strategy_alpha');
+    expect(strategyCombobox).toHaveTextContent('自定义策略 (custom_strategy_alpha)');
     openScreeningConfiguration();
     expect(screen.getByLabelText('策略参数')).toHaveValue('custom_strategy_alpha');
     expect(screen.getByLabelText('返回数量')).toHaveValue(17);

@@ -151,7 +151,9 @@ stored run parameters are only a fallback for a bare Discover URL. Any explicit
 Discover-owned parameter selects the complete URL-owned run state, so stale
 task parameters cannot rewrite a canonical or legacy-redirect deep link. Safe
 custom strategy IDs remain URL-owned even when absent from the current preset
-catalog. Wholly malformed owned input normalizes to explicit canonical defaults
+catalog, and the primary strategy selector presents that retained value as the
+active custom option instead of an unavailable-catalog placeholder. Wholly
+malformed owned input normalizes to explicit canonical defaults
 instead of becoming bare, preserving the same precedence across refresh.
 
 Home continuity includes the validated task/history Run Flow identity owned by
@@ -394,7 +396,9 @@ the groups open by default, and allow users to collapse or reopen their child
 routes without turning the parent route link into a false toggle. Compact
 navigation opens the same children in a right-side hover or keyboard flyout;
 Right Arrow enters the flyout and Left Arrow or Escape restores its parent
-trigger.
+trigger. While a secondary subtree is visible, its active child is the sole
+`aria-current="page"` link. When that subtree is collapsed or its compact flyout
+is closed, the visible parent link inherits the same current-page semantic.
 
 Canonical Research paths are `/research/market`, `/research/discover`, and
 `/research/backtest`. The legacy `/screening` and `/backtest` URLs use the shared
