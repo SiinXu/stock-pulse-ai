@@ -4,7 +4,11 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { analysisApi } from '../../api/analysis';
 import type { HistoryListResponse } from '../../types/analysis';
-import { useMarketReviewRunner } from '../useMarketReviewRunner';
+import {
+  MARKET_REVIEW_POLL_INTERVAL_MS,
+  MARKET_REVIEW_POLL_MAX_ATTEMPTS,
+  useMarketReviewRunner,
+} from '../useMarketReviewRunner';
 
 vi.mock('../../api/analysis', async () => {
   const actual = await vi.importActual<typeof import('../../api/analysis')>('../../api/analysis');
@@ -86,7 +90,7 @@ describe('useMarketReviewRunner', () => {
     expect(result.current.notice?.title).toBe('大盘复盘进行中');
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(2_000);
+      await vi.advanceTimersByTimeAsync(MARKET_REVIEW_POLL_INTERVAL_MS);
     });
 
     expect(analysisApi.getStatus).toHaveBeenCalledTimes(2);
@@ -132,6 +136,101 @@ describe('useMarketReviewRunner', () => {
       '大盘复盘任务已完成，结果已生成并按配置推送。',
     );
     expect(JSON.stringify(result.current)).not.toContain('RAW_TASK_OUTPUT_MUST_NOT_RENDER');
+  });
+
+  it('surfaces a terminal task failure and stops polling', async () => {
+    vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
+      status: 'accepted',
+      sendNotification: true,
+      message: 'Accepted',
+      taskId: 'market-task',
+    });
+    vi.mocked(analysisApi.getStatus).mockResolvedValue({
+      taskId: 'market-task',
+      status: 'failed',
+      error: 'Provider unavailable',
+    });
+    const onFeedback = vi.fn();
+    const { result } = renderHook(() => useMarketReviewRunner({
+      notify: true,
+      refreshMarketReviewHistory: vi.fn().mockResolvedValue(emptyHistory),
+      onPersistedReport: vi.fn(),
+      onFeedback,
+    }));
+
+    await act(async () => {
+      await result.current.triggerMarketReview();
+      await Promise.resolve();
+    });
+
+    expect(result.current.error).toMatchObject({
+      code: 'market_review_failed',
+      status: 500,
+      rawMessage: 'Provider unavailable',
+    });
+    expect(result.current.notice).toBeNull();
+    expect(analysisApi.getStatus).toHaveBeenCalledTimes(1);
+    expect(onFeedback).toHaveBeenCalled();
+  });
+
+  it('reports a bounded timeout after the maximum polling attempts', async () => {
+    vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
+      status: 'accepted',
+      sendNotification: false,
+      message: 'Accepted',
+      taskId: 'market-task',
+    });
+    vi.mocked(analysisApi.getStatus).mockResolvedValue({
+      taskId: 'market-task',
+      status: 'processing',
+      progress: 25,
+    });
+    const { result } = renderHook(() => useMarketReviewRunner({
+      notify: false,
+      refreshMarketReviewHistory: vi.fn().mockResolvedValue(emptyHistory),
+      onPersistedReport: vi.fn(),
+    }));
+
+    await act(async () => {
+      await result.current.triggerMarketReview();
+      await vi.advanceTimersByTimeAsync(
+        MARKET_REVIEW_POLL_INTERVAL_MS * MARKET_REVIEW_POLL_MAX_ATTEMPTS,
+      );
+    });
+
+    expect(analysisApi.getStatus).toHaveBeenCalledTimes(MARKET_REVIEW_POLL_MAX_ATTEMPTS);
+    expect(result.current.notice).toEqual({
+      variant: 'danger',
+      title: '大盘复盘已超时',
+      message: '任务长时间未返回最终结果，请在任务列表/历史中查看。',
+    });
+    expect(result.current.error).toBeNull();
+  });
+
+  it('surfaces a trigger failure without starting status polling', async () => {
+    vi.mocked(analysisApi.triggerMarketReview).mockRejectedValue({
+      response: {
+        status: 503,
+        data: { error: 'market_review_unavailable', message: 'Service unavailable' },
+      },
+    });
+    const { result } = renderHook(() => useMarketReviewRunner({
+      notify: true,
+      refreshMarketReviewHistory: vi.fn().mockResolvedValue(emptyHistory),
+      onPersistedReport: vi.fn(),
+    }));
+
+    await act(async () => {
+      await result.current.triggerMarketReview();
+    });
+
+    expect(result.current.error).toMatchObject({
+      code: 'market_review_unavailable',
+      status: 503,
+      rawMessage: 'Service unavailable',
+    });
+    expect(result.current.notice).toBeNull();
+    expect(analysisApi.getStatus).not.toHaveBeenCalled();
   });
 
   it('ignores a superseded poll result after a newer run completes', async () => {

@@ -19,6 +19,9 @@ type UseMarketReviewRunnerOptions = {
   onFeedback?: () => void;
 };
 
+export const MARKET_REVIEW_POLL_MAX_ATTEMPTS = 120;
+export const MARKET_REVIEW_POLL_INTERVAL_MS = 2_000;
+
 export function useMarketReviewRunner({
   notify,
   refreshMarketReviewHistory,
@@ -65,13 +68,11 @@ export function useMarketReviewRunner({
     const isCurrent = () => (
       activeRef.current && generation === pollGenerationRef.current
     );
-    const maxAttempts = 120;
-    const intervalMs = 2_000;
     let attempts = 0;
 
     const poll = async (): Promise<boolean> => {
       if (!isCurrent()) return false;
-      if (attempts >= maxAttempts) {
+      if (attempts >= MARKET_REVIEW_POLL_MAX_ATTEMPTS) {
         setNotice({
           variant: 'danger',
           title: t('home.marketReviewTimeout'),
@@ -141,7 +142,7 @@ export function useMarketReviewRunner({
         return false;
       } catch (pollError: unknown) {
         if (!isCurrent()) return false;
-        if (attempts >= maxAttempts) {
+        if (attempts >= MARKET_REVIEW_POLL_MAX_ATTEMPTS) {
           setError(getParsedApiError(pollError));
           setNotice(null);
           onFeedbackRef.current?.();
@@ -156,7 +157,7 @@ export function useMarketReviewRunner({
       if (!isCurrent() || !shouldContinue) return;
       pollTimerRef.current = window.setTimeout(() => {
         void runPoll();
-      }, intervalMs);
+      }, MARKET_REVIEW_POLL_INTERVAL_MS);
     };
 
     await runPoll();

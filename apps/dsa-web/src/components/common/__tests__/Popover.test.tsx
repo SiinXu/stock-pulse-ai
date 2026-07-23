@@ -75,6 +75,55 @@ describe('Popover', () => {
     }
   });
 
+  it('falls back to the left and stays inside the viewport near the right edge', async () => {
+    const rect = (left: number, top: number, width: number, height: number): DOMRect => ({
+      bottom: top + height,
+      height,
+      left,
+      right: left + width,
+      top,
+      width,
+      x: left,
+      y: top,
+      toJSON: () => ({}),
+    });
+    const originalInnerWidth = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1_024 });
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function getBoundingClientRect(this: HTMLElement) {
+        return this.getAttribute('role') === 'menu'
+          ? rect(0, 0, 180, 100)
+          : rect(970, 50, 44, 44);
+      });
+    try {
+      render(
+        <Popover
+          defaultOpen
+          placement="right"
+          autoFocusContent={false}
+          contentRole="menu"
+          ariaLabel="Research"
+          trigger={() => <button type="button">Research</button>}
+        >
+          <a href={APP_ROUTE_PATHS.researchMarket} role="menuitem">Market review</a>
+        </Popover>,
+      );
+
+      const menu = await screen.findByRole('menu', { name: 'Research' });
+      await waitFor(() => expect(menu.style.visibility).toBe('visible'));
+      const left = Number.parseFloat(menu.style.left);
+      expect(left).toBeLessThan(970);
+      expect(left).toBeGreaterThanOrEqual(8);
+      expect(left + 180).toBeLessThanOrEqual(window.innerWidth - 8);
+    } finally {
+      rectSpy.mockRestore();
+      Object.defineProperty(window, 'innerWidth', {
+        configurable: true,
+        value: originalInnerWidth,
+      });
+    }
+  });
+
   it('supports controlled state and Escape closing', () => {
     const onOpenChange = vi.fn();
     const { rerender } = render(

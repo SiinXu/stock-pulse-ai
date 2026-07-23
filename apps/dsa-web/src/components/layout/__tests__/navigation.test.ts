@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { APP_ROUTE_PATHS, LEGACY_ROUTE_PATHS } from '../../../routing/routes';
+import {
+  APP_ROUTE_PATHS,
+  LEGACY_ROUTE_PATHS,
+  REPORT_ROUTE_QUERY_KEYS,
+  RESEARCH_BACKTEST_PHASE_VALUES,
+  RESEARCH_BACKTEST_ROUTE_QUERY_KEYS,
+  RESEARCH_DISCOVER_MARKET_VALUES,
+  RESEARCH_DISCOVER_ROUTE_QUERY_KEYS,
+  RUN_FLOW_ROUTE_QUERY_VALUES,
+} from '../../../routing/routes';
 import {
   APPLICATION_NAVIGATION_ITEMS,
   shouldDelegateCurrentDocumentNavigation,
@@ -37,6 +46,37 @@ describe('application navigation descriptor', () => {
     expect(targets).not.toContain(LEGACY_ROUTE_PATHS.screening);
     expect(targets).not.toContain(LEGACY_ROUTE_PATHS.backtest);
     expect(targets).not.toContain('/more');
+  });
+
+  it('centralizes Research and shared report URL state names and legal values', () => {
+    expect(Object.values(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS)).toEqual([
+      'market',
+      'strategy',
+      'count',
+    ]);
+    expect(Object.values(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS)).toEqual([
+      'code',
+      'window',
+      'from',
+      'to',
+      'phase',
+      'page',
+    ]);
+    expect(Object.values(REPORT_ROUTE_QUERY_KEYS)).toEqual([
+      'recordId',
+      'runFlow',
+      'runFlowRecordId',
+      'runFlowTaskId',
+    ]);
+    expect(Object.values(RESEARCH_DISCOVER_MARKET_VALUES)).toEqual(['cn']);
+    expect(Object.values(RESEARCH_BACKTEST_PHASE_VALUES)).toEqual([
+      'all',
+      'premarket',
+      'intraday',
+      'postmarket',
+      'unknown',
+    ]);
+    expect(Object.values(RUN_FLOW_ROUTE_QUERY_VALUES)).toEqual(['history', 'task']);
   });
 
   it('delegates only unmodified primary same-window link activation', () => {

@@ -41,6 +41,10 @@ import { formatParsedApiError, getParsedApiError, toApiErrorMessage, type Parsed
 import { AppPage, Button, DataTable, type DataTableColumn, InlineAlert, Input, Modal, Select, Surface } from '../components/common';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
+import {
+  RESEARCH_DISCOVER_MARKET_VALUES,
+  RESEARCH_DISCOVER_ROUTE_QUERY_KEYS,
+} from '../routing/routes';
 import { SCREENING_TEXT } from '../locales/screening';
 import { formatUiDateTime, formatUiNumber, getUiListSeparator } from '../utils/uiLocale';
 import { formatTaskMessage } from '../utils/taskMessage';
@@ -59,7 +63,7 @@ type PersistedScreenTask = {
 type ScreeningRunParameters = Omit<PersistedScreenTask, 'taskId'>;
 
 const DEFAULT_SCREENING_RUN_PARAMETERS: ScreeningRunParameters = {
-  market: 'cn',
+  market: RESEARCH_DISCOVER_MARKET_VALUES.china,
   strategy: 'dual_low',
   maxResults: 3,
 };
@@ -76,10 +80,13 @@ const readScreeningRunParameters = (
     };
   }
   const params = new URLSearchParams(search);
-  const count = Number(params.get('count'));
-  const strategy = params.get('strategy')?.trim();
+  const count = Number(params.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count));
+  const strategy = params.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy)?.trim();
   return {
-    market: params.get('market') === 'cn' ? 'cn' : DEFAULT_SCREENING_RUN_PARAMETERS.market,
+    market: params.get(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market)
+      === RESEARCH_DISCOVER_MARKET_VALUES.china
+      ? RESEARCH_DISCOVER_MARKET_VALUES.china
+      : DEFAULT_SCREENING_RUN_PARAMETERS.market,
     strategy: strategy || DEFAULT_SCREENING_RUN_PARAMETERS.strategy,
     maxResults: Number.isInteger(count) && count >= 1 && count <= 100
       ? count
@@ -91,9 +98,15 @@ const getScreeningRunParametersLocation = ({ market, strategy, maxResults }: Scr
   if (typeof window === 'undefined') return null;
   const url = new URL(window.location.href);
   const values: Record<string, string | undefined> = {
-    market: market === DEFAULT_SCREENING_RUN_PARAMETERS.market ? undefined : market,
-    strategy: strategy === DEFAULT_SCREENING_RUN_PARAMETERS.strategy ? undefined : strategy,
-    count: maxResults === DEFAULT_SCREENING_RUN_PARAMETERS.maxResults ? undefined : String(maxResults),
+    [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market]: market === DEFAULT_SCREENING_RUN_PARAMETERS.market
+      ? undefined
+      : market,
+    [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy]: strategy === DEFAULT_SCREENING_RUN_PARAMETERS.strategy
+      ? undefined
+      : strategy,
+    [RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count]: maxResults === DEFAULT_SCREENING_RUN_PARAMETERS.maxResults
+      ? undefined
+      : String(maxResults),
   };
   Object.entries(values).forEach(([key, value]) => {
     if (value) url.searchParams.set(key, value);
@@ -118,7 +131,9 @@ const readPersistedScreenTask = (): PersistedScreenTask | null => {
     const restoredMaxResults = Number(parsed.maxResults);
     return {
       taskId: parsed.taskId,
-      market: typeof parsed.market === 'string' && parsed.market.trim() ? parsed.market : 'cn',
+      market: typeof parsed.market === 'string' && parsed.market.trim()
+        ? parsed.market
+        : RESEARCH_DISCOVER_MARKET_VALUES.china,
       strategy: typeof parsed.strategy === 'string' && parsed.strategy.trim() ? parsed.strategy : 'dual_low',
       maxResults: Number.isFinite(restoredMaxResults) ? Math.min(100, Math.max(1, restoredMaxResults)) : 3,
     };
@@ -537,7 +552,10 @@ const StockScreeningPage: React.FC = () => {
   const { language, t } = useUiLanguage();
   const configurationFormId = useId();
   const text = SCREENING_TEXT[language];
-  const markets = useMemo(() => [{ id: 'cn', label: text.marketCn }], [text.marketCn]);
+  const markets = useMemo(
+    () => [{ id: RESEARCH_DISCOVER_MARKET_VALUES.china, label: text.marketCn }],
+    [text.marketCn],
+  );
   const [restoredTask] = useState<PersistedScreenTask | null>(() => readPersistedScreenTask());
   const [initialRunParameters] = useState<ScreeningRunParameters>(() => readScreeningRunParameters(restoredTask));
   const [statusLoading, setStatusLoading] = useState(true);
@@ -1680,7 +1698,7 @@ const StockScreeningPage: React.FC = () => {
                 variant="primary"
                 size="default"
                 disabled={loading}
-                aria-label={text.waitingRun}
+                aria-label={`${text.run} · ${text.noResults}`}
                 onClick={handleOpenConfiguration}
               >
                 <Play className="h-4 w-4" aria-hidden="true" />

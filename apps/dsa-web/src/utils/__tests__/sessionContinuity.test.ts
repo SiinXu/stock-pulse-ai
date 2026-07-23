@@ -1,7 +1,15 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { beforeEach, describe, expect, it } from 'vitest';
-import { APP_ROUTE_PATHS, LEGACY_ROUTE_PATHS } from '../../routing/routes';
+import {
+  APP_ROUTE_PATHS,
+  LEGACY_ROUTE_PATHS,
+  REPORT_ROUTE_QUERY_KEYS,
+  RESEARCH_BACKTEST_ROUTE_QUERY_KEYS,
+  RESEARCH_DISCOVER_MARKET_VALUES,
+  RESEARCH_DISCOVER_ROUTE_QUERY_KEYS,
+  RUN_FLOW_ROUTE_QUERY_VALUES,
+} from '../../routing/routes';
 import { WEB_SESSION_CONTINUITY_STORAGE_KEY } from '../sessionPersistence';
 import {
   recordSessionLocation,
@@ -142,16 +150,16 @@ describe('sessionContinuity', () => {
     window.sessionStorage.setItem(WEB_SESSION_CONTINUITY_STORAGE_KEY, JSON.stringify({
       version: 1,
       routes: {
-        screening: `${LEGACY_ROUTE_PATHS.screening}?market=cn&strategy=quality&count=20`,
-        backtest: `${LEGACY_ROUTE_PATHS.backtest}?code=aapl&window=30`,
+        screening: `${LEGACY_ROUTE_PATHS.screening}?${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market}=${RESEARCH_DISCOVER_MARKET_VALUES.china}&${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy}=quality&${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count}=20`,
+        backtest: `${LEGACY_ROUTE_PATHS.backtest}?${RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code}=aapl&${RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.window}=30`,
       },
     }));
 
     expect(resolveInitialSessionHref(APP_ROUTE_PATHS.researchDiscover)).toBe(
-      `${APP_ROUTE_PATHS.researchDiscover}?market=cn&strategy=quality&count=20`,
+      `${APP_ROUTE_PATHS.researchDiscover}?${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.market}=${RESEARCH_DISCOVER_MARKET_VALUES.china}&${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.strategy}=quality&${RESEARCH_DISCOVER_ROUTE_QUERY_KEYS.count}=20`,
     );
     expect(resolveInitialSessionHref(APP_ROUTE_PATHS.researchBacktest)).toBe(
-      `${APP_ROUTE_PATHS.researchBacktest}?code=AAPL&window=30`,
+      `${APP_ROUTE_PATHS.researchBacktest}?${RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code}=AAPL&${RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.window}=30`,
     );
     const persisted = window.sessionStorage.getItem(WEB_SESSION_CONTINUITY_STORAGE_KEY) ?? '';
     expect(persisted).toContain('research-discover');
@@ -162,11 +170,11 @@ describe('sessionContinuity', () => {
 
   it('restores market review record and Run Flow state on the canonical route', () => {
     recordSessionLocation(
-      `${APP_ROUTE_PATHS.researchMarket}?recordId=42&runFlow=history&runFlowRecordId=42`,
+      `${APP_ROUTE_PATHS.researchMarket}?${REPORT_ROUTE_QUERY_KEYS.recordId}=42&${REPORT_ROUTE_QUERY_KEYS.runFlow}=${RUN_FLOW_ROUTE_QUERY_VALUES.history}&${REPORT_ROUTE_QUERY_KEYS.runFlowRecordId}=42`,
     );
 
     expect(resolveInitialSessionHref(APP_ROUTE_PATHS.researchMarket)).toBe(
-      `${APP_ROUTE_PATHS.researchMarket}?recordId=42&runFlow=history&runFlowRecordId=42`,
+      `${APP_ROUTE_PATHS.researchMarket}?${REPORT_ROUTE_QUERY_KEYS.recordId}=42&${REPORT_ROUTE_QUERY_KEYS.runFlow}=${RUN_FLOW_ROUTE_QUERY_VALUES.history}&${REPORT_ROUTE_QUERY_KEYS.runFlowRecordId}=42`,
     );
   });
 
