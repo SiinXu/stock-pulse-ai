@@ -22,6 +22,7 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     BacktestSummary Base Boolean CURRENT_SCHEMA_VERSION Callable Column
     ConversationMessage ConversationSummary DatabaseManager
     DatabaseSchemaMigration Date DateTime DecisionSignalFeedbackRecord
+    DecisionSignalMemoryFlagRecord
     DecisionSignalOutcomeRecord DecisionSignalRecord Dict Float ForeignKey
     FundamentalSnapshot INTELLIGENCE_ITEM_NULL_SCOPE_VALUE Index Integer
     IntegrityError IntelligenceItem IntelligenceSource
@@ -114,6 +115,7 @@ EXPECTED_SCHEMA_MODELS = (
     "DecisionSignalRecord",
     "DecisionSignalOutcomeRecord",
     "DecisionSignalFeedbackRecord",
+    "DecisionSignalMemoryFlagRecord",
 )
 EXPECTED_SCHEMA_TABLES = (
     "schema_migrations",
@@ -145,6 +147,7 @@ EXPECTED_SCHEMA_TABLES = (
     "decision_signals",
     "decision_signal_outcomes",
     "decision_signal_feedback",
+    "decision_signal_memory_flags",
 )
 EXPECTED_SCHEMA_METHODS = {
     "StockDaily": ("__repr__", "to_dict"),
@@ -162,6 +165,9 @@ EXPECTED_UTC_COLUMN_CALLBACKS = (
     ("decision_signal_feedback", "created_at", "default"),
     ("decision_signal_feedback", "updated_at", "default"),
     ("decision_signal_feedback", "updated_at", "onupdate"),
+    ("decision_signal_memory_flags", "created_at", "default"),
+    ("decision_signal_memory_flags", "updated_at", "default"),
+    ("decision_signal_memory_flags", "updated_at", "onupdate"),
 )
 
 EXPECTED_GROUPS = (

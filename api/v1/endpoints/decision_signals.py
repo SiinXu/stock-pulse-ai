@@ -17,6 +17,8 @@ from api.v1.schemas.decision_signals import (
     DecisionSignalFeedbackRequest,
     DecisionSignalItem,
     DecisionSignalListResponse,
+    DecisionSignalMemoryFlagItem,
+    DecisionSignalMemoryFlagRequest,
     DecisionSignalMutationResponse,
     DecisionSignalOutcomeListResponse,
     DecisionSignalOutcomeRunRequest,
@@ -33,6 +35,7 @@ from src.services.decision_signal_service import (
     DecisionSignalService,
     DecisionSignalStorageError,
 )
+from src.services.decision_memory_service import DecisionMemoryService
 from src.services.decision_signal_outcome_service import DecisionSignalOutcomeService
 from src.services.decision_signal_reassess_service import (
     DecisionSignalReassessGuardrailBlockedError,
@@ -507,6 +510,78 @@ def put_feedback(signal_id: int, request: DecisionSignalFeedbackRequest) -> Deci
         raise _bad_request(exc)
     except Exception as exc:
         raise _internal_error("Put decision signal feedback failed", exc)
+
+
+@router.get(
+    "/{signal_id}/memory-flag",
+    response_model=DecisionSignalMemoryFlagItem,
+    responses={
+        **AUTH_RESPONSE,
+        404: {"model": ErrorResponse, "description": "信号不存在"},
+        422: {"model": ErrorResponse, "description": "路径参数校验失败"},
+        500: {"model": ErrorResponse, "description": "查询失败"},
+    },
+    summary="查询决策信号记忆标记",
+    description="返回 memorable/ignored 标记；未标记时均为 false；信号不存在时返回 404。",
+    operation_id="getDecisionSignalMemoryFlag",
+)
+def get_memory_flag(signal_id: int) -> DecisionSignalMemoryFlagItem:
+    service = DecisionMemoryService()
+    try:
+        return DecisionSignalMemoryFlagItem(**service.get_flag(signal_id))
+    except DecisionSignalNotFoundError as exc:
+        raise _not_found(exc)
+    except Exception as exc:  # broad-exception: fallback_recorded - map memory flag read failures to a sanitized API error
+        log_safe_exception(
+            logger, "Get decision signal memory flag failed", exc, error_code="internal_error"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "internal_error", "message": "Get decision signal memory flag failed"},
+        )
+
+
+@router.patch(
+    "/{signal_id}/memory-flag",
+    response_model=DecisionSignalMemoryFlagItem,
+    responses={
+        **AUTH_RESPONSE,
+        400: {"model": ErrorResponse, "description": "请求字段非法"},
+        404: {"model": ErrorResponse, "description": "信号不存在"},
+        422: {"model": ErrorResponse, "description": "请求体或路径参数校验失败"},
+        500: {"model": ErrorResponse, "description": "更新失败"},
+    },
+    summary="更新决策信号记忆标记",
+    description=(
+        "按 signal_id upsert memorable/ignored 标记；省略的字段保留原值。"
+        "ignored=true 的信号会被历史决策复盘完全排除；memorable=true 会在复盘中优先展示。"
+    ),
+    operation_id="updateDecisionSignalMemoryFlag",
+)
+def update_memory_flag(
+    signal_id: int, request: DecisionSignalMemoryFlagRequest
+) -> DecisionSignalMemoryFlagItem:
+    service = DecisionMemoryService()
+    try:
+        return DecisionSignalMemoryFlagItem(
+            **service.set_flag(
+                signal_id,
+                memorable=request.memorable,
+                ignored=request.ignored,
+            )
+        )
+    except DecisionSignalNotFoundError as exc:
+        raise _not_found(exc)
+    except ValueError as exc:
+        raise _bad_request(exc)
+    except Exception as exc:  # broad-exception: fallback_recorded - map memory flag update failures to a sanitized API error
+        log_safe_exception(
+            logger, "Update decision signal memory flag failed", exc, error_code="internal_error"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "internal_error", "message": "Update decision signal memory flag failed"},
+        )
 
 
 @router.patch(
