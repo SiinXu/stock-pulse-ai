@@ -3,6 +3,7 @@ import logging
 import sys
 import threading
 import time
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -81,7 +82,7 @@ class _CompletedFuture:
     def result(self, timeout=None):
         if timeout is not None and not self._wait_attempted:
             self._wait_attempted = True
-            raise TimeoutError
+            raise FuturesTimeoutError
         return self._result
 
     def cancel(self):
@@ -364,7 +365,7 @@ def test_parallel_completion_claims_win_before_batch_publication(monkeypatch):
     ]
 
     def _raise_batch_timeout(*_args, **_kwargs):
-        raise TimeoutError
+        raise FuturesTimeoutError
 
     monkeypatch.setattr("src.agent.runner.ThreadPoolExecutor", _InlineExecutor)
     monkeypatch.setattr("src.agent.runner.as_completed", _raise_batch_timeout)

@@ -6,7 +6,10 @@ from __future__ import annotations
 
 import ast
 import json
+import sys
 from pathlib import Path
+
+import pytest
 
 from scripts.check_broad_exceptions import (
     BaselineError,
@@ -863,6 +866,10 @@ def test_tuple_and_bare_handlers_are_in_scope(tmp_path: Path) -> None:
     assert sum(item.rule == "new-broad-handler" for item in violations) == 2
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 11),
+    reason="except* syntax requires Python 3.11 or newer",
+)
 def test_exception_group_handlers_are_in_scope(tmp_path: Path) -> None:
     """Detect broad exception-group handlers."""
 
