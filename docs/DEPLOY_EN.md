@@ -397,6 +397,7 @@ Add these Secrets:
 | `BRAVE_API_KEYS` | Brave Search API Key | Optional |
 | `MINIMAX_API_KEYS` | MiniMax Coding Plan Web Search | Optional |
 | `TUSHARE_TOKEN` | Tushare Token | Optional |
+| `TUSHARE_HTTP_URL` | Tushare Pro API endpoint (default `http://api.tushare.pro`) for self-hosted nodes, proxies, or internal mirrors; empty keeps default behavior. Private/internal hosts must also be added to `OUTBOUND_HTTP_ALLOWLIST` | Optional |
 | `GEMINI_MODEL` | Model name (default gemini-2.0-flash) | Optional |
 
 > *Note: Configure at least one notification channel, multiple channels supported for simultaneous push

@@ -1,6 +1,6 @@
 # Outbound HTTP Security Policy
 
-StockPulse applies one fail-closed policy to HTTP targets that can be selected by an operator, a caller, or an upstream response. This includes search-result content, configurable search and intelligence sources, explicit model base URLs, HTTP notification targets, notification tests, and platform reply webhooks.
+StockPulse applies one fail-closed policy to HTTP targets that can be selected by an operator, a caller, or an upstream response. This includes search-result content, configurable search and intelligence sources, configurable market-data endpoints such as `TUSHARE_HTTP_URL`, explicit model base URLs, HTTP notification targets, notification tests, and platform reply webhooks.
 
 The policy is enabled without configuration. A default installation can reach public HTTP(S) services, while loopback and other non-public destinations are denied.
 
