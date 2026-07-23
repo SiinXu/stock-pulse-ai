@@ -51,6 +51,11 @@ const zh = {
   back: '上一步',
   saveApply: '保存并应用',
   next: '下一步',
+  resolvedConfig: '生效配置：{value}',
+  capabilityTitle: '能力检查',
+  capabilityPassed: '支持',
+  capabilityFailed: '不支持',
+  capabilitySkipped: '已跳过',
 } as const;
 
 const en: Record<keyof typeof zh, string> = {
@@ -101,6 +106,11 @@ const en: Record<keyof typeof zh, string> = {
   back: 'Back',
   saveApply: 'Save & Apply',
   next: 'Next',
+  resolvedConfig: 'Effective config: {value}',
+  capabilityTitle: 'Capability checks',
+  capabilityPassed: 'Supported',
+  capabilityFailed: 'Not supported',
+  capabilitySkipped: 'Skipped',
 };
 
 export const SETTINGS_WIZARD_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = createUiLanguageRecord("locales.settingsWizard.SETTINGS_WIZARD_TEXT", { zh, en });
