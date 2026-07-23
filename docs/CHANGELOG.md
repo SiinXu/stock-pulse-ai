@@ -325,6 +325,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Made secondary sidebar groups collapsible with visible current-page ownership and preserved explicit Discover URL ownership across default, non-default, malformed, refreshed, legacy, authenticated, and safe custom-strategy links.
 - [Added] Added a desktop-only local model center that discovers, starts/stops, downloads recommended Ollama models, and registers them into the desktop `.env`, using whitelisted process launches, strict model-name validation, an isolated sandboxed renderer, and secret-free logs.
 - [Added] Added an opt-in Settings beginner mode (persisted client preference) that simplifies the settings navigation to the essentials and reveals advanced sections on demand, keeping the active section reachable and defaulting to the full professional view.
+- [Added] Added a persistent Beginner Web mode with guided first-run setup, brief quick analysis, simplified risk-aware report summaries, and progressive access to professional report controls.
 
 ## [3.26.3] - 2026-07-15
 
@@ -622,7 +623,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Tests
 
-- Covered backend runtime and compatibility verification after #1381: `tests/app/test_main_schedule_mode.py`、`tests/core/test_pipeline_daily_market_context.py`、`tests/market/test_daily_market_context.py`、`tests/market/test_daily_market_context_guardrail.py`、`tests/test_agent_executor.py`、`tests/test_config_env_compat.py`、`tests/test_config_registry.py` and `apps/dsa-web/tests/system_config_i18n.test.ts`.
+- Covered backend runtime and compatibility verification after #1381: `tests/app/test_main_schedule_mode.py`、`tests/core/test_pipeline_daily_market_context.py`、`tests/services/test_daily_market_context.py`、`tests/test_daily_market_context_guardrail.py`、`tests/test_agent_executor.py`、`tests/test_config_env_compat.py`、`tests/test_config_registry.py` and `apps/dsa-web/tests/system_config_i18n.test.ts`.
 - Added/Updated AlphaSift backend regression tests: `python -m pytest tests/api/alphasift/test_alphasift_api.py -q`, `python -m pytest tests/test_docker_entrypoint.py -q`, `python -m pytest tests/app/test_main_schedule_mode.py -q -k "start_api_server_fails_before_thread_when_port_is_busy"`.
 
 ## [3.21.0] - 2026-06-07
