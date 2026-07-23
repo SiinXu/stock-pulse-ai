@@ -32,6 +32,7 @@
     "files": [
       "main.js",
       "assistant-preload.js",
+      "model-preload.js",
       "preload.js",
       "renderer/**/*"
     ],
