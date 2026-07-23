@@ -1523,6 +1523,10 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     const account = await createPortfolioAccount(page, 'signal-center-link');
     await selectPortfolioAccount(page, account.id);
 
+    const portfolioIdentity = page.locator('[data-portfolio-switcher="single"]');
+    await expect(portfolioIdentity).toHaveText('组合');
+    await expect(portfolioIdentity.locator('button, [role="button"], select')).toHaveCount(0);
+
     const holdingsHref = buildSignalCenterHref({
       scope: SIGNAL_CENTER_SCOPE_VALUES.holdings,
     });
