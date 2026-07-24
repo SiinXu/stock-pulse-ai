@@ -908,9 +908,9 @@ def test_prose_prefixed_diagnostic_fields_survive_composite_key_walk() -> None:
 
     Regression: the composite-key walker previously fail-closed to
     "authorization" whenever it hit its 16-part budget, or matched a single
-    sensitive word (``webhook``/``token``/...) across bare whitespace joiners
-    in prose. Both paths redacted the trailing ``key=value`` in ordinary log
-    lines such as debug messages and retry summaries, hiding diagnostic
+    sensitive word (``webhook``/``token``/...) across a punctuation-delimited
+    prose prefix. Both paths redacted the trailing ``key=value`` in ordinary
+    log lines such as debug messages and retry summaries, hiding diagnostic
     fields the operator relies on.
     """
 
@@ -950,6 +950,9 @@ def test_prose_prefixed_diagnostic_fields_survive_composite_key_walk() -> None:
     assert sanitize_module.sanitize_diagnostic_text(
         "session token=hunter2"
     ) == "session token=[REDACTED]"
+    assert sanitize_module.sanitize_diagnostic_text(
+        "api: key=hunter2"
+    ) == "api: key=[REDACTED]"
     long_label = (
         "api.key."
         + ".".join(["filler"] * sanitize_module._TEXT_FIELD_KEY_PART_LIMIT)
@@ -958,6 +961,23 @@ def test_prose_prefixed_diagnostic_fields_survive_composite_key_walk() -> None:
     assert sanitize_module.sanitize_diagnostic_text(
         f"{long_label}=hunter2"
     ) == f"{long_label}=[REDACTED]"
+
+    # Whitespace alone does not make a sensitive compound prose. Text labels
+    # must retain the same fail-closed classification as mapping keys even
+    # when the value is too short for token-pattern fallback redaction.
+    for label in (
+        "password value",
+        "token value",
+        "webhook signing",
+        "authorization value",
+    ):
+        assert sanitize_module.is_sensitive_key(label)
+        assert sanitize_module.sanitize_diagnostic_text(
+            f"{label}=hunter2"
+        ) == f"{label}=[REDACTED]"
+    assert sanitize_module.sanitize_diagnostic_text(
+        "password value: hunter2"
+    ) == "password value: [REDACTED]"
 
 
 def test_generic_fields_reject_ambiguous_delimiter_suffixes() -> None:

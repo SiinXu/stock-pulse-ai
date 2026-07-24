@@ -489,7 +489,7 @@ def _text_field_key_starts(
 
     starts = [immediate_start]
     cursor = immediate_start
-    prose_joiner_seen = False
+    whitespace_joiner_seen = False
     while cursor > lower_bound and len(starts) < _TEXT_FIELD_KEY_PART_LIMIT:
         joiner_end = cursor
         joiner_only_whitespace = True
@@ -503,7 +503,7 @@ def _text_field_key_starts(
         if cursor == joiner_end:
             break
         if joiner_only_whitespace:
-            prose_joiner_seen = True
+            whitespace_joiner_seen = True
         part_end = cursor
         while cursor > lower_bound:
             char = text[cursor - 1]
@@ -515,7 +515,7 @@ def _text_field_key_starts(
         starts.append(cursor)
     truncated = False
     if (
-        not prose_joiner_seen
+        not whitespace_joiner_seen
         and len(starts) == _TEXT_FIELD_KEY_PART_LIMIT
         and cursor > lower_bound
     ):
@@ -545,6 +545,8 @@ def _classify_text_field_match(
 ) -> tuple[Optional[str], Optional[int]]:
     """Classify the shortest sensitive suffix using the complete key's kind."""
 
+    if _is_diagnostic_field_prose_prefix(text, match):
+        return None, None
     starts, truncated = _text_field_key_starts(
         text,
         match.start(1),
@@ -557,12 +559,16 @@ def _classify_text_field_match(
         candidate = text[key_start:match.end(1)]
         if not _is_sensitive_mapping_key_text(candidate):
             continue
-        # Compounds joined by bare whitespace are prose in most log lines
-        # (e.g., "Parsed webhook payload: body_bytes=181"). Accept them only
-        # when the normalized compound matches a canonical multi-word phrase
-        # so that structural forms like "api key" still redact while
-        # sensitive words appearing in unrelated prose do not.
-        if _contains_prose_join_whitespace(candidate) and not _matches_multi_word_sensitive_phrase(candidate):
+        # A sentence prefix separated from the assigned field by punctuation
+        # is prose (e.g., "Parsed webhook payload: body_bytes=181"). Accept
+        # such candidates only when they contain a canonical multi-word phrase
+        # so structural forms like "api: key" still redact. Bare whitespace
+        # alone remains structural to preserve mapping/text classification
+        # parity for labels such as "password value".
+        if (
+            _contains_punctuation_delimited_prose_boundary(candidate)
+            and not _matches_multi_word_sensitive_phrase(candidate)
+        ):
             continue
         return (
             complete_kind
@@ -574,17 +580,38 @@ def _classify_text_field_match(
     return None, None
 
 
-def _contains_prose_join_whitespace(text: str) -> bool:
-    """Return True when the compound key spans bare ASCII whitespace.
+def _is_diagnostic_field_prose_prefix(
+    text: str,
+    match: re.Match[str],
+) -> bool:
+    """Reject a prose colon whose value begins with a diagnostic assignment."""
 
-    ASCII whitespace here means space, tab, vertical tab, and form feed. CR
-    and LF are already excluded upstream by ``_is_text_field_key_joiner``
-    because they mark record boundaries; the character-class check below
-    stays whitespace-based so future joiner tweaks cannot silently widen
-    this classification.
-    """
+    separator = match.group(2)
+    return (
+        ":" in separator
+        and "=" not in separator
+        and not _is_sensitive_mapping_key_text(match.group(1))
+        and _ORDINARY_DIAGNOSTIC_FIELD_PATTERN.match(text, match.end())
+        is not None
+    )
 
-    return any(char in " \t\v\f" for char in text)
+
+def _contains_punctuation_delimited_prose_boundary(text: str) -> bool:
+    """Return whether sentence punctuation separates words in the candidate."""
+
+    whitespace = " \t\v\f"
+    punctuation = ":;,.!?"
+    return any(
+        char in whitespace
+        and (
+            (index > 0 and text[index - 1] in punctuation)
+            or (
+                index + 1 < len(text)
+                and text[index + 1] in punctuation
+            )
+        )
+        for index, char in enumerate(text)
+    )
 
 
 def _matches_multi_word_sensitive_phrase(candidate: str) -> bool:
