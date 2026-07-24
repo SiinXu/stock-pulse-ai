@@ -51,7 +51,7 @@ new surface requires an ADR instead of an implicit registry expansion.
 | Agent Tools | `ToolDefinition`, `ToolRegistry`, Tool Surface | Default process adapter wired; strict registration validation remains fail-closed |
 | Notification Channels | `NotificationChannel`, sender mixins, `NotificationService` | Contract only in this batch |
 | Report Templates | `src/services/report_renderer.py`, `templates/report_*.j2` | Contract only in this batch |
-| Event Hooks | Task and Agent runtime event streams | Contract only in this batch |
+| Event Hooks | `src/plugins/event_hooks.py` plus the stock-analysis and market-review lifecycle paths | Six observational lifecycle events wired; Task/Agent/SSE streams remain separate |
 
 "Contract only" means a plugin cannot yet rely on runtime wiring for that
 extension point. It does not mean the existing core path is deprecated.
@@ -722,7 +722,23 @@ and unrestricted tool results.
 These Hooks do not replace `TaskEventStream`, Agent runtime events, SSE, or
 pipeline diagnostics. Started events are emitted only after core admission;
 terminal events observe the already-decided terminal state and cannot mutate or
-veto it. Runtime wiring is deferred.
+veto it. The current emission boundaries are `process_single_stock` after its
+resolve/admission stage and `run_market_review` after its task identity and
+normalized region are fixed.
+
+Version 1 projects only these fields:
+
+- every event carries `task_id` plus the top-level `trace_id`;
+- started events carry `stock_code` or `market_region` and `trigger_source`;
+- terminal events carry the same subject plus `terminal_status`;
+- completed events may carry `result_reference` (the stable task/query ID);
+- failed events carry only a stable `error_code`, never exception text.
+
+All string fields pass through the shared diagnostic sanitizer before the
+payload is detached and deeply frozen. Hook return values are ignored. Adding a
+new optional field or event name follows the additive version-1 policy below;
+renaming/removing a field or changing ordering, isolation, or mutability requires
+a new contract major.
 
 ## Versioning
 

@@ -344,7 +344,6 @@
     {"path":"src/config.py","scope":"<module>.setup_env","caught":["Exception"],"digest":"ddadc0ed15e407027f45828dededf0b5b4614370fbcf31e153403abc0b81c0a4"},
     {"path":"src/core/market_review.py","scope":"<module>._persist_market_review_history","caught":["Exception"],"digest":"c3534b1e2393b65af99a9707836ee39512739a95b2405fcbf3911c801ce522a1"},
     {"path":"src/core/market_review.py","scope":"<module>._refresh_market_review_history_diagnostics","caught":["Exception"],"digest":"1975734c95a23583c8c7837c304cc94d959a1ae9ad19a8eacdd35e9355715d43"},
-    {"path":"src/core/market_review.py","scope":"<module>.run_market_review","caught":["Exception"],"digest":"c86c7b2da0cf8042494d41ac344c25544c1864ac691e152363eeba099b48b887"},
     {"path":"src/core/market_review_lock.py","scope":"<module>._is_windows_process_alive","caught":["Exception"],"digest":"e29323f8fadf67616109eef9508e2cfad0c593b3dc08ee6bdd00587f754406df"},
     {"path":"src/core/trading_calendar.py","scope":"<module>._phase_minutes","caught":["Exception"],"digest":"4bb2cb3fe92cfc77176dca0a29debb75b7492d36ed7ce1dcddc98ea1c06e4d8c"},
     {"path":"src/core/trading_calendar.py","scope":"<module>.get_effective_trading_date","caught":["Exception"],"digest":"d02a26da3942cd15ef056653df5be364c9cb472eceb37ecf8d6a60c61ff6195b"},
