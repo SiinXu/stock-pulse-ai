@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import json
+from pathlib import Path
 from unittest.mock import Mock
 
 import httpx
 from fastapi import FastAPI
 
+from api.app import create_app
 from api.middlewares.error_handler import add_error_handlers
 from api.v1.endpoints import local_models
 from src.services.local_model_service import (
@@ -217,3 +220,35 @@ def test_assignment_forbids_unknown_fields_and_keeps_primary_action_explicit() -
     assert response.status_code == 200
     assert response.json()["selected_primary"] is True
     service.configure_model.assert_called_once_with("qwen3:4b", assignment="primary")
+
+
+def test_static_openapi_contains_the_local_model_contract() -> None:
+    root = Path(__file__).resolve().parents[1]
+    static = json.loads(
+        (root / "docs/architecture/api_spec.json").read_text(encoding="utf-8")
+    )
+    runtime = create_app().openapi()
+
+    for path in (
+        "/api/v1/local-models/assignments",
+        "/api/v1/local-models/configuration",
+        "/api/v1/local-models/models",
+        "/api/v1/local-models/pulls",
+        "/api/v1/local-models/pulls/{task_id}",
+        "/api/v1/local-models/registrations",
+        "/api/v1/local-models/runtime",
+    ):
+        assert static["paths"][path] == runtime["paths"][path]
+    for schema in (
+        "LocalModelAssignmentRequest",
+        "LocalModelConfigurationResponse",
+        "LocalModelMutationResponse",
+        "LocalModelPullAccepted",
+        "LocalModelPullResult",
+        "LocalModelPullStatus",
+        "LocalModelRequest",
+        "LocalModelRuntimeResponse",
+    ):
+        assert static["components"]["schemas"][schema] == runtime["components"][
+            "schemas"
+        ][schema]

@@ -41,7 +41,6 @@
       "main.js",
       "local-model-catalog.js",
       "assistant-preload.js",
-      "model-preload.js",
       "preload.js",
       "renderer/**/*"
     ],

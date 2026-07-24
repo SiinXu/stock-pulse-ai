@@ -125,6 +125,14 @@ LITELLM_MODEL=ollama/qwen3:8b
 >
 > **Outbound security**: loopback and private destinations are denied by default. For local/private Ollama, also set the exact target in `.env`, for example `OUTBOUND_HTTP_ALLOWLIST=localhost:11434`; use `127.0.0.1:8642` for local Hermes. See [Outbound HTTP Security Policy](security-outbound-policy.md).
 
+#### Settings Local Model Center (Recommended And Sole Download Entry)
+
+Use **Settings -> AI & Models -> Local Models** for routine downloads and management. General and finance cards come from the repository's authoritative catalog and show size, memory tier, capabilities, license, installation state, and download progress. A recommendation is highlighted only when host memory can be detected. Web deployments proxy Ollama through the backend using the server-owned `LLM_OLLAMA_BASE_URL`; clients cannot supply a target URL. Desktop reuses the same panel and controls Ollama detection, start/stop, downloads, and deletion through the main-window preload. When Ollama is unavailable, the panel provides the matching `ollama pull <tag>` command and installation guidance without exposing low-level errors.
+
+After a successful pull, the backend uses `SystemConfigService` to append the model to `LLM_OLLAMA_MODELS`, ensure `LLM_CHANNELS` contains `ollama`, and hot-reload configuration. It selects `ollama/<id>` automatically only when no primary model exists. An existing primary remains unchanged and the panel offers an explicit switch; Agent assignment is a separate action and never implicitly replaces the primary. The first-run wizard's Local Model branch embeds this same panel and routes directly to the Analysis Workbench when setup completes, with no `.env` editing or terminal step.
+
+Fallback order remains owned by the existing multi-channel configuration and the model fallback editor under **Settings -> AI & Models -> Reliability**; the Local Model center does not add a second fallback setting. Finance entries marked guided-only show conversion and license guidance without a download action. A model currently assigned as primary or Agent must be replaced before its weights can be deleted.
+
 > **Congratulations! If you're a beginner, you can stop reading here and run the program!**
 > Want to test the connection? Open your terminal in the root directory and run: `python scripts/check_env.py --llm`
 

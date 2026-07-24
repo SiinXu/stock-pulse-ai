@@ -2736,6 +2736,261 @@
           }
         ]
       }
+    },
+    "/api/v1/local-models/assignments": {
+      "post": {
+        "tags": [
+          "LocalModels"
+        ],
+        "summary": "Assign Local Model",
+        "description": "Register or explicitly assign one local model through SystemConfigService.",
+        "operationId": "assign_local_model_api_v1_local_models_assignments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalModelAssignmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalModelMutationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/local-models/configuration": {
+      "get": {
+        "tags": [
+          "LocalModels"
+        ],
+        "summary": "Get Local Model Configuration",
+        "description": "Return caller-safe registered and assigned local models.",
+        "operationId": "get_local_model_configuration_api_v1_local_models_configuration_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalModelConfigurationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/local-models/models": {
+      "delete": {
+        "tags": [
+          "LocalModels"
+        ],
+        "summary": "Delete Local Model",
+        "description": "Delete a non-active model through the server-side Ollama transport.",
+        "operationId": "delete_local_model_api_v1_local_models_models_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalModelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalModelMutationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/local-models/pulls": {
+      "post": {
+        "tags": [
+          "LocalModels"
+        ],
+        "summary": "Start Local Model Pull",
+        "description": "Submit one catalog-allowlisted Ollama pull task.",
+        "operationId": "start_local_model_pull_api_v1_local_models_pulls_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalModelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalModelPullAccepted"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/local-models/pulls/{task_id}": {
+      "get": {
+        "tags": [
+          "LocalModels"
+        ],
+        "summary": "Get Local Model Pull",
+        "description": "Poll one local model pull task.",
+        "operationId": "get_local_model_pull_api_v1_local_models_pulls__task_id__get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalModelPullStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/local-models/registrations": {
+      "delete": {
+        "tags": [
+          "LocalModels"
+        ],
+        "summary": "Unregister Local Model",
+        "description": "Validate and remove configuration before desktop deletes local weights.",
+        "operationId": "unregister_local_model_api_v1_local_models_registrations_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalModelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalModelMutationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/local-models/runtime": {
+      "get": {
+        "tags": [
+          "LocalModels"
+        ],
+        "summary": "Get Local Model Runtime",
+        "description": "Return runtime availability and current saved assignments.",
+        "operationId": "get_local_model_runtime_api_v1_local_models_runtime_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalModelRuntimeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -8206,6 +8461,341 @@
         ],
         "title": "LocalModelUpstream",
         "description": "Canonical upstream model locations."
+      },
+      "LocalModelAssignmentRequest": {
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*(?::[A-Za-z0-9][A-Za-z0-9._-]*)?$",
+            "title": "Model Id"
+          },
+          "assignment": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "primary",
+              "agent"
+            ],
+            "title": "Assignment",
+            "default": "auto"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model_id"
+        ],
+        "title": "LocalModelAssignmentRequest",
+        "description": "Register or explicitly assign one installed local model."
+      },
+      "LocalModelConfigurationResponse": {
+        "properties": {
+          "config_version": {
+            "type": "string",
+            "title": "Config Version"
+          },
+          "registered_models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Registered Models"
+          },
+          "primary_model": {
+            "type": "string",
+            "title": "Primary Model",
+            "default": ""
+          },
+          "agent_model": {
+            "type": "string",
+            "title": "Agent Model",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "config_version"
+        ],
+        "title": "LocalModelConfigurationResponse",
+        "description": "Caller-safe local model configuration state."
+      },
+      "LocalModelMutationResponse": {
+        "properties": {
+          "config_version": {
+            "type": "string",
+            "title": "Config Version"
+          },
+          "registered_models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Registered Models"
+          },
+          "primary_model": {
+            "type": "string",
+            "title": "Primary Model",
+            "default": ""
+          },
+          "agent_model": {
+            "type": "string",
+            "title": "Agent Model",
+            "default": ""
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "selected_primary": {
+            "type": "boolean",
+            "title": "Selected Primary",
+            "default": false
+          },
+          "selected_agent": {
+            "type": "boolean",
+            "title": "Selected Agent",
+            "default": false
+          },
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted",
+            "default": false
+          },
+          "updated_keys": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Updated Keys"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "applied_count": {
+            "type": "integer",
+            "title": "Applied Count",
+            "default": 0
+          },
+          "skipped_masked_count": {
+            "type": "integer",
+            "title": "Skipped Masked Count",
+            "default": 0
+          },
+          "reload_triggered": {
+            "type": "boolean",
+            "title": "Reload Triggered",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "config_version",
+          "model_id"
+        ],
+        "title": "LocalModelMutationResponse",
+        "description": "Configuration or deletion mutation response."
+      },
+      "LocalModelPullAccepted": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "trace_id": {
+            "type": "string",
+            "title": "Trace Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "processing",
+              "cancel_requested"
+            ],
+            "title": "Status"
+          },
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "trace_id",
+          "status",
+          "model_id"
+        ],
+        "title": "LocalModelPullAccepted",
+        "description": "Accepted local model pull task."
+      },
+      "LocalModelPullResult": {
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "activated": {
+            "type": "boolean",
+            "title": "Activated"
+          },
+          "selected_primary": {
+            "type": "boolean",
+            "title": "Selected Primary",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "model_id",
+          "activated"
+        ],
+        "title": "LocalModelPullResult",
+        "description": "Successful pull and activation result."
+      },
+      "LocalModelPullStatus": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "processing",
+              "cancel_requested",
+              "completed",
+              "failed",
+              "cancelled",
+              "interrupted"
+            ],
+            "title": "Status"
+          },
+          "progress": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Progress",
+            "default": 0
+          },
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LocalModelPullResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "status",
+          "model_id"
+        ],
+        "title": "LocalModelPullStatus",
+        "description": "Polling response for one local model pull task."
+      },
+      "LocalModelRequest": {
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*(?::[A-Za-z0-9][A-Za-z0-9._-]*)?$",
+            "title": "Model Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model_id"
+        ],
+        "title": "LocalModelRequest",
+        "description": "One catalog-backed model operation without caller-controlled endpoints."
+      },
+      "LocalModelRuntimeResponse": {
+        "properties": {
+          "runtime": {
+            "type": "string",
+            "const": "ollama",
+            "title": "Runtime",
+            "default": "ollama"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "unavailable"
+            ],
+            "title": "Status"
+          },
+          "installed_models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Installed Models"
+          },
+          "manual_pull_supported": {
+            "type": "boolean",
+            "title": "Manual Pull Supported",
+            "default": false
+          },
+          "configuration": {
+            "$ref": "#/components/schemas/LocalModelConfigurationResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "configuration"
+        ],
+        "title": "LocalModelRuntimeResponse",
+        "description": "Runtime availability plus saved assignment state."
+      },
+      "TaskStatusEnum": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "processing",
+          "cancel_requested",
+          "completed",
+          "failed",
+          "cancelled",
+          "interrupted"
+        ],
+        "title": "TaskStatusEnum",
+        "description": "Canonical process-local task lifecycle states."
       }
     },
     "securitySchemes": {

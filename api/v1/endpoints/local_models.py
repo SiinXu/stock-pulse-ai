@@ -171,7 +171,7 @@ def unregister_local_model(
     request: LocalModelRequest,
     service: LocalModelService = Depends(get_local_model_service),
 ) -> LocalModelMutationResponse:
-    """Remove configuration after the desktop transport deletes local weights."""
+    """Validate and remove configuration before desktop deletes local weights."""
     try:
         payload = service.unregister_model(request.model_id)
         payload["success"] = True

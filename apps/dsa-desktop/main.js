@@ -12,6 +12,7 @@ const {
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const os = require('os');
 const { loadDesktopLocalModelPresets } = require('./local-model-catalog');
 const { spawn } = require('child_process');
 const net = require('net');
@@ -40,8 +41,6 @@ let pendingDesktopDeepLinkRoute = null;
 let pendingDesktopDeepLinkOutcome = null;
 let desktopDeepLinkNavigationInFlight = false;
 let desktopDeepLinkFlushPromise = null;
-let localModelWindow = null;
-let localModelWindowLoadPromise = null;
 let localModelServeProcess = null;
 let localModelServeRuntime = null;
 let localModelState = null;
@@ -127,6 +126,7 @@ const DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE = Object.freeze({
   UNAVAILABLE: 'unavailable',
 });
 const DESKTOP_LOCAL_MODEL_PRESETS_ARG_PREFIX = '--stockpulse-local-model-presets=';
+const DESKTOP_LOCAL_MODELS_SETTINGS_ROUTE = '/settings?section=ai_models&view=local_models';
 // The checked-in catalog is the only allowlist authority. Arbitrary
 // user-provided model names are never downloaded by the desktop shell.
 const DESKTOP_LOCAL_MODEL_PRESETS = loadDesktopLocalModelPresets();
@@ -146,11 +146,9 @@ const DESKTOP_LOCAL_MODEL_DETECT_CHANNEL = 'desktop-local-model:detect';
 const DESKTOP_LOCAL_MODEL_START_CHANNEL = 'desktop-local-model:start';
 const DESKTOP_LOCAL_MODEL_STOP_CHANNEL = 'desktop-local-model:stop';
 const DESKTOP_LOCAL_MODEL_PULL_CHANNEL = 'desktop-local-model:pull';
-const DESKTOP_LOCAL_MODEL_REGISTER_CHANNEL = 'desktop-local-model:register';
+const DESKTOP_LOCAL_MODEL_REMOVE_CHANNEL = 'desktop-local-model:remove';
 const DESKTOP_LOCAL_MODEL_OPEN_GUIDE_CHANNEL = 'desktop-local-model:open-guide';
 const DESKTOP_LOCAL_MODEL_STATE_EVENT = 'desktop-local-model:state';
-const DESKTOP_LOCAL_MODEL_WINDOW_WIDTH = 520;
-const DESKTOP_LOCAL_MODEL_WINDOW_HEIGHT = 640;
 const PUBLIC_BIND_HOSTS = Object.freeze(new Set(['0.0.0.0', '::', '[::]', '*']));
 const MAC_DESKTOP_CLI_PATH_ENTRIES = Object.freeze([
   '/opt/homebrew/bin',
@@ -2644,7 +2642,7 @@ function createDesktopTray({
       {
         label: 'Local Models…',
         click: () => {
-          void showLocalModelWindow();
+          void openLocalModelsSettings();
         },
       },
       {
@@ -2895,6 +2893,8 @@ function resolveEmbeddedLocalModelRuntime({
 function requestLocalModelJson({
   baseUrl,
   pathname,
+  method = 'GET',
+  jsonBody = null,
   timeoutMs = DESKTOP_LOCAL_MODEL_REQUEST_TIMEOUT_MS,
   requestImpl = null,
 } = {}) {
@@ -2908,13 +2908,21 @@ function requestLocalModelJson({
     }
     const transport = requestImpl
       || (target.protocol === 'https:' ? https.request : http.request);
+    const payload = jsonBody === null
+      ? null
+      : Buffer.from(JSON.stringify(jsonBody), 'utf-8');
+    const headers = { Accept: 'application/json' };
+    if (payload) {
+      headers['Content-Type'] = 'application/json';
+      headers['Content-Length'] = payload.length;
+    }
     let settled = false;
 
     const req = transport(
       target,
       {
-        method: 'GET',
-        headers: { Accept: 'application/json' },
+        method,
+        headers,
       },
       (response) => {
         const chunks = [];
@@ -2962,6 +2970,9 @@ function requestLocalModelJson({
       settled = true;
       reject(error);
     });
+    if (payload) {
+      req.write(payload);
+    }
     req.end();
   });
 }
@@ -3248,7 +3259,6 @@ function buildLocalModelState(overrides = {}) {
     status: DESKTOP_LOCAL_MODEL_STATUS.UNKNOWN,
     installed: false,
     installedModels: [],
-    registeredModels: [],
     managed: false,
     runtimeSource: DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE.UNAVAILABLE,
     baseUrl: DESKTOP_LOCAL_MODEL_DEFAULT_BASE_URL,
@@ -3256,7 +3266,11 @@ function buildLocalModelState(overrides = {}) {
     progress: null,
     message: '',
   };
-  return { ...base, ...overrides };
+  return {
+    ...base,
+    ...overrides,
+    totalMemoryGb: resolveLocalModelTotalMemoryGb(),
+  };
 }
 
 function setLocalModelState(nextState) {
@@ -3265,29 +3279,22 @@ function setLocalModelState(nextState) {
   return localModelState;
 }
 
-function readRegisteredLocalModels(envFile = resolveLocalModelEnvPath()) {
-  const values = readEnvFileValues(envFile);
-  const channels = String(values.LLM_CHANNELS || '')
-    .split(',')
-    .map((entry) => entry.trim().toLowerCase())
-    .filter(Boolean);
-  if (!channels.includes(DESKTOP_LOCAL_MODEL_RUNTIME)) {
-    return [];
+function resolveLocalModelTotalMemoryGb(totalBytes = os.totalmem()) {
+  const bytes = Number(totalBytes);
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return null;
   }
-  return String(values.LLM_OLLAMA_MODELS || '')
-    .split(',')
-    .map((entry) => normalizeLocalModelName(entry))
-    .filter(Boolean);
+  return Math.round((bytes / (1024 ** 3)) * 10) / 10;
 }
 
 function notifyLocalModelState() {
-  if (!isDesktopWindowAvailable(localModelWindow)
-    || !localModelWindow.webContents
-    || (typeof localModelWindow.webContents.isDestroyed === 'function'
-      && localModelWindow.webContents.isDestroyed())) {
+  if (!isDesktopWindowAvailable(mainWindow)
+    || !mainWindow.webContents
+    || (typeof mainWindow.webContents.isDestroyed === 'function'
+      && mainWindow.webContents.isDestroyed())) {
     return false;
   }
-  localModelWindow.webContents.send(
+  mainWindow.webContents.send(
     DESKTOP_LOCAL_MODEL_STATE_EVENT,
     buildLocalModelState()
   );
@@ -3429,7 +3436,6 @@ async function startManagedLocalModelRuntime({
         status: DESKTOP_LOCAL_MODEL_STATUS.RUNNING,
         installed: true,
         installedModels: extractLocalModelNames(tags),
-        registeredModels: readRegisteredLocalModels(),
         managed: true,
         runtimeSource: runtimeBinary.source,
         baseUrl,
@@ -3563,183 +3569,98 @@ async function pullLocalModel(rawModelId, { requestImpl = null } = {}) {
   return { ok: true, modelId };
 }
 
-function composeCsvValue(existingRaw, additions) {
-  const seen = new Set();
-  const ordered = [];
-  const push = (value) => {
-    const token = String(value || '').trim();
-    if (!token || seen.has(token)) {
-      return;
-    }
-    seen.add(token);
-    ordered.push(token);
-  };
-  String(existingRaw || '').split(',').forEach(push);
-  additions.forEach(push);
-  return ordered.join(',');
-}
-
-function upsertEnvLine(lines, key, value) {
-  const assignment = `${key}=${value}`;
-  const matcher = new RegExp(`^\\uFEFF?\\s*(?:export\\s+)?${key}\\s*=`);
-  let replaced = false;
-  const nextLines = lines.map((line) => {
-    if (!replaced && matcher.test(line)) {
-      replaced = true;
-      return assignment;
-    }
-    return line;
-  });
-  if (!replaced) {
-    nextLines.push(assignment);
+function decodeConfiguredModelRoute(rawValue) {
+  const value = String(rawValue || '').trim();
+  const prefix = 'modelref:v1:';
+  if (!value.startsWith(prefix)) {
+    return value;
   }
-  return nextLines;
-}
-
-function applyLocalModelRegistration(envFile, modelId, { baseUrl = resolveLocalModelBaseUrl() } = {}) {
-  const existing = readEnvFileValues(envFile);
-  const nextChannels = composeCsvValue(existing.LLM_CHANNELS, [DESKTOP_LOCAL_MODEL_RUNTIME]);
-  const nextModels = composeCsvValue(existing.LLM_OLLAMA_MODELS, [modelId]);
-  const registration = {
-    LLM_CHANNELS: nextChannels,
-    LLM_OLLAMA_PROVIDER: DESKTOP_LOCAL_MODEL_RUNTIME,
-    LLM_OLLAMA_BASE_URL: baseUrl,
-    LLM_OLLAMA_MODELS: nextModels,
-  };
-
-  const original = fs.existsSync(envFile) ? fs.readFileSync(envFile, 'utf-8') : '';
-  const hadTrailingNewline = original.endsWith('\n') || original === '';
-  let lines = original ? original.replace(/\n$/, '').split('\n') : [];
-  for (const [key, value] of Object.entries(registration)) {
-    lines = upsertEnvLine(lines, key, value);
+  const payload = value.slice(prefix.length);
+  const separatorIndex = payload.indexOf(':');
+  if (separatorIndex <= 0 || separatorIndex === payload.length - 1) {
+    return value;
   }
-  const content = lines.join('\n') + (hadTrailingNewline ? '\n' : '');
-
-  ensureDirectory(path.dirname(envFile));
-  const tempPath = `${envFile}.local-model.tmp`;
-  const mode = fs.existsSync(envFile) ? (fs.statSync(envFile).mode & 0o777) : 0o600;
-  fs.writeFileSync(tempPath, content, { encoding: 'utf-8', mode });
   try {
-    fs.chmodSync(tempPath, mode);
+    const connectionId = decodeURIComponent(payload.slice(0, separatorIndex)).trim();
+    const runtimeRoute = decodeURIComponent(payload.slice(separatorIndex + 1)).trim();
+    return connectionId && runtimeRoute ? runtimeRoute : value;
   } catch (_error) {
-    // best-effort; some filesystems reject chmod
+    return value;
   }
-  fs.renameSync(tempPath, envFile);
-
-  return {
-    channels: nextChannels,
-    models: nextModels,
-    changed: original !== content,
-  };
 }
 
-function registerLocalModel(rawModelId) {
+function isLocalModelAssigned(rawModelId, { envFile = resolveLocalModelEnvPath() } = {}) {
   const modelId = normalizeLocalModelName(rawModelId);
   if (!modelId) {
-    return { ok: false, error: 'invalid-model', message: 'Invalid local model name.' };
-  }
-  const envFile = resolveLocalModelEnvPath();
-  let result;
-  try {
-    result = applyLocalModelRegistration(envFile, modelId);
-  } catch (error) {
-    logLine(`[local-model] registration failed model=${modelId}`);
-    return {
-      ok: false,
-      error: 'registration-failed',
-      message: 'Could not update the local model configuration.',
-    };
-  }
-  logLine(`[local-model] registered model=${modelId} channels=${result.channels}`);
-  setLocalModelState({
-    registeredModels: readRegisteredLocalModels(envFile),
-    message: `Registered ${modelId}. Restart StockPulse to select it for analysis.`,
-  });
-  return { ok: true, modelId, restartRequired: true };
-}
-
-async function createLocalModelWindow({ BrowserWindowClass = BrowserWindow } = {}) {
-  if (isDesktopWindowAvailable(localModelWindow)) {
-    return localModelWindowLoadPromise || localModelWindow;
-  }
-
-  const createdWindow = new BrowserWindowClass({
-    width: DESKTOP_LOCAL_MODEL_WINDOW_WIDTH,
-    height: DESKTOP_LOCAL_MODEL_WINDOW_HEIGHT,
-    minWidth: DESKTOP_LOCAL_MODEL_WINDOW_WIDTH,
-    minHeight: 480,
-    resizable: true,
-    maximizable: false,
-    fullscreenable: false,
-    show: false,
-    title: 'StockPulse Local Models',
-    backgroundColor: resolveWindowBackgroundColor(),
-    webPreferences: {
-      preload: path.join(__dirname, 'model-preload.js'),
-      nodeIntegration: false,
-      contextIsolation: true,
-      sandbox: true,
-      additionalArguments: [
-        `${DESKTOP_LOCAL_MODEL_PRESETS_ARG_PREFIX}${encodeURIComponent(JSON.stringify(DESKTOP_LOCAL_MODEL_PRESETS))}`,
-      ],
-    },
-  });
-  localModelWindow = createdWindow;
-
-  createdWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  const denyRendererNavigation = (event) => {
-    event.preventDefault();
-  };
-  createdWindow.webContents.on('will-navigate', denyRendererNavigation);
-  createdWindow.webContents.on('will-redirect', denyRendererNavigation);
-  createdWindow.once('closed', () => {
-    if (localModelWindow === createdWindow) {
-      localModelWindow = null;
-      localModelWindowLoadPromise = null;
-    }
-  });
-
-  const modelPagePath = path.join(__dirname, 'renderer', 'local-models.html');
-  localModelWindowLoadPromise = Promise.resolve(createdWindow.loadFile(modelPagePath))
-    .then(() => createdWindow)
-    .catch((error) => {
-      logLine(`[local-model] failed to load view: ${error instanceof Error ? error.message : String(error)}`);
-      if (localModelWindow === createdWindow) {
-        localModelWindow = null;
-      }
-      if (!createdWindow.isDestroyed() && typeof createdWindow.destroy === 'function') {
-        createdWindow.destroy();
-      }
-      throw error;
-    })
-    .finally(() => {
-      localModelWindowLoadPromise = null;
-    });
-
-  return localModelWindowLoadPromise;
-}
-
-async function showLocalModelWindow() {
-  try {
-    const windowRef = await createLocalModelWindow();
-    if (!isDesktopWindowAvailable(windowRef)) {
-      return false;
-    }
-    windowRef.show();
-    windowRef.focus();
-    void refreshLocalModelState().catch(() => undefined);
-    return true;
-  } catch (_error) {
     return false;
   }
+  const values = readEnvFileValues(envFile);
+  const expectedRoute = `${DESKTOP_LOCAL_MODEL_RUNTIME}/${modelId}`;
+  return ['LITELLM_MODEL', 'AGENT_LITELLM_MODEL'].some(
+    (key) => decodeConfiguredModelRoute(values[key]) === expectedRoute
+  );
+}
+
+async function removeLocalModel(rawModelId, {
+  requestImpl = null,
+  envFile = resolveLocalModelEnvPath(),
+} = {}) {
+  const modelId = normalizeLocalModelName(rawModelId);
+  if (!modelId || !isAllowedLocalModelPreset(modelId)) {
+    return {
+      ok: false,
+      error: 'model-not-allowed',
+      message: 'Only recommended local models can be deleted.',
+    };
+  }
+  if (isLocalModelAssigned(modelId, { envFile })) {
+    return {
+      ok: false,
+      error: 'model-in-use',
+      message: 'Change the active primary or Agent model before deleting it.',
+    };
+  }
+
+  try {
+    await requestLocalModelJson({
+      baseUrl: resolveLocalModelBaseUrl({ envFile }),
+      pathname: '/api/delete',
+      method: 'DELETE',
+      jsonBody: { name: modelId },
+      requestImpl,
+    });
+  } catch (_error) {
+    logLine(`[local-model] delete failed model=${modelId}`);
+    return {
+      ok: false,
+      error: 'delete-failed',
+      message: `Could not delete ${modelId}.`,
+    };
+  }
+
+  await refreshLocalModelState({ requestImpl });
+  return { ok: true, modelId };
+}
+
+async function openLocalModelsSettings() {
+  if (!isDesktopWindowAvailable(mainWindow)) {
+    return false;
+  }
+  const rawUrl = `${DESKTOP_PROTOCOL}://${DESKTOP_PROTOCOL_HOST}${DESKTOP_LOCAL_MODELS_SETTINGS_ROUTE}`;
+  if (!queueDesktopDeepLink(rawUrl)) {
+    return false;
+  }
+  focusExistingMainWindow();
+  await flushPendingDesktopDeepLink();
+  return true;
 }
 
 function isLocalModelSender(event) {
   return Boolean(
     event
     && event.sender
-    && isDesktopWindowAvailable(localModelWindow)
-    && localModelWindow.webContents === event.sender
+    && isDesktopWindowAvailable(mainWindow)
+    && mainWindow.webContents === event.sender
   );
 }
 
@@ -3800,7 +3721,7 @@ ipcMain.handle(DESKTOP_ASSISTANT_HIDE_CHANNEL, (event) => {
 });
 ipcMain.handle(DESKTOP_LOCAL_MODEL_GET_STATE_CHANNEL, (event) => {
   assertLocalModelSender(event);
-  return buildLocalModelState({ registeredModels: readRegisteredLocalModels() });
+  return buildLocalModelState();
 });
 ipcMain.handle(DESKTOP_LOCAL_MODEL_DETECT_CHANNEL, (event) => {
   assertLocalModelSender(event);
@@ -3818,9 +3739,9 @@ ipcMain.handle(DESKTOP_LOCAL_MODEL_PULL_CHANNEL, (event, payload = {}) => {
   assertLocalModelSender(event);
   return runLocalModelOperation(() => pullLocalModel(payload && payload.modelId));
 });
-ipcMain.handle(DESKTOP_LOCAL_MODEL_REGISTER_CHANNEL, (event, payload = {}) => {
+ipcMain.handle(DESKTOP_LOCAL_MODEL_REMOVE_CHANNEL, (event, payload = {}) => {
   assertLocalModelSender(event);
-  return registerLocalModel(payload && payload.modelId);
+  return runLocalModelOperation(() => removeLocalModel(payload && payload.modelId));
 });
 ipcMain.handle(DESKTOP_LOCAL_MODEL_OPEN_GUIDE_CHANNEL, async (event) => {
   assertLocalModelSender(event);
@@ -4199,10 +4120,11 @@ module.exports = {
   DESKTOP_LOCAL_MODEL_START_CHANNEL,
   DESKTOP_LOCAL_MODEL_STOP_CHANNEL,
   DESKTOP_LOCAL_MODEL_PULL_CHANNEL,
-  DESKTOP_LOCAL_MODEL_REGISTER_CHANNEL,
+  DESKTOP_LOCAL_MODEL_REMOVE_CHANNEL,
   DESKTOP_LOCAL_MODEL_OPEN_GUIDE_CHANNEL,
   DESKTOP_LOCAL_MODEL_STATE_EVENT,
   DESKTOP_LOCAL_MODEL_INSTALL_GUIDE_URL,
+  DESKTOP_LOCAL_MODELS_SETTINGS_ROUTE,
   DESKTOP_LOCAL_MODEL_PRESETS,
   DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE,
   DESKTOP_LOCAL_MODEL_STATUS,
@@ -4244,13 +4166,12 @@ module.exports = {
   startManagedLocalModelRuntime,
   stopManagedLocalModelRuntime,
   pullLocalModel,
-  registerLocalModel,
-  applyLocalModelRegistration,
-  readRegisteredLocalModels,
+  removeLocalModel,
+  isLocalModelAssigned,
+  decodeConfiguredModelRoute,
+  resolveLocalModelTotalMemoryGb,
   buildLocalModelState,
-  composeCsvValue,
-  upsertEnvLine,
-  createLocalModelWindow,
+  openLocalModelsSettings,
   extractDesktopDeepLink,
   flushPendingDesktopDeepLink,
   handleDesktopOpenUrl,
@@ -4315,10 +4236,6 @@ module.exports = {
   },
   __getPendingDesktopDeepLinkRouteForTest() {
     return pendingDesktopDeepLinkRoute;
-  },
-  __setLocalModelWindowForTest(windowRef = null) {
-    localModelWindow = windowRef;
-    localModelWindowLoadPromise = null;
   },
   __setLocalModelServeProcessForTest(processRef = null) {
     localModelServeProcess = processRef;

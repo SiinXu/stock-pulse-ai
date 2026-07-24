@@ -121,4 +121,41 @@ describe('localModelTransport', () => {
     expect(bridge.pull).toHaveBeenCalledWith('qwen3:4b');
     expect(api.assign).toHaveBeenCalledWith('qwen3:4b', 'auto');
   });
+
+  it('validates and unregisters before asking desktop IPC to delete model weights', async () => {
+    const bridge = createDesktopBridge();
+    const mutation = {
+      ...CONFIGURATION,
+      success: true,
+      modelId: 'qwen3:4b',
+      selectedPrimary: false,
+      selectedAgent: false,
+      deleted: true,
+      updatedKeys: ['LLM_OLLAMA_MODELS'],
+      warnings: [],
+      appliedCount: 1,
+      skippedMaskedCount: 0,
+      reloadTriggered: true,
+    };
+    api.unregister.mockResolvedValue(mutation);
+
+    await expect(
+      __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
+    ).resolves.toEqual(mutation);
+    expect(api.unregister).toHaveBeenCalledWith('qwen3:4b');
+    expect(bridge.remove).toHaveBeenCalledWith('qwen3:4b');
+    expect(api.unregister.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(bridge.remove).mock.invocationCallOrder[0],
+    );
+  });
+
+  it('does not mutate desktop weights when backend active-model validation fails', async () => {
+    const bridge = createDesktopBridge();
+    api.unregister.mockRejectedValue(new Error('model in use'));
+
+    await expect(
+      __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
+    ).rejects.toThrow('model in use');
+    expect(bridge.remove).not.toHaveBeenCalled();
+  });
 });

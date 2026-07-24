@@ -227,6 +227,7 @@ function createDesktopTransport(bridge: DesktopLocalModelBridge): LocalModelTran
       }
     },
     async remove(modelId) {
+      const configuration = await localModelsApi.unregister(modelId);
       const result = await bridge.remove(modelId);
       if (result.ok !== true) {
         throw new LocalModelTransportError(
@@ -234,7 +235,7 @@ function createDesktopTransport(bridge: DesktopLocalModelBridge): LocalModelTran
           'Local model deletion failed',
         );
       }
-      return localModelsApi.unregister(modelId);
+      return configuration;
     },
     assign: (modelId, assignment) => localModelsApi.assign(modelId, assignment),
     start: () => loadState(bridge.start),
