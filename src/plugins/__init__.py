@@ -4,6 +4,7 @@
 
 from .agent_tools import (
     AgentToolRegistrationBackend,
+    build_agent_tool_extension_contract,
     build_agent_tool_extension_registry,
     validate_agent_tool_definition,
 )
@@ -18,6 +19,17 @@ from .manager import (
     PluginState,
 )
 from .manifest import PluginManifest
+from .notification_channels import (
+    NotificationAdapterResult,
+    NotificationChannelAdapter,
+    NotificationChannelFactory,
+    NotificationChannelRegistry,
+    NotificationChannelSnapshot,
+    NotificationRequest,
+    available_notification_channel_snapshot,
+    build_notification_channel_extension_contract,
+    validate_notification_channel_factory,
+)
 from .plugin import Plugin
 from .registry import (
     EXTENSION_POINTS,
@@ -31,6 +43,7 @@ from .registry import (
     RegistrationHandle,
     default_extension_contracts,
 )
+from .runtime import build_application_extension_registry
 
 __all__ = [
     "AgentToolRegistrationBackend",
@@ -43,6 +56,12 @@ __all__ = [
     "ExtensionRegistry",
     "JSONValue",
     "NativeRegistrationBackend",
+    "NotificationAdapterResult",
+    "NotificationChannelAdapter",
+    "NotificationChannelFactory",
+    "NotificationChannelRegistry",
+    "NotificationChannelSnapshot",
+    "NotificationRequest",
     "Plugin",
     "PLUGIN_APPLICATION_VERSION",
     "PluginContext",
@@ -56,7 +75,12 @@ __all__ = [
     "PluginSource",
     "PluginState",
     "RegistrationHandle",
+    "available_notification_channel_snapshot",
+    "build_agent_tool_extension_contract",
     "build_agent_tool_extension_registry",
+    "build_application_extension_registry",
+    "build_notification_channel_extension_contract",
     "default_extension_contracts",
     "validate_agent_tool_definition",
+    "validate_notification_channel_factory",
 ]

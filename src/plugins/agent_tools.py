@@ -303,15 +303,23 @@ class AgentToolRegistrationBackend:
                 del self._owned_registries[owner_key]
 
 
+def build_agent_tool_extension_contract(
+    registry: ToolRegistry | Callable[[], ToolRegistry],
+) -> ExtensionContract:
+    """Build the Agent Tool contract bound to one native registry."""
+
+    return ExtensionContract(
+        identity_resolver=lambda implementation: implementation.name,
+        validator=validate_agent_tool_definition,
+        backend=AgentToolRegistrationBackend(registry),
+    )
+
+
 def build_agent_tool_extension_registry(
     registry: ToolRegistry | Callable[[], ToolRegistry],
 ) -> ExtensionRegistry:
     """Build the six-point registry with Agent Tools wired to ToolRegistry."""
 
     contracts = dict(default_extension_contracts())
-    contracts["agent_tool"] = ExtensionContract(
-        identity_resolver=lambda implementation: implementation.name,
-        validator=validate_agent_tool_definition,
-        backend=AgentToolRegistrationBackend(registry),
-    )
+    contracts["agent_tool"] = build_agent_tool_extension_contract(registry)
     return ExtensionRegistry(contracts)

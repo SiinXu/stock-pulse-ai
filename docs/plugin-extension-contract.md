@@ -16,7 +16,7 @@ right boundary.
 | Need | Choose | Current path | Boundary |
 | --- | --- | --- | --- |
 | Add investment criteria, prompt instructions, activation metadata, or declare existing tools required by a specialist without executing code | Skill / strategy package | Built-ins use `strategies/*.yaml`; custom definitions use top-level YAML or nested `SKILL.md` under `AGENT_SKILL_DIR` | Declarative input to the existing Skill runtime; `required_tools` narrows only an optional `SkillAgent` specialist, while imported `allowed_tools` is metadata rather than runtime access control |
-| Add reviewed Python behavior for one of the six official extension points below | System plugin | `PLUGINS_DIR` provides package discovery and lifecycle only; an application composition path must also bind `PluginManager` to the exact native registry described by the implementation-status table | Trusted in-process code; the default process binds Agent Tools, while every unbound or contract-only point remains unavailable at runtime |
+| Add reviewed Python behavior for one of the six official extension points below | System plugin | `PLUGINS_DIR` provides package discovery and lifecycle only; an application composition path must also bind `PluginManager` to the exact native registry described by the implementation-status table | Trusted in-process code; the default process binds Agent Tools and Notification Channels, while every unbound or contract-only point remains unavailable at runtime |
 | Add UI components, Settings panels, custom commands, a remote marketplace, dependency installation, hot reload, a connector/MCP boundary, or another extension point | New design and ADR | Propose the authority, trust, compatibility, and lifecycle contract before implementation | Outside the version 1 plugin surface; do not route it through a nearby registration API |
 
 Skill packages are appropriate when an author only needs natural-language
@@ -30,10 +30,11 @@ behavior and an application composition path has bound the extension point's
 exact native registry. `PLUGINS_DIR` alone discovers and manages package
 lifecycle; it can activate only implementations whose point is bound by that
 composition root. The default process root binds Agent Tools to its cached
-`ToolRegistry`. Data Provider plugin execution still requires programmatic
-composition with `PluginManager(registry=manager.plugin_registry)`. A listed
-but unbound point needs explicit wiring under the accepted contract, while a
-new surface requires an ADR instead of an implicit registry expansion.
+`ToolRegistry` and Notification Channels to its root-owned adapter registry.
+Data Provider plugin execution still requires programmatic composition with
+`PluginManager(registry=manager.plugin_registry)`. A listed but unbound point
+needs explicit wiring under the accepted contract, while a new surface requires
+an ADR instead of an implicit registry expansion.
 
 > **Operator trust boundary:** Setting `PLUGINS_DIR` opts into arbitrary Python
 > code running with the StockPulse process's OS privileges. Keeping it unset or
@@ -44,12 +45,12 @@ new surface requires an ADR instead of an implicit registry expansion.
 
 | Surface | Current authority | Track X delivery |
 | --- | --- | --- |
-| Plugin lifecycle, manifest, registry | `src/plugins/` core; Data Provider and Agent Tool native adapters wired, other points fail closed | #273 X2a core implemented |
+| Plugin lifecycle, manifest, registry | `src/plugins/` core; Data Provider, Agent Tool, and Notification Channel native adapters wired, other points fail closed | #273 X2a core implemented |
 | Built-in/external startup wiring | `src/application_services.py` composition root | #273 X2b implemented |
 | Data Providers | `DataProvider`, `BaseFetcher`, and `DataFetcherManager` | #276 X3 native adapter implemented; caller must inject the target manager registry |
 | Analysis Strategies | `Skill`, `SkillManager`, `StrategyEngine` | Contract only in this batch |
 | Agent Tools | `ToolDefinition`, `ToolRegistry`, Tool Surface | Default process adapter wired; strict registration validation remains fail-closed |
-| Notification Channels | `NotificationChannel`, sender mixins, `NotificationService` | Contract only in this batch |
+| Notification Channels | `NotificationChannel`, sender mixins, `NotificationService` | #538 runtime adapter implemented in the default process root |
 | Report Templates | `src/services/report_renderer.py`, `templates/report_*.j2` | Contract only in this batch |
 | Event Hooks | Task and Agent runtime event streams | Contract only in this batch |
 
@@ -165,7 +166,7 @@ including every `onunload()` callback, before a successor may start.
 The default lifecycle-style built-in catalog is configuration-gated. Existing
 Data Provider built-ins remain owned by each `DataFetcherManager`; the optional
 Kronos Agent Tool is added only when its explicit enable flag is true, while the
-other four extension points remain contract-only. `ApplicationServices`
+other three extension points remain contract-only. `ApplicationServices`
 continues to accept an explicit built-in iterable for tests and composition
 callers. New built-ins must use that seam rather than a parallel startup hook.
 
@@ -603,10 +604,18 @@ class NotificationChannelAdapter(Protocol):
     ) -> NotificationAdapterResult: ...
 
 
-NotificationChannelFactory = Callable[[Config], NotificationChannelAdapter]
+class NotificationChannelFactory(Protocol):
+    channel_id: str
+    display_name: str
+
+    def __call__(self, config: Config) -> NotificationChannelAdapter: ...
 ```
 
-The factory receives the application configuration and returns one adapter.
+The factory receives the application configuration and returns one adapter. It
+exposes the same canonical `channel_id` and `display_name` before construction;
+an adapter class with a `Config` constructor is the simplest valid factory.
+This lets the registry reject identity and built-in collisions before executing
+the factory. The returned adapter must repeat the same identity.
 The core, not the adapter, measures latency, binds the canonical channel ID, and
 maps `NotificationAdapterResult` into the existing `ChannelAttemptResult` and
 `NotificationDispatchResult` semantics. One adapter failure must not stop later
@@ -636,7 +645,18 @@ current fixed allowlist; it must not maintain a parallel route configuration.
 Adapters do not send before route/noise decisions and do not claim success
 without a real delivery attempt. User-influenced outbound endpoints remain
 subject to the central outbound security policy when that policy is available.
-No notification runtime wiring is part of this batch.
+
+The default process wiring is implemented by
+`src/plugins/notification_channels.py`, the root-owned registry exposed by
+`ApplicationServices`, and the existing `NotificationService` dispatcher.
+Factory validation and native/built-in canonical-ID collision checks happen
+before publication. Disable and unload remove the exact owned adapter, while an
+in-flight dispatch retains its already resolved immutable adapter tuple so a
+mid-send lifecycle change cannot duplicate or omit a target from that send.
+Availability failures, invalid results, and send exceptions are isolated and
+mapped into sanitized channel attempts. The deterministic
+[`example_log` adapter](../examples/plugins/example-notification-channel/README.md)
+shows the complete external package shape without network access or secrets.
 
 ### Report Templates
 

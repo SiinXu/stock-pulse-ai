@@ -311,10 +311,35 @@ def _require_pair(
         )
 
 
-def run_notification_diagnostics(config: Config) -> NotificationDiagnosticResult:
+def run_notification_diagnostics(
+    config: Config,
+    *,
+    enabled_plugin_channels: Sequence[str] = (),
+    available_plugin_channels: Sequence[str] = (),
+) -> NotificationDiagnosticResult:
     """Run read-only diagnostics for notification configuration."""
 
-    configured = tuple(channel.value for channel in NotificationService.detect_configured_channels(config))
+    enabled_plugins = tuple(dict.fromkeys(enabled_plugin_channels))
+    available_plugins = tuple(
+        dict.fromkeys(
+            channel
+            for channel in available_plugin_channels
+            if channel in enabled_plugins
+        )
+    )
+    configured = tuple(
+        dict.fromkeys(
+            (
+                *(
+                    channel.value
+                    for channel in NotificationService.detect_configured_channels(
+                        config
+                    )
+                ),
+                *available_plugins,
+            )
+        )
+    )
     errors: List[NotificationDiagnosticIssue] = []
     warnings: List[NotificationDiagnosticIssue] = []
     info: List[NotificationDiagnosticIssue] = [
@@ -477,7 +502,15 @@ def run_notification_diagnostics(config: Config) -> NotificationDiagnosticResult
         if not route_channels:
             continue
 
-        valid_channels, invalid_channels = split_notification_route_channels(route_channels)
+        allowed_channels = tuple(
+            dict.fromkeys(
+                (*ROUTABLE_NOTIFICATION_CHANNELS, *enabled_plugins)
+            )
+        )
+        valid_channels, invalid_channels = split_notification_route_channels(
+            route_channels,
+            allowed_channels=allowed_channels,
+        )
         if invalid_channels:
             errors.append(
                 _issue(
@@ -485,7 +518,7 @@ def run_notification_diagnostics(config: Config) -> NotificationDiagnosticResult
                     "invalid_route_channel",
                     (
                         f"{route_config['env_key']} 包含未知通知渠道: {', '.join(invalid_channels)}；"
-                        f"允许值: {', '.join(ROUTABLE_NOTIFICATION_CHANNELS)}。"
+                        f"允许值: {', '.join(allowed_channels)}。"
                     ),
                     key=route_config["env_key"],
                 )

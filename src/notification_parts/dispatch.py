@@ -13,6 +13,11 @@ if TYPE_CHECKING:
         NotificationChannel,
         NotificationDispatchResult,
         WECHAT_IMAGE_MAX_BYTES,
+        _NotificationAdapterResult,
+        _NotificationRequest,
+        _ROUTABLE_NOTIFICATION_CHANNELS,
+        _available_notification_channel_snapshot,
+        _normalize_notification_adapter_error_code,
         log_safe_exception,
         logger,
         sanitize_diagnostic_text,
@@ -167,7 +172,32 @@ class _DispatchMethods:
                 message="interactive context delivery failed; static channels skipped",
             )
 
-        if not self._available_channels:
+        plugin_channel_snapshot = self._notification_channel_registry.snapshot()
+        available_plugin_channels = _available_notification_channel_snapshot(
+            plugin_channel_snapshot
+        )
+        available_channels = [
+            *self._available_channels,
+            *available_plugin_channels,
+        ]
+        allowed_channel_ids = tuple(
+            dict.fromkeys(
+                (
+                    *_ROUTABLE_NOTIFICATION_CHANNELS,
+                    *(
+                        channel.channel_id
+                        for channel in plugin_channel_snapshot
+                    ),
+                )
+            )
+        )
+        target_channels = self.get_channels_for_route(
+            route_type,
+            available_channels,
+            allowed_channel_ids=allowed_channel_ids,
+        )
+
+        if not available_channels:
             if context_success:
                 logger.info("已通过消息上下文渠道完成推送（无其他通知渠道）")
                 return NotificationDispatchResult(
@@ -184,7 +214,6 @@ class _DispatchMethods:
                 message="notification service unavailable",
             )
 
-        target_channels = self.get_channels_for_route(route_type)
         if not target_channels:
             if context_success:
                 logger.info("已通过消息上下文渠道完成推送（路由后无其他通知渠道）")
@@ -224,11 +253,21 @@ class _DispatchMethods:
         # Markdown to image (Issue #289): convert once if any channel needs it.
         # Per-channel decision via _should_use_image_for_channel (see send() docstring for fallback rules).
         image_bytes = None
-        channels_needing_image = {
-            ch for ch in target_channels
-            if ch.value in self._markdown_to_image_channels
-            and ch not in {NotificationChannel.NTFY, NotificationChannel.GOTIFY}
-        }
+        target_channel_ids = tuple(
+            channel.value
+            if isinstance(channel, NotificationChannel)
+            else channel.channel_id
+            for channel in target_channels
+        )
+        channels_needing_image = tuple(
+            channel_id
+            for channel_id in target_channel_ids
+            if channel_id in self._markdown_to_image_channels
+            and channel_id not in {
+                NotificationChannel.NTFY.value,
+                NotificationChannel.GOTIFY.value,
+            }
+        )
         if channels_needing_image:
             from src.md2img import markdown_to_image
             image_bytes = markdown_to_image(
@@ -236,7 +275,7 @@ class _DispatchMethods:
             )
             if image_bytes:
                 logger.info("Markdown 已转换为图片，将向 %s 发送图片",
-                            [ch.value for ch in channels_needing_image])
+                            list(channels_needing_image))
             elif channels_needing_image:
                 try:
                     from src.config import get_config
@@ -252,7 +291,12 @@ class _DispatchMethods:
                     hint,
                 )
 
-        channel_names = ', '.join(ChannelDetector.get_channel_name(ch) for ch in target_channels)
+        channel_names = ', '.join(
+            ChannelDetector.get_channel_name(channel)
+            if isinstance(channel, NotificationChannel)
+            else channel.display_name
+            for channel in target_channels
+        )
         logger.info(f"正在向 {len(target_channels)} 个渠道发送通知：{channel_names}")
 
         success_count = 0
@@ -260,30 +304,82 @@ class _DispatchMethods:
         channel_results: List[ChannelAttemptResult] = []
 
         for channel in target_channels:
-            channel_name = ChannelDetector.get_channel_name(channel)
+            channel_id = (
+                channel.value
+                if isinstance(channel, NotificationChannel)
+                else channel.channel_id
+            )
             started_at = time.monotonic()
             try:
-                result = self._send_to_static_channel(
-                    channel,
-                    content,
-                    image_bytes=image_bytes,
-                    email_stock_codes=email_stock_codes,
-                    email_send_to_all=email_send_to_all,
-                    route_type=route_type,
-                )
+                if isinstance(channel, NotificationChannel):
+                    result = self._send_to_static_channel(
+                        channel,
+                        content,
+                        image_bytes=image_bytes,
+                        email_stock_codes=email_stock_codes,
+                        email_send_to_all=email_send_to_all,
+                        route_type=route_type,
+                    )
+                    attempt_success = bool(result)
+                    error_code = None if attempt_success else "send_failed"
+                    retryable = not attempt_success
+                    diagnostics = None
+                else:
+                    adapter_result = channel.adapter.send(
+                        _NotificationRequest(
+                            content=content,
+                            route_type=route_type,
+                            severity=severity,
+                            image_bytes=(
+                                image_bytes
+                                if channel_id in self._markdown_to_image_channels
+                                else None
+                            ),
+                            stock_codes=tuple(email_stock_codes or ()),
+                            metadata={},
+                        )
+                    )
+                    if type(adapter_result) is not _NotificationAdapterResult:
+                        logger.warning(
+                            "Notification channel adapter returned an invalid result "
+                            "error_code=notification_adapter_result_invalid channel=%s",
+                            channel_id,
+                        )
+                        attempt_success = False
+                        error_code = "notification_adapter_result_invalid"
+                        retryable = False
+                        diagnostics = None
+                    else:
+                        attempt_success = adapter_result.success
+                        error_code = _normalize_notification_adapter_error_code(
+                            adapter_result.error_code,
+                            success=attempt_success,
+                        )
+                        retryable = (
+                            adapter_result.retryable
+                            if not attempt_success
+                            else False
+                        )
+                        diagnostics = (
+                            sanitize_diagnostic_text(
+                                adapter_result.diagnostics
+                            )
+                            or None
+                        )
                 latency_ms = int((time.monotonic() - started_at) * 1000)
 
-                if result:
+                if attempt_success:
                     success_count += 1
                 else:
                     fail_count += 1
                 channel_results.append(
                     ChannelAttemptResult(
-                        channel=channel.value,
-                        success=bool(result),
-                        error_code=None if result else "send_failed",
-                        retryable=not bool(result),
+                        channel=channel_id,
+                        success=attempt_success,
+                        error_code=error_code,
+                        retryable=retryable,
                         latency_ms=latency_ms,
+                        diagnostics=diagnostics,
                     )
                 )
 
@@ -293,17 +389,28 @@ class _DispatchMethods:
                     "Notification channel delivery failed",
                     exc,
                     error_code="notification_channel_delivery_failed",
-                    context={"channel": channel.value},
+                    context={"channel": channel_id},
+                    exception_redaction_values=(
+                        ()
+                        if not isinstance(channel, NotificationChannel)
+                        else None
+                    ),
                 )
                 fail_count += 1
                 channel_results.append(
                     ChannelAttemptResult(
-                        channel=channel.value,
+                        channel=channel_id,
                         success=False,
                         error_code="exception",
                         retryable=True,
                         latency_ms=int((time.monotonic() - started_at) * 1000),
-                        diagnostics=sanitize_exception_chain(exc),
+                        diagnostics=sanitize_exception_chain(
+                            exc,
+                            redact_diagnostics=not isinstance(
+                                channel,
+                                NotificationChannel,
+                            ),
+                        ),
                     )
                 )
 

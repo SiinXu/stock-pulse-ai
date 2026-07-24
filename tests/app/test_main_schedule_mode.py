@@ -607,7 +607,11 @@ class MainScheduleModeTestCase(unittest.TestCase):
             exit_code = main.main()
 
         self.assertEqual(exit_code, 0)
-        run_diagnostics.assert_called_once_with(config)
+        run_diagnostics.assert_called_once_with(
+            config,
+            enabled_plugin_channels=(),
+            available_plugin_channels=(),
+        )
         print_output.assert_called_once_with("通知配置诊断")
         start_api_server.assert_not_called()
         run_full_analysis.assert_not_called()

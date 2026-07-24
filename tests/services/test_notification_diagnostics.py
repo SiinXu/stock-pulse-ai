@@ -164,6 +164,52 @@ class NotificationDiagnosticsTestCase(unittest.TestCase):
         self.assertEqual(warnings[0].key, "NOTIFICATION_ALERT_CHANNELS")
         self.assertIn("telegram", warnings[0].message)
 
+    def test_plugin_route_uses_enabled_and_available_runtime_snapshot(self):
+        result = run_notification_diagnostics(
+            _config(notification_report_channels=["private_sink"]),
+            enabled_plugin_channels=("private_sink",),
+            available_plugin_channels=("private_sink",),
+        )
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.configured_channels, ("private_sink",))
+        self.assertNotIn(
+            "invalid_route_channel",
+            {item.code for item in result.errors},
+        )
+
+    def test_enabled_but_unavailable_plugin_route_is_warning_not_invalid(self):
+        result = run_notification_diagnostics(
+            _config(notification_report_channels=["offline_sink"]),
+            enabled_plugin_channels=("offline_sink",),
+        )
+
+        self.assertFalse(result.ok)
+        self.assertIn(
+            "route_channel_not_configured",
+            {item.code for item in result.warnings},
+        )
+        self.assertNotIn(
+            "invalid_route_channel",
+            {item.code for item in result.errors},
+        )
+
+    def test_disabled_plugin_route_is_reported_as_invalid(self):
+        result = run_notification_diagnostics(
+            _config(
+                wechat_webhook_url=(
+                    "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=1"
+                ),
+                notification_report_channels=["disabled_sink"],
+            )
+        )
+
+        self.assertFalse(result.ok)
+        self.assertIn(
+            "invalid_route_channel",
+            {item.code for item in result.errors},
+        )
+
     def test_noise_invalid_quiet_hours_reports_error(self):
         result = run_notification_diagnostics(
             _config(

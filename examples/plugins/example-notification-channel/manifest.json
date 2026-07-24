@@ -1,0 +1,11 @@
+{
+  "id": "example-notification-channel",
+  "name": "Example Notification Channel",
+  "version": "1.0.0",
+  "minAppVersion": "3.26.3",
+  "description": "Writes routed notification attempts to the application log.",
+  "author": "StockPulse contributors",
+  "permissions": [],
+  "apiVersion": "1",
+  "entrypoint": "plugin.py:Plugin"
+}

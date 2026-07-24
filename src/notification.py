@@ -28,6 +28,7 @@ from src.config import Config, get_config
 from src.enums import ReportType
 from src.market_phase_summary import format_public_market_status_line, format_public_phase_pack_excerpt
 from src.notification_routing import (
+    ROUTABLE_NOTIFICATION_CHANNELS as _ROUTABLE_NOTIFICATION_CHANNELS,
     get_notification_route_config,
     split_notification_route_channels,
 )
@@ -92,8 +93,43 @@ from src.notification_sender import (
     resolve_gotify_message_endpoint,
     resolve_ntfy_endpoint,
 )
+from src.plugins.notification_channels import (
+    NotificationAdapterResult as _NotificationAdapterResult,
+    NotificationChannelSnapshot as _NotificationChannelSnapshot,
+    NotificationRequest as _NotificationRequest,
+    available_notification_channel_snapshot as _available_notification_channel_snapshot,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def _get_notification_channel_registry():
+    """Resolve the registry owned by the installed application root."""
+
+    from src.application_services import get_application_services
+
+    return get_application_services().notification_channel_registry
+
+
+def _normalize_notification_adapter_error_code(
+    value: Any,
+    *,
+    success: bool,
+) -> Optional[str]:
+    """Map plugin-provided error codes into the bounded core attempt format."""
+
+    if success:
+        return None
+    candidate = sanitize_diagnostic_text(value, max_length=120)
+    if (
+        candidate
+        and candidate.isascii()
+        and candidate == candidate.lower()
+        and candidate[0].isalnum()
+        and all(character.isalnum() or character in "._-" for character in candidate)
+    ):
+        return candidate
+    return "send_failed"
 
 
 def _safe_float(value: Any) -> Optional[float]:
@@ -314,6 +350,7 @@ class NotificationService(
         self._config = config
         self._request_context = request_context
         self._context_channels: List[str] = []
+        self._notification_channel_registry = _get_notification_channel_registry()
 
         # Markdown Convert to image(Issue #289)
         self._markdown_to_image_channels = set(
@@ -346,16 +383,22 @@ class NotificationService(
 
         # Detect all configured channels
         self._available_channels = self._detect_all_channels()
+        plugin_channels = self._notification_channel_registry.snapshot()
         if self._extract_dingtalk_session_webhook() is not None:
             self._context_channels.append("钉钉会话")
         if self._extract_feishu_reply_info() is not None:
             self._context_channels.append("飞书会话")
 
-        if not self._available_channels and not self._context_channels:
+        if (
+            not self._available_channels
+            and not self._context_channels
+            and not plugin_channels
+        ):
             logger.warning("未配置有效的通知渠道，将不发送推送通知")
         else:
             channel_names = [ChannelDetector.get_channel_name(ch) for ch in self._available_channels]
             channel_names.extend(self._context_channels)
+            channel_names.extend(channel.display_name for channel in plugin_channels)
             logger.info(f"已配置 {len(channel_names)} 个通知渠道：{', '.join(channel_names)}")
 
     # Reserve the legacy class namespace order. Facade binding replaces each

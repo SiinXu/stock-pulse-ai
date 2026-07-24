@@ -150,7 +150,7 @@ EXPECTED_GROUPS = (
             "_send_feishu_stream_reply",
             "_send_feishu_stream_chunked",
         ),
-        "4ddd7490b49c2c90bd5d697e08285925ff08a18ff162ccdc680c8330de2f4d61",
+        "85b5970ab3d9cdd29de59fa5b362564b21bafa94e3b3a04326ead0870b34683e",
     ),
     (
         "_RenderingMethods",
@@ -198,7 +198,7 @@ EXPECTED_GROUPS = (
             "save_report_to_file",
             "save_and_send_feishu_file",
         ),
-        "97f849e86a403cfb2de7247a21b759fd6a42bc0da730b41ffb5fab0c35a713fe",
+        "21dd795c49af9c19f23812d6cdd1c536890d8da9f7474cb3692eae6aecf5f815",
     ),
 )
 
