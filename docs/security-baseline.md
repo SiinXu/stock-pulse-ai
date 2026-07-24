@@ -1,7 +1,7 @@
 # Security and Compliance Baseline
 
 Status: Maintainer baseline
-Last reviewed: 2026-07-21
+Last reviewed: 2026-07-23
 Applies to: StockPulse backend, API, Web and desktop clients, Agent and Bot integrations, data providers, notifications, reports, automation, and release workflows
 
 ## Scope
@@ -100,7 +100,7 @@ Current anchors: [`.gitignore`](../.gitignore), [`.env.example`](../.env.example
 | `NET-05` | MUST | Outbound requests must have finite timeouts and TLS verification enabled by default. Any opt-out must be explicit, narrowly scoped, documented as risky, and unsuitable for untrusted networks. |
 | `NET-06` | SHOULD | Egress denials should emit a stable, redacted security event with the policy reason and correlation identifier, never the credential-bearing URL. |
 
-Current anchors include URL and DNS checks for configurable intelligence feeds in [`src/services/intelligence_service.py`](../src/services/intelligence_service.py), search providers and result fetching in [`src/search_service.py`](../src/search_service.py), and notification senders under [`src/notification_sender/`](../src/notification_sender/). These paths currently apply different validation depths; the required centralized policy is tracked in [#171](https://github.com/SiinXu/stock-pulse-ai/issues/171).
+Current anchors include the shared fail-closed policy in [`src/security/outbound_policy.py`](../src/security/outbound_policy.py), its search and result-fetching integration in [`src/search_service.py`](../src/search_service.py), configurable intelligence-feed validation in [`src/services/intelligence_service.py`](../src/services/intelligence_service.py), and notification senders under [`src/notification_parts/senders/`](../src/notification_parts/senders/). New user-influenced outbound paths remain subject to the secure change checklist and the same shared policy.
 
 ### Auditability and human control
 
@@ -124,7 +124,7 @@ Current anchors include redacted Agent tool audit records in [`src/agent/tools/e
 | `SUPPLY-04` | MUST | Release and publish jobs must separate build from credentialed publication, validate artifact provenance and expected paths, and require the narrowest practical token scope. |
 | `SUPPLY-05` | SHOULD | CI should detect known vulnerable dependencies, stale immutable pins, unexpected lock changes, and permission expansion while providing an explicit exception workflow. |
 
-Current anchors: [`requirements.txt`](../requirements.txt), [`requirements-pydanticai.txt`](../requirements-pydanticai.txt), the npm lockfiles under [`apps/`](../apps/), and [`.github/workflows/`](../.github/workflows/). The optional PydanticAI closure is exactly versioned and npm installs use lockfiles, while the default Python environment and most workflow Action references are not immutable. The remaining reproducibility and least-privilege work is tracked in [#326](https://github.com/SiinXu/stock-pulse-ai/issues/326).
+Current anchors include [`constraints.txt`](../constraints.txt), [`build-constraints.txt`](../build-constraints.txt), the npm lockfiles under [`apps/`](../apps/), the maintenance policy in [`docs/supply-chain-maintenance.md`](supply-chain-maintenance.md), supply-chain checks under [`scripts/`](../scripts/), and immutable Action references with explicit permissions under [`.github/workflows/`](../.github/workflows/). These controls require ongoing lock refreshes, advisory review, and exception expiry under the documented maintenance policy.
 
 ### Financial and privacy compliance
 
@@ -161,13 +161,23 @@ This table is a scope and ownership map, not an exploit guide. Sensitive impleme
 | --- | --- | --- |
 | Multi-user identity, role and workspace authorization, consent, data ownership, export, deletion, and privacy audit are not implemented. | `AUTH-05`, `COMP-04` | [#230](https://github.com/SiinXu/stock-pulse-ai/issues/230) |
 | Agent tool schema, capability, data-scope, and network enforcement is not yet one complete deny-by-default sandbox. | `INPUT-04`, `NET-04`, `AUDIT-02` | [#191](https://github.com/SiinXu/stock-pulse-ai/issues/191), coordinated with [#137](https://github.com/SiinXu/stock-pulse-ai/issues/137) and [#214](https://github.com/SiinXu/stock-pulse-ai/issues/214) |
-| Redaction coverage is not yet systemic across every provider error, Agent trace, webhook diagnostic, and exported artifact. | `SECRET-03` | [#176](https://github.com/SiinXu/stock-pulse-ai/issues/176) |
-| Search, news, model endpoints, and notification URLs do not yet share one fail-closed SSRF and egress policy. | `NET-01` through `NET-06` | [#171](https://github.com/SiinXu/stock-pulse-ai/issues/171) |
 | Structured Agent observability is not yet a complete queryable cross-stage event and trace foundation. | `AUDIT-01` through `AUDIT-03` | [#222](https://github.com/SiinXu/stock-pulse-ai/issues/222) |
 | Analysis reports do not yet provide a complete exportable, redacted evidence chain and audit package. | `AUDIT-05` | [#127](https://github.com/SiinXu/stock-pulse-ai/issues/127) |
 | High-risk Agent actions do not yet have configurable, attributable human approval gates. | `AUDIT-04` | [#251](https://github.com/SiinXu/stock-pulse-ai/issues/251) |
-| Default Python dependency resolution, third-party Action pinning, and explicit workflow permission coverage do not yet meet the reproducibility and least-privilege baseline. | `SUPPLY-01` through `SUPPLY-05` | [#326](https://github.com/SiinXu/stock-pulse-ai/issues/326) |
 | Product-level investment and limitation disclosures are not yet guaranteed consistently across every report, notification, Web surface, and supported language. | `COMP-01` through `COMP-03`, `COMP-05` | [#144](https://github.com/SiinXu/stock-pulse-ai/issues/144) |
+| Central redaction rules still need regression hardening against prose-log over-scrubbing while preserving fail-closed secret removal. | `SECRET-03` | Accepted residual - owner: Security maintainers; review date: 2026-10-23. |
+
+## Completed Remediation Evidence
+
+These completed tracks are implementation evidence, not open gaps. Residual risks are listed explicitly above rather than leaving completed issues in the gap queue.
+
+| Completed track | Current boundary | Evidence |
+| --- | --- | --- |
+| Core security and compliance baseline definition | `AUTH-01` through `COMP-05` | [#228](https://github.com/SiinXu/stock-pulse-ai/issues/228) (completed) |
+| Shared SSRF and outbound egress policy | `NET-01` through `NET-06` | [#171](https://github.com/SiinXu/stock-pulse-ai/issues/171) (completed) |
+| Central sensitive-data redaction expansion | `SECRET-03` | [#176](https://github.com/SiinXu/stock-pulse-ai/issues/176) (completed) |
+| Dependency and workflow supply-chain hardening | `SUPPLY-01` through `SUPPLY-05` | [#326](https://github.com/SiinXu/stock-pulse-ai/issues/326) (completed) |
+| Constrained AlphaSift repair installation | `SUPPLY-01` | [#359](https://github.com/SiinXu/stock-pulse-ai/issues/359) (completed by [#531](https://github.com/SiinXu/stock-pulse-ai/pull/531)) |
 
 ## Review Cadence
 
