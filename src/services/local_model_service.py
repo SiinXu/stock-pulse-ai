@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import threading
 import time
@@ -15,11 +16,11 @@ import requests
 
 from src.llm.model_ref import decode_model_ref
 from src.services.system_config_service import (
-    ConfigConflictError,
     ConfigValidationError,
     SystemConfigService,
 )
 from src.services.task_queue import AnalysisTaskQueue, TaskInfo, TaskStatus
+from src.utils.sanitize import log_safe_exception
 
 
 OLLAMA_DEFAULT_BASE_URL = "http://127.0.0.1:11434"
@@ -35,6 +36,9 @@ LOCAL_MODEL_ID_PATTERN = re.compile(
 )
 LOCAL_MODEL_MAX_ID_LENGTH = 128
 LocalModelAssignment = Literal["auto", "primary", "agent"]
+
+
+logger = logging.getLogger(__name__)
 
 
 class LocalModelError(Exception):
@@ -130,6 +134,54 @@ def get_pullable_local_model_ids() -> Set[str]:
     return pullable
 
 
+def _read_bounded_response_body(response: requests.Response, max_bytes: int) -> bytes:
+    """Read a streamed response without allowing an unbounded in-memory body."""
+    chunks: List[bytes] = []
+    received = 0
+    for chunk in response.iter_content(chunk_size=64 * 1024):
+        if not chunk:
+            continue
+        value = chunk.encode("utf-8") if isinstance(chunk, str) else bytes(chunk)
+        received += len(value)
+        if received > max_bytes:
+            raise LocalModelRuntimeRequestError("The local model response is too large")
+        chunks.append(value)
+    return b"".join(chunks)
+
+
+def _iter_bounded_response_lines(
+    response: requests.Response,
+    max_event_bytes: int,
+) -> Iterable[bytes]:
+    """Yield NDJSON lines while bounding both complete events and partial buffers."""
+    buffer = bytearray()
+    for chunk in response.iter_content(chunk_size=max_event_bytes):
+        if not chunk:
+            continue
+        value = chunk.encode("utf-8") if isinstance(chunk, str) else bytes(chunk)
+        buffer.extend(value)
+        newline_index = buffer.find(b"\n")
+        while newline_index >= 0:
+            line = bytes(buffer[:newline_index])
+            del buffer[: newline_index + 1]
+            if len(line) > max_event_bytes:
+                raise LocalModelRuntimeRequestError(
+                    "The local model progress event is too large"
+                )
+            yield line
+            newline_index = buffer.find(b"\n")
+        if len(buffer) > max_event_bytes:
+            raise LocalModelRuntimeRequestError(
+                "The local model progress event is too large"
+            )
+    if buffer:
+        if len(buffer) > max_event_bytes:
+            raise LocalModelRuntimeRequestError(
+                "The local model progress event is too large"
+            )
+        yield bytes(buffer)
+
+
 @dataclass(frozen=True)
 class OllamaPullProgress:
     """One normalized Ollama pull progress event."""
@@ -175,7 +227,9 @@ class OllamaRuntimeClient:
                 json=dict(json_body) if json_body is not None else None,
                 headers={"Accept": "application/x-ndjson" if stream else "application/json"},
                 allow_redirects=False,
-                stream=stream,
+                # Always stream transport bodies so every caller can enforce a
+                # strict byte bound before buffering or parsing the response.
+                stream=True,
                 timeout=timeout,
             )
         except requests.RequestException as exc:
@@ -194,9 +248,12 @@ class OllamaRuntimeClient:
         """Return validated model names reported by Ollama."""
         response = self._request("GET", "/api/tags")
         try:
-            content = response.content
-            if len(content) > OLLAMA_MAX_JSON_BYTES:
-                raise LocalModelRuntimeRequestError("The local model response is too large")
+            try:
+                content = _read_bounded_response_body(response, OLLAMA_MAX_JSON_BYTES)
+            except requests.RequestException as exc:
+                raise LocalModelRuntimeUnavailableError(
+                    "The configured local model runtime is unavailable"
+                ) from exc
             try:
                 payload = json.loads(content.decode("utf-8")) if content else {}
             except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -238,13 +295,14 @@ class OllamaRuntimeClient:
         deadline = time.monotonic() + max(1.0, float(timeout_seconds))
         saw_terminal_success = False
         try:
-            for raw_line in response.iter_lines():
+            for raw_line in _iter_bounded_response_lines(
+                response,
+                OLLAMA_MAX_EVENT_BYTES,
+            ):
                 if time.monotonic() > deadline:
                     raise LocalModelRuntimeRequestError("The local model download timed out")
                 if not raw_line:
                     continue
-                if len(raw_line) > OLLAMA_MAX_EVENT_BYTES:
-                    raise LocalModelRuntimeRequestError("The local model progress event is too large")
                 try:
                     event = json.loads(raw_line.decode("utf-8") if isinstance(raw_line, bytes) else raw_line)
                 except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -314,7 +372,7 @@ class LocalModelService:
         self._task_queue = task_queue
         self._pullable_model_ids = pullable_model_ids
         self._client_factory = client_factory
-        self._task_lock = threading.RLock()
+        self._operation_lock = threading.RLock()
 
     @staticmethod
     def _split_csv(value: Any) -> List[str]:
@@ -419,6 +477,15 @@ class LocalModelService:
         assignment: LocalModelAssignment = "auto",
     ) -> Dict[str, Any]:
         """Register one model and optionally assign it without stealing an existing default."""
+        with self._operation_lock:
+            return self._configure_model(model_id, assignment=assignment)
+
+    def _configure_model(
+        self,
+        model_id: Any,
+        *,
+        assignment: LocalModelAssignment,
+    ) -> Dict[str, Any]:
         normalized = self._require_pullable(model_id)
         if assignment not in {"auto", "primary", "agent"}:
             raise LocalModelValidationError("Invalid local model assignment")
@@ -451,6 +518,24 @@ class LocalModelService:
         base_url: str,
     ) -> Dict[str, Any]:
         """Activate a verified model against one immutable runtime/config snapshot."""
+        with self._operation_lock:
+            return self._configure_model_from_snapshot_locked(
+                normalized,
+                assignment=assignment,
+                config_version=config_version,
+                values=values,
+                base_url=base_url,
+            )
+
+    def _configure_model_from_snapshot_locked(
+        self,
+        normalized: str,
+        *,
+        assignment: LocalModelAssignment,
+        config_version: str,
+        values: Mapping[str, str],
+        base_url: str,
+    ) -> Dict[str, Any]:
         current_channels = values.get("LLM_CHANNELS", "")
         current_models = values.get("LLM_OLLAMA_MODELS", "")
         route = f"ollama/{normalized}"
@@ -523,8 +608,23 @@ class LocalModelService:
 
     def unregister_model(self, model_id: Any) -> Dict[str, Any]:
         """Remove a non-active model from the Ollama connection configuration."""
-        normalized = self._require_pullable(model_id)
-        config_version, values = self._config_snapshot()
+        with self._operation_lock:
+            normalized = self._require_pullable(model_id)
+            config_version, values = self._config_snapshot()
+            return self._unregister_model_from_snapshot(
+                normalized,
+                config_version=config_version,
+                values=values,
+            )
+
+    def _unregister_model_from_snapshot(
+        self,
+        normalized: str,
+        *,
+        config_version: str,
+        values: Mapping[str, str],
+    ) -> Dict[str, Any]:
+        """Remove one model using the exact configuration snapshot already validated."""
         if self._is_model_referenced(values, normalized):
             raise LocalModelInUseError("Change the active model assignment before deleting it")
 
@@ -583,6 +683,8 @@ class LocalModelService:
         mode = str(values.get("LLM_CONFIG_MODE") or "auto").strip().lower() or "auto"
         if mode not in {"auto", "channels"}:
             return False
+        if mode == "auto" and str(values.get("LITELLM_CONFIG") or "").strip():
+            return False
         for channel in cls._split_csv(values.get("LLM_CHANNELS")):
             prefix = f"LLM_{channel.upper()}"
             enabled = str(values.get(f"{prefix}_ENABLED") or "true").strip().lower()
@@ -622,7 +724,7 @@ class LocalModelService:
     def start_pull(self, model_id: Any) -> TaskInfo:
         """Submit one allowlisted pull to the shared background task queue."""
         normalized = self._require_pullable(model_id)
-        with self._task_lock:
+        with self._operation_lock:
             pending = self._pending_pull(normalized)
             if pending is not None:
                 return pending
@@ -655,7 +757,14 @@ class LocalModelService:
                         values=values,
                         base_url=base_url,
                     )
-                except (ConfigConflictError, ConfigValidationError, LocalModelError):
+                except Exception as exc:  # broad-exception: fallback_recorded - download already succeeded
+                    log_safe_exception(
+                        logger,
+                        "Local model activation failed after download",
+                        exc,
+                        error_code="local_model_activation_failed",
+                        context={"model_id": normalized},
+                    )
                     return {
                         "model_id": normalized,
                         "activated": False,
@@ -695,38 +804,103 @@ class LocalModelService:
 
     def delete_model(self, model_id: Any) -> Dict[str, Any]:
         """Validate and unregister one catalog model before deleting its weights."""
+        with self._operation_lock:
+            return self._delete_model(model_id)
+
+    def _delete_model(self, model_id: Any) -> Dict[str, Any]:
         normalized = self._require_pullable(model_id)
-        _config_version, previous_values = self._config_snapshot()
+        if self._pending_pull(normalized) is not None:
+            raise LocalModelInUseError(
+                "Wait for the active model download before deleting it"
+            )
+        config_version, previous_values = self._config_snapshot()
+        base_url = self._base_url(previous_values)
+        previous_channels = self._split_csv(previous_values.get("LLM_CHANNELS"))
+        previous_models = self._split_csv(previous_values.get("LLM_OLLAMA_MODELS"))
         was_registered = any(
             item.lower() == normalized.lower()
-            for item in self._split_csv(previous_values.get("LLM_OLLAMA_MODELS"))
+            for item in previous_models
         )
-        result = self.unregister_model(normalized)
+        remaining_models = [
+            item for item in previous_models if item.lower() != normalized.lower()
+        ]
+        remaining_channels = list(previous_channels)
+        if not remaining_models:
+            remaining_channels = [
+                item for item in previous_channels if item.lower() != "ollama"
+            ]
+        result = self._unregister_model_from_snapshot(
+            normalized,
+            config_version=config_version,
+            values=previous_values,
+        )
+        client = self._client_factory(base_url)
         try:
-            self._client_factory(self._base_url(previous_values)).delete_model(normalized)
-        except LocalModelError as exc:
-            if was_registered:
-                current_version, _current_values = self._config_snapshot()
+            client.delete_model(normalized)
+        except Exception:  # broad-exception: fallback_recorded - recover config after runtime failure
+            weights_remain = True
+            try:
+                installed = client.list_installed_models()
+                weights_remain = any(
+                    item.lower() == normalized.lower() for item in installed
+                )
+            except Exception as probe_exc:  # broad-exception: fallback_recorded - restore conservatively
+                log_safe_exception(
+                    logger,
+                    "Could not confirm local model state after deletion failure",
+                    probe_exc,
+                    error_code="local_model_delete_probe_failed",
+                    context={"model_id": normalized},
+                )
+
+            if was_registered and weights_remain:
+                current_version, current_values = self._config_snapshot()
+                current_channels = self._split_csv(current_values.get("LLM_CHANNELS"))
+                current_models = self._split_csv(current_values.get("LLM_OLLAMA_MODELS"))
+                same_runtime = False
                 try:
-                    self._system_config_service.update(
-                        config_version=current_version,
-                        items=[
-                            {
-                                "key": "LLM_CHANNELS",
-                                "value": str(previous_values.get("LLM_CHANNELS") or ""),
-                            },
-                            {
-                                "key": "LLM_OLLAMA_MODELS",
-                                "value": str(previous_values.get("LLM_OLLAMA_MODELS") or ""),
-                            },
-                        ],
-                        reload_now=True,
-                        validate_connectivity=False,
-                        actor="local_model_delete_rollback",
+                    same_runtime = self._base_url(current_values) == base_url
+                except LocalModelError:
+                    pass
+                related_config_unchanged = (
+                    [item.lower() for item in current_channels]
+                    == [item.lower() for item in remaining_channels]
+                    and [item.lower() for item in current_models]
+                    == [item.lower() for item in remaining_models]
+                )
+                if same_runtime and related_config_unchanged:
+                    try:
+                        self._system_config_service.update(
+                            config_version=current_version,
+                            items=[
+                                {
+                                    "key": "LLM_CHANNELS",
+                                    "value": ",".join(previous_channels),
+                                },
+                                {
+                                    "key": "LLM_OLLAMA_MODELS",
+                                    "value": ",".join(previous_models),
+                                },
+                            ],
+                            reload_now=True,
+                            validate_connectivity=False,
+                            actor="local_model_delete_rollback",
+                        )
+                    except Exception as rollback_exc:  # broad-exception: fallback_recorded - preserve original boundary
+                        log_safe_exception(
+                            logger,
+                            "Local model registration recovery failed",
+                            rollback_exc,
+                            error_code="local_model_delete_rollback_failed",
+                            context={"model_id": normalized},
+                        )
+                        raise LocalModelRuntimeRequestError(
+                            "Local model deletion failed and registration recovery was rejected"
+                        ) from rollback_exc
+                else:
+                    logger.warning(
+                        "Skipped local model registration recovery because related configuration changed",
+                        extra={"error_code": "local_model_delete_rollback_conflict"},
                     )
-                except (ConfigConflictError, ConfigValidationError) as rollback_exc:
-                    raise LocalModelRuntimeRequestError(
-                        "Local model deletion failed and registration recovery was rejected"
-                    ) from rollback_exc
             raise
         return {**result, "deleted": True, "model_id": normalized}

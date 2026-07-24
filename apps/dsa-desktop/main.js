@@ -3025,12 +3025,12 @@ function requestLocalModelPullStream({
     };
 
     const consumeLine = (line) => {
-      const trimmed = line.trim();
-      if (!trimmed) {
+      if (Buffer.byteLength(line, 'utf-8') > DESKTOP_LOCAL_MODEL_MAX_EVENT_BYTES) {
+        finish(reject, new Error('Local model progress event is too large.'));
         return;
       }
-      if (Buffer.byteLength(trimmed, 'utf-8') > DESKTOP_LOCAL_MODEL_MAX_EVENT_BYTES) {
-        finish(reject, new Error('Local model progress event is too large.'));
+      const trimmed = line.trim();
+      if (!trimmed) {
         return;
       }
       let event;
@@ -3087,9 +3087,14 @@ function requestLocalModelPullStream({
             buffer = buffer.slice(newlineIndex + 1);
             newlineIndex = buffer.indexOf('\n');
           }
+          if (settled) {
+            if (typeof response.destroy === 'function') {
+              response.destroy();
+            }
+            return;
+          }
           if (
-            !settled
-            && Buffer.byteLength(buffer, 'utf-8') > DESKTOP_LOCAL_MODEL_MAX_EVENT_BYTES
+            Buffer.byteLength(buffer, 'utf-8') > DESKTOP_LOCAL_MODEL_MAX_EVENT_BYTES
           ) {
             finish(reject, new Error('Local model progress event is too large.'));
             if (typeof response.destroy === 'function') {
@@ -3636,10 +3641,48 @@ function isLocalModelAssigned(rawModelId, { envFile = resolveLocalModelEnvPath()
     return false;
   }
   const values = readEnvFileValues(envFile);
-  const expectedRoute = `${DESKTOP_LOCAL_MODEL_RUNTIME}/${modelId}`;
-  return ['LITELLM_MODEL', 'AGENT_LITELLM_MODEL'].some(
-    (key) => decodeConfiguredModelRoute(values[key]) === expectedRoute
+  const expectedRoute = `${DESKTOP_LOCAL_MODEL_RUNTIME}/${modelId}`.toLowerCase();
+  const routeMatches = (value) => (
+    decodeConfiguredModelRoute(value).toLowerCase() === expectedRoute
   );
+  if (['LITELLM_MODEL', 'AGENT_LITELLM_MODEL', 'VISION_MODEL'].some(
+    (key) => routeMatches(values[key])
+  )) {
+    return true;
+  }
+  if (String(values.LITELLM_FALLBACK_MODELS || '').split(',').some(routeMatches)) {
+    return true;
+  }
+
+  if (String(values.LITELLM_MODEL || '').trim()) {
+    return false;
+  }
+  const mode = String(values.LLM_CONFIG_MODE || 'auto').trim().toLowerCase() || 'auto';
+  if (!['auto', 'channels'].includes(mode)) {
+    return false;
+  }
+  if (mode === 'auto' && String(values.LITELLM_CONFIG || '').trim()) {
+    return false;
+  }
+  const channels = String(values.LLM_CHANNELS || '').split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  for (const channel of channels) {
+    const prefix = `LLM_${channel.toUpperCase()}`;
+    const enabled = String(values[`${prefix}_ENABLED`] || 'true').trim().toLowerCase();
+    if (['false', '0', 'no', 'off'].includes(enabled)) {
+      continue;
+    }
+    const models = String(values[`${prefix}_MODELS`] || '').split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+    if (models.length === 0) {
+      continue;
+    }
+    return channel.toLowerCase() === DESKTOP_LOCAL_MODEL_RUNTIME
+      && models[0].toLowerCase() === modelId.toLowerCase();
+  }
+  return false;
 }
 
 async function removeLocalModel(rawModelId, {
@@ -3658,7 +3701,7 @@ async function removeLocalModel(rawModelId, {
     return {
       ok: false,
       error: 'model-in-use',
-      message: 'Change the active primary or Agent model before deleting it.',
+      message: 'Change every active model assignment before deleting it.',
     };
   }
 

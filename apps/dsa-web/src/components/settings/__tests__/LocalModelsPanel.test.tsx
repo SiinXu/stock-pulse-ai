@@ -6,7 +6,10 @@ import type {
   LocalModelRuntimeState,
 } from '../../../types/localModels';
 import { LocalModelsPanel } from '../LocalModelsPanel';
-import type { LocalModelTransport } from '../localModelTransport';
+import {
+  LocalModelTransportError,
+  type LocalModelTransport,
+} from '../localModelTransport';
 
 const { getCatalog, createTransport } = vi.hoisted(() => ({
   getCatalog: vi.fn(),
@@ -232,6 +235,23 @@ describe('LocalModelsPanel', () => {
 
     expect(screen.getByRole('button', { name: 'Stop service' })).toBeDisabled();
     resolvePull?.({ modelId: 'qwen3:4b', activated: true, selectedPrimary: false });
+  });
+
+  it('reports activation failure without recommending a duplicate pull', async () => {
+    createTransport.mockReturnValue(transport({
+      pull: vi.fn().mockRejectedValue(new LocalModelTransportError(
+        'local_model_activation_failed',
+        'Local model configuration failed',
+      )),
+    }));
+
+    renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: 'Download' }));
+
+    expect(await screen.findByText(
+      'The operation did not complete. Refresh status and try again.',
+    )).toBeInTheDocument();
+    expect(screen.queryByText('ollama pull qwen3:4b')).not.toBeInTheDocument();
   });
 
   it('degrades to a copyable command when Ollama is unavailable', async () => {

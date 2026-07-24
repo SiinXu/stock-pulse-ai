@@ -10,6 +10,8 @@ import requests
 
 from src.services.local_model_service import (
     LOCAL_MODEL_PULL_TASK_KIND,
+    OLLAMA_MAX_EVENT_BYTES,
+    OLLAMA_MAX_JSON_BYTES,
     LocalModelInUseError,
     LocalModelNotInstalledError,
     LocalModelRuntimeRequestError,
@@ -42,6 +44,11 @@ class _FakeResponse:
 
     def iter_lines(self):
         yield from self._lines
+
+    def iter_content(self, chunk_size: int):
+        content = b"\n".join(self._lines) if self._lines else self.content
+        for offset in range(0, len(content), chunk_size):
+            yield content[offset: offset + chunk_size]
 
     def close(self) -> None:
         self.closed = True
@@ -178,6 +185,42 @@ class LocalModelRuntimeClientTestCase(_SystemConfigServiceTestCaseBase):
             OllamaRuntimeClient("http://private-runtime.example:11434", session=session).list_installed_models()
 
         self.assertNotIn("private-runtime", str(caught.exception))
+
+    def test_interrupted_stream_is_mapped_to_a_stable_runtime_error(self) -> None:
+        class _InterruptedResponse(_FakeResponse):
+            def iter_content(self, chunk_size: int):
+                yield b'{"models":['
+                raise requests.ConnectionError(
+                    "failed http://private-runtime.example:11434/api/tags"
+                )
+
+        response = _InterruptedResponse()
+        session = Mock()
+        session.request.return_value = response
+
+        with self.assertRaises(LocalModelRuntimeUnavailableError) as caught:
+            OllamaRuntimeClient(
+                "http://private-runtime.example:11434",
+                session=session,
+            ).list_installed_models()
+
+        self.assertNotIn("private-runtime", str(caught.exception))
+        self.assertTrue(response.closed)
+
+    def test_runtime_response_limits_are_enforced_before_json_or_ndjson_parsing(self) -> None:
+        oversized_json = _FakeResponse(payload=b"x" * (OLLAMA_MAX_JSON_BYTES + 1))
+        oversized_event = _FakeResponse(lines=[b" " * (OLLAMA_MAX_EVENT_BYTES + 1)])
+        session = Mock()
+        session.request.side_effect = [oversized_json, oversized_event]
+        client = OllamaRuntimeClient("http://127.0.0.1:11434", session=session)
+
+        with self.assertRaises(LocalModelRuntimeRequestError):
+            client.list_installed_models()
+        with self.assertRaises(LocalModelRuntimeRequestError):
+            client.pull_model("qwen3:4b", on_progress=lambda _progress: None)
+
+        self.assertTrue(oversized_json.closed)
+        self.assertTrue(oversized_event.closed)
 
 
 class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
@@ -442,6 +485,24 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
 
         self.assertEqual(client.deleted, [])
 
+    def test_inactive_auto_mode_channel_does_not_block_deletion_when_yaml_wins(self) -> None:
+        self._rewrite_env(
+            "ADMIN_AUTH_ENABLED=true",
+            "LLM_CONFIG_MODE=auto",
+            "LITELLM_CONFIG=/tmp/litellm.yaml",
+            "LLM_CHANNELS=ollama",
+            "LLM_OLLAMA_PROVIDER=ollama",
+            "LLM_OLLAMA_PROTOCOL=ollama",
+            "LLM_OLLAMA_MODELS=qwen3:4b",
+            "LLM_OLLAMA_ENABLED=true",
+        )
+        service, _queue, client = self._local_service()
+
+        result = service.delete_model("qwen3:4b")
+
+        self.assertTrue(result["deleted"])
+        self.assertEqual(client.deleted, ["qwen3:4b"])
+
     def test_delete_restores_registration_when_runtime_mutation_fails(self) -> None:
         class _DeleteFailureClient(_FakeRuntimeClient):
             def delete_model(self, model_id: str) -> None:
@@ -473,6 +534,91 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertEqual(values["LLM_CHANNELS"], "cloud,ollama")
         self.assertEqual(values["LLM_OLLAMA_MODELS"], "qwen3:4b")
 
+    def test_delete_does_not_restore_registration_when_weights_are_gone(self) -> None:
+        class _AmbiguousDeleteClient(_FakeRuntimeClient):
+            def delete_model(self, model_id: str) -> None:
+                self.installed = [
+                    item for item in self.installed if item.lower() != model_id.lower()
+                ]
+                raise LocalModelRuntimeRequestError("runtime disconnected after delete")
+
+        self._rewrite_env(
+            "ADMIN_AUTH_ENABLED=true",
+            "LLM_CONFIG_MODE=channels",
+            "LLM_CHANNELS=cloud,ollama",
+            "LLM_CLOUD_PROVIDER=openai",
+            "LLM_CLOUD_PROTOCOL=openai",
+            "LLM_CLOUD_API_KEY=secret-value",
+            "LLM_CLOUD_MODELS=gpt-4o",
+            "LLM_CLOUD_ENABLED=true",
+            "LLM_OLLAMA_PROVIDER=ollama",
+            "LLM_OLLAMA_PROTOCOL=ollama",
+            "LLM_OLLAMA_MODELS=qwen3:4b",
+            "LLM_OLLAMA_ENABLED=true",
+            "LITELLM_MODEL=openai/gpt-4o",
+        )
+        service, _queue, _client = self._local_service(
+            client=_AmbiguousDeleteClient(),
+        )
+
+        with self.assertRaises(LocalModelRuntimeRequestError):
+            service.delete_model("qwen3:4b")
+
+        values = self.manager.read_config_map()
+        self.assertEqual(values["LLM_CHANNELS"], "cloud")
+        self.assertEqual(values["LLM_OLLAMA_MODELS"], "")
+
+    def test_delete_recovery_preserves_concurrent_local_model_changes(self) -> None:
+        test_case = self
+
+        class _ConcurrentDeleteFailureClient(_FakeRuntimeClient):
+            def delete_model(self, model_id: str) -> None:
+                test_case._rewrite_env(
+                    "ADMIN_AUTH_ENABLED=true",
+                    "LLM_CONFIG_MODE=channels",
+                    "LLM_CHANNELS=cloud,ollama",
+                    "LLM_CLOUD_PROVIDER=openai",
+                    "LLM_CLOUD_PROTOCOL=openai",
+                    "LLM_CLOUD_API_KEY=secret-value",
+                    "LLM_CLOUD_MODELS=gpt-4o",
+                    "LLM_CLOUD_ENABLED=true",
+                    "LLM_OLLAMA_PROVIDER=ollama",
+                    "LLM_OLLAMA_PROTOCOL=ollama",
+                    "LLM_OLLAMA_MODELS=stockpulse/finance:latest",
+                    "LLM_OLLAMA_ENABLED=true",
+                    "LITELLM_MODEL=openai/gpt-4o",
+                )
+                raise LocalModelRuntimeRequestError("runtime rejected delete")
+
+        self._rewrite_env(
+            "ADMIN_AUTH_ENABLED=true",
+            "LLM_CONFIG_MODE=channels",
+            "LLM_CHANNELS=cloud,ollama",
+            "LLM_CLOUD_PROVIDER=openai",
+            "LLM_CLOUD_PROTOCOL=openai",
+            "LLM_CLOUD_API_KEY=secret-value",
+            "LLM_CLOUD_MODELS=gpt-4o",
+            "LLM_CLOUD_ENABLED=true",
+            "LLM_OLLAMA_PROVIDER=ollama",
+            "LLM_OLLAMA_PROTOCOL=ollama",
+            "LLM_OLLAMA_MODELS=qwen3:4b",
+            "LLM_OLLAMA_ENABLED=true",
+            "LITELLM_MODEL=openai/gpt-4o",
+        )
+        service, _queue, _client = self._local_service(
+            client=_ConcurrentDeleteFailureClient(),
+        )
+
+        with self.assertRaises(LocalModelRuntimeRequestError):
+            service.delete_model("qwen3:4b")
+
+        values = self.manager.read_config_map()
+        self.assertEqual(values["LLM_CHANNELS"], "cloud,ollama")
+        self.assertEqual(
+            values["LLM_OLLAMA_MODELS"],
+            "stockpulse/finance:latest",
+        )
+
     def test_pull_reuses_task_queue_progress_and_activates_after_success(self) -> None:
         self._rewrite_env("ADMIN_AUTH_ENABLED=true")
         service, queue, client = self._local_service()
@@ -502,6 +648,16 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertEqual(second.task_id, first.task_id)
         self.assertEqual(client.list_calls, 1)
 
+    def test_delete_rejects_a_model_with_an_active_pull_before_runtime_mutation(self) -> None:
+        self._rewrite_env("ADMIN_AUTH_ENABLED=true")
+        service, _queue, client = self._local_service()
+        service.start_pull("qwen3:4b")
+
+        with self.assertRaises(LocalModelInUseError):
+            service.delete_model("qwen3:4b")
+
+        self.assertEqual(client.deleted, [])
+
     def test_pull_does_not_activate_against_a_changed_runtime_snapshot(self) -> None:
         self._rewrite_env(
             "ADMIN_AUTH_ENABLED=true",
@@ -520,6 +676,20 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertFalse(result["activated"])
         self.assertFalse(result["selected_primary"])
         self.assertNotIn("LLM_OLLAMA_MODELS", self.manager.read_config_map())
+
+    def test_pull_keeps_unexpected_activation_errors_separate_from_download(self) -> None:
+        self._rewrite_env("ADMIN_AUTH_ENABLED=true")
+        service, queue, client = self._local_service()
+
+        service.start_pull("qwen3:4b")
+        service._configure_model_from_snapshot = Mock(
+            side_effect=RuntimeError("unexpected activation failure")
+        )
+        result = queue.run_task()
+
+        self.assertEqual(client.pulled, ["qwen3:4b"])
+        self.assertFalse(result["activated"])
+        self.assertFalse(result["selected_primary"])
 
     def test_runtime_unavailable_status_is_actionable_without_raw_error(self) -> None:
         class _UnavailableClient:

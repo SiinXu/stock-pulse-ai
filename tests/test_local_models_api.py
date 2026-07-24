@@ -15,6 +15,7 @@ from api.middlewares.error_handler import add_error_handlers
 from api.v1.endpoints import local_models
 from src.services.local_model_service import (
     LocalModelInUseError,
+    LocalModelNotInstalledError,
     LocalModelRuntimeUnavailableError,
 )
 from src.services.task_queue import TaskInfo, TaskStatus
@@ -220,6 +221,24 @@ def test_assignment_forbids_unknown_fields_and_keeps_primary_action_explicit() -
     assert response.status_code == 200
     assert response.json()["selected_primary"] is True
     service.configure_model.assert_called_once_with("qwen3:4b", assignment="primary")
+
+
+def test_assignment_rejects_a_catalog_model_missing_from_the_runtime() -> None:
+    service = _FakeLocalModelService()
+    service.configure_model.side_effect = LocalModelNotInstalledError("not installed")
+
+    response = asyncio.run(
+        _request(
+            service,
+            "POST",
+            "/api/v1/local-models/assignments",
+            json={"model_id": "qwen3:4b", "assignment": "agent"},
+        )
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"] == "local_model_not_installed"
+    assert "manual_command" not in response.json().get("params", {})
 
 
 def test_static_openapi_contains_the_local_model_contract() -> None:

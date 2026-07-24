@@ -2831,7 +2831,7 @@ function makeStagedJsonRequest(stages) {
   const calls = [];
   const impl = (target, options, cb) => {
     const stage = stages[Math.min(index, stages.length - 1)];
-    const call = { target, options, body: [] };
+    const call = { target, options, body: [], responseDestroyed: false };
     calls.push(call);
     index += 1;
     const req = new EventEmitter();
@@ -2851,6 +2851,9 @@ function makeStagedJsonRequest(stages) {
         response.statusCode = (stage && stage.statusCode) || 200;
         response.setEncoding = () => undefined;
         response.resume = () => undefined;
+        response.destroy = () => {
+          call.responseDestroyed = true;
+        };
         cb(response);
         setImmediate(() => {
           if (stage && stage.jsonBody != null) {
@@ -2859,6 +2862,11 @@ function makeStagedJsonRequest(stages) {
           if (stage && Array.isArray(stage.ndjson)) {
             for (const line of stage.ndjson) {
               response.emit('data', `${JSON.stringify(line)}\n`);
+            }
+          }
+          if (stage && Array.isArray(stage.rawChunks)) {
+            for (const chunk of stage.rawChunks) {
+              response.emit('data', chunk);
             }
           }
           response.emit('end');
@@ -3506,6 +3514,20 @@ test('desktop rejects oversized local model JSON and progress events', async (t)
     }),
     /too large/i,
   );
+
+  const oversizedWhitespace = makeStagedJsonRequest([{
+    statusCode: 200,
+    rawChunks: [`${' '.repeat(mainModule.DESKTOP_LOCAL_MODEL_MAX_EVENT_BYTES)}{}\n`],
+  }]);
+  await assert.rejects(
+    mainModule.requestLocalModelPullStream({
+      baseUrl: 'http://127.0.0.1:11434',
+      modelId: 'qwen3:8b',
+      requestImpl: oversizedWhitespace,
+    }),
+    /too large/i,
+  );
+  assert.equal(oversizedWhitespace.calls[0].responseDestroyed, true);
 });
 
 test('desktop Stop is serialized behind an active local model operation', async (t) => {
@@ -3578,7 +3600,7 @@ test('desktop deletion sends the Ollama DELETE request body', async (t) => {
   );
 });
 
-test('desktop deletion rejects active plain routes and ModelRefs before network activity', async (t) => {
+test('desktop deletion rejects every active assignment before network activity', async (t) => {
   const mainModule = loadMainModule(t);
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-localmodel-active-'));
   t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
@@ -3595,6 +3617,27 @@ test('desktop deletion rejects active plain routes and ModelRefs before network 
   );
   const agentResult = await mainModule.removeLocalModel('qwen3:8b', { requestImpl, envFile });
   assert.equal(agentResult.error, 'model-in-use');
+
+  fs.writeFileSync(envFile, 'VISION_MODEL=ollama/qwen3:8b\n');
+  const visionResult = await mainModule.removeLocalModel('qwen3:8b', { requestImpl, envFile });
+  assert.equal(visionResult.error, 'model-in-use');
+
+  fs.writeFileSync(envFile, 'LITELLM_FALLBACK_MODELS=ollama/qwen3:8b\n');
+  const fallbackResult = await mainModule.removeLocalModel('qwen3:8b', { requestImpl, envFile });
+  assert.equal(fallbackResult.error, 'model-in-use');
+
+  fs.writeFileSync(
+    envFile,
+    [
+      'LLM_CONFIG_MODE=channels',
+      'LLM_CHANNELS=ollama',
+      'LLM_OLLAMA_MODELS=qwen3:8b',
+      'LLM_OLLAMA_ENABLED=true',
+      '',
+    ].join('\n')
+  );
+  const implicitResult = await mainModule.removeLocalModel('qwen3:8b', { requestImpl, envFile });
+  assert.equal(implicitResult.error, 'model-in-use');
   assert.equal(requestImpl.calls.length, 0);
 });
 
