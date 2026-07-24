@@ -773,6 +773,15 @@ const DecisionSignalsPage: React.FC = () => {
   const reassessRequestIdRef = useRef(0);
   const selectedSignalIdRef = useRef<number | null>(null);
   const pendingSelectedSignalIdRef = useRef<number | null>(getInitialSelectedSignalId());
+  const routeSelectionSourcesRef = useRef<Array<{
+    source: SelectedSignal['source'];
+    items: DecisionSignalItem[];
+  }>>([]);
+  routeSelectionSourcesRef.current = [
+    { source: 'list', items },
+    { source: 'latest', items: latestItems },
+    { source: 'timeline', items: timelineItems },
+  ];
   const statusUpdateInFlightRef = useRef(false);
   const didObserveViewNavigationRef = useRef(false);
   useEffect(() => {
@@ -803,6 +812,28 @@ const DecisionSignalsPage: React.FC = () => {
     pendingSelectedSignalIdRef.current = null;
     return { source, item };
   }, []);
+
+  useLayoutEffect(() => {
+    const routeSignalId = getInitialSelectedSignalId(routeLocation.search);
+    if (routeSignalId === null) {
+      pendingSelectedSignalIdRef.current = null;
+      if (selectedSignalIdRef.current !== null) setSelected(null);
+      return;
+    }
+    if (selectedSignalIdRef.current === routeSignalId) {
+      pendingSelectedSignalIdRef.current = null;
+      return;
+    }
+    pendingSelectedSignalIdRef.current = routeSignalId;
+    for (const source of routeSelectionSourcesRef.current) {
+      const item = source.items.find((candidate) => candidate.id === routeSignalId);
+      if (!item) continue;
+      pendingSelectedSignalIdRef.current = null;
+      setSelected({ source: source.source, item });
+      return;
+    }
+    setSelected(null);
+  }, [routeLocation.key, routeLocation.search]);
 
   const handleSelectSignal = useCallback((source: SelectedSignal['source'], item: DecisionSignalItem) => {
     pendingSelectedSignalIdRef.current = null;

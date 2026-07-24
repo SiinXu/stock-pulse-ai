@@ -37,6 +37,7 @@ import type {
   DecisionSignalReassessResponse,
 } from '../../types/decisionSignals';
 import type { StockIndexItem } from '../../types/stockIndex';
+import { buildDeepLink } from '../../utils/deepLink';
 import DecisionSignalsPage from '../DecisionSignalsPage';
 
 // jsdom does not implement scrollIntoView, while Select calls it to keep the active item visible when opening a dropdown.
@@ -542,7 +543,8 @@ describe('DecisionSignalsPage', () => {
     expect(screen.getByRole('button', { name: '持仓' })).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('opens alert history on page one and locates a deep-linked trigger row', async () => {
+  it('locates a deep-linked trigger even when the unrelated rules request fails', async () => {
+    vi.mocked(alertsApi.listRules).mockRejectedValue(new Error('rules down'));
     vi.mocked(alertsApi.listTriggers).mockResolvedValue({
       items: [{
         id: 42,
@@ -2619,6 +2621,28 @@ describe('DecisionSignalsPage', () => {
     await waitFor(() => expect(decisionSignalsApi.getSignalOutcomes).toHaveBeenCalledWith(7));
     fireEvent.click(within(dialog).getByRole('button', { name: '关闭抽屉' }));
     await waitFor(() => expect(new URLSearchParams(window.location.search).get('signal')).toBeNull());
+  });
+
+  it('opens a Bell signal detail after same-route navigation', async () => {
+    window.history.pushState({}, '', APP_ROUTE_PATHS.signals);
+    renderPage(
+      <Link to={buildDeepLink({
+        page: 'decision-signals',
+        stockCode: signal.stockCode,
+        signalId: signal.id,
+      })}
+      >
+        Open Bell signal
+      </Link>,
+    );
+    await screen.findByText('贵州茅台');
+
+    fireEvent.click(screen.getByRole('link', { name: 'Open Bell signal' }));
+
+    const dialog = await screen.findByRole('dialog', { name: '信号详情' });
+    expect(within(dialog).getByText('贵州茅台')).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get('signal')).toBe('7');
+    await waitFor(() => expect(decisionSignalsApi.getSignalOutcomes).toHaveBeenCalledWith(7));
   });
 
   it('restores timeline filters together with the current-stock scope', async () => {

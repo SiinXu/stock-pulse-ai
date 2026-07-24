@@ -184,6 +184,24 @@ describe('useUnreadNotifications', () => {
     expect(result.current.unreadCount).toBe(0);
   });
 
+  it('retains cached rows but exposes total failure after a successful refresh', async () => {
+    listMock
+      .mockResolvedValueOnce(signalResponse([NEW_A]))
+      .mockRejectedValueOnce(new Error('signals down'));
+    triggersMock
+      .mockResolvedValueOnce(triggerResponse([NEW_B]))
+      .mockRejectedValueOnce(new Error('alerts down'));
+
+    const { result } = renderHook(() => useUnreadNotifications({ pollMs: 0 }));
+    await waitFor(() => expect(result.current.unreadCount).toBe(2));
+
+    act(() => result.current.refresh());
+
+    await waitFor(() => expect(result.current.hasError).toBe(true));
+    expect(result.current.signalItems).toHaveLength(1);
+    expect(result.current.alertItems).toHaveLength(1);
+  });
+
   it('requests active signals with a bounded page size', async () => {
     listMock.mockResolvedValue(signalResponse([]));
     triggersMock.mockResolvedValue(triggerResponse([]));

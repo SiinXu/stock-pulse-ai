@@ -178,7 +178,7 @@ export function NotificationBell({
               <div className="px-4 py-8 text-center text-sm text-secondary-text" role="status">
                 {t('common.loading')}
               </div>
-            ) : notifications.hasError && !hasItems ? (
+            ) : notifications.hasError ? (
               <div className="flex flex-col items-center gap-3 px-4 py-8 text-center" role="alert">
                 <p className="text-sm text-secondary-text">{text.unavailable}</p>
                 <button

@@ -149,7 +149,6 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
   const [alertTypeFilter, setAlertTypeFilter] = useState<AlertTypeFilter>('all');
   const [rulesLoading, setRulesLoading] = useState(false);
   const [rulesError, setRulesError] = useState<ParsedApiError | null>(null);
-  const [rulesLoaded, setRulesLoaded] = useState(false);
 
   const [triggers, setTriggers] = useState<AlertTriggerItem[]>([]);
   const [triggersPage, setTriggersPage] = useState(1);
@@ -241,7 +240,6 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
       setRules(response.items);
       setRulesTotal(response.total);
       setRulesError(null);
-      setRulesLoaded(true);
       return response;
     } catch (error) {
       if (!isLatestRequest()) return null;
@@ -316,7 +314,6 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
   }, [loadRules]);
 
   useEffect(() => {
-    if (!rulesLoaded) return;
     const selectionChanged = selectedTriggerId !== null
       && selectedTriggerId !== previousSelectedTriggerIdRef.current;
     previousSelectedTriggerIdRef.current = selectedTriggerId;
@@ -325,12 +322,11 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
       return;
     }
     void loadTriggers(triggersPage);
-  }, [loadTriggers, rulesLoaded, selectedTriggerId, triggersPage]);
+  }, [loadTriggers, selectedTriggerId, triggersPage]);
 
   useEffect(() => {
-    if (!rulesLoaded) return;
     void loadNotifications(notificationsPage);
-  }, [loadNotifications, notificationsPage, rulesLoaded]);
+  }, [loadNotifications, notificationsPage]);
 
   const handleCreateRule = async (payload: AlertRuleCreateRequest) => {
     setCreateLoading(true);

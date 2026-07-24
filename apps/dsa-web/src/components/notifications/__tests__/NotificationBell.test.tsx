@@ -112,6 +112,29 @@ describe('NotificationBell', () => {
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
+  it('does not present cached rows as current when both channels fail', async () => {
+    vi.mocked(useUnreadNotifications).mockReturnValue(notificationState({
+      signalItems: [{
+        id: 7,
+        stockCode: 'AAPL',
+        action: 'buy',
+        status: 'active',
+        createdAt: '2026-07-23T10:00:00Z',
+      } as UnreadNotificationsState['signalItems'][number]],
+      hasError: true,
+      signalsFailed: true,
+      alertsFailed: true,
+    }));
+    renderBell();
+
+    fireEvent.click(screen.getByRole('button', { name: '通知' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('暂时无法加载通知');
+    expect(screen.queryByRole('link', { name: /AAPL/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
   it('shows partial degradation and does not mark recovered items during the same open session', async () => {
     vi.mocked(useUnreadNotifications).mockReturnValue(notificationState({
       hasPartialError: true,
