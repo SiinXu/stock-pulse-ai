@@ -23,40 +23,12 @@ logger = logging.getLogger(__name__)
 
 # Built-in skill YAML directory (project_root/strategies/ kept for compatibility)
 _BUILTIN_SKILLS_DIR = Path(__file__).resolve().parent.parent.parent.parent / "strategies"
+_BUILTIN_YAML_SUBDIRECTORIES = ("personas",)
 
 
 @dataclass
 class Skill:
-    """A trading skill that can be injected into the agent prompt.
-
-    Each skill represents a common or custom trading pattern used
-    for stock analysis and push notifications. Strategies are typically
-    loaded from YAML files written in natural language.
-
-    Attributes:
-        name: Unique strategy identifier (e.g., "dragon_head").
-        display_name: Human-readable name (e.g., "龙头策略").
-        description: Brief description of when to apply this strategy.
-        instructions: Detailed natural language instructions injected into the system prompt.
-        category: Skill category — "trend" (趋势), "pattern" (形态), "reversal" (反转), "framework" (框架).
-        core_rules: List of core trading rule numbers this strategy relates to (1-7).
-        required_tools: List of tool names this skill depends on.
-        allowed_tools: Optional allowlist metadata from SKILL.md frontmatter.
-        aliases: Optional alias phrases used by NL selectors / bot commands.
-        enabled: Whether this skill is currently active.
-        source: Origin of this skill — "builtin" or file path of a custom definition.
-        entrypoint: Definition file path (YAML or SKILL.md).
-        bundle_dir: Skill bundle directory when loaded from SKILL.md.
-        disable_model_invocation: Whether the model should avoid auto-invoking this skill.
-        user_invocable: Whether the skill should be exposed in user-facing selectors.
-        default_active: Whether this skill participates in the default activation set.
-        default_router: Whether this skill participates in router fallback selection.
-        default_priority: Ordering hint for defaults / selectors (lower comes first).
-        market_regimes: Optional market regime tags used by the skill router.
-        execution_context: Inline/fork execution hint from frontmatter.
-        subagent_type: Optional subagent type hint from frontmatter.
-        preferred_model: Optional model hint from frontmatter.
-    """
+    """A trading skill that can be injected into the agent prompt."""
     name: str
     display_name: str
     description: str
@@ -140,22 +112,8 @@ def _infer_skill_description(instructions: str) -> str:
 
 
 def load_skill_from_yaml(filepath: Union[str, Path]) -> Skill:
-    """Load a single Skill from a YAML file.
-
-    The YAML file must contain at minimum: ``name``, ``display_name``,
-    ``description``, and ``instructions``. All values are natural language text.
-
-    Args:
-        filepath: Path to the ``.yaml`` file.
-
-    Returns:
-        A ``Skill`` instance with ``enabled=False``.
-
-    Raises:
-        ValueError: If required fields are missing or the file is invalid.
-        FileNotFoundError: If the file does not exist.
-    """
-    import yaml  # lazy import — only needed when loading skill YAML
+    """Load a single Skill from a YAML file."""
+    import yaml
 
     filepath = Path(filepath)
     if not filepath.exists():
@@ -167,7 +125,6 @@ def load_skill_from_yaml(filepath: Union[str, Path]) -> Skill:
     if not isinstance(data, dict):
         raise ValueError(f"Invalid skill file (expected YAML mapping): {filepath}")
 
-    # Validate required fields
     required_fields = ["name", "display_name", "description", "instructions"]
     missing = [fld for fld in required_fields if not data.get(fld)]
     if missing:
@@ -276,15 +233,8 @@ def load_skill_from_markdown(filepath: Union[str, Path]) -> Skill:
 def load_skills_from_directory(directory: Union[str, Path]) -> List[Skill]:
     """Load all skills from YAML files in a directory.
 
-    Scans for top-level ``*.yaml`` / ``*.yml`` compatibility files and
-    nested ``SKILL.md`` bundles, sorted alphabetically.
-    Skips files that fail to parse (logs a warning).
-
-    Args:
-        directory: Path to the directory containing skill definitions.
-
-    Returns:
-        List of ``Skill`` instances (all disabled by default).
+    The built-in catalog additionally scans explicitly reserved YAML collections;
+    custom-directory YAML discovery remains top-level only.
     """
     directory = Path(directory)
     if not directory.is_dir():
@@ -292,7 +242,17 @@ def load_skills_from_directory(directory: Union[str, Path]) -> List[Skill]:
         return []
 
     skills: List[Skill] = []
-    yaml_files = sorted(directory.glob("*.yaml")) + sorted(directory.glob("*.yml"))
+    yaml_directories = [directory]
+    if directory == _BUILTIN_SKILLS_DIR:
+        for subdirectory in _BUILTIN_YAML_SUBDIRECTORIES:
+            nested_directory = directory / subdirectory
+            if nested_directory.is_dir():
+                yaml_directories.append(nested_directory)
+
+    yaml_files: List[Path] = []
+    for yaml_directory in yaml_directories:
+        yaml_files.extend(sorted(yaml_directory.glob("*.yaml")))
+        yaml_files.extend(sorted(yaml_directory.glob("*.yml")))
     markdown_files = sorted(directory.rglob("SKILL.md"))
 
     for filepath in yaml_files:
@@ -300,7 +260,7 @@ def load_skills_from_directory(directory: Union[str, Path]) -> List[Skill]:
             skill = load_skill_from_yaml(filepath)
             skills.append(skill)
             logger.debug(f"Loaded skill from YAML: {skill.name} ({filepath.name})")
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - invalid YAML is isolated with safe diagnostics.
             log_safe_exception(
                 logger,
                 "Skill YAML loading failed",
@@ -315,7 +275,7 @@ def load_skills_from_directory(directory: Union[str, Path]) -> List[Skill]:
             skill = load_skill_from_markdown(filepath)
             skills.append(skill)
             logger.debug(f"Loaded skill bundle: {skill.name} ({filepath})")
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - invalid bundles are isolated with safe diagnostics.
             log_safe_exception(
                 logger,
                 "Skill bundle loading failed",
@@ -329,40 +289,16 @@ def load_skills_from_directory(directory: Union[str, Path]) -> List[Skill]:
 
 
 class SkillManager:
-    """Manages trading skills and generates combined prompt instructions.
-
-    Supports loading skills from:
-    1. YAML files in the built-in ``strategies/`` directory
-    2. YAML files in a user-specified custom directory
-    3. Programmatic ``Skill`` instances (backward compatible)
-
-    Usage::
-
-        manager = SkillManager()
-        # Load built-in + custom skills from YAML
-        manager.load_builtin_skills()
-        manager.load_custom_skills("./my_skills")
-        # Or register programmatically
-        manager.register(some_skill)
-        # Activate and generate prompt
-        manager.activate(["dragon_head", "shrink_pullback"])
-        instructions = manager.get_skill_instructions()
-    """
+    """Manages trading skills and generates combined prompt instructions."""
 
     def __init__(self):
         self._skills: Dict[str, Skill] = {}
 
     def register(self, skill: Skill) -> None:
-        """Register a skill (programmatic or YAML-loaded)."""
         self._skills[skill.name] = skill
         logger.debug(f"Registered skill: {skill.name} ({skill.display_name})")
 
     def load_builtin_skills(self) -> int:
-        """Load all built-in skills from the compatibility `strategies/` directory.
-
-        Returns:
-            Number of skills loaded.
-        """
         skills_dir = _BUILTIN_SKILLS_DIR
         if not skills_dir.is_dir():
             logger.warning(f"Built-in skill directory not found: {skills_dir}")
@@ -377,17 +313,6 @@ class SkillManager:
         return len(skills)
 
     def load_custom_skills(self, directory: Union[str, Path, None]) -> int:
-        """Load custom skills from a user-specified directory.
-
-        Custom skills override built-in ones if names conflict.
-
-        Args:
-            directory: Path to the custom skill directory.
-                       If None or empty, does nothing.
-
-        Returns:
-            Number of skills loaded.
-        """
         if not directory:
             return 0
 
@@ -408,32 +333,21 @@ class SkillManager:
         return len(skills)
 
     def load_builtin_strategies(self) -> int:
-        """Compatibility wrapper for older call sites."""
         return self.load_builtin_skills()
 
     def load_custom_strategies(self, directory: Union[str, Path, None]) -> int:
-        """Compatibility wrapper for older call sites."""
         return self.load_custom_skills(directory)
 
     def get(self, name: str) -> Optional[Skill]:
-        """Get a skill by name."""
         return self._skills.get(name)
 
     def list_skills(self) -> List[Skill]:
-        """List all registered skills."""
         return list(self._skills.values())
 
     def list_active_skills(self) -> List[Skill]:
-        """List only active (enabled) skills."""
         return [s for s in self._skills.values() if s.enabled]
 
     def activate(self, skill_names: List[str]) -> None:
-        """Activate specific skills by name. Deactivate all others.
-
-        Args:
-            skill_names: List of skill names to activate.
-                         If ["all"], activate everything.
-        """
         if skill_names == ["all"] or "all" in skill_names:
             for s in self._skills.values():
                 s.enabled = True
@@ -447,16 +361,10 @@ class SkillManager:
         logger.info(f"Activated skills: {activated}")
 
     def get_skill_instructions(self) -> str:
-        """Generate combined instruction text for all active skills.
-
-        Returns a formatted string ready to be injected into the agent
-        system prompt, organized by category.
-        """
         active = self.list_active_skills()
         if not active:
             return ""
 
-        # Group by category
         categories = {"trend": "趋势", "pattern": "形态", "reversal": "反转", "framework": "框架"}
         grouped: Dict[str, List[Skill]] = {}
         for skill in active:
@@ -465,7 +373,6 @@ class SkillManager:
 
         parts = []
         idx = 1
-        # Render known categories in fixed order, then any remaining custom categories
         ordered_keys = ["trend", "pattern", "reversal", "framework"]
         for cat_key in ordered_keys + [k for k in grouped if k not in ordered_keys]:
             skills_in_cat = grouped.get(cat_key, [])
@@ -490,7 +397,6 @@ class SkillManager:
         return "\n".join(parts)
 
     def get_required_tools(self) -> List[str]:
-        """Get all tool names required by active skills."""
         tools: set = set()
         for s in self.list_active_skills():
             tools.update(s.required_tools)
