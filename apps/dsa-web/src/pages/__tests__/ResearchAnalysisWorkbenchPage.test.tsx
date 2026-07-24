@@ -351,7 +351,7 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     ));
   });
 
-  it('imports chart/document symbols and exposes a working batch action', async () => {
+  it('keeps a partial imported batch warning visible after switching to tasks', async () => {
     const { container } = renderWorkbench();
     const file = new File(['symbol'], 'stocks.csv', { type: 'text/csv' });
     const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
@@ -370,6 +370,7 @@ describe('ResearchAnalysisWorkbenchPage', () => {
       expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment))
         .toBe(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
     });
+    expect(await screen.findByText(/已确认提交 1 个任务.*另有 1 只未确认/u)).toBeInTheDocument();
   });
 
   it('submits only watchlist symbols not analyzed today', async () => {

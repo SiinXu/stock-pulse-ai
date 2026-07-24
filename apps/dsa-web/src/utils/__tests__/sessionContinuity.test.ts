@@ -136,12 +136,12 @@ describe('sessionContinuity', () => {
   });
 
   it('carries Analysis Workbench report context into Chat', () => {
-    recordSessionLocation('/chat?session=session-1&stock=600519&recordId=3');
+    recordSessionLocation(`${APP_ROUTE_PATHS.agent}?session=session-1&stock=600519&recordId=3`);
 
     expect(resolveContextAwareNavigationTarget(
-      '/chat',
+      APP_ROUTE_PATHS.agent,
       `${APP_ROUTE_PATHS.researchAnalysis}?${HOME_ROUTE_QUERY_KEYS.stock}=AAPL&${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId}=9`,
-    )).toBe('/chat?session=session-1&stock=AAPL&recordId=9');
+    )).toBe(`${APP_ROUTE_PATHS.agent}?session=session-1&stock=AAPL&recordId=9`);
   });
 
   it('retains same-stock Home pipeline context and drops it when the stock changes', () => {

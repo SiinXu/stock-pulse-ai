@@ -8,7 +8,13 @@ import { getShanghaiDateKey, getTodayInShanghai } from '../utils/format';
 import { normalizeStockCode } from '../utils/stockCode';
 import { toStockBarItemFromHistoryItem } from '../utils/stockBar';
 
+type WatchlistHistoryLookupRequest = {
+  entries: Array<[string, string]>;
+  signature: string;
+};
+
 type WatchlistHistoryLookupState = {
+  request: WatchlistHistoryLookupRequest | null;
   signature: string;
   settledKeys: Set<string>;
   failedKeys: Set<string>;
@@ -47,6 +53,7 @@ export function useWatchlistAnalysisCoverage({
     () => new Map(),
   );
   const [historyLookup, setHistoryLookup] = useState<WatchlistHistoryLookupState>({
+    request: null,
     signature: '',
     settledKeys: new Set(),
     failedKeys: new Set(),
@@ -82,14 +89,17 @@ export function useWatchlistAnalysisCoverage({
     () => missingHistoryEntries.map(([key]) => key).join('\n'),
     [missingHistoryEntries],
   );
+  const lookupRequest = useMemo<WatchlistHistoryLookupRequest>(() => ({
+    entries: missingHistoryEntries,
+    signature: missingHistorySignature,
+  }), [missingHistoryEntries, missingHistorySignature]);
 
   useEffect(() => {
-    if (!canLookupHistory || missingHistoryEntries.length === 0) return undefined;
+    if (!canLookupHistory || lookupRequest.entries.length === 0) return undefined;
 
-    const currentSignature = missingHistorySignature;
-    const missingKeys = missingHistoryEntries.map(([key]) => key);
+    const missingKeys = lookupRequest.entries.map(([key]) => key);
     let active = true;
-    void Promise.all(missingHistoryEntries.map(async ([key, code]) => {
+    void Promise.all(lookupRequest.entries.map(async ([key, code]) => {
       try {
         const response = await historyApi.getList({ stockCode: code, limit: 1 });
         return {
@@ -110,7 +120,8 @@ export function useWatchlistAnalysisCoverage({
       }
       setHistoryItemsByCode(nextItems);
       setHistoryLookup({
-        signature: currentSignature,
+        request: lookupRequest,
+        signature: lookupRequest.signature,
         settledKeys: new Set(missingKeys),
         failedKeys,
       });
@@ -119,7 +130,7 @@ export function useWatchlistAnalysisCoverage({
     return () => {
       active = false;
     };
-  }, [canLookupHistory, missingHistoryEntries, missingHistorySignature]);
+  }, [canLookupHistory, lookupRequest]);
 
   const activeTaskByCode = useMemo(() => {
     const result = new Map<string, TaskInfo>();
@@ -135,8 +146,11 @@ export function useWatchlistAnalysisCoverage({
   const todayDateKey = getTodayInShanghai();
   const rows = useMemo<HomeWatchlistRow[]>(() => watchlistCodes.map((code) => {
     const key = getStockCodeKey(code);
+    const isCurrentHistoryLookup = historyLookup.request === lookupRequest
+      && historyLookup.signature === missingHistorySignature;
     const latestItem = key
-      ? stockBarItemByCode.get(key) ?? historyItemsByCode.get(key)
+      ? stockBarItemByCode.get(key)
+        ?? (isCurrentHistoryLookup ? historyItemsByCode.get(key) : undefined)
       : undefined;
     const missingFromStockBar = Boolean(key && !stockBarItemByCode.has(key));
     const isTodayStatusUnknown = Boolean(
@@ -144,7 +158,7 @@ export function useWatchlistAnalysisCoverage({
       || (
         missingFromStockBar
         && canLookupHistory
-        && historyLookup.signature === missingHistorySignature
+        && isCurrentHistoryLookup
         && historyLookup.failedKeys.has(key)
       ),
     );
@@ -153,7 +167,7 @@ export function useWatchlistAnalysisCoverage({
       && !isTodayStatusUnknown
       && (
         !canLookupHistory
-        || historyLookup.signature !== missingHistorySignature
+        || !isCurrentHistoryLookup
         || !historyLookup.settledKeys.has(key)
       ),
     );
@@ -174,6 +188,7 @@ export function useWatchlistAnalysisCoverage({
     canLookupHistory,
     historyItemsByCode,
     historyLookup,
+    lookupRequest,
     missingHistorySignature,
     stockBarItemByCode,
     stockBarRefreshFailed,

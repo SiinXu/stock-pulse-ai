@@ -818,6 +818,9 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
         {visibleError ? <ApiErrorAlert error={visibleError} onDismiss={clearError} /> : null}
         {deleteError ? <ApiErrorAlert error={deleteError} onDismiss={() => setDeleteError(null)} /> : null}
         {runFlowError ? <ApiErrorAlert error={runFlowError} onDismiss={() => setRunFlowError(null)} /> : null}
+        {batchNotice ? (
+          <InlineAlert variant={batchNotice.variant} message={batchNotice.message} />
+        ) : null}
       </div>
 
       <TabPanel
@@ -959,13 +962,6 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                   className="mt-3"
                   variant={importNotice.variant}
                   message={importNotice.message}
-                />
-              ) : null}
-              {batchNotice ? (
-                <InlineAlert
-                  className="mt-3"
-                  variant={batchNotice.variant}
-                  message={batchNotice.message}
                 />
               ) : null}
             </div>
