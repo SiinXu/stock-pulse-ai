@@ -191,10 +191,7 @@ export const RESEARCH_BACKTEST_LIMITS = {
 
 export const ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS = {
   segment: 'segment',
-  recordId: 'recordId',
-  runFlow: 'runFlow',
-  runFlowRecordId: 'runFlowRecordId',
-  runFlowTaskId: 'runFlowTaskId',
+  ...REPORT_ROUTE_QUERY_KEYS,
 } as const;
 
 export const ANALYSIS_WORKBENCH_SEGMENT_VALUES = {
@@ -221,8 +218,14 @@ export function isStableAnalysisWorkbenchTaskId(value: string): boolean {
   return ANALYSIS_WORKBENCH_TASK_ID_PATTERN.test(value.trim());
 }
 
-function isPositiveSafeInteger(value: number | null | undefined): value is number {
+export function isPositiveRouteInteger(value: number | null | undefined): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+}
+
+export function parsePositiveRouteInteger(value: string | null): number | null {
+  if (!value || !/^\d+$/.test(value)) return null;
+  const parsed = Number(value);
+  return isPositiveRouteInteger(parsed) ? parsed : null;
 }
 
 export function buildAnalysisWorkbenchHref(
@@ -235,7 +238,7 @@ export function buildAnalysisWorkbenchHref(
   ) {
     searchParams.set(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment, options.segment);
   }
-  if (isPositiveSafeInteger(options.recordId)) {
+  if (isPositiveRouteInteger(options.recordId)) {
     searchParams.set(
       ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId,
       String(options.recordId),
@@ -243,7 +246,7 @@ export function buildAnalysisWorkbenchHref(
   }
   if (
     options.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.history
-    && isPositiveSafeInteger(options.runFlowRecordId)
+    && isPositiveRouteInteger(options.runFlowRecordId)
   ) {
     searchParams.set(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow, options.runFlow);
     searchParams.set(

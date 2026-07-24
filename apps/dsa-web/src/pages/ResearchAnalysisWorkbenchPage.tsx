@@ -5,10 +5,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FileUp, FlaskConical, History, ListChecks, Upload, Workflow } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { agentApi, type SkillInfo } from '../api/agent';
-import { analysisApi, DuplicateTaskError } from '../api/analysis';
-import { getParsedApiError, type ParsedApiError } from '../api/error';
+import { analysisApi } from '../api/analysis';
+import {
+  getParsedApiError,
+  isPermanentlyUnavailableResourceError,
+  type ParsedApiError,
+} from '../api/error';
 import { historyApi } from '../api/history';
 import { stocksApi } from '../api/stocks';
+import { systemConfigApi } from '../api/systemConfig';
 import {
   ApiErrorAlert,
   AppPage,
@@ -24,6 +29,7 @@ import {
   Surface,
   TabPanel,
   Tabs,
+  WorkspaceLayout,
 } from '../components/common';
 import { useToast } from '../components/common/toastContext';
 import { DashboardStateBlock } from '../components/dashboard';
@@ -51,10 +57,10 @@ import {
   type AnalysisWorkbenchRouteState,
 } from '../routing/analysisWorkbenchRouteState';
 import { useStockPoolStore } from '../stores/stockPoolStore';
-import type { AnalyzeAsyncResponse, TaskInfo } from '../types/analysis';
+import type { TaskInfo } from '../types/analysis';
 import type { RunFlowSnapshotSource } from '../types/runFlow';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
-import { normalizeStockCode } from '../utils/stockCode';
+import { normalizeBatchAnalysisCodes, submitBatchAnalysis } from '../utils/batchAnalysis';
 import {
   readExperienceMode,
   writeExperienceMode,
@@ -75,40 +81,7 @@ type WorkbenchNavigationState = {
 };
 
 const WORKBENCH_TABS_ID = 'analysis-workbench-tabs';
-const BATCH_ANALYSIS_CHUNK_SIZE = 50;
-
 const noopAsync = async (): Promise<void> => undefined;
-
-function chunkStockCodes(codes: readonly string[]): string[][] {
-  const chunks: string[][] = [];
-  for (let index = 0; index < codes.length; index += BATCH_ANALYSIS_CHUNK_SIZE) {
-    chunks.push(codes.slice(index, index + BATCH_ANALYSIS_CHUNK_SIZE));
-  }
-  return chunks;
-}
-
-function countBatchAccepted(result: AnalyzeAsyncResponse): { accepted: number; duplicates: number } {
-  if ('accepted' in result) {
-    return {
-      accepted: result.accepted.length,
-      duplicates: result.duplicates.length,
-    };
-  }
-  return { accepted: 1, duplicates: 0 };
-}
-
-function normalizeBatchCodes(codes: readonly string[]): string[] {
-  const seen = new Set<string>();
-  const unique: string[] = [];
-  for (const code of codes) {
-    const normalized = code.trim().toUpperCase();
-    const key = normalizeStockCode(normalized).toUpperCase();
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    unique.push(normalized);
-  }
-  return unique;
-}
 
 function stateForSegment(
   current: AnalysisWorkbenchRouteState,
@@ -146,11 +119,18 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const completedRecordIdsRef = useRef(new Map<string, number>());
+  const suppressedHistoryDefaultSearchRef = useRef<string | null>(null);
   const [analysisSkills, setAnalysisSkills] = useState<SkillInfo[]>([]);
   const [selectedStrategyId, setSelectedStrategyId] = useState('');
-  const [experienceMode, setExperienceMode] = useState<ExperienceMode>(
-    () => readExperienceMode() ?? 'professional',
-  );
+  const [experiencePreference, setExperiencePreference] = useState<{
+    mode: ExperienceMode;
+    explicit: boolean;
+  }>(() => {
+    const storedMode = readExperienceMode();
+    return { mode: storedMode ?? 'professional', explicit: storedMode !== null };
+  });
+  const [setupComplete, setSetupComplete] = useState<boolean | null>(null);
+  const [isSetupStatusResolved, setIsSetupStatusResolved] = useState(false);
   const [selectedHistoryIds, setSelectedHistoryIds] = useState<ReadonlySet<number>>(
     () => new Set(),
   );
@@ -224,10 +204,12 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
   }, [location.hash, location.search, navigate]);
 
   const selectSegment = useCallback((segment: AnalysisWorkbenchSegment) => {
+    suppressedHistoryDefaultSearchRef.current = null;
     navigateToState(stateForSegment(routeState, segment));
   }, [navigateToState, routeState]);
 
   const navigateToRecord = useCallback((recordId: number, replace = false) => {
+    suppressedHistoryDefaultSearchRef.current = null;
     navigateToState({
       segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
       recordId,
@@ -253,6 +235,23 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
   useEffect(() => {
     document.title = t('analysisWorkbench.documentTitle');
   }, [t]);
+
+  useEffect(() => {
+    let active = true;
+    void systemConfigApi.getSetupStatus()
+      .then((status) => {
+        if (active) setSetupComplete(status.isComplete);
+      })
+      .catch(() => {
+        if (active) setSetupComplete(null);
+      })
+      .finally(() => {
+        if (active) setIsSetupStatusResolved(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -303,10 +302,18 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
 
   useEffect(() => {
     if (
+      suppressedHistoryDefaultSearchRef.current !== null
+      && routeState.recordId === null
+      && suppressedHistoryDefaultSearchRef.current !== location.search
+    ) {
+      suppressedHistoryDefaultSearchRef.current = null;
+    }
+    if (
       routeState.segment !== ANALYSIS_WORKBENCH_SEGMENT_VALUES.history
       || isLoadingHistory
       || routeState.recordId !== null
       || analysisHistoryItems.length === 0
+      || suppressedHistoryDefaultSearchRef.current === location.search
     ) {
       return;
     }
@@ -314,6 +321,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
   }, [
     analysisHistoryItems,
     isLoadingHistory,
+    location.search,
     navigateToRecord,
     routeState.recordId,
     routeState.segment,
@@ -323,11 +331,38 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
     if (
       routeState.recordId === null
       || selectedRecordId === routeState.recordId
+      || suppressedHistoryDefaultSearchRef.current !== null
     ) {
       return;
     }
     void selectHistoryItem(routeState.recordId, true);
   }, [routeState.recordId, selectHistoryItem, selectedRecordId]);
+
+  useEffect(() => {
+    if (
+      routeState.recordId === null
+      || selectedRecordId !== routeState.recordId
+      || isLoadingReport
+      || !isPermanentlyUnavailableResourceError(reportDetailError)
+    ) {
+      return;
+    }
+
+    const nextState = { ...routeState, recordId: null };
+    const nextParams = setAnalysisWorkbenchRouteState(location.search, nextState);
+    const nextQuery = nextParams.toString();
+    suppressedHistoryDefaultSearchRef.current = nextQuery ? `?${nextQuery}` : '';
+    clearSelectedRecord(true);
+    navigateToState(nextState, true);
+  }, [
+    clearSelectedRecord,
+    isLoadingReport,
+    location.search,
+    navigateToState,
+    reportDetailError,
+    routeState,
+    selectedRecordId,
+  ]);
 
   useEffect(() => {
     if (
@@ -405,9 +440,16 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
     })),
   ], [analysisSkills, language, t]);
 
+  const experienceMode = experiencePreference.explicit
+    ? experiencePreference.mode
+    : setupComplete === false
+      ? 'beginner'
+      : 'professional';
+  const isExperienceModeReady = experiencePreference.explicit || isSetupStatusResolved;
+
   const handleExperienceModeChange = useCallback((mode: ExperienceMode) => {
     writeExperienceMode(mode);
-    setExperienceMode(mode);
+    setExperiencePreference({ mode, explicit: true });
   }, []);
 
   const handleSubmitAnalysis = useCallback(async (
@@ -415,6 +457,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
     stockName?: string,
     selectionSource: 'manual' | 'autocomplete' | 'import' = 'manual',
   ) => {
+    if (!isExperienceModeReady) return;
     const stockInput = (stockCode ?? query).trim();
     if (!stockInput) {
       await submitAnalysis({ stockCode: stockInput });
@@ -436,10 +479,11 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
     if (taskAccepted || latest.duplicateTask) {
       selectSegment(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
     }
-  }, [analysisTasks, experienceMode, query, selectSegment, selectedAnalysisSkills, submitAnalysis]);
+  }, [analysisTasks, experienceMode, isExperienceModeReady, query, selectSegment, selectedAnalysisSkills, submitAnalysis]);
 
   const submitBatch = useCallback(async (sourceCodes: readonly string[]) => {
-    const codes = normalizeBatchCodes(sourceCodes);
+    if (!isExperienceModeReady) return;
+    const codes = normalizeBatchAnalysisCodes(sourceCodes);
     if (codes.length === 0) {
       setBatchNotice({ variant: 'warning', message: t('watchlist.noStocksAnalyze') });
       return;
@@ -447,51 +491,30 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
 
     setIsBatchSubmitting(true);
     setBatchNotice(null);
-    let accepted = 0;
-    let duplicates = 0;
-    let confirmed = 0;
-    let submissionError: ParsedApiError | null = null;
     try {
-      for (const chunk of chunkStockCodes(codes)) {
-        try {
-          const result = await analysisApi.analyzeAsync({
-            stockCodes: chunk,
-            reportType: experienceMode === 'beginner' ? 'brief' : 'detailed',
-            notify,
-            skills: selectedAnalysisSkills,
-          });
-          const counts = countBatchAccepted(result);
-          accepted += counts.accepted;
-          duplicates += counts.duplicates;
-          const confirmedInChunk = counts.accepted + counts.duplicates;
-          confirmed += Math.min(confirmedInChunk, chunk.length);
-          if (confirmedInChunk !== chunk.length) {
-            submissionError = getParsedApiError(new Error(t('watchlist.batchIncompleteResponse', {
-              confirmed: confirmedInChunk,
-              requested: chunk.length,
-            })), language);
-            break;
-          }
-        } catch (batchError) {
-          if (batchError instanceof DuplicateTaskError && chunk.length === 1) {
-            duplicates += 1;
-            confirmed += 1;
-            continue;
-          }
-          submissionError = getParsedApiError(batchError, language);
-          break;
-        }
-      }
-      // A timeout can arrive after accepted chunks, so always reconcile tasks.
-      await refreshActiveTasks();
+      const result = await submitBatchAnalysis({
+        codes,
+        submitChunk: (stockCodes) => analysisApi.analyzeAsync({
+          stockCodes,
+          reportType: experienceMode === 'beginner' ? 'brief' : 'detailed',
+          notify,
+          skills: selectedAnalysisSkills,
+        }),
+        reconcile: refreshActiveTasks,
+        parseError: (error) => getParsedApiError(error, language),
+        incompleteResponseMessage: (confirmed, requested) => (
+          t('watchlist.batchIncompleteResponse', { confirmed, requested })
+        ),
+      });
+      const submissionError = result.submissionError ?? result.reconciliationError;
       if (submissionError) {
-        setBatchNotice(accepted > 0 || duplicates > 0
+        setBatchNotice(result.accepted > 0 || result.duplicates > 0
           ? {
               variant: 'warning',
               message: t('watchlist.batchPartiallySubmitted', {
-                accepted,
-                duplicates,
-                unconfirmed: Math.max(0, codes.length - confirmed),
+                accepted: result.accepted,
+                duplicates: result.duplicates,
+                unconfirmed: result.unconfirmed,
                 error: submissionError.message || t('watchlist.batchFailed'),
               }),
             }
@@ -501,11 +524,14 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
             });
       } else {
         setBatchNotice({
-          variant: accepted > 0 ? 'success' : 'warning',
-          message: t('watchlist.batchSubmitted', { accepted, duplicates }),
+          variant: result.accepted > 0 ? 'success' : 'warning',
+          message: t('watchlist.batchSubmitted', {
+            accepted: result.accepted,
+            duplicates: result.duplicates,
+          }),
         });
       }
-      if (accepted > 0 || duplicates > 0) {
+      if (result.accepted > 0 || result.duplicates > 0) {
         selectSegment(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
       }
     } catch (batchError) {
@@ -513,14 +539,10 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
         variant: 'danger',
         message: getParsedApiError(batchError, language).message || t('watchlist.batchFailed'),
       });
-      await refreshActiveTasks();
-      if (accepted > 0 || duplicates > 0) {
-        selectSegment(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
-      }
     } finally {
       setIsBatchSubmitting(false);
     }
-  }, [experienceMode, language, notify, refreshActiveTasks, selectSegment, selectedAnalysisSkills, t]);
+  }, [experienceMode, isExperienceModeReady, language, notify, refreshActiveTasks, selectSegment, selectedAnalysisSkills, t]);
 
   const handleImportFile = useCallback(async (file: File) => {
     setIsImporting(true);
@@ -529,7 +551,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
       const response = file.type.startsWith('image/')
         ? await stocksApi.extractFromImage(file)
         : await stocksApi.parseImport(file);
-      const codes = normalizeBatchCodes(response.codes);
+      const codes = normalizeBatchAnalysisCodes(response.codes);
       setImportedCodes(codes);
       if (codes.length === 0) {
         setImportNotice({ variant: 'warning', message: t('analysisWorkbench.importEmpty') });
@@ -771,7 +793,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
               </p>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_15rem]">
+            <div className="grid gap-4 lg:grid-cols-2">
               <StockAutocomplete
                 id="analysis-workbench-stock-search"
                 value={query}
@@ -780,7 +802,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                   void handleSubmitAnalysis(stockCode, stockName, selectionSource);
                 }}
                 placeholder={t('home.placeholder')}
-                disabled={isAnalyzing}
+                disabled={isAnalyzing || !isExperienceModeReady}
                 className={inputError ? 'border-danger/50' : undefined}
               />
               <Select
@@ -788,7 +810,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                 onChange={setSelectedStrategyId}
                 options={strategyOptions}
                 label={t('home.strategy')}
-                disabled={isAnalyzing}
+                disabled={isAnalyzing || !isExperienceModeReady}
                 className="w-full"
                 triggerClassName="w-full"
               />
@@ -812,7 +834,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
               <Button
                 type="button"
                 variant="primary"
-                disabled={!query || isAnalyzing}
+                disabled={!query || isAnalyzing || !isExperienceModeReady}
                 isLoading={isAnalyzing}
                 loadingText={t('home.analyzing')}
                 onClick={() => void handleSubmitAnalysis()}
@@ -831,7 +853,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                   type="button"
                   variant="secondary"
                   isLoading={isBatchSubmitting}
-                  disabled={isBatchSubmitting || watchlist.isLoading}
+                  disabled={isBatchSubmitting || watchlist.isLoading || !isExperienceModeReady}
                   onClick={() => void submitBatch(watchlist.watchlistCodes)}
                 >
                   <ListChecks className="h-4 w-4" aria-hidden="true" />
@@ -853,7 +875,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                     type="button"
                     variant="secondary"
                     isLoading={isBatchSubmitting}
-                    disabled={isBatchSubmitting}
+                    disabled={isBatchSubmitting || !isExperienceModeReady}
                     onClick={() => void submitBatch(importedCodes)}
                   >
                     <FileUp className="h-4 w-4" aria-hidden="true" />
@@ -940,23 +962,26 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
             )}
           />
         ) : (
-          <div className="grid min-h-0 gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
-            <HistoryList
-              className="min-h-96"
-              items={analysisHistoryItems}
-              isLoading={isLoadingHistory}
-              isLoadingMore={isLoadingMore}
-              hasMore={hasMore}
-              selectedId={routeState.recordId ?? undefined}
-              selectedIds={new Set(selectedHistoryIds)}
-              isDeleting={isDeletingHistory}
-              onItemClick={navigateToRecord}
-              onLoadMore={() => void loadMoreHistory()}
-              onToggleItemSelection={toggleHistorySelection}
-              onToggleSelectAll={toggleAllHistory}
-              onDeleteSelected={() => void deleteSelectedHistory()}
-            />
-
+          <WorkspaceLayout
+            railPosition="start"
+            rail={(
+              <HistoryList
+                className="min-h-96"
+                items={analysisHistoryItems}
+                isLoading={isLoadingHistory}
+                isLoadingMore={isLoadingMore}
+                hasMore={hasMore}
+                selectedId={routeState.recordId ?? undefined}
+                selectedIds={new Set(selectedHistoryIds)}
+                isDeleting={isDeletingHistory}
+                onItemClick={navigateToRecord}
+                onLoadMore={() => void loadMoreHistory()}
+                onToggleItemSelection={toggleHistorySelection}
+                onToggleSelectAll={toggleAllHistory}
+                onDeleteSelected={() => void deleteSelectedHistory()}
+              />
+            )}
+          >
             <section className="min-w-0" aria-label={t('analysisWorkbench.history')}>
               {isLoadingReport ? (
                 <DashboardStateBlock title={t('home.loadingReport')} loading />
@@ -998,7 +1023,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                 />
               )}
             </section>
-          </div>
+          </WorkspaceLayout>
         )}
       </TabPanel>
 

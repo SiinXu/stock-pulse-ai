@@ -63,6 +63,7 @@ import {
   Tooltip,
   useToast,
   WorkspaceNavigation,
+  WorkspaceLayout,
   WorkspacePage,
   type ButtonVariant,
   type DataTableColumn,
@@ -368,6 +369,26 @@ const WorkspacePageStory = () => {
         <p className="text-sm text-secondary-text">{text.preview}</p>
       </CommonSurface>
     </WorkspacePage>
+  );
+};
+
+const WorkspaceLayoutStory = () => {
+  const text = useSampleText();
+  return (
+    <WorkspaceLayout
+      railPosition="start"
+      rail={(
+        <CommonSurface level="interactive" padding="md">
+          <p className="text-sm font-medium text-foreground">{text.details}</p>
+          <p className="mt-1 text-sm text-secondary-text">{text.fieldHint}</p>
+        </CommonSurface>
+      )}
+    >
+      <CommonSurface level="interactive" padding="md">
+        <p className="text-sm font-medium text-foreground">{text.appPageLabel}</p>
+        <p className="mt-1 text-sm text-secondary-text">{text.preview}</p>
+      </CommonSurface>
+    </WorkspaceLayout>
   );
 };
 
@@ -939,6 +960,7 @@ export const COMMON_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   checkbox: CheckboxStory,
   'app-page': AppPageStory,
   'workspace-page': WorkspacePageStory,
+  'workspace-layout': WorkspaceLayoutStory,
   'responsive-filter-panel': ResponsiveFilterPanelStory,
   'responsive-rail': ResponsiveRailStory,
   'workspace-navigation': WorkspaceNavigationStory,

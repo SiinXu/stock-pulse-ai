@@ -5,6 +5,7 @@ import {
   ANALYSIS_WORKBENCH_SEGMENT_VALUES,
   RUN_FLOW_ROUTE_QUERY_VALUES,
   isStableAnalysisWorkbenchTaskId,
+  parsePositiveRouteInteger,
   type AnalysisWorkbenchSegment,
   type RunFlowRouteValue,
 } from './routes';
@@ -37,15 +38,6 @@ const SEGMENTS = new Set<AnalysisWorkbenchSegment>(
 );
 function toSearchParams(search: string | URLSearchParams): URLSearchParams {
   return typeof search === 'string' ? new URLSearchParams(search) : new URLSearchParams(search);
-}
-
-function parsePositiveInt(raw: string | null): number | null {
-  if (raw === null) return null;
-  const trimmed = raw.trim();
-  if (!trimmed) return null;
-  const value = Number(trimmed);
-  if (!Number.isFinite(value) || !Number.isInteger(value) || value <= 0) return null;
-  return value;
 }
 
 function parseStableTaskId(raw: string | null): string | null {
@@ -104,7 +96,7 @@ export function parseAnalysisWorkbenchRouteState(
   }
 
   const rawRecordId = source.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId);
-  const recordId = parsePositiveInt(rawRecordId);
+  const recordId = parsePositiveRouteInteger(rawRecordId);
   if (rawRecordId !== null && recordId === null) {
     invalidKeys.push(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId);
   }
@@ -118,7 +110,7 @@ export function parseAnalysisWorkbenchRouteState(
   }
 
   const rawRunFlowRecordId = source.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowRecordId);
-  let runFlowRecordId = parsePositiveInt(rawRunFlowRecordId);
+  let runFlowRecordId = parsePositiveRouteInteger(rawRunFlowRecordId);
   if (rawRunFlowRecordId !== null && runFlowRecordId === null) {
     invalidKeys.push(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowRecordId);
   }

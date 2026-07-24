@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Check, Menu, SlidersHorizontal, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
-import { analysisApi, DuplicateTaskError } from '../api/analysis';
+import { analysisApi } from '../api/analysis';
 import { historyApi } from '../api/history';
 import { agentApi, type SkillInfo } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
@@ -26,16 +26,12 @@ import { useWatchlist } from '../hooks/useWatchlist';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import type { SetupStatusResponse } from '../types/systemConfig';
 import { normalizeReportLanguage } from '../utils/reportLanguage';
-import type {
-  AnalyzeAsyncResponse,
-  HistoryItem,
-  StockBarItem,
-  TaskInfo,
-} from '../types/analysis';
+import type { HistoryItem, StockBarItem, TaskInfo } from '../types/analysis';
 import type { RunFlowSnapshotSource } from '../types/runFlow';
 import { getTodayInShanghai } from '../utils/format';
 import { buildDeepLink } from '../utils/deepLink';
 import { normalizeStockCode } from '../utils/stockCode';
+import { normalizeBatchAnalysisCodes, submitBatchAnalysis } from '../utils/batchAnalysis';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
 import { getUiListSeparator } from '../utils/uiLocale';
 import {
@@ -72,7 +68,6 @@ type HomeRecordIdentityResolution =
   | { status: 'unresolved'; record: null };
 
 const DUPLICATE_BANNER_AUTO_DISMISS_MS = 5000;
-const BATCH_ANALYSIS_CHUNK_SIZE = 50;
 const TODAY_ANALYSIS_PAGE_SIZE = 100;
 const SERVER_LOCAL_DATE_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/;
 
@@ -117,24 +112,6 @@ function shiftDateKey(dateKey: string, days: number): string {
 function getStockCodeKey(code?: string | null): string {
   const trimmed = (code ?? '').trim();
   return trimmed ? normalizeStockCode(trimmed).toUpperCase() : '';
-}
-
-function chunkStockCodes(codes: string[]): string[][] {
-  const chunks: string[][] = [];
-  for (let index = 0; index < codes.length; index += BATCH_ANALYSIS_CHUNK_SIZE) {
-    chunks.push(codes.slice(index, index + BATCH_ANALYSIS_CHUNK_SIZE));
-  }
-  return chunks;
-}
-
-function countBatchAccepted(result: AnalyzeAsyncResponse): { accepted: number; duplicates: number } {
-  if ('accepted' in result) {
-    return {
-      accepted: result.accepted.length,
-      duplicates: result.duplicates.length,
-    };
-  }
-  return { accepted: 1, duplicates: 0 };
 }
 
 function toStockBarItemFromHistoryItem(item: HistoryItem): StockBarItem {
@@ -1162,15 +1139,7 @@ const HomePage: React.FC = () => {
     }
 
     const sourceCodes = mode === 'pending' ? pendingWatchlistCodes : watchlistState.watchlistCodes;
-    const seen = new Set<string>();
-    const targetCodes = sourceCodes.filter((code) => {
-      const key = getStockCodeKey(code);
-      if (!key || seen.has(key)) {
-        return false;
-      }
-      seen.add(key);
-      return true;
-    });
+    const targetCodes = normalizeBatchAnalysisCodes(sourceCodes);
 
     if (targetCodes.length === 0) {
       setBatchAnalyzeStatus({
@@ -1182,55 +1151,32 @@ const HomePage: React.FC = () => {
 
     setIsBatchAnalyzingWatchlist(true);
     setBatchAnalyzeStatus(null);
-    let acceptedCount = 0;
-    let duplicateCount = 0;
-    let confirmedCodeCount = 0;
-    let submissionError: ParsedApiError | null = null;
     try {
-      for (const chunk of chunkStockCodes(targetCodes)) {
-        try {
-          const result = await analysisApi.analyzeAsync({
-            stockCodes: chunk,
-            reportType: experienceMode === 'beginner' ? 'brief' : 'detailed',
-            notify,
-            skills: selectedAnalysisSkills,
-          });
-          const counts = countBatchAccepted(result);
-          acceptedCount += counts.accepted;
-          duplicateCount += counts.duplicates;
-          const confirmedInChunk = counts.accepted + counts.duplicates;
-          confirmedCodeCount += Math.min(confirmedInChunk, chunk.length);
-          if (confirmedInChunk !== chunk.length) {
-            submissionError = getParsedApiError(new Error(t('watchlist.batchIncompleteResponse', {
-              confirmed: confirmedInChunk,
-              requested: chunk.length,
-            })));
-            break;
-          }
-        } catch (error: unknown) {
-          if (error instanceof DuplicateTaskError && chunk.length === 1) {
-            duplicateCount += 1;
-            confirmedCodeCount += 1;
-            continue;
-          }
-          submissionError = getParsedApiError(error);
-          break;
-        }
-      }
-
-      // Reconcile even after a failed request: a timeout or disconnect may occur
-      // after the server has accepted tasks, and earlier chunks may be running.
-      await refreshActiveTasks();
+      const result = await submitBatchAnalysis({
+        codes: targetCodes,
+        submitChunk: (stockCodes) => analysisApi.analyzeAsync({
+          stockCodes,
+          reportType: experienceMode === 'beginner' ? 'brief' : 'detailed',
+          notify,
+          skills: selectedAnalysisSkills,
+        }),
+        reconcile: refreshActiveTasks,
+        parseError: getParsedApiError,
+        incompleteResponseMessage: (confirmed, requested) => (
+          t('watchlist.batchIncompleteResponse', { confirmed, requested })
+        ),
+      });
       setSidebarWorkspaceTab(HOME_WORKSPACE_VALUES.watchlist);
 
+      const submissionError = result.submissionError ?? result.reconciliationError;
       if (submissionError) {
-        if (acceptedCount > 0 || duplicateCount > 0) {
+        if (result.accepted > 0 || result.duplicates > 0) {
           setBatchAnalyzeStatus({
             variant: 'warning',
             message: t('watchlist.batchPartiallySubmitted', {
-              accepted: acceptedCount,
-              duplicates: duplicateCount,
-              unconfirmed: targetCodes.length - confirmedCodeCount,
+              accepted: result.accepted,
+              duplicates: result.duplicates,
+              unconfirmed: result.unconfirmed,
               error: submissionError.message || t('watchlist.batchFailed'),
             }),
           });
@@ -1244,10 +1190,10 @@ const HomePage: React.FC = () => {
       }
 
       setBatchAnalyzeStatus({
-        variant: acceptedCount > 0 ? 'success' : 'warning',
+        variant: result.accepted > 0 ? 'success' : 'warning',
         message: t('watchlist.batchSubmitted', {
-          accepted: acceptedCount,
-          duplicates: duplicateCount,
+          accepted: result.accepted,
+          duplicates: result.duplicates,
         }),
       });
     } catch (error: unknown) {

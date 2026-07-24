@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate, useNavigationType } from 'react-router-dom';
-import type { ParsedApiError } from '../api/error';
+import {
+  isPermanentlyUnavailableResourceError,
+  type ParsedApiError,
+} from '../api/error';
 import type { HomeWorkspaceValue } from '../routing/routes';
 import type { RunFlowSnapshotSource } from '../types/runFlow';
 import {
@@ -59,18 +62,6 @@ type RejectedRecordLocation = {
   search: string;
 };
 const HOME_URL_ISSUE_STATE_KEY = '__stockPulseHomeUrlIssue';
-
-const isPermanentRecordError = (error: ParsedApiError | null): boolean => Boolean(
-  error
-  && (
-    error.status === 401
-    || error.status === 403
-    || error.status === 404
-    || error.code === 'unauthorized'
-    || error.code === 'forbidden'
-    || error.code === 'not_found'
-  ),
-);
 
 export function useHomeUrlState({
   defaultRecordId,
@@ -264,7 +255,7 @@ export function useHomeUrlState({
       || urlState.recordId === null
       || urlState.recordId !== selectedRecordId
       || isReportLoading
-      || !isPermanentRecordError(reportError)
+      || !isPermanentlyUnavailableResourceError(reportError)
     ) {
       return;
     }

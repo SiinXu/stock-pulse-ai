@@ -7,6 +7,7 @@ import { agentApi } from '../../api/agent';
 import { analysisApi } from '../../api/analysis';
 import { historyApi } from '../../api/history';
 import { stocksApi } from '../../api/stocks';
+import { systemConfigApi } from '../../api/systemConfig';
 import { ToastProvider } from '../../components/common';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import {
@@ -14,6 +15,7 @@ import {
   ANALYSIS_WORKBENCH_SEGMENT_VALUES,
   APP_ROUTE_PATHS,
   RUN_FLOW_ROUTE_QUERY_VALUES,
+  buildAnalysisWorkbenchHref,
 } from '../../routing/routes';
 import { useStockPoolStore } from '../../stores/stockPoolStore';
 import type { AnalysisReport, HistoryItem, TaskInfo } from '../../types/analysis';
@@ -60,6 +62,12 @@ vi.mock('../../api/stocks', () => ({
   stocksApi: {
     extractFromImage: vi.fn(),
     parseImport: vi.fn(),
+  },
+}));
+
+vi.mock('../../api/systemConfig', () => ({
+  systemConfigApi: {
+    getSetupStatus: vi.fn(),
   },
 }));
 
@@ -169,6 +177,11 @@ function renderWorkbench(initialEntry: string = APP_ROUTE_PATHS.researchAnalysis
   );
 }
 
+function renderedSearch(): URLSearchParams {
+  const location = screen.getByTestId('location').textContent ?? '';
+  return new URL(location, 'http://stockpulse.local').searchParams;
+}
+
 describe('ResearchAnalysisWorkbenchPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -186,6 +199,13 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     vi.mocked(historyApi.deleteRecords).mockResolvedValue({ deleted: 1 });
     vi.mocked(stocksApi.extractFromImage).mockResolvedValue({ codes: ['AAPL', 'MSFT'] });
     vi.mocked(stocksApi.parseImport).mockResolvedValue({ codes: ['AAPL', 'MSFT'] });
+    vi.mocked(systemConfigApi.getSetupStatus).mockResolvedValue({
+      isComplete: true,
+      readyForSmoke: true,
+      requiredMissingKeys: [],
+      nextStepKey: null,
+      checks: [],
+    });
   });
 
   it('renders one workbench with three URL-backed segments and launch actions', async () => {
@@ -208,9 +228,9 @@ describe('ResearchAnalysisWorkbenchPage', () => {
 
     fireEvent.click(await screen.findByRole('tab', { name: '运行中任务' }));
 
-    expect(screen.getByTestId('location')).toHaveTextContent(
-      `${APP_ROUTE_PATHS.researchAnalysis}?${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment}=${ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks}`,
-    );
+    expect(screen.getByTestId('location')).toHaveTextContent(buildAnalysisWorkbenchHref({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
+    }));
     expect(screen.getByText('暂无运行任务')).toBeInTheDocument();
     const launchAction = screen.getByRole('button', { name: '发起与批量' });
     expect(launchAction).toHaveAttribute('data-variant', 'primary');
@@ -231,9 +251,9 @@ describe('ResearchAnalysisWorkbenchPage', () => {
         runningTask,
       ],
     });
-    renderWorkbench(
-      `${APP_ROUTE_PATHS.researchAnalysis}?${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment}=${ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks}`,
-    );
+    renderWorkbench(buildAnalysisWorkbenchHref({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
+    }));
 
     const tasksTab = await screen.findByRole('tab', { name: /运行中任务/u });
     expect(within(tasksTab).getByText('1')).toBeInTheDocument();
@@ -250,7 +270,7 @@ describe('ResearchAnalysisWorkbenchPage', () => {
 
   it('loads a historical report from a recordId deep link and opens its RunFlow', async () => {
     useStockPoolStore.setState({ historyItems: [historyItem] });
-    renderWorkbench(`${APP_ROUTE_PATHS.researchAnalysis}?recordId=12`);
+    renderWorkbench(buildAnalysisWorkbenchHref({ recordId: 12 }));
 
     expect(await screen.findByTestId('report-summary')).toHaveTextContent('Apple');
     expect(historyApi.getDetail).toHaveBeenCalledWith(12);
@@ -261,19 +281,19 @@ describe('ResearchAnalysisWorkbenchPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open report run flow' }));
     expect(await screen.findByTestId('run-flow-panel')).toHaveTextContent('history');
-    const location = screen.getByTestId('location').textContent ?? '';
-    expect(location).toContain(`${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow}=history`);
-    expect(location).toContain(`${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowRecordId}=12`);
+    expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow))
+      .toBe(RUN_FLOW_ROUTE_QUERY_VALUES.history);
+    expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowRecordId)).toBe('12');
   });
 
   it('selects the newest report when the history segment has no recordId', async () => {
     useStockPoolStore.setState({ historyItems: [historyItem] });
-    renderWorkbench(
-      `${APP_ROUTE_PATHS.researchAnalysis}?${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment}=${ANALYSIS_WORKBENCH_SEGMENT_VALUES.history}`,
-    );
+    renderWorkbench(buildAnalysisWorkbenchHref({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+    }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('location')).toHaveTextContent('recordId=12');
+      expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId)).toBe('12');
     });
     expect(await screen.findByTestId('report-summary')).toBeInTheDocument();
   });
@@ -286,13 +306,34 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     fireEvent.click(analyzeButtons.at(-1)!);
 
     await waitFor(() => {
-      expect(screen.getByTestId('location')).toHaveTextContent('segment=tasks');
+      expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment))
+        .toBe(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
     });
     expect((await screen.findAllByText('AAPL')).length).toBeGreaterThan(0);
     expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(expect.objectContaining({
       stockCode: 'AAPL',
       reportType: 'detailed',
     }));
+  });
+
+  it('preserves the existing beginner default until setup is complete', async () => {
+    vi.mocked(systemConfigApi.getSetupStatus).mockResolvedValue({
+      isComplete: false,
+      readyForSmoke: false,
+      requiredMissingKeys: ['LLM_CHANNELS'],
+      nextStepKey: 'LLM_CHANNELS',
+      checks: [],
+    });
+    useStockPoolStore.setState({ query: 'AAPL' });
+    renderWorkbench();
+
+    const analyzeButton = (await screen.findAllByRole('button', { name: '快速分析' })).at(-1)!;
+    await waitFor(() => expect(analyzeButton).toBeEnabled());
+    fireEvent.click(analyzeButton);
+
+    await waitFor(() => expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ stockCode: 'AAPL', reportType: 'brief' }),
+    ));
   });
 
   it('imports chart/document symbols and exposes a working batch action', async () => {
@@ -311,16 +352,17 @@ describe('ResearchAnalysisWorkbenchPage', () => {
       }));
     });
     await waitFor(() => {
-      expect(screen.getByTestId('location')).toHaveTextContent('segment=tasks');
+      expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment))
+        .toBe(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
     });
   });
 
   it('offers a completion toast action that deep-links to the finished report', async () => {
     const refreshCompleted = vi.fn().mockResolvedValue(historyItem);
     useStockPoolStore.setState({ refreshHistoryForCompletedTask: refreshCompleted });
-    renderWorkbench(
-      `${APP_ROUTE_PATHS.researchAnalysis}?${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment}=${ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks}`,
-    );
+    renderWorkbench(buildAnalysisWorkbenchHref({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
+    }));
 
     expect(lifecycleOptions).not.toBeNull();
     await act(async () => {
@@ -338,15 +380,17 @@ describe('ResearchAnalysisWorkbenchPage', () => {
 
     expect(await screen.findByText('分析已完成')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '查看报告' }));
-    expect(screen.getByTestId('location')).toHaveTextContent('segment=history&recordId=12');
+    expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment))
+      .toBe(ANALYSIS_WORKBENCH_SEGMENT_VALUES.history);
+    expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId)).toBe('12');
   });
 
   it('keeps the completion toast actionable while history persistence catches up', async () => {
     const refreshCompleted = vi.fn().mockResolvedValue(null);
     useStockPoolStore.setState({ refreshHistoryForCompletedTask: refreshCompleted });
-    renderWorkbench(
-      `${APP_ROUTE_PATHS.researchAnalysis}?${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment}=${ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks}`,
-    );
+    renderWorkbench(buildAnalysisWorkbenchHref({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
+    }));
 
     await act(async () => {
       await lifecycleOptions?.refreshHistoryForCompletedTask?.({
@@ -362,13 +406,36 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     });
 
     fireEvent.click(await screen.findByRole('button', { name: '查看报告' }));
-    expect(screen.getByTestId('location')).toHaveTextContent('segment=history');
+    expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment))
+      .toBe(ANALYSIS_WORKBENCH_SEGMENT_VALUES.history);
+  });
+
+  it.each([
+    { status: 401, code: 'unauthorized' },
+    { status: 403, code: 'forbidden' },
+    { status: 404, code: 'not_found' },
+  ])('removes a permanently unavailable report intent for HTTP $status', async ({ status, code }) => {
+    useStockPoolStore.setState({ historyItems: [historyItem] });
+    vi.mocked(historyApi.getDetail).mockRejectedValue({
+      response: {
+        status,
+        data: { error: code, message: 'The requested report is unavailable.' },
+      },
+    });
+    renderWorkbench(buildAnalysisWorkbenchHref({ recordId: 404 }));
+
+    await waitFor(() => {
+      expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId)).toBeNull();
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('The requested report is unavailable.');
+    expect(historyApi.getDetail).toHaveBeenCalledTimes(1);
+    expect(useStockPoolStore.getState().selectedRecordId).toBeNull();
   });
 
   it('gives an empty history segment a primary launch action', async () => {
-    renderWorkbench(
-      `${APP_ROUTE_PATHS.researchAnalysis}?${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment}=${ANALYSIS_WORKBENCH_SEGMENT_VALUES.history}`,
-    );
+    renderWorkbench(buildAnalysisWorkbenchHref({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+    }));
 
     expect(await screen.findByText('暂无历史分析记录')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '发起与批量' }))
