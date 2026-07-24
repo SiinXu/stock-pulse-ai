@@ -206,10 +206,10 @@ LLM_CONFIG_MODE=channels
 LLM_CHANNELS=ollama
 LLM_OLLAMA_PROVIDER=ollama
 LLM_OLLAMA_BASE_URL=http://localhost:11434
-LLM_OLLAMA_MODELS=qwen3:8b,llama3.2
+LLM_OLLAMA_MODELS=qwen3:8b,qwen3:4b
 
 LITELLM_MODEL=ollama/qwen3:8b
-LITELLM_FALLBACK_MODELS=ollama/llama3.2
+LITELLM_FALLBACK_MODELS=ollama/qwen3:4b
 GENERATION_FALLBACK_BACKEND=
 ```
 
@@ -318,11 +318,15 @@ LLM_OLLAMA_PROVIDER=ollama
 
 # 2. Configure Ollama address (default local port 11434)
 LLM_OLLAMA_BASE_URL=http://localhost:11434
-LLM_OLLAMA_MODELS=qwen3:8b,llama3.2
+LLM_OLLAMA_MODELS=qwen3:8b,qwen3:4b
 
 # 3. Specify primary model
 LITELLM_MODEL=ollama/qwen3:8b
 ```
+
+See the [Local Model Catalog](local-model-catalog.md) for the curated model
+list, verified download sizes, RAM guidance, license evidence, and current
+distribution status.
 
 ### Example: Hermes Local HTTP Generation (Phase 3)
 ```env

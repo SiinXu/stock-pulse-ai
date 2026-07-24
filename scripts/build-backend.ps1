@@ -144,6 +144,7 @@ $pyInstallerArgs = @(
   '--noconsole',
   '--add-data', 'static;static',
   '--add-data', 'strategies;strategies',
+  '--add-data', 'src/llm/local_model_catalog.json;src/llm',
   '--add-data', 'src/migrations/versions/*.py;src/migrations/versions',
   '--add-data', 'constraints.txt;.',
   '--add-data', 'build-constraints.txt;.',
@@ -196,6 +197,20 @@ if (-not (Test-Path $packagedMigrationSourceDir -PathType Container)) {
 }
 if (-not (Test-Path $packagedMigrationSourceDir -PathType Container) -or -not (Get-ChildItem -Path $packagedMigrationSourceDir -Filter 'v*.py' -File | Select-Object -First 1)) {
   throw 'Packaged migration source not found under dist\backend\stock_analysis.'
+}
+
+Write-Host 'Verifying packaged local model catalog...'
+$packagedLocalModelCatalog = Join-Path 'dist\backend\stock_analysis' '_internal\src\llm\local_model_catalog.json'
+if (-not (Test-Path $packagedLocalModelCatalog)) {
+  $packagedLocalModelCatalog = Join-Path 'dist\backend\stock_analysis' 'src\llm\local_model_catalog.json'
+}
+if (-not (Test-Path $packagedLocalModelCatalog)) {
+  throw 'Packaged local model catalog not found under dist\backend\stock_analysis.'
+}
+$sourceCatalogHash = (Get-FileHash 'src\llm\local_model_catalog.json' -Algorithm SHA256).Hash
+$packagedCatalogHash = (Get-FileHash $packagedLocalModelCatalog -Algorithm SHA256).Hash
+if ($sourceCatalogHash -ne $packagedCatalogHash) {
+  throw 'Packaged local model catalog differs from the authoritative source.'
 }
 
 Write-Host 'Verifying packaged AkShare calendar data...'

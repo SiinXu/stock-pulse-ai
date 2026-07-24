@@ -2,10 +2,18 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const Module = require('node:module');
 
-function loadModelPreload(t, ipcRenderer) {
+function loadModelPreload(t, ipcRenderer, presets = [{
+  id: 'qwen3:8b',
+  label: 'Qwen3 8B',
+  approxSizeGb: 5.2,
+  minRamGb: 16,
+  guidance: 'Balanced local model.',
+}]) {
   const originalLoad = Module._load;
+  const originalArgv = [...process.argv];
   const exposed = [];
   const preloadPath = require.resolve('../model-preload.js');
+  process.argv.push(`--stockpulse-local-model-presets=${encodeURIComponent(JSON.stringify(presets))}`);
 
   Module._load = function patchedLoad(request, parent, isMain) {
     if (request === 'electron') {
@@ -22,6 +30,7 @@ function loadModelPreload(t, ipcRenderer) {
 
   t.after(() => {
     Module._load = originalLoad;
+    process.argv = originalArgv;
     delete require.cache[preloadPath];
   });
 
@@ -110,4 +119,16 @@ test('model bridge presets are inert display metadata only', (t) => {
     assert.match(preset.id, /^[a-z0-9]+(?:[._-][a-z0-9]+)*(?::[a-z0-9]+(?:[._-][a-z0-9]+)*)?$/i);
     assert.equal(typeof preset.guidance, 'string');
   }
+});
+
+test('model preload fails closed for a malformed preset projection', (t) => {
+  const ipcRenderer = {
+    invoke: async () => undefined,
+    on: () => undefined,
+    removeListener: () => undefined,
+  };
+  const { preloadModule } = loadModelPreload(t, ipcRenderer, [{ id: '../invalid' }]);
+
+  assert.deepEqual(preloadModule.DESKTOP_LOCAL_MODEL_PRESETS, []);
+  assert.equal(Object.isFrozen(preloadModule.DESKTOP_LOCAL_MODEL_PRESETS), true);
 });

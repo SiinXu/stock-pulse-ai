@@ -122,7 +122,7 @@ for module in "${hidden_imports[@]}"; do
 done
 
 pushd "${ROOT_DIR}" >/dev/null
-cmd=("${PYTHON_BIN}" -m PyInstaller --name stock_analysis --onedir --noconfirm --noconsole --add-data "static:static" --add-data "strategies:strategies" --add-data "src/migrations/versions/*.py:src/migrations/versions" --add-data "constraints.txt:." --add-data "build-constraints.txt:." --collect-data litellm --collect-data tiktoken --collect-data akshare)
+cmd=("${PYTHON_BIN}" -m PyInstaller --name stock_analysis --onedir --noconfirm --noconsole --add-data "static:static" --add-data "strategies:strategies" --add-data "src/llm/local_model_catalog.json:src/llm" --add-data "src/migrations/versions/*.py:src/migrations/versions" --add-data "constraints.txt:." --add-data "build-constraints.txt:." --collect-data litellm --collect-data tiktoken --collect-data akshare)
 cmd+=("--collect-all" "alphasift")
 cmd+=("${hidden_import_args[@]}" "main.py")
 
@@ -165,6 +165,20 @@ if [[ ! -d "${packaged_migration_source_dir}" ]]; then
 fi
 if [[ ! -d "${packaged_migration_source_dir}" ]] || ! find "${packaged_migration_source_dir}" -maxdepth 1 -type f -name 'v*.py' -print -quit | grep -q .; then
   echo "ERROR: packaged migration source not found under ${packaged_root}."
+  exit 1
+fi
+
+log "Verifying packaged local model catalog..."
+packaged_local_model_catalog="${packaged_root}/_internal/src/llm/local_model_catalog.json"
+if [[ ! -f "${packaged_local_model_catalog}" ]]; then
+  packaged_local_model_catalog="${packaged_root}/src/llm/local_model_catalog.json"
+fi
+if [[ ! -f "${packaged_local_model_catalog}" ]]; then
+  echo "ERROR: packaged local model catalog not found under ${packaged_root}."
+  exit 1
+fi
+if ! cmp -s "${ROOT_DIR}/src/llm/local_model_catalog.json" "${packaged_local_model_catalog}"; then
+  echo "ERROR: packaged local model catalog differs from the authoritative source."
   exit 1
 fi
 

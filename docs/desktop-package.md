@@ -297,7 +297,7 @@ powershell -ExecutionPolicy Bypass -File scripts\build-backend.ps1
 bash scripts/build-backend-macos.sh
 ```
 
-两个脚本都通过 `requirements-desktop.txt` 安装默认运行时与固定版本的 PyInstaller，由仓库通用 `constraints.txt` 约束完整闭包，并通过 `--build-constraint build-constraints.txt` 固定 AlphaSift 的 PEP 517 构建后端；安装后先执行 `pip check`，不会再在构建时临时拉取最新版 PyInstaller。随后脚本执行 `--collect-all alphasift` 和 `--collect-data akshare`，并显式收集 `src.migrations`、registry、versions package 及 source-bound checksum 所需的 version `.py` 源码。脚本还将 `constraints.txt` 与 `build-constraints.txt` 打入冻结产物根目录，使 AlphaSift 修复安装可通过 `sys._MEIPASS` 定位锁文件，并以 `--constraint` / `--build-constraint` 约束运行时与 PEP 517 构建依赖，而非退回到仅 `--no-deps`。构建完成后会校验 `alphasift.dsa_adapter` 和 `src.migrations.registry` 可导入，并确认 migration 源码与 AkShare 的 `file_fold/calendar.json` 已进入冻结产物，避免发行包在启动 migration、热点题材或日线增强路径中因缺少模块/package data 失败。
+两个脚本都通过 `requirements-desktop.txt` 安装默认运行时与固定版本的 PyInstaller，由仓库通用 `constraints.txt` 约束完整闭包，并通过 `--build-constraint build-constraints.txt` 固定 AlphaSift 的 PEP 517 构建后端；安装后先执行 `pip check`，不会再在构建时临时拉取最新版 PyInstaller。随后脚本执行 `--collect-all alphasift` 和 `--collect-data akshare`，并显式收集 `src.migrations`、registry、versions package、`src/llm/local_model_catalog.json` 及 source-bound checksum 所需的 version `.py` 源码。脚本还将 `constraints.txt` 与 `build-constraints.txt` 打入冻结产物根目录，使 AlphaSift 修复安装可通过 `sys._MEIPASS` 定位锁文件，并以 `--constraint` / `--build-constraint` 约束运行时与 PEP 517 构建依赖，而非退回到仅 `--no-deps`。构建完成后会校验 `alphasift.dsa_adapter` 和 `src.migrations.registry` 可导入，并确认 migration 源码、local model catalog 与 AkShare 的 `file_fold/calendar.json` 已进入冻结产物，避免发行包在启动 migration、读取本地模型目录、热点题材或日线增强路径中因缺少模块/package data 失败。
 
 3) 打包 Electron 桌面应用
 
@@ -329,6 +329,7 @@ win-unpacked/
     desktop.log               <- 运行日志
   resources/
     .env.example              <- 配置模板
+    local-model-catalog.json  <- 与后端共享的本地模型目录
     backend/
       stock_analysis.exe      <- 后端服务
 ```

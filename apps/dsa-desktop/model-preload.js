@@ -8,33 +8,56 @@ const DESKTOP_LOCAL_MODEL_PULL_CHANNEL = 'desktop-local-model:pull';
 const DESKTOP_LOCAL_MODEL_REGISTER_CHANNEL = 'desktop-local-model:register';
 const DESKTOP_LOCAL_MODEL_OPEN_GUIDE_CHANNEL = 'desktop-local-model:open-guide';
 const DESKTOP_LOCAL_MODEL_STATE_EVENT = 'desktop-local-model:state';
+const DESKTOP_LOCAL_MODEL_PRESETS_ARG_PREFIX = '--stockpulse-local-model-presets=';
+const DESKTOP_LOCAL_MODEL_NAME_PATTERN =
+  /^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)?(?::[a-z0-9]+(?:[._-][a-z0-9]+)*)?$/i;
 
-// The recommended presets are duplicated here as inert display metadata so the
-// isolated renderer never has to reach the network. The main process remains
-// the single source of truth for which ids may actually be pulled.
-const DESKTOP_LOCAL_MODEL_PRESETS = Object.freeze([
-  Object.freeze({
-    id: 'llama3.2:3b',
-    label: 'Llama 3.2 3B',
-    approxSizeGb: 2.0,
-    minRamGb: 8,
-    guidance: 'Lightweight general model. Runs on 8 GB RAM machines.',
-  }),
-  Object.freeze({
-    id: 'qwen3:4b',
-    label: 'Qwen3 4B',
-    approxSizeGb: 2.6,
-    minRamGb: 8,
-    guidance: 'Compact reasoning model. Comfortable on 8-16 GB RAM.',
-  }),
-  Object.freeze({
-    id: 'qwen3:8b',
-    label: 'Qwen3 8B',
-    approxSizeGb: 5.2,
-    minRamGb: 16,
-    guidance: 'Balanced quality for 16 GB RAM or more.',
-  }),
-]);
+function readDesktopLocalModelPresets(argv = process.argv) {
+  const rawArgument = argv.find((value) => (
+    typeof value === 'string' && value.startsWith(DESKTOP_LOCAL_MODEL_PRESETS_ARG_PREFIX)
+  ));
+  if (!rawArgument) {
+    return Object.freeze([]);
+  }
+
+  try {
+    const encoded = rawArgument.slice(DESKTOP_LOCAL_MODEL_PRESETS_ARG_PREFIX.length);
+    const parsed = JSON.parse(decodeURIComponent(encoded));
+    if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > 32) {
+      return Object.freeze([]);
+    }
+    const seen = new Set();
+    const presets = parsed.map((preset) => {
+      if (
+        !preset ||
+        typeof preset.id !== 'string' ||
+        !DESKTOP_LOCAL_MODEL_NAME_PATTERN.test(preset.id) ||
+        seen.has(preset.id) ||
+        typeof preset.label !== 'string' ||
+        typeof preset.guidance !== 'string' ||
+        !Number.isFinite(preset.approxSizeGb) ||
+        !Number.isInteger(preset.minRamGb)
+      ) {
+        throw new Error('invalid preset projection');
+      }
+      seen.add(preset.id);
+      return Object.freeze({
+        id: preset.id,
+        label: preset.label,
+        approxSizeGb: preset.approxSizeGb,
+        minRamGb: preset.minRamGb,
+        guidance: preset.guidance,
+      });
+    });
+    return Object.freeze(presets);
+  } catch (_error) {
+    return Object.freeze([]);
+  }
+}
+
+// The sandboxed preload receives inert catalog-derived metadata from main. It
+// does not read files or perform network discovery.
+const DESKTOP_LOCAL_MODEL_PRESETS = readDesktopLocalModelPresets();
 
 function createLocalModelBridge({ renderer = ipcRenderer } = {}) {
   return {
@@ -82,6 +105,8 @@ module.exports = {
   DESKTOP_LOCAL_MODEL_REGISTER_CHANNEL,
   DESKTOP_LOCAL_MODEL_OPEN_GUIDE_CHANNEL,
   DESKTOP_LOCAL_MODEL_STATE_EVENT,
+  DESKTOP_LOCAL_MODEL_PRESETS_ARG_PREFIX,
   DESKTOP_LOCAL_MODEL_PRESETS,
   createLocalModelBridge,
+  readDesktopLocalModelPresets,
 };

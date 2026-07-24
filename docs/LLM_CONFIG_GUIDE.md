@@ -226,10 +226,10 @@ LLM_CONFIG_MODE=channels
 LLM_CHANNELS=ollama
 LLM_OLLAMA_PROVIDER=ollama
 LLM_OLLAMA_BASE_URL=http://localhost:11434
-LLM_OLLAMA_MODELS=qwen3:8b,llama3.2
+LLM_OLLAMA_MODELS=qwen3:8b,qwen3:4b
 
 LITELLM_MODEL=ollama/qwen3:8b
-LITELLM_FALLBACK_MODELS=ollama/llama3.2
+LITELLM_FALLBACK_MODELS=ollama/qwen3:4b
 GENERATION_FALLBACK_BACKEND=
 ```
 
@@ -338,7 +338,7 @@ LLM_OLLAMA_PROVIDER=ollama
 
 # 2. 配置 Ollama 地址（本地默认 11434 端口）
 LLM_OLLAMA_BASE_URL=http://localhost:11434
-LLM_OLLAMA_MODELS=qwen3:8b,llama3.2
+LLM_OLLAMA_MODELS=qwen3:8b,qwen3:4b
 
 # 3. 指定主模型
 LITELLM_MODEL=ollama/qwen3:8b
