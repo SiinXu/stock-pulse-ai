@@ -102,10 +102,11 @@ def run_agent_loop(
     tool_calls_log: List[Dict[str, Any]] = []
     # Single tool authority for the whole run: every tool call in every step is
     # dispatched through this bound session. Native runs it in
-    # ``enforce_access_policy=False`` compatibility mode so the replay-frozen
-    # behaviour is preserved byte-for-byte while the direct ToolRegistry path is
-    # retired. The session's internal non-retriable memo replaces the previous
-    # ad-hoc per-run cache dict.
+    # ``enforce_access_policy=False`` compatibility mode so replay-frozen core
+    # behavior is preserved while the direct ToolRegistry path is retired.
+    # Definitions marked ``enforce_contract`` (including plugin tools) still
+    # receive ToolSurface argument and scope validation. The session's internal
+    # non-retriable memo replaces the previous ad-hoc per-run cache dict.
     tool_session = BoundToolSession(
         tool_registry,
         execution_id=str(uuid.uuid4()),

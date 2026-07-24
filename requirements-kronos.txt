@@ -1,0 +1,12 @@
+# Optional local inference dependencies for the Kronos Agent Tool.
+#
+# This file is not included by requirements.txt. Install the base StockPulse
+# requirements first, then install this exact optional set with the repository
+# runtime and build constraints as documented in docs/kronos-agent-tool.md.
+-c constraints.txt
+
+torch==2.13.0
+einops==0.8.2
+huggingface-hub==1.24.0
+safetensors==0.8.0
+tqdm==4.69.0

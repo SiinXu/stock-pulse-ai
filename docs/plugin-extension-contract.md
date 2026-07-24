@@ -47,7 +47,7 @@ new surface requires an ADR instead of an implicit registry expansion.
 | Built-in/external startup wiring | `src/application_services.py` composition root | #273 X2b implemented |
 | Data Providers | `DataProvider`, `BaseFetcher`, and `DataFetcherManager` | #276 X3 native adapter implemented; caller must inject the target manager registry |
 | Analysis Strategies | `Skill`, `SkillManager`, `StrategyEngine` | Contract only in this batch |
-| Agent Tools | `ToolDefinition`, `ToolRegistry`, Tool Surface | Contract only; `src/agent/**` stays untouched |
+| Agent Tools | `ToolDefinition`, `ToolRegistry`, Tool Surface | Wired through the native registry; registration remains fail-closed |
 | Notification Channels | `NotificationChannel`, sender mixins, `NotificationService` | Contract only in this batch |
 | Report Templates | `src/services/report_renderer.py`, `templates/report_*.j2` | Contract only in this batch |
 | Event Hooks | Task and Agent runtime event streams | Contract only in this batch |
@@ -161,12 +161,12 @@ outer operation finishes; the root then performs the same state-based cleanup
 exactly once. The installer drain remains active through that deferred cleanup,
 including every `onunload()` callback, before a successor may start.
 
-There is currently no default lifecycle-style built-in catalog to fabricate:
-existing Data Provider built-ins remain owned by each `DataFetcherManager`, and
-the other five extension points are contract-only. `ApplicationServices`
-therefore accepts an explicit built-in iterable while its default is empty.
-Adding a real built-in later must use that seam rather than a parallel startup
-hook.
+The default lifecycle-style built-in catalog is configuration-gated. Existing
+Data Provider built-ins remain owned by each `DataFetcherManager`; the optional
+Kronos Agent Tool is added only when its explicit enable flag is true, while the
+other four extension points remain contract-only. `ApplicationServices`
+continues to accept an explicit built-in iterable for tests and composition
+callers. New built-ins must use that seam rather than a parallel startup hook.
 
 `PLUGINS_DIR` is read once for each root startup. Unset, empty, or whitespace-only
 values do not instantiate the external loader and do not probe a default path.
@@ -538,14 +538,32 @@ AgentToolRegistration = ToolDefinition
 
 The implementation must be a `ToolDefinition` with an exact stable name,
 serializable parameter schema, callable handler, category, and a declared
-`ToolPolicy`. The plugin registry delegates to `ToolRegistry`; every execution
-continues through the Tool Surface and its argument, stock-scope, timeout,
-serialization, audit, and completion guards.
+`ToolPolicy`. It must set `enforce_contract=True`, and its callable signature
+must exactly match the declared schema: no positional-only, variadic, or hidden
+parameters; optional defaults must match the handler, satisfy the declared
+type/enum/pattern/bounds, and be JSON-compatible. Defaults are materialized
+before validation and scope checks, and a stock-scoped `stock_code` identity
+must be required. The plugin registry delegates to `ToolRegistry`; every
+execution continues through the Tool Surface and its argument, stock-scope,
+timeout, serialization, audit, and completion guards.
+Per-definition enforcement keeps argument and scope checks active for plugin
+tools even while existing core tools use the native compatibility mode.
 
-Plugin registration cannot grant a tool access, weaken strict policy
-validation, publish a transport, or mutate Agent runner internals. Tool names
-cannot overwrite built-ins. Runtime wiring is deferred because `src/agent/**`
-belongs to the Agent decomposition track.
+Registration follows the existing Agent exposure model: the default single
+Agent receives the process tool catalog, while multi-agent specialists receive
+only their named subset. Registration cannot bypass those architecture rules,
+weaken strict policy validation, publish a transport, or mutate Agent runner
+internals. Single-Agent RUN resolves a frozen scope from its task/context before
+dispatch, matching the Chat and specialist scope boundary. Tool names cannot
+overwrite built-ins. `ApplicationServices`
+supplies an exact-owner native adapter backed by the cached `ToolRegistry`;
+unload removes only the definition registered by that plugin from the exact
+registry instance selected during registration.
+
+This is an interim ToolSurface subset, not completion of the process sandbox in
+#191. External plugins remain reviewed, process-equivalent Python; manifest
+permissions are descriptive and do not constrain handler code or raw network
+access.
 
 ### Notification Channels
 

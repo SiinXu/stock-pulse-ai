@@ -16,6 +16,7 @@ from typing import Optional
 from src.agent.agents.base_agent import BaseAgent
 from src.agent.protocols import AgentContext, AgentOpinion
 from src.agent.runner import try_parse_json
+from src.agent.tools.kronos_tools import KRONOS_FORECAST_TOOL_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,15 @@ class TechnicalAgent(BaseAgent):
         "get_analysis_context",
     ]
 
+    def _filtered_registry(self):
+        """Add the optional Kronos tool only when its plugin registered it."""
+
+        registry = super()._filtered_registry()
+        kronos_tool = self.tool_registry.get(KRONOS_FORECAST_TOOL_NAME)
+        if kronos_tool is not None:
+            registry.register(kronos_tool)
+        return registry
+
     def system_prompt(self, ctx: AgentContext) -> str:
         skills = ""
         if self.skill_instructions:
@@ -51,6 +61,13 @@ class TechnicalAgent(BaseAgent):
             if "get_chip_distribution" in disabled_tools
             else "3. Analyse volume and chip distribution"
         )
+        kronos_workflow = ""
+        if self.tool_registry.get(KRONOS_FORECAST_TOOL_NAME) is not None:
+            kronos_workflow = (
+                "\n5. When a probabilistic forecast would materially help, call "
+                f"{KRONOS_FORECAST_TOOL_NAME}; treat it only as supporting evidence "
+                "and preserve its uncertainty and disclaimer"
+            )
 
         return f"""\
 You are a **Technical Analysis Agent** specialising in Chinese A-shares, \
@@ -64,6 +81,7 @@ output a structured JSON opinion.
 2. Run trend analysis (MA alignment, MACD, RSI)
 {chip_workflow}
 4. Identify chart patterns
+{kronos_workflow}
 
 {baseline}
 {skills}

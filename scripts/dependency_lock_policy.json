@@ -19,6 +19,7 @@
   "source_files": [
     "requirements.txt",
     "requirements-pydanticai.txt",
+    "requirements-kronos.txt",
     ".github/requirements-ci.txt",
     ".github/requirements-review.txt",
     "requirements-desktop.txt",
@@ -26,6 +27,7 @@
   ],
   "exact_source_files": [
     "requirements-pydanticai.txt",
+    "requirements-kronos.txt",
     "build-constraints.txt"
   ],
   "install_contracts": {
@@ -34,6 +36,18 @@
       "includes": [],
       "packages": [],
       "allow_other_packages": true
+    },
+    "requirements-kronos.txt": {
+      "constraint": "constraints.txt",
+      "includes": [],
+      "packages": [
+        "torch",
+        "einops",
+        "huggingface-hub",
+        "safetensors",
+        "tqdm"
+      ],
+      "allow_other_packages": false
     },
     ".github/requirements-ci.txt": {
       "constraint": "constraints.txt",
@@ -80,5 +94,5 @@
       ]
     }
   },
-  "lock_sha256": "e6858f4547833f1429a5fa79633132c208406f205099f5508acd090287c8304a"
+  "lock_sha256": "722ea492fdd820feba80922900b96ceef62fbad0e0257a2933da061682f2ac38"
 }

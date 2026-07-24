@@ -4,7 +4,12 @@ import os
 from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
-from src.config_parts.defaults import ConfigIssue, _has_gotify_base_url, _has_ntfy_topic_endpoint
+from src.config_parts.defaults import (
+    KRONOS_MODEL_SIZES as _KRONOS_MODEL_SIZES,
+    ConfigIssue,
+    _has_gotify_base_url,
+    _has_ntfy_topic_endpoint,
+)
 from src.config_parts.parsers import (
     _get_litellm_provider,
     _matches_exact_route,
@@ -97,6 +102,29 @@ class _ConfigValidationMethods:
                 severity="info",
                 message="未配置 Tushare Token，将使用其他数据源",
                 field="TUSHARE_TOKEN",
+            ))
+
+        # --- Optional local Kronos forecasting ---
+        kronos_model_size = str(self.kronos_model_size or "").strip().lower()
+        if self.kronos_enabled and kronos_model_size not in _KRONOS_MODEL_SIZES:
+            issues.append(ConfigIssue(
+                severity="error",
+                message=(
+                    "KRONOS_MODEL_SIZE must be one of: "
+                    f"{', '.join(sorted(_KRONOS_MODEL_SIZES))}."
+                ),
+                field="KRONOS_MODEL_SIZE",
+                code="kronos_model_size_invalid",
+            ))
+        if self.kronos_enabled and not str(self.kronos_weights_dir or "").strip():
+            issues.append(ConfigIssue(
+                severity="warning",
+                message=(
+                    "KRONOS_ENABLED is true but KRONOS_WEIGHTS_DIR is empty; "
+                    "the Kronos agent tool will remain unregistered."
+                ),
+                field="KRONOS_WEIGHTS_DIR",
+                code="kronos_weights_dir_missing",
             ))
 
         # --- Generation backend selection ---

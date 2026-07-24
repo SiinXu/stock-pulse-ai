@@ -32,6 +32,9 @@ class ToolParameter:
     required: bool = True
     enum: Optional[List[str]] = None
     default: Any = None
+    minimum: Optional[float] = None
+    maximum: Optional[float] = None
+    pattern: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -83,6 +86,7 @@ class ToolDefinition:
     handler: Callable
     category: str = "data"  # data | analysis | search | action
     policy: ToolPolicy = field(default_factory=ToolPolicy.unknown)
+    enforce_contract: bool = False
 
     # ----- Multi-provider schema converters -----
 
@@ -94,6 +98,12 @@ class ToolDefinition:
             prop: Dict[str, Any] = {"type": p.type, "description": p.description}
             if p.enum:
                 prop["enum"] = p.enum
+            if p.minimum is not None:
+                prop["minimum"] = p.minimum
+            if p.maximum is not None:
+                prop["maximum"] = p.maximum
+            if p.pattern is not None:
+                prop["pattern"] = p.pattern
             properties[p.name] = prop
             if p.required:
                 required.append(p.name)

@@ -16,13 +16,12 @@ or cancelled are dropped behind a late-result fence.
 
 The native runner now dispatches through this same session too (RF-03):
 there is a single tool authority for every runtime. Native uses the
-``enforce_access_policy=False`` construction so the allowlist, policy and
-permission gates stay in equivalent pass-through mode and the surface
-skips its declared-contract validation, reproducing the replay-frozen
-direct path byte-for-byte while still routing through one authority. The
-lifecycle gates (closed, cancellation, deadline and budget) remain active
-in both modes; external runtime adapters (AR-PY-04+) keep the strict
-default so their access is fully enforced.
+``enforce_access_policy=False`` construction so existing core tools retain
+their replay-frozen pass-through behavior. Definitions that explicitly set
+``enforce_contract=True`` still receive ToolSurface argument and scope
+validation on that native path. The lifecycle gates (closed, cancellation,
+deadline and budget) remain active in both modes; external runtime adapters
+(AR-PY-04+) keep the strict default so their access is fully enforced.
 """
 
 from __future__ import annotations
@@ -245,12 +244,12 @@ class BoundToolSession:
                             tool_name=tool_name,
                             arguments=arguments,
                             started_at=started_at,
-                            call_context=self._build_call_context(),
+                            call_context=self._build_call_context(tool_name),
                             completion_rejection=completion_rejection,
                         )
                     self._audit_trail.append(cached["audit"])
                     return cached
-            call_context = self._build_call_context()
+            call_context = self._build_call_context(tool_name)
             if rejection is None and (
                 self._deadline_monotonic is not None
                 and call_context.timeout_seconds is not None
@@ -475,7 +474,7 @@ class BoundToolSession:
             code=code,
             message=message,
             started_at=started_at,
-            context=self._build_call_context(),
+            context=self._build_call_context(tool_name),
             retriable=False,
             details=details,
             arguments=arguments,
@@ -502,11 +501,15 @@ class BoundToolSession:
             and time.monotonic() >= self._deadline_monotonic
         )
 
-    def _build_call_context(self) -> ToolAccessContext:
+    def _build_call_context(self, tool_name: str = "") -> ToolAccessContext:
         timeout = self._call_timeout_seconds
         if self._deadline_monotonic is not None:
             remaining = self._deadline_monotonic - time.monotonic()
             timeout = remaining if timeout is None else min(timeout, remaining)
+        tool_def = self._registry.resolve(tool_name)
+        enforce_contract = self._enforce_access_policy or bool(
+            tool_def is not None and tool_def.enforce_contract
+        )
         return ToolAccessContext(
             stock_scope=self._stock_scope,
             backend=self._backend,
@@ -514,7 +517,7 @@ class BoundToolSession:
             timeout_seconds=timeout,
             max_result_bytes=self._max_result_bytes,
             audit_context=dict(self._base_audit_context),
-            enforce_contract=self._enforce_access_policy,
+            enforce_contract=enforce_contract,
         )
 
     @staticmethod

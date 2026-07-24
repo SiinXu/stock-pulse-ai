@@ -44,6 +44,7 @@
 | 文档 | 内容 |
 | --- | --- |
 | [Bot 命令与接入](bot-command.md) | Bot 命令、Webhook、平台接入和回调说明 |
+| [Kronos K 线预测 Agent Tool（英文）](kronos-agent-tool.md) | 可选本地模型启用、注册门槛、输出契约、局限、验证与回滚 |
 | [Bot 平台配置](bot/) | 飞书、钉钉、Discord 等 Bot 配置截图和补充说明 |
 | [实时告警中心](alerts.md) | EventMonitor 基线、Web 规则管理、通知结果、冷却状态和 Phase 边界 |
 | [DecisionSignal 决策信号专题](decision-signals.md) | AI 建议池字段语义、API、Web 展示、告警/通知/组合风险联动、后验评估、脱敏、迁移与回滚 |

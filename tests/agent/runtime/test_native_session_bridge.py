@@ -31,7 +31,13 @@ from src.agent.tools.execution import (
     execute_runner_tool_call_via_session,
     serialize_tool_result,
 )
-from src.agent.tools.registry import ToolDefinition, ToolParameter, ToolRegistry
+from src.agent.tools.registry import (
+    ToolDefinition,
+    ToolParameter,
+    ToolPolicy,
+    ToolRegistry,
+)
+from src.plugins import build_agent_tool_extension_registry
 
 
 class _TC:
@@ -248,6 +254,166 @@ def test_native_run_unknown_tool_fails_closed_via_session():
         "code": "tool_not_found",
         "retriable": False,
     }
+
+
+def test_native_run_enforces_plugin_tool_schema_before_handler():
+    registry = ToolRegistry()
+    calls = []
+    tool = ToolDefinition(
+        name="bounded_plugin_tool",
+        description="Bounded plugin tool",
+        parameters=[
+            ToolParameter(
+                name="value",
+                type="integer",
+                description="Bounded value",
+                maximum=1,
+            )
+        ],
+        handler=lambda value: calls.append(value) or {"value": value},
+        policy=ToolPolicy.declared(read_only=True),
+        enforce_contract=True,
+    )
+    extension_registry = build_agent_tool_extension_registry(registry)
+    extension_registry.register(
+        plugin_id="test.bounded-tool",
+        extension_point="agent_tool",
+        registration_id=tool.name,
+        implementation=tool,
+    )
+    adapter = MagicMock()
+    adapter.call_with_tools.side_effect = [
+        LLMResponse(
+            content="",
+            tool_calls=[
+                ToolCall(
+                    id="bounded-1",
+                    name=tool.name,
+                    arguments={"value": 2},
+                )
+            ],
+            usage={"total_tokens": 3},
+            provider="openai",
+        ),
+        _dashboard_response(),
+    ]
+
+    result = run_agent_loop(
+        messages=[{"role": "user", "content": "go"}],
+        tool_registry=registry,
+        llm_adapter=adapter,
+        max_steps=5,
+    )
+
+    assert result.success is True
+    assert result.tool_calls_log[0]["success"] is False
+    tool_messages = [m for m in result.messages if m.get("role") == "tool"]
+    assert json.loads(tool_messages[0]["content"])["code"] == "invalid_arguments"
+    assert calls == []
+
+
+def test_native_run_rejects_omitted_scoped_plugin_identity_before_handler():
+    registry = ToolRegistry()
+    calls = []
+    tool = ToolDefinition(
+        name="scoped_plugin_tool",
+        description="Scoped plugin tool",
+        parameters=[
+            ToolParameter(
+                name="stock_code",
+                type="string",
+                description="Stock code",
+            )
+        ],
+        handler=lambda stock_code: calls.append(stock_code) or {"stock_code": stock_code},
+        policy=ToolPolicy.declared(
+            read_only=True,
+            scope_dimensions=["stock"],
+        ),
+        enforce_contract=True,
+    )
+    build_agent_tool_extension_registry(registry).register(
+        plugin_id="test.scoped-tool",
+        extension_point="agent_tool",
+        registration_id=tool.name,
+        implementation=tool,
+    )
+    adapter = MagicMock()
+    adapter.call_with_tools.side_effect = [
+        LLMResponse(
+            content="",
+            tool_calls=[ToolCall(id="scoped-1", name=tool.name, arguments={})],
+            usage={"total_tokens": 3},
+            provider="openai",
+        ),
+        _dashboard_response(),
+    ]
+
+    result = run_agent_loop(
+        messages=[{"role": "user", "content": "go"}],
+        tool_registry=registry,
+        llm_adapter=adapter,
+        max_steps=5,
+        stock_scope=StockScope(
+            expected_stock_code="600519",
+            allowed_stock_codes={"600519"},
+        ),
+    )
+
+    assert result.success is True
+    tool_messages = [m for m in result.messages if m.get("role") == "tool"]
+    assert json.loads(tool_messages[0]["content"])["code"] == "invalid_arguments"
+    assert calls == []
+
+
+def test_native_run_materializes_valid_plugin_default_before_handler():
+    registry = ToolRegistry()
+    calls = []
+    tool = ToolDefinition(
+        name="defaulted_plugin_tool",
+        description="Defaulted plugin tool",
+        parameters=[
+            ToolParameter(
+                name="value",
+                type="integer",
+                description="Bounded value",
+                required=False,
+                default=1,
+                minimum=1,
+                maximum=1,
+            )
+        ],
+        handler=lambda value=1: calls.append(value) or {"value": value},
+        policy=ToolPolicy.declared(read_only=True),
+        enforce_contract=True,
+    )
+    build_agent_tool_extension_registry(registry).register(
+        plugin_id="test.defaulted-tool",
+        extension_point="agent_tool",
+        registration_id=tool.name,
+        implementation=tool,
+    )
+    adapter = MagicMock()
+    adapter.call_with_tools.side_effect = [
+        LLMResponse(
+            content="",
+            tool_calls=[ToolCall(id="defaulted-1", name=tool.name, arguments={})],
+            usage={"total_tokens": 3},
+            provider="openai",
+        ),
+        _dashboard_response(),
+    ]
+
+    result = run_agent_loop(
+        messages=[{"role": "user", "content": "go"}],
+        tool_registry=registry,
+        llm_adapter=adapter,
+        max_steps=5,
+    )
+
+    assert result.success is True
+    assert result.tool_calls_log[0]["success"] is True
+    assert calls == [1]
 
 
 def test_mapper_drops_result_completing_after_session_close():

@@ -12,6 +12,8 @@ logger = logging.getLogger("src.config")
 DEFAULT_ALPHASIFT_INSTALL_SPEC = (
     "git+https://github.com/ZhuLinsen/alphasift.git@9f522747caafd3c0b1ddb7e14d5cf44c8580b6cf"
 )
+KRONOS_MODEL_SIZE_DEFAULT = "mini"
+KRONOS_MODEL_SIZES = frozenset({"mini", "small", "base"})
 
 
 @dataclass
