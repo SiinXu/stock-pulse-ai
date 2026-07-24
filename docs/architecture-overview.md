@@ -201,6 +201,11 @@ Product terminology is **Skill**; **Strategy** remains in user-facing trading
 language and compatibility names. The current implementation has one product
 runtime authority, not parallel Skill and Strategy engines.
 
+These Skill definitions are declarative packages, not trusted Python system
+plugins. Contributors choosing between a YAML / `SKILL.md` definition, a wired
+plugin extension point, and a new ADR must follow the
+[extension-mechanism decision matrix](plugin-extension-contract.md#choosing-an-extension-mechanism).
+
 ```mermaid
 flowchart TB
   BUILTIN[Built-in definitions<br/>strategies/*.yaml] -->|load| MANAGER[SkillManager<br/>src/agent/skills/base.py]

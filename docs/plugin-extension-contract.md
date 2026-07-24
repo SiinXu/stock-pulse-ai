@@ -7,6 +7,30 @@ first supported extension boundaries and the signatures that implementation
 work must converge on. Runnable code remains authoritative while a listed
 integration is not yet wired.
 
+## Choosing An Extension Mechanism
+
+Choose the smallest extension mechanism that matches the capability. A feature
+request using the word "plugin" does not by itself make trusted Python code the
+right boundary.
+
+| Need | Choose | Current path | Boundary |
+| --- | --- | --- | --- |
+| Add investment criteria, prompt instructions, activation metadata, or an allowlist of existing Agent tools without executing code | Skill / strategy package | Built-ins use `strategies/*.yaml`; custom definitions use top-level YAML or nested `SKILL.md` under `AGENT_SKILL_DIR` | Declarative input to the existing Skill runtime; it cannot add tools, providers, or another execution engine |
+| Add reviewed Python behavior for one of the six official extension points below | System plugin | Package a manifest and Python entrypoint under an explicitly configured `PLUGINS_DIR`, then use only an extension point marked as wired in the implementation-status table | Trusted in-process code; the core service remains the policy authority, and a contract-only point is not available at runtime |
+| Add UI components, Settings panels, custom commands, a remote marketplace, dependency installation, hot reload, a connector/MCP boundary, or another extension point | New design and ADR | Propose the authority, trust, compatibility, and lifecycle contract before implementation | Outside the version 1 plugin surface; do not route it through a nearby registration API |
+
+Skill packages are appropriate when an author only needs natural-language
+analysis behavior and the tools already allowed by the runtime. System plugins
+are appropriate only when a trusted operator needs code-backed behavior at a
+wired extension point and accepts the plugin's process privileges. If neither
+description fits, extend the architecture through an ADR instead of broadening
+the Skill loader or plugin registry implicitly.
+
+> **Operator trust boundary:** Setting `PLUGINS_DIR` opts into arbitrary Python
+> code running with the StockPulse process's OS privileges. Keeping it unset or
+> blank is the safe default. StockPulse does not download plugins, install their
+> dependencies, sandbox them, or discover them from a remote marketplace.
+
 ## Implementation Status
 
 | Surface | Current authority | Track X delivery |

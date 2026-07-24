@@ -95,3 +95,9 @@ AGENT_SKILL_DIR=./my_skills
 系统会同时加载内置策略和自定义策略。如果名称冲突，自定义策略覆盖内置策略。
 
 环境变量名仍然是 `AGENT_SKILL_DIR`，这是内部统一命名后的配置入口；在产品语义上，它依然表示“自定义策略目录”。
+
+## 何时使用策略 Skill，何时使用系统插件
+
+- 如果需求只包含自然语言分析规则、提示词、激活元数据，或对现有 Agent 工具的 allowlist，请使用本目录的 YAML，或 `AGENT_SKILL_DIR` 下的 YAML / `SKILL.md`。这类 Skill 不执行 Python，也不能注册新工具或数据源。
+- 如果需求必须执行受信任的 Python，并且属于数据源、分析策略、Agent 工具、通知渠道、报告模板或事件 Hook 之一，请先检查[插件扩展机制选择矩阵](../docs/plugin-extension-contract.md#choosing-an-extension-mechanism)及其实现状态。只有已经接入运行时的扩展点可用。
+- UI 组件、Settings 面板、自定义命令、远程 marketplace、自动安装依赖、hot reload、connector / MCP 或新的扩展点需要先完成独立设计与 ADR；不要通过策略目录或相近的插件注册项绕过该边界。
