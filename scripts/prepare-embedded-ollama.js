@@ -24,6 +24,14 @@ const ALLOWED_DOWNLOAD_HOSTS = new Set([
 ]);
 
 const BLOCKED_DOWNLOAD_ADDRESSES = new net.BlockList();
+const GLOBAL_DOWNLOAD_IPV6_ADDRESSES = new net.BlockList();
+GLOBAL_DOWNLOAD_IPV6_ADDRESSES.addSubnet('2000::', 3, 'ipv6');
+
+// Mirror the IANA special-purpose registries and fail closed for IPv6 outside
+// the currently allocated global-unicast space. Broad registry parents are
+// intentional: the fixed GitHub release hosts do not depend on their narrow
+// anycast exceptions, so a false denial is safer than admitting a special-use
+// or newly reserved destination.
 for (const [network, prefix] of [
   ['0.0.0.0', 8],
   ['10.0.0.0', 8],
@@ -33,7 +41,11 @@ for (const [network, prefix] of [
   ['172.16.0.0', 12],
   ['192.0.0.0', 24],
   ['192.0.2.0', 24],
+  ['192.31.196.0', 24],
+  ['192.52.193.0', 24],
+  ['192.88.99.0', 24],
   ['192.168.0.0', 16],
+  ['192.175.48.0', 24],
   ['198.18.0.0', 15],
   ['198.51.100.0', 24],
   ['203.0.113.0', 24],
@@ -45,9 +57,18 @@ for (const [network, prefix] of [
 for (const [network, prefix] of [
   ['::', 128],
   ['::1', 128],
+  ['64:ff9b::', 96],
+  ['64:ff9b:1::', 48],
   ['100::', 64],
+  ['100:0:0:1::', 64],
+  ['2001::', 23],
   ['2001:db8::', 32],
+  ['2002::', 16],
+  ['2620:4f:8000::', 48],
+  ['3fff::', 20],
+  ['5f00::', 16],
   ['fc00::', 7],
+  ['fec0::', 10],
   ['fe80::', 10],
   ['ff00::', 8],
 ]) {
@@ -225,14 +246,20 @@ function validateDownloadUrl(url) {
 }
 
 function isPublicDownloadAddress(address) {
-  if (String(address).toLowerCase().startsWith('::ffff:')) {
+  if (typeof address !== 'string'
+    || address.includes('%')
+    || address.toLowerCase().startsWith('::ffff:')) {
     return false;
   }
   const family = net.isIP(address);
   if (!family) {
     return false;
   }
-  return !BLOCKED_DOWNLOAD_ADDRESSES.check(address, family === 4 ? 'ipv4' : 'ipv6');
+  const addressType = family === 4 ? 'ipv4' : 'ipv6';
+  if (family === 6 && !GLOBAL_DOWNLOAD_IPV6_ADDRESSES.check(address, addressType)) {
+    return false;
+  }
+  return !BLOCKED_DOWNLOAD_ADDRESSES.check(address, addressType);
 }
 
 function createPublicLookup(lookupImpl = dns.lookup) {
