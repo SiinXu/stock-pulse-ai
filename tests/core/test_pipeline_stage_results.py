@@ -654,6 +654,9 @@ def test_real_report_content_is_identical_for_save_and_dispatch() -> None:
     with patch("src.notification.datetime", _FrozenDateTime), patch(
         "src.notification.get_config",
         return_value=config,
+    ), patch(
+        "src.config.get_config",
+        return_value=config,
     ):
         notifier = NotificationService()
         expected = notifier.generate_aggregate_report(
@@ -668,7 +671,7 @@ def test_real_report_content_is_identical_for_save_and_dispatch() -> None:
             return_value=[NotificationChannel.NTFY]
         )
         notifier.get_channels_for_route = MagicMock(
-            side_effect=lambda route_type, *, channels: channels
+            side_effect=lambda route_type, *, channels, **_kwargs: channels
         )
         notifier._has_context_channel = MagicMock(return_value=False)
         notifier.send_to_context = MagicMock(return_value=False)

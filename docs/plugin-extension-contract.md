@@ -31,9 +31,10 @@ exact native registry. `PLUGINS_DIR` alone discovers and manages package
 lifecycle; it can activate only implementations whose point is bound by that
 composition root. The default process root binds Agent Tools to its cached
 `ToolRegistry`, Analysis Strategies to its root-owned declarative catalog
-adapter, Report Templates to the existing aggregate report render paths, and
-Event Hooks to the stock-analysis and market-review lifecycle paths. Data
-Provider plugin execution still requires programmatic composition with
+adapter, Notification Channels to its root-owned adapter registry, Report
+Templates to the existing aggregate report render paths, and Event Hooks to the
+stock-analysis and market-review lifecycle paths. Data Provider plugin execution
+still requires programmatic composition with
 `PluginManager(registry=manager.plugin_registry)`. A listed but unbound point
 needs explicit wiring under the accepted contract, while a new surface requires
 an ADR instead of an implicit registry expansion.
@@ -47,12 +48,12 @@ an ADR instead of an implicit registry expansion.
 
 | Surface | Current authority | Track X delivery |
 | --- | --- | --- |
-| Plugin lifecycle, manifest, registry | `src/plugins/` core; Data Provider, Analysis Strategy, Agent Tool, Report Template, and Event Hook contracts are wired, while unconfigured points fail closed | #273 X2a core implemented; #541 Report Template and #542 Event Hook validators implemented |
+| Plugin lifecycle, manifest, registry | `src/plugins/` core; Data Provider, Analysis Strategy, Agent Tool, Notification Channel, Report Template, and Event Hook contracts are wired, while unconfigured points fail closed | #273 X2a core implemented; #538 Notification Channel, #541 Report Template, and #542 Event Hook validators implemented |
 | Built-in/external startup wiring | `src/application_services.py` composition root | #273 X2b implemented |
 | Data Providers | `DataProvider`, `BaseFetcher`, and `DataFetcherManager` | #276 X3 native adapter implemented; caller must inject the target manager registry |
 | Analysis Strategies | `Skill`, `SkillManager`, `StrategyEngine` | Default process definition adapter wired; `SkillManager` and `StrategyEngine` remain authoritative |
 | Agent Tools | `ToolDefinition`, `ToolRegistry`, Tool Surface | Default process adapter wired; strict registration validation remains fail-closed |
-| Notification Channels | `NotificationChannel`, sender mixins, `NotificationService` | Contract only in this batch |
+| Notification Channels | `NotificationChannel`, sender mixins, `NotificationService` | #538 runtime adapter implemented in the default process root |
 | Report Templates | `src/services/report_renderer.py`, `templates/report_*.j2` | #541 runtime selection implemented; Jinja and hard-coded fallbacks retained |
 | Event Hooks | `src/plugins/event_hooks.py` plus the stock-analysis and market-review lifecycle paths | Six observational lifecycle events wired; Task/Agent/SSE streams remain separate |
 
@@ -168,9 +169,9 @@ including every `onunload()` callback, before a successor may start.
 The default lifecycle-style built-in catalog is configuration-gated. Existing
 Data Provider built-ins remain owned by each `DataFetcherManager`; the optional
 Kronos Agent Tool is added only when its explicit enable flag is true. Analysis
-Strategy registration is available without a built-in lifecycle plugin. Other
-point statuses remain governed by the implementation table above.
-`ApplicationServices`
+Strategy and Notification Channel registration are available without built-in
+lifecycle plugins. Other point statuses remain governed by the implementation
+table above. `ApplicationServices`
 continues to accept an explicit built-in iterable for tests and composition
 callers. New built-ins must use that seam rather than a parallel startup hook.
 
@@ -656,10 +657,18 @@ class NotificationChannelAdapter(Protocol):
     ) -> NotificationAdapterResult: ...
 
 
-NotificationChannelFactory = Callable[[Config], NotificationChannelAdapter]
+class NotificationChannelFactory(Protocol):
+    channel_id: str
+    display_name: str
+
+    def __call__(self, config: Config) -> NotificationChannelAdapter: ...
 ```
 
-The factory receives the application configuration and returns one adapter.
+The factory receives the application configuration and returns one adapter. It
+exposes the same canonical `channel_id` and `display_name` before construction;
+an adapter class with a `Config` constructor is the simplest valid factory.
+This lets the registry reject identity and built-in collisions before executing
+the factory. The returned adapter must repeat the same identity.
 The core, not the adapter, measures latency, binds the canonical channel ID, and
 maps `NotificationAdapterResult` into the existing `ChannelAttemptResult` and
 `NotificationDispatchResult` semantics. One adapter failure must not stop later
@@ -689,7 +698,34 @@ current fixed allowlist; it must not maintain a parallel route configuration.
 Adapters do not send before route/noise decisions and do not claim success
 without a real delivery attempt. User-influenced outbound endpoints remain
 subject to the central outbound security policy when that policy is available.
-No notification runtime wiring is part of this batch.
+
+The default process wiring is implemented by
+`src/plugins/notification_channels.py`, the root-owned registry exposed by
+`ApplicationServices`, and the existing `NotificationService` dispatcher.
+Factory validation and native/built-in canonical-ID collision checks happen
+before publication, including exact factory/adapter `channel_id` and
+`display_name` equality plus callable signatures for construction,
+`is_available()`, and `send(request)`. Disable and unload remove the exact owned
+adapter. A root-owned read-side lease retains the complete resolved adapter tuple;
+concurrent destructive lifecycle work waits before `onunload()`, while a
+same-thread lifecycle request is explicitly deferred until every already-entered
+lease, including nested sends on that reader thread, exits. The writer reservation
+blocks new snapshots until deferred lifecycle work finishes. The requesting send
+may return first when another entered lease remains, so `deferred=True` is an
+acceptance signal, not a completion signal. Each frozen target therefore completes
+once and the next snapshot omits removed adapters. Availability exceptions and invalid values are
+sanitized, logged, and excluded before dispatch, so they do not create channel
+attempts. Invalid send results and send exceptions are isolated and mapped into
+sanitized channel attempts. Factory construction and `NotificationService`
+routing both resolve Config from the paired `ApplicationServices` authority.
+Report-only `NotificationService` construction remains lazy and does not install
+or start a default root; the first availability, route, or send operation binds
+the delivery runtime and rejects a concurrently installed root with a different
+Config identity. Adapters retain their enable-time Config; after a default-root
+Config reload, disable plus re-enable rebuilds them from the new snapshot, while
+an explicit root Config is unaffected by global singleton reset. The deterministic
+[`example_log` adapter](../examples/plugins/example-notification-channel/README.md)
+shows the complete external package shape without network access or secrets.
 
 ### Report Templates
 

@@ -701,8 +701,30 @@ class _DeliveryStageMixin:
 
             # Send notifications
             if self.notifier.is_available():
-                channels = self.notifier.get_available_channels()
-                channels = self.notifier.get_channels_for_route("report", channels=channels)
+                delivery_snapshot = getattr(
+                    self.notifier,
+                    "_notification_delivery_snapshot",
+                    None,
+                )
+                if callable(delivery_snapshot):
+                    channels = list(
+                        static_scope_guards.enter_context(
+                            delivery_snapshot("report")
+                        )
+                    )
+                else:
+                    channels = self.notifier.get_available_channels()
+                    channels = self.notifier.get_channels_for_route(
+                        "report",
+                        channels=channels,
+                    )
+
+                def _channel_id(channel: Any) -> str:
+                    return (
+                        channel.value
+                        if isinstance(channel, NotificationChannel)
+                        else channel.channel_id
+                    )
 
                 def _send_channel_safely(
                     channel_label: str,
@@ -977,20 +999,28 @@ class _DeliveryStageMixin:
                 # Issue #455: Markdown to image conversion (consistent with notification.send logic).
                 from src.md2img import markdown_to_image
 
-                channels_needing_image = {
-                    ch for ch in channels
-                    if ch.value in self.notifier._markdown_to_image_channels
-                    and ch not in {NotificationChannel.NTFY, NotificationChannel.GOTIFY}
-                }
-                non_wechat_channels_needing_image = {
-                    ch for ch in channels_needing_image if ch != NotificationChannel.WECHAT
-                }
+                channels_needing_image = tuple(
+                    ch
+                    for ch in channels
+                    if _channel_id(ch) in self.notifier._markdown_to_image_channels
+                    and _channel_id(ch)
+                    not in {
+                        NotificationChannel.NTFY.value,
+                        NotificationChannel.GOTIFY.value,
+                    }
+                )
+                non_wechat_channels_needing_image = tuple(
+                    ch
+                    for ch in channels_needing_image
+                    if _channel_id(ch) != NotificationChannel.WECHAT.value
+                )
 
                 def _get_md2img_hint() -> str:
-                    try:
-                        engine = getattr(get_config(), "md2img_engine", "wkhtmltoimage")
-                    except Exception:  # broad-exception: optional_metadata - Renderer install hints fall back to the default when optional config lookup fails.
-                        engine = "wkhtmltoimage"
+                    engine = getattr(
+                        self.config,
+                        "md2img_engine",
+                        "wkhtmltoimage",
+                    )
                     return (
                         "npm i -g markdown-to-file" if engine == "markdown-to-file"
                         else "wkhtmltopdf (apt install wkhtmltopdf / brew install wkhtmltopdf)"
@@ -1004,7 +1034,10 @@ class _DeliveryStageMixin:
                     if image_bytes:
                         logger.info(
                             "Markdown converted to an image for channels: %s",
-                            [ch.value for ch in non_wechat_channels_needing_image],
+                            [
+                                _channel_id(ch)
+                                for ch in non_wechat_channels_needing_image
+                            ],
                         )
                     else:
                         logger.warning(
@@ -1060,7 +1093,43 @@ class _DeliveryStageMixin:
                 for channel in channels:
                     if channel == NotificationChannel.WECHAT:
                         continue
-                    if channel == NotificationChannel.FEISHU:
+                    if not isinstance(channel, NotificationChannel):
+                        channel_id = _channel_id(channel)
+
+                        def _send_plugin_report(
+                            channel=channel,
+                            channel_id=channel_id,
+                        ) -> bool:
+                            adapter_result = self.notifier._send_to_plugin_channel(
+                                channel,
+                                report,
+                                image_bytes=(
+                                    image_bytes
+                                    if channel_id
+                                    in self.notifier._markdown_to_image_channels
+                                    else None
+                                ),
+                                email_stock_codes=[
+                                    str(result.code) for result in results
+                                ],
+                                route_type="report",
+                                severity="info",
+                            )
+                            return bool(adapter_result.success)
+
+                        channel_success, channel_error = _send_channel_safely(
+                            channel_id,
+                            _send_plugin_report,
+                        )
+                        non_wechat_success = (
+                            channel_success or non_wechat_success
+                        )
+                        _record_channel_result(
+                            channel_id,
+                            channel_success,
+                            channel_error,
+                        )
+                    elif channel == NotificationChannel.FEISHU:
                         def _send_feishu_report() -> bool:
                             if getattr(self.notifier, "_feishu_send_as_file", False):
                                 date_str = datetime.now().strftime('%Y%m%d')
@@ -1324,7 +1393,9 @@ class _DeliveryStageMixin:
                 else:
                     logger.warning("Decision dashboard delivery failed")
                 if not has_targeted_channels and not send_context:
-                    channel_label = ",".join(channel.value for channel in channels) or "report"
+                    channel_label = ",".join(
+                        _channel_id(channel) for channel in channels
+                    ) or "report"
                     notification_run = self._build_notification_run_snapshot(
                         channel=channel_label,
                         status="success" if success else "failed",

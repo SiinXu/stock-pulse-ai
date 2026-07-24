@@ -237,12 +237,52 @@ def _dispatch_cli(config: Config, args: argparse.Namespace) -> int:
         logger.warning(warning)
 
     if getattr(args, "check_notify", False):
+        from src.application_services import get_application_services
+        from src.plugins import available_notification_channel_snapshot
         from src.services.notification_diagnostics import (
+            NotificationPluginChannelStatus,
             format_notification_diagnostics,
             run_notification_diagnostics,
         )
 
-        result = run_notification_diagnostics(config)
+        application_services = get_application_services()
+        notification_registry = (
+            application_services.notification_channel_registry
+        )
+        with application_services.notification_dispatch():
+            plugin_snapshot = notification_registry.snapshot()
+            available_plugin_snapshot = available_notification_channel_snapshot(
+                plugin_snapshot
+            )
+            available_plugin_ids = {
+                channel.channel_id for channel in available_plugin_snapshot
+            }
+            plugin_channel_states = tuple(
+                NotificationPluginChannelStatus(
+                    channel_id=channel.channel_id,
+                    display_name=channel.display_name,
+                    state=(
+                        (
+                            "available"
+                            if channel.channel_id in available_plugin_ids
+                            else "enabled_unavailable"
+                        )
+                        if channel.state == "enabled"
+                        else channel.state
+                    ),
+                )
+                for channel in notification_registry.lifecycle_snapshot()
+            )
+        result = run_notification_diagnostics(
+            config,
+            enabled_plugin_channels=tuple(
+                channel.channel_id for channel in plugin_snapshot
+            ),
+            available_plugin_channels=tuple(
+                channel.channel_id for channel in available_plugin_snapshot
+            ),
+            plugin_channel_states=plugin_channel_states,
+        )
         print(format_notification_diagnostics(result))
         return 0 if result.ok else 1
 

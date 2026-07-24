@@ -30,6 +30,8 @@ for optional_module in ("litellm", "json_repair"):
         sys.modules[optional_module] = mock.MagicMock()
 
 from src.config import Config
+from src.application_services import reset_application_services
+import src.notification as notification_module
 from src.notification import NotificationBuilder, NotificationChannel, NotificationService
 from src.notification_noise import reset_notification_noise_state
 from src.notification_sender.gotify_sender import resolve_gotify_message_endpoint
@@ -51,6 +53,19 @@ def _make_response(status_code: int, json: Optional[dict] = None) -> requests.Re
     if json:
         response.json = lambda: json
     return response
+
+
+def _install_notification_config_test_authority(test_case: unittest.TestCase) -> None:
+    """Route the default composition root through the legacy facade patch seam."""
+
+    reset_application_services()
+    config_patcher = mock.patch(
+        "src.config.get_config",
+        side_effect=lambda: notification_module.get_config(),
+    )
+    config_patcher.start()
+    test_case.addCleanup(config_patcher.stop)
+    test_case.addCleanup(reset_application_services)
 
 
 def _attach_decision_signal_summary(result: AnalysisResult) -> AnalysisResult:
@@ -155,6 +170,7 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
     """
 
     def setUp(self):
+        _install_notification_config_test_authority(self)
         reset_notification_noise_state()
 
     @mock.patch("src.notification.get_config")
@@ -766,6 +782,9 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
 
 class TestNotificationServiceReportGeneration(unittest.TestCase):
     """报告生成与选路相关测试。"""
+
+    def setUp(self):
+        _install_notification_config_test_authority(self)
 
     def test_signal_metadata_uses_resolved_eight_state_action(self):
         service = NotificationService()

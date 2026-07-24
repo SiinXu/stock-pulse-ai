@@ -32,6 +32,7 @@ class PluginOperationResult:
     success: bool
     state: PluginState
     error_code: str | None = None
+    deferred: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,22 +83,38 @@ class PluginManager:
             Callable[[Callable[[], Any]], Any] | None
         ) = None
         self._activation_allowed: Callable[[], bool] | None = None
+        self._disable_boundary: (
+            Callable[
+                [str, Callable[[], PluginOperationResult]],
+                PluginOperationResult,
+            ]
+            | None
+        ) = None
         self._lifecycle_boundary_state = threading.local()
 
     def _bind_lifecycle_boundary(
         self,
         boundary: Callable[[Callable[[], Any]], Any],
         activation_allowed: Callable[[], bool],
+        disable_boundary: Callable[
+            [str, Callable[[], PluginOperationResult]],
+            PluginOperationResult,
+        ],
     ) -> None:
         """Bind the owning composition root's outer lifecycle authority."""
 
-        if not callable(boundary) or not callable(activation_allowed):
+        if (
+            not callable(boundary)
+            or not callable(activation_allowed)
+            or not callable(disable_boundary)
+        ):
             raise TypeError("plugin lifecycle boundary and guard must be callable")
         with self._lock:
             if self._lifecycle_boundary is not None:
                 if (
                     self._lifecycle_boundary == boundary
                     and self._activation_allowed == activation_allowed
+                    and self._disable_boundary == disable_boundary
                 ):
                     return
                 raise RuntimeError(
@@ -105,6 +122,7 @@ class PluginManager:
                 )
             self._lifecycle_boundary = boundary
             self._activation_allowed = activation_allowed
+            self._disable_boundary = disable_boundary
 
     def _run_lifecycle_boundary(self, operation: Callable[[], Any]) -> Any:
         """Run only the outermost lifecycle operation through the root hook."""
@@ -412,7 +430,15 @@ class PluginManager:
     def disable(self, plugin_id: str) -> PluginOperationResult:
         """Unload an enabled plugin or converge a failed plugin after cleanup."""
 
-        return self._run_lifecycle_boundary(lambda: self._disable(plugin_id))
+        def run_disable() -> PluginOperationResult:
+            if self._disable_boundary is None:
+                return self._disable(plugin_id)
+            return self._disable_boundary(
+                plugin_id,
+                lambda: self._disable(plugin_id),
+            )
+
+        return self._run_lifecycle_boundary(run_disable)
 
     def _disable(self, plugin_id: str) -> PluginOperationResult:
         """Perform one disable transition inside the outer lifecycle boundary."""

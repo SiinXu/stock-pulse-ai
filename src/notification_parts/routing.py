@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from typing import TYPE_CHECKING, Dict, List, Optional
 
 if TYPE_CHECKING:
@@ -10,6 +11,10 @@ if TYPE_CHECKING:
         Config,
         NotificationChannel,
         NotificationNoiseDecision,
+        _NotificationChannelSnapshot,
+        _ROUTABLE_NOTIFICATION_CHANNELS,
+        _available_notification_channel_snapshot,
+        _ensure_notification_runtime,
         evaluate_notification_noise,
         get_notification_route_config,
         is_feishu_static_configured,
@@ -21,6 +26,43 @@ if TYPE_CHECKING:
         resolve_ntfy_endpoint,
         split_notification_route_channels,
     )
+
+
+@contextmanager
+def _notification_delivery_snapshot_context(service, route_type):
+    """Retain one routed target snapshot until its caller exits."""
+
+    from src.notification import _ensure_notification_runtime
+    from src.notification_routing import ROUTABLE_NOTIFICATION_CHANNELS
+    from src.plugins import available_notification_channel_snapshot
+
+    application_services, notification_registry = (
+        _ensure_notification_runtime(service)
+    )
+    with application_services.notification_dispatch():
+        plugin_snapshot = notification_registry.snapshot()
+        available_plugins = available_notification_channel_snapshot(
+            plugin_snapshot
+        )
+        available_channels = [
+            *service.get_available_channels(),
+            *available_plugins,
+        ]
+        allowed_channel_ids = tuple(
+            dict.fromkeys(
+                (
+                    *ROUTABLE_NOTIFICATION_CHANNELS,
+                    *(entry.channel_id for entry in plugin_snapshot),
+                )
+            )
+        )
+        yield tuple(
+            service.get_channels_for_route(
+                route_type,
+                channels=available_channels,
+                allowed_channel_ids=allowed_channel_ids,
+            )
+        )
 
 
 class _RoutingMethods:
@@ -109,17 +151,41 @@ class _RoutingMethods:
 
     def is_available(self) -> bool:
         """检查通知服务是否可用（至少有一个渠道或上下文渠道）"""
-        return len(self._available_channels) > 0 or self._has_context_channel()
+        application_services, notification_registry = (
+            _ensure_notification_runtime(self)
+        )
+        with application_services.notification_dispatch():
+            return (
+                len(self._available_channels) > 0
+                or self._has_context_channel()
+                or bool(
+                    _available_notification_channel_snapshot(
+                        notification_registry.snapshot()
+                    )
+                )
+            )
 
     def get_available_channels(self) -> List[NotificationChannel]:
         """获取所有已配置的渠道"""
         return self._available_channels
 
+    def _notification_delivery_snapshot(
+        self,
+        route_type: Optional[str],
+    ):
+        """Yield one routed target snapshot protected from plugin unload."""
+
+        return _notification_delivery_snapshot_context(self, route_type)
+
     def get_channels_for_route(
         self,
         route_type: Optional[str],
-        channels: Optional[List[NotificationChannel]] = None,
-    ) -> List[NotificationChannel]:
+        channels: Optional[
+            List[NotificationChannel | _NotificationChannelSnapshot]
+        ] = None,
+        *,
+        allowed_channel_ids: Optional[tuple[str, ...]] = None,
+    ) -> List[NotificationChannel | _NotificationChannelSnapshot]:
         """Return channels allowed for a route type.
 
         ``route_type=None`` keeps the legacy behavior and returns all supplied
@@ -127,7 +193,9 @@ class _RoutingMethods:
         Non-empty route config that matches no enabled channel returns an empty
         list.
         """
-        target_channels = list(channels if channels is not None else self._available_channels)
+        target_channels = list(
+            channels if channels is not None else self._available_channels
+        )
         if route_type is None:
             return target_channels
 
@@ -140,7 +208,14 @@ class _RoutingMethods:
         if not configured_route_channels:
             return target_channels
 
-        valid_channels, invalid_channels = split_notification_route_channels(configured_route_channels)
+        valid_channels, invalid_channels = split_notification_route_channels(
+            configured_route_channels,
+            allowed_channels=(
+                allowed_channel_ids
+                if allowed_channel_ids is not None
+                else _ROUTABLE_NOTIFICATION_CHANNELS
+            ),
+        )
         if invalid_channels:
             logger.warning(
                 "%s 包含未知通知渠道，将忽略: %s",
@@ -149,11 +224,30 @@ class _RoutingMethods:
             )
 
         allowed = set(valid_channels)
-        return [channel for channel in target_channels if channel.value in allowed]
+        return [
+            channel
+            for channel in target_channels
+            if (
+                channel.value
+                if isinstance(channel, NotificationChannel)
+                else channel.channel_id
+            )
+            in allowed
+        ]
 
     def get_channel_names(self) -> str:
         """获取所有已配置渠道的名称"""
         names = [ChannelDetector.get_channel_name(ch) for ch in self._available_channels]
+        application_services, notification_registry = (
+            _ensure_notification_runtime(self)
+        )
+        with application_services.notification_dispatch():
+            names.extend(
+                channel.display_name
+                for channel in _available_notification_channel_snapshot(
+                    notification_registry.snapshot()
+                )
+            )
         if self._has_context_channel():
             names.append("钉钉会话")
         return ', '.join(names)

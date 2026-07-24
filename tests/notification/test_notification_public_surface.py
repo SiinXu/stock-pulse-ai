@@ -135,6 +135,7 @@ EXPECTED_GROUPS = (
             "_detect_all_channels",
             "is_available",
             "get_available_channels",
+            "_notification_delivery_snapshot",
             "get_channels_for_route",
             "get_channel_names",
             "evaluate_noise_control",
@@ -150,7 +151,7 @@ EXPECTED_GROUPS = (
             "_send_feishu_stream_reply",
             "_send_feishu_stream_chunked",
         ),
-        "4ddd7490b49c2c90bd5d697e08285925ff08a18ff162ccdc680c8330de2f4d61",
+        "10a1ca57be8be1d7382dd0af283ad6f49aa709de0a8ad77174eafa45ebee02d3",
     ),
     (
         "_RenderingMethods",
@@ -193,12 +194,14 @@ EXPECTED_GROUPS = (
             "_should_use_image_for_channel",
             "_sanitize_notification_diagnostics",
             "_send_to_static_channel",
+            "_send_to_plugin_channel",
             "send_with_results",
+            "_send_with_results_under_lease",
             "send",
             "save_report_to_file",
             "save_and_send_feishu_file",
         ),
-        "97f849e86a403cfb2de7247a21b759fd6a42bc0da730b41ffb5fab0c35a713fe",
+        "ebe1d6ee7c0509daea8de054120261b0b5f3b09985b7925af7429ed8cb1fdaf6",
     ),
 )
 
@@ -360,7 +363,7 @@ def test_notification_method_order_matches_pre_split_contract():
         )
     )
 
-    assert len(expected_names) == 64
+    assert len(expected_names) == 67
     assert actual_names == expected_names
 
 
