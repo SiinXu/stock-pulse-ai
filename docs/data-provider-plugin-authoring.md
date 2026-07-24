@@ -67,7 +67,10 @@ The reference plugin declares only `daily_data` for `cn`. Its implementation
 returns the normalized columns expected by the current daily-data path:
 `date`, `open`, `high`, `low`, `close`, `volume`, `amount`, and `pct_chg`.
 Production plugins should validate and normalize their upstream response before
-returning it, and should raise a meaningful exception when an attempt fails.
+returning it. A provider that performs network or SDK I/O must configure finite
+transport timeouts at its client or transport layer and raise a meaningful
+exception when that single attempt fails. `DataFetcherManager` does not wrap
+every provider call in a universal deadline.
 
 `onload()` registers the declaration through the supplied `PluginContext`:
 
@@ -191,9 +194,16 @@ and circuit admission, serialized calls, diagnostics, cache attribution, and
 fresh/stale fallback. Existing cache entries retain their normal TTL when a
 plugin is disabled.
 
-Do not add a private fallback loop, cache, route table, timeout policy, or
-provider-priority override to the plugin. Handle one provider attempt and let
-the manager apply the shared policies from
+The manager does not impose a universal deadline around `get_daily_data()` or
+`_call_fetcher_method()`. A production plugin must set finite connect/read or
+SDK transport timeouts for every network call it owns. When that transport
+times out, raise the failure from the current provider attempt so the manager
+can record it and continue its eligible fallback chain.
+
+Do not add a private cross-provider fallback loop, cache, route table, or
+dynamic provider-priority override to the plugin. Handle one provider attempt,
+including its bounded transport I/O, and let the manager apply the shared
+cross-provider policies from
 [ADR-005](adr/ADR-005-provider-fallback-and-circuit-control.md) and
 [data-source stability](data-source-stability_EN.md).
 

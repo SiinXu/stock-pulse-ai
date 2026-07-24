@@ -498,6 +498,14 @@ non-empty successes, and preserves stale last-good fallback only after the
 eligible provider chain fails. Plugins cannot supply their own fallback loop or
 bypass any of these policies.
 
+`DataFetcherManager` does not impose a universal deadline around
+`DataProvider.get_daily_data()` or `_call_fetcher_method()`. A provider that
+performs network or SDK I/O must configure finite transport timeouts at its own
+client or transport layer and raise a timeout failure from that single attempt.
+The manager can then record the failure and continue the eligible provider
+chain. This bounded-I/O responsibility does not let a plugin own a
+cross-provider fallback loop, cache, route table, or dynamic priority override.
+
 Lower plugin priority values run earlier only inside routes governed by numeric
 priority. Existing named routes remain hard anchors: U.S. index, U.S. stock, and
 Longbridge-preferred built-in chains execute in their historical order, and an

@@ -228,3 +228,35 @@ def test_invalid_manifest_and_provider_initialization_failure_are_isolated(
 
     assert plugins.snapshot("stockpulse.failing-provider-test").state == "disabled"
     assert plugins.snapshot(_PLUGIN_ID).state == "disabled"
+
+
+def test_provider_author_docs_preserve_timeout_and_startup_ownership() -> None:
+    author_guide = (
+        _REPOSITORY_ROOT / "docs" / "data-provider-plugin-authoring.md"
+    ).read_text(encoding="utf-8")
+    plugin_contract = (
+        _REPOSITORY_ROOT / "docs" / "plugin-extension-contract.md"
+    ).read_text(encoding="utf-8")
+    stability_docs = tuple(
+        (_REPOSITORY_ROOT / relative_path).read_text(encoding="utf-8")
+        for relative_path in (
+            "docs/data-source-stability.md",
+            "docs/data-source-stability_EN.md",
+        )
+    )
+    normalized_guide = " ".join(author_guide.split())
+    normalized_contract = " ".join(plugin_contract.split())
+
+    assert "does not impose a universal deadline" in normalized_guide
+    assert "finite connect/read or SDK transport timeouts" in normalized_guide
+    assert "timeout policy" not in author_guide
+    assert "does not impose a universal deadline" in normalized_contract
+    assert "finite transport timeouts" in normalized_contract
+
+    for content in stability_docs:
+        assert "`ApplicationServices.start_plugins()`" in content
+        assert "`PLUGINS_DIR`" in content
+        assert "`DataFetcherManager.plugin_registry`" in content
+        assert "data-provider-plugin-authoring.md" in content
+        assert "transport timeout" in content
+        assert "X2b/GATE-P3" not in content

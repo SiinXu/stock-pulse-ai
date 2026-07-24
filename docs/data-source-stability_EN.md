@@ -137,10 +137,25 @@ registry state cannot broaden or reorder the in-flight snapshot.
 Unload does not rewrite unexpired daily-cache entries or process-local health
 observations; they keep their existing TTL, stale, and reset semantics.
 
-This batch exposes programmatic registration. External-directory startup
-scanning remains deferred to X2b behind GATE-P3 and is not automatically wired.
-See the [plugin extension contract](plugin-extension-contract.md#data-providers)
-for fields, capability identifiers, and an example.
+`DataFetcherManager.get_daily_data()` and `_call_fetcher_method()` do not wrap
+every provider call in a universal deadline. A plugin provider that performs
+network or SDK I/O must set finite connect/read or SDK transport timeouts at its
+own transport or client layer. It must raise a timeout failure from the current
+provider attempt so the manager can record it and continue the eligible
+fallback chain. A plugin still must not own a cross-provider fallback loop,
+cache, route table, or dynamic priority override.
+
+`ApplicationServices.start_plugins()` now wires explicitly opted-in external
+directory scanning and lifecycle management. When `PLUGINS_DIR` is non-empty,
+it scans direct child directories in order, registers valid plugins, loads the
+snapshot, and later disables it in reverse order. This wiring supplies discovery
+and lifecycle only. Activating a Data Provider implementation still requires
+the composition caller to bind `PluginManager` to the exact same registry
+exposed by the target `DataFetcherManager.plugin_registry`; the default process
+root does not fabricate a process-wide `DataFetcherManager`. See the
+[plugin extension contract](plugin-extension-contract.md#data-providers) and
+[Data Provider Plugin Authoring Guide](data-provider-plugin-authoring.md) for
+fields, capability identifiers, a loadable example, and verified commands.
 
 ## Recommended Profiles
 
