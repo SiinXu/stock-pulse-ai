@@ -1438,27 +1438,46 @@ const DecisionSignalsPage: React.FC = () => {
     clearStockContext(true);
   }, [clearStockContext]);
 
-  const stockLocationKeyRef = useRef<string | null>(null);
+  const reconciledStockRef = useRef<string | null>(null);
   useEffect(() => {
-    if (stockLocationKeyRef.current === routeLocation.key) return;
-    stockLocationKeyRef.current = routeLocation.key;
+    // Reconcile the active stock context with the URL. This keys off the
+    // resolved stock query value rather than routeLocation.key, because the
+    // same-URL replace navigations that sync list/signal/view state mint fresh
+    // location keys for the same logical entry; a key-based guard raced browser
+    // Back/Forward and could leave the displayed stock out of sync with the
+    // restored URL.
+    //
+    // reconciledStockRef records the stock we last drove into state so the
+    // effect stays idempotent when applyStockContext's identity changes before
+    // the setActiveStockContext update is observable in this closure.
+    //
+    // A browser Back/Forward (navigationType 'POP') restores a URL whose stock
+    // may already equal reconciledStockRef.current, because same-URL replace
+    // syncs churn location keys and can advance that ref to the target value
+    // ahead of the pop. In that case the ref short-circuit would wrongly leave
+    // the displayed context (e.g. MSFT) out of sync with the restored URL
+    // (?stock=AAPL), so on POP we reconcile whenever the active context still
+    // disagrees with the URL.
     const urlStock = new URLSearchParams(routeLocation.search)
       .get(SIGNAL_CENTER_ROUTE_QUERY_KEYS.stock)
       ?.trim() ?? '';
+    const contextMatchesUrl = urlStock
+      ? !!activeStockContext && areStockCodesEquivalent(activeStockContext.code, urlStock)
+      : !activeStockContext;
+    const popMustReconcile = navigationType === 'POP' && !contextMatchesUrl;
+    if (reconciledStockRef.current === urlStock && !popMustReconcile) return;
+    reconciledStockRef.current = urlStock;
+    if (contextMatchesUrl) return;
     if (urlStock) {
-      if (
-        activeStockContext
-        && areStockCodesEquivalent(activeStockContext.code, urlStock)
-      ) return;
       applyStockContext({ code: urlStock }, false);
       return;
     }
-    if (activeStockContext) clearStockContext(false);
+    clearStockContext(false);
   }, [
     activeStockContext,
     applyStockContext,
     clearStockContext,
-    routeLocation.key,
+    navigationType,
     routeLocation.search,
   ]);
 

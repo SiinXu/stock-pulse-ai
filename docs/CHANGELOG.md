@@ -336,6 +336,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Added an opt-in public signal scorecard at `GET /api/v1/scorecard` (off by default via `SIGNAL_SCORECARD_PUBLIC_ENABLED`) that aggregates existing decision-signal outcomes into hit rate by signal type and horizon, a return distribution, and recent notable misses; buckets below `SIGNAL_SCORECARD_MIN_SAMPLES` render as `insufficient_data`, hit semantics reuse the existing outcome services, and the payload is aggregated and non-sensitive (no per-stock identity).
 - [Added] Added a persistent Beginner Web mode with guided first-run setup, brief quick analysis, simplified risk-aware report summaries, and progressive access to professional report controls.
 - [Changed] Unified Web decision signals, alert rules, delivery history, and outcome review under `/signals` with URL-scoped filters and legacy redirects.
+- [Fixed] Kept the Signal Center active stock context in sync with the URL across browser Back/Forward by reconciling on the resolved `?stock=` value and navigation type instead of the unstable router location key, which same-URL state syncs churned.
 
 ## [3.26.3] - 2026-07-15
 
