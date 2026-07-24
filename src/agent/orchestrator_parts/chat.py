@@ -21,6 +21,7 @@ from src.agent.public_contract import (
 from src.agent.runner import run_agent_loop
 from src.agent.runtime.contract import ExecutionState
 from src.agent.runtime.lifecycle import classify_result_terminal_state
+from src.agent.soul import compose_agent_soul_prompt as _compose_agent_soul_prompt
 from src.agent.stock_scope import StockScope, resolve_stock_scope
 from src.agent.tools.registry import ToolRegistry
 from src.config import get_config
@@ -36,10 +37,6 @@ logger = logging.getLogger("src.agent.orchestrator")
 
 class _ChatMethods:
     """Source container rebound onto ``AgentOrchestrator`` by the facade."""
-
-    # -----------------------------------------------------------------
-    # Public interface (mirrors AgentExecutor)
-    # -----------------------------------------------------------------
 
     def run(
         self,
@@ -82,12 +79,7 @@ class _ChatMethods:
         context: Optional[Dict[str, Any]] = None,
         cancelled_check: Optional[Callable[[], bool]] = None,
     ) -> "AgentResult":
-        """Run the pipeline in chat mode (free-form answer, no dashboard parse).
-
-        Conversation history is managed externally by the caller (via
-        ``conversation_manager``); the orchestrator focuses on multi-agent
-        coordination.
-        """
+        """Run the pipeline in chat mode (free-form answer, no dashboard parse)."""
         from src.agent.executor import AgentResult
         from src.agent.conversation import conversation_manager
 
@@ -113,7 +105,6 @@ class _ChatMethods:
             ),
         )
 
-        # Persist user turn
         user_message_id = conversation_manager.add_message(
             session_id,
             "user",
@@ -176,11 +167,6 @@ class _ChatMethods:
                 error=AGENT_CHAT_FAILURE_MESSAGE,
             )
 
-        # Persist assistant response through the single shared terminal
-        # classifier so the multi-agent write fence matches the single-agent
-        # and SSE paths exactly. A cancelled run is user intent, not an agent
-        # failure: skip the failure sentinel so the cancelled turn leaves no
-        # misleading "analysis failed" assistant message in the visible history.
         terminal_state = classify_result_terminal_state(orch_result)
         if terminal_state is ExecutionState.SUCCEEDED:
             conversation_manager.add_message(session_id, "assistant", orch_result.content)
@@ -228,8 +214,6 @@ class _ChatMethods:
         """Build one Chat-only pipeline context with an isolated market surface."""
         ctx = self._build_context(message, context)
         if stock_scope is not None:
-            # Chat scope resolution is authoritative; legacy dashboard extraction
-            # must not reinterpret a rejected token from the original message.
             ctx.stock_code = context.get("stock_code", "")
             ctx.stock_name = context.get("stock_name", "")
         ctx.session_id = session_id
@@ -421,6 +405,7 @@ class _ChatMethods:
                 "你负责综合跨市场股票比较。只能使用给定的逐标的分析，必须按同口径比较，"
                 "保留币种与时区差异，并明确说明所有数据缺口。"
             )
+        system_prompt = _compose_agent_soul_prompt(system_prompt)
 
         evidence = []
         for stock_code, result in per_symbol_results:

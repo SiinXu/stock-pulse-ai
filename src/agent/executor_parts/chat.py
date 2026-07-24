@@ -22,6 +22,7 @@ from src.agent.public_contract import (
 )
 from src.agent.runtime.contract import ExecutionState
 from src.agent.runtime.lifecycle import classify_result_terminal_state
+from src.agent.soul import compose_agent_soul_prompt as _compose_agent_soul_prompt
 from src.agent.stock_scope import resolve_stock_scope
 from src.config import get_config
 from src.market_structure_prompt import format_market_structure_prompt_section
@@ -94,6 +95,7 @@ class _ChatMethods:
             skills_section=skills_section,
             language_section=_build_language_section(report_language, chat_mode=True),
         )
+        system_prompt = _compose_agent_soul_prompt(system_prompt)
 
         chat_tool_registry = build_agent_chat_tool_registry(
             self.tool_registry,

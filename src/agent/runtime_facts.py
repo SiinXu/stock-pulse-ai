@@ -18,6 +18,7 @@ from src.agent.protocols import (
     StageFailureReason,
     normalize_stage_failure_reason,
 )
+from src.agent.soul import AGENT_SOUL_HASH, AGENT_SOUL_VERSION
 
 if TYPE_CHECKING:
     from src.agent.risk_override import RiskOverrideApplication
@@ -82,10 +83,19 @@ class PipelineTerminationFact:
 class AgentRuntimeFacts:
     """Immutable internal snapshot carried by ``AgentResult``."""
 
+    soul_version: str = AGENT_SOUL_VERSION
+    soul_hash: str = AGENT_SOUL_HASH
     base_agent_opinions: Tuple[BaseAgentOpinionFact, ...] = ()
     degraded_events: Tuple[DegradedEvent, ...] = ()
     pipeline_termination: Optional[PipelineTerminationFact] = None
     risk_override_application: Optional[RiskOverrideApplication] = None
+
+    def to_metadata(self) -> dict[str, str]:
+        """Project the stable run identity without exposing model reasoning."""
+        return {
+            "soul_version": self.soul_version,
+            "soul_hash": self.soul_hash,
+        }
 
 
 def build_agent_runtime_facts(ctx: AgentContext) -> AgentRuntimeFacts:
