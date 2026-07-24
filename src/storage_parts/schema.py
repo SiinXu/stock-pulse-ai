@@ -1125,3 +1125,27 @@ class DecisionSignalMemoryFlagRecord(Base):
     ignored = Column(Boolean, nullable=False, default=False, index=True)
     created_at = Column(DateTime, default=utc_naive_now, index=True)
     updated_at = Column(DateTime, default=utc_naive_now, onupdate=utc_naive_now, index=True)
+
+
+class PortfolioAccountKind(Base):
+    """Paper vs real classification for a portfolio account (Issue #370).
+
+    Additive sidecar keyed by account_id so paper trading can be introduced
+    without altering the frozen ``portfolio_accounts`` schema. A missing row
+    means the account is ``real`` (the pre-existing default); a ``paper`` row
+    marks a forward-simulation account.
+    """
+
+    __tablename__ = 'portfolio_account_kinds'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    account_id = Column(
+        Integer,
+        ForeignKey('portfolio_accounts.id'),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    account_type = Column(String(16), nullable=False, default='paper', index=True)
+    created_at = Column(DateTime, default=utc_naive_now, index=True)
+    updated_at = Column(DateTime, default=utc_naive_now, onupdate=utc_naive_now, index=True)

@@ -81,6 +81,9 @@ class Config:
     signal_scorecard_public_enabled: bool = False
     signal_scorecard_min_samples: int = 10
 
+    # === Paper trading portfolio (Issue #370) ===
+    paper_portfolio_initial_cash: float = 1_000_000.0
+
     # == AI Analysis Configuration ===
     generation_backend: str = LITELLM_BACKEND_ID
     generation_fallback_backend: str = LITELLM_BACKEND_ID
