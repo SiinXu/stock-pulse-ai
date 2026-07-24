@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Fixed] Updated compatible desktop transitive dependencies and pinned `app-builder-lib` to patched `tar` 7.5.19, removing the critical build-chain and updater production-closure findings while deferring the breaking Electron runtime upgrade.
+- [Docs] Clarified when contributors should use declarative Skill packages, trusted system plugins, or a new ADR, including plugin trust and deferred-surface boundaries.
 - [Added] Added a validated cross-client local model catalog and read-only API for four general and three finance models, derived desktop presets from the same source, and retired the Llama 3.2 recommendation to avoid unnecessary redistribution obligations.
 - [Docs] Added verified local-model sizes, RAM tiers, upstream repositories, license conclusions, GGUF conversion guidance, distribution boundaries, and Ollama configuration.
 - [Fixed] Bundled `constraints.txt` / `build-constraints.txt` into the packaged desktop backend and resolved them from `sys._MEIPASS`, so the AlphaSift repair install pins runtime and PEP 517 build dependencies on the desktop artifact too instead of degrading to `--no-deps` only.
