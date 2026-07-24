@@ -33,9 +33,31 @@ from src.agent.tools.registry import (
 from src.agent.skills.base import Skill, SkillManager
 
 
-def _builtin_strategy_names() -> set[str]:
+_PERSONA_SKILL_NAMES = {
+    "persona_contrarian_deep_value",
+    "persona_disruptive_growth",
+    "persona_mental_models",
+    "persona_tail_risk",
+    "persona_value_moat",
+}
+_PERSONA_COMPLIANCE_COPY = (
+    "Simulated perspectives for learning/research only.",
+    "Not affiliated with, endorsed by, or representing any named individual or firm.",
+    "Not investment advice; markets involve risk.",
+)
+
+
+def _builtin_strategy_paths() -> list[Path]:
     strategies_dir = Path(__file__).resolve().parent.parent / "strategies"
-    return {path.stem for path in strategies_dir.glob("*.yaml")}
+    paths = sorted(strategies_dir.glob("*.yaml")) + sorted(strategies_dir.glob("*.yml"))
+    personas_dir = strategies_dir / "personas"
+    paths.extend(sorted(personas_dir.glob("*.yaml")))
+    paths.extend(sorted(personas_dir.glob("*.yml")))
+    return paths
+
+
+def _builtin_strategy_names() -> set[str]:
+    return {path.stem for path in _builtin_strategy_paths()}
 
 
 # ============================================================
@@ -424,6 +446,108 @@ class TestBuiltinSkills(unittest.TestCase):
 
         # Verify all strategy names from YAML are loaded
         self.assertEqual(names, expected)
+
+    def test_persona_pack_contract(self):
+        """Persona skills are distinct, opt-in, compliant, and tool-valid."""
+        from src.agent.skills.defaults import (
+            get_default_active_skill_ids,
+            get_default_router_skill_ids,
+        )
+        from src.agent.tools.analysis_tools import ALL_ANALYSIS_TOOLS
+        from src.agent.tools.backtest_tools import ALL_BACKTEST_TOOLS
+        from src.agent.tools.data_tools import ALL_DATA_TOOLS
+        from src.agent.tools.market_tools import ALL_MARKET_TOOLS
+        from src.agent.tools.search_tools import ALL_SEARCH_TOOLS
+
+        manager = SkillManager()
+        manager.load_builtin_skills()
+        skills = manager.list_skills()
+        personas = {skill.name: skill for skill in skills if skill.category == "persona"}
+        available_tools = {
+            tool.name
+            for tool in (
+                ALL_DATA_TOOLS
+                + ALL_ANALYSIS_TOOLS
+                + ALL_SEARCH_TOOLS
+                + ALL_MARKET_TOOLS
+                + ALL_BACKTEST_TOOLS
+            )
+        }
+
+        self.assertEqual(set(personas), _PERSONA_SKILL_NAMES)
+        self.assertEqual(get_default_active_skill_ids(skills), ["bull_trend"])
+        self.assertEqual(
+            get_default_router_skill_ids(skills),
+            ["bull_trend", "shrink_pullback"],
+        )
+
+        for persona in personas.values():
+            self.assertEqual(Path(persona.entrypoint).parent.name, "personas")
+            self.assertEqual(persona.source, "builtin")
+            self.assertFalse(persona.enabled)
+            self.assertFalse(persona.default_active)
+            self.assertFalse(persona.default_router)
+            self.assertTrue(persona.required_tools)
+            self.assertEqual(len(persona.required_tools), len(set(persona.required_tools)))
+            self.assertLessEqual(set(persona.required_tools), available_tools)
+            for heading in ("Evidence standard", "Risk boundaries", "Output contract"):
+                self.assertIn(heading, persona.instructions)
+            for statement in _PERSONA_COMPLIANCE_COPY:
+                self.assertIn(statement, persona.instructions)
+
+        semantic_markers = {
+            "persona_value_moat": ("moat durability", "margin of safety"),
+            "persona_mental_models": ("inversion", "incentive map"),
+            "persona_contrarian_deep_value": ("consensus mismatch", "catalyst path"),
+            "persona_disruptive_growth": ("adoption curve", "unit economics"),
+            "persona_tail_risk": ("fragility map", "stress scenarios"),
+        }
+        for persona_name, markers in semantic_markers.items():
+            instructions = personas[persona_name].instructions.lower()
+            for marker in markers:
+                self.assertIn(marker, instructions)
+
+    def test_builtin_persona_discovery_is_bounded_and_skips_invalid_yaml(self):
+        """Only the reserved built-in directory gains nested YAML discovery."""
+        import tempfile
+
+        from src.agent.skills import base as skill_base
+
+        valid_yaml = """
+name: {name}
+display_name: {name}
+description: Test skill
+instructions: Test instructions
+"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            personas_dir = root / "personas"
+            ignored_dir = root / "other"
+            personas_dir.mkdir()
+            ignored_dir.mkdir()
+            (root / "root.yaml").write_text(
+                valid_yaml.format(name="root_skill"),
+                encoding="utf-8",
+            )
+            (personas_dir / "nested.yaml").write_text(
+                valid_yaml.format(name="nested_persona"),
+                encoding="utf-8",
+            )
+            (personas_dir / "invalid.yaml").write_text("name: invalid\n", encoding="utf-8")
+            (ignored_dir / "ignored.yaml").write_text(
+                valid_yaml.format(name="ignored_nested_skill"),
+                encoding="utf-8",
+            )
+
+            with patch.object(skill_base, "_BUILTIN_SKILLS_DIR", root):
+                manager = SkillManager()
+                count = manager.load_builtin_skills()
+
+        self.assertEqual(count, 2)
+        self.assertEqual(
+            {skill.name for skill in manager.list_skills()},
+            {"root_skill", "nested_persona"},
+        )
 
 
 # ============================================================

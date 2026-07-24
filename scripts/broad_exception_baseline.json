@@ -317,8 +317,6 @@
     {"path":"src/agent/runtime/pydantic_ai_adapter.py","scope":"<module>.PydanticAIRuntimeAdapter.start._worker","caught":["Exception"],"digest":"dabe590074f9ac711bbd80d79428d840605cd78af7c9cd340582cc0049d85e68"},
     {"path":"src/agent/skills/aggregator.py","scope":"<module>.SkillAggregator._backtest_factor","caught":["Exception"],"digest":"75d5b90750dcf48e114e50921f10416b6bc23afc305c98197d1f16bfddd4efc0"},
     {"path":"src/agent/skills/aggregator.py","scope":"<module>.SkillAggregator._use_backtest_autoweight","caught":["Exception"],"digest":"01fc95b4454bc7445c28a59159dc1561dd8f0698b7edc1e9a35746e0993f335b"},
-    {"path":"src/agent/skills/base.py","scope":"<module>.load_skills_from_directory","caught":["Exception"],"digest":"355935ad675112e174bdd44804c8f4d0b058795e583dc80378657565ce261c47"},
-    {"path":"src/agent/skills/base.py","scope":"<module>.load_skills_from_directory","caught":["Exception"],"digest":"3bd4dddf1a8db27c0c1f8b67e855d85773d0697c6533bed9c40a398f9c83ddc1"},
     {"path":"src/agent/skills/defaults.py","scope":"<module>._load_builtin_skill_catalog","caught":["Exception"],"digest":"201d1c0ee5edc7b55ffbbd9d9fcf92c6ceebd9fa01c373d824fe0efbcfa3baee"},
     {"path":"src/agent/skills/router.py","scope":"<module>.SkillRouter._get_available_skills","caught":["Exception"],"digest":"1d00211452aa45dab95edd18e215cef8db6c860fef6f45060d4f05f7c93b4283"},
     {"path":"src/agent/skills/router.py","scope":"<module>.SkillRouter._get_manual_skills","caught":["Exception"],"digest":"f72116a798ec2e99969421a4c6fbd3c0de6ffe3a13a7accbdac263e3465e037f"},

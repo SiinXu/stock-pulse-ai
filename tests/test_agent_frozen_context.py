@@ -129,12 +129,25 @@ class DesktopBackendPackagingAssetsTestCase(unittest.TestCase):
     def test_builtin_strategy_yaml_inventory_matches_expected_desktop_bundle(self):
         strategies_dir = self.repo_root / "strategies"
         strategy_names = sorted(path.stem for path in strategies_dir.glob("*.yaml"))
+        persona_names = sorted(
+            path.stem for path in (strategies_dir / "personas").glob("*.yaml")
+        )
 
         self.assertEqual(len(strategy_names), 15)
         self.assertIn("bottom_volume", strategy_names)
         self.assertIn("chan_theory", strategy_names)
         self.assertIn("ma_golden_cross", strategy_names)
         self.assertIn("wave_theory", strategy_names)
+        self.assertEqual(
+            persona_names,
+            [
+                "persona_contrarian_deep_value",
+                "persona_disruptive_growth",
+                "persona_mental_models",
+                "persona_tail_risk",
+                "persona_value_moat",
+            ],
+        )
 
     def test_backend_pyinstaller_scripts_include_strategies_data_directory(self):
         macos_script = (self.repo_root / "scripts" / "build-backend-macos.sh").read_text(

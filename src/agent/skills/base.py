@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 # Built-in skill YAML directory (project_root/strategies/ kept for compatibility)
 _BUILTIN_SKILLS_DIR = Path(__file__).resolve().parent.parent.parent.parent / "strategies"
+_BUILTIN_YAML_SUBDIRECTORIES = ("personas",)
 
 
 @dataclass
@@ -277,7 +278,9 @@ def load_skills_from_directory(directory: Union[str, Path]) -> List[Skill]:
     """Load all skills from YAML files in a directory.
 
     Scans for top-level ``*.yaml`` / ``*.yml`` compatibility files and
-    nested ``SKILL.md`` bundles, sorted alphabetically.
+    nested ``SKILL.md`` bundles, sorted alphabetically. The built-in catalog
+    additionally scans explicitly reserved YAML collections; custom-directory
+    YAML discovery remains top-level only.
     Skips files that fail to parse (logs a warning).
 
     Args:
@@ -292,7 +295,17 @@ def load_skills_from_directory(directory: Union[str, Path]) -> List[Skill]:
         return []
 
     skills: List[Skill] = []
-    yaml_files = sorted(directory.glob("*.yaml")) + sorted(directory.glob("*.yml"))
+    yaml_directories = [directory]
+    if directory == _BUILTIN_SKILLS_DIR:
+        for subdirectory in _BUILTIN_YAML_SUBDIRECTORIES:
+            nested_directory = directory / subdirectory
+            if nested_directory.is_dir():
+                yaml_directories.append(nested_directory)
+
+    yaml_files: List[Path] = []
+    for yaml_directory in yaml_directories:
+        yaml_files.extend(sorted(yaml_directory.glob("*.yaml")))
+        yaml_files.extend(sorted(yaml_directory.glob("*.yml")))
     markdown_files = sorted(directory.rglob("SKILL.md"))
 
     for filepath in yaml_files:
@@ -300,7 +313,7 @@ def load_skills_from_directory(directory: Union[str, Path]) -> List[Skill]:
             skill = load_skill_from_yaml(filepath)
             skills.append(skill)
             logger.debug(f"Loaded skill from YAML: {skill.name} ({filepath.name})")
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - invalid YAML is isolated with safe diagnostics.
             log_safe_exception(
                 logger,
                 "Skill YAML loading failed",
@@ -315,7 +328,7 @@ def load_skills_from_directory(directory: Union[str, Path]) -> List[Skill]:
             skill = load_skill_from_markdown(filepath)
             skills.append(skill)
             logger.debug(f"Loaded skill bundle: {skill.name} ({filepath})")
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - invalid bundles are isolated with safe diagnostics.
             log_safe_exception(
                 logger,
                 "Skill bundle loading failed",

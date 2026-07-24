@@ -1,6 +1,6 @@
 # 交易策略目录 / Trading Strategies
 
-本目录存放 **自然语言交易策略文件**（YAML 格式）。系统启动时自动加载此目录下所有 `.yaml` 文件。
+本目录存放 **自然语言交易策略文件**（YAML 格式）。系统启动时自动加载本目录顶层的 `.yaml` / `.yml` 文件，以及保留的 `personas/` 子目录中的 Persona YAML；其他 YAML 子目录不会被递归发现。
 
 对用户和文档，我们继续把这些能力称为“策略”；在代码、配置和 API 字段里，它们统一命名为 `skill`，你可以把它理解为“可复用的策略能力包”。
 
@@ -84,6 +84,27 @@ instructions: |
 | 6 | 量价配合：成交量验证价格运动 |
 | 7 | 强势趋势股放宽：龙头股可适当放宽标准 |
 
+## 投资委员会 Persona Skills（默认关闭）
+
+`personas/` 提供五个互补的研究视角：价值与护城河、心智模型、逆向深度价值、颠覆式成长和尾部风险。它们是普通 YAML Skill，会随内置 catalog 一起被发现，但全部声明 `default_active: false` 和 `default_router: false`，因此留空 `AGENT_SKILLS` 时仍只使用既有默认策略，不会改变默认分析结果。
+
+Persona 必须显式选择后才会运行。例如在手动路由下使用：
+
+```env
+AGENT_SKILL_ROUTING=manual
+AGENT_SKILLS=persona_value_moat,persona_tail_risk
+```
+
+已有请求字段支持 `skills` 时，也可以传入同样的稳定 id，例如 `skills: ["persona_mental_models"]`。本内容包没有新增 API、UI 或委员会编排；多个 Persona 仍由既有 Skill / Multi-Agent 路径和 StrategyEngine 合同处理。
+
+每个 Persona 的 `required_tools` 只列出现有 Agent 工具，并在 specialist 路径限定该 Skill 可用的工具子集；它不是新的授权层，也不会注册工具。运行时系统指令、ToolSurface 策略和 StrategyEngine 决策权威始终优先，Persona 不得绕过或削弱这些边界。
+
+所有 Persona 都包含同一合规边界：
+
+- Simulated perspectives for learning/research only.
+- Not affiliated with, endorsed by, or representing any named individual or firm.
+- Not investment advice; markets involve risk.
+
 ## 自定义策略目录
 
 除了本目录（内置策略），你还可以通过环境变量指定额外的自定义策略目录：
@@ -92,7 +113,7 @@ instructions: |
 AGENT_SKILL_DIR=./my_skills
 ```
 
-系统会同时加载内置策略和自定义策略。如果名称冲突，自定义策略覆盖内置策略。
+系统会同时加载内置策略和自定义策略。如果名称冲突，自定义策略覆盖内置策略。自定义目录的 YAML 仍使用顶层发现规则；嵌套 bundle 继续使用 `SKILL.md` 入口。
 
 环境变量名仍然是 `AGENT_SKILL_DIR`，这是内部统一命名后的配置入口；在产品语义上，它依然表示“自定义策略目录”。
 

@@ -1,7 +1,7 @@
 # StockPulse Architecture Overview
 
 - Status: `Living`
-- Last verified: 2026-07-22
+- Last verified: 2026-07-24
 - Scope: current technical component boundaries, process entrypoints, and analysis data flow
 
 This document is the technical view of the current implementation. For
@@ -75,7 +75,7 @@ resolve -> fetch -> intelligence -> context -> analyze -> persist -> render -> d
 | `data_provider/` | Provider adapters, capability routing, normalization, caching, fallback, and health control. |
 | `api/` | FastAPI transport, middleware, lifecycle, and public HTTP schemas. |
 | `bot/` | Messaging-platform adapters, dispatch, commands, and stream integrations. |
-| `strategies/` | Built-in natural-language trading Skill definitions loaded from top-level YAML files. |
+| `strategies/` | Built-in natural-language trading Skill definitions loaded from top-level YAML files and the reserved `personas/` YAML collection. |
 | `templates/` | Jinja report presentation templates consumed by the report renderer. |
 
 `src/`, `data_provider/`, `api/`, and `bot/` intentionally remain separate
@@ -208,7 +208,7 @@ plugin extension point, and a new ADR must follow the
 
 ```mermaid
 flowchart TB
-  BUILTIN[Built-in definitions<br/>strategies/*.yaml] -->|load| MANAGER[SkillManager<br/>src/agent/skills/base.py]
+  BUILTIN[Built-in definitions<br/>top-level YAML<br/>and strategies/personas YAML] -->|load| MANAGER[SkillManager<br/>src/agent/skills/base.py]
   CUSTOM[Configured custom directory<br/>top-level YAML or nested SKILL.md] -->|load; same name overrides built-in| MANAGER
   MANAGER -->|catalog clone and activation| ASSEMBLY[Runtime assembly<br/>src/agent/runtime_assembly.py]
 
@@ -231,8 +231,10 @@ flowchart TB
 The flow has two execution shapes:
 
 1. `SkillManager` loads built-in top-level YAML definitions from `strategies/`
-   and, when `AGENT_SKILL_DIR` is configured, top-level `*.yaml` / `*.yml` files
-   plus nested `SKILL.md` bundles from that custom directory. A custom definition
+   plus YAML definitions from the reserved `strategies/personas/` collection.
+   Other built-in YAML subdirectories are not discovered. When `AGENT_SKILL_DIR`
+   is configured, the manager loads top-level `*.yaml` / `*.yml` files plus
+   nested `SKILL.md` bundles from that custom directory. A custom definition
    with the same name replaces the built-in catalog entry.
 2. `src/agent/runtime_assembly.py` caches the disk-loaded prototype, returns an
    isolated clone per assembly, resolves active skills, and supplies their prompt
@@ -255,7 +257,7 @@ The flow has two execution shapes:
 
 | Surface | Current role | Boundary |
 | --- | --- | --- |
-| `strategies/` | Built-in natural-language Skill definitions in top-level YAML files; the directory name is retained for product language and compatibility | Definition catalog, not a second loader or execution engine |
+| `strategies/` | Built-in natural-language Skill definitions in top-level YAML files plus the reserved `personas/` YAML collection; the directory name is retained for product language and compatibility | Definition catalog, not a second loader or execution engine; other nested YAML directories are not discovered |
 | Configured `AGENT_SKILL_DIR` | Optional custom top-level YAML definitions and nested `SKILL.md` bundles | Custom names can override built-ins; no directory is loaded when the setting is empty |
 | `src/agent/skills/` | Canonical product runtime: model, loaders, `SkillManager`, defaults, `SkillRouter`, `SkillAgent`, aggregation, synthesis, and `StrategyEngine` | Source of truth for current Skill/Strategy execution semantics |
 | `src/agent/runtime_assembly.py` | Tool and Skill catalog assembly, activation, prompt-state resolution, and Single/Multi executor construction | `src/agent/factory.py` remains a compatibility facade, not another authority |

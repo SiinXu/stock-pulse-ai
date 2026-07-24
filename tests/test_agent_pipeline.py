@@ -30,7 +30,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 def _builtin_strategy_names() -> set[str]:
     strategies_dir = Path(__file__).resolve().parent.parent / "strategies"
-    return {path.stem for path in strategies_dir.glob("*.yaml")}
+    paths = list(strategies_dir.glob("*.yaml")) + list(strategies_dir.glob("*.yml"))
+    personas_dir = strategies_dir / "personas"
+    paths.extend(personas_dir.glob("*.yaml"))
+    paths.extend(personas_dir.glob("*.yml"))
+    return {path.stem for path in paths}
 
 
 # ============================================================
