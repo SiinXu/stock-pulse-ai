@@ -300,15 +300,15 @@ def test_registry_rejects_identity_version_metadata_and_validator_drift() -> Non
         )
 
 
-def test_default_contracts_fail_closed_until_native_validator_is_configured() -> None:
+def test_unwired_default_contracts_remain_fail_closed() -> None:
     registry = ExtensionRegistry()
 
     _assert_error(
         "extension_implementation_invalid",
         lambda: registry.register(
             plugin_id="example-plugin",
-            extension_point="report_template",
-            registration_id="daily",
-            implementation=_Template("daily"),
+            extension_point="event_hook",
+            registration_id="daily-hook",
+            implementation=type("Hook", (), {"hook_id": "daily-hook"})(),
         ),
     )
