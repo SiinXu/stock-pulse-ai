@@ -9,7 +9,6 @@ import re
 import secrets
 import threading
 import time
-import uuid
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterable, List, Literal, Mapping, Optional, Sequence, Set
 from urllib.parse import urlsplit, urlunsplit
@@ -17,16 +16,21 @@ from urllib.parse import urlsplit, urlunsplit
 import requests
 
 from src.llm.model_ref import decode_model_ref
+from src.llm.provider_catalog import get_provider
 from src.services.system_config_service import (
     ConfigConflictError,
     ConfigValidationError,
     SystemConfigService,
 )
-from src.services.task_queue import AnalysisTaskQueue, TaskInfo, TaskStatus
+from src.services.task_queue import AnalysisTaskQueue, TaskInfo
+from src.task_execution import TaskCommand, TaskRunContext, TaskStatusEnum
 from src.utils.sanitize import log_safe_exception
 
 
-OLLAMA_DEFAULT_BASE_URL = "http://127.0.0.1:11434"
+_OLLAMA_PROVIDER = get_provider("ollama")
+if _OLLAMA_PROVIDER is None:  # pragma: no cover - checked-in provider catalog invariant
+    raise RuntimeError("The Ollama provider is missing from the provider catalog")
+OLLAMA_DEFAULT_BASE_URL = str(_OLLAMA_PROVIDER["default_base_url"])
 OLLAMA_CONNECT_TIMEOUT_SECONDS = 5.0
 OLLAMA_READ_TIMEOUT_SECONDS = 30.0
 OLLAMA_PULL_TIMEOUT_SECONDS = 30.0 * 60.0
@@ -166,10 +170,14 @@ def _read_bounded_response_body(response: requests.Response, max_bytes: int) -> 
 def _iter_bounded_response_lines(
     response: requests.Response,
     max_event_bytes: int,
+    *,
+    should_continue: Optional[Callable[[], bool]] = None,
 ) -> Iterable[bytes]:
     """Yield NDJSON lines while bounding both complete events and partial buffers."""
     buffer = bytearray()
     for chunk in response.iter_content(chunk_size=max_event_bytes):
+        if should_continue is not None and not should_continue():
+            return
         if not chunk:
             continue
         value = chunk.encode("utf-8") if isinstance(chunk, str) else bytes(chunk)
@@ -182,6 +190,8 @@ def _iter_bounded_response_lines(
                 raise LocalModelRuntimeRequestError(
                     "The local model progress event is too large"
                 )
+            if should_continue is not None and not should_continue():
+                return
             yield line
             newline_index = buffer.find(b"\n")
         if len(buffer) > max_event_bytes:
@@ -193,7 +203,8 @@ def _iter_bounded_response_lines(
             raise LocalModelRuntimeRequestError(
                 "The local model progress event is too large"
             )
-        yield bytes(buffer)
+        if should_continue is None or should_continue():
+            yield bytes(buffer)
 
 
 @dataclass(frozen=True)
@@ -213,6 +224,7 @@ class _LocalModelRegistrationRecovery:
     runtime_identity: str
     previous_channels: tuple[str, ...]
     previous_models: tuple[str, ...]
+    registration_changed: bool
     expires_at: float
 
 
@@ -308,25 +320,35 @@ class OllamaRuntimeClient:
         model_id: str,
         *,
         on_progress: Callable[[OllamaPullProgress], None],
+        is_cancel_requested: Optional[Callable[[], bool]] = None,
         timeout_seconds: float = OLLAMA_PULL_TIMEOUT_SECONDS,
     ) -> None:
         """Pull one validated model and emit bounded normalized progress events."""
         model_id = normalize_local_model_id(model_id)
+        deadline = time.monotonic() + max(1.0, float(timeout_seconds))
+
+        def should_continue() -> bool:
+            if is_cancel_requested is not None and is_cancel_requested():
+                return False
+            if time.monotonic() > deadline:
+                raise LocalModelRuntimeRequestError("The local model download timed out")
+            return True
+
+        if not should_continue():
+            return
         response = self._request(
             "POST",
             "/api/pull",
             json_body={"name": model_id, "stream": True},
             stream=True,
         )
-        deadline = time.monotonic() + max(1.0, float(timeout_seconds))
         saw_terminal_success = False
         try:
             for raw_line in _iter_bounded_response_lines(
                 response,
                 OLLAMA_MAX_EVENT_BYTES,
+                should_continue=should_continue,
             ):
-                if time.monotonic() > deadline:
-                    raise LocalModelRuntimeRequestError("The local model download timed out")
                 if not raw_line:
                     continue
                 try:
@@ -357,6 +379,8 @@ class OllamaRuntimeClient:
             ) from exc
         finally:
             response.close()
+        if not should_continue():
+            return
         if not saw_terminal_success:
             raise LocalModelRuntimeRequestError("The local model download ended unexpectedly")
 
@@ -407,10 +431,12 @@ class LocalModelService:
 
     @staticmethod
     def _split_csv(value: Any) -> List[str]:
+        """Split one comma-separated configuration value into ordered entries."""
         return [item.strip() for item in str(value or "").split(",") if item.strip()]
 
     @classmethod
     def _append_csv(cls, value: Any, additions: Sequence[str]) -> str:
+        """Append entries case-insensitively while preserving the original order."""
         ordered: List[str] = []
         seen: Set[str] = set()
         for item in [*cls._split_csv(value), *additions]:
@@ -423,6 +449,7 @@ class LocalModelService:
 
     @staticmethod
     def _runtime_route(value: Any) -> str:
+        """Resolve a ModelRef to its runtime route while preserving legacy values."""
         raw = str(value or "").strip()
         try:
             decoded = decode_model_ref(raw)
@@ -441,6 +468,7 @@ class LocalModelService:
 
     @classmethod
     def _has_existing_primary(cls, values: Mapping[str, str]) -> bool:
+        """Return whether the effective configuration already has a primary route."""
         if str(values.get("LITELLM_MODEL") or "").strip():
             return True
         generation_backend = str(values.get("GENERATION_BACKEND") or "").strip().lower()
@@ -448,15 +476,7 @@ class LocalModelService:
             return True
 
         has_yaml = bool(str(values.get("LITELLM_CONFIG") or "").strip())
-        has_channels = False
-        for channel in cls._split_csv(values.get("LLM_CHANNELS")):
-            prefix = f"LLM_{channel.upper()}"
-            enabled = str(values.get(f"{prefix}_ENABLED") or "true").strip().lower()
-            if enabled not in {"false", "0", "no", "off"} and cls._split_csv(
-                values.get(f"{prefix}_MODELS")
-            ):
-                has_channels = True
-                break
+        has_channels = cls._has_routable_channels(values)
         has_legacy = any(
             str(values.get(key) or "").strip() for key in cls._LEGACY_PRIMARY_KEYS
         )
@@ -471,10 +491,18 @@ class LocalModelService:
         return has_yaml or has_channels or has_legacy
 
     @staticmethod
+    def _has_routable_channels(values: Mapping[str, str]) -> bool:
+        """Reuse setup validation to distinguish declared channels from usable routes."""
+        return bool(
+            SystemConfigService._collect_setup_channel_models(dict(values))
+        )
+
+    @staticmethod
     def _is_assigned(values: Mapping[str, str], key: str, model_id: str) -> bool:
         return LocalModelService._runtime_route(values.get(key)) == f"ollama/{model_id}"
 
     def _base_url(self, values: Mapping[str, str]) -> str:
+        """Resolve the normalized server-owned Ollama origin from a snapshot."""
         return normalize_ollama_base_url(values.get("LLM_OLLAMA_BASE_URL"))
 
     def _require_expected_runtime_snapshot(
@@ -591,12 +619,14 @@ class LocalModelService:
         return current_version, values
 
     def _allowed_model_ids(self) -> Set[str]:
+        """Return the normalized catalog allowlist for lifecycle operations."""
         allowed: Set[str] = set()
         for candidate in self._pullable_model_ids():
             allowed.add(normalize_local_model_id(candidate))
         return allowed
 
     def _require_pullable(self, model_id: Any) -> str:
+        """Validate one model and require membership in the catalog allowlist."""
         normalized = normalize_local_model_id(model_id)
         if normalized not in self._allowed_model_ids():
             raise LocalModelNotAllowedError(
@@ -750,7 +780,7 @@ class LocalModelService:
                 ]
             )
         requested_mode = str(values.get("LLM_CONFIG_MODE") or "auto").strip().lower() or "auto"
-        had_channels = bool(self._split_csv(current_channels))
+        had_channels = self._has_routable_channels(values)
         has_yaml = bool(str(values.get("LITELLM_CONFIG") or "").strip())
         has_legacy = any(str(values.get(key) or "").strip() for key in self._LEGACY_PRIMARY_KEYS)
         if assignment == "agent":
@@ -819,7 +849,7 @@ class LocalModelService:
                 expected_runtime_identity=expected_runtime_identity,
             )
             current_models = self._split_csv(values.get("LLM_OLLAMA_MODELS"))
-            was_registered = any(
+            registration_changed = any(
                 item.lower() == normalized.lower() for item in current_models
             )
             result = self._unregister_model_from_snapshot(
@@ -829,9 +859,6 @@ class LocalModelService:
             )
             now = time.monotonic()
             self._prune_registration_recoveries()
-            if not was_registered:
-                return result
-
             recovery_token = secrets.token_urlsafe(32)
             self._registration_recoveries[recovery_token] = (
                 _LocalModelRegistrationRecovery(
@@ -842,6 +869,7 @@ class LocalModelService:
                         self._split_csv(values.get("LLM_CHANNELS"))
                     ),
                     previous_models=tuple(current_models),
+                    registration_changed=registration_changed,
                     expires_at=now + LOCAL_MODEL_REGISTRATION_RECOVERY_TTL_SECONDS,
                 )
             )
@@ -886,6 +914,13 @@ class LocalModelService:
             current_version, _values = self._validate_registration_recovery_configuration(
                 recovery
             )
+            if not recovery.registration_changed:
+                return {
+                    **self.get_configuration(),
+                    "success": True,
+                    "model_id": normalized,
+                    "deleted": False,
+                }
             result = self._system_config_service.update(
                 config_version=current_version,
                 items=[
@@ -1007,6 +1042,7 @@ class LocalModelService:
         }
 
     def _pending_pull(self, model_id: str) -> Optional[TaskInfo]:
+        """Return the active canonical pull task for one model, when present."""
         for task in self._task_queue.list_pending_tasks():
             if task.report_type == LOCAL_MODEL_PULL_TASK_KIND and task.stock_code == model_id:
                 return task
@@ -1026,21 +1062,26 @@ class LocalModelService:
             # Fail before accepting a task so the UI can immediately offer the
             # manual command instead of polling a predictably failed worker.
             self._client_factory(base_url).list_installed_models()
-            task_id = uuid.uuid4().hex
-
-            def run_pull() -> Dict[str, Any]:
+            def run_pull(context: TaskRunContext) -> Dict[str, Any]:
                 client = self._client_factory(base_url)
 
                 def update(progress: OllamaPullProgress) -> None:
-                    self._task_queue.update_task_progress(
-                        task_id,
+                    context.update_progress(
                         progress.percent if progress.percent is not None else 1,
                         "Downloading local model",
-                        message_code="local_model.pull.progress",
-                        message_params={"model_id": normalized, "status": progress.status},
                     )
 
-                client.pull_model(normalized, on_progress=update)
+                client.pull_model(
+                    normalized,
+                    on_progress=update,
+                    is_cancel_requested=context.is_cancel_requested,
+                )
+                if context.is_cancel_requested():
+                    return {
+                        "model_id": normalized,
+                        "activated": False,
+                        "selected_primary": False,
+                    }
                 try:
                     activation = self._configure_model_from_snapshot(
                         normalized,
@@ -1068,26 +1109,40 @@ class LocalModelService:
                     "selected_primary": bool(activation.get("selected_primary")),
                 }
 
-            return self._task_queue.submit_background_task(
-                run_pull,
-                stock_code=normalized,
-                stock_name=normalized,
-                report_type=LOCAL_MODEL_PULL_TASK_KIND,
-                message="Local model download queued",
-                task_id=task_id,
-                trace_id=task_id,
+            command = TaskCommand(
+                kind=LOCAL_MODEL_PULL_TASK_KIND,
+                run=run_pull,
+                metadata={
+                    "stock_code": normalized,
+                    "stock_name": normalized,
+                    "report_type": LOCAL_MODEL_PULL_TASK_KIND,
+                    "message": "Local model download queued",
+                },
                 failure_error_code="local_model_pull_failed",
             )
+            task_id = self._task_queue.submit(command)
+            task = self._task_queue.get_task(task_id)
+            if task is None:  # pragma: no cover - queue adapter invariant
+                raise RuntimeError("Accepted local model pull task is unavailable")
+            return task
 
     def get_pull(self, task_id: str) -> Optional[Dict[str, Any]]:
         """Return a caller-safe pull task snapshot."""
         task = self._task_queue.get_task(str(task_id or ""))
         if task is None or task.report_type != LOCAL_MODEL_PULL_TASK_KIND:
             return None
-        result = task.result if task.status == TaskStatus.COMPLETED and isinstance(task.result, dict) else None
+        result = (
+            task.result
+            if task.status == TaskStatusEnum.COMPLETED and isinstance(task.result, dict)
+            else None
+        )
         return {
             "task_id": task.task_id,
-            "status": task.status.value if isinstance(task.status, TaskStatus) else str(task.status),
+            "status": (
+                task.status.value
+                if isinstance(task.status, TaskStatusEnum)
+                else str(task.status)
+            ),
             "progress": task.progress,
             "model_id": task.stock_code,
             "error": task.public_error(),
@@ -1100,7 +1155,9 @@ class LocalModelService:
             return self._delete_model(model_id)
 
     def _delete_model(self, model_id: Any) -> Dict[str, Any]:
+        """Apply the server-side unregister/delete transaction for one model."""
         normalized = self._require_pullable(model_id)
+        self._require_no_pending_unregistration(normalized)
         if self._pending_pull(normalized) is not None:
             raise LocalModelInUseError(
                 "Wait for the active model download before deleting it"
@@ -1151,6 +1208,9 @@ class LocalModelService:
                     error_code="local_model_delete_probe_failed",
                     context={"model_id": normalized},
                 )
+
+            if not weights_remain:
+                return {**result, "deleted": True, "model_id": normalized}
 
             if was_registered and weights_remain:
                 current_version, current_values = self._config_snapshot()

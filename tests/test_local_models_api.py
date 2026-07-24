@@ -4,13 +4,19 @@ from __future__ import annotations
 
 import asyncio
 import json
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock
+from unittest.mock import patch
 
 import httpx
 from fastapi import FastAPI
 
 from api.app import create_app
+from api import deps as api_deps
 from api.middlewares.error_handler import add_error_handlers
 from api.v1.endpoints import local_models
 from src.services.local_model_service import (
@@ -108,6 +114,35 @@ async def _request(service: _FakeLocalModelService, method: str, path: str, **kw
         return await client.request(method, path, **kwargs)
 
 
+def test_local_model_dependency_constructs_one_stateful_service_under_concurrency() -> None:
+    request = SimpleNamespace(
+        app=SimpleNamespace(
+            state=SimpleNamespace(system_config_service=Mock()),
+        )
+    )
+    expected = object()
+    callers = 8
+    ready = threading.Barrier(callers)
+
+    def construct(**_kwargs):
+        time.sleep(0.02)
+        return expected
+
+    def resolve():
+        ready.wait(timeout=2)
+        return api_deps.get_local_model_service(request)
+
+    with (
+        patch.object(api_deps, "LocalModelService", side_effect=construct) as factory,
+        patch.object(api_deps, "get_task_queue", return_value=Mock()),
+        ThreadPoolExecutor(max_workers=callers) as executor,
+    ):
+        resolved = list(executor.map(lambda _index: resolve(), range(callers)))
+
+    assert all(service is expected for service in resolved)
+    factory.assert_called_once()
+
+
 class LocalModelApiIntegrationTestCase(_SystemConfigServiceTestCaseBase):
     """Exercise the API, service, and optimistic configuration boundary together."""
 
@@ -177,6 +212,53 @@ class LocalModelApiIntegrationTestCase(_SystemConfigServiceTestCaseBase):
 
         self.assertEqual(restored.status_code, 200, restored.text)
         self.assertEqual(restored.json()["registered_models"], ["qwen3:4b"])
+        self.assertEqual(self.runtime_probe_count, 0)
+
+    def test_unregistered_model_receives_a_reservation_without_becoming_registered(self) -> None:
+        self._rewrite_env(
+            "ADMIN_AUTH_ENABLED=true",
+            "LLM_CONFIG_MODE=channels",
+            "LLM_CHANNELS=cloud",
+            "LLM_CLOUD_PROVIDER=openai",
+            "LLM_CLOUD_PROTOCOL=openai",
+            "LLM_CLOUD_API_KEY=secret-value",
+            "LLM_CLOUD_MODELS=gpt-4o",
+            "LLM_CLOUD_ENABLED=true",
+            "LITELLM_MODEL=openai/gpt-4o",
+        )
+        configuration = self.local_model_service.get_configuration()
+
+        reserved = asyncio.run(
+            _request(
+                self.local_model_service,
+                "DELETE",
+                "/api/v1/local-models/registrations",
+                json={
+                    "model_id": "qwen3:4b",
+                    "expected_config_version": configuration["config_version"],
+                    "expected_runtime_identity": DEFAULT_RUNTIME_IDENTITY,
+                },
+            )
+        )
+
+        self.assertEqual(reserved.status_code, 200, reserved.text)
+        self.assertTrue(reserved.json()["recovery_token"])
+        self.assertEqual(reserved.json()["registered_models"], [])
+
+        restored = asyncio.run(
+            _request(
+                self.local_model_service,
+                "POST",
+                "/api/v1/local-models/registrations",
+                json={
+                    "model_id": "qwen3:4b",
+                    "recovery_token": reserved.json()["recovery_token"],
+                },
+            )
+        )
+
+        self.assertEqual(restored.status_code, 200, restored.text)
+        self.assertEqual(restored.json()["registered_models"], [])
         self.assertEqual(self.runtime_probe_count, 0)
 
     def test_unregister_rejects_a_changed_desktop_runtime_before_mutation(self) -> None:

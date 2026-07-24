@@ -6,6 +6,8 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.task_execution import TaskStatusEnum
+
 
 LOCAL_MODEL_ID_PATTERN = (
     r"^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*"
@@ -75,7 +77,7 @@ class LocalModelPullAccepted(BaseModel):
 
     task_id: str
     trace_id: str
-    status: Literal["pending", "processing", "cancel_requested"]
+    status: TaskStatusEnum
     model_id: str
 
 
@@ -91,15 +93,7 @@ class LocalModelPullStatus(BaseModel):
     """Polling response for one local model pull task."""
 
     task_id: str
-    status: Literal[
-        "pending",
-        "processing",
-        "cancel_requested",
-        "completed",
-        "failed",
-        "cancelled",
-        "interrupted",
-    ]
+    status: TaskStatusEnum
     progress: int = Field(0, ge=0, le=100)
     model_id: str
     error: Optional[str] = None
@@ -122,6 +116,6 @@ class LocalModelMutationResponse(LocalModelConfigurationResponse):
 
 
 class LocalModelUnregistrationResponse(LocalModelMutationResponse):
-    """Unregister result with an optional one-time desktop rollback capability."""
+    """Unregister result with the required one-time Desktop deletion reservation."""
 
-    recovery_token: Optional[str] = None
+    recovery_token: str

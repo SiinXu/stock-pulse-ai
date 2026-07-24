@@ -10,6 +10,7 @@ API 依赖注入模块
 3. 提供服务层依赖
 """
 
+import threading
 from typing import Generator
 
 from fastapi import Request
@@ -21,6 +22,9 @@ from src.services.system_config_service import SystemConfigService
 from src.services.runtime_scheduler import RuntimeSchedulerService
 from src.services.local_model_service import LocalModelService, get_pullable_local_model_ids
 from src.services.task_queue import get_task_queue
+
+
+_LOCAL_MODEL_SERVICE_INIT_LOCK = threading.Lock()
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -87,10 +91,13 @@ def get_local_model_service(request: Request) -> LocalModelService:
     """Get the app-lifecycle shared local model management service."""
     service = getattr(request.app.state, "local_model_service", None)
     if service is None:
-        service = LocalModelService(
-            system_config_service=get_system_config_service(request),
-            task_queue=get_task_queue(),
-            pullable_model_ids=get_pullable_local_model_ids,
-        )
-        request.app.state.local_model_service = service
+        with _LOCAL_MODEL_SERVICE_INIT_LOCK:
+            service = getattr(request.app.state, "local_model_service", None)
+            if service is None:
+                service = LocalModelService(
+                    system_config_service=get_system_config_service(request),
+                    task_queue=get_task_queue(),
+                    pullable_model_ids=get_pullable_local_model_ids,
+                )
+                request.app.state.local_model_service = service
     return service

@@ -1,3 +1,5 @@
+import type { TaskLifecycleStatus } from './analysis';
+
 export type LocalModelSection = 'general' | 'finance';
 export type LocalModelMemoryTier = 'light' | 'standard' | 'high';
 export type LocalModelInstallMethod = 'ollama_pull' | 'planned_ollama_package' | 'guided_import';
@@ -95,7 +97,7 @@ export interface LocalModelProgress {
 export interface LocalModelPullAccepted {
   taskId: string;
   traceId: string;
-  status: 'pending' | 'processing' | 'cancel_requested';
+  status: TaskLifecycleStatus;
   modelId: string;
 }
 
@@ -107,7 +109,7 @@ export interface LocalModelPullResult {
 
 export interface LocalModelPullStatus {
   taskId: string;
-  status: 'pending' | 'processing' | 'cancel_requested' | 'completed' | 'failed' | 'cancelled' | 'interrupted';
+  status: TaskLifecycleStatus;
   progress: number;
   modelId: string;
   error?: string | null;
@@ -130,5 +132,5 @@ export interface LocalModelMutationResponse extends LocalModelConfiguration {
 }
 
 export interface LocalModelUnregistrationResponse extends LocalModelMutationResponse {
-  recoveryToken?: string | null;
+  recoveryToken: string;
 }

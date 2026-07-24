@@ -278,7 +278,7 @@ describe('localModelTransport', () => {
     expect(api.finalizeUnregistration).toHaveBeenCalledTimes(2);
   });
 
-  it('surfaces a semantic finalization conflict after successful weight deletion', async () => {
+  it('keeps confirmed weight deletion successful across a semantic finalization conflict', async () => {
     const bridge = createDesktopBridge();
     const mutation = {
       ...CONFIGURATION,
@@ -308,8 +308,8 @@ describe('localModelTransport', () => {
 
     await expect(
       __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
-    ).rejects.toMatchObject({ code: 'config_version_conflict' });
-    expect(api.finalizeUnregistration).toHaveBeenCalledTimes(1);
+    ).resolves.toEqual({ ...mutation, deleted: true });
+    expect(api.finalizeUnregistration).toHaveBeenCalledTimes(2);
     expect(api.restoreRegistration).not.toHaveBeenCalled();
   });
 
@@ -383,6 +383,7 @@ describe('localModelTransport', () => {
     await expect(
       __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
     ).rejects.toMatchObject({ code: 'local_model_delete_recovery_failed' });
+    expect(bridge.remove).not.toHaveBeenCalled();
     expect(api.restoreRegistration).not.toHaveBeenCalled();
   });
 
@@ -449,6 +450,75 @@ describe('localModelTransport', () => {
     expect(api.restoreRegistration).toHaveBeenCalledWith('qwen3:4b', 'recovery-1');
   });
 
+  it('releases the deletion reservation when Desktop IPC rejects ambiguously', async () => {
+    const bridge = createDesktopBridge();
+    const mutation = {
+      ...CONFIGURATION,
+      success: true,
+      modelId: 'qwen3:4b',
+      selectedPrimary: false,
+      selectedAgent: false,
+      deleted: false,
+      updatedKeys: ['LLM_OLLAMA_MODELS'],
+      warnings: [],
+      appliedCount: 1,
+      skippedMaskedCount: 0,
+      reloadTriggered: true,
+      recoveryToken: 'recovery-1',
+    };
+    api.unregister.mockResolvedValue(mutation);
+    api.restoreRegistration.mockResolvedValue({ ...mutation, deleted: false });
+    vi.mocked(bridge.remove).mockRejectedValue(new Error('ipc disconnected'));
+
+    await expect(
+      __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
+    ).rejects.toThrow('ipc disconnected');
+    expect(bridge.detect).toHaveBeenCalledTimes(2);
+    expect(api.restoreRegistration).toHaveBeenCalledWith('qwen3:4b', 'recovery-1');
+  });
+
+  it('finalizes confirmed deletion when Desktop IPC rejects after mutation', async () => {
+    const bridge = createDesktopBridge();
+    const mutation = {
+      ...CONFIGURATION,
+      success: true,
+      modelId: 'qwen3:4b',
+      selectedPrimary: false,
+      selectedAgent: false,
+      deleted: false,
+      updatedKeys: [],
+      warnings: [],
+      appliedCount: 0,
+      skippedMaskedCount: 0,
+      reloadTriggered: false,
+      recoveryToken: 'recovery-1',
+    };
+    const finalized = { ...mutation, deleted: true };
+    api.unregister.mockResolvedValue(mutation);
+    api.finalizeUnregistration.mockResolvedValue(finalized);
+    vi.mocked(bridge.remove).mockRejectedValue(new Error('response lost'));
+    vi.mocked(bridge.detect)
+      .mockResolvedValueOnce({
+        status: 'running',
+        installedModels: ['qwen3:4b'],
+        runtimeIdentity: RUNTIME_IDENTITY,
+      })
+      .mockResolvedValueOnce({
+        status: 'running',
+        installedModels: [],
+        runtimeIdentity: RUNTIME_IDENTITY,
+      });
+
+    await expect(
+      __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
+    ).resolves.toEqual(finalized);
+    expect(api.restoreRegistration).not.toHaveBeenCalled();
+    expect(api.finalizeUnregistration).toHaveBeenCalledWith(
+      'qwen3:4b',
+      'recovery-1',
+    );
+  });
+
   it('keeps registration removed when the running runtime confirms weights are gone', async () => {
     const bridge = createDesktopBridge();
     const mutation = {
@@ -503,6 +573,7 @@ describe('localModelTransport', () => {
       appliedCount: 0,
       skippedMaskedCount: 0,
       reloadTriggered: false,
+      recoveryToken: 'recovery-1',
     };
     api.unregister.mockResolvedValue(mutation);
     vi.mocked(bridge.remove).mockResolvedValue({
@@ -515,6 +586,6 @@ describe('localModelTransport', () => {
       __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
     ).rejects.toMatchObject({ code: 'delete-failed' });
     expect(bridge.detect).toHaveBeenCalledTimes(1);
-    expect(api.restoreRegistration).not.toHaveBeenCalled();
+    expect(api.restoreRegistration).toHaveBeenCalledWith('qwen3:4b', 'recovery-1');
   });
 });

@@ -221,23 +221,38 @@ function createDesktopTransport(bridge: DesktopLocalModelBridge): LocalModelTran
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         return await localModelsApi.finalizeUnregistration(modelId, recoveryToken);
-      } catch (error) {
-        const parsed = getParsedApiError(error, 'en');
-        if (parsed.status !== undefined || ![
-          'local_connection_failed',
-          'upstream_network',
-          'upstream_timeout',
-          'unknown',
-        ].includes(parsed.category)) {
-          throw new LocalModelTransportError(
-            parsed.code || 'local_model_delete_finalize_failed',
-            'Local model weights were deleted but configuration finalization failed',
-          );
-        }
-        // Retry once because the first response may have been lost after revocation.
+      } catch {
+        // The first response may have been lost after the idempotent revocation.
       }
     }
     return { ...unregistered, deleted: true };
+  };
+  const confirmWeightsRemain = async (modelId: string): Promise<boolean> => {
+    try {
+      const state = await bridge.detect();
+      if (state.status === 'running' && Array.isArray(state.installedModels)) {
+        return state.installedModels.some(
+          (installed) => typeof installed === 'string'
+            && installed.toLowerCase() === modelId.toLowerCase(),
+        );
+      }
+    } catch {
+      // Recover conservatively when Desktop cannot confirm deletion state.
+    }
+    return true;
+  };
+  const restoreDeletionReservation = async (
+    modelId: string,
+    recoveryToken: string,
+  ): Promise<void> => {
+    try {
+      await localModelsApi.restoreRegistration(modelId, recoveryToken);
+    } catch {
+      throw new LocalModelTransportError(
+        'local_model_delete_recovery_failed',
+        'Local model deletion failed and registration could not be restored',
+      );
+    }
   };
   return {
     kind: 'desktop',
@@ -308,55 +323,44 @@ function createDesktopTransport(bridge: DesktopLocalModelBridge): LocalModelTran
         configurationSnapshot.configVersion,
         runtimeIdentity,
       );
-      const result = await bridge.remove(modelId, runtimeIdentity);
+      if (!configuration.recoveryToken) {
+        throw new LocalModelTransportError(
+          'local_model_delete_recovery_failed',
+          'Local model deletion reservation was not issued',
+        );
+      }
+      let result: DesktopOperationResult;
+      try {
+        result = await bridge.remove(modelId, runtimeIdentity);
+      } catch (error) {
+        if (!await confirmWeightsRemain(modelId)) {
+          return finalizeDeletedRegistration(
+            modelId,
+            configuration.recoveryToken,
+            configuration,
+          );
+        }
+        await restoreDeletionReservation(modelId, configuration.recoveryToken);
+        throw error;
+      }
       if (result.ok !== true) {
-        const registrationChanged = configuration.updatedKeys.includes('LLM_OLLAMA_MODELS');
-        if (registrationChanged) {
-          let weightsRemain = result.weightsMutationAttempted !== true;
-          if (result.weightsMutationAttempted === true) {
-            weightsRemain = true;
-            try {
-              const state = await bridge.detect();
-              if (state.status === 'running' && Array.isArray(state.installedModels)) {
-                weightsRemain = state.installedModels.some(
-                  (installed) => typeof installed === 'string'
-                    && installed.toLowerCase() === modelId.toLowerCase(),
-                );
-              }
-            } catch {
-              // Restore conservatively when desktop cannot confirm deletion state.
-            }
-          }
-          if (weightsRemain) {
-            if (!configuration.recoveryToken) {
-              throw new LocalModelTransportError(
-                'local_model_delete_recovery_failed',
-                'Local model deletion failed and no registration recovery was issued',
-              );
-            }
-            try {
-              await localModelsApi.restoreRegistration(modelId, configuration.recoveryToken);
-            } catch {
-              throw new LocalModelTransportError(
-                'local_model_delete_recovery_failed',
-                'Local model deletion failed and registration could not be restored',
-              );
-            }
-          } else if (configuration.recoveryToken) {
-            return finalizeDeletedRegistration(
-              modelId,
-              configuration.recoveryToken,
-              configuration,
-            );
-          }
+        let weightsRemain = result.weightsMutationAttempted !== true;
+        if (result.weightsMutationAttempted === true) {
+          weightsRemain = await confirmWeightsRemain(modelId);
+        }
+        if (weightsRemain) {
+          await restoreDeletionReservation(modelId, configuration.recoveryToken);
+        } else {
+          return finalizeDeletedRegistration(
+            modelId,
+            configuration.recoveryToken,
+            configuration,
+          );
         }
         throw new LocalModelTransportError(
           typeof result.error === 'string' ? result.error : 'local_model_delete_failed',
           'Local model deletion failed',
         );
-      }
-      if (!configuration.recoveryToken) {
-        return { ...configuration, deleted: true };
       }
       return finalizeDeletedRegistration(
         modelId,

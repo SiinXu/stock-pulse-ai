@@ -32,7 +32,7 @@ from src.services.local_model_service import (
     LocalModelValidationError,
 )
 from src.services.system_config_service import ConfigConflictError, ConfigValidationError
-from src.services.task_queue import TaskStatus
+from src.task_execution import TaskStatusEnum
 from src.utils.sanitize import log_safe_exception
 
 
@@ -111,7 +111,11 @@ def start_local_model_pull(
     """Submit one catalog-allowlisted Ollama pull task."""
     try:
         task = service.start_pull(request.model_id)
-        task_status = task.status.value if isinstance(task.status, TaskStatus) else str(task.status)
+        task_status = (
+            task.status.value
+            if isinstance(task.status, TaskStatusEnum)
+            else str(task.status)
+        )
         return LocalModelPullAccepted(
             task_id=task.task_id,
             trace_id=task.trace_id or task.task_id,

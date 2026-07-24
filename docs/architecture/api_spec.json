@@ -8741,13 +8741,7 @@
             "title": "Trace Id"
           },
           "status": {
-            "type": "string",
-            "enum": [
-              "pending",
-              "processing",
-              "cancel_requested"
-            ],
-            "title": "Status"
+            "$ref": "#/components/schemas/TaskStatusEnum"
           },
           "model_id": {
             "type": "string",
@@ -8795,17 +8789,7 @@
             "title": "Task Id"
           },
           "status": {
-            "type": "string",
-            "enum": [
-              "pending",
-              "processing",
-              "cancel_requested",
-              "completed",
-              "failed",
-              "cancelled",
-              "interrupted"
-            ],
-            "title": "Status"
+            "$ref": "#/components/schemas/TaskStatusEnum"
           },
           "progress": {
             "type": "integer",
@@ -9009,24 +8993,18 @@
             "default": false
           },
           "recovery_token": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
             "title": "Recovery Token"
           }
         },
         "type": "object",
         "required": [
           "config_version",
-          "model_id"
+          "model_id",
+          "recovery_token"
         ],
         "title": "LocalModelUnregistrationResponse",
-        "description": "Unregister result with an optional one-time desktop rollback capability."
+        "description": "Unregister result with the required one-time Desktop deletion reservation."
       },
       "TaskStatusEnum": {
         "type": "string",

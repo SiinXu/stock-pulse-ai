@@ -203,9 +203,11 @@ they never carry a target URL. The backend recomputes that identity from its own
 configuration and rejects activation or unregistration when either snapshot
 value changed during the operation. While a Desktop deletion recovery is
 pending, the backend reserves that model against concurrent local-model pulls
-or registration. Every lifecycle registration remains catalog-backed. Recovery
-is single-use and bound to the exact post-unregister configuration and runtime
-identity; it optimistically restores that snapshot offline without probing a
+or registration, including models installed directly in Ollama that were not
+registered yet. Every lifecycle registration remains catalog-backed. Recovery
+is single-use and bound to the exact post-reservation configuration and runtime
+identity. For an unregistered model it only releases the reservation and never
+creates a registration. Recovery remains offline without probing a
 stopped or temporarily unavailable runtime. Successful weight deletion retries
 idempotent recovery revocation once. If acknowledgement remains unavailable,
 deletion still succeeds and any unrevoked token expires after its short TTL.

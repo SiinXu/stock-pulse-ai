@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import threading
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from unittest.mock import Mock, patch
 
 import requests
@@ -27,7 +27,8 @@ from src.services.local_model_service import (
     normalize_ollama_base_url,
 )
 from src.services.task_queue import TaskInfo
-from src.services.system_config_service import ConfigConflictError
+from src.services.system_config_service import ConfigConflictError, ConfigValidationError
+from src.task_execution import TaskCommand, TaskRunContext, TaskStatusEnum, deep_thaw
 from tests._llm_env_isolation import strip_ambient_llm_env
 from tests.system_config_service_test_support import _SystemConfigServiceTestCaseBase
 
@@ -63,27 +64,61 @@ class _FakeTaskQueue:
         self.pending: List[TaskInfo] = []
         self.tasks: Dict[str, TaskInfo] = {}
         self.run_task = None
+        self.command: Optional[TaskCommand] = None
         self.progress_updates: List[tuple] = []
+        self.cancel_requested = False
+        self.cancel_after_progress = False
 
     def list_pending_tasks(self) -> List[TaskInfo]:
         return list(self.pending)
 
-    def submit_background_task(self, run_task, **kwargs) -> TaskInfo:
-        self.run_task = run_task
+    def submit(self, command: TaskCommand) -> str:
+        self.command = command
+        metadata = deep_thaw(command.metadata)
+        task_id = "local-model-pull-task"
         task = TaskInfo(
-            task_id=kwargs["task_id"],
-            trace_id=kwargs["trace_id"],
-            stock_code=kwargs["stock_code"],
-            stock_name=kwargs["stock_name"],
-            report_type=kwargs["report_type"],
-            message=kwargs["message"],
+            task_id=task_id,
+            trace_id=command.trace_id or task_id,
+            kind=command.kind,
+            stock_code=str(metadata["stock_code"]),
+            stock_name=str(metadata["stock_name"]),
+            report_type=str(metadata["report_type"]),
+            message=str(metadata["message"]),
+            failure_error_code=command.failure_error_code,
         )
         self.tasks[task.task_id] = task
         self.pending = [task]
-        return task
+        self.run_task = lambda: self._run_command(task)
+        return task_id
 
-    def update_task_progress(self, *args, **kwargs) -> None:
-        self.progress_updates.append((args, kwargs))
+    def _run_command(self, task: TaskInfo) -> Any:
+        assert self.command is not None
+        task.status = TaskStatusEnum.PROCESSING
+
+        def update_progress(progress: int, message: Optional[str] = None) -> None:
+            self.progress_updates.append(((task.task_id, progress, message), {}))
+            task.progress = progress
+            task.message = message
+            if self.cancel_after_progress:
+                self.cancel_requested = True
+
+        context = TaskRunContext(
+            task_id=task.task_id,
+            trace_id=task.trace_id or task.task_id,
+            command=self.command,
+            update_progress=update_progress,
+            append_flow_event=lambda _event: None,
+            is_cancel_requested=lambda: self.cancel_requested,
+        )
+        result = self.command.run(context)
+        task.status = (
+            TaskStatusEnum.CANCELLED
+            if self.cancel_requested
+            else TaskStatusEnum.COMPLETED
+        )
+        task.result = None if self.cancel_requested else result
+        self.pending = []
+        return result
 
     def get_task(self, task_id: str) -> Optional[TaskInfo]:
         return self.tasks.get(task_id)
@@ -103,11 +138,15 @@ class _FakeRuntimeClient:
         self.list_calls += 1
         return list(self.installed)
 
-    def pull_model(self, model_id: str, *, on_progress) -> None:
+    def pull_model(self, model_id: str, *, on_progress, is_cancel_requested=None) -> None:
+        if is_cancel_requested is not None and is_cancel_requested():
+            return
         self.pulled.append(model_id)
         if model_id not in self.installed:
             self.installed.append(model_id)
         on_progress(OllamaPullProgress(percent=42, status="pulling manifest"))
+        if is_cancel_requested is not None and is_cancel_requested():
+            return
         on_progress(OllamaPullProgress(percent=99, status="success"))
 
     def delete_model(self, model_id: str) -> None:
@@ -183,6 +222,78 @@ class LocalModelRuntimeClientTestCase(_SystemConfigServiceTestCaseBase):
         request = session.request.call_args
         self.assertEqual(request.args[:2], ("POST", "http://127.0.0.1:11434/api/pull"))
         self.assertEqual(request.kwargs["json"], {"name": "qwen3:4b", "stream": True})
+        self.assertTrue(response.closed)
+
+    def test_pull_cancellation_before_request_does_not_contact_the_runtime(self) -> None:
+        session = Mock()
+
+        OllamaRuntimeClient(
+            "http://127.0.0.1:11434",
+            session=session,
+        ).pull_model(
+            "qwen3:4b",
+            on_progress=lambda _progress: None,
+            is_cancel_requested=lambda: True,
+        )
+
+        session.request.assert_not_called()
+
+    def test_pull_cancellation_between_events_closes_the_stream(self) -> None:
+        response = _FakeResponse(
+            lines=[
+                b'{"status":"pulling","total":100,"completed":25}',
+                b'{"status":"success"}',
+            ]
+        )
+        session = Mock()
+        session.request.return_value = response
+        progress: List[OllamaPullProgress] = []
+
+        OllamaRuntimeClient(
+            "http://127.0.0.1:11434",
+            session=session,
+        ).pull_model(
+            "qwen3:4b",
+            on_progress=progress.append,
+            is_cancel_requested=lambda: bool(progress),
+        )
+
+        self.assertEqual(progress, [OllamaPullProgress(percent=25, status="pulling")])
+        self.assertTrue(response.closed)
+
+    def test_pull_absolute_deadline_applies_despite_continuous_progress(self) -> None:
+        response = _FakeResponse(
+            lines=[
+                b'{"status":"pulling","total":100,"completed":25}',
+                b'{"status":"success"}',
+            ]
+        )
+        session = Mock()
+        session.request.return_value = response
+        now = 0.0
+
+        def monotonic() -> float:
+            nonlocal now
+            now += 0.25
+            return now
+
+        with patch(
+            "src.services.local_model_service.time.monotonic",
+            side_effect=monotonic,
+        ):
+            with self.assertRaisesRegex(
+                LocalModelRuntimeRequestError,
+                "timed out",
+            ):
+                OllamaRuntimeClient(
+                    "http://127.0.0.1:11434",
+                    session=session,
+                ).pull_model(
+                    "qwen3:4b",
+                    on_progress=lambda _progress: None,
+                    timeout_seconds=1,
+                )
+
         self.assertTrue(response.closed)
 
     def test_connection_failure_is_stable_and_does_not_echo_the_target(self) -> None:
@@ -453,6 +564,76 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertEqual(values["LLM_CHANNELS"], "ollama")
         self.assertNotIn("LITELLM_MODEL", values)
 
+    def test_auto_activation_ignores_a_disabled_declared_channel(self) -> None:
+        self._rewrite_env(
+            "ADMIN_AUTH_ENABLED=true",
+            "LLM_CONFIG_MODE=auto",
+            "LLM_CHANNELS=stale",
+            "LLM_STALE_ENABLED=false",
+            "LLM_STALE_PROTOCOL=openai",
+            "LLM_STALE_API_KEY=secret-value",
+            "LLM_STALE_MODELS=gpt-4o",
+            "GEMINI_API_KEY=secret-value",
+        )
+        service, _queue, _client = self._local_service()
+
+        result = service.configure_model("qwen3:4b", assignment="auto")
+        values = self.manager.read_config_map()
+
+        self.assertFalse(result["selected_primary"])
+        self.assertEqual(values["LLM_CONFIG_MODE"], "legacy")
+        self.assertNotIn("LITELLM_MODEL", values)
+
+    def test_unroutable_channel_cannot_displace_legacy_through_partial_update(self) -> None:
+        self._rewrite_env(
+            "ADMIN_AUTH_ENABLED=true",
+            "LLM_CONFIG_MODE=auto",
+            "LLM_CHANNELS=stale",
+            "LLM_STALE_ENABLED=true",
+            "LLM_STALE_PROTOCOL=openai",
+            "LLM_STALE_MODELS=gpt-4o",
+            "GEMINI_API_KEY=secret-value",
+        )
+        service, _queue, _client = self._local_service()
+
+        with self.assertRaises(ConfigValidationError):
+            service.configure_model("qwen3:4b", assignment="auto")
+
+        values = self.manager.read_config_map()
+        self.assertEqual(values["LLM_CONFIG_MODE"], "auto")
+        self.assertEqual(values["LLM_CHANNELS"], "stale")
+        self.assertNotIn("LITELLM_MODEL", values)
+        self.assertNotIn("LLM_OLLAMA_MODELS", values)
+
+    def test_agent_assignment_rejects_when_only_declared_channels_are_unroutable(self) -> None:
+        for channel_values in (
+            (
+                "LLM_STALE_ENABLED=false",
+                "LLM_STALE_API_KEY=secret-value",
+            ),
+            ("LLM_STALE_ENABLED=true",),
+        ):
+            with self.subTest(channel_values=channel_values):
+                strip_ambient_llm_env()
+                self._rewrite_env(
+                    "ADMIN_AUTH_ENABLED=true",
+                    "LLM_CONFIG_MODE=auto",
+                    "LLM_CHANNELS=stale",
+                    "LLM_STALE_PROTOCOL=openai",
+                    "LLM_STALE_MODELS=gpt-4o",
+                    "GEMINI_API_KEY=secret-value",
+                    *channel_values,
+                )
+                service, _queue, _client = self._local_service()
+
+                with self.assertRaises(LocalModelValidationError):
+                    service.configure_model("qwen3:4b", assignment="agent")
+
+                self.assertNotIn(
+                    "AGENT_LITELLM_MODEL",
+                    self.manager.read_config_map(),
+                )
+
     def test_agent_assignment_rejects_an_incompatible_legacy_source(self) -> None:
         self._rewrite_env(
             "ADMIN_AUTH_ENABLED=true",
@@ -643,10 +824,10 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
             client=_AmbiguousDeleteClient(),
         )
 
-        with self.assertRaises(LocalModelRuntimeRequestError):
-            service.delete_model("qwen3:4b")
+        result = service.delete_model("qwen3:4b")
 
         values = self.manager.read_config_map()
+        self.assertTrue(result["deleted"])
         self.assertEqual(values["LLM_CHANNELS"], "cloud")
         self.assertEqual(values["LLM_OLLAMA_MODELS"], "")
 
@@ -714,10 +895,7 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertTrue(result["activated"])
         self.assertTrue(result["selected_primary"], service.get_configuration())
         self.assertEqual(queue.progress_updates[0][0][1], 42)
-        self.assertEqual(
-            queue.progress_updates[0][1]["message_code"],
-            "local_model.pull.progress",
-        )
+        self.assertIsInstance(queue.command, TaskCommand)
         self.assertEqual(self.manager.read_config_map()["LITELLM_MODEL"], "ollama/qwen3:4b")
 
     def test_pull_reuses_an_inflight_task_without_repeating_runtime_preflight(self) -> None:
@@ -737,10 +915,14 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
         pull_result: Dict[str, object] = {}
 
         class _BlockingPullClient(_FakeRuntimeClient):
-            def pull_model(self, model_id: str, *, on_progress) -> None:
+            def pull_model(self, model_id: str, *, on_progress, is_cancel_requested=None) -> None:
                 pull_started.set()
                 self.assert_released = release_pull.wait(timeout=5)
-                super().pull_model(model_id, on_progress=on_progress)
+                super().pull_model(
+                    model_id,
+                    on_progress=on_progress,
+                    is_cancel_requested=is_cancel_requested,
+                )
 
         client = _BlockingPullClient()
         self._rewrite_env("ADMIN_AUTH_ENABLED=true")
@@ -769,6 +951,23 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertFalse(pull_thread.is_alive())
         self.assertTrue(client.assert_released)
         self.assertFalse(pull_result["activated"])
+
+    def test_pull_cancellation_skips_activation_through_the_task_context(self) -> None:
+        self._rewrite_env("ADMIN_AUTH_ENABLED=true")
+        queue = _FakeTaskQueue()
+        queue.cancel_after_progress = True
+        service, _queue, client = self._local_service(queue=queue)
+
+        service.start_pull("qwen3:4b")
+        result = queue.run_task()
+
+        self.assertEqual(client.pulled, ["qwen3:4b"])
+        self.assertFalse(result["activated"])
+        self.assertEqual(
+            queue.tasks["local-model-pull-task"].status,
+            TaskStatusEnum.CANCELLED,
+        )
+        self.assertNotIn("LLM_OLLAMA_MODELS", self.manager.read_config_map())
 
     def test_registration_restore_is_offline_and_bound_to_the_original_runtime(self) -> None:
         self._rewrite_env(
@@ -861,6 +1060,46 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
             "qwen3:4b",
             recovery_token=unregistered["recovery_token"],
         )
+
+    def test_unregistered_desktop_delete_is_reserved_without_creating_registration(self) -> None:
+        self._rewrite_env(
+            "ADMIN_AUTH_ENABLED=true",
+            "LLM_CONFIG_MODE=channels",
+            "LLM_CHANNELS=cloud",
+            "LLM_CLOUD_PROVIDER=openai",
+            "LLM_CLOUD_PROTOCOL=openai",
+            "LLM_CLOUD_API_KEY=secret-value",
+            "LLM_CLOUD_MODELS=gpt-4o",
+            "LLM_CLOUD_ENABLED=true",
+            "LITELLM_MODEL=openai/gpt-4o",
+        )
+        service, _queue, client = self._local_service()
+        reserved = self._unregister(service)
+
+        self.assertTrue(reserved["recovery_token"])
+        self.assertFalse(reserved.get("deleted", False))
+        with self.assertRaises(LocalModelInUseError):
+            service.configure_model("qwen3:4b", assignment="auto")
+        with self.assertRaises(LocalModelInUseError):
+            service.start_pull("qwen3:4b")
+        with self.assertRaises(LocalModelInUseError):
+            service.delete_model("qwen3:4b")
+        self.assertEqual(client.deleted, [])
+        self.assertEqual(client.list_calls, 0)
+
+        restored = service.restore_registration(
+            "qwen3:4b",
+            recovery_token=reserved["recovery_token"],
+        )
+        self.assertNotIn("qwen3:4b", restored["registered_models"])
+
+        reserved_again = self._unregister(service)
+        finalized = service.finalize_unregistration(
+            "qwen3:4b",
+            recovery_token=reserved_again["recovery_token"],
+        )
+        self.assertTrue(finalized["deleted"])
+        service.start_pull("qwen3:4b")
 
     def test_finalize_consumes_recovery_when_post_unregister_config_changed(self) -> None:
         self._rewrite_env(
