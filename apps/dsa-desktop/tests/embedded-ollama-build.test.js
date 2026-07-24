@@ -102,6 +102,71 @@ test('embedded Ollama downloads reject unapproved destinations and private DNS r
     assert.throws(() => prepareScript.validateDownloadUrl(url), /Refusing embedded Ollama/);
   }
 
+  for (const address of [
+    '0.0.0.0',
+    '10.0.0.1',
+    '100.64.0.1',
+    '127.0.0.1',
+    '169.254.169.254',
+    '172.16.0.1',
+    '192.0.0.8',
+    '192.0.2.1',
+    '192.31.196.1',
+    '192.52.193.1',
+    '192.88.99.2',
+    '192.168.0.1',
+    '192.175.48.1',
+    '198.18.0.1',
+    '198.51.100.1',
+    '203.0.113.1',
+    '224.0.0.1',
+    '240.0.0.1',
+    '255.255.255.255',
+    '::',
+    '::1',
+    '::ffff:127.0.0.1',
+    '::ffff:8.8.8.8',
+    '64:ff9b::7f00:1',
+    '64:ff9b:1::1',
+    '100::1',
+    '100:0:0:1::1',
+    '2001::1',
+    '2001:2::1',
+    '2001:10::1',
+    '2001:db8::1',
+    '2002:7f00:1::',
+    '2620:4f:8000::1',
+    '3fff::1',
+    '5f00::1',
+    'fc00::1',
+    'fec0::1',
+    'fe80::1',
+    'ff00::1',
+    '4000::1',
+    '2001:4860:4860::8888%lo0',
+    'not-an-ip',
+    null,
+    undefined,
+  ]) {
+    assert.equal(
+      prepareScript.isPublicDownloadAddress(address),
+      false,
+      `expected a non-public address: ${address}`
+    );
+  }
+  for (const address of [
+    '8.8.8.8',
+    '140.82.112.4',
+    '2001:4860:4860::8888',
+    '2606:4700:4700::1111',
+  ]) {
+    assert.equal(
+      prepareScript.isPublicDownloadAddress(address),
+      true,
+      `expected a public address: ${address}`
+    );
+  }
+
   const privateLookup = prepareScript.createPublicLookup((_hostname, options, callback) => {
     assert.equal(options.all, true);
     callback(null, [{ address: '127.0.0.1', family: 4 }]);
@@ -109,6 +174,21 @@ test('embedded Ollama downloads reject unapproved destinations and private DNS r
   await assert.rejects(
     new Promise((resolve, reject) => {
       privateLookup('github.com', {}, (error, address) => error ? reject(error) : resolve(address));
+    }),
+    /exclusively to public addresses/
+  );
+
+  const mixedLookup = prepareScript.createPublicLookup((_hostname, _options, callback) => {
+    callback(null, [
+      { address: '140.82.112.4', family: 4 },
+      { address: '2001:2::1', family: 6 },
+    ]);
+  });
+  await assert.rejects(
+    new Promise((resolve, reject) => {
+      mixedLookup('github.com', { all: true }, (error, addresses) => (
+        error ? reject(error) : resolve(addresses)
+      ));
     }),
     /exclusively to public addresses/
   );
