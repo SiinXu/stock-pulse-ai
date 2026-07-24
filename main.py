@@ -97,7 +97,6 @@ from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 _RUNTIME_ENV_FILE_KEYS = set()
-_PUBLIC_BIND_HOSTS = frozenset({"0.0.0.0", "::", "[::]", "*"})
 
 
 def _get_active_env_path() -> Path:
@@ -283,11 +282,11 @@ _is_public_bind_host = __cli_source.clone_facade_function(
     module_name=__name__,
     qualname="_is_public_bind_host",
 )
-_warn_if_public_webui_without_auth = __cli_source.clone_facade_function(
-    __runtime_source._warn_if_public_webui_without_auth,
+_enforce_webui_bind_security = __cli_source.clone_facade_function(
+    __runtime_source._enforce_webui_bind_security,
     globals(),
     module_name=__name__,
-    qualname="_warn_if_public_webui_without_auth",
+    qualname="_enforce_webui_bind_security",
 )
 _resolve_web_service_bind = __cli_source.clone_facade_function(
     __runtime_source._resolve_web_service_bind,

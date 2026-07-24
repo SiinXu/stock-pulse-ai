@@ -42,6 +42,15 @@ cp .env.example .env
 vim .env  # Fill in real API Keys and configuration
 ```
 
+The Compose `server` publishes the Web/API port and binds to `0.0.0.0` inside
+the container. Set `ADMIN_AUTH_ENABLED=true` in `.env` before starting that
+service. With authentication disabled, StockPulse refuses this non-local bind;
+the default `127.0.0.1` bind remains available for local development.
+
+`ALLOW_INSECURE_PUBLIC_BIND=true` is an emergency-only escape hatch. It exposes
+the service without request authentication and writes a persistent security
+warning, so it must not be used as a normal deployment setting.
+
 ### 3. One-Click Start
 
 ```bash
@@ -132,6 +141,11 @@ python -m pip check
 cp .env.example .env
 vim .env  # Fill in configuration
 ```
+
+Keep `WEBUI_HOST=127.0.0.1` while developing on the same machine. Before using
+`0.0.0.0`, a LAN address, or a public interface, set
+`ADMIN_AUTH_ENABLED=true`; otherwise HTTP startup fails closed. Unix sockets
+remain available as a local-only bind.
 
 ### 4. Run
 

@@ -71,13 +71,13 @@ EXPECTED_PRIVATE_NAMES = (
     "_INITIAL_PROCESS_ENV",
     "_LazyPipelineDescriptor",
     "_ModuleExports",
-    "_PUBLIC_BIND_HOSTS",
     "_RUNTIME_ENV_FILE_KEYS",
     "_bootstrap_environment",
     "_build_schedule_time_provider",
     "_build_schedule_times_provider",
     "_can_reuse_market_context_for_review",
     "_compute_trading_day_filter",
+    "_enforce_webui_bind_security",
     "_env_bootstrapped",
     "_exports",
     "_get_active_env_path",
@@ -101,7 +101,6 @@ EXPECTED_PRIVATE_NAMES = (
     "_save_reused_market_review_report",
     "_setup_bootstrap_logging",
     "_setup_runtime_logging",
-    "_warn_if_public_webui_without_auth",
 )
 EXPECTED_ARGUMENT_DEFAULTS = {
     "backtest": False,

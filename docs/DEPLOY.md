@@ -42,6 +42,10 @@ cp .env.example .env
 vim .env  # 填入真实的 API Key 等配置
 ```
 
+Compose 的 `server` 会在容器内监听 `0.0.0.0` 并发布 Web/API 端口。启动该服务前，必须在 `.env` 中设置 `ADMIN_AUTH_ENABLED=true`。认证关闭时，StockPulse 会拒绝这个非本机监听；本地开发仍可使用默认的 `127.0.0.1`。
+
+`ALLOW_INSECURE_PUBLIC_BIND=true` 仅用于紧急逃生。它会让服务在没有请求认证的情况下对外监听，并持续写入安全警告，不能作为常规部署配置。
+
 ### 3. 一键启动
 
 ```bash
@@ -137,6 +141,8 @@ cp .env.example .env
 vim .env  # 填入配置
 ```
 
+同机开发请保留 `WEBUI_HOST=127.0.0.1`。改为 `0.0.0.0`、局域网地址或公网接口前，必须设置 `ADMIN_AUTH_ENABLED=true`，否则 HTTP 服务会拒绝启动；Unix socket 仍按本机监听处理。
+
 ### 4. 运行
 
 ```bash
@@ -149,7 +155,7 @@ python main.py --schedule
 # 后台运行（使用 nohup）
 nohup python main.py --schedule > /dev/null 2>&1 &
 
-# 启动 Web 管理界面（云服务器需先在 .env 中设置 WEBUI_HOST=0.0.0.0）
+# 启动 Web 管理界面（云服务器需先启用认证，再设置 WEBUI_HOST=0.0.0.0）
 python main.py --webui-only
 
 # 启动 Web 界面（启动时执行一次分析；需每日定时请加 --schedule 或设 SCHEDULE_ENABLED=true）

@@ -24,7 +24,7 @@ from src.app import runtime as runtime_source
 
 MOVED_RUNTIME_FUNCTIONS = (
     "_is_public_bind_host",
-    "_warn_if_public_webui_without_auth",
+    "_enforce_webui_bind_security",
     "_resolve_web_service_bind",
     "run_scheduled_analysis",
     "_run_analysis_with_runtime_scheduler_lock",

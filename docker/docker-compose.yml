@@ -35,7 +35,8 @@ x-common: &common
   environment:
     - TZ=Asia/Shanghai
 
-    # Web/API service bind address (must be 0.0.0.0 inside container)
+    # Web/API service bind address (must be 0.0.0.0 inside the container).
+    # The server fails closed unless ADMIN_AUTH_ENABLED=true is resolved from ../.env.
     - WEBUI_HOST=0.0.0.0
     # API_PORT is read from .env file, no need to hardcode it here
 
@@ -67,6 +68,7 @@ services:
     <<: *common
     container_name: stock-server
     command: ["python", "main.py", "--serve-only", "--host", "0.0.0.0", "--port", "${API_PORT:-8000}"]
+    # Keep ADMIN_AUTH_ENABLED=true in ../.env for this published-port service.
     # If network_mode: host is used, the following ports mapping is invalid; the port is specified in the command via --port.
     ports:
       - "${API_PORT:-8000}:${API_PORT:-8000}"

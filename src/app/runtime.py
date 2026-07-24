@@ -16,7 +16,6 @@ from src.webui_frontend import prepare_webui_frontend_assets
 if TYPE_CHECKING:
     from main import (
         _INITIAL_PROCESS_ENV,
-        _PUBLIC_BIND_HOSTS,
         _reload_env_file_values_preserving_overrides,
         run_full_analysis,
     )
@@ -26,22 +25,19 @@ logger = logging.getLogger(__name__)
 
 
 def _is_public_bind_host(host: str) -> bool:
-    return (host or "").strip().lower() in _PUBLIC_BIND_HOSTS
+    from src.security.http_bind import is_local_only_bind
+
+    return not is_local_only_bind(host)
 
 
-def _warn_if_public_webui_without_auth(host: str) -> None:
-    if not _is_public_bind_host(host):
-        return
+def _enforce_webui_bind_security(host: str) -> None:
+    """Apply the HTTP bind guard before the main entrypoint starts Uvicorn."""
+    from src.security.http_bind import enforce_http_bind_security
 
-    from src.auth import is_auth_enabled
-
-    if is_auth_enabled():
-        return
-    logger.warning(
-        "WEBUI_HOST=%s binds the Web UI to a public interface while "
-        "ADMIN_AUTH_ENABLED=false. Keep this service behind a trusted network "
-        "boundary or enable admin authentication before exposing it.",
+    enforce_http_bind_security(
         host,
+        event_logger=logger,
+        entrypoint="main.py Web/API service",
     )
 
 
@@ -319,7 +315,16 @@ def _coordinate_service_runtime(
 
     if start_serve:
         args.host, args.port = _resolve_web_service_bind(args, config)
-        _warn_if_public_webui_without_auth(args.host)
+        from src.security.http_bind import (
+            INSECURE_PUBLIC_BIND_ERROR_MESSAGE,
+            InsecurePublicBindError,
+        )
+
+        try:
+            _enforce_webui_bind_security(args.host)
+        except InsecurePublicBindError:
+            logger.error(INSECURE_PUBLIC_BIND_ERROR_MESSAGE)
+            return start_serve, 1
 
     bot_clients_started = False
     if start_serve:

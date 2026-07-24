@@ -458,6 +458,10 @@ The default Compose file sets `limits.memory: 1G` and `reservations.memory: 512M
 
 Use these commands only after the target tag appears in this repository's Packages page. Replace `<published-tag>` with a tag that actually exists; otherwise use the source-build workflow above.
 
+Before starting any published Web/API port, set `ADMIN_AUTH_ENABLED=true` in
+`.env`. An auth-disabled container refuses the non-local bind before accepting
+connections.
+
 ```bash
 IMAGE="ghcr.io/siinxu/stock-pulse-ai:<published-tag>"
 
@@ -581,6 +585,8 @@ docker-compose -f ./docker/docker-compose.yml up -d server
 ```
 
 ### Manual Image Build
+
+Set `ADMIN_AUTH_ENABLED=true` in `.env` before publishing the container port.
 
 ```bash
 docker build -f docker/Dockerfile -t stock-analysis .
@@ -1515,7 +1521,9 @@ curl "http://127.0.0.1:8000/api/v1/backtest/results?page=1&limit=20"
 
 ### Custom Configuration
 
-Modify default port or allow LAN access:
+Modify the default port or allow LAN access. LAN and other non-local binds
+require `ADMIN_AUTH_ENABLED=true`; the auth-disabled local default remains
+`127.0.0.1`:
 
 ```bash
 python main.py --serve-only --host 0.0.0.0 --port 8888

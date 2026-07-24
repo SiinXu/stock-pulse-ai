@@ -521,6 +521,8 @@ docker-compose -f ./docker/docker-compose.yml logs -f server
 
 仅当目标 tag 已出现在当前仓库 Packages 中时使用以下命令。将 `<published-tag>` 替换为实际存在的 tag；若尚未发布，请使用上面的源码构建方式。
 
+发布任何 Web/API 端口前，先在 `.env` 中设置 `ADMIN_AUTH_ENABLED=true`。认证关闭的容器会在接受连接前拒绝非本机监听。
+
 ```bash
 IMAGE="ghcr.io/siinxu/stock-pulse-ai:<published-tag>"
 
@@ -644,6 +646,8 @@ docker-compose -f ./docker/docker-compose.yml up -d server
 ```
 
 ### 手动构建镜像
+
+发布容器端口前，请先在 `.env` 中设置 `ADMIN_AUTH_ENABLED=true`。
 
 ```bash
 docker build -f docker/Dockerfile -t stock-analysis .
@@ -1695,7 +1699,7 @@ curl "http://127.0.0.1:8000/api/v1/backtest/results?page=1&limit=20"
 
 ### 自定义配置
 
-修改默认端口或允许局域网访问：
+修改默认端口或允许局域网访问。局域网及其他非本机监听要求 `ADMIN_AUTH_ENABLED=true`；认证关闭时请保留本机默认地址 `127.0.0.1`：
 
 ```bash
 python main.py --serve-only --host 0.0.0.0 --port 8888

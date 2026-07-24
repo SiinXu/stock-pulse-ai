@@ -199,19 +199,17 @@ class MainScheduleModeTestCase(unittest.TestCase):
         self.assertEqual(effective_region, "jp,kr")
         self.assertFalse(should_skip_all)
 
-    def test_public_webui_bind_warns_when_auth_is_disabled(self) -> None:
+    def test_public_webui_bind_is_rejected_when_auth_is_disabled(self) -> None:
         with patch("src.auth.is_auth_enabled", return_value=False), \
-             patch("main.logger.warning") as warning_log:
-            main._warn_if_public_webui_without_auth("0.0.0.0")
+             patch.dict(os.environ, {"ALLOW_INSECURE_PUBLIC_BIND": "false"}):
+            with self.assertRaisesRegex(RuntimeError, "Refusing to start"):
+                main._enforce_webui_bind_security("0.0.0.0")
 
-        warning_log.assert_called_once()
-        self.assertIn("WEBUI_HOST=%s", warning_log.call_args.args[0])
-        self.assertEqual(warning_log.call_args.args[1], "0.0.0.0")
-
-    def test_loopback_webui_bind_does_not_warn_when_auth_is_disabled(self) -> None:
+    def test_loopback_webui_bind_is_allowed_when_auth_is_disabled(self) -> None:
         with patch("src.auth.is_auth_enabled", return_value=False), \
+             patch.dict(os.environ, {"ALLOW_INSECURE_PUBLIC_BIND": "false"}), \
              patch("main.logger.warning") as warning_log:
-            main._warn_if_public_webui_without_auth("127.0.0.1")
+            main._enforce_webui_bind_security("127.0.0.1")
 
         warning_log.assert_not_called()
 
@@ -242,6 +240,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
             observed_bind.append((host, port))
 
         with patch.dict(os.environ, {"GITHUB_ACTIONS": "false"}, clear=False), \
+             patch("src.auth.is_auth_enabled", return_value=False), \
              patch("main.parse_arguments", return_value=args), \
              patch("main.get_config", return_value=config), \
              patch("main.prepare_webui_frontend_assets", return_value=True), \
@@ -262,6 +261,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
             observed_bind.append((host, port))
 
         with patch.dict(os.environ, {"GITHUB_ACTIONS": "false"}, clear=False), \
+             patch("src.auth.is_auth_enabled", return_value=True), \
              patch("main.parse_arguments", return_value=args), \
              patch("main.get_config", return_value=config), \
              patch("main.prepare_webui_frontend_assets", return_value=True), \
@@ -272,6 +272,31 @@ class MainScheduleModeTestCase(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(observed_bind, [("0.0.0.0", 8000)])
+
+    def test_serve_only_refuses_public_bind_when_auth_is_disabled(self) -> None:
+        args = self._make_args(serve_only=True, host="0.0.0.0", port=8000)
+        config = self._make_config(
+            webui_enabled=False,
+            webui_host="127.0.0.1",
+            webui_port=18000,
+        )
+
+        with patch.dict(
+            os.environ,
+            {
+                "GITHUB_ACTIONS": "false",
+                "ALLOW_INSECURE_PUBLIC_BIND": "false",
+            },
+            clear=False,
+        ), patch("src.auth.is_auth_enabled", return_value=False), patch(
+            "main.parse_arguments", return_value=args
+        ), patch("main.get_config", return_value=config), patch(
+            "main.start_api_server"
+        ) as start_api_server:
+            exit_code = main.main()
+
+        self.assertEqual(exit_code, 1)
+        start_api_server.assert_not_called()
 
     def test_start_api_server_fails_before_thread_when_port_is_busy(self) -> None:
         config = self._make_config(log_level="INFO")
