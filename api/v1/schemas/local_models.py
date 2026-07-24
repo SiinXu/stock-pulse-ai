@@ -31,14 +31,18 @@ class LocalModelDesktopActivationRequest(LocalModelRequest):
     """Activate a Desktop pull only against its original configuration snapshot."""
 
     expected_config_version: str = Field(..., min_length=1, max_length=128)
-    expected_runtime_base_url: str = Field(..., min_length=1, max_length=2048)
+    expected_runtime_identity: str = Field(
+        ..., min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$"
+    )
 
 
 class LocalModelDesktopUnregistrationRequest(LocalModelRequest):
     """Unregister before Desktop deletion using one immutable runtime snapshot."""
 
     expected_config_version: str = Field(..., min_length=1, max_length=128)
-    expected_runtime_base_url: str = Field(..., min_length=1, max_length=2048)
+    expected_runtime_identity: str = Field(
+        ..., min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$"
+    )
 
 
 class LocalModelRegistrationRestoreRequest(LocalModelRequest):

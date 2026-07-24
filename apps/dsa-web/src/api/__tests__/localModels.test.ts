@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { localModelsApi } from '../localModels';
 
+const RUNTIME_IDENTITY = 'b26993598dffd1f14aed97def57ef67f753518a9b773d8a12033c82b4fa545ca';
+
 const { get, post, deleteRequest } = vi.hoisted(() => ({
   get: vi.fn(),
   post: vi.fn(),
@@ -69,13 +71,13 @@ describe('localModelsApi', () => {
     await localModelsApi.activateDesktop(
       'qwen3:4b',
       'config-1',
-      'http://127.0.0.1:11434',
+      RUNTIME_IDENTITY,
     );
     await localModelsApi.deleteModel('qwen3:4b');
     await localModelsApi.unregister(
       'qwen3:4b',
       'config-1',
-      'http://127.0.0.1:11434',
+      RUNTIME_IDENTITY,
     );
     await localModelsApi.restoreRegistration('qwen3:4b', 'recovery-2');
     await localModelsApi.finalizeUnregistration('qwen3:4b', 'recovery-3');
@@ -90,7 +92,7 @@ describe('localModelsApi', () => {
     expect(post).toHaveBeenNthCalledWith(3, '/api/v1/local-models/desktop-activations', {
       model_id: 'qwen3:4b',
       expected_config_version: 'config-1',
-      expected_runtime_base_url: 'http://127.0.0.1:11434',
+      expected_runtime_identity: RUNTIME_IDENTITY,
     });
     expect(deleteRequest).toHaveBeenNthCalledWith(1, '/api/v1/local-models/models', {
       data: { model_id: 'qwen3:4b' },
@@ -99,7 +101,7 @@ describe('localModelsApi', () => {
       data: {
         model_id: 'qwen3:4b',
         expected_config_version: 'config-1',
-        expected_runtime_base_url: 'http://127.0.0.1:11434',
+        expected_runtime_identity: RUNTIME_IDENTITY,
       },
     });
     expect(post).toHaveBeenNthCalledWith(4, '/api/v1/local-models/registrations', {
@@ -114,6 +116,6 @@ describe('localModelsApi', () => {
     const payloads = [...post.mock.calls, ...deleteRequest.mock.calls]
       .map((call) => call[1])
       .filter((payload) => payload && typeof payload === 'object');
-    expect(payloads.some((payload) => Object.hasOwn(payload, 'base_url'))).toBe(false);
+    expect(payloads.some((payload) => JSON.stringify(payload).includes('base_url'))).toBe(false);
   });
 });

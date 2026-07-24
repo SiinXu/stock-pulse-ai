@@ -167,7 +167,7 @@ def activate_desktop_local_model(
         payload = service.activate_desktop_model(
             request.model_id,
             expected_config_version=request.expected_config_version,
-            expected_runtime_base_url=request.expected_runtime_base_url,
+            expected_runtime_identity=request.expected_runtime_identity,
         )
         payload["success"] = True
         return LocalModelMutationResponse.model_validate(payload)
@@ -210,10 +210,10 @@ def unregister_local_model(
         payload = service.unregister_model(
             request.model_id,
             expected_config_version=request.expected_config_version,
-            expected_runtime_base_url=request.expected_runtime_base_url,
+            expected_runtime_identity=request.expected_runtime_identity,
         )
         payload["success"] = True
-        payload["deleted"] = True
+        payload["deleted"] = False
         return LocalModelUnregistrationResponse.model_validate(payload)
     except (LocalModelError, ConfigValidationError, ConfigConflictError) as exc:
         _raise_local_model_error(exc, model_id=request.model_id)
@@ -251,7 +251,7 @@ def restore_local_model_registration(
     request: LocalModelRegistrationRestoreRequest,
     service: LocalModelService = Depends(get_local_model_service),
 ) -> LocalModelMutationResponse:
-    """Consume a desktop unregister rollback without probing a stopped runtime."""
+    """Consume a Desktop rollback only if the original runtime still has weights."""
     try:
         payload = service.restore_registration(
             request.model_id,

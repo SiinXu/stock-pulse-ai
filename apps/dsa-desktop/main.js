@@ -2709,6 +2709,14 @@ function resolveLocalModelBaseUrl({ envFile = resolveLocalModelEnvPath(), source
   }
 }
 
+function getLocalModelRuntimeIdentity(baseUrl) {
+  const parsed = new URL(String(baseUrl));
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('Invalid local model runtime URL');
+  }
+  return crypto.createHash('sha256').update(parsed.origin, 'utf8').digest('hex');
+}
+
 function resolveLocalModelEnvPath() {
   return path.join(resolveAppDir(), '.env');
 }
@@ -3327,9 +3335,13 @@ function buildLocalModelState(overrides = {}) {
     progress: null,
     message: '',
   };
-  return {
+  const state = {
     ...base,
     ...overrides,
+  };
+  return {
+    ...state,
+    runtimeIdentity: getLocalModelRuntimeIdentity(state.baseUrl),
     totalMemoryGb: resolveLocalModelTotalMemoryGb(),
   };
 }
@@ -3627,7 +3639,11 @@ async function pullLocalModel(rawModelId, { requestImpl = null } = {}) {
   }
 
   await refreshLocalModelState();
-  return { ok: true, modelId, baseUrl };
+  return {
+    ok: true,
+    modelId,
+    runtimeIdentity: getLocalModelRuntimeIdentity(baseUrl),
+  };
 }
 
 function decodeConfiguredModelRoute(rawValue) {
@@ -3703,7 +3719,7 @@ function isLocalModelAssigned(rawModelId, { envFile = resolveLocalModelEnvPath()
 async function removeLocalModel(rawModelId, {
   requestImpl = null,
   envFile = resolveLocalModelEnvPath(),
-  expectedBaseUrl = '',
+  expectedRuntimeIdentity = '',
 } = {}) {
   const modelId = normalizeLocalModelName(rawModelId);
   if (!modelId || !isAllowedLocalModelPreset(modelId)) {
@@ -3711,6 +3727,7 @@ async function removeLocalModel(rawModelId, {
       ok: false,
       error: 'model-not-allowed',
       message: 'Only recommended local models can be deleted.',
+      weightsMutationAttempted: false,
     };
   }
   if (isLocalModelAssigned(modelId, { envFile })) {
@@ -3718,15 +3735,18 @@ async function removeLocalModel(rawModelId, {
       ok: false,
       error: 'model-in-use',
       message: 'Change every active model assignment before deleting it.',
+      weightsMutationAttempted: false,
     };
   }
 
   const baseUrl = resolveLocalModelBaseUrl({ envFile });
-  if (!expectedBaseUrl || String(expectedBaseUrl).trim() !== baseUrl) {
+  const runtimeIdentity = getLocalModelRuntimeIdentity(baseUrl);
+  if (!expectedRuntimeIdentity || String(expectedRuntimeIdentity).trim() !== runtimeIdentity) {
     return {
       ok: false,
       error: 'runtime-changed',
       message: 'The configured local model runtime changed. Refresh and try again.',
+      weightsMutationAttempted: false,
     };
   }
 
@@ -3744,11 +3764,17 @@ async function removeLocalModel(rawModelId, {
       ok: false,
       error: 'delete-failed',
       message: `Could not delete ${modelId}.`,
+      weightsMutationAttempted: true,
     };
   }
 
   await refreshLocalModelState({ requestImpl });
-  return { ok: true, modelId, baseUrl };
+  return {
+    ok: true,
+    modelId,
+    runtimeIdentity,
+    weightsMutationAttempted: true,
+  };
 }
 
 async function openLocalModelsSettings() {
@@ -3852,7 +3878,7 @@ ipcMain.handle(DESKTOP_LOCAL_MODEL_REMOVE_CHANNEL, (event, payload = {}) => {
   assertLocalModelSender(event);
   return runLocalModelOperation(() => removeLocalModel(
     payload && payload.modelId,
-    { expectedBaseUrl: payload && payload.expectedBaseUrl }
+    { expectedRuntimeIdentity: payload && payload.expectedRuntimeIdentity }
   ));
 });
 ipcMain.handle(DESKTOP_LOCAL_MODEL_OPEN_GUIDE_CHANNEL, async (event) => {
@@ -4274,6 +4300,7 @@ module.exports = {
   resolveEmbeddedLocalModelRoot,
   resolveEmbeddedLocalModelRuntime,
   resolveLocalModelBinary,
+  getLocalModelRuntimeIdentity,
   extractLocalModelNames,
   probeLocalModelBinary,
   detectLocalModelRuntime,

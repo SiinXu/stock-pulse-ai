@@ -198,13 +198,14 @@ GET /api/v1/system/config/llm/local-models
 Runtime status, background pull submission/polling, assignment, and deletion
 are exposed under `/api/v1/local-models`. The proxy always obtains its Ollama
 base URL from server configuration. Desktop completion requests carry the
-configuration version and runtime URL only as equality assertions; the backend
-never uses those assertions as a request target and rejects activation or
-unregistration when either value changed during the operation. Successful
-Desktop deletion revokes its one-time registration recovery capability. The
-service also exposes `register_installed_model()` for validated offline import
-flows so they reuse the same registration and activation writer without
-widening the catalog-only pull allowlist.
+configuration version and a SHA-256 identity of the observed normalized runtime;
+they never carry a target URL. The backend recomputes that identity from its own
+configuration and rejects activation or unregistration when either snapshot
+value changed during the operation. While a Desktop deletion recovery is
+pending, the backend reserves that model against concurrent local-model
+registration. Successful weight deletion retries recovery revocation once. If
+acknowledgement remains unavailable, the token cannot restore weights that the
+original runtime no longer reports and expires after its short TTL.
 
 Run `python scripts/check_local_model_catalog.py` after every catalog or desktop
 packaging change.

@@ -2934,7 +2934,7 @@
           "LocalModels"
         ],
         "summary": "Restore Local Model Registration",
-        "description": "Consume a desktop unregister rollback without probing a stopped runtime.",
+        "description": "Consume a Desktop rollback only if the original runtime still has weights.",
         "operationId": "restore_local_model_registration_api_v1_local_models_registrations_post",
         "requestBody": {
           "content": {
@@ -9057,11 +9057,12 @@
             "minLength": 1,
             "title": "Expected Config Version"
           },
-          "expected_runtime_base_url": {
+          "expected_runtime_identity": {
             "type": "string",
-            "maxLength": 2048,
-            "minLength": 1,
-            "title": "Expected Runtime Base Url"
+            "maxLength": 64,
+            "minLength": 64,
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Expected Runtime Identity"
           }
         },
         "additionalProperties": false,
@@ -9069,7 +9070,7 @@
         "required": [
           "model_id",
           "expected_config_version",
-          "expected_runtime_base_url"
+          "expected_runtime_identity"
         ],
         "title": "LocalModelDesktopActivationRequest",
         "description": "Activate a Desktop pull only against its original configuration snapshot."
@@ -9089,11 +9090,12 @@
             "minLength": 1,
             "title": "Expected Config Version"
           },
-          "expected_runtime_base_url": {
+          "expected_runtime_identity": {
             "type": "string",
-            "maxLength": 2048,
-            "minLength": 1,
-            "title": "Expected Runtime Base Url"
+            "maxLength": 64,
+            "minLength": 64,
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Expected Runtime Identity"
           }
         },
         "additionalProperties": false,
@@ -9101,7 +9103,7 @@
         "required": [
           "model_id",
           "expected_config_version",
-          "expected_runtime_base_url"
+          "expected_runtime_identity"
         ],
         "title": "LocalModelDesktopUnregistrationRequest",
         "description": "Unregister before Desktop deletion using one immutable runtime snapshot."

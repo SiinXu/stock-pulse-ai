@@ -2,6 +2,8 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const Module = require('node:module');
 
+const LOCAL_MODEL_RUNTIME_IDENTITY = 'b26993598dffd1f14aed97def57ef67f753518a9b773d8a12033c82b4fa545ca';
+
 test('preload exposes desktop version from BrowserWindow additionalArguments', (t) => {
   const originalLoad = Module._load;
   const originalArgv = [...process.argv];
@@ -217,11 +219,11 @@ test('createLocalModelBridge delegates lifecycle actions and removes state liste
     channel: preloadModule.DESKTOP_LOCAL_MODEL_PULL_CHANNEL,
     payload: { modelId: 'qwen3:8b' },
   });
-  assert.deepEqual(await bridge.remove('qwen3:8b', 'http://127.0.0.1:11434'), {
+  assert.deepEqual(await bridge.remove('qwen3:8b', LOCAL_MODEL_RUNTIME_IDENTITY), {
     channel: preloadModule.DESKTOP_LOCAL_MODEL_REMOVE_CHANNEL,
     payload: {
       modelId: 'qwen3:8b',
-      expectedBaseUrl: 'http://127.0.0.1:11434',
+      expectedRuntimeIdentity: LOCAL_MODEL_RUNTIME_IDENTITY,
     },
   });
 

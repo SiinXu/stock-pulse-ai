@@ -60,14 +60,14 @@ export const localModelsApi = {
   async activateDesktop(
     modelId: string,
     expectedConfigVersion: string,
-    expectedRuntimeBaseUrl: string,
+    expectedRuntimeIdentity: string,
   ): Promise<LocalModelMutationResponse> {
     const response = await apiClient.post<Record<string, unknown>>(
       '/api/v1/local-models/desktop-activations',
       {
         ...modelPayload(modelId),
         expected_config_version: expectedConfigVersion,
-        expected_runtime_base_url: expectedRuntimeBaseUrl,
+        expected_runtime_identity: expectedRuntimeIdentity,
       },
     );
     return toCamelCase<LocalModelMutationResponse>(response.data);
@@ -84,7 +84,7 @@ export const localModelsApi = {
   async unregister(
     modelId: string,
     expectedConfigVersion: string,
-    expectedRuntimeBaseUrl: string,
+    expectedRuntimeIdentity: string,
   ): Promise<LocalModelUnregistrationResponse> {
     const response = await apiClient.delete<Record<string, unknown>>(
       '/api/v1/local-models/registrations',
@@ -92,7 +92,7 @@ export const localModelsApi = {
         data: {
           ...modelPayload(modelId),
           expected_config_version: expectedConfigVersion,
-          expected_runtime_base_url: expectedRuntimeBaseUrl,
+          expected_runtime_identity: expectedRuntimeIdentity,
         },
       },
     );

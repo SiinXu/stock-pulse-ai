@@ -18,9 +18,14 @@ from src.services.local_model_service import (
     LocalModelNotInstalledError,
     LocalModelRuntimeUnavailableError,
     LocalModelService,
+    get_ollama_runtime_identity,
 )
 from src.services.task_queue import TaskInfo, TaskStatus
 from tests.system_config_service_test_support import _SystemConfigServiceTestCaseBase
+
+
+DEFAULT_RUNTIME_IDENTITY = get_ollama_runtime_identity("http://127.0.0.1:11434")
+ALTERNATE_RUNTIME_IDENTITY = get_ollama_runtime_identity("http://127.0.0.1:22434")
 
 
 class _FakeLocalModelService:
@@ -65,10 +70,12 @@ class _FakeLocalModelService:
         self.activate_desktop_model = Mock(return_value=self.configure_model.return_value)
         self.unregister_model = Mock(
             return_value=self.configure_model.return_value
-            | {"deleted": True, "recovery_token": "registration-recovery-1"}
+            | {"deleted": False, "recovery_token": "registration-recovery-1"}
         )
         self.restore_registration = Mock(return_value=self.configure_model.return_value)
-        self.finalize_unregistration = Mock(return_value=self.configure_model.return_value)
+        self.finalize_unregistration = Mock(
+            return_value=self.configure_model.return_value | {"deleted": True}
+        )
 
     def get_runtime_status(self):
         return {
@@ -125,10 +132,10 @@ class LocalModelApiIntegrationTestCase(_SystemConfigServiceTestCaseBase):
 
         test_case = self
 
-        class _StoppedRuntime:
+        class _InstalledRuntime:
             def list_installed_models(self):
                 test_case.runtime_probe_count += 1
-                raise AssertionError("registration recovery must not probe Ollama")
+                return ["qwen3:4b"]
 
         task_queue = Mock()
         task_queue.list_pending_tasks.return_value = []
@@ -136,10 +143,10 @@ class LocalModelApiIntegrationTestCase(_SystemConfigServiceTestCaseBase):
             system_config_service=self.service,
             task_queue=task_queue,
             pullable_model_ids=lambda: {"qwen3:4b"},
-            client_factory=lambda _base_url: _StoppedRuntime(),
+            client_factory=lambda _base_url: _InstalledRuntime(),
         )
 
-    def test_unregister_then_restore_crosses_the_real_config_boundary_offline(self) -> None:
+    def test_unregister_then_restore_checks_weights_across_the_real_api_boundary(self) -> None:
         configuration = self.local_model_service.get_configuration()
         unregistered = asyncio.run(
             _request(
@@ -149,11 +156,12 @@ class LocalModelApiIntegrationTestCase(_SystemConfigServiceTestCaseBase):
                 json={
                     "model_id": "qwen3:4b",
                     "expected_config_version": configuration["config_version"],
-                    "expected_runtime_base_url": "http://127.0.0.1:11434",
+                    "expected_runtime_identity": DEFAULT_RUNTIME_IDENTITY,
                 },
             )
         )
         self.assertEqual(unregistered.status_code, 200, unregistered.text)
+        self.assertFalse(unregistered.json()["deleted"])
 
         restored = asyncio.run(
             _request(
@@ -169,7 +177,7 @@ class LocalModelApiIntegrationTestCase(_SystemConfigServiceTestCaseBase):
 
         self.assertEqual(restored.status_code, 200, restored.text)
         self.assertEqual(restored.json()["registered_models"], ["qwen3:4b"])
-        self.assertEqual(self.runtime_probe_count, 0)
+        self.assertEqual(self.runtime_probe_count, 1)
 
     def test_unregister_rejects_a_changed_desktop_runtime_before_mutation(self) -> None:
         configuration = self.local_model_service.get_configuration()
@@ -182,7 +190,7 @@ class LocalModelApiIntegrationTestCase(_SystemConfigServiceTestCaseBase):
                 json={
                     "model_id": "qwen3:4b",
                     "expected_config_version": configuration["config_version"],
-                    "expected_runtime_base_url": "http://127.0.0.1:22434",
+                    "expected_runtime_identity": ALTERNATE_RUNTIME_IDENTITY,
                 },
             )
         )
@@ -203,13 +211,21 @@ class LocalModelApiIntegrationTestCase(_SystemConfigServiceTestCaseBase):
                 json={
                     "model_id": "qwen3:4b",
                     "expected_config_version": configuration["config_version"],
-                    "expected_runtime_base_url": "http://127.0.0.1:11434",
+                    "expected_runtime_identity": DEFAULT_RUNTIME_IDENTITY,
                 },
             )
         )
         token = unregistered.json()["recovery_token"]
 
         finalized = asyncio.run(
+            _request(
+                self.local_model_service,
+                "POST",
+                "/api/v1/local-models/registration-recoveries/finalize",
+                json={"model_id": "qwen3:4b", "recovery_token": token},
+            )
+        )
+        retried = asyncio.run(
             _request(
                 self.local_model_service,
                 "POST",
@@ -227,7 +243,10 @@ class LocalModelApiIntegrationTestCase(_SystemConfigServiceTestCaseBase):
         )
 
         self.assertEqual(finalized.status_code, 200, finalized.text)
+        self.assertEqual(retried.status_code, 200, retried.text)
         self.assertEqual(finalized.json()["registered_models"], [])
+        self.assertTrue(finalized.json()["deleted"])
+        self.assertTrue(retried.json()["deleted"])
         self.assertEqual(restored.status_code, 400, restored.text)
         self.assertEqual(self.runtime_probe_count, 0)
 
@@ -391,7 +410,7 @@ def test_desktop_activation_passes_only_snapshot_assertions_to_the_service() -> 
             json={
                 "model_id": "qwen3:4b",
                 "expected_config_version": "config-1",
-                "expected_runtime_base_url": "http://127.0.0.1:11434",
+                "expected_runtime_identity": DEFAULT_RUNTIME_IDENTITY,
             },
         )
     )
@@ -400,8 +419,33 @@ def test_desktop_activation_passes_only_snapshot_assertions_to_the_service() -> 
     service.activate_desktop_model.assert_called_once_with(
         "qwen3:4b",
         expected_config_version="config-1",
-        expected_runtime_base_url="http://127.0.0.1:11434",
+        expected_runtime_identity=DEFAULT_RUNTIME_IDENTITY,
     )
+
+
+def test_desktop_snapshot_requests_reject_caller_controlled_runtime_urls() -> None:
+    for method, path in (
+        ("POST", "/api/v1/local-models/desktop-activations"),
+        ("DELETE", "/api/v1/local-models/registrations"),
+    ):
+        service = _FakeLocalModelService()
+        response = asyncio.run(
+            _request(
+                service,
+                method,
+                path,
+                json={
+                    "model_id": "qwen3:4b",
+                    "expected_config_version": "config-1",
+                    "expected_runtime_identity": DEFAULT_RUNTIME_IDENTITY,
+                    "expected_runtime_base_url": "http://169.254.169.254/latest",
+                },
+            )
+        )
+
+        assert response.status_code == 422
+        service.activate_desktop_model.assert_not_called()
+        service.unregister_model.assert_not_called()
 
 
 def test_registration_restore_passes_the_server_issued_recovery_token() -> None:
@@ -436,6 +480,7 @@ def test_unregistration_finalization_revokes_the_server_issued_recovery_token() 
     )
 
     assert response.status_code == 200
+    assert response.json()["deleted"] is True
     service.finalize_unregistration.assert_called_once_with(
         "qwen3:4b",
         recovery_token="registration-recovery-1",

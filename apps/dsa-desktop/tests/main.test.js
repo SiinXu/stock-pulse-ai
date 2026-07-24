@@ -8,6 +8,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const POSIX_PATH_DELIMITER = ':';
+const LOCAL_MODEL_RUNTIME_IDENTITY = 'b26993598dffd1f14aed97def57ef67f753518a9b773d8a12033c82b4fa545ca';
 
 function loadMainModule(t, options = {}) {
   const originalLoad = Module._load;
@@ -3453,6 +3454,19 @@ test('pull refuses names outside the curated allowlist before any network call',
   assert.equal(requestImpl.calls.length, 0);
 });
 
+test('runtime identity canonicalizes explicit default ports across Desktop and backend', (t) => {
+  const mainModule = loadMainModule(t);
+
+  assert.equal(
+    mainModule.getLocalModelRuntimeIdentity('http://LOCALHOST:80/v1'),
+    mainModule.getLocalModelRuntimeIdentity('http://localhost')
+  );
+  assert.equal(
+    mainModule.getLocalModelRuntimeIdentity('https://LOCALHOST:443/v1'),
+    mainModule.getLocalModelRuntimeIdentity('https://localhost')
+  );
+});
+
 test('pull streams a curated model and reports progress', async (t) => {
   const mainModule = loadMainModule(t);
   mainModule.__setLocalModelStateForTest(null);
@@ -3468,7 +3482,8 @@ test('pull streams a curated model and reports progress', async (t) => {
   const result = await mainModule.pullLocalModel('qwen3:8b', { requestImpl });
   assert.equal(result.ok, true);
   assert.equal(result.modelId, 'qwen3:8b');
-  assert.equal(result.baseUrl, 'http://127.0.0.1:11434');
+  assert.equal(result.runtimeIdentity, LOCAL_MODEL_RUNTIME_IDENTITY);
+  assert.equal(Object.hasOwn(result, 'baseUrl'), false);
 });
 
 test('pull does not activate when Ollama closes without terminal success', async (t) => {
@@ -3634,13 +3649,14 @@ test('desktop deletion sends the Ollama DELETE request body', async (t) => {
   const result = await mainModule.removeLocalModel('qwen3:8b', {
     requestImpl,
     envFile,
-    expectedBaseUrl: 'http://127.0.0.1:11434',
+    expectedRuntimeIdentity: LOCAL_MODEL_RUNTIME_IDENTITY,
   });
 
   assert.deepEqual(result, {
     ok: true,
     modelId: 'qwen3:8b',
-    baseUrl: 'http://127.0.0.1:11434',
+    runtimeIdentity: LOCAL_MODEL_RUNTIME_IDENTITY,
+    weightsMutationAttempted: true,
   });
   assert.equal(requestImpl.calls[0].target.pathname, '/api/delete');
   assert.equal(requestImpl.calls[0].options.method, 'DELETE');
@@ -3719,10 +3735,11 @@ test('desktop deletion rejects a changed runtime before network activity', async
   const result = await mainModule.removeLocalModel('qwen3:8b', {
     requestImpl,
     envFile,
-    expectedBaseUrl: 'http://127.0.0.1:11434',
+    expectedRuntimeIdentity: LOCAL_MODEL_RUNTIME_IDENTITY,
   });
 
   assert.equal(result.error, 'runtime-changed');
+  assert.equal(result.weightsMutationAttempted, false);
   assert.equal(requestImpl.calls.length, 0);
 });
 
@@ -3751,13 +3768,14 @@ test('desktop deletion ignores an implicit channel model when YAML wins auto mod
   const result = await mainModule.removeLocalModel('qwen3:8b', {
     requestImpl,
     envFile,
-    expectedBaseUrl: 'http://127.0.0.1:11434',
+    expectedRuntimeIdentity: LOCAL_MODEL_RUNTIME_IDENTITY,
   });
 
   assert.deepEqual(result, {
     ok: true,
     modelId: 'qwen3:8b',
-    baseUrl: 'http://127.0.0.1:11434',
+    runtimeIdentity: LOCAL_MODEL_RUNTIME_IDENTITY,
+    weightsMutationAttempted: true,
   });
   assert.equal(requestImpl.calls[0].target.pathname, '/api/delete');
 });

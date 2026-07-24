@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
@@ -36,6 +37,7 @@ LOCAL_MODEL_ID_PATTERN = re.compile(
     r"^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*"
     r"(?::[A-Za-z0-9][A-Za-z0-9._-]*)?$"
 )
+LOCAL_MODEL_RUNTIME_IDENTITY_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 LOCAL_MODEL_MAX_ID_LENGTH = 128
 LOCAL_MODEL_REGISTRATION_RECOVERY_TTL_SECONDS = 5.0 * 60.0
 LocalModelAssignment = Literal["auto", "primary", "agent"]
@@ -117,11 +119,20 @@ def normalize_ollama_base_url(value: Any) -> str:
         or parsed.fragment
     ):
         raise LocalModelValidationError("Invalid configured Ollama Base URL")
+    scheme = parsed.scheme.lower()
+    if (scheme == "http" and port == 80) or (scheme == "https" and port == 443):
+        port = None
     hostname = parsed.hostname.lower()
     if ":" in hostname and not hostname.startswith("["):
         hostname = f"[{hostname}]"
     netloc = f"{hostname}:{port}" if port is not None else hostname
-    return urlunsplit((parsed.scheme.lower(), netloc, "", "", ""))
+    return urlunsplit((scheme, netloc, "", "", ""))
+
+
+def get_ollama_runtime_identity(value: Any) -> str:
+    """Return an opaque identity for one normalized server-controlled runtime."""
+    normalized = normalize_ollama_base_url(value)
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
 def get_pullable_local_model_ids() -> Set[str]:
@@ -199,6 +210,7 @@ class _LocalModelRegistrationRecovery:
 
     model_id: str
     config_version: str
+    runtime_base_url: str
     previous_channels: tuple[str, ...]
     previous_models: tuple[str, ...]
     expires_at: float
@@ -389,6 +401,9 @@ class LocalModelService:
         self._task_lock = threading.RLock()
         self._operation_lock = threading.RLock()
         self._registration_recoveries: Dict[str, _LocalModelRegistrationRecovery] = {}
+        self._revoked_registration_recoveries: Dict[
+            str, _LocalModelRegistrationRecovery
+        ] = {}
 
     @staticmethod
     def _split_csv(value: Any) -> List[str]:
@@ -468,19 +483,106 @@ class LocalModelService:
         config_version: str,
         values: Mapping[str, str],
         expected_config_version: Any,
-        expected_runtime_base_url: Any,
+        expected_runtime_identity: Any,
     ) -> str:
-        """Validate caller observations without using them as a request target."""
+        """Validate opaque caller observations without accepting a request target."""
         expected_version = str(expected_config_version or "").strip()
         if not expected_version or expected_version != config_version:
             raise ConfigConflictError(current_version=config_version)
         configured_base_url = self._base_url(values)
-        if not str(expected_runtime_base_url or "").strip():
-            raise ConfigConflictError(current_version=config_version)
-        expected_base_url = normalize_ollama_base_url(expected_runtime_base_url)
-        if expected_base_url != configured_base_url:
+        expected_identity = str(expected_runtime_identity or "").strip()
+        configured_identity = get_ollama_runtime_identity(configured_base_url)
+        if (
+            LOCAL_MODEL_RUNTIME_IDENTITY_PATTERN.fullmatch(expected_identity) is None
+            or not secrets.compare_digest(expected_identity, configured_identity)
+        ):
             raise ConfigConflictError(current_version=config_version)
         return configured_base_url
+
+    def _prune_registration_recoveries(self) -> None:
+        """Discard expired Desktop rollback capabilities and deletion reservations."""
+        now = time.monotonic()
+        self._registration_recoveries = {
+            token: recovery
+            for token, recovery in self._registration_recoveries.items()
+            if recovery.expires_at > now
+        }
+        self._revoked_registration_recoveries = {
+            token: recovery
+            for token, recovery in self._revoked_registration_recoveries.items()
+            if recovery.expires_at > now
+        }
+
+    def _require_no_pending_unregistration(self, model_id: str) -> None:
+        """Keep one model unregistered until its Desktop weight mutation resolves."""
+        self._prune_registration_recoveries()
+        if any(
+            recovery.model_id.lower() == model_id.lower()
+            for recovery in self._registration_recoveries.values()
+        ):
+            raise LocalModelInUseError(
+                "Wait for the active model deletion before registering it again"
+            )
+
+    def _consume_registration_recovery(
+        self,
+        model_id: str,
+        recovery_token: Any,
+        *,
+        allow_revoked: bool = False,
+    ) -> tuple[str, _LocalModelRegistrationRecovery]:
+        """Consume one matching recovery before any fallible completion work."""
+        token = str(recovery_token or "").strip()
+        if not token or len(token) > 128:
+            raise LocalModelValidationError(
+                "A valid registration recovery token is required"
+            )
+        self._prune_registration_recoveries()
+        revoked = self._revoked_registration_recoveries.get(token)
+        if (
+            allow_revoked
+            and revoked is not None
+            and revoked.model_id.lower() == model_id.lower()
+        ):
+            return token, revoked
+        recovery = self._registration_recoveries.get(token)
+        if recovery is None or recovery.model_id.lower() != model_id.lower():
+            raise LocalModelValidationError(
+                "The registration recovery token is invalid or expired"
+        )
+        del self._registration_recoveries[token]
+        return token, recovery
+
+    def _validate_registration_recovery_configuration(
+        self,
+        recovery: _LocalModelRegistrationRecovery,
+    ) -> tuple[str, Dict[str, str]]:
+        """Require the exact post-unregister configuration owned by a recovery."""
+        current_version, values = self._config_snapshot()
+        if current_version != recovery.config_version:
+            raise ConfigConflictError(current_version=current_version)
+
+        current_models = self._split_csv(values.get("LLM_OLLAMA_MODELS"))
+        expected_models = [
+            item
+            for item in recovery.previous_models
+            if item.lower() != recovery.model_id.lower()
+        ]
+        expected_channels = list(recovery.previous_channels)
+        if not expected_models:
+            expected_channels = [
+                item for item in expected_channels if item.lower() != "ollama"
+            ]
+        if (
+            [item.lower() for item in current_models]
+            != [item.lower() for item in expected_models]
+            or [item.lower() for item in self._split_csv(values.get("LLM_CHANNELS"))]
+            != [item.lower() for item in expected_channels]
+        ):
+            raise LocalModelValidationError(
+                "The registration recovery no longer matches configuration"
+            )
+        return current_version, values
 
     def _allowed_model_ids(self) -> Set[str]:
         allowed: Set[str] = set()
@@ -533,7 +635,7 @@ class LocalModelService:
         model_id: Any,
         *,
         expected_config_version: Any,
-        expected_runtime_base_url: Any,
+        expected_runtime_identity: Any,
     ) -> Dict[str, Any]:
         """Activate a Desktop pull only when its runtime snapshot is still current."""
         with self._operation_lock:
@@ -543,7 +645,7 @@ class LocalModelService:
                 config_version=config_version,
                 values=values,
                 expected_config_version=expected_config_version,
-                expected_runtime_base_url=expected_runtime_base_url,
+                expected_runtime_identity=expected_runtime_identity,
             )
             return self._register_installed_model_from_snapshot(
                 normalized,
@@ -559,6 +661,7 @@ class LocalModelService:
         *,
         assignment: LocalModelAssignment,
     ) -> Dict[str, Any]:
+        self._require_no_pending_unregistration(normalized)
         if assignment not in {"auto", "primary", "agent"}:
             raise LocalModelValidationError("Invalid local model assignment")
 
@@ -627,6 +730,7 @@ class LocalModelService:
         values: Mapping[str, str],
         base_url: str,
     ) -> Dict[str, Any]:
+        self._require_no_pending_unregistration(normalized)
         current_channels = values.get("LLM_CHANNELS", "")
         current_models = values.get("LLM_OLLAMA_MODELS", "")
         route = f"ollama/{normalized}"
@@ -701,24 +805,24 @@ class LocalModelService:
         self,
         model_id: Any,
         *,
-        expected_config_version: Any = None,
-        expected_runtime_base_url: Any = None,
+        expected_config_version: Any,
+        expected_runtime_identity: Any,
     ) -> Dict[str, Any]:
         """Remove a non-active model from the Ollama connection configuration."""
         with self._task_lock, self._operation_lock:
             normalized = self._require_pullable(model_id)
+            self._require_no_pending_unregistration(normalized)
             if self._pending_pull(normalized) is not None:
                 raise LocalModelInUseError(
                     "Wait for the active model download before deleting it"
                 )
             config_version, values = self._config_snapshot()
-            if expected_config_version is not None or expected_runtime_base_url is not None:
-                self._require_expected_runtime_snapshot(
-                    config_version=config_version,
-                    values=values,
-                    expected_config_version=expected_config_version,
-                    expected_runtime_base_url=expected_runtime_base_url,
-                )
+            base_url = self._require_expected_runtime_snapshot(
+                config_version=config_version,
+                values=values,
+                expected_config_version=expected_config_version,
+                expected_runtime_identity=expected_runtime_identity,
+            )
             current_models = self._split_csv(values.get("LLM_OLLAMA_MODELS"))
             was_registered = any(
                 item.lower() == normalized.lower() for item in current_models
@@ -729,12 +833,7 @@ class LocalModelService:
                 values=values,
             )
             now = time.monotonic()
-            self._registration_recoveries = {
-                token: recovery
-                for token, recovery in self._registration_recoveries.items()
-                if recovery.expires_at > now
-                and recovery.model_id.lower() != normalized.lower()
-            }
+            self._prune_registration_recoveries()
             if not was_registered:
                 return result
 
@@ -743,6 +842,7 @@ class LocalModelService:
                 _LocalModelRegistrationRecovery(
                     model_id=normalized,
                     config_version=str(result.get("config_version") or ""),
+                    runtime_base_url=base_url,
                     previous_channels=tuple(
                         self._split_csv(values.get("LLM_CHANNELS"))
                     ),
@@ -761,27 +861,18 @@ class LocalModelService:
         """Revoke a rollback capability after Desktop confirms weight deletion."""
         with self._operation_lock:
             normalized = self._require_pullable(model_id)
-            token = str(recovery_token or "").strip()
-            if not token or len(token) > 128:
-                raise LocalModelValidationError(
-                    "A valid registration recovery token is required"
-                )
-            now = time.monotonic()
-            self._registration_recoveries = {
-                candidate: recovery
-                for candidate, recovery in self._registration_recoveries.items()
-                if recovery.expires_at > now
-            }
-            recovery = self._registration_recoveries.get(token)
-            if recovery is None or recovery.model_id.lower() != normalized.lower():
-                raise LocalModelValidationError(
-                    "The registration recovery token is invalid or expired"
-                )
-            del self._registration_recoveries[token]
+            token, recovery = self._consume_registration_recovery(
+                normalized,
+                recovery_token,
+                allow_revoked=True,
+            )
+            self._revoked_registration_recoveries[token] = recovery
+            self._validate_registration_recovery_configuration(recovery)
             return {
                 **self.get_configuration(),
                 "success": True,
                 "model_id": normalized,
+                "deleted": True,
             }
 
     def restore_registration(
@@ -790,57 +881,29 @@ class LocalModelService:
         *,
         recovery_token: Any,
     ) -> Dict[str, Any]:
-        """Consume one server-issued unregister rollback without probing Ollama."""
+        """Restore a registration only while its original runtime still has weights."""
         with self._operation_lock:
             normalized = self._require_pullable(model_id)
-            token = str(recovery_token or "").strip()
-            if not token or len(token) > 128:
-                raise LocalModelValidationError(
-                    "A valid registration recovery token is required"
-                )
-
-            now = time.monotonic()
-            self._registration_recoveries = {
-                candidate: recovery
-                for candidate, recovery in self._registration_recoveries.items()
-                if recovery.expires_at > now
+            _token, recovery = self._consume_registration_recovery(
+                normalized,
+                recovery_token,
+            )
+            current_version, _values = self._validate_registration_recovery_configuration(
+                recovery
+            )
+            installed = {
+                item.lower()
+                for item in self._client_factory(
+                    recovery.runtime_base_url
+                ).list_installed_models()
             }
-            recovery = self._registration_recoveries.get(token)
-            if recovery is None or recovery.model_id.lower() != normalized.lower():
-                raise LocalModelValidationError(
-                    "The registration recovery token is invalid or expired"
-                )
-
-            # A valid token is single-use even when a later optimistic write is
-            # rejected, so it cannot be replayed after configuration changes.
-            del self._registration_recoveries[token]
-            current_version, values = self._config_snapshot()
-            if current_version != recovery.config_version:
-                raise ConfigConflictError(current_version=current_version)
-
-            current_models = self._split_csv(values.get("LLM_OLLAMA_MODELS"))
-            expected_models = [
-                item
-                for item in recovery.previous_models
-                if item.lower() != normalized.lower()
-            ]
-            expected_channels = list(recovery.previous_channels)
-            if not expected_models:
-                expected_channels = [
-                    item for item in expected_channels if item.lower() != "ollama"
-                ]
-            if (
-                [item.lower() for item in current_models]
-                != [item.lower() for item in expected_models]
-                or [item.lower() for item in self._split_csv(values.get("LLM_CHANNELS"))]
-                != [item.lower() for item in expected_channels]
-            ):
-                raise LocalModelValidationError(
-                    "The registration recovery no longer matches configuration"
+            if normalized.lower() not in installed:
+                raise LocalModelNotInstalledError(
+                    "The deleted local model weights cannot be registered again"
                 )
 
             result = self._system_config_service.update(
-                config_version=recovery.config_version,
+                config_version=current_version,
                 items=[
                     {
                         "key": "LLM_CHANNELS",
@@ -968,7 +1031,8 @@ class LocalModelService:
     def start_pull(self, model_id: Any) -> TaskInfo:
         """Submit one allowlisted pull to the shared background task queue."""
         normalized = self._require_pullable(model_id)
-        with self._task_lock:
+        with self._task_lock, self._operation_lock:
+            self._require_no_pending_unregistration(normalized)
             pending = self._pending_pull(normalized)
             if pending is not None:
                 return pending

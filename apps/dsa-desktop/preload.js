@@ -73,10 +73,10 @@ function createLocalModelBridge({ renderer = ipcRenderer } = {}) {
     pull(modelId) {
       return renderer.invoke(DESKTOP_LOCAL_MODEL_PULL_CHANNEL, { modelId });
     },
-    remove(modelId, expectedBaseUrl) {
+    remove(modelId, expectedRuntimeIdentity) {
       return renderer.invoke(DESKTOP_LOCAL_MODEL_REMOVE_CHANNEL, {
         modelId,
-        expectedBaseUrl,
+        expectedRuntimeIdentity,
       });
     },
     openInstallGuide() {

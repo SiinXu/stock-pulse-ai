@@ -22,6 +22,8 @@ const api = vi.hoisted(() => ({
 
 vi.mock('../../../api/localModels', () => ({ localModelsApi: api }));
 
+const RUNTIME_IDENTITY = 'b26993598dffd1f14aed97def57ef67f753518a9b773d8a12033c82b4fa545ca';
+
 const CONFIGURATION: LocalModelConfiguration = {
   configVersion: 'config-1',
   registeredModels: [],
@@ -36,16 +38,20 @@ function createDesktopBridge(): DesktopLocalModelBridge {
       status: 'running',
       installedModels: ['qwen3:4b'],
       totalMemoryGb: 24,
-      baseUrl: 'http://127.0.0.1:11434',
+      runtimeIdentity: RUNTIME_IDENTITY,
     }),
     start: vi.fn().mockResolvedValue({ status: 'running' }),
     stop: vi.fn().mockResolvedValue({ status: 'stopped' }),
     pull: vi.fn().mockResolvedValue({
       ok: true,
       modelId: 'qwen3:4b',
-      baseUrl: 'http://127.0.0.1:11434',
+      runtimeIdentity: RUNTIME_IDENTITY,
     }),
-    remove: vi.fn().mockResolvedValue({ ok: true, modelId: 'qwen3:4b' }),
+    remove: vi.fn().mockResolvedValue({
+      ok: true,
+      modelId: 'qwen3:4b',
+      weightsMutationAttempted: true,
+    }),
     openInstallGuide: vi.fn().mockResolvedValue(true),
     onStateChange: vi.fn().mockReturnValue(() => undefined),
   };
@@ -181,7 +187,7 @@ describe('localModelTransport', () => {
     expect(api.activateDesktop).toHaveBeenCalledWith(
       'qwen3:4b',
       'config-1',
-      'http://127.0.0.1:11434',
+      RUNTIME_IDENTITY,
     );
   });
 
@@ -209,7 +215,7 @@ describe('localModelTransport', () => {
       modelId: 'qwen3:4b',
       selectedPrimary: false,
       selectedAgent: false,
-      deleted: true,
+      deleted: false,
       updatedKeys: ['LLM_OLLAMA_MODELS'],
       warnings: [],
       appliedCount: 1,
@@ -218,19 +224,20 @@ describe('localModelTransport', () => {
       recoveryToken: 'recovery-1',
     };
     api.unregister.mockResolvedValue(mutation);
-    api.finalizeUnregistration.mockResolvedValue(mutation);
+    const finalized = { ...mutation, deleted: true };
+    api.finalizeUnregistration.mockResolvedValue(finalized);
 
     await expect(
       __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
-    ).resolves.toEqual(mutation);
+    ).resolves.toEqual(finalized);
     expect(api.unregister).toHaveBeenCalledWith(
       'qwen3:4b',
       'config-1',
-      'http://127.0.0.1:11434',
+      RUNTIME_IDENTITY,
     );
     expect(bridge.remove).toHaveBeenCalledWith(
       'qwen3:4b',
-      'http://127.0.0.1:11434',
+      RUNTIME_IDENTITY,
     );
     expect(api.finalizeUnregistration).toHaveBeenCalledWith(
       'qwen3:4b',
@@ -241,31 +248,68 @@ describe('localModelTransport', () => {
     );
   });
 
-  it('reports a distinct failure when successful weight deletion cannot revoke recovery', async () => {
+  it('keeps successful weight deletion successful when recovery finalization fails', async () => {
     const bridge = createDesktopBridge();
-    api.unregister.mockResolvedValue({
+    const mutation = {
       ...CONFIGURATION,
       success: true,
       modelId: 'qwen3:4b',
       selectedPrimary: false,
       selectedAgent: false,
-      deleted: true,
+      deleted: false,
       updatedKeys: ['LLM_OLLAMA_MODELS'],
       warnings: [],
       appliedCount: 1,
       skippedMaskedCount: 0,
       reloadTriggered: true,
       recoveryToken: 'recovery-1',
-    });
+    };
+    api.unregister.mockResolvedValue(mutation);
     api.finalizeUnregistration.mockRejectedValue(new Error('network failure'));
 
     await expect(
       __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
-    ).rejects.toMatchObject({ code: 'local_model_delete_finalize_failed' });
+    ).resolves.toEqual({ ...mutation, deleted: true });
     expect(bridge.remove).toHaveBeenCalledWith(
       'qwen3:4b',
-      'http://127.0.0.1:11434',
+      RUNTIME_IDENTITY,
     );
+    expect(api.restoreRegistration).not.toHaveBeenCalled();
+    expect(api.finalizeUnregistration).toHaveBeenCalledTimes(2);
+  });
+
+  it('surfaces a semantic finalization conflict after successful weight deletion', async () => {
+    const bridge = createDesktopBridge();
+    const mutation = {
+      ...CONFIGURATION,
+      success: true,
+      modelId: 'qwen3:4b',
+      selectedPrimary: false,
+      selectedAgent: false,
+      deleted: false,
+      updatedKeys: ['LLM_OLLAMA_MODELS'],
+      warnings: [],
+      appliedCount: 1,
+      skippedMaskedCount: 0,
+      reloadTriggered: true,
+      recoveryToken: 'recovery-1',
+    };
+    api.unregister.mockResolvedValue(mutation);
+    api.finalizeUnregistration.mockRejectedValue(Object.assign(new Error('conflict'), {
+      parsedError: {
+        title: 'Configuration conflict',
+        message: 'Refresh and retry',
+        rawMessage: 'conflict',
+        status: 409,
+        category: 'http_error',
+        code: 'config_version_conflict',
+      },
+    }));
+
+    await expect(
+      __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
+    ).rejects.toMatchObject({ code: 'config_version_conflict' });
+    expect(api.finalizeUnregistration).toHaveBeenCalledTimes(1);
     expect(api.restoreRegistration).not.toHaveBeenCalled();
   });
 
@@ -279,7 +323,7 @@ describe('localModelTransport', () => {
     expect(bridge.remove).not.toHaveBeenCalled();
   });
 
-  it('restores desktop registration when weight deletion fails before mutation', async () => {
+  it('restores registration when the runtime changes before weight mutation', async () => {
     const bridge = createDesktopBridge();
     const mutation = {
       ...CONFIGURATION,
@@ -287,7 +331,7 @@ describe('localModelTransport', () => {
       modelId: 'qwen3:4b',
       selectedPrimary: false,
       selectedAgent: false,
-      deleted: true,
+      deleted: false,
       updatedKeys: ['LLM_OLLAMA_MODELS'],
       warnings: [],
       appliedCount: 1,
@@ -297,17 +341,21 @@ describe('localModelTransport', () => {
     };
     api.unregister.mockResolvedValue(mutation);
     api.restoreRegistration.mockResolvedValue({ ...mutation, deleted: false });
-    vi.mocked(bridge.remove).mockResolvedValue({ ok: false, error: 'delete-failed' });
+    vi.mocked(bridge.remove).mockResolvedValue({
+      ok: false,
+      error: 'runtime-changed',
+      weightsMutationAttempted: false,
+    });
     vi.mocked(bridge.detect).mockResolvedValue({
       status: 'running',
-      installedModels: ['qwen3:4b'],
-      baseUrl: 'http://127.0.0.1:11434',
+      installedModels: [],
+      runtimeIdentity: RUNTIME_IDENTITY,
     });
 
     await expect(
       __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
-    ).rejects.toMatchObject({ code: 'delete-failed' });
-    expect(bridge.detect).toHaveBeenCalledTimes(2);
+    ).rejects.toMatchObject({ code: 'runtime-changed' });
+    expect(bridge.detect).toHaveBeenCalledTimes(1);
     expect(api.restoreRegistration).toHaveBeenCalledWith('qwen3:4b', 'recovery-1');
   });
 
@@ -319,14 +367,18 @@ describe('localModelTransport', () => {
       modelId: 'qwen3:4b',
       selectedPrimary: false,
       selectedAgent: false,
-      deleted: true,
+      deleted: false,
       updatedKeys: ['LLM_OLLAMA_MODELS'],
       warnings: [],
       appliedCount: 1,
       skippedMaskedCount: 0,
       reloadTriggered: true,
     });
-    vi.mocked(bridge.remove).mockResolvedValue({ ok: false, error: 'delete-failed' });
+    vi.mocked(bridge.remove).mockResolvedValue({
+      ok: false,
+      error: 'delete-failed',
+      weightsMutationAttempted: false,
+    });
 
     await expect(
       __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
@@ -342,7 +394,7 @@ describe('localModelTransport', () => {
       modelId: 'qwen3:4b',
       selectedPrimary: false,
       selectedAgent: false,
-      deleted: true,
+      deleted: false,
       updatedKeys: ['LLM_OLLAMA_MODELS'],
       warnings: [],
       appliedCount: 1,
@@ -351,7 +403,11 @@ describe('localModelTransport', () => {
       recoveryToken: 'recovery-1',
     });
     api.restoreRegistration.mockRejectedValue(new Error('conflict'));
-    vi.mocked(bridge.remove).mockResolvedValue({ ok: false, error: 'delete-failed' });
+    vi.mocked(bridge.remove).mockResolvedValue({
+      ok: false,
+      error: 'delete-failed',
+      weightsMutationAttempted: false,
+    });
 
     await expect(
       __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
@@ -366,7 +422,7 @@ describe('localModelTransport', () => {
       modelId: 'qwen3:4b',
       selectedPrimary: false,
       selectedAgent: false,
-      deleted: true,
+      deleted: false,
       updatedKeys: ['LLM_OLLAMA_MODELS'],
       warnings: [],
       appliedCount: 1,
@@ -376,11 +432,15 @@ describe('localModelTransport', () => {
     };
     api.unregister.mockResolvedValue(mutation);
     api.restoreRegistration.mockResolvedValue({ ...mutation, deleted: false });
-    vi.mocked(bridge.remove).mockResolvedValue({ ok: false, error: 'delete-failed' });
+    vi.mocked(bridge.remove).mockResolvedValue({
+      ok: false,
+      error: 'delete-failed',
+      weightsMutationAttempted: true,
+    });
     vi.mocked(bridge.detect).mockResolvedValue({
       status: 'stopped',
       installedModels: [],
-      baseUrl: 'http://127.0.0.1:11434',
+      runtimeIdentity: RUNTIME_IDENTITY,
     });
 
     await expect(
@@ -397,7 +457,7 @@ describe('localModelTransport', () => {
       modelId: 'qwen3:4b',
       selectedPrimary: false,
       selectedAgent: false,
-      deleted: true,
+      deleted: false,
       updatedKeys: ['LLM_OLLAMA_MODELS'],
       warnings: [],
       appliedCount: 1,
@@ -405,11 +465,15 @@ describe('localModelTransport', () => {
       reloadTriggered: true,
     };
     api.unregister.mockResolvedValue(mutation);
-    vi.mocked(bridge.remove).mockResolvedValue({ ok: false, error: 'delete-failed' });
+    vi.mocked(bridge.remove).mockResolvedValue({
+      ok: false,
+      error: 'delete-failed',
+      weightsMutationAttempted: true,
+    });
     vi.mocked(bridge.detect).mockResolvedValue({
       status: 'running',
       installedModels: [],
-      baseUrl: 'http://127.0.0.1:11434',
+      runtimeIdentity: RUNTIME_IDENTITY,
     });
 
     await expect(
@@ -426,7 +490,7 @@ describe('localModelTransport', () => {
       modelId: 'qwen3:4b',
       selectedPrimary: false,
       selectedAgent: false,
-      deleted: true,
+      deleted: false,
       updatedKeys: [],
       warnings: [],
       appliedCount: 0,
@@ -434,7 +498,11 @@ describe('localModelTransport', () => {
       reloadTriggered: false,
     };
     api.unregister.mockResolvedValue(mutation);
-    vi.mocked(bridge.remove).mockResolvedValue({ ok: false, error: 'delete-failed' });
+    vi.mocked(bridge.remove).mockResolvedValue({
+      ok: false,
+      error: 'delete-failed',
+      weightsMutationAttempted: false,
+    });
 
     await expect(
       __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
