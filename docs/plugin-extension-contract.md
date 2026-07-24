@@ -16,7 +16,7 @@ right boundary.
 | Need | Choose | Current path | Boundary |
 | --- | --- | --- | --- |
 | Add investment criteria, prompt instructions, activation metadata, or declare existing tools required by a specialist without executing code | Skill / strategy package | Built-ins use `strategies/*.yaml`; custom definitions use top-level YAML or nested `SKILL.md` under `AGENT_SKILL_DIR` | Declarative input to the existing Skill runtime; `required_tools` narrows only an optional `SkillAgent` specialist, while imported `allowed_tools` is metadata rather than runtime access control |
-| Add reviewed Python behavior for one of the six official extension points below | System plugin | `PLUGINS_DIR` provides package discovery and lifecycle only; an application composition path must also bind `PluginManager` to the exact native registry described by the implementation-status table | Trusted in-process code; the default process binds Agent Tools, while every unbound or contract-only point remains unavailable at runtime |
+| Add reviewed Python behavior for one of the six official extension points below | System plugin | `PLUGINS_DIR` provides package discovery and lifecycle only; an application composition path must also bind `PluginManager` to the exact native registry described by the implementation-status table | Trusted in-process code; the default process binds Agent Tools and Report Templates, while every unbound or contract-only point remains unavailable at runtime |
 | Add UI components, Settings panels, custom commands, a remote marketplace, dependency installation, hot reload, a connector/MCP boundary, or another extension point | New design and ADR | Propose the authority, trust, compatibility, and lifecycle contract before implementation | Outside the version 1 plugin surface; do not route it through a nearby registration API |
 
 Skill packages are appropriate when an author only needs natural-language
@@ -30,10 +30,11 @@ behavior and an application composition path has bound the extension point's
 exact native registry. `PLUGINS_DIR` alone discovers and manages package
 lifecycle; it can activate only implementations whose point is bound by that
 composition root. The default process root binds Agent Tools to its cached
-`ToolRegistry`. Data Provider plugin execution still requires programmatic
-composition with `PluginManager(registry=manager.plugin_registry)`. A listed
-but unbound point needs explicit wiring under the accepted contract, while a
-new surface requires an ADR instead of an implicit registry expansion.
+`ToolRegistry` and Report Templates to the existing aggregate report render
+paths. Data Provider plugin execution still requires programmatic composition
+with `PluginManager(registry=manager.plugin_registry)`. A listed but unbound
+point needs explicit wiring under the accepted contract, while a new surface
+requires an ADR instead of an implicit registry expansion.
 
 > **Operator trust boundary:** Setting `PLUGINS_DIR` opts into arbitrary Python
 > code running with the StockPulse process's OS privileges. Keeping it unset or
@@ -44,13 +45,13 @@ new surface requires an ADR instead of an implicit registry expansion.
 
 | Surface | Current authority | Track X delivery |
 | --- | --- | --- |
-| Plugin lifecycle, manifest, registry | `src/plugins/` core; Data Provider and Agent Tool native adapters wired, other points fail closed | #273 X2a core implemented |
+| Plugin lifecycle, manifest, registry | `src/plugins/` core; Data Provider, Agent Tool, and Report Template contracts wired; other points fail closed | #273 X2a core implemented; #541 Report Template validator implemented |
 | Built-in/external startup wiring | `src/application_services.py` composition root | #273 X2b implemented |
 | Data Providers | `DataProvider`, `BaseFetcher`, and `DataFetcherManager` | #276 X3 native adapter implemented; caller must inject the target manager registry |
 | Analysis Strategies | `Skill`, `SkillManager`, `StrategyEngine` | Contract only in this batch |
 | Agent Tools | `ToolDefinition`, `ToolRegistry`, Tool Surface | Default process adapter wired; strict registration validation remains fail-closed |
 | Notification Channels | `NotificationChannel`, sender mixins, `NotificationService` | Contract only in this batch |
-| Report Templates | `src/services/report_renderer.py`, `templates/report_*.j2` | Contract only in this batch |
+| Report Templates | `src/services/report_renderer.py`, `templates/report_*.j2` | #541 runtime selection implemented; Jinja and hard-coded fallbacks retained |
 | Event Hooks | Task and Agent runtime event streams | Contract only in this batch |
 
 "Contract only" means a plugin cannot yet rely on runtime wiring for that
@@ -665,7 +666,10 @@ templates whose `platforms` contain that exact value. Candidates run by numeric
 registration priority and then registration order. The first non-empty string
 wins; `None` or an empty string continues, and an exception is safely recorded
 before continuing. Duplicate template IDs are rejected by the canonical
-identity rule above.
+identity rule above. Contract version 1 accepts only the exact `markdown`,
+`wechat`, and `brief` platform values. The request carries a tuple snapshot of
+the current results and a detached, deeply immutable JSON-compatible
+`extra_context` mapping.
 
 If no plugin candidate renders, the core calls the existing Jinja renderer
 under its current `REPORT_RENDERER_ENABLED` setting. If that renderer is
@@ -675,8 +679,14 @@ candidates, but cannot unregister or erase either legacy fallback layer.
 
 The real current path is `src/services/report_renderer.py` plus
 `templates/report_markdown.j2`, `report_wechat.j2`, and `report_brief.j2`;
-there is no `src/reports/` package. Existing `REPORT_TEMPLATES_DIR` remains the
-supported Jinja file-template override until later plugin wiring is implemented.
+there is no `src/reports/` package. Use `REPORT_TEMPLATES_DIR` for file-only
+Jinja overrides. Use a `ReportTemplate` plugin only for trusted, reviewed Python
+render logic; loading the plugin enables its candidates independently of
+`REPORT_RENDERER_ENABLED`, which continues to gate only the Jinja fallback.
+The loadable [report-template example](examples/report-template-plugin/README.md)
+shows the minimal manifest, entrypoint, and registration call. As with every
+external plugin, this code runs with the StockPulse process's OS privileges and
+is not sandboxed.
 
 ### Event Hooks
 

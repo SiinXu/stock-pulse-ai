@@ -19,6 +19,14 @@ from .manager import (
 )
 from .manifest import PluginManifest
 from .plugin import Plugin
+from .report_templates import (
+    ReportPlatform,
+    ReportRenderRequest,
+    ReportTemplate,
+    SUPPORTED_REPORT_PLATFORMS,
+    normalize_report_platform,
+    validate_report_template,
+)
 from .registry import (
     EXTENSION_POINTS,
     ExtensionContract,
@@ -55,8 +63,14 @@ __all__ = [
     "PluginSnapshot",
     "PluginSource",
     "PluginState",
+    "ReportPlatform",
+    "ReportRenderRequest",
+    "ReportTemplate",
     "RegistrationHandle",
+    "SUPPORTED_REPORT_PLATFORMS",
     "build_agent_tool_extension_registry",
     "default_extension_contracts",
+    "normalize_report_platform",
     "validate_agent_tool_definition",
+    "validate_report_template",
 ]

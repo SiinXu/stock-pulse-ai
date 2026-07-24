@@ -16,6 +16,8 @@ from typing import Any, Dict, List, Optional
 from src.analyzer import AnalysisResult
 from src.config import get_config
 from src.market_phase_summary import format_public_market_status_line, format_public_phase_pack_excerpt
+from src.plugins import ReportRenderRequest, normalize_report_platform
+from src.plugins.registry import freeze_json_metadata
 from src.report_language import (
     format_strategy_skill_items,
     get_localized_stock_name,
@@ -50,6 +52,118 @@ from src.utils.data_processing import (
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_report_language(
+    results: List[AnalysisResult],
+    extra_context: Optional[Dict[str, Any]],
+) -> str:
+    return normalize_report_language(
+        (extra_context or {}).get("report_language")
+        or next(
+            (
+                getattr(result, "report_language", None)
+                for result in results
+                if getattr(result, "report_language", None)
+            ),
+            None,
+        )
+        or getattr(get_config(), "report_language", "zh")
+    )
+
+
+def render_plugin_template(
+    platform: str,
+    results: List[AnalysisResult],
+    report_date: Optional[str] = None,
+    summary_only: bool = False,
+    extra_context: Optional[Dict[str, Any]] = None,
+) -> Optional[str]:
+    """Render the first matching enabled plugin candidate, if one succeeds."""
+
+    from datetime import datetime
+
+    normalized_platform = normalize_report_platform(platform)
+    if normalized_platform is None:
+        return None
+    try:
+        from src.application_services import get_application_services
+
+        registrations = get_application_services().plugin_manager.registrations(
+            "report_template"
+        )
+    except Exception as exc:  # broad-exception: fallback_recorded - Plugin lookup failure preserves both legacy report fallbacks.
+        log_safe_exception(
+            logger,
+            "Report template plugin snapshot failed",
+            exc,
+            error_code="report_template_snapshot_failed",
+            level=logging.WARNING,
+            context={"platform": normalized_platform},
+        )
+        return None
+    if not registrations:
+        return None
+
+    if report_date is None:
+        report_date = datetime.now().strftime("%Y-%m-%d")
+    try:
+        frozen_extra_context = freeze_json_metadata(extra_context)
+        request = ReportRenderRequest(
+            platform=normalized_platform,
+            results=tuple(results),
+            report_date=report_date,
+            summary_only=summary_only,
+            report_language=_resolve_report_language(results, extra_context),
+            extra_context=frozen_extra_context,
+        )
+    except Exception as exc:  # broad-exception: fallback_recorded - An invalid plugin request must preserve both legacy report fallbacks.
+        log_safe_exception(
+            logger,
+            "Report template plugin request was invalid",
+            exc,
+            error_code="report_template_request_invalid",
+            level=logging.WARNING,
+            context={"platform": normalized_platform},
+        )
+        return None
+
+    for registration in registrations:
+        implementation = registration.implementation
+        try:
+            if normalized_platform not in implementation.platforms:
+                continue
+            rendered = implementation.render(request)
+        except Exception as exc:  # broad-exception: fallback_recorded - One renderer cannot block later candidates or legacy fallbacks.
+            log_safe_exception(
+                logger,
+                "Report template plugin rendering failed",
+                exc,
+                error_code="report_template_rendering_failed",
+                level=logging.WARNING,
+                context={
+                    "platform": normalized_platform,
+                    "plugin_id": registration.plugin_id,
+                    "template_id": registration.registration_id,
+                },
+            )
+            continue
+        if rendered is None:
+            continue
+        if type(rendered) is not str:
+            logger.warning(
+                "Report template returned a non-string result "
+                "[error_code=report_template_result_invalid, plugin_id=%s, "
+                "template_id=%s, platform=%s]",
+                registration.plugin_id,
+                registration.registration_id,
+                normalized_platform,
+            )
+            continue
+        if rendered == "":
+            continue
+        return rendered
+    return None
 
 
 def _escape_md(text: str) -> str:
