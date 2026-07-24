@@ -49,6 +49,14 @@ function triggerResponse(triggeredAts: string[]): AlertTriggerListResponse {
   };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+  return { promise, resolve };
+}
+
 const OLD = '2026-07-20T00:00:00Z';
 const NEW_A = '2026-07-23T10:00:00Z';
 const NEW_B = '2026-07-23T11:00:00Z';
@@ -88,13 +96,13 @@ describe('useUnreadNotifications', () => {
     const { result } = renderHook(() => useUnreadNotifications({ pollMs: 0 }));
     await waitFor(() => expect(result.current.unreadCount).toBe(2));
 
-    // markAllSeen stamps Date.now(); advance it past the newest item.
-    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-07-24T00:00:00Z'));
+    // The server timestamps are ahead of the client clock; opening the Bell
+    // must still mark every currently loaded item as seen.
     act(() => result.current.markAllSeen());
 
     expect(result.current.unreadCount).toBe(0);
     expect(window.localStorage.getItem('stockpulse.notifications.lastSeenAt')).toBe(
-      String(Date.parse('2026-07-24T00:00:00Z')),
+      String(Date.parse(NEW_B)),
     );
   });
 
@@ -132,5 +140,31 @@ describe('useUnreadNotifications', () => {
     await waitFor(() => expect(listMock).toHaveBeenCalled());
     expect(listMock).toHaveBeenCalledWith({ status: 'active', page: 1, pageSize: 5 });
     expect(triggersMock).toHaveBeenCalledWith({ page: 1, pageSize: 5 });
+  });
+
+  it('does not let an older refresh overwrite a newer generation', async () => {
+    const oldSignals = deferred<DecisionSignalListResponse>();
+    const oldAlerts = deferred<AlertTriggerListResponse>();
+    listMock
+      .mockReturnValueOnce(oldSignals.promise)
+      .mockResolvedValueOnce(signalResponse([NEW_B]));
+    triggersMock
+      .mockReturnValueOnce(oldAlerts.promise)
+      .mockResolvedValueOnce(triggerResponse([NEW_B]));
+
+    const { result } = renderHook(() => useUnreadNotifications({ pollMs: 0 }));
+    await waitFor(() => expect(listMock).toHaveBeenCalledTimes(1));
+
+    act(() => result.current.refresh());
+    await waitFor(() => expect(result.current.signalItems[0]?.createdAt).toBe(NEW_B));
+
+    await act(async () => {
+      oldSignals.resolve(signalResponse([OLD]));
+      oldAlerts.resolve(triggerResponse([OLD]));
+      await Promise.all([oldSignals.promise, oldAlerts.promise]);
+    });
+
+    expect(result.current.signalItems[0]?.createdAt).toBe(NEW_B);
+    expect(result.current.alertItems[0]?.triggeredAt).toBe(NEW_B);
   });
 });

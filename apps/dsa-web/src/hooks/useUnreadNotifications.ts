@@ -81,7 +81,7 @@ export function useUnreadNotifications(options: {
 
   const [signalItems, setSignalItems] = useState<readonly DecisionSignalItem[]>([]);
   const [alertItems, setAlertItems] = useState<readonly AlertTriggerItem[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(enabled);
   const [signalsFailed, setSignalsFailed] = useState(false);
   const [alertsFailed, setAlertsFailed] = useState(false);
   const [lastSeenAt, setLastSeenAt] = useState<number>(() => readLastSeenAt());
@@ -126,17 +126,24 @@ export function useUnreadNotifications(options: {
 
   useEffect(() => {
     if (!enabled) return undefined;
-    refresh();
-    if (pollMs <= 0) return undefined;
-    const timer = window.setInterval(refresh, pollMs);
-    return () => window.clearInterval(timer);
+    const initialTimer = window.setTimeout(refresh, 0);
+    const pollTimer = pollMs > 0 ? window.setInterval(refresh, pollMs) : undefined;
+    return () => {
+      window.clearTimeout(initialTimer);
+      if (pollTimer !== undefined) window.clearInterval(pollTimer);
+      generationRef.current += 1;
+    };
   }, [enabled, pollMs, refresh]);
 
   const markAllSeen = useCallback(() => {
-    const now = Date.now();
-    setLastSeenAt(now);
-    writeLastSeenAt(now);
-  }, []);
+    const seenThrough = Math.max(
+      Date.now(),
+      ...signalItems.map((item) => toTimestamp(item.createdAt)),
+      ...alertItems.map((item) => toTimestamp(item.triggeredAt)),
+    );
+    setLastSeenAt(seenThrough);
+    writeLastSeenAt(seenThrough);
+  }, [alertItems, signalItems]);
 
   const unreadSignalCount = useMemo(
     () => countNewerThan(signalItems, lastSeenAt, (item) => item.createdAt),
