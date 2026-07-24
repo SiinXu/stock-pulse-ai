@@ -128,6 +128,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const completedRecordIdsRef = useRef(new Map<string, number>());
   const suppressedHistoryDefaultSearchRef = useRef<string | null>(null);
+  const consumedStockContextRef = useRef<string | null>(null);
   const [analysisSkills, setAnalysisSkills] = useState<SkillInfo[]>([]);
   const [selectedStrategyId, setSelectedStrategyId] = useState('');
   const [experiencePreference, setExperiencePreference] = useState<{
@@ -288,8 +289,10 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const stockCode = params.get(HOME_ROUTE_QUERY_KEYS.stock)?.trim() ?? '';
-    if (stockCode && query !== stockCode) setQuery(stockCode);
-  }, [location.search, query, setQuery]);
+    if (consumedStockContextRef.current === stockCode) return;
+    consumedStockContextRef.current = stockCode;
+    if (stockCode) setQuery(stockCode);
+  }, [location.search, setQuery]);
 
   useEffect(() => {
     const navigationState = location.state as WorkbenchNavigationState | null;

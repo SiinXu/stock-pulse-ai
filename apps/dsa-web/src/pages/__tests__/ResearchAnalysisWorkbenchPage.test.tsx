@@ -339,6 +339,27 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     }));
   });
 
+  it('consumes stock context once and allows a different symbol to be submitted', async () => {
+    renderWorkbench(buildAnalysisWorkbenchHref({ stock: 'AAPL' }));
+    const stockInput = document.querySelector<HTMLInputElement>('#analysis-workbench-stock-search')!;
+    await waitFor(() => expect(stockInput).toHaveValue('AAPL'));
+
+    fireEvent.change(stockInput, { target: { value: 'MSFT' } });
+    await waitFor(() => expect(stockInput).toHaveValue('MSFT'));
+    const analyzeButton = (await screen.findAllByRole('button', { name: '分析' })).at(-1)!;
+    await waitFor(() => expect(analyzeButton).toBeEnabled());
+    fireEvent.click(analyzeButton);
+
+    await waitFor(() => expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ stockCode: 'MSFT' }),
+    ));
+    await waitFor(() => {
+      expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment))
+        .toBe(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
+    });
+    expect(useStockPoolStore.getState().query).not.toBe('AAPL');
+  });
+
   it('preserves the existing beginner default until setup is complete', async () => {
     vi.mocked(systemConfigApi.getSetupStatus).mockResolvedValue({
       isComplete: false,
