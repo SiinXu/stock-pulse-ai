@@ -35,6 +35,8 @@ from api.v1.schemas.portfolio import (
     PortfolioSnapshotResponse,
     PortfolioTradeListResponse,
     PortfolioTradeCreateRequest,
+    PaperTradeCreateRequest,
+    PaperTradeCreatedResponse,
 )
 from src.services.task_queue import get_task_queue
 from src.services.portfolio_import_service import PortfolioImportService
@@ -45,6 +47,12 @@ from src.services.portfolio_service import (
     PortfolioIdempotencyConflictError,
     PortfolioOversellError,
     PortfolioService,
+)
+from src.services.paper_portfolio_service import (
+    PaperAccountRequiredError,
+    PaperInsufficientCashError,
+    PaperPortfolioService,
+    PaperQuoteUnavailableError,
 )
 from src.utils.sanitize import log_safe_exception
 
@@ -115,12 +123,19 @@ def create_account(request: PortfolioAccountCreateRequest) -> PortfolioAccountIt
             market=request.market,
             base_currency=request.base_currency,
             owner_id=request.owner_id,
+            account_type=request.account_type,
         )
         return PortfolioAccountItem(**row)
     except ValueError as exc:
         raise _bad_request(exc)
-    except Exception as exc:
-        raise _internal_error("Create account failed", exc)
+    except Exception as exc:  # broad-exception: fallback_recorded - map account create failures to a sanitized API error
+        log_safe_exception(
+            logger, "Create account failed", exc, error_code="internal_error"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "internal_error", "message": "Create account failed"},
+        )
 
 
 @router.get(
@@ -233,6 +248,62 @@ def create_trade(
         raise _bad_request(exc)
     except Exception as exc:
         raise _internal_error("Create trade failed", exc)
+
+
+@router.post(
+    "/accounts/{account_id}/paper-trades",
+    response_model=PaperTradeCreatedResponse,
+    responses={400: {"model": ErrorResponse}, 409: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    summary="Record a simulated paper-trading buy/sell",
+)
+def create_paper_trade(
+    account_id: int,
+    request: PaperTradeCreateRequest,
+    idempotency_key: Optional[str] = Header(
+        None,
+        alias="Idempotency-Key",
+        description=PORTFOLIO_IDEMPOTENCY_KEY_DESCRIPTION,
+    ),
+) -> PaperTradeCreatedResponse:
+    service = PaperPortfolioService()
+    try:
+        data = service.record_paper_trade(
+            account_id=account_id,
+            symbol=request.symbol,
+            trade_date=request.trade_date,
+            side=request.side,
+            quantity=request.quantity,
+            price=request.price,
+            note=request.note,
+            operation_id=_resolve_operation_id(request.operation_id, idempotency_key),
+        )
+        return PaperTradeCreatedResponse(**data)
+    except PaperInsufficientCashError as exc:
+        raise api_error(400, "insufficient_cash", str(exc))
+    except PaperAccountRequiredError as exc:
+        raise api_error(400, "paper_account_required", str(exc))
+    except PaperQuoteUnavailableError as exc:
+        raise api_error(400, "quote_unavailable", str(exc))
+    except PortfolioIdempotencyConflictError as exc:
+        raise _conflict_error(error="idempotency_conflict", message=str(exc))
+    except PortfolioBusyError as exc:
+        raise _conflict_error(error="portfolio_busy", message=str(exc))
+    except PortfolioOversellError as exc:
+        raise _conflict_error(error="portfolio_oversell", message=str(exc))
+    except PortfolioConflictError as exc:
+        raise _conflict_error(error="conflict", message=str(exc))
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise _bad_request(exc)
+    except Exception as exc:  # broad-exception: fallback_recorded - map paper trade failures to a sanitized API error
+        log_safe_exception(
+            logger, "Create paper trade failed", exc, error_code="internal_error"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "internal_error", "message": "Create paper trade failed"},
+        )
 
 
 @router.get(

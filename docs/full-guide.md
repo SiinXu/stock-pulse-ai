@@ -467,6 +467,7 @@ stock-pulse-ai/
 | `DECISION_MEMORY_MIN_SAMPLES` | 展示胜率前所需的最小“已判定”样本数（命中+偏离）；小于该阈值的桶视为噪声不展示比率 | `5` |
 | `SIGNAL_SCORECARD_PUBLIC_ENABLED` | 是否对外开放聚合信号计分卡（`GET /api/v1/scorecard`，免登录）；默认关闭以保证自托管私密，开启后仅输出聚合、非敏感数据 | `false` |
 | `SIGNAL_SCORECARD_MIN_SAMPLES` | 计分卡中低于该“已判定”样本数（命中+偏离）的分桶返回 `insufficient_data` 而非比率 | `10` |
+| `PAPER_PORTFOLIO_INITIAL_CASH` | 新建模拟组合（paper portfolio）时播种的初始现金（作为一笔现金流入记账）；模拟成交按交易时点最新可得收盘价成交，MVP 忽略费用与滑点，买入按可用现金校验 | `1000000` |
 | `MARKET_REVIEW_REGION` | 大盘复盘市场区域：cn(A股)、hk(港股)、us(美股)、jp(日股)、kr(韩股)、both(五市场)，us/jp/kr 适合仅关注单区域用户 | `cn` |
 | `MARKET_REVIEW_COLOR_SCHEME` | 大盘复盘指数涨跌颜色：`green_up`=绿涨红跌（默认），`red_up`=红涨绿跌 | `green_up` |
 | `TRADING_DAY_CHECK_ENABLED` | 交易日检查：默认 `true`，非交易日跳过执行；设为 `false` 或使用 `--force-run` 可强制执行（Issue #373） | `true` |
