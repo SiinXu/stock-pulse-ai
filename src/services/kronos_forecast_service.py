@@ -519,10 +519,12 @@ class OfficialKronosInferenceBackend:
             tokenizer = KronosTokenizer.from_pretrained(
                 str(self._tokenizer_dir),
                 local_files_only=True,
+                strict=True,
             )
             model = Kronos.from_pretrained(
                 str(self._model_dir),
                 local_files_only=True,
+                strict=True,
             )
             tokenizer.eval()
             model.eval()

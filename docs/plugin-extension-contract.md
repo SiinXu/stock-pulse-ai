@@ -16,7 +16,7 @@ right boundary.
 | Need | Choose | Current path | Boundary |
 | --- | --- | --- | --- |
 | Add investment criteria, prompt instructions, activation metadata, or declare existing tools required by a specialist without executing code | Skill / strategy package | Built-ins use `strategies/*.yaml`; custom definitions use top-level YAML or nested `SKILL.md` under `AGENT_SKILL_DIR` | Declarative input to the existing Skill runtime; `required_tools` narrows only an optional `SkillAgent` specialist, while imported `allowed_tools` is metadata rather than runtime access control |
-| Add reviewed Python behavior for one of the six official extension points below | System plugin | `PLUGINS_DIR` provides package discovery and lifecycle only; an application composition path must also bind `PluginManager` to the exact native registry described by the implementation-status table | Trusted in-process code; default process startup has a fail-closed generic registry, and an unbound or contract-only point is not available at runtime |
+| Add reviewed Python behavior for one of the six official extension points below | System plugin | `PLUGINS_DIR` provides package discovery and lifecycle only; an application composition path must also bind `PluginManager` to the exact native registry described by the implementation-status table | Trusted in-process code; the default process binds Agent Tools, while every unbound or contract-only point remains unavailable at runtime |
 | Add UI components, Settings panels, custom commands, a remote marketplace, dependency installation, hot reload, a connector/MCP boundary, or another extension point | New design and ADR | Propose the authority, trust, compatibility, and lifecycle contract before implementation | Outside the version 1 plugin surface; do not route it through a nearby registration API |
 
 Skill packages are appropriate when an author only needs natural-language
@@ -28,8 +28,9 @@ Imported `allowed_tools` is metadata and does not enforce permissions.
 System plugins are appropriate only when a trusted operator needs code-backed
 behavior and an application composition path has bound the extension point's
 exact native registry. `PLUGINS_DIR` alone discovers and manages package
-lifecycle; the default process plugin manager rejects implementation
-registrations. Today, Data Provider plugin execution requires programmatic
+lifecycle; it can activate only implementations whose point is bound by that
+composition root. The default process root binds Agent Tools to its cached
+`ToolRegistry`. Data Provider plugin execution still requires programmatic
 composition with `PluginManager(registry=manager.plugin_registry)`. A listed
 but unbound point needs explicit wiring under the accepted contract, while a
 new surface requires an ADR instead of an implicit registry expansion.
@@ -43,11 +44,11 @@ new surface requires an ADR instead of an implicit registry expansion.
 
 | Surface | Current authority | Track X delivery |
 | --- | --- | --- |
-| Plugin lifecycle, manifest, registry | `src/plugins/` core; Data Provider native adapter wired, other points fail closed | #273 X2a core implemented |
+| Plugin lifecycle, manifest, registry | `src/plugins/` core; Data Provider and Agent Tool native adapters wired, other points fail closed | #273 X2a core implemented |
 | Built-in/external startup wiring | `src/application_services.py` composition root | #273 X2b implemented |
 | Data Providers | `DataProvider`, `BaseFetcher`, and `DataFetcherManager` | #276 X3 native adapter implemented; caller must inject the target manager registry |
 | Analysis Strategies | `Skill`, `SkillManager`, `StrategyEngine` | Contract only in this batch |
-| Agent Tools | `ToolDefinition`, `ToolRegistry`, Tool Surface | Wired through the native registry; registration remains fail-closed |
+| Agent Tools | `ToolDefinition`, `ToolRegistry`, Tool Surface | Default process adapter wired; strict registration validation remains fail-closed |
 | Notification Channels | `NotificationChannel`, sender mixins, `NotificationService` | Contract only in this batch |
 | Report Templates | `src/services/report_renderer.py`, `templates/report_*.j2` | Contract only in this batch |
 | Event Hooks | Task and Agent runtime event streams | Contract only in this batch |
@@ -536,16 +537,18 @@ Registration shape:
 AgentToolRegistration = ToolDefinition
 ```
 
-The implementation must be a `ToolDefinition` with an exact stable name,
-serializable parameter schema, callable handler, category, and a declared
-`ToolPolicy`. It must set `enforce_contract=True`, and its callable signature
-must exactly match the declared schema: no positional-only, variadic, or hidden
-parameters; optional defaults must match the handler, satisfy the declared
-type/enum/pattern/bounds, and be JSON-compatible. Defaults are materialized
-before validation and scope checks, and a stock-scoped `stock_code` identity
-must be required. The plugin registry delegates to `ToolRegistry`; every
-execution continues through the Tool Surface and its argument, stock-scope,
-timeout, serialization, audit, and completion guards.
+The implementation must be a `ToolDefinition` with a stable, provider-portable
+name of 1-64 ASCII letters, digits, underscores, or hyphens; a serializable
+parameter schema; a callable handler; a category; and a declared `ToolPolicy`.
+It must set `enforce_contract=True`, and its callable signature must exactly
+match the declared schema: no positional-only, variadic, or hidden parameters;
+optional defaults must match the handler, satisfy the declared
+type/enum/pattern/bounds, and survive a lossless JSON round trip. Nested values
+must use exact JSON scalar/container types, and object keys must be strings.
+Defaults are materialized before validation and scope checks, and a stock-scoped
+`stock_code` identity must be required. The plugin registry delegates to
+`ToolRegistry`; every execution continues through the Tool Surface and its
+argument, stock-scope, timeout, serialization, audit, and completion guards.
 Per-definition enforcement keeps argument and scope checks active for plugin
 tools even while existing core tools use the native compatibility mode.
 

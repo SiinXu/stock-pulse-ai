@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
-from types import SimpleNamespace
+import sys
+from types import ModuleType, SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -290,6 +291,59 @@ def test_local_model_prepare_failure_keeps_tool_absent(
     )
 
 
+def test_incomplete_state_dict_is_strictly_rejected_before_registration(
+    tmp_path,
+    monkeypatch,
+    caplog,
+) -> None:
+    calls = []
+
+    class _LoadedTokenizer:
+        def eval(self) -> None:
+            calls.append(("tokenizer_eval", None, None))
+
+    class _TokenizerLoader:
+        @classmethod
+        def from_pretrained(cls, path, **kwargs):
+            calls.append(("tokenizer_load", path, kwargs))
+            return _LoadedTokenizer()
+
+    class _ModelLoader:
+        @classmethod
+        def from_pretrained(cls, path, **kwargs):
+            calls.append(("model_load", path, kwargs))
+            if kwargs.get("strict") is True:
+                raise RuntimeError("missing state-dict keys")
+            raise AssertionError("incomplete state dict was loaded non-strictly")
+
+    class _Predictor:
+        def __init__(self, *_args, **_kwargs) -> None:
+            raise AssertionError("predictor must not be built from incomplete weights")
+
+    vendor_module = ModuleType("src.services._kronos_vendor")
+    vendor_module.Kronos = _ModelLoader
+    vendor_module.KronosPredictor = _Predictor
+    vendor_module.KronosTokenizer = _TokenizerLoader
+    monkeypatch.setitem(sys.modules, "src.services._kronos_vendor", vendor_module)
+    caplog.set_level(logging.WARNING, logger="src.agent.tools.kronos_tools")
+
+    tool = build_kronos_tool(
+        _config(_write_ready_weights(tmp_path)),
+        dependency_probe=lambda _module: True,
+    )
+
+    assert tool is None
+    load_calls = [call for call in calls if call[0].endswith("_load")]
+    assert [call[0] for call in load_calls] == ["tokenizer_load", "model_load"]
+    assert all(
+        call[2] == {"local_files_only": True, "strict": True}
+        for call in load_calls
+    )
+    assert "reason=model_load_failed" in "\n".join(
+        record.getMessage() for record in caplog.records
+    )
+
+
 def test_ready_plugin_registers_through_native_registry_and_unloads_exact_owner(
     tmp_path,
 ) -> None:
@@ -311,6 +365,8 @@ def test_ready_plugin_registers_through_native_registry_and_unloads_exact_owner(
     registered = registry.get(KRONOS_FORECAST_TOOL_NAME)
     assert registered is not None
     assert manager.registrations("agent_tool")[0].implementation is registered
+    declarations = registry.to_openai_tools()
+    assert declarations[0]["function"]["name"] == KRONOS_FORECAST_TOOL_NAME
 
     assert manager.disable(plugin.manifest.id).success is True
     assert registry.get(KRONOS_FORECAST_TOOL_NAME) is None
@@ -397,6 +453,33 @@ def test_registration_rejects_handler_schema_drift(parameters, handler) -> None:
     assert native_registry.get(tool.name) is None
 
 
+@pytest.mark.parametrize("tool_name", ["provider.tool", "x" * 65])
+def test_registration_rejects_nonportable_provider_tool_names(tool_name) -> None:
+    native_registry = ToolRegistry()
+    extension_registry = build_agent_tool_extension_registry(native_registry)
+    tool = ToolDefinition(
+        name=tool_name,
+        description="Nonportable plugin tool name",
+        parameters=[],
+        handler=lambda: None,
+        policy=ToolPolicy.declared(read_only=True),
+        enforce_contract=True,
+    )
+
+    with pytest.raises(
+        PluginRegistryError,
+        match="extension_implementation_invalid",
+    ):
+        extension_registry.register(
+            plugin_id="test.nonportable-name",
+            extension_point="agent_tool",
+            registration_id=tool.name,
+            implementation=tool,
+        )
+
+    assert native_registry.to_openai_tools() == []
+
+
 @pytest.mark.parametrize(
     ("parameter", "handler"),
     [
@@ -440,6 +523,26 @@ def test_registration_rejects_handler_schema_drift(parameters, handler) -> None:
                 enum=["1"],
             ),
             lambda value: value,
+        ),
+        (
+            ToolParameter(
+                name="value",
+                type="object",
+                description="Value",
+                required=False,
+                default={1: "silently-stringified-key"},
+            ),
+            lambda value={1: "silently-stringified-key"}: value,
+        ),
+        (
+            ToolParameter(
+                name="value",
+                type="array",
+                description="Value",
+                required=False,
+                default=[{"nested": ("tuple",)}],
+            ),
+            lambda value=[{"nested": ("tuple",)}]: value,
         ),
     ],
 )
