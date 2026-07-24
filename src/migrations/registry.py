@@ -28,6 +28,9 @@ from src.migrations.versions.v202607190004_intelligence_item_scope_values import
 from src.migrations.versions.v202607190005_intelligence_item_unique_index import (
     MIGRATION as INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION,
 )
+from src.migrations.versions.v202607240002_investment_framework_schema import (
+    MIGRATION as INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION,
+)
 
 
 MIGRATIONS: Tuple[Migration, ...] = validate_registry(
@@ -39,6 +42,7 @@ MIGRATIONS: Tuple[Migration, ...] = validate_registry(
         PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION,
         INTELLIGENCE_ITEM_SCOPE_MIGRATION,
         INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION,
+        INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION,
     )
 )
 

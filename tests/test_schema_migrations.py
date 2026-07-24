@@ -35,6 +35,7 @@ from src.migrations.registry import (
     DECISION_SIGNAL_PROFILE_MIGRATION,
     INTELLIGENCE_ITEM_SCOPE_MIGRATION,
     INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION,
+    INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION,
     LEGACY_BASELINE_MIGRATION,
     LLM_USAGE_TELEMETRY_MIGRATION,
     PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION,
@@ -421,6 +422,7 @@ def test_production_registry_is_stable_unique_and_strictly_ordered_across_import
         PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION.id,
         INTELLIGENCE_ITEM_SCOPE_MIGRATION.id,
         INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION.id,
+        INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION.id,
     )
     assert reloaded.TARGET_VERSION == ids[-1]
     assert all(len(checksum) == 64 for _, _, checksum in after)

@@ -1149,3 +1149,51 @@ class PortfolioAccountKind(Base):
     account_type = Column(String(16), nullable=False, default='paper', index=True)
     created_at = Column(DateTime, default=utc_naive_now, index=True)
     updated_at = Column(DateTime, default=utc_naive_now, onupdate=utc_naive_now, index=True)
+
+
+class InvestmentFrameworkRecord(Base):
+    """Single-local-account investment framework aggregate."""
+
+    __tablename__ = 'investment_frameworks'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    scope_key = Column(String(32), nullable=False)
+    latest_version = Column(Integer, nullable=False)
+    active_version = Column(Integer)
+    revision = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=utc_naive_now, nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=utc_naive_now,
+        onupdate=utc_naive_now,
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint('scope_key', name='uix_investment_framework_scope'),
+    )
+
+
+class InvestmentFrameworkVersionRecord(Base):
+    """Immutable content version belonging to an investment framework."""
+
+    __tablename__ = 'investment_framework_versions'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    framework_id = Column(
+        Integer,
+        ForeignKey('investment_frameworks.id', ondelete='CASCADE'),
+        nullable=False,
+    )
+    version = Column(Integer, nullable=False)
+    content_json = Column(Text, nullable=False)
+    change_summary = Column(String(500))
+    created_at = Column(DateTime, default=utc_naive_now, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            'framework_id',
+            'version',
+            name='uix_investment_framework_version',
+        ),
+    )
