@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*
+# -*- coding: utf-8 -*-
 """
 Trading skill base classes and SkillManager.
 
@@ -28,36 +28,7 @@ _BUILTIN_YAML_SUBDIRECTORIES = ("personas",)
 
 @dataclass
 class Skill:
-    """A trading skill that can be injected into the agent prompt.
-
-    Each skill represents a common or custom trading pattern used
-    for stock analysis and push notifications. Strategies are typically
-    loaded from YAML files written in natural language.
-
-    Attributes:
-        name: Unique strategy identifier (e.g., "dragon_head").
-        display_name: Human-readable name (e.g., "龙头策略").
-        description: Brief description of when to apply this strategy.
-        instructions: Detailed natural language instructions injected into the system prompt.
-        category: Skill category — "trend" (趋势), "pattern" (形态), "reversal" (反转), "framework" (框架).
-        core_rules: List of core trading rule numbers this strategy relates to (1-7).
-        required_tools: List of tool names this skill depends on.
-        allowed_tools: Optional allowlist metadata from SKILL.md frontmatter.
-        aliases: Optional alias phrases used by NL selectors / bot commands.
-        enabled: Whether this skill is currently active.
-        source: Origin of this skill — "builtin" or file path of a custom definition.
-        entrypoint: Definition file path (YAML or SKILL.md).
-        bundle_dir: Skill bundle directory when loaded from SKILL.md.
-        disable_model_invocation: Whether the model should avoid auto-invoking this skill.
-        user_invocable: Whether the skill should be exposed in user-facing selectors.
-        default_active: Whether this skill participates in the default activation set.
-        default_router: Whether this skill participates in router fallback selection.
-        default_priority: Ordering hint for defaults / selectors (lower comes first).
-        market_regimes: Optional market regime tags used by the skill router.
-        execution_context: Inline/fork execution hint from frontmatter.
-        subagent_type: Optional subagent type hint from frontmatter.
-        preferred_model: Optional model hint from frontmatter.
-    """
+    """A trading skill that can be injected into the agent prompt."""
     name: str
     display_name: str
     description: str
@@ -262,11 +233,8 @@ def load_skill_from_markdown(filepath: Union[str, Path]) -> Skill:
 def load_skills_from_directory(directory: Union[str, Path]) -> List[Skill]:
     """Load all skills from YAML files in a directory.
 
-    Scans for top-level ``*.yaml`` / ``*.yml`` compatibility files and
-    nested ``SKILL.md`` bundles, sorted alphabetically. The built-in catalog
-    additionally scans explicitly reserved YAML collections; custom-directory
-    YAML discovery remains top-level only.
-    Skips files that fail to parse (logs a warning).
+    The built-in catalog additionally scans explicitly reserved YAML collections;
+    custom-directory YAML discovery remains top-level only.
     """
     directory = Path(directory)
     if not directory.is_dir():
@@ -327,12 +295,10 @@ class SkillManager:
         self._skills: Dict[str, Skill] = {}
 
     def register(self, skill: Skill) -> None:
-        """Register a skill (programmatic or YAML-loaded)."""
         self._skills[skill.name] = skill
         logger.debug(f"Registered skill: {skill.name} ({skill.display_name})")
 
     def load_builtin_skills(self) -> int:
-        """Load all built-in skills from the compatibility `strategies/` directory."""
         skills_dir = _BUILTIN_SKILLS_DIR
         if not skills_dir.is_dir():
             logger.warning(f"Built-in skill directory not found: {skills_dir}")
@@ -347,7 +313,6 @@ class SkillManager:
         return len(skills)
 
     def load_custom_skills(self, directory: Union[str, Path, None]) -> int:
-        """Load custom skills from a user-specified directory."""
         if not directory:
             return 0
 
@@ -368,27 +333,21 @@ class SkillManager:
         return len(skills)
 
     def load_builtin_strategies(self) -> int:
-        """Compatibility wrapper for older call sites."""
         return self.load_builtin_skills()
 
     def load_custom_strategies(self, directory: Union[str, Path, None]) -> int:
-        """Compatibility wrapper for older call sites."""
         return self.load_custom_skills(directory)
 
     def get(self, name: str) -> Optional[Skill]:
-        """Get a skill by name."""
         return self._skills.get(name)
 
     def list_skills(self) -> List[Skill]:
-        """List all registered skills."""
         return list(self._skills.values())
 
     def list_active_skills(self) -> List[Skill]:
-        """List only active (enabled) skills."""
         return [s for s in self._skills.values() if s.enabled]
 
     def activate(self, skill_names: List[str]) -> None:
-        """Activate specific skills by name. Deactivate all others."""
         if skill_names == ["all"] or "all" in skill_names:
             for s in self._skills.values():
                 s.enabled = True
@@ -402,7 +361,6 @@ class SkillManager:
         logger.info(f"Activated skills: {activated}")
 
     def get_skill_instructions(self) -> str:
-        """Generate combined instruction text for all active skills."""
         active = self.list_active_skills()
         if not active:
             return ""
@@ -439,7 +397,6 @@ class SkillManager:
         return "\n".join(parts)
 
     def get_required_tools(self) -> List[str]:
-        """Get all tool names required by active skills."""
         tools: set = set()
         for s in self.list_active_skills():
             tools.update(s.required_tools)
