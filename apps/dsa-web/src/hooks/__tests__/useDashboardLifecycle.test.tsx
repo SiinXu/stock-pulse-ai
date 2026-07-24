@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { TaskInfo } from '../../types/analysis';
 import { useDashboardLifecycle } from '../useDashboardLifecycle';
 import { useTaskStream } from '../useTaskStream';
 
@@ -282,5 +283,56 @@ describe('useDashboardLifecycle', () => {
     const taskStreamOptions = vi.mocked(useTaskStream).mock.calls[0]?.[0];
     act(() => taskStreamOptions?.onError?.(new Event('error')));
     expect(pollKnownTasks).toHaveBeenCalledTimes(4);
+  });
+
+  it('runs the completion workflow when disconnected polling updates a known task', async () => {
+    vi.mocked(useTaskStream).mockReturnValue({
+      isConnected: false,
+      reconnect: vi.fn(),
+      disconnect: vi.fn(),
+    });
+    const processingTask: TaskInfo = {
+      ...createTask(),
+      status: 'processing' as const,
+      progress: 70,
+    };
+    const completedTask = createTask();
+    const refreshHistoryForCompletedTask = vi.fn().mockResolvedValue(undefined);
+    const refreshStockBar = vi.fn().mockResolvedValue(undefined);
+    const onCompletedTaskDataRefreshed = vi.fn();
+    const removeTask = vi.fn();
+
+    const { rerender } = renderHook(
+      ({ activeTasks }) => useDashboardLifecycle({
+        loadInitialHistory: vi.fn().mockResolvedValue(undefined),
+        refreshHistory: vi.fn().mockResolvedValue(undefined),
+        refreshHistoryForCompletedTask,
+        refreshActiveTasks: vi.fn().mockResolvedValue(undefined),
+        pollKnownTasks: vi.fn().mockResolvedValue(undefined),
+        activeTasks,
+        loadStockBar: vi.fn().mockResolvedValue(undefined),
+        refreshStockBar,
+        syncTaskCreated: vi.fn(),
+        syncTaskUpdated: vi.fn(),
+        syncTaskFailed: vi.fn(),
+        removeTask,
+        onCompletedTaskDataRefreshed,
+        terminalRetentionMs: 6_000,
+      }),
+      { initialProps: { activeTasks: [processingTask] } },
+    );
+
+    await act(async () => {
+      rerender({ activeTasks: [completedTask] });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(refreshHistoryForCompletedTask).toHaveBeenCalledWith(completedTask);
+    expect(refreshStockBar).toHaveBeenCalledTimes(1);
+    expect(onCompletedTaskDataRefreshed).toHaveBeenCalledWith(completedTask);
+
+    act(() => vi.advanceTimersByTime(6_000));
+    expect(removeTask).toHaveBeenCalledWith(completedTask.taskId);
   });
 });

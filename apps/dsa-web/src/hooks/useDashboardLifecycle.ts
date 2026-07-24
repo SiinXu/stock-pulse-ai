@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TaskInfo } from '../types/analysis';
 import { useTaskStream } from './useTaskStream';
 
@@ -8,6 +8,7 @@ type UseDashboardLifecycleOptions = {
   refreshHistoryForCompletedTask?: (task: TaskInfo) => Promise<unknown>;
   refreshActiveTasks: () => Promise<void>;
   pollKnownTasks?: () => Promise<void>;
+  activeTasks?: readonly TaskInfo[];
   loadStockBar: () => Promise<void>;
   refreshStockBar: () => Promise<void>;
   syncTaskCreated: (task: TaskInfo) => void;
@@ -22,6 +23,11 @@ type UseDashboardLifecycleOptions = {
 };
 
 const noopAsync = async (): Promise<void> => undefined;
+const EMPTY_TASKS: readonly TaskInfo[] = [];
+
+function isTerminalTaskStatus(status: TaskInfo['status']): boolean {
+  return ['completed', 'failed', 'cancelled', 'interrupted'].includes(status);
+}
 
 export type DashboardLifecycleState = {
   isInitialStockBarLoadSettled: boolean;
@@ -33,6 +39,7 @@ export function useDashboardLifecycle({
   refreshHistoryForCompletedTask,
   refreshActiveTasks,
   pollKnownTasks = noopAsync,
+  activeTasks = EMPTY_TASKS,
   loadStockBar,
   refreshStockBar,
   syncTaskCreated,
@@ -46,6 +53,8 @@ export function useDashboardLifecycle({
   terminalRetentionMs = 2 * 60 * 1000,
 }: UseDashboardLifecycleOptions): DashboardLifecycleState {
   const removalTimeoutsRef = useRef<Map<string, number>>(new Map());
+  const previousTaskStatusesRef = useRef<Map<string, TaskInfo['status']>>(new Map());
+  const handledTerminalStatusesRef = useRef<Map<string, TaskInfo['status']>>(new Map());
   const [isInitialStockBarLoadSettled, setIsInitialStockBarLoadSettled] = useState(false);
 
   useEffect(() => {
@@ -105,7 +114,7 @@ export function useDashboardLifecycle({
     };
   }, []);
 
-  const scheduleTaskRemoval = (taskId: string, delayMs: number) => {
+  const scheduleTaskRemoval = useCallback((taskId: string, delayMs: number) => {
     const existingTimeout = removalTimeoutsRef.current.get(taskId);
     if (existingTimeout !== undefined) {
       window.clearTimeout(existingTimeout);
@@ -116,7 +125,54 @@ export function useDashboardLifecycle({
     }, delayMs);
 
     removalTimeoutsRef.current.set(taskId, timeoutId);
-  };
+  }, [removeTask]);
+
+  const claimTerminalTask = useCallback((task: TaskInfo): boolean => {
+    if (handledTerminalStatusesRef.current.get(task.taskId) === task.status) return false;
+    handledTerminalStatusesRef.current.set(task.taskId, task.status);
+    return true;
+  }, []);
+
+  const handleCompletedTask = useCallback((task: TaskInfo) => {
+    if (!claimTerminalTask(task)) return;
+    const historyRefresh = refreshHistoryForCompletedTask
+      ? refreshHistoryForCompletedTask(task)
+      : refreshHistory(true);
+    const stockBarRefresh = refreshStockBar();
+    void Promise.allSettled([historyRefresh, stockBarRefresh]).then(() => {
+      onCompletedTaskDataRefreshed?.(task);
+    });
+    scheduleTaskRemoval(task.taskId, terminalRetentionMs);
+  }, [
+    claimTerminalTask,
+    onCompletedTaskDataRefreshed,
+    refreshHistory,
+    refreshHistoryForCompletedTask,
+    refreshStockBar,
+    scheduleTaskRemoval,
+    terminalRetentionMs,
+  ]);
+
+  const handleNonCompletedTerminalTask = useCallback((task: TaskInfo) => {
+    if (!claimTerminalTask(task)) return;
+    scheduleTaskRemoval(task.taskId, terminalRetentionMs);
+  }, [claimTerminalTask, scheduleTaskRemoval, terminalRetentionMs]);
+
+  useEffect(() => {
+    const previousStatuses = previousTaskStatusesRef.current;
+    const nextStatuses = new Map(activeTasks.map((task) => [task.taskId, task.status]));
+    if (enabled) {
+      for (const task of activeTasks) {
+        const previousStatus = previousStatuses.get(task.taskId);
+        if (!previousStatus || isTerminalTaskStatus(previousStatus) || !isTerminalTaskStatus(task.status)) {
+          continue;
+        }
+        if (task.status === 'completed') handleCompletedTask(task);
+        else handleNonCompletedTerminalTask(task);
+      }
+    }
+    previousTaskStatusesRef.current = nextStatuses;
+  }, [activeTasks, enabled, handleCompletedTask, handleNonCompletedTerminalTask]);
 
   const taskStream = useTaskStream({
     onTaskCreated: syncTaskCreated,
@@ -127,20 +183,11 @@ export function useDashboardLifecycle({
     },
     onTaskCompleted: (task) => {
       syncTaskUpdated(task);
-      const historyRefresh = refreshHistoryForCompletedTask
-        ? refreshHistoryForCompletedTask(task)
-        : refreshHistory(true);
-      const stockBarRefresh = refreshStockBar();
-      void Promise.allSettled([historyRefresh, stockBarRefresh]).then(() => {
-        onCompletedTaskDataRefreshed?.(task);
-      });
-      // Keep the terminal task visible long enough for the user to see the
-      // completion and dismiss it; the panel now renders terminal tasks.
-      scheduleTaskRemoval(task.taskId, terminalRetentionMs);
+      handleCompletedTask(task);
     },
     onTaskFailed: (task) => {
       syncTaskFailed(task);
-      scheduleTaskRemoval(task.taskId, terminalRetentionMs);
+      handleNonCompletedTerminalTask(task);
     },
     onError: () => {
       console.warn('SSE connection disconnected, reconnecting...');

@@ -428,6 +428,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
     refreshHistoryForCompletedTask: refreshCompletedTaskHistory,
     refreshActiveTasks,
     pollKnownTasks,
+    activeTasks,
     loadStockBar,
     refreshStockBar,
     syncTaskCreated,
@@ -588,6 +589,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
   }, [submitBatch, t, watchlist.watchlistCodes, watchlistCoverage]);
 
   const handleImportFile = useCallback(async (file: File) => {
+    setImportedCodes([]);
     setIsImporting(true);
     setImportNotice(null);
     try {
@@ -939,7 +941,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                     type="button"
                     variant="secondary"
                     isLoading={isBatchSubmitting}
-                    disabled={isBatchSubmitting || !isExperienceModeReady}
+                    disabled={isImporting || isBatchSubmitting || !isExperienceModeReady}
                     onClick={() => void submitBatch(importedCodes)}
                   >
                     <FileUp className="h-4 w-4" aria-hidden="true" />

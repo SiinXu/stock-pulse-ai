@@ -566,6 +566,7 @@ const HomePage: React.FC = () => {
     syncTaskFailed,
     refreshActiveTasks,
     pollKnownTasks,
+    activeTasks,
     removeTask,
     onDashboardDataRefresh: handleDashboardDataRefresh,
     onCompletedTaskDataRefreshed: handleCompletedTaskDataRefreshed,

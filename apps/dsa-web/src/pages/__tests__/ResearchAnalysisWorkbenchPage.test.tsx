@@ -169,6 +169,14 @@ const stockBarItem = (
   lastAnalysisTime,
 });
 
+function deferredPromise<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+  return { promise, resolve };
+}
+
 function LocationProbe() {
   const location = useLocation();
   return <output data-testid="location">{`${location.pathname}${location.search}${location.hash}`}</output>;
@@ -371,6 +379,33 @@ describe('ResearchAnalysisWorkbenchPage', () => {
         .toBe(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
     });
     expect(await screen.findByText(/已确认提交 1 个任务.*另有 1 只未确认/u)).toBeInTheDocument();
+  });
+
+  it('removes the previous imported batch while a replacement file is parsing', async () => {
+    const replacementImport = deferredPromise<{ codes: string[] }>();
+    vi.mocked(stocksApi.parseImport)
+      .mockResolvedValueOnce({ codes: ['AAPL'] })
+      .mockReturnValueOnce(replacementImport.promise);
+    const { container } = renderWorkbench();
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+
+    fireEvent.change(input, {
+      target: { files: [new File(['first'], 'first.csv', { type: 'text/csv' })] },
+    });
+    expect(await screen.findByRole('button', { name: '分析已导入 (1)' })).toBeInTheDocument();
+
+    fireEvent.change(input, {
+      target: { files: [new File(['second'], 'second.csv', { type: 'text/csv' })] },
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /分析已导入/u })).not.toBeInTheDocument();
+    });
+
+    await act(async () => {
+      replacementImport.resolve({ codes: ['MSFT', 'GOOG'] });
+      await replacementImport.promise;
+    });
+    expect(await screen.findByRole('button', { name: '分析已导入 (2)' })).toBeInTheDocument();
   });
 
   it('submits only watchlist symbols not analyzed today', async () => {
