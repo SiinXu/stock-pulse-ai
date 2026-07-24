@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -110,6 +111,87 @@ class LLMProviderCatalogResponse(BaseModel):
     providers: List[LLMProviderCatalogEntry]
     connection_fields: List[LLMConnectionFieldSchema]
     empty_api_key_hosts: List[str] = Field(default_factory=list)
+
+
+class LocalModelCatalogText(BaseModel):
+    """Bilingual catalog copy shared by backend and future clients."""
+
+    en: str
+    zh: str
+
+
+class LocalModelQ4Artifact(BaseModel):
+    """Verified Q4 artifact facts for one local model."""
+
+    quantization: Literal["Q4_K_M"]
+    size_bytes: int = Field(..., gt=0)
+    source_kind: Literal["official_ollama", "community_gguf"]
+    source_url: str
+    source_revision: str
+
+
+class LocalModelLicense(BaseModel):
+    """License evidence and StockPulse redistribution conclusion."""
+
+    identifier: str
+    name: str
+    evidence_url: str
+    redistribution: Literal["allowed_with_notice", "guided_only"]
+    standalone_license_file: bool
+
+
+class LocalModelUpstream(BaseModel):
+    """Canonical upstream model locations."""
+
+    primary_url: str
+    huggingface_url: Optional[str] = None
+    modelscope_url: Optional[str] = None
+    revision: str
+
+
+class LocalModelInstall(BaseModel):
+    """Current install surface without advertising unpublished artifacts."""
+
+    method: Literal["ollama_pull", "planned_ollama_package", "guided_import"]
+    status: Literal["available", "conversion_required", "license_review_required"]
+    ollama_tag: Optional[str] = None
+    planned_ollama_tag: Optional[str] = None
+    download_url: str
+    hosted_by_stockpulse: bool
+    minimum_runtime_version: Optional[str] = None
+
+
+class LocalModelDesktopMetadata(BaseModel):
+    """Desktop recommendation projection from the shared catalog."""
+
+    recommended: bool
+    role: Optional[Literal["lightweight", "default", "high_performance", "reasoning"]] = None
+    guidance_en: str
+
+
+class LocalModelCatalogEntry(BaseModel):
+    """One fixed model selection in the local model catalog."""
+
+    id: str
+    section: Literal["general", "finance"]
+    display_name: LocalModelCatalogText
+    capability_summary: LocalModelCatalogText
+    capabilities: List[str]
+    q4: LocalModelQ4Artifact
+    memory_tier: Literal["light", "standard", "high"]
+    recommended_ram_gb: int = Field(..., gt=0)
+    license: LocalModelLicense
+    upstream: LocalModelUpstream
+    install: LocalModelInstall
+    desktop: LocalModelDesktopMetadata
+
+
+class LocalModelCatalogResponse(BaseModel):
+    """Versioned authoritative local model catalog."""
+
+    schema_version: Literal[1]
+    verified_at: date
+    models: List[LocalModelCatalogEntry]
 
 
 class SystemConfigFieldSchema(BaseModel):

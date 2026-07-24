@@ -26,6 +26,7 @@ deterministic_checks() {
   python scripts/check_dependency_locks.py
   python scripts/check_install_guidance.py --self-test
   python scripts/check_install_guidance.py
+  python scripts/check_local_model_catalog.py
   python scripts/check_dependency_vulnerabilities.py --self-test
   ./scripts/test.sh code
   ./scripts/test.sh yfinance

@@ -17,6 +17,7 @@ from api.v1.schemas.system_config import (
     GenerationBackendStatusPreviewRequest,
     GenerationBackendStatusResponse,
     ImportSystemConfigRequest,
+    LocalModelCatalogResponse,
     LLMProviderCatalogResponse,
     RollbackSystemConfigRequest,
     SystemConfigConflictResponse,
@@ -36,6 +37,7 @@ from api.v1.schemas.system_config import (
     ValidateSystemConfigResponse,
 )
 from src.auth import COOKIE_NAME, is_auth_enabled, refresh_auth_state, verify_session
+from src.llm.local_model_catalog import LocalModelCatalogError, get_local_model_catalog
 from src.services.system_config_service import (
     ConfigConflictError,
     ConfigImportError,
@@ -343,6 +345,31 @@ def get_llm_provider_catalog() -> dict:
         raise HTTPException(
             status_code=500,
             detail={"error": "internal_error", "message": "Failed to load LLM provider catalog"},
+        )
+
+
+@router.get(
+    "/config/llm/local-models",
+    response_model=LocalModelCatalogResponse,
+    responses={
+        200: {"description": "Local model catalog loaded"},
+        500: {"description": "Internal server error", "model": ErrorResponse},
+    },
+    summary="Get the authoritative local model catalog",
+    description=(
+        "Return the fixed General and Finance local-model selections, verified "
+        "artifact facts, hardware guidance, license conclusions, and install status."
+    ),
+)
+def get_llm_local_model_catalog() -> dict:
+    """Return the validated local model catalog without reading user config."""
+    try:
+        return get_local_model_catalog()
+    except LocalModelCatalogError as exc:
+        _log_config_exception("Local model catalog load failed", exc)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "internal_error", "message": "Failed to load local model catalog"},
         )
 
 

@@ -2863,7 +2863,13 @@ function makeLocalModelSpawn(records, { serveStaysAlive = true } = {}) {
 test('local model names accept curated tags and reject injection payloads', (t) => {
   const mainModule = loadMainModule(t);
 
-  for (const valid of ['qwen3:8b', 'llama3.2:3b', 'llama3.2', 'qwen2.5-coder:7b']) {
+  for (const valid of [
+    'qwen3:8b',
+    'gemma4:12b',
+    'deepseek-r1:8b',
+    'qwen2.5-coder:7b',
+    'stockpulse/fin-r1-7b:q4_k_m',
+  ]) {
     assert.equal(mainModule.normalizeLocalModelName(valid), valid);
   }
   assert.equal(mainModule.normalizeLocalModelName(' qwen3:8b '), 'qwen3:8b');
@@ -2875,7 +2881,7 @@ test('local model names accept curated tags and reject injection payloads', (t) 
     'qwen3 8b',
     '../etc/passwd',
     'model$(whoami)',
-    'foo/bar',
+    'foo//bar',
     'foo|bar',
     'foo&&bar',
     'a'.repeat(200),
@@ -2888,7 +2894,8 @@ test('only curated presets are allowed for download', (t) => {
   const mainModule = loadMainModule(t);
 
   assert.equal(mainModule.isAllowedLocalModelPreset('qwen3:8b'), true);
-  assert.equal(mainModule.isAllowedLocalModelPreset('llama3.2:3b'), true);
+  assert.equal(mainModule.isAllowedLocalModelPreset('gemma4:12b'), true);
+  assert.equal(mainModule.isAllowedLocalModelPreset('llama3.2:3b'), false);
   assert.equal(mainModule.isAllowedLocalModelPreset('mistral:latest'), false);
   assert.equal(mainModule.isAllowedLocalModelPreset('qwen3:8b; ls'), false);
 });
@@ -2900,13 +2907,13 @@ test('installed model names are parsed and sanitized from the tags payload', (t)
     mainModule.extractLocalModelNames({
       models: [
         { name: 'qwen3:8b' },
-        { name: 'llama3.2:3b' },
+        { name: 'gemma4:12b' },
         { name: '../evil' },
         { name: '' },
         { name: 'qwen3:8b' },
       ],
     }),
-    ['llama3.2:3b', 'qwen3:8b']
+    ['gemma4:12b', 'qwen3:8b']
   );
   assert.deepEqual(mainModule.extractLocalModelNames(null), []);
   assert.deepEqual(mainModule.extractLocalModelNames({ models: 'nope' }), []);
@@ -3096,10 +3103,10 @@ test('registration preserves existing secrets and stays idempotent', (t) => {
   assert.equal((rewritten.match(/^LLM_CHANNELS=/gm) || []).length, 1);
   assert.match(rewritten, /LLM_CHANNELS=deepseek,ollama/);
 
-  mainModule.applyLocalModelRegistration(envFile, 'llama3.2:3b', {
+  mainModule.applyLocalModelRegistration(envFile, 'qwen3:4b', {
     baseUrl: 'http://127.0.0.1:11434',
   });
-  assert.match(fs.readFileSync(envFile, 'utf-8'), /LLM_OLLAMA_MODELS=qwen3:8b,llama3\.2:3b/);
+  assert.match(fs.readFileSync(envFile, 'utf-8'), /LLM_OLLAMA_MODELS=qwen3:8b,qwen3:4b/);
 });
 
 test('registerLocalModel never writes secrets into the desktop log', (t) => {
@@ -3200,6 +3207,14 @@ test('local model window is isolated, sandboxed, and denies renderer navigation'
   assert.equal(windowRef.options.webPreferences.nodeIntegration, false);
   assert.equal(windowRef.options.webPreferences.sandbox, true);
   assert.match(String(windowRef.options.webPreferences.preload), /model-preload\.js$/);
+  const presetArgument = windowRef.options.webPreferences.additionalArguments.find((value) => (
+    value.startsWith('--stockpulse-local-model-presets=')
+  ));
+  const projectedPresets = JSON.parse(decodeURIComponent(presetArgument.split('=', 2)[1]));
+  assert.deepEqual(
+    projectedPresets.map((preset) => preset.id),
+    ['qwen3:4b', 'qwen3:8b', 'gemma4:12b', 'deepseek-r1:8b']
+  );
   assert.deepEqual(windowOpenHandler(), { action: 'deny' });
   let prevented = false;
   navigationHandlers['will-navigate']({ preventDefault: () => { prevented = true; } });

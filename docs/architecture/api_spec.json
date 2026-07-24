@@ -2618,6 +2618,38 @@
         }
       }
     },
+    "/api/v1/system/config/llm/local-models": {
+      "get": {
+        "tags": [
+          "SystemConfig"
+        ],
+        "summary": "Get the authoritative local model catalog",
+        "description": "Return the fixed General and Finance local-model selections, verified artifact facts, hardware guidance, license conclusions, and install status.",
+        "operationId": "get_llm_local_model_catalog_api_v1_system_config_llm_local_models_get",
+        "responses": {
+          "200": {
+            "description": "Local model catalog loaded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalModelCatalogResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/decision-signals/reassess": {
       "post": {
         "tags": [
@@ -7824,6 +7856,356 @@
           "code"
         ],
         "title": "DecisionSignalWarning"
+      },
+      "LocalModelCatalogEntry": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "section": {
+            "type": "string",
+            "enum": [
+              "general",
+              "finance"
+            ],
+            "title": "Section"
+          },
+          "display_name": {
+            "$ref": "#/components/schemas/LocalModelCatalogText"
+          },
+          "capability_summary": {
+            "$ref": "#/components/schemas/LocalModelCatalogText"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Capabilities"
+          },
+          "q4": {
+            "$ref": "#/components/schemas/LocalModelQ4Artifact"
+          },
+          "memory_tier": {
+            "type": "string",
+            "enum": [
+              "light",
+              "standard",
+              "high"
+            ],
+            "title": "Memory Tier"
+          },
+          "recommended_ram_gb": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Recommended Ram Gb"
+          },
+          "license": {
+            "$ref": "#/components/schemas/LocalModelLicense"
+          },
+          "upstream": {
+            "$ref": "#/components/schemas/LocalModelUpstream"
+          },
+          "install": {
+            "$ref": "#/components/schemas/LocalModelInstall"
+          },
+          "desktop": {
+            "$ref": "#/components/schemas/LocalModelDesktopMetadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "section",
+          "display_name",
+          "capability_summary",
+          "capabilities",
+          "q4",
+          "memory_tier",
+          "recommended_ram_gb",
+          "license",
+          "upstream",
+          "install",
+          "desktop"
+        ],
+        "title": "LocalModelCatalogEntry",
+        "description": "One fixed model selection in the local model catalog."
+      },
+      "LocalModelCatalogResponse": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version"
+          },
+          "verified_at": {
+            "type": "string",
+            "format": "date",
+            "title": "Verified At"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/LocalModelCatalogEntry"
+            },
+            "type": "array",
+            "title": "Models"
+          }
+        },
+        "type": "object",
+        "required": [
+          "schema_version",
+          "verified_at",
+          "models"
+        ],
+        "title": "LocalModelCatalogResponse",
+        "description": "Versioned authoritative local model catalog."
+      },
+      "LocalModelCatalogText": {
+        "properties": {
+          "en": {
+            "type": "string",
+            "title": "En"
+          },
+          "zh": {
+            "type": "string",
+            "title": "Zh"
+          }
+        },
+        "type": "object",
+        "required": [
+          "en",
+          "zh"
+        ],
+        "title": "LocalModelCatalogText",
+        "description": "Bilingual catalog copy shared by backend and future clients."
+      },
+      "LocalModelDesktopMetadata": {
+        "properties": {
+          "recommended": {
+            "type": "boolean",
+            "title": "Recommended"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "lightweight",
+                  "default",
+                  "high_performance",
+                  "reasoning"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "guidance_en": {
+            "type": "string",
+            "title": "Guidance En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "recommended",
+          "guidance_en"
+        ],
+        "title": "LocalModelDesktopMetadata",
+        "description": "Desktop recommendation projection from the shared catalog."
+      },
+      "LocalModelInstall": {
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "ollama_pull",
+              "planned_ollama_package",
+              "guided_import"
+            ],
+            "title": "Method"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "conversion_required",
+              "license_review_required"
+            ],
+            "title": "Status"
+          },
+          "ollama_tag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ollama Tag"
+          },
+          "planned_ollama_tag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Ollama Tag"
+          },
+          "download_url": {
+            "type": "string",
+            "title": "Download Url"
+          },
+          "hosted_by_stockpulse": {
+            "type": "boolean",
+            "title": "Hosted By Stockpulse"
+          },
+          "minimum_runtime_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Runtime Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "method",
+          "status",
+          "download_url",
+          "hosted_by_stockpulse"
+        ],
+        "title": "LocalModelInstall",
+        "description": "Current install surface without advertising unpublished artifacts."
+      },
+      "LocalModelLicense": {
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "title": "Identifier"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "evidence_url": {
+            "type": "string",
+            "title": "Evidence Url"
+          },
+          "redistribution": {
+            "type": "string",
+            "enum": [
+              "allowed_with_notice",
+              "guided_only"
+            ],
+            "title": "Redistribution"
+          },
+          "standalone_license_file": {
+            "type": "boolean",
+            "title": "Standalone License File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "identifier",
+          "name",
+          "evidence_url",
+          "redistribution",
+          "standalone_license_file"
+        ],
+        "title": "LocalModelLicense",
+        "description": "License evidence and StockPulse redistribution conclusion."
+      },
+      "LocalModelQ4Artifact": {
+        "properties": {
+          "quantization": {
+            "type": "string",
+            "const": "Q4_K_M",
+            "title": "Quantization"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Size Bytes"
+          },
+          "source_kind": {
+            "type": "string",
+            "enum": [
+              "official_ollama",
+              "community_gguf"
+            ],
+            "title": "Source Kind"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "source_revision": {
+            "type": "string",
+            "title": "Source Revision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "quantization",
+          "size_bytes",
+          "source_kind",
+          "source_url",
+          "source_revision"
+        ],
+        "title": "LocalModelQ4Artifact",
+        "description": "Verified Q4 artifact facts for one local model."
+      },
+      "LocalModelUpstream": {
+        "properties": {
+          "primary_url": {
+            "type": "string",
+            "title": "Primary Url"
+          },
+          "huggingface_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Huggingface Url"
+          },
+          "modelscope_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modelscope Url"
+          },
+          "revision": {
+            "type": "string",
+            "title": "Revision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "primary_url",
+          "revision"
+        ],
+        "title": "LocalModelUpstream",
+        "description": "Canonical upstream model locations."
       }
     },
     "securitySchemes": {
