@@ -18,6 +18,7 @@ const {
   getSetupStatus,
   load,
   notifySystemConfigChanged,
+  refreshAfterExternalSave,
   resetDraftKeys,
   routerSearchParamsMock,
   save,
@@ -28,6 +29,33 @@ const {
 } = SettingsPageTestHarness;
 
 export function registerSettingsPageLlmTests(): void {
+  it('renders the local-model center as the sole local_models deep-link content', async () => {
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
+    routerSearchParamsMock.params = new URLSearchParams({
+      section: 'ai_models',
+      view: 'local_models',
+    });
+
+    render(<SettingsPage />);
+
+    expect(await screen.findByTestId('local-models-panel')).toBeInTheDocument();
+    expect(screen.queryByTestId('model-access-section')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'simulate local model config' }));
+    await waitFor(() => expect(refreshAfterExternalSave).toHaveBeenCalledWith([
+      'GENERATION_BACKEND',
+      'LLM_CONFIG_MODE',
+      'LLM_CHANNELS',
+      'LLM_OLLAMA_PROVIDER',
+      'LLM_OLLAMA_PROTOCOL',
+      'LLM_OLLAMA_BASE_URL',
+      'LLM_OLLAMA_MODELS',
+      'LLM_OLLAMA_ENABLED',
+      'LITELLM_MODEL',
+      'AGENT_LITELLM_MODEL',
+    ]));
+  });
+
   it('autosaves the llm channel and task-routing draft as one group', async () => {
     save.mockResolvedValue({ success: true });
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));

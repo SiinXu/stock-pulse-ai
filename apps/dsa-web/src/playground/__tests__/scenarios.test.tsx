@@ -64,6 +64,17 @@ describe('representative playground scenarios', () => {
     expect(screen.getByRole('button', { name: 'Component details' })).toHaveTextContent('2 of 3 selected');
   });
 
+  it('renders the local model center from deterministic catalog and runtime fixtures', async () => {
+    sandbox = installPlaygroundApiMock('ready', { delayResponse: 0 });
+    const Story = SETTINGS_SCENARIOS['local-models-panel'];
+    renderStory(Story);
+
+    expect(await screen.findByRole('heading', { name: 'Local Models' })).toBeInTheDocument();
+    expect(screen.getByText('Qwen 2.5 7B Instruct')).toBeInTheDocument();
+    expect(screen.getByText('Finance Qwen 7B')).toBeInTheDocument();
+    expect(screen.queryByText('playground_mock_not_registered')).not.toBeInTheDocument();
+  });
+
   it('renders a network-owned report story entirely from the iframe API sandbox', async () => {
     sandbox = installPlaygroundApiMock('ready', { delayResponse: 0 });
     const Story = DECISION_REPORT_RUN_FLOW_SCENARIOS['report-news'];

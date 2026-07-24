@@ -19,17 +19,19 @@ from src.storage import DatabaseManager
 from src.config import get_config, Config
 from src.services.system_config_service import SystemConfigService
 from src.services.runtime_scheduler import RuntimeSchedulerService
+from src.services.local_model_service import LocalModelService, get_pullable_local_model_ids
+from src.services.task_queue import get_task_queue
 
 
 def get_db() -> Generator[Session, None, None]:
     """
     获取数据库 Session 依赖
-    
+
     使用 FastAPI 依赖注入机制，确保请求结束后自动关闭 Session
-    
+
     Yields:
         Session: SQLAlchemy Session 对象
-        
+
     Example:
         @router.get("/items")
         async def get_items(db: Session = Depends(get_db)):
@@ -46,7 +48,7 @@ def get_db() -> Generator[Session, None, None]:
 def get_config_dep() -> Config:
     """
     获取配置依赖
-    
+
     Returns:
         Config: 配置单例对象
     """
@@ -56,7 +58,7 @@ def get_config_dep() -> Config:
 def get_database_manager() -> DatabaseManager:
     """
     获取数据库管理器依赖
-    
+
     Returns:
         DatabaseManager: 数据库管理器单例对象
     """
@@ -78,4 +80,17 @@ def get_runtime_scheduler_service(request: Request) -> RuntimeSchedulerService:
     if service is None:
         service = RuntimeSchedulerService()
         request.app.state.runtime_scheduler_service = service
+    return service
+
+
+def get_local_model_service(request: Request) -> LocalModelService:
+    """Get the app-lifecycle shared local model management service."""
+    service = getattr(request.app.state, "local_model_service", None)
+    if service is None:
+        service = LocalModelService(
+            system_config_service=get_system_config_service(request),
+            task_queue=get_task_queue(),
+            pullable_model_ids=get_pullable_local_model_ids,
+        )
+        request.app.state.local_model_service = service
     return service

@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
-import { SETTINGS_SECTION_IDS } from '../../../routing/routes';
+import { SETTINGS_SECTION_IDS, SETTINGS_VIEW_IDS } from '../../../routing/routes';
 import {
   SETTINGS_SECTIONS,
   getDefaultView,
@@ -65,12 +65,13 @@ describe('settingsInformationArchitecture', () => {
       .toEqual({ section: SETTINGS_SECTION_IDS.usage, view: '' });
   });
 
-  it('splits AI & Models into the four expected views with a default', () => {
+  it('splits AI & Models into the expected views with a default', () => {
     // No "advanced" view: the legacy Model Providers panel is retired and
     // Model Access (Connections) is the single entry for provider credentials.
     expect(getSectionViews('ai_models').map((view) => view.id)).toEqual([
       'overview',
       'connections',
+      SETTINGS_VIEW_IDS.aiModels.localModels,
       'task_routing',
       'reliability',
     ]);
@@ -93,6 +94,8 @@ describe('settingsInformationArchitecture', () => {
     expect(sectionLabel('ai_models', 'en')).toBe('AI & Models');
     expect(viewLabel('ai_models', 'connections', 'zh')).toBe('模型接入');
     expect(viewLabel('ai_models', 'connections', 'en')).toBe('Model Access');
+    expect(viewLabel('ai_models', SETTINGS_VIEW_IDS.aiModels.localModels, 'zh')).toBe('本地模型');
+    expect(viewLabel('ai_models', SETTINGS_VIEW_IDS.aiModels.localModels, 'en')).toBe('Local Models');
     expect(viewLabel('ai_models', 'task_routing', 'zh')).toBe('任务路由');
     expect(viewLabel('ai_models', 'task_routing', 'en')).toBe('Task Routing');
   });

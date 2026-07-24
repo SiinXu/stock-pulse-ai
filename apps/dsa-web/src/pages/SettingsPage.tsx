@@ -1,14 +1,16 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useBlocker, useSearchParams } from 'react-router-dom';
+import { useBlocker, useNavigate, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, ChevronDown, CircleAlert, Clock, RefreshCw } from 'lucide-react';
 import { useAuth, useBeginnerMode, useSystemConfig } from '../hooks';
 import { useProviderCatalog } from '../hooks/useProviderCatalog';
 import { useAvailableModels } from '../hooks/useAvailableModels';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import {
+  buildAnalysisWorkbenchHref,
   SETTINGS_ROUTE_QUERY_KEYS,
   SETTINGS_SECTION_IDS,
+  SETTINGS_VIEW_IDS,
 } from '../routing/routes';
 import { getUiListSeparator } from '../utils/uiLocale';
 import { createParsedApiError, getParsedApiError, type ParsedApiError } from '../api/error';
@@ -22,6 +24,7 @@ import {
   ChangePasswordCard,
   GenerationBackendStatusPanel,
   IntelligentImport,
+  LocalModelsPanel,
   LLMChannelEditor,
   LLMConfigModeBanner,
   NotificationChannelsPanel,
@@ -120,6 +123,19 @@ const CHANNEL_ROUTING_FIELD_KEYS = new Set([
   'NOTIFICATION_ALERT_CHANNELS',
   'NOTIFICATION_SYSTEM_ERROR_CHANNELS',
 ]);
+
+const LOCAL_MODEL_CONFIG_KEYS = [
+  'GENERATION_BACKEND',
+  'LLM_CONFIG_MODE',
+  'LLM_CHANNELS',
+  'LLM_OLLAMA_PROVIDER',
+  'LLM_OLLAMA_PROTOCOL',
+  'LLM_OLLAMA_BASE_URL',
+  'LLM_OLLAMA_MODELS',
+  'LLM_OLLAMA_ENABLED',
+  'LITELLM_MODEL',
+  'AGENT_LITELLM_MODEL',
+];
 
 type DesktopUpdateState = {
   status?: string;
@@ -387,6 +403,7 @@ function parseSetupStockList(value: unknown) {
 const SettingsPage: React.FC = () => {
   const { authEnabled, passwordChangeable } = useAuth();
   const { language: uiLanguage, t } = useUiLanguage();
+  const navigate = useNavigate();
   const settingsText = SETTINGS_PAGE_TEXT[uiLanguage];
   const [llmFocusFieldRequest, setLlmFocusFieldRequest] = useState<ModelAccessFieldFocusRequest | null>(null);
   const [envBackupActionError, setEnvBackupActionError] = useState<ParsedApiError | null>(null);
@@ -1109,7 +1126,10 @@ const SettingsPage: React.FC = () => {
   }, [dirtyKeys, itemsByCategory]);
   // The AI & Models Overview view shows a task-routing matrix instead of raw
   // fields / the channel editor.
-  const isAiOverview = activeSection === 'ai_models' && activeView === 'overview';
+  const isAiOverview = activeSection === SETTINGS_SECTION_IDS.aiModels
+    && activeView === SETTINGS_VIEW_IDS.aiModels.overview;
+  const isAiLocalModels = activeSection === SETTINGS_SECTION_IDS.aiModels
+    && activeView === SETTINGS_VIEW_IDS.aiModels.localModels;
   // Task Routing view: the single place to edit which model each task uses.
   const isAiTaskRouting = activeSection === 'ai_models' && activeView === 'task_routing';
   const pickAiModelItems = useCallback(
@@ -1837,6 +1857,7 @@ const SettingsPage: React.FC = () => {
   const hasSectionFieldContent = subFilteredItems.length > 0 || activeSubPromptCacheItems.length > 0;
   const shouldRenderFieldPanel = (hasSubNav ? hasSubFieldContent : hasSectionFieldContent)
     && !isAiOverview
+    && !isAiLocalModels
     && !isAiTaskRouting
     && !isAiReliability
     && !isTopLevelAdvanced
@@ -2531,6 +2552,15 @@ const SettingsPage: React.FC = () => {
                 )}
               </SettingsSectionCard>
             ) : null}
+            {isAiLocalModels ? (
+              <LocalModelsPanel
+                language={uiLanguage}
+                onConfigurationChanged={async () => {
+                  await refreshAfterExternalSave(LOCAL_MODEL_CONFIG_KEYS);
+                  applyPostSaveEffects();
+                }}
+              />
+            ) : null}
             {isAiTaskRouting ? (
               <SettingsSectionCard
                 title={settingsText.taskRouting}
@@ -2738,7 +2768,7 @@ const SettingsPage: React.FC = () => {
                 ) : null}
               </SettingsSectionCard>
             ) : null}
-            {activeCategory === 'ai_model' && !isAiOverview && !isAiTaskRouting && !isAiReliability && !isTopLevelAdvanced ? (
+            {activeCategory === 'ai_model' && !isAiOverview && !isAiLocalModels && !isAiTaskRouting && !isAiReliability && !isTopLevelAdvanced ? (
               <section className="space-y-4" aria-labelledby="model-access-heading" data-testid="model-access-section">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 space-y-1">
@@ -2945,6 +2975,14 @@ const SettingsPage: React.FC = () => {
           onViewRouting={() => {
             setIsWizardOpen(false);
             selectSectionView('ai_models', 'task_routing');
+          }}
+          onLocalModelConfigurationChanged={async () => {
+            await refreshAfterExternalSave(LOCAL_MODEL_CONFIG_KEYS);
+            applyPostSaveEffects();
+          }}
+          onStartFirstAnalysis={() => {
+            setIsWizardOpen(false);
+            navigate(buildAnalysisWorkbenchHref());
           }}
         />
       ) : null}

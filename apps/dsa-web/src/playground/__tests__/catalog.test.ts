@@ -32,7 +32,7 @@ describe('playground catalog', () => {
   it('uses stable, unique ids and valid source paths', () => {
     const ids = PLAYGROUND_CATALOG.map((entry) => entry.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(PLAYGROUND_CATALOG).toHaveLength(143);
+    expect(PLAYGROUND_CATALOG).toHaveLength(144);
     for (const entry of PLAYGROUND_CATALOG) {
       expect(fs.existsSync(path.join(sourceRoot, entry.sourcePath))).toBe(true);
       expect(entry.scenarios.length).toBeGreaterThan(0);

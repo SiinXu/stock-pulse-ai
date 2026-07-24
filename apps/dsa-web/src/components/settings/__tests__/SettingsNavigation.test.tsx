@@ -168,7 +168,7 @@ describe('SettingsSectionNav', () => {
 });
 
 describe('SettingsViewTabs', () => {
-  it('renders the four AI & Models views and marks the active tab', () => {
+  it('renders the five AI & Models views and marks the active tab', () => {
     render(
       <SettingsViewTabs
         section="ai_models"
@@ -182,6 +182,7 @@ describe('SettingsViewTabs', () => {
     expect(tabs.map((tab) => tab.textContent)).toEqual([
       'Overview',
       'Model Access',
+      'Local Models',
       'Task Routing',
       'Reliability',
     ]);

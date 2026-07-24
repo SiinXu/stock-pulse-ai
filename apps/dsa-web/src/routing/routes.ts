@@ -322,7 +322,18 @@ export const SETTINGS_ROUTE_QUERY_KEYS = {
 } as const;
 
 export const SETTINGS_SECTION_IDS = {
+  aiModels: 'ai_models',
   usage: 'usage',
+} as const;
+
+export const SETTINGS_VIEW_IDS = {
+  aiModels: {
+    overview: 'overview',
+    connections: 'connections',
+    localModels: 'local_models',
+    taskRouting: 'task_routing',
+    reliability: 'reliability',
+  },
 } as const;
 
 export type SettingsRouteSearch = {

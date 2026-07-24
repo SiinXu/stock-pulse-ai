@@ -17,6 +17,28 @@ vi.mock('../../../api/systemConfig', () => ({
   },
 }));
 
+vi.mock('../LocalModelsPanel', () => ({
+  LocalModelsPanel: ({
+    onConfigurationChanged,
+    onModelReady,
+  }: {
+    onConfigurationChanged?: () => void | Promise<void>;
+    onModelReady?: (modelId: string) => void;
+  }) => (
+    <div data-testid="wizard-local-model-panel">
+      <button
+        type="button"
+        onClick={() => {
+          void onConfigurationChanged?.();
+          onModelReady?.('qwen3:4b');
+        }}
+      >
+        simulate ready local model
+      </button>
+    </div>
+  ),
+}));
+
 if (!HTMLElement.prototype.scrollIntoView) {
   HTMLElement.prototype.scrollIntoView = () => {};
 }
@@ -144,6 +166,38 @@ function expectCloudSetupReadOnlyForSchema(connectionFields: LlmConnectionFieldS
 describe('FirstRunWizard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('reuses the local-model panel and routes a ready setup to first analysis', () => {
+    const onComplete = okComplete();
+    const onConfigurationChanged = vi.fn();
+    const onStartFirstAnalysis = vi.fn();
+    render(
+      <FirstRunWizard
+        onComplete={onComplete}
+        onClose={() => {}}
+        isSaving={false}
+        language="en"
+        providers={BILINGUAL_CATALOG}
+        onLocalModelConfigurationChanged={onConfigurationChanged}
+        onStartFirstAnalysis={onStartFirstAnalysis}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Local model/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(screen.getByTestId('wizard-local-model-panel')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'simulate ready local model' }));
+    expect(onConfigurationChanged).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(screen.getByText('qwen3:4b')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Complete setup' }));
+    expect(onComplete).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Start first analysis' }));
+    expect(onStartFirstAnalysis).toHaveBeenCalledTimes(1);
   });
 
   it('renders built-in Provider labels in the requested English UI language', () => {

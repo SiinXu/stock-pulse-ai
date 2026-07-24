@@ -41,6 +41,13 @@ type MockState = {
   alertRules: typeof fixtureAlertRules;
   decisionSignals: Array<typeof fixtureDecisionSignal>;
   intelligenceSources: IntelligenceSourceFixture[];
+  installedLocalModels: string[];
+  localModelConfiguration: {
+    registeredModels: string[];
+    primaryModel: string;
+    agentModel: string;
+  };
+  localModelPullModel: string | null;
   authStatus: {
     authEnabled: boolean;
     loggedIn: boolean;
@@ -135,6 +142,101 @@ const fixtureBackendStatus = {
   lastErrorMessage: null,
 };
 
+const fixtureLocalModelCatalog = [
+  {
+    id: 'qwen2.5-7b-instruct-q4',
+    section: 'general',
+    display_name: { en: 'Qwen 2.5 7B Instruct', zh: 'Qwen 2.5 7B 指令模型' },
+    capability_summary: {
+      en: 'A balanced multilingual model for everyday analysis.',
+      zh: '适合日常分析的均衡多语言模型。',
+    },
+    capabilities: ['general', 'reasoning', 'multilingual'],
+    q4: {
+      quantization: 'Q4_K_M',
+      size_bytes: 4_700_000_000,
+      source_kind: 'official_ollama',
+      source_url: 'https://ollama.com/library/qwen2.5',
+      source_revision: 'fixture-revision',
+    },
+    memory_tier: 'standard',
+    recommended_ram_gb: 8,
+    license: {
+      identifier: 'Apache-2.0',
+      name: 'Apache License 2.0',
+      evidence_url: 'https://www.apache.org/licenses/LICENSE-2.0',
+      redistribution: 'allowed_with_notice',
+      standalone_license_file: false,
+    },
+    upstream: {
+      primary_url: 'https://ollama.com/library/qwen2.5',
+      huggingface_url: null,
+      modelscope_url: null,
+      revision: 'fixture-revision',
+    },
+    install: {
+      method: 'ollama_pull',
+      status: 'available',
+      ollama_tag: 'qwen2.5:7b',
+      planned_ollama_tag: null,
+      download_url: 'https://ollama.com/library/qwen2.5',
+      hosted_by_stockpulse: false,
+      minimum_runtime_version: null,
+    },
+    desktop: {
+      recommended: true,
+      role: 'default',
+      guidance_en: 'Recommended for most desktops.',
+    },
+  },
+  {
+    id: 'finance-qwen-7b-q4',
+    section: 'finance',
+    display_name: { en: 'Finance Qwen 7B', zh: '金融 Qwen 7B' },
+    capability_summary: {
+      en: 'A finance-focused model for local market analysis.',
+      zh: '面向本地市场分析的金融模型。',
+    },
+    capabilities: ['finance', 'chinese', 'reasoning'],
+    q4: {
+      quantization: 'Q4_K_M',
+      size_bytes: 5_100_000_000,
+      source_kind: 'community_gguf',
+      source_url: 'https://huggingface.co/example/finance-qwen',
+      source_revision: 'fixture-revision',
+    },
+    memory_tier: 'standard',
+    recommended_ram_gb: 8,
+    license: {
+      identifier: 'Apache-2.0',
+      name: 'Apache License 2.0',
+      evidence_url: 'https://www.apache.org/licenses/LICENSE-2.0',
+      redistribution: 'allowed_with_notice',
+      standalone_license_file: false,
+    },
+    upstream: {
+      primary_url: 'https://huggingface.co/example/finance-qwen',
+      huggingface_url: 'https://huggingface.co/example/finance-qwen',
+      modelscope_url: null,
+      revision: 'fixture-revision',
+    },
+    install: {
+      method: 'ollama_pull',
+      status: 'available',
+      ollama_tag: 'finance-qwen:7b',
+      planned_ollama_tag: null,
+      download_url: 'https://huggingface.co/example/finance-qwen',
+      hosted_by_stockpulse: false,
+      minimum_runtime_version: null,
+    },
+    desktop: {
+      recommended: false,
+      role: 'reasoning',
+      guidance_en: 'Use for finance-focused analysis.',
+    },
+  },
+];
+
 const errorPayload = {
   error: 'playground_fixture_error',
   message: 'The selected playground profile returns a deterministic service error.',
@@ -188,6 +290,13 @@ export function installPlaygroundApiMock(
     intelligenceSources: profile === 'empty'
       ? []
       : fixtureIntelligenceSources.map((item) => ({ ...item })),
+    installedLocalModels: profile === 'empty' ? [] : ['qwen2.5:7b'],
+    localModelConfiguration: {
+      registeredModels: profile === 'empty' ? [] : ['qwen2.5:7b'],
+      primaryModel: profile === 'empty' ? '' : 'ollama/qwen2.5:7b',
+      agentModel: '',
+    },
+    localModelPullModel: null,
     authStatus: {
       authEnabled: false,
       loggedIn: true,
@@ -342,6 +451,137 @@ export function installPlaygroundApiMock(
       },
     ],
   }, { models: [] }));
+  const localModelConfigurationResponse = () => ({
+    config_version: `fixture-v${state.configVersion}`,
+    registered_models: state.localModelConfiguration.registeredModels,
+    primary_model: state.localModelConfiguration.primaryModel,
+    agent_model: state.localModelConfiguration.agentModel,
+  });
+  const localModelMutationResponse = (
+    modelId: string,
+    options: { selectedPrimary?: boolean; selectedAgent?: boolean; deleted?: boolean } = {},
+  ) => ({
+    success: true,
+    model_id: modelId,
+    selected_primary: options.selectedPrimary === true,
+    selected_agent: options.selectedAgent === true,
+    deleted: options.deleted === true,
+    updated_keys: [],
+    warnings: [],
+    applied_count: 1,
+    skipped_masked_count: 0,
+    reload_triggered: false,
+    ...localModelConfigurationResponse(),
+  });
+  mock.onGet('/api/v1/system/config/llm/local-models').reply(() => responseFor(profile, {
+    schema_version: 1,
+    verified_at: FIXTURE_TIMESTAMP,
+    models: fixtureLocalModelCatalog,
+  }, {
+    schema_version: 1,
+    verified_at: FIXTURE_TIMESTAMP,
+    models: [],
+  }));
+  mock.onGet('/api/v1/local-models/runtime').reply(() => responseFor(profile, {
+    runtime: 'ollama',
+    status: 'running',
+    installed_models: state.installedLocalModels,
+    manual_pull_supported: false,
+    configuration: localModelConfigurationResponse(),
+    managed: false,
+    operation: null,
+    progress: null,
+    total_memory_gb: 16,
+  }, {
+    runtime: 'ollama',
+    status: 'running',
+    installed_models: [],
+    manual_pull_supported: false,
+    configuration: localModelConfigurationResponse(),
+    managed: false,
+    operation: null,
+    progress: null,
+    total_memory_gb: null,
+  }));
+  mock.onGet('/api/v1/local-models/configuration').reply(() => responseFor(
+    profile,
+    localModelConfigurationResponse(),
+    localModelConfigurationResponse(),
+  ));
+  mock.onPost('/api/v1/local-models/pulls').reply((config) => {
+    if (profile === 'error') return [503, errorPayload];
+    const body = readJsonRecord(config.data);
+    const modelId = typeof body.model_id === 'string' ? body.model_id : '';
+    state.localModelPullModel = modelId;
+    if (!state.installedLocalModels.includes(modelId)) state.installedLocalModels.push(modelId);
+    if (!state.localModelConfiguration.registeredModels.includes(modelId)) {
+      state.localModelConfiguration.registeredModels.push(modelId);
+    }
+    if (!state.localModelConfiguration.primaryModel) {
+      state.localModelConfiguration.primaryModel = `ollama/${modelId}`;
+    }
+    state.configVersion += 1;
+    return [202, {
+      task_id: 'fixture-local-model-pull',
+      trace_id: 'fixture-local-model-trace',
+      status: 'processing',
+      model_id: modelId,
+    }];
+  });
+  mock.onGet(/\/api\/v1\/local-models\/pulls\/[^/]+$/).reply(() => {
+    if (profile === 'error') return [503, errorPayload];
+    const modelId = state.localModelPullModel ?? 'finance-qwen:7b';
+    return [200, {
+      task_id: 'fixture-local-model-pull',
+      status: 'completed',
+      progress: 100,
+      model_id: modelId,
+      error: null,
+      result: {
+        model_id: modelId,
+        activated: true,
+        selected_primary: state.localModelConfiguration.primaryModel === `ollama/${modelId}`,
+      },
+    }];
+  });
+  mock.onPost('/api/v1/local-models/assignments').reply((config) => {
+    if (profile === 'error') return [503, errorPayload];
+    const body = readJsonRecord(config.data);
+    const modelId = typeof body.model_id === 'string' ? body.model_id : '';
+    const assignment = typeof body.assignment === 'string' ? body.assignment : 'auto';
+    if (!state.localModelConfiguration.registeredModels.includes(modelId)) {
+      state.localModelConfiguration.registeredModels.push(modelId);
+    }
+    let selectedPrimary = false;
+    let selectedAgent = false;
+    if (assignment === 'primary' || (assignment === 'auto' && !state.localModelConfiguration.primaryModel)) {
+      state.localModelConfiguration.primaryModel = `ollama/${modelId}`;
+      selectedPrimary = true;
+    }
+    if (assignment === 'agent') {
+      state.localModelConfiguration.agentModel = `ollama/${modelId}`;
+      selectedAgent = true;
+    }
+    state.configVersion += 1;
+    return [200, localModelMutationResponse(modelId, { selectedPrimary, selectedAgent })];
+  });
+  const removeLocalModel = (
+    config: { data?: unknown },
+    deleteWeights: boolean,
+  ): [number, unknown] => {
+    if (profile === 'error') return [503, errorPayload];
+    const body = readJsonRecord(config.data);
+    const modelId = typeof body.model_id === 'string' ? body.model_id : '';
+    state.localModelConfiguration.registeredModels = state.localModelConfiguration.registeredModels
+      .filter((candidate) => candidate !== modelId);
+    if (deleteWeights) {
+      state.installedLocalModels = state.installedLocalModels.filter((candidate) => candidate !== modelId);
+    }
+    state.configVersion += 1;
+    return [200, localModelMutationResponse(modelId, { deleted: deleteWeights })];
+  };
+  mock.onDelete('/api/v1/local-models/models').reply((config) => removeLocalModel(config, true));
+  mock.onDelete('/api/v1/local-models/registrations').reply((config) => removeLocalModel(config, false));
   mock.onGet('/api/v1/system/config/llm/mode-status').reply(() => responseFor(profile, {
     requestedMode: 'auto',
     effectiveMode: 'legacy',
