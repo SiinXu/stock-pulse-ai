@@ -163,6 +163,7 @@ stock-pulse-ai/
 | `SEARXNG_BASE_URLS` | SearXNG 自建实例（无配额兜底，需在 settings.yml 启用 format: json）；留空时默认自动发现公共实例 | 可选 |
 | `SEARXNG_PUBLIC_INSTANCES_ENABLED` | 是否在 `SEARXNG_BASE_URLS` 为空时自动从 `searx.space` 获取公共实例（默认 `true`） | 可选 |
 | `TUSHARE_TOKEN` | [Tushare Pro](https://tushare.pro/) Token | 可选 |
+| `TUSHARE_HTTP_URL` | Tushare Pro 接口地址（默认 `http://api.tushare.pro`）；用于自建节点、代理或内网镜像。留空时行为不变；指向私网/内网主机时需同时加入 `OUTBOUND_HTTP_ALLOWLIST`，详见 [docs/security-outbound-policy.md](./security-outbound-policy.md)。 | 可选 |
 | `TICKFLOW_API_KEY` | [TickFlow](https://tickflow.org) API Key；可选，用于 A 股日 K、实时行情、股票列表/名称与大盘复盘增强；失败或权限不足时自动回退。 | 可选 |
 | `LONGBRIDGE_OAUTH_CLIENT_ID` | [Longbridge OpenAPI](https://open.longbridge.com/) OAuth client_id；留空且无 Legacy Access Token 时会兼容使用 `LONGBRIDGE_APP_KEY` | 可选 |
 | `LONGBRIDGE_OAUTH_TOKEN_CACHE_B64` | OAuth token 缓存文件的 base64 内容，供 GitHub Actions / Docker 等 headless 环境恢复 SDK token 缓存 | 可选 |
@@ -391,6 +392,7 @@ stock-pulse-ai/
 | 变量名 | 说明 | 默认值 | 必填 |
 |--------|------|--------|:----:|
 | `TUSHARE_TOKEN` | Tushare Pro Token | - | 可选 |
+| `TUSHARE_HTTP_URL` | Tushare Pro 接口地址；用于自建节点、代理或内网镜像。留空使用默认官方端点，行为不变；指向私网/内网主机时需同时加入 `OUTBOUND_HTTP_ALLOWLIST`。 | `http://api.tushare.pro` | 可选 |
 | `TICKFLOW_API_KEY` | TickFlow API Key；可选，用于 A 股日 K、实时行情、股票列表/名称与大盘复盘增强；失败或权限不足时自动回退。 | - | 可选 |
 | `TICKFLOW_PRIORITY` | TickFlow 日 K 数据源优先级；数字越小越早尝试，默认 `2`；未配置 API Key 时不启用；不影响实时行情，实时行情顺序由 `REALTIME_SOURCE_PRIORITY` 控制。 | `2` | 可选 |
 | `TICKFLOW_KLINE_ADJUST` | TickFlow 日 K 复权模式：`none`、`forward`、`backward`、`forward_additive`、`backward_additive`。 | `none` | 可选 |
@@ -1535,6 +1537,7 @@ FastAPI 提供 RESTful API 服务，支持配置管理和触发分析。
 - 📝 **配置管理** - 查看/修改自选股列表
 - 🗂️ **首页三视图** - 首页新增「历史 / 自选 / 今日」工作区，默认进入历史视图；自选页支持批量提交全部或仅提交“今日未分析”股票
 - 🔗 **首页可恢复链接** - 历史报告使用 `?recordId=<正整数>`；task 运行流使用 `?runFlow=task&runFlowTaskId=<task_id>`；history 运行流使用 `?runFlow=history&runFlowRecordId=<正整数>`。点击使用浏览器 history push，关闭运行流只移除运行流参数并保留报告和其它 query；刷新、分享、Back/Forward 会从 URL 恢复。非法、无权限或已删除对象会显示本地化错误并用 replace 清理失效参数。
+- 🧪 **分析工作台** - 研究导航下的 `/research/analysis` 在同一页面提供「发起与批量 / 运行中任务 / 历史与对比」三分段；`segment`、`recordId` 与 Run Flow 参数可通过 URL 恢复。单股、自选股和图表/文档导入任务提交后会直接切到任务段，完成通知可进入对应历史报告。
 - 🧭 **界面语言切换** - 登录态与退出态均支持界面语言快速切换（`zh` / `en`），独立于 `REPORT_LANGUAGE`，用于静态 UI 文案与导航骨架
 - 🚀 **快速分析** - 首次配置未完成且没有显式偏好时，首页默认进入新手模式并提交 `brief` 报告；已配置用户默认保持专业模式和 `detailed` 报告
 - 🧭 **新手 / 专业模式** - 新手模式只展示简短结论、保守风险等级和下一步操作，保留研究声明；“查看专业详情”恢复完整报告和历史趋势入口。用户显式选择保存在浏览器 `localStorage`，登出只清理会话痕迹，不删除该非敏感界面偏好

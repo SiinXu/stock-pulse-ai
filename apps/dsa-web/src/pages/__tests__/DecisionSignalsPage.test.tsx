@@ -14,13 +14,17 @@ import {
   type RouteFocusTarget,
 } from '../../contexts/routeFocusContext';
 import {
+  ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS,
+  ANALYSIS_WORKBENCH_SEGMENT_VALUES,
   APP_ROUTE_PATHS,
+  HOME_ROUTE_QUERY_KEYS,
   LEGACY_ROUTE_PATHS,
   SIGNAL_CENTER_HISTORY_VALUES,
   SIGNAL_CENTER_ROUTE_QUERY_KEYS,
   SIGNAL_CENTER_SCOPE_VALUES,
   SIGNAL_CENTER_TAB_VALUES,
   SIGNAL_FEED_VIEW_VALUES,
+  RUN_FLOW_ROUTE_QUERY_VALUES,
   buildSignalCenterHref,
 } from '../../routing/routes';
 import type { StockBarResponse } from '../../types/analysis';
@@ -1063,17 +1067,19 @@ describe('DecisionSignalsPage', () => {
     const sourceLink = await screen.findByRole('link', { name: '来源报告 #3001' });
     expect(sourceLink).toHaveAttribute(
       'href',
-      '/?recordId=3001&stock=600519&runFlow=history&runFlowRecordId=3001',
+      `${APP_ROUTE_PATHS.researchAnalysis}?${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment}=${ANALYSIS_WORKBENCH_SEGMENT_VALUES.history}&${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId}=3001&${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow}=${RUN_FLOW_ROUTE_QUERY_VALUES.history}&${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowRecordId}=3001&${HOME_ROUTE_QUERY_KEYS.stock}=600519`,
     );
     fireEvent.click(sourceLink);
 
-    await waitFor(() => expect(window.location.pathname).toBe('/'));
-    expect(Object.fromEntries(new URLSearchParams(window.location.search))).toEqual({
-      recordId: '3001',
-      stock: '600519',
-      runFlow: 'history',
-      runFlowRecordId: '3001',
-    });
+    await waitFor(() => expect(window.location.pathname).toBe(APP_ROUTE_PATHS.researchAnalysis));
+    const targetParams = new URLSearchParams(window.location.search);
+    expect(targetParams.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment))
+      .toBe(ANALYSIS_WORKBENCH_SEGMENT_VALUES.history);
+    expect(targetParams.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId)).toBe('3001');
+    expect(targetParams.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow))
+      .toBe(RUN_FLOW_ROUTE_QUERY_VALUES.history);
+    expect(targetParams.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowRecordId)).toBe('3001');
+    expect(targetParams.get(HOME_ROUTE_QUERY_KEYS.stock)).toBe('600519');
   });
 
   it('reassesses from an existing source report id filter without a selected signal', async () => {

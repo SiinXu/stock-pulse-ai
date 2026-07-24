@@ -36,6 +36,7 @@ import { resolveLoginRedirect } from './utils/loginRedirect';
 import './App.css';
 
 const HomePage = lazy(() => import('./pages/HomePage'));
+const ResearchAnalysisWorkbenchPage = lazy(() => import('./pages/ResearchAnalysisWorkbenchPage'));
 const MarketReviewPage = lazy(() => import('./pages/MarketReviewPage'));
 const BacktestPage = lazy(() => import('./pages/BacktestPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
@@ -164,6 +165,10 @@ const routes = [
           { path: APP_ROUTE_PATHS.stockDetails, element: <StockDetailsPage /> },
           { path: APP_ROUTE_PATHS.researchMarket, element: <MarketReviewPage /> },
           { path: APP_ROUTE_PATHS.researchDiscover, element: <StockScreeningPage /> },
+          {
+            path: APP_ROUTE_PATHS.researchAnalysis,
+            element: <ResearchAnalysisWorkbenchPage />,
+          },
           { path: APP_ROUTE_PATHS.researchBacktest, element: <BacktestPage /> },
           {
             path: LEGACY_ROUTE_PATHS.decisionSignals,

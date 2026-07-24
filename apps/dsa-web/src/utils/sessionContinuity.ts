@@ -3,6 +3,7 @@
 import type { DeepLinkTarget } from './deepLink';
 import { buildDeepLink, parseDeepLink } from './deepLink';
 import {
+  ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS,
   APP_ROUTE_PATHS,
   HOME_ROUTE_QUERY_KEYS,
   LEGACY_ROUTE_PATHS,
@@ -12,6 +13,7 @@ import {
   SIGNAL_CENTER_ROUTE_QUERY_KEYS,
   SIGNAL_FEED_ROUTE_QUERY_KEYS,
 } from '../routing/routes';
+import { parseAnalysisWorkbenchRouteState } from '../routing/analysisWorkbenchRouteState';
 import {
   parseResearchBacktestRouteState,
   parseResearchDiscoverRouteState,
@@ -31,6 +33,7 @@ type PersistedRouteKey =
   | 'decision-signals'
   | 'home'
   | 'portfolio'
+  | 'research-analysis'
   | 'research-backtest'
   | 'research-discover'
   | 'research-market'
@@ -55,6 +58,7 @@ const INITIAL_RESTORE_PATHS = new Map<string, PersistedRouteKey>([
   [APP_ROUTE_PATHS.agent, 'chat'],
   [APP_ROUTE_PATHS.signals, 'decision-signals'],
   [APP_ROUTE_PATHS.portfolio, 'portfolio'],
+  [APP_ROUTE_PATHS.researchAnalysis, 'research-analysis'],
   [APP_ROUTE_PATHS.researchBacktest, 'research-backtest'],
   [APP_ROUTE_PATHS.researchDiscover, 'research-discover'],
   [APP_ROUTE_PATHS.researchMarket, 'research-market'],
@@ -98,6 +102,10 @@ const ALLOWED_QUERY_KEYS: Record<PersistedRouteKey, readonly string[]> = {
     'sourceReportId',
   ],
   stock: ['period', 'days'],
+  'research-analysis': [
+    ...Object.values(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS),
+    HOME_ROUTE_QUERY_KEYS.stock,
+  ],
   'research-discover': Object.values(RESEARCH_DISCOVER_ROUTE_QUERY_KEYS),
   'research-backtest': Object.values(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS),
   'research-market': Object.values(REPORT_ROUTE_QUERY_KEYS),
@@ -146,6 +154,18 @@ function normalizeSafeStockName(value: unknown): string | null {
 
 function sanitizeStandaloneRoute(url: URL): SanitizedRoute | null {
   const params = new URLSearchParams();
+  if (url.pathname === APP_ROUTE_PATHS.researchAnalysis) {
+    const normalized = parseAnalysisWorkbenchRouteState(url.searchParams).normalizedParams;
+    for (const key of ALLOWED_QUERY_KEYS['research-analysis']) {
+      const value = normalized.get(key);
+      if (value !== null) params.set(key, value);
+    }
+    return {
+      key: 'research-analysis',
+      href: `${APP_ROUTE_PATHS.researchAnalysis}${params.size ? `?${params}` : ''}`,
+      target: null,
+    };
+  }
   if (
     url.pathname === APP_ROUTE_PATHS.researchDiscover
     || url.pathname === LEGACY_ROUTE_PATHS.screening
@@ -264,6 +284,17 @@ function stockContextFromTarget(target: DeepLinkTarget | null): PersistedStockCo
 function stockContextFromRoute(route: SanitizedRoute | null): PersistedStockContext | null {
   const targetContext = stockContextFromTarget(route?.target ?? null);
   if (targetContext) return targetContext;
+  if (route?.key === 'research-analysis') {
+    const params = new URL(route.href, 'http://stockpulse.local').searchParams;
+    const stockCode = params.get(HOME_ROUTE_QUERY_KEYS.stock);
+    const workbench = parseAnalysisWorkbenchRouteState(params).state;
+    return stockCode
+      ? {
+          stockCode,
+          ...(workbench.recordId ? { recordId: workbench.recordId } : {}),
+        }
+      : null;
+  }
   if (route?.key !== 'research-backtest') return null;
   const code = new URL(route.href, 'http://stockpulse.local').searchParams.get(
     RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.code,
@@ -272,7 +303,14 @@ function stockContextFromRoute(route: SanitizedRoute | null): PersistedStockCont
 }
 
 function routeOwnsStockContext(route: SanitizedRoute | null): boolean {
-  return Boolean(route && ['research-backtest', 'chat', 'decision-signals', 'home', 'stock'].includes(route.key));
+  return Boolean(route && [
+    'research-analysis',
+    'research-backtest',
+    'chat',
+    'decision-signals',
+    'home',
+    'stock',
+  ].includes(route.key));
 }
 
 export function recordSessionLocation(href: string): void {

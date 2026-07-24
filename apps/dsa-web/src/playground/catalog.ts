@@ -55,6 +55,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   common('checkbox', 'Checkbox', ['interactive', 'states']),
   common('app-page', 'AppPage'),
   common('workspace-page', 'WorkspacePage'),
+  entry('foundation', 'workspace-layout', 'WorkspaceLayout', 'components/common/WorkspacePage.tsx'),
   common('responsive-filter-panel', 'ResponsiveFilterPanel', ['interactive', 'states']),
   common('responsive-rail', 'ResponsiveRail', ['interactive']),
   common('workspace-navigation', 'WorkspaceNavigation', ['interactive']),

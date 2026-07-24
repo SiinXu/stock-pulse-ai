@@ -10,6 +10,7 @@ export const APP_ROUTE_PATHS = {
   portfolio: '/portfolio',
   signals: '/signals',
   stockDetails: '/stocks/:stockCode',
+  researchAnalysis: '/research/analysis',
   researchMarket: '/research/market',
   researchDiscover: '/research/discover',
   researchBacktest: '/research/backtest',
@@ -131,6 +132,9 @@ export const RUN_FLOW_ROUTE_QUERY_VALUES = {
   task: 'task',
 } as const;
 
+export type RunFlowRouteValue =
+  (typeof RUN_FLOW_ROUTE_QUERY_VALUES)[keyof typeof RUN_FLOW_ROUTE_QUERY_VALUES];
+
 export const HOME_ROUTE_QUERY_KEYS = {
   stock: 'stock',
   workspace: 'workspace',
@@ -184,6 +188,99 @@ export const RESEARCH_BACKTEST_PHASE_VALUES = {
 export const RESEARCH_BACKTEST_LIMITS = {
   maxWindowDays: 120,
 } as const;
+
+export const ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS = {
+  segment: 'segment',
+  ...REPORT_ROUTE_QUERY_KEYS,
+} as const;
+
+export const ANALYSIS_WORKBENCH_SEGMENT_VALUES = {
+  launch: 'launch',
+  tasks: 'tasks',
+  history: 'history',
+} as const;
+
+export type AnalysisWorkbenchSegment =
+  (typeof ANALYSIS_WORKBENCH_SEGMENT_VALUES)[keyof typeof ANALYSIS_WORKBENCH_SEGMENT_VALUES];
+
+export type AnalysisWorkbenchHrefOptions = {
+  segment?: AnalysisWorkbenchSegment;
+  recordId?: number | null;
+  runFlow?: RunFlowRouteValue;
+  runFlowRecordId?: number | null;
+  runFlowTaskId?: string | null;
+  stock?: string | null;
+};
+
+const ANALYSIS_WORKBENCH_TASK_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+
+export function isStableAnalysisWorkbenchTaskId(value: string): boolean {
+  return ANALYSIS_WORKBENCH_TASK_ID_PATTERN.test(value.trim());
+}
+
+export function isPositiveRouteInteger(value: number | null | undefined): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+}
+
+export function parsePositiveRouteInteger(value: string | null): number | null {
+  if (!value || !/^\d+$/.test(value)) return null;
+  const parsed = Number(value);
+  return isPositiveRouteInteger(parsed) ? parsed : null;
+}
+
+export function buildAnalysisWorkbenchHref(
+  options: AnalysisWorkbenchHrefOptions = {},
+): string {
+  const searchParams = new URLSearchParams();
+  const segment = options.segment
+    ?? (options.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.task
+      ? ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks
+      : isPositiveRouteInteger(options.recordId)
+          || options.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.history
+        ? ANALYSIS_WORKBENCH_SEGMENT_VALUES.history
+        : ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch);
+  if (segment !== ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch) {
+    searchParams.set(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment, segment);
+  }
+  if (
+    segment === ANALYSIS_WORKBENCH_SEGMENT_VALUES.history
+    && isPositiveRouteInteger(options.recordId)
+  ) {
+    searchParams.set(
+      ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId,
+      String(options.recordId),
+    );
+  }
+  if (
+    segment === ANALYSIS_WORKBENCH_SEGMENT_VALUES.history
+    && options.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.history
+    && isPositiveRouteInteger(options.runFlowRecordId)
+  ) {
+    searchParams.set(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow, options.runFlow);
+    searchParams.set(
+      ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowRecordId,
+      String(options.runFlowRecordId),
+    );
+  } else if (
+    segment === ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks
+    && options.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.task
+    && typeof options.runFlowTaskId === 'string'
+    && isStableAnalysisWorkbenchTaskId(options.runFlowTaskId)
+  ) {
+    searchParams.set(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow, options.runFlow);
+    searchParams.set(
+      ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowTaskId,
+      options.runFlowTaskId.trim(),
+    );
+  }
+  if (options.stock?.trim()) {
+    searchParams.set(HOME_ROUTE_QUERY_KEYS.stock, options.stock.trim());
+  }
+  const search = searchParams.toString();
+  return search
+    ? `${APP_ROUTE_PATHS.researchAnalysis}?${search}`
+    : APP_ROUTE_PATHS.researchAnalysis;
+}
 
 export const SETTINGS_ROUTE_QUERY_KEYS = {
   section: 'section',

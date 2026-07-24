@@ -29,6 +29,22 @@ export interface ParsedApiError {
   traceId?: string;
 }
 
+export function isPermanentlyUnavailableResourceError(
+  error: ParsedApiError | null,
+): error is ParsedApiError {
+  return Boolean(
+    error
+    && (
+      error.status === 401
+      || error.status === 403
+      || error.status === 404
+      || error.code === 'unauthorized'
+      || error.code === 'forbidden'
+      || error.code === 'not_found'
+    )
+  );
+}
+
 type StableErrorText = Record<UiLanguage, { title: string; message: string }> & {
   category?: ApiErrorCategory;
 };

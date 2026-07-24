@@ -178,6 +178,8 @@ PROVIDER_ADAPTIVE_PRIORITY_MIN_SAMPLES=3
 
 Tushare improves daily and snapshot stability. TickFlow can improve A-share daily bars, realtime quotes, and market review, subject to account permissions. Keep the free chain as fallback; do not make a credentialed provider the only source.
 
+Tushare custom endpoint: set `TUSHARE_HTTP_URL` (default `http://api.tushare.pro`) to target a self-hosted node, proxy, or internal mirror. Leaving it empty keeps default behavior. The endpoint is still enforced by the outbound security policy, so a private/internal host must also be added as `host:port` to `OUTBOUND_HTTP_ALLOWLIST`; see [security-outbound-policy.md](./security-outbound-policy.md).
+
 ### Production Hong Kong and U.S. profile
 
 ```env

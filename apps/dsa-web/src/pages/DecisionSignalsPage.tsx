@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   BarChart3,
@@ -89,7 +89,6 @@ import { getDecisionProfile } from '../utils/decisionSignalProfile';
 import { parseDecisionSignalDate } from '../utils/decisionSignalTime';
 import { getDecisionSignalPresentation } from '../utils/decisionSignalPresentation';
 import { parseDeepLink, type DecisionSignalsView } from '../utils/deepLink';
-import { buildHomeHistoryRunFlowHref } from '../utils/homeUrlState';
 import { areStockCodesEquivalent } from '../utils/stockCode';
 import {
   APP_ROUTE_PATHS,
@@ -98,6 +97,9 @@ import {
   SIGNAL_CENTER_SCOPE_VALUES,
   SIGNAL_CENTER_TAB_VALUES,
   SIGNAL_FEED_VIEW_VALUES,
+  ANALYSIS_WORKBENCH_SEGMENT_VALUES,
+  RUN_FLOW_ROUTE_QUERY_VALUES,
+  buildAnalysisWorkbenchHref,
   type SignalCenterScope,
   type SignalCenterTab,
 } from '../routing/routes';
@@ -702,7 +704,7 @@ const DecisionSignalsPage: React.FC = () => {
     updateDecisionSignalSearchParams({
       ...getStockSearchValues(code),
       ...(timelineSnapshot ? getTimelineSearchValues(timelineSnapshot) : {}),
-      view: activeViewRef.current === defaultView ? null : activeViewRef.current,
+      view: code || activeViewRef.current === defaultView ? null : activeViewRef.current,
     }, false);
   }, [updateDecisionSignalSearchParams]);
   const setActiveView = useCallback((view: DecisionSignalsView) => {
@@ -784,6 +786,10 @@ const DecisionSignalsPage: React.FC = () => {
     setActiveViewState(nextView);
   }, [decisionSignalsTarget?.view, navigationType, routeLocation.key]);
   const timelineMarketSourceRef = useRef<TimelineMarketSource>(null);
+  const pendingStockNavigationRef = useRef<{
+    context: StockContext | null;
+    timeline?: TimelineFilterUpdate;
+  } | null>(null);
   const mountedRef = useRef(true);
 
   const takePendingSelection = useCallback((
@@ -1370,31 +1376,36 @@ const DecisionSignalsPage: React.FC = () => {
     reassessSourceReportId,
   ]);
 
-  const applyStockContext = useCallback((nextContext: StockContext, syncUrl = true) => {
+  const commitStockContext = useCallback((
+    nextContext: StockContext,
+    nextTimeline: TimelineFilterUpdate,
+    selectLatestView: boolean,
+  ) => {
+    timelineMarketSourceRef.current = nextTimeline.marketSource;
+    setActiveStockContext(nextContext);
+    if (selectLatestView) {
+      activeViewRef.current = 'latest';
+      setActiveViewState('latest');
+    }
+    setStockDraft(nextContext.displayCode ?? nextContext.code);
+    setTimelineFilters(nextTimeline.filters);
+    void loadLatestForContext(nextContext);
+    void loadTimelineForContext(nextContext, nextTimeline.filters, false);
+  }, [
+    loadLatestForContext,
+    loadTimelineForContext,
+  ]);
+
+  const applyStockContext = useCallback((nextContext: StockContext) => {
     const nextTimeline = buildNextTimelineFilters(
       timelineFilters,
       activeStockContext,
       nextContext,
       timelineMarketSourceRef.current,
     );
-    timelineMarketSourceRef.current = nextTimeline.marketSource;
-    setActiveStockContext(nextContext);
-    if (syncUrl) {
-      activeViewRef.current = 'latest';
-      setActiveViewState('latest');
-    }
-    setStockDraft(nextContext.displayCode ?? nextContext.code);
-    setTimelineFilters(nextTimeline.filters);
-    if (syncUrl) syncStockContextSearchParams(nextContext.code, nextTimeline.filters);
-    void loadLatestForContext(nextContext);
-    void loadTimelineForContext(nextContext, nextTimeline.filters, false);
-  }, [
-    activeStockContext,
-    loadLatestForContext,
-    loadTimelineForContext,
-    syncStockContextSearchParams,
-    timelineFilters,
-  ]);
+    pendingStockNavigationRef.current = { context: nextContext, timeline: nextTimeline };
+    syncStockContextSearchParams(nextContext.code, nextTimeline.filters);
+  }, [activeStockContext, syncStockContextSearchParams, timelineFilters]);
 
   const handleStockSubmit = useCallback((
     code: string,
@@ -1425,11 +1436,15 @@ const DecisionSignalsPage: React.FC = () => {
   }, [activeStockContext, applyStockContext, handleStockSubmit]);
 
   const clearStockContext = useCallback((syncUrl: boolean) => {
+    if (syncUrl) {
+      pendingStockNavigationRef.current = { context: null };
+      syncStockContextSearchParams(null);
+      return;
+    }
     setStockDraft('');
     setActiveStockContext(null);
     timelineMarketSourceRef.current = null;
     setTimelineFilters((current) => ({ ...current, market: '' }));
-    if (syncUrl) syncStockContextSearchParams(null);
     resetLatestView();
     resetTimelineView();
   }, [resetLatestView, resetTimelineView, syncStockContextSearchParams]);
@@ -1438,28 +1453,46 @@ const DecisionSignalsPage: React.FC = () => {
     clearStockContext(true);
   }, [clearStockContext]);
 
-  const stockLocationKeyRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (stockLocationKeyRef.current === routeLocation.key) return;
-    stockLocationKeyRef.current = routeLocation.key;
+  // The URL entry is authoritative. User commands stage metadata, then commit
+  // local context only after React Router observes the corresponding entry.
+  useLayoutEffect(() => {
     const urlStock = new URLSearchParams(routeLocation.search)
       .get(SIGNAL_CENTER_ROUTE_QUERY_KEYS.stock)
       ?.trim() ?? '';
+    const pending = pendingStockNavigationRef.current;
     if (urlStock) {
+      const pendingMatches = pending?.context
+        ? areStockCodesEquivalent(pending.context.code, urlStock)
+        : false;
+      if (pendingMatches && pending?.context && pending.timeline) {
+        pendingStockNavigationRef.current = null;
+        commitStockContext(pending.context, pending.timeline, true);
+        return;
+      }
+      if (pending) pendingStockNavigationRef.current = null;
       if (
         activeStockContext
         && areStockCodesEquivalent(activeStockContext.code, urlStock)
       ) return;
-      applyStockContext({ code: urlStock }, false);
+      const nextContext = { code: urlStock };
+      const nextTimeline = buildNextTimelineFilters(
+        timelineFilters,
+        activeStockContext,
+        nextContext,
+        timelineMarketSourceRef.current,
+      );
+      commitStockContext(nextContext, nextTimeline, false);
       return;
     }
+    if (pending) pendingStockNavigationRef.current = null;
     if (activeStockContext) clearStockContext(false);
   }, [
     activeStockContext,
-    applyStockContext,
     clearStockContext,
+    commitStockContext,
     routeLocation.key,
     routeLocation.search,
+    timelineFilters,
   ]);
 
   const handleTimelineSearch = useCallback(() => {
@@ -2410,10 +2443,13 @@ const DecisionSignalsPage: React.FC = () => {
                 <>
                   {selected.item.sourceReportId ? (
                     <Link
-                      to={buildHomeHistoryRunFlowHref(
-                        selected.item.sourceReportId,
-                        selected.item.stockCode,
-                      )}
+                      to={buildAnalysisWorkbenchHref({
+                        segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+                        recordId: selected.item.sourceReportId,
+                        runFlow: RUN_FLOW_ROUTE_QUERY_VALUES.history,
+                        runFlowRecordId: selected.item.sourceReportId,
+                        stock: selected.item.stockCode,
+                      })}
                       data-control="navigation-link"
                       className="control-hit-target inline-flex min-h-7 min-w-0 max-w-full items-center gap-1.5 px-1.5 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
                     >

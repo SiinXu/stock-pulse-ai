@@ -2,7 +2,10 @@ import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, RefreshCw, Workflow } from 'lucide-react';
 import { Button, EmptyState, InlineAlert } from '../common';
-import type { ParsedApiError } from '../../api/error';
+import {
+  isPermanentlyUnavailableResourceError,
+  type ParsedApiError,
+} from '../../api/error';
 import { useRunFlowSnapshot } from '../../hooks/useRunFlowSnapshot';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { RunFlowNode, RunFlowSnapshotSource } from '../../types/runFlow';
@@ -18,18 +21,6 @@ interface RunFlowPanelProps {
   onUnavailable?: (error: ParsedApiError) => void;
 }
 
-const isPermanentlyUnavailable = (error: ParsedApiError | null): error is ParsedApiError => Boolean(
-  error
-  && (
-    error.status === 401
-    || error.status === 403
-    || error.status === 404
-    || error.code === 'unauthorized'
-    || error.code === 'forbidden'
-    || error.code === 'not_found'
-  ),
-);
-
 export const RunFlowPanel: React.FC<RunFlowPanelProps> = ({ source, title, onUnavailable }) => {
   const { t } = useUiLanguage();
   const { snapshot, isLoading, error, refetch } = useRunFlowSnapshot({
@@ -42,7 +33,7 @@ export const RunFlowPanel: React.FC<RunFlowPanelProps> = ({ source, title, onUna
   const unavailableReportKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!isPermanentlyUnavailable(error) || !onUnavailable) {
+    if (!isPermanentlyUnavailableResourceError(error) || !onUnavailable) {
       if (!error) {
         unavailableReportKeyRef.current = null;
       }
