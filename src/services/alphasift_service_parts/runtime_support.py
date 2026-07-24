@@ -97,13 +97,18 @@ def _install_alphasift(config: Config) -> Dict[str, Any]:
 
         # Keep the repair install inside StockPulse's reviewed dependency lock: --no-deps
         # unconditionally blocks resolving anything beyond the pinned AlphaSift spec, and the
-        # constraint files pin runtime and PEP 517 build resolution wherever they ship. Packaged
-        # desktop artifacts omit the lock files, so add the constraint flags only when present.
+        # constraint files pin runtime and PEP 517 build resolution wherever they ship. A frozen
+        # desktop build bundles the lock at sys._MEIPASS; source and Docker keep it at the
+        # repository root. Add the constraint flags only when the files are actually present.
         constraint_args = []
-        constraint_root = next(
-            (parent for parent in Path(__file__).resolve().parents if (parent / "constraints.txt").is_file()),
-            None,
-        )
+        bundled_root = getattr(sys, "_MEIPASS", None)
+        if bundled_root and (Path(bundled_root) / "constraints.txt").is_file():
+            constraint_root = Path(bundled_root)
+        else:
+            constraint_root = next(
+                (parent for parent in Path(__file__).resolve().parents if (parent / "constraints.txt").is_file()),
+                None,
+            )
         if constraint_root is not None:
             constraint_args = ["--constraint", str(constraint_root / "constraints.txt")]
             build_constraint_file = constraint_root / "build-constraints.txt"
