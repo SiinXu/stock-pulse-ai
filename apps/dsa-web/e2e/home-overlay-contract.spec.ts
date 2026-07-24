@@ -1016,7 +1016,7 @@ test.describe('Analysis Workbench interaction contract', () => {
 
     await page.getByRole('button', { name: 'History trend' }).click();
     await expect(page.getByRole('heading', { name: 'History trend' })).toBeVisible();
-    await expect(page.getByRole('table', { name: 'History records' })).toBeVisible();
+    await expect(page.getByRole('table', { name: 'Historical analysis records' })).toBeVisible();
     await page.getByRole('button', { name: 'Back to current report' }).click();
     await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
 
