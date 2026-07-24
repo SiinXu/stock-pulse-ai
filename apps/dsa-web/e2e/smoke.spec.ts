@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { getE2eAuthStatus, loginAsE2eAdmin } from './auth-fixture';
+import { getE2eAuthStatus, loginAsE2eAdmin, mockCompletedSetupStatus } from './auth-fixture';
 import { resolvePlaywrightPorts } from './playwright-result-paths.mjs';
 
 const { frontendPort } = resolvePlaywrightPorts(process.env);
@@ -164,6 +164,10 @@ test.describe('web smoke', () => {
   });
 
   test('home page shows analysis entry and history panel after login', async ({ page }) => {
+    // HomePage defaults to beginner-mode UI (Quick analysis / BeginnerReportSummary)
+    // when setup-status reports incomplete; force professional mode so the
+    // '分析' CTA and stock panel assertions below stay meaningful.
+    await mockCompletedSetupStatus(page);
     await login(page);
 
     const stockInput = page.getByPlaceholder('输入股票代码或名称，如 600519、贵州茅台、AAPL');
