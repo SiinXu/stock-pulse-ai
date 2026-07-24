@@ -62,6 +62,9 @@ class MainScheduleModeTestCase(unittest.TestCase):
         Config.reset_instance()
         root_logger = logging.getLogger()
         self._original_root_handlers = list(root_logger.handlers)
+        self._original_root_formatters = [
+            (handler, handler.formatter) for handler in self._original_root_handlers
+        ]
         self._original_root_level = root_logger.level
 
     def tearDown(self) -> None:
@@ -74,6 +77,13 @@ class MainScheduleModeTestCase(unittest.TestCase):
                     handler.close()
                 except Exception:
                     pass
+        # Restore original formatters — some tests exercise main paths that call
+        # ``logging.basicConfig`` and then ``setFormatter`` on every existing root
+        # handler (e.g. installing ``RelativePathFormatter``). Without restoring
+        # the formatter, that state leaks into later tests and their captured
+        # logs get sanitized in unexpected ways.
+        for handler, original_formatter in self._original_root_formatters:
+            handler.setFormatter(original_formatter)
         root_logger.setLevel(self._original_root_level)
         os.chdir(self.original_cwd)
         Config.reset_instance()
