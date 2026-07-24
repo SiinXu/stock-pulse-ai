@@ -8,7 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [Added] Introduced the Analysis Workbench route contract at `/research/analysis` with `?segment=launch|tasks|history` plus the existing `recordId` / `runFlow` / `runFlowRecordId` / `runFlowTaskId` params, exposed `buildAnalysisWorkbenchHref`, and added a `mapLegacyHomeAnalysisSearchParams` helper that infers the segment for legacy Home links ahead of the workbench extraction.
 - [Added] Added paper-trading portfolios as an additive account type (Issue #370): a paper account is created from the portfolio switcher and seeded with configurable initial cash (`PAPER_PORTFOLIO_INITIAL_CASH`); simulated buys/sells fill at the latest available close (fees/slippage ignored in the MVP) with available-cash validation on buys, and reuse the existing snapshot/positions/P&L. Classification lives in a new `portfolio_account_kinds` sidecar table created via `create_all` (no migration).
 - [Tests] Stabilized Agent LLM fallback and orchestrator timeout tests by replacing fixed-length `time.time` side_effect lists with call-count-agnostic clocks, preventing StopIteration under full-suite collection ordering.
 - [Added] Extended the Web LLM setup wizard with ordered fallback and Vision routing, a secret-free saved summary, direct Task Routing access, and a persistent re-entry action.
@@ -332,6 +331,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Added an opt-in public signal scorecard at `GET /api/v1/scorecard` (off by default via `SIGNAL_SCORECARD_PUBLIC_ENABLED`) that aggregates existing decision-signal outcomes into hit rate by signal type and horizon, a return distribution, and recent notable misses; buckets below `SIGNAL_SCORECARD_MIN_SAMPLES` render as `insufficient_data`, hit semantics reuse the existing outcome services, and the payload is aggregated and non-sensitive (no per-stock identity).
 - [Added] Added a persistent Beginner Web mode with guided first-run setup, brief quick analysis, simplified risk-aware report summaries, and progressive access to professional report controls.
 - [Changed] Unified Web decision signals, alert rules, delivery history, and outcome review under `/signals` with URL-scoped filters and legacy redirects.
+- [Added] Added the `/research/analysis` workbench with URL-backed launch, running-task, and history segments; watchlist and file batch submission; report and Run Flow deep links; completion actions; and a collapsible Research navigation entry.
 
 ## [3.26.3] - 2026-07-15
 

@@ -1,0 +1,377 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { agentApi } from '../../api/agent';
+import { analysisApi } from '../../api/analysis';
+import { historyApi } from '../../api/history';
+import { stocksApi } from '../../api/stocks';
+import { ToastProvider } from '../../components/common';
+import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
+import {
+  ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS,
+  ANALYSIS_WORKBENCH_SEGMENT_VALUES,
+  APP_ROUTE_PATHS,
+  RUN_FLOW_ROUTE_QUERY_VALUES,
+} from '../../routing/routes';
+import { useStockPoolStore } from '../../stores/stockPoolStore';
+import type { AnalysisReport, HistoryItem, TaskInfo } from '../../types/analysis';
+import ResearchAnalysisWorkbenchPage from '../ResearchAnalysisWorkbenchPage';
+
+type LifecycleOptions = Parameters<
+  (typeof import('../../hooks/useDashboardLifecycle'))['useDashboardLifecycle']
+>[0];
+
+let lifecycleOptions: LifecycleOptions | null = null;
+let watchlistCodes: string[] = [];
+
+vi.mock('../../hooks/useDashboardLifecycle', () => ({
+  useDashboardLifecycle: (options: LifecycleOptions) => {
+    lifecycleOptions = options;
+  },
+}));
+
+vi.mock('../../api/agent', () => ({
+  agentApi: {
+    getSkills: vi.fn(),
+  },
+}));
+
+vi.mock('../../api/analysis', async () => {
+  const actual = await vi.importActual<typeof import('../../api/analysis')>('../../api/analysis');
+  return {
+    ...actual,
+    analysisApi: {
+      ...actual.analysisApi,
+      analyzeAsync: vi.fn(),
+    },
+  };
+});
+
+vi.mock('../../api/history', () => ({
+  historyApi: {
+    getDetail: vi.fn(),
+    deleteRecords: vi.fn(),
+  },
+}));
+
+vi.mock('../../api/stocks', () => ({
+  stocksApi: {
+    extractFromImage: vi.fn(),
+    parseImport: vi.fn(),
+  },
+}));
+
+vi.mock('../../hooks/useStockIndex', () => ({
+  useStockIndex: () => ({
+    index: [],
+    loading: false,
+    error: null,
+    fallback: false,
+    loaded: true,
+  }),
+}));
+
+vi.mock('../../hooks/useWatchlist', () => ({
+  useWatchlist: () => ({
+    watchlistCodes,
+    isLoading: false,
+    isActioning: false,
+    loadError: null,
+    actionMessage: null,
+    isInWatchlist: vi.fn(() => false),
+    toggleWatchlist: vi.fn(),
+    refresh: vi.fn(),
+  }),
+}));
+
+vi.mock('../../components/report/ReportSummary', () => ({
+  ReportSummary: ({
+    data,
+    onOpenRunFlow,
+  }: {
+    data: AnalysisReport;
+    onOpenRunFlow?: (recordId: number) => void;
+  }) => (
+    <div data-testid="report-summary">
+      <span>{data.meta.stockName}</span>
+      <button type="button" onClick={() => onOpenRunFlow?.(data.meta.id!)}>
+        Open report run flow
+      </button>
+    </div>
+  ),
+}));
+
+vi.mock('../../components/run-flow', () => ({
+  RunFlowPanel: ({ source }: { source: { type: string } }) => (
+    <div data-testid="run-flow-panel">{source.type}</div>
+  ),
+}));
+
+const historyItem: HistoryItem = {
+  id: 12,
+  queryId: 'query-12',
+  stockCode: 'AAPL',
+  stockName: 'Apple',
+  reportType: 'detailed',
+  createdAt: '2026-07-23T12:00:00Z',
+};
+
+const report: AnalysisReport = {
+  meta: {
+    id: historyItem.id,
+    queryId: historyItem.queryId,
+    stockCode: historyItem.stockCode,
+    stockName: historyItem.stockName ?? 'Apple',
+    reportType: 'detailed',
+    createdAt: historyItem.createdAt,
+    reportLanguage: 'en',
+  },
+  summary: {
+    analysisSummary: 'Apple report',
+    operationAdvice: 'Observe',
+    trendPrediction: 'Neutral',
+    sentimentScore: 55,
+  },
+};
+
+const runningTask: TaskInfo = {
+  taskId: 'task-7',
+  stockCode: 'AAPL',
+  stockName: 'Apple',
+  status: 'processing',
+  progress: 40,
+  reportType: 'detailed',
+  createdAt: '2026-07-23T12:00:00Z',
+};
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location">{`${location.pathname}${location.search}${location.hash}`}</output>;
+}
+
+function renderWorkbench(initialEntry: string = APP_ROUTE_PATHS.researchAnalysis) {
+  return render(
+    <UiLanguageProvider initialLanguage="zh">
+      <ToastProvider>
+        <MemoryRouter initialEntries={[initialEntry]}>
+          <LocationProbe />
+          <Routes>
+            <Route
+              path={APP_ROUTE_PATHS.researchAnalysis}
+              element={<ResearchAnalysisWorkbenchPage />}
+            />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
+    </UiLanguageProvider>,
+  );
+}
+
+describe('ResearchAnalysisWorkbenchPage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    lifecycleOptions = null;
+    watchlistCodes = [];
+    useStockPoolStore.getState().resetDashboardState();
+    vi.mocked(agentApi.getSkills).mockResolvedValue({ skills: [], default_skill_id: '' });
+    vi.mocked(analysisApi.analyzeAsync).mockResolvedValue({
+      taskId: 'task-new',
+      status: 'pending',
+    });
+    vi.mocked(historyApi.getDetail).mockResolvedValue(report);
+    vi.mocked(historyApi.deleteRecords).mockResolvedValue({ deleted: 1 });
+    vi.mocked(stocksApi.extractFromImage).mockResolvedValue({ codes: ['AAPL', 'MSFT'] });
+    vi.mocked(stocksApi.parseImport).mockResolvedValue({ codes: ['AAPL', 'MSFT'] });
+  });
+
+  it('renders one workbench with three URL-backed segments and launch actions', async () => {
+    renderWorkbench();
+
+    expect(await screen.findByRole('heading', { name: '分析工作台' })).toBeInTheDocument();
+    expect(document.title).toBe('分析工作台 - StockPulse');
+    const workbenchTabs = screen.getByRole('tablist', { name: '分析工作台分段' });
+    expect(within(workbenchTabs).getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      '发起与批量',
+      '运行中任务',
+      '历史与对比',
+    ]);
+    expect(screen.getByRole('button', { name: '导入图表/文档到分析' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '分析全部' })).toBeInTheDocument();
+  });
+
+  it('switches segments without a reload and gives the empty tasks view a primary action', async () => {
+    renderWorkbench();
+
+    fireEvent.click(await screen.findByRole('tab', { name: '运行中任务' }));
+
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      `${APP_ROUTE_PATHS.researchAnalysis}?${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment}=${ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks}`,
+    );
+    expect(screen.getByText('暂无运行任务')).toBeInTheDocument();
+    const launchAction = screen.getByRole('button', { name: '发起与批量' });
+    expect(launchAction).toHaveAttribute('data-variant', 'primary');
+    fireEvent.click(launchAction);
+    expect(screen.getByTestId('location')).toHaveTextContent(APP_ROUTE_PATHS.researchAnalysis);
+  });
+
+  it('shows the running count and opens task RunFlow through canonical URL state', async () => {
+    useStockPoolStore.setState({
+      activeTasks: [
+        {
+          ...runningTask,
+          taskId: 'market-task',
+          stockCode: 'MARKET',
+          stockName: 'Market review task',
+          reportType: 'market_review',
+        },
+        runningTask,
+      ],
+    });
+    renderWorkbench(
+      `${APP_ROUTE_PATHS.researchAnalysis}?${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment}=${ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks}`,
+    );
+
+    const tasksTab = await screen.findByRole('tab', { name: /运行中任务/u });
+    expect(within(tasksTab).getByText('1')).toBeInTheDocument();
+    expect(screen.getByText('Apple')).toBeInTheDocument();
+    expect(screen.queryByText('Market review task')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '查看 Apple 运行流' }));
+
+    expect(await screen.findByTestId('run-flow-panel')).toHaveTextContent('task');
+    const search = new URLSearchParams(screen.getByTestId('location').textContent?.split('?')[1]);
+    expect(search.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow))
+      .toBe(RUN_FLOW_ROUTE_QUERY_VALUES.task);
+    expect(search.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowTaskId)).toBe('task-7');
+  });
+
+  it('loads a historical report from a recordId deep link and opens its RunFlow', async () => {
+    useStockPoolStore.setState({ historyItems: [historyItem] });
+    renderWorkbench(`${APP_ROUTE_PATHS.researchAnalysis}?recordId=12`);
+
+    expect(await screen.findByTestId('report-summary')).toHaveTextContent('Apple');
+    expect(historyApi.getDetail).toHaveBeenCalledWith(12);
+    expect(screen.getByRole('tab', { name: '历史与对比' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open report run flow' }));
+    expect(await screen.findByTestId('run-flow-panel')).toHaveTextContent('history');
+    const location = screen.getByTestId('location').textContent ?? '';
+    expect(location).toContain(`${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow}=history`);
+    expect(location).toContain(`${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowRecordId}=12`);
+  });
+
+  it('selects the newest report when the history segment has no recordId', async () => {
+    useStockPoolStore.setState({ historyItems: [historyItem] });
+    renderWorkbench(
+      `${APP_ROUTE_PATHS.researchAnalysis}?${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment}=${ANALYSIS_WORKBENCH_SEGMENT_VALUES.history}`,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent('recordId=12');
+    });
+    expect(await screen.findByTestId('report-summary')).toBeInTheDocument();
+  });
+
+  it('moves an accepted launch directly to the tasks segment', async () => {
+    useStockPoolStore.setState({ query: 'AAPL' });
+    renderWorkbench();
+
+    const analyzeButtons = await screen.findAllByRole('button', { name: '分析' });
+    fireEvent.click(analyzeButtons.at(-1)!);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent('segment=tasks');
+    });
+    expect((await screen.findAllByText('AAPL')).length).toBeGreaterThan(0);
+    expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(expect.objectContaining({
+      stockCode: 'AAPL',
+      reportType: 'detailed',
+    }));
+  });
+
+  it('imports chart/document symbols and exposes a working batch action', async () => {
+    const { container } = renderWorkbench();
+    const file = new File(['symbol'], 'stocks.csv', { type: 'text/csv' });
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(await screen.findByText('已识别 2 只股票，可批量提交分析。')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '分析已导入 (2)' }));
+
+    await waitFor(() => {
+      expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(expect.objectContaining({
+        stockCodes: ['AAPL', 'MSFT'],
+      }));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent('segment=tasks');
+    });
+  });
+
+  it('offers a completion toast action that deep-links to the finished report', async () => {
+    const refreshCompleted = vi.fn().mockResolvedValue(historyItem);
+    useStockPoolStore.setState({ refreshHistoryForCompletedTask: refreshCompleted });
+    renderWorkbench(
+      `${APP_ROUTE_PATHS.researchAnalysis}?${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment}=${ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks}`,
+    );
+
+    expect(lifecycleOptions).not.toBeNull();
+    await act(async () => {
+      await lifecycleOptions?.refreshHistoryForCompletedTask?.({
+        ...runningTask,
+        status: 'completed',
+        progress: 100,
+      });
+      lifecycleOptions?.onCompletedTaskDataRefreshed?.({
+        ...runningTask,
+        status: 'completed',
+        progress: 100,
+      });
+    });
+
+    expect(await screen.findByText('分析已完成')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '查看报告' }));
+    expect(screen.getByTestId('location')).toHaveTextContent('segment=history&recordId=12');
+  });
+
+  it('keeps the completion toast actionable while history persistence catches up', async () => {
+    const refreshCompleted = vi.fn().mockResolvedValue(null);
+    useStockPoolStore.setState({ refreshHistoryForCompletedTask: refreshCompleted });
+    renderWorkbench(
+      `${APP_ROUTE_PATHS.researchAnalysis}?${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment}=${ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks}`,
+    );
+
+    await act(async () => {
+      await lifecycleOptions?.refreshHistoryForCompletedTask?.({
+        ...runningTask,
+        status: 'completed',
+        progress: 100,
+      });
+      lifecycleOptions?.onCompletedTaskDataRefreshed?.({
+        ...runningTask,
+        status: 'completed',
+        progress: 100,
+      });
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: '查看报告' }));
+    expect(screen.getByTestId('location')).toHaveTextContent('segment=history');
+  });
+
+  it('gives an empty history segment a primary launch action', async () => {
+    renderWorkbench(
+      `${APP_ROUTE_PATHS.researchAnalysis}?${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment}=${ANALYSIS_WORKBENCH_SEGMENT_VALUES.history}`,
+    );
+
+    expect(await screen.findByText('暂无历史分析记录')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '发起与批量' }))
+      .toHaveAttribute('data-variant', 'primary');
+  });
+});

@@ -89,7 +89,6 @@ import { getDecisionProfile } from '../utils/decisionSignalProfile';
 import { parseDecisionSignalDate } from '../utils/decisionSignalTime';
 import { getDecisionSignalPresentation } from '../utils/decisionSignalPresentation';
 import { parseDeepLink, type DecisionSignalsView } from '../utils/deepLink';
-import { buildHomeHistoryRunFlowHref } from '../utils/homeUrlState';
 import { areStockCodesEquivalent } from '../utils/stockCode';
 import {
   APP_ROUTE_PATHS,
@@ -98,6 +97,9 @@ import {
   SIGNAL_CENTER_SCOPE_VALUES,
   SIGNAL_CENTER_TAB_VALUES,
   SIGNAL_FEED_VIEW_VALUES,
+  ANALYSIS_WORKBENCH_SEGMENT_VALUES,
+  RUN_FLOW_ROUTE_QUERY_VALUES,
+  buildAnalysisWorkbenchHref,
   type SignalCenterScope,
   type SignalCenterTab,
 } from '../routing/routes';
@@ -2410,10 +2412,13 @@ const DecisionSignalsPage: React.FC = () => {
                 <>
                   {selected.item.sourceReportId ? (
                     <Link
-                      to={buildHomeHistoryRunFlowHref(
-                        selected.item.sourceReportId,
-                        selected.item.stockCode,
-                      )}
+                      to={buildAnalysisWorkbenchHref({
+                        segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+                        recordId: selected.item.sourceReportId,
+                        runFlow: RUN_FLOW_ROUTE_QUERY_VALUES.history,
+                        runFlowRecordId: selected.item.sourceReportId,
+                        stock: selected.item.stockCode,
+                      })}
                       data-control="navigation-link"
                       className="control-hit-target inline-flex min-h-7 min-w-0 max-w-full items-center gap-1.5 px-1.5 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
                     >

@@ -174,12 +174,13 @@ describe('SidebarNav', () => {
 
     await screen.findByRole('link', { name: '发现' });
     const hrefs = screen.getAllByRole('link').map((link) => link.getAttribute('href'));
-    expect(hrefs.slice(0, 9)).toEqual([
+    expect(hrefs.slice(0, 10)).toEqual([
       APP_ROUTE_PATHS.home,
       APP_ROUTE_PATHS.signals,
       APP_ROUTE_PATHS.researchMarket,
       APP_ROUTE_PATHS.researchMarket,
       APP_ROUTE_PATHS.researchDiscover,
+      APP_ROUTE_PATHS.researchAnalysis,
       APP_ROUTE_PATHS.researchBacktest,
       APP_ROUTE_PATHS.portfolio,
       APP_ROUTE_PATHS.agent,
@@ -204,6 +205,7 @@ describe('SidebarNav', () => {
     }
     expect(screen.getByRole('link', { name: '大盘复盘' })).toBeVisible();
     expect(screen.getByRole('link', { name: '发现' })).toBeVisible();
+    expect(screen.getByRole('link', { name: '分析工作台' })).toBeVisible();
 
     const researchToggle = screen.getByRole('button', { name: '研究' });
     fireEvent.click(researchToggle);
@@ -211,6 +213,7 @@ describe('SidebarNav', () => {
     expect(researchToggle).not.toHaveAttribute('aria-controls');
     expect(screen.queryByRole('link', { name: '大盘复盘' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '发现' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '分析工作台' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: '信号中心' })).toBeVisible();
 
     fireEvent.click(researchToggle);
@@ -218,6 +221,7 @@ describe('SidebarNav', () => {
     expect(researchToggle).toHaveAttribute('aria-controls', 'shell-nav-research-children');
     expect(screen.getByRole('link', { name: '大盘复盘' })).toBeVisible();
     expect(screen.getByRole('link', { name: '发现' })).toBeVisible();
+    expect(screen.getByRole('link', { name: '分析工作台' })).toBeVisible();
   });
 
   it('keeps the Discover navigation item stable after config save events', () => {
@@ -343,6 +347,8 @@ describe('SidebarNav', () => {
       .toHaveAttribute('href', APP_ROUTE_PATHS.researchMarket);
     expect(within(menu).getByRole('menuitem', { name: '发现' }))
       .toHaveAttribute('href', APP_ROUTE_PATHS.researchDiscover);
+    expect(within(menu).getByRole('menuitem', { name: '分析工作台' }))
+      .toHaveAttribute('href', APP_ROUTE_PATHS.researchAnalysis);
     expect(research).toHaveAttribute('aria-expanded', 'true');
     expect(beforeNavigation).toHaveFocus();
   });
@@ -431,6 +437,16 @@ describe('SidebarNav', () => {
     expect(currentLinks).toHaveLength(1);
     expect(currentLinks[0]).toHaveAttribute('href', APP_ROUTE_PATHS.researchDiscover);
     discoverRender.unmount();
+
+    const workbenchRender = render(
+      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.researchAnalysis]}>
+        <SidebarNav />
+      </MemoryRouter>,
+    );
+    currentLinks = workbenchRender.container.querySelectorAll('a[aria-current="page"]');
+    expect(currentLinks).toHaveLength(1);
+    expect(currentLinks[0]).toHaveAttribute('href', APP_ROUTE_PATHS.researchAnalysis);
+    workbenchRender.unmount();
 
     const compactRender = render(
       <MemoryRouter initialEntries={[APP_ROUTE_PATHS.researchMarket]}>

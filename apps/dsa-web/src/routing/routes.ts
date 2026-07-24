@@ -132,6 +132,9 @@ export const RUN_FLOW_ROUTE_QUERY_VALUES = {
   task: 'task',
 } as const;
 
+export type RunFlowRouteValue =
+  (typeof RUN_FLOW_ROUTE_QUERY_VALUES)[keyof typeof RUN_FLOW_ROUTE_QUERY_VALUES];
+
 export const HOME_ROUTE_QUERY_KEYS = {
   stock: 'stock',
   workspace: 'workspace',
@@ -206,43 +209,60 @@ export type AnalysisWorkbenchSegment =
 export type AnalysisWorkbenchHrefOptions = {
   segment?: AnalysisWorkbenchSegment;
   recordId?: number | null;
-  runFlow?: 'history' | 'task';
+  runFlow?: RunFlowRouteValue;
   runFlowRecordId?: number | null;
   runFlowTaskId?: string | null;
+  stock?: string | null;
 };
+
+const ANALYSIS_WORKBENCH_TASK_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+
+export function isStableAnalysisWorkbenchTaskId(value: string): boolean {
+  return ANALYSIS_WORKBENCH_TASK_ID_PATTERN.test(value.trim());
+}
+
+function isPositiveSafeInteger(value: number | null | undefined): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+}
 
 export function buildAnalysisWorkbenchHref(
   options: AnalysisWorkbenchHrefOptions = {},
 ): string {
   const searchParams = new URLSearchParams();
-  if (options.segment) {
+  if (
+    options.segment
+    && options.segment !== ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch
+  ) {
     searchParams.set(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment, options.segment);
   }
-  if (typeof options.recordId === 'number' && Number.isFinite(options.recordId) && options.recordId > 0) {
+  if (isPositiveSafeInteger(options.recordId)) {
     searchParams.set(
       ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId,
-      String(Math.trunc(options.recordId)),
+      String(options.recordId),
     );
   }
-  if (options.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.history || options.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.task) {
+  if (
+    options.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.history
+    && isPositiveSafeInteger(options.runFlowRecordId)
+  ) {
     searchParams.set(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow, options.runFlow);
-    if (options.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.history
-      && typeof options.runFlowRecordId === 'number'
-      && Number.isFinite(options.runFlowRecordId)
-      && options.runFlowRecordId > 0) {
-      searchParams.set(
-        ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowRecordId,
-        String(Math.trunc(options.runFlowRecordId)),
-      );
-    }
-    if (options.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.task
-      && typeof options.runFlowTaskId === 'string'
-      && options.runFlowTaskId.trim()) {
-      searchParams.set(
-        ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowTaskId,
-        options.runFlowTaskId.trim(),
-      );
-    }
+    searchParams.set(
+      ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowRecordId,
+      String(options.runFlowRecordId),
+    );
+  } else if (
+    options.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.task
+    && typeof options.runFlowTaskId === 'string'
+    && isStableAnalysisWorkbenchTaskId(options.runFlowTaskId)
+  ) {
+    searchParams.set(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow, options.runFlow);
+    searchParams.set(
+      ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowTaskId,
+      options.runFlowTaskId.trim(),
+    );
+  }
+  if (options.stock?.trim()) {
+    searchParams.set(HOME_ROUTE_QUERY_KEYS.stock, options.stock.trim());
   }
   const search = searchParams.toString();
   return search

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS,
+  ANALYSIS_WORKBENCH_SEGMENT_VALUES,
   APP_ROUTE_PATHS,
   HOME_WORKSPACE_VALUES,
   LEGACY_ROUTE_PATHS,
@@ -37,6 +39,7 @@ describe('application navigation descriptor', () => {
     expect(APPLICATION_NAVIGATION_ITEMS[1]?.children?.map(({ key, to }) => [key, to])).toEqual([
       ['research-market', APP_ROUTE_PATHS.researchMarket],
       ['research-discover', APP_ROUTE_PATHS.researchDiscover],
+      ['research-analysis', APP_ROUTE_PATHS.researchAnalysis],
       ['research-backtest', APP_ROUTE_PATHS.researchBacktest],
     ]);
   });
@@ -86,6 +89,18 @@ describe('application navigation descriptor', () => {
       'unknown',
     ]);
     expect(Object.values(RUN_FLOW_ROUTE_QUERY_VALUES)).toEqual(['history', 'task']);
+    expect(Object.values(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS)).toEqual([
+      'segment',
+      'recordId',
+      'runFlow',
+      'runFlowRecordId',
+      'runFlowTaskId',
+    ]);
+    expect(Object.values(ANALYSIS_WORKBENCH_SEGMENT_VALUES)).toEqual([
+      'launch',
+      'tasks',
+      'history',
+    ]);
     expect(Object.values(HOME_WORKSPACE_VALUES)).toEqual(['history', 'watchlist', 'today']);
     expect(RESEARCH_DISCOVER_DEFAULT_VALUES).toEqual({
       market: RESEARCH_DISCOVER_MARKET_VALUES.china,

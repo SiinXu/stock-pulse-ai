@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS,
+  ANALYSIS_WORKBENCH_SEGMENT_VALUES,
   APP_ROUTE_PATHS,
+  HOME_ROUTE_QUERY_KEYS,
   LEGACY_ROUTE_PATHS,
   REPORT_ROUTE_QUERY_KEYS,
   RESEARCH_BACKTEST_ROUTE_QUERY_KEYS,
@@ -77,6 +80,22 @@ describe('sessionContinuity', () => {
     );
   });
 
+  it('restores validated task and history Run Flow context for Analysis Workbench', () => {
+    recordSessionLocation(
+      `${APP_ROUTE_PATHS.researchAnalysis}?${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId}=42&${HOME_ROUTE_QUERY_KEYS.stock}=AAPL&${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow}=${RUN_FLOW_ROUTE_QUERY_VALUES.history}&${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowRecordId}=42`,
+    );
+    expect(resolveInitialSessionHref(APP_ROUTE_PATHS.researchAnalysis)).toBe(
+      `${APP_ROUTE_PATHS.researchAnalysis}?${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment}=${ANALYSIS_WORKBENCH_SEGMENT_VALUES.history}&${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId}=42&${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow}=${RUN_FLOW_ROUTE_QUERY_VALUES.history}&${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowRecordId}=42&${HOME_ROUTE_QUERY_KEYS.stock}=AAPL`,
+    );
+
+    recordSessionLocation(
+      `${APP_ROUTE_PATHS.researchAnalysis}?${HOME_ROUTE_QUERY_KEYS.stock}=AAPL&${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow}=${RUN_FLOW_ROUTE_QUERY_VALUES.task}&${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowTaskId}=task_01%3Aus-east.2`,
+    );
+    expect(resolveInitialSessionHref(APP_ROUTE_PATHS.researchAnalysis)).toBe(
+      `${APP_ROUTE_PATHS.researchAnalysis}?${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment}=${ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks}&${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow}=${RUN_FLOW_ROUTE_QUERY_VALUES.task}&${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowTaskId}=task_01%3Aus-east.2&${HOME_ROUTE_QUERY_KEYS.stock}=AAPL`,
+    );
+  });
+
   it('overwrites a previous snapshot when the user clears route state', () => {
     recordSessionLocation('/portfolio?account=7');
     expect(resolveInitialSessionHref('/portfolio')).toBe('/portfolio?account=7');
@@ -113,6 +132,15 @@ describe('sessionContinuity', () => {
     expect(resolveContextAwareNavigationTarget(
       '/chat',
       '/?recordId=9&stock=AAPL&workspace=watchlist',
+    )).toBe('/chat?session=session-1&stock=AAPL&recordId=9');
+  });
+
+  it('carries Analysis Workbench report context into Chat', () => {
+    recordSessionLocation('/chat?session=session-1&stock=600519&recordId=3');
+
+    expect(resolveContextAwareNavigationTarget(
+      '/chat',
+      `${APP_ROUTE_PATHS.researchAnalysis}?${HOME_ROUTE_QUERY_KEYS.stock}=AAPL&${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId}=9`,
     )).toBe('/chat?session=session-1&stock=AAPL&recordId=9');
   });
 
@@ -232,6 +260,18 @@ describe('sessionContinuity', () => {
     }));
 
     expect(resolveInitialSessionHref('/')).toBeNull();
+    expect(window.sessionStorage.getItem(WEB_SESSION_CONTINUITY_STORAGE_KEY)).not.toContain('provider_api_key');
+  });
+
+  it('removes malformed Analysis Workbench pipeline identities from tampered storage', () => {
+    window.sessionStorage.setItem(WEB_SESSION_CONTINUITY_STORAGE_KEY, JSON.stringify({
+      version: 1,
+      routes: {
+        'research-analysis': `${APP_ROUTE_PATHS.researchAnalysis}?${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow}=${RUN_FLOW_ROUTE_QUERY_VALUES.task}&${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowTaskId}=..%2Fprovider_api_key`,
+      },
+    }));
+
+    expect(resolveInitialSessionHref(APP_ROUTE_PATHS.researchAnalysis)).toBeNull();
     expect(window.sessionStorage.getItem(WEB_SESSION_CONTINUITY_STORAGE_KEY)).not.toContain('provider_api_key');
   });
 });

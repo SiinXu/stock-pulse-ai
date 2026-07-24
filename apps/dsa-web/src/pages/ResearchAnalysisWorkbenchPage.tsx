@@ -1,0 +1,1024 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+import type React from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FileUp, FlaskConical, History, ListChecks, Upload, Workflow } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { agentApi, type SkillInfo } from '../api/agent';
+import { analysisApi, DuplicateTaskError } from '../api/analysis';
+import { getParsedApiError, type ParsedApiError } from '../api/error';
+import { historyApi } from '../api/history';
+import { stocksApi } from '../api/stocks';
+import {
+  ApiErrorAlert,
+  AppPage,
+  Badge,
+  Button,
+  Checkbox,
+  EmptyState,
+  InlineAlert,
+  Modal,
+  PageHeader,
+  SegmentedControl,
+  Select,
+  Surface,
+  TabPanel,
+  Tabs,
+} from '../components/common';
+import { useToast } from '../components/common/toastContext';
+import { DashboardStateBlock } from '../components/dashboard';
+import { HistoryList } from '../components/history';
+import { ReportSummary } from '../components/report/ReportSummary';
+import { RunFlowPanel } from '../components/run-flow';
+import { StockAutocomplete } from '../components/StockAutocomplete';
+import { TaskPanel } from '../components/tasks';
+import { useUiLanguage } from '../contexts/UiLanguageContext';
+import { useAnalysisWorkbenchState } from '../hooks/useAnalysisWorkbenchState';
+import { useDashboardLifecycle } from '../hooks/useDashboardLifecycle';
+import { useWatchlist } from '../hooks/useWatchlist';
+import {
+  ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS,
+  ANALYSIS_WORKBENCH_SEGMENT_VALUES,
+  APP_ROUTE_PATHS,
+  HOME_ROUTE_QUERY_KEYS,
+  RUN_FLOW_ROUTE_QUERY_VALUES,
+  type AnalysisWorkbenchSegment,
+} from '../routing/routes';
+import {
+  DEFAULT_ANALYSIS_WORKBENCH_ROUTE_STATE,
+  parseAnalysisWorkbenchRouteState,
+  setAnalysisWorkbenchRouteState,
+  type AnalysisWorkbenchRouteState,
+} from '../routing/analysisWorkbenchRouteState';
+import { useStockPoolStore } from '../stores/stockPoolStore';
+import type { AnalyzeAsyncResponse, TaskInfo } from '../types/analysis';
+import type { RunFlowSnapshotSource } from '../types/runFlow';
+import { getStrategyDisplay } from '../utils/strategyDisplay';
+import { normalizeStockCode } from '../utils/stockCode';
+import {
+  readExperienceMode,
+  writeExperienceMode,
+  type ExperienceMode,
+} from '../utils/onboardingPreferences';
+
+type RunFlowDialogState =
+  | { open: false }
+  | { open: true; source: RunFlowSnapshotSource; title: string };
+
+type WorkbenchNotice = {
+  variant: 'success' | 'warning' | 'danger';
+  message: string;
+} | null;
+
+type WorkbenchNavigationState = {
+  focusStockSearch?: boolean;
+};
+
+const WORKBENCH_TABS_ID = 'analysis-workbench-tabs';
+const BATCH_ANALYSIS_CHUNK_SIZE = 50;
+
+const noopAsync = async (): Promise<void> => undefined;
+
+function chunkStockCodes(codes: readonly string[]): string[][] {
+  const chunks: string[][] = [];
+  for (let index = 0; index < codes.length; index += BATCH_ANALYSIS_CHUNK_SIZE) {
+    chunks.push(codes.slice(index, index + BATCH_ANALYSIS_CHUNK_SIZE));
+  }
+  return chunks;
+}
+
+function countBatchAccepted(result: AnalyzeAsyncResponse): { accepted: number; duplicates: number } {
+  if ('accepted' in result) {
+    return {
+      accepted: result.accepted.length,
+      duplicates: result.duplicates.length,
+    };
+  }
+  return { accepted: 1, duplicates: 0 };
+}
+
+function normalizeBatchCodes(codes: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const code of codes) {
+    const normalized = code.trim().toUpperCase();
+    const key = normalizeStockCode(normalized).toUpperCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    unique.push(normalized);
+  }
+  return unique;
+}
+
+function stateForSegment(
+  current: AnalysisWorkbenchRouteState,
+  segment: AnalysisWorkbenchSegment,
+): AnalysisWorkbenchRouteState {
+  if (segment === ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch) {
+    return { ...DEFAULT_ANALYSIS_WORKBENCH_ROUTE_STATE };
+  }
+  if (segment === ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks) {
+    return {
+      segment,
+      recordId: null,
+      runFlow: current.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.task ? current.runFlow : null,
+      runFlowRecordId: null,
+      runFlowTaskId: current.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.task
+        ? current.runFlowTaskId
+        : null,
+    };
+  }
+  return {
+    segment,
+    recordId: current.recordId,
+    runFlow: current.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.history ? current.runFlow : null,
+    runFlowRecordId: current.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.history
+      ? current.runFlowRecordId
+      : null,
+    runFlowTaskId: null,
+  };
+}
+
+const ResearchAnalysisWorkbenchPage: React.FC = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { language, t } = useUiLanguage();
+  const { showToast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const completedRecordIdsRef = useRef(new Map<string, number>());
+  const [analysisSkills, setAnalysisSkills] = useState<SkillInfo[]>([]);
+  const [selectedStrategyId, setSelectedStrategyId] = useState('');
+  const [experienceMode, setExperienceMode] = useState<ExperienceMode>(
+    () => readExperienceMode() ?? 'professional',
+  );
+  const [selectedHistoryIds, setSelectedHistoryIds] = useState<ReadonlySet<number>>(
+    () => new Set(),
+  );
+  const [isDeletingHistory, setIsDeletingHistory] = useState(false);
+  const [deleteError, setDeleteError] = useState<ParsedApiError | null>(null);
+  const [runFlowError, setRunFlowError] = useState<ParsedApiError | null>(null);
+  const [importedCodes, setImportedCodes] = useState<string[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importNotice, setImportNotice] = useState<WorkbenchNotice>(null);
+  const [isBatchSubmitting, setIsBatchSubmitting] = useState(false);
+  const [batchNotice, setBatchNotice] = useState<WorkbenchNotice>(null);
+
+  const {
+    query,
+    inputError,
+    duplicateError,
+    duplicateTask,
+    error,
+    reportDetailError,
+    isAnalyzing,
+    historyItems,
+    isLoadingHistory,
+    isLoadingMore,
+    hasMore,
+    selectedReport,
+    selectedRecordId,
+    isLoadingReport,
+    activeTasks,
+    notify,
+    setQuery,
+    setNotify,
+    clearError,
+    loadInitialHistory,
+    refreshHistory,
+    refreshHistoryForCompletedTask,
+    loadMoreHistory,
+    selectHistoryItem,
+    retrySelectedRecord,
+    clearSelectedRecord,
+    submitAnalysis,
+    syncTaskCreated,
+    syncTaskUpdated,
+    syncTaskFailed,
+    refreshActiveTasks,
+    pollKnownTasks,
+    removeTask,
+  } = useAnalysisWorkbenchState();
+  const watchlist = useWatchlist();
+
+  const parsedRoute = useMemo(
+    () => parseAnalysisWorkbenchRouteState(location.search),
+    [location.search],
+  );
+  const routeState = parsedRoute.state;
+  const canonicalSearch = parsedRoute.normalizedParams.toString();
+
+  const navigateToState = useCallback((
+    nextState: AnalysisWorkbenchRouteState,
+    replace = false,
+  ) => {
+    const nextParams = setAnalysisWorkbenchRouteState(location.search, nextState);
+    const nextSearch = nextParams.toString();
+    navigate(
+      {
+        pathname: APP_ROUTE_PATHS.researchAnalysis,
+        search: nextSearch ? `?${nextSearch}` : '',
+        hash: location.hash,
+      },
+      { replace },
+    );
+  }, [location.hash, location.search, navigate]);
+
+  const selectSegment = useCallback((segment: AnalysisWorkbenchSegment) => {
+    navigateToState(stateForSegment(routeState, segment));
+  }, [navigateToState, routeState]);
+
+  const navigateToRecord = useCallback((recordId: number, replace = false) => {
+    navigateToState({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+      recordId,
+      runFlow: null,
+      runFlowRecordId: null,
+      runFlowTaskId: null,
+    }, replace);
+  }, [navigateToState]);
+
+  useEffect(() => {
+    const expectedSearch = canonicalSearch ? `?${canonicalSearch}` : '';
+    if (expectedSearch === location.search) return;
+    navigate(
+      {
+        pathname: APP_ROUTE_PATHS.researchAnalysis,
+        search: expectedSearch,
+        hash: location.hash,
+      },
+      { replace: true },
+    );
+  }, [canonicalSearch, location.hash, location.search, navigate]);
+
+  useEffect(() => {
+    document.title = t('analysisWorkbench.documentTitle');
+  }, [t]);
+
+  useEffect(() => {
+    let active = true;
+    void agentApi.getSkills()
+      .then((response) => {
+        if (active) setAnalysisSkills(response.skills);
+      })
+      .catch(() => {
+        if (active) setAnalysisSkills([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (selectedStrategyId && !analysisSkills.some((skill) => skill.id === selectedStrategyId)) {
+      setSelectedStrategyId('');
+    }
+  }, [analysisSkills, selectedStrategyId]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const stockCode = params.get(HOME_ROUTE_QUERY_KEYS.stock)?.trim() ?? '';
+    if (stockCode && query !== stockCode) setQuery(stockCode);
+  }, [location.search, query, setQuery]);
+
+  useEffect(() => {
+    const navigationState = location.state as WorkbenchNavigationState | null;
+    if (!navigationState?.focusStockSearch) return;
+    document.getElementById('analysis-workbench-stock-search')?.focus();
+    navigate(`${location.pathname}${location.search}${location.hash}`, {
+      replace: true,
+      state: null,
+    });
+  }, [location.hash, location.pathname, location.search, location.state, navigate]);
+
+  const analysisHistoryItems = useMemo(
+    () => historyItems.filter((item) => (
+      item.reportType !== 'market_review' && item.stockCode !== 'MARKET'
+    )),
+    [historyItems],
+  );
+  const analysisTasks = useMemo(
+    () => activeTasks.filter((task) => task.reportType !== 'market_review'),
+    [activeTasks],
+  );
+
+  useEffect(() => {
+    if (
+      routeState.segment !== ANALYSIS_WORKBENCH_SEGMENT_VALUES.history
+      || isLoadingHistory
+      || routeState.recordId !== null
+      || analysisHistoryItems.length === 0
+    ) {
+      return;
+    }
+    navigateToRecord(analysisHistoryItems[0].id, true);
+  }, [
+    analysisHistoryItems,
+    isLoadingHistory,
+    navigateToRecord,
+    routeState.recordId,
+    routeState.segment,
+  ]);
+
+  useEffect(() => {
+    if (
+      routeState.recordId === null
+      || selectedRecordId === routeState.recordId
+    ) {
+      return;
+    }
+    void selectHistoryItem(routeState.recordId, true);
+  }, [routeState.recordId, selectHistoryItem, selectedRecordId]);
+
+  useEffect(() => {
+    if (
+      routeState.recordId === null
+      || selectedReport?.meta.id !== routeState.recordId
+      || selectedReport.meta.reportType !== 'market_review'
+    ) {
+      return;
+    }
+    const params = new URLSearchParams(location.search);
+    params.delete(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment);
+    navigate(
+      {
+        pathname: APP_ROUTE_PATHS.researchMarket,
+        search: params.toString() ? `?${params}` : '',
+        hash: location.hash,
+      },
+      { replace: true },
+    );
+  }, [location.hash, location.search, navigate, routeState.recordId, selectedReport]);
+
+  const refreshCompletedTaskHistory = useCallback(async (task: TaskInfo) => {
+    const item = await refreshHistoryForCompletedTask(task);
+    if (item) completedRecordIdsRef.current.set(task.taskId, item.id);
+    return item;
+  }, [refreshHistoryForCompletedTask]);
+
+  const handleCompletedTaskDataRefreshed = useCallback((task: TaskInfo) => {
+    if (task.reportType === 'market_review') return;
+    const recordId = completedRecordIdsRef.current.get(task.taskId);
+    completedRecordIdsRef.current.delete(task.taskId);
+    showToast({
+      title: t('analysisWorkbench.taskCompletedTitle'),
+      message: t('analysisWorkbench.taskCompletedMessage', {
+        stock: task.stockName || task.stockCode,
+      }),
+      tone: 'success',
+      action: {
+        label: t('analysisWorkbench.viewReport'),
+        onClick: () => {
+          if (recordId) navigateToRecord(recordId);
+          else selectSegment(ANALYSIS_WORKBENCH_SEGMENT_VALUES.history);
+        },
+      },
+    });
+  }, [navigateToRecord, selectSegment, showToast, t]);
+
+  useDashboardLifecycle({
+    loadInitialHistory,
+    refreshHistory,
+    refreshHistoryForCompletedTask: refreshCompletedTaskHistory,
+    refreshActiveTasks,
+    pollKnownTasks,
+    loadStockBar: noopAsync,
+    refreshStockBar: noopAsync,
+    syncTaskCreated,
+    syncTaskUpdated,
+    syncTaskFailed,
+    removeTask,
+    onCompletedTaskDataRefreshed: handleCompletedTaskDataRefreshed,
+  });
+
+  const selectedAnalysisSkills = useMemo(
+    () => (selectedStrategyId ? [selectedStrategyId] : undefined),
+    [selectedStrategyId],
+  );
+  const strategyOptions = useMemo(() => [
+    {
+      value: '',
+      label: t('home.defaultStrategyName'),
+    },
+    ...analysisSkills.map((skill) => ({
+      value: skill.id,
+      label: getStrategyDisplay(skill, language).name,
+    })),
+  ], [analysisSkills, language, t]);
+
+  const handleExperienceModeChange = useCallback((mode: ExperienceMode) => {
+    writeExperienceMode(mode);
+    setExperienceMode(mode);
+  }, []);
+
+  const handleSubmitAnalysis = useCallback(async (
+    stockCode?: string,
+    stockName?: string,
+    selectionSource: 'manual' | 'autocomplete' | 'import' = 'manual',
+  ) => {
+    const stockInput = (stockCode ?? query).trim();
+    if (!stockInput) {
+      await submitAnalysis({ stockCode: stockInput });
+      return;
+    }
+    const beforeTaskIds = new Set(analysisTasks.map((task) => task.taskId));
+    await submitAnalysis({
+      stockCode,
+      stockName,
+      originalQuery: query,
+      selectionSource,
+      reportType: experienceMode === 'beginner' ? 'brief' : 'detailed',
+      skills: selectedAnalysisSkills,
+    });
+    const latest = useStockPoolStore.getState();
+    const taskAccepted = latest.activeTasks.some((task) => (
+      task.reportType !== 'market_review' && !beforeTaskIds.has(task.taskId)
+    ));
+    if (taskAccepted || latest.duplicateTask) {
+      selectSegment(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
+    }
+  }, [analysisTasks, experienceMode, query, selectSegment, selectedAnalysisSkills, submitAnalysis]);
+
+  const submitBatch = useCallback(async (sourceCodes: readonly string[]) => {
+    const codes = normalizeBatchCodes(sourceCodes);
+    if (codes.length === 0) {
+      setBatchNotice({ variant: 'warning', message: t('watchlist.noStocksAnalyze') });
+      return;
+    }
+
+    setIsBatchSubmitting(true);
+    setBatchNotice(null);
+    let accepted = 0;
+    let duplicates = 0;
+    let confirmed = 0;
+    let submissionError: ParsedApiError | null = null;
+    try {
+      for (const chunk of chunkStockCodes(codes)) {
+        try {
+          const result = await analysisApi.analyzeAsync({
+            stockCodes: chunk,
+            reportType: experienceMode === 'beginner' ? 'brief' : 'detailed',
+            notify,
+            skills: selectedAnalysisSkills,
+          });
+          const counts = countBatchAccepted(result);
+          accepted += counts.accepted;
+          duplicates += counts.duplicates;
+          const confirmedInChunk = counts.accepted + counts.duplicates;
+          confirmed += Math.min(confirmedInChunk, chunk.length);
+          if (confirmedInChunk !== chunk.length) {
+            submissionError = getParsedApiError(new Error(t('watchlist.batchIncompleteResponse', {
+              confirmed: confirmedInChunk,
+              requested: chunk.length,
+            })), language);
+            break;
+          }
+        } catch (batchError) {
+          if (batchError instanceof DuplicateTaskError && chunk.length === 1) {
+            duplicates += 1;
+            confirmed += 1;
+            continue;
+          }
+          submissionError = getParsedApiError(batchError, language);
+          break;
+        }
+      }
+      // A timeout can arrive after accepted chunks, so always reconcile tasks.
+      await refreshActiveTasks();
+      if (submissionError) {
+        setBatchNotice(accepted > 0 || duplicates > 0
+          ? {
+              variant: 'warning',
+              message: t('watchlist.batchPartiallySubmitted', {
+                accepted,
+                duplicates,
+                unconfirmed: Math.max(0, codes.length - confirmed),
+                error: submissionError.message || t('watchlist.batchFailed'),
+              }),
+            }
+          : {
+              variant: 'danger',
+              message: submissionError.message || t('watchlist.batchFailed'),
+            });
+      } else {
+        setBatchNotice({
+          variant: accepted > 0 ? 'success' : 'warning',
+          message: t('watchlist.batchSubmitted', { accepted, duplicates }),
+        });
+      }
+      if (accepted > 0 || duplicates > 0) {
+        selectSegment(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
+      }
+    } catch (batchError) {
+      setBatchNotice({
+        variant: 'danger',
+        message: getParsedApiError(batchError, language).message || t('watchlist.batchFailed'),
+      });
+      await refreshActiveTasks();
+      if (accepted > 0 || duplicates > 0) {
+        selectSegment(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
+      }
+    } finally {
+      setIsBatchSubmitting(false);
+    }
+  }, [experienceMode, language, notify, refreshActiveTasks, selectSegment, selectedAnalysisSkills, t]);
+
+  const handleImportFile = useCallback(async (file: File) => {
+    setIsImporting(true);
+    setImportNotice(null);
+    try {
+      const response = file.type.startsWith('image/')
+        ? await stocksApi.extractFromImage(file)
+        : await stocksApi.parseImport(file);
+      const codes = normalizeBatchCodes(response.codes);
+      setImportedCodes(codes);
+      if (codes.length === 0) {
+        setImportNotice({ variant: 'warning', message: t('analysisWorkbench.importEmpty') });
+        return;
+      }
+      setQuery(codes[0]);
+      setImportNotice({
+        variant: 'success',
+        message: t('analysisWorkbench.importReady', { count: codes.length }),
+      });
+    } catch (importError) {
+      setImportedCodes([]);
+      setImportNotice({
+        variant: 'danger',
+        message: getParsedApiError(importError, language).message,
+      });
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }, [language, setQuery, t]);
+
+  const toggleHistorySelection = useCallback((recordId: number) => {
+    setSelectedHistoryIds((current) => {
+      const next = new Set(current);
+      if (next.has(recordId)) next.delete(recordId);
+      else next.add(recordId);
+      return next;
+    });
+  }, []);
+
+  const toggleAllHistory = useCallback(() => {
+    setSelectedHistoryIds((current) => {
+      const visibleIds = analysisHistoryItems.map((item) => item.id);
+      const allSelected = visibleIds.length > 0 && visibleIds.every((id) => current.has(id));
+      if (allSelected) return new Set();
+      return new Set(visibleIds);
+    });
+  }, [analysisHistoryItems]);
+
+  const deleteSelectedHistory = useCallback(async () => {
+    if (selectedHistoryIds.size === 0 || isDeletingHistory) return;
+    const recordIds = [...selectedHistoryIds];
+    const deletesCurrentRecord = routeState.recordId !== null
+      && selectedHistoryIds.has(routeState.recordId);
+    setIsDeletingHistory(true);
+    setDeleteError(null);
+    try {
+      await historyApi.deleteRecords(recordIds);
+      setSelectedHistoryIds(new Set());
+      if (deletesCurrentRecord) {
+        clearSelectedRecord();
+        navigateToState({
+          ...DEFAULT_ANALYSIS_WORKBENCH_ROUTE_STATE,
+          segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+        }, true);
+      }
+      await refreshHistory(false);
+    } catch (historyError) {
+      setDeleteError(getParsedApiError(historyError, language));
+    } finally {
+      setIsDeletingHistory(false);
+    }
+  }, [
+    clearSelectedRecord,
+    isDeletingHistory,
+    language,
+    navigateToState,
+    refreshHistory,
+    routeState.recordId,
+    selectedHistoryIds,
+  ]);
+
+  const openTaskRunFlow = useCallback((task: TaskInfo) => {
+    setRunFlowError(null);
+    navigateToState({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
+      recordId: null,
+      runFlow: RUN_FLOW_ROUTE_QUERY_VALUES.task,
+      runFlowRecordId: null,
+      runFlowTaskId: task.taskId,
+    });
+  }, [navigateToState]);
+
+  const openHistoryRunFlow = useCallback((recordId: number) => {
+    setRunFlowError(null);
+    navigateToState({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+      recordId,
+      runFlow: RUN_FLOW_ROUTE_QUERY_VALUES.history,
+      runFlowRecordId: recordId,
+      runFlowTaskId: null,
+    });
+  }, [navigateToState]);
+
+  const closeRunFlow = useCallback(() => {
+    navigateToState({
+      ...routeState,
+      runFlow: null,
+      runFlowRecordId: null,
+      runFlowTaskId: null,
+    }, true);
+  }, [navigateToState, routeState]);
+
+  const runFlowDialog = useMemo<RunFlowDialogState>(() => {
+    if (routeState.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.task && routeState.runFlowTaskId) {
+      const task = analysisTasks.find((candidate) => candidate.taskId === routeState.runFlowTaskId);
+      return {
+        open: true,
+        source: { type: 'task', taskId: routeState.runFlowTaskId },
+        title: t('runFlow.taskDrawerTitle', {
+          stock: task?.stockName || task?.stockCode || routeState.runFlowTaskId,
+        }),
+      };
+    }
+    if (
+      routeState.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.history
+      && routeState.runFlowRecordId !== null
+    ) {
+      const historyItem = analysisHistoryItems.find(
+        (candidate) => candidate.id === routeState.runFlowRecordId,
+      );
+      return {
+        open: true,
+        source: { type: 'history', recordId: routeState.runFlowRecordId },
+        title: t('runFlow.historyDrawerTitle', {
+          stock: historyItem?.stockName
+            || historyItem?.stockCode
+            || String(routeState.runFlowRecordId),
+        }),
+      };
+    }
+    return { open: false };
+  }, [analysisHistoryItems, analysisTasks, routeState, t]);
+
+  const handleUnavailableRunFlow = useCallback((nextError: ParsedApiError) => {
+    setRunFlowError(nextError);
+    closeRunFlow();
+  }, [closeRunFlow]);
+
+  const runningTaskCount = analysisTasks.filter((task) => (
+    task.status === 'pending'
+    || task.status === 'processing'
+    || task.status === 'cancel_requested'
+  )).length;
+  const tabItems = useMemo(() => [
+    {
+      id: ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch,
+      label: t('analysisWorkbench.launch'),
+    },
+    {
+      id: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
+      label: (
+        <span className="flex items-center gap-2">
+          {t('analysisWorkbench.tasks')}
+          {runningTaskCount > 0 ? <Badge variant="info">{runningTaskCount}</Badge> : null}
+        </span>
+      ),
+    },
+    {
+      id: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+      label: t('analysisWorkbench.history'),
+    },
+  ], [runningTaskCount, t]);
+
+  const selectedAnalysisReport = selectedReport?.meta.reportType !== 'market_review'
+    && selectedReport?.meta.id === routeState.recordId
+    ? selectedReport
+    : null;
+  const hasUnresolvedReportIntent = routeState.recordId !== null
+    && selectedRecordId === routeState.recordId
+    && selectedAnalysisReport === null
+    && !isLoadingReport;
+  const visibleError = reportDetailError ?? error;
+
+  return (
+    <AppPage data-testid="analysis-workbench-page">
+      <PageHeader
+        title={t('analysisWorkbench.title')}
+        description={t('analysisWorkbench.description')}
+        actions={(
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => selectSegment(ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch)}
+          >
+            <FlaskConical className="h-4 w-4" aria-hidden="true" />
+            {t('home.analyze')}
+          </Button>
+        )}
+      />
+
+      <Tabs
+        id={WORKBENCH_TABS_ID}
+        className="mt-5"
+        aria-label={t('analysisWorkbench.tabsLabel')}
+        value={routeState.segment}
+        items={tabItems}
+        onValueChange={(value) => {
+          if (Object.values(ANALYSIS_WORKBENCH_SEGMENT_VALUES).includes(
+            value as AnalysisWorkbenchSegment,
+          )) {
+            selectSegment(value as AnalysisWorkbenchSegment);
+          }
+        }}
+      />
+
+      <div className="mt-4 space-y-3" aria-live="polite">
+        {inputError ? (
+          <InlineAlert variant="danger" title={t('home.inputInvalid')} message={inputError} />
+        ) : null}
+        {duplicateError ? (
+          <InlineAlert
+            variant="warning"
+            title={t('home.duplicateTask')}
+            message={duplicateTask
+              ? t('home.duplicateTaskMessage', { stock: duplicateTask.stockCode })
+              : getParsedApiError(duplicateError, language).message}
+          />
+        ) : null}
+        {visibleError ? <ApiErrorAlert error={visibleError} onDismiss={clearError} /> : null}
+        {deleteError ? <ApiErrorAlert error={deleteError} onDismiss={() => setDeleteError(null)} /> : null}
+        {runFlowError ? <ApiErrorAlert error={runFlowError} onDismiss={() => setRunFlowError(null)} /> : null}
+      </div>
+
+      <TabPanel
+        tabsId={WORKBENCH_TABS_ID}
+        value={ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch}
+        activeValue={routeState.segment}
+      >
+        <Surface level="interactive" padding="lg">
+          <div className="max-w-4xl space-y-5">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">
+                {t('analysisWorkbench.launch')}
+              </h2>
+              <p className="mt-1 text-sm text-secondary-text">
+                {t('analysisWorkbench.launchDescription')}
+              </p>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_15rem]">
+              <StockAutocomplete
+                id="analysis-workbench-stock-search"
+                value={query}
+                onChange={setQuery}
+                onSubmit={(stockCode, stockName, selectionSource) => {
+                  void handleSubmitAnalysis(stockCode, stockName, selectionSource);
+                }}
+                placeholder={t('home.placeholder')}
+                disabled={isAnalyzing}
+                className={inputError ? 'border-danger/50' : undefined}
+              />
+              <Select
+                value={selectedStrategyId}
+                onChange={setSelectedStrategyId}
+                options={strategyOptions}
+                label={t('home.strategy')}
+                disabled={isAnalyzing}
+                className="w-full"
+                triggerClassName="w-full"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <SegmentedControl
+                value={experienceMode}
+                onChange={handleExperienceModeChange}
+                ariaLabel={t('home.experienceModeLabel')}
+                options={[
+                  { value: 'beginner', label: t('home.beginnerMode') },
+                  { value: 'professional', label: t('home.professionalMode') },
+                ]}
+              />
+              <Checkbox
+                checked={notify}
+                onChange={(event) => setNotify(event.target.checked)}
+                label={t('home.notify')}
+              />
+              <Button
+                type="button"
+                variant="primary"
+                disabled={!query || isAnalyzing}
+                isLoading={isAnalyzing}
+                loadingText={t('home.analyzing')}
+                onClick={() => void handleSubmitAnalysis()}
+              >
+                <FlaskConical className="h-4 w-4" aria-hidden="true" />
+                {experienceMode === 'beginner' ? t('home.quickAnalyze') : t('home.analyze')}
+              </Button>
+            </div>
+
+            <div className="border-t border-border pt-5">
+              <p className="text-sm text-secondary-text">
+                {t('analysisWorkbench.batchDescription')}
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  isLoading={isBatchSubmitting}
+                  disabled={isBatchSubmitting || watchlist.isLoading}
+                  onClick={() => void submitBatch(watchlist.watchlistCodes)}
+                >
+                  <ListChecks className="h-4 w-4" aria-hidden="true" />
+                  {t('watchlist.analyzeAll')}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  isLoading={isImporting}
+                  loadingText={t('analysisWorkbench.importing')}
+                  disabled={isImporting || isBatchSubmitting}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="h-4 w-4" aria-hidden="true" />
+                  {t('analysisWorkbench.importAction')}
+                </Button>
+                {importedCodes.length > 0 ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    isLoading={isBatchSubmitting}
+                    disabled={isBatchSubmitting}
+                    onClick={() => void submitBatch(importedCodes)}
+                  >
+                    <FileUp className="h-4 w-4" aria-hidden="true" />
+                    {t('analysisWorkbench.analyzeImported', { count: importedCodes.length })}
+                  </Button>
+                ) : null}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  accept="image/jpeg,image/png,image/webp,image/gif,.csv,.xlsx,.xls,.txt"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) void handleImportFile(file);
+                  }}
+                />
+              </div>
+              {importNotice ? (
+                <InlineAlert
+                  className="mt-3"
+                  variant={importNotice.variant}
+                  message={importNotice.message}
+                />
+              ) : null}
+              {batchNotice ? (
+                <InlineAlert
+                  className="mt-3"
+                  variant={batchNotice.variant}
+                  message={batchNotice.message}
+                />
+              ) : null}
+            </div>
+          </div>
+        </Surface>
+      </TabPanel>
+
+      <TabPanel
+        tabsId={WORKBENCH_TABS_ID}
+        value={ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks}
+        activeValue={routeState.segment}
+      >
+        {analysisTasks.length > 0 ? (
+          <TaskPanel
+            tasks={analysisTasks}
+            onOpenRunFlow={openTaskRunFlow}
+            onDismiss={removeTask}
+          />
+        ) : (
+          <EmptyState
+            title={t('analysisWorkbench.tasksEmptyTitle')}
+            description={t('analysisWorkbench.tasksEmptyDescription')}
+            icon={<Workflow className="h-6 w-6" aria-hidden="true" />}
+            action={(
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => selectSegment(ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch)}
+              >
+                {t('analysisWorkbench.launch')}
+              </Button>
+            )}
+          />
+        )}
+      </TabPanel>
+
+      <TabPanel
+        tabsId={WORKBENCH_TABS_ID}
+        value={ANALYSIS_WORKBENCH_SEGMENT_VALUES.history}
+        activeValue={routeState.segment}
+      >
+        {!isLoadingHistory && analysisHistoryItems.length === 0 ? (
+          <EmptyState
+            title={t('history.defaultEmptyTitle')}
+            description={t('history.defaultEmptyDescription')}
+            icon={<History className="h-6 w-6" aria-hidden="true" />}
+            action={(
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => selectSegment(ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch)}
+              >
+                {t('analysisWorkbench.launch')}
+              </Button>
+            )}
+          />
+        ) : (
+          <div className="grid min-h-0 gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
+            <HistoryList
+              className="min-h-96"
+              items={analysisHistoryItems}
+              isLoading={isLoadingHistory}
+              isLoadingMore={isLoadingMore}
+              hasMore={hasMore}
+              selectedId={routeState.recordId ?? undefined}
+              selectedIds={new Set(selectedHistoryIds)}
+              isDeleting={isDeletingHistory}
+              onItemClick={navigateToRecord}
+              onLoadMore={() => void loadMoreHistory()}
+              onToggleItemSelection={toggleHistorySelection}
+              onToggleSelectAll={toggleAllHistory}
+              onDeleteSelected={() => void deleteSelectedHistory()}
+            />
+
+            <section className="min-w-0" aria-label={t('analysisWorkbench.history')}>
+              {isLoadingReport ? (
+                <DashboardStateBlock title={t('home.loadingReport')} loading />
+              ) : selectedAnalysisReport ? (
+                <ReportSummary
+                  data={selectedAnalysisReport}
+                  isHistory
+                  onOpenRunFlow={openHistoryRunFlow}
+                  watchlist={{
+                    isInWatchlist: watchlist.isInWatchlist,
+                    onToggle: watchlist.toggleWatchlist,
+                    isActioning: watchlist.isActioning,
+                    actionMessage: watchlist.actionMessage,
+                  }}
+                />
+              ) : hasUnresolvedReportIntent && !reportDetailError ? (
+                <DashboardStateBlock
+                  title={t('home.loadingReport')}
+                  action={(
+                    <Button type="button" variant="secondary" onClick={() => void retrySelectedRecord()}>
+                      {t('common.retry')}
+                    </Button>
+                  )}
+                />
+              ) : (
+                <EmptyState
+                  title={t('analysisWorkbench.reportEmptyTitle')}
+                  description={t('analysisWorkbench.reportEmptyDescription')}
+                  icon={<History className="h-6 w-6" aria-hidden="true" />}
+                  action={(
+                    <Button
+                      type="button"
+                      variant="primary"
+                      onClick={() => selectSegment(ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch)}
+                    >
+                      {t('analysisWorkbench.launch')}
+                    </Button>
+                  )}
+                />
+              )}
+            </section>
+          </div>
+        )}
+      </TabPanel>
+
+      {runFlowDialog.open ? (
+        <Modal
+          isOpen
+          onClose={closeRunFlow}
+          title={t('runFlow.drawerTitle')}
+          size="fullscreen"
+        >
+          <RunFlowPanel
+            key={`${runFlowDialog.source.type}-${runFlowDialog.source.type === 'task' ? runFlowDialog.source.taskId : runFlowDialog.source.recordId}`}
+            source={runFlowDialog.source}
+            title={runFlowDialog.title}
+            onUnavailable={handleUnavailableRunFlow}
+          />
+        </Modal>
+      ) : null}
+    </AppPage>
+  );
+};
+
+export default ResearchAnalysisWorkbenchPage;

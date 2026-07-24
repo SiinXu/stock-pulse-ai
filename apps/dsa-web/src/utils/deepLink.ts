@@ -14,6 +14,9 @@ import {
   type HomeWorkspaceValue,
 } from '../routing/routes';
 import {
+  parseAnalysisWorkbenchRouteState,
+} from '../routing/analysisWorkbenchRouteState';
+import {
   parseResearchBacktestRouteState,
   parseResearchDiscoverRouteState,
 } from '../routing/researchRouteState';
@@ -551,6 +554,13 @@ export function parseDeepLink(input: string, origin = DEFAULT_ORIGIN): ParsedDee
         }
         target = { page: 'stock', stockCode, period, days };
       }
+    } else if (url.pathname === APP_ROUTE_PATHS.researchAnalysis) {
+      const parsedWorkbench = parseAnalysisWorkbenchRouteState(params);
+      params = parsedWorkbench.normalizedParams;
+      parsedWorkbench.invalidKeys.forEach((parameter) => {
+        issues.push({ code: 'invalid_filter', parameter });
+      });
+      parseStockParam(params, issues, HOME_ROUTE_QUERY_KEYS.stock);
     } else if (
       url.pathname === APP_ROUTE_PATHS.researchDiscover
       || url.pathname === LEGACY_ROUTE_PATHS.screening

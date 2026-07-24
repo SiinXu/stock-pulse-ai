@@ -3,15 +3,16 @@
 import {
   ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS,
   ANALYSIS_WORKBENCH_SEGMENT_VALUES,
-  REPORT_ROUTE_QUERY_KEYS,
   RUN_FLOW_ROUTE_QUERY_VALUES,
+  isStableAnalysisWorkbenchTaskId,
   type AnalysisWorkbenchSegment,
+  type RunFlowRouteValue,
 } from './routes';
 
 export type AnalysisWorkbenchRouteState = {
   segment: AnalysisWorkbenchSegment;
   recordId: number | null;
-  runFlow: 'history' | 'task' | null;
+  runFlow: RunFlowRouteValue | null;
   runFlowRecordId: number | null;
   runFlowTaskId: string | null;
 };
@@ -19,6 +20,7 @@ export type AnalysisWorkbenchRouteState = {
 export type ParsedAnalysisWorkbenchRouteState = {
   state: AnalysisWorkbenchRouteState;
   normalizedParams: URLSearchParams;
+  ownedParams: URLSearchParams;
   invalidKeys: string[];
 };
 
@@ -33,7 +35,6 @@ export const DEFAULT_ANALYSIS_WORKBENCH_ROUTE_STATE: AnalysisWorkbenchRouteState
 const SEGMENTS = new Set<AnalysisWorkbenchSegment>(
   Object.values(ANALYSIS_WORKBENCH_SEGMENT_VALUES),
 );
-
 function toSearchParams(search: string | URLSearchParams): URLSearchParams {
   return typeof search === 'string' ? new URLSearchParams(search) : new URLSearchParams(search);
 }
@@ -47,6 +48,11 @@ function parsePositiveInt(raw: string | null): number | null {
   return value;
 }
 
+function parseStableTaskId(raw: string | null): string | null {
+  const value = raw?.trim() ?? '';
+  return isStableAnalysisWorkbenchTaskId(value) ? value : null;
+}
+
 function replaceOwnedParams(
   source: URLSearchParams,
   state: AnalysisWorkbenchRouteState,
@@ -56,10 +62,7 @@ function replaceOwnedParams(
   source.forEach((value, key) => {
     if (!ownedKeys.has(key)) next.append(key, value);
   });
-  if (
-    state.segment !== DEFAULT_ANALYSIS_WORKBENCH_ROUTE_STATE.segment
-    || source.has(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment)
-  ) {
+  if (state.segment !== DEFAULT_ANALYSIS_WORKBENCH_ROUTE_STATE.segment) {
     next.set(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment, state.segment);
   }
   if (state.recordId !== null) {
@@ -107,7 +110,7 @@ export function parseAnalysisWorkbenchRouteState(
   }
 
   const rawRunFlow = source.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow);
-  let runFlow: 'history' | 'task' | null = null;
+  let runFlow: RunFlowRouteValue | null = null;
   if (rawRunFlow === RUN_FLOW_ROUTE_QUERY_VALUES.history || rawRunFlow === RUN_FLOW_ROUTE_QUERY_VALUES.task) {
     runFlow = rawRunFlow;
   } else if (rawRunFlow !== null) {
@@ -121,13 +124,30 @@ export function parseAnalysisWorkbenchRouteState(
   }
 
   const rawRunFlowTaskId = source.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowTaskId);
-  let runFlowTaskId = rawRunFlowTaskId?.trim() || null;
+  let runFlowTaskId = parseStableTaskId(rawRunFlowTaskId);
+  if (rawRunFlowTaskId !== null && runFlowTaskId === null) {
+    invalidKeys.push(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowTaskId);
+  }
 
   if (runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.history) {
     runFlowTaskId = null;
+    if (runFlowRecordId === null) {
+      runFlow = null;
+      invalidKeys.push(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowRecordId);
+    }
   } else if (runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.task) {
     runFlowRecordId = null;
+    if (runFlowTaskId === null) {
+      runFlow = null;
+      invalidKeys.push(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowTaskId);
+    }
   } else {
+    if (rawRunFlowRecordId !== null && runFlowRecordId !== null) {
+      invalidKeys.push(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowRecordId);
+    }
+    if (rawRunFlowTaskId !== null && runFlowTaskId !== null) {
+      invalidKeys.push(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowTaskId);
+    }
     runFlowRecordId = null;
     runFlowTaskId = null;
   }
@@ -149,10 +169,18 @@ export function parseAnalysisWorkbenchRouteState(
     runFlowRecordId,
     runFlowTaskId,
   };
+  const normalizedParams = replaceOwnedParams(source, state);
+  const ownedParams = new URLSearchParams();
+  for (const key of Object.values(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS)) {
+    for (const value of normalizedParams.getAll(key)) {
+      ownedParams.append(key, value);
+    }
+  }
   return {
     state,
-    normalizedParams: replaceOwnedParams(source, state),
-    invalidKeys,
+    normalizedParams,
+    ownedParams,
+    invalidKeys: [...new Set(invalidKeys)],
   };
 }
 
@@ -161,57 +189,4 @@ export function setAnalysisWorkbenchRouteState(
   state: AnalysisWorkbenchRouteState,
 ): URLSearchParams {
   return replaceOwnedParams(toSearchParams(search), state);
-}
-
-function replaceSearchParams(target: URLSearchParams, source: URLSearchParams): void {
-  for (const key of [...target.keys()]) target.delete(key);
-  source.forEach((value, key) => target.append(key, value));
-}
-
-/**
- * Legacy home compatibility: map old HomePage analysis-scoped params
- * (recordId, runFlow, runFlowRecordId, runFlowTaskId — see REPORT_ROUTE_QUERY_KEYS)
- * to the Analysis Workbench route contract with an explicit segment.
- */
-export function mapLegacyHomeAnalysisSearchParams(searchParams: URLSearchParams): void {
-  const rawRecordId = searchParams.get(REPORT_ROUTE_QUERY_KEYS.recordId);
-  const rawRunFlow = searchParams.get(REPORT_ROUTE_QUERY_KEYS.runFlow);
-  const rawRunFlowRecordId = searchParams.get(REPORT_ROUTE_QUERY_KEYS.runFlowRecordId);
-  const rawRunFlowTaskId = searchParams.get(REPORT_ROUTE_QUERY_KEYS.runFlowTaskId);
-
-  const recordId = parsePositiveInt(rawRecordId);
-  const runFlow: 'history' | 'task' | null =
-    rawRunFlow === RUN_FLOW_ROUTE_QUERY_VALUES.history
-      ? RUN_FLOW_ROUTE_QUERY_VALUES.history
-      : rawRunFlow === RUN_FLOW_ROUTE_QUERY_VALUES.task
-        ? RUN_FLOW_ROUTE_QUERY_VALUES.task
-        : null;
-  const runFlowRecordId = runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.history
-    ? parsePositiveInt(rawRunFlowRecordId)
-    : null;
-  const runFlowTaskId = runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.task
-    ? (rawRunFlowTaskId?.trim() || null)
-    : null;
-
-  // Drop the legacy home-scoped analysis params from the copy we hand to the workbench parser.
-  searchParams.delete(REPORT_ROUTE_QUERY_KEYS.recordId);
-  searchParams.delete(REPORT_ROUTE_QUERY_KEYS.runFlow);
-  searchParams.delete(REPORT_ROUTE_QUERY_KEYS.runFlowRecordId);
-  searchParams.delete(REPORT_ROUTE_QUERY_KEYS.runFlowTaskId);
-
-  const segment: AnalysisWorkbenchSegment = runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.task
-    ? ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks
-    : recordId !== null || runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.history
-      ? ANALYSIS_WORKBENCH_SEGMENT_VALUES.history
-      : DEFAULT_ANALYSIS_WORKBENCH_ROUTE_STATE.segment;
-
-  const state: AnalysisWorkbenchRouteState = {
-    segment,
-    recordId,
-    runFlow,
-    runFlowRecordId,
-    runFlowTaskId,
-  };
-  const normalized = setAnalysisWorkbenchRouteState(searchParams, state);
-  replaceSearchParams(searchParams, normalized);
 }

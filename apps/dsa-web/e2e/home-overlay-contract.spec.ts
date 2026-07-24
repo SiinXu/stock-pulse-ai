@@ -1,7 +1,12 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
-import { APP_ROUTE_PATHS } from '../src/routing/routes';
+import {
+  ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS,
+  ANALYSIS_WORKBENCH_SEGMENT_VALUES,
+  APP_ROUTE_PATHS,
+  RUN_FLOW_ROUTE_QUERY_VALUES,
+} from '../src/routing/routes';
 import { loginAsE2eAdmin } from './auth-fixture';
 
 const UI_LANGUAGE_STORAGE_KEY = 'dsa.uiLanguage';
@@ -977,5 +982,68 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
     await expect(trigger).toBeFocused();
     await expectSearchParams(page, { recordId: '2', runFlow: null, runFlowRecordId: null });
     await expectBodyOverflow(page, '');
+  });
+});
+
+test.describe('Analysis Workbench interaction contract', () => {
+  test('three URL segments keep history selection and Run Flow on one page', async ({ page }) => {
+    const fixture = await openFixtureHome(page, APP_ROUTE_PATHS.researchAnalysis);
+
+    await expect(page.getByRole('heading', { name: 'Analysis Workbench' })).toBeVisible();
+    const tabs = page.getByRole('tablist', { name: 'Analysis Workbench segments' });
+    await expect(tabs.getByRole('tab')).toHaveText([
+      'Launch & batch',
+      'Running tasks',
+      'History & comparison',
+    ]);
+
+    await tabs.getByRole('tab', { name: 'Running tasks' }).click();
+    await expectSearchParams(page, {
+      [ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment]: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
+    });
+    await expect(page.getByText('No running tasks', { exact: true })).toBeVisible();
+
+    await tabs.getByRole('tab', { name: 'History & comparison' }).click();
+    await expectSearchParams(page, {
+      [ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment]: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+      [ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId]: '1',
+    });
+    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+    await expect.poll(() => fixture.detailRequests).toContain(1);
+
+    await page.getByTestId('run-diagnostics').locator('summary').first().click();
+    await page.getByRole('button', { name: 'View run flow for history record 1' }).click();
+    await expect(page.getByTestId('run-flow-panel')).toBeVisible();
+    await expectSearchParams(page, {
+      [ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment]: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+      [ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId]: '1',
+      [ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow]: RUN_FLOW_ROUTE_QUERY_VALUES.history,
+      [ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowRecordId]: '1',
+    });
+  });
+
+  test('an accepted launch switches directly to the tasks segment', async ({ page }) => {
+    await openFixtureHome(page, APP_ROUTE_PATHS.researchAnalysis);
+    let submitted: Record<string, unknown> | null = null;
+    await page.route('**/api/v1/analysis/analyze', async (route) => {
+      submitted = route.request().postDataJSON() as Record<string, unknown>;
+      await fulfillJson(route, {
+        task_id: 'workbench-e2e-task',
+        status: 'pending',
+      }, 202);
+    });
+
+    await page.locator('#analysis-workbench-stock-search').fill('AAPL');
+    await page.getByRole('button', { name: 'Analyze', exact: true }).last().click();
+
+    await expectSearchParams(page, {
+      [ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment]: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
+    });
+    await expect(page.getByText('AAPL', { exact: true }).first()).toBeVisible();
+    expect(submitted).toMatchObject({
+      stock_code: 'AAPL',
+      async_mode: true,
+      report_type: 'detailed',
+    });
   });
 });

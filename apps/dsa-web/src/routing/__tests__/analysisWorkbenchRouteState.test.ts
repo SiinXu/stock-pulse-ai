@@ -6,13 +6,11 @@ import {
   ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS,
   ANALYSIS_WORKBENCH_SEGMENT_VALUES,
   APP_ROUTE_PATHS,
-  REPORT_ROUTE_QUERY_KEYS,
   RUN_FLOW_ROUTE_QUERY_VALUES,
   buildAnalysisWorkbenchHref,
 } from '../routes';
 import {
   DEFAULT_ANALYSIS_WORKBENCH_ROUTE_STATE,
-  mapLegacyHomeAnalysisSearchParams,
   parseAnalysisWorkbenchRouteState,
   setAnalysisWorkbenchRouteState,
 } from '../analysisWorkbenchRouteState';
@@ -31,6 +29,12 @@ describe('parseAnalysisWorkbenchRouteState', () => {
       expect(parsed.state.segment).toBe(segment);
       expect(parsed.invalidKeys).toEqual([]);
     }
+  });
+
+  it('normalizes an explicit launch segment to the single bare encoding', () => {
+    const parsed = parseAnalysisWorkbenchRouteState('segment=launch');
+    expect(parsed.state.segment).toBe(ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch);
+    expect(parsed.normalizedParams.toString()).toBe('');
   });
 
   it('falls back to the launch default and records an invalid key for an unknown segment', () => {
@@ -100,6 +104,22 @@ describe('parseAnalysisWorkbenchRouteState', () => {
     expect(parsedTask.state.runFlowTaskId).toBe('xyz');
   });
 
+  it('rejects incomplete or unstable run-flow identities', () => {
+    const missingHistoryId = parseAnalysisWorkbenchRouteState('runFlow=history');
+    expect(missingHistoryId.state.runFlow).toBeNull();
+    expect(missingHistoryId.invalidKeys).toContain(
+      ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowRecordId,
+    );
+
+    const unsafeTaskId = parseAnalysisWorkbenchRouteState(
+      'runFlow=task&runFlowTaskId=%3Cscript%3E',
+    );
+    expect(unsafeTaskId.state.runFlow).toBeNull();
+    expect(unsafeTaskId.invalidKeys).toContain(
+      ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowTaskId,
+    );
+  });
+
   it('preserves foreign search params in the normalized copy', () => {
     const parsed = parseAnalysisWorkbenchRouteState(
       'utm=source&segment=tasks',
@@ -108,6 +128,7 @@ describe('parseAnalysisWorkbenchRouteState', () => {
     expect(parsed.normalizedParams.get(
       ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment,
     )).toBe(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
+    expect(parsed.ownedParams.toString()).toBe('segment=tasks');
   });
 });
 
@@ -157,61 +178,12 @@ describe('setAnalysisWorkbenchRouteState', () => {
   });
 });
 
-describe('mapLegacyHomeAnalysisSearchParams', () => {
-  it('leaves a URL with no home analysis params unchanged besides removing owned keys', () => {
-    const params = new URLSearchParams('utm=source');
-    mapLegacyHomeAnalysisSearchParams(params);
-    expect(params.get('utm')).toBe('source');
-    // No segment param when default (launch) — foreign only.
-    expect(params.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment)).toBeNull();
-    expect(params.get(REPORT_ROUTE_QUERY_KEYS.recordId)).toBeNull();
-  });
-
-  it('maps a bare recordId onto segment=history + recordId (same key name as workbench)', () => {
-    // The legacy home `recordId` and workbench `recordId` intentionally share the
-    // same URL param name — the mapper only adds an explicit segment.
-    const params = new URLSearchParams(`${REPORT_ROUTE_QUERY_KEYS.recordId}=17`);
-    mapLegacyHomeAnalysisSearchParams(params);
-    expect(params.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment))
-      .toBe(ANALYSIS_WORKBENCH_SEGMENT_VALUES.history);
-    expect(params.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId)).toBe('17');
-  });
-
-  it('maps runFlow=history with a runFlowRecordId onto the history segment', () => {
-    const params = new URLSearchParams(
-      `${REPORT_ROUTE_QUERY_KEYS.runFlow}=history&${REPORT_ROUTE_QUERY_KEYS.runFlowRecordId}=88`,
-    );
-    mapLegacyHomeAnalysisSearchParams(params);
-    expect(params.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment))
-      .toBe(ANALYSIS_WORKBENCH_SEGMENT_VALUES.history);
-    expect(params.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow)).toBe('history');
-    expect(params.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowRecordId)).toBe('88');
-  });
-
-  it('maps runFlow=task with a runFlowTaskId onto the tasks segment', () => {
-    const params = new URLSearchParams(
-      `${REPORT_ROUTE_QUERY_KEYS.runFlow}=task&${REPORT_ROUTE_QUERY_KEYS.runFlowTaskId}=t-4`,
-    );
-    mapLegacyHomeAnalysisSearchParams(params);
-    expect(params.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment))
-      .toBe(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
-    expect(params.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow)).toBe('task');
-    expect(params.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowTaskId)).toBe('t-4');
-  });
-
-  it('preserves foreign params alongside the mapped state', () => {
-    const params = new URLSearchParams(
-      `utm=nav&${REPORT_ROUTE_QUERY_KEYS.recordId}=5`,
-    );
-    mapLegacyHomeAnalysisSearchParams(params);
-    expect(params.get('utm')).toBe('nav');
-    expect(params.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId)).toBe('5');
-  });
-});
-
 describe('buildAnalysisWorkbenchHref', () => {
   it('returns the bare path when no options are provided', () => {
     expect(buildAnalysisWorkbenchHref()).toBe(APP_ROUTE_PATHS.researchAnalysis);
+    expect(buildAnalysisWorkbenchHref({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch,
+    })).toBe(APP_ROUTE_PATHS.researchAnalysis);
   });
 
   it('writes segment/recordId/runFlow options when supplied', () => {
@@ -234,5 +206,27 @@ describe('buildAnalysisWorkbenchHref', () => {
       runFlow: 'task',
       runFlowTaskId: 't-77',
     })).toBe(`${APP_ROUTE_PATHS.researchAnalysis}?segment=tasks&runFlow=task&runFlowTaskId=t-77`);
+  });
+
+  it('preserves stock context in a report deep link', () => {
+    expect(buildAnalysisWorkbenchHref({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+      recordId: 33,
+      runFlow: RUN_FLOW_ROUTE_QUERY_VALUES.history,
+      runFlowRecordId: 33,
+      stock: ' AAPL ',
+    })).toBe(
+      `${APP_ROUTE_PATHS.researchAnalysis}?segment=history&recordId=33&runFlow=history&runFlowRecordId=33&stock=AAPL`,
+    );
+  });
+
+  it('uses the same canonical encoding as the parser and setter', () => {
+    const href = buildAnalysisWorkbenchHref({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch,
+    });
+    const url = new URL(href, 'http://stockpulse.local');
+    const parsed = parseAnalysisWorkbenchRouteState(url.search);
+    const serialized = setAnalysisWorkbenchRouteState('', parsed.state).toString();
+    expect(serialized).toBe(url.searchParams.toString());
   });
 });
