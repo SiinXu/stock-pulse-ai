@@ -421,6 +421,9 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     const detailCallCount = vi.mocked(historyApi.getDetail).mock.calls.length;
     fireEvent.click(screen.getByRole('checkbox', { name: '选择 Apple 历史记录' }));
     fireEvent.click(screen.getByRole('button', { name: '删除' }));
+    const deleteDialog = screen.getByRole('dialog', { name: '删除历史记录' });
+    expect(deleteDialog).toHaveTextContent('确定删除已选 1 项的全部分析历史吗？此操作不可恢复。');
+    fireEvent.click(within(deleteDialog).getByRole('button', { name: '删除' }));
 
     await waitFor(() => expect(historyApi.deleteRecords).toHaveBeenCalledWith([12]));
     await waitFor(() => {

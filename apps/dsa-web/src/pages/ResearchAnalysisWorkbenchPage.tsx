@@ -30,6 +30,7 @@ import {
   Badge,
   Button,
   Checkbox,
+  ConfirmDialog,
   Drawer,
   EmptyState,
   InlineAlert,
@@ -155,6 +156,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
   const [selectedHistoryIds, setSelectedHistoryIds] = useState<ReadonlySet<number>>(
     () => new Set(),
   );
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isDeletingHistory, setIsDeletingHistory] = useState(false);
   const [deleteError, setDeleteError] = useState<ParsedApiError | null>(null);
   const [runFlowError, setRunFlowError] = useState<ParsedApiError | null>(null);
@@ -667,6 +669,18 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
     });
   }, [analysisHistoryItems]);
 
+  const requestDeleteSelectedHistory = useCallback(() => {
+    if (selectedHistoryIds.size === 0 || isDeletingHistory) return;
+    setDeleteError(null);
+    setIsDeleteConfirmOpen(true);
+  }, [isDeletingHistory, selectedHistoryIds.size]);
+
+  const cancelDeleteSelectedHistory = useCallback(() => {
+    if (isDeletingHistory) return;
+    setIsDeleteConfirmOpen(false);
+    setDeleteError(null);
+  }, [isDeletingHistory]);
+
   const deleteSelectedHistory = useCallback(async () => {
     if (selectedHistoryIds.size === 0 || isDeletingHistory) return;
     const recordIds = [...selectedHistoryIds];
@@ -695,6 +709,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
         ));
         if (nextItem) navigateToRecord(nextItem.id, true);
       }
+      setIsDeleteConfirmOpen(false);
     } catch (historyError) {
       setDeleteError(getParsedApiError(historyError, language));
     } finally {
@@ -873,7 +888,9 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
           />
         ) : null}
         {visibleError ? <ApiErrorAlert error={visibleError} onDismiss={clearError} /> : null}
-        {deleteError ? <ApiErrorAlert error={deleteError} onDismiss={() => setDeleteError(null)} /> : null}
+        {deleteError && !isDeleteConfirmOpen ? (
+          <ApiErrorAlert error={deleteError} onDismiss={() => setDeleteError(null)} />
+        ) : null}
         {runFlowError ? <ApiErrorAlert error={runFlowError} onDismiss={() => setRunFlowError(null)} /> : null}
         {batchNotice ? (
           <InlineAlert variant={batchNotice.variant} message={batchNotice.message} />
@@ -1100,7 +1117,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                 onLoadMore={() => void loadMoreHistory()}
                 onToggleItemSelection={toggleHistorySelection}
                 onToggleSelectAll={toggleAllHistory}
-                onDeleteSelected={() => void deleteSelectedHistory()}
+                onDeleteSelected={requestDeleteSelectedHistory}
               />
             )}
           >
@@ -1190,6 +1207,19 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
           </WorkspaceLayout>
         )}
       </TabPanel>
+
+      <ConfirmDialog
+        isOpen={isDeleteConfirmOpen}
+        title={t('history.deleteConfirmTitle')}
+        message={t('history.deleteConfirmBatch', { count: selectedHistoryIds.size })}
+        confirmText={isDeletingHistory ? t('common.deleting') : t('common.delete')}
+        confirmDisabled={isDeletingHistory}
+        cancelDisabled={isDeletingHistory}
+        error={deleteError?.message ?? null}
+        isDanger
+        onConfirm={() => void deleteSelectedHistory()}
+        onCancel={cancelDeleteSelectedHistory}
+      />
 
       {markdownRecordId !== null
       && selectedAnalysisReport?.meta.id === markdownRecordId ? (

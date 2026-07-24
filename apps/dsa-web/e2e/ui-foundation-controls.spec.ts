@@ -1,7 +1,11 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { APP_ROUTE_PATHS } from '../src/routing/routes';
+import {
+  ANALYSIS_WORKBENCH_SEGMENT_VALUES,
+  APP_ROUTE_PATHS,
+  buildAnalysisWorkbenchHref,
+} from '../src/routing/routes';
 import { loginAsE2eAdmin } from './auth-fixture';
 
 const buttonHeights: Record<string, number> = {
@@ -149,47 +153,29 @@ test.describe('touch-capable foundation controls', () => {
 
     await loginAsE2eAdmin(page);
     await page.setViewportSize({ width: 1440, height: 900 });
-    const historyDelete = page.getByRole('button', { name: /删除 .*历史记录/ }).first();
+    await page.goto(buildAnalysisWorkbenchHref({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+    }));
+    const historySelection = page.getByRole('checkbox', {
+      name: /选择 .*历史记录|Select .* history record/,
+    }).first();
+    await expect(historySelection).toBeVisible();
+    const historySelectionTarget = historySelection.locator('xpath=ancestor::label[1]');
+    const historySelectionTargetBox = await historySelectionTarget.boundingBox();
+    expect(historySelectionTargetBox).not.toBeNull();
+    expect(historySelectionTargetBox!.width).toBeGreaterThanOrEqual(
+      minimumCoarseTarget - pixelRoundingTolerance,
+    );
+    expect(historySelectionTargetBox!.height).toBeGreaterThanOrEqual(
+      minimumCoarseTarget - pixelRoundingTolerance,
+    );
+    await historySelection.check();
+
+    const historyDelete = page.getByRole('button', { name: /删除|Delete/, exact: true }).first();
     await expect(historyDelete).toBeVisible();
-    await expectVisibleHeights(historyDelete, iconButtonHeights);
+    await expectVisibleHeights(historyDelete, buttonHeights);
     await expectCoarseHitTarget(historyDelete, 'history delete action');
-
-    const historyDeleteSlot = historyDelete.locator(
-      'xpath=ancestor::*[@data-testid="history-delete-target"]',
-    );
-    const historyItem = historyDeleteSlot.locator('..');
-    const historyOpen = historyItem.locator(':scope > button');
-    const historyDeleteBox = await historyDelete.boundingBox();
-    const historyDeleteSlotBox = await historyDeleteSlot.boundingBox();
-    const historyItemBox = await historyItem.boundingBox();
-    const historyOpenBox = await historyOpen.boundingBox();
-    expect(historyDeleteBox).not.toBeNull();
-    expect(historyDeleteSlotBox).not.toBeNull();
-    expect(historyItemBox).not.toBeNull();
-    expect(historyOpenBox).not.toBeNull();
-    expect(historyDeleteSlotBox!.width).toBeCloseTo(minimumCoarseTarget, 1);
-    expect(historyDeleteSlotBox!.height).toBeCloseTo(minimumCoarseTarget, 1);
-
-    const historyDeleteHitLeft = historyDeleteBox!.x + historyDeleteBox!.width / 2
-      - minimumCoarseTarget / 2;
-    const historyDeleteHitRight = historyDeleteHitLeft + minimumCoarseTarget;
-    expect(historyDeleteHitLeft).toBeGreaterThanOrEqual(
-      historyDeleteSlotBox!.x - pixelRoundingTolerance,
-    );
-    expect(historyDeleteHitRight).toBeLessThanOrEqual(
-      historyDeleteSlotBox!.x + historyDeleteSlotBox!.width + pixelRoundingTolerance,
-    );
-    expect(historyDeleteHitLeft).toBeGreaterThanOrEqual(
-      historyOpenBox!.x + historyOpenBox!.width - pixelRoundingTolerance,
-    );
-    expect(historyDeleteHitRight).toBeLessThanOrEqual(
-      historyItemBox!.x + historyItemBox!.width + pixelRoundingTolerance,
-    );
-
-    await page.touchscreen.tap(
-      historyDeleteHitLeft + 2,
-      historyDeleteBox!.y + historyDeleteBox!.height / 2,
-    );
+    await historyDelete.click();
     const deleteDialog = page.getByRole('dialog', { name: '删除历史记录' });
     await expect(deleteDialog).toBeVisible();
     await deleteDialog.getByRole('button', { name: '取消' }).click();

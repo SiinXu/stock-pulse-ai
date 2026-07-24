@@ -131,11 +131,11 @@ export const HistoryList: React.FC<HistoryListProps> = ({
               />
               <Button
                 variant="danger-subtle"
-                size="compact"
+                size="default"
                 onClick={onDeleteSelected}
                 disabled={selectedCount === 0 || isDeleting}
                 isLoading={isDeleting}
-                className="history-batch-delete-button disabled:!border-transparent disabled:!bg-transparent"
+                className="disabled:!border-transparent disabled:!bg-transparent"
               >
                 {isDeleting ? t('common.deleting') : t('common.delete')}
               </Button>
