@@ -163,24 +163,20 @@ test.describe('web smoke', () => {
     await expectSecurityWarningContrast(page, 'dark');
   });
 
-  test('home page shows analysis entry and history panel after login', async ({ page }) => {
-    // HomePage defaults to beginner-mode UI (Quick analysis / BeginnerReportSummary)
-    // when setup-status reports incomplete; force professional mode so the
-    // '分析' CTA and stock panel assertions below stay meaningful.
+  test('home page shows the attention hub and keeps configurable content collapsed', async ({ page }) => {
     await mockCompletedSetupStatus(page);
     await login(page);
 
-    const stockInput = page.getByPlaceholder('输入股票代码或名称，如 600519、贵州茅台、AAPL');
-    await expect(stockInput).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('link', { name: '首页' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Agent' })).toBeVisible();
-    await expect(page.getByRole('combobox', { name: '工作台视图切换' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: '个股栏' })).toBeVisible();
-
-    await stockInput.fill('600519');
-    const analyzeButton = page.getByRole('button', { name: '分析', exact: true });
-    await expect(analyzeButton).toBeVisible();
-
+    const core = page.getByTestId('home-core-blocks');
+    await expect(core.getByRole('heading', { name: '今日焦点', exact: true })).toBeVisible({ timeout: 10_000 });
+    await expect(core.getByRole('heading', { name: '待办', exact: true })).toBeVisible();
+    await expect(core.getByRole('heading', { name: '信号摘要', exact: true })).toBeVisible();
+    await expect(core.getByRole('region')).toHaveCount(3);
+    const configurable = page.getByRole('button', { name: /可配置区/ });
+    await expect(configurable).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator('#home-configurable-content')).toBeHidden();
   });
 
   test('chat page allows entering a question and starts a request', async ({ page }) => {

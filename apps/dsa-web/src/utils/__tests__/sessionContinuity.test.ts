@@ -68,16 +68,12 @@ describe('sessionContinuity', () => {
       .toBe(explicitDefaults);
   });
 
-  it('restores validated task and history Run Flow context for Home', () => {
+  it('does not restore legacy analysis context into the attention hub', () => {
     recordSessionLocation('/?recordId=42&stock=AAPL&runFlow=history&runFlowRecordId=42');
-    expect(resolveInitialSessionHref('/')).toBe(
-      '/?recordId=42&stock=AAPL&runFlow=history&runFlowRecordId=42',
-    );
+    expect(resolveInitialSessionHref('/')).toBeNull();
 
     recordSessionLocation('/?stock=AAPL&runFlow=task&runFlowTaskId=task_01%3Aus-east.2');
-    expect(resolveInitialSessionHref('/')).toBe(
-      '/?stock=AAPL&runFlow=task&runFlowTaskId=task_01%3Aus-east.2',
-    );
+    expect(resolveInitialSessionHref('/')).toBeNull();
   });
 
   it('restores validated task and history Run Flow context for Analysis Workbench', () => {
@@ -126,7 +122,7 @@ describe('sessionContinuity', () => {
     );
   });
 
-  it('carries Home report context into Chat and clears stale report identity for another stock', () => {
+  it('uses an explicit legacy Home report context when entering Chat', () => {
     recordSessionLocation('/chat?session=session-1&stock=600519&recordId=3');
 
     expect(resolveContextAwareNavigationTarget(
@@ -144,17 +140,13 @@ describe('sessionContinuity', () => {
     )).toBe(`${APP_ROUTE_PATHS.agent}?session=session-1&stock=AAPL&recordId=9`);
   });
 
-  it('retains same-stock Home pipeline context and drops it when the stock changes', () => {
+  it('keeps the attention-hub destination free of stock and pipeline context', () => {
     recordSessionLocation(
       '/?recordId=9&stock=AAPL&workspace=watchlist&runFlow=history&runFlowRecordId=9',
     );
 
-    expect(resolveContextAwareNavigationTarget('/', APP_ROUTE_PATHS.settings)).toBe(
-      '/?recordId=9&stock=AAPL&workspace=watchlist&runFlow=history&runFlowRecordId=9',
-    );
-    expect(resolveContextAwareNavigationTarget('/', '/stocks/MSFT')).toBe(
-      '/?stock=MSFT&workspace=watchlist',
-    );
+    expect(resolveContextAwareNavigationTarget('/', APP_ROUTE_PATHS.settings)).toBe('/');
+    expect(resolveContextAwareNavigationTarget('/', '/stocks/MSFT')).toBe('/');
   });
 
   it('retains consumed Chat context for the same stock and resets it for a new stock', () => {

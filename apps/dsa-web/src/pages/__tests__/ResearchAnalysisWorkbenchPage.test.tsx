@@ -64,6 +64,7 @@ vi.mock('../../api/history', () => ({
   historyApi: {
     getList: vi.fn(),
     getDetail: vi.fn(),
+    getMarkdown: vi.fn().mockResolvedValue('# Full report'),
     deleteRecords: vi.fn(),
   },
 }));
@@ -383,6 +384,50 @@ describe('ResearchAnalysisWorkbenchPage', () => {
       expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId)).toBe('12');
     });
     expect(await screen.findByTestId('report-summary')).toBeInTheDocument();
+  });
+
+  it('moves to the next report after deleting the current record without refetching it', async () => {
+    const nextHistoryItem: HistoryItem = {
+      ...historyItem,
+      id: 11,
+      queryId: 'query-11',
+      stockCode: 'MSFT',
+      stockName: 'Microsoft',
+      createdAt: '2026-07-22T12:00:00Z',
+    };
+    const nextReport: AnalysisReport = {
+      ...report,
+      meta: {
+        ...report.meta,
+        id: 11,
+        queryId: 'query-11',
+        stockCode: 'MSFT',
+        stockName: 'Microsoft',
+      },
+    };
+    useStockPoolStore.setState({ historyItems: [historyItem, nextHistoryItem] });
+    vi.mocked(historyApi.getDetail).mockImplementation(async (recordId) => (
+      recordId === 11 ? nextReport : report
+    ));
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 1,
+      page: 1,
+      limit: 20,
+      items: [nextHistoryItem],
+    });
+    renderWorkbench(buildAnalysisWorkbenchHref({ recordId: 12 }));
+
+    expect(await screen.findByTestId('report-summary')).toHaveTextContent('Apple');
+    const detailCallCount = vi.mocked(historyApi.getDetail).mock.calls.length;
+    fireEvent.click(screen.getByRole('checkbox', { name: '选择 Apple 历史记录' }));
+    fireEvent.click(screen.getByRole('button', { name: '删除' }));
+
+    await waitFor(() => expect(historyApi.deleteRecords).toHaveBeenCalledWith([12]));
+    await waitFor(() => {
+      expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId)).toBe('11');
+    });
+    expect(await screen.findByTestId('report-summary')).toHaveTextContent('Microsoft');
+    expect(vi.mocked(historyApi.getDetail).mock.calls.slice(detailCallCount)).toEqual([[11]]);
   });
 
   it('moves an accepted launch directly to the tasks segment', async () => {

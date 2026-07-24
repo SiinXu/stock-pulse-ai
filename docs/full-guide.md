@@ -1547,18 +1547,18 @@ FastAPI 提供 RESTful API 服务，支持配置管理和触发分析。
 ### 功能特性
 
 - 📝 **配置管理** - 查看/修改自选股列表
-- 🗂️ **首页三视图** - 首页新增「历史 / 自选 / 今日」工作区，默认进入历史视图；自选页支持批量提交全部或仅提交“今日未分析”股票
-- 🔗 **首页可恢复链接** - 历史报告使用 `?recordId=<正整数>`；task 运行流使用 `?runFlow=task&runFlowTaskId=<task_id>`；history 运行流使用 `?runFlow=history&runFlowRecordId=<正整数>`。点击使用浏览器 history push，关闭运行流只移除运行流参数并保留报告和其它 query；刷新、分享、Back/Forward 会从 URL 恢复。非法、无权限或已删除对象会显示本地化错误并用 replace 清理失效参数。
-- 🧪 **分析工作台** - 研究导航下的 `/research/analysis` 在同一页面提供「发起与批量 / 运行中任务 / 历史与对比」三分段；`segment`、`recordId` 与 Run Flow 参数可通过 URL 恢复。单股、自选股和图表/文档导入任务提交后会直接切到任务段，完成通知可进入对应历史报告。
+- 🏠 **首页注意力中枢** - 首页默认只展示「今日焦点 / 待办 / 信号摘要」三块；晨报/大盘复盘与最近分析位于默认收起的可配置区，展开偏好保存在浏览器 `localStorage`。
+- 🔗 **旧首页分析链接兼容** - `/?recordId=...`、`/?runFlow=...`、`stock` 与旧 `workspace` 分析参数会使用 replace 导航到 `/research/analysis`，规范化为对应的 `segment=history|tasks`，并保留安全的无关 query 与 hash。无分析参数的 `/` 始终停留在首页，不恢复旧报告上下文。
+- 🧪 **分析工作台** - 研究导航下的 `/research/analysis` 在同一页面提供「发起与批量 / 运行中任务 / 历史与对比」三分段；`segment`、`recordId` 与 Run Flow 参数可通过 URL 恢复。单股、自选股和图表/文档导入任务提交后会直接切到任务段，完成通知可进入对应历史报告；历史段提供趋势对比、完整 Markdown 报告和 Run Flow 详情 Drawer。
 - 🧭 **界面语言切换** - 登录态与退出态均支持界面语言快速切换（`zh` / `en`），独立于 `REPORT_LANGUAGE`，用于静态 UI 文案与导航骨架
-- 🚀 **快速分析** - 首次配置未完成且没有显式偏好时，首页默认进入新手模式并提交 `brief` 报告；已配置用户默认保持专业模式和 `detailed` 报告
+- 🚀 **快速分析** - 首次配置未完成且没有显式偏好时，分析工作台默认进入新手模式并提交 `brief` 报告；已配置用户默认保持专业模式和 `detailed` 报告
 - 🧭 **新手 / 专业模式** - 新手模式只展示简短结论、保守风险等级和下一步操作，保留研究声明；“查看专业详情”恢复完整报告和历史趋势入口。用户显式选择保存在浏览器 `localStorage`，登出只清理会话痕迹，不删除该非敏感界面偏好
-- 🎯 **策略选择** - 首页支持显式选择分析策略 skill；不传 `skills` 时按系统默认策略运行，便于保持与历史行为兼容
-- 🧪 **今日状态/任务刷新防抖** - 首页「今日」与「自选」通过带有时区感知的历史区间判断并发起分页历史查询；任务完成后由最新一次 stock bar 刷新成功才清除失败态，避免旧请求乱序覆盖新状态导致重复提交
+- 🎯 **策略选择** - 分析工作台支持显式选择分析策略 skill；不传 `skills` 时按系统默认策略运行，便于保持与历史行为兼容
+- 🧪 **待分析状态/任务刷新防抖** - 分析工作台通过带有时区感知的历史区间判断并发起分页历史查询；任务完成后由最新一次 stock bar 刷新成功才清除失败态，避免旧请求乱序覆盖新状态导致重复提交
 - 🧭 **首次配置提示** - 首页会读取只读配置状态，缺少 LLM 主渠道、自选股等基础项时提示缺口；提示可关闭，从引导链接进入 Settings 时，只有确实缺少 LLM 主配置才自动打开现有 LLM 向导，数据源可从首次配置卡直接进入
 - 📊 **实时进度** - 分析任务状态实时更新，支持多任务并行；普通分析链路在进入 LLM 阶段后会优先尝试 LiteLLM 流式生成，并通过任务 SSE 回灌更细粒度的 `message/progress`
 - 🧪 **AlphaSift 选股任务可恢复** - 选股页提交后台任务后轮询状态，切换页面再返回会恢复当前任务进度或最终结果，避免外部快照/行情/LLM 变慢时丢失反馈
-- 🗂️ **大盘复盘任务可见性** - 首页触发大盘复盘后会返回 `task_id` 并轮询 `GET /api/v1/analysis/status/{task_id}`，在进行中/完成/失败场景给出可见反馈，失败时直接透出报错内容
+- 🗂️ **大盘复盘任务可见性** - Research > 大盘复盘触发任务后会返回 `task_id` 并轮询 `GET /api/v1/analysis/status/{task_id}`，在进行中/完成/失败场景给出可见反馈，失败时直接透出报错内容
 - 🗂️ **市场复盘历史独立入口** - 大盘复盘历史通过专用入口与普通个股历史隔离；建议通过 `stock_code=MARKET` + `report_type=market_review` 直接查询与回放大盘复盘记录
 - 🧾 **市场复盘历史可复用** - 大盘复盘任务会持久化到分析历史，`report_type` 为 `market_review`，可直接通过历史列表/详情打开对应 Markdown 或详情页，不会重新触发分析重算
 - 🧭 **市场位置卡片** - A 股普通分析报告会展示市场题材层和个股位置层，区分大盘主线、主关联题材、题材阶段、个股位置和缺失证据
@@ -1616,7 +1616,7 @@ FastAPI 提供 RESTful API 服务，支持配置管理和触发分析。
 > 说明：`POST /api/v1/analysis/analyze` 支持使用 `skills` 传入策略 skill ID 列表；若未传则按服务端默认策略执行。为兼容历史调用，`strategies` 字段仍作为兼容别名保留。
 > 说明：`POST /api/v1/analysis/analyze` 支持 `analysis_phase=auto|premarket|intraday|postmarket`，默认 `auto`。非 `auto` 只覆盖本次分析阶段与派生阶段标记，不改写真实交易日历时间；accepted response、内存 task status、任务列表和 SSE 会回显请求阶段，最终报告阶段以 `report.meta.market_phase_summary.phase` 为准。
 > 说明：`POST /api/v1/analysis/analyze` 支持 `report_language=zh|en|ko`，并兼容 `reportLanguage` 作为别名；未传时回退到全局 `REPORT_LANGUAGE`（或环境中的 `Config.report_language`）。该字段仅影响本次分析的报告文本、`report.meta.report_language` 与持久化展示，不会持久化为运行时配置。
-> 说明：Web 侧首页策略下拉为显式可选策略入口。用户未手动选择时不会携带 `skills`，与历史客户端行为一致；选择策略后将透传到该接口并在任务状态与历史快照中保留。
+> 说明：Web 侧分析工作台的策略下拉为显式可选策略入口。用户未手动选择时不会携带 `skills`，与历史客户端行为一致；选择策略后将透传到该接口并在任务状态与历史快照中保留。
 > 说明：`POST /api/v1/analysis/market-review` 采用后端与 CLI/Bot 共用的配置路径（`GeminiAnalyzer(config=...)` 与同样的搜索/提示词构造入口）。Provider 兼容路由会优先识别并使用 `litellm_model`、`llm_model_list`，若未配置则回退 legacy `GEMINI_*`、`OPENAI_*`、`ANTHROPIC_*`、`DEEPSEEK_*` 键；不会新增/调整 provider、Base URL 或 LiteLLM 路由语义。
 > 说明：`POST /api/v1/analysis/market-review` 额外支持 `report_language=zh|en|ko`（支持别名 `reportLanguage`）。未传时同样回退到全局 `REPORT_LANGUAGE`。该参数仅影响本次复盘报告文本与结构化返回字段中的语言相关内容；Bot、schedule、CLI 或按钮触发的 `main.py --market-review` 仍沿用全局配置，未新增请求级覆盖能力。
 > 说明：`POST /api/v1/analysis/market-review` 是 Web / 桌面端的人工触发入口，点击后会直接提交大盘复盘任务，不会因 `TRADING_DAY_CHECK_ENABLED=true` 或当日相关市场休市而短路跳过；定时任务、GitHub Actions 手动运行和 CLI 默认入口仍遵循交易日检查，可用 `--force-run` 或 workflow `force_run` 覆盖。

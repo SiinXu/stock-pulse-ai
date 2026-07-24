@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BarChart3,
   CheckCircle2,
+  FileText,
   FileUp,
   FlaskConical,
   History,
@@ -43,6 +44,7 @@ import {
 import { useToast } from '../components/common/toastContext';
 import { DashboardStateBlock } from '../components/dashboard';
 import { HistoryList, StockHistoryTrendDrawer } from '../components/history';
+import { ReportMarkdownDrawer } from '../components/report/ReportMarkdownDrawer';
 import { ReportSummary } from '../components/report/ReportSummary';
 import { useRouteFocusTarget } from '../components/routing';
 import { RunFlowPanel } from '../components/run-flow';
@@ -73,6 +75,7 @@ import type { TaskInfo } from '../types/analysis';
 import type { RunFlowSnapshotSource } from '../types/runFlow';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
 import { normalizeBatchAnalysisCodes, submitBatchAnalysis } from '../utils/batchAnalysis';
+import { normalizeReportLanguage } from '../utils/reportLanguage';
 import {
   readExperienceMode,
   writeExperienceMode,
@@ -160,6 +163,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
   const [importNotice, setImportNotice] = useState<WorkbenchNotice>(null);
   const [isBatchSubmitting, setIsBatchSubmitting] = useState(false);
   const [batchNotice, setBatchNotice] = useState<WorkbenchNotice>(null);
+  const [markdownRecordId, setMarkdownRecordId] = useState<number | null>(null);
 
   const {
     query,
@@ -239,11 +243,13 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
 
   const selectSegment = useCallback((segment: AnalysisWorkbenchSegment) => {
     suppressedHistoryDefaultSearchRef.current = null;
+    setMarkdownRecordId(null);
     navigateToState(stateForSegment(routeState, segment));
   }, [navigateToState, routeState]);
 
   const navigateToRecord = useCallback((recordId: number, replace = false) => {
     suppressedHistoryDefaultSearchRef.current = null;
+    setMarkdownRecordId(null);
     navigateToState({
       segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
       recordId,
@@ -671,14 +677,24 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
     try {
       await historyApi.deleteRecords(recordIds);
       setSelectedHistoryIds(new Set());
+      const emptyHistoryState = {
+        ...DEFAULT_ANALYSIS_WORKBENCH_ROUTE_STATE,
+        segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+      };
       if (deletesCurrentRecord) {
+        const nextParams = setAnalysisWorkbenchRouteState(location.search, emptyHistoryState);
+        const nextQuery = nextParams.toString();
+        suppressedHistoryDefaultSearchRef.current = nextQuery ? `?${nextQuery}` : '';
         clearSelectedRecord();
-        navigateToState({
-          ...DEFAULT_ANALYSIS_WORKBENCH_ROUTE_STATE,
-          segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
-        }, true);
+        navigateToState(emptyHistoryState, true);
       }
-      await refreshHistory(false);
+      const refreshed = await refreshHistory(false);
+      if (deletesCurrentRecord) {
+        const nextItem = refreshed?.items.find((item) => (
+          item.reportType !== 'market_review' && item.stockCode !== 'MARKET'
+        ));
+        if (nextItem) navigateToRecord(nextItem.id, true);
+      }
     } catch (historyError) {
       setDeleteError(getParsedApiError(historyError, language));
     } finally {
@@ -688,7 +704,9 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
     clearSelectedRecord,
     isDeletingHistory,
     language,
+    location.search,
     navigateToState,
+    navigateToRecord,
     refreshHistory,
     routeState.recordId,
     selectedHistoryIds,
@@ -1092,7 +1110,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
               ) : selectedAnalysisReport ? (
                 <>
                   {!isHistoryTrendOpen ? (
-                    <div className="mb-3 flex justify-end">
+                    <div className="mb-3 flex flex-wrap justify-end gap-2">
                       <Button
                         type="button"
                         variant="secondary"
@@ -1101,6 +1119,14 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                       >
                         <BarChart3 className="h-4 w-4" aria-hidden="true" />
                         {t('home.historyTrend')}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => setMarkdownRecordId(selectedAnalysisReport.meta.id ?? null)}
+                      >
+                        <FileText className="h-4 w-4" aria-hidden="true" />
+                        {t('home.fullReport')}
                       </Button>
                     </div>
                   ) : null}
@@ -1164,6 +1190,18 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
           </WorkspaceLayout>
         )}
       </TabPanel>
+
+      {markdownRecordId !== null
+      && selectedAnalysisReport?.meta.id === markdownRecordId ? (
+        <ReportMarkdownDrawer
+          key={markdownRecordId}
+          recordId={markdownRecordId}
+          stockName={selectedAnalysisReport.meta.stockName || ''}
+          stockCode={selectedAnalysisReport.meta.stockCode}
+          reportLanguage={normalizeReportLanguage(selectedAnalysisReport.meta.reportLanguage)}
+          onClose={() => setMarkdownRecordId(null)}
+        />
+      ) : null}
 
       {runFlowDialog.open ? (
         <Drawer

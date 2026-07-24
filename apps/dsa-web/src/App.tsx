@@ -21,6 +21,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { UiLanguageProvider, useUiLanguage } from './contexts/UiLanguageContext';
 import type { UiLanguage } from './i18n/uiLanguages';
 import { LegacyRouteRedirect } from './routing/LegacyRedirectRoute';
+import { LegacyHomeAnalysisRedirect } from './routing/LegacyHomeAnalysisRedirect';
 import {
   mapLegacyAlertsSearchParams,
   mapLegacyDecisionSignalsSearchParams,
@@ -158,7 +159,14 @@ const routes = [
           </Shell>
         ),
         children: [
-          { path: APP_ROUTE_PATHS.home, element: <HomePage /> },
+          {
+            path: APP_ROUTE_PATHS.home,
+            element: (
+              <LegacyHomeAnalysisRedirect>
+                <HomePage />
+              </LegacyHomeAnalysisRedirect>
+            ),
+          },
           { path: APP_ROUTE_PATHS.agent, element: <ChatPage /> },
           { path: APP_ROUTE_PATHS.portfolio, element: <PortfolioPage /> },
           { path: APP_ROUTE_PATHS.signals, element: <SignalCenterPage /> },
