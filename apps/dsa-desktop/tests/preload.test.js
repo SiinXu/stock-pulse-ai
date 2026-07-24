@@ -2,6 +2,8 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const Module = require('node:module');
 
+const LOCAL_MODEL_RUNTIME_IDENTITY = 'b26993598dffd1f14aed97def57ef67f753518a9b773d8a12033c82b4fa545ca';
+
 test('preload exposes desktop version from BrowserWindow additionalArguments', (t) => {
   const originalLoad = Module._load;
   const originalArgv = [...process.argv];
@@ -39,14 +41,25 @@ test('preload exposes desktop version from BrowserWindow additionalArguments', (
 
   const preloadModule = require('../preload.js');
 
-  assert.equal(exposeInMainWorldCalls.length, 1);
-  assert.equal(exposeInMainWorldCalls[0][0], 'dsaDesktop');
-  assert.equal(exposeInMainWorldCalls[0][1].version, expectedVersion);
-  assert.equal(typeof exposeInMainWorldCalls[0][1].getUpdateState, 'function');
-  assert.equal(typeof exposeInMainWorldCalls[0][1].checkForUpdates, 'function');
-  assert.equal(typeof exposeInMainWorldCalls[0][1].installDownloadedUpdate, 'function');
-  assert.equal(typeof exposeInMainWorldCalls[0][1].openReleasePage, 'function');
-  assert.equal(typeof exposeInMainWorldCalls[0][1].onUpdateStateChange, 'function');
+  assert.equal(exposeInMainWorldCalls.length, 2);
+  const exposed = Object.fromEntries(exposeInMainWorldCalls);
+  assert.deepEqual(Object.keys(exposed).sort(), ['dsaDesktop', 'stockPulseLocalModels']);
+  assert.equal(exposed.dsaDesktop.version, expectedVersion);
+  assert.equal(typeof exposed.dsaDesktop.getUpdateState, 'function');
+  assert.equal(typeof exposed.dsaDesktop.checkForUpdates, 'function');
+  assert.equal(typeof exposed.dsaDesktop.installDownloadedUpdate, 'function');
+  assert.equal(typeof exposed.dsaDesktop.openReleasePage, 'function');
+  assert.equal(typeof exposed.dsaDesktop.onUpdateStateChange, 'function');
+  assert.deepEqual(Object.keys(exposed.stockPulseLocalModels).sort(), [
+    'detect',
+    'getState',
+    'onStateChange',
+    'openInstallGuide',
+    'pull',
+    'remove',
+    'start',
+    'stop',
+  ]);
   assert.equal(
     preloadModule.readDesktopVersion([`--dsa-desktop-version=${expectedVersion}`]),
     expectedVersion
@@ -89,9 +102,10 @@ test('preload falls back to empty version when BrowserWindow does not pass one',
 
   const preloadModule = require('../preload.js');
 
-  assert.equal(exposeInMainWorldCalls.length, 1);
+  assert.equal(exposeInMainWorldCalls.length, 2);
   assert.equal(exposeInMainWorldCalls[0][0], 'dsaDesktop');
   assert.equal(exposeInMainWorldCalls[0][1].version, '');
+  assert.equal(exposeInMainWorldCalls[1][0], 'stockPulseLocalModels');
   assert.equal(preloadModule.readDesktopVersion(['--unrelated=1']), '');
 });
 
@@ -162,4 +176,61 @@ test('createDesktopBridge delegates update actions to ipcRenderer', async (t) =>
 
   assert.deepEqual(receivedPayloads, [{ status: 'update-available' }]);
   assert.equal(listeners.has(preloadModule.DESKTOP_UPDATE_STATE_EVENT), false);
+});
+
+test('createLocalModelBridge delegates lifecycle actions and removes state listeners', async (t) => {
+  const originalLoad = Module._load;
+  const listeners = new Map();
+  const ipcRenderer = {
+    invoke: async (channel, payload) => ({ channel, payload }),
+    on: (channel, listener) => listeners.set(channel, listener),
+    removeListener: (channel, listener) => {
+      if (listeners.get(channel) === listener) listeners.delete(channel);
+    },
+  };
+  const preloadPath = require.resolve('../preload.js');
+  t.after(() => {
+    Module._load = originalLoad;
+    delete require.cache[preloadPath];
+  });
+  Module._load = function patchedLoad(request, parent, isMain) {
+    if (request === 'electron') {
+      return {
+        contextBridge: { exposeInMainWorld: () => undefined },
+        ipcRenderer,
+      };
+    }
+    return originalLoad.call(this, request, parent, isMain);
+  };
+  delete require.cache[preloadPath];
+  const preloadModule = require('../preload.js');
+  const bridge = preloadModule.createLocalModelBridge({ renderer: ipcRenderer });
+
+  for (const [method, channel] of [
+    ['getState', preloadModule.DESKTOP_LOCAL_MODEL_GET_STATE_CHANNEL],
+    ['detect', preloadModule.DESKTOP_LOCAL_MODEL_DETECT_CHANNEL],
+    ['start', preloadModule.DESKTOP_LOCAL_MODEL_START_CHANNEL],
+    ['stop', preloadModule.DESKTOP_LOCAL_MODEL_STOP_CHANNEL],
+    ['openInstallGuide', preloadModule.DESKTOP_LOCAL_MODEL_OPEN_GUIDE_CHANNEL],
+  ]) {
+    assert.deepEqual(await bridge[method](), { channel, payload: undefined });
+  }
+  assert.deepEqual(await bridge.pull('qwen3:8b'), {
+    channel: preloadModule.DESKTOP_LOCAL_MODEL_PULL_CHANNEL,
+    payload: { modelId: 'qwen3:8b' },
+  });
+  assert.deepEqual(await bridge.remove('qwen3:8b', LOCAL_MODEL_RUNTIME_IDENTITY), {
+    channel: preloadModule.DESKTOP_LOCAL_MODEL_REMOVE_CHANNEL,
+    payload: {
+      modelId: 'qwen3:8b',
+      expectedRuntimeIdentity: LOCAL_MODEL_RUNTIME_IDENTITY,
+    },
+  });
+
+  const states = [];
+  const unsubscribe = bridge.onStateChange((state) => states.push(state));
+  listeners.get(preloadModule.DESKTOP_LOCAL_MODEL_STATE_EVENT)(null, { status: 'running' });
+  unsubscribe();
+  assert.deepEqual(states, [{ status: 'running' }]);
+  assert.equal(listeners.has(preloadModule.DESKTOP_LOCAL_MODEL_STATE_EVENT), false);
 });

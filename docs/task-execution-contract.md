@@ -169,6 +169,12 @@ therefore cooperate by polling `TaskRunContext.is_cancel_requested()` and return
 promptly when it becomes true. This process-local contract does not claim forced
 process termination for an uncooperative runner.
 
+Local-model pulls are canonical `TaskCommand` runners under this same authority.
+Their bounded Ollama stream checks cancellation before the request, between
+response chunks/events, and immediately before configuration activation. The
+absolute pull deadline remains independent of progress frequency, so a runtime
+cannot keep a task alive indefinitely by continuously emitting partial data.
+
 This task does not add HTTP cancel/retry routes, an external broker, cross-process
 task sharing, or durable recovery after an ungraceful process loss.
 

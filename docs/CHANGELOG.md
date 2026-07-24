@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 - [Added] Added a loadable, network-free reference Data Provider plugin and author guide covering opt-in discovery, lifecycle diagnostics, compatibility, trust, and manager-owned routing boundaries.
 - [Fixed] Rejected all non-global and IANA special-purpose IPv4 and IPv6 results when resolving pinned embedded Ollama download hosts, including mixed DNS responses and IPv4-mapped forms.
+- [Added] Added a unified Settings local model center for Web and Desktop with catalog-backed recommendations, canonical cancellable Ollama pull tasks with bounded streaming and absolute deadlines, zero-config activation, explicit primary and Agent assignment, protected catalog-only deletion, exact-version offline recovery, and a shared first-run flow.
 - [Fixed] Updated compatible desktop transitive dependencies and pinned `app-builder-lib` to patched `tar` 7.5.19, removing the critical build-chain and updater production-closure findings while deferring the breaking Electron runtime upgrade.
 - [Docs] Clarified when contributors should use declarative Skill packages, trusted system plugins, or a new ADR, including plugin trust and deferred-surface boundaries.
 - [Added] Added a validated cross-client local model catalog and read-only API for four general and three finance models, derived desktop presets from the same source, and retired the Llama 3.2 recommendation to avoid unnecessary redistribution obligations.

@@ -180,11 +180,37 @@ ordered fallback behavior through **Settings > AI & Models > Reliability** and
 declare every backing connection in `LLM_CHANNELS`; do not copy unverified
 environment variables from third-party setup guides.
 
-The read-only API is:
+**Settings > AI & Models > Local Models** is the sole download and management
+surface. Web uses the backend's server-configured Ollama proxy, while Desktop
+uses lifecycle IPC from the same panel. A successful pull registers the model
+through `SystemConfigService` and selects it as primary only when no primary
+exists; primary and Agent assignment remain explicit independent actions.
+Guided-only finance entries never expose a pull action. Active primary or Agent
+models cannot be deleted. The first-run Local Model path embeds the same panel
+and proceeds to the Analysis Workbench after activation.
+
+The catalog API is:
 
 ```text
 GET /api/v1/system/config/llm/local-models
 ```
+
+Runtime status, background pull submission/polling, assignment, and deletion
+are exposed under `/api/v1/local-models`. The proxy always obtains its Ollama
+base URL from server configuration. Desktop completion requests carry the
+configuration version and a SHA-256 identity of the observed normalized runtime;
+they never carry a target URL. The backend recomputes that identity from its own
+configuration and rejects activation or unregistration when either snapshot
+value changed during the operation. While a Desktop deletion recovery is
+pending, the backend reserves that model against concurrent local-model pulls
+or registration, including models installed directly in Ollama that were not
+registered yet. Every lifecycle registration remains catalog-backed. Recovery
+is single-use and bound to the exact post-reservation configuration and runtime
+identity. For an unregistered model it only releases the reservation and never
+creates a registration. Recovery remains offline without probing a
+stopped or temporarily unavailable runtime. Successful weight deletion retries
+idempotent recovery revocation once. If acknowledgement remains unavailable,
+deletion still succeeds and any unrevoked token expires after its short TTL.
 
 Run `python scripts/check_local_model_catalog.py` after every catalog or desktop
 packaging change.

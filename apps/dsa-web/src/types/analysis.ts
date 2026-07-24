@@ -8,6 +8,14 @@
 export type StockReportType = 'simple' | 'detailed' | 'full' | 'brief';
 export type ReportType = StockReportType | 'market_review';
 export type AnalysisPhase = 'auto' | 'premarket' | 'intraday' | 'postmarket';
+export type TaskLifecycleStatus =
+  | 'pending'
+  | 'processing'
+  | 'cancel_requested'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+  | 'interrupted';
 
 export interface AnalysisRequest {
   stockCode?: string;
@@ -422,7 +430,7 @@ export interface AnalysisResult {
 export interface TaskAccepted {
   taskId: string;
   traceId?: string;
-  status: 'pending' | 'processing';
+  status: Extract<TaskLifecycleStatus, 'pending' | 'processing'>;
   message?: string;
   messageCode?: string;
   messageParams?: Record<string, unknown>;
@@ -433,7 +441,7 @@ export interface BatchTaskAcceptedItem {
   taskId: string;
   traceId?: string;
   stockCode: string;
-  status: 'pending' | 'processing';
+  status: Extract<TaskLifecycleStatus, 'pending' | 'processing'>;
   message?: string;
   messageCode?: string;
   messageParams?: Record<string, unknown>;
@@ -460,7 +468,7 @@ export type AnalyzeResponse = AnalysisResult | AnalyzeAsyncResponse;
 export interface TaskStatus {
   taskId: string;
   traceId?: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancel_requested' | 'cancelled' | 'interrupted';
+  status: TaskLifecycleStatus;
   progress?: number;
   message?: string;
   messageCode?: string;
@@ -482,7 +490,7 @@ export interface TaskInfo {
   traceId?: string;
   stockCode: string;
   stockName?: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancel_requested' | 'cancelled' | 'interrupted';
+  status: TaskLifecycleStatus;
   progress: number;
   message?: string;
   messageCode?: string;

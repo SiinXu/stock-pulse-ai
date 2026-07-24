@@ -44,6 +44,7 @@ import { SETTINGS_WIZARD_TEXT } from '../../locales/settingsWizard';
 import { decodeModelRef, encodeModelRef } from '../../utils/modelRef';
 import { ProviderQuickLinks } from './ProviderQuickLinks';
 import { SETTINGS_CONTROL_WIDTH_CLASS } from './settingsControlLayout';
+import { LocalModelsPanel } from './LocalModelsPanel';
 
 export interface WizardDraftItem {
   key: string;
@@ -84,10 +85,14 @@ interface FirstRunWizardProps {
   initialVisionModel?: string;
   /** Opens the persistent Task Routing view after a successful save. */
   onViewRouting?: () => void;
+  /** Refreshes Settings after the shared local-model panel persists configuration. */
+  onLocalModelConfigurationChanged?: () => void | Promise<void>;
+  /** Leaves setup for the canonical first-analysis workspace. */
+  onStartFirstAnalysis?: () => void;
 }
 
-type WizardMode = 'cloud' | 'cli';
-type StepId = 'mode' | 'connection' | 'models' | 'model' | 'review';
+type WizardMode = 'cloud' | 'local_model' | 'cli';
+type StepId = 'mode' | 'connection' | 'models' | 'model' | 'local_model' | 'review';
 
 interface SavedWizardSummary {
   mode: WizardMode;
@@ -105,6 +110,7 @@ const CLI_BACKENDS: Array<{ value: string; label: string }> = [
 
 const STEP_ORDER: Record<WizardMode, StepId[]> = {
   cloud: ['mode', 'connection', 'models', 'model', 'review'],
+  local_model: ['mode', 'local_model', 'review'],
   cli: ['mode', 'connection', 'review'],
 };
 
@@ -139,6 +145,8 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   initialFallbackModels = '',
   initialVisionModel = '',
   onViewRouting,
+  onLocalModelConfigurationChanged,
+  onStartFirstAnalysis,
 }) => {
   const text = SETTINGS_WIZARD_TEXT[language];
   const [step, setStep] = useState<StepId>('mode');
@@ -154,6 +162,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   const [fallbackModels, setFallbackModels] = useState(initialFallbackModels);
   const [visionModel, setVisionModel] = useState(initialVisionModel);
   const [cliBackend, setCliBackend] = useState('');
+  const [localModelReady, setLocalModelReady] = useState('');
   // Discovery results are candidates only: the user confirms which ones to
   // enable via the multi-select — never auto-selected wholesale.
   const [discoveredModels, setDiscoveredModels] = useState<string[]>([]);
@@ -547,6 +556,8 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
           : modelOptions.length > 0;
       case 'model':
         return !hasConnectionSchema || cloudContractReady;
+      case 'local_model':
+        return Boolean(localModelReady);
       default:
         return true;
     }
@@ -572,6 +583,16 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   };
 
   const handleSave = async () => {
+    if (mode === 'local_model') {
+      setSavedSummary({
+        mode,
+        execution: text.localModel,
+        primaryModelRef: localModelReady ? `ollama/${localModelReady}` : '',
+        fallbackModels: [],
+        visionModel: '',
+      });
+      return;
+    }
     if (mode === 'cloud' && hasConnectionSchema && !cloudContractReady) {
       return;
     }
@@ -596,6 +617,9 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   };
 
   const buildItems = (): WizardDraftItem[] => {
+    if (mode === 'local_model') {
+      return [];
+    }
     if (mode === 'cli') {
       return [{ key: 'GENERATION_BACKEND', value: cliBackend }];
     }
@@ -705,7 +729,9 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
           <InlineAlert
             variant="success"
             title={text.savedTitle}
-            message={text.savedDescription}
+            message={savedSummary.mode === 'local_model'
+              ? text.localSavedDescription
+              : text.savedDescription}
           />
           <dl
             className="space-y-2 rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-3 text-sm"
@@ -715,30 +741,36 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
               <dt className="text-muted-text">{text.execution}</dt>
               <dd className="font-medium text-foreground">{savedSummary.execution}</dd>
             </div>
-            {savedSummary.mode === 'cloud' ? (
+            {savedSummary.mode !== 'cli' ? (
               <>
                 <div className="flex justify-between gap-3">
-                  <dt className="text-muted-text">{text.reportModel}</dt>
+                  <dt className="text-muted-text">
+                    {savedSummary.mode === 'local_model' ? text.readyLocalModel : text.reportModel}
+                  </dt>
                   <dd className="min-w-0 text-right font-medium text-foreground">
                     {routingLabel(savedSummary.primaryModelRef)}
                   </dd>
                 </div>
-                <div className="flex justify-between gap-3">
-                  <dt className="text-muted-text">{text.fallbackModels}</dt>
-                  <dd className="min-w-0 text-right font-medium text-foreground">
-                    {savedSummary.fallbackModels.length > 0
-                      ? savedSummary.fallbackModels.map(routingLabel).join(' -> ')
-                      : text.none}
-                  </dd>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <dt className="text-muted-text">{text.visionModel}</dt>
-                  <dd className="min-w-0 text-right font-medium text-foreground">
-                    {savedSummary.visionModel
-                      ? routingLabel(savedSummary.visionModel)
-                      : text.inheritPrimary}
-                  </dd>
-                </div>
+                {savedSummary.mode === 'cloud' ? (
+                  <>
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-muted-text">{text.fallbackModels}</dt>
+                      <dd className="min-w-0 text-right font-medium text-foreground">
+                        {savedSummary.fallbackModels.length > 0
+                          ? savedSummary.fallbackModels.map(routingLabel).join(' -> ')
+                          : text.none}
+                      </dd>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-muted-text">{text.visionModel}</dt>
+                      <dd className="min-w-0 text-right font-medium text-foreground">
+                        {savedSummary.visionModel
+                          ? routingLabel(savedSummary.visionModel)
+                          : text.inheritPrimary}
+                      </dd>
+                    </div>
+                  </>
+                ) : null}
               </>
             ) : null}
           </dl>
@@ -748,9 +780,19 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 {text.viewRouting}
               </Button>
             ) : null}
-            <Button type="button" variant="primary" size="default" onClick={onClose}>
+            <Button
+              type="button"
+              variant={savedSummary.mode === 'local_model' && onStartFirstAnalysis ? 'secondary' : 'primary'}
+              size="default"
+              onClick={onClose}
+            >
               {text.done}
             </Button>
+            {savedSummary.mode === 'local_model' && onStartFirstAnalysis ? (
+              <Button type="button" variant="primary" size="default" onClick={onStartFirstAnalysis}>
+                {text.startFirstAnalysis}
+              </Button>
+            ) : null}
           </div>
         </div>
       </Modal>
@@ -758,7 +800,12 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   }
 
   return (
-    <Modal isOpen onClose={onClose} title={text.title}>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={text.title}
+      size={mode === 'local_model' && step === 'local_model' ? 'fullscreen' : 'default'}
+    >
       <div data-testid="first-run-wizard" className="space-y-5">
         <p className="text-xs text-muted-text">{stepLabel}</p>
 
@@ -768,7 +815,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
               {text.chooseMode}
             </p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {(['cloud', 'cli'] as WizardMode[]).map((value) => (
+              {(['cloud', 'local_model', 'cli'] as WizardMode[]).map((value) => (
                 <button
                   key={value}
                   type="button"
@@ -781,12 +828,18 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                   }`}
                 >
                   <span className="block font-medium text-foreground">
-                    {value === 'cloud' ? text.cloudApi : text.localCli}
+                    {value === 'cloud'
+                      ? text.cloudApi
+                      : value === 'local_model'
+                        ? text.localModel
+                        : text.localCli}
                   </span>
                   <span className="mt-1 block text-xs text-muted-text">
                     {value === 'cloud'
                       ? text.cloudDescription
-                      : text.cliDescription}
+                      : value === 'local_model'
+                        ? text.localModelDescription
+                        : text.cliDescription}
                   </span>
                 </button>
               ))}
@@ -908,6 +961,15 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
               className={SETTINGS_CONTROL_WIDTH_CLASS}
             />
           </div>
+        ) : null}
+
+        {step === 'local_model' && mode === 'local_model' ? (
+          <LocalModelsPanel
+            language={language}
+            headingAs="h3"
+            onConfigurationChanged={onLocalModelConfigurationChanged}
+            onModelReady={setLocalModelReady}
+          />
         ) : null}
 
         {step === 'models' && showModelsField ? (
@@ -1088,7 +1150,9 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
           <div className="space-y-3">
             <InlineAlert
               variant="info"
-              message={text.reviewDescription}
+              message={mode === 'local_model'
+                ? formatUiText(text.localReviewDescription, { model: localModelReady })
+                : text.reviewDescription}
             />
             {/* User-facing summary only — no internal keys such as LLM_CHANNELS. */}
             <dl className="space-y-1.5 rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-3 text-sm">
@@ -1097,7 +1161,9 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 <dd className="font-medium text-foreground">
                   {mode === 'cli'
                     ? CLI_BACKENDS.find((entry) => entry.value === cliBackend)?.label ?? text.localCli
-                    : text.cloudApi}
+                    : mode === 'local_model'
+                      ? text.localModel
+                      : text.cloudApi}
                 </dd>
               </div>
               {mode === 'cloud' ? (
@@ -1135,6 +1201,14 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                     </dd>
                   </div>
                 </>
+              ) : null}
+              {mode === 'local_model' ? (
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-text">{text.readyLocalModel}</dt>
+                  <dd className="min-w-0 text-right font-medium text-foreground">
+                    {localModelReady}
+                  </dd>
+                </div>
               ) : null}
             </dl>
             {saveError ? <InlineAlert variant="danger" title={text.saveFailedTitle} message={saveError} /> : null}
@@ -1214,7 +1288,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 disabled={isSaving || (mode === 'cloud' && hasConnectionSchema && !cloudContractReady)}
                 isLoading={isSaving}
               >
-                {text.saveApply}
+                {mode === 'local_model' ? text.completeSetup : text.saveApply}
               </Button>
             ) : (
               <Button

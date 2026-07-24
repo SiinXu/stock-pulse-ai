@@ -449,6 +449,17 @@ vi.mock('../../components/settings', async () => {
       {children}
     </section>
   ),
+  LocalModelsPanel: ({
+    onConfigurationChanged,
+  }: {
+    onConfigurationChanged?: () => void | Promise<void>;
+  }) => (
+    <div data-testid="local-models-panel">
+      <button type="button" onClick={() => void onConfigurationChanged?.()}>
+        simulate local model config
+      </button>
+    </div>
+  ),
   FirstRunWizard: ({
     onComplete,
     onClose,
