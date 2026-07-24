@@ -24,6 +24,7 @@ from api.v1.endpoints import (
     intelligence,
     local_models,
     portfolio,
+    scheduled_tasks,
     scorecard,
     security_audit,
     stocks,
@@ -129,6 +130,12 @@ router.include_router(
     security_audit.router,
     prefix="/security",
     tags=["SecurityAudit"],
+)
+
+router.include_router(
+    scheduled_tasks.router,
+    prefix="/scheduled-tasks",
+    tags=["ScheduledTasks"]
 )
 
 router.include_router(

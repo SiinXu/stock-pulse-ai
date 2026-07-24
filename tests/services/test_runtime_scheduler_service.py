@@ -538,6 +538,8 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
                 force_enabled=False,
                 run_immediately_in_background=False,
                 schedule_args_overrides=None,
+                scheduled_task_service=None,
+                personalized_schedule_enabled=True,
             ):
                 self.owns_schedule = owns_schedule
                 self.force_enabled = force_enabled
@@ -592,6 +594,8 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
                 force_enabled=False,
                 run_immediately_in_background=False,
                 schedule_args_overrides=None,
+                scheduled_task_service=None,
+                personalized_schedule_enabled=True,
             ):
                 events.append(("init", owns_schedule, force_enabled, run_immediately_in_background))
 
@@ -641,6 +645,8 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
                 force_enabled=False,
                 run_immediately_in_background=False,
                 schedule_args_overrides=None,
+                scheduled_task_service=None,
+                personalized_schedule_enabled=True,
             ):
                 events.append(("init", owns_schedule, force_enabled, run_immediately_in_background))
 
@@ -697,6 +703,8 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
                 force_enabled=False,
                 run_immediately_in_background=False,
                 schedule_args_overrides=None,
+                scheduled_task_service=None,
+                personalized_schedule_enabled=True,
             ):
                 events.append(("init_args", schedule_args_overrides))
 
@@ -741,6 +749,8 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
                 force_enabled=False,
                 run_immediately_in_background=False,
                 schedule_args_overrides=None,
+                scheduled_task_service=None,
+                personalized_schedule_enabled=True,
             ):
                 events.append(("init", owns_schedule, force_enabled, run_immediately_in_background))
 

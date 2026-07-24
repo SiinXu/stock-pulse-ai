@@ -117,6 +117,8 @@ class RuntimeSchedulerService:
         run_immediately_in_background: bool = False,
         background_tasks_provider: Optional[Callable[[Config], List[Dict[str, Any]]]] = None,
         schedule_args_overrides: Optional[Dict[str, Any]] = None,
+        scheduled_task_service: Any = None,
+        personalized_schedule_enabled: bool = True,
     ) -> None:
         self._config_provider = config_provider
         self._task_runner = task_runner
@@ -131,6 +133,8 @@ class RuntimeSchedulerService:
         self._force_enabled = force_enabled
         self._run_immediately_in_background = run_immediately_in_background
         self._background_tasks_provider = background_tasks_provider
+        self._scheduled_task_service = scheduled_task_service
+        self._personalized_schedule_enabled = personalized_schedule_enabled
         self._schedule_args_overrides = {
             key: value
             for key, value in (schedule_args_overrides or {}).items()
@@ -143,6 +147,7 @@ class RuntimeSchedulerService:
         self._scheduler: Optional[Scheduler] = None
         self._thread: Optional[threading.Thread] = None
         self._enabled = False
+        self._legacy_enabled = False
         self._last_run_at: Optional[str] = None
         self._last_success_at: Optional[str] = None
         self._last_error: Optional[str] = None
@@ -220,12 +225,42 @@ class RuntimeSchedulerService:
         )
 
     def _is_schedule_enabled(self, config: Config) -> bool:
+        return self._is_legacy_schedule_enabled(config) or self._has_scheduled_tasks()
+
+    def _is_legacy_schedule_enabled(self, config: Config) -> bool:
         return self._force_enabled or bool(getattr(config, "schedule_enabled", False))
+
+    def _has_scheduled_tasks(self) -> bool:
+        service = self._scheduled_task_service
+        if service is None or not self._personalized_schedule_enabled:
+            return False
+        try:
+            return bool(service.has_enabled_tasks())
+        except Exception as exc:  # broad-exception: fallback_recorded - scheduler availability fails closed and keeps legacy scheduling intact.
+            log_safe_exception(
+                logger,
+                "Scheduled task availability lookup failed",
+                exc,
+                error_code="scheduled_task_availability_failed",
+                level=logging.WARNING,
+            )
+            return False
 
     def _current_background_tasks(self, config: Config) -> List[Dict[str, Any]]:
         if self._background_tasks_provider is not None:
-            return self._background_tasks_provider(config)
-        return self._current_agent_event_monitor_background_tasks(config)
+            tasks = list(self._background_tasks_provider(config))
+        else:
+            tasks = self._current_agent_event_monitor_background_tasks(config)
+        if self._scheduled_task_service is not None and self._personalized_schedule_enabled:
+            from src.schemas.scheduled_task import SCHEDULED_TASK_POLL_INTERVAL_SECONDS
+
+            tasks.append({
+                "task": self._scheduled_task_service.tick,
+                "interval_seconds": SCHEDULED_TASK_POLL_INTERVAL_SECONDS,
+                "run_immediately": True,
+                "name": "scheduled_tasks",
+            })
+        return tasks
 
     def _current_agent_event_monitor_background_tasks(self, config: Config) -> List[Dict[str, Any]]:
         name = "agent_event_monitor"
@@ -285,6 +320,7 @@ class RuntimeSchedulerService:
                 self.stop()
                 return
             background_tasks = self._current_background_tasks(config)
+            legacy_enabled = self._is_legacy_schedule_enabled(config)
             self.stop()
             times = normalize_schedule_times(
                 getattr(config, "schedule_times", None),
@@ -296,10 +332,11 @@ class RuntimeSchedulerService:
                 schedule_times_provider=self._current_times,
                 register_signals=False,
             )
-            if run_immediately and self._run_immediately_in_background:
-                scheduler.set_daily_task(self._run_analysis_once, run_immediately=False)
-            else:
-                scheduler.set_daily_task(self._run_analysis_once, run_immediately=run_immediately)
+            if legacy_enabled:
+                if run_immediately and self._run_immediately_in_background:
+                    scheduler.set_daily_task(self._run_analysis_once, run_immediately=False)
+                else:
+                    scheduler.set_daily_task(self._run_analysis_once, run_immediately=run_immediately)
             for entry in background_tasks:
                 scheduler.add_background_task(
                     entry["task"],
@@ -307,7 +344,7 @@ class RuntimeSchedulerService:
                     run_immediately=entry.get("run_immediately", False),
                     name=entry.get("name"),
                 )
-            if run_immediately and self._run_immediately_in_background:
+            if legacy_enabled and run_immediately and self._run_immediately_in_background:
                 self._run_in_background_thread(self._run_analysis_once)
             thread = threading.Thread(
                 target=scheduler.run,
@@ -317,6 +354,7 @@ class RuntimeSchedulerService:
             self._scheduler = scheduler
             self._thread = thread
             self._enabled = True
+            self._legacy_enabled = legacy_enabled
             thread.start()
 
     def stop(self) -> None:
@@ -326,6 +364,7 @@ class RuntimeSchedulerService:
         self._scheduler = None
         self._thread = None
         self._enabled = False
+        self._legacy_enabled = False
 
     def reconcile_from_config(
         self,
@@ -342,6 +381,18 @@ class RuntimeSchedulerService:
         if self._is_schedule_enabled(config):
             self.start(run_immediately=run_immediately)
         else:
+            self.stop()
+
+    def reconcile_scheduled_tasks(self) -> None:
+        """Start or stop the shared loop after a task enablement change."""
+        if not self._owns_schedule:
+            self.stop()
+            return
+        config = self._config_provider()
+        should_run = self._is_schedule_enabled(config)
+        if should_run and not self._enabled:
+            self.start(run_immediately=False)
+        elif not should_run and self._enabled:
             self.stop()
 
     def run_now(self) -> Dict[str, Any]:
@@ -386,7 +437,7 @@ class RuntimeSchedulerService:
                 schedule_times = []
         running = self._run_lock.locked()
         return {
-            "enabled": self._enabled,
+            "enabled": self._legacy_enabled,
             "running": running,
             "schedule_times": schedule_times,
             "next_run_at": next_run,

@@ -40,6 +40,7 @@ from src.migrations.registry import (
     PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION,
     REGISTRY_METADATA_MIGRATION,
     SECURITY_AUDIT_EVENTS_MIGRATION,
+    SCHEDULED_TASK_SCHEMA_MIGRATION,
     TARGET_VERSION,
     get_migrations,
 )
@@ -423,6 +424,7 @@ def test_production_registry_is_stable_unique_and_strictly_ordered_across_import
         INTELLIGENCE_ITEM_SCOPE_MIGRATION.id,
         INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION.id,
         SECURITY_AUDIT_EVENTS_MIGRATION.id,
+        SCHEDULED_TASK_SCHEMA_MIGRATION.id,
     )
     assert reloaded.TARGET_VERSION == ids[-1]
     assert all(len(checksum) == 64 for _, _, checksum in after)
