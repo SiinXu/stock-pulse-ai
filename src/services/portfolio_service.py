@@ -46,6 +46,8 @@ VALID_MARKETS = {"cn", "hk", "us", "jp", "kr", "tw"}
 PARTIAL_VALUATION_MARKETS = {"jp", "kr", "tw"}
 VALID_COST_METHODS = {"fifo", "avg"}
 VALID_SIDES = {"buy", "sell"}
+VALID_ACCOUNT_TYPES = {"real", "paper"}
+DEFAULT_ACCOUNT_TYPE = "real"
 VALID_CASH_DIRECTIONS = {"in", "out"}
 VALID_CORPORATE_ACTIONS = {"cash_dividend", "split_adjustment"}
 PORTFOLIO_FX_REFRESH_DISABLED_REASON = "portfolio_fx_update_disabled"
@@ -133,6 +135,24 @@ class PortfolioService:
     ):
         self.repo = repo or PortfolioRepository()
         self._now_provider = now_provider or datetime.now
+        self._kind_repo: Any = None
+
+    @property
+    def kind_repo(self) -> Any:
+        if self._kind_repo is None:
+            from src.repositories.portfolio_account_kind_repo import (
+                PortfolioAccountKindRepository,
+            )
+
+            self._kind_repo = PortfolioAccountKindRepository()
+        return self._kind_repo
+
+    @staticmethod
+    def _normalize_account_type(account_type: Optional[str]) -> str:
+        value = (account_type or DEFAULT_ACCOUNT_TYPE).strip().lower()
+        if value not in VALID_ACCOUNT_TYPES:
+            raise ValueError("account_type must be real or paper")
+        return value
 
     # ------------------------------------------------------------------
     # Account CRUD
@@ -145,10 +165,12 @@ class PortfolioService:
         market: str,
         base_currency: str,
         owner_id: Optional[str] = None,
+        account_type: str = DEFAULT_ACCOUNT_TYPE,
     ) -> Dict[str, Any]:
         name_norm = (name or "").strip()
         if not name_norm:
             raise ValueError("name is required")
+        account_type_norm = self._normalize_account_type(account_type)
         market_norm = self._normalize_market(market)
         base_currency_norm = self._normalize_currency(base_currency)
         row = self.repo.create_account(
@@ -158,11 +180,41 @@ class PortfolioService:
             base_currency=base_currency_norm,
             owner_id=(owner_id or "").strip() or None,
         )
-        return self._account_to_dict(row)
+        result = self._account_to_dict(row)
+        if account_type_norm == "paper":
+            self.kind_repo.upsert(
+                {"account_id": int(row.id), "account_type": "paper"}
+            )
+            self._seed_paper_cash(account_id=int(row.id), currency=base_currency_norm)
+        result["account_type"] = account_type_norm
+        return result
+
+    def _seed_paper_cash(self, *, account_id: int, currency: str) -> None:
+        """Seed a new paper account with the configurable initial cash balance."""
+        initial_cash = float(
+            getattr(get_config(), "paper_portfolio_initial_cash", 0.0) or 0.0
+        )
+        if initial_cash <= 0:
+            return
+        self.record_cash_ledger(
+            account_id=account_id,
+            event_date=self._now_provider().date(),
+            direction="in",
+            amount=initial_cash,
+            currency=currency,
+            note="Paper trading initial balance",
+        )
 
     def list_accounts(self, include_inactive: bool = False) -> List[Dict[str, Any]]:
         rows = self.repo.list_accounts(include_inactive=include_inactive)
-        return [self._account_to_dict(r) for r in rows]
+        result = [self._account_to_dict(r) for r in rows]
+        if result:
+            types = self.kind_repo.types_for(
+                account_ids=[int(item["id"]) for item in result]
+            )
+            for item in result:
+                item["account_type"] = types.get(int(item["id"]), DEFAULT_ACCOUNT_TYPE)
+        return result
 
     def update_account(
         self,
@@ -197,7 +249,11 @@ class PortfolioService:
         row = self.repo.update_account(account_id, fields)
         if row is None:
             return None
-        return self._account_to_dict(row)
+        result = self._account_to_dict(row)
+        result["account_type"] = self.kind_repo.types_for(
+            account_ids=[int(row.id)]
+        ).get(int(row.id), DEFAULT_ACCOUNT_TYPE)
+        return result
 
     def deactivate_account(self, account_id: int) -> bool:
         return self.repo.deactivate_account(account_id)

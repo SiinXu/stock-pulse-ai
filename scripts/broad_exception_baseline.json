@@ -44,7 +44,6 @@
     {"path":"api/v1/endpoints/intelligence.py","scope":"<module>.test_source_payload","caught":["Exception"],"digest":"6bfeecfd4b9a72ef23ee11c06b00bf570d80497dc8274febca8e276e207df3cb"},
     {"path":"api/v1/endpoints/portfolio.py","scope":"<module>.analyze_position","caught":["Exception"],"digest":"e7a75d014b99a75d4eb63ab9d08ae4e19cc2e3dc6ef4e282350cbba202cab11d"},
     {"path":"api/v1/endpoints/portfolio.py","scope":"<module>.commit_csv_import","caught":["Exception"],"digest":"552d6c78910e02a84766ec55d36eeb1cf4ca93c7677229fcd536e4f0195999f2"},
-    {"path":"api/v1/endpoints/portfolio.py","scope":"<module>.create_account","caught":["Exception"],"digest":"771502cbfca12df483be6d9293519e8d2c64486e61f7b2a9828d9f553f0e8503"},
     {"path":"api/v1/endpoints/portfolio.py","scope":"<module>.create_cash_ledger","caught":["Exception"],"digest":"3ef161baf9cce8a3f85dd2e09cb77b0b55de9ca08fb0a00e8f5c647fa343f446"},
     {"path":"api/v1/endpoints/portfolio.py","scope":"<module>.create_corporate_action","caught":["Exception"],"digest":"6cdd98c43abad8de7cfc95af831b45371df034e844a17f222a8af82de6223165"},
     {"path":"api/v1/endpoints/portfolio.py","scope":"<module>.create_trade","caught":["Exception"],"digest":"b9cbf5de56da495312f54493b26292e4f6984a643e978b9808df65577fc654be"},

@@ -95,11 +95,36 @@ def _install_alphasift(config: Config) -> Dict[str, Any]:
 
         install_spec = _validate_install_spec(config.alphasift_install_spec)
 
+        # Keep the repair install inside StockPulse's reviewed dependency lock: --no-deps
+        # unconditionally blocks resolving anything beyond the pinned AlphaSift spec, and the
+        # constraint files pin runtime and PEP 517 build resolution wherever they ship. Packaged
+        # desktop artifacts omit the lock files, so add the constraint flags only when present.
+        constraint_args = []
+        constraint_root = next(
+            (parent for parent in Path(__file__).resolve().parents if (parent / "constraints.txt").is_file()),
+            None,
+        )
+        if constraint_root is not None:
+            constraint_args = ["--constraint", str(constraint_root / "constraints.txt")]
+            build_constraint_file = constraint_root / "build-constraints.txt"
+            if build_constraint_file.is_file():
+                constraint_args += ["--build-constraint", str(build_constraint_file)]
+
         try:
             _purge_alphasift_modules()
             importlib.invalidate_caches()
             completed = subprocess.run(
-                [sys.executable, "-m", "pip", "install", "--upgrade", "--force-reinstall", install_spec],
+                [
+                    sys.executable,
+                    "-m",
+                    "pip",
+                    "install",
+                    "--upgrade",
+                    "--force-reinstall",
+                    "--no-deps",
+                    *constraint_args,
+                    install_spec,
+                ],
                 check=False,
                 capture_output=True,
                 text=True,
