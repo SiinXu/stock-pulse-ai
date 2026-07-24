@@ -210,7 +210,7 @@ class _LocalModelRegistrationRecovery:
 
     model_id: str
     config_version: str
-    runtime_identity: str
+    runtime_base_url: str
     previous_channels: tuple[str, ...]
     previous_models: tuple[str, ...]
     expires_at: float
@@ -561,12 +561,6 @@ class LocalModelService:
         current_version, values = self._config_snapshot()
         if current_version != recovery.config_version:
             raise ConfigConflictError(current_version=current_version)
-        current_runtime_identity = get_ollama_runtime_identity(self._base_url(values))
-        if not secrets.compare_digest(
-            current_runtime_identity,
-            recovery.runtime_identity,
-        ):
-            raise ConfigConflictError(current_version=current_version)
 
         current_models = self._split_csv(values.get("LLM_OLLAMA_MODELS"))
         expected_models = [
@@ -623,6 +617,17 @@ class LocalModelService:
         """Register one model and optionally assign it without stealing an existing default."""
         with self._operation_lock:
             normalized = self._require_pullable(model_id)
+            return self._register_installed_model(normalized, assignment=assignment)
+
+    def register_installed_model(
+        self,
+        model_id: Any,
+        *,
+        assignment: LocalModelAssignment = "auto",
+    ) -> Dict[str, Any]:
+        """Register any validated installed model without widening the pull allowlist."""
+        with self._operation_lock:
+            normalized = normalize_local_model_id(model_id)
             return self._register_installed_model(normalized, assignment=assignment)
 
     def activate_desktop_model(
@@ -837,7 +842,7 @@ class LocalModelService:
                 _LocalModelRegistrationRecovery(
                     model_id=normalized,
                     config_version=str(result.get("config_version") or ""),
-                    runtime_identity=get_ollama_runtime_identity(base_url),
+                    runtime_base_url=base_url,
                     previous_channels=tuple(
                         self._split_csv(values.get("LLM_CHANNELS"))
                     ),
@@ -876,7 +881,7 @@ class LocalModelService:
         *,
         recovery_token: Any,
     ) -> Dict[str, Any]:
-        """Restore one exact Desktop snapshot without probing a stopped runtime."""
+        """Restore a registration only while its original runtime still has weights."""
         with self._operation_lock:
             normalized = self._require_pullable(model_id)
             _token, recovery = self._consume_registration_recovery(
@@ -886,6 +891,17 @@ class LocalModelService:
             current_version, _values = self._validate_registration_recovery_configuration(
                 recovery
             )
+            installed = {
+                item.lower()
+                for item in self._client_factory(
+                    recovery.runtime_base_url
+                ).list_installed_models()
+            }
+            if normalized.lower() not in installed:
+                raise LocalModelNotInstalledError(
+                    "The deleted local model weights cannot be registered again"
+                )
+
             result = self._system_config_service.update(
                 config_version=current_version,
                 items=[

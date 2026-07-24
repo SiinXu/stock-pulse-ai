@@ -2934,7 +2934,7 @@
           "LocalModels"
         ],
         "summary": "Restore Local Model Registration",
-        "description": "Consume an exact Desktop rollback without probing the stopped runtime.",
+        "description": "Consume a Desktop rollback only if the original runtime still has weights.",
         "operationId": "restore_local_model_registration_api_v1_local_models_registrations_post",
         "requestBody": {
           "content": {

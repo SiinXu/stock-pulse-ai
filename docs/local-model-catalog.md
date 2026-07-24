@@ -202,13 +202,11 @@ configuration version and a SHA-256 identity of the observed normalized runtime;
 they never carry a target URL. The backend recomputes that identity from its own
 configuration and rejects activation or unregistration when either snapshot
 value changed during the operation. While a Desktop deletion recovery is
-pending, the backend reserves that model against concurrent local-model pulls
-or registration. Every lifecycle registration remains catalog-backed. Recovery
-is single-use and bound to the exact post-unregister configuration and runtime
-identity; it optimistically restores that snapshot offline without probing a
-stopped or temporarily unavailable runtime. Successful weight deletion retries
-idempotent recovery revocation once. If acknowledgement remains unavailable,
-deletion still succeeds and any unrevoked token expires after its short TTL.
+pending, the backend reserves that model against concurrent local-model
+registration. Successful weight deletion retries recovery revocation once. If
+acknowledgement remains unavailable, deletion still succeeds, but the token
+cannot restore weights that the original runtime no longer reports and expires
+after its short TTL.
 
 Run `python scripts/check_local_model_catalog.py` after every catalog or desktop
 packaging change.
