@@ -18,6 +18,17 @@ from .analysis_strategies import (
 )
 from .constants import PLUGIN_APPLICATION_VERSION
 from .errors import PluginContextClosedError, PluginError, PluginRegistryError
+from .event_hooks import (
+    EVENT_HOOK_NAMES,
+    EVENT_HOOK_SCHEMA_VERSION,
+    EventHook,
+    EventHookRegistration,
+    PluginEvent,
+    dispatch_analysis_event,
+    dispatch_market_review_event,
+    event_hook_extension_contract,
+    validate_event_hook_registration,
+)
 from .loader import ExternalPluginLoader, ExternalPluginResult
 from .manager import (
     PluginManager,
@@ -56,6 +67,10 @@ __all__ = [
     "AnalysisStrategyDefinition",
     "AnalysisStrategyRegistry",
     "EXTENSION_POINTS",
+    "EVENT_HOOK_NAMES",
+    "EVENT_HOOK_SCHEMA_VERSION",
+    "EventHook",
+    "EventHookRegistration",
     "ExternalPluginLoader",
     "ExternalPluginResult",
     "ExtensionContract",
@@ -65,6 +80,7 @@ __all__ = [
     "JSONValue",
     "NativeRegistrationBackend",
     "Plugin",
+    "PluginEvent",
     "PLUGIN_APPLICATION_VERSION",
     "PluginContext",
     "PluginContextClosedError",
@@ -87,8 +103,12 @@ __all__ = [
     "build_analysis_strategy_extension_contract",
     "build_application_extension_registry",
     "default_extension_contracts",
+    "dispatch_analysis_event",
+    "dispatch_market_review_event",
+    "event_hook_extension_contract",
     "normalize_report_platform",
     "validate_agent_tool_definition",
+    "validate_event_hook_registration",
     "validate_report_template",
     "validate_analysis_strategy_definition",
 ]
