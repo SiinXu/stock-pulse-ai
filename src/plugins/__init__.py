@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """Public contracts for the StockPulse plugin core."""
 
+from .agent_tools import (
+    AgentToolRegistrationBackend,
+    build_agent_tool_extension_registry,
+    validate_agent_tool_definition,
+)
+from .constants import PLUGIN_APPLICATION_VERSION
 from .errors import PluginContextClosedError, PluginError, PluginRegistryError
 from .loader import ExternalPluginLoader, ExternalPluginResult
 from .manager import (
@@ -27,6 +33,7 @@ from .registry import (
 )
 
 __all__ = [
+    "AgentToolRegistrationBackend",
     "EXTENSION_POINTS",
     "ExternalPluginLoader",
     "ExternalPluginResult",
@@ -37,6 +44,7 @@ __all__ = [
     "JSONValue",
     "NativeRegistrationBackend",
     "Plugin",
+    "PLUGIN_APPLICATION_VERSION",
     "PluginContext",
     "PluginContextClosedError",
     "PluginError",
@@ -48,5 +56,7 @@ __all__ = [
     "PluginSource",
     "PluginState",
     "RegistrationHandle",
+    "build_agent_tool_extension_registry",
     "default_extension_contracts",
+    "validate_agent_tool_definition",
 ]

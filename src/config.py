@@ -106,6 +106,8 @@ from src.config_parts.defaults import (
     DEFAULT_ALPHASIFT_INSTALL_SPEC,
     _FALSEY_ENV_VALUES,
     _MANAGED_LITELLM_KEY_PROVIDERS,
+    KRONOS_MODEL_SIZE_DEFAULT as _KRONOS_MODEL_SIZE_DEFAULT,
+    KRONOS_MODEL_SIZES as _KRONOS_MODEL_SIZES,
     _has_gotify_base_url,
     _has_ntfy_topic_endpoint,
     normalize_tickflow_kline_adjust,

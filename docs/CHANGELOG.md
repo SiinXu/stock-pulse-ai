@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 - [Added] Added a validated cross-client local model catalog and read-only API for four general and three finance models, derived desktop presets from the same source, and retired the Llama 3.2 recommendation to avoid unnecessary redistribution obligations.
 - [Docs] Added verified local-model sizes, RAM tiers, upstream repositories, license conclusions, GGUF conversion guidance, distribution boundaries, and Ollama configuration.
+
+- [Added] An optional, default-off Kronos K-line forecasting Agent Tool with isolated dependencies, local-only weights, strict input bounds, probabilistic direction and volatility output, and mandatory investment-risk disclosure.
 - [Fixed] Bundled `constraints.txt` / `build-constraints.txt` into the packaged desktop backend and resolved them from `sys._MEIPASS`, so the AlphaSift repair install pins runtime and PEP 517 build dependencies on the desktop artifact too instead of degrading to `--no-deps` only.
 - [Fixed] Prevented Windows API and desktop startup from hanging on a cold MIME database by initializing built-in mappings without scanning the registry before registering frontend asset types.
 - [Added] Added opt-in `--portfolio futu` analysis scope loading from non-zero long stock positions in eligible live Futu OpenD accounts, with A-share/Hong Kong/U.S. symbol normalization and no changes to the default static stock-list behavior.

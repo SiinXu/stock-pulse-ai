@@ -17,6 +17,7 @@ from src.config_parts.defaults import (
     AGENT_MAX_STEPS_DEFAULT,
     DEFAULT_ALPHASIFT_INSTALL_SPEC,
     FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT,
+    KRONOS_MODEL_SIZE_DEFAULT as _KRONOS_MODEL_SIZE_DEFAULT,
     PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS_DEFAULT,
 )
 from src.config_parts.llm import _ConfigLLMMethods
@@ -70,6 +71,11 @@ class Config:
     # === AlphaSift optional stock screening integration ===
     alphasift_enabled: bool = False
     alphasift_install_spec: str = DEFAULT_ALPHASIFT_INSTALL_SPEC
+
+    # === Optional local Kronos K-line forecasting tool ===
+    kronos_enabled: bool = False
+    kronos_model_size: str = _KRONOS_MODEL_SIZE_DEFAULT
+    kronos_weights_dir: Optional[str] = None
 
     # === Historical decision memory & reflection (Issue #118) ===
     decision_memory_enabled: bool = True

@@ -15,7 +15,7 @@ integration is not yet wired.
 | Built-in/external startup wiring | `src/application_services.py` composition root | #273 X2b implemented |
 | Data Providers | `DataProvider`, `BaseFetcher`, and `DataFetcherManager` | #276 X3 implemented |
 | Analysis Strategies | `Skill`, `SkillManager`, `StrategyEngine` | Contract only in this batch |
-| Agent Tools | `ToolDefinition`, `ToolRegistry`, Tool Surface | Contract only; `src/agent/**` stays untouched |
+| Agent Tools | `ToolDefinition`, `ToolRegistry`, Tool Surface | Wired through the native registry; registration remains fail-closed |
 | Notification Channels | `NotificationChannel`, sender mixins, `NotificationService` | Contract only in this batch |
 | Report Templates | `src/services/report_renderer.py`, `templates/report_*.j2` | Contract only in this batch |
 | Event Hooks | Task and Agent runtime event streams | Contract only in this batch |
@@ -123,12 +123,12 @@ outer operation finishes; the root then performs the same state-based cleanup
 exactly once. The installer drain remains active through that deferred cleanup,
 including every `onunload()` callback, before a successor may start.
 
-There is currently no default lifecycle-style built-in catalog to fabricate:
-existing Data Provider built-ins remain owned by each `DataFetcherManager`, and
-the other five extension points are contract-only. `ApplicationServices`
-therefore accepts an explicit built-in iterable while its default is empty.
-Adding a real built-in later must use that seam rather than a parallel startup
-hook.
+The default lifecycle-style built-in catalog is configuration-gated. Existing
+Data Provider built-ins remain owned by each `DataFetcherManager`; the optional
+Kronos Agent Tool is added only when its explicit enable flag is true, while the
+other four extension points remain contract-only. `ApplicationServices`
+continues to accept an explicit built-in iterable for tests and composition
+callers. New built-ins must use that seam rather than a parallel startup hook.
 
 `PLUGINS_DIR` is read once for each root startup. Unset, empty, or whitespace-only
 values do not instantiate the external loader and do not probe a default path.
@@ -499,8 +499,9 @@ serialization, audit, and completion guards.
 
 Plugin registration cannot grant a tool access, weaken strict policy
 validation, publish a transport, or mutate Agent runner internals. Tool names
-cannot overwrite built-ins. Runtime wiring is deferred because `src/agent/**`
-belongs to the Agent decomposition track.
+cannot overwrite built-ins. `ApplicationServices` supplies an exact-owner
+native adapter backed by the cached `ToolRegistry`; unload removes only the
+definition registered by that plugin.
 
 ### Notification Channels
 

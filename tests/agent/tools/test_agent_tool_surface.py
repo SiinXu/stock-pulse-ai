@@ -174,6 +174,36 @@ def test_argument_validation_errors_before_handler() -> None:
     assert calls == []
 
 
+def test_bounded_integer_validation_rejects_arbitrarily_large_json_integer() -> None:
+    calls = []
+    registry = ToolRegistry()
+    registry.register(
+        ToolDefinition(
+            name="bounded_integer",
+            description="Bounded integer test tool",
+            parameters=[
+                ToolParameter(
+                    name="value",
+                    type="integer",
+                    description="Bounded value",
+                    maximum=512,
+                )
+            ],
+            handler=lambda value: calls.append(value),
+            policy=ToolPolicy.declared(read_only=True),
+        )
+    )
+
+    result = ToolSurface(registry).execute_tool(
+        "bounded_integer",
+        {"value": 10**1_000},
+    )
+
+    assert result["error"]["code"] == "invalid_arguments"
+    assert result["error"]["message"] == "argument value must be <= 512"
+    assert calls == []
+
+
 def test_optional_null_arguments_are_rejected_but_omitted_defaults_still_work() -> None:
     calls = []
     registry = ToolRegistry()

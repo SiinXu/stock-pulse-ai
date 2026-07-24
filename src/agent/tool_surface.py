@@ -6,6 +6,8 @@ from __future__ import annotations
 import contextvars
 import json
 import logging
+import math
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from typing import Any, Dict, Optional
@@ -425,21 +427,32 @@ def _validate_scope_contract(tool_def: ToolDefinition) -> Optional[Dict[str, Any
 def _validate_parameter_value(param: ToolParameter, value: Any) -> Optional[str]:
     if value is None:
         return f"argument {param.name} must not be null"
-    if param.enum and value not in param.enum:
-        return f"argument {param.name} must be one of: {', '.join(map(str, param.enum))}"
     expected = _JSON_TYPE_TO_PYTHON.get(param.type)
-    if not expected:
-        return None
-    if param.type == "integer":
+    if expected and param.type == "integer":
         if isinstance(value, bool) or not isinstance(value, int):
             return f"argument {param.name} must be integer"
-        return None
-    if param.type == "number":
+    elif expected and param.type == "number":
         if isinstance(value, bool) or not isinstance(value, expected):
             return f"argument {param.name} must be number"
-        return None
-    if not isinstance(value, expected):
+    elif expected and not isinstance(value, expected):
         return f"argument {param.name} must be {param.type}"
+
+    if param.enum and value not in param.enum:
+        return f"argument {param.name} must be one of: {', '.join(map(str, param.enum))}"
+    if param.pattern is not None and isinstance(value, str):
+        try:
+            pattern_matches = re.search(param.pattern, value) is not None
+        except re.error:
+            return f"argument {param.name} has an invalid schema pattern"
+        if not pattern_matches:
+            return f"argument {param.name} must match the required format"
+    if param.type in {"integer", "number"}:
+        if isinstance(value, float) and not math.isfinite(value):
+            return f"argument {param.name} must be finite"
+        if param.minimum is not None and value < param.minimum:
+            return f"argument {param.name} must be >= {param.minimum:g}"
+        if param.maximum is not None and value > param.maximum:
+            return f"argument {param.name} must be <= {param.maximum:g}"
     return None
 
 

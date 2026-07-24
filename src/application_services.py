@@ -36,6 +36,8 @@ import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional
 
+from src.plugins.constants import PLUGIN_APPLICATION_VERSION
+
 if TYPE_CHECKING:  # import for typing only; avoids runtime import cycles
     from src.config import Config
     from src.plugins import (
@@ -49,7 +51,12 @@ if TYPE_CHECKING:  # import for typing only; avoids runtime import cycles
     from src.storage import DatabaseManager
 
 
-PLUGIN_APPLICATION_VERSION = "3.26.3"
+def _get_process_agent_tool_registry():
+    """Resolve the cached Agent ToolRegistry only when a plugin needs it."""
+
+    from src.agent.runtime_assembly import get_tool_registry
+
+    return get_tool_registry()
 
 
 class ApplicationServices:
@@ -68,7 +75,7 @@ class ApplicationServices:
         search: Optional["SearchService"] = None,
         task_queue: Optional["AnalysisTaskQueue"] = None,
         plugin_manager: Optional["PluginManager"] = None,
-        builtin_plugins: Iterable["Plugin"] = (),
+        builtin_plugins: Optional[Iterable["Plugin"]] = None,
         plugins_dir: str | Path | None = None,
         plugin_application_version: str = PLUGIN_APPLICATION_VERSION,
     ) -> None:
@@ -76,14 +83,22 @@ class ApplicationServices:
         self._database = database
         self._search = search
         self._task_queue = task_queue
+        plugin_manager_was_provided = plugin_manager is not None
         if plugin_manager is None:
-            from src.plugins import PluginManager
+            from src.plugins import PluginManager, build_agent_tool_extension_registry
 
             plugin_manager = PluginManager(
                 application_version=plugin_application_version,
+                registry=build_agent_tool_extension_registry(
+                    _get_process_agent_tool_registry,
+                ),
             )
         self._plugin_manager = plugin_manager
-        self._builtin_plugins = tuple(builtin_plugins)
+        if builtin_plugins is None and not plugin_manager_was_provided:
+            from src.plugins.builtin import get_configured_builtin_plugins
+
+            builtin_plugins = get_configured_builtin_plugins(config)
+        self._builtin_plugins = tuple(builtin_plugins or ())
         self._plugins_dir = plugins_dir
         self._builtin_plugin_results: tuple["PluginOperationResult", ...] = ()
         self._external_plugin_results: tuple["ExternalPluginResult", ...] = ()

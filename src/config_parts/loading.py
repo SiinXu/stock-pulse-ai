@@ -15,6 +15,7 @@ from src.config_parts.defaults import (
     ANSPIRE_LLM_MODEL_DEFAULT,
     DEFAULT_ALPHASIFT_INSTALL_SPEC,
     FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT,
+    KRONOS_MODEL_SIZE_DEFAULT as _KRONOS_MODEL_SIZE_DEFAULT,
     PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS_DEFAULT,
     logger,
     normalize_tickflow_kline_adjust,
@@ -1008,6 +1009,12 @@ class _ConfigLoadingMethods:
                 if os.getenv('ALPHASIFT_INSTALL_SPEC') is None
                 else os.getenv('ALPHASIFT_INSTALL_SPEC', '').strip()
             ),
+            kronos_enabled=parse_env_bool(os.getenv('KRONOS_ENABLED'), default=False),
+            kronos_model_size=(
+                os.getenv('KRONOS_MODEL_SIZE', _KRONOS_MODEL_SIZE_DEFAULT).strip().lower()
+                or _KRONOS_MODEL_SIZE_DEFAULT
+            ),
+            kronos_weights_dir=os.getenv('KRONOS_WEIGHTS_DIR', '').strip() or None,
             decision_memory_enabled=parse_env_bool(os.getenv('DECISION_MEMORY_ENABLED'), default=True),
             decision_memory_lookback=parse_env_int(
                 os.getenv('DECISION_MEMORY_LOOKBACK'), 5, field_name='DECISION_MEMORY_LOOKBACK', minimum=0
