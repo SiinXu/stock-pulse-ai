@@ -97,14 +97,19 @@ class ExtensionContract:
 
 
 def default_extension_contracts() -> Mapping[ExtensionPoint, ExtensionContract]:
-    """Return fail-closed identity contracts for the ADR-007 extension points."""
+    """Return the wired and fail-closed ADR-007 extension contracts."""
+
+    from .report_templates import validate_report_template
 
     contracts: dict[ExtensionPoint, ExtensionContract] = {
         "data_provider": ExtensionContract(_attribute_identity("provider_id")),
         "analysis_strategy": ExtensionContract(_attribute_identity("name")),
         "agent_tool": ExtensionContract(_attribute_identity("name")),
         "notification_channel": ExtensionContract(_attribute_identity("channel_id")),
-        "report_template": ExtensionContract(_attribute_identity("template_id")),
+        "report_template": ExtensionContract(
+            _attribute_identity("template_id"),
+            validator=validate_report_template,
+        ),
         "event_hook": ExtensionContract(_attribute_identity("hook_id")),
     }
     return MappingProxyType(contracts)
