@@ -4,10 +4,13 @@ import { Menu } from 'lucide-react';
 import { Outlet } from 'react-router-dom';
 import { Drawer } from '../common/Drawer';
 import { IconButton } from '../common/IconButton';
+import { CommandPalette, useCommandPaletteShortcut } from '../command-palette';
+import { NotificationBell } from '../notifications';
 import { SidebarNav } from './SidebarNav';
 import { SidebarProfile } from './SidebarProfile';
 import { cn } from '../../utils/cn';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { APP_ROUTE_PATHS } from '../../routing/routes';
 
 type ShellProps = {
   children?: React.ReactNode;
@@ -42,6 +45,7 @@ function useMediaQuery(query: string): boolean {
 
 export const Shell: React.FC<ShellProps> = ({ children }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const mobileOpenRef = useRef(false);
   const [profilePresentation, setProfilePresentation] = useState<ProfilePresentation | null>(null);
   const profilePresentationRef = useRef<ProfilePresentation | null>(null);
@@ -55,8 +59,15 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
     return stored === null ? null : stored === '1';
   });
   const { t } = useUiLanguage();
+  const desktopSidebar = useMediaQuery(DESKTOP_SIDEBAR_QUERY);
   const compactSidebar = useMediaQuery(COMPACT_SIDEBAR_QUERY);
   const sidebarCollapsed = collapsedPreference ?? compactSidebar;
+
+  const openCommandPalette = useCallback(() => {
+    setCommandPaletteOpen(true);
+  }, []);
+
+  useCommandPaletteShortcut(openCommandPalette);
 
   const setMobileNavigationOpen = useCallback((nextOpen: boolean) => {
     mobileOpenRef.current = nextOpen;
@@ -146,6 +157,9 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
         >
           {t('layout.appFallbackTitle')}
         </span>
+        {!desktopSidebar ? (
+          <NotificationBell className="pointer-events-auto" placement="bottom" />
+        ) : null}
         <SidebarProfile
           collapsed
           placement="bottom"
@@ -173,6 +187,8 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
             collapsed={sidebarCollapsed}
             onToggleCollapse={toggleCollapsed}
             onNavigate={() => setMobileNavigationOpen(false)}
+            onOpenCommandPalette={openCommandPalette}
+            globalActions={desktopSidebar ? <NotificationBell placement="right" /> : null}
             focusKeyPrefix="shell-nav-desktop"
             profileOpen={profilePresentation === 'desktop'}
             onProfileOpenChange={(open) => updateProfilePresentation('desktop', open)}
@@ -198,6 +214,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
         <div className="flex h-full flex-col">
           <SidebarNav
             onNavigate={closeMobileNavigation}
+            onOpenCommandPalette={openCommandPalette}
             focusKeyPrefix="shell-nav-mobile"
             returnFocusKey="shell:mobile-navigation"
             profileOpen={profilePresentation === 'drawer'}
@@ -206,6 +223,12 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
           />
         </div>
       </Drawer>
+
+      <CommandPalette
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        analysisHref={APP_ROUTE_PATHS.researchAnalysis}
+      />
     </div>
   );
 };

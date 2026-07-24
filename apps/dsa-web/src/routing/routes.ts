@@ -25,10 +25,31 @@ export const LEGACY_ROUTE_PATHS = {
   alerts: '/alerts',
 } as const;
 
+export const RESEARCH_MARKET_ROUTE_QUERY_KEYS = {
+  action: 'action',
+} as const;
+
+export const RESEARCH_MARKET_ACTION_VALUES = {
+  run: 'run',
+} as const;
+
+export type ResearchMarketAction =
+  (typeof RESEARCH_MARKET_ACTION_VALUES)[keyof typeof RESEARCH_MARKET_ACTION_VALUES];
+
+export function buildResearchMarketHref(options: { action?: ResearchMarketAction } = {}): string {
+  const searchParams = new URLSearchParams();
+  if (options.action) {
+    searchParams.set(RESEARCH_MARKET_ROUTE_QUERY_KEYS.action, options.action);
+  }
+  const search = searchParams.toString();
+  return search ? `${APP_ROUTE_PATHS.researchMarket}?${search}` : APP_ROUTE_PATHS.researchMarket;
+}
+
 export const SIGNAL_CENTER_ROUTE_QUERY_KEYS = {
   scope: 'scope',
   tab: 'tab',
   history: 'history',
+  trigger: 'trigger',
   createRule: 'createRule',
   stock: 'stock',
 } as const;
@@ -83,6 +104,7 @@ export type SignalCenterHrefOptions = {
   scope?: SignalCenterScope;
   tab?: SignalCenterTab;
   history?: SignalCenterHistoryView;
+  triggerId?: number | null;
   createRule?: boolean;
   stock?: string;
 };
@@ -91,9 +113,11 @@ export function buildSignalCenterHref(options: SignalCenterHrefOptions = {}): st
   const searchParams = new URLSearchParams();
   const tab = options.createRule
     ? SIGNAL_CENTER_TAB_VALUES.rules
-    : options.history
+    : isPositiveRouteInteger(options.triggerId)
       ? SIGNAL_CENTER_TAB_VALUES.history
-      : options.tab;
+      : options.history
+        ? SIGNAL_CENTER_TAB_VALUES.history
+        : options.tab;
   if (options.scope) {
     searchParams.set(SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope, options.scope);
   }
@@ -106,6 +130,13 @@ export function buildSignalCenterHref(options: SignalCenterHrefOptions = {}): st
     && tab === SIGNAL_CENTER_TAB_VALUES.history
   ) {
     searchParams.set(SIGNAL_CENTER_ROUTE_QUERY_KEYS.history, options.history);
+  }
+  if (
+    tab === SIGNAL_CENTER_TAB_VALUES.history
+    && options.history !== SIGNAL_CENTER_HISTORY_VALUES.notifications
+    && isPositiveRouteInteger(options.triggerId)
+  ) {
+    searchParams.set(SIGNAL_CENTER_ROUTE_QUERY_KEYS.trigger, String(options.triggerId));
   }
   if (options.createRule) {
     searchParams.set(

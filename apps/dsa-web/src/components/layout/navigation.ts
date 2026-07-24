@@ -48,9 +48,6 @@ export const APPLICATION_NAVIGATION_ITEMS: readonly ApplicationNavigationItem[] 
     to: APP_ROUTE_PATHS.home,
     icon: Home,
     exact: true,
-    children: [
-      { key: 'signals', labelKey: 'layout.nav.decisionSignals', to: APP_ROUTE_PATHS.signals, icon: Activity },
-    ],
   },
   {
     key: 'research',

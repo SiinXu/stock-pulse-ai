@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Activity, RefreshCw } from 'lucide-react';
 import { Route, Routes } from 'react-router-dom';
 import { Button } from '../../components/common';
+import { CommandPalette } from '../../components/command-palette';
 import { DashboardPanelHeader, DashboardStateBlock } from '../../components/dashboard';
 import { UiLanguageToggle } from '../../components/i18n/UiLanguageToggle';
 import {
@@ -14,12 +15,14 @@ import {
 import { Shell } from '../../components/layout/Shell';
 import { SidebarNav } from '../../components/layout/SidebarNav';
 import { SidebarProfile } from '../../components/layout/SidebarProfile';
+import { NotificationBell } from '../../components/notifications';
 import { RouteFocusCoordinator } from '../../components/routing';
 import { DeepLinkGuard } from '../../components/routing/DeepLinkGuard';
 import { SessionContinuityGuard } from '../../components/routing/SessionContinuityGuard';
 import { ThemeToggle } from '../../components/theme/ThemeToggle';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { PLAYGROUND_TEXT } from '../../locales/playground';
+import { NOTIFICATIONS_TEXT } from '../../locales/notifications';
 import { usePlaygroundScenario } from '../scenarioContext';
 import type { PlaygroundScenarioRenderer } from '../types';
 
@@ -40,6 +43,25 @@ const ShellStory = () => {
     </Shell>
   );
 };
+
+const CommandPaletteStory = () => {
+  const { language } = useUiLanguage();
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex min-h-48 items-start justify-center rounded-lg border border-border bg-card p-6">
+      <Button variant="secondary" onClick={() => setOpen(true)}>
+        {NOTIFICATIONS_TEXT[language].paletteTitle}
+      </Button>
+      <CommandPalette isOpen={open} onClose={() => setOpen(false)} />
+    </div>
+  );
+};
+
+const NotificationBellStory = () => (
+  <div className="flex min-h-48 items-start justify-center rounded-lg border border-border bg-card p-6">
+    <NotificationBell />
+  </div>
+);
 
 const SidebarNavStory = () => {
   const { scenario } = usePlaygroundScenario();
@@ -158,6 +180,8 @@ const DashboardStateBlockStory = () => {
 
 export const LAYOUT_DASHBOARD_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   shell: ShellStory,
+  'command-palette': CommandPaletteStory,
+  'notification-bell': NotificationBellStory,
   'sidebar-nav': SidebarNavStory,
   'sidebar-profile': SidebarProfileStory,
   'page-loading-fallback': PageLoadingFallback,

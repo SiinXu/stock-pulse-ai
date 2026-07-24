@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '../../theme/ThemeProvider';
 import { Shell } from '../Shell';
@@ -22,6 +22,34 @@ vi.mock('../../../stores/agentChatStore', () => ({
   useAgentChatStore: (selector: (state: { completionBadge: boolean }) => unknown) =>
     selector({ completionBadge: true }),
 }));
+
+vi.mock('../../../hooks/useUnreadNotifications', () => ({
+  useUnreadNotifications: () => ({
+    signalItems: [],
+    alertItems: [],
+    unreadSignalCount: 0,
+    unreadAlertCount: 0,
+    unreadCount: 0,
+    isLoading: false,
+    hasError: false,
+    hasPartialError: false,
+    signalsFailed: false,
+    alertsFailed: false,
+    signalLastSeenAt: 0,
+    alertLastSeenAt: 0,
+    markAllSeen: () => undefined,
+    refresh: () => undefined,
+  }),
+}));
+
+vi.mock('../../StockAutocomplete', () => ({
+  StockAutocomplete: ({ ariaLabel }: { ariaLabel: string }) => <input aria-label={ariaLabel} />,
+}));
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output aria-label="current location">{`${location.pathname}${location.search}`}</output>;
+}
 
 function createMediaQueryList(query: string): MediaQueryList {
   const listeners = mediaListeners.get(query) ?? new Set();
@@ -60,6 +88,7 @@ function renderShell() {
       <ThemeProvider>
         <Shell>
           <button type="button">page content</button>
+          <LocationProbe />
         </Shell>
       </ThemeProvider>
     </MemoryRouter>,
@@ -90,6 +119,49 @@ describe('Shell', () => {
     expect(screen.getByText('page content')).toBeInTheDocument();
   });
 
+  it('renders exactly one Bell and moves it between the mobile header and desktop Sidebar', async () => {
+    const { container } = renderShell();
+    const mobileHeader = container.querySelector('[data-shell-mobile-header]');
+    const sidebar = container.querySelector('[data-shell-sidebar]');
+
+    expect(screen.getAllByRole('button', { name: '通知' })).toHaveLength(1);
+    expect(within(mobileHeader as HTMLElement).getByRole('button', { name: '通知' })).toBeInTheDocument();
+
+    act(() => setMediaMatch(DESKTOP_SIDEBAR_QUERY, true));
+
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '通知' })).toHaveLength(1));
+    expect(within(sidebar as HTMLElement).getByRole('button', { name: '通知' })).toBeInTheDocument();
+  });
+
+  it('opens the command palette from Search and navigates Analysis to the Workbench', async () => {
+    renderShell();
+
+    fireEvent.click(screen.getByRole('button', { name: '搜索' }));
+    const palette = await screen.findByRole('dialog', { name: '快速前往' });
+    fireEvent.click(within(palette).getByRole('button', { name: '开始分析' }));
+
+    expect(screen.getByRole('status', { name: 'current location' })).toHaveTextContent('/research/analysis');
+  });
+
+  it('opens the command palette from the global shortcut', async () => {
+    renderShell();
+
+    fireEvent.keyDown(document, { key: 'k', metaKey: true });
+
+    expect(await screen.findByRole('dialog', { name: '快速前往' })).toBeInTheDocument();
+  });
+
+  it('closes the mobile navigation drawer before opening the command palette', async () => {
+    renderShell();
+    fireEvent.click(screen.getByRole('button', { name: '打开导航菜单' }));
+    const drawer = screen.getByRole('dialog', { name: '导航菜单' });
+
+    fireEvent.click(within(drawer).getByRole('button', { name: '搜索' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '导航菜单' })).not.toBeInTheDocument());
+    expect(screen.getByRole('dialog', { name: '快速前往' })).toBeInTheDocument();
+  });
+
   it('retains the owner-selected framed main without clipping horizontal content', () => {
     renderShell();
 
@@ -105,7 +177,7 @@ describe('Shell', () => {
 
     const mobileHeader = container.querySelector('[data-shell-mobile-header]');
     expect(mobileHeader).not.toBeNull();
-    expect(within(mobileHeader as HTMLElement).getAllByRole('button')).toHaveLength(2);
+    expect(within(mobileHeader as HTMLElement).getAllByRole('button')).toHaveLength(3);
     expect(within(mobileHeader as HTMLElement).getByText('StockPulse')).toBeInTheDocument();
     const openers = screen.getAllByRole('button', { name: '打开导航菜单' });
     expect(openers).toHaveLength(1);

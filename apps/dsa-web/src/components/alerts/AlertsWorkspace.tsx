@@ -52,6 +52,7 @@ export type AlertsWorkspaceProps = {
   createRuleRequested?: boolean;
   onCreateRuleRequestHandled?: () => void;
   ruleStock?: string;
+  selectedTriggerId?: number | null;
 };
 
 function enabledFilterToQuery(value: AlertRuleEnabledFilter): boolean | undefined {
@@ -125,6 +126,7 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
   createRuleRequested = false,
   onCreateRuleRequestHandled,
   ruleStock,
+  selectedTriggerId = null,
 }) => {
   const { language, t } = useUiLanguage();
   const text = ALERT_PAGE_TEXT[language];
@@ -147,7 +149,6 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
   const [alertTypeFilter, setAlertTypeFilter] = useState<AlertTypeFilter>('all');
   const [rulesLoading, setRulesLoading] = useState(false);
   const [rulesError, setRulesError] = useState<ParsedApiError | null>(null);
-  const [rulesLoaded, setRulesLoaded] = useState(false);
 
   const [triggers, setTriggers] = useState<AlertTriggerItem[]>([]);
   const [triggersPage, setTriggersPage] = useState(1);
@@ -182,6 +183,7 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
   } | null>(null);
   const rulesRequestIdRef = useRef(0);
   const triggersRequestIdRef = useRef(0);
+  const previousSelectedTriggerIdRef = useRef<number | null>(null);
   const notificationsRequestIdRef = useRef(0);
   const editRequestIdRef = useRef(0);
   const busyRulesRef = useRef<Map<number, AlertRuleBusyAction>>(new Map());
@@ -238,7 +240,6 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
       setRules(response.items);
       setRulesTotal(response.total);
       setRulesError(null);
-      setRulesLoaded(true);
       return response;
     } catch (error) {
       if (!isLatestRequest()) return null;
@@ -313,14 +314,19 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
   }, [loadRules]);
 
   useEffect(() => {
-    if (!rulesLoaded) return;
+    const selectionChanged = selectedTriggerId !== null
+      && selectedTriggerId !== previousSelectedTriggerIdRef.current;
+    previousSelectedTriggerIdRef.current = selectedTriggerId;
+    if (selectionChanged && triggersPage !== 1) {
+      setTriggersPage(1);
+      return;
+    }
     void loadTriggers(triggersPage);
-  }, [loadTriggers, rulesLoaded, triggersPage]);
+  }, [loadTriggers, selectedTriggerId, triggersPage]);
 
   useEffect(() => {
-    if (!rulesLoaded) return;
     void loadNotifications(notificationsPage);
-  }, [loadNotifications, notificationsPage, rulesLoaded]);
+  }, [loadNotifications, notificationsPage]);
 
   const handleCreateRule = async (payload: AlertRuleCreateRequest) => {
     setCreateLoading(true);
@@ -670,6 +676,7 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
             lastUpdated={triggersLastUpdated}
             onPageChange={setTriggersPage}
             onRefresh={() => void loadTriggers(triggersPage)}
+            selectedTriggerId={selectedTriggerId}
           />
         </ActivePanel>
       ) : null}

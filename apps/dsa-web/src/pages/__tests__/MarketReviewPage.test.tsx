@@ -5,7 +5,12 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { analysisApi } from '../../api/analysis';
 import { historyApi } from '../../api/history';
-import { APP_ROUTE_PATHS, REPORT_ROUTE_QUERY_KEYS } from '../../routing/routes';
+import {
+  APP_ROUTE_PATHS,
+  REPORT_ROUTE_QUERY_KEYS,
+  RESEARCH_MARKET_ACTION_VALUES,
+  buildResearchMarketHref,
+} from '../../routing/routes';
 import { useStockPoolStore } from '../../stores/stockPoolStore';
 import MarketReviewPage from '../MarketReviewPage';
 
@@ -78,11 +83,20 @@ function LocationProbe() {
   return <output>{`${location.pathname}${location.search}${location.hash}`}</output>;
 }
 
+function MarketReviewRoute() {
+  return (
+    <>
+      <MarketReviewPage />
+      <LocationProbe />
+    </>
+  );
+}
+
 function renderMarketReview(initialEntry: string = APP_ROUTE_PATHS.researchMarket) {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
-        <Route path={APP_ROUTE_PATHS.researchMarket} element={<MarketReviewPage />} />
+        <Route path={APP_ROUTE_PATHS.researchMarket} element={<MarketReviewRoute />} />
         <Route path={APP_ROUTE_PATHS.home} element={<LocationProbe />} />
       </Routes>
     </MemoryRouter>,
@@ -125,6 +139,15 @@ describe('MarketReviewPage', () => {
     const primaryActions = screen.getAllByRole('button', { name: '大盘复盘' });
     expect(primaryActions.length).toBeGreaterThanOrEqual(2);
     expect(primaryActions.every((button) => button.getAttribute('data-variant') === 'primary')).toBe(true);
+  });
+
+  it('consumes a one-shot command action while preserving unrelated URL state', async () => {
+    renderMarketReview(
+      `${buildResearchMarketHref({ action: RESEARCH_MARKET_ACTION_VALUES.run })}&keep=yes#summary`,
+    );
+
+    await waitFor(() => expect(analysisApi.triggerMarketReview).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText('/research/market?keep=yes#summary')).toBeInTheDocument();
   });
 
   it('loads a persisted market report from canonical URL state', async () => {

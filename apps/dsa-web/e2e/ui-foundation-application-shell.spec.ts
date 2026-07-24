@@ -2,6 +2,12 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const FIXTURE_PATH = '/e2e/application-shell-fixture.html';
 
+test.beforeEach(async ({ page }) => {
+  const emptyPage = { items: [], total: 0, page: 1, page_size: 20 };
+  await page.route('**/api/v1/decision-signals**', (route) => route.fulfill({ json: emptyPage }));
+  await page.route('**/api/v1/alerts/triggers**', (route) => route.fulfill({ json: emptyPage }));
+});
+
 async function openFixture(page: Page, width: number, height = 800) {
   await page.setViewportSize({ width, height });
   await page.goto(FIXTURE_PATH);
@@ -40,11 +46,14 @@ test.describe('application shell foundation', () => {
       await openFixture(page, width, height);
       const mobileHeader = page.locator('[data-shell-mobile-header]');
       const opener = page.getByRole('button', { name: 'Open navigation' });
-      await expect(mobileHeader.getByRole('button')).toHaveCount(2);
+      const bell = mobileHeader.getByRole('button', { name: /^Notifications/ });
+      await expect(mobileHeader.getByRole('button')).toHaveCount(3);
       await expect(mobileHeader.getByText('StockPulse', { exact: true })).toBeVisible();
       const profile = mobileHeader.getByRole('button', { name: 'StockPulse' });
       await expect(profile).toBeVisible();
       expect((await profile.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+      await expect(bell).toBeVisible();
+      expect((await bell.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
       await expect(opener).toHaveCount(1);
       await expect(opener).toBeVisible();
       expect((await opener.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
@@ -52,7 +61,7 @@ test.describe('application shell foundation', () => {
       await expectNoDocumentOverflow(page);
 
       await opener.focus();
-      await expect(page.getByRole('tooltip')).toHaveText('Open navigation');
+      await expect(page.getByRole('tooltip', { name: 'Open navigation' })).toBeVisible();
       await opener.click();
       const drawer = page.getByRole('dialog', { name: 'Navigation' });
       await expect(drawer).toBeVisible();
@@ -276,16 +285,13 @@ test.describe('application shell foundation', () => {
     const sidebar = page.locator('[data-shell-sidebar]');
     const compactSearch = sidebar.getByRole('button', { name: 'Search', exact: true });
     await compactSearch.focus();
-    await expect(page.getByRole('tooltip')).toHaveText('Search');
+    await expect(page.getByRole('tooltip', { name: 'Search' })).toBeVisible();
     const compactHome = sidebar.getByRole('link', { name: 'Home' });
     await compactHome.focus();
+    await expect(compactHome).not.toHaveAttribute('aria-haspopup');
     await compactHome.press('ArrowRight');
     const homeMenu = page.getByRole('menu', { name: 'Home' });
-    await expect(homeMenu).toBeVisible();
-    await expect(homeMenu.getByRole('menuitem', { name: 'Signal Center' })).toBeVisible();
-    await expect(homeMenu.getByRole('menuitem')).toHaveCount(1);
-    await page.keyboard.press('Escape');
-    await expect(homeMenu).toBeHidden();
+    await expect(homeMenu).toHaveCount(0);
     await expect(compactHome).toBeFocused();
 
     const compactResearch = sidebar.getByRole('link', { name: 'Research' });

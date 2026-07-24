@@ -1,4 +1,5 @@
 import type React from 'react';
+import { useEffect, useRef } from 'react';
 import { Activity, RefreshCw } from 'lucide-react';
 import { Badge, Button, Card, DataTable, type DataTableColumn, Pagination } from '../common';
 import type { AlertTriggerItem } from '../../types/alerts';
@@ -49,6 +50,7 @@ interface AlertTriggerHistoryProps {
   lastUpdated?: string | null;
   onPageChange?: (page: number) => void;
   onRefresh?: () => void;
+  selectedTriggerId?: number | null;
 }
 
 export const AlertTriggerHistory: React.FC<AlertTriggerHistoryProps> = ({
@@ -60,11 +62,20 @@ export const AlertTriggerHistory: React.FC<AlertTriggerHistoryProps> = ({
   lastUpdated = null,
   onPageChange,
   onRefresh,
+  selectedTriggerId = null,
 }) => {
   const { language } = useUiLanguage();
   const text = ALERT_TRIGGER_TEXT[language];
   const controlsText = ALERT_HISTORY_CONTROLS_TEXT[language];
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const selectedTargetRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (isLoading || selectedTriggerId === null) return;
+    const target = selectedTargetRef.current;
+    if (!target) return;
+    target.focus({ preventScroll: true });
+    target.closest('tr')?.scrollIntoView?.({ block: 'center' });
+  }, [isLoading, selectedTriggerId, triggers]);
   const triggerColumns: DataTableColumn<AlertTriggerItem>[] = [
     {
       id: 'status',
@@ -83,7 +94,15 @@ export const AlertTriggerHistory: React.FC<AlertTriggerHistoryProps> = ({
     {
       id: 'target',
       header: text.target,
-      cell: (trigger) => <span className="font-mono">{trigger.target}</span>,
+      cell: (trigger) => (
+        <span
+          ref={trigger.id === selectedTriggerId ? selectedTargetRef : undefined}
+          tabIndex={trigger.id === selectedTriggerId ? -1 : undefined}
+          className="font-mono focus-visible:outline-none"
+        >
+          {trigger.target}
+        </span>
+      ),
     },
     {
       id: 'observed',
@@ -137,6 +156,8 @@ export const AlertTriggerHistory: React.FC<AlertTriggerHistoryProps> = ({
         columns={triggerColumns}
         rows={triggers}
         getRowKey={(trigger) => trigger.id}
+        isRowSelected={(trigger) => trigger.id === selectedTriggerId}
+        getRowTestId={(trigger) => `alert-trigger-row-${trigger.id}`}
         status={isLoading ? { state: 'loading', title: text.loading } : undefined}
         emptyState={{
           icon: <Activity className="h-6 w-6" />,
