@@ -1024,6 +1024,9 @@ class _ConfigLoadingMethods:
             signal_scorecard_min_samples=parse_env_int(
                 os.getenv('SIGNAL_SCORECARD_MIN_SAMPLES'), 10, field_name='SIGNAL_SCORECARD_MIN_SAMPLES', minimum=1
             ),
+            paper_portfolio_initial_cash=parse_env_float(
+                os.getenv('PAPER_PORTFOLIO_INITIAL_CASH'), 1_000_000.0, field_name='PAPER_PORTFOLIO_INITIAL_CASH', minimum=0.0
+            ),
         )
 
 
