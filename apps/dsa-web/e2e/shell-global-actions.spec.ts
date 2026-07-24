@@ -9,6 +9,8 @@ test.describe('Shell global actions', () => {
 
   test('keeps one Bell and coordinates Search, the command palette, and mobile navigation', async ({ page }) => {
     await mockCompletedSetupStatus(page);
+    await page.goto('/login');
+    await expect(page.locator('#password')).toBeVisible({ timeout: 30_000 });
     await loginAsE2eAdmin(page);
 
     await expect(page.getByRole('button', { name: /^通知/ })).toHaveCount(1);

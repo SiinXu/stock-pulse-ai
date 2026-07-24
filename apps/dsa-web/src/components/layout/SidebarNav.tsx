@@ -184,25 +184,31 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
           ) : null}
         </>
       ) : (
-        <div className="mb-4 flex items-center gap-2 px-1">
-          <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-primary text-primary-foreground">
-            <BarChart3 className="size-4.5" />
+        <>
+          <div className="mb-4 flex items-center gap-2 px-1">
+            <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-primary text-primary-foreground">
+              <BarChart3 className="size-4.5" />
+            </div>
+            <p className="min-w-0 flex-1 truncate text-xl font-bold tracking-tight text-foreground">StockPulse</p>
+            {onToggleCollapse ? (
+              <Tooltip content={t('layout.collapseSidebar')}>
+                <button
+                  type="button"
+                  onClick={onToggleCollapse}
+                  aria-label={t('layout.collapseSidebar')}
+                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-transparent text-secondary-text transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-foreground motion-reduce:transition-none"
+                >
+                  <PanelLeft className="size-4.5" />
+                </button>
+              </Tooltip>
+            ) : null}
           </div>
-          <p className="min-w-0 flex-1 truncate text-xl font-bold tracking-tight text-foreground">StockPulse</p>
-          {globalActions}
-          {onToggleCollapse ? (
-            <Tooltip content={t('layout.collapseSidebar')}>
-              <button
-                type="button"
-                onClick={onToggleCollapse}
-                aria-label={t('layout.collapseSidebar')}
-                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-transparent text-secondary-text transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-foreground motion-reduce:transition-none"
-              >
-                <PanelLeft className="size-4.5" />
-              </button>
-            </Tooltip>
+          {globalActions ? (
+            <div data-sidebar-global-actions="true" className="mb-3 flex justify-end px-1">
+              {globalActions}
+            </div>
           ) : null}
-        </div>
+        </>
       )}
 
       {collapsed ? (
