@@ -32,7 +32,8 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     PortfolioCashLedger
     PortfolioCorporateAction PortfolioDailySnapshot PortfolioFxRate
     PortfolioIdempotencyRecord PortfolioPosition PortfolioPositionLot
-    PortfolioTrade Session StockDaily String T TYPE_CHECKING Text Tuple
+    PortfolioTrade ScheduledTaskRecord ScheduledTaskRunRecord Session StockDaily
+    String T TYPE_CHECKING Text Tuple
     TypeVar Union UniqueConstraint agent_history_public_fields and_
     apply_pending_within_transaction atexit contextmanager
     create_database_engine create_engine date datetime declarative_base delete
@@ -82,9 +83,11 @@ EXPECTED_SCHEMA_DEFINITIONS = (
     "DecisionSignalRecord",
     "DecisionSignalOutcomeRecord",
     "DecisionSignalFeedbackRecord",
+    "ScheduledTaskRecord",
+    "ScheduledTaskRunRecord",
 )
 EXPECTED_SCHEMA_AST_HASH = (
-    "fed25c613b0de7f606f56ad353e5c83bc400d972a899d2f31c2bd587ced17754"
+    "aaafae447bd2f2496beccbc9ee8bbfbb7b0f3eed81eaf51f058c76703d699a96"
 )
 EXPECTED_SCHEMA_MODELS = (
     "DatabaseSchemaMigration",
@@ -118,6 +121,8 @@ EXPECTED_SCHEMA_MODELS = (
     "DecisionSignalFeedbackRecord",
     "DecisionSignalMemoryFlagRecord",
     "PortfolioAccountKind",
+    "ScheduledTaskRecord",
+    "ScheduledTaskRunRecord",
 )
 EXPECTED_SCHEMA_TABLES = (
     "schema_migrations",
@@ -151,6 +156,8 @@ EXPECTED_SCHEMA_TABLES = (
     "decision_signal_feedback",
     "decision_signal_memory_flags",
     "portfolio_account_kinds",
+    "scheduled_tasks",
+    "scheduled_task_runs",
 )
 EXPECTED_SCHEMA_METHODS = {
     "StockDaily": ("__repr__", "to_dict"),
@@ -174,6 +181,12 @@ EXPECTED_UTC_COLUMN_CALLBACKS = (
     ("portfolio_account_kinds", "created_at", "default"),
     ("portfolio_account_kinds", "updated_at", "default"),
     ("portfolio_account_kinds", "updated_at", "onupdate"),
+    ("scheduled_tasks", "created_at", "default"),
+    ("scheduled_tasks", "updated_at", "default"),
+    ("scheduled_tasks", "updated_at", "onupdate"),
+    ("scheduled_task_runs", "created_at", "default"),
+    ("scheduled_task_runs", "updated_at", "default"),
+    ("scheduled_task_runs", "updated_at", "onupdate"),
 )
 
 EXPECTED_GROUPS = (

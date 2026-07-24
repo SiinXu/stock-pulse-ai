@@ -19,6 +19,7 @@ from src.storage import DatabaseManager
 from src.config import get_config, Config
 from src.services.system_config_service import SystemConfigService
 from src.services.runtime_scheduler import RuntimeSchedulerService
+from src.services.scheduled_task_service import ScheduledTaskService
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -78,4 +79,13 @@ def get_runtime_scheduler_service(request: Request) -> RuntimeSchedulerService:
     if service is None:
         service = RuntimeSchedulerService()
         request.app.state.runtime_scheduler_service = service
+    return service
+
+
+def get_scheduled_task_service(request: Request) -> ScheduledTaskService:
+    """Get the app-lifecycle shared ScheduledTaskService instance."""
+    service = getattr(request.app.state, "scheduled_task_service", None)
+    if service is None:
+        service = ScheduledTaskService()
+        request.app.state.scheduled_task_service = service
     return service

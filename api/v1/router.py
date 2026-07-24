@@ -23,6 +23,7 @@ from api.v1.endpoints import (
     history,
     intelligence,
     portfolio,
+    scheduled_tasks,
     scorecard,
     stocks,
     system_config,
@@ -115,6 +116,12 @@ router.include_router(
     scorecard.router,
     prefix="/scorecard",
     tags=["Scorecard"]
+)
+
+router.include_router(
+    scheduled_tasks.router,
+    prefix="/scheduled-tasks",
+    tags=["ScheduledTasks"]
 )
 
 router.include_router(

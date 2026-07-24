@@ -202,6 +202,7 @@ from src.services.runtime_scheduler import (
     RUNTIME_SCHEDULER_SUPPRESS_START_ENV,
     RuntimeSchedulerService,
 )
+from src.services.scheduled_task_service import ScheduledTaskService
 from src.services.stock_index_remote_service import (
     get_remote_stock_index_cache_path,
     refresh_remote_stock_index_cache,
@@ -305,11 +306,15 @@ async def app_lifespan(app: FastAPI):
     os.environ.pop(RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV, None)
     os.environ.pop(RUNTIME_SCHEDULER_SUPPRESS_START_ENV, None)
     os.environ.pop(RUNTIME_SCHEDULER_ARGS_ENV, None)
+    scheduled_task_service = ScheduledTaskService()
+    app.state.scheduled_task_service = scheduled_task_service
     runtime_scheduler_service = RuntimeSchedulerService(
         owns_schedule=runtime_owns_schedule,
         force_enabled=runtime_force_enabled,
         run_immediately_in_background=True,
         schedule_args_overrides=runtime_scheduler_args,
+        scheduled_task_service=scheduled_task_service,
+        personalized_schedule_enabled=not runtime_suppress_start,
     )
     app.state.runtime_scheduler_service = runtime_scheduler_service
     if not runtime_suppress_start:
@@ -330,6 +335,8 @@ async def app_lifespan(app: FastAPI):
                 await refresh_task
         if hasattr(app.state, "system_config_service"):
             delattr(app.state, "system_config_service")
+        if hasattr(app.state, "scheduled_task_service"):
+            delattr(app.state, "scheduled_task_service")
         runtime_scheduler = getattr(app.state, "runtime_scheduler_service", None)
         if runtime_scheduler is not None:
             runtime_scheduler.stop()

@@ -1149,3 +1149,76 @@ class PortfolioAccountKind(Base):
     account_type = Column(String(16), nullable=False, default='paper', index=True)
     created_at = Column(DateTime, default=utc_naive_now, index=True)
     updated_at = Column(DateTime, default=utc_naive_now, onupdate=utc_naive_now, index=True)
+
+
+class ScheduledTaskRecord(Base):
+    """Versioned persisted definition for one recurring task."""
+
+    __tablename__ = 'scheduled_tasks'
+
+    id = Column(String(32), primary_key=True)
+    schema_version = Column(Integer, nullable=False)
+    name = Column(String(128), nullable=False)
+    task_type = Column(String(32), nullable=False, index=True)
+    schedule_kind = Column(String(16), nullable=False)
+    schedule_time = Column(String(5), nullable=False)
+    timezone = Column(String(64), nullable=False)
+    calendar_market = Column(String(8), nullable=False)
+    non_trading_day_policy = Column(String(16), nullable=False)
+    payload_json = Column(Text, nullable=False)
+    enabled = Column(Boolean, nullable=False, default=True, index=True)
+    max_attempts = Column(Integer, nullable=False, default=1)
+    next_run_at = Column(DateTime, index=True)
+    created_at = Column(DateTime, default=utc_naive_now, nullable=False, index=True)
+    updated_at = Column(
+        DateTime,
+        default=utc_naive_now,
+        onupdate=utc_naive_now,
+        nullable=False,
+        index=True,
+    )
+
+    __table_args__ = (
+        Index('ix_scheduled_task_due', 'enabled', 'next_run_at'),
+    )
+
+
+class ScheduledTaskRunRecord(Base):
+    """Durable aggregate result for one scheduled occurrence."""
+
+    __tablename__ = 'scheduled_task_runs'
+
+    id = Column(String(32), primary_key=True)
+    task_id = Column(
+        String(32),
+        ForeignKey('scheduled_tasks.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    scheduled_for = Column(DateTime, nullable=False, index=True)
+    status = Column(String(16), nullable=False, index=True)
+    attempt_count = Column(Integer, nullable=False, default=0)
+    execution_task_ids_json = Column(Text, nullable=False, default='[]')
+    owned_execution_task_ids_json = Column(Text, nullable=False, default='[]')
+    result_refs_json = Column(Text, nullable=False, default='[]')
+    error_code = Column(String(64), index=True)
+    next_attempt_at = Column(DateTime, index=True)
+    started_at = Column(DateTime)
+    finished_at = Column(DateTime, index=True)
+    created_at = Column(DateTime, default=utc_naive_now, nullable=False, index=True)
+    updated_at = Column(
+        DateTime,
+        default=utc_naive_now,
+        onupdate=utc_naive_now,
+        nullable=False,
+        index=True,
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            'task_id',
+            'scheduled_for',
+            name='uix_scheduled_task_run_occurrence',
+        ),
+        Index('ix_scheduled_task_run_active', 'status', 'next_attempt_at'),
+    )

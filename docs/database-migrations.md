@@ -4,7 +4,7 @@
 
 StockPulse 使用仓库内的 Python Migration Runner 管理 SQLite Schema 演进。第一阶段不引入 Alembic，也不一次性替换已有的 `Base.metadata.create_all()` 和 startup `_ensure_*` 兼容逻辑，而是逐项把 startup DDL 转成正式 migration。
 
-当前生产 registry 的目标版本是 `202607190005_intelligence_item_unique_index`。`202607160001_migration_runner_registry` 建立有序 registry 所需的 additive metadata；`202607190001`~`202607190005` 依次把原先由 startup `_ensure_*` 兼容步骤补写的 `llm_usage` 遥测列，`decision_signals` 的 `decision_profile` 列/索引/回填，`portfolio_idempotency_records` 的 scope 列/唯一索引/规范化/guard trigger，`intelligence_items` 的 legacy scope 值规范化，以及 `intelligence_items` 从 legacy url 唯一到 scoped 复合唯一键的重建改为正式 migration，对缺失的旧库幂等补齐，对 fresh 库为 no-op。至此启动路径不再执行业务 schema DDL 兼容步骤。
+当前生产 registry 的目标版本是 `202607240001_scheduled_task_schema`。`202607160001_migration_runner_registry` 建立有序 registry 所需的 additive metadata；`202607190001`~`202607190005` 依次把原先由 startup `_ensure_*` 兼容步骤补写的 `llm_usage` 遥测列，`decision_signals` 的 `decision_profile` 列/索引/回填，`portfolio_idempotency_records` 的 scope 列/唯一索引/规范化/guard trigger，`intelligence_items` 的 legacy scope 值规范化，以及 `intelligence_items` 从 legacy url 唯一到 scoped 复合唯一键的重建改为正式 migration，对缺失的旧库幂等补齐，对 fresh 库为 no-op；`202607240001` 新增版本化 scheduled-task 定义与运行记录表。至此启动路径不再执行业务 schema DDL 兼容步骤。
 
 数据模型版本化在本仓库分两个正交层次：**DB schema 层**由下文的有序 migration runner 管理（表/列/索引形状演进）；**序列化领域 artifact 层**由内嵌的版本标签管理（持久化或跨模块传递的 payload 内部契约），见文末「序列化 artifact 版本化」。
 
@@ -189,6 +189,7 @@ CI Docker smoke 除了导入 `src.migrations.registry`、调用 `get_migrations(
 | `AnalysisReportSchema` | `REPORT_SCHEMA_VERSION` | `report-v1` | `schema_version` | LLM 报告 payload 校验契约（`src/schemas/report_schema.py`） |
 | `RunFlowSnapshot` | `RUN_FLOW_SCHEMA_VERSION` | `run-flow-v1` | `schema_version` | 任务 / 历史 run-flow API 响应（按需构建，无专用列） |
 | `DecisionSignalPresentation` | `DECISION_SIGNAL_PRESENTATION_SCHEMA_VERSION` | `decision-signal-presentation-v1` | `schema_version` | DecisionSignal 展示对象（由 DB 行按需构建，无专用列） |
+| Scheduled task definition | `SCHEDULED_TASK_SCHEMA_VERSION` | `1` | `schema_version` | `scheduled_tasks` 定义及 `/api/v1/scheduled-tasks` payload |
 
 清单与实际常量由守护测试 `tests/test_data_model_versioning_guard.py` 绑定，任何常量漂移或序列化时丢弃版本字段都会被捕获。
 

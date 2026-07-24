@@ -110,6 +110,16 @@ from api.v1.schemas.alerts import (
     AlertTriggerItem,
     AlertTriggerListResponse,
 )
+from api.v1.schemas.scheduled_tasks import (
+    DailyScheduleRequest,
+    ScheduledTaskCreateRequest,
+    ScheduledTaskItem,
+    ScheduledTaskListResponse,
+    ScheduledTaskRunItem,
+    ScheduledTaskRunListResponse,
+    ScheduledTaskStatusResponse,
+    StockAnalysisScheduledPayload,
+)
 from api.v1.schemas.decision_signals import (
     DecisionProfile,
     DecisionSignalCreateRequest,
@@ -224,6 +234,15 @@ __all__ = [
     "AlertRuleUpdateRequest",
     "AlertTriggerItem",
     "AlertTriggerListResponse",
+    # scheduled tasks
+    "DailyScheduleRequest",
+    "ScheduledTaskCreateRequest",
+    "ScheduledTaskItem",
+    "ScheduledTaskListResponse",
+    "ScheduledTaskRunItem",
+    "ScheduledTaskRunListResponse",
+    "ScheduledTaskStatusResponse",
+    "StockAnalysisScheduledPayload",
     # decision signals
     "DecisionProfile",
     "DecisionSignalCreateRequest",

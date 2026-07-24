@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Added] Added a loadable, network-free reference Data Provider plugin and author guide covering opt-in discovery, lifecycle diagnostics, compatibility, trust, and manager-owned routing boundaries.
+- [Added] Added schema-versioned deterministic daily stock-analysis tasks with explicit trading-day policy, durable run records, bounded retries, duplicate occurrence protection, and execution through the existing analysis task queue.
 - [Fixed] Rejected all non-global and IANA special-purpose IPv4 and IPv6 results when resolving pinned embedded Ollama download hosts, including mixed DNS responses and IPv4-mapped forms.
 - [Fixed] Updated compatible desktop transitive dependencies and pinned `app-builder-lib` to patched `tar` 7.5.19, removing the critical build-chain and updater production-closure findings while deferring the breaking Electron runtime upgrade.
 - [Docs] Clarified when contributors should use declarative Skill packages, trusted system plugins, or a new ADR, including plugin trust and deferred-surface boundaries.
