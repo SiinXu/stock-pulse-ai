@@ -2411,6 +2411,7 @@ const DecisionSignalsPage: React.FC = () => {
                 ? 'notifications'
                 : 'history'}
               onActiveViewChange={handleAlertsViewChange}
+              selectedTriggerId={signalCenterState.triggerId}
             />
           ) : null}
         </TabPanel>

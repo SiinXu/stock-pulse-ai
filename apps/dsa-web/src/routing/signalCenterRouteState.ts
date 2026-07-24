@@ -9,6 +9,8 @@ import {
   SIGNAL_CENTER_TAB_VALUES,
   SIGNAL_FEED_ROUTE_QUERY_KEYS,
   SIGNAL_FEED_VIEW_VALUES,
+  isPositiveRouteInteger,
+  parsePositiveRouteInteger,
   type SignalCenterHistoryView,
   type SignalCenterScope,
   type SignalCenterTab,
@@ -24,6 +26,7 @@ export type SignalCenterRouteState = {
   scope: SignalCenterScope;
   tab: SignalCenterTab;
   history: SignalCenterHistoryView;
+  triggerId: number | null;
   createRule: boolean;
 };
 
@@ -37,6 +40,7 @@ export const DEFAULT_SIGNAL_CENTER_ROUTE_STATE: SignalCenterRouteState = {
   scope: SIGNAL_CENTER_SCOPE_VALUES.all,
   tab: SIGNAL_CENTER_TAB_VALUES.feed,
   history: SIGNAL_CENTER_HISTORY_VALUES.triggers,
+  triggerId: null,
   createRule: false,
 };
 
@@ -72,6 +76,13 @@ function replaceOwnedParams(
     && state.history !== SIGNAL_CENTER_HISTORY_VALUES.triggers
   ) {
     next.set(SIGNAL_CENTER_ROUTE_QUERY_KEYS.history, state.history);
+  }
+  if (
+    state.tab === SIGNAL_CENTER_TAB_VALUES.history
+    && state.history === SIGNAL_CENTER_HISTORY_VALUES.triggers
+    && isPositiveRouteInteger(state.triggerId)
+  ) {
+    next.set(SIGNAL_CENTER_ROUTE_QUERY_KEYS.trigger, String(state.triggerId));
   }
   if (state.tab === SIGNAL_CENTER_TAB_VALUES.rules && state.createRule) {
     next.set(
@@ -120,6 +131,16 @@ export function parseSignalCenterRouteState(
     invalidKeys.push(SIGNAL_CENTER_ROUTE_QUERY_KEYS.history);
   }
 
+  const rawTrigger = source.get(SIGNAL_CENTER_ROUTE_QUERY_KEYS.trigger);
+  const parsedTriggerId = parsePositiveRouteInteger(rawTrigger);
+  const triggerId = tab === SIGNAL_CENTER_TAB_VALUES.history
+    && history === SIGNAL_CENTER_HISTORY_VALUES.triggers
+    ? parsedTriggerId
+    : null;
+  if (rawTrigger !== null && parsedTriggerId === null) {
+    invalidKeys.push(SIGNAL_CENTER_ROUTE_QUERY_KEYS.trigger);
+  }
+
   const rawCreateRule = source.get(SIGNAL_CENTER_ROUTE_QUERY_KEYS.createRule);
   const createRule = tab === SIGNAL_CENTER_TAB_VALUES.rules
     && rawCreateRule === SIGNAL_CENTER_CREATE_RULE_VALUES.requested;
@@ -130,7 +151,7 @@ export function parseSignalCenterRouteState(
     invalidKeys.push(SIGNAL_CENTER_ROUTE_QUERY_KEYS.createRule);
   }
 
-  const state = { scope, tab, history, createRule };
+  const state = { scope, tab, history, triggerId, createRule };
   if (legacyStatsView) normalizedSource.delete(SIGNAL_FEED_ROUTE_QUERY_KEYS.view);
   return {
     state,

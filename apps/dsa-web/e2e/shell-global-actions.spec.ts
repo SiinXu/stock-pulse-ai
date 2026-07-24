@@ -8,6 +8,23 @@ test.describe('Shell global actions', () => {
   test.use({ locale: 'zh-CN' });
 
   test('keeps one Bell and coordinates Search, the command palette, and mobile navigation', async ({ page }) => {
+    let marketReviewRequests = 0;
+    await page.route('**/api/v1/analysis/market-review', async (route) => {
+      if (route.request().method() !== 'POST') {
+        await route.fallback();
+        return;
+      }
+      marketReviewRequests += 1;
+      await route.fulfill({
+        status: 202,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'accepted',
+          send_notification: true,
+          message: 'Market review accepted',
+        }),
+      });
+    });
     await mockCompletedSetupStatus(page);
     await page.goto('/login');
     await expect(page.locator('#password')).toBeVisible({ timeout: 30_000 });
@@ -35,5 +52,9 @@ test.describe('Shell global actions', () => {
     await expect(palette).toBeVisible();
     await expect(palette.getByRole('searchbox', { name: '搜索页面或操作' })).toBeFocused();
     await expect(page.locator('button[aria-label^="通知"]')).toHaveCount(1);
+
+    await palette.getByRole('button', { name: '运行大盘复盘' }).click();
+    await expect.poll(() => marketReviewRequests).toBe(1);
+    await expect(page).toHaveURL(new RegExp(`${APP_ROUTE_PATHS.researchMarket}$`));
   });
 });

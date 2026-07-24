@@ -26,7 +26,11 @@ function notificationState(
     unreadCount: 0,
     isLoading: false,
     hasError: false,
-    lastSeenAt: 0,
+    hasPartialError: false,
+    signalsFailed: false,
+    alertsFailed: false,
+    signalLastSeenAt: 0,
+    alertLastSeenAt: 0,
     markAllSeen,
     refresh,
     ...overrides,
@@ -86,8 +90,14 @@ describe('NotificationBell', () => {
     expect(await screen.findByRole('dialog', { name: '通知' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '信号' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '告警' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Apple/ })).toHaveAttribute('href', '/signals?stock=AAPL');
-    expect(screen.getByRole('link', { name: /MSFT/ })).toHaveAttribute('href', '/signals?tab=history');
+    expect(screen.getByRole('link', { name: /Apple/ })).toHaveAttribute(
+      'href',
+      '/signals?stock=AAPL&signal=7',
+    );
+    expect(screen.getByRole('link', { name: /MSFT/ })).toHaveAttribute(
+      'href',
+      '/signals?tab=history&trigger=9',
+    );
     expect(screen.getByRole('link', { name: '查看全部' })).toHaveAttribute('href', '/signals');
   });
 
@@ -100,6 +110,43 @@ describe('NotificationBell', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('暂时无法加载通知');
     fireEvent.click(screen.getByRole('button', { name: '重试' }));
     expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows partial degradation and does not mark recovered items during the same open session', async () => {
+    vi.mocked(useUnreadNotifications).mockReturnValue(notificationState({
+      hasPartialError: true,
+      signalsFailed: true,
+    }));
+    const { rerender } = renderBell();
+
+    fireEvent.click(screen.getByRole('button', { name: '通知' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('部分通知暂时无法加载');
+    expect(markAllSeen).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+    expect(refresh).toHaveBeenCalledTimes(1);
+
+    vi.mocked(useUnreadNotifications).mockReturnValue(notificationState({
+      signalItems: [{
+        id: 7,
+        stockCode: 'AAPL',
+        action: 'buy',
+        status: 'active',
+        createdAt: '2026-07-23T10:00:00Z',
+      } as UnreadNotificationsState['signalItems'][number]],
+      unreadSignalCount: 1,
+      unreadCount: 1,
+    }));
+    rerender(
+      <MemoryRouter>
+        <UiLanguageProvider initialLanguage="zh">
+          <NotificationBell />
+        </UiLanguageProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('link', { name: /AAPL/ })).toBeInTheDocument();
+    expect(markAllSeen).toHaveBeenCalledTimes(1);
   });
 
   it('marks server-ahead items seen when an open Bell finishes loading', async () => {

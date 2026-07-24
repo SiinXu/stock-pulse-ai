@@ -87,6 +87,15 @@ describe('CommandPalette', () => {
     expect(onNavigate).toHaveBeenCalledWith('/research/analysis');
   });
 
+  it('exposes a one-shot Market Review action instead of only the page destination', () => {
+    renderPalette();
+
+    fireEvent.click(screen.getByRole('button', { name: '运行大盘复盘' }));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onNavigate).toHaveBeenCalledWith('/research/market?action=run');
+  });
+
   it('reuses stock autocomplete and opens the selected stock detail route', () => {
     renderPalette();
     const stockSearch = screen.getByRole('textbox', { name: '股票' });

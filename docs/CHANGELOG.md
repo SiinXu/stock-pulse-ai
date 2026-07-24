@@ -344,7 +344,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Added the `/research/analysis` workbench with URL-backed launch, running-task, and history segments; watchlist and file batch submission; report and Run Flow deep links; completion actions; and a collapsible Research navigation entry.
 - [Fixed] Synchronized Signal Center URL stock context before paint so immediate browser Back and Forward navigation cannot retain the newer stock under an older URL entry.
 - [Changed] Slimmed Web Home into a source-aware three-block attention hub with best-effort disclosure persistence, moved complete stock-report history plus report and Run Flow ownership and confirmed deletion to Analysis Workbench, kept same-source Run Flow snapshots visible during stream-error refreshes, and retained canonical redirects for legacy Home analysis links.
-- [Added] Added one responsive notification Bell and a global command palette to the Web Shell, with Signal Center deep links, stock lookup, and the Analysis Workbench as the canonical analysis destination.
+- [Added] Added one responsive notification Bell and a global command palette to the Web Shell, with item-specific Signal Center deep links, per-channel unread and partial-failure handling, one-shot Market Review, stock lookup, and the Analysis Workbench as the canonical analysis destination.
 
 ## [3.26.3] - 2026-07-15
 

@@ -22,8 +22,10 @@ import type { UiTextKey } from '../../i18n/uiText';
 import { NOTIFICATIONS_TEXT } from '../../locales/notifications';
 import {
   APP_ROUTE_PATHS,
+  RESEARCH_MARKET_ACTION_VALUES,
   SIGNAL_CENTER_SCOPE_VALUES,
   SIGNAL_CENTER_TAB_VALUES,
+  buildResearchMarketHref,
   buildSignalCenterHref,
 } from '../../routing/routes';
 import { cn } from '../../utils/cn';
@@ -33,10 +35,12 @@ import type { LucideIcon } from 'lucide-react';
 
 type CommandItem = {
   id: string;
-  labelKey: UiTextKey;
   href: string;
   icon: LucideIcon;
-};
+} & (
+  | { labelKey: UiTextKey; label?: never }
+  | { label: string; labelKey?: never }
+);
 
 export type CommandPaletteProps = {
   isOpen: boolean;
@@ -75,8 +79,9 @@ export function CommandPalette({
     { id: 'scope-all', labelKey: 'decisionSignals.scopeAllSignals', href: buildSignalCenterHref({ scope: SIGNAL_CENTER_SCOPE_VALUES.all }), icon: Activity },
     { id: 'scope-holdings', labelKey: 'decisionSignals.scopeHoldings', href: buildSignalCenterHref({ scope: SIGNAL_CENTER_SCOPE_VALUES.holdings }), icon: BriefcaseBusiness },
     { id: 'scope-watchlist', labelKey: 'decisionSignals.scopeWatchlist', href: buildSignalCenterHref({ scope: SIGNAL_CENTER_SCOPE_VALUES.watchlist }), icon: ClipboardCheck },
+    { id: 'run-market-review', label: text.runMarketReview, href: buildResearchMarketHref({ action: RESEARCH_MARKET_ACTION_VALUES.run }), icon: BarChart3 },
     { id: 'review-signals', labelKey: 'decisionSignals.tab.review', href: buildSignalCenterHref({ tab: SIGNAL_CENTER_TAB_VALUES.review }), icon: Activity },
-  ], [analysisHref]);
+  ], [analysisHref, text.runMarketReview]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -89,8 +94,11 @@ export function CommandPalette({
   }, [isOpen]);
 
   const normalizedQuery = query.trim().toLocaleLowerCase();
+  const getItemLabel = (item: CommandItem) => (
+    item.label ?? t(item.labelKey)
+  );
   const matchesQuery = (item: CommandItem) => (
-    normalizedQuery.length === 0 || t(item.labelKey).toLocaleLowerCase().includes(normalizedQuery)
+    normalizedQuery.length === 0 || getItemLabel(item).toLocaleLowerCase().includes(normalizedQuery)
   );
   const visiblePages = pages.filter(matchesQuery);
   const visibleActions = actions.filter(matchesQuery);
@@ -162,7 +170,7 @@ export function CommandPalette({
                 )}
               >
                 <Icon className="size-4 shrink-0 text-secondary-text" aria-hidden="true" />
-                <span className="truncate">{t(item.labelKey)}</span>
+                <span className="truncate">{getItemLabel(item)}</span>
               </button>
             );
           })}

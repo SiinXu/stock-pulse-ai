@@ -76,6 +76,31 @@ describe('Signal Center route state', () => {
         [SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab]: SIGNAL_CENTER_TAB_VALUES.history,
         [SIGNAL_CENTER_ROUTE_QUERY_KEYS.history]: SIGNAL_CENTER_HISTORY_VALUES.notifications,
       }));
+    expect(buildSignalCenterHref({ triggerId: 42 }))
+      .toBe(signalCenterHref({
+        [SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab]: SIGNAL_CENTER_TAB_VALUES.history,
+        [SIGNAL_CENTER_ROUTE_QUERY_KEYS.trigger]: '42',
+      }));
+  });
+
+  it('parses positive trigger deep links and removes them outside trigger history', () => {
+    const parsed = parseSignalCenterRouteState(new URL(
+      buildSignalCenterHref({ triggerId: 42 }),
+      'https://example.test',
+    ).search);
+
+    expect(parsed.state).toEqual({
+      ...DEFAULT_SIGNAL_CENTER_ROUTE_STATE,
+      tab: SIGNAL_CENTER_TAB_VALUES.history,
+      triggerId: 42,
+    });
+    expect(setSignalCenterRouteState(parsed.normalizedParams, {
+      ...parsed.state,
+      history: SIGNAL_CENTER_HISTORY_VALUES.notifications,
+    }).toString()).toBe(toQuery({
+      [SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab]: SIGNAL_CENTER_TAB_VALUES.history,
+      [SIGNAL_CENTER_ROUTE_QUERY_KEYS.history]: SIGNAL_CENTER_HISTORY_VALUES.notifications,
+    }));
   });
 
   it('preserves explicit default ownership while normalizing Signal Center state', () => {
@@ -98,6 +123,7 @@ describe('Signal Center route state', () => {
         [SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope]: 'portfolio',
         [SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab]: 'unknown',
         [SIGNAL_CENTER_ROUTE_QUERY_KEYS.history]: 'delivery',
+        [SIGNAL_CENTER_ROUTE_QUERY_KEYS.trigger]: '-1',
         [SIGNAL_CENTER_ROUTE_QUERY_KEYS.createRule]: 'yes',
         [SIGNAL_CENTER_ROUTE_QUERY_KEYS.stock]: 'AAPL',
         keep: 'yes',
@@ -115,6 +141,7 @@ describe('Signal Center route state', () => {
       SIGNAL_CENTER_ROUTE_QUERY_KEYS.scope,
       SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab,
       SIGNAL_CENTER_ROUTE_QUERY_KEYS.history,
+      SIGNAL_CENTER_ROUTE_QUERY_KEYS.trigger,
       SIGNAL_CENTER_ROUTE_QUERY_KEYS.createRule,
     ]);
   });

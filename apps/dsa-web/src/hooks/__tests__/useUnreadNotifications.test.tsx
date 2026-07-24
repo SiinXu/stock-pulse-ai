@@ -71,7 +71,7 @@ describe('useUnreadNotifications', () => {
     vi.restoreAllMocks();
   });
 
-  it('counts items newer than the persisted lastSeenAt across both channels', async () => {
+  it('uses the legacy shared boundary when per-channel boundaries are absent', async () => {
     // lastSeen is 2026-07-21; OLD (07-20) is read, NEW_A/NEW_B (07-23) are unread.
     window.localStorage.setItem(
       'stockpulse.notifications.lastSeenAt',
@@ -101,7 +101,10 @@ describe('useUnreadNotifications', () => {
     act(() => result.current.markAllSeen());
 
     expect(result.current.unreadCount).toBe(0);
-    expect(window.localStorage.getItem('stockpulse.notifications.lastSeenAt')).toBe(
+    expect(window.localStorage.getItem('stockpulse.notifications.signalsLastSeenAt')).toBe(
+      String(Date.parse(NEW_A)),
+    );
+    expect(window.localStorage.getItem('stockpulse.notifications.alertsLastSeenAt')).toBe(
       String(Date.parse(NEW_B)),
     );
   });
@@ -116,8 +119,57 @@ describe('useUnreadNotifications', () => {
     expect(result.current.signalItems).toEqual([]);
     expect(result.current.alertItems).toHaveLength(1);
     expect(result.current.unreadAlertCount).toBe(1);
-    // Only one channel failed, so the Bell is not in a hard-error state.
+    expect(result.current.signalsFailed).toBe(true);
+    expect(result.current.alertsFailed).toBe(false);
+    expect(result.current.hasPartialError).toBe(true);
     expect(result.current.hasError).toBe(false);
+  });
+
+  it('keeps recovered signal items unread after the Bell opens during a signal failure', async () => {
+    const legacyBoundary = Date.parse('2026-07-21T00:00:00Z');
+    window.localStorage.setItem(
+      'stockpulse.notifications.lastSeenAt',
+      String(legacyBoundary),
+    );
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-07-24T00:00:00Z'));
+    listMock
+      .mockRejectedValueOnce(new Error('signals down'))
+      .mockResolvedValueOnce(signalResponse([NEW_A]));
+    triggersMock.mockResolvedValue(triggerResponse([OLD]));
+
+    const { result } = renderHook(() => useUnreadNotifications({ pollMs: 0 }));
+    await waitFor(() => expect(result.current.hasPartialError).toBe(true));
+
+    act(() => result.current.markAllSeen());
+
+    expect(result.current.signalLastSeenAt).toBe(legacyBoundary);
+    expect(window.localStorage.getItem('stockpulse.notifications.signalsLastSeenAt'))
+      .toBe(String(legacyBoundary));
+    expect(result.current.alertLastSeenAt).toBe(Date.parse('2026-07-24T00:00:00Z'));
+
+    act(() => result.current.refresh());
+
+    await waitFor(() => expect(result.current.signalsFailed).toBe(false));
+    expect(result.current.unreadSignalCount).toBe(1);
+    expect(result.current.signalItems[0]?.createdAt).toBe(NEW_A);
+  });
+
+  it('advances a failed channel only through its visible cached items', async () => {
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-07-24T00:00:00Z'));
+    listMock
+      .mockResolvedValueOnce(signalResponse([NEW_A]))
+      .mockRejectedValueOnce(new Error('signals down'));
+    triggersMock.mockResolvedValue(triggerResponse([]));
+
+    const { result } = renderHook(() => useUnreadNotifications({ pollMs: 0 }));
+    await waitFor(() => expect(result.current.signalItems).toHaveLength(1));
+
+    act(() => result.current.refresh());
+    await waitFor(() => expect(result.current.signalsFailed).toBe(true));
+    act(() => result.current.markAllSeen());
+
+    expect(result.current.signalLastSeenAt).toBe(Date.parse(NEW_A));
+    expect(result.current.alertLastSeenAt).toBe(Date.parse('2026-07-24T00:00:00Z'));
   });
 
   it('reports a hard error only when both channels fail', async () => {
@@ -128,6 +180,7 @@ describe('useUnreadNotifications', () => {
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.hasError).toBe(true);
+    expect(result.current.hasPartialError).toBe(false);
     expect(result.current.unreadCount).toBe(0);
   });
 

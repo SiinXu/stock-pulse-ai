@@ -542,6 +542,35 @@ describe('DecisionSignalsPage', () => {
     expect(screen.getByRole('button', { name: '持仓' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('opens alert history on page one and locates a deep-linked trigger row', async () => {
+    vi.mocked(alertsApi.listTriggers).mockResolvedValue({
+      items: [{
+        id: 42,
+        ruleId: 1,
+        target: 'AAPL',
+        status: 'triggered',
+        reason: 'Price crossed threshold',
+        triggeredAt: '2026-07-23T10:00:00Z',
+      }],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+    });
+    window.history.pushState({}, '', buildSignalCenterHref({ triggerId: 42 }));
+
+    renderPage();
+
+    expect(await screen.findByRole('tab', { name: '触发历史' }))
+      .toHaveAttribute('aria-selected', 'true');
+    const row = await screen.findByTestId('alert-trigger-row-42');
+    expect(row).toHaveAttribute('data-row-selected', 'true');
+    await waitFor(() => expect(within(row).getByText('AAPL')).toHaveFocus());
+    expect(alertsApi.listTriggers).toHaveBeenCalledWith({ page: 1, pageSize: 20 });
+    expect(new URLSearchParams(window.location.search).get(
+      SIGNAL_CENTER_ROUTE_QUERY_KEYS.trigger,
+    )).toBe('42');
+  });
+
   it('loads watchlist signals from existing stock-scoped list calls', async () => {
     window.history.pushState({}, '', buildSignalCenterHref({
       scope: SIGNAL_CENTER_SCOPE_VALUES.watchlist,

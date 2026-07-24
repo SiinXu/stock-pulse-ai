@@ -111,6 +111,7 @@ describe('application navigation descriptor', () => {
       'scope',
       'tab',
       'history',
+      'trigger',
       'createRule',
       'stock',
     ]);

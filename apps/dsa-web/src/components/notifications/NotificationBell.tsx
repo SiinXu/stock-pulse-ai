@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Activity, Bell, BellRing, TriangleAlert } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { useUnreadNotifications } from '../../hooks/useUnreadNotifications';
@@ -14,6 +14,7 @@ import {
 import type { AlertTriggerItem } from '../../types/alerts';
 import type { DecisionSignalItem } from '../../types/decisionSignals';
 import { cn } from '../../utils/cn';
+import { buildDeepLink } from '../../utils/deepLink';
 import { formatUiDateTime } from '../../utils/uiLocale';
 import { IconButton } from '../common/IconButton';
 import { Popover } from '../common/Popover';
@@ -35,7 +36,11 @@ function SignalRow({ item, close }: { item: DecisionSignalItem; close: () => voi
   const detail = item.presentation?.label || item.actionLabel || item.action;
   return (
     <Link
-      to={buildSignalCenterHref({ stock: item.stockCode })}
+      to={buildDeepLink({
+        page: 'decision-signals',
+        stockCode: item.stockCode,
+        signalId: item.id,
+      })}
       onClick={close}
       className="flex min-h-14 items-start gap-3 px-4 py-2.5 transition-colors hover:bg-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25"
     >
@@ -56,7 +61,10 @@ function SignalRow({ item, close }: { item: DecisionSignalItem; close: () => voi
 function AlertRow({ item, close }: { item: AlertTriggerItem; close: () => void }) {
   return (
     <Link
-      to={buildSignalCenterHref({ tab: SIGNAL_CENTER_TAB_VALUES.history })}
+      to={buildSignalCenterHref({
+        tab: SIGNAL_CENTER_TAB_VALUES.history,
+        triggerId: item.id,
+      })}
       onClick={close}
       className="flex min-h-14 items-start gap-3 px-4 py-2.5 transition-colors hover:bg-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25"
     >
@@ -88,6 +96,7 @@ export function NotificationBell({
   const { language, t } = useUiLanguage();
   const text = NOTIFICATIONS_TEXT[language];
   const [open, setOpen] = useState(false);
+  const markedForCurrentOpenRef = useRef(false);
   const notifications = useUnreadNotifications();
   const { isLoading, markAllSeen } = notifications;
   const hasItems = notifications.signalItems.length > 0 || notifications.alertItems.length > 0;
@@ -96,7 +105,14 @@ export function NotificationBell({
     : text.bellLabel;
 
   useEffect(() => {
-    if (open && !isLoading) markAllSeen();
+    if (!open) {
+      markedForCurrentOpenRef.current = false;
+      return;
+    }
+    if (!isLoading && !markedForCurrentOpenRef.current) {
+      markedForCurrentOpenRef.current = true;
+      markAllSeen();
+    }
   }, [isLoading, markAllSeen, open]);
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -143,6 +159,21 @@ export function NotificationBell({
           </header>
 
           <div className="min-h-0 flex-1 overflow-y-auto">
+            {notifications.hasPartialError ? (
+              <div
+                className="flex items-center justify-between gap-3 border-b border-warning/35 bg-warning/10 px-4 py-2"
+                role="alert"
+              >
+                <p className="text-xs text-secondary-text">{text.partialUnavailable}</p>
+                <button
+                  type="button"
+                  onClick={notifications.refresh}
+                  className="shrink-0 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-hover"
+                >
+                  {t('common.retry')}
+                </button>
+              </div>
+            ) : null}
             {notifications.isLoading && !hasItems ? (
               <div className="px-4 py-8 text-center text-sm text-secondary-text" role="status">
                 {t('common.loading')}

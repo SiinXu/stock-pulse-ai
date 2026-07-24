@@ -26,7 +26,11 @@ import {
   useMarketReviewState,
 } from '../hooks';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
-import { APP_ROUTE_PATHS } from '../routing/routes';
+import {
+  APP_ROUTE_PATHS,
+  RESEARCH_MARKET_ACTION_VALUES,
+  RESEARCH_MARKET_ROUTE_QUERY_KEYS,
+} from '../routing/routes';
 import type { RunFlowSnapshotSource } from '../types/runFlow';
 import { normalizeReportLanguage } from '../utils/reportLanguage';
 
@@ -39,6 +43,7 @@ const MarketReviewPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const feedbackRef = useRef<HTMLDivElement | null>(null);
+  const handledActionRef = useRef<string | null>(null);
   const {
     error,
     reportDetailError,
@@ -104,6 +109,28 @@ const MarketReviewPage: React.FC = () => {
     onPersistedReport: urlState.replaceRecord,
     onFeedback: scrollFeedbackIntoView,
   });
+  const triggerMarketReview = runner.triggerMarketReview;
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    if (
+      searchParams.get(RESEARCH_MARKET_ROUTE_QUERY_KEYS.action)
+      !== RESEARCH_MARKET_ACTION_VALUES.run
+    ) {
+      return;
+    }
+    const actionToken = `${location.key}:${location.search}`;
+    if (handledActionRef.current === actionToken) return;
+    handledActionRef.current = actionToken;
+    searchParams.delete(RESEARCH_MARKET_ROUTE_QUERY_KEYS.action);
+    const nextSearch = searchParams.toString();
+    navigate({
+      pathname: APP_ROUTE_PATHS.researchMarket,
+      search: nextSearch ? `?${nextSearch}` : '',
+      hash: location.hash,
+    }, { replace: true });
+    void triggerMarketReview();
+  }, [location.hash, location.key, location.search, navigate, triggerMarketReview]);
 
   useEffect(() => {
     document.title = t('home.marketReviewPageTitle');
@@ -225,7 +252,7 @@ const MarketReviewPage: React.FC = () => {
               variant="primary"
               isLoading={runner.isSubmitting}
               loadingText={t('home.submitMarketReview')}
-              onClick={() => void runner.triggerMarketReview()}
+              onClick={() => void triggerMarketReview()}
             >
               <BarChart3 className="h-4 w-4" aria-hidden="true" />
               {t('home.marketReview')}
@@ -306,7 +333,7 @@ const MarketReviewPage: React.FC = () => {
                   isLoading={runner.isSubmitting}
                   disabled={runner.isSubmitting}
                   loadingText={t('home.submitMarketReview')}
-                  onClick={() => void runner.triggerMarketReview()}
+                  onClick={() => void triggerMarketReview()}
                 >
                   <BarChart3 className="h-4 w-4" aria-hidden="true" />
                   {t('home.rerunMarketReview')}
@@ -376,7 +403,7 @@ const MarketReviewPage: React.FC = () => {
                   type="button"
                   variant="primary"
                   isLoading={runner.isSubmitting}
-                  onClick={() => void runner.triggerMarketReview()}
+                  onClick={() => void triggerMarketReview()}
                 >
                   {t('home.marketReview')}
                 </Button>

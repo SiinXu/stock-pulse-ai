@@ -12,13 +12,16 @@ import type { AlertTriggerItem } from '../types/alerts';
  * There is no backend "unread" flag, so unread state is a client-side model:
  * the most recent active decision signals and alert triggers are polled from the
  * existing list APIs, and any item created after the locally persisted
- * `lastSeenAt` timestamp counts as unread. Opening the Bell marks everything seen.
+ * per-channel read timestamp counts as unread. Opening the Bell marks every
+ * currently available channel seen without hiding items from a failed channel.
  *
  * Each channel fails soft: a failing signals fetch never suppresses alerts and
  * vice versa, so a single degraded endpoint cannot blank the Bell.
  */
 
-const LAST_SEEN_STORAGE_KEY = 'stockpulse.notifications.lastSeenAt';
+const LEGACY_LAST_SEEN_STORAGE_KEY = 'stockpulse.notifications.lastSeenAt';
+const SIGNALS_LAST_SEEN_STORAGE_KEY = 'stockpulse.notifications.signalsLastSeenAt';
+const ALERTS_LAST_SEEN_STORAGE_KEY = 'stockpulse.notifications.alertsLastSeenAt';
 const DEFAULT_POLL_MS = 60_000;
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -30,28 +33,53 @@ export type UnreadNotificationsState = {
   unreadCount: number;
   isLoading: boolean;
   hasError: boolean;
-  lastSeenAt: number;
+  hasPartialError: boolean;
+  signalsFailed: boolean;
+  alertsFailed: boolean;
+  signalLastSeenAt: number;
+  alertLastSeenAt: number;
   markAllSeen: () => void;
   refresh: () => void;
 };
 
-function readLastSeenAt(): number {
+function readStoredTimestamp(key: string): number | null {
   try {
-    const raw = window.localStorage.getItem(LAST_SEEN_STORAGE_KEY);
-    if (raw === null) return 0;
+    const raw = window.localStorage.getItem(key);
+    if (raw === null) return null;
     const value = Number(raw);
-    return Number.isFinite(value) && value >= 0 ? value : 0;
+    return Number.isFinite(value) && value >= 0 ? value : null;
   } catch {
-    return 0;
+    return null;
   }
 }
 
-function writeLastSeenAt(value: number): void {
+function readInitialBoundaries(): { signals: number; alerts: number } {
+  const legacy = readStoredTimestamp(LEGACY_LAST_SEEN_STORAGE_KEY) ?? 0;
+  return {
+    signals: readStoredTimestamp(SIGNALS_LAST_SEEN_STORAGE_KEY) ?? legacy,
+    alerts: readStoredTimestamp(ALERTS_LAST_SEEN_STORAGE_KEY) ?? legacy,
+  };
+}
+
+function writeStoredTimestamp(key: string, value: number): void {
   try {
-    window.localStorage.setItem(LAST_SEEN_STORAGE_KEY, String(value));
+    window.localStorage.setItem(key, String(value));
   } catch {
     // Private-mode / storage-disabled: unread state degrades to session-only.
   }
+}
+
+function getSeenThrough<T>(
+  current: number,
+  items: readonly T[],
+  getTimestamp: (item: T) => string | null | undefined,
+  failed: boolean,
+): number {
+  return Math.max(
+    current,
+    failed ? 0 : Date.now(),
+    ...items.map((item) => toTimestamp(getTimestamp(item))),
+  );
 }
 
 function toTimestamp(createdAt: string | null | undefined): number {
@@ -84,7 +112,9 @@ export function useUnreadNotifications(options: {
   const [isLoading, setIsLoading] = useState(enabled);
   const [signalsFailed, setSignalsFailed] = useState(false);
   const [alertsFailed, setAlertsFailed] = useState(false);
-  const [lastSeenAt, setLastSeenAt] = useState<number>(() => readLastSeenAt());
+  const [initialBoundaries] = useState(readInitialBoundaries);
+  const [signalLastSeenAt, setSignalLastSeenAt] = useState(initialBoundaries.signals);
+  const [alertLastSeenAt, setAlertLastSeenAt] = useState(initialBoundaries.alerts);
 
   const generationRef = useRef(0);
 
@@ -136,22 +166,31 @@ export function useUnreadNotifications(options: {
   }, [enabled, pollMs, refresh]);
 
   const markAllSeen = useCallback(() => {
-    const seenThrough = Math.max(
-      Date.now(),
-      ...signalItems.map((item) => toTimestamp(item.createdAt)),
-      ...alertItems.map((item) => toTimestamp(item.triggeredAt)),
+    const signalsSeenThrough = getSeenThrough(
+      signalLastSeenAt,
+      signalItems,
+      (item) => item.createdAt,
+      signalsFailed,
     );
-    setLastSeenAt(seenThrough);
-    writeLastSeenAt(seenThrough);
-  }, [alertItems, signalItems]);
+    const alertsSeenThrough = getSeenThrough(
+      alertLastSeenAt,
+      alertItems,
+      (item) => item.triggeredAt,
+      alertsFailed,
+    );
+    setSignalLastSeenAt(signalsSeenThrough);
+    setAlertLastSeenAt(alertsSeenThrough);
+    writeStoredTimestamp(SIGNALS_LAST_SEEN_STORAGE_KEY, signalsSeenThrough);
+    writeStoredTimestamp(ALERTS_LAST_SEEN_STORAGE_KEY, alertsSeenThrough);
+  }, [alertItems, alertLastSeenAt, alertsFailed, signalItems, signalLastSeenAt, signalsFailed]);
 
   const unreadSignalCount = useMemo(
-    () => countNewerThan(signalItems, lastSeenAt, (item) => item.createdAt),
-    [signalItems, lastSeenAt],
+    () => countNewerThan(signalItems, signalLastSeenAt, (item) => item.createdAt),
+    [signalItems, signalLastSeenAt],
   );
   const unreadAlertCount = useMemo(
-    () => countNewerThan(alertItems, lastSeenAt, (item) => item.triggeredAt),
-    [alertItems, lastSeenAt],
+    () => countNewerThan(alertItems, alertLastSeenAt, (item) => item.triggeredAt),
+    [alertItems, alertLastSeenAt],
   );
 
   return {
@@ -162,7 +201,11 @@ export function useUnreadNotifications(options: {
     unreadCount: unreadSignalCount + unreadAlertCount,
     isLoading,
     hasError: signalsFailed && alertsFailed,
-    lastSeenAt,
+    hasPartialError: signalsFailed !== alertsFailed,
+    signalsFailed,
+    alertsFailed,
+    signalLastSeenAt,
+    alertLastSeenAt,
     markAllSeen,
     refresh,
   };
