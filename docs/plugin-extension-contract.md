@@ -203,6 +203,11 @@ configured plugins directory:
     plugin.py
 ```
 
+The tested [`example-provider` package](../examples/plugins/example-provider/)
+and [Data Provider Plugin Authoring Guide](data-provider-plugin-authoring.md)
+provide a complete manifest, implementation, load command, diagnostics, and
+trust checklist.
+
 Example `manifest.json`:
 
 ```json
@@ -475,6 +480,12 @@ class ExampleProviderPlugin(Plugin):
             priority=20,
         )
 ```
+
+For the same contract in a directly loadable package, see the
+[`example-provider` source](../examples/plugins/example-provider/plugin.py) and
+the [authoring guide](data-provider-plugin-authoring.md). Its tests exercise the
+repository copy through `PLUGINS_DIR`, including lifecycle cleanup and
+per-candidate failure isolation.
 
 The provider factory supplies an implementation. `DataFetcherManager` remains
 the only routing authority. For daily data, fresh L1/L2 cache lookup wraps the

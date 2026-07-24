@@ -1,0 +1,11 @@
+{
+  "id": "stockpulse.example-provider",
+  "name": "StockPulse Example Provider",
+  "version": "1.0.0",
+  "minAppVersion": "3.26.3",
+  "description": "Deterministic reference Data Provider for plugin authors.",
+  "author": "StockPulse Contributors",
+  "permissions": [],
+  "apiVersion": "1",
+  "entrypoint": "plugin.py:Plugin"
+}
