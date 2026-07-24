@@ -150,4 +150,5 @@ def build_kronos_tool(
         handler=_KronosToolHandler(service),
         category="analysis",
         policy=_KRONOS_TOOL_POLICY,
+        enforce_contract=True,
     )

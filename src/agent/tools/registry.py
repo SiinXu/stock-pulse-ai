@@ -86,6 +86,7 @@ class ToolDefinition:
     handler: Callable
     category: str = "data"  # data | analysis | search | action
     policy: ToolPolicy = field(default_factory=ToolPolicy.unknown)
+    enforce_contract: bool = False
 
     # ----- Multi-provider schema converters -----
 

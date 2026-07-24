@@ -31,7 +31,13 @@ from src.agent.tools.execution import (
     execute_runner_tool_call_via_session,
     serialize_tool_result,
 )
-from src.agent.tools.registry import ToolDefinition, ToolParameter, ToolRegistry
+from src.agent.tools.registry import (
+    ToolDefinition,
+    ToolParameter,
+    ToolPolicy,
+    ToolRegistry,
+)
+from src.plugins import build_agent_tool_extension_registry
 
 
 class _TC:
@@ -248,6 +254,62 @@ def test_native_run_unknown_tool_fails_closed_via_session():
         "code": "tool_not_found",
         "retriable": False,
     }
+
+
+def test_native_run_enforces_plugin_tool_schema_before_handler():
+    registry = ToolRegistry()
+    calls = []
+    tool = ToolDefinition(
+        name="bounded_plugin_tool",
+        description="Bounded plugin tool",
+        parameters=[
+            ToolParameter(
+                name="value",
+                type="integer",
+                description="Bounded value",
+                maximum=1,
+            )
+        ],
+        handler=lambda value: calls.append(value) or {"value": value},
+        policy=ToolPolicy.declared(read_only=True),
+        enforce_contract=True,
+    )
+    extension_registry = build_agent_tool_extension_registry(registry)
+    extension_registry.register(
+        plugin_id="test.bounded-tool",
+        extension_point="agent_tool",
+        registration_id=tool.name,
+        implementation=tool,
+    )
+    adapter = MagicMock()
+    adapter.call_with_tools.side_effect = [
+        LLMResponse(
+            content="",
+            tool_calls=[
+                ToolCall(
+                    id="bounded-1",
+                    name=tool.name,
+                    arguments={"value": 2},
+                )
+            ],
+            usage={"total_tokens": 3},
+            provider="openai",
+        ),
+        _dashboard_response(),
+    ]
+
+    result = run_agent_loop(
+        messages=[{"role": "user", "content": "go"}],
+        tool_registry=registry,
+        llm_adapter=adapter,
+        max_steps=5,
+    )
+
+    assert result.success is True
+    assert result.tool_calls_log[0]["success"] is False
+    tool_messages = [m for m in result.messages if m.get("role") == "tool"]
+    assert json.loads(tool_messages[0]["content"])["code"] == "invalid_arguments"
+    assert calls == []
 
 
 def test_mapper_drops_result_completing_after_session_close():

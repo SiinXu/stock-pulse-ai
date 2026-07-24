@@ -493,15 +493,27 @@ AgentToolRegistration = ToolDefinition
 
 The implementation must be a `ToolDefinition` with an exact stable name,
 serializable parameter schema, callable handler, category, and a declared
-`ToolPolicy`. The plugin registry delegates to `ToolRegistry`; every execution
-continues through the Tool Surface and its argument, stock-scope, timeout,
-serialization, audit, and completion guards.
+`ToolPolicy`. It must set `enforce_contract=True`, and its callable signature
+must exactly match the declared schema: no positional-only, variadic, or hidden
+parameters, and optional defaults must match. The plugin registry delegates to
+`ToolRegistry`; every execution continues through the Tool Surface and its
+argument, stock-scope, timeout, serialization, audit, and completion guards.
+Per-definition enforcement keeps argument and scope checks active for plugin
+tools even while existing core tools use the native compatibility mode.
 
-Plugin registration cannot grant a tool access, weaken strict policy
-validation, publish a transport, or mutate Agent runner internals. Tool names
-cannot overwrite built-ins. `ApplicationServices` supplies an exact-owner
-native adapter backed by the cached `ToolRegistry`; unload removes only the
-definition registered by that plugin.
+Registration follows the existing Agent exposure model: the default single
+Agent receives the process tool catalog, while multi-agent specialists receive
+only their named subset. Registration cannot bypass those architecture rules,
+weaken strict policy validation, publish a transport, or mutate Agent runner
+internals. Tool names cannot overwrite built-ins. `ApplicationServices`
+supplies an exact-owner native adapter backed by the cached `ToolRegistry`;
+unload removes only the definition registered by that plugin from the exact
+registry instance selected during registration.
+
+This is an interim ToolSurface subset, not completion of the process sandbox in
+#191. External plugins remain reviewed, process-equivalent Python; manifest
+permissions are descriptive and do not constrain handler code or raw network
+access.
 
 ### Notification Channels
 

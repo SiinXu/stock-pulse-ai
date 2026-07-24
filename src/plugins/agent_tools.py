@@ -4,9 +4,11 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 import math
 import re
+import threading
 from collections.abc import Callable
 
 from src.agent.tools.registry import (
@@ -77,6 +79,50 @@ def _valid_parameter(parameter: object) -> bool:
     return True
 
 
+def _same_default(schema_default: object, handler_default: object) -> bool:
+    if type(schema_default) is not type(handler_default):
+        return False
+    try:
+        comparison = schema_default == handler_default
+    except Exception:  # broad-exception: optional_metadata - Custom equality failures make the optional default invalid.
+        return False
+    return type(comparison) is bool and comparison
+
+
+def _valid_handler_signature(implementation: ToolDefinition) -> bool:
+    try:
+        signature = inspect.signature(implementation.handler)
+    except (TypeError, ValueError):
+        return False
+
+    handler_parameters = signature.parameters
+    schema_parameters = {
+        parameter.name: parameter for parameter in implementation.parameters
+    }
+    if set(handler_parameters) != set(schema_parameters):
+        return False
+
+    for name, handler_parameter in handler_parameters.items():
+        if handler_parameter.kind not in {
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            inspect.Parameter.KEYWORD_ONLY,
+        }:
+            return False
+        schema_parameter = schema_parameters[name]
+        if schema_parameter.required:
+            if handler_parameter.default is not inspect.Parameter.empty:
+                return False
+        elif (
+            handler_parameter.default is inspect.Parameter.empty
+            or not _same_default(
+                schema_parameter.default,
+                handler_parameter.default,
+            )
+        ):
+            return False
+    return True
+
+
 def validate_agent_tool_definition(implementation: object) -> bool:
     """Return whether a plugin tool satisfies the executable ToolSurface contract."""
 
@@ -91,12 +137,15 @@ def validate_agent_tool_definition(implementation: object) -> bool:
         or type(implementation.category) is not str
         or not implementation.category.strip()
         or not callable(implementation.handler)
+        or implementation.enforce_contract is not True
         or type(implementation.parameters) is not list
         or any(not _valid_parameter(parameter) for parameter in implementation.parameters)
     ):
         return False
     parameter_names = [parameter.name for parameter in implementation.parameters]
     if len(parameter_names) != len(set(parameter_names)):
+        return False
+    if not _valid_handler_signature(implementation):
         return False
 
     policy = implementation.policy
@@ -139,6 +188,10 @@ class AgentToolRegistrationBackend:
         if not isinstance(registry, ToolRegistry) and not callable(registry):
             raise TypeError("agent tool registry must be a ToolRegistry or provider")
         self._registry_or_provider = registry
+        self._owned_registries: dict[
+            tuple[str, int], tuple[object, ToolRegistry]
+        ] = {}
+        self._lock = threading.RLock()
 
     def _registry(self) -> ToolRegistry:
         candidate = self._registry_or_provider
@@ -159,12 +212,29 @@ class AgentToolRegistrationBackend:
         registry = self._registry()
         if registry.get(registration_id) is not None:
             raise ValueError("agent tool registration conflicts with an existing tool")
-        registry.register(implementation)
+        owner_key = (registration_id, id(implementation))
+        with self._lock:
+            if owner_key in self._owned_registries:
+                raise ValueError("agent tool implementation is already registered")
+            self._owned_registries[owner_key] = (implementation, registry)
+            registry.register(implementation)
 
     def unregister(self, registration_id: str, implementation: object) -> None:
-        registry = self._registry()
-        if registry.get(registration_id) is implementation:
-            registry.unregister(registration_id)
+        owner_key = (registration_id, id(implementation))
+        with self._lock:
+            owner = self._owned_registries.get(owner_key)
+            if owner is None or owner[0] is not implementation:
+                return
+            registry = owner[1]
+            if registry.get(registration_id) is implementation:
+                registry.unregister(registration_id)
+            current = self._owned_registries.get(owner_key)
+            if (
+                current is not None
+                and current[0] is implementation
+                and current[1] is registry
+            ):
+                del self._owned_registries[owner_key]
 
 
 def build_agent_tool_extension_registry(

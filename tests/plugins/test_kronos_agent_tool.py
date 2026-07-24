@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 from types import SimpleNamespace
 
+import pytest
+
 from src.agent.agents.technical_agent import TechnicalAgent
 from src.agent.stock_scope import StockScope
 from src.agent.tool_surface import ToolSurface
@@ -20,7 +22,11 @@ from src.agent.tools.registry import (
     ToolRegistry,
 )
 from src.application_services import ApplicationServices
-from src.plugins import PluginManager, build_agent_tool_extension_registry
+from src.plugins import (
+    PluginManager,
+    PluginRegistryError,
+    build_agent_tool_extension_registry,
+)
 from src.plugins.builtin import get_configured_builtin_plugins
 from src.plugins.builtin.kronos import KronosAgentToolPlugin
 from src.services.kronos_forecast_service import KRONOS_FORECAST_DISCLAIMER
@@ -92,6 +98,7 @@ def test_technical_agent_includes_registered_optional_tool(tmp_path) -> None:
     filtered = agent._filtered_registry()
 
     assert filtered.get(KRONOS_FORECAST_TOOL_NAME) is tool
+    assert filtered.get(KRONOS_FORECAST_TOOL_NAME).enforce_contract is True
 
 
 def test_missing_dependencies_prevent_registration_with_actionable_log(
@@ -197,6 +204,114 @@ def test_ready_plugin_registers_through_native_registry_and_unloads_exact_owner(
 
     assert manager.disable(plugin.manifest.id).success is True
     assert registry.get(KRONOS_FORECAST_TOOL_NAME) is None
+
+
+def test_unload_uses_the_exact_registry_resolved_during_registration(
+    tmp_path,
+) -> None:
+    weights = _write_ready_weights(tmp_path)
+    first_registry = ToolRegistry()
+    second_registry = ToolRegistry()
+    current_registry = [first_registry]
+    manager = PluginManager(
+        application_version="3.26.3",
+        registry=build_agent_tool_extension_registry(
+            lambda: current_registry[0],
+        ),
+    )
+    plugin = KronosAgentToolPlugin(
+        _config(weights),
+        dependency_probe=lambda _module: True,
+        service_factory=lambda _availability: _FakeService(),
+    )
+
+    assert manager.register(plugin, source="builtin").success is True
+    assert manager.load(plugin.manifest.id).success is True
+    assert first_registry.get(KRONOS_FORECAST_TOOL_NAME) is not None
+
+    current_registry[0] = second_registry
+    assert manager.disable(plugin.manifest.id).success is True
+
+    assert first_registry.get(KRONOS_FORECAST_TOOL_NAME) is None
+    assert second_registry.get(KRONOS_FORECAST_TOOL_NAME) is None
+
+
+@pytest.mark.parametrize(
+    ("parameters", "handler"),
+    [
+        (
+            [ToolParameter(name="value", type="integer", description="Value")],
+            lambda value, **extra: (value, extra),
+        ),
+        (
+            [
+                ToolParameter(
+                    name="value",
+                    type="integer",
+                    description="Value",
+                    required=False,
+                    default=1,
+                )
+            ],
+            lambda value=2: value,
+        ),
+        (
+            [ToolParameter(name="value", type="integer", description="Value")],
+            lambda value, hidden=None: (value, hidden),
+        ),
+    ],
+)
+def test_registration_rejects_handler_schema_drift(parameters, handler) -> None:
+    native_registry = ToolRegistry()
+    extension_registry = build_agent_tool_extension_registry(native_registry)
+    tool = ToolDefinition(
+        name="schema_drift",
+        description="Invalid plugin tool",
+        parameters=parameters,
+        handler=handler,
+        policy=ToolPolicy.declared(read_only=True),
+        enforce_contract=True,
+    )
+
+    with pytest.raises(
+        PluginRegistryError,
+        match="extension_implementation_invalid",
+    ):
+        extension_registry.register(
+            plugin_id="test.schema-drift",
+            extension_point="agent_tool",
+            registration_id=tool.name,
+            implementation=tool,
+        )
+
+    assert native_registry.get(tool.name) is None
+
+
+def test_registration_requires_native_contract_enforcement() -> None:
+    native_registry = ToolRegistry()
+    extension_registry = build_agent_tool_extension_registry(native_registry)
+    tool = ToolDefinition(
+        name="permissive_tool",
+        description="Permissive plugin tool",
+        parameters=[
+            ToolParameter(name="value", type="integer", description="Value")
+        ],
+        handler=lambda value: value,
+        policy=ToolPolicy.declared(read_only=True),
+    )
+
+    with pytest.raises(
+        PluginRegistryError,
+        match="extension_implementation_invalid",
+    ):
+        extension_registry.register(
+            plugin_id="test.permissive",
+            extension_point="agent_tool",
+            registration_id=tool.name,
+            implementation=tool,
+        )
+
+    assert native_registry.get(tool.name) is None
 
 
 def test_application_services_uses_the_same_native_registry_for_builtin_tool(

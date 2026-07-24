@@ -7,8 +7,10 @@ annualized volatility intervals, and daily OHLC uncertainty bands.
 
 Kronos is not an LLM and is never added to the chat-model catalog. It supplies
 quantitative supporting evidence to Agent workflows. The tool is absent from a
-default installation and is available to the Technical Agent only after an
-operator explicitly enables it.
+default installation. After an operator explicitly enables it, the multi-agent
+architecture exposes it only to the Technical Agent; the default single-agent
+architecture exposes it to that one Agent with the rest of the process tool
+registry.
 
 ## Default And Registration Contract
 
@@ -27,7 +29,9 @@ Docker, reports, and notifications continue without Kronos.
 The plugin registers a declared `ToolDefinition` through the existing
 `agent_tool` extension point. Calls still pass through the same
 `ToolRegistry`, ToolSurface, stock-scope, timeout, serialization, audit, and
-completion boundaries as core tools. The Agent can supply only:
+completion boundaries as core tools. Plugin definitions opt in to mandatory
+contract enforcement, so argument and scope validation remains active even on
+the native compatibility runner. The Agent can supply only:
 
 - `stock_code`: a bounded A-share, Hong Kong, or U.S. symbol;
 - `lookback_days`: 30 through 512;
@@ -129,7 +133,8 @@ Successful calls return `schema_version=kronos-forecast-v1` with:
 
 - the canonical stock code, data source, as-of date, lookback, and horizon;
 - official model and tokenizer identities;
-- sampled `up`, `flat`, and `down` horizon probabilities;
+- sampled `up`, `flat`, and `down` horizon probabilities, with `dominant` set
+  to `ambiguous` whenever the largest path counts are tied;
 - p10/p50/p90 horizon-return and annualized-volatility intervals;
 - p10/p50/p90 open/high/low/close bands for each future business day;
 - sampling metadata, limitations, and the mandatory disclaimer.

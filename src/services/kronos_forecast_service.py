@@ -629,17 +629,30 @@ def _aggregate_paths(
         final_returns = arrays[:, -1, 3] / last_close - 1.0
     if not np.isfinite(final_returns).all():
         raise KronosInferenceError("Kronos produced non-finite forecast returns.")
-    up_probability = float(np.mean(final_returns > KRONOS_FLAT_RETURN_THRESHOLD))
-    down_probability = float(np.mean(final_returns < -KRONOS_FLAT_RETURN_THRESHOLD))
-    flat_probability = max(0.0, 1.0 - up_probability - down_probability)
-    direction_probabilities = {
-        "up": _round(up_probability),
-        "flat": _round(flat_probability),
-        "down": _round(down_probability),
+    direction_counts = {
+        "up": int(np.count_nonzero(final_returns > KRONOS_FLAT_RETURN_THRESHOLD)),
+        "flat": int(
+            np.count_nonzero(
+                np.abs(final_returns) <= KRONOS_FLAT_RETURN_THRESHOLD
+            )
+        ),
+        "down": int(np.count_nonzero(final_returns < -KRONOS_FLAT_RETURN_THRESHOLD)),
     }
-    dominant_direction = max(
-        direction_probabilities,
-        key=lambda key: direction_probabilities[key],
+    path_count = len(final_returns)
+    direction_probabilities = {
+        direction: _round(count / path_count)
+        for direction, count in direction_counts.items()
+    }
+    dominant_count = max(direction_counts.values())
+    dominant_candidates = [
+        direction
+        for direction, count in direction_counts.items()
+        if count == dominant_count
+    ]
+    dominant_direction = (
+        dominant_candidates[0]
+        if len(dominant_candidates) == 1
+        else "ambiguous"
     )
 
     volatility_values = np.array(

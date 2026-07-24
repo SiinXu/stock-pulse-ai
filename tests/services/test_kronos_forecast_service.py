@@ -33,8 +33,15 @@ def _history(rows: int = 40) -> pd.DataFrame:
 
 
 class _ForecastBackend:
-    def __init__(self) -> None:
+    def __init__(self, final_multipliers=None) -> None:
         self.calls = []
+        self.final_multipliers = final_multipliers or (
+            1.05,
+            1.02,
+            1.0005,
+            0.98,
+            0.95,
+        )
 
     def predict_paths(
         self,
@@ -53,9 +60,8 @@ class _ForecastBackend:
             )
         )
         last_close = float(history_frame["close"].iloc[-1])
-        final_multipliers = (1.05, 1.02, 1.0005, 0.98, 0.95)
         paths = []
-        for multiplier in final_multipliers:
+        for multiplier in self.final_multipliers:
             closes = np.linspace(
                 last_close * (1 + (multiplier - 1) / len(future_timestamps)),
                 last_close * multiplier,
@@ -95,7 +101,7 @@ def test_mocked_inference_returns_versioned_probability_and_interval_contract() 
     assert result["stock_code"] == "600519"
     assert result["data_source"] == "db_cache"
     assert result["direction"] == {
-        "dominant": "up",
+        "dominant": "ambiguous",
         "probabilities": {"up": 0.4, "flat": 0.2, "down": 0.4},
     }
     assert result["horizon_return_pct"]["p10"] < result["horizon_return_pct"]["p50"]
@@ -112,6 +118,26 @@ def test_mocked_inference_returns_versioned_probability_and_interval_contract() 
             5,
         )
     ]
+
+
+def test_unique_direction_path_count_is_reported_as_dominant() -> None:
+    backend = _ForecastBackend((1.05, 1.04, 1.03, 1.0005, 0.95))
+    service = KronosForecastService(
+        spec=KRONOS_MODEL_SPECS["mini"],
+        backend=backend,
+        history_loader=lambda _code, days: (_history(days), "db_cache"),
+    )
+
+    result = service.forecast(
+        stock_code="600519",
+        lookback_days=30,
+        horizon_days=3,
+    )
+
+    assert result["direction"] == {
+        "dominant": "up",
+        "probabilities": {"up": 0.6, "flat": 0.2, "down": 0.2},
+    }
 
 
 @pytest.mark.parametrize(
