@@ -140,8 +140,8 @@ separate desktop-owned change.
 
 The Router URL remains the primary state owner. A tab-scoped continuity layer
 stores only allowlisted, normalized route snapshots for Home, Chat, Portfolio,
-Decision Signals, Research Market, Research Discover, Research Backtest, and
-stock details. On a fresh document
+Decision Signals, Research Market, Research Discover, Research Analysis,
+Research Backtest, and stock details. On a fresh document
 load, a bare major-route URL may replace itself once with the last snapshot for
 that route. Explicit URL state always wins, and later in-app navigation is not
 overridden by the initial restore guard.
@@ -393,7 +393,7 @@ replace or reinterpret the separately owned UI4 L-09 target. The typed
 application navigation descriptor exposes five stable primary domains: Home,
 Research, Portfolio, Agent, and Settings. Home temporarily owns one Signal
 Center child until the global notification entry replaces it, while Research
-owns Market Review, Discover, and Backtest. Expanded desktop navigation and the mobile
+owns Market Review, Discover, Analysis Workbench, and Backtest. Expanded desktop navigation and the mobile
 drawer expose a separate 44px disclosure button for each secondary group, keep
 the groups open by default, and allow users to collapse or reopen their child
 routes without turning the parent route link into a false toggle. Compact
@@ -404,8 +404,10 @@ trigger. While a secondary subtree is visible, its active child is the sole
 is closed, the visible parent link becomes the sole `aria-current="page"` owner
 for either its own destination or an active descendant.
 
-Canonical Research paths are `/research/market`, `/research/discover`, and
-`/research/backtest`. The legacy `/screening` and `/backtest` URLs use the shared
+Canonical Research paths are `/research/market`, `/research/discover`,
+`/research/analysis`, and `/research/backtest`. Analysis Workbench owns the
+`launch`, `tasks`, and `history` segments as URL state on that single route. The
+legacy `/screening` and `/backtest` URLs use the shared
 replace-redirect contract and preserve query parameters and hash state. The
 canonical Signal Center path is `/signals`; legacy `/decision-signals` and
 `/alerts` paths map their query state into its feed, rules, history, or review

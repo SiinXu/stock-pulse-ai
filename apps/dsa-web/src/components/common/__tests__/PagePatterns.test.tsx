@@ -13,6 +13,7 @@ import {
   Tabs,
   Toolbar,
   WorkspaceNavigation,
+  WorkspaceLayout,
   WorkspacePage,
 } from '..';
 
@@ -94,6 +95,19 @@ describe('page skeleton Patterns', () => {
     fireEvent.click(toggle);
     expect(rail).toHaveAttribute('data-compact-state', 'expanded');
     expect(screen.getByRole('button', { name: 'Hide run context' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('places a semantic workspace rail before its content when requested', () => {
+    const { container } = render(
+      <WorkspaceLayout railPosition="start" rail={<p>Record history</p>}>
+        <p>Selected report</p>
+      </WorkspaceLayout>,
+    );
+
+    const layout = container.querySelector('[data-pattern="workspace-layout"]');
+    expect(layout).toHaveAttribute('data-rail-position', 'start');
+    expect(layout?.firstElementChild).toHaveAttribute('data-slot', 'workspace-rail');
+    expect(layout?.lastElementChild).toHaveAttribute('data-slot', 'workspace-content');
   });
 
   it('implements roving Tabs and associated tab panels without using segmented controls', () => {

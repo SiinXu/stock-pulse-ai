@@ -4,6 +4,7 @@ import {
   Activity,
   BarChart3,
   BriefcaseBusiness,
+  FlaskConical,
   Home,
   MessageSquareQuote,
   Search,
@@ -59,6 +60,7 @@ export const APPLICATION_NAVIGATION_ITEMS: readonly ApplicationNavigationItem[] 
     children: [
       { key: 'research-market', labelKey: 'home.marketReview', to: APP_ROUTE_PATHS.researchMarket, icon: BarChart3 },
       { key: 'research-discover', labelKey: 'layout.nav.discover', to: APP_ROUTE_PATHS.researchDiscover, icon: Search },
+      { key: 'research-analysis', labelKey: 'analysisWorkbench.title', to: APP_ROUTE_PATHS.researchAnalysis, icon: FlaskConical },
       { key: 'research-backtest', labelKey: 'layout.nav.backtest', to: APP_ROUTE_PATHS.researchBacktest, icon: Activity },
     ],
   },

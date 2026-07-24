@@ -17,6 +17,7 @@ import { Badge, Button, IconButton, InlineAlert, Input, ScrollArea, SearchInput,
 import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
 import { StockBar } from '../history';
 import type { StockBarItem, TaskInfo } from '../../types/analysis';
+import type { HomeWatchlistRow } from '../../types/watchlist';
 import { getSentimentColor } from '../../types/analysis';
 import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../../utils/decisionAction';
 import { formatDateTime } from '../../utils/format';
@@ -28,14 +29,7 @@ import { HOME_WORKSPACE_VALUES, type HomeWorkspaceValue } from '../../routing/ro
 export type HomeWorkspaceTab = HomeWorkspaceValue;
 export type WatchlistAnalyzeMode = 'all' | 'pending';
 
-export interface HomeWatchlistRow {
-  code: string;
-  latestItem?: StockBarItem;
-  analyzedToday: boolean;
-  isTodayStatusLoading?: boolean;
-  isTodayStatusUnknown?: boolean;
-  activeTask?: TaskInfo;
-}
+export type { HomeWatchlistRow } from '../../types/watchlist';
 
 interface BatchStatus {
   variant: 'success' | 'warning' | 'danger';

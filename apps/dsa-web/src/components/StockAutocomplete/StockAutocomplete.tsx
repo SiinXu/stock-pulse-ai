@@ -56,6 +56,7 @@ function FallbackInput({
 }: StockAutocompleteProps) {
   const { language } = useUiLanguage();
   const resolvedPlaceholder = placeholder ?? STOCK_SEARCH_TEXT[language].placeholder;
+  const resolvedAriaLabel = ariaLabel ?? STOCK_SEARCH_TEXT[language].inputLabel;
   return (
     <input
       id={id}
@@ -69,7 +70,7 @@ function FallbackInput({
         }
       }}
       placeholder={resolvedPlaceholder}
-      aria-label={ariaLabel}
+      aria-label={resolvedAriaLabel}
       disabled={disabled}
       className={cn(AUTOCOMPLETE_INPUT_CLASS, className)}
       data-autocomplete-mode="fallback"
@@ -122,6 +123,7 @@ function StockAutocompleteInner({
 }: StockAutocompleteProps) {
   const { language } = useUiLanguage();
   const resolvedPlaceholder = placeholder ?? STOCK_SEARCH_TEXT[language].placeholder;
+  const resolvedAriaLabel = ariaLabel ?? STOCK_SEARCH_TEXT[language].inputLabel;
   const { index, loading, fallback } = useStockIndex();
   const {
     // query,
@@ -257,7 +259,7 @@ function StockAutocompleteInner({
         onSubmit={onSubmit}
         disabled={disabled}
         placeholder={resolvedPlaceholder}
-        ariaLabel={ariaLabel}
+        ariaLabel={resolvedAriaLabel}
         className={className}
       />
     );
@@ -281,7 +283,7 @@ function StockAutocompleteInner({
         }}
         onBlur={handleBlur}
         placeholder={resolvedPlaceholder}
-        aria-label={ariaLabel}
+        aria-label={resolvedAriaLabel}
         disabled={disabled}
         className={cn(
           AUTOCOMPLETE_INPUT_CLASS,

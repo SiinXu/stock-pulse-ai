@@ -6,6 +6,7 @@ import {
   HOME_WORKSPACE_VALUES,
   REPORT_ROUTE_QUERY_KEYS,
   RUN_FLOW_ROUTE_QUERY_VALUES,
+  parsePositiveRouteInteger,
   type HomeWorkspaceValue,
 } from '../routing/routes';
 import { buildDeepLink, parseDeepLink } from './deepLink';
@@ -35,14 +36,6 @@ function toSearchParams(search: string): URLSearchParams {
   return new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
 }
 
-function parsePositiveInteger(value: string | null): number | null {
-  if (!value || !/^\d+$/.test(value)) {
-    return null;
-  }
-  const parsed = Number(value);
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
-}
-
 function parseStableTaskId(value: string | null): string | null {
   const parsed = value?.trim() ?? '';
   return STABLE_TASK_ID_PATTERN.test(parsed) ? parsed : null;
@@ -54,7 +47,7 @@ function normalizeCoreParams(params: URLSearchParams): {
   runFlow: RunFlowSnapshotSource | null;
 } {
   const normalized = new URLSearchParams(params);
-  const recordId = parsePositiveInteger(params.get(REPORT_ROUTE_QUERY_KEYS.recordId));
+  const recordId = parsePositiveRouteInteger(params.get(REPORT_ROUTE_QUERY_KEYS.recordId));
   if (recordId === null) {
     normalized.delete(REPORT_ROUTE_QUERY_KEYS.recordId);
   } else {
@@ -64,7 +57,9 @@ function normalizeCoreParams(params: URLSearchParams): {
   let runFlow: RunFlowSnapshotSource | null = null;
   const runFlowType = params.get(REPORT_ROUTE_QUERY_KEYS.runFlow);
   if (runFlowType === RUN_FLOW_ROUTE_QUERY_VALUES.history) {
-    const runFlowRecordId = parsePositiveInteger(params.get(REPORT_ROUTE_QUERY_KEYS.runFlowRecordId));
+    const runFlowRecordId = parsePositiveRouteInteger(
+      params.get(REPORT_ROUTE_QUERY_KEYS.runFlowRecordId),
+    );
     if (runFlowRecordId !== null) {
       runFlow = { type: 'history', recordId: runFlowRecordId };
       normalized.set(REPORT_ROUTE_QUERY_KEYS.runFlow, RUN_FLOW_ROUTE_QUERY_VALUES.history);
