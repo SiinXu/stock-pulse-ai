@@ -79,10 +79,12 @@ class _FakeTaskQueue:
 class _FakeRuntimeClient:
     def __init__(self, installed: Optional[List[str]] = None) -> None:
         self.installed = installed or []
+        self.list_calls = 0
         self.pulled: List[str] = []
         self.deleted: List[str] = []
 
     def list_installed_models(self) -> List[str]:
+        self.list_calls += 1
         return list(self.installed)
 
     def pull_model(self, model_id: str, *, on_progress) -> None:
@@ -362,6 +364,20 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
 
         self.assertEqual(client.deleted, [])
 
+    def test_active_model_refs_block_deletion_before_runtime_mutation(self) -> None:
+        self._rewrite_env(
+            "ADMIN_AUTH_ENABLED=true",
+            "LLM_CHANNELS=ollama",
+            "LLM_OLLAMA_MODELS=qwen3:4b",
+            "AGENT_LITELLM_MODEL=modelref:v1:local_ollama:ollama%2Fqwen3%3A4b",
+        )
+        service, _queue, client = self._local_service()
+
+        with self.assertRaises(LocalModelInUseError):
+            service.delete_model("qwen3:4b")
+
+        self.assertEqual(client.deleted, [])
+
     def test_pull_reuses_task_queue_progress_and_activates_after_success(self) -> None:
         self._rewrite_env("ADMIN_AUTH_ENABLED=true")
         service, queue, client = self._local_service()
@@ -380,6 +396,16 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
             "local_model.pull.progress",
         )
         self.assertEqual(self.manager.read_config_map()["LITELLM_MODEL"], "ollama/qwen3:4b")
+
+    def test_pull_reuses_an_inflight_task_without_repeating_runtime_preflight(self) -> None:
+        self._rewrite_env("ADMIN_AUTH_ENABLED=true")
+        service, _queue, client = self._local_service()
+
+        first = service.start_pull("qwen3:4b")
+        second = service.start_pull("qwen3:4b")
+
+        self.assertEqual(second.task_id, first.task_id)
+        self.assertEqual(client.list_calls, 1)
 
     def test_runtime_unavailable_status_is_actionable_without_raw_error(self) -> None:
         class _UnavailableClient:

@@ -1,4 +1,5 @@
 import { localModelsApi } from '../../api/localModels';
+import { getParsedApiError } from '../../api/error';
 import type {
   LocalModelAssignment,
   LocalModelMutationResponse,
@@ -175,10 +176,13 @@ function createWebTransport(): LocalModelTransport {
         if (error instanceof LocalModelTransportError || (error instanceof DOMException && error.name === 'AbortError')) {
           throw error;
         }
+        const parsed = getParsedApiError(error, 'en');
         throw new LocalModelTransportError(
-          'local_model_runtime_unavailable',
-          'Local model runtime unavailable',
-          `ollama pull ${modelId}`,
+          parsed.code || 'local_model_pull_submit_failed',
+          'Local model download failed',
+          parsed.code === 'local_model_runtime_unavailable'
+            ? `ollama pull ${modelId}`
+            : undefined,
         );
       }
     },
@@ -230,6 +234,28 @@ function createDesktopTransport(bridge: DesktopLocalModelBridge): LocalModelTran
       const configuration = await localModelsApi.unregister(modelId);
       const result = await bridge.remove(modelId);
       if (result.ok !== true) {
+        const registrationChanged = configuration.updatedKeys.includes('LLM_OLLAMA_MODELS');
+        if (registrationChanged) {
+          let weightsRemain = true;
+          try {
+            const state = await bridge.detect();
+            if (Array.isArray(state.installedModels)) {
+              weightsRemain = state.installedModels.some(
+                (installed) => typeof installed === 'string'
+                  && installed.toLowerCase() === modelId.toLowerCase(),
+              );
+            }
+          } catch {
+            // Restore conservatively when desktop cannot confirm deletion state.
+          }
+          if (weightsRemain) {
+            try {
+              await localModelsApi.assign(modelId, 'auto');
+            } catch {
+              // The original deletion error remains the actionable UI result.
+            }
+          }
+        }
         throw new LocalModelTransportError(
           typeof result.error === 'string' ? result.error : 'local_model_delete_failed',
           'Local model deletion failed',

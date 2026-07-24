@@ -2998,6 +2998,7 @@ function requestLocalModelPullStream({
     let settled = false;
     let buffer = '';
     let lastStatus = '';
+    let sawTerminalSuccess = false;
 
     const finish = (fn, value) => {
       if (settled) {
@@ -3016,6 +3017,7 @@ function requestLocalModelPullStream({
       try {
         event = JSON.parse(trimmed);
       } catch (_error) {
+        finish(reject, new Error('Local model runtime returned invalid progress.'));
         return;
       }
       if (event.error) {
@@ -3024,6 +3026,9 @@ function requestLocalModelPullStream({
       }
       if (typeof event.status === 'string') {
         lastStatus = event.status;
+        if (lastStatus === 'success') {
+          sawTerminalSuccess = true;
+        }
       }
       const total = Number(event.total);
       const completed = Number(event.completed);
@@ -3064,6 +3069,10 @@ function requestLocalModelPullStream({
           if (buffer) {
             consumeLine(buffer);
             buffer = '';
+          }
+          if (!sawTerminalSuccess) {
+            finish(reject, new Error('Local model download ended unexpectedly.'));
+            return;
           }
           finish(resolve, { status: lastStatus });
         });

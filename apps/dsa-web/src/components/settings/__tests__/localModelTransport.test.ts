@@ -90,14 +90,43 @@ describe('localModelTransport', () => {
     }
   });
 
-  it('returns a safe manual command when the Web runtime request fails', async () => {
-    api.startPull.mockRejectedValue(new Error('private runtime details'));
+  it('returns a safe manual command only for an explicit Web runtime failure', async () => {
+    const runtimeError = Object.assign(new Error('private runtime details'), {
+      parsedError: {
+        title: 'Request failed',
+        message: 'Request failed',
+        rawMessage: 'private runtime details',
+        category: 'http_error',
+        code: 'local_model_runtime_unavailable',
+      },
+    });
+    api.startPull.mockRejectedValue(runtimeError);
 
     await expect(
       __localModelTransportTest.createWebTransport().pull('qwen3:4b', () => undefined),
     ).rejects.toMatchObject({
       code: 'local_model_runtime_unavailable',
       manualCommand: 'ollama pull qwen3:4b',
+    } satisfies Partial<LocalModelTransportError>);
+  });
+
+  it('does not mislabel a configuration conflict as an Ollama outage', async () => {
+    const conflict = Object.assign(new Error('configuration conflict'), {
+      parsedError: {
+        title: 'Configuration conflict',
+        message: 'Refresh and retry',
+        rawMessage: 'configuration conflict',
+        category: 'http_error',
+        code: 'config_version_conflict',
+      },
+    });
+    api.startPull.mockRejectedValue(conflict);
+
+    await expect(
+      __localModelTransportTest.createWebTransport().pull('qwen3:4b', () => undefined),
+    ).rejects.toMatchObject({
+      code: 'config_version_conflict',
+      manualCommand: undefined,
     } satisfies Partial<LocalModelTransportError>);
   });
 
@@ -157,5 +186,60 @@ describe('localModelTransport', () => {
       __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
     ).rejects.toThrow('model in use');
     expect(bridge.remove).not.toHaveBeenCalled();
+  });
+
+  it('restores desktop registration when weight deletion fails before mutation', async () => {
+    const bridge = createDesktopBridge();
+    const mutation = {
+      ...CONFIGURATION,
+      success: true,
+      modelId: 'qwen3:4b',
+      selectedPrimary: false,
+      selectedAgent: false,
+      deleted: true,
+      updatedKeys: ['LLM_OLLAMA_MODELS'],
+      warnings: [],
+      appliedCount: 1,
+      skippedMaskedCount: 0,
+      reloadTriggered: true,
+    };
+    api.unregister.mockResolvedValue(mutation);
+    api.assign.mockResolvedValue({ ...mutation, deleted: false });
+    vi.mocked(bridge.remove).mockResolvedValue({ ok: false, error: 'delete-failed' });
+    vi.mocked(bridge.detect).mockResolvedValue({
+      status: 'running',
+      installedModels: ['qwen3:4b'],
+    });
+
+    await expect(
+      __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
+    ).rejects.toMatchObject({ code: 'delete-failed' });
+    expect(bridge.detect).toHaveBeenCalledTimes(1);
+    expect(api.assign).toHaveBeenCalledWith('qwen3:4b', 'auto');
+  });
+
+  it('does not create registration while recovering an externally installed model', async () => {
+    const bridge = createDesktopBridge();
+    const mutation = {
+      ...CONFIGURATION,
+      success: true,
+      modelId: 'qwen3:4b',
+      selectedPrimary: false,
+      selectedAgent: false,
+      deleted: true,
+      updatedKeys: [],
+      warnings: [],
+      appliedCount: 0,
+      skippedMaskedCount: 0,
+      reloadTriggered: false,
+    };
+    api.unregister.mockResolvedValue(mutation);
+    vi.mocked(bridge.remove).mockResolvedValue({ ok: false, error: 'delete-failed' });
+
+    await expect(
+      __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
+    ).rejects.toMatchObject({ code: 'delete-failed' });
+    expect(bridge.detect).not.toHaveBeenCalled();
+    expect(api.assign).not.toHaveBeenCalled();
   });
 });

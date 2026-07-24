@@ -3462,6 +3462,23 @@ test('pull streams a curated model and reports progress', async (t) => {
   assert.equal(result.modelId, 'qwen3:8b');
 });
 
+test('pull does not activate when Ollama closes without terminal success', async (t) => {
+  const mainModule = loadMainModule(t);
+  mainModule.__setLocalModelStateForTest(null);
+  const requestImpl = makeStagedJsonRequest([
+    { statusCode: 200, ndjson: [
+      { status: 'pulling manifest' },
+      { status: 'downloading', total: 100, completed: 100 },
+    ] },
+    { statusCode: 200, jsonBody: { models: [] } },
+  ]);
+
+  const result = await mainModule.pullLocalModel('qwen3:8b', { requestImpl });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error, 'pull-failed');
+});
+
 test('desktop deletion rejects non-catalog names before network activity', async (t) => {
   const mainModule = loadMainModule(t);
   const requestImpl = makeStagedJsonRequest([{ statusCode: 200, jsonBody: {} }]);
