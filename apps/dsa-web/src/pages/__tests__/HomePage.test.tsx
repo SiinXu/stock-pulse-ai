@@ -1,6 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { alertsApi } from '../../api/alerts';
@@ -109,23 +109,39 @@ describe('HomePage attention hub', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
-    vi.mocked(decisionSignalsApi.list).mockResolvedValue({
-      items: [activeSignal],
-      total: 4,
-      page: 1,
-      pageSize: 12,
-    });
+    vi.mocked(decisionSignalsApi.list).mockImplementation(async (params) => (
+      params?.expiresTo
+        ? {
+            items: [activeSignal],
+            total: 1,
+            page: 1,
+            pageSize: 1,
+          }
+        : {
+            items: [activeSignal],
+            total: 4,
+            page: 1,
+            pageSize: 12,
+          }
+    ));
     vi.mocked(alertsApi.listTriggers).mockResolvedValue({
       items: [],
       total: 2,
       page: 1,
       pageSize: 1,
     });
-    vi.mocked(historyApi.getList).mockResolvedValue({
-      items: [marketHistory, analysisHistory],
-      total: 2,
-      page: 1,
-      limit: 8,
+    vi.mocked(historyApi.getList).mockImplementation(async (params = {}) => {
+      const items = params.reportType === 'market_review'
+        ? [marketHistory]
+        : params.reportType === 'detailed'
+          ? [analysisHistory]
+          : [];
+      return {
+        items,
+        total: items.length,
+        page: 1,
+        limit: params.limit ?? 20,
+      };
     });
     vi.mocked(systemConfigApi.getSetupStatus).mockResolvedValue({
       isComplete: true,
@@ -145,12 +161,87 @@ describe('HomePage attention hub', () => {
     expect(within(core).getByRole('heading', { name: "Today's Focus" })).toBeInTheDocument();
     expect(within(core).getByRole('heading', { name: 'To-dos' })).toBeInTheDocument();
     expect(within(core).getByRole('heading', { name: 'Signal summary' })).toBeInTheDocument();
+    for (const block of within(core).getAllByRole('region')) {
+      expect(block).toHaveAttribute('data-surface-level', 'canvas');
+    }
 
     const configurable = screen.getByRole('button', { name: /Configurable area/ });
     expect(configurable).toHaveAttribute('aria-expanded', 'false');
     expect(document.getElementById('home-configurable-content')).not.toBeVisible();
     expect(window.localStorage.getItem(HOME_CONFIGURABLE_STORAGE_KEY)).toBeNull();
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  });
+
+  it('uses the filtered reassessment total instead of the active-signal page window', async () => {
+    vi.mocked(decisionSignalsApi.list).mockImplementation(async (params) => (
+      params?.expiresTo
+        ? { items: [], total: 13, page: 1, pageSize: 1 }
+        : { items: [activeSignal], total: 30, page: 1, pageSize: 12 }
+    ));
+
+    renderHome();
+
+    expect(await screen.findByText('Due for reassessment: 13')).toBeInTheDocument();
+    expect(decisionSignalsApi.list).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'active',
+      expiresTo: expect.any(String),
+      page: 1,
+      pageSize: 1,
+    }));
+  });
+
+  it('loads market review and every stock-report category through independent filters', async () => {
+    renderHome();
+
+    fireEvent.click(await screen.findByRole('button', { name: /Configurable area/ }));
+    expect(within(screen.getByRole('region', { name: 'Morning report / Market review' }))
+      .getByText('Market review')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Recent analyses' }))
+      .getByText('Apple')).toBeInTheDocument();
+
+    for (const reportType of ['market_review', 'simple', 'detailed', 'full', 'brief']) {
+      expect(historyApi.getList).toHaveBeenCalledWith(expect.objectContaining({ reportType }));
+    }
+  });
+
+  it('shows loading rather than false empty history states when configuration starts expanded', async () => {
+    window.localStorage.setItem(HOME_CONFIGURABLE_STORAGE_KEY, '1');
+    let resolveHistory!: (value: Awaited<ReturnType<typeof historyApi.getList>>) => void;
+    const historyResult = new Promise<Awaited<ReturnType<typeof historyApi.getList>>>((resolve) => {
+      resolveHistory = resolve;
+    });
+    vi.mocked(historyApi.getList).mockReturnValue(historyResult);
+
+    renderHome();
+
+    const morningReport = screen.getByRole('region', { name: 'Morning report / Market review' });
+    const recentAnalyses = screen.getByRole('region', { name: 'Recent analyses' });
+    expect(within(morningReport).getByText('Loading')).toBeInTheDocument();
+    expect(within(recentAnalyses).getByText('Loading')).toBeInTheDocument();
+    expect(screen.queryByText('No morning report')).not.toBeInTheDocument();
+    expect(screen.queryByText('No recent analyses')).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveHistory({ items: [], total: 0, page: 1, limit: 4 });
+      await historyResult;
+    });
+    expect(await screen.findByText('No morning report')).toBeInTheDocument();
+    expect(screen.getByText('No recent analyses')).toBeInTheDocument();
+  });
+
+  it('shows unavailable history sources as partial data instead of empty collections', async () => {
+    window.localStorage.setItem(HOME_CONFIGURABLE_STORAGE_KEY, '1');
+    vi.mocked(historyApi.getList).mockRejectedValue(new Error('history unavailable'));
+
+    renderHome();
+
+    expect(await screen.findAllByText('Home data is incomplete')).toHaveLength(3);
+    expect(within(screen.getByRole('region', { name: 'Morning report / Market review' }))
+      .getByText('Home data is incomplete')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Recent analyses' }))
+      .getByText('Home data is incomplete')).toBeInTheDocument();
+    expect(screen.queryByText('No morning report')).not.toBeInTheDocument();
+    expect(screen.queryByText('No recent analyses')).not.toBeInTheDocument();
   });
 
   it('links focus, reassessment, signal summary, morning report, and recent analysis to canonical pages', async () => {

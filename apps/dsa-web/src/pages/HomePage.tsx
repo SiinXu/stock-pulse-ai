@@ -40,12 +40,11 @@ import {
   buildSettingsHref,
   buildSignalCenterHref,
 } from '../routing/routes';
-import type { HistoryItem } from '../types/analysis';
+import type { HistoryItem, StockReportType } from '../types/analysis';
 import type { DecisionSignalItem } from '../types/decisionSignals';
 import type { SetupStatusResponse } from '../types/systemConfig';
 import { buildDecisionActionLabelMap } from '../utils/decisionAction';
 import { getDecisionSignalPresentation } from '../utils/decisionSignalPresentation';
-import { parseDecisionSignalDate } from '../utils/decisionSignalTime';
 import { formatDateTime } from '../utils/format';
 import {
   dismissOnboarding,
@@ -56,53 +55,102 @@ import { getUiListSeparator } from '../utils/uiLocale';
 export const HOME_CONFIGURABLE_STORAGE_KEY = 'dsa.home.configurable.expanded';
 
 const SIGNAL_PAGE_SIZE = 12;
-const HISTORY_PAGE_SIZE = 8;
 const FOCUS_ITEM_LIMIT = 3;
 const RECENT_ANALYSIS_LIMIT = 4;
 const REASSESSMENT_WINDOW_MS = 24 * 60 * 60 * 1000;
+const STOCK_REPORT_TYPES: readonly StockReportType[] = ['simple', 'detailed', 'full', 'brief'];
+
+type HomeAttentionAvailability = {
+  activeSignals: boolean;
+  reassessments: boolean;
+  alerts: boolean;
+  marketReview: boolean;
+  recentAnalyses: boolean;
+};
 
 type HomeAttentionData = {
   activeSignals: DecisionSignalItem[];
-  activeSignalTotal: number;
-  triggeredAlertTotal: number;
-  historyItems: HistoryItem[];
+  activeSignalTotal: number | null;
+  dueReassessmentTotal: number | null;
+  triggeredAlertTotal: number | null;
+  latestMarketReview: HistoryItem | null;
+  recentAnalyses: HistoryItem[];
 };
 
 type HomeAttentionLoadResult = {
   data: HomeAttentionData;
+  availability: HomeAttentionAvailability;
   failedSourceCount: number;
-  loadedAt: number;
 };
 
 const EMPTY_ATTENTION_DATA: HomeAttentionData = {
   activeSignals: [],
-  activeSignalTotal: 0,
-  triggeredAlertTotal: 0,
-  historyItems: [],
+  activeSignalTotal: null,
+  dueReassessmentTotal: null,
+  triggeredAlertTotal: null,
+  latestMarketReview: null,
+  recentAnalyses: [],
 };
 
-function isReassessmentDue(item: DecisionSignalItem, now: number): boolean {
-  const expiresAt = parseDecisionSignalDate(item.expiresAt);
-  return Boolean(expiresAt && expiresAt.getTime() <= now + REASSESSMENT_WINDOW_MS);
-}
+const EMPTY_ATTENTION_AVAILABILITY: HomeAttentionAvailability = {
+  activeSignals: false,
+  reassessments: false,
+  alerts: false,
+  marketReview: false,
+  recentAnalyses: false,
+};
 
 async function fetchHomeAttentionData(): Promise<HomeAttentionLoadResult> {
-  const [signalsResult, alertsResult, historyResult] = await Promise.allSettled([
-    decisionSignalsApi.list({ status: 'active', page: 1, pageSize: SIGNAL_PAGE_SIZE }),
-    alertsApi.listTriggers({ status: 'triggered', page: 1, pageSize: 1 }),
-    historyApi.getList({ page: 1, limit: HISTORY_PAGE_SIZE }),
+  const reassessmentCutoff = new Date(Date.now() + REASSESSMENT_WINDOW_MS).toISOString();
+  const [coreResults, recentAnalysisResults] = await Promise.all([
+    Promise.allSettled([
+      decisionSignalsApi.list({ status: 'active', page: 1, pageSize: SIGNAL_PAGE_SIZE }),
+      decisionSignalsApi.list({
+        status: 'active',
+        expiresTo: reassessmentCutoff,
+        page: 1,
+        pageSize: 1,
+      }),
+      alertsApi.listTriggers({ status: 'triggered', page: 1, pageSize: 1 }),
+      historyApi.getList({ reportType: 'market_review', page: 1, limit: 1 }),
+    ]),
+    Promise.allSettled(STOCK_REPORT_TYPES.map((reportType) => (
+      historyApi.getList({ reportType, page: 1, limit: RECENT_ANALYSIS_LIMIT })
+    ))),
   ]);
+  const [signalsResult, reassessmentsResult, alertsResult, marketReviewResult] = coreResults;
+  const availability: HomeAttentionAvailability = {
+    activeSignals: signalsResult.status === 'fulfilled',
+    reassessments: reassessmentsResult.status === 'fulfilled',
+    alerts: alertsResult.status === 'fulfilled',
+    marketReview: marketReviewResult.status === 'fulfilled',
+    recentAnalyses: recentAnalysisResults.every((result) => result.status === 'fulfilled'),
+  };
+  const recentAnalyses = recentAnalysisResults
+    .flatMap((result) => (result.status === 'fulfilled' ? result.value.items : []))
+    .filter((item) => item.reportType !== 'market_review' && item.stockCode !== 'MARKET')
+    .sort((left, right) => {
+      const timeDifference = Date.parse(right.createdAt) - Date.parse(left.createdAt);
+      return Number.isFinite(timeDifference) && timeDifference !== 0
+        ? timeDifference
+        : right.id - left.id;
+    })
+    .slice(0, RECENT_ANALYSIS_LIMIT);
   return {
     data: {
       activeSignals: signalsResult.status === 'fulfilled' ? signalsResult.value.items : [],
-      activeSignalTotal: signalsResult.status === 'fulfilled' ? signalsResult.value.total : 0,
-      triggeredAlertTotal: alertsResult.status === 'fulfilled' ? alertsResult.value.total : 0,
-      historyItems: historyResult.status === 'fulfilled' ? historyResult.value.items : [],
+      activeSignalTotal: signalsResult.status === 'fulfilled' ? signalsResult.value.total : null,
+      dueReassessmentTotal: reassessmentsResult.status === 'fulfilled'
+        ? reassessmentsResult.value.total
+        : null,
+      triggeredAlertTotal: alertsResult.status === 'fulfilled' ? alertsResult.value.total : null,
+      latestMarketReview: marketReviewResult.status === 'fulfilled'
+        ? marketReviewResult.value.items[0] ?? null
+        : null,
+      recentAnalyses,
     },
-    failedSourceCount: [signalsResult, alertsResult, historyResult]
-      .filter((result) => result.status === 'rejected')
-      .length,
-    loadedAt: Date.now(),
+    availability,
+    failedSourceCount: Object.values(availability).filter((available) => !available).length,
   };
 }
 
@@ -112,8 +160,10 @@ const HomePage: React.FC = () => {
   const pageHeadingRef = useRef<HTMLHeadingElement | null>(null);
   const requestIdRef = useRef(0);
   const [data, setData] = useState<HomeAttentionData>(EMPTY_ATTENTION_DATA);
+  const [availability, setAvailability] = useState<HomeAttentionAvailability>(
+    EMPTY_ATTENTION_AVAILABILITY,
+  );
   const [isLoading, setIsLoading] = useState(true);
-  const [loadedAt, setLoadedAt] = useState(0);
   const [failedSourceCount, setFailedSourceCount] = useState(0);
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
   const [onboardingDismissed, setOnboardingDismissed] = useState(readOnboardingDismissed);
@@ -129,8 +179,8 @@ const HomePage: React.FC = () => {
 
   const applyAttentionData = useCallback((result: HomeAttentionLoadResult) => {
     setData(result.data);
+    setAvailability(result.availability);
     setFailedSourceCount(result.failedSourceCount);
-    setLoadedAt(result.loadedAt);
     setIsLoading(false);
   }, []);
 
@@ -176,19 +226,7 @@ const HomePage: React.FC = () => {
     () => data.activeSignals.slice(0, FOCUS_ITEM_LIMIT),
     [data.activeSignals],
   );
-  const dueSignals = useMemo(() => {
-    return data.activeSignals.filter((item) => isReassessmentDue(item, loadedAt));
-  }, [data.activeSignals, loadedAt]);
-  const latestMarketReview = useMemo(
-    () => data.historyItems.find((item) => item.reportType === 'market_review' || item.stockCode === 'MARKET'),
-    [data.historyItems],
-  );
-  const recentAnalyses = useMemo(
-    () => data.historyItems
-      .filter((item) => item.reportType !== 'market_review' && item.stockCode !== 'MARKET')
-      .slice(0, RECENT_ANALYSIS_LIMIT),
-    [data.historyItems],
-  );
+  const latestMarketReview = data.latestMarketReview;
   const setupMissingLabels = useMemo(() => setupStatus?.checks
     .filter((check) => check.required && check.status === 'needs_action')
     .map((check) => check.title)
@@ -298,12 +336,21 @@ const HomePage: React.FC = () => {
         <Section
           title={t('home.todayFocus')}
           description={t('home.todayFocusDescription')}
-          level="section"
+          level="canvas"
           padding="md"
           actions={<Activity className="h-5 w-5 text-primary" aria-hidden="true" />}
         >
           {isLoading ? (
             <StatePanel state="loading" title={t('common.loading')} size="compact" />
+          ) : !availability.activeSignals ? (
+            <StatePanel
+              state="error"
+              title={t('home.partialDataTitle')}
+              description={t('home.partialDataMessage')}
+              action={<Button variant="secondary" size="default" onClick={handleRefresh}>{t('common.retry')}</Button>}
+              size="compact"
+              titleAs="p"
+            />
           ) : focusSignals.length > 0 ? (
             <div className="divide-y divide-border/70">
               {focusSignals.map((item) => {
@@ -348,13 +395,22 @@ const HomePage: React.FC = () => {
         <Section
           title={t('home.todos')}
           description={t('home.todosDescription')}
-          level="section"
+          level="canvas"
           padding="md"
           actions={<ClipboardCheck className="h-5 w-5 text-warning" aria-hidden="true" />}
         >
           {isLoading ? (
             <StatePanel state="loading" title={t('common.loading')} size="compact" />
-          ) : dueSignals.length > 0 ? (
+          ) : !availability.reassessments ? (
+            <StatePanel
+              state="error"
+              title={t('home.partialDataTitle')}
+              description={t('home.partialDataMessage')}
+              action={<Button variant="secondary" size="default" onClick={handleRefresh}>{t('common.retry')}</Button>}
+              size="compact"
+              titleAs="p"
+            />
+          ) : (data.dueReassessmentTotal ?? 0) > 0 ? (
             <div className="space-y-3">
               <button
                 type="button"
@@ -363,7 +419,7 @@ const HomePage: React.FC = () => {
               >
                 <span>
                   <span className="block text-sm font-semibold text-foreground">
-                    {t('home.reassessmentDue', { count: dueSignals.length })}
+                    {t('home.reassessmentDue', { count: data.dueReassessmentTotal ?? 0 })}
                   </span>
                   <span className="mt-1 block text-xs text-secondary-text">
                     {t('home.reassessmentDueDescription')}
@@ -389,7 +445,7 @@ const HomePage: React.FC = () => {
         <Section
           title={t('home.signalSummary')}
           description={t('home.signalSummaryDescription')}
-          level="section"
+          level="canvas"
           padding="md"
           actions={<BellRing className="h-5 w-5 text-danger" aria-hidden="true" />}
         >
@@ -401,19 +457,19 @@ const HomePage: React.FC = () => {
                 <div>
                   <dt className="text-xs text-secondary-text">{t('home.activeSignals')}</dt>
                   <dd className="mt-1 text-xl font-semibold tabular-nums text-foreground">
-                    {data.activeSignalTotal}
+                    {data.activeSignalTotal ?? '—'}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-xs text-secondary-text">{t('home.triggeredAlerts')}</dt>
                   <dd className="mt-1 text-xl font-semibold tabular-nums text-foreground">
-                    {data.triggeredAlertTotal}
+                    {data.triggeredAlertTotal ?? '—'}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-xs text-secondary-text">{t('home.dueReassessments')}</dt>
                   <dd className="mt-1 text-xl font-semibold tabular-nums text-foreground">
-                    {dueSignals.length}
+                    {data.dueReassessmentTotal ?? '—'}
                   </dd>
                 </div>
               </dl>
@@ -455,7 +511,18 @@ const HomePage: React.FC = () => {
             padding="md"
             actions={<CalendarClock className="h-5 w-5 text-primary" aria-hidden="true" />}
           >
-            {latestMarketReview ? (
+            {isLoading ? (
+              <StatePanel state="loading" title={t('common.loading')} size="compact" titleAs="p" />
+            ) : !availability.marketReview ? (
+              <StatePanel
+                state="error"
+                title={t('home.partialDataTitle')}
+                description={t('home.partialDataMessage')}
+                action={<Button variant="secondary" size="default" onClick={handleRefresh}>{t('common.retry')}</Button>}
+                size="compact"
+                titleAs="p"
+              />
+            ) : latestMarketReview ? (
               <button
                 type="button"
                 className="flex min-h-14 w-full items-center justify-between gap-3 text-left"
@@ -493,9 +560,11 @@ const HomePage: React.FC = () => {
           </Section>
 
           <Section title={t('home.recentAnalyses')} level="section" padding="md">
-            {recentAnalyses.length > 0 ? (
+            {isLoading ? (
+              <StatePanel state="loading" title={t('common.loading')} size="compact" titleAs="p" />
+            ) : data.recentAnalyses.length > 0 ? (
               <div className="divide-y divide-border/70">
-                {recentAnalyses.map((item) => (
+                {data.recentAnalyses.map((item) => (
                   <button
                     key={item.id}
                     type="button"
@@ -514,6 +583,15 @@ const HomePage: React.FC = () => {
                   </button>
                 ))}
               </div>
+            ) : !availability.recentAnalyses ? (
+              <StatePanel
+                state="partial"
+                title={t('home.partialDataTitle')}
+                description={t('home.partialDataMessage')}
+                action={<Button variant="secondary" size="default" onClick={handleRefresh}>{t('common.retry')}</Button>}
+                size="compact"
+                titleAs="p"
+              />
             ) : (
               <EmptyState
                 compact

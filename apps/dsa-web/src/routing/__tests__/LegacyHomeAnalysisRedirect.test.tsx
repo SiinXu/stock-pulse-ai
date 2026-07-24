@@ -3,6 +3,9 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
+import { DeepLinkGuard } from '../../components/routing/DeepLinkGuard';
+import { ToastProvider } from '../../components/common';
+import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import {
   LegacyHomeAnalysisRedirect,
 } from '../LegacyHomeAnalysisRedirect';
@@ -92,5 +95,33 @@ describe('LegacyHomeAnalysisRedirect', () => {
       source: 'bookmark',
       [SESSION_RESTORE_SUPPRESS_STATE_KEY]: true,
     });
+  });
+
+  it('maps a workspace-only bookmark after the global deep-link guard runs', async () => {
+    render(
+      <UiLanguageProvider initialLanguage="en">
+        <ToastProvider>
+          <MemoryRouter initialEntries={[`${APP_ROUTE_PATHS.home}?${HOME_ROUTE_QUERY_KEYS.workspace}=${HOME_WORKSPACE_VALUES.history}`]}>
+            <DeepLinkGuard>
+              <Routes>
+                <Route
+                  path={APP_ROUTE_PATHS.home}
+                  element={(
+                    <LegacyHomeAnalysisRedirect>
+                      <div>Attention hub</div>
+                    </LegacyHomeAnalysisRedirect>
+                  )}
+                />
+                <Route path={APP_ROUTE_PATHS.researchAnalysis} element={<LocationProbe />} />
+              </Routes>
+            </DeepLinkGuard>
+          </MemoryRouter>
+        </ToastProvider>
+      </UiLanguageProvider>,
+    );
+
+    expect(await screen.findByTestId('location')).toHaveTextContent(
+      `${APP_ROUTE_PATHS.researchAnalysis}?${ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment}=${ANALYSIS_WORKBENCH_SEGMENT_VALUES.history}`,
+    );
   });
 });

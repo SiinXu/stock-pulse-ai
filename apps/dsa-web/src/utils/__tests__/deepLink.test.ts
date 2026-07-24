@@ -52,6 +52,19 @@ describe('deepLink', () => {
     expect(parsed.issues).toEqual([]);
   });
 
+  it('preserves the legacy Home history workspace for the route redirect owner', () => {
+    const parsed = parseDeepLink('/?workspace=history&keep=yes');
+
+    expect(parsed.target).toEqual({
+      page: 'home',
+      recordId: undefined,
+      stockCode: undefined,
+      workspace: 'history',
+    });
+    expect(parsed.normalizedHref).toBe('/?workspace=history&keep=yes');
+    expect(parsed.issues).toEqual([]);
+  });
+
   it('removes invalid and sensitive state without dropping benign query context', () => {
     const parsed = parseDeepLink(
       '/?keep=yes&recordId=0&stock=%3Cscript%3E&workspace=unknown&api_key=secret',

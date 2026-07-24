@@ -15,7 +15,7 @@ GET /api/v1/history/{record_id}/diagnostics
 - 同步分析响应若已经带有 `diagnostic_summary`，前端可直接展示，不额外请求历史接口。
 - 诊断面板支持复制后端生成的脱敏 `copy_text`，用于 issue 或部署排障。
 - 分析链路在保存历史后会补齐任务/Provider/LLM/通知诊断到 `context_snapshot.diagnostics`，历史诊断接口统一聚合为用户可读摘要。
-- 首页运行流面板复用同一 RunFlowSnapshot 契约展示 active task、completed report 与大盘复盘；active task 通过任务 SSE 的可选增量事件实时追加事件流，完成或断线后再 refetch 快照保证最终一致。
+- 分析工作台的任务/历史分段与「研究 > 大盘复盘」页面复用同一 RunFlowSnapshot 契约展示 active task、completed report 与大盘复盘；active task 通过任务 SSE 的可选增量事件实时追加事件流，完成或断线后再 refetch 快照保证最终一致。
 
 ## Pipeline 阶段观测
 
@@ -114,7 +114,7 @@ GET /api/v1/history/{record_id}/flow
 
 ## 运行流视图
 
-运行流视图是在运行诊断摘要之上的可视化排障入口，用于串联一次分析从触发、数据获取、ContextPack 组装、LLM 生成到保存/通知的大致链路。它不替代诊断摘要的 `copy_text`，而是把同一批脱敏诊断证据组织为节点、连线、事件和摘要指标，方便从 Web 首页快速定位异常或降级环节。
+运行流视图是在运行诊断摘要之上的可视化排障入口，用于串联一次分析从触发、数据获取、ContextPack 组装、LLM 生成到保存/通知的大致链路。它不替代诊断摘要的 `copy_text`，而是把同一批脱敏诊断证据组织为节点、连线、事件和摘要指标，方便从 Web 分析工作台或大盘复盘页面定位异常或降级环节。
 
 后端提供两个只读快照接口：
 
@@ -133,8 +133,9 @@ GET /api/v1/history/{record_id}/flow
 
 Web 入口：
 
-- 首页活跃任务卡片提供运行流入口，打开抽屉后按 `task_id` 拉取任务快照。
-- 历史报告摘要和运行诊断区域提供运行流入口，打开抽屉后按历史记录 ID 拉取历史快照。
+- 分析工作台任务分段的活跃任务卡片提供运行流入口，打开 Drawer 后按 `task_id` 拉取任务快照。
+- 分析工作台历史分段的报告摘要和运行诊断区域提供运行流入口，打开 Drawer 后按历史记录 ID 拉取历史快照。
+- 「研究 > 大盘复盘」的历史报告继续按历史记录 ID 打开同一运行流 Drawer。
 - 面板展示摘要、基础拓扑、事件流和节点详情；复杂拓扑聚合、实时增量事件和布局 polish 会在后续阶段继续收敛。
 
 脱敏与兼容边界：

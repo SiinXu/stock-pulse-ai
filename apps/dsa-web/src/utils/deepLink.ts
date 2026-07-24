@@ -397,9 +397,6 @@ export function parseDeepLink(input: string, origin = DEFAULT_ORIGIN): ParsedDee
     if (rawWorkspace !== null) {
       if (HOME_WORKSPACE_VIEWS.has(rawWorkspace as HomeWorkspaceView)) {
         workspace = rawWorkspace as HomeWorkspaceView;
-        if (workspace === HOME_WORKSPACE_VALUES.history) {
-          params.delete(HOME_ROUTE_QUERY_KEYS.workspace);
-        }
       } else {
         params.delete(HOME_ROUTE_QUERY_KEYS.workspace);
         issues.push({ code: 'invalid_workspace', parameter: HOME_ROUTE_QUERY_KEYS.workspace });
