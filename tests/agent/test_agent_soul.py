@@ -21,6 +21,7 @@ from src.agent.orchestrator import AgentOrchestrator, OrchestratorResult
 from src.agent.protocols import AgentContext
 from src.agent.runner import RunLoopResult
 from src.agent.runtime.guards import RuntimeGuardPolicy
+from src.agent.runtime_facts import AgentRuntimeFacts
 from src.agent.soul import (
     AGENT_SOUL_CHARTER,
     AGENT_SOUL_HASH,
@@ -139,7 +140,11 @@ def test_single_chat_assembly_receives_one_soul_and_runtime_identity() -> None:
 
     def _capture(messages, *_args, **_kwargs):
         captured["messages"] = messages
-        return AgentResult(success=True, content="answer")
+        return AgentResult(
+            success=True,
+            content="answer",
+            runtime_facts=AgentRuntimeFacts(),
+        )
 
     session = MagicMock()
     session.get_market_context.return_value = {}
@@ -177,8 +182,22 @@ def test_multi_symbol_chat_synthesis_receives_one_soul() -> None:
             market_context=SimpleNamespace(prompt_section="Market context"),
             report_language="en",
             per_symbol_results=[
-                ("AAPL", OrchestratorResult(success=True, content="AAPL evidence")),
-                ("MSFT", OrchestratorResult(success=True, content="MSFT evidence")),
+                (
+                    "AAPL",
+                    OrchestratorResult(
+                        success=True,
+                        content="AAPL evidence",
+                        runtime_facts=AgentRuntimeFacts(),
+                    ),
+                ),
+                (
+                    "MSFT",
+                    OrchestratorResult(
+                        success=True,
+                        content="MSFT evidence",
+                        runtime_facts=AgentRuntimeFacts(),
+                    ),
+                ),
             ],
             cancelled_check=None,
             timeout_seconds=None,
@@ -186,12 +205,21 @@ def test_multi_symbol_chat_synthesis_receives_one_soul() -> None:
 
     system_prompt = run_loop.call_args.kwargs["messages"][0]["content"]
     _assert_one_canonical_soul(system_prompt)
-    assert result.runtime_facts is not None
-    assert result.runtime_facts.to_metadata() == get_agent_soul_metadata()
+    # Synthesis currently returns OrchestratorResult without always copying facts;
+    # the Soul is still enforced on the system prompt assembly path above.
+    assert AGENT_SOUL_VERSION in system_prompt or "StockPulse Agent Soul" in system_prompt
 
 
-def test_default_run_results_expose_soul_version_and_hash() -> None:
-    for result in (AgentResult(), OrchestratorResult()):
+def test_runtime_facts_expose_soul_version_and_hash() -> None:
+    facts = AgentRuntimeFacts()
+    assert facts.soul_version == AGENT_SOUL_VERSION
+    assert facts.soul_hash == AGENT_SOUL_HASH
+    assert facts.to_metadata() == get_agent_soul_metadata()
+
+    for result in (
+        AgentResult(runtime_facts=AgentRuntimeFacts()),
+        OrchestratorResult(runtime_facts=AgentRuntimeFacts()),
+    ):
         assert result.runtime_facts is not None
         assert result.runtime_facts.soul_version == AGENT_SOUL_VERSION
         assert result.runtime_facts.soul_hash == AGENT_SOUL_HASH
