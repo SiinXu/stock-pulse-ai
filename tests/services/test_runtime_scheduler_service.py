@@ -87,7 +87,7 @@ class _SynchronousThread(_NoopThread):
 
 
 class RuntimeSchedulerServiceTestCase(unittest.TestCase):
-    def test_run_analysis_args_include_workers(self) -> None:
+    def test_run_analysis_args_include_runtime_scope_defaults(self) -> None:
         config = SimpleNamespace(
             schedule_enabled=True,
             schedule_time="18:00",
@@ -109,6 +109,8 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
         self.assertEqual(len(seen_args), 1)
         self.assertTrue(hasattr(seen_args[0], "workers"))
         self.assertIsNone(seen_args[0].workers)
+        self.assertTrue(hasattr(seen_args[0], "portfolio"))
+        self.assertIsNone(seen_args[0].portfolio)
 
     def test_run_analysis_args_preserve_startup_schedule_flags(self) -> None:
         config = SimpleNamespace(
@@ -132,6 +134,7 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
                 "single_notify": True,
                 "no_context_snapshot": True,
                 "workers": 3,
+                "portfolio": "futu",
                 "serve": True,
             },
         )
@@ -147,6 +150,7 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
         self.assertTrue(seen_args[0].single_notify)
         self.assertTrue(seen_args[0].no_context_snapshot)
         self.assertEqual(seen_args[0].workers, 3)
+        self.assertEqual(seen_args[0].portfolio, "futu")
         self.assertFalse(seen_args[0].serve)
         self.assertTrue(seen_args[0].serve_only)
 

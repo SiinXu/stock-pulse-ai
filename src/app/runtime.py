@@ -65,19 +65,28 @@ def _run_analysis_with_runtime_scheduler_lock(
     config: Config,
     args: argparse.Namespace,
     stock_codes: Optional[List[str]] = None,
-) -> None:
+) -> bool:
     from src.services.runtime_scheduler import run_with_global_analysis_lock
+
+    analysis_succeeded = False
+
+    def _run_locked(runtime_config, runtime_args, runtime_stock_codes):
+        nonlocal analysis_succeeded
+        analysis_succeeded = bool(
+            run_full_analysis(runtime_config, runtime_args, runtime_stock_codes)
+        )
 
     # Keep startup/triggered analysis in sync with API runtime scheduler and
     # run-now entrypoint. Blocking is expected here because startup paths should
     # wait for an in-flight job before returning a response.
-    run_with_global_analysis_lock(
-        task_runner=run_full_analysis,
+    lock_acquired = run_with_global_analysis_lock(
+        task_runner=_run_locked,
         config=config,
         args=args,
         stock_codes=stock_codes,
         blocking=True,
     )
+    return bool(lock_acquired and analysis_succeeded)
 
 
 def start_api_server(host: str, port: int, config: Config) -> None:
@@ -363,6 +372,7 @@ def _coordinate_service_runtime(
             "single_notify": bool(getattr(args, "single_notify", False)),
             "no_context_snapshot": bool(getattr(args, "no_context_snapshot", False)),
             "workers": getattr(args, "workers", None),
+            "portfolio": getattr(args, "portfolio", None),
         })
         if not prepare_webui_frontend_assets():
             logger.warning(

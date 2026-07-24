@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Fixed] Prevented Windows API and desktop startup from hanging on a cold MIME database by initializing built-in mappings without scanning the registry before registering frontend asset types.
+- [Added] Added opt-in `--portfolio futu` analysis scope loading from non-zero long stock positions in eligible live Futu OpenD accounts, with A-share/Hong Kong/U.S. symbol normalization and no changes to the default static stock-list behavior.
 - [Tests] Added a shared `mockCompletedSetupStatus` Playwright helper and applied it to the `smoke`, `report-markdown`, and `infrastructure-acceptance` specs so the new default-on beginner HomePage experience no longer forces professional-mode assertions off `分析` / `完整分析报告` / full report body.
 - [Fixed] Preserved structured diagnostic fields in prose log lines by preventing whitespace prose from triggering the composite-key walker's bounded fail-closed path and removing a sensitive-word ambiguity from the bot request-size log, while retaining fail-closed text/mapping parity for sensitive whitespace and punctuation labels.
 - [Added] Embedded additive `schema_version` tags in the `Report`, `RunFlowSnapshot`, and `DecisionSignalPresentation` serialized artifacts (default `report-v1` / `run-flow-v1` / `decision-signal-presentation-v1`); historical payloads that omit the field deserialize as the v1 default, and the versioning guard test plus migration docs inventory were extended accordingly.
