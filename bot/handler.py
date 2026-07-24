@@ -99,7 +99,7 @@ def handle_webhook(
         )
         return WebhookResponse.error("Invalid JSON", 400)
 
-    logger.debug("[BotHandler] Parsed webhook payload: body_bytes=%d", len(body))
+    logger.debug("[BotHandler] Parsed request: body_bytes=%d", len(body))
 
     # Handle webhooks
     message, immediate_response = platform.handle_webhook(headers, body, data)
@@ -196,7 +196,7 @@ async def handle_webhook_async(
         )
         return WebhookResponse.error("Invalid JSON", 400)
 
-    logger.debug("[BotHandler] Parsed webhook payload: body_bytes=%d", len(body))
+    logger.debug("[BotHandler] Parsed request: body_bytes=%d", len(body))
 
     message, immediate_response = platform.handle_webhook(headers, body, data)
 
