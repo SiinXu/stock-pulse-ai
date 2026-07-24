@@ -162,9 +162,12 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
   const refreshRuntime = useCallback(async () => {
     setActionError('');
     try {
-      setRuntime(await transport.getRuntime());
+      const nextRuntime = await transport.getRuntime();
+      setRuntime(nextRuntime);
+      return nextRuntime;
     } catch {
       setActionError(text.actionFailed);
+      return null;
     }
   }, [text.actionFailed, transport]);
 
@@ -249,19 +252,26 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
     setPrimaryPromptModel('');
     try {
       const result = await transport.pull(modelId, setProgress, controller.signal);
-      await refreshRuntime();
+      const nextRuntime = await refreshRuntime();
       await onConfigurationChanged?.();
       setReadyModel(modelId);
       readyNotifiedRef.current = modelId;
       onModelReady?.(modelId);
-      if (result.selectedPrimary) {
+      if (
+        result.selectedPrimary
+        || Boolean(nextRuntime && modelIsAssigned(nextRuntime.configuration.primaryModel, modelId))
+      ) {
         setPrimaryPromptModel('');
       } else {
         setPrimaryPromptModel(modelId);
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
-      setActionError(text.pullFailed);
+      setActionError(
+        error instanceof LocalModelTransportError && error.code === 'local_model_activation_failed'
+          ? text.actionFailed
+          : text.pullFailed,
+      );
       if (error instanceof LocalModelTransportError && error.manualCommand) {
         setManualCommand(error.manualCommand);
       } else {

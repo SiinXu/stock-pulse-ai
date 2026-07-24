@@ -167,6 +167,41 @@ describe('LocalModelsPanel', () => {
     expect(onModelReady).toHaveBeenCalledWith('qwen3:4b');
   });
 
+  it('does not prompt to reselect a local model that is already primary', async () => {
+    const configuredRuntime: LocalModelRuntimeState = {
+      ...AVAILABLE_RUNTIME,
+      installedModels: ['qwen3:4b'],
+      configuration: {
+        ...AVAILABLE_RUNTIME.configuration,
+        configVersion: 'config-2',
+        registeredModels: ['qwen3:4b'],
+        primaryModel: 'ollama/qwen3:4b',
+      },
+    };
+    createTransport.mockReturnValue(transport({
+      getRuntime: vi.fn()
+        .mockResolvedValueOnce({
+          ...AVAILABLE_RUNTIME,
+          configuration: {
+            ...AVAILABLE_RUNTIME.configuration,
+            primaryModel: 'ollama/qwen3:4b',
+          },
+        })
+        .mockResolvedValue(configuredRuntime),
+      pull: vi.fn().mockResolvedValue({
+        modelId: 'qwen3:4b',
+        activated: true,
+        selectedPrimary: false,
+      }),
+    }));
+
+    renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: 'Download' }));
+
+    expect(await screen.findByText('qwen3:4b is downloaded and registered.')).toBeInTheDocument();
+    expect(screen.queryByText(/current primary model was preserved/)).not.toBeInTheDocument();
+  });
+
   it('degrades to a copyable command when Ollama is unavailable', async () => {
     createTransport.mockReturnValue(transport({
       getRuntime: vi.fn().mockResolvedValue({

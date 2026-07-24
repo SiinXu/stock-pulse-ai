@@ -220,7 +220,15 @@ function createDesktopTransport(bridge: DesktopLocalModelBridge): LocalModelTran
             `ollama pull ${modelId}`,
           );
         }
-        const activation = await localModelsApi.assign(modelId, 'auto');
+        let activation: LocalModelMutationResponse;
+        try {
+          activation = await localModelsApi.assign(modelId, 'auto');
+        } catch {
+          throw new LocalModelTransportError(
+            'local_model_activation_failed',
+            'Local model configuration failed',
+          );
+        }
         return {
           modelId,
           activated: true,
@@ -239,7 +247,7 @@ function createDesktopTransport(bridge: DesktopLocalModelBridge): LocalModelTran
           let weightsRemain = true;
           try {
             const state = await bridge.detect();
-            if (Array.isArray(state.installedModels)) {
+            if (state.status === 'running' && Array.isArray(state.installedModels)) {
               weightsRemain = state.installedModels.some(
                 (installed) => typeof installed === 'string'
                   && installed.toLowerCase() === modelId.toLowerCase(),
