@@ -3,6 +3,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  BarChart3,
   CheckCircle2,
   FileUp,
   FlaskConical,
@@ -41,7 +42,7 @@ import {
 } from '../components/common';
 import { useToast } from '../components/common/toastContext';
 import { DashboardStateBlock } from '../components/dashboard';
-import { HistoryList } from '../components/history';
+import { HistoryList, StockHistoryTrendDrawer } from '../components/history';
 import { ReportSummary } from '../components/report/ReportSummary';
 import { RunFlowPanel } from '../components/run-flow';
 import { StockAutocomplete } from '../components/StockAutocomplete';
@@ -167,6 +168,14 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
     selectedReport,
     selectedRecordId,
     isLoadingReport,
+    isHistoryTrendOpen,
+    stockHistoryItems,
+    stockHistoryTotal,
+    stockHistoryHasMore,
+    isLoadingStockHistory,
+    isLoadingMoreStockHistory,
+    stockHistoryError,
+    stockHistoryFilters,
     activeTasks,
     stockBarItems,
     isLoadingStockBar,
@@ -182,6 +191,10 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
     selectHistoryItem,
     retrySelectedRecord,
     clearSelectedRecord,
+    openHistoryTrend,
+    closeHistoryTrend,
+    setStockHistoryRange,
+    loadMoreStockHistory,
     submitAnalysis,
     syncTaskCreated,
     syncTaskUpdated,
@@ -769,6 +782,18 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
     && selectedReport?.meta.id === routeState.recordId
     ? selectedReport
     : null;
+  const isHistoryTrendUnavailable = !selectedReport?.meta.stockCode;
+  useEffect(() => {
+    if (
+      isHistoryTrendOpen
+      && (
+        routeState.segment !== ANALYSIS_WORKBENCH_SEGMENT_VALUES.history
+        || isHistoryTrendUnavailable
+      )
+    ) {
+      closeHistoryTrend();
+    }
+  }, [closeHistoryTrend, isHistoryTrendOpen, isHistoryTrendUnavailable, routeState.segment]);
   const hasUnresolvedReportIntent = routeState.recordId !== null
     && selectedRecordId === routeState.recordId
     && selectedAnalysisReport === null
@@ -1048,17 +1073,51 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
               {isLoadingReport ? (
                 <DashboardStateBlock title={t('home.loadingReport')} loading />
               ) : selectedAnalysisReport ? (
-                <ReportSummary
-                  data={selectedAnalysisReport}
-                  isHistory
-                  onOpenRunFlow={openHistoryRunFlow}
-                  watchlist={{
-                    isInWatchlist: watchlist.isInWatchlist,
-                    onToggle: watchlist.toggleWatchlist,
-                    isActioning: watchlist.isActioning,
-                    actionMessage: watchlist.actionMessage,
-                  }}
-                />
+                <>
+                  {!isHistoryTrendOpen ? (
+                    <div className="mb-3 flex justify-end">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={isHistoryTrendUnavailable}
+                        onClick={() => void openHistoryTrend()}
+                      >
+                        <BarChart3 className="h-4 w-4" aria-hidden="true" />
+                        {t('home.historyTrend')}
+                      </Button>
+                    </div>
+                  ) : null}
+                  {isHistoryTrendOpen ? (
+                    <StockHistoryTrendDrawer
+                      key={`workbench-stock-history-${selectedAnalysisReport.meta.id}`}
+                      report={selectedAnalysisReport}
+                      items={stockHistoryItems}
+                      total={stockHistoryTotal}
+                      hasMore={stockHistoryHasMore}
+                      isLoading={isLoadingStockHistory}
+                      isLoadingMore={isLoadingMoreStockHistory}
+                      error={stockHistoryError}
+                      filters={stockHistoryFilters}
+                      onClose={closeHistoryTrend}
+                      onRangeChange={(range) => void setStockHistoryRange(range)}
+                      onLoadMore={() => void loadMoreStockHistory()}
+                      onSelectRecord={navigateToRecord}
+                      onRetry={() => void openHistoryTrend()}
+                    />
+                  ) : (
+                    <ReportSummary
+                      data={selectedAnalysisReport}
+                      isHistory
+                      onOpenRunFlow={openHistoryRunFlow}
+                      watchlist={{
+                        isInWatchlist: watchlist.isInWatchlist,
+                        onToggle: watchlist.toggleWatchlist,
+                        isActioning: watchlist.isActioning,
+                        actionMessage: watchlist.actionMessage,
+                      }}
+                    />
+                  )}
+                </>
               ) : hasUnresolvedReportIntent && !reportDetailError ? (
                 <DashboardStateBlock
                   title={t('home.loadingReport')}

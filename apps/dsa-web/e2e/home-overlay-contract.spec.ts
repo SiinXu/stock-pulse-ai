@@ -1014,6 +1014,12 @@ test.describe('Analysis Workbench interaction contract', () => {
     await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
     await expect.poll(() => fixture.detailRequests).toContain(1);
 
+    await page.getByRole('button', { name: 'History trend' }).click();
+    await expect(page.getByRole('heading', { name: 'History trend' })).toBeVisible();
+    await expect(page.getByRole('table', { name: 'History records' })).toBeVisible();
+    await page.getByRole('button', { name: 'Back to current report' }).click();
+    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+
     await page.getByTestId('run-diagnostics').locator('summary').first().click();
     await page.getByRole('button', { name: 'View run flow for history record 1' }).click();
     await expect(page.getByTestId('run-flow-panel')).toBeVisible();

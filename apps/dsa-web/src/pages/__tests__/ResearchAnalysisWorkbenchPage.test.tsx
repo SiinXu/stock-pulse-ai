@@ -54,6 +54,7 @@ vi.mock('../../api/analysis', async () => {
 
 vi.mock('../../api/history', () => ({
   historyApi: {
+    getList: vi.fn(),
     getDetail: vi.fn(),
     deleteRecords: vi.fn(),
   },
@@ -219,6 +220,21 @@ describe('ResearchAnalysisWorkbenchPage', () => {
       status: 'pending',
     });
     vi.mocked(historyApi.getDetail).mockResolvedValue(report);
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 2,
+      page: 1,
+      limit: 20,
+      items: [
+        historyItem,
+        {
+          ...historyItem,
+          id: 11,
+          queryId: 'query-11',
+          createdAt: '2026-07-22T12:00:00Z',
+          sentimentScore: 49,
+        },
+      ],
+    });
     vi.mocked(historyApi.deleteRecords).mockResolvedValue({ deleted: 1 });
     vi.mocked(stocksApi.extractFromImage).mockResolvedValue({ codes: ['AAPL', 'MSFT'] });
     vi.mocked(stocksApi.parseImport).mockResolvedValue({ codes: ['AAPL', 'MSFT'] });
@@ -317,6 +333,26 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow))
       .toBe(RUN_FLOW_ROUTE_QUERY_VALUES.history);
     expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowRecordId)).toBe('12');
+  });
+
+  it('reuses the history trend comparison and returns to the selected report', async () => {
+    useStockPoolStore.setState({ historyItems: [historyItem] });
+    renderWorkbench(buildAnalysisWorkbenchHref({ recordId: 12 }));
+
+    expect(await screen.findByTestId('report-summary')).toHaveTextContent('Apple');
+    fireEvent.click(screen.getByRole('button', { name: '历史趋势' }));
+
+    expect(await screen.findByRole('heading', { name: '历史趋势' })).toBeInTheDocument();
+    expect(historyApi.getList).toHaveBeenCalledWith(expect.objectContaining({
+      stockCode: 'AAPL',
+      page: 1,
+      limit: 20,
+    }));
+    expect(within(screen.getByRole('table', { name: '历史分析记录' })).getAllByRole('row'))
+      .toHaveLength(3);
+
+    fireEvent.click(screen.getByRole('button', { name: '返回当前报告' }));
+    expect(await screen.findByTestId('report-summary')).toHaveTextContent('Apple');
   });
 
   it('selects the newest report when the history segment has no recordId', async () => {
