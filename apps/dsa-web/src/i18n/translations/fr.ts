@@ -3177,6 +3177,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.viewRouting": "Voir le routage des tâches",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.visionModel": "Modèle Vision",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.title": "Assistant de configuration rapide",
+  "locales.stockSearch.STOCK_SEARCH_TEXT.inputLabel": "Recherche d’actions",
   "locales.stockSearch.STOCK_SEARCH_TEXT.marketBSE": "Pékin",
   "locales.stockSearch.STOCK_SEARCH_TEXT.marketCN": "Chine",
   "locales.stockSearch.STOCK_SEARCH_TEXT.marketHK": "Hong Kong",

@@ -990,9 +990,12 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
 
 test.describe('Analysis Workbench interaction contract', () => {
   test('three URL segments keep history selection and Run Flow on one page', async ({ page }) => {
-    const fixture = await openFixtureHome(page, APP_ROUTE_PATHS.researchAnalysis);
+    const fixture = await openFixtureHome(page, APP_ROUTE_PATHS.home);
 
-    await expect(page.getByRole('heading', { name: 'Analysis Workbench' })).toBeVisible();
+    await page.getByRole('link', { name: 'Analysis Workbench' }).click();
+    const heading = page.getByRole('heading', { name: 'Analysis Workbench' });
+    await expect(heading).toBeVisible();
+    await expect(heading).toBeFocused();
     const tabs = page.getByRole('tablist', { name: 'Analysis Workbench segments' });
     await expect(tabs.getByRole('tab')).toHaveText([
       'Launch & batch',

@@ -11,6 +11,10 @@ import { systemConfigApi } from '../../api/systemConfig';
 import { ToastProvider } from '../../components/common';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import {
+  RouteFocusRegistrationContext,
+  type RouteFocusTarget,
+} from '../../contexts/routeFocusContext';
+import {
   ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS,
   ANALYSIS_WORKBENCH_SEGMENT_VALUES,
   APP_ROUTE_PATHS,
@@ -27,6 +31,10 @@ type LifecycleOptions = Parameters<
 
 let lifecycleOptions: LifecycleOptions | null = null;
 let watchlistCodes: string[] = [];
+const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
+  void target;
+  return () => {};
+});
 
 vi.mock('../../hooks/useDashboardLifecycle', () => ({
   useDashboardLifecycle: (options: LifecycleOptions) => {
@@ -185,19 +193,21 @@ function LocationProbe() {
 
 function renderWorkbench(initialEntry: string = APP_ROUTE_PATHS.researchAnalysis) {
   return render(
-    <UiLanguageProvider initialLanguage="zh">
-      <ToastProvider>
-        <MemoryRouter initialEntries={[initialEntry]}>
-          <LocationProbe />
-          <Routes>
-            <Route
-              path={APP_ROUTE_PATHS.researchAnalysis}
-              element={<ResearchAnalysisWorkbenchPage />}
-            />
-          </Routes>
-        </MemoryRouter>
-      </ToastProvider>
-    </UiLanguageProvider>,
+    <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+      <UiLanguageProvider initialLanguage="zh">
+        <ToastProvider>
+          <MemoryRouter initialEntries={[initialEntry]}>
+            <LocationProbe />
+            <Routes>
+              <Route
+                path={APP_ROUTE_PATHS.researchAnalysis}
+                element={<ResearchAnalysisWorkbenchPage />}
+              />
+            </Routes>
+          </MemoryRouter>
+        </ToastProvider>
+      </UiLanguageProvider>
+    </RouteFocusRegistrationContext.Provider>,
   );
 }
 
@@ -250,7 +260,15 @@ describe('ResearchAnalysisWorkbenchPage', () => {
   it('renders one workbench with three URL-backed segments and launch actions', async () => {
     renderWorkbench();
 
-    expect(await screen.findByRole('heading', { name: '分析工作台' })).toBeInTheDocument();
+    const heading = await screen.findByRole('heading', { name: '分析工作台' });
+    expect(heading).toBeInTheDocument();
+    expect(routeFocusRegister).toHaveBeenCalledWith(expect.objectContaining({
+      routeId: APP_ROUTE_PATHS.researchAnalysis,
+      ready: true,
+    }));
+    const registration = routeFocusRegister.mock.calls.at(-1)?.[0];
+    expect(registration?.headingRef.current).toBe(heading);
+    expect(screen.getByRole('combobox', { name: '股票搜索' })).toBeInTheDocument();
     expect(document.title).toBe('分析工作台 - StockPulse');
     const workbenchTabs = screen.getByRole('tablist', { name: '分析工作台分段' });
     expect(within(workbenchTabs).getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
@@ -507,8 +525,10 @@ describe('ResearchAnalysisWorkbenchPage', () => {
 
     const pendingButton = await screen.findByRole('button', { name: '仅未分析' });
     expect(pendingButton).toBeDisabled();
-    expect(pendingButton).toHaveAttribute(
-      'title',
+    expect(pendingButton).not.toHaveAttribute('title');
+    const reasonId = pendingButton.getAttribute('aria-describedby');
+    expect(reasonId).toBeTruthy();
+    expect(document.getElementById(reasonId!)).toHaveTextContent(
       '自选股今日状态仍有未知项，请刷新后再提交仅未分析。',
     );
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();

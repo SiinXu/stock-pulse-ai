@@ -3177,6 +3177,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.viewRouting": "查看任務路由",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.visionModel": "Vision 模型",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.title": "快速配置嚮導",
+  "locales.stockSearch.STOCK_SEARCH_TEXT.inputLabel": "股票搜尋",
   "locales.stockSearch.STOCK_SEARCH_TEXT.marketBSE": "北交所",
   "locales.stockSearch.STOCK_SEARCH_TEXT.marketCN": "A股",
   "locales.stockSearch.STOCK_SEARCH_TEXT.marketHK": "港股",

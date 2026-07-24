@@ -44,6 +44,7 @@ import { useToast } from '../components/common/toastContext';
 import { DashboardStateBlock } from '../components/dashboard';
 import { HistoryList, StockHistoryTrendDrawer } from '../components/history';
 import { ReportSummary } from '../components/report/ReportSummary';
+import { useRouteFocusTarget } from '../components/routing';
 import { RunFlowPanel } from '../components/run-flow';
 import { StockAutocomplete } from '../components/StockAutocomplete';
 import { TaskPanel } from '../components/tasks';
@@ -92,6 +93,7 @@ type WorkbenchNavigationState = {
 };
 
 const WORKBENCH_TABS_ID = 'analysis-workbench-tabs';
+const WORKBENCH_PENDING_REASON_ID = 'analysis-workbench-pending-reason';
 function stateForSegment(
   current: AnalysisWorkbenchRouteState,
   segment: AnalysisWorkbenchSegment,
@@ -126,6 +128,12 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
   const navigate = useNavigate();
   const { language, t } = useUiLanguage();
   const { showToast } = useToast();
+  const pageHeadingRef = useRef<HTMLHeadingElement>(null);
+  useRouteFocusTarget({
+    routeId: APP_ROUTE_PATHS.researchAnalysis,
+    headingRef: pageHeadingRef,
+    ready: true,
+  });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const completedRecordIdsRef = useRef(new Map<string, number>());
   const suppressedHistoryDefaultSearchRef = useRef<string | null>(null);
@@ -803,6 +811,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
   return (
     <AppPage data-testid="analysis-workbench-page">
       <PageHeader
+        ref={pageHeadingRef}
         title={t('analysisWorkbench.title')}
         description={t('analysisWorkbench.description')}
         actions={(
@@ -945,8 +954,8 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                     || watchlistCoverage.isTodayStatusBlocked
                     || watchlistCoverage.pendingCodes.length === 0
                   )}
-                  title={watchlistCoverage.isTodayStatusBlocked
-                    ? t('watchlist.pendingStatusUnavailable')
+                  aria-describedby={watchlistCoverage.isTodayStatusBlocked
+                    ? WORKBENCH_PENDING_REASON_ID
                     : undefined}
                   onClick={() => void submitWatchlistBatch('pending')}
                 >
@@ -975,6 +984,14 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                     <FileUp className="h-4 w-4" aria-hidden="true" />
                     {t('analysisWorkbench.analyzeImported', { count: importedCodes.length })}
                   </Button>
+                ) : null}
+                {watchlistCoverage.isTodayStatusBlocked ? (
+                  <p
+                    id={WORKBENCH_PENDING_REASON_ID}
+                    className="basis-full text-xs text-secondary-text"
+                  >
+                    {t('watchlist.pendingStatusUnavailable')}
+                  </p>
                 ) : null}
                 <input
                   ref={fileInputRef}

@@ -3177,6 +3177,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.viewRouting": "タスクルーティングを表示",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.visionModel": "Vision モデル",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.title": "クイックセットアップウィザード",
+  "locales.stockSearch.STOCK_SEARCH_TEXT.inputLabel": "銘柄検索",
   "locales.stockSearch.STOCK_SEARCH_TEXT.marketBSE": "北京",
   "locales.stockSearch.STOCK_SEARCH_TEXT.marketCN": "中国",
   "locales.stockSearch.STOCK_SEARCH_TEXT.marketHK": "香港",

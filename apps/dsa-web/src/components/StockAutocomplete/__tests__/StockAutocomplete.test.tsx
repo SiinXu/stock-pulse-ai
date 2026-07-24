@@ -235,7 +235,7 @@ describe('StockAutocomplete', () => {
       />
     );
 
-    const input = screen.getByRole('combobox');
+    const input = screen.getByRole('combobox', { name: '股票搜索' });
     expect(input).toHaveAttribute('aria-autocomplete', 'none');
     expect(input).toHaveAttribute('role', 'combobox');
   });
@@ -271,7 +271,7 @@ describe('StockAutocomplete', () => {
         />
       );
 
-      const input = screen.getByPlaceholderText(/输入股票代码或名称/);
+      const input = screen.getByRole('textbox', { name: '股票搜索' });
       expect(input).toHaveAttribute('data-autocomplete-mode', 'fallback');
       expect(input).toHaveClass('h-11', 'min-h-11', 'min-w-11', 'sm:h-9', 'sm:min-h-9', 'sm:min-w-9');
     });
