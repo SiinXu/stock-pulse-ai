@@ -422,7 +422,7 @@ class TestAgentExecutor(unittest.TestCase):
         self.assertEqual(captured["stock_scope"].expected_stock_code, "")
         self.assertEqual(captured["stock_scope"].allowed_stock_codes, set())
 
-    def test_run_does_not_pass_stock_scope_to_dashboard_path(self):
+    def test_run_freezes_context_stock_scope_for_dashboard_path(self):
         registry = _make_registry_with_echo()
         adapter = _make_mock_adapter()
         executor = AgentExecutor(registry, adapter, max_steps=2)
@@ -436,7 +436,9 @@ class TestAgentExecutor(unittest.TestCase):
             result = executor.run("Analyze 600519", context={"stock_code": "600519"})
 
         self.assertTrue(result.success)
-        self.assertIsNone(captured["stock_scope"])
+        self.assertEqual(captured["stock_scope"].mode, "maintain")
+        self.assertEqual(captured["stock_scope"].expected_stock_code, "600519")
+        self.assertEqual(captured["stock_scope"].allowed_stock_codes, {"600519"})
 
     def test_resolve_stock_scope_compare_collects_multiple_normalized_codes(self):
         result = resolve_stock_scope(

@@ -11,6 +11,7 @@ import re
 import threading
 from collections.abc import Callable
 
+from src.agent.tool_surface import validate_tool_parameter_value
 from src.agent.tools.registry import (
     SUPPORTED_TOOL_SURFACE_SCOPE_DIMENSIONS,
     ToolDefinition,
@@ -76,6 +77,21 @@ def _valid_parameter(parameter: object) -> bool:
         and parameter.minimum > parameter.maximum
     ):
         return False
+    if parameter.enum is not None and any(
+        validate_tool_parameter_value(parameter, value) is not None
+        for value in parameter.enum
+    ):
+        return False
+    if parameter.required:
+        if parameter.default is not None:
+            return False
+    else:
+        if validate_tool_parameter_value(parameter, parameter.default) is not None:
+            return False
+        try:
+            json.dumps(parameter.default, allow_nan=False, sort_keys=True)
+        except (TypeError, ValueError):
+            return False
     return True
 
 
@@ -165,6 +181,18 @@ def validate_agent_tool_definition(implementation: object) -> bool:
     has_stock_parameter = "stock_code" in parameter_names
     declares_stock_scope = "stock" in policy.scope_dimensions
     if has_stock_parameter != declares_stock_scope:
+        return False
+    stock_parameter = next(
+        (
+            parameter
+            for parameter in implementation.parameters
+            if parameter.name == "stock_code"
+        ),
+        None,
+    )
+    if declares_stock_scope and (
+        stock_parameter is None or not stock_parameter.required
+    ):
         return False
 
     try:

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
+from src.agent.stock_scope import resolve_stock_scope
 from src.market_context import get_market_guidelines, get_market_role
 from src.report_language import normalize_report_language
 
@@ -37,7 +38,11 @@ class _RunMethods:
         Returns:
             AgentResult with parsed dashboard or error.
         """
-        system_prompt, user_message, tool_decls = self.build_run_messages(task, context)
+        scope_resolution = resolve_stock_scope(task, context)
+        system_prompt, user_message, tool_decls = self.build_run_messages(
+            task,
+            scope_resolution.effective_context,
+        )
 
         # Initialize conversation
         messages: List[Dict[str, Any]] = [
@@ -46,7 +51,11 @@ class _RunMethods:
         ]
 
         return self._run_loop(
-            messages, tool_decls, parse_dashboard=True, cancelled_check=cancelled_check
+            messages,
+            tool_decls,
+            parse_dashboard=True,
+            stock_scope=scope_resolution.stock_scope,
+            cancelled_check=cancelled_check,
         )
 
     def build_run_messages(

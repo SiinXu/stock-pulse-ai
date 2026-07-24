@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
 from src.agent.agents.technical_agent import TechnicalAgent
+from src.agent.executor import AgentExecutor
+from src.agent.llm_adapter import LLMResponse, ToolCall
 from src.agent.stock_scope import StockScope
 from src.agent.tool_surface import ToolSurface
 from src.agent.tools.kronos_tools import (
@@ -29,7 +33,10 @@ from src.plugins import (
 )
 from src.plugins.builtin import get_configured_builtin_plugins
 from src.plugins.builtin.kronos import KronosAgentToolPlugin
-from src.services.kronos_forecast_service import KRONOS_FORECAST_DISCLAIMER
+from src.services.kronos_forecast_service import (
+    KRONOS_FORECAST_DISCLAIMER,
+    KRONOS_MODEL_SPECS,
+)
 
 
 def _config(weights_dir, *, enabled=True, size="mini"):
@@ -41,12 +48,34 @@ def _config(weights_dir, *, enabled=True, size="mini"):
 
 
 def _write_ready_weights(root, *, size="mini"):
-    tokenizer = "Kronos-Tokenizer-2k" if size == "mini" else "Kronos-Tokenizer-base"
-    for directory in (f"Kronos-{size}", tokenizer):
+    spec = KRONOS_MODEL_SPECS[size]
+    tensor_header = json.dumps(
+        {
+            "readiness_probe": {
+                "dtype": "F32",
+                "shape": [1],
+                "data_offsets": [0, 4],
+            }
+        },
+        separators=(",", ":"),
+    ).encode("utf-8")
+    tensor_header += b" " * (-len(tensor_header) % 8)
+    safetensors_payload = (
+        len(tensor_header).to_bytes(8, "little")
+        + tensor_header
+        + b"\x00\x00\x00\x00"
+    )
+    for directory, config in (
+        (spec.model_directory, spec.model_config),
+        (spec.tokenizer_directory, spec.tokenizer_config),
+    ):
         target = root / directory
         target.mkdir(parents=True, exist_ok=True)
-        (target / "config.json").write_text("{}", encoding="utf-8")
-        (target / "model.safetensors").write_bytes(b"test")
+        (target / "config.json").write_text(
+            json.dumps(dict(config), sort_keys=True),
+            encoding="utf-8",
+        )
+        (target / "model.safetensors").write_bytes(safetensors_payload)
     return root
 
 
@@ -153,10 +182,15 @@ def test_missing_weights_prevent_registration_without_network_access(
     assert "Download the official Hugging Face artifacts elsewhere" in rendered
 
 
-def test_invalid_local_weight_config_prevents_registration(tmp_path, caplog) -> None:
+@pytest.mark.parametrize("config_payload", ["not-json", "{}"])
+def test_invalid_local_weight_config_prevents_registration(
+    tmp_path,
+    caplog,
+    config_payload,
+) -> None:
     weights = _write_ready_weights(tmp_path)
     (weights / "Kronos-mini" / "config.json").write_text(
-        "not-json",
+        config_payload,
         encoding="utf-8",
     )
     registry = ToolRegistry()
@@ -176,6 +210,82 @@ def test_invalid_local_weight_config_prevents_registration(tmp_path, caplog) -> 
     assert result.success is True
     assert registry.get(KRONOS_FORECAST_TOOL_NAME) is None
     assert "weights_invalid" in "\n".join(
+        record.getMessage() for record in caplog.records
+    )
+
+
+def test_invalid_safetensors_container_prevents_registration(tmp_path, caplog) -> None:
+    weights = _write_ready_weights(tmp_path)
+    (weights / "Kronos-mini" / "model.safetensors").write_bytes(b"not-safetensors")
+
+    caplog.set_level(logging.WARNING, logger="src.agent.tools.kronos_tools")
+    tool = build_kronos_tool(
+        _config(weights),
+        dependency_probe=lambda _module: True,
+        service_factory=lambda _availability: _FakeService(),
+    )
+
+    assert tool is None
+    rendered = "\n".join(record.getMessage() for record in caplog.records)
+    assert "weights_invalid" in rendered
+    assert "Kronos-mini/model.safetensors" in rendered
+
+
+def test_default_service_factory_prepares_local_model_before_registration(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    calls = []
+
+    class _PreparingBackend:
+        def __init__(self, **kwargs) -> None:
+            calls.append(("init", kwargs))
+
+        def prepare(self) -> None:
+            calls.append(("prepare", None))
+
+        def predict_paths(self, *_args, **_kwargs):
+            raise AssertionError("inference is not part of registration")
+
+    monkeypatch.setattr(
+        "src.agent.tools.kronos_tools.OfficialKronosInferenceBackend",
+        _PreparingBackend,
+    )
+
+    tool = build_kronos_tool(
+        _config(_write_ready_weights(tmp_path)),
+        dependency_probe=lambda _module: True,
+    )
+
+    assert tool is not None
+    assert [event for event, _payload in calls] == ["init", "prepare"]
+
+
+def test_local_model_prepare_failure_keeps_tool_absent(
+    tmp_path,
+    monkeypatch,
+    caplog,
+) -> None:
+    class _BrokenBackend:
+        def __init__(self, **_kwargs) -> None:
+            pass
+
+        def prepare(self) -> None:
+            raise RuntimeError("local artifact rejected")
+
+    monkeypatch.setattr(
+        "src.agent.tools.kronos_tools.OfficialKronosInferenceBackend",
+        _BrokenBackend,
+    )
+    caplog.set_level(logging.WARNING, logger="src.agent.tools.kronos_tools")
+
+    tool = build_kronos_tool(
+        _config(_write_ready_weights(tmp_path)),
+        dependency_probe=lambda _module: True,
+    )
+
+    assert tool is None
+    assert "reason=model_load_failed" in "\n".join(
         record.getMessage() for record in caplog.records
     )
 
@@ -279,6 +389,118 @@ def test_registration_rejects_handler_schema_drift(parameters, handler) -> None:
     ):
         extension_registry.register(
             plugin_id="test.schema-drift",
+            extension_point="agent_tool",
+            registration_id=tool.name,
+            implementation=tool,
+        )
+
+    assert native_registry.get(tool.name) is None
+
+
+@pytest.mark.parametrize(
+    ("parameter", "handler"),
+    [
+        (
+            ToolParameter(
+                name="value",
+                type="integer",
+                description="Value",
+                required=False,
+                default=2,
+                maximum=1,
+            ),
+            lambda value=2: value,
+        ),
+        (
+            ToolParameter(
+                name="value",
+                type="integer",
+                description="Value",
+                required=False,
+                default="2",
+            ),
+            lambda value="2": value,
+        ),
+        (
+            ToolParameter(
+                name="value",
+                type="string",
+                description="Value",
+                required=False,
+                default="base",
+                enum=["mini"],
+            ),
+            lambda value="base": value,
+        ),
+        (
+            ToolParameter(
+                name="value",
+                type="integer",
+                description="Value",
+                enum=["1"],
+            ),
+            lambda value: value,
+        ),
+    ],
+)
+def test_registration_rejects_defaults_and_enum_values_outside_schema(
+    parameter,
+    handler,
+) -> None:
+    native_registry = ToolRegistry()
+    extension_registry = build_agent_tool_extension_registry(native_registry)
+    tool = ToolDefinition(
+        name="invalid_parameter_value",
+        description="Invalid plugin parameter value",
+        parameters=[parameter],
+        handler=handler,
+        policy=ToolPolicy.declared(read_only=True),
+        enforce_contract=True,
+    )
+
+    with pytest.raises(
+        PluginRegistryError,
+        match="extension_implementation_invalid",
+    ):
+        extension_registry.register(
+            plugin_id="test.invalid-parameter-value",
+            extension_point="agent_tool",
+            registration_id=tool.name,
+            implementation=tool,
+        )
+
+    assert native_registry.get(tool.name) is None
+
+
+def test_registration_requires_stock_scoped_identity_parameter() -> None:
+    native_registry = ToolRegistry()
+    extension_registry = build_agent_tool_extension_registry(native_registry)
+    tool = ToolDefinition(
+        name="optional_stock_identity",
+        description="Invalid optional stock identity",
+        parameters=[
+            ToolParameter(
+                name="stock_code",
+                type="string",
+                description="Stock code",
+                required=False,
+                default="AAPL",
+            )
+        ],
+        handler=lambda stock_code="AAPL": {"stock_code": stock_code},
+        policy=ToolPolicy.declared(
+            read_only=True,
+            scope_dimensions=["stock"],
+        ),
+        enforce_contract=True,
+    )
+
+    with pytest.raises(
+        PluginRegistryError,
+        match="extension_implementation_invalid",
+    ):
+        extension_registry.register(
+            plugin_id="test.optional-stock-identity",
             extension_point="agent_tool",
             registration_id=tool.name,
             implementation=tool,
@@ -460,6 +682,58 @@ def test_ready_tool_executes_with_structured_disclaimer_and_bounded_schema(
     assert result["ok"] is True
     assert result["result"]["schema_version"] == "kronos-forecast-v1"
     assert result["result"]["disclaimer"] == KRONOS_FORECAST_DISCLAIMER
+    assert fake_service.calls == [
+        {
+            "stock_code": "600519",
+            "lookback_days": 30,
+            "horizon_days": 5,
+        }
+    ]
+
+
+def test_single_agent_run_executes_kronos_with_frozen_context_scope(tmp_path) -> None:
+    fake_service = _FakeService()
+    tool = build_kronos_tool(
+        _config(_write_ready_weights(tmp_path)),
+        dependency_probe=lambda _module: True,
+        service_factory=lambda _availability: fake_service,
+    )
+    assert tool is not None
+    registry = ToolRegistry()
+    registry.register(tool)
+    adapter = MagicMock()
+    adapter.call_with_tools.side_effect = [
+        LLMResponse(
+            content="",
+            tool_calls=[
+                ToolCall(
+                    id="kronos-1",
+                    name=KRONOS_FORECAST_TOOL_NAME,
+                    arguments={
+                        "stock_code": "600519",
+                        "lookback_days": 30,
+                        "horizon_days": 5,
+                    },
+                )
+            ],
+            usage={"total_tokens": 3},
+            provider="openai",
+        ),
+        LLMResponse(
+            content=json.dumps({"decision_type": "hold", "stock_name": "test"}),
+            tool_calls=[],
+            usage={"total_tokens": 3},
+            provider="openai",
+        ),
+    ]
+
+    result = AgentExecutor(registry, adapter, max_steps=3).run(
+        "Analyze stock 600519",
+        context={"stock_code": "600519"},
+    )
+
+    assert result.success is True
+    assert result.tool_calls_log[0]["success"] is True
     assert fake_service.calls == [
         {
             "stock_code": "600519",

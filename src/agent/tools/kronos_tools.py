@@ -78,6 +78,7 @@ def _default_service_factory(
         model_dir=availability.model_dir,
         tokenizer_dir=availability.tokenizer_dir,
     )
+    backend.prepare()
     return KronosForecastService(spec=availability.spec, backend=backend)
 
 
@@ -104,7 +105,15 @@ def build_kronos_tool(
         )
         return None
 
-    service = service_factory(availability)
+    try:
+        service = service_factory(availability)
+    except Exception:  # broad-exception: fallback_recorded - Offline model-load failures are reported and keep the optional tool absent.
+        logger.warning(
+            "Kronos Agent Tool was not registered reason=model_load_failed "
+            "guidance=Reinstall requirements-kronos.txt and replace both local "
+            "directories with the selected official model/tokenizer artifacts."
+        )
+        return None
     return ToolDefinition(
         name=KRONOS_FORECAST_TOOL_NAME,
         description=(

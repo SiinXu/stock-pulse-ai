@@ -10,16 +10,19 @@ quantitative supporting evidence to Agent workflows. The tool is absent from a
 default installation. After an operator explicitly enables it, the multi-agent
 architecture exposes it only to the Technical Agent; the default single-agent
 architecture exposes it to that one Agent with the rest of the process tool
-registry.
+registry. Single-Agent RUN and Chat both freeze a stock scope from the current
+request/context before dispatch, so a call for another symbol fails closed.
 
 ## Default And Registration Contract
 
 The tool registers only when all three gates pass:
 
 1. `KRONOS_ENABLED=true`.
-2. Every package in `requirements-kronos.txt` is importable.
+2. Every package in `requirements-kronos.txt` imports successfully.
 3. `KRONOS_WEIGHTS_DIR` contains the selected official model and its matching
-   tokenizer.
+   tokenizer: both configs match the pinned architecture, both safetensors
+   containers are structurally valid, and the official local-only loaders can
+   construct the model/tokenizer pair.
 
 If any gate fails, StockPulse does not register
 `forecast_kline_with_kronos`. Startup logs provide a reason and remediation
@@ -31,7 +34,9 @@ The plugin registers a declared `ToolDefinition` through the existing
 `ToolRegistry`, ToolSurface, stock-scope, timeout, serialization, audit, and
 completion boundaries as core tools. Plugin definitions opt in to mandatory
 contract enforcement, so argument and scope validation remains active even on
-the native compatibility runner. The Agent can supply only:
+the native compatibility runner. Optional defaults are validated against their
+schema and materialized before scope checks; the scoped `stock_code` identity is
+always required. The Agent can supply only:
 
 - `stock_code`: a bounded A-share, Hong Kong, or U.S. symbol;
 - `lookback_days`: 30 through 512;
@@ -125,7 +130,11 @@ KRONOS_WEIGHTS_DIR=/absolute/path/to/kronos-weights
 Long-running CLI and API processes resolve the built-in plugin during
 application-root startup. Source-based desktop backends do the same when their
 Python environment contains the optional dependencies. Configuration changes
-take effect only after restart.
+take effect only after restart. Enabling Kronos imports the optional modules and
+loads the selected model/tokenizer during plugin registration so an unusable
+tool is never advertised. Startup therefore incurs the selected model's local
+I/O, memory, and device-initialization cost once; the loaded predictor is reused
+for later calls.
 
 ## Output Contract
 
@@ -164,8 +173,11 @@ Every successful or typed error result carries:
 ## Verification
 
 The default suite mocks only the inference backend; readiness gates, plugin
-registration, ToolRegistry delegation, schema validation, stock scope, and
-output aggregation run through their real code paths.
+registration, official config matching, safetensors container validation,
+ToolRegistry delegation, schema/default validation, single-Agent stock scope,
+and output aggregation run through their real code paths. The production
+factory also performs the real local model load before registration; the
+opt-in test below exercises that load with reviewed artifacts.
 
 Real local inference is explicit and excluded from default CI:
 

@@ -106,6 +106,8 @@ class ToolSurface:
             )
 
         if ctx.enforce_contract:
+            if tool_def.enforce_contract:
+                arguments = _materialize_optional_defaults(tool_def, arguments)
             validation_error = _validate_arguments(tool_def, arguments)
             if validation_error is not None:
                 return self._error_result(
@@ -373,10 +375,25 @@ def _validate_arguments(tool_def: ToolDefinition, arguments: Any) -> Optional[st
         param = params.get(key)
         if param is None:
             continue
-        error = _validate_parameter_value(param, value)
+        error = validate_tool_parameter_value(param, value)
         if error:
             return error
     return None
+
+
+def _materialize_optional_defaults(
+    tool_def: ToolDefinition,
+    arguments: Any,
+) -> Any:
+    if not isinstance(arguments, dict):
+        return arguments
+    effective = dict(arguments)
+    for parameter in tool_def.parameters:
+        if not parameter.required and parameter.name not in effective:
+            effective[parameter.name] = json.loads(
+                json.dumps(parameter.default, allow_nan=False)
+            )
+    return effective
 
 
 def _handler_accepts_extra_kwargs(tool_def: ToolDefinition) -> bool:
@@ -424,7 +441,12 @@ def _validate_scope_contract(tool_def: ToolDefinition) -> Optional[Dict[str, Any
     return None
 
 
-def _validate_parameter_value(param: ToolParameter, value: Any) -> Optional[str]:
+def validate_tool_parameter_value(
+    param: ToolParameter,
+    value: Any,
+) -> Optional[str]:
+    """Return one stable validation error for a declared parameter value."""
+
     if value is None:
         return f"argument {param.name} must not be null"
     expected = _JSON_TYPE_TO_PYTHON.get(param.type)

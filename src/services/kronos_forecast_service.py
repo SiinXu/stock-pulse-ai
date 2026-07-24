@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-import importlib.util
+import importlib
 import json
 import logging
 import math
@@ -13,7 +13,7 @@ import threading
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Callable, Protocol, Sequence
+from typing import Any, Callable, Mapping, Protocol, Sequence
 
 import numpy as np
 import pandas as pd
@@ -55,6 +55,77 @@ _OPTIONAL_DEPENDENCIES = (
     "tqdm",
 )
 _MODEL_FILES = ("config.json", "model.safetensors")
+_SAFETENSORS_MAX_HEADER_BYTES = 16 * 1024 * 1024
+_SAFETENSORS_DTYPE_BYTES = MappingProxyType(
+    {
+        "BOOL": 1,
+        "U8": 1,
+        "I8": 1,
+        "F8_E4M3": 1,
+        "F8_E5M2": 1,
+        "I16": 2,
+        "U16": 2,
+        "F16": 2,
+        "BF16": 2,
+        "I32": 4,
+        "U32": 4,
+        "F32": 4,
+        "I64": 8,
+        "U64": 8,
+        "F64": 8,
+    }
+)
+
+
+def _official_model_config(
+    *,
+    n_layers: int,
+    d_model: int,
+    n_heads: int,
+    ff_dim: int,
+    ffn_dropout_p: float,
+    attn_dropout_p: float,
+    resid_dropout_p: float,
+    token_dropout_p: float,
+) -> Mapping[str, Any]:
+    return MappingProxyType(
+        {
+            "attn_dropout_p": attn_dropout_p,
+            "d_model": d_model,
+            "ff_dim": ff_dim,
+            "ffn_dropout_p": ffn_dropout_p,
+            "learn_te": True,
+            "n_heads": n_heads,
+            "n_layers": n_layers,
+            "resid_dropout_p": resid_dropout_p,
+            "s1_bits": 10,
+            "s2_bits": 10,
+            "token_dropout_p": token_dropout_p,
+        }
+    )
+
+
+def _official_tokenizer_config(*, group_size: int) -> Mapping[str, Any]:
+    return MappingProxyType(
+        {
+            "attn_dropout_p": 0.0,
+            "beta": 0.05,
+            "d_in": 6,
+            "d_model": 256,
+            "ff_dim": 512,
+            "ffn_dropout_p": 0.0,
+            "gamma": 1.1,
+            "gamma0": 1.0,
+            "group_size": group_size,
+            "n_dec_layers": 4,
+            "n_enc_layers": 4,
+            "n_heads": 4,
+            "resid_dropout_p": 0.0,
+            "s1_bits": 10,
+            "s2_bits": 10,
+            "zeta": 0.05,
+        }
+    )
 
 
 @dataclass(frozen=True)
@@ -67,6 +138,8 @@ class KronosModelSpec:
     model_directory: str
     tokenizer_directory: str
     context_length: int
+    model_config: Mapping[str, Any]
+    tokenizer_config: Mapping[str, Any]
 
 
 KRONOS_MODEL_SPECS = MappingProxyType(
@@ -78,6 +151,17 @@ KRONOS_MODEL_SPECS = MappingProxyType(
             model_directory="Kronos-mini",
             tokenizer_directory="Kronos-Tokenizer-2k",
             context_length=2048,
+            model_config=_official_model_config(
+                n_layers=4,
+                d_model=256,
+                n_heads=4,
+                ff_dim=512,
+                ffn_dropout_p=0.2,
+                attn_dropout_p=0.0,
+                resid_dropout_p=0.2,
+                token_dropout_p=0.0,
+            ),
+            tokenizer_config=_official_tokenizer_config(group_size=5),
         ),
         "small": KronosModelSpec(
             size="small",
@@ -86,6 +170,17 @@ KRONOS_MODEL_SPECS = MappingProxyType(
             model_directory="Kronos-small",
             tokenizer_directory="Kronos-Tokenizer-base",
             context_length=512,
+            model_config=_official_model_config(
+                n_layers=8,
+                d_model=512,
+                n_heads=8,
+                ff_dim=1024,
+                ffn_dropout_p=0.25,
+                attn_dropout_p=0.1,
+                resid_dropout_p=0.25,
+                token_dropout_p=0.1,
+            ),
+            tokenizer_config=_official_tokenizer_config(group_size=4),
         ),
         "base": KronosModelSpec(
             size="base",
@@ -94,6 +189,17 @@ KRONOS_MODEL_SPECS = MappingProxyType(
             model_directory="Kronos-base",
             tokenizer_directory="Kronos-Tokenizer-base",
             context_length=512,
+            model_config=_official_model_config(
+                n_layers=12,
+                d_model=832,
+                n_heads=16,
+                ff_dim=2048,
+                ffn_dropout_p=0.2,
+                attn_dropout_p=0.0,
+                resid_dropout_p=0.2,
+                token_dropout_p=0.0,
+            ),
+            tokenizer_config=_official_tokenizer_config(group_size=4),
         ),
     }
 )
@@ -101,7 +207,7 @@ KRONOS_MODEL_SPECS = MappingProxyType(
 
 @dataclass(frozen=True)
 class KronosAvailability:
-    """Registration readiness without importing or downloading model code."""
+    """Registration readiness resolved without network access."""
 
     ready: bool
     reason: str
@@ -146,7 +252,12 @@ class KronosInferenceBackend(Protocol):
 
 
 def _dependency_available(module_name: str) -> bool:
-    return importlib.util.find_spec(module_name) is not None
+    try:
+        importlib.import_module(module_name)
+    except Exception:  # broad-exception: fallback_recorded - Any optional dependency import failure closes readiness and is reported by module name.
+        logger.debug("Kronos optional dependency import failed module=%s", module_name)
+        return False
+    return True
 
 
 def _artifact_file_ready(path: Path) -> bool:
@@ -154,6 +265,87 @@ def _artifact_file_ready(path: Path) -> bool:
         return path.is_file() and path.stat().st_size > 0
     except OSError:
         return False
+
+
+def _config_matches(
+    path: Path,
+    expected: Mapping[str, Any],
+) -> bool:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return False
+    if not isinstance(payload, dict) or set(payload) != set(expected):
+        return False
+    return all(
+        type(payload[key]) is type(expected_value)
+        and payload[key] == expected_value
+        for key, expected_value in expected.items()
+    )
+
+
+def _safetensors_file_valid(path: Path) -> bool:
+    try:
+        file_size = path.stat().st_size
+        with path.open("rb") as stream:
+            raw_header_size = stream.read(8)
+            if len(raw_header_size) != 8:
+                return False
+            header_size = int.from_bytes(raw_header_size, "little", signed=False)
+            if (
+                header_size <= 0
+                or header_size % 8 != 0
+                or header_size > _SAFETENSORS_MAX_HEADER_BYTES
+                or header_size > file_size - 8
+            ):
+                return False
+            raw_header = stream.read(header_size)
+    except OSError:
+        return False
+
+    try:
+        header = json.loads(raw_header.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError):
+        return False
+    if not isinstance(header, dict):
+        return False
+
+    data_size = file_size - 8 - header_size
+    ranges: list[tuple[int, int]] = []
+    tensor_count = 0
+    for name, tensor in header.items():
+        if name == "__metadata__":
+            if not isinstance(tensor, dict):
+                return False
+            continue
+        if type(name) is not str or not name or not isinstance(tensor, dict):
+            return False
+        dtype = tensor.get("dtype")
+        shape = tensor.get("shape")
+        offsets = tensor.get("data_offsets")
+        if (
+            type(dtype) is not str
+            or dtype not in _SAFETENSORS_DTYPE_BYTES
+            or type(shape) is not list
+            or any(type(dimension) is not int or dimension < 0 for dimension in shape)
+            or type(offsets) is not list
+            or len(offsets) != 2
+            or any(type(offset) is not int or offset < 0 for offset in offsets)
+        ):
+            return False
+        start, end = offsets
+        expected_bytes = math.prod(shape) * _SAFETENSORS_DTYPE_BYTES[dtype]
+        if start > end or end > data_size or end - start != expected_bytes:
+            return False
+        ranges.append((start, end))
+        tensor_count += 1
+
+    cursor = 0
+    for start, end in sorted(ranges):
+        if start != cursor:
+            return False
+        cursor = end
+    return tensor_count > 0 and cursor == data_size
 
 
 def assess_kronos_availability(
@@ -191,7 +383,8 @@ def assess_kronos_availability(
     for module_name in _OPTIONAL_DEPENDENCIES:
         try:
             available = dependency_probe(module_name)
-        except (ImportError, OSError, ValueError):
+        except Exception:  # broad-exception: fallback_recorded - Probe failures close the optional registration gate and are reported by module name.
+            logger.debug("Kronos dependency readiness probe failed module=%s", module_name)
             available = False
         if not available:
             missing_dependencies.append(module_name)
@@ -261,21 +454,23 @@ def assess_kronos_availability(
             tokenizer_dir=tokenizer_dir,
         )
 
-    invalid_configs = []
-    for directory in (model_dir, tokenizer_dir):
-        try:
-            payload = json.loads((directory / "config.json").read_text(encoding="utf-8"))
-        except (OSError, UnicodeError, json.JSONDecodeError):
-            payload = None
-        if not isinstance(payload, dict):
-            invalid_configs.append(f"{directory.name}/config.json")
-    if invalid_configs:
+    invalid_artifacts = []
+    for directory, expected_config in (
+        (model_dir, spec.model_config),
+        (tokenizer_dir, spec.tokenizer_config),
+    ):
+        if not _config_matches(directory / "config.json", expected_config):
+            invalid_artifacts.append(f"{directory.name}/config.json")
+        if not _safetensors_file_valid(directory / "model.safetensors"):
+            invalid_artifacts.append(f"{directory.name}/model.safetensors")
+    if invalid_artifacts:
         return KronosAvailability(
             ready=False,
             reason="weights_invalid",
             message=(
-                "Kronos local configuration artifacts are invalid: "
-                f"{', '.join(invalid_configs)}. No automatic download was attempted."
+                "Kronos local artifacts do not match the selected official "
+                f"model/tokenizer contract: {', '.join(invalid_artifacts)}. "
+                "No automatic download was attempted."
             ),
             spec=spec,
             model_dir=model_dir,
@@ -340,6 +535,11 @@ class OfficialKronosInferenceBackend:
                 ),
             )
         return self._predictor
+
+    def prepare(self) -> None:
+        """Load and validate the configured local model/tokenizer pair once."""
+
+        self._get_predictor()
 
     def predict_paths(
         self,
