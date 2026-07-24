@@ -146,7 +146,7 @@ class LocalModelApiIntegrationTestCase(_SystemConfigServiceTestCaseBase):
             client_factory=lambda _base_url: _InstalledRuntime(),
         )
 
-    def test_unregister_then_restore_checks_weights_across_the_real_api_boundary(self) -> None:
+    def test_unregister_then_restore_stays_offline_across_the_real_api_boundary(self) -> None:
         configuration = self.local_model_service.get_configuration()
         unregistered = asyncio.run(
             _request(
@@ -177,7 +177,7 @@ class LocalModelApiIntegrationTestCase(_SystemConfigServiceTestCaseBase):
 
         self.assertEqual(restored.status_code, 200, restored.text)
         self.assertEqual(restored.json()["registered_models"], ["qwen3:4b"])
-        self.assertEqual(self.runtime_probe_count, 1)
+        self.assertEqual(self.runtime_probe_count, 0)
 
     def test_unregister_rejects_a_changed_desktop_runtime_before_mutation(self) -> None:
         configuration = self.local_model_service.get_configuration()

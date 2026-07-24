@@ -251,7 +251,7 @@ def restore_local_model_registration(
     request: LocalModelRegistrationRestoreRequest,
     service: LocalModelService = Depends(get_local_model_service),
 ) -> LocalModelMutationResponse:
-    """Consume a Desktop rollback only if the original runtime still has weights."""
+    """Consume an exact Desktop rollback without probing the stopped runtime."""
     try:
         payload = service.restore_registration(
             request.model_id,
