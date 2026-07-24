@@ -85,6 +85,23 @@ const FINANCE_MODEL: LocalModelCatalogEntry = {
   },
 };
 
+const GENERAL_MODEL_8B: LocalModelCatalogEntry = {
+  ...GENERAL_MODEL,
+  id: 'qwen3-8b',
+  displayName: { en: 'Qwen3 8B', zh: 'Qwen3 8B' },
+  q4: {
+    ...GENERAL_MODEL.q4,
+    sizeBytes: 4_930_000_000,
+    sourceUrl: 'https://ollama.com/library/qwen3:8b',
+  },
+  recommendedRamGb: 16,
+  install: {
+    ...GENERAL_MODEL.install,
+    ollamaTag: 'qwen3:8b',
+    downloadUrl: 'https://ollama.com/library/qwen3:8b',
+  },
+};
+
 const AVAILABLE_RUNTIME: LocalModelRuntimeState = {
   runtime: 'ollama',
   status: 'running',
@@ -146,6 +163,104 @@ describe('LocalModelsPanel', () => {
     expect(within(finance).getByText('Standard tier')).toBeInTheDocument();
     expect(within(finance).getByText('Conversion pending')).toBeInTheDocument();
     expect(within(finance).getByRole('button', { name: 'Open download guide' })).toBeEnabled();
+  });
+
+  it('does not auto-select an existing ready model in wizard mode', async () => {
+    createTransport.mockReturnValue(transport({
+      getRuntime: vi.fn().mockResolvedValue({
+        ...AVAILABLE_RUNTIME,
+        installedModels: ['qwen3:4b'],
+        configuration: {
+          ...AVAILABLE_RUNTIME.configuration,
+          registeredModels: ['qwen3:4b'],
+        },
+      }),
+    }));
+    const onModelReady = vi.fn();
+
+    renderPanel({
+      onModelReady,
+      selectModelLabel: 'Select model',
+      selectedModelLabel: 'Selected model',
+    });
+
+    expect(await screen.findByRole('button', { name: 'Select model' })).toBeEnabled();
+    expect(onModelReady).not.toHaveBeenCalled();
+  });
+
+  it('registers and selects an installed model only after an explicit action', async () => {
+    const assign = vi.fn().mockResolvedValue({
+      ...AVAILABLE_RUNTIME.configuration,
+      configVersion: 'config-2',
+      registeredModels: ['qwen3:4b'],
+    });
+    createTransport.mockReturnValue(transport({
+      getRuntime: vi.fn().mockResolvedValue({
+        ...AVAILABLE_RUNTIME,
+        installedModels: ['qwen3:4b'],
+      }),
+      assign,
+    }));
+    const onModelReady = vi.fn();
+
+    renderPanel({
+      onModelReady,
+      selectModelLabel: 'Select model',
+      selectedModelLabel: 'Selected model',
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Select model' }));
+
+    await vi.waitFor(() => {
+      expect(assign).toHaveBeenCalledWith('qwen3:4b', 'auto');
+      expect(onModelReady).toHaveBeenCalledWith('qwen3:4b');
+    });
+  });
+
+  it('keeps a newly downloaded model selected when another model is already ready', async () => {
+    getCatalog.mockResolvedValue({
+      schemaVersion: 1,
+      verifiedAt: '2026-07-23',
+      models: [GENERAL_MODEL, GENERAL_MODEL_8B, FINANCE_MODEL],
+    });
+    const initialRuntime: LocalModelRuntimeState = {
+      ...AVAILABLE_RUNTIME,
+      installedModels: ['qwen3:4b'],
+      configuration: {
+        ...AVAILABLE_RUNTIME.configuration,
+        registeredModels: ['qwen3:4b'],
+      },
+    };
+    const completedRuntime: LocalModelRuntimeState = {
+      ...initialRuntime,
+      installedModels: ['qwen3:4b', 'qwen3:8b'],
+      configuration: {
+        ...initialRuntime.configuration,
+        configVersion: 'config-2',
+        registeredModels: ['qwen3:4b', 'qwen3:8b'],
+      },
+    };
+    createTransport.mockReturnValue(transport({
+      getRuntime: vi.fn()
+        .mockResolvedValueOnce(initialRuntime)
+        .mockResolvedValue(completedRuntime),
+      pull: vi.fn().mockResolvedValue({
+        modelId: 'qwen3:8b',
+        activated: true,
+        selectedPrimary: false,
+      }),
+    }));
+    const onModelReady = vi.fn();
+
+    renderPanel({
+      onModelReady,
+      selectModelLabel: 'Select model',
+      selectedModelLabel: 'Selected model',
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Download' }));
+
+    expect(await screen.findByText('qwen3:8b is downloaded and registered.')).toBeInTheDocument();
+    expect(onModelReady).toHaveBeenCalledTimes(1);
+    expect(onModelReady).toHaveBeenCalledWith('qwen3:8b');
   });
 
   it('marks a downloaded model ready without replacing the existing primary', async () => {

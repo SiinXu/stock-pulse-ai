@@ -968,6 +968,9 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
             language={language}
             headingAs="h3"
             onConfigurationChanged={onLocalModelConfigurationChanged}
+            selectedModelId={localModelReady}
+            selectModelLabel={text.select}
+            selectedModelLabel={text.readyLocalModel}
             onModelReady={setLocalModelReady}
           />
         ) : null}

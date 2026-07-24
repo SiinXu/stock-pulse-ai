@@ -49,10 +49,13 @@ interface LocalModelsPanelProps {
   language: UiLang;
   headingAs?: 'h2' | 'h3' | 'h4';
   onConfigurationChanged?: () => void | Promise<void>;
+  selectedModelId?: string;
+  selectModelLabel?: string;
+  selectedModelLabel?: string;
   onModelReady?: (modelId: string) => void;
 }
 
-type OperationKind = 'pull' | 'assign-primary' | 'assign-agent' | 'delete' | 'runtime';
+type OperationKind = 'pull' | 'assign-primary' | 'assign-agent' | 'select' | 'delete' | 'runtime';
 
 interface ActiveOperation {
   kind: OperationKind;
@@ -127,6 +130,9 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
   language,
   headingAs = 'h2',
   onConfigurationChanged,
+  selectedModelId = '',
+  selectModelLabel,
+  selectedModelLabel,
   onModelReady,
 }) => {
   const text = SETTINGS_LOCAL_MODELS_TEXT[language];
@@ -145,7 +151,6 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
   const [primaryPromptModel, setPrimaryPromptModel] = useState('');
   const [deleteModel, setDeleteModel] = useState<LocalModelCatalogEntry | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const readyNotifiedRef = useRef('');
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -212,10 +217,13 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
   }), [memoryGb, models]);
 
   useEffect(() => {
-    const ready = models.find((model) => {
+    const selected = selectedModelId.trim();
+    if (!selected || activeOperation !== null) return;
+    const selectedReady = models.some((model) => {
       const tag = model.install.ollamaTag;
       return Boolean(
         tag
+        && tag.toLowerCase() === selected.toLowerCase()
         && installedModels.has(tag.toLowerCase())
         && (
           registeredModels.has(tag.toLowerCase())
@@ -224,17 +232,17 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
         ),
       );
     });
-    if (!ready?.install.ollamaTag) {
-      if (readyNotifiedRef.current) {
-        readyNotifiedRef.current = '';
-        onModelReady?.('');
-      }
-      return;
-    }
-    if (readyNotifiedRef.current === ready.install.ollamaTag) return;
-    readyNotifiedRef.current = ready.install.ollamaTag;
-    onModelReady?.(ready.install.ollamaTag);
-  }, [configuration.agentModel, configuration.primaryModel, installedModels, models, onModelReady, registeredModels]);
+    if (!selectedReady) onModelReady?.('');
+  }, [
+    activeOperation,
+    configuration.agentModel,
+    configuration.primaryModel,
+    installedModels,
+    models,
+    onModelReady,
+    registeredModels,
+    selectedModelId,
+  ]);
 
   const updateConfiguration = useCallback(async (next: LocalModelConfiguration) => {
     setRuntime((current) => current ? {
@@ -261,7 +269,6 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
       const nextRuntime = await refreshRuntime();
       await onConfigurationChanged?.();
       setReadyModel(modelId);
-      readyNotifiedRef.current = modelId;
       onModelReady?.(modelId);
       if (
         result.selectedPrimary
@@ -300,9 +307,24 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
       await updateConfiguration(result);
       if (assignment === 'primary') {
         setPrimaryPromptModel('');
-        readyNotifiedRef.current = modelId;
         onModelReady?.(modelId);
       }
+    } catch {
+      setActionError(text.actionFailed);
+    } finally {
+      setActiveOperation(null);
+    }
+  };
+
+  const handleModelSelection = async (modelId: string, ready: boolean) => {
+    setActiveOperation({ kind: 'select', modelId });
+    setActionError('');
+    try {
+      if (!ready) {
+        const result = await transport.assign(modelId, 'auto');
+        await updateConfiguration(result);
+      }
+      onModelReady?.(modelId);
     } catch {
       setActionError(text.actionFailed);
     } finally {
@@ -321,7 +343,6 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
       await updateConfiguration(result);
       await refreshRuntime();
       setReadyModel('');
-      readyNotifiedRef.current = '';
       onModelReady?.('');
     } catch {
       setActionError(text.actionFailed);
@@ -391,6 +412,10 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
       const registered = Boolean(modelId && registeredModels.has(modelId.toLowerCase()));
       const primary = Boolean(modelId && modelIsAssigned(configuration.primaryModel, modelId));
       const agent = Boolean(modelId && modelIsAssigned(configuration.agentModel, modelId));
+      const ready = installed && (registered || primary || agent);
+      const selected = Boolean(
+        modelId && selectedModelId.trim().toLowerCase() === modelId.toLowerCase(),
+      );
       const recommended = recommendedBySection[section] === model.recommendedRamGb;
       const pulling = activeOperation?.kind === 'pull' && activeOperation.modelId === modelId;
       const busy = activeOperation !== null;
@@ -478,6 +503,18 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
             ) : null}
 
             <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+              {installed && modelId && onModelReady && selectModelLabel && selectedModelLabel ? (
+                <Button
+                  variant={selected ? 'secondary' : 'primary'}
+                  size="default"
+                  disabled={busy || selected}
+                  aria-pressed={selected}
+                  onClick={() => void handleModelSelection(modelId, ready)}
+                >
+                  {selected ? <Check aria-hidden="true" /> : null}
+                  {selected ? selectedModelLabel : selectModelLabel}
+                </Button>
+              ) : null}
               {directPull && !installed ? (
                 <Button
                   variant="primary"
