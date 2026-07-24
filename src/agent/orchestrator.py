@@ -75,6 +75,7 @@ from src.agent.runtime_facts import (
     build_agent_runtime_facts,
 )
 from src.agent.runtime.lifecycle import classify_result_terminal_state
+from src.agent.soul import compose_agent_soul_prompt as _compose_agent_soul_prompt
 from src.agent.runtime.guards import (
     RuntimeGuardPolicy,
     StageFailurePolicy,
@@ -126,6 +127,7 @@ _ORCHESTRATOR_COMPAT_EXPORTS = (
     json,
     log_runtime_guard_event,
     log_safe_exception,
+    _compose_agent_soul_prompt,
     normalize_decision_signal,
     normalize_report_language,
     normalize_stage_failure_reason,
@@ -167,7 +169,7 @@ class OrchestratorResult:
     model: str = ""
     error: Optional[str] = None
     stats: Optional[AgentRunStats] = None
-    runtime_facts: Optional[AgentRuntimeFacts] = None
+    runtime_facts: Optional[AgentRuntimeFacts] = field(default_factory=AgentRuntimeFacts)
     cancelled: bool = False
     timed_out: bool = False
 

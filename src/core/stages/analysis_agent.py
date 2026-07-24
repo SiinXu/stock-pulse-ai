@@ -567,6 +567,19 @@ class _AgentAnalysisStageMixin:
                         market_phase_summary=market_phase_summary,
                     )
                     context_snapshot["stock_name"] = resolved_stock_name
+                    runtime_facts = getattr(agent_result, "runtime_facts", None)
+                    soul_version = getattr(runtime_facts, "soul_version", None)
+                    soul_hash = getattr(runtime_facts, "soul_hash", None)
+                    if (
+                        isinstance(soul_version, str)
+                        and soul_version
+                        and isinstance(soul_hash, str)
+                        and soul_hash
+                    ):
+                        context_snapshot["agent_runtime"] = {
+                            "soul_version": soul_version,
+                            "soul_hash": soul_hash,
+                        }
                     return context_snapshot
 
                 persistence_result = self._persist_analysis_history_stage(

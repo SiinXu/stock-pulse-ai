@@ -462,6 +462,7 @@ class PipelineMarketPhaseContextTestCase(unittest.TestCase):
         phase_payload = _phase_payload()
 
         from src.agent.executor import AgentResult
+        from src.agent.soul import get_agent_soul_metadata
 
         agent_result = AgentResult(
             success=True,
@@ -503,6 +504,10 @@ class PipelineMarketPhaseContextTestCase(unittest.TestCase):
 
         save_kwargs = pipeline.db.save_analysis_history.call_args.kwargs
         self.assertTrue(save_kwargs["save_snapshot"])
+        self.assertEqual(
+            save_kwargs["context_snapshot"]["agent_runtime"],
+            get_agent_soul_metadata(),
+        )
         self.assertNotIn("market_phase_context", save_kwargs["context_snapshot"])
         self.assertNotIn("analysis_context_pack_summary", save_kwargs["context_snapshot"])
         self.assertEqual(save_kwargs["context_snapshot"]["market_phase_summary"]["phase"], "intraday")

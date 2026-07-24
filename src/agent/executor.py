@@ -39,6 +39,7 @@ from src.agent.runner import parse_dashboard_json_result, run_agent_loop
 from src.agent.runtime.contract import ExecutionState
 from src.agent.runtime.lifecycle import classify_result_terminal_state
 from src.agent.runtime_facts import AgentRuntimeFacts
+from src.agent.soul import compose_agent_soul_prompt as _compose_agent_soul_prompt
 from src.agent.stock_scope import StockScope, resolve_stock_scope
 from src.storage import get_db
 from src.agent.tools.registry import ToolRegistry
@@ -77,6 +78,7 @@ _EXECUTOR_COMPAT_EXPORTS = (
     get_market_role,
     json,
     log_safe_exception,
+    _compose_agent_soul_prompt,
     parse_dashboard_json_result,
     resolve_stock_scope,
     run_agent_loop,
@@ -109,7 +111,7 @@ class AgentResult:
     model: str = ""                            # comma-separated models used (supports fallback)
     error: Optional[str] = None
     messages: List[Dict[str, Any]] = field(default_factory=list)
-    runtime_facts: Optional[AgentRuntimeFacts] = None
+    runtime_facts: Optional[AgentRuntimeFacts] = field(default_factory=AgentRuntimeFacts)
     cancelled: bool = False
     timed_out: bool = False
 

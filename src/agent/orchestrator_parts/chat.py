@@ -21,6 +21,7 @@ from src.agent.public_contract import (
 from src.agent.runner import run_agent_loop
 from src.agent.runtime.contract import ExecutionState
 from src.agent.runtime.lifecycle import classify_result_terminal_state
+from src.agent.soul import compose_agent_soul_prompt as _compose_agent_soul_prompt
 from src.agent.stock_scope import StockScope, resolve_stock_scope
 from src.agent.tools.registry import ToolRegistry
 from src.config import get_config
@@ -421,6 +422,7 @@ class _ChatMethods:
                 "你负责综合跨市场股票比较。只能使用给定的逐标的分析，必须按同口径比较，"
                 "保留币种与时区差异，并明确说明所有数据缺口。"
             )
+        system_prompt = _compose_agent_soul_prompt(system_prompt)
 
         evidence = []
         for stock_code, result in per_symbol_results:

@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
 from src.agent.stock_scope import resolve_stock_scope
+from src.agent.soul import compose_agent_soul_prompt as _compose_agent_soul_prompt
 from src.market_context import get_market_guidelines, get_market_role
 from src.report_language import normalize_report_language
 
@@ -92,6 +93,7 @@ class _RunMethods:
             skills_section=skills_section,
             language_section=_build_language_section(report_language),
         )
+        system_prompt = _compose_agent_soul_prompt(system_prompt)
 
         # Build tool declarations in OpenAI format (litellm handles all providers)
         tool_decls = self.tool_registry.to_openai_tools()
