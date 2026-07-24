@@ -5,7 +5,10 @@
   "main": "main.js",
   "scripts": {
     "dev": "electron .",
+    "prepare:ollama": "node ../../scripts/prepare-embedded-ollama.js",
+    "prebuild": "npm run prepare:ollama",
     "build": "electron-builder",
+    "build:electron": "electron-builder",
     "test": "node --test tests/*.test.js"
   },
   "dependencies": {
@@ -58,6 +61,14 @@
       {
         "from": "../../docs/assets/dsa_vi/lightlogo.iconset/icon_32x32.png",
         "to": "assistant-tray.png"
+      },
+      {
+        "from": "vendor/ollama",
+        "to": "ollama"
+      },
+      {
+        "from": "../../THIRD_PARTY_NOTICES",
+        "to": "THIRD_PARTY_NOTICES"
       }
     ],
     "win": {

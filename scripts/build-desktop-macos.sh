@@ -80,10 +80,12 @@ if [[ -n "${MAC_ARCH}" ]]; then
 fi
 
 echo "Building macOS target arch: ${MAC_ARCH:-default}"
+TARGET_ARCH="${MAC_ARCH:-$(node -p 'process.arch')}"
+npm run prepare:ollama -- --platform darwin --arch "${TARGET_ARCH}"
 if [[ ${#ARCH_ARGS[@]} -gt 0 ]]; then
-  npx electron-builder --mac dmg "${ARCH_ARGS[@]}" --publish never
+  npm run build:electron -- --mac dmg "${ARCH_ARGS[@]}" --publish never
 else
-  npx electron-builder --mac dmg --publish never
+  npm run build:electron -- --mac dmg --publish never
 fi
 popd >/dev/null
 

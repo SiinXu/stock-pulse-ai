@@ -92,7 +92,12 @@ if (!(Test-Path $appBuilderPath)) {
   Install-DesktopDependencies -Reason 'app-builder.exe missing' -Clean
 }
 
-npx electron-builder --win nsis --publish never
+npm run prepare:ollama -- --platform win32 --arch x64
+if ($LASTEXITCODE -ne 0) {
+  throw 'Embedded Ollama preparation failed.'
+}
+
+npm run build:electron -- --win nsis --publish never
 if ($LASTEXITCODE -ne 0) {
   throw 'Electron build failed.'
 }

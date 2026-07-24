@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "runtime": "ollama",
+  "version": "v0.32.3",
+  "releaseBaseUrl": "https://github.com/ollama/ollama/releases/download/v0.32.3",
+  "checksumSourceUrl": "https://github.com/ollama/ollama/releases/download/v0.32.3/sha256sum.txt",
+  "artifacts": {
+    "darwin": {
+      "architectures": [
+        "arm64",
+        "x64"
+      ],
+      "fileName": "ollama-darwin.tgz",
+      "archiveType": "tgz",
+      "sha256": "14462bd438815eb2c1d4c61224744637131ab744e858a2e2562e7fc7fc2c4f7d",
+      "binaryPath": "ollama",
+      "requiredPaths": [
+        "ollama",
+        "llama-server"
+      ]
+    },
+    "win32-x64": {
+      "architectures": [
+        "x64"
+      ],
+      "fileName": "ollama-windows-amd64.zip",
+      "archiveType": "zip",
+      "sha256": "c66dd7dde4d5ec4822eaa57dd421d51aa7c633a3ff36a974040837df73a5969e",
+      "binaryPath": "ollama.exe",
+      "requiredPaths": [
+        "ollama.exe",
+        "lib/ollama/llama-server.exe"
+      ]
+    }
+  }
+}

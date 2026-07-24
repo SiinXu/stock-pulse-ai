@@ -87,6 +87,8 @@ verify_*.py
 static/
 /apps/dsa-desktop/dist/
 /apps/dsa-desktop/node_modules/
+/apps/dsa-desktop/.ollama-cache/
+/apps/dsa-desktop/vendor/ollama/
 docs/specs/
 
 # ignore root-level node modules and Playwright MCP artifacts
