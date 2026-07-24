@@ -151,6 +151,8 @@ def test_webhook_handler_does_not_log_payload_or_message_content(caplog) -> None
     assert async_response.status_code == 200
     rendered = "\n".join(record.getMessage() for record in caplog.records)
     _assert_canary_absent(rendered)
+    assert "[BotHandler] Parsed request:" in rendered
+    assert "Parsed webhook payload" not in rendered
     assert f"body_bytes={len(body)}" in rendered
     assert f"content_length={len(SENSITIVE_DIAGNOSTIC)}" in rendered
 

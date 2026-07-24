@@ -489,15 +489,21 @@ def _text_field_key_starts(
 
     starts = [immediate_start]
     cursor = immediate_start
+    whitespace_joiner_seen = False
     while cursor > lower_bound and len(starts) < _TEXT_FIELD_KEY_PART_LIMIT:
         joiner_end = cursor
+        joiner_only_whitespace = True
         while (
             cursor > lower_bound
             and _is_text_field_key_joiner(text[cursor - 1])
         ):
+            if not (text[cursor - 1].isascii() and text[cursor - 1].isspace()):
+                joiner_only_whitespace = False
             cursor -= 1
         if cursor == joiner_end:
             break
+        if joiner_only_whitespace:
+            whitespace_joiner_seen = True
         part_end = cursor
         while cursor > lower_bound:
             char = text[cursor - 1]
@@ -508,7 +514,11 @@ def _text_field_key_starts(
             break
         starts.append(cursor)
     truncated = False
-    if len(starts) == _TEXT_FIELD_KEY_PART_LIMIT and cursor > lower_bound:
+    if (
+        not whitespace_joiner_seen
+        and len(starts) == _TEXT_FIELD_KEY_PART_LIMIT
+        and cursor > lower_bound
+    ):
         probe = cursor
         while (
             probe > lower_bound
@@ -544,12 +554,11 @@ def _classify_text_field_match(
         text[starts[-1]:match.end(1)]
     )
     for key_start in starts:
-        if _is_sensitive_mapping_key_text(text[key_start:match.end(1)]):
+        candidate = text[key_start:match.end(1)]
+        if _is_sensitive_mapping_key_text(candidate):
             return (
                 complete_kind
-                or _sensitive_text_field_kind(
-                    text[key_start:match.end(1)]
-                ),
+                or _sensitive_text_field_kind(candidate),
                 key_start,
             )
     if truncated:
