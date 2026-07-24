@@ -16,13 +16,14 @@ Design notes:
 - Plugin composition starts only after the root is installed. Built-ins supplied
   by the composition caller are registered first, then an explicitly configured
   external directory is scanned, and the resulting snapshot is loaded with
-  per-plugin fault isolation.
+  per-plugin fault isolation. The root-owned notification adapter registry is
+  bound into that same manager and consumed by the existing notification sender.
 
 Only the singletons that actually exist in this codebase are held: Config,
 DatabaseManager, SearchService, AnalysisTaskQueue, and the process plugin
-manager. There is no process-wide cache, auth rate limiter or shared thread pool
-singleton to own, so none is invented here (thread pools are owned per-pipeline /
-per-queue instance).
+manager plus its notification adapter registry. There is no process-wide cache,
+auth rate limiter or shared thread pool singleton to own, so none is invented
+here (thread pools are owned per-pipeline / per-queue instance).
 ``system_config_service`` is already composed in the FastAPI lifespan
 (``api/app.py``) and keeps its app-scoped lifecycle; this root does not modify
 or take over ``system_config_service.py``.
@@ -42,6 +43,7 @@ if TYPE_CHECKING:  # import for typing only; avoids runtime import cycles
     from src.config import Config
     from src.plugins import (
         ExternalPluginResult,
+        NotificationChannelRegistry,
         Plugin,
         PluginManager,
         PluginOperationResult,
@@ -75,6 +77,9 @@ class ApplicationServices:
         search: Optional["SearchService"] = None,
         task_queue: Optional["AnalysisTaskQueue"] = None,
         plugin_manager: Optional["PluginManager"] = None,
+        notification_channel_registry: Optional[
+            "NotificationChannelRegistry"
+        ] = None,
         builtin_plugins: Optional[Iterable["Plugin"]] = None,
         plugins_dir: str | Path | None = None,
         plugin_application_version: str = PLUGIN_APPLICATION_VERSION,
@@ -83,14 +88,30 @@ class ApplicationServices:
         self._database = database
         self._search = search
         self._task_queue = task_queue
+        from src.plugins import NotificationChannelRegistry
+
+        if notification_channel_registry is None:
+            notification_channel_registry = NotificationChannelRegistry(
+                lambda: self.config
+            )
+        elif not isinstance(
+            notification_channel_registry,
+            NotificationChannelRegistry,
+        ):
+            raise TypeError("notification channel registry is invalid")
+        self._notification_channel_registry = notification_channel_registry
         plugin_manager_was_provided = plugin_manager is not None
         if plugin_manager is None:
-            from src.plugins import PluginManager, build_agent_tool_extension_registry
+            from src.plugins import (
+                PluginManager,
+                build_application_extension_registry,
+            )
 
             plugin_manager = PluginManager(
                 application_version=plugin_application_version,
-                registry=build_agent_tool_extension_registry(
+                registry=build_application_extension_registry(
                     _get_process_agent_tool_registry,
+                    notification_channel_registry,
                 ),
             )
         self._plugin_manager = plugin_manager
@@ -153,6 +174,12 @@ class ApplicationServices:
         """Return the process plugin lifecycle and registration authority."""
 
         return self._plugin_manager
+
+    @property
+    def notification_channel_registry(self) -> "NotificationChannelRegistry":
+        """Return the root-owned adapter snapshot authority."""
+
+        return self._notification_channel_registry
 
     @property
     def builtin_plugin_results(self) -> tuple["PluginOperationResult", ...]:

@@ -110,7 +110,7 @@ MODULES = {
             "parse_notification_route_channels",
             "split_notification_route_channels",
         ),
-        "c85ccfb6502e0b81ec63569b5b6e8aa3f99a7e515d07ca0e03b5327454cda925",
+        "370865f0a9df3b98e8a562c0bf53548cba4bef0419f98f61b70fe1816348d62a",
     ),
 }
 

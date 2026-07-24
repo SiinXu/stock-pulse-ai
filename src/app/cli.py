@@ -237,12 +237,28 @@ def _dispatch_cli(config: Config, args: argparse.Namespace) -> int:
         logger.warning(warning)
 
     if getattr(args, "check_notify", False):
+        from src.application_services import get_application_services
+        from src.plugins import available_notification_channel_snapshot
         from src.services.notification_diagnostics import (
             format_notification_diagnostics,
             run_notification_diagnostics,
         )
 
-        result = run_notification_diagnostics(config)
+        plugin_snapshot = (
+            get_application_services().notification_channel_registry.snapshot()
+        )
+        available_plugin_snapshot = available_notification_channel_snapshot(
+            plugin_snapshot
+        )
+        result = run_notification_diagnostics(
+            config,
+            enabled_plugin_channels=tuple(
+                channel.channel_id for channel in plugin_snapshot
+            ),
+            available_plugin_channels=tuple(
+                channel.channel_id for channel in available_plugin_snapshot
+            ),
+        )
         print(format_notification_diagnostics(result))
         return 0 if result.ok else 1
 
