@@ -1,0 +1,193 @@
+from __future__ import annotations
+
+import hashlib
+from pathlib import Path
+from zipfile import ZIP_STORED, ZipFile
+
+import pytest
+
+from scripts.build_model_pack import build_model_pack, main
+from src.model_pack import MAX_LICENSE_BYTES, ModelPackError, inspect_model_pack
+
+
+def _sources(root: Path):
+    gguf = root / "weights.gguf"
+    modelfile = root / "Modelfile"
+    license_file = root / "LICENSE"
+    gguf.write_bytes(b"GGUF-deterministic-test")
+    modelfile.write_text(
+        "FROM ./weights.gguf\nPARAMETER temperature 0.2\n",
+        encoding="utf-8",
+    )
+    license_file.write_text("Apache License test text\n", encoding="utf-8")
+    return gguf, modelfile, license_file
+
+
+def _build(root: Path, output: Path):
+    gguf, modelfile, license_file = _sources(root)
+    return build_model_pack(
+        gguf_path=gguf,
+        modelfile_path=modelfile,
+        license_file_path=license_file,
+        model_id="stockpulse/test:q4",
+        display_name="StockPulse Test",
+        license_id="Apache-2.0",
+        minimum_memory_gb=8,
+        output_path=output,
+    )
+
+
+def test_builder_outputs_a_valid_pack_and_release_checksum(tmp_path: Path) -> None:
+    artifact, checksum = _build(tmp_path, tmp_path / "release" / "test.modelpack")
+
+    expected_digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+    assert checksum.read_text(encoding="ascii") == f"{expected_digest}  test.modelpack\n"
+    with ZipFile(artifact) as archive:
+        assert archive.namelist() == [
+            "manifest.json",
+            "weights.gguf",
+            "Modelfile",
+            "LICENSE",
+        ]
+        assert archive.getinfo("weights.gguf").compress_type == ZIP_STORED
+
+    with inspect_model_pack(artifact) as inspected:
+        assert inspected.manifest.model_id == "stockpulse/test:q4"
+        assert inspected.manifest.license.id == "Apache-2.0"
+        assert inspected.modelfile.parameters == {"temperature": 0.2}
+
+
+def test_builder_is_deterministic_for_the_same_sources(tmp_path: Path) -> None:
+    first_dir = tmp_path / "first"
+    second_dir = tmp_path / "second"
+    first_dir.mkdir()
+    second_dir.mkdir()
+    first, _first_checksum = _build(first_dir, tmp_path / "first.modelpack")
+    second, _second_checksum = _build(second_dir, tmp_path / "second.modelpack")
+
+    assert first.read_bytes() == second.read_bytes()
+
+
+def test_builder_rejects_unsafe_modelfile_before_writing(tmp_path: Path) -> None:
+    gguf, modelfile, license_file = _sources(tmp_path)
+    modelfile.write_text(
+        "FROM ../../private.gguf\nADAPTER ./adapter.gguf\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "unsafe.modelpack"
+
+    with pytest.raises(ModelPackError) as error:
+        build_model_pack(
+            gguf_path=gguf,
+            modelfile_path=modelfile,
+            license_file_path=license_file,
+            model_id="stockpulse/test:q4",
+            display_name="StockPulse Test",
+            license_id="Apache-2.0",
+            minimum_memory_gb=8,
+            output_path=output,
+        )
+
+    assert error.value.code == "unsafe_modelfile"
+    assert not output.exists()
+
+
+def test_builder_rejects_symbolic_link_sources(tmp_path: Path) -> None:
+    gguf, modelfile, license_file = _sources(tmp_path)
+    linked_gguf = tmp_path / "linked.gguf"
+    linked_gguf.symlink_to(gguf)
+
+    with pytest.raises(ModelPackError) as error:
+        build_model_pack(
+            gguf_path=linked_gguf,
+            modelfile_path=modelfile,
+            license_file_path=license_file,
+            model_id="stockpulse/test:q4",
+            display_name="StockPulse Test",
+            license_id="Apache-2.0",
+            minimum_memory_gb=8,
+            output_path=tmp_path / "linked.modelpack",
+        )
+
+    assert error.value.code == "invalid_source_file"
+
+
+def test_builder_rejects_license_text_above_the_import_limit(tmp_path: Path) -> None:
+    gguf, modelfile, license_file = _sources(tmp_path)
+    license_file.write_bytes(b"x" * (MAX_LICENSE_BYTES + 1))
+
+    with pytest.raises(ModelPackError) as error:
+        build_model_pack(
+            gguf_path=gguf,
+            modelfile_path=modelfile,
+            license_file_path=license_file,
+            model_id="stockpulse/test:q4",
+            display_name="StockPulse Test",
+            license_id="Apache-2.0",
+            minimum_memory_gb=8,
+            output_path=tmp_path / "oversized-license.modelpack",
+        )
+
+    assert error.value.code == "invalid_license_file"
+    assert str(MAX_LICENSE_BYTES) in error.value.user_message
+
+
+def test_builder_does_not_overwrite_a_source_with_the_checksum(tmp_path: Path) -> None:
+    gguf, modelfile, license_file = _sources(tmp_path)
+    checksum_source = tmp_path / "release.modelpack.sha256"
+    license_file.rename(checksum_source)
+
+    with pytest.raises(ModelPackError) as error:
+        build_model_pack(
+            gguf_path=gguf,
+            modelfile_path=modelfile,
+            license_file_path=checksum_source,
+            model_id="stockpulse/test:q4",
+            display_name="StockPulse Test",
+            license_id="Apache-2.0",
+            minimum_memory_gb=8,
+            output_path=tmp_path / "release.modelpack",
+        )
+
+    assert error.value.code == "invalid_output_path"
+    assert checksum_source.read_text(encoding="utf-8") == "Apache License test text\n"
+
+
+def test_builder_preserves_unrelated_legacy_temp_names(tmp_path: Path) -> None:
+    legacy_temp = tmp_path / ".release.modelpack.tmp"
+    legacy_temp.write_text("keep", encoding="utf-8")
+
+    _build(tmp_path, tmp_path / "release.modelpack")
+
+    assert legacy_temp.read_text(encoding="utf-8") == "keep"
+
+
+def test_cli_returns_actionable_error_without_a_traceback(tmp_path: Path, capsys) -> None:
+    gguf, modelfile, license_file = _sources(tmp_path)
+    gguf.write_bytes(b"not-a-gguf")
+
+    exit_code = main(
+        [
+            "--gguf",
+            str(gguf),
+            "--modelfile",
+            str(modelfile),
+            "--license-file",
+            str(license_file),
+            "--model-id",
+            "stockpulse/test:q4",
+            "--display-name",
+            "StockPulse Test",
+            "--license-id",
+            "Apache-2.0",
+            "--minimum-memory-gb",
+            "8",
+            "--output",
+            str(tmp_path / "bad.modelpack"),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "not GGUF" in captured.err
+    assert "Traceback" not in captured.err

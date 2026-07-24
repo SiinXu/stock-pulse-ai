@@ -21,6 +21,7 @@ from src.config import get_config, Config
 from src.services.system_config_service import SystemConfigService
 from src.services.runtime_scheduler import RuntimeSchedulerService
 from src.services.local_model_service import LocalModelService, get_pullable_local_model_ids
+from src.services.model_pack_import_service import ModelPackImportService
 from src.services.security_audit_service import (
     SecurityAuditRecorder,
     SecurityAuditService,
@@ -236,4 +237,16 @@ def get_scheduled_task_service(request: Request) -> ScheduledTaskService:
     if service is None:
         service = ScheduledTaskService()
         request.app.state.scheduled_task_service = service
+    return service
+
+
+def get_model_pack_import_service(request: Request) -> ModelPackImportService:
+    """Get the app-lifecycle shared Model Pack import service."""
+    service = getattr(request.app.state, "model_pack_import_service", None)
+    if service is None:
+        service = ModelPackImportService(
+            system_config_service=get_system_config_service(request),
+            task_queue=get_task_queue(),
+        )
+        request.app.state.model_pack_import_service = service
     return service

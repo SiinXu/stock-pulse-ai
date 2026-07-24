@@ -1,0 +1,268 @@
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+
+import pytest
+import requests
+
+from src.model_pack import (
+    ModelPackError,
+    OllamaHttpModelPackExecutor,
+    inspect_model_pack,
+    normalize_ollama_native_base_url,
+)
+from src.services.local_model_activation import LocalModelActivationService
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def _write_pack(root: Path) -> Path:
+    root.mkdir()
+    gguf = root / "finance.gguf"
+    modelfile = root / "Modelfile"
+    license_file = root / "LICENSE"
+    gguf.write_bytes(b"GGUF-finance-test")
+    modelfile.write_text(
+        (
+            "FROM ./finance.gguf\n"
+            "PARAMETER temperature 0.1\n"
+            "PARAMETER stop END\n"
+            'SYSTEM """You are a finance model.\nUse cited evidence."""\n'
+        ),
+        encoding="utf-8",
+    )
+    license_file.write_text("LicenseRef-Finance terms\n", encoding="utf-8")
+    manifest = {
+        "format_version": 1,
+        "model_id": "stockpulse/finance-test:q4",
+        "display_name": "Finance Test",
+        "gguf_file": gguf.name,
+        "modelfile": modelfile.name,
+        "license": {"id": "LicenseRef-Finance", "file": license_file.name},
+        "minimum_memory_gb": 16,
+        "files": [
+            {
+                "path": gguf.name,
+                "role": "gguf",
+                "sha256": _sha256(gguf),
+                "size_bytes": gguf.stat().st_size,
+            },
+            {
+                "path": modelfile.name,
+                "role": "modelfile",
+                "sha256": _sha256(modelfile),
+                "size_bytes": modelfile.stat().st_size,
+            },
+            {
+                "path": license_file.name,
+                "role": "license",
+                "sha256": _sha256(license_file),
+                "size_bytes": license_file.stat().st_size,
+            },
+        ],
+    }
+    (root / "manifest.json").write_text(
+        json.dumps(manifest) + "\n",
+        encoding="utf-8",
+    )
+    return root
+
+
+class _Response:
+    def __init__(self, status_code: int, body=None) -> None:
+        self.status_code = status_code
+        self._body = {} if body is None else body
+
+    def json(self):
+        return self._body
+
+
+def test_normalize_ollama_native_base_url_accepts_only_root_or_v1() -> None:
+    assert (
+        normalize_ollama_native_base_url("http://127.0.0.1:11434/v1/")
+        == "http://127.0.0.1:11434"
+    )
+    assert (
+        normalize_ollama_native_base_url("https://ollama.example:443")
+        == "https://ollama.example:443"
+    )
+
+    for invalid in (
+        "file:///tmp/ollama",
+        "http://user:secret@localhost:11434",
+        "http://localhost:11434/private",
+        "http://localhost:11434?target=other",
+    ):
+        with pytest.raises(ModelPackError) as error:
+            normalize_ollama_native_base_url(invalid)
+        assert error.value.code == "invalid_ollama_configuration"
+
+
+def test_http_executor_uploads_verified_blob_then_creates_from_controlled_fields(
+    tmp_path: Path,
+) -> None:
+    pack_path = _write_pack(tmp_path / "pack")
+    requests_seen = []
+
+    def requester(method: str, url: str, **kwargs):
+        requests_seen.append((method, url, kwargs))
+        if method == "HEAD":
+            return _Response(404)
+        if url.endswith("/api/create"):
+            return _Response(200, {"status": "success"})
+        assert kwargs["data"].read() == b"GGUF-finance-test"
+        return _Response(201)
+
+    progress = []
+    executor = OllamaHttpModelPackExecutor(
+        base_url_provider=lambda: "http://127.0.0.1:11434/v1",
+        requester=requester,
+    )
+    with inspect_model_pack(pack_path) as inspected:
+        executor.create(
+            inspected,
+            on_progress=lambda percent, message: progress.append((percent, message)),
+        )
+
+    digest = hashlib.sha256(b"GGUF-finance-test").hexdigest()
+    assert [(method, url) for method, url, _kwargs in requests_seen] == [
+        ("HEAD", f"http://127.0.0.1:11434/api/blobs/sha256:{digest}"),
+        ("POST", f"http://127.0.0.1:11434/api/blobs/sha256:{digest}"),
+        ("POST", "http://127.0.0.1:11434/api/create"),
+    ]
+    create_payload = requests_seen[-1][2]["json"]
+    assert create_payload == {
+        "model": "stockpulse/finance-test:q4",
+        "files": {"finance.gguf": f"sha256:{digest}"},
+        "license": "LicenseRef-Finance terms\n",
+        "stream": False,
+        "parameters": {"temperature": 0.1, "stop": "END"},
+        "system": "You are a finance model.\nUse cited evidence.",
+    }
+    assert progress == [
+        (45, "Uploading the verified GGUF data to Ollama"),
+        (75, "Creating the Ollama model"),
+        (90, "Activating the imported model"),
+    ]
+
+
+def test_http_executor_translates_unreachable_ollama_without_exposing_traceback(
+    tmp_path: Path,
+) -> None:
+    pack_path = _write_pack(tmp_path / "pack")
+
+    def unavailable(_method: str, _url: str, **_kwargs):
+        raise requests.ConnectionError("connection refused at a private path")
+
+    executor = OllamaHttpModelPackExecutor(
+        base_url_provider=lambda: "http://127.0.0.1:11434",
+        requester=unavailable,
+    )
+    with inspect_model_pack(pack_path) as inspected:
+        with pytest.raises(ModelPackError) as error:
+            executor.create(inspected)
+
+    assert error.value.code == "ollama_unavailable"
+    assert "Start Ollama" in error.value.user_message
+    assert "private path" not in error.value.user_message
+
+
+def test_http_executor_requires_private_target_allowlisting(tmp_path: Path) -> None:
+    pack_path = _write_pack(tmp_path / "pack")
+    executor = OllamaHttpModelPackExecutor(
+        base_url_provider=lambda: "http://127.0.0.1:11434",
+        allowlist_provider=lambda: (),
+    )
+
+    with inspect_model_pack(pack_path) as inspected:
+        with pytest.raises(ModelPackError) as error:
+            executor.create(inspected)
+
+    assert error.value.code == "ollama_access_blocked"
+    assert "OUTBOUND_HTTP_ALLOWLIST" in error.value.user_message
+
+
+class _FakeSystemConfigService:
+    def __init__(self, values):
+        self.values = dict(values)
+        self.update_calls = []
+
+    def get_config(self, include_schema: bool):
+        assert include_schema is False
+        return {
+            "config_version": "version-before",
+            "items": [
+                {"key": key, "value": value}
+                for key, value in self.values.items()
+            ],
+        }
+
+    def update(self, **kwargs):
+        self.update_calls.append(kwargs)
+        return {
+            "config_version": "version-after",
+            "reload_triggered": kwargs["reload_now"],
+        }
+
+
+def test_activation_reuses_system_config_update_and_preserves_existing_values() -> None:
+    config_service = _FakeSystemConfigService(
+        {
+            "LLM_CHANNELS": "primary,ollama",
+            "LLM_OLLAMA_BASE_URL": "http://localhost:11434/v1",
+            "LLM_OLLAMA_MODELS": "qwen3:8b",
+        }
+    )
+
+    result = LocalModelActivationService(config_service).activate(
+        "stockpulse/finance-test:q4"
+    )
+
+    assert result == {
+        "channels": "primary,ollama",
+        "models": "qwen3:8b,stockpulse/finance-test:q4",
+        "config_version": "version-after",
+        "reload_triggered": True,
+    }
+    assert config_service.update_calls == [
+        {
+            "config_version": "version-before",
+            "items": [
+                {"key": "LLM_CHANNELS", "value": "primary,ollama"},
+                {"key": "LLM_OLLAMA_PROVIDER", "value": "ollama"},
+                {"key": "LLM_OLLAMA_PROTOCOL", "value": "ollama"},
+                {"key": "LLM_OLLAMA_BASE_URL", "value": "http://localhost:11434"},
+                {
+                    "key": "LLM_OLLAMA_MODELS",
+                    "value": "qwen3:8b,stockpulse/finance-test:q4",
+                },
+                {"key": "LLM_OLLAMA_ENABLED", "value": "true"},
+            ],
+            "reload_now": True,
+            "actor": "local_model_activation",
+        }
+    ]
+
+
+def test_activation_is_idempotent_for_channel_and_model() -> None:
+    config_service = _FakeSystemConfigService(
+        {
+            "LLM_CHANNELS": "OLLAMA",
+            "LLM_OLLAMA_MODELS": "stockpulse/finance-test:q4",
+        }
+    )
+
+    result = LocalModelActivationService(
+        config_service,
+        reload_now=False,
+    ).activate("stockpulse/finance-test:q4")
+
+    assert result["channels"] == "OLLAMA"
+    assert result["models"] == "stockpulse/finance-test:q4"
+    assert result["reload_triggered"] is False
