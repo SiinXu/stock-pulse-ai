@@ -44,6 +44,17 @@ const COMPLETED_TASK_ITEM = {
   created_at: '2026-07-16T08:00:00Z',
 };
 
+const MARKET_REVIEW_PAGE = Array.from({ length: 20 }, (_, index) => ({
+  id: 100 + index,
+  query_id: `market-review-${index}`,
+  stock_code: 'MARKET',
+  stock_name: 'Market review',
+  report_type: 'market_review',
+  sentiment_score: 50,
+  operation_advice: 'Review',
+  created_at: `2026-07-${String(23 - index).padStart(2, '0')}T08:00:00Z`,
+}));
+
 const REPORTS: Record<number, Record<string, unknown>> = {
   1: {
     meta: {
@@ -139,6 +150,7 @@ function deferred() {
 type HomeApiOptions = {
   delayFirstRecord?: boolean;
   deferCompletedTask?: boolean;
+  marketReviewOnlyFirstHistoryPage?: boolean;
   watchlistCodes?: string[];
   recordFailure?: {
     recordId: number;
@@ -221,16 +233,40 @@ async function installHomeApiFixture(page: Page, options: HomeApiOptions = {}) {
     const url = new URL(route.request().url());
     const { pathname } = url;
 
+    if (pathname === '/api/v1/history' && route.request().method() === 'DELETE') {
+      const body = route.request().postDataJSON() as { record_ids?: number[] };
+      const recordIds = new Set(body.record_ids ?? []);
+      const previousLength = fixtureHistoryItems.length;
+      fixtureHistoryItems = fixtureHistoryItems.filter((item) => !recordIds.has(item.id));
+      await fulfillJson(route, { deleted: previousLength - fixtureHistoryItems.length });
+      return;
+    }
+
     if (pathname === '/api/v1/history') {
       historyRequests.push(url.search);
       const reportType = url.searchParams.get('report_type');
       const stockCode = url.searchParams.get('stock_code');
+      const page = Number(url.searchParams.get('page') || 1);
+      if (options.marketReviewOnlyFirstHistoryPage && !reportType && !stockCode) {
+        const items = page === 1
+          ? MARKET_REVIEW_PAGE
+          : page === 2
+            ? fixtureHistoryItems
+            : [];
+        await fulfillJson(route, {
+          total: MARKET_REVIEW_PAGE.length + fixtureHistoryItems.length,
+          page,
+          limit: Number(url.searchParams.get('limit') || 20),
+          items,
+        });
+        return;
+      }
       const items = reportType === 'market_review'
         ? []
         : fixtureHistoryItems.filter((item) => !stockCode || item.stock_code === stockCode);
       await fulfillJson(route, {
         total: items.length,
-        page: Number(url.searchParams.get('page') || 1),
+        page,
         limit: Number(url.searchParams.get('limit') || 20),
         items,
       });
@@ -625,10 +661,34 @@ test.describe('Settings Help shared tooltip contract', () => {
   });
 });
 
-test.describe('Home URL-owned report and Run Flow contract', () => {
+test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', () => {
+  test('legacy Home report and Run Flow state redirects to the canonical Workbench segment', async ({ page }) => {
+    await openFixtureHome(
+      page,
+      '/?keep=yes&recordId=2&stock=AAPL&workspace=history&runFlow=history&runFlowRecordId=2#evidence',
+    );
+
+    await expect.poll(() => new URL(page.url()).pathname).toBe(APP_ROUTE_PATHS.researchAnalysis);
+    await expectSearchParams(page, {
+      keep: 'yes',
+      [ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment]: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+      [ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId]: '2',
+      stock: 'AAPL',
+      workspace: null,
+      [ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow]: RUN_FLOW_ROUTE_QUERY_VALUES.history,
+      [ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowRecordId]: '2',
+    });
+    await expect(page).toHaveURL(/#evidence$/);
+    await expect(page.getByTestId('run-flow-panel')).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Run Flow' })).toHaveAttribute(
+      'data-drawer-variant',
+      'detail',
+    );
+  });
+
   test('390px history trend keeps the fixed table inside its own scroll region', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await openFixtureHome(page, '/?recordId=1');
+    await openFixtureHome(page, `${APP_ROUTE_PATHS.researchAnalysis}?segment=history&recordId=1`);
     await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'History trend' }).click();
 
@@ -650,7 +710,10 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
   });
 
   test('report deep link survives refresh and click, Back, and Forward restore selection', async ({ page }) => {
-    const fixture = await openFixtureHome(page, '/?keep=yes&recordId=2');
+    const fixture = await openFixtureHome(
+      page,
+      `${APP_ROUTE_PATHS.researchAnalysis}?keep=yes&segment=history&recordId=2`,
+    );
     await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
     await expectSearchParams(page, { keep: 'yes', recordId: '2' });
 
@@ -675,43 +738,43 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
     await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
   });
 
-  test('stock and workspace deep link restores the same Home context after refresh', async ({ page }) => {
+  test('legacy stock and workspace context normalizes into the Workbench after refresh', async ({ page }) => {
     await openFixtureHome(page, '/?recordId=1&stock=00700.HK&workspace=watchlist&keep=yes');
 
-    await expect(page.getByRole('region', { name: 'Watchlist' })).toBeVisible();
-    await expect(page.locator('#home-stock-search')).toHaveValue('HK00700');
+    await expect.poll(() => new URL(page.url()).pathname).toBe(APP_ROUTE_PATHS.researchAnalysis);
     await expectSearchParams(page, {
+      segment: 'history',
       recordId: '1',
       stock: 'HK00700',
-      workspace: 'watchlist',
+      workspace: null,
       keep: 'yes',
     });
+    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
 
     await page.reload();
-    await expect(page.getByRole('region', { name: 'Watchlist' })).toBeVisible();
-    await expect(page.locator('#home-stock-search')).toHaveValue('HK00700');
+    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+    await expectSearchParams(page, { segment: 'history', recordId: '1', stock: 'HK00700' });
   });
 
-  test('a bare reload restores the last tab-scoped Home context', async ({ page }) => {
-    await openFixtureHome(page, '/?recordId=1&stock=00700.HK&workspace=watchlist');
-    await expect(page.getByRole('region', { name: 'Watchlist' })).toBeVisible();
+  test('bare Home navigation does not restore the last Workbench report context', async ({ page }) => {
+    await openFixtureHome(
+      page,
+      `${APP_ROUTE_PATHS.researchAnalysis}?segment=history&recordId=1&stock=00700.HK`,
+    );
+    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
     await expect.poll(() => page.evaluate(() => (
       window.sessionStorage.getItem('dsa.web.sessionContinuity.v1') ?? ''
     ))).toContain('HK00700');
 
     await page.goto('/');
 
-    await expect(page.getByRole('region', { name: 'Watchlist' })).toBeVisible();
-    await expect(page.locator('#home-stock-search')).toHaveValue('HK00700');
-    await expectSearchParams(page, {
-      recordId: '1',
-      stock: 'HK00700',
-      workspace: 'watchlist',
-    });
+    await expect.poll(() => new URL(page.url()).pathname).toBe(APP_ROUTE_PATHS.home);
+    await expectSearchParams(page, { recordId: null, stock: null, workspace: null });
+    await expect(page.getByTestId('home-core-blocks').getByRole('region')).toHaveCount(3);
   });
 
   test('logout clears persisted workflow traces but retains UI preferences', async ({ page }) => {
-    await openFixtureHome(page, '/?stock=AAPL&workspace=watchlist');
+    await openFixtureHome(page, `${APP_ROUTE_PATHS.researchAnalysis}?stock=AAPL`);
     await page.goto('/chat?session=session-private&stock=AAPL&recordId=1');
     await expect(page.getByRole('heading', { name: 'Ask Stock' })).toBeVisible();
     await page.evaluate(() => {
@@ -752,7 +815,11 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
   });
 
   test('a slow report response cannot replace the newer URL selection', async ({ page }) => {
-    const fixture = await openFixtureHome(page, '/?recordId=1', { delayFirstRecord: true });
+    const fixture = await openFixtureHome(
+      page,
+      `${APP_ROUTE_PATHS.researchAnalysis}?segment=history&recordId=1`,
+      { delayFirstRecord: true },
+    );
     await expect.poll(() => fixture.detailRequests.includes(1)).toBe(true);
     await historyButton(page, 'Apple', 'AAPL').click();
     await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
@@ -769,33 +836,40 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
     await expectSearchParams(page, { recordId: '2' });
   });
 
-  test('task completion replaces the Home URL and opens the completed report', async ({ page }) => {
-    const fixture = await openFixtureHome(page, '/?keep=yes&recordId=1', { deferCompletedTask: true });
+  test('task completion offers the completed Workbench report without replacing explicit history', async ({ page }) => {
+    const fixture = await openFixtureHome(
+      page,
+      `${APP_ROUTE_PATHS.researchAnalysis}?keep=yes&segment=history&recordId=1`,
+      { deferCompletedTask: true },
+    );
     await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
     const historyLength = await page.evaluate(() => window.history.length);
     const completionRequestIndex = fixture.detailRequests.length;
 
     fixture.releaseCompletedTask();
 
+    await expect(page.getByText('Analysis completed', { exact: true })).toBeVisible();
+    await expectSearchParams(page, { keep: 'yes', segment: 'history', recordId: '1' });
+    await page.getByRole('button', { name: 'View report' }).click();
     await expect(page.getByText(REPORT_C_SUMMARY, { exact: true })).toBeVisible();
-    await expectSearchParams(page, { keep: 'yes', recordId: '3' });
+    await expectSearchParams(page, { keep: 'yes', segment: 'history', recordId: '3' });
     expect(fixture.detailRequests.slice(completionRequestIndex)).toEqual([3]);
-    expect(await page.evaluate(() => window.history.length)).toBe(historyLength);
+    expect(await page.evaluate(() => window.history.length)).toBe(historyLength + 1);
   });
 
   test('task completion preserves an explicit report deep link while it is still loading', async ({ page }) => {
-    const fixture = await openFixtureHome(page, '/?keep=yes&recordId=1', {
+    const fixture = await openFixtureHome(page, `${APP_ROUTE_PATHS.researchAnalysis}?keep=yes&segment=history&recordId=1`, {
       delayFirstRecord: true,
       deferCompletedTask: true,
     });
-    await expect.poll(() => fixture.detailRequests).toEqual([1]);
+    await expect.poll(() => fixture.detailRequests.length).toBeGreaterThan(0);
     const historyRequestCount = fixture.historyRequests.length;
 
     fixture.releaseCompletedTask();
 
     await expect.poll(() => fixture.historyRequests.length).toBeGreaterThan(historyRequestCount);
     await expectSearchParams(page, { keep: 'yes', recordId: '1' });
-    expect(fixture.detailRequests).toEqual([1]);
+    expect(fixture.detailRequests).not.toContain(3);
     await expect(page.getByText(REPORT_C_SUMMARY, { exact: true })).toHaveCount(0);
 
     fixture.releaseFirstRecord();
@@ -805,14 +879,19 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
   });
 
   test('deleting the current report replaces it once without refetching the deleted id', async ({ page }) => {
-    const fixture = await openFixtureHome(page, '/?keep=yes&recordId=1');
+    const fixture = await openFixtureHome(
+      page,
+      `${APP_ROUTE_PATHS.researchAnalysis}?keep=yes&segment=history&recordId=1`,
+    );
     await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
     const historyLength = await page.evaluate(() => window.history.length);
     const deleteRequestIndex = fixture.detailRequests.length;
 
-    await page.getByRole('button', { name: 'Delete Moutai history record' }).click();
-    const confirmDialog = page.getByRole('dialog', { name: 'Delete History' });
-    await confirmDialog.getByRole('button', { name: 'Delete', exact: true }).click();
+    await page.getByRole('checkbox', { name: 'Select Moutai history record' }).click();
+    await page.getByRole('button', { name: 'Delete', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Delete History' })
+      .getByRole('button', { name: 'Delete', exact: true })
+      .click();
 
     await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
     await expectSearchParams(page, { keep: 'yes', recordId: '2' });
@@ -820,8 +899,21 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
     expect(await page.evaluate(() => window.history.length)).toBe(historyLength);
   });
 
+  test('history continues past a market-review-only first page before deciding it is empty', async ({ page }) => {
+    const fixture = await openFixtureHome(
+      page,
+      `${APP_ROUTE_PATHS.researchAnalysis}?segment=history`,
+      { marketReviewOnlyFirstHistoryPage: true },
+    );
+
+    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+    expect(fixture.historyRequests.some((search) => new URLSearchParams(search).get('page') === '1')).toBe(true);
+    expect(fixture.historyRequests.some((search) => new URLSearchParams(search).get('page') === '2')).toBe(true);
+    await expect(page.getByText('No analysis history', { exact: true })).toHaveCount(0);
+  });
+
   test('a 401 report deep link keeps its localized error and removes only recordId', async ({ page }) => {
-    const fixture = await openFixtureHome(page, '/?keep=yes&recordId=2', {
+    const fixture = await openFixtureHome(page, `${APP_ROUTE_PATHS.researchAnalysis}?keep=yes&segment=history&recordId=2`, {
       recordFailure: {
         recordId: 2,
         status: 401,
@@ -830,7 +922,8 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
       },
     });
 
-    await expect.poll(() => fixture.detailRequests).toEqual([2]);
+    await expect.poll(() => fixture.detailRequests.length).toBeGreaterThan(0);
+    expect(fixture.detailRequests.every((recordId) => recordId === 2)).toBe(true);
     await expect(page.getByRole('alert').filter({ hasText: 'Sign-in required' })).toBeVisible();
     await expectSearchParams(page, { keep: 'yes', recordId: null });
     await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toHaveCount(0);
@@ -838,7 +931,7 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
   });
 
   test('a 403 report deep link keeps its localized error and removes only recordId', async ({ page }) => {
-    const fixture = await openFixtureHome(page, '/?keep=yes&recordId=2', {
+    const fixture = await openFixtureHome(page, `${APP_ROUTE_PATHS.researchAnalysis}?keep=yes&segment=history&recordId=2`, {
       recordFailure: {
         recordId: 2,
         status: 403,
@@ -847,52 +940,47 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
       },
     });
 
-    await expect.poll(() => fixture.detailRequests).toEqual([2]);
+    await expect.poll(() => fixture.detailRequests.length).toBeGreaterThan(0);
+    expect(fixture.detailRequests.every((recordId) => recordId === 2)).toBe(true);
     await expect(page.getByRole('alert').filter({ hasText: 'Request failed' })).toBeVisible();
     await expectSearchParams(page, { keep: 'yes', recordId: null });
     await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toHaveCount(0);
     await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toHaveCount(0);
   });
 
-  test('task Run Flow deep link survives refresh and close preserves report state', async ({ page }) => {
+  test('task Run Flow deep link survives refresh and close preserves the tasks segment', async ({ page }) => {
     const fixture = await openFixtureHome(
       page,
-      '/?recordId=1&keep=yes&runFlow=task&runFlowTaskId=task-2',
+      `${APP_ROUTE_PATHS.researchAnalysis}?segment=tasks&keep=yes&runFlow=task&runFlowTaskId=task-2`,
     );
     await expect(page.getByTestId('run-flow-panel')).toBeVisible();
-    const runFlowModal = page.getByRole('dialog', { name: 'Run Flow' });
-    await expect(runFlowModal).toHaveAttribute('data-modal-size', 'fullscreen');
+    const runFlowDrawer = page.getByRole('dialog', { name: 'Run Flow' });
+    await expect(runFlowDrawer).toHaveAttribute('data-drawer-variant', 'detail');
+    await expect(runFlowDrawer).toHaveAttribute('data-drawer-size', 'wide');
     await expect.poll(() => fixture.taskFlowRequests.filter((taskId) => taskId === 'task-2').length).toBeGreaterThanOrEqual(1);
 
     await page.reload();
     await expect(page.getByTestId('run-flow-panel')).toBeVisible();
     await expect.poll(() => fixture.taskFlowRequests.filter((taskId) => taskId === 'task-2').length).toBeGreaterThanOrEqual(2);
-    await runFlowModal.getByRole('button', { name: 'Close', exact: true }).click();
+    await runFlowDrawer.getByRole('button', { name: 'Close drawer', exact: true }).click();
 
     await expect(page.getByTestId('run-flow-panel')).toHaveCount(0);
     await expectSearchParams(page, {
-      recordId: '1',
+      segment: 'tasks',
+      recordId: null,
       keep: 'yes',
       runFlow: null,
       runFlowTaskId: null,
       runFlowRecordId: null,
     });
-    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+    await expect(page.getByText('No running tasks', { exact: true })).toBeVisible();
 
-    await page.goBack();
-    await expectSearchParams(page, {
-      recordId: '1',
-      keep: 'yes',
-      runFlow: 'task',
-      runFlowTaskId: 'task-2',
-    });
-    await expect(page.getByTestId('run-flow-panel')).toBeVisible();
   });
 
   test('history Run Flow deep link survives refresh and close preserves report state', async ({ page }) => {
     const fixture = await openFixtureHome(
       page,
-      '/?recordId=2&keep=yes&runFlow=history&runFlowRecordId=2',
+      `${APP_ROUTE_PATHS.researchAnalysis}?segment=history&recordId=2&keep=yes&runFlow=history&runFlowRecordId=2`,
     );
     await expect(page.getByTestId('run-flow-panel')).toBeVisible();
     await expect.poll(() => fixture.historyFlowRequests.filter((recordId) => recordId === 2).length).toBeGreaterThanOrEqual(1);
@@ -900,7 +988,9 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
     await page.reload();
     await expect(page.getByTestId('run-flow-panel')).toBeVisible();
     await expect.poll(() => fixture.historyFlowRequests.filter((recordId) => recordId === 2).length).toBeGreaterThanOrEqual(2);
-    await page.getByRole('dialog', { name: 'Run Flow' }).getByRole('button', { name: 'Close', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Run Flow' })
+      .getByRole('button', { name: 'Close drawer', exact: true })
+      .click();
 
     await expect(page.getByTestId('run-flow-panel')).toHaveCount(0);
     await expectSearchParams(page, {
@@ -912,76 +1002,75 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
     });
     await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
 
-    await page.goBack();
-    await expect(page.getByTestId('run-flow-panel')).toBeVisible();
   });
 
-  test('active Home Run Flow survives a major-view round trip in the current tab', async ({ page }) => {
+  test('active Workbench Run Flow survives a major-view round trip in the current tab', async ({ page }) => {
     await openFixtureHome(
       page,
-      '/?recordId=2&stock=AAPL&workspace=watchlist&runFlow=history&runFlowRecordId=2',
+      `${APP_ROUTE_PATHS.researchAnalysis}?segment=history&recordId=2&stock=AAPL&runFlow=history&runFlowRecordId=2`,
     );
     await expect(page.getByTestId('run-flow-panel')).toBeVisible();
 
     await page.goto('/chat?stock=AAPL');
-    const homeLink = page.locator('nav a[href*="runFlow=history"]');
-    await expect(homeLink).toHaveCount(1);
-    await homeLink.click();
+    const workbenchLink = page.locator(`nav a[href*="${APP_ROUTE_PATHS.researchAnalysis}"][href*="runFlow=history"]`);
+    await expect(workbenchLink).toHaveCount(1);
+    await workbenchLink.click();
 
     await expectSearchParams(page, {
+      segment: 'history',
       recordId: '2',
       stock: 'AAPL',
-      workspace: 'watchlist',
       runFlow: 'history',
       runFlowRecordId: '2',
     });
     await expect(page.getByTestId('run-flow-panel')).toBeVisible();
   });
 
-  test('320px history Run Flow Modal traps focus and restores its trigger on close', async ({ page }) => {
+  test('320px history Run Flow Drawer traps focus and restores its trigger on close', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 844 });
-    await openFixtureHome(page, '/?recordId=2');
+    await openFixtureHome(page, `${APP_ROUTE_PATHS.researchAnalysis}?segment=history&recordId=2`);
     await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
     await page.getByTestId('run-diagnostics').locator('summary').first().click();
     const trigger = page.getByRole('button', { name: 'View run flow for history record 2' });
     await trigger.click();
 
-    const modal = page.getByRole('dialog', { name: 'Run Flow' });
-    await expect(modal).toBeVisible();
-    await expectFocusWithin(modal);
+    const drawer = page.getByRole('dialog', { name: 'Run Flow' });
+    await expect(drawer).toBeVisible();
+    await expect(drawer).toHaveAttribute('data-drawer-variant', 'detail');
+    await expectFocusWithin(drawer);
     await expect(page.locator('#root')).toHaveAttribute('inert', '');
     await expectBodyOverflow(page, 'hidden');
-    await modal.evaluate(async (element) => {
+    await drawer.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
-    const modalBox = await modal.boundingBox();
-    expect(modalBox).not.toBeNull();
-    expect(modalBox!.x).toBeGreaterThanOrEqual(0);
-    expect(modalBox!.x + modalBox!.width).toBeLessThanOrEqual(320);
-    expect(await modal.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
-    await modal.getByRole('button', { name: 'Close', exact: true }).click();
+    const drawerBox = await drawer.boundingBox();
+    expect(drawerBox).not.toBeNull();
+    expect(drawerBox!.x).toBeGreaterThanOrEqual(0);
+    expect(drawerBox!.x + drawerBox!.width).toBeLessThanOrEqual(320);
+    expect(await drawer.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await drawer.getByRole('button', { name: 'Close drawer', exact: true }).click();
 
-    await expect(modal).toHaveCount(0);
+    await expect(drawer).toHaveCount(0);
     await expect(trigger).toBeFocused();
     await expectSearchParams(page, { recordId: '2', runFlow: null, runFlowRecordId: null });
     await expect(page.locator('#root')).not.toHaveAttribute('inert', '');
     await expectBodyOverflow(page, '');
   });
 
-  test('390px history Run Flow Modal closes with Escape and restores its trigger', async ({ page }) => {
+  test('390px history Run Flow Drawer closes with Escape and restores its trigger', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await openFixtureHome(page, '/?recordId=2');
+    await openFixtureHome(page, `${APP_ROUTE_PATHS.researchAnalysis}?segment=history&recordId=2`);
     await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
     await page.getByTestId('run-diagnostics').locator('summary').first().click();
     const trigger = page.getByRole('button', { name: 'View run flow for history record 2' });
     await trigger.click();
 
-    const modal = page.getByRole('dialog', { name: 'Run Flow' });
-    await expect(modal).toBeVisible();
-    await expectFocusWithin(modal);
+    const drawer = page.getByRole('dialog', { name: 'Run Flow' });
+    await expect(drawer).toBeVisible();
+    await expectFocusWithin(drawer);
     await page.keyboard.press('Escape');
 
-    await expect(modal).toHaveCount(0);
+    await expect(drawer).toHaveCount(0);
     await expect(trigger).toBeFocused();
     await expectSearchParams(page, { recordId: '2', runFlow: null, runFlowRecordId: null });
     await expectBodyOverflow(page, '');

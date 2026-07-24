@@ -54,7 +54,6 @@ type PersistedSessionContinuity = {
 const EMPTY_STATE: PersistedSessionContinuity = { version: 1, routes: {} };
 const MAX_PERSISTED_HREF_LENGTH = 2_048;
 const INITIAL_RESTORE_PATHS = new Map<string, PersistedRouteKey>([
-  [APP_ROUTE_PATHS.home, 'home'],
   [APP_ROUTE_PATHS.agent, 'chat'],
   [APP_ROUTE_PATHS.signals, 'decision-signals'],
   [APP_ROUTE_PATHS.portfolio, 'portfolio'],
@@ -334,9 +333,10 @@ export function recordSessionLocation(href: string): void {
 export function resolveInitialSessionHref(href: string): string | null {
   const url = new URL(href, 'http://stockpulse.local');
   if (url.search || url.hash) return null;
+  const state = readState();
   const key = INITIAL_RESTORE_PATHS.get(url.pathname);
   if (!key) return null;
-  const restored = readState().routes[key];
+  const restored = state.routes[key];
   return restored && restored !== url.pathname ? restored : null;
 }
 
@@ -378,24 +378,6 @@ export function resolveContextAwareNavigationTarget(to: string, currentHref: str
   if (!sourceContext) return savedHref;
 
   switch (destinationKey) {
-    case 'home': {
-      const saved = savedTarget?.page === 'home' ? savedTarget : null;
-      const sameStock = saved?.stockCode === sourceContext.stockCode;
-      const base = buildDeepLink({
-        page: 'home',
-        stockCode: sourceContext.stockCode,
-        workspace: saved?.workspace,
-        recordId: sourceContext.recordId,
-      });
-      return appendAllowedParameters(
-        base,
-        savedHref,
-        destinationKey,
-        sameStock
-          ? new Set()
-          : new Set(Object.values(REPORT_ROUTE_QUERY_KEYS)),
-      );
-    }
     case 'chat': {
       const saved = savedTarget?.page === 'chat' ? savedTarget : null;
       const sameStock = saved?.stockCode === sourceContext.stockCode;

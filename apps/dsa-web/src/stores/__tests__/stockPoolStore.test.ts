@@ -146,6 +146,85 @@ describe('stockPoolStore', () => {
     expect(state.isLoadingReport).toBe(false);
   });
 
+  it('continues past market-review-only pages to the first stock history records', async () => {
+    const marketReviewItems = Array.from({ length: 20 }, (_, index) => ({
+      ...historyItem,
+      id: 100 + index,
+      queryId: `market-${index}`,
+      stockCode: 'MARKET',
+      stockName: '大盘复盘',
+      reportType: 'market_review' as const,
+    }));
+    vi.mocked(historyApi.getList)
+      .mockResolvedValueOnce({
+        total: 21,
+        page: 1,
+        limit: 20,
+        items: marketReviewItems,
+      })
+      .mockResolvedValueOnce({
+        total: 21,
+        page: 2,
+        limit: 20,
+        items: [{ ...historyItem, reportType: 'detailed' as const }],
+      });
+
+    await useStockPoolStore.getState().loadInitialHistory();
+
+    const state = useStockPoolStore.getState();
+    expect(historyApi.getList).toHaveBeenCalledTimes(2);
+    expect(historyApi.getList).toHaveBeenNthCalledWith(2, expect.objectContaining({ page: 2 }));
+    expect(state.historyItems).toEqual([{ ...historyItem, reportType: 'detailed' }]);
+    expect(state.currentPage).toBe(2);
+    expect(state.hasMore).toBe(false);
+  });
+
+  it('continues load-more past market-review-only pages without losing stock history', async () => {
+    const marketReviewItems = Array.from({ length: 20 }, (_, index) => ({
+      ...historyItem,
+      id: 200 + index,
+      queryId: `market-page-2-${index}`,
+      stockCode: 'MARKET',
+      stockName: '大盘复盘',
+      reportType: 'market_review' as const,
+    }));
+    const olderStockItem = {
+      ...historyItem,
+      id: 2,
+      queryId: 'q-2',
+      stockCode: 'AAPL',
+      stockName: 'Apple',
+      reportType: 'brief' as const,
+    };
+    useStockPoolStore.setState({
+      historyItems: [{ ...historyItem, reportType: 'detailed' }],
+      currentPage: 1,
+      hasMore: true,
+    });
+    vi.mocked(historyApi.getList)
+      .mockResolvedValueOnce({
+        total: 41,
+        page: 2,
+        limit: 20,
+        items: marketReviewItems,
+      })
+      .mockResolvedValueOnce({
+        total: 41,
+        page: 3,
+        limit: 20,
+        items: [olderStockItem],
+      });
+
+    await useStockPoolStore.getState().loadMoreHistory();
+
+    const state = useStockPoolStore.getState();
+    expect(historyApi.getList).toHaveBeenNthCalledWith(1, expect.objectContaining({ page: 2 }));
+    expect(historyApi.getList).toHaveBeenNthCalledWith(2, expect.objectContaining({ page: 3 }));
+    expect(state.historyItems.map((item) => item.id)).toEqual([1, 2]);
+    expect(state.currentPage).toBe(3);
+    expect(state.hasMore).toBe(false);
+  });
+
   it('opens same-stock history trend and loads more records', async () => {
     const olderItem = {
       ...historyItem,
@@ -584,6 +663,72 @@ describe('stockPoolStore', () => {
     const state = useStockPoolStore.getState();
     expect(state.historyItems.map((item) => item.id)).toEqual([2, 1]);
     expect(state.currentPage).toBe(1);
+  });
+
+  it('advances past market-review-only pages during silent refresh before loading more', async () => {
+    const marketReviewItems = Array.from({ length: 20 }, (_, index) => ({
+      ...historyItem,
+      id: 300 + index,
+      queryId: `market-silent-${index}`,
+      stockCode: 'MARKET',
+      stockName: '大盘复盘',
+      reportType: 'market_review' as const,
+    }));
+    const newStockItem = {
+      ...historyItem,
+      id: 2,
+      queryId: 'q-2',
+      stockCode: 'AAPL',
+      stockName: 'Apple',
+      reportType: 'detailed' as const,
+    };
+    const olderStockItem = {
+      ...historyItem,
+      id: 3,
+      queryId: 'q-3',
+      stockCode: 'MSFT',
+      stockName: 'Microsoft',
+      reportType: 'brief' as const,
+    };
+    useStockPoolStore.setState({
+      historyItems: [{ ...historyItem, reportType: 'detailed' }],
+      currentPage: 1,
+      hasMore: true,
+    });
+    vi.mocked(historyApi.getList)
+      .mockResolvedValueOnce({
+        total: 41,
+        page: 1,
+        limit: 20,
+        items: marketReviewItems,
+      })
+      .mockResolvedValueOnce({
+        total: 41,
+        page: 2,
+        limit: 20,
+        items: [newStockItem],
+      })
+      .mockResolvedValueOnce({
+        total: 41,
+        page: 3,
+        limit: 20,
+        items: [olderStockItem],
+      });
+
+    await useStockPoolStore.getState().refreshHistory(true);
+
+    let state = useStockPoolStore.getState();
+    expect(state.historyItems.map((item) => item.id)).toEqual([2, 1]);
+    expect(state.currentPage).toBe(2);
+    expect(state.hasMore).toBe(true);
+
+    await useStockPoolStore.getState().loadMoreHistory();
+
+    state = useStockPoolStore.getState();
+    expect(historyApi.getList).toHaveBeenNthCalledWith(3, expect.objectContaining({ page: 3 }));
+    expect(state.historyItems.map((item) => item.id)).toEqual([2, 1, 3]);
+    expect(state.currentPage).toBe(3);
+    expect(state.hasMore).toBe(false);
   });
 
   it('returns the newest completed-task item without selecting its report', async () => {

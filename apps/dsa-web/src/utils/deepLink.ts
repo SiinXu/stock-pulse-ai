@@ -51,6 +51,10 @@ export type DeepLinkTarget =
       accountId?: number;
     }
   | {
+      page: 'market-review';
+      recordId?: number;
+    }
+  | {
       page: 'decision-signals';
       stockCode?: string;
       signalId?: number;
@@ -320,6 +324,10 @@ export function buildDeepLink(target: DeepLinkTarget): string {
       pathname = APP_ROUTE_PATHS.portfolio;
       setPositiveInteger(params, 'account', target.accountId);
       break;
+    case 'market-review':
+      pathname = APP_ROUTE_PATHS.researchMarket;
+      setPositiveInteger(params, REPORT_ROUTE_QUERY_KEYS.recordId, target.recordId);
+      break;
     case 'decision-signals':
       pathname = APP_ROUTE_PATHS.signals;
       if (target.stockCode) params.set('stock', requireStockCode(target.stockCode));
@@ -397,9 +405,6 @@ export function parseDeepLink(input: string, origin = DEFAULT_ORIGIN): ParsedDee
     if (rawWorkspace !== null) {
       if (HOME_WORKSPACE_VIEWS.has(rawWorkspace as HomeWorkspaceView)) {
         workspace = rawWorkspace as HomeWorkspaceView;
-        if (workspace === HOME_WORKSPACE_VALUES.history) {
-          params.delete(HOME_ROUTE_QUERY_KEYS.workspace);
-        }
       } else {
         params.delete(HOME_ROUTE_QUERY_KEYS.workspace);
         issues.push({ code: 'invalid_workspace', parameter: HOME_ROUTE_QUERY_KEYS.workspace });
@@ -459,6 +464,14 @@ export function parseDeepLink(input: string, origin = DEFAULT_ORIGIN): ParsedDee
   } else if (url.pathname === APP_ROUTE_PATHS.portfolio) {
     const accountId = parsePositiveIntegerParam(params, issues, 'account', 'invalid_account_id');
     target = { page: 'portfolio', accountId };
+  } else if (url.pathname === APP_ROUTE_PATHS.researchMarket) {
+    const recordId = parsePositiveIntegerParam(
+      params,
+      issues,
+      REPORT_ROUTE_QUERY_KEYS.recordId,
+      'invalid_record_id',
+    );
+    target = { page: 'market-review', recordId };
   } else if (
     url.pathname === APP_ROUTE_PATHS.signals
     || url.pathname === LEGACY_ROUTE_PATHS.decisionSignals
@@ -581,7 +594,6 @@ export function parseDeepLink(input: string, origin = DEFAULT_ORIGIN): ParsedDee
       });
     } else if (!new Set<string>([
       LEGACY_ROUTE_PATHS.alerts,
-      APP_ROUTE_PATHS.researchMarket,
       APP_ROUTE_PATHS.settings,
       LEGACY_ROUTE_PATHS.usage,
     ]).has(url.pathname)) {

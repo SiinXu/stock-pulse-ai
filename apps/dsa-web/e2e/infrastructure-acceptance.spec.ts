@@ -15,6 +15,7 @@ import { PORTFOLIO_TEXT } from '../src/locales/portfolio';
 import { SCREENING_TEXT } from '../src/locales/screening';
 import { UI_TEXT } from '../src/i18n/uiText';
 import {
+  ANALYSIS_WORKBENCH_SEGMENT_VALUES,
   APP_ROUTE_PATHS,
   LEGACY_ALERTS_VIEW_VALUES,
   LEGACY_ROUTE_PATHS,
@@ -28,6 +29,7 @@ import {
   SIGNAL_FEED_VIEW_VALUES,
   SETTINGS_ROUTE_QUERY_KEYS,
   SETTINGS_SECTION_IDS,
+  buildAnalysisWorkbenchHref,
   buildSignalCenterHref,
   buildSettingsHref,
   buildSettingsSectionHref,
@@ -176,9 +178,6 @@ async function expectMinimumTouchTarget(locator: Locator, minimum = 44) {
 }
 
 async function login(page: Page, language: 'zh' | 'en' = 'zh') {
-  // Force professional-mode HomePage so downstream assertions on report
-  // surface, canonical action buttons, and Home reachability at 320px keep
-  // seeing the full-experience UI instead of BeginnerReportSummary.
   await mockCompletedSetupStatus(page);
   await loginAsE2eAdmin(page);
   if (language === 'en') {
@@ -291,6 +290,9 @@ async function openSeededReport(page: Page, uiLanguage: 'zh' | 'en', reportLangu
     });
   });
   await login(page, uiLanguage);
+  await page.goto(buildAnalysisWorkbenchHref({
+    segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+  }));
   const historyItem = page.locator('.home-history-item').filter({ hasText: 'E2E Fixture' }).first();
   await expect(historyItem).toBeVisible({ timeout: 15_000 });
   await historyItem.click();
@@ -837,7 +839,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
 
   test('05 application routes render English chrome and localized document titles', async ({ page }) => {
     await login(page, 'en');
-    await assertRouteChrome(page, APP_ROUTE_PATHS.home, UI_TEXT.en['home.strategy'], UI_TEXT.en['home.pageTitle']);
+    await assertRouteChrome(page, APP_ROUTE_PATHS.home, UI_TEXT.en['home.todayFocus'], UI_TEXT.en['home.pageTitle']);
     await assertRouteChrome(page, APP_ROUTE_PATHS.agent, UI_TEXT.en['chat.title'], UI_TEXT.en['chat.pageTitle']);
     await assertRouteChrome(page, APP_ROUTE_PATHS.researchMarket, UI_TEXT.en['home.marketReview'], UI_TEXT.en['home.marketReviewPageTitle']);
     const navigation = page.getByRole('navigation', { name: UI_TEXT.en['layout.mainNav'] });
@@ -854,6 +856,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await researchToggle.click();
     await expect(researchParent).not.toHaveAttribute('aria-current', 'page');
     await expect(marketChild).toHaveAttribute('aria-current', 'page');
+    await assertRouteChrome(page, APP_ROUTE_PATHS.researchAnalysis, UI_TEXT.en['analysisWorkbench.title'], UI_TEXT.en['analysisWorkbench.documentTitle']);
     await assertRouteChrome(page, APP_ROUTE_PATHS.researchDiscover, SCREENING_TEXT.en.title, SCREENING_TEXT.en.documentTitle);
     await assertRouteChrome(page, APP_ROUTE_PATHS.portfolio, PORTFOLIO_TEXT.en.title, PORTFOLIO_TEXT.en.documentTitle);
     await assertRouteChrome(page, APP_ROUTE_PATHS.signals, UI_TEXT.en['decisionSignals.title'], UI_TEXT.en['decisionSignals.pageTitle']);
@@ -1067,27 +1070,27 @@ test.describe('infrastructure interaction acceptance matrix', () => {
   test('06 Chinese UI with Chinese report keeps both report body and system actions Chinese', async ({ page }) => {
     await openSeededReport(page, 'zh', 'zh');
     await expect(page.getByText('核心洞察', { exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: '重新分析' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '完整分析报告' })).toBeVisible();
   });
 
   test('07 Chinese UI with English report renders English body and Chinese system actions', async ({ page }) => {
     await openSeededReport(page, 'zh', 'en');
     await expect(page.getByText('KEY INSIGHTS', { exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: '重新分析' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Reanalyze' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '完整分析报告' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Full analysis report' })).toHaveCount(0);
   });
 
   test('08 English UI with Chinese report renders Chinese body and English system actions', async ({ page }) => {
     await openSeededReport(page, 'en', 'zh');
     await expect(page.getByText('核心洞察', { exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Reanalyze' })).toBeVisible();
-    await expect(page.getByRole('button', { name: '重新分析' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Full analysis report' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '完整分析报告' })).toHaveCount(0);
   });
 
   test('09 English UI with English report keeps both report body and system actions English', async ({ page }) => {
     await openSeededReport(page, 'en', 'en');
     await expect(page.getByText('KEY INSIGHTS', { exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Reanalyze' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Full analysis report' })).toBeVisible();
   });
 
   test('10 report copy, diagnostics, and traceability chrome always follows UI language', async ({ page }) => {
@@ -1177,12 +1180,12 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     }).toEqual({ stock: 'AAPL', name: 'Apple', recordId: '1', context: 'active' });
 
     const homeLink = page.getByRole('link', { name: '首页' });
-    await expect(homeLink).toHaveAttribute('href', /recordId=1/);
+    await expect(homeLink).toHaveAttribute('href', APP_ROUTE_PATHS.home);
     await homeLink.click();
     await expect.poll(() => {
       const url = new URL(page.url());
       return { pathname: url.pathname, stock: url.searchParams.get('stock'), recordId: url.searchParams.get('recordId') };
-    }).toEqual({ pathname: '/', stock: 'AAPL', recordId: '1' });
+    }).toEqual({ pathname: '/', stock: null, recordId: null });
   });
 
   test('13 Screening displays a built-in strategy by stable ID in English', async ({ page }) => {
@@ -1933,7 +1936,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page).toHaveURL(/view=task_routing/);
   });
 
-  test('31 Home keeps a submitted task trackable through SSE failure and polling completion', async ({ page }) => {
+  test('31 Analysis Workbench keeps a submitted task trackable through SSE failure and polling completion', async ({ page }) => {
     let statusCalls = 0;
     await page.route('**/api/v1/analysis/tasks/stream', (route) => route.abort('connectionfailed'));
     await page.route('**/api/v1/analysis/analyze', async (route) => {
@@ -2026,9 +2029,12 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       });
     });
     await login(page);
+    await page.goto(APP_ROUTE_PATHS.researchAnalysis);
     const input = page.getByPlaceholder('输入股票代码或名称，如 600519、贵州茅台、AAPL');
     await input.fill('AAPL');
-    await page.getByRole('button', { name: '分析', exact: true }).click();
+    await page.getByRole('tabpanel', { name: '发起与批量' })
+      .getByRole('button', { name: '分析', exact: true })
+      .click();
     const task = page.getByTestId('task-panel-item').filter({ hasText: 'AAPL' });
     await expect(task).toBeVisible();
     await expect(task.getByText('已完成', { exact: true })).toBeVisible({ timeout: 10_000 });
@@ -2072,6 +2078,9 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       await route.continue();
     });
     await login(page);
+    await page.goto(buildAnalysisWorkbenchHref({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+    }));
     await expect(page.getByText('New Report semantic report', { exact: true })).toBeVisible();
     const oldItem = page.locator('.home-history-item').filter({ hasText: 'Old Report' }).first();
     const newItem = page.locator('.home-history-item').filter({ hasText: 'New Report' }).first();
@@ -2428,6 +2437,9 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     });
 
     await login(page, 'en');
+    await page.goto(buildAnalysisWorkbenchHref({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+    }));
     const reportItem = page.getByRole('button', {
       name: 'Canonical report fixture AAPL history record',
       exact: true,
@@ -2503,43 +2515,49 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(historyButton).toBeFocused();
   });
 
-  test('37 Home and Chat mobile Drawers support touch close, keyboard Escape, focus trap, and focus restore', async ({ page }) => {
+  test('37 Workbench history stays reachable and Chat mobile Drawer restores focus', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await login(page);
-    const homeHistory = page.getByRole('button', { name: '历史记录' });
-    await homeHistory.click();
-    let drawer = page.getByRole('dialog', { name: '历史记录' });
-    await expect(drawer).toBeVisible();
-    await drawer.getByRole('button', { name: '关闭抽屉' }).click();
-    await expect(drawer).toBeHidden();
-    await homeHistory.focus();
-    await homeHistory.click();
-    drawer = page.getByRole('dialog', { name: '历史记录' });
-    await page.keyboard.press('Tab');
-    expect(await drawer.evaluate((node) => node.contains(document.activeElement))).toBe(true);
-    await page.keyboard.press('Escape');
-    await expect(homeHistory).toBeFocused();
+    await page.goto(buildAnalysisWorkbenchHref({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+    }));
+    const historyItem = page.getByRole('button', { name: /E2E Fixture AAPL 历史记录/ });
+    await expect(historyItem).toBeVisible();
+    await historyItem.focus();
+    await expect(historyItem).toBeFocused();
+    await expect(page.getByRole('dialog', { name: '历史记录' })).toHaveCount(0);
 
     await page.goto('/chat');
     const chatHistory = page.getByRole('button', { name: '历史对话' }).first();
     await chatHistory.focus();
     await chatHistory.click();
-    drawer = page.getByRole('dialog', { name: '历史对话' });
+    const drawer = page.getByRole('dialog', { name: '历史对话' });
     await expect(drawer.getByRole('button', { name: '关闭抽屉' })).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(drawer).toBeHidden();
     await expect(chatHistory).toBeFocused();
   });
 
-  test('38 320px Home and Market Review keep their primary controls fully reachable', async ({ page }) => {
+  test('38 320px Home, Workbench, and Market Review keep their primary controls fully reachable', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 720 });
     await login(page);
+    const core = page.getByTestId('home-core-blocks');
+    await expect(core.getByRole('heading', { name: '今日焦点', exact: true })).toBeVisible();
+    await expect(core.getByRole('heading', { name: '待办', exact: true })).toBeVisible();
+    await expect(core.getByRole('heading', { name: '信号摘要', exact: true })).toBeVisible();
+    const configurable = page.getByRole('button', { name: /可配置区/ });
+    await expect(configurable).toBeVisible();
+    const configurableBox = await configurable.boundingBox();
+    expect(configurableBox).not.toBeNull();
+    expect(configurableBox!.x).toBeGreaterThanOrEqual(0);
+    expect(configurableBox!.x + configurableBox!.width).toBeLessThanOrEqual(320);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
+
+    await page.goto(APP_ROUTE_PATHS.researchAnalysis);
     const input = page.getByPlaceholder('输入股票代码或名称，如 600519、贵州茅台、AAPL');
     await input.fill('AAPL');
-    const controls = [
-      page.getByRole('button', { name: '分析', exact: true }),
-      page.getByRole('button', { name: '历史记录' }),
-    ];
+    const controls = [page.getByRole('tabpanel', { name: '发起与批量' })
+      .getByRole('button', { name: '分析', exact: true })];
     for (const control of controls) {
       await expect(control).toBeVisible();
       const box = await control.boundingBox();
@@ -2563,7 +2581,10 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await login(page);
     await assertNoDocumentOverflow(page, APP_ROUTE_PATHS.home);
-    await expect(page.getByPlaceholder('输入股票代码或名称，如 600519、贵州茅台、AAPL')).toBeVisible();
+    await expect(page.getByTestId('home-core-blocks').getByRole('region')).toHaveCount(3);
+    await assertNoDocumentOverflow(page, buildAnalysisWorkbenchHref({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+    }));
     const reportHeading = page.getByRole('heading', { name: 'E2E Fixture' });
     const reportBody = page.getByText('E2E_MARKDOWN_FIXTURE: deterministic report content.', { exact: true });
     await expect(reportHeading).toBeVisible();
@@ -2583,7 +2604,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
 
   test('40 light and dark themes keep Home and Settings key content readable', async ({ page }, testInfo) => {
     await login(page);
-    const homeText = page.getByRole('heading', { name: '个股栏', exact: true });
+    const homeText = page.getByRole('heading', { name: '今日焦点', exact: true });
     await selectTheme(page, '浅色');
     await expect(page.locator('html')).not.toHaveClass(/dark/);
     await expect(homeText).toBeVisible();
