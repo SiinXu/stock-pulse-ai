@@ -74,6 +74,7 @@ This is the entry point for project documentation. The README covers the project
 | [ADR Registry And Process](adr/README.md) | Decision numbering, statuses, template, significant-PR consideration, and historical records |
 | [API Spec](architecture/api_spec.json) | FastAPI OpenAPI artifact |
 | [Contributing Guide (EN)](CONTRIBUTING_EN.md) | Issues, pull requests, tests, documentation sync, and collaboration expectations |
+| [Data Provider Plugin Authoring Guide](data-provider-plugin-authoring.md) | Loadable example, manifest, `PLUGINS_DIR`, lifecycle diagnostics, compatibility, trust, and routing boundaries |
 | [Supply-Chain Maintenance](supply-chain-maintenance.md) | Dependency and GitHub Actions pinning, permissions, updates, exceptions, validation, and rollback policy |
 | [Web UI Foundation Contract](web-ui-foundation.md) | Semantic controls, visible sizes, coarse-pointer targets, guardrails, and migration ownership |
 | [Multilingual Financial Terminology Guide](financial-terminology-guide.md) | Product semantics and ten-language candidate terminology (guide body in Simplified Chinese) |

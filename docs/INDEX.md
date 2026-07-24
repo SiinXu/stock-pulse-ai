@@ -73,6 +73,7 @@
 | [ADR 注册表与流程](adr/README.md) | 架构决策编号、状态、模板、重大 PR 考量规则与历史决策入口 |
 | [API 规格](architecture/api_spec.json) | FastAPI OpenAPI 规格产物 |
 | [贡献指南](CONTRIBUTING.md) | Issue、PR、测试、文档同步和协作要求 |
+| [Data Provider 插件作者指南（英文）](data-provider-plugin-authoring.md) | 可加载示例、manifest、`PLUGINS_DIR`、生命周期诊断、版本兼容、信任模型与路由边界 |
 | [供应链维护策略](supply-chain-maintenance.md) | 依赖与 GitHub Actions 的固定、权限、更新、例外、验证和回滚契约（英文） |
 | [Web UI 基础控件契约](web-ui-foundation.md) | Button、IconButton、Input、Field、Textarea 的语义、尺寸、命中区、守卫和迁移边界 |
 | [多语言金融术语指导](financial-terminology-guide.md) | 十语言 UI 金融术语单一治理源：语义边界、术语表、已知译文漂移、风险表达、格式化与审查流程 |

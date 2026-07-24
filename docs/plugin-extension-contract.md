@@ -203,6 +203,11 @@ configured plugins directory:
     plugin.py
 ```
 
+The tested [`example-provider` package](../examples/plugins/example-provider/)
+and [Data Provider Plugin Authoring Guide](data-provider-plugin-authoring.md)
+provide a complete manifest, implementation, load command, diagnostics, and
+trust checklist.
+
 Example `manifest.json`:
 
 ```json
@@ -476,6 +481,12 @@ class ExampleProviderPlugin(Plugin):
         )
 ```
 
+For the same contract in a directly loadable package, see the
+[`example-provider` source](../examples/plugins/example-provider/plugin.py) and
+the [authoring guide](data-provider-plugin-authoring.md). Its tests exercise the
+repository copy through `PLUGINS_DIR`, including lifecycle cleanup and
+per-candidate failure isolation.
+
 The provider factory supplies an implementation. `DataFetcherManager` remains
 the only routing authority. For daily data, fresh L1/L2 cache lookup wraps the
 provider route and may return before provider selection. On a miss, the manager
@@ -486,6 +497,14 @@ serialized provider call, records the attempt in `RunDiagnosticContext`, stores
 non-empty successes, and preserves stale last-good fallback only after the
 eligible provider chain fails. Plugins cannot supply their own fallback loop or
 bypass any of these policies.
+
+`DataFetcherManager` does not impose a universal deadline around
+`DataProvider.get_daily_data()` or `_call_fetcher_method()`. A provider that
+performs network or SDK I/O must configure finite transport timeouts at its own
+client or transport layer and raise a timeout failure from that single attempt.
+The manager can then record the failure and continue the eligible provider
+chain. This bounded-I/O responsibility does not let a plugin own a
+cross-provider fallback loop, cache, route table, or dynamic priority override.
 
 Lower plugin priority values run earlier only inside routes governed by numeric
 priority. Existing named routes remain hard anchors: U.S. index, U.S. stock, and
