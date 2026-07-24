@@ -46,6 +46,39 @@ export async function updateE2eConfigOutsidePlaywrightTrace(items: ConfigUpdateI
   if (!update.ok) throw new Error(`E2E native config update failed (${update.status})`);
 }
 
+// HomePage picks `experienceMode = 'beginner'` when
+// GET /api/v1/system/config/setup/status returns `is_complete: false`
+// (see apps/dsa-web/src/pages/HomePage.tsx around the experienceMode
+// derivation). In beginner mode the primary CTA becomes `home.quickAnalyze`
+// and the report region renders `BeginnerReportSummary` instead of the full
+// report, so specs that assert professional-mode surface (`分析`,
+// `完整分析报告`, full report body) must force setup-status to complete before
+// navigating.
+//
+// Call this before `loginAsE2eAdmin` (or any navigation that lands on `/`) in
+// tests that need the professional experience. Kept opt-in — do not fold into
+// `loginAsE2eAdmin`, so beginner-mode surface remains covered by tests that
+// deliberately skip this helper.
+export async function mockCompletedSetupStatus(page: Page): Promise<void> {
+  await page.route('**/api/v1/system/config/setup/status', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        is_complete: true,
+        ready_for_smoke: true,
+        required_missing_keys: [],
+        next_step_key: null,
+        checks: [],
+      }),
+    });
+  });
+}
+
 export async function getE2eAuthStatus(page: Page): Promise<AuthStatus> {
   const response = await page.request.get('/api/v1/auth/status');
   expect(response.ok(), `auth status failed (${response.status()})`).toBe(true);
