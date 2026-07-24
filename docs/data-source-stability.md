@@ -228,6 +228,8 @@ DAILY_FETCH_MAX_WORKERS=1
 
 注意：TickFlow 能力按套餐权限分层；权限不足或请求失败时会 fail-open 回退到现有免费源，不建议把它当成所有市场行情的唯一来源。
 
+Tushare 自定义端点：如需指向自建节点、代理或内网镜像，可设置 `TUSHARE_HTTP_URL`（默认 `http://api.tushare.pro`）。留空时行为不变。该端点仍受出站安全策略约束，指向私网 / 内网主机时需同时把对应 `host:port` 加入 `OUTBOUND_HTTP_ALLOWLIST`，详见 [security-outbound-policy.md](./security-outbound-policy.md)。
+
 ### 港股 / 美股稳定模式
 
 适合港美股组合、持仓和个股分析。Longbridge 配置后优先参与支持的港美股实时行情和美股个股日线；港股日线仍按静态 numeric priority。YFinance、AkShare、Tushare、Finnhub、AlphaVantage 按市场能力继续兜底。

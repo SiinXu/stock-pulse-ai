@@ -49,6 +49,23 @@ _ETF_SZ_PREFIXES = ('15', '16', '18')
 _ETF_ALL_PREFIXES = _ETF_SH_PREFIXES + _ETF_SZ_PREFIXES
 
 
+# Default Tushare Pro HTTP endpoint. Overridable via TUSHARE_HTTP_URL for
+# self-hosted nodes, proxies, or internal mirrors; when the variable is unset or
+# blank the official endpoint is used so default behavior stays unchanged.
+_TUSHARE_DEFAULT_API_URL = "http://api.tushare.pro"
+
+
+def _resolve_tushare_api_url() -> str:
+    """Resolve the Tushare Pro endpoint, honoring the optional TUSHARE_HTTP_URL override.
+
+    A blank or unset TUSHARE_HTTP_URL falls back to the official endpoint, keeping the
+    default request path unchanged. Custom endpoints remain subject to the outbound
+    security policy, so private hosts still require OUTBOUND_HTTP_ALLOWLIST.
+    """
+    custom = (os.getenv("TUSHARE_HTTP_URL") or "").strip()
+    return custom or _TUSHARE_DEFAULT_API_URL
+
+
 def _is_etf_code(stock_code: str) -> bool:
     """
     Check if the code is an ETF fund code.
@@ -76,7 +93,7 @@ def _is_us_code(stock_code: str) -> bool:
 class _TushareHttpClient:
     """Lightweight Tushare Pro client that does not require the tushare SDK."""
 
-    def __init__(self, token: str, timeout: int = 30, api_url: str = "http://api.tushare.pro") -> None:
+    def __init__(self, token: str, timeout: int = 30, api_url: str = _TUSHARE_DEFAULT_API_URL) -> None:
         self._token = token
         self._timeout = timeout
         self._api_url = api_url
@@ -188,9 +205,17 @@ class TushareFetcher(BaseFetcher):
 
         The project already normalizes all Pro calls through the same request
         contract, so we do not need the official tushare SDK during runtime.
+
+        The endpoint honors the optional TUSHARE_HTTP_URL override so self-hosted
+        nodes, proxies, or internal mirrors can be targeted; when it is unset the
+        official Tushare Pro endpoint is used and behavior is unchanged.
         """
-        client = _TushareHttpClient(token=token)
-        logger.debug("Tushare API client configured for direct HTTP calls")
+        api_url = _resolve_tushare_api_url()
+        client = _TushareHttpClient(token=token, api_url=api_url)
+        if api_url == _TUSHARE_DEFAULT_API_URL:
+            logger.debug("Tushare API client configured for direct HTTP calls")
+        else:
+            logger.info("Tushare API endpoint overridden via TUSHARE_HTTP_URL: %s", api_url)
         return client
 
     def _determine_priority(self) -> int:
