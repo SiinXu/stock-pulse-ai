@@ -74,9 +74,11 @@ def _is_auth_enabled_from_env() -> bool:
     env_file = os.getenv("ENV_FILE")
     env_path = Path(env_file) if env_file else Path(__file__).resolve().parent.parent / ".env"
     if not env_path.exists():
-        return False
-    values = dotenv_values(env_path)
-    val = (values.get("ADMIN_AUTH_ENABLED") or "").strip().lower()
+        val = os.getenv("ADMIN_AUTH_ENABLED", "")
+    else:
+        values = dotenv_values(env_path)
+        val = values.get("ADMIN_AUTH_ENABLED") or ""
+    val = val.strip().lower()
     return val in ("true", "1", "yes")
 
 

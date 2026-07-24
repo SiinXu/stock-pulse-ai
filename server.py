@@ -1,24 +1,19 @@
 # -*- coding: utf-8 -*-
-"""
-===================================
-Daily Stock Analysis - FastAPI 后端服务入口
-===================================
+"""FastAPI service entrypoint with a fail-closed network bind guard.
 
-职责：
-1. 提供 RESTful API 服务
-2. 配置 CORS 跨域支持
-3. 健康检查接口
-4. 托管前端静态文件（生产模式）
+Local development::
 
-启动方式：
-    uvicorn server:app --reload --host 0.0.0.0 --port 8000
-    
-    或使用 main.py:
-    python main.py --serve-only      # 仅启动 API 服务
-    python main.py --serve           # API 服务 + 执行分析
+    uvicorn server:app --reload --host 127.0.0.1 --port 8000
+    python main.py --serve-only
+
+Non-local binds require administrator authentication unless the documented
+emergency override is explicitly enabled.
 """
 
+import argparse
 import logging
+import os
+import sys
 
 from src.application_services import ApplicationServices, set_application_services
 from src.config import setup_env, get_config
@@ -37,6 +32,38 @@ setup_logging(
     extra_quiet_loggers=['uvicorn', 'fastapi'],
 )
 
+
+def _parse_server_bind(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse Uvicorn bind options while leaving unrelated process args untouched."""
+    parser = argparse.ArgumentParser(add_help=False, allow_abbrev=False)
+    parser.add_argument("--host")
+    parser.add_argument("--port", type=int)
+    parser.add_argument("--uds")
+    parser.add_argument("--fd", type=int)
+    options, _ = parser.parse_known_args((argv or sys.argv)[1:])
+    if options.host is None:
+        options.host = os.getenv("WEBUI_HOST", os.getenv("API_HOST", "127.0.0.1"))
+    if options.port is None:
+        options.port = int(os.getenv("WEBUI_PORT", os.getenv("API_PORT", "8000")))
+    return options
+
+
+def _enforce_server_bind(options: argparse.Namespace) -> None:
+    """Apply the shared bind policy for direct and Uvicorn CLI startup."""
+    from src.security.http_bind import enforce_http_bind_security
+
+    enforce_http_bind_security(
+        options.host,
+        unix_socket=options.uds,
+        inherited_socket=options.fd is not None,
+        event_logger=logging.getLogger(__name__),
+        entrypoint="server.py",
+    )
+
+
+_bind_options = _parse_server_bind()
+_enforce_server_bind(_bind_options)
+
 # Establish the application composition root at the API startup layer so the
 # process-wide service singletons have a single owner before the app loads.
 set_application_services(ApplicationServices())
@@ -53,7 +80,9 @@ if __name__ == "__main__":
 
     uvicorn.run(
         "server:app",
-        host="0.0.0.0",
-        port=8000,
+        host=_bind_options.host,
+        port=_bind_options.port,
+        uds=_bind_options.uds,
+        fd=_bind_options.fd,
         reload=True,
     )

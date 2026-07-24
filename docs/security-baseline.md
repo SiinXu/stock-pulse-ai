@@ -63,7 +63,7 @@ It does not make StockPulse suitable for regulated use by itself. Operators rema
 | `AUTH-05` | MUST | Authorization and data ownership must deny cross-user or cross-workspace access by default. Until a multi-user model exists, administrator authentication must not be described as user isolation or role-based access control. |
 | `AUTH-06` | SHOULD | Login attempts and other abuse-sensitive endpoints should use bounded rate limits whose client identity is derived only from a documented trusted-proxy topology. |
 
-Current anchors: [`api/middlewares/auth.py`](../api/middlewares/auth.py), [`api/v1/endpoints/auth.py`](../api/v1/endpoints/auth.py), and [PR #292](https://github.com/SiinXu/stock-pulse-ai/pull/292). The current implementation uses an opt-in single-administrator session, signed expiring cookies, file-backed password hashes and session secrets, login throttling, session-secret rotation, and current-password verification before disabling authentication. It is not a multi-user identity or authorization system.
+Current anchors: [`api/middlewares/auth.py`](../api/middlewares/auth.py), [`api/v1/endpoints/auth.py`](../api/v1/endpoints/auth.py), the startup bind policy in [`src/security/http_bind.py`](../src/security/http_bind.py), and [PR #292](https://github.com/SiinXu/stock-pulse-ai/pull/292). The current implementation uses an opt-in single-administrator session, signed expiring cookies, file-backed password hashes and session secrets, login throttling, session-secret rotation, current-password verification before disabling authentication, and fail-closed startup for unauthenticated non-local HTTP binds. The emergency public-bind override is explicit and emits a security warning. This is not a multi-user identity or authorization system.
 
 ### Input and capability boundaries
 
@@ -159,7 +159,6 @@ This table is a scope and ownership map, not an exploit guide. Sensitive impleme
 
 | Gap | Current boundary | Follow-up |
 | --- | --- | --- |
-| Authentication-disabled HTTP startup can still bind beyond a trusted local interface without a fail-closed exposure guard. | `AUTH-01`, `AUTH-02` | [#534](https://github.com/SiinXu/stock-pulse-ai/issues/534) |
 | Multi-user identity, role and workspace authorization, consent, data ownership, export, deletion, and privacy audit are not implemented. | `AUTH-05`, `COMP-04` | [#230](https://github.com/SiinXu/stock-pulse-ai/issues/230) |
 | Agent tool schema, capability, data-scope, and network enforcement is not yet one complete deny-by-default sandbox. | `INPUT-04`, `NET-04`, `AUDIT-02` | [#191](https://github.com/SiinXu/stock-pulse-ai/issues/191), coordinated with [#137](https://github.com/SiinXu/stock-pulse-ai/issues/137) and [#214](https://github.com/SiinXu/stock-pulse-ai/issues/214) |
 | Structured Agent observability is not yet a complete queryable cross-stage event and trace foundation. | `AUDIT-01`, `AUDIT-02` | [#222](https://github.com/SiinXu/stock-pulse-ai/issues/222) |
@@ -176,6 +175,7 @@ These completed tracks are implementation evidence, not open gaps. Residual risk
 | Completed track | Current boundary | Evidence |
 | --- | --- | --- |
 | Core security and compliance baseline definition | `AUTH-*`, `INPUT-*`, `SECRET-*`, `NET-*`, `AUDIT-*`, `SUPPLY-*`, `COMP-*` | [#228](https://github.com/SiinXu/stock-pulse-ai/issues/228) (completed) |
+| Fail-closed unauthenticated public-bind startup policy | `AUTH-01`, `AUTH-02` | [#534](https://github.com/SiinXu/stock-pulse-ai/issues/534) (completed) |
 | Shared SSRF and outbound egress policy | `NET-01` through `NET-06` | [#171](https://github.com/SiinXu/stock-pulse-ai/issues/171) (completed) |
 | Central sensitive-data redaction expansion | `SECRET-03` | [#176](https://github.com/SiinXu/stock-pulse-ai/issues/176) (completed) |
 | Dependency and workflow supply-chain hardening | `SUPPLY-01` through `SUPPLY-05` | [#326](https://github.com/SiinXu/stock-pulse-ai/issues/326) (completed) |

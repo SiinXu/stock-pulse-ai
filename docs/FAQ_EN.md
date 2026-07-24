@@ -292,8 +292,9 @@ Work through the following 5 checkpoints in order:
 ### Q14: API service inaccessible in Docker?
 
 **Solution**:
-1. Ensure startup command includes `--host 0.0.0.0` (cannot be 127.0.0.1)
-2. Check port mapping is correct:
+1. Set `ADMIN_AUTH_ENABLED=true` in `.env`; an auth-disabled container refuses non-local binds
+2. Ensure startup command includes `--host 0.0.0.0` (cannot be 127.0.0.1)
+3. Check port mapping is correct:
    ```yaml
     ports:
       - "8000:8000"
