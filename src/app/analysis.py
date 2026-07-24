@@ -281,6 +281,20 @@ def run_full_analysis(
     from src.core.pipeline import StockAnalysisPipeline
 
     try:
+        portfolio_source = getattr(args, "portfolio", None)
+        if portfolio_source:
+            from src.services.stock_list_parser import resolve_portfolio_stock_list
+
+            portfolio_codes = resolve_portfolio_stock_list(portfolio_source)
+            if portfolio_codes is None:  # pragma: no cover - guarded by the source check.
+                raise RuntimeError("Selected portfolio source did not resolve a stock scope")
+            stock_codes = portfolio_codes
+            logger.info(
+                "Using %d stock(s) from live portfolio source %s",
+                len(stock_codes),
+                portfolio_source,
+            )
+
         _refresh_stock_index_cache_for_analysis(config)
 
         # Issue #529: Hot-reload STOCK_LIST from .env on each scheduled run
@@ -381,13 +395,21 @@ def run_full_analysis(
             )
 
         # 1. Run individual stock analysis
-        results = pipeline.run(
-            stock_codes=stock_codes,
-            dry_run=args.dry_run,
-            send_notification=not args.no_notify,
-            merge_notification=merge_notification,
-            current_time=analysis_reference_time,
-        )
+        if portfolio_source and not stock_codes:
+            logger.info(
+                "Live portfolio source %s has no supported long stock positions; "
+                "skipping individual-stock analysis",
+                portfolio_source,
+            )
+            results = []
+        else:
+            results = pipeline.run(
+                stock_codes=stock_codes,
+                dry_run=args.dry_run,
+                send_notification=not args.no_notify,
+                merge_notification=merge_notification,
+                current_time=analysis_reference_time,
+            )
 
         if should_use_daily_market_context and not market_context_summary:
             (
