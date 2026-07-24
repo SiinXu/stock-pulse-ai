@@ -545,8 +545,6 @@ def _classify_text_field_match(
 ) -> tuple[Optional[str], Optional[int]]:
     """Classify the shortest sensitive suffix using the complete key's kind."""
 
-    if _is_diagnostic_field_prose_prefix(text, match):
-        return None, None
     starts, truncated = _text_field_key_starts(
         text,
         match.start(1),
@@ -557,81 +555,15 @@ def _classify_text_field_match(
     )
     for key_start in starts:
         candidate = text[key_start:match.end(1)]
-        if not _is_sensitive_mapping_key_text(candidate):
-            continue
-        # A sentence prefix separated from the assigned field by punctuation
-        # is prose (e.g., "Parsed webhook payload: body_bytes=181"). Accept
-        # such candidates only when they contain a canonical multi-word phrase
-        # so structural forms like "api: key" still redact. Bare whitespace
-        # alone remains structural to preserve mapping/text classification
-        # parity for labels such as "password value".
-        if (
-            _contains_punctuation_delimited_prose_boundary(candidate)
-            and not _matches_multi_word_sensitive_phrase(candidate)
-        ):
-            continue
-        return (
-            complete_kind
-            or _sensitive_text_field_kind(candidate),
-            key_start,
-        )
+        if _is_sensitive_mapping_key_text(candidate):
+            return (
+                complete_kind
+                or _sensitive_text_field_kind(candidate),
+                key_start,
+            )
     if truncated:
         return "authorization", starts[-1]
     return None, None
-
-
-def _is_diagnostic_field_prose_prefix(
-    text: str,
-    match: re.Match[str],
-) -> bool:
-    """Reject a prose colon whose value begins with a diagnostic assignment."""
-
-    separator = match.group(2)
-    return (
-        ":" in separator
-        and "=" not in separator
-        and not _is_sensitive_mapping_key_text(match.group(1))
-        and _ORDINARY_DIAGNOSTIC_FIELD_PATTERN.match(text, match.end())
-        is not None
-    )
-
-
-def _contains_punctuation_delimited_prose_boundary(text: str) -> bool:
-    """Return whether sentence punctuation separates words in the candidate."""
-
-    whitespace = " \t\v\f"
-    punctuation = ":;,.!?"
-    return any(
-        char in whitespace
-        and (
-            (index > 0 and text[index - 1] in punctuation)
-            or (
-                index + 1 < len(text)
-                and text[index + 1] in punctuation
-            )
-        )
-        for index, char in enumerate(text)
-    )
-
-
-def _matches_multi_word_sensitive_phrase(candidate: str) -> bool:
-    """Match canonical multi-word sensitive phrases without loose single-word fallback.
-
-    Intentionally omits the ``_SENSITIVE_COMPACT_KEY_PATTERN`` substring
-    check from ``_has_sensitive_phrase``: that path matches any single
-    sensitive word (``webhook``, ``token``, ...) and is the exact source of
-    the prose false positive this helper guards against.
-    """
-
-    parts = _mapping_key_parts(candidate)
-    if not parts:
-        return False
-    normalized = "_".join(parts)
-    padded = f"_{normalized}_"
-    if any(f"_{phrase}_" in padded for phrase in _SENSITIVE_KEY_PHRASES):
-        return True
-    compact = normalized.replace("_", "")
-    return any(phrase in compact for phrase in _SENSITIVE_COMPACT_KEY_PHRASES)
 
 
 def _next_sensitive_text_field_match(

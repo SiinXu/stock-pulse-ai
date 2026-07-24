@@ -908,10 +908,11 @@ def test_prose_prefixed_diagnostic_fields_survive_composite_key_walk() -> None:
 
     Regression: the composite-key walker previously fail-closed to
     "authorization" whenever it hit its 16-part budget, or matched a single
-    sensitive word (``webhook``/``token``/...) across a punctuation-delimited
-    prose prefix. Both paths redacted the trailing ``key=value`` in ordinary
-    log lines such as debug messages and retry summaries, hiding diagnostic
-    fields the operator relies on.
+    sensitive word from an ambiguous log prefix. Both paths redacted the
+    trailing ``key=value`` in ordinary log lines such as debug messages and
+    retry summaries, hiding diagnostic fields the operator relies on. The
+    ambiguous webhook prefix is fixed at its call site so the central
+    sanitizer retains fail-closed text/mapping classification parity.
     """
 
     prose_cases = {
@@ -921,7 +922,7 @@ def test_prose_prefixed_diagnostic_fields_survive_composite_key_walk() -> None:
             "error_code=vision_provider_failed",
             "exception_type=RuntimeError",
         ),
-        "[BotHandler] Parsed webhook payload: body_bytes=181": (
+        "[BotHandler] Parsed request: body_bytes=181": (
             "body_bytes=181",
         ),
         "File logging initialization failed; using console output."
@@ -978,6 +979,23 @@ def test_prose_prefixed_diagnostic_fields_survive_composite_key_walk() -> None:
     assert sanitize_module.sanitize_diagnostic_text(
         "password value: hunter2"
     ) == "password value: [REDACTED]"
+
+    punctuation_labels = {
+        "password label: value=hunter2": "password label: [REDACTED]",
+        "token label; value=hunter2": "token label; value=[REDACTED]",
+        "webhook signing, value=hunter2": (
+            "webhook signing, value=[REDACTED]"
+        ),
+        "authorization label. value=hunter2": (
+            "authorization label. value=[REDACTED]"
+        ),
+        "credential label! value=hunter2": (
+            "credential label! value=[REDACTED]"
+        ),
+        "secret label? value=hunter2": "secret label? value=[REDACTED]",
+    }
+    for raw, expected in punctuation_labels.items():
+        assert sanitize_module.sanitize_diagnostic_text(raw) == expected
 
 
 def test_generic_fields_reject_ambiguous_delimiter_suffixes() -> None:
