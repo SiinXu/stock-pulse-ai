@@ -15,16 +15,24 @@ right boundary.
 
 | Need | Choose | Current path | Boundary |
 | --- | --- | --- | --- |
-| Add investment criteria, prompt instructions, activation metadata, or an allowlist of existing Agent tools without executing code | Skill / strategy package | Built-ins use `strategies/*.yaml`; custom definitions use top-level YAML or nested `SKILL.md` under `AGENT_SKILL_DIR` | Declarative input to the existing Skill runtime; it cannot add tools, providers, or another execution engine |
-| Add reviewed Python behavior for one of the six official extension points below | System plugin | Package a manifest and Python entrypoint under an explicitly configured `PLUGINS_DIR`, then use only an extension point marked as wired in the implementation-status table | Trusted in-process code; the core service remains the policy authority, and a contract-only point is not available at runtime |
+| Add investment criteria, prompt instructions, activation metadata, or declare existing tools required by a specialist without executing code | Skill / strategy package | Built-ins use `strategies/*.yaml`; custom definitions use top-level YAML or nested `SKILL.md` under `AGENT_SKILL_DIR` | Declarative input to the existing Skill runtime; `required_tools` narrows only an optional `SkillAgent` specialist, while imported `allowed_tools` is metadata rather than runtime access control |
+| Add reviewed Python behavior for one of the six official extension points below | System plugin | `PLUGINS_DIR` provides package discovery and lifecycle only; an application composition path must also bind `PluginManager` to the exact native registry described by the implementation-status table | Trusted in-process code; default process startup has a fail-closed generic registry, and an unbound or contract-only point is not available at runtime |
 | Add UI components, Settings panels, custom commands, a remote marketplace, dependency installation, hot reload, a connector/MCP boundary, or another extension point | New design and ADR | Propose the authority, trust, compatibility, and lifecycle contract before implementation | Outside the version 1 plugin surface; do not route it through a nearby registration API |
 
 Skill packages are appropriate when an author only needs natural-language
-analysis behavior and the tools already allowed by the runtime. System plugins
-are appropriate only when a trusted operator needs code-backed behavior at a
-wired extension point and accepts the plugin's process privileges. If neither
-description fits, extend the architecture through an ADR instead of broadening
-the Skill loader or plugin registry implicitly.
+analysis behavior and optional required-tool metadata. `required_tools` narrows
+the tool set only when the optional specialist path constructs a `SkillAgent`;
+prompt-only and Single-Agent paths retain their normal runtime tool catalog.
+Imported `allowed_tools` is metadata and does not enforce permissions.
+
+System plugins are appropriate only when a trusted operator needs code-backed
+behavior and an application composition path has bound the extension point's
+exact native registry. `PLUGINS_DIR` alone discovers and manages package
+lifecycle; the default process plugin manager rejects implementation
+registrations. Today, Data Provider plugin execution requires programmatic
+composition with `PluginManager(registry=manager.plugin_registry)`. A listed
+but unbound point needs explicit wiring under the accepted contract, while a
+new surface requires an ADR instead of an implicit registry expansion.
 
 > **Operator trust boundary:** Setting `PLUGINS_DIR` opts into arbitrary Python
 > code running with the StockPulse process's OS privileges. Keeping it unset or
@@ -37,7 +45,7 @@ the Skill loader or plugin registry implicitly.
 | --- | --- | --- |
 | Plugin lifecycle, manifest, registry | `src/plugins/` core; Data Provider native adapter wired, other points fail closed | #273 X2a core implemented |
 | Built-in/external startup wiring | `src/application_services.py` composition root | #273 X2b implemented |
-| Data Providers | `DataProvider`, `BaseFetcher`, and `DataFetcherManager` | #276 X3 implemented |
+| Data Providers | `DataProvider`, `BaseFetcher`, and `DataFetcherManager` | #276 X3 native adapter implemented; caller must inject the target manager registry |
 | Analysis Strategies | `Skill`, `SkillManager`, `StrategyEngine` | Contract only in this batch |
 | Agent Tools | `ToolDefinition`, `ToolRegistry`, Tool Surface | Contract only; `src/agent/**` stays untouched |
 | Notification Channels | `NotificationChannel`, sender mixins, `NotificationService` | Contract only in this batch |
@@ -65,6 +73,12 @@ own distinct managers. A composition caller that activates Data Provider
 plugins must inject a `PluginManager` bound to the exact target manager registry.
 X2b does not silently redirect or replace those existing provider-manager
 ownership boundaries.
+
+Consequently, setting `PLUGINS_DIR` on the default process root discovers and
+loads plugin lifecycle objects but does not by itself activate a Data Provider
+implementation. A composition caller must construct `PluginManager` with the
+exact target `DataFetcherManager.plugin_registry`; no default process-wide
+provider manager is fabricated for external plugins.
 
 ## Startup Composition
 
@@ -497,10 +511,17 @@ AnalysisStrategyRegistration = Skill
 ```
 
 The current `Skill` definition is the first contract: stable `name`, prompt
-instructions, category, tool requirements/allowlist, activation metadata,
-market regimes, and execution hints. YAML and `SKILL.md` remain supported input
-formats. `SkillManager` owns name lookup and activation; `StrategyEngine` owns
-signal normalization, evidence partitioning, aggregation, and synthesis.
+instructions, category, required-tool declarations, imported allowed-tool
+metadata, activation metadata, market regimes, and execution hints. YAML and
+`SKILL.md` remain supported input formats. `SkillManager` owns name lookup and
+activation; `StrategyEngine` owns signal normalization, evidence partitioning,
+aggregation, and synthesis.
+
+`required_tools` narrows the tool names only when specialist mode constructs a
+`SkillAgent`. Imported `allowed_tools` is retained as metadata and is not read
+by the runtime access-policy path. Prompt-only and Single-Agent execution do not
+gain a per-Skill tool allowlist, so a general tool-permission request cannot be
+implemented by authoring Skill YAML or `SKILL.md` alone.
 
 A plugin registers a definition. It does not replace `StrategyEngine`, write a
 consensus result directly, or bypass required-tool and policy checks. Existing
