@@ -129,6 +129,7 @@ def test_service_normalizes_fields_and_partial_plan_quality(isolated_db) -> None
     assert item["action_label"] == "买入"
     assert item["confidence"] == 0.72
     assert item["presentation"] == {
+        "schema_version": "decision-signal-presentation-v1",
         "action": "buy",
         "label": "买入",
         "confidence": 0.72,
@@ -163,6 +164,7 @@ def test_service_presentation_uses_action_and_explicit_report_language(isolated_
     assert item["action_label"] == "Sell"
     assert item["metadata"]["report_language"] == "en"
     assert item["presentation"] == {
+        "schema_version": "decision-signal-presentation-v1",
         "action": "buy",
         "label": "Buy",
         "confidence": 0.91,

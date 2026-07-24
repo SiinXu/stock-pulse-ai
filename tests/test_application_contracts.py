@@ -47,7 +47,7 @@ RUN_FLOW_PATHS = (
     "/api/v1/history/{record_id}/flow",
 )
 RUN_FLOW_OPENAPI_SHA256 = (
-    "14d4816b582eec9af86fede9edda8deb07e204641b4cdbccf2bf44799184faae"
+    "a441854585d67abdab6085538eef0b97b241b5693e25e0945d20070c79c662bc"
 )
 
 

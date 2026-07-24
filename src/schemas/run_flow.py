@@ -8,6 +8,9 @@ from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
+RUN_FLOW_SCHEMA_VERSION = "run-flow-v1"
+
+
 RunFlowStatus = Literal[
     "pending",
     "running",
@@ -106,6 +109,10 @@ class RunFlowSummary(BaseModel):
 class RunFlowSnapshot(BaseModel):
     """Public run-flow snapshot returned by task and history endpoints."""
 
+    # Additive version tag; historical snapshots that omit it deserialize as "run-flow-v1".
+    schema_version: str = Field(
+        RUN_FLOW_SCHEMA_VERSION, description="Serialized run-flow snapshot version"
+    )
     task_id: str = Field(..., description="Task id or query id")
     trace_id: Optional[str] = Field(None, description="Diagnostic trace id")
     stock_code: str = Field(..., description="Stock code")

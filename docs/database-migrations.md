@@ -186,6 +186,9 @@ CI Docker smoke 除了导入 `src.migrations.registry`、调用 `get_migrations(
 | Canonical decision scale | `CANONICAL_DECISION_SCALE_VERSION` | `decision-scale-v1` | `scale_version`（`score_band_metadata`） | DecisionSignal / 报告评分口径 |
 | Runtime event | `RUNTIME_EVENT_SCHEMA_VERSION` | `1` | `schema_version` | Agent runtime 事件 |
 | Provider usage | `PROVIDER_USAGE_SCHEMA_VERSION`（+ `PROVIDER_USAGE_SCHEMA_NAME`） | `2026-06-10`（`provider_usage_v1`） | `provider_usage_schema_version` | `llm_usage.provider_usage_schema_version` 列 |
+| `AnalysisReportSchema` | `REPORT_SCHEMA_VERSION` | `report-v1` | `schema_version` | LLM 报告 payload 校验契约（`src/schemas/report_schema.py`） |
+| `RunFlowSnapshot` | `RUN_FLOW_SCHEMA_VERSION` | `run-flow-v1` | `schema_version` | 任务 / 历史 run-flow API 响应（按需构建，无专用列） |
+| `DecisionSignalPresentation` | `DECISION_SIGNAL_PRESENTATION_SCHEMA_VERSION` | `decision-signal-presentation-v1` | `schema_version` | DecisionSignal 展示对象（由 DB 行按需构建，无专用列） |
 
 清单与实际常量由守护测试 `tests/test_data_model_versioning_guard.py` 绑定，任何常量漂移或序列化时丢弃版本字段都会被捕获。
 
@@ -203,7 +206,3 @@ CI Docker smoke 除了导入 `src.migrations.registry`、调用 `get_migrations(
 2. 更新本清单表与守护测试 `tests/test_data_model_versioning_guard.py`。
 3. 若该 artifact 的持久化列 / 表形状同时变化，另配一个更高 ID 的 DB migration（见上文「新增 migration」）。
 4. 走常规源码审查与完整 backend gate。
-
-### 尚未版本化的 artifact（后续）
-
-`Report`（`src/schemas/report_schema.py`）、`RunFlowSnapshot`（`src/schemas/run_flow.py`）、`DecisionSignalPresentation`（`src/schemas/decision_signal_presentation.py`）目前未内嵌显式版本字段。它们在下次改变持久化形状时，按上文“版本内加字段 / 破坏性才升级”的加字段模式补齐即可，成本很低——这正是本策略要保证的“低迁移成本演进”。

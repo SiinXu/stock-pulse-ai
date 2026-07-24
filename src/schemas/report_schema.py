@@ -15,6 +15,9 @@ from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
+REPORT_SCHEMA_VERSION = "report-v1"
+
+
 class PositionAdvice(BaseModel):
     """Position advice for no-position vs has-position."""
 
@@ -234,6 +237,9 @@ class AnalysisReportSchema(BaseModel):
     """
 
     model_config = ConfigDict(extra="allow")  # Allow extra fields from LLM
+
+    # Additive version tag; historical payloads that omit it deserialize as "report-v1".
+    schema_version: str = REPORT_SCHEMA_VERSION
 
     stock_name: Optional[str] = None
     sentiment_score: Optional[int] = Field(None, ge=0, le=100)
