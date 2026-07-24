@@ -21,6 +21,7 @@ from api.v1.endpoints import (
     decision_signals,
     health,
     history,
+    investment_framework,
     intelligence,
     portfolio,
     scorecard,
@@ -109,6 +110,12 @@ router.include_router(
     intelligence.router,
     prefix="/intelligence",
     tags=["Intelligence"]
+)
+
+router.include_router(
+    investment_framework.router,
+    prefix="/investment-framework",
+    tags=["InvestmentFramework"]
 )
 
 router.include_router(

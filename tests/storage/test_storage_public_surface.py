@@ -25,6 +25,7 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     DecisionSignalMemoryFlagRecord
     DecisionSignalOutcomeRecord DecisionSignalRecord Dict Float ForeignKey
     FundamentalSnapshot INTELLIGENCE_ITEM_NULL_SCOPE_VALUE Index Integer
+    InvestmentFrameworkRecord InvestmentFrameworkVersionRecord
     IntegrityError IntelligenceItem IntelligenceSource
     LEGACY_BASELINE_MIGRATION LLMUsage List MigrationError NewsIntel
     OperationalError Optional PORTFOLIO_LEGACY_IDEMPOTENCY_GUARD_TRIGGER
@@ -118,6 +119,8 @@ EXPECTED_SCHEMA_MODELS = (
     "DecisionSignalFeedbackRecord",
     "DecisionSignalMemoryFlagRecord",
     "PortfolioAccountKind",
+    "InvestmentFrameworkRecord",
+    "InvestmentFrameworkVersionRecord",
 )
 EXPECTED_SCHEMA_TABLES = (
     "schema_migrations",
@@ -151,6 +154,8 @@ EXPECTED_SCHEMA_TABLES = (
     "decision_signal_feedback",
     "decision_signal_memory_flags",
     "portfolio_account_kinds",
+    "investment_frameworks",
+    "investment_framework_versions",
 )
 EXPECTED_SCHEMA_METHODS = {
     "StockDaily": ("__repr__", "to_dict"),
@@ -174,6 +179,10 @@ EXPECTED_UTC_COLUMN_CALLBACKS = (
     ("portfolio_account_kinds", "created_at", "default"),
     ("portfolio_account_kinds", "updated_at", "default"),
     ("portfolio_account_kinds", "updated_at", "onupdate"),
+    ("investment_frameworks", "created_at", "default"),
+    ("investment_frameworks", "updated_at", "default"),
+    ("investment_frameworks", "updated_at", "onupdate"),
+    ("investment_framework_versions", "created_at", "default"),
 )
 
 EXPECTED_GROUPS = (
