@@ -15,6 +15,11 @@
     "electron": "^31.4.0",
     "electron-builder": "^24.13.3"
   },
+  "overrides": {
+    "app-builder-lib": {
+      "tar": "7.5.19"
+    }
+  },
   "build": {
     "appId": "com.daily-stock-analysis.desktop",
     "productName": "StockPulse",
