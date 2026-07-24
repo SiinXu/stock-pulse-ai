@@ -5,6 +5,8 @@ from __future__ import annotations
 
 from tests.alphasift_api_test_support import (
     os,
+    sys,
+    Path,
     SimpleNamespace,
     MagicMock,
     patch,
@@ -285,9 +287,73 @@ class AlphaSiftOpportunitiesApiTestCase(_AlphaSiftApiTestCaseBase):
         self.assertNotIn("install_spec", payload)
         run_mock.assert_called_once()
         install_command = run_mock.call_args.args[0]
-        self.assertIn("--upgrade", install_command)
-        self.assertIn("--force-reinstall", install_command)
-        self.assertIn(DEFAULT_ALPHASIFT_TEST_SPEC, install_command)
+        repo_root = Path(alphasift_service.__file__).resolve().parents[2]
+        constraint_path = str(repo_root / "constraints.txt")
+        build_constraint_path = str(repo_root / "build-constraints.txt")
+        self.assertEqual(
+            install_command,
+            [
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
+                "--upgrade",
+                "--force-reinstall",
+                "--no-deps",
+                "--constraint",
+                constraint_path,
+                "--build-constraint",
+                build_constraint_path,
+                DEFAULT_ALPHASIFT_TEST_SPEC,
+            ],
+        )
+        # Dependency-isolation boundary: --no-deps blocks transitive resolution and both
+        # constraint flags resolve to the committed lock files on disk.
+        self.assertIn("--no-deps", install_command)
+        self.assertTrue((repo_root / "constraints.txt").is_file())
+        self.assertTrue((repo_root / "build-constraints.txt").is_file())
+
+    def test_install_degrades_to_no_deps_when_lock_files_absent(self) -> None:
+        # Packaged desktop artifacts do not ship constraints.txt / build-constraints.txt.
+        # Repair must still run (unchanged user-facing behavior) while --no-deps keeps the
+        # dependency-isolation boundary intact.
+        config = self._config(enabled=True)
+        completed = SimpleNamespace(returncode=0, stdout="installed", stderr="")
+
+        with (
+            patch.dict(os.environ, {"DSA_DESKTOP_MODE": "true"}, clear=False),
+            patch("src.services.alphasift_service._is_alphasift_available", side_effect=[False, True]),
+            patch(
+                "src.services.alphasift_service._call_alphasift_status",
+                return_value={"available": True, "supported_markets": ["cn"], "contract_version": "1", "version": "0.2.0", "strategy_count": 1},
+            ),
+            # Simulate the packaged desktop artifact: no constraints.txt / build-constraints.txt
+            # exists above the runtime file, so the constraint flags are omitted.
+            patch("pathlib.Path.is_file", return_value=False),
+            patch("src.services.alphasift_service.subprocess.run", return_value=completed) as run_mock,
+            patch("src.services.alphasift_service._get_dsa_adapter", return_value=_make_adapter_module()),
+        ):
+            payload = alphasift_endpoint.alphasift_install(request=self._request(), config=config)
+
+        self.assertEqual(payload["installed"], True)
+        run_mock.assert_called_once()
+        install_command = run_mock.call_args.args[0]
+        self.assertEqual(
+            install_command,
+            [
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
+                "--upgrade",
+                "--force-reinstall",
+                "--no-deps",
+                DEFAULT_ALPHASIFT_TEST_SPEC,
+            ],
+        )
+        self.assertIn("--no-deps", install_command)
+        self.assertNotIn("--constraint", install_command)
+        self.assertNotIn("--build-constraint", install_command)
 
     def test_install_start_failure_hides_raw_diagnostic(self) -> None:
         config = self._config(enabled=True)
