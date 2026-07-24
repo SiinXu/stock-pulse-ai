@@ -110,6 +110,28 @@ describe('localModelTransport', () => {
     } satisfies Partial<LocalModelTransportError>);
   });
 
+  it('does not recommend another pull when Web download activation fails', async () => {
+    api.startPull.mockResolvedValue({ taskId: 'pull-activation', status: 'pending' });
+    api.getPull.mockResolvedValue({
+      taskId: 'pull-activation',
+      status: 'completed',
+      progress: 100,
+      modelId: 'qwen3:4b',
+      result: {
+        modelId: 'qwen3:4b',
+        activated: false,
+        selectedPrimary: false,
+      },
+    });
+
+    await expect(
+      __localModelTransportTest.createWebTransport().pull('qwen3:4b', () => undefined),
+    ).rejects.toMatchObject({
+      code: 'local_model_activation_failed',
+      manualCommand: undefined,
+    } satisfies Partial<LocalModelTransportError>);
+  });
+
   it('does not mislabel a configuration conflict as an Ollama outage', async () => {
     const conflict = Object.assign(new Error('configuration conflict'), {
       parsedError: {

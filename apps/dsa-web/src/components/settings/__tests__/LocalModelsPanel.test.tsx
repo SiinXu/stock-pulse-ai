@@ -20,7 +20,14 @@ vi.mock('../../../api/localModels', () => ({
 vi.mock('../localModelTransport', () => ({
   createLocalModelTransport: () => createTransport(),
   LocalModelTransportError: class LocalModelTransportError extends Error {
+    code: string;
     manualCommand?: string;
+
+    constructor(code: string, message: string, manualCommand?: string) {
+      super(message);
+      this.code = code;
+      this.manualCommand = manualCommand;
+    }
   },
 }));
 
@@ -200,6 +207,31 @@ describe('LocalModelsPanel', () => {
 
     expect(await screen.findByText('qwen3:4b is downloaded and registered.')).toBeInTheDocument();
     expect(screen.queryByText(/current primary model was preserved/)).not.toBeInTheDocument();
+  });
+
+  it('keeps runtime Stop disabled while a model pull is active', async () => {
+    let resolvePull: ((value: {
+      modelId: string;
+      activated: boolean;
+      selectedPrimary: boolean;
+    }) => void) | undefined;
+    const pull = vi.fn().mockReturnValue(new Promise((resolve) => {
+      resolvePull = resolve;
+    }));
+    createTransport.mockReturnValue(transport({
+      canControlRuntime: true,
+      getRuntime: vi.fn().mockResolvedValue({
+        ...AVAILABLE_RUNTIME,
+        managed: true,
+      }),
+      pull,
+    }));
+
+    renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: 'Download' }));
+
+    expect(screen.getByRole('button', { name: 'Stop service' })).toBeDisabled();
+    resolvePull?.({ modelId: 'qwen3:4b', activated: true, selectedPrimary: false });
   });
 
   it('degrades to a copyable command when Ollama is unavailable', async () => {

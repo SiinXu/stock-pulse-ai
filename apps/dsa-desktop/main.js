@@ -115,6 +115,8 @@ const DESKTOP_LOCAL_MODEL_START_TIMEOUT_MS = 20000;
 const DESKTOP_LOCAL_MODEL_STOP_FORCE_AFTER_MS = 3000;
 const DESKTOP_LOCAL_MODEL_STOP_TIMEOUT_MS = 5000;
 const DESKTOP_LOCAL_MODEL_PULL_TIMEOUT_MS = 30 * 60 * 1000;
+const DESKTOP_LOCAL_MODEL_MAX_JSON_BYTES = 4 * 1024 * 1024;
+const DESKTOP_LOCAL_MODEL_MAX_EVENT_BYTES = 64 * 1024;
 const DESKTOP_LOCAL_MODEL_NAME_PATTERN =
   /^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)?(?::[a-z0-9]+(?:[._-][a-z0-9]+)*)?$/i;
 const DESKTOP_LOCAL_MODEL_MAX_NAME_LENGTH = 96;
@@ -2926,8 +2928,22 @@ function requestLocalModelJson({
       },
       (response) => {
         const chunks = [];
+        let receivedBytes = 0;
         response.on('data', (chunk) => {
-          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
+          if (settled) {
+            return;
+          }
+          const value = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
+          receivedBytes += value.length;
+          if (receivedBytes > DESKTOP_LOCAL_MODEL_MAX_JSON_BYTES) {
+            settled = true;
+            if (typeof response.destroy === 'function') {
+              response.destroy();
+            }
+            reject(new Error('Local model runtime response is too large.'));
+            return;
+          }
+          chunks.push(value);
         });
         response.on('end', () => {
           if (settled) {
@@ -3013,6 +3029,10 @@ function requestLocalModelPullStream({
       if (!trimmed) {
         return;
       }
+      if (Buffer.byteLength(trimmed, 'utf-8') > DESKTOP_LOCAL_MODEL_MAX_EVENT_BYTES) {
+        finish(reject, new Error('Local model progress event is too large.'));
+        return;
+      }
       let event;
       try {
         event = JSON.parse(trimmed);
@@ -3057,12 +3077,24 @@ function requestLocalModelPullStream({
         }
         response.setEncoding('utf-8');
         response.on('data', (chunk) => {
+          if (settled) {
+            return;
+          }
           buffer += chunk;
           let newlineIndex = buffer.indexOf('\n');
-          while (newlineIndex !== -1) {
+          while (newlineIndex !== -1 && !settled) {
             consumeLine(buffer.slice(0, newlineIndex));
             buffer = buffer.slice(newlineIndex + 1);
             newlineIndex = buffer.indexOf('\n');
+          }
+          if (
+            !settled
+            && Buffer.byteLength(buffer, 'utf-8') > DESKTOP_LOCAL_MODEL_MAX_EVENT_BYTES
+          ) {
+            finish(reject, new Error('Local model progress event is too large.'));
+            if (typeof response.destroy === 'function') {
+              response.destroy();
+            }
           }
         });
         response.on('end', () => {
@@ -3742,7 +3774,7 @@ ipcMain.handle(DESKTOP_LOCAL_MODEL_START_CHANNEL, (event) => {
 });
 ipcMain.handle(DESKTOP_LOCAL_MODEL_STOP_CHANNEL, (event) => {
   assertLocalModelSender(event);
-  return stopManagedLocalModelRuntime();
+  return runLocalModelOperation(() => stopManagedLocalModelRuntime());
 });
 ipcMain.handle(DESKTOP_LOCAL_MODEL_PULL_CHANNEL, (event, payload = {}) => {
   assertLocalModelSender(event);
@@ -4133,6 +4165,8 @@ module.exports = {
   DESKTOP_LOCAL_MODEL_OPEN_GUIDE_CHANNEL,
   DESKTOP_LOCAL_MODEL_STATE_EVENT,
   DESKTOP_LOCAL_MODEL_INSTALL_GUIDE_URL,
+  DESKTOP_LOCAL_MODEL_MAX_JSON_BYTES,
+  DESKTOP_LOCAL_MODEL_MAX_EVENT_BYTES,
   DESKTOP_LOCAL_MODELS_SETTINGS_ROUTE,
   DESKTOP_LOCAL_MODEL_PRESETS,
   DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE,
@@ -4179,6 +4213,9 @@ module.exports = {
   isLocalModelAssigned,
   decodeConfiguredModelRoute,
   resolveLocalModelTotalMemoryGb,
+  requestLocalModelJson,
+  requestLocalModelPullStream,
+  runLocalModelOperation,
   buildLocalModelState,
   openLocalModelsSettings,
   extractDesktopDeepLink,

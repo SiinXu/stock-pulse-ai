@@ -8662,7 +8662,7 @@
           "activated"
         ],
         "title": "LocalModelPullResult",
-        "description": "Successful pull and activation result."
+        "description": "Completed download with its separate activation outcome."
       },
       "LocalModelPullStatus": {
         "properties": {

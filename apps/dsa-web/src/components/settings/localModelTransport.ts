@@ -149,7 +149,15 @@ async function pollWebPull(
   while (Date.now() < deadline) {
     const task = await localModelsApi.getPull(taskId);
     onProgress({ modelId: task.modelId, percent: task.progress, status: task.status });
-    if (task.status === 'completed' && task.result) return task.result;
+    if (task.status === 'completed' && task.result) {
+      if (!task.result.activated) {
+        throw new LocalModelTransportError(
+          'local_model_activation_failed',
+          'Local model configuration failed',
+        );
+      }
+      return task.result;
+    }
     if (['failed', 'cancelled', 'interrupted'].includes(task.status)) {
       throw new LocalModelTransportError(
         task.error || 'local_model_pull_failed',

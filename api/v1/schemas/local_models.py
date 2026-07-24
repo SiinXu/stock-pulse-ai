@@ -56,7 +56,7 @@ class LocalModelPullAccepted(BaseModel):
 
 
 class LocalModelPullResult(BaseModel):
-    """Successful pull and activation result."""
+    """Completed download with its separate activation outcome."""
 
     model_id: str
     activated: bool

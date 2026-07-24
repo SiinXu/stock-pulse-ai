@@ -3479,6 +3479,71 @@ test('pull does not activate when Ollama closes without terminal success', async
   assert.equal(result.error, 'pull-failed');
 });
 
+test('desktop rejects oversized local model JSON and progress events', async (t) => {
+  const mainModule = loadMainModule(t);
+  const oversizedJson = makeStagedJsonRequest([{
+    statusCode: 200,
+    jsonBody: { value: 'x'.repeat(mainModule.DESKTOP_LOCAL_MODEL_MAX_JSON_BYTES) },
+  }]);
+  await assert.rejects(
+    mainModule.requestLocalModelJson({
+      baseUrl: 'http://127.0.0.1:11434',
+      pathname: '/api/tags',
+      requestImpl: oversizedJson,
+    }),
+    /too large/i,
+  );
+
+  const oversizedProgress = makeStagedJsonRequest([{
+    statusCode: 200,
+    ndjson: [{ status: 'x'.repeat(mainModule.DESKTOP_LOCAL_MODEL_MAX_EVENT_BYTES) }],
+  }]);
+  await assert.rejects(
+    mainModule.requestLocalModelPullStream({
+      baseUrl: 'http://127.0.0.1:11434',
+      modelId: 'qwen3:8b',
+      requestImpl: oversizedProgress,
+    }),
+    /too large/i,
+  );
+});
+
+test('desktop Stop is serialized behind an active local model operation', async (t) => {
+  const mainModule = loadMainModule(t);
+  const webContents = {
+    isDestroyed: () => false,
+    send: () => undefined,
+  };
+  mainModule.__setMainWindowForTest({
+    isDestroyed: () => false,
+    webContents,
+  });
+  let killed = false;
+  mainModule.__setLocalModelServeProcessForTest({
+    pid: 9191,
+    exitCode: null,
+    signalCode: null,
+    kill: () => {
+      killed = true;
+      return true;
+    },
+  });
+  let releaseOperation;
+  const inFlight = mainModule.runLocalModelOperation(() => new Promise((resolve) => {
+    releaseOperation = resolve;
+  }));
+
+  const stopHandler = mainModule.__getIpcMainHandler(
+    mainModule.DESKTOP_LOCAL_MODEL_STOP_CHANNEL,
+  );
+  const result = await stopHandler({ sender: webContents });
+
+  assert.equal(result.error, 'busy');
+  assert.equal(killed, false);
+  releaseOperation({ ok: true });
+  await inFlight;
+});
+
 test('desktop deletion rejects non-catalog names before network activity', async (t) => {
   const mainModule = loadMainModule(t);
   const requestImpl = makeStagedJsonRequest([{ statusCode: 200, jsonBody: {} }]);

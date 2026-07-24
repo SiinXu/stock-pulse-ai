@@ -20,6 +20,7 @@ from api.v1.schemas.local_models import (
 from src.services.local_model_service import (
     LocalModelError,
     LocalModelInUseError,
+    LocalModelNotInstalledError,
     LocalModelNotAllowedError,
     LocalModelRuntimeRequestError,
     LocalModelRuntimeUnavailableError,
@@ -39,7 +40,10 @@ def _raise_local_model_error(exc: Exception, *, model_id: str = "") -> NoReturn:
     """Map internal local-model failures to stable caller-safe API errors."""
     if isinstance(exc, LocalModelValidationError):
         status_code = status.HTTP_400_BAD_REQUEST
-    elif isinstance(exc, (LocalModelNotAllowedError, LocalModelInUseError)):
+    elif isinstance(
+        exc,
+        (LocalModelNotAllowedError, LocalModelNotInstalledError, LocalModelInUseError),
+    ):
         status_code = status.HTTP_409_CONFLICT
     elif isinstance(exc, (LocalModelRuntimeUnavailableError, LocalModelRuntimeRequestError)):
         # Keep this as a public dependency failure. The global API boundary

@@ -14,7 +14,11 @@ from urllib.parse import urlsplit, urlunsplit
 import requests
 
 from src.llm.model_ref import decode_model_ref
-from src.services.system_config_service import SystemConfigService
+from src.services.system_config_service import (
+    ConfigConflictError,
+    ConfigValidationError,
+    SystemConfigService,
+)
 from src.services.task_queue import AnalysisTaskQueue, TaskInfo, TaskStatus
 
 
@@ -49,6 +53,12 @@ class LocalModelNotAllowedError(LocalModelError):
     """Raised when a model is not pullable from the authoritative catalog."""
 
     error_code = "local_model_not_pullable"
+
+
+class LocalModelNotInstalledError(LocalModelError):
+    """Raised when assignment targets a catalog model absent from Ollama."""
+
+    error_code = "local_model_not_installed"
 
 
 class LocalModelRuntimeUnavailableError(LocalModelError):
@@ -414,6 +424,33 @@ class LocalModelService:
             raise LocalModelValidationError("Invalid local model assignment")
 
         config_version, values = self._config_snapshot()
+        base_url = self._base_url(values)
+        installed = {
+            item.lower()
+            for item in self._client_factory(base_url).list_installed_models()
+        }
+        if normalized.lower() not in installed:
+            raise LocalModelNotInstalledError(
+                "The selected local model is not installed in the configured runtime"
+            )
+        return self._configure_model_from_snapshot(
+            normalized,
+            assignment=assignment,
+            config_version=config_version,
+            values=values,
+            base_url=base_url,
+        )
+
+    def _configure_model_from_snapshot(
+        self,
+        normalized: str,
+        *,
+        assignment: LocalModelAssignment,
+        config_version: str,
+        values: Mapping[str, str],
+        base_url: str,
+    ) -> Dict[str, Any]:
+        """Activate a verified model against one immutable runtime/config snapshot."""
         current_channels = values.get("LLM_CHANNELS", "")
         current_models = values.get("LLM_OLLAMA_MODELS", "")
         route = f"ollama/{normalized}"
@@ -421,7 +458,7 @@ class LocalModelService:
             {"key": "LLM_CHANNELS", "value": self._append_csv(current_channels, ["ollama"])},
             {"key": "LLM_OLLAMA_PROVIDER", "value": "ollama"},
             {"key": "LLM_OLLAMA_PROTOCOL", "value": "ollama"},
-            {"key": "LLM_OLLAMA_BASE_URL", "value": self._base_url(values)},
+            {"key": "LLM_OLLAMA_BASE_URL", "value": base_url},
             {"key": "LLM_OLLAMA_MODELS", "value": self._append_csv(current_models, [normalized])},
             {"key": "LLM_OLLAMA_ENABLED", "value": "true"},
         ]
@@ -437,14 +474,29 @@ class LocalModelService:
                     {"key": "LITELLM_MODEL", "value": route},
                 ]
             )
-        elif assignment == "agent":
-            updates.append({"key": "AGENT_LITELLM_MODEL", "value": route})
-
         requested_mode = str(values.get("LLM_CONFIG_MODE") or "auto").strip().lower() or "auto"
         had_channels = bool(self._split_csv(current_channels))
+        has_yaml = bool(str(values.get("LITELLM_CONFIG") or "").strip())
         has_legacy = any(str(values.get(key) or "").strip() for key in self._LEGACY_PRIMARY_KEYS)
+        if assignment == "agent":
+            incompatible_agent_source = (
+                requested_mode in {"legacy", "yaml"}
+                or (requested_mode == "auto" and has_yaml)
+                or (requested_mode == "auto" and not had_channels and has_legacy)
+            )
+            if incompatible_agent_source:
+                raise LocalModelValidationError(
+                    "The active configuration source cannot route an Ollama Agent model"
+                )
+            updates.extend(
+                [
+                    {"key": "AGENT_GENERATION_BACKEND", "value": "litellm"},
+                    {"key": "AGENT_LITELLM_MODEL", "value": route},
+                ]
+            )
         if (
             not selected_primary
+            and assignment != "agent"
             and requested_mode == "auto"
             and not had_channels
             and has_legacy
@@ -473,9 +525,7 @@ class LocalModelService:
         """Remove a non-active model from the Ollama connection configuration."""
         normalized = self._require_pullable(model_id)
         config_version, values = self._config_snapshot()
-        if self._is_assigned(values, "LITELLM_MODEL", normalized) or self._is_assigned(
-            values, "AGENT_LITELLM_MODEL", normalized
-        ):
+        if self._is_model_referenced(values, normalized):
             raise LocalModelInUseError("Change the active model assignment before deleting it")
 
         current_models = self._split_csv(values.get("LLM_OLLAMA_MODELS"))
@@ -490,6 +540,18 @@ class LocalModelService:
                 if item.lower() != "ollama"
             ]
             updates.append({"key": "LLM_CHANNELS", "value": ",".join(remaining_channels)})
+        validation = self._system_config_service.validate(items=updates)
+        errors = [
+            issue
+            for issue in validation["issues"]
+            if issue.get("severity") == "error"
+        ]
+        if any(issue.get("code") == "model_in_use" for issue in errors):
+            raise LocalModelInUseError(
+                "Change every active model assignment before deleting it"
+            )
+        if errors:
+            raise ConfigValidationError(issues=errors)
         result = self._system_config_service.update(
             config_version=config_version,
             items=updates,
@@ -498,6 +560,39 @@ class LocalModelService:
             actor="local_model_center",
         )
         return {**result, **self.get_configuration(), "model_id": normalized}
+
+    @classmethod
+    def _is_model_referenced(
+        cls,
+        values: Mapping[str, str],
+        model_id: str,
+    ) -> bool:
+        """Protect explicit task routes and the effective implicit channel primary."""
+        route = f"ollama/{model_id}".lower()
+        for key in ("LITELLM_MODEL", "AGENT_LITELLM_MODEL", "VISION_MODEL"):
+            if cls._runtime_route(values.get(key)).lower() == route:
+                return True
+        if any(
+            cls._runtime_route(candidate).lower() == route
+            for candidate in cls._split_csv(values.get("LITELLM_FALLBACK_MODELS"))
+        ):
+            return True
+
+        if str(values.get("LITELLM_MODEL") or "").strip():
+            return False
+        mode = str(values.get("LLM_CONFIG_MODE") or "auto").strip().lower() or "auto"
+        if mode not in {"auto", "channels"}:
+            return False
+        for channel in cls._split_csv(values.get("LLM_CHANNELS")):
+            prefix = f"LLM_{channel.upper()}"
+            enabled = str(values.get(f"{prefix}_ENABLED") or "true").strip().lower()
+            if enabled in {"false", "0", "no", "off"}:
+                continue
+            models = cls._split_csv(values.get(f"{prefix}_MODELS"))
+            if not models:
+                continue
+            return channel.lower() == "ollama" and models[0].lower() == model_id.lower()
+        return False
 
     def get_runtime_status(self) -> Dict[str, Any]:
         """Return installed models or a stable unavailable state without raw diagnostics."""
@@ -532,7 +627,7 @@ class LocalModelService:
             if pending is not None:
                 return pending
 
-            _config_version, values = self._config_snapshot()
+            config_version, values = self._config_snapshot()
             base_url = self._base_url(values)
             # Fail before accepting a task so the UI can immediately offer the
             # manual command instead of polling a predictably failed worker.
@@ -552,7 +647,20 @@ class LocalModelService:
                     )
 
                 client.pull_model(normalized, on_progress=update)
-                activation = self.configure_model(normalized, assignment="auto")
+                try:
+                    activation = self._configure_model_from_snapshot(
+                        normalized,
+                        assignment="auto",
+                        config_version=config_version,
+                        values=values,
+                        base_url=base_url,
+                    )
+                except (ConfigConflictError, ConfigValidationError, LocalModelError):
+                    return {
+                        "model_id": normalized,
+                        "activated": False,
+                        "selected_primary": False,
+                    }
                 return {
                     "model_id": normalized,
                     "activated": True,
@@ -586,13 +694,39 @@ class LocalModelService:
         }
 
     def delete_model(self, model_id: Any) -> Dict[str, Any]:
-        """Delete one non-active catalog model and remove its saved registration."""
+        """Validate and unregister one catalog model before deleting its weights."""
         normalized = self._require_pullable(model_id)
-        _config_version, values = self._config_snapshot()
-        if self._is_assigned(values, "LITELLM_MODEL", normalized) or self._is_assigned(
-            values, "AGENT_LITELLM_MODEL", normalized
-        ):
-            raise LocalModelInUseError("Change the active model assignment before deleting it")
-        self._client_factory(self._base_url(values)).delete_model(normalized)
+        _config_version, previous_values = self._config_snapshot()
+        was_registered = any(
+            item.lower() == normalized.lower()
+            for item in self._split_csv(previous_values.get("LLM_OLLAMA_MODELS"))
+        )
         result = self.unregister_model(normalized)
+        try:
+            self._client_factory(self._base_url(previous_values)).delete_model(normalized)
+        except LocalModelError as exc:
+            if was_registered:
+                current_version, _current_values = self._config_snapshot()
+                try:
+                    self._system_config_service.update(
+                        config_version=current_version,
+                        items=[
+                            {
+                                "key": "LLM_CHANNELS",
+                                "value": str(previous_values.get("LLM_CHANNELS") or ""),
+                            },
+                            {
+                                "key": "LLM_OLLAMA_MODELS",
+                                "value": str(previous_values.get("LLM_OLLAMA_MODELS") or ""),
+                            },
+                        ],
+                        reload_now=True,
+                        validate_connectivity=False,
+                        actor="local_model_delete_rollback",
+                    )
+                except (ConfigConflictError, ConfigValidationError) as rollback_exc:
+                    raise LocalModelRuntimeRequestError(
+                        "Local model deletion failed and registration recovery was rejected"
+                    ) from rollback_exc
+            raise
         return {**result, "deleted": True, "model_id": normalized}

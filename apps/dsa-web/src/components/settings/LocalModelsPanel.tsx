@@ -275,7 +275,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
       if (error instanceof LocalModelTransportError && error.manualCommand) {
         setManualCommand(error.manualCommand);
       } else {
-        setManualCommand(`ollama pull ${modelId}`);
+        setManualCommand('');
       }
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
@@ -540,6 +540,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
           size="default"
           aria-label={text.refresh}
           isLoading={activeOperation?.kind === 'runtime'}
+          disabled={activeOperation !== null}
           onClick={() => void refreshRuntime()}
         >
           <RefreshCw aria-hidden="true" />
@@ -561,17 +562,29 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
           </div>
           <div className="flex items-center gap-2">
             {transport.canControlRuntime && runtime?.status === 'stopped' ? (
-              <Button variant="secondary" onClick={() => void handleRuntimeAction('start')}>
+              <Button
+                variant="secondary"
+                disabled={activeOperation !== null}
+                onClick={() => void handleRuntimeAction('start')}
+              >
                 <Play aria-hidden="true" />{text.start}
               </Button>
             ) : null}
             {transport.canControlRuntime && runtime?.status === 'running' && runtime.managed ? (
-              <Button variant="secondary" onClick={() => void handleRuntimeAction('stop')}>
+              <Button
+                variant="secondary"
+                disabled={activeOperation !== null}
+                onClick={() => void handleRuntimeAction('stop')}
+              >
                 <Square aria-hidden="true" />{text.stop}
               </Button>
             ) : null}
             {runtime?.status === 'not-installed' || runtime?.status === 'unavailable' ? (
-              <Button variant="secondary" onClick={() => void transport.openInstallGuide()}>
+              <Button
+                variant="secondary"
+                disabled={activeOperation !== null}
+                onClick={() => void transport.openInstallGuide()}
+              >
                 <ExternalLink aria-hidden="true" />{text.installRuntime}
               </Button>
             ) : null}
