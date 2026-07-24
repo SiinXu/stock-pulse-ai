@@ -56,6 +56,16 @@ P6_SIGNAL_LINKED_SCHEMAS = (
     "PortfolioDecisionSignalRiskItem",
     "PortfolioRiskResponse",
 )
+LOCAL_MODEL_CATALOG_SCHEMAS = (
+    "LocalModelCatalogEntry",
+    "LocalModelCatalogResponse",
+    "LocalModelCatalogText",
+    "LocalModelDesktopMetadata",
+    "LocalModelInstall",
+    "LocalModelLicense",
+    "LocalModelQ4Artifact",
+    "LocalModelUpstream",
+)
 
 
 def _collect_component_schema_refs(node: Any) -> set[str]:
@@ -187,6 +197,8 @@ def test_local_model_catalog_static_api_spec_matches_runtime_path() -> None:
     path = "/api/v1/system/config/llm/local-models"
 
     assert static_spec["paths"][path] == runtime_spec["paths"][path]
+    for schema_name in LOCAL_MODEL_CATALOG_SCHEMAS:
+        assert static_spec["components"]["schemas"][schema_name] == runtime_spec["components"]["schemas"][schema_name]
 
 
 def test_v1_prefix_is_applied_at_app_mount_level() -> None:
