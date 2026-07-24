@@ -22,7 +22,7 @@ The tool registers only when all three gates pass:
 3. `KRONOS_WEIGHTS_DIR` contains the selected official model and its matching
    tokenizer: both configs match the pinned architecture, both safetensors
    containers are structurally valid, and the official local-only loaders can
-   construct the model/tokenizer pair.
+   strictly load every expected state-dict key and shape without leftovers.
 
 If any gate fails, StockPulse does not register
 `forecast_kline_with_kronos`. Startup logs provide a reason and remediation
@@ -60,10 +60,30 @@ python -m pip check
 Kronos-only packages. Removing the optional environment therefore has no effect
 on the default dependency contract.
 
+### Optional Runtime Platforms
+
+The exact optional manifest inherits the wheel matrix published for
+`torch==2.13.0`:
+
+| Platform | Optional Kronos install support |
+| --- | --- |
+| Linux x86_64 / arm64 | Python 3.10-3.14 on a `manylinux_2_28` compatible system |
+| Windows x64 | Python 3.10-3.14 |
+| macOS Apple Silicon | Python 3.10-3.14 on macOS 14 or newer |
+| macOS Intel | Not supported: PyTorch 2.13.0 publishes no x86_64 macOS wheel |
+
+On macOS 13 arm64 or macOS Intel, the documented optional install command fails
+because no matching PyTorch wheel exists. This limitation affects only Kronos;
+the default source application and prebuilt desktop packages keep their normal
+platform support. Do not replace the reviewed PyTorch pin with an arbitrary
+build. Supporting another platform requires a separately reviewed dependency
+and inference compatibility update.
+
 Prebuilt desktop artifacts and the default Docker image intentionally do not
 bundle this optional dependency set or model weights. Run Kronos from a source
-environment with the optional requirements installed, or build a reviewed
-custom backend image that installs them and mounts the local weight directory.
+environment on a supported platform with the optional requirements installed,
+or build a reviewed custom backend image that installs them and mounts the
+local weight directory.
 
 StockPulse vendors the official MIT inference implementation from
 `shiyu-coder/Kronos` commit
@@ -134,7 +154,8 @@ take effect only after restart. Enabling Kronos imports the optional modules and
 loads the selected model/tokenizer during plugin registration so an unusable
 tool is never advertised. Startup therefore incurs the selected model's local
 I/O, memory, and device-initialization cost once; the loaded predictor is reused
-for later calls.
+for later calls. Both official loaders use strict state-dict matching, so
+missing, unexpected, or shape-incompatible tensors keep the tool absent.
 
 ## Output Contract
 
@@ -165,6 +186,9 @@ Every successful or typed error result carries:
   changes can invalidate those patterns.
 - Direction probabilities are based on a small bounded sample of stochastic
   paths and must not be interpreted as calibrated confidence.
+- A schema-valid request can still produce model paths that violate finite or
+  OHLC ordering invariants. StockPulse rejects the entire result with the typed
+  `inference_failed` error instead of silently repairing or publishing it.
 - Daily source quality and adjustment policy affect the input distribution.
 - Larger models consume substantially more memory and CPU/GPU time.
 - This tool does not place trades, size positions, guarantee returns, or replace
@@ -172,12 +196,13 @@ Every successful or typed error result carries:
 
 ## Verification
 
-The default suite mocks only the inference backend; readiness gates, plugin
-registration, official config matching, safetensors container validation,
-ToolRegistry delegation, schema/default validation, single-Agent stock scope,
-and output aggregation run through their real code paths. The production
-factory also performs the real local model load before registration; the
-opt-in test below exercises that load with reviewed artifacts.
+The default suite replaces only heavyweight tensor execution; readiness gates,
+plugin registration, official config matching, safetensors container
+validation, strict local-loader arguments and failure handling, ToolRegistry
+delegation, schema/default validation, single-Agent stock scope, and output
+aggregation run through their real code paths. The production factory performs
+the real strict local model load before registration; the opt-in test below
+exercises that load and inference with reviewed artifacts.
 
 Real local inference is explicit and excluded from default CI:
 

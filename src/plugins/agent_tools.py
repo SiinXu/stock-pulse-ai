@@ -28,9 +28,50 @@ from .registry import (
 
 
 _PARAMETER_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_PORTABLE_TOOL_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 _SUPPORTED_PARAMETER_TYPES = frozenset(
     {"string", "number", "integer", "boolean", "array", "object"}
 )
+
+
+def _same_json_value(left: object, right: object) -> bool:
+    if type(left) is not type(right):
+        return False
+    if type(left) is list:
+        return len(left) == len(right) and all(
+            _same_json_value(left_item, right_item)
+            for left_item, right_item in zip(left, right)
+        )
+    if type(left) is dict:
+        return set(left) == set(right) and all(
+            _same_json_value(left[key], right[key]) for key in left
+        )
+    return left == right
+
+
+def _is_lossless_json_value(value: object) -> bool:
+    if value is None or type(value) in {str, bool, int}:
+        return True
+    if type(value) is float:
+        return math.isfinite(value)
+    if type(value) is list:
+        return all(_is_lossless_json_value(item) for item in value)
+    if type(value) is dict:
+        return all(
+            type(key) is str and _is_lossless_json_value(item)
+            for key, item in value.items()
+        )
+    return False
+
+
+def _has_lossless_json_roundtrip(value: object) -> bool:
+    if not _is_lossless_json_value(value):
+        return False
+    try:
+        decoded = json.loads(json.dumps(value, allow_nan=False, sort_keys=True))
+    except (TypeError, ValueError):
+        return False
+    return _same_json_value(value, decoded)
 
 
 def _valid_parameter(parameter: object) -> bool:
@@ -88,9 +129,7 @@ def _valid_parameter(parameter: object) -> bool:
     else:
         if validate_tool_parameter_value(parameter, parameter.default) is not None:
             return False
-        try:
-            json.dumps(parameter.default, allow_nan=False, sort_keys=True)
-        except (TypeError, ValueError):
+        if not _has_lossless_json_roundtrip(parameter.default):
             return False
     return True
 
@@ -146,8 +185,7 @@ def validate_agent_tool_definition(implementation: object) -> bool:
         return False
     if (
         type(implementation.name) is not str
-        or not implementation.name.strip()
-        or len(implementation.name) > 128
+        or _PORTABLE_TOOL_NAME_PATTERN.fullmatch(implementation.name) is None
         or type(implementation.description) is not str
         or not implementation.description.strip()
         or type(implementation.category) is not str
