@@ -25,6 +25,7 @@ from .registry import (
     ExtensionRegistry,
     default_extension_contracts,
 )
+from .event_hooks import event_hook_extension_contract
 
 
 _PARAMETER_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -306,7 +307,7 @@ class AgentToolRegistrationBackend:
 def build_agent_tool_extension_registry(
     registry: ToolRegistry | Callable[[], ToolRegistry],
 ) -> ExtensionRegistry:
-    """Build the six-point registry with Agent Tools wired to ToolRegistry."""
+    """Build the registry with runtime-backed Agent Tool and Event Hook contracts."""
 
     contracts = dict(default_extension_contracts())
     contracts["agent_tool"] = ExtensionContract(
@@ -314,4 +315,5 @@ def build_agent_tool_extension_registry(
         validator=validate_agent_tool_definition,
         backend=AgentToolRegistrationBackend(registry),
     )
+    contracts["event_hook"] = event_hook_extension_contract()
     return ExtensionRegistry(contracts)
