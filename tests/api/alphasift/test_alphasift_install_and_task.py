@@ -7,6 +7,7 @@ from tests.alphasift_api_test_support import (
     os,
     sys,
     Path,
+    tempfile,
     SimpleNamespace,
     MagicMock,
     patch,
@@ -354,6 +355,49 @@ class AlphaSiftOpportunitiesApiTestCase(_AlphaSiftApiTestCaseBase):
         self.assertIn("--no-deps", install_command)
         self.assertNotIn("--constraint", install_command)
         self.assertNotIn("--build-constraint", install_command)
+
+    def test_install_uses_bundled_lock_when_frozen(self) -> None:
+        # A PyInstaller desktop build bundles the lock files at sys._MEIPASS. The repair
+        # install must pin against the bundled copy instead of degrading to --no-deps only.
+        config = self._config(enabled=True)
+        completed = SimpleNamespace(returncode=0, stdout="installed", stderr="")
+
+        with tempfile.TemporaryDirectory() as bundle:
+            (Path(bundle) / "constraints.txt").write_text("", encoding="utf-8")
+            (Path(bundle) / "build-constraints.txt").write_text("", encoding="utf-8")
+            with (
+                patch.dict(os.environ, {"DSA_DESKTOP_MODE": "true"}, clear=False),
+                patch("src.services.alphasift_service._is_alphasift_available", side_effect=[False, True]),
+                patch(
+                    "src.services.alphasift_service._call_alphasift_status",
+                    return_value={"available": True, "supported_markets": ["cn"], "contract_version": "1", "version": "0.2.0", "strategy_count": 1},
+                ),
+                patch.object(sys, "_MEIPASS", bundle, create=True),
+                patch("src.services.alphasift_service.subprocess.run", return_value=completed) as run_mock,
+                patch("src.services.alphasift_service._get_dsa_adapter", return_value=_make_adapter_module()),
+            ):
+                payload = alphasift_endpoint.alphasift_install(request=self._request(), config=config)
+
+            self.assertEqual(payload["installed"], True)
+            run_mock.assert_called_once()
+            install_command = run_mock.call_args.args[0]
+            self.assertEqual(
+                install_command,
+                [
+                    sys.executable,
+                    "-m",
+                    "pip",
+                    "install",
+                    "--upgrade",
+                    "--force-reinstall",
+                    "--no-deps",
+                    "--constraint",
+                    str(Path(bundle) / "constraints.txt"),
+                    "--build-constraint",
+                    str(Path(bundle) / "build-constraints.txt"),
+                    DEFAULT_ALPHASIFT_TEST_SPEC,
+                ],
+            )
 
     def test_install_start_failure_hides_raw_diagnostic(self) -> None:
         config = self._config(enabled=True)

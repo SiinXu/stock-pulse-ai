@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Bundled `constraints.txt` / `build-constraints.txt` into the packaged desktop backend and resolved them from `sys._MEIPASS`, so the AlphaSift repair install pins runtime and PEP 517 build dependencies on the desktop artifact too instead of degrading to `--no-deps` only.
 - [Fixed] Prevented Windows API and desktop startup from hanging on a cold MIME database by initializing built-in mappings without scanning the registry before registering frontend asset types.
 - [Added] Added opt-in `--portfolio futu` analysis scope loading from non-zero long stock positions in eligible live Futu OpenD accounts, with A-share/Hong Kong/U.S. symbol normalization and no changes to the default static stock-list behavior.
 - [Tests] Added a shared `mockCompletedSetupStatus` Playwright helper and applied it to the `smoke`, `report-markdown`, and `infrastructure-acceptance` specs so the new default-on beginner HomePage experience no longer forces professional-mode assertions off `分析` / `完整分析报告` / full report body.
