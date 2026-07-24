@@ -145,6 +145,8 @@ $pyInstallerArgs = @(
   '--add-data', 'static;static',
   '--add-data', 'strategies;strategies',
   '--add-data', 'src/migrations/versions/*.py;src/migrations/versions',
+  '--add-data', 'constraints.txt;.',
+  '--add-data', 'build-constraints.txt;.',
   '--collect-data', 'litellm',
   '--collect-data', 'tiktoken',
   '--collect-data', 'akshare',

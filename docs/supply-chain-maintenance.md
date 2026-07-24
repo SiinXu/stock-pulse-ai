@@ -209,9 +209,10 @@ exceptions also include the exact repository-relative `path`. There is no curren
 runtime exception: the AlphaSift repair install always passes `--no-deps`, which
 blocks resolving anything beyond the pinned spec, and additionally pins runtime
 and PEP 517 build resolution with `--constraint constraints.txt` /
-`--build-constraint build-constraints.txt` wherever the lock files ship (source
-and Docker runtimes). The packaged desktop artifact does not ship the lock files,
-so it degrades to `--no-deps` only rather than failing the repair. A dependency
+`--build-constraint build-constraints.txt`. The lock files ship at the repository
+root for source and Docker runtimes and are bundled into the packaged desktop
+artifact (resolved from `sys._MEIPASS`); if they are ever absent the install
+degrades to `--no-deps` only rather than failing the repair. A dependency
 exception does not waive source/lock digest synchronization, resolver
 reproduction, platform-marker exclusivity, other install-entry contracts, or the
 exact optional PydanticAI closure.
