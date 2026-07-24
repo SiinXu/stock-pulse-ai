@@ -232,20 +232,28 @@ export function buildAnalysisWorkbenchHref(
   options: AnalysisWorkbenchHrefOptions = {},
 ): string {
   const searchParams = new URLSearchParams();
-  if (
-    options.segment
-    && options.segment !== ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch
-  ) {
-    searchParams.set(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment, options.segment);
+  const segment = options.segment
+    ?? (options.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.task
+      ? ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks
+      : isPositiveRouteInteger(options.recordId)
+          || options.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.history
+        ? ANALYSIS_WORKBENCH_SEGMENT_VALUES.history
+        : ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch);
+  if (segment !== ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch) {
+    searchParams.set(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment, segment);
   }
-  if (isPositiveRouteInteger(options.recordId)) {
+  if (
+    segment === ANALYSIS_WORKBENCH_SEGMENT_VALUES.history
+    && isPositiveRouteInteger(options.recordId)
+  ) {
     searchParams.set(
       ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId,
       String(options.recordId),
     );
   }
   if (
-    options.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.history
+    segment === ANALYSIS_WORKBENCH_SEGMENT_VALUES.history
+    && options.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.history
     && isPositiveRouteInteger(options.runFlowRecordId)
   ) {
     searchParams.set(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow, options.runFlow);
@@ -254,7 +262,8 @@ export function buildAnalysisWorkbenchHref(
       String(options.runFlowRecordId),
     );
   } else if (
-    options.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.task
+    segment === ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks
+    && options.runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.task
     && typeof options.runFlowTaskId === 'string'
     && isStableAnalysisWorkbenchTaskId(options.runFlowTaskId)
   ) {

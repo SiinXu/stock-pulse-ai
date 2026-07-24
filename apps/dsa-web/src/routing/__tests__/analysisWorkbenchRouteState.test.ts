@@ -90,13 +90,17 @@ describe('parseAnalysisWorkbenchRouteState', () => {
     expect(parsed.state.runFlowTaskId).toBe('abc');
   });
 
-  it('respects an explicit segment override even when recordId is present', () => {
+  it('strips a record intent that conflicts with the explicit launch segment', () => {
     const parsed = parseAnalysisWorkbenchRouteState(query({
       [ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment]: ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch,
       [ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId]: '9',
     }));
     expect(parsed.state.segment).toBe(ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch);
-    expect(parsed.state.recordId).toBe(9);
+    expect(parsed.state.recordId).toBeNull();
+    expect(parsed.invalidKeys).toContain(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId);
+    expect(parsed.normalizedParams.toString()).toBe('');
+    expect(parseAnalysisWorkbenchRouteState(parsed.normalizedParams).state)
+      .toEqual(parsed.state);
   });
 
   it('rejects non-positive-integer recordId values', () => {
@@ -224,7 +228,9 @@ describe('setAnalysisWorkbenchRouteState', () => {
         runFlowTaskId: 't-9',
       },
     );
-    expect(next.getAll(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment)).toEqual(['tasks']);
+    expect(next.getAll(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment)).toEqual([
+      ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
+    ]);
     expect(next.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId)).toBeNull();
     expect(next.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow))
       .toBe(RUN_FLOW_ROUTE_QUERY_VALUES.task);
@@ -238,6 +244,15 @@ describe('buildAnalysisWorkbenchHref', () => {
     expect(buildAnalysisWorkbenchHref()).toBe(APP_ROUTE_PATHS.researchAnalysis);
     expect(buildAnalysisWorkbenchHref({
       segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch,
+    })).toBe(APP_ROUTE_PATHS.researchAnalysis);
+  });
+
+  it('drops report context that conflicts with an explicit launch segment', () => {
+    expect(buildAnalysisWorkbenchHref({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch,
+      recordId: 9,
+      runFlow: RUN_FLOW_ROUTE_QUERY_VALUES.history,
+      runFlowRecordId: 9,
     })).toBe(APP_ROUTE_PATHS.researchAnalysis);
   });
 

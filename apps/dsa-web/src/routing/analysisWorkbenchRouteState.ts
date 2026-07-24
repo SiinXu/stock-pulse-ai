@@ -96,7 +96,7 @@ export function parseAnalysisWorkbenchRouteState(
   }
 
   const rawRecordId = source.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId);
-  const recordId = parsePositiveRouteInteger(rawRecordId);
+  let recordId = parsePositiveRouteInteger(rawRecordId);
   if (rawRecordId !== null && recordId === null) {
     invalidKeys.push(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId);
   }
@@ -142,6 +142,35 @@ export function parseAnalysisWorkbenchRouteState(
     }
     runFlowRecordId = null;
     runFlowTaskId = null;
+  }
+
+  if (rawSegment !== null) {
+    const clearRecord = () => {
+      if (recordId !== null) invalidKeys.push(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.recordId);
+      recordId = null;
+    };
+    const clearRunFlow = () => {
+      if (runFlow !== null) invalidKeys.push(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow);
+      if (runFlowRecordId !== null) {
+        invalidKeys.push(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowRecordId);
+      }
+      if (runFlowTaskId !== null) {
+        invalidKeys.push(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowTaskId);
+      }
+      runFlow = null;
+      runFlowRecordId = null;
+      runFlowTaskId = null;
+    };
+
+    if (segment === ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch) {
+      clearRecord();
+      clearRunFlow();
+    } else if (segment === ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks) {
+      clearRecord();
+      if (runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.history) clearRunFlow();
+    } else if (runFlow === RUN_FLOW_ROUTE_QUERY_VALUES.task) {
+      clearRunFlow();
+    }
   }
 
   // Coerce segment when the URL implies a specific view but leaves segment unspecified:

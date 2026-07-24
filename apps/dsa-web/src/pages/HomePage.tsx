@@ -18,20 +18,25 @@ import { RunFlowPanel } from '../components/run-flow';
 import { TaskPanel } from '../components/tasks';
 import {
   HomeStockWorkspace,
-  type HomeWatchlistRow,
   type WatchlistAnalyzeMode,
 } from '../components/watchlist/HomeStockWorkspace';
 import { useDashboardLifecycle, useHomeDashboardState, useHomeUrlState } from '../hooks';
+import { useWatchlistAnalysisCoverage } from '../hooks/useWatchlistAnalysisCoverage';
 import { useWatchlist } from '../hooks/useWatchlist';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import type { SetupStatusResponse } from '../types/systemConfig';
 import { normalizeReportLanguage } from '../utils/reportLanguage';
-import type { HistoryItem, StockBarItem, TaskInfo } from '../types/analysis';
+import type { StockBarItem, TaskInfo } from '../types/analysis';
 import type { RunFlowSnapshotSource } from '../types/runFlow';
-import { getTodayInShanghai } from '../utils/format';
+import {
+  getShanghaiDateKey,
+  getShanghaiTimeValue,
+  getTodayInShanghai,
+} from '../utils/format';
 import { buildDeepLink } from '../utils/deepLink';
 import { normalizeStockCode } from '../utils/stockCode';
 import { normalizeBatchAnalysisCodes, submitBatchAnalysis } from '../utils/batchAnalysis';
+import { toStockBarItemFromHistoryItem } from '../utils/stockBar';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
 import { getUiListSeparator } from '../utils/uiLocale';
 import {
@@ -69,39 +74,11 @@ type HomeRecordIdentityResolution =
 
 const DUPLICATE_BANNER_AUTO_DISMISS_MS = 5000;
 const TODAY_ANALYSIS_PAGE_SIZE = 100;
-const SERVER_LOCAL_DATE_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/;
 
 type BatchAnalyzeStatus = {
   variant: 'success' | 'warning' | 'danger';
   message: string;
 } | null;
-
-type WatchlistHistoryLookupState = {
-  signature: string;
-  settledKeys: Set<string>;
-  failedKeys: Set<string>;
-};
-
-function getShanghaiDateKey(value?: string | null): string {
-  if (!value) return '';
-  const trimmed = value.trim();
-  const normalized = SERVER_LOCAL_DATE_TIME_PATTERN.test(trimmed)
-    ? `${trimmed.replace(' ', 'T')}+08:00`
-    : trimmed;
-  const date = new Date(normalized);
-  if (Number.isNaN(date.getTime())) return '';
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(date);
-}
-
-function getShanghaiTimeValue(value?: string | null): number {
-  if (!value) return 0;
-  const trimmed = value.trim();
-  const normalized = SERVER_LOCAL_DATE_TIME_PATTERN.test(trimmed)
-    ? `${trimmed.replace(' ', 'T')}+08:00`
-    : trimmed;
-  const date = new Date(normalized);
-  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
-}
 
 function shiftDateKey(dateKey: string, days: number): string {
   const date = new Date(`${dateKey}T12:00:00Z`);
@@ -112,23 +89,6 @@ function shiftDateKey(dateKey: string, days: number): string {
 function getStockCodeKey(code?: string | null): string {
   const trimmed = (code ?? '').trim();
   return trimmed ? normalizeStockCode(trimmed).toUpperCase() : '';
-}
-
-function toStockBarItemFromHistoryItem(item: HistoryItem): StockBarItem {
-  return {
-    id: item.id,
-    stockCode: item.stockCode,
-    stockName: item.stockName,
-    reportType: item.reportType,
-    sentimentScore: item.sentimentScore,
-    operationAdvice: item.operationAdvice,
-    action: item.action ?? null,
-    actionLabel: item.actionLabel ?? null,
-    analysisCount: 0,
-    lastAnalysisTime: item.createdAt,
-    modelUsed: item.modelUsed,
-    marketPhaseSummary: item.marketPhaseSummary ?? null,
-  };
 }
 
 async function getTodayAnalysisItems(dateKey: string): Promise<StockBarItem[]> {
@@ -180,21 +140,13 @@ const HomePage: React.FC = () => {
   const [duplicateBannerVisible, setDuplicateBannerVisible] = useState(false);
   const [isBatchAnalyzingWatchlist, setIsBatchAnalyzingWatchlist] = useState(false);
   const [batchAnalyzeStatus, setBatchAnalyzeStatus] = useState<BatchAnalyzeStatus>(null);
-  const [watchlistHistoryItemsByCode, setWatchlistHistoryItemsByCode] = useState<Map<string, StockBarItem>>(new Map());
-  const [watchlistHistoryLookupState, setWatchlistHistoryLookupState] = useState<WatchlistHistoryLookupState>({
-    signature: '',
-    settledKeys: new Set(),
-    failedKeys: new Set(),
-  });
   const [todayHistoryItems, setTodayHistoryItems] = useState<StockBarItem[]>([]);
   const [isLoadingTodayAnalysisItems, setIsLoadingTodayAnalysisItems] = useState(false);
   const [todayAnalysisLoadFailed, setTodayAnalysisLoadFailed] = useState(false);
   const [todayAnalysisRefreshVersion, setTodayAnalysisRefreshVersion] = useState(0);
-  const [isStockBarInitialLoadSettled, setIsStockBarInitialLoadSettled] = useState(false);
   const duplicateBannerTimer = useRef<number | null>(null);
   const homeUrlOwnerActiveRef = useRef(false);
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
-  const stockBarLoadStartedRef = useRef(false);
   const strategyButtonRef = useRef<HTMLButtonElement | null>(null);
   const strategyItemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const strategyInitialFocusIndexRef = useRef<number | null>(null);
@@ -603,7 +555,7 @@ const HomePage: React.FC = () => {
     setTodayAnalysisRefreshVersion((version) => version + 1);
   }, []);
 
-  useDashboardLifecycle({
+  const dashboardLifecycle = useDashboardLifecycle({
     loadInitialHistory,
     refreshHistory,
     refreshHistoryForCompletedTask: refreshCompletedTaskHistory,
@@ -619,132 +571,15 @@ const HomePage: React.FC = () => {
     onCompletedTaskDataRefreshed: handleCompletedTaskDataRefreshed,
   });
 
-  useEffect(() => {
-    if (isLoadingStockBar) {
-      stockBarLoadStartedRef.current = true;
-      return;
-    }
-    if (stockBarLoadStartedRef.current || stockBarItems.length > 0) {
-      setIsStockBarInitialLoadSettled(true);
-    }
-  }, [isLoadingStockBar, stockBarItems.length]);
-
   const watchlistState = useWatchlist();
-  const watchlistCodesByNormalized = useMemo(() => {
-    const codesByNormalized = new Map<string, string>();
-    for (const code of watchlistState.watchlistCodes) {
-      const key = getStockCodeKey(code);
-      if (!key || key === 'MARKET' || codesByNormalized.has(key)) {
-        continue;
-      }
-      codesByNormalized.set(key, code);
-    }
-    return Array.from(codesByNormalized.entries());
-  }, [watchlistState.watchlistCodes]);
-
-  const stockBarItemByCode = useMemo(() => {
-    const itemsByCode = new Map<string, StockBarItem>();
-    for (const item of stockBarItems) {
-      if (item.stockCode === 'MARKET') {
-        continue;
-      }
-      const key = getStockCodeKey(item.stockCode);
-      if (key) {
-        itemsByCode.set(key, item);
-      }
-    }
-    return itemsByCode;
-  }, [stockBarItems]);
-
-  const canLookupWatchlistHistory = !isLoadingStockBar && isStockBarInitialLoadSettled;
-
-  const watchlistMissingHistoryEntries = useMemo(
-    () => (
-      canLookupWatchlistHistory
-        ? watchlistCodesByNormalized.filter(([key]) => !stockBarItemByCode.has(key))
-        : []
-    ),
-    [canLookupWatchlistHistory, stockBarItemByCode, watchlistCodesByNormalized],
-  );
-
-  const watchlistMissingHistorySignature = useMemo(
-    () => watchlistMissingHistoryEntries.map(([key]) => key).join('\n'),
-    [watchlistMissingHistoryEntries],
-  );
-
-  useEffect(() => {
-    if (!canLookupWatchlistHistory) {
-      setWatchlistHistoryItemsByCode(new Map());
-      setWatchlistHistoryLookupState({ signature: '', settledKeys: new Set(), failedKeys: new Set() });
-      return undefined;
-    }
-
-    const missingCodes = watchlistMissingHistoryEntries.map(([, code]) => code);
-    const missingKeys = watchlistMissingHistoryEntries.map(([key]) => key);
-    const currentSignature = watchlistMissingHistorySignature;
-
-    if (missingCodes.length === 0) {
-      setWatchlistHistoryItemsByCode(new Map());
-      setWatchlistHistoryLookupState({ signature: '', settledKeys: new Set(), failedKeys: new Set() });
-      return;
-    }
-
-    let isCanceled = false;
-    setWatchlistHistoryLookupState({ signature: currentSignature, settledKeys: new Set(), failedKeys: new Set() });
-    void (async () => {
-      try {
-        const results = await Promise.all(
-          missingCodes.map(async (code) => {
-            try {
-              const response = await historyApi.getList({ stockCode: code, limit: 1 });
-              return { code, item: response.items[0] ?? null, failed: false };
-            } catch {
-              return { code, item: null, failed: true };
-            }
-          }),
-        );
-
-        if (isCanceled) {
-          return;
-        }
-
-        const next = new Map<string, StockBarItem>();
-        const failedKeys = new Set<string>();
-        for (const entry of results) {
-          const key = getStockCodeKey(entry.code);
-          if (!key) {
-            continue;
-          }
-          if (entry.failed) {
-            failedKeys.add(key);
-            continue;
-          }
-          if (entry.item) {
-            next.set(key, toStockBarItemFromHistoryItem(entry.item));
-          }
-        }
-        setWatchlistHistoryItemsByCode(next);
-        setWatchlistHistoryLookupState({
-          signature: currentSignature,
-          settledKeys: new Set(missingKeys),
-          failedKeys,
-        });
-      } catch {
-        if (!isCanceled) {
-          setWatchlistHistoryItemsByCode(new Map());
-          setWatchlistHistoryLookupState({
-            signature: currentSignature,
-            settledKeys: new Set(missingKeys),
-            failedKeys: new Set(missingKeys),
-          });
-        }
-      }
-    })();
-
-    return () => {
-      isCanceled = true;
-    };
-  }, [canLookupWatchlistHistory, watchlistMissingHistoryEntries, watchlistMissingHistorySignature]);
+  const watchlistCoverage = useWatchlistAnalysisCoverage({
+    watchlistCodes: watchlistState.watchlistCodes,
+    stockBarItems,
+    isLoadingStockBar,
+    isInitialStockBarLoadSettled: dashboardLifecycle.isInitialStockBarLoadSettled,
+    stockBarRefreshFailed,
+    activeTasks,
+  });
 
   const handleHistoryItemClick = useCallback((recordId: number) => {
     homeUrlState.navigateToRecord(recordId);
@@ -1016,86 +851,12 @@ const HomePage: React.FC = () => {
     };
   }, [sidebarWorkspaceTab, todayAnalysisRefreshVersion, todayDateKey]);
 
-  const activeTaskByCode = useMemo(() => {
-    const tasksByCode = new Map<string, TaskInfo>();
-    for (const task of activeTasks) {
-      if (!['pending', 'processing', 'cancel_requested'].includes(task.status)) {
-        continue;
-      }
-      if (task.reportType === 'market_review') {
-        continue;
-      }
-      const key = getStockCodeKey(task.stockCode);
-      if (key) {
-        tasksByCode.set(key, task);
-      }
-    }
-    return tasksByCode;
-  }, [activeTasks]);
-
-  const watchlistRows = useMemo<HomeWatchlistRow[]>(() => (
-    watchlistState.watchlistCodes.map((code) => {
-      const key = getStockCodeKey(code);
-      const latestItem = key
-        ? stockBarItemByCode.get(key) ?? watchlistHistoryItemsByCode.get(key)
-        : undefined;
-      const isMissingFromStockBar = Boolean(key && !stockBarItemByCode.has(key));
-      const isTodayStatusUnknown = Boolean(
-        stockBarRefreshFailed
-        || (
-          isMissingFromStockBar
-          && canLookupWatchlistHistory
-          && watchlistHistoryLookupState.signature === watchlistMissingHistorySignature
-          && watchlistHistoryLookupState.failedKeys.has(key)
-        ),
-      );
-      const isTodayStatusLoading = Boolean(
-        isMissingFromStockBar
-        && !isTodayStatusUnknown
-        && (
-          !canLookupWatchlistHistory
-          ||
-          watchlistHistoryLookupState.signature !== watchlistMissingHistorySignature
-          || !watchlistHistoryLookupState.settledKeys.has(key)
-        ),
-      );
-      return {
-        code,
-        latestItem,
-        analyzedToday: !isTodayStatusLoading && !isTodayStatusUnknown && getShanghaiDateKey(latestItem?.lastAnalysisTime) === todayDateKey,
-        isTodayStatusLoading,
-        isTodayStatusUnknown,
-        activeTask: key ? activeTaskByCode.get(key) : undefined,
-      };
-    })
-  ), [
-    activeTaskByCode,
-    canLookupWatchlistHistory,
-    stockBarRefreshFailed,
-    stockBarItemByCode,
-    todayDateKey,
-    watchlistHistoryItemsByCode,
-    watchlistHistoryLookupState,
-    watchlistMissingHistorySignature,
-    watchlistState.watchlistCodes,
-  ]);
-
-  const watchlistAnalyzedTodayCount = useMemo(
-    () => watchlistRows.filter((row) => row.analyzedToday).length,
-    [watchlistRows],
-  );
-
-  const pendingWatchlistCodes = useMemo(
-    () => watchlistRows
-      .filter((row) => !row.analyzedToday && !row.isTodayStatusLoading && !row.isTodayStatusUnknown)
-      .map((row) => row.code),
-    [watchlistRows],
-  );
-
-  const watchlistTodayStatusBlocked = useMemo(
-    () => watchlistRows.some((row) => row.isTodayStatusLoading || row.isTodayStatusUnknown),
-    [watchlistRows],
-  );
+  const {
+    rows: watchlistRows,
+    analyzedTodayCount: watchlistAnalyzedTodayCount,
+    pendingCodes: pendingWatchlistCodes,
+    isTodayStatusBlocked: watchlistTodayStatusBlocked,
+  } = watchlistCoverage;
 
   const todayAnalysisItems = useMemo(() => {
     const itemsById = new Map<number, StockBarItem>();

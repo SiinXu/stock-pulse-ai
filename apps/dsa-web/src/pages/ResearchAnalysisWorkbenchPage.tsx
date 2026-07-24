@@ -2,7 +2,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FileUp, FlaskConical, History, ListChecks, Upload, Workflow } from 'lucide-react';
+import {
+  CheckCircle2,
+  FileUp,
+  FlaskConical,
+  History,
+  ListChecks,
+  Upload,
+  Workflow,
+} from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { agentApi, type SkillInfo } from '../api/agent';
 import { analysisApi } from '../api/analysis';
@@ -38,10 +46,12 @@ import { ReportSummary } from '../components/report/ReportSummary';
 import { RunFlowPanel } from '../components/run-flow';
 import { StockAutocomplete } from '../components/StockAutocomplete';
 import { TaskPanel } from '../components/tasks';
+import type { WatchlistAnalyzeMode } from '../components/watchlist/HomeStockWorkspace';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { useAnalysisWorkbenchState } from '../hooks/useAnalysisWorkbenchState';
 import { useDashboardLifecycle } from '../hooks/useDashboardLifecycle';
 import { useWatchlist } from '../hooks/useWatchlist';
+import { useWatchlistAnalysisCoverage } from '../hooks/useWatchlistAnalysisCoverage';
 import {
   ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS,
   ANALYSIS_WORKBENCH_SEGMENT_VALUES,
@@ -81,8 +91,6 @@ type WorkbenchNavigationState = {
 };
 
 const WORKBENCH_TABS_ID = 'analysis-workbench-tabs';
-const noopAsync = async (): Promise<void> => undefined;
-
 function stateForSegment(
   current: AnalysisWorkbenchRouteState,
   segment: AnalysisWorkbenchSegment,
@@ -159,6 +167,9 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
     selectedRecordId,
     isLoadingReport,
     activeTasks,
+    stockBarItems,
+    isLoadingStockBar,
+    stockBarRefreshFailed,
     notify,
     setQuery,
     setNotify,
@@ -177,9 +188,10 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
     refreshActiveTasks,
     pollKnownTasks,
     removeTask,
+    loadStockBar,
+    refreshStockBar,
   } = useAnalysisWorkbenchState();
   const watchlist = useWatchlist();
-
   const parsedRoute = useMemo(
     () => parseAnalysisWorkbenchRouteState(location.search),
     [location.search],
@@ -410,19 +422,27 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
     });
   }, [navigateToRecord, selectSegment, showToast, t]);
 
-  useDashboardLifecycle({
+  const dashboardLifecycle = useDashboardLifecycle({
     loadInitialHistory,
     refreshHistory,
     refreshHistoryForCompletedTask: refreshCompletedTaskHistory,
     refreshActiveTasks,
     pollKnownTasks,
-    loadStockBar: noopAsync,
-    refreshStockBar: noopAsync,
+    loadStockBar,
+    refreshStockBar,
     syncTaskCreated,
     syncTaskUpdated,
     syncTaskFailed,
     removeTask,
     onCompletedTaskDataRefreshed: handleCompletedTaskDataRefreshed,
+  });
+  const watchlistCoverage = useWatchlistAnalysisCoverage({
+    watchlistCodes: watchlist.watchlistCodes,
+    stockBarItems,
+    isLoadingStockBar,
+    isInitialStockBarLoadSettled: dashboardLifecycle.isInitialStockBarLoadSettled,
+    stockBarRefreshFailed,
+    activeTasks,
   });
 
   const selectedAnalysisSkills = useMemo(
@@ -543,6 +563,29 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
       setIsBatchSubmitting(false);
     }
   }, [experienceMode, isExperienceModeReady, language, notify, refreshActiveTasks, selectSegment, selectedAnalysisSkills, t]);
+
+  const submitWatchlistBatch = useCallback(async (mode: WatchlistAnalyzeMode) => {
+    if (mode === 'pending' && watchlistCoverage.isTodayStatusBlocked) {
+      setBatchNotice({
+        variant: 'warning',
+        message: t('watchlist.pendingStatusUnavailable'),
+      });
+      return;
+    }
+    const codes = mode === 'pending'
+      ? watchlistCoverage.pendingCodes
+      : watchlist.watchlistCodes;
+    if (codes.length === 0) {
+      setBatchNotice({
+        variant: 'warning',
+        message: mode === 'pending'
+          ? t('watchlist.noPendingAnalyze')
+          : t('watchlist.noStocksAnalyze'),
+      });
+      return;
+    }
+    await submitBatch(codes);
+  }, [submitBatch, t, watchlist.watchlistCodes, watchlistCoverage]);
 
   const handleImportFile = useCallback(async (file: File) => {
     setIsImporting(true);
@@ -854,10 +897,28 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                   variant="secondary"
                   isLoading={isBatchSubmitting}
                   disabled={isBatchSubmitting || watchlist.isLoading || !isExperienceModeReady}
-                  onClick={() => void submitBatch(watchlist.watchlistCodes)}
+                  onClick={() => void submitWatchlistBatch('all')}
                 >
                   <ListChecks className="h-4 w-4" aria-hidden="true" />
                   {t('watchlist.analyzeAll')}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={(
+                    isBatchSubmitting
+                    || watchlist.isLoading
+                    || !isExperienceModeReady
+                    || watchlistCoverage.isTodayStatusBlocked
+                    || watchlistCoverage.pendingCodes.length === 0
+                  )}
+                  title={watchlistCoverage.isTodayStatusBlocked
+                    ? t('watchlist.pendingStatusUnavailable')
+                    : undefined}
+                  onClick={() => void submitWatchlistBatch('pending')}
+                >
+                  <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                  {t('watchlist.analyzePending')}
                 </Button>
                 <Button
                   type="button"

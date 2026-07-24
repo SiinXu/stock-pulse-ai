@@ -2,6 +2,28 @@ import type { UiLanguage } from '../i18n/uiText';
 import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import { getUiLocale } from './uiLocale';
 
+const SERVER_LOCAL_DATE_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/;
+
+function normalizeShanghaiDateTime(value: string): string {
+  const trimmed = value.trim();
+  return SERVER_LOCAL_DATE_TIME_PATTERN.test(trimmed)
+    ? `${trimmed.replace(' ', 'T')}+08:00`
+    : trimmed;
+}
+
+export function getShanghaiDateKey(value?: string | null): string {
+  if (!value) return '';
+  const date = new Date(normalizeShanghaiDateTime(value));
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(date);
+}
+
+export function getShanghaiTimeValue(value?: string | null): number {
+  if (!value) return 0;
+  const date = new Date(normalizeShanghaiDateTime(value));
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+}
+
 export const formatDateTime = (value?: string | null, language: UiLanguage = 'zh'): string => {
   if (!value) return '—';
   const date = new Date(value);

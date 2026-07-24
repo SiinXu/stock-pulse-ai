@@ -18,7 +18,7 @@ import {
   buildAnalysisWorkbenchHref,
 } from '../../routing/routes';
 import { useStockPoolStore } from '../../stores/stockPoolStore';
-import type { AnalysisReport, HistoryItem, TaskInfo } from '../../types/analysis';
+import type { AnalysisReport, HistoryItem, StockBarItem, TaskInfo } from '../../types/analysis';
 import ResearchAnalysisWorkbenchPage from '../ResearchAnalysisWorkbenchPage';
 
 type LifecycleOptions = Parameters<
@@ -31,6 +31,7 @@ let watchlistCodes: string[] = [];
 vi.mock('../../hooks/useDashboardLifecycle', () => ({
   useDashboardLifecycle: (options: LifecycleOptions) => {
     lifecycleOptions = options;
+    return { isInitialStockBarLoadSettled: true };
   },
 }));
 
@@ -153,6 +154,20 @@ const runningTask: TaskInfo = {
   reportType: 'detailed',
   createdAt: '2026-07-23T12:00:00Z',
 };
+
+const stockBarItem = (
+  id: number,
+  stockCode: string,
+  lastAnalysisTime: string,
+): StockBarItem => ({
+  id,
+  stockCode,
+  stockName: stockCode,
+  reportType: 'detailed',
+  sentimentScore: 50,
+  analysisCount: 1,
+  lastAnalysisTime,
+});
 
 function LocationProbe() {
   const location = useLocation();
@@ -355,6 +370,45 @@ describe('ResearchAnalysisWorkbenchPage', () => {
       expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment))
         .toBe(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
     });
+  });
+
+  it('submits only watchlist symbols not analyzed today', async () => {
+    watchlistCodes = ['AAPL', 'MSFT'];
+    useStockPoolStore.setState({
+      stockBarItems: [
+        stockBarItem(1, 'AAPL', new Date().toISOString()),
+        stockBarItem(2, 'MSFT', '2020-01-01T00:00:00Z'),
+      ],
+      isLoadingStockBar: false,
+      stockBarRefreshFailed: false,
+    });
+    renderWorkbench();
+
+    const pendingButton = await screen.findByRole('button', { name: '仅未分析' });
+    await waitFor(() => expect(pendingButton).toBeEnabled());
+    fireEvent.click(pendingButton);
+
+    await waitFor(() => expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ stockCodes: ['MSFT'] }),
+    ));
+  });
+
+  it('blocks pending-only submission while today coverage is unavailable', async () => {
+    watchlistCodes = ['AAPL'];
+    useStockPoolStore.setState({
+      stockBarItems: [stockBarItem(1, 'AAPL', '2020-01-01T00:00:00Z')],
+      isLoadingStockBar: false,
+      stockBarRefreshFailed: true,
+    });
+    renderWorkbench();
+
+    const pendingButton = await screen.findByRole('button', { name: '仅未分析' });
+    expect(pendingButton).toBeDisabled();
+    expect(pendingButton).toHaveAttribute(
+      'title',
+      '自选股今日状态仍有未知项，请刷新后再提交仅未分析。',
+    );
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
   });
 
   it('offers a completion toast action that deep-links to the finished report', async () => {

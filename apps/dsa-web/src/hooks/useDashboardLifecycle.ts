@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { TaskInfo } from '../types/analysis';
 import { useTaskStream } from './useTaskStream';
 
@@ -23,6 +23,10 @@ type UseDashboardLifecycleOptions = {
 
 const noopAsync = async (): Promise<void> => undefined;
 
+export type DashboardLifecycleState = {
+  isInitialStockBarLoadSettled: boolean;
+};
+
 export function useDashboardLifecycle({
   loadInitialHistory,
   refreshHistory,
@@ -40,8 +44,9 @@ export function useDashboardLifecycle({
   enabled = true,
   taskPollIntervalMs = 2_000,
   terminalRetentionMs = 2 * 60 * 1000,
-}: UseDashboardLifecycleOptions): void {
+}: UseDashboardLifecycleOptions): DashboardLifecycleState {
   const removalTimeoutsRef = useRef<Map<string, number>>(new Map());
+  const [isInitialStockBarLoadSettled, setIsInitialStockBarLoadSettled] = useState(false);
 
   useEffect(() => {
     if (!enabled) {
@@ -49,8 +54,14 @@ export function useDashboardLifecycle({
     }
 
     void loadInitialHistory();
-    void loadStockBar();
+    let active = true;
+    void loadStockBar().finally(() => {
+      if (active) setIsInitialStockBarLoadSettled(true);
+    });
     void refreshActiveTasks();
+    return () => {
+      active = false;
+    };
   }, [enabled, loadInitialHistory, loadStockBar, refreshActiveTasks]);
 
   useEffect(() => {
@@ -150,6 +161,8 @@ export function useDashboardLifecycle({
     }, taskPollIntervalMs);
     return () => window.clearInterval(intervalId);
   }, [enabled, isConnected, pollKnownTasks, taskPollIntervalMs]);
+
+  return { isInitialStockBarLoadSettled };
 }
 
 export default useDashboardLifecycle;

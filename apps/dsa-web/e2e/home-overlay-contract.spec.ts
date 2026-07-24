@@ -139,6 +139,7 @@ function deferred() {
 type HomeApiOptions = {
   delayFirstRecord?: boolean;
   deferCompletedTask?: boolean;
+  watchlistCodes?: string[];
   recordFailure?: {
     recordId: number;
     status: 401 | 403;
@@ -165,7 +166,9 @@ async function installHomeApiFixture(page: Page, options: HomeApiOptions = {}) {
     next_step_key: null,
     checks: [],
   }));
-  await page.route('**/api/v1/stocks/watchlist', (route) => fulfillJson(route, { stock_codes: [] }));
+  await page.route('**/api/v1/stocks/watchlist', (route) => fulfillJson(route, {
+    stock_codes: options.watchlistCodes ?? [],
+  }));
   await page.route('**/api/v1/agent/skills', (route) => fulfillJson(route, {
     skills: [],
     default_skill_id: '',
@@ -1042,6 +1045,34 @@ test.describe('Analysis Workbench interaction contract', () => {
     await expect(page.getByText('AAPL', { exact: true }).first()).toBeVisible();
     expect(submitted).toMatchObject({
       stock_code: 'AAPL',
+      async_mode: true,
+      report_type: 'detailed',
+    });
+  });
+
+  test('pending-only batch submits watchlist symbols without today coverage', async ({ page }) => {
+    await openFixtureHome(page, APP_ROUTE_PATHS.researchAnalysis, {
+      watchlistCodes: ['AAPL'],
+    });
+    let submitted: Record<string, unknown> | null = null;
+    await page.route('**/api/v1/analysis/analyze', async (route) => {
+      submitted = route.request().postDataJSON() as Record<string, unknown>;
+      await fulfillJson(route, {
+        accepted: [{ task_id: 'workbench-pending-task', stock_code: 'AAPL', status: 'pending' }],
+        duplicates: [],
+        message: 'Accepted',
+      }, 202);
+    });
+
+    const pendingButton = page.getByRole('button', { name: 'Pending only' });
+    await expect(pendingButton).toBeEnabled();
+    await pendingButton.click();
+
+    await expectSearchParams(page, {
+      [ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment]: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
+    });
+    expect(submitted).toMatchObject({
+      stock_codes: ['AAPL'],
       async_mode: true,
       report_type: 'detailed',
     });

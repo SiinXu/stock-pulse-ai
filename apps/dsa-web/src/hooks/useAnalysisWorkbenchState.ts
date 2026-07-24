@@ -22,6 +22,9 @@ export function useAnalysisWorkbenchState() {
       selectedRecordId: state.selectedRecordId,
       isLoadingReport: state.isLoadingReport,
       activeTasks: state.activeTasks,
+      stockBarItems: state.stockBarItems,
+      isLoadingStockBar: state.isLoadingStockBar,
+      stockBarRefreshFailed: state.stockBarRefreshFailed,
       notify: state.notify,
       setQuery: state.setQuery,
       setNotify: state.setNotify,
@@ -40,6 +43,8 @@ export function useAnalysisWorkbenchState() {
       refreshActiveTasks: state.refreshActiveTasks,
       pollKnownTasks: state.pollKnownTasks,
       removeTask: state.removeTask,
+      loadStockBar: state.loadStockBar,
+      refreshStockBar: state.refreshStockBar,
     })),
   );
 }
