@@ -18,6 +18,7 @@ interface UseRunFlowSnapshotResult {
 }
 
 type RunFlowRequestState = {
+  sourceKey: string;
   requestKey: string;
   snapshot: RunFlowSnapshot | null;
   error: ParsedApiError | null;
@@ -425,6 +426,7 @@ export function useRunFlowSnapshot({
   enabled = true,
 }: UseRunFlowSnapshotOptions): UseRunFlowSnapshotResult {
   const [requestState, setRequestState] = useState<RunFlowRequestState>({
+    sourceKey: 'none',
     requestKey: 'none',
     snapshot: null,
     error: null,
@@ -499,6 +501,7 @@ export function useRunFlowSnapshot({
             ? replayFlowEvents(result, flowEventBufferRef.current)
             : result;
           setRequestState({
+            sourceKey,
             requestKey,
             snapshot,
             error: null,
@@ -508,6 +511,7 @@ export function useRunFlowSnapshot({
       .catch((err: unknown) => {
         if (active) {
           setRequestState({
+            sourceKey,
             requestKey,
             snapshot: null,
             error: getParsedApiError(err),
@@ -518,12 +522,13 @@ export function useRunFlowSnapshot({
     return () => {
       active = false;
     };
-  }, [recordId, requestKey, shouldLoad, sourceType, taskId]);
+  }, [recordId, requestKey, shouldLoad, sourceKey, sourceType, taskId]);
 
   const hasFreshState = shouldLoad && requestState.requestKey === requestKey;
+  const hasSameSourceSnapshot = shouldLoad && requestState.sourceKey === sourceKey;
 
   return {
-    snapshot: hasFreshState ? requestState.snapshot : null,
+    snapshot: hasFreshState || hasSameSourceSnapshot ? requestState.snapshot : null,
     isLoading: shouldLoad && !hasFreshState,
     error: hasFreshState ? requestState.error : null,
     refetch,

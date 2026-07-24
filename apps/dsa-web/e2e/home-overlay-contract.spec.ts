@@ -862,6 +862,9 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
 
     await page.getByRole('checkbox', { name: 'Select Moutai history record' }).click();
     await page.getByRole('button', { name: 'Delete', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Delete History' })
+      .getByRole('button', { name: 'Delete', exact: true })
+      .click();
 
     await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
     await expectSearchParams(page, { keep: 'yes', recordId: '2' });
