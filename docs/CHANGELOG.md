@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Added] Added one responsive notification Bell and a global command palette to the Web Shell, with Signal Center deep links, stock lookup, and the Analysis Workbench as the canonical analysis destination.
 - [Tests] Added a shared `mockCompletedSetupStatus` Playwright helper and applied it to the `smoke`, `report-markdown`, and `infrastructure-acceptance` specs so the new default-on beginner HomePage experience no longer forces professional-mode assertions off `分析` / `完整分析报告` / full report body.
 - [Fixed] Preserved structured diagnostic fields in prose log lines by preventing whitespace prose from triggering the composite-key walker's bounded fail-closed path and removing a sensitive-word ambiguity from the bot request-size log, while retaining fail-closed text/mapping parity for sensitive whitespace and punctuation labels.
 - [Added] Embedded additive `schema_version` tags in the `Report`, `RunFlowSnapshot`, and `DecisionSignalPresentation` serialized artifacts (default `report-v1` / `run-flow-v1` / `decision-signal-presentation-v1`); historical payloads that omit the field deserialize as the v1 default, and the versioning guard test plus migration docs inventory were extended accordingly.

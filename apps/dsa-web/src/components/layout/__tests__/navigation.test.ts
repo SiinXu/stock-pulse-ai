@@ -33,9 +33,7 @@ describe('application navigation descriptor', () => {
       ['agent', APP_ROUTE_PATHS.agent],
       ['settings', APP_ROUTE_PATHS.settings],
     ]);
-    expect(APPLICATION_NAVIGATION_ITEMS[0]?.children?.map(({ key, to }) => [key, to])).toEqual([
-      ['signals', APP_ROUTE_PATHS.signals],
-    ]);
+    expect(APPLICATION_NAVIGATION_ITEMS[0]?.children?.map(({ key, to }) => [key, to]) ?? []).toEqual([]);
     expect(APPLICATION_NAVIGATION_ITEMS[1]?.children?.map(({ key, to }) => [key, to])).toEqual([
       ['research-market', APP_ROUTE_PATHS.researchMarket],
       ['research-discover', APP_ROUTE_PATHS.researchDiscover],

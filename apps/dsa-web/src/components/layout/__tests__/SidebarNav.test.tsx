@@ -78,6 +78,22 @@ describe('SidebarNav', () => {
     expect(screen.getByRole('button', { name: 'StockPulse' })).toHaveClass('h-11', 'w-11');
   });
 
+  it('closes the current navigation surface before opening the command palette', () => {
+    const calls: string[] = [];
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <SidebarNav
+          onNavigate={() => calls.push('close-navigation')}
+          onOpenCommandPalette={() => calls.push('open-palette')}
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '搜索' }));
+
+    expect(calls).toEqual(['close-navigation', 'open-palette']);
+  });
+
   it('keeps the compact brand persistent when the rail cannot expand', () => {
     const { container } = render(
       <MemoryRouter initialEntries={['/']}>
@@ -115,7 +131,6 @@ describe('SidebarNav', () => {
 
     expect(screen.getByRole('link', { name: '首页' })).toHaveAttribute('href', '/?stock=AAPL');
     expect(screen.getByRole('link', { name: 'Agent' })).toHaveAttribute('href', `${APP_ROUTE_PATHS.agent}?stock=AAPL`);
-    expect(screen.getByRole('link', { name: '信号中心' })).toHaveAttribute('href', `${APP_ROUTE_PATHS.signals}?stock=AAPL`);
     expect(screen.getByRole('link', { name: '回测' })).toHaveAttribute('href', `${APP_ROUTE_PATHS.researchBacktest}?code=AAPL`);
   });
 
@@ -174,9 +189,8 @@ describe('SidebarNav', () => {
 
     await screen.findByRole('link', { name: '发现' });
     const hrefs = screen.getAllByRole('link').map((link) => link.getAttribute('href'));
-    expect(hrefs.slice(0, 10)).toEqual([
+    expect(hrefs.slice(0, 9)).toEqual([
       APP_ROUTE_PATHS.home,
-      APP_ROUTE_PATHS.signals,
       APP_ROUTE_PATHS.researchMarket,
       APP_ROUTE_PATHS.researchMarket,
       APP_ROUTE_PATHS.researchDiscover,
@@ -195,14 +209,13 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    for (const name of ['首页', '研究']) {
-      const groupLink = screen.getByRole('link', { name });
-      expect(groupLink).not.toHaveAttribute('aria-expanded');
-      expect(groupLink.querySelectorAll('svg')).toHaveLength(1);
-      expect(screen.getByRole('button', { name })).toHaveAttribute('aria-expanded', 'true');
-      expect(screen.getByRole('button', { name })).toHaveAttribute('data-control', 'icon-button');
-      expect(screen.getByRole('button', { name })).toHaveAttribute('data-size', 'navigation');
-    }
+    const groupLink = screen.getByRole('link', { name: '研究' });
+    expect(groupLink).not.toHaveAttribute('aria-expanded');
+    expect(groupLink.querySelectorAll('svg')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: '研究' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: '研究' })).toHaveAttribute('data-control', 'icon-button');
+    expect(screen.getByRole('button', { name: '研究' })).toHaveAttribute('data-size', 'navigation');
+    expect(screen.queryByRole('button', { name: '首页' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: '大盘复盘' })).toBeVisible();
     expect(screen.getByRole('link', { name: '发现' })).toBeVisible();
     expect(screen.getByRole('link', { name: '分析工作台' })).toBeVisible();
@@ -214,7 +227,7 @@ describe('SidebarNav', () => {
     expect(screen.queryByRole('link', { name: '大盘复盘' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '发现' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '分析工作台' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '信号中心' })).toBeVisible();
+    expect(screen.getByRole('link', { name: '首页' })).toBeVisible();
 
     fireEvent.click(researchToggle);
     expect(researchToggle).toHaveAttribute('aria-expanded', 'true');
@@ -411,23 +424,6 @@ describe('SidebarNav', () => {
     expect(screen.getByRole('link', { name: '大盘复盘' })).toHaveAttribute('aria-current', 'page');
     marketRender.unmount();
 
-    const signalsRender = render(
-      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.signals]}>
-        <SidebarNav />
-      </MemoryRouter>,
-    );
-    const homeParent = screen.getByRole('link', { name: '首页' });
-    const signalsChild = screen.getByRole('link', { name: '信号中心' });
-    expect(homeParent).not.toHaveAttribute('aria-current', 'page');
-    expect(signalsChild).toHaveAttribute('aria-current', 'page');
-    fireEvent.click(screen.getByRole('button', { name: '首页' }));
-    expect(homeParent).toHaveAttribute('aria-current', 'page');
-    expect(screen.queryByRole('link', { name: '信号中心' })).not.toBeInTheDocument();
-    currentLinks = signalsRender.container.querySelectorAll('a[aria-current="page"]');
-    expect(currentLinks).toHaveLength(1);
-    expect(currentLinks[0]).toBe(homeParent);
-    signalsRender.unmount();
-
     const discoverRender = render(
       <MemoryRouter initialEntries={[APP_ROUTE_PATHS.researchDiscover]}>
         <SidebarNav />
@@ -497,7 +493,7 @@ describe('SidebarNav', () => {
 
   it('renders stable, unique route focus markers from the navigation descriptor', () => {
     render(
-      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.signals]}>
+      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.researchAnalysis]}>
         <SidebarNav focusKeyPrefix="shell-nav-desktop" />
       </MemoryRouter>,
     );
@@ -510,9 +506,9 @@ describe('SidebarNav', () => {
       'data-route-focus-key',
       'shell-nav-desktop:home',
     );
-    expect(screen.getByRole('link', { name: '信号中心' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '分析工作台' })).toHaveAttribute(
       'data-route-focus-key',
-      'shell-nav-desktop:signals',
+      'shell-nav-desktop:research-analysis',
     );
     screen.getAllByRole('link').forEach((link) => expect(link).toHaveClass('shrink-0'));
 
@@ -534,16 +530,15 @@ describe('SidebarNav', () => {
     expect(container.querySelector(`a[href="${LEGACY_ROUTE_PATHS.usage}"]`)).toBeNull();
   });
 
-  it('renders the temporary Signal Center navigation item and marks it active', () => {
+  it('removes the temporary Signal Center item from product navigation', () => {
     const { container } = render(
       <MemoryRouter initialEntries={[APP_ROUTE_PATHS.signals]}>
         <SidebarNav />
       </MemoryRouter>,
     );
 
-    const signalsLink = screen.getByRole('link', { name: '信号中心' });
-    expect(signalsLink).toHaveAttribute('href', APP_ROUTE_PATHS.signals);
-    expect(signalsLink).toHaveClass('font-medium');
+    expect(screen.queryByRole('link', { name: '信号中心' })).not.toBeInTheDocument();
+    expect(container.querySelector(`a[href="${APP_ROUTE_PATHS.signals}"]`)).toBeNull();
     expect(container.querySelector(`a[href="${LEGACY_ROUTE_PATHS.decisionSignals}"]`)).toBeNull();
     expect(container.querySelector(`a[href="${LEGACY_ROUTE_PATHS.alerts}"]`)).toBeNull();
   });

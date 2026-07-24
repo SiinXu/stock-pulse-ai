@@ -187,7 +187,6 @@ export function CommandPalette({
           onKeyDown={handleSearchKeyDown}
           placeholder={text.searchPlaceholder}
           aria-label={text.searchPlaceholder}
-          shortcut="⌘K"
           wrapperClassName="h-10 sm:h-10"
         />
 

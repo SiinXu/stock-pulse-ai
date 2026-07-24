@@ -56,6 +56,7 @@ describe('CommandPalette', () => {
     renderPalette();
     const search = screen.getByRole('searchbox', { name: '搜索页面或操作' });
     await waitFor(() => expect(search).toHaveFocus());
+    expect(screen.queryByText('⌘K')).not.toBeInTheDocument();
 
     fireEvent.change(search, { target: { value: '持仓' } });
     expect(screen.getByRole('button', { name: '持仓' })).toBeInTheDocument();

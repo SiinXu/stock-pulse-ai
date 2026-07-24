@@ -21,7 +21,9 @@ import {
 type SidebarNavProps = {
   collapsed?: boolean;
   onNavigate?: () => void;
+  onOpenCommandPalette?: () => void;
   onToggleCollapse?: () => void;
+  globalActions?: React.ReactNode;
   variant?: 'default' | 'rail';
   focusKeyPrefix?: string;
   returnFocusKey?: string;
@@ -36,7 +38,9 @@ const SIDEBAR_GROUP_CLOSE_DELAY_MS = 120;
 export const SidebarNav: React.FC<SidebarNavProps> = ({
   collapsed = false,
   onNavigate,
+  onOpenCommandPalette,
   onToggleCollapse,
+  globalActions,
   variant = 'default',
   focusKeyPrefix = 'shell-nav',
   returnFocusKey,
@@ -52,6 +56,11 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
   const currentHref = `${location.pathname}${location.search}${location.hash}`;
 
   const openSearch = () => {
+    if (onOpenCommandPalette) {
+      onNavigate?.();
+      onOpenCommandPalette();
+      return;
+    }
     navigate(resolveContextAwareNavigationTarget(APP_ROUTE_PATHS.home, currentHref), {
       state: { focusStockSearch: true, focusToken: Date.now() },
     });
@@ -136,43 +145,51 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
   return (
     <>
       {collapsed ? (
-        <div className="mb-4 flex justify-center">
-          <div
-            className={cn('relative h-11 w-11', onToggleCollapse && 'group')}
-            data-shell-brand-behavior={onToggleCollapse ? 'replaceable' : 'persistent'}
-          >
+        <>
+          <div className="mb-4 flex justify-center">
             <div
-              data-shell-brand-mark="true"
-              className={cn(
-                'flex h-11 w-11 items-center justify-center rounded-md bg-primary text-primary-foreground transition-opacity motion-reduce:transition-none',
-                onToggleCollapse && 'group-hover:opacity-0',
-              )}
+              className={cn('relative h-11 w-11', onToggleCollapse && 'group')}
+              data-shell-brand-behavior={onToggleCollapse ? 'replaceable' : 'persistent'}
             >
-              <BarChart3 className="size-4.5" />
-            </div>
-            {onToggleCollapse ? (
-              <Tooltip
-                content={t('layout.expandSidebar')}
-                className="absolute inset-0"
+              <div
+                data-shell-brand-mark="true"
+                className={cn(
+                  'flex h-11 w-11 items-center justify-center rounded-md bg-primary text-primary-foreground transition-opacity motion-reduce:transition-none',
+                  onToggleCollapse && 'group-hover:opacity-0',
+                )}
               >
-                <button
-                  type="button"
-                  onClick={onToggleCollapse}
-                  aria-label={t('layout.expandSidebar')}
-                  className="flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-card text-secondary-text opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100 motion-reduce:transition-none"
+                <BarChart3 className="size-4.5" />
+              </div>
+              {onToggleCollapse ? (
+                <Tooltip
+                  content={t('layout.expandSidebar')}
+                  className="absolute inset-0"
                 >
-                  <PanelRight className="size-4.5" />
-                </button>
-              </Tooltip>
-            ) : null}
+                  <button
+                    type="button"
+                    onClick={onToggleCollapse}
+                    aria-label={t('layout.expandSidebar')}
+                    className="flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-card text-secondary-text opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100 motion-reduce:transition-none"
+                  >
+                    <PanelRight className="size-4.5" />
+                  </button>
+                </Tooltip>
+              ) : null}
+            </div>
           </div>
-        </div>
+          {globalActions ? (
+            <div data-sidebar-global-actions="true" className="mb-3 flex justify-center">
+              {globalActions}
+            </div>
+          ) : null}
+        </>
       ) : (
         <div className="mb-4 flex items-center gap-2 px-1">
           <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-primary text-primary-foreground">
             <BarChart3 className="size-4.5" />
           </div>
           <p className="min-w-0 flex-1 truncate text-xl font-bold tracking-tight text-foreground">StockPulse</p>
+          {globalActions}
           {onToggleCollapse ? (
             <Tooltip content={t('layout.collapseSidebar')}>
               <button
