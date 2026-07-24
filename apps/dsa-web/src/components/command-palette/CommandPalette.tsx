@@ -48,7 +48,7 @@ export type CommandPaletteProps = {
 export function CommandPalette({
   isOpen,
   onClose,
-  analysisHref = APP_ROUTE_PATHS.home,
+  analysisHref = APP_ROUTE_PATHS.researchAnalysis,
   onNavigate,
 }: CommandPaletteProps) {
   const { language, t } = useUiLanguage();

@@ -32,7 +32,7 @@ vi.mock('../../StockAutocomplete', () => ({
 const onClose = vi.fn();
 const onNavigate = vi.fn();
 
-function renderPalette() {
+function renderPalette(analysisHref: string | null = '/research/analysis') {
   return render(
     <MemoryRouter>
       <UiLanguageProvider initialLanguage="zh">
@@ -40,7 +40,7 @@ function renderPalette() {
           isOpen
           onClose={onClose}
           onNavigate={onNavigate}
-          analysisHref="/research/analysis"
+          analysisHref={analysisHref ?? undefined}
         />
       </UiLanguageProvider>
     </MemoryRouter>,
@@ -77,6 +77,14 @@ describe('CommandPalette', () => {
 
     fireEvent.keyDown(screen.getByRole('button', { name: '开始分析' }), { key: 'ArrowUp' });
     expect(screen.getByRole('button', { name: '再评估与统计' })).toHaveFocus();
+  });
+
+  it('defaults analysis commands to the canonical Workbench route', () => {
+    renderPalette(null);
+
+    fireEvent.click(screen.getByRole('button', { name: '开始分析' }));
+
+    expect(onNavigate).toHaveBeenCalledWith('/research/analysis');
   });
 
   it('reuses stock autocomplete and opens the selected stock detail route', () => {

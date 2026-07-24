@@ -102,6 +102,31 @@ describe('NotificationBell', () => {
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
+  it('marks server-ahead items seen when an open Bell finishes loading', async () => {
+    vi.mocked(useUnreadNotifications)
+      .mockReturnValueOnce(notificationState({ isLoading: true }))
+      .mockReturnValue(notificationState({
+        signalItems: [{
+          id: 7,
+          stockCode: 'AAPL',
+          market: 'us',
+          sourceType: 'analysis',
+          triggerSource: 'analysis',
+          action: 'buy',
+          planQuality: 'complete',
+          status: 'active',
+          createdAt: '2026-07-23T10:00:00Z',
+        }],
+        unreadSignalCount: 1,
+        unreadCount: 1,
+      }));
+    renderBell();
+
+    fireEvent.click(screen.getByRole('button', { name: '通知' }));
+
+    await waitFor(() => expect(markAllSeen).toHaveBeenCalledTimes(1));
+  });
+
   it('caps the visual badge without changing the accessible unread count', async () => {
     vi.mocked(useUnreadNotifications).mockReturnValue(notificationState({ unreadCount: 125 }));
     renderBell();

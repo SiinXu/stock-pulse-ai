@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Activity, Bell, BellRing, TriangleAlert } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { useUnreadNotifications } from '../../hooks/useUnreadNotifications';
@@ -89,14 +89,18 @@ export function NotificationBell({
   const text = NOTIFICATIONS_TEXT[language];
   const [open, setOpen] = useState(false);
   const notifications = useUnreadNotifications();
+  const { isLoading, markAllSeen } = notifications;
   const hasItems = notifications.signalItems.length > 0 || notifications.alertItems.length > 0;
   const triggerLabel = notifications.unreadCount > 0
     ? formatUiText(text.bellLabelWithUnread, { count: notifications.unreadCount })
     : text.bellLabel;
 
+  useEffect(() => {
+    if (open && !isLoading) markAllSeen();
+  }, [isLoading, markAllSeen, open]);
+
   const handleOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen);
-    if (nextOpen) notifications.markAllSeen();
   };
 
   return (

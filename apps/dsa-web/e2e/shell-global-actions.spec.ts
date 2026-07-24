@@ -33,6 +33,7 @@ test.describe('Shell global actions', () => {
     await expect(drawer).toBeHidden();
     palette = page.getByRole('dialog', { name: '快速前往' });
     await expect(palette).toBeVisible();
+    await expect(palette.getByRole('searchbox', { name: '搜索页面或操作' })).toBeFocused();
     await expect(page.locator('button[aria-label^="通知"]')).toHaveCount(1);
   });
 });
