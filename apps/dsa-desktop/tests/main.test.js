@@ -2874,6 +2874,7 @@ function createEmbeddedRuntimeFixture(t, {
   platform = 'darwin',
   arch = 'arm64',
   omitRequiredPath = '',
+  omitRuntimePath = '',
 } = {}) {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-embedded-ollama-'));
   const rootDir = path.join(tmpDir, 'ollama');
@@ -2882,11 +2883,15 @@ function createEmbeddedRuntimeFixture(t, {
   const requiredPaths = platform === 'win32'
     ? ['ollama.exe', 'lib/ollama/llama-server.exe']
     : ['ollama', 'llama-server'];
-  const requiredFileSha256 = {};
-  for (const relativePath of requiredPaths) {
+  const dependencyPath = platform === 'win32'
+    ? 'lib/ollama/libllama-server-impl.dll'
+    : 'libllama-server-impl.dylib';
+  const runtimePaths = [...requiredPaths, dependencyPath].sort();
+  const fileSha256 = {};
+  for (const relativePath of runtimePaths) {
     const content = `fixture:${relativePath}`;
-    requiredFileSha256[relativePath] = crypto.createHash('sha256').update(content).digest('hex');
-    if (relativePath === omitRequiredPath) {
+    fileSha256[relativePath] = crypto.createHash('sha256').update(content).digest('hex');
+    if (relativePath === omitRequiredPath || relativePath === omitRuntimePath) {
       continue;
     }
     const absolutePath = path.join(rootDir, relativePath);
@@ -2897,7 +2902,7 @@ function createEmbeddedRuntimeFixture(t, {
     }
   }
   fs.writeFileSync(path.join(rootDir, 'runtime-manifest.json'), JSON.stringify({
-    schemaVersion: 1,
+    schemaVersion: 2,
     runtime: 'ollama',
     version: 'v0.32.3',
     platform,
@@ -2905,9 +2910,10 @@ function createEmbeddedRuntimeFixture(t, {
     supportedArchitectures: platform === 'darwin' ? ['arm64', 'x64'] : ['x64'],
     binaryPath,
     requiredPaths,
-    requiredFileSha256,
+    fileSha256,
     archive: {
       fileName: platform === 'darwin' ? 'ollama-darwin.tgz' : 'ollama-windows-amd64.zip',
+      sizeBytes: 123,
       sha256: 'a'.repeat(64),
     },
   }));
@@ -2915,6 +2921,7 @@ function createEmbeddedRuntimeFixture(t, {
   return {
     rootDir,
     command: path.join(rootDir, binaryPath),
+    dependencyPath,
   };
 }
 
@@ -3093,6 +3100,33 @@ test('local model binary resolution rejects an embedded runtime with corrupt hel
 
   assert.equal(resolved, null);
   assert.deepEqual(records.map((record) => record.command), ['ollama']);
+});
+
+test('local model binary resolution rejects missing or corrupt embedded dependency files', async (t) => {
+  const mainModule = loadMainModule(t);
+  const missing = createEmbeddedRuntimeFixture(t);
+  fs.rmSync(path.join(missing.rootDir, missing.dependencyPath));
+  const missingRecords = [];
+  assert.equal(await mainModule.resolveLocalModelBinary({
+    embeddedRoot: missing.rootDir,
+    platform: 'darwin',
+    arch: 'arm64',
+    spawnImpl: makeRuntimeAvailabilitySpawn(missingRecords, () => 'error'),
+    logImpl: () => undefined,
+  }), null);
+  assert.deepEqual(missingRecords.map((record) => record.command), ['ollama']);
+
+  const corrupt = createEmbeddedRuntimeFixture(t);
+  fs.writeFileSync(path.join(corrupt.rootDir, corrupt.dependencyPath), 'corrupt library bytes');
+  const corruptRecords = [];
+  assert.equal(await mainModule.resolveLocalModelBinary({
+    embeddedRoot: corrupt.rootDir,
+    platform: 'darwin',
+    arch: 'arm64',
+    spawnImpl: makeRuntimeAvailabilitySpawn(corruptRecords, () => 'error'),
+    logImpl: () => undefined,
+  }), null);
+  assert.deepEqual(corruptRecords.map((record) => record.command), ['ollama']);
 });
 
 test('embedded runtime validation supports the packaged Windows layout', (t) => {

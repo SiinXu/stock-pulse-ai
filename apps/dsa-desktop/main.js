@@ -2792,6 +2792,43 @@ function calculateLocalModelFileSha256(filePath, fsImpl = fs) {
   return hash.digest('hex');
 }
 
+function collectLocalModelRuntimeFilePaths(rootDir, fsImpl = fs) {
+  const root = path.resolve(rootDir);
+  const realRoot = fsImpl.realpathSync(root);
+  const files = [];
+  const walk = (directory, relativeDirectory = '') => {
+    const entries = fsImpl.readdirSync(directory, { withFileTypes: true })
+      .sort((left, right) => left.name.localeCompare(right.name, 'en'));
+    for (const entry of entries) {
+      const relativePath = relativeDirectory
+        ? path.join(relativeDirectory, entry.name)
+        : entry.name;
+      const normalizedPath = relativePath.split(path.sep).join('/');
+      if (normalizedPath === DESKTOP_LOCAL_MODEL_EMBEDDED_MANIFEST_FILE) {
+        continue;
+      }
+      const resourcePath = resolveContainedLocalModelResource(root, relativePath);
+      if (!resourcePath) {
+        throw new Error(`Embedded runtime path escaped its root: ${relativePath}`);
+      }
+      const linkStats = fsImpl.lstatSync(resourcePath);
+      if (linkStats.isDirectory()) {
+        walk(resourcePath, relativePath);
+        continue;
+      }
+      const stats = fsImpl.statSync(resourcePath);
+      const realResourcePath = fsImpl.realpathSync(resourcePath);
+      if ((realResourcePath !== realRoot && !realResourcePath.startsWith(`${realRoot}${path.sep}`))
+        || !stats.isFile()) {
+        throw new Error(`Unsupported embedded runtime entry: ${relativePath}`);
+      }
+      files.push(normalizedPath);
+    }
+  };
+  walk(root);
+  return files.sort();
+}
+
 function resolveEmbeddedLocalModelRuntime({
   rootDir = resolveEmbeddedLocalModelRoot(),
   platform = process.platform,
@@ -2805,7 +2842,8 @@ function resolveEmbeddedLocalModelRuntime({
   try {
     const manifestPath = path.join(rootDir, DESKTOP_LOCAL_MODEL_EMBEDDED_MANIFEST_FILE);
     const manifest = JSON.parse(fsImpl.readFileSync(manifestPath, 'utf-8'));
-    if (manifest.schemaVersion !== 1
+    const runtimeFilePaths = collectLocalModelRuntimeFilePaths(rootDir, fsImpl);
+    if (manifest.schemaVersion !== 2
       || manifest.runtime !== DESKTOP_LOCAL_MODEL_RUNTIME
       || manifest.platform !== platform
       || !/^v\d+\.\d+\.\d+$/.test(String(manifest.version || ''))
@@ -2814,18 +2852,23 @@ function resolveEmbeddedLocalModelRuntime({
       || manifest.binaryPath !== expectedBinaryPath
       || !Array.isArray(manifest.requiredPaths)
       || JSON.stringify(manifest.requiredPaths) !== JSON.stringify(expectedRequiredPaths)
-      || !manifest.requiredFileSha256
-      || typeof manifest.requiredFileSha256 !== 'object'
-      || Array.isArray(manifest.requiredFileSha256)
-      || JSON.stringify(Object.keys(manifest.requiredFileSha256).sort())
-        !== JSON.stringify([...expectedRequiredPaths].sort())) {
+      || !manifest.fileSha256
+      || typeof manifest.fileSha256 !== 'object'
+      || Array.isArray(manifest.fileSha256)
+      || JSON.stringify(Object.keys(manifest.fileSha256).sort())
+        !== JSON.stringify(runtimeFilePaths)
+      || expectedRequiredPaths.some((relativePath) => !runtimeFilePaths.includes(relativePath))
+      || !manifest.archive
+      || !Number.isSafeInteger(manifest.archive.sizeBytes)
+      || manifest.archive.sizeBytes <= 0
+      || !/^[a-f0-9]{64}$/.test(String(manifest.archive.sha256 || ''))) {
       return null;
     }
-    for (const relativePath of expectedRequiredPaths) {
+    for (const relativePath of runtimeFilePaths) {
       const resourcePath = resolveContainedLocalModelResource(rootDir, relativePath);
-      const expectedSha256 = manifest.requiredFileSha256[relativePath];
+      const expectedSha256 = manifest.fileSha256[relativePath];
       if (!resourcePath
-        || !fsImpl.lstatSync(resourcePath).isFile()
+        || !fsImpl.statSync(resourcePath).isFile()
         || !/^[a-f0-9]{64}$/.test(String(expectedSha256 || ''))
         || calculateLocalModelFileSha256(resourcePath, fsImpl) !== expectedSha256) {
         return null;

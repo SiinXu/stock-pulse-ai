@@ -99,7 +99,7 @@ jobs:
           $embeddedRoot = Join-Path $winUnpacked 'resources/ollama'
           node -e "const p=require('./scripts/prepare-embedded-ollama'); p.verifyPreparedOllama({platform:'win32',arch:'x64',outputDir:process.argv[1]}).then(m=>console.log('verified embedded Ollama',m.version,m.platform,m.architecture)).catch(e=>{console.error(e);process.exit(1)})" $embeddedRoot
           if ($LASTEXITCODE -ne 0) {
-            throw 'Embedded Ollama manifest or required-file checksum validation failed.'
+            throw 'Embedded Ollama manifest or complete runtime-file checksum validation failed.'
           }
           New-Item -ItemType Directory -Path 'dist/release-assets' -Force | Out-Null
           $exeTarget = "dist/release-assets/$expectedInstallerName"

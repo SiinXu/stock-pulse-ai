@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 
 const crypto = require('node:crypto');
+const dns = require('node:dns');
 const fs = require('node:fs');
 const https = require('node:https');
+const net = require('node:net');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { Transform } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 
 const REPOSITORY_ROOT = path.resolve(__dirname, '..');
@@ -13,7 +16,43 @@ const CONFIG_PATH = path.join(DESKTOP_ROOT, 'ollama-runtime.json');
 const DEFAULT_OUTPUT_DIR = path.join(DESKTOP_ROOT, 'vendor', 'ollama');
 const PREPARED_MANIFEST_FILE = 'runtime-manifest.json';
 const DOWNLOAD_TIMEOUT_MS = 60_000;
+const DOWNLOAD_TOTAL_TIMEOUT_MS = 30 * 60_000;
 const MAX_REDIRECTS = 5;
+const ALLOWED_DOWNLOAD_HOSTS = new Set([
+  'github.com',
+  'release-assets.githubusercontent.com',
+]);
+
+const BLOCKED_DOWNLOAD_ADDRESSES = new net.BlockList();
+for (const [network, prefix] of [
+  ['0.0.0.0', 8],
+  ['10.0.0.0', 8],
+  ['100.64.0.0', 10],
+  ['127.0.0.0', 8],
+  ['169.254.0.0', 16],
+  ['172.16.0.0', 12],
+  ['192.0.0.0', 24],
+  ['192.0.2.0', 24],
+  ['192.168.0.0', 16],
+  ['198.18.0.0', 15],
+  ['198.51.100.0', 24],
+  ['203.0.113.0', 24],
+  ['224.0.0.0', 4],
+  ['240.0.0.0', 4],
+]) {
+  BLOCKED_DOWNLOAD_ADDRESSES.addSubnet(network, prefix, 'ipv4');
+}
+for (const [network, prefix] of [
+  ['::', 128],
+  ['::1', 128],
+  ['100::', 64],
+  ['2001:db8::', 32],
+  ['fc00::', 7],
+  ['fe80::', 10],
+  ['ff00::', 8],
+]) {
+  BLOCKED_DOWNLOAD_ADDRESSES.addSubnet(network, prefix, 'ipv6');
+}
 
 function readRuntimeConfig(configPath = CONFIG_PATH) {
   const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
@@ -28,6 +67,25 @@ function readRuntimeConfig(configPath = CONFIG_PATH) {
     || config.checksumSourceUrl !== `${expectedReleaseUrl}/sha256sum.txt`) {
     throw new Error('Embedded Ollama URLs must match the official pinned release.');
   }
+  const goModules = config.goRuntime && config.goRuntime.modules;
+  if (!config.goRuntime
+    || !/^go\d+\.\d+\.\d+$/.test(String(config.goRuntime.version || ''))
+    || !Array.isArray(goModules)
+    || goModules.length === 0) {
+    throw new Error('Embedded Ollama Go runtime inventory is invalid.');
+  }
+  const moduleKeys = goModules.map((entry) => {
+    if (!entry
+      || !/^[A-Za-z0-9._~+/-]+$/.test(String(entry.path || ''))
+      || !/^v[^\s]+$/.test(String(entry.version || ''))) {
+      throw new Error('Embedded Ollama Go module inventory contains an invalid entry.');
+    }
+    return `${entry.path}@${entry.version}`;
+  });
+  if (new Set(moduleKeys).size !== moduleKeys.length
+    || JSON.stringify(moduleKeys) !== JSON.stringify([...moduleKeys].sort())) {
+    throw new Error('Embedded Ollama Go module inventory must be unique and sorted.');
+  }
   return config;
 }
 
@@ -39,6 +97,9 @@ function selectArtifact(config, platform, arch) {
   }
   if (!/^[a-f0-9]{64}$/.test(String(artifact.sha256 || ''))) {
     throw new Error(`Embedded Ollama checksum is invalid for ${platform}/${arch}.`);
+  }
+  if (!Number.isSafeInteger(artifact.sizeBytes) || artifact.sizeBytes <= 0) {
+    throw new Error(`Embedded Ollama byte size is invalid for ${platform}/${arch}.`);
   }
   if (!['tgz', 'zip'].includes(artifact.archiveType)) {
     throw new Error(`Unsupported embedded Ollama archive type: ${artifact.archiveType}`);
@@ -78,71 +139,270 @@ async function assertFileChecksum(filePath, expectedSha256, fsImpl = fs) {
   return actualSha256;
 }
 
-async function calculateRequiredFileSha256(rootDir, requiredPaths, fsImpl = fs) {
+function assertFileSize(filePath, expectedBytes, fsImpl = fs) {
+  const actualBytes = fsImpl.statSync(filePath).size;
+  if (actualBytes !== expectedBytes) {
+    const error = new Error(
+      `Embedded Ollama byte-size mismatch for ${path.basename(filePath)}: `
+      + `expected ${expectedBytes}, received ${actualBytes}`
+    );
+    error.code = 'OLLAMA_SIZE_MISMATCH';
+    throw error;
+  }
+  return actualBytes;
+}
+
+function normalizeRuntimeRelativePath(relativePath) {
+  return relativePath.split(path.sep).join('/');
+}
+
+function collectRuntimeFilePaths(rootDir, fsImpl = fs) {
+  const root = path.resolve(rootDir);
+  const realRoot = fsImpl.realpathSync(root);
+  const files = [];
+  const walk = (directory, relativeDirectory = '') => {
+    const entries = fsImpl.readdirSync(directory, { withFileTypes: true })
+      .sort((left, right) => left.name.localeCompare(right.name, 'en'));
+    for (const entry of entries) {
+      const relativePath = relativeDirectory
+        ? path.join(relativeDirectory, entry.name)
+        : entry.name;
+      if (normalizeRuntimeRelativePath(relativePath) === PREPARED_MANIFEST_FILE) {
+        continue;
+      }
+      const resourcePath = resolveContainedPath(root, relativePath);
+      const linkStats = fsImpl.lstatSync(resourcePath);
+      if (linkStats.isDirectory()) {
+        walk(resourcePath, relativePath);
+        continue;
+      }
+      const stats = fsImpl.statSync(resourcePath);
+      const realResourcePath = fsImpl.realpathSync(resourcePath);
+      if ((realResourcePath !== realRoot && !realResourcePath.startsWith(`${realRoot}${path.sep}`))
+        || !stats.isFile()) {
+        throw new Error(`Unsupported embedded Ollama archive entry: ${relativePath}`);
+      }
+      files.push(normalizeRuntimeRelativePath(relativePath));
+    }
+  };
+  walk(root);
+  return files.sort();
+}
+
+async function calculateRuntimeFileSha256(rootDir, runtimeFilePaths, fsImpl = fs) {
   const hashes = {};
-  for (const relativePath of requiredPaths) {
+  for (const relativePath of runtimeFilePaths) {
     const resourcePath = resolveContainedPath(rootDir, relativePath);
     hashes[relativePath] = await calculateFileSha256(resourcePath, fsImpl);
   }
   return hashes;
 }
 
+function createDownloadPolicyError(message) {
+  const error = new Error(message);
+  error.code = 'OLLAMA_DOWNLOAD_POLICY';
+  return error;
+}
+
+function validateDownloadUrl(url) {
+  let parsedUrl;
+  try {
+    parsedUrl = url instanceof URL ? url : new URL(url);
+  } catch (_error) {
+    throw createDownloadPolicyError('Embedded Ollama download URL is invalid.');
+  }
+  const hostname = parsedUrl.hostname.toLowerCase();
+  if (parsedUrl.protocol !== 'https:'
+    || parsedUrl.username
+    || parsedUrl.password
+    || (parsedUrl.port && parsedUrl.port !== '443')
+    || !ALLOWED_DOWNLOAD_HOSTS.has(hostname)) {
+    throw createDownloadPolicyError(
+      `Refusing embedded Ollama download destination: ${parsedUrl.origin}`
+    );
+  }
+  return parsedUrl;
+}
+
+function isPublicDownloadAddress(address) {
+  if (String(address).toLowerCase().startsWith('::ffff:')) {
+    return false;
+  }
+  const family = net.isIP(address);
+  if (!family) {
+    return false;
+  }
+  return !BLOCKED_DOWNLOAD_ADDRESSES.check(address, family === 4 ? 'ipv4' : 'ipv6');
+}
+
+function createPublicLookup(lookupImpl = dns.lookup) {
+  return (hostname, options, callback) => {
+    lookupImpl(hostname, { all: true, verbatim: true }, (error, records) => {
+      if (error) {
+        callback(error);
+        return;
+      }
+      const addresses = Array.isArray(records) ? records : [];
+      if (addresses.length === 0
+        || addresses.some((record) => !record || !isPublicDownloadAddress(record.address))) {
+        callback(createDownloadPolicyError(
+          `Embedded Ollama download host did not resolve exclusively to public addresses: ${hostname}`
+        ));
+        return;
+      }
+      if (options && options.all) {
+        callback(null, addresses);
+        return;
+      }
+      callback(null, addresses[0].address, addresses[0].family);
+    });
+  };
+}
+
 function openDownload(url, {
   httpsImpl = https,
+  lookupImpl = dns.lookup,
   redirectCount = 0,
   timeoutMs = DOWNLOAD_TIMEOUT_MS,
+  deadlineAt = Date.now() + DOWNLOAD_TOTAL_TIMEOUT_MS,
 } = {}) {
   return new Promise((resolve, reject) => {
     let parsedUrl;
     try {
-      parsedUrl = new URL(url);
+      parsedUrl = validateDownloadUrl(url);
     } catch (error) {
       reject(error);
       return;
     }
-    if (parsedUrl.protocol !== 'https:') {
-      reject(new Error(`Refusing non-HTTPS embedded Ollama download: ${parsedUrl.protocol}`));
+    const remainingMs = deadlineAt - Date.now();
+    if (remainingMs <= 0) {
+      reject(new Error('Embedded Ollama download exceeded its total time limit.'));
       return;
     }
 
+    let settled = false;
+    let deadlineTimer;
+    const finish = (fn, value) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(deadlineTimer);
+      fn(value);
+    };
     const request = httpsImpl.get(parsedUrl, {
       headers: {
         Accept: 'application/octet-stream',
         'User-Agent': 'StockPulse-Desktop-Build',
       },
+      lookup: createPublicLookup(lookupImpl),
     }, (response) => {
       const statusCode = response.statusCode || 0;
       if (statusCode >= 300 && statusCode < 400 && response.headers.location) {
-        response.resume();
+        response.destroy();
         if (redirectCount >= MAX_REDIRECTS) {
-          reject(new Error('Too many redirects while downloading embedded Ollama.'));
+          finish(reject, createDownloadPolicyError(
+            'Too many redirects while downloading embedded Ollama.'
+          ));
           return;
         }
-        const redirectUrl = new URL(response.headers.location, parsedUrl).toString();
+        let redirectUrl;
+        try {
+          redirectUrl = validateDownloadUrl(new URL(response.headers.location, parsedUrl));
+        } catch (error) {
+          finish(reject, error);
+          return;
+        }
+        clearTimeout(deadlineTimer);
+        settled = true;
         openDownload(redirectUrl, {
           httpsImpl,
+          lookupImpl,
           redirectCount: redirectCount + 1,
           timeoutMs,
+          deadlineAt,
         }).then(resolve, reject);
         return;
       }
       if (statusCode !== 200) {
-        response.resume();
-        reject(new Error(`Embedded Ollama download failed with HTTP ${statusCode}.`));
+        response.destroy();
+        finish(reject, new Error(`Embedded Ollama download failed with HTTP ${statusCode}.`));
         return;
       }
-      resolve(response);
+      finish(resolve, response);
     });
     request.setTimeout(timeoutMs, () => {
-      request.destroy(new Error(`Embedded Ollama download timed out after ${timeoutMs}ms.`));
+      request.destroy(new Error(
+        `Embedded Ollama download was inactive for more than ${timeoutMs}ms.`
+      ));
     });
-    request.on('error', reject);
+    deadlineTimer = setTimeout(() => {
+      request.destroy(new Error('Embedded Ollama download exceeded its total time limit.'));
+    }, remainingMs);
+    request.on('error', (error) => finish(reject, error));
   });
 }
 
-async function downloadFile(url, destination, options = {}) {
-  const response = await openDownload(url, options);
-  await pipeline(response, fs.createWriteStream(destination, { flags: 'wx' }));
+function createDownloadSizeError(expectedBytes, actualBytes) {
+  const error = new Error(
+    `Embedded Ollama response-size mismatch: expected ${expectedBytes}, received ${actualBytes}`
+  );
+  error.code = 'OLLAMA_SIZE_MISMATCH';
+  return error;
+}
+
+async function downloadFile(url, destination, {
+  expectedBytes,
+  maxBytes = expectedBytes,
+  totalTimeoutMs = DOWNLOAD_TOTAL_TIMEOUT_MS,
+  ...openOptions
+} = {}) {
+  if (!Number.isSafeInteger(expectedBytes) || expectedBytes <= 0
+    || !Number.isSafeInteger(maxBytes) || maxBytes < expectedBytes
+    || !Number.isSafeInteger(totalTimeoutMs) || totalTimeoutMs <= 0) {
+    throw new Error('Embedded Ollama download bounds are invalid.');
+  }
+  const deadlineAt = Date.now() + totalTimeoutMs;
+  let response;
+  let receivedBytes = 0;
+  const totalTimer = setTimeout(() => {
+    if (response) {
+      response.destroy(new Error('Embedded Ollama download exceeded its total time limit.'));
+    }
+  }, totalTimeoutMs);
+  try {
+    response = await openDownload(url, { ...openOptions, deadlineAt });
+    const contentLengthHeader = response.headers['content-length'];
+    if (contentLengthHeader !== undefined) {
+      const contentLength = Number(contentLengthHeader);
+      if (!Number.isSafeInteger(contentLength)
+        || contentLength !== expectedBytes
+        || contentLength > maxBytes) {
+        response.destroy();
+        throw createDownloadSizeError(expectedBytes, contentLengthHeader);
+      }
+    }
+    const limiter = new Transform({
+      transform(chunk, encoding, callback) {
+        receivedBytes += Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(chunk, encoding);
+        if (receivedBytes > maxBytes) {
+          callback(createDownloadSizeError(expectedBytes, receivedBytes));
+          return;
+        }
+        callback(null, chunk);
+      },
+      flush(callback) {
+        if (receivedBytes !== expectedBytes) {
+          callback(createDownloadSizeError(expectedBytes, receivedBytes));
+          return;
+        }
+        callback();
+      },
+    });
+    await pipeline(response, limiter, fs.createWriteStream(destination, { flags: 'wx' }));
+  } finally {
+    clearTimeout(totalTimer);
+  }
 }
 
 async function ensureVerifiedArchive({
@@ -155,6 +415,7 @@ async function ensureVerifiedArchive({
 }) {
   if (archiveOverride) {
     const overridePath = path.resolve(archiveOverride);
+    assertFileSize(overridePath, artifact.sizeBytes);
     await assertFileChecksum(overridePath, artifact.sha256);
     return overridePath;
   }
@@ -162,6 +423,7 @@ async function ensureVerifiedArchive({
   fs.mkdirSync(cacheDir, { recursive: true });
   const archivePath = path.join(cacheDir, artifact.fileName);
   if (fs.existsSync(archivePath)) {
+    assertFileSize(archivePath, artifact.sizeBytes);
     await assertFileChecksum(archivePath, artifact.sha256);
     console.log(`Using verified embedded Ollama cache: ${archivePath}`);
     return archivePath;
@@ -172,13 +434,22 @@ async function ensureVerifiedArchive({
   for (let attempt = 1; attempt <= downloadAttempts; attempt += 1) {
     fs.rmSync(temporaryPath, { force: true });
     try {
-      await downloadImpl(artifact.downloadUrl, temporaryPath);
+      await downloadImpl(artifact.downloadUrl, temporaryPath, {
+        expectedBytes: artifact.sizeBytes,
+        maxBytes: artifact.sizeBytes,
+        totalTimeoutMs: DOWNLOAD_TOTAL_TIMEOUT_MS,
+      });
+      assertFileSize(temporaryPath, artifact.sizeBytes);
       await assertFileChecksum(temporaryPath, artifact.sha256);
       fs.renameSync(temporaryPath, archivePath);
       return archivePath;
     } catch (error) {
       fs.rmSync(temporaryPath, { force: true });
-      if (error && error.code === 'OLLAMA_CHECKSUM_MISMATCH') {
+      if (error && [
+        'OLLAMA_CHECKSUM_MISMATCH',
+        'OLLAMA_DOWNLOAD_POLICY',
+        'OLLAMA_SIZE_MISMATCH',
+      ].includes(error.code)) {
         throw error;
       }
       if (attempt === downloadAttempts) {
@@ -239,9 +510,9 @@ function extractArchive({ archivePath, artifact, stagingDir, platform, spawnSync
   }
 }
 
-function buildPreparedManifest(config, artifact, platform, arch, requiredFileSha256) {
+function buildPreparedManifest(config, artifact, platform, arch, fileSha256) {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     runtime: config.runtime,
     version: config.version,
     platform,
@@ -249,9 +520,10 @@ function buildPreparedManifest(config, artifact, platform, arch, requiredFileSha
     supportedArchitectures: artifact.architectures,
     binaryPath: artifact.binaryPath,
     requiredPaths: artifact.requiredPaths,
-    requiredFileSha256,
+    fileSha256,
     archive: {
       fileName: artifact.fileName,
+      sizeBytes: artifact.sizeBytes,
       sha256: artifact.sha256,
     },
   };
@@ -265,7 +537,8 @@ async function assertPreparedRuntimeMatchesManifest(
   arch,
   fsImpl = fs
 ) {
-  if (manifest.schemaVersion !== 1
+  const runtimeFilePaths = collectRuntimeFilePaths(rootDir, fsImpl);
+  if (manifest.schemaVersion !== 2
     || manifest.runtime !== 'ollama'
     || manifest.platform !== platform
     || manifest.architecture !== arch
@@ -274,20 +547,22 @@ async function assertPreparedRuntimeMatchesManifest(
     || JSON.stringify(manifest.requiredPaths) !== JSON.stringify(artifact.requiredPaths)
     || !manifest.archive
     || manifest.archive.fileName !== artifact.fileName
+    || manifest.archive.sizeBytes !== artifact.sizeBytes
     || manifest.archive.sha256 !== artifact.sha256
-    || !manifest.requiredFileSha256
-    || typeof manifest.requiredFileSha256 !== 'object'
-    || Array.isArray(manifest.requiredFileSha256)
-    || JSON.stringify(Object.keys(manifest.requiredFileSha256).sort())
-      !== JSON.stringify([...artifact.requiredPaths].sort())) {
+    || !manifest.fileSha256
+    || typeof manifest.fileSha256 !== 'object'
+    || Array.isArray(manifest.fileSha256)
+    || JSON.stringify(Object.keys(manifest.fileSha256).sort())
+      !== JSON.stringify(runtimeFilePaths)
+    || artifact.requiredPaths.some((relativePath) => !runtimeFilePaths.includes(relativePath))) {
     throw new Error(`Embedded Ollama prepared manifest is invalid for ${platform}/${arch}.`);
   }
 
   validatePreparedRuntime(rootDir, artifact, platform, fsImpl);
-  for (const relativePath of artifact.requiredPaths) {
-    const expectedSha256 = manifest.requiredFileSha256[relativePath];
+  for (const relativePath of runtimeFilePaths) {
+    const expectedSha256 = manifest.fileSha256[relativePath];
     if (!/^[a-f0-9]{64}$/.test(String(expectedSha256 || ''))) {
-      throw new Error(`Embedded Ollama required-file checksum is invalid: ${relativePath}`);
+      throw new Error(`Embedded Ollama runtime-file checksum is invalid: ${relativePath}`);
     }
     await assertFileChecksum(resolveContainedPath(rootDir, relativePath), expectedSha256, fsImpl);
   }
@@ -366,16 +641,14 @@ async function prepareEmbeddedOllama({
   try {
     extractArchive({ archivePath, artifact, stagingDir, platform, spawnSyncImpl });
     validatePreparedRuntime(stagingDir, artifact, platform);
-    const requiredFileSha256 = await calculateRequiredFileSha256(
-      stagingDir,
-      artifact.requiredPaths
-    );
+    const runtimeFilePaths = collectRuntimeFilePaths(stagingDir);
+    const fileSha256 = await calculateRuntimeFileSha256(stagingDir, runtimeFilePaths);
     preparedManifest = buildPreparedManifest(
       config,
       artifact,
       platform,
       arch,
-      requiredFileSha256
+      fileSha256
     );
     fs.writeFileSync(
       path.join(stagingDir, PREPARED_MANIFEST_FILE),
@@ -425,13 +698,21 @@ if (require.main === module) {
 }
 
 module.exports = {
+  ALLOWED_DOWNLOAD_HOSTS,
+  DOWNLOAD_TOTAL_TIMEOUT_MS,
   PREPARED_MANIFEST_FILE,
   assertFileChecksum,
+  assertFileSize,
   assertPreparedRuntimeMatchesManifest,
   buildPreparedManifest,
   calculateFileSha256,
-  calculateRequiredFileSha256,
+  calculateRuntimeFileSha256,
+  collectRuntimeFilePaths,
+  createPublicLookup,
+  downloadFile,
   ensureVerifiedArchive,
+  isPublicDownloadAddress,
+  openDownload,
   parseArguments,
   prepareEmbeddedOllama,
   preparedRuntimeIsCurrent,
@@ -439,5 +720,6 @@ module.exports = {
   resolveContainedPath,
   selectArtifact,
   validatePreparedRuntime,
+  validateDownloadUrl,
   verifyPreparedOllama,
 };
