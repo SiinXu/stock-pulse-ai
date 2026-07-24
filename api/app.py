@@ -21,6 +21,8 @@ import logging
 import mimetypes
 import os
 import re
+import sys
+import threading
 from contextlib import asynccontextmanager, suppress
 from datetime import datetime
 from pathlib import Path
@@ -54,6 +56,7 @@ _FRONTEND_INDEX_NO_CACHE_HEADERS = {
     "Pragma": "no-cache",
     "Expires": "0",
 }
+_MIMETYPES_INIT_LOCK = threading.Lock()
 
 
 def _frontend_index_response(static_dir: Path) -> FileResponse:
@@ -129,8 +132,32 @@ def _resolve_asset_path(assets_dir: Path, asset_path: str) -> Optional[Path]:
     return candidate
 
 
+def _initialize_mimetypes_without_windows_registry() -> None:
+    """Initialize built-in MIME mappings without a blocking Windows registry scan."""
+    if sys.platform != "win32" or mimetypes.inited:
+        return
+
+    with _MIMETYPES_INIT_LOCK:
+        if mimetypes.inited:
+            return
+        registry_reader = getattr(mimetypes.MimeTypes, "read_windows_registry", None)
+        if registry_reader is None:
+            mimetypes.init()
+            return
+
+        def _skip_windows_registry(*_args, **_kwargs) -> None:
+            return None
+
+        mimetypes.MimeTypes.read_windows_registry = _skip_windows_registry
+        try:
+            mimetypes.init()
+        finally:
+            mimetypes.MimeTypes.read_windows_registry = registry_reader
+
+
 def _register_frontend_asset_mime_types() -> None:
     """Keep Vite module assets loadable even when OS MIME maps are wrong."""
+    _initialize_mimetypes_without_windows_registry()
     for suffix, media_type in _FRONTEND_ASSET_MEDIA_TYPES.items():
         mimetypes.add_type(media_type, suffix)
 

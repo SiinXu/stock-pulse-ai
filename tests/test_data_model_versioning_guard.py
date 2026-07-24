@@ -32,6 +32,10 @@ from src.schemas.decision_scale import (
     CANONICAL_DECISION_SCALE_VERSION,
     score_band_metadata,
 )
+from src.schemas.decision_signal_presentation import (
+    DECISION_SIGNAL_PRESENTATION_SCHEMA_VERSION,
+    build_decision_signal_presentation,
+)
 from src.schemas.market_structure import (
     MARKET_STRUCTURE_SCHEMA_VERSION,
     MARKET_THEME_SCHEMA_VERSION,
@@ -39,6 +43,12 @@ from src.schemas.market_structure import (
     MarketStructureContext,
     MarketThemeContext,
     StockMarketPosition,
+)
+from src.schemas.report_schema import REPORT_SCHEMA_VERSION, AnalysisReportSchema
+from src.schemas.run_flow import (
+    RUN_FLOW_SCHEMA_VERSION,
+    RunFlowSnapshot,
+    RunFlowSummary,
 )
 
 
@@ -51,6 +61,12 @@ def test_serialized_artifact_version_constants_match_documented_inventory() -> N
     assert RUNTIME_EVENT_SCHEMA_VERSION == 1
     assert PROVIDER_USAGE_SCHEMA_NAME == "provider_usage_v1"
     assert PROVIDER_USAGE_SCHEMA_VERSION == "2026-06-10"
+    assert REPORT_SCHEMA_VERSION == "report-v1"
+    assert RUN_FLOW_SCHEMA_VERSION == "run-flow-v1"
+    assert (
+        DECISION_SIGNAL_PRESENTATION_SCHEMA_VERSION
+        == "decision-signal-presentation-v1"
+    )
 
 
 def test_analysis_context_pack_serialization_emits_version() -> None:
@@ -102,3 +118,47 @@ def test_provider_usage_record_emits_schema_version() -> None:
     )
     assert record["provider_usage_schema_name"] == PROVIDER_USAGE_SCHEMA_NAME
     assert record["provider_usage_schema_version"] == PROVIDER_USAGE_SCHEMA_VERSION
+
+
+def test_analysis_report_schema_serialization_emits_version() -> None:
+    report = AnalysisReportSchema()
+    assert report.model_dump()["schema_version"] == REPORT_SCHEMA_VERSION
+    assert report.model_dump(mode="json")["schema_version"] == REPORT_SCHEMA_VERSION
+
+
+def test_analysis_report_schema_defaults_legacy_payload_to_version() -> None:
+    report = AnalysisReportSchema.model_validate({"sentiment_score": 60})
+    assert report.schema_version == REPORT_SCHEMA_VERSION
+
+
+def test_run_flow_snapshot_serialization_emits_version() -> None:
+    snapshot = RunFlowSnapshot(
+        task_id="task-1",
+        stock_code="600519",
+        status="success",
+        summary=RunFlowSummary(),
+        generated_at="2026-01-01T00:00:00+00:00",
+    )
+    assert snapshot.model_dump()["schema_version"] == RUN_FLOW_SCHEMA_VERSION
+
+
+def test_run_flow_snapshot_defaults_legacy_payload_to_version() -> None:
+    snapshot = RunFlowSnapshot.model_validate(
+        {
+            "task_id": "task-1",
+            "stock_code": "600519",
+            "status": "success",
+            "summary": {},
+            "generated_at": "2026-01-01T00:00:00+00:00",
+        }
+    )
+    assert snapshot.schema_version == RUN_FLOW_SCHEMA_VERSION
+
+
+def test_decision_signal_presentation_emits_version() -> None:
+    presentation = build_decision_signal_presentation({"action": "buy"})
+    assert presentation is not None
+    assert (
+        presentation["schema_version"]
+        == DECISION_SIGNAL_PRESENTATION_SCHEMA_VERSION
+    )

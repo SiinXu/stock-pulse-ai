@@ -186,6 +186,9 @@ The ordered migration registry above governs the **DB schema layer**. In additio
 | Canonical decision scale | `CANONICAL_DECISION_SCALE_VERSION` | `decision-scale-v1` | `scale_version` (`score_band_metadata`) | DecisionSignal / report scoring convention |
 | Runtime event | `RUNTIME_EVENT_SCHEMA_VERSION` | `1` | `schema_version` | Agent runtime events |
 | Provider usage | `PROVIDER_USAGE_SCHEMA_VERSION` (+ `PROVIDER_USAGE_SCHEMA_NAME`) | `2026-06-10` (`provider_usage_v1`) | `provider_usage_schema_version` | `llm_usage.provider_usage_schema_version` column |
+| `AnalysisReportSchema` | `REPORT_SCHEMA_VERSION` | `report-v1` | `schema_version` | LLM report payload validation contract (`src/schemas/report_schema.py`) |
+| `RunFlowSnapshot` | `RUN_FLOW_SCHEMA_VERSION` | `run-flow-v1` | `schema_version` | task / history run-flow API responses (built on demand, no dedicated column) |
+| `DecisionSignalPresentation` | `DECISION_SIGNAL_PRESENTATION_SCHEMA_VERSION` | `decision-signal-presentation-v1` | `schema_version` | DecisionSignal presentation object (built on demand from DB rows, no dedicated column) |
 
 The inventory is bound to the actual constants by the guard test `tests/test_data_model_versioning_guard.py`; any constant drift or dropping a version field during serialization is caught.
 
@@ -203,7 +206,3 @@ The inventory is bound to the actual constants by the guard test `tests/test_dat
 2. Update this inventory table and the guard test `tests/test_data_model_versioning_guard.py`.
 3. If the artifact's persisted column/table shape changes at the same time, add a higher-ID DB migration as well (see "Adding a Migration" above).
 4. Go through the normal source review and complete backend gate.
-
-### Artifacts not yet versioned (follow-up)
-
-`Report` (`src/schemas/report_schema.py`), `RunFlowSnapshot` (`src/schemas/run_flow.py`), and `DecisionSignalPresentation` (`src/schemas/decision_signal_presentation.py`) do not yet embed an explicit version field. They can adopt the "add fields within a version / bump only for breaking changes" pattern above the next time their persisted shape changes, at low cost — which is exactly the low-migration-cost evolution this strategy is meant to guarantee.
