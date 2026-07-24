@@ -3468,6 +3468,7 @@ test('pull streams a curated model and reports progress', async (t) => {
   const result = await mainModule.pullLocalModel('qwen3:8b', { requestImpl });
   assert.equal(result.ok, true);
   assert.equal(result.modelId, 'qwen3:8b');
+  assert.equal(result.baseUrl, 'http://127.0.0.1:11434');
 });
 
 test('pull does not activate when Ollama closes without terminal success', async (t) => {
@@ -3530,6 +3531,47 @@ test('desktop rejects oversized local model JSON and progress events', async (t)
   assert.equal(oversizedWhitespace.calls[0].responseDestroyed, true);
 });
 
+test('desktop pull enforces an absolute deadline despite continuous progress', async (t) => {
+  const mainModule = loadMainModule(t);
+  let interval = null;
+  const requestImpl = (_target, _options, callback) => {
+    const request = new EventEmitter();
+    request.setTimeout = () => request;
+    request.write = () => true;
+    request.destroy = (error) => {
+      if (interval) clearInterval(interval);
+      request.emit('error', error);
+    };
+    request.end = () => {
+      const response = new EventEmitter();
+      response.statusCode = 200;
+      response.setEncoding = () => undefined;
+      response.resume = () => undefined;
+      response.destroy = () => {
+        if (interval) clearInterval(interval);
+      };
+      callback(response);
+      interval = setInterval(() => {
+        response.emit('data', '{"status":"downloading","total":100,"completed":1}\n');
+      }, 2);
+    };
+    return request;
+  };
+  t.after(() => {
+    if (interval) clearInterval(interval);
+  });
+
+  await assert.rejects(
+    mainModule.requestLocalModelPullStream({
+      baseUrl: 'http://127.0.0.1:11434',
+      modelId: 'qwen3:8b',
+      timeoutMs: 20,
+      requestImpl,
+    }),
+    /deadline exceeded/i,
+  );
+});
+
 test('desktop Stop is serialized behind an active local model operation', async (t) => {
   const mainModule = loadMainModule(t);
   const webContents = {
@@ -3589,9 +3631,17 @@ test('desktop deletion sends the Ollama DELETE request body', async (t) => {
     { statusCode: 200, jsonBody: { models: [] } },
   ]);
 
-  const result = await mainModule.removeLocalModel('qwen3:8b', { requestImpl, envFile });
+  const result = await mainModule.removeLocalModel('qwen3:8b', {
+    requestImpl,
+    envFile,
+    expectedBaseUrl: 'http://127.0.0.1:11434',
+  });
 
-  assert.deepEqual(result, { ok: true, modelId: 'qwen3:8b' });
+  assert.deepEqual(result, {
+    ok: true,
+    modelId: 'qwen3:8b',
+    baseUrl: 'http://127.0.0.1:11434',
+  });
   assert.equal(requestImpl.calls[0].target.pathname, '/api/delete');
   assert.equal(requestImpl.calls[0].options.method, 'DELETE');
   assert.deepEqual(
@@ -3655,6 +3705,27 @@ test('desktop deletion rejects every active assignment before network activity',
   assert.equal(requestImpl.calls.length, 0);
 });
 
+test('desktop deletion rejects a changed runtime before network activity', async (t) => {
+  const mainModule = loadMainModule(t);
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-localmodel-runtime-change-'));
+  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+  const envFile = path.join(tmpDir, '.env');
+  fs.writeFileSync(
+    envFile,
+    'LLM_OLLAMA_BASE_URL=http://127.0.0.1:22434\nLLM_OLLAMA_MODELS=qwen3:8b\n',
+  );
+  const requestImpl = makeStagedJsonRequest([{ statusCode: 200, jsonBody: {} }]);
+
+  const result = await mainModule.removeLocalModel('qwen3:8b', {
+    requestImpl,
+    envFile,
+    expectedBaseUrl: 'http://127.0.0.1:11434',
+  });
+
+  assert.equal(result.error, 'runtime-changed');
+  assert.equal(requestImpl.calls.length, 0);
+});
+
 test('desktop deletion ignores an implicit channel model when YAML wins auto mode', async (t) => {
   const mainModule = loadMainModule(t);
   mainModule.__setLocalModelStateForTest(null);
@@ -3677,9 +3748,17 @@ test('desktop deletion ignores an implicit channel model when YAML wins auto mod
     { statusCode: 200, jsonBody: { models: [] } },
   ]);
 
-  const result = await mainModule.removeLocalModel('qwen3:8b', { requestImpl, envFile });
+  const result = await mainModule.removeLocalModel('qwen3:8b', {
+    requestImpl,
+    envFile,
+    expectedBaseUrl: 'http://127.0.0.1:11434',
+  });
 
-  assert.deepEqual(result, { ok: true, modelId: 'qwen3:8b' });
+  assert.deepEqual(result, {
+    ok: true,
+    modelId: 'qwen3:8b',
+    baseUrl: 'http://127.0.0.1:11434',
+  });
   assert.equal(requestImpl.calls[0].target.pathname, '/api/delete');
 });
 

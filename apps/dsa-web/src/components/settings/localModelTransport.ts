@@ -21,12 +21,14 @@ interface DesktopLocalModelState {
   operation?: unknown;
   progress?: unknown;
   totalMemoryGb?: unknown;
+  baseUrl?: unknown;
 }
 
 interface DesktopOperationResult {
   ok?: unknown;
   modelId?: unknown;
   error?: unknown;
+  baseUrl?: unknown;
 }
 
 export interface DesktopLocalModelBridge {
@@ -35,7 +37,7 @@ export interface DesktopLocalModelBridge {
   start: () => Promise<DesktopLocalModelState>;
   stop: () => Promise<DesktopLocalModelState>;
   pull: (modelId: string) => Promise<DesktopOperationResult>;
-  remove: (modelId: string) => Promise<DesktopOperationResult>;
+  remove: (modelId: string, expectedBaseUrl: string) => Promise<DesktopOperationResult>;
   openInstallGuide: () => Promise<boolean>;
   onStateChange: (listener: (state: DesktopLocalModelState) => void) => (() => void) | void;
 }
@@ -215,6 +217,7 @@ function createDesktopTransport(bridge: DesktopLocalModelBridge): LocalModelTran
     canControlRuntime: true,
     getRuntime: () => loadState(bridge.detect),
     async pull(modelId, onProgress) {
+      const configuration = await localModelsApi.getConfiguration();
       const unsubscribe = bridge.onStateChange((state) => {
         const progress = normalizeProgress(state.progress);
         if (progress) onProgress(progress);
@@ -228,9 +231,20 @@ function createDesktopTransport(bridge: DesktopLocalModelBridge): LocalModelTran
             `ollama pull ${modelId}`,
           );
         }
+        const runtimeBaseUrl = typeof result.baseUrl === 'string' ? result.baseUrl : '';
+        if (!runtimeBaseUrl) {
+          throw new LocalModelTransportError(
+            'local_model_runtime_snapshot_missing',
+            'Local model runtime identity was not returned',
+          );
+        }
         let activation: LocalModelMutationResponse;
         try {
-          activation = await localModelsApi.assign(modelId, 'auto');
+          activation = await localModelsApi.activateDesktop(
+            modelId,
+            configuration.configVersion,
+            runtimeBaseUrl,
+          );
         } catch {
           throw new LocalModelTransportError(
             'local_model_activation_failed',
@@ -247,8 +261,25 @@ function createDesktopTransport(bridge: DesktopLocalModelBridge): LocalModelTran
       }
     },
     async remove(modelId) {
-      const configuration = await localModelsApi.unregister(modelId);
-      const result = await bridge.remove(modelId);
+      const [configurationSnapshot, runtimeSnapshot] = await Promise.all([
+        localModelsApi.getConfiguration(),
+        bridge.detect(),
+      ]);
+      const runtimeBaseUrl = typeof runtimeSnapshot.baseUrl === 'string'
+        ? runtimeSnapshot.baseUrl
+        : '';
+      if (!runtimeBaseUrl) {
+        throw new LocalModelTransportError(
+          'local_model_runtime_snapshot_missing',
+          'Local model runtime identity was not returned',
+        );
+      }
+      const configuration = await localModelsApi.unregister(
+        modelId,
+        configurationSnapshot.configVersion,
+        runtimeBaseUrl,
+      );
+      const result = await bridge.remove(modelId, runtimeBaseUrl);
       if (result.ok !== true) {
         const registrationChanged = configuration.updatedKeys.includes('LLM_OLLAMA_MODELS');
         if (registrationChanged) {
@@ -286,7 +317,18 @@ function createDesktopTransport(bridge: DesktopLocalModelBridge): LocalModelTran
           'Local model deletion failed',
         );
       }
-      return configuration;
+      if (!configuration.recoveryToken) return configuration;
+      try {
+        return await localModelsApi.finalizeUnregistration(
+          modelId,
+          configuration.recoveryToken,
+        );
+      } catch {
+        throw new LocalModelTransportError(
+          'local_model_delete_finalize_failed',
+          'Local model weights were deleted but rollback finalization failed',
+        );
+      }
     },
     assign: (modelId, assignment) => localModelsApi.assign(modelId, assignment),
     start: () => loadState(bridge.start),

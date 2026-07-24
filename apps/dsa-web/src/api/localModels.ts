@@ -57,6 +57,22 @@ export const localModelsApi = {
     return toCamelCase<LocalModelMutationResponse>(response.data);
   },
 
+  async activateDesktop(
+    modelId: string,
+    expectedConfigVersion: string,
+    expectedRuntimeBaseUrl: string,
+  ): Promise<LocalModelMutationResponse> {
+    const response = await apiClient.post<Record<string, unknown>>(
+      '/api/v1/local-models/desktop-activations',
+      {
+        ...modelPayload(modelId),
+        expected_config_version: expectedConfigVersion,
+        expected_runtime_base_url: expectedRuntimeBaseUrl,
+      },
+    );
+    return toCamelCase<LocalModelMutationResponse>(response.data);
+  },
+
   async deleteModel(modelId: string): Promise<LocalModelMutationResponse> {
     const response = await apiClient.delete<Record<string, unknown>>(
       '/api/v1/local-models/models',
@@ -65,10 +81,20 @@ export const localModelsApi = {
     return toCamelCase<LocalModelMutationResponse>(response.data);
   },
 
-  async unregister(modelId: string): Promise<LocalModelUnregistrationResponse> {
+  async unregister(
+    modelId: string,
+    expectedConfigVersion: string,
+    expectedRuntimeBaseUrl: string,
+  ): Promise<LocalModelUnregistrationResponse> {
     const response = await apiClient.delete<Record<string, unknown>>(
       '/api/v1/local-models/registrations',
-      { data: modelPayload(modelId) },
+      {
+        data: {
+          ...modelPayload(modelId),
+          expected_config_version: expectedConfigVersion,
+          expected_runtime_base_url: expectedRuntimeBaseUrl,
+        },
+      },
     );
     return toCamelCase<LocalModelUnregistrationResponse>(response.data);
   },
@@ -79,6 +105,17 @@ export const localModelsApi = {
   ): Promise<LocalModelMutationResponse> {
     const response = await apiClient.post<Record<string, unknown>>(
       '/api/v1/local-models/registrations',
+      { ...modelPayload(modelId), recovery_token: recoveryToken },
+    );
+    return toCamelCase<LocalModelMutationResponse>(response.data);
+  },
+
+  async finalizeUnregistration(
+    modelId: string,
+    recoveryToken: string,
+  ): Promise<LocalModelMutationResponse> {
+    const response = await apiClient.post<Record<string, unknown>>(
+      '/api/v1/local-models/registration-recoveries/finalize',
       { ...modelPayload(modelId), recovery_token: recoveryToken },
     );
     return toCamelCase<LocalModelMutationResponse>(response.data);

@@ -27,6 +27,20 @@ class LocalModelAssignmentRequest(LocalModelRequest):
     assignment: Literal["auto", "primary", "agent"] = "auto"
 
 
+class LocalModelDesktopActivationRequest(LocalModelRequest):
+    """Activate a Desktop pull only against its original configuration snapshot."""
+
+    expected_config_version: str = Field(..., min_length=1, max_length=128)
+    expected_runtime_base_url: str = Field(..., min_length=1, max_length=2048)
+
+
+class LocalModelDesktopUnregistrationRequest(LocalModelRequest):
+    """Unregister before Desktop deletion using one immutable runtime snapshot."""
+
+    expected_config_version: str = Field(..., min_length=1, max_length=128)
+    expected_runtime_base_url: str = Field(..., min_length=1, max_length=2048)
+
+
 class LocalModelRegistrationRestoreRequest(LocalModelRequest):
     """Consume a short-lived rollback capability issued by unregister."""
 

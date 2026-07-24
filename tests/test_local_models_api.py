@@ -62,11 +62,13 @@ class _FakeLocalModelService:
             }
         )
         self.delete_model = Mock(return_value=self.configure_model.return_value | {"deleted": True})
+        self.activate_desktop_model = Mock(return_value=self.configure_model.return_value)
         self.unregister_model = Mock(
             return_value=self.configure_model.return_value
             | {"deleted": True, "recovery_token": "registration-recovery-1"}
         )
         self.restore_registration = Mock(return_value=self.configure_model.return_value)
+        self.finalize_unregistration = Mock(return_value=self.configure_model.return_value)
 
     def get_runtime_status(self):
         return {
@@ -138,12 +140,17 @@ class LocalModelApiIntegrationTestCase(_SystemConfigServiceTestCaseBase):
         )
 
     def test_unregister_then_restore_crosses_the_real_config_boundary_offline(self) -> None:
+        configuration = self.local_model_service.get_configuration()
         unregistered = asyncio.run(
             _request(
                 self.local_model_service,
                 "DELETE",
                 "/api/v1/local-models/registrations",
-                json={"model_id": "qwen3:4b"},
+                json={
+                    "model_id": "qwen3:4b",
+                    "expected_config_version": configuration["config_version"],
+                    "expected_runtime_base_url": "http://127.0.0.1:11434",
+                },
             )
         )
         self.assertEqual(unregistered.status_code, 200, unregistered.text)
@@ -162,6 +169,66 @@ class LocalModelApiIntegrationTestCase(_SystemConfigServiceTestCaseBase):
 
         self.assertEqual(restored.status_code, 200, restored.text)
         self.assertEqual(restored.json()["registered_models"], ["qwen3:4b"])
+        self.assertEqual(self.runtime_probe_count, 0)
+
+    def test_unregister_rejects_a_changed_desktop_runtime_before_mutation(self) -> None:
+        configuration = self.local_model_service.get_configuration()
+
+        response = asyncio.run(
+            _request(
+                self.local_model_service,
+                "DELETE",
+                "/api/v1/local-models/registrations",
+                json={
+                    "model_id": "qwen3:4b",
+                    "expected_config_version": configuration["config_version"],
+                    "expected_runtime_base_url": "http://127.0.0.1:22434",
+                },
+            )
+        )
+
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertEqual(
+            self.local_model_service.get_configuration()["registered_models"],
+            ["qwen3:4b"],
+        )
+
+    def test_finalize_revokes_recovery_across_the_real_api_boundary(self) -> None:
+        configuration = self.local_model_service.get_configuration()
+        unregistered = asyncio.run(
+            _request(
+                self.local_model_service,
+                "DELETE",
+                "/api/v1/local-models/registrations",
+                json={
+                    "model_id": "qwen3:4b",
+                    "expected_config_version": configuration["config_version"],
+                    "expected_runtime_base_url": "http://127.0.0.1:11434",
+                },
+            )
+        )
+        token = unregistered.json()["recovery_token"]
+
+        finalized = asyncio.run(
+            _request(
+                self.local_model_service,
+                "POST",
+                "/api/v1/local-models/registration-recoveries/finalize",
+                json={"model_id": "qwen3:4b", "recovery_token": token},
+            )
+        )
+        restored = asyncio.run(
+            _request(
+                self.local_model_service,
+                "POST",
+                "/api/v1/local-models/registrations",
+                json={"model_id": "qwen3:4b", "recovery_token": token},
+            )
+        )
+
+        self.assertEqual(finalized.status_code, 200, finalized.text)
+        self.assertEqual(finalized.json()["registered_models"], [])
+        self.assertEqual(restored.status_code, 400, restored.text)
         self.assertEqual(self.runtime_probe_count, 0)
 
 
@@ -313,6 +380,30 @@ def test_assignment_rejects_a_catalog_model_missing_from_the_runtime() -> None:
     assert "manual_command" not in response.json().get("params", {})
 
 
+def test_desktop_activation_passes_only_snapshot_assertions_to_the_service() -> None:
+    service = _FakeLocalModelService()
+
+    response = asyncio.run(
+        _request(
+            service,
+            "POST",
+            "/api/v1/local-models/desktop-activations",
+            json={
+                "model_id": "qwen3:4b",
+                "expected_config_version": "config-1",
+                "expected_runtime_base_url": "http://127.0.0.1:11434",
+            },
+        )
+    )
+
+    assert response.status_code == 200
+    service.activate_desktop_model.assert_called_once_with(
+        "qwen3:4b",
+        expected_config_version="config-1",
+        expected_runtime_base_url="http://127.0.0.1:11434",
+    )
+
+
 def test_registration_restore_passes_the_server_issued_recovery_token() -> None:
     service = _FakeLocalModelService()
 
@@ -327,6 +418,25 @@ def test_registration_restore_passes_the_server_issued_recovery_token() -> None:
 
     assert response.status_code == 200
     service.restore_registration.assert_called_once_with(
+        "qwen3:4b",
+        recovery_token="registration-recovery-1",
+    )
+
+
+def test_unregistration_finalization_revokes_the_server_issued_recovery_token() -> None:
+    service = _FakeLocalModelService()
+
+    response = asyncio.run(
+        _request(
+            service,
+            "POST",
+            "/api/v1/local-models/registration-recoveries/finalize",
+            json={"model_id": "qwen3:4b", "recovery_token": "registration-recovery-1"},
+        )
+    )
+
+    assert response.status_code == 200
+    service.finalize_unregistration.assert_called_once_with(
         "qwen3:4b",
         recovery_token="registration-recovery-1",
     )
@@ -358,16 +468,20 @@ def test_static_openapi_contains_the_local_model_contract() -> None:
     for path in (
         "/api/v1/local-models/assignments",
         "/api/v1/local-models/configuration",
+        "/api/v1/local-models/desktop-activations",
         "/api/v1/local-models/models",
         "/api/v1/local-models/pulls",
         "/api/v1/local-models/pulls/{task_id}",
         "/api/v1/local-models/registrations",
+        "/api/v1/local-models/registration-recoveries/finalize",
         "/api/v1/local-models/runtime",
     ):
         assert static["paths"][path] == runtime["paths"][path]
     for schema in (
         "LocalModelAssignmentRequest",
         "LocalModelConfigurationResponse",
+        "LocalModelDesktopActivationRequest",
+        "LocalModelDesktopUnregistrationRequest",
         "LocalModelMutationResponse",
         "LocalModelPullAccepted",
         "LocalModelPullResult",

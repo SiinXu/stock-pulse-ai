@@ -3015,12 +3015,18 @@ function requestLocalModelPullStream({
     let buffer = '';
     let lastStatus = '';
     let sawTerminalSuccess = false;
+    let req = null;
+    let absoluteDeadline = null;
 
     const finish = (fn, value) => {
       if (settled) {
         return;
       }
       settled = true;
+      if (absoluteDeadline) {
+        clearTimeout(absoluteDeadline);
+        absoluteDeadline = null;
+      }
       fn(value);
     };
 
@@ -3058,7 +3064,7 @@ function requestLocalModelPullStream({
       onProgress({ status: lastStatus, percent });
     };
 
-    const req = transport(
+    req = transport(
       target,
       {
         method: 'POST',
@@ -3117,6 +3123,15 @@ function requestLocalModelPullStream({
       }
     );
 
+    if (!settled) {
+      absoluteDeadline = setTimeout(() => {
+        const error = new Error(`Local model pull deadline exceeded after ${timeoutMs}ms`);
+        if (req && typeof req.destroy === 'function') {
+          req.destroy(error);
+        }
+        finish(reject, error);
+      }, timeoutMs);
+    }
     req.setTimeout(timeoutMs, () => {
       req.destroy(new Error(`Local model pull timeout after ${timeoutMs}ms`));
     });
@@ -3612,7 +3627,7 @@ async function pullLocalModel(rawModelId, { requestImpl = null } = {}) {
   }
 
   await refreshLocalModelState();
-  return { ok: true, modelId };
+  return { ok: true, modelId, baseUrl };
 }
 
 function decodeConfiguredModelRoute(rawValue) {
@@ -3688,6 +3703,7 @@ function isLocalModelAssigned(rawModelId, { envFile = resolveLocalModelEnvPath()
 async function removeLocalModel(rawModelId, {
   requestImpl = null,
   envFile = resolveLocalModelEnvPath(),
+  expectedBaseUrl = '',
 } = {}) {
   const modelId = normalizeLocalModelName(rawModelId);
   if (!modelId || !isAllowedLocalModelPreset(modelId)) {
@@ -3705,9 +3721,18 @@ async function removeLocalModel(rawModelId, {
     };
   }
 
+  const baseUrl = resolveLocalModelBaseUrl({ envFile });
+  if (!expectedBaseUrl || String(expectedBaseUrl).trim() !== baseUrl) {
+    return {
+      ok: false,
+      error: 'runtime-changed',
+      message: 'The configured local model runtime changed. Refresh and try again.',
+    };
+  }
+
   try {
     await requestLocalModelJson({
-      baseUrl: resolveLocalModelBaseUrl({ envFile }),
+      baseUrl,
       pathname: '/api/delete',
       method: 'DELETE',
       jsonBody: { name: modelId },
@@ -3723,7 +3748,7 @@ async function removeLocalModel(rawModelId, {
   }
 
   await refreshLocalModelState({ requestImpl });
-  return { ok: true, modelId };
+  return { ok: true, modelId, baseUrl };
 }
 
 async function openLocalModelsSettings() {
@@ -3825,7 +3850,10 @@ ipcMain.handle(DESKTOP_LOCAL_MODEL_PULL_CHANNEL, (event, payload = {}) => {
 });
 ipcMain.handle(DESKTOP_LOCAL_MODEL_REMOVE_CHANNEL, (event, payload = {}) => {
   assertLocalModelSender(event);
-  return runLocalModelOperation(() => removeLocalModel(payload && payload.modelId));
+  return runLocalModelOperation(() => removeLocalModel(
+    payload && payload.modelId,
+    { expectedBaseUrl: payload && payload.expectedBaseUrl }
+  ));
 });
 ipcMain.handle(DESKTOP_LOCAL_MODEL_OPEN_GUIDE_CHANNEL, async (event) => {
   assertLocalModelSender(event);

@@ -217,9 +217,12 @@ test('createLocalModelBridge delegates lifecycle actions and removes state liste
     channel: preloadModule.DESKTOP_LOCAL_MODEL_PULL_CHANNEL,
     payload: { modelId: 'qwen3:8b' },
   });
-  assert.deepEqual(await bridge.remove('qwen3:8b'), {
+  assert.deepEqual(await bridge.remove('qwen3:8b', 'http://127.0.0.1:11434'), {
     channel: preloadModule.DESKTOP_LOCAL_MODEL_REMOVE_CHANNEL,
-    payload: { modelId: 'qwen3:8b' },
+    payload: {
+      modelId: 'qwen3:8b',
+      expectedBaseUrl: 'http://127.0.0.1:11434',
+    },
   });
 
   const states = [];

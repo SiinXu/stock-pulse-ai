@@ -2980,7 +2980,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/LocalModelRequest"
+                "$ref": "#/components/schemas/LocalModelDesktopUnregistrationRequest"
               }
             }
           },
@@ -3025,6 +3025,90 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/LocalModelRuntimeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/local-models/desktop-activations": {
+      "post": {
+        "tags": [
+          "LocalModels"
+        ],
+        "summary": "Activate Desktop Local Model",
+        "description": "Activate a Desktop pull only if its configuration and runtime stayed fixed.",
+        "operationId": "activate_desktop_local_model_api_v1_local_models_desktop_activations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalModelDesktopActivationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalModelMutationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/local-models/registration-recoveries/finalize": {
+      "post": {
+        "tags": [
+          "LocalModels"
+        ],
+        "summary": "Finalize Local Model Unregistration",
+        "description": "Revoke Desktop rollback after the corresponding weights were deleted.",
+        "operationId": "finalize_local_model_unregistration_api_v1_local_models_registration_recoveries_finalize_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalModelRegistrationRestoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalModelMutationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -8957,6 +9041,70 @@
         ],
         "title": "TaskStatusEnum",
         "description": "Canonical process-local task lifecycle states."
+      },
+      "LocalModelDesktopActivationRequest": {
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*(?::[A-Za-z0-9][A-Za-z0-9._-]*)?$",
+            "title": "Model Id"
+          },
+          "expected_config_version": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Expected Config Version"
+          },
+          "expected_runtime_base_url": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Expected Runtime Base Url"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model_id",
+          "expected_config_version",
+          "expected_runtime_base_url"
+        ],
+        "title": "LocalModelDesktopActivationRequest",
+        "description": "Activate a Desktop pull only against its original configuration snapshot."
+      },
+      "LocalModelDesktopUnregistrationRequest": {
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*(?::[A-Za-z0-9][A-Za-z0-9._-]*)?$",
+            "title": "Model Id"
+          },
+          "expected_config_version": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Expected Config Version"
+          },
+          "expected_runtime_base_url": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Expected Runtime Base Url"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model_id",
+          "expected_config_version",
+          "expected_runtime_base_url"
+        ],
+        "title": "LocalModelDesktopUnregistrationRequest",
+        "description": "Unregister before Desktop deletion using one immutable runtime snapshot."
       }
     },
     "securitySchemes": {

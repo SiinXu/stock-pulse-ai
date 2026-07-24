@@ -462,6 +462,26 @@ class LocalModelService:
     def _base_url(self, values: Mapping[str, str]) -> str:
         return normalize_ollama_base_url(values.get("LLM_OLLAMA_BASE_URL"))
 
+    def _require_expected_runtime_snapshot(
+        self,
+        *,
+        config_version: str,
+        values: Mapping[str, str],
+        expected_config_version: Any,
+        expected_runtime_base_url: Any,
+    ) -> str:
+        """Validate caller observations without using them as a request target."""
+        expected_version = str(expected_config_version or "").strip()
+        if not expected_version or expected_version != config_version:
+            raise ConfigConflictError(current_version=config_version)
+        configured_base_url = self._base_url(values)
+        if not str(expected_runtime_base_url or "").strip():
+            raise ConfigConflictError(current_version=config_version)
+        expected_base_url = normalize_ollama_base_url(expected_runtime_base_url)
+        if expected_base_url != configured_base_url:
+            raise ConfigConflictError(current_version=config_version)
+        return configured_base_url
+
     def _allowed_model_ids(self) -> Set[str]:
         allowed: Set[str] = set()
         for candidate in self._pullable_model_ids():
@@ -494,20 +514,75 @@ class LocalModelService:
     ) -> Dict[str, Any]:
         """Register one model and optionally assign it without stealing an existing default."""
         with self._operation_lock:
-            return self._configure_model(model_id, assignment=assignment)
+            normalized = self._require_pullable(model_id)
+            return self._register_installed_model(normalized, assignment=assignment)
 
-    def _configure_model(
+    def register_installed_model(
         self,
         model_id: Any,
         *,
+        assignment: LocalModelAssignment = "auto",
+    ) -> Dict[str, Any]:
+        """Register any validated installed model without widening the pull allowlist."""
+        with self._operation_lock:
+            normalized = normalize_local_model_id(model_id)
+            return self._register_installed_model(normalized, assignment=assignment)
+
+    def activate_desktop_model(
+        self,
+        model_id: Any,
+        *,
+        expected_config_version: Any,
+        expected_runtime_base_url: Any,
+    ) -> Dict[str, Any]:
+        """Activate a Desktop pull only when its runtime snapshot is still current."""
+        with self._operation_lock:
+            normalized = self._require_pullable(model_id)
+            config_version, values = self._config_snapshot()
+            base_url = self._require_expected_runtime_snapshot(
+                config_version=config_version,
+                values=values,
+                expected_config_version=expected_config_version,
+                expected_runtime_base_url=expected_runtime_base_url,
+            )
+            return self._register_installed_model_from_snapshot(
+                normalized,
+                assignment="auto",
+                config_version=config_version,
+                values=values,
+                base_url=base_url,
+            )
+
+    def _register_installed_model(
+        self,
+        normalized: str,
+        *,
         assignment: LocalModelAssignment,
     ) -> Dict[str, Any]:
-        normalized = self._require_pullable(model_id)
         if assignment not in {"auto", "primary", "agent"}:
             raise LocalModelValidationError("Invalid local model assignment")
 
         config_version, values = self._config_snapshot()
         base_url = self._base_url(values)
+        return self._register_installed_model_from_snapshot(
+            normalized,
+            assignment=assignment,
+            config_version=config_version,
+            values=values,
+            base_url=base_url,
+        )
+
+    def _register_installed_model_from_snapshot(
+        self,
+        normalized: str,
+        *,
+        assignment: LocalModelAssignment,
+        config_version: str,
+        values: Mapping[str, str],
+        base_url: str,
+    ) -> Dict[str, Any]:
+        if assignment not in {"auto", "primary", "agent"}:
+            raise LocalModelValidationError("Invalid local model assignment")
         installed = {
             item.lower()
             for item in self._client_factory(base_url).list_installed_models()
@@ -622,7 +697,13 @@ class LocalModelService:
             "selected_agent": assignment == "agent",
         }
 
-    def unregister_model(self, model_id: Any) -> Dict[str, Any]:
+    def unregister_model(
+        self,
+        model_id: Any,
+        *,
+        expected_config_version: Any = None,
+        expected_runtime_base_url: Any = None,
+    ) -> Dict[str, Any]:
         """Remove a non-active model from the Ollama connection configuration."""
         with self._task_lock, self._operation_lock:
             normalized = self._require_pullable(model_id)
@@ -631,6 +712,13 @@ class LocalModelService:
                     "Wait for the active model download before deleting it"
                 )
             config_version, values = self._config_snapshot()
+            if expected_config_version is not None or expected_runtime_base_url is not None:
+                self._require_expected_runtime_snapshot(
+                    config_version=config_version,
+                    values=values,
+                    expected_config_version=expected_config_version,
+                    expected_runtime_base_url=expected_runtime_base_url,
+                )
             current_models = self._split_csv(values.get("LLM_OLLAMA_MODELS"))
             was_registered = any(
                 item.lower() == normalized.lower() for item in current_models
@@ -663,6 +751,38 @@ class LocalModelService:
                 )
             )
             return {**result, "recovery_token": recovery_token}
+
+    def finalize_unregistration(
+        self,
+        model_id: Any,
+        *,
+        recovery_token: Any,
+    ) -> Dict[str, Any]:
+        """Revoke a rollback capability after Desktop confirms weight deletion."""
+        with self._operation_lock:
+            normalized = self._require_pullable(model_id)
+            token = str(recovery_token or "").strip()
+            if not token or len(token) > 128:
+                raise LocalModelValidationError(
+                    "A valid registration recovery token is required"
+                )
+            now = time.monotonic()
+            self._registration_recoveries = {
+                candidate: recovery
+                for candidate, recovery in self._registration_recoveries.items()
+                if recovery.expires_at > now
+            }
+            recovery = self._registration_recoveries.get(token)
+            if recovery is None or recovery.model_id.lower() != normalized.lower():
+                raise LocalModelValidationError(
+                    "The registration recovery token is invalid or expired"
+                )
+            del self._registration_recoveries[token]
+            return {
+                **self.get_configuration(),
+                "success": True,
+                "model_id": normalized,
+            }
 
     def restore_registration(
         self,

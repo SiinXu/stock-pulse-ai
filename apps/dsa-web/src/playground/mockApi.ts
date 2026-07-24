@@ -544,7 +544,7 @@ export function installPlaygroundApiMock(
       },
     }];
   });
-  mock.onPost('/api/v1/local-models/assignments').reply((config) => {
+  const assignLocalModel = (config: { data?: unknown }): [number, unknown] => {
     if (profile === 'error') return [503, errorPayload];
     const body = readJsonRecord(config.data);
     const modelId = typeof body.model_id === 'string' ? body.model_id : '';
@@ -564,7 +564,9 @@ export function installPlaygroundApiMock(
     }
     state.configVersion += 1;
     return [200, localModelMutationResponse(modelId, { selectedPrimary, selectedAgent })];
-  });
+  };
+  mock.onPost('/api/v1/local-models/assignments').reply(assignLocalModel);
+  mock.onPost('/api/v1/local-models/desktop-activations').reply(assignLocalModel);
   const removeLocalModel = (
     config: { data?: unknown },
     deleteWeights: boolean,
@@ -572,16 +574,26 @@ export function installPlaygroundApiMock(
     if (profile === 'error') return [503, errorPayload];
     const body = readJsonRecord(config.data);
     const modelId = typeof body.model_id === 'string' ? body.model_id : '';
+    const wasRegistered = state.localModelConfiguration.registeredModels.includes(modelId);
     state.localModelConfiguration.registeredModels = state.localModelConfiguration.registeredModels
       .filter((candidate) => candidate !== modelId);
     if (deleteWeights) {
       state.installedLocalModels = state.installedLocalModels.filter((candidate) => candidate !== modelId);
     }
     state.configVersion += 1;
-    return [200, localModelMutationResponse(modelId, { deleted: deleteWeights })];
+    return [200, {
+      ...localModelMutationResponse(modelId, { deleted: deleteWeights }),
+      recovery_token: !deleteWeights && wasRegistered ? 'fixture-recovery-token' : null,
+    }];
   };
   mock.onDelete('/api/v1/local-models/models').reply((config) => removeLocalModel(config, true));
   mock.onDelete('/api/v1/local-models/registrations').reply((config) => removeLocalModel(config, false));
+  mock.onPost('/api/v1/local-models/registration-recoveries/finalize').reply((config) => {
+    if (profile === 'error') return [503, errorPayload];
+    const body = readJsonRecord(config.data);
+    const modelId = typeof body.model_id === 'string' ? body.model_id : '';
+    return [200, localModelMutationResponse(modelId)];
+  });
   mock.onGet('/api/v1/system/config/llm/mode-status').reply(() => responseFor(profile, {
     requestedMode: 'auto',
     effectiveMode: 'legacy',

@@ -288,6 +288,64 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
 
         self.assertNotIn("LLM_OLLAMA_MODELS", self.manager.read_config_map())
 
+    def test_public_installed_registration_accepts_a_valid_non_catalog_model(self) -> None:
+        self._rewrite_env("ADMIN_AUTH_ENABLED=true")
+        service, _queue, _client = self._local_service(
+            client=_FakeRuntimeClient(installed=["licensed/finance:q4"]),
+        )
+
+        result = service.register_installed_model(
+            "licensed/finance:q4",
+            assignment="auto",
+        )
+
+        self.assertTrue(result["selected_primary"])
+        self.assertEqual(
+            self.manager.read_config_map()["LLM_OLLAMA_MODELS"],
+            "licensed/finance:q4",
+        )
+
+    def test_desktop_activation_rejects_changed_config_or_runtime_before_probe(self) -> None:
+        self._rewrite_env(
+            "ADMIN_AUTH_ENABLED=true",
+            "LLM_OLLAMA_BASE_URL=http://127.0.0.1:11434",
+        )
+        service, _queue, client = self._local_service()
+        configuration = service.get_configuration()
+
+        with self.assertRaises(ConfigConflictError):
+            service.activate_desktop_model(
+                "qwen3:4b",
+                expected_config_version="stale-version",
+                expected_runtime_base_url="http://127.0.0.1:11434",
+            )
+        with self.assertRaises(ConfigConflictError):
+            service.activate_desktop_model(
+                "qwen3:4b",
+                expected_config_version=configuration["config_version"],
+                expected_runtime_base_url="http://127.0.0.1:22434",
+            )
+
+        self.assertEqual(client.list_calls, 0)
+        self.assertNotIn("LLM_OLLAMA_MODELS", self.manager.read_config_map())
+
+    def test_desktop_activation_uses_the_matching_server_owned_snapshot(self) -> None:
+        self._rewrite_env(
+            "ADMIN_AUTH_ENABLED=true",
+            "LLM_OLLAMA_BASE_URL=http://127.0.0.1:11434",
+        )
+        service, _queue, client = self._local_service()
+        configuration = service.get_configuration()
+
+        result = service.activate_desktop_model(
+            "qwen3:4b",
+            expected_config_version=configuration["config_version"],
+            expected_runtime_base_url="http://127.0.0.1:11434",
+        )
+
+        self.assertTrue(result["selected_primary"])
+        self.assertEqual(client.list_calls, 1)
+
     def test_auto_activation_preserves_an_existing_primary_model(self) -> None:
         self._rewrite_env(
             "ADMIN_AUTH_ENABLED=true",
@@ -719,6 +777,42 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
 
         self.assertIn("qwen3:4b", restored["registered_models"])
         self.assertEqual(self.manager.read_config_map()["LLM_CHANNELS"], "cloud,ollama")
+
+    def test_successful_desktop_delete_finalization_revokes_recovery(self) -> None:
+        self._rewrite_env(
+            "ADMIN_AUTH_ENABLED=true",
+            "LLM_CONFIG_MODE=channels",
+            "LLM_CHANNELS=cloud,ollama",
+            "LLM_CLOUD_PROVIDER=openai",
+            "LLM_CLOUD_PROTOCOL=openai",
+            "LLM_CLOUD_API_KEY=secret-value",
+            "LLM_CLOUD_MODELS=gpt-4o",
+            "LLM_CLOUD_ENABLED=true",
+            "LLM_OLLAMA_PROVIDER=ollama",
+            "LLM_OLLAMA_PROTOCOL=ollama",
+            "LLM_OLLAMA_MODELS=qwen3:4b",
+            "LLM_OLLAMA_ENABLED=true",
+            "LITELLM_MODEL=openai/gpt-4o",
+        )
+        service, _queue, _client = self._local_service()
+        configuration = service.get_configuration()
+        unregistered = service.unregister_model(
+            "qwen3:4b",
+            expected_config_version=configuration["config_version"],
+            expected_runtime_base_url="http://127.0.0.1:11434",
+        )
+
+        finalized = service.finalize_unregistration(
+            "qwen3:4b",
+            recovery_token=unregistered["recovery_token"],
+        )
+
+        self.assertEqual(finalized["registered_models"], [])
+        with self.assertRaises(LocalModelValidationError):
+            service.restore_registration(
+                "qwen3:4b",
+                recovery_token=unregistered["recovery_token"],
+            )
 
     def test_registration_restore_rejects_a_stale_config_version(self) -> None:
         self._rewrite_env(

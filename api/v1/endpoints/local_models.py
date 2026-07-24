@@ -11,6 +11,8 @@ from api.deps import get_local_model_service
 from api.v1.schemas.local_models import (
     LocalModelAssignmentRequest,
     LocalModelConfigurationResponse,
+    LocalModelDesktopActivationRequest,
+    LocalModelDesktopUnregistrationRequest,
     LocalModelMutationResponse,
     LocalModelPullAccepted,
     LocalModelPullStatus,
@@ -155,6 +157,32 @@ def assign_local_model(
         _raise_local_model_error(exc, model_id=request.model_id)
 
 
+@router.post("/desktop-activations", response_model=LocalModelMutationResponse)
+def activate_desktop_local_model(
+    request: LocalModelDesktopActivationRequest,
+    service: LocalModelService = Depends(get_local_model_service),
+) -> LocalModelMutationResponse:
+    """Activate a Desktop pull only if its configuration and runtime stayed fixed."""
+    try:
+        payload = service.activate_desktop_model(
+            request.model_id,
+            expected_config_version=request.expected_config_version,
+            expected_runtime_base_url=request.expected_runtime_base_url,
+        )
+        payload["success"] = True
+        return LocalModelMutationResponse.model_validate(payload)
+    except (LocalModelError, ConfigValidationError, ConfigConflictError) as exc:
+        _raise_local_model_error(exc, model_id=request.model_id)
+    except Exception as exc:  # broad-exception: fallback_recorded - sanitized API boundary
+        log_safe_exception(
+            logger,
+            "Desktop local model activation failed",
+            exc,
+            error_code="local_model_desktop_activation_failed",
+        )
+        _raise_local_model_error(exc, model_id=request.model_id)
+
+
 @router.delete("/models", response_model=LocalModelMutationResponse)
 def delete_local_model(
     request: LocalModelRequest,
@@ -174,12 +202,16 @@ def delete_local_model(
 
 @router.delete("/registrations", response_model=LocalModelUnregistrationResponse)
 def unregister_local_model(
-    request: LocalModelRequest,
+    request: LocalModelDesktopUnregistrationRequest,
     service: LocalModelService = Depends(get_local_model_service),
 ) -> LocalModelUnregistrationResponse:
     """Validate and remove configuration before desktop deletes local weights."""
     try:
-        payload = service.unregister_model(request.model_id)
+        payload = service.unregister_model(
+            request.model_id,
+            expected_config_version=request.expected_config_version,
+            expected_runtime_base_url=request.expected_runtime_base_url,
+        )
         payload["success"] = True
         payload["deleted"] = True
         return LocalModelUnregistrationResponse.model_validate(payload)
@@ -187,6 +219,30 @@ def unregister_local_model(
         _raise_local_model_error(exc, model_id=request.model_id)
     except Exception as exc:  # broad-exception: fallback_recorded - sanitized API boundary
         log_safe_exception(logger, "Local model unregister failed", exc, error_code="local_model_unregister_failed")
+        _raise_local_model_error(exc, model_id=request.model_id)
+
+
+@router.post("/registration-recoveries/finalize", response_model=LocalModelMutationResponse)
+def finalize_local_model_unregistration(
+    request: LocalModelRegistrationRestoreRequest,
+    service: LocalModelService = Depends(get_local_model_service),
+) -> LocalModelMutationResponse:
+    """Revoke Desktop rollback after the corresponding weights were deleted."""
+    try:
+        payload = service.finalize_unregistration(
+            request.model_id,
+            recovery_token=request.recovery_token,
+        )
+        return LocalModelMutationResponse.model_validate(payload)
+    except (LocalModelError, ConfigValidationError, ConfigConflictError) as exc:
+        _raise_local_model_error(exc, model_id=request.model_id)
+    except Exception as exc:  # broad-exception: fallback_recorded - sanitized API boundary
+        log_safe_exception(
+            logger,
+            "Local model unregistration finalization failed",
+            exc,
+            error_code="local_model_unregistration_finalize_failed",
+        )
         _raise_local_model_error(exc, model_id=request.model_id)
 
 
