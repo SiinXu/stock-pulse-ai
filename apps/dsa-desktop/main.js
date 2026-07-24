@@ -3379,7 +3379,6 @@ async function refreshLocalModelState({ requestImpl = null, spawnImpl = spawn } 
   const detection = await detectLocalModelRuntime({ baseUrl, requestImpl, spawnImpl });
   return setLocalModelState({
     ...toPublicLocalModelDetection(detection),
-    registeredModels: readRegisteredLocalModels(),
     operation: null,
     progress: null,
   });
@@ -3411,7 +3410,6 @@ async function startManagedLocalModelRuntime({
   if (detection.status === DESKTOP_LOCAL_MODEL_STATUS.RUNNING) {
     return setLocalModelState({
       ...publicDetection,
-      registeredModels: readRegisteredLocalModels(),
       operation: null,
       message: '',
     });
@@ -3419,7 +3417,6 @@ async function startManagedLocalModelRuntime({
   if (detection.status === DESKTOP_LOCAL_MODEL_STATUS.NOT_INSTALLED) {
     return setLocalModelState({
       ...publicDetection,
-      registeredModels: readRegisteredLocalModels(),
       operation: null,
       message: 'Ollama is not installed. Install it to run local models.',
     });

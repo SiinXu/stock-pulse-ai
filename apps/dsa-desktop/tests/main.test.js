@@ -3807,7 +3807,7 @@ test('local model IPC rejects foreign renderers and serves the main Web window',
   assert.equal(typeof state.status, 'string');
   assert.ok(state.totalMemoryGb > 0);
 
-  mainModule.stopManagedLocalModelRuntime();
+  await mainModule.stopManagedLocalModelRuntime();
   assert.equal(stateEvents.at(-1).channel, mainModule.DESKTOP_LOCAL_MODEL_STATE_EVENT);
   assert.equal(stateEvents.at(-1).payload.status, 'stopped');
 });
