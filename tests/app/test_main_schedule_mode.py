@@ -754,6 +754,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
             single_notify=True,
             no_context_snapshot=True,
             workers=4,
+            portfolio="futu",
         )
         config = self._make_config(webui_enabled=False, schedule_enabled=True)
         marker_seen_by_server = []
@@ -790,6 +791,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
             "single_notify": True,
             "no_context_snapshot": True,
             "workers": 4,
+            "portfolio": "futu",
         }])
         start_bots.assert_called_once_with(config)
         run_with_schedule.assert_not_called()
@@ -870,6 +872,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
             "single_notify": True,
             "no_context_snapshot": True,
             "workers": 4,
+            "portfolio": None,
         }])
         self.assertFalse(config.schedule_enabled)
         run_with_schedule.assert_not_called()

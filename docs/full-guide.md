@@ -154,6 +154,9 @@ stock-pulse-ai/
 | Secret 名称 | 说明 | 必填 |
 |------------|------|:----:|
 | `STOCK_LIST` | 自选股代码，如 `600519,300750,002594,7203.T,005930.KS`；推荐使用英文逗号，中文逗号、顿号、分号、空格和换行会被识别并规范为英文逗号 | ✅ |
+| `FUTU_OPEND_HOST` / `FUTU_OPEND_PORT` | `--portfolio futu` 使用的 OpenD 地址；默认 `127.0.0.1:11111`，未选择该参数时完全不连接 OpenD | 可选 |
+| `FUTU_ACC_ID` | 可选真实证券账户 ID；留空时合并符合条件的 `ACTIVE REAL NORMAL/MASTER` 账户 | 可选 |
+| `FUTU_SECURITY_FIRM` | Futu 券商枚举；默认 `NONE`，由 SDK 自动识别 | 可选 |
 | `ANSPIRE_API_KEYS` | [Anspire AI Search](https://aisearch.anspire.cn/) 针对中文内容特别优化；同一 Key 可用于搜索与 Anspire 大模型网关的兜底示例（是否可用以控制台与账号权限为准） | 推荐 |
 | `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/baidu-search-api) 搜索引擎结果补强，适合实时金融新闻 | 推荐 |
 | `TAVILY_API_KEYS` | [Tavily](https://tavily.com/) 搜索 API（新闻搜索） | 可选 |
@@ -702,6 +705,7 @@ python main.py                        # 完整分析（个股 + 大盘复盘）
 python main.py --market-review        # 仅大盘复盘
 python main.py --no-market-review     # 仅个股分析
 python main.py --stocks 600519,300750 # 指定股票
+python main.py --portfolio futu       # 读取 Futu OpenD 真实持仓作为分析范围
 python main.py --dry-run              # 仅获取数据，不 AI 分析
 python main.py --no-notify            # 不发送推送
 python main.py --schedule             # 定时任务模式
@@ -709,6 +713,14 @@ python main.py --force-run            # 非交易日也强制执行（Issue #373
 python main.py --debug                # 调试模式（详细日志）
 python main.py --workers 5            # 指定并发数
 ```
+
+#### Futu OpenD 真实持仓分析范围
+
+`python main.py --portfolio futu` 是显式、只读的分析范围入口。它查询 Futu OpenD 中状态为 `ACTIVE` 的 `REAL` 普通或主证券账户，只保留数量非零、方向为 `LONG` 且由 OpenD 明确分类为 `STOCK` 的持仓，并把沪深 A 股、港股和美股代码转换为本项目格式。空头、零持仓、ETF/期权等非正股、B 股和其他暂不支持的市场会被跳过。
+
+选择该参数后，实盘范围覆盖 `--stocks` 和 `STOCK_LIST`。成功读取到真实空仓时会保持空列表，不会回退到静态自选股；账户发现、持仓查询、证券类型确认或代码转换失败时，本次运行显式失败，避免分析不可信的部分范围。定时模式会在每次实际执行时重新查询，而不是缓存启动时持仓。未选择 `--portfolio` 时，现有行为完全不变。
+
+默认连接 `127.0.0.1:11111`，可通过 `FUTU_OPEND_HOST` / `FUTU_OPEND_PORT` 调整；`FUTU_ACC_ID` 可限定一个符合条件的真实账户，留空则合并所有符合条件的账户；`FUTU_SECURITY_FIRM=NONE` 使用 SDK 自动识别。Docker 内的 `127.0.0.1` 指容器本身，使用容器运行时需显式配置一个受信任且从容器网络可达的 OpenD 地址。该集成只调用账户列表、持仓列表和证券基础信息查询，不解锁交易，也不下单、改单或撤单；第一版不会把实盘持仓写入组合持仓管理。
 
 ---
 

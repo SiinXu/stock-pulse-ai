@@ -63,6 +63,7 @@ def parse_arguments() -> argparse.Namespace:
   python main.py --debug            # 调试模式
   python main.py --dry-run          # 仅获取数据，不进行 AI 分析
   python main.py --stocks 600519,000001  # 指定分析特定股票
+  python main.py --portfolio futu   # 从 Futu OpenD 读取实盘持仓作为分析范围
   python main.py --no-notify        # 不发送推送通知
   python main.py --check-notify     # 检查通知配置，不发送通知
   python main.py --single-notify    # 启用单股推送模式（每分析完一只立即推送）
@@ -87,6 +88,15 @@ def parse_arguments() -> argparse.Namespace:
         '--stocks',
         type=str,
         help='指定要分析的股票代码，逗号分隔（覆盖配置文件）'
+    )
+
+    from src.services.stock_list_parser import SUPPORTED_PORTFOLIO_SOURCES
+
+    parser.add_argument(
+        '--portfolio',
+        choices=SUPPORTED_PORTFOLIO_SOURCES,
+        default=None,
+        help='从只读实盘持仓加载分析股票范围（当前支持 futu）',
     )
 
     parser.add_argument(
@@ -245,6 +255,13 @@ def _dispatch_cli(config: Config, args: argparse.Namespace) -> int:
             if (c or "").strip()
         ]
         logger.info("Using the stock list supplied on the command line: %s", stock_codes)
+    if getattr(args, "portfolio", None):
+        if stock_codes is not None:
+            logger.warning(
+                "--portfolio %s overrides the stock list supplied by --stocks",
+                args.portfolio,
+            )
+        logger.info("Using live portfolio source for analysis scope: %s", args.portfolio)
 
     start_serve, service_exit_code = __coordinate_service_runtime(config, args)
     if service_exit_code is not None:
@@ -316,7 +333,17 @@ def _dispatch_cli(config: Config, args: argparse.Namespace) -> int:
 
         # Mode 3: Normal single run
         if config.run_immediately:
-            _run_analysis_with_runtime_scheduler_lock(config, args, stock_codes)
+            analysis_succeeded = _run_analysis_with_runtime_scheduler_lock(
+                config,
+                args,
+                stock_codes,
+            )
+            if (
+                analysis_succeeded is False
+                and getattr(args, "portfolio", None)
+                and not start_serve
+            ):
+                return 1
         else:
             logger.info("Immediate analysis is disabled (RUN_IMMEDIATELY=false)")
 

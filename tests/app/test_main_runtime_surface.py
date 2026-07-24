@@ -228,6 +228,45 @@ def test_runtime_coordinator_routes_four_startup_modes(
         keep_service_alive.assert_called_once_with(start_serve, args, config)
 
 
+def test_futu_startup_failure_exits_standalone_but_keeps_started_service_alive() -> None:
+    """Preserve explicit CLI failure without terminating an active API process."""
+    dispatch = vars(main)["__dispatch_cli"]
+    config = _make_config()
+
+    for start_serve, expected_exit in ((False, 1), (True, 0)):
+        args = _make_args(portfolio="futu")
+        with patch(
+            "main.__coordinate_service_runtime",
+            return_value=(start_serve, None),
+        ), patch(
+            "main._run_analysis_with_runtime_scheduler_lock",
+            return_value=False,
+        ), patch("main.__keep_service_runtime_alive") as keep_service_alive:
+            assert dispatch(config, args) == expected_exit
+
+        if start_serve:
+            keep_service_alive.assert_called_once_with(True, args, config)
+        else:
+            keep_service_alive.assert_not_called()
+
+
+def test_runtime_lock_returns_the_underlying_analysis_outcome() -> None:
+    """Let CLI dispatch distinguish a requested Futu import failure."""
+    config = _make_config()
+    args = _make_args(portfolio="futu")
+
+    def run_immediately(*, task_runner, config, args, stock_codes, blocking):
+        assert blocking is True
+        task_runner(config, args, stock_codes)
+        return True
+
+    with patch("main.run_full_analysis", return_value=False), patch(
+        "src.services.runtime_scheduler.run_with_global_analysis_lock",
+        side_effect=run_immediately,
+    ):
+        assert main._run_analysis_with_runtime_scheduler_lock(config, args, None) is False
+
+
 def test_source_first_import_and_reload_restore_runtime_bindings() -> None:
     """Reconstruct runtime facade functions after source or facade patching."""
 

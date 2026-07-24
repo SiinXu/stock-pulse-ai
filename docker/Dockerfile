@@ -61,8 +61,10 @@ COPY strategies/ ./strategies/
 COPY --from=web-builder /app/static ./static/
 COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-# Verify the bundled AlphaSift adapter from requirements.
-RUN python -c "import alphasift.dsa_adapter"
+# Verify bundled integrations without retaining SDK-created user files.
+RUN mkdir -p /tmp/futu-sdk-smoke-home && \
+    HOME=/tmp/futu-sdk-smoke-home python -c "import alphasift.dsa_adapter; import futu" && \
+    rm -rf /tmp/futu-sdk-smoke-home
 
 # Ensure the data directory exists and is authorized for non-root users
 RUN mkdir -p /app/data /app/logs /app/reports && \

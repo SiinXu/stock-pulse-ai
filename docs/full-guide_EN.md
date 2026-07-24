@@ -144,6 +144,9 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 | Secret Name | Description | Required |
 |------------|------|:----:|
 | `STOCK_LIST` | Watchlist codes, e.g., `600519,300750,002594,7203.T,005930.KS`; English commas are recommended, while pasted Chinese commas, enumeration commas, semicolons, spaces, and newlines are recognized and normalized to English commas | ✅ |
+| `FUTU_OPEND_HOST` / `FUTU_OPEND_PORT` | OpenD endpoint used by `--portfolio futu`; defaults to `127.0.0.1:11111` and is never contacted unless that option is selected | Optional |
+| `FUTU_ACC_ID` | Optional live securities account ID; when empty, eligible `ACTIVE REAL NORMAL/MASTER` accounts are merged | Optional |
+| `FUTU_SECURITY_FIRM` | Futu security-firm enum; defaults to SDK auto-detection with `NONE` | Optional |
 | `ANSPIRE_API_KEYS` | [Anspire AI Search](https://aisearch.anspire.cn/) optimized for Chinese content; the same key can also be used for Anspire LLM fallback scenarios (example model: `Doubao-Seed-2.0-lite`) | Recommended |
 | `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/baidu-search-api) search-engine results for realtime financial news | Recommended |
 | `TAVILY_API_KEYS` | [Tavily](https://tavily.com/) Search API (for news search) | Optional |
@@ -639,12 +642,21 @@ python main.py                        # Full analysis (stocks + market review)
 python main.py --market-review        # Market review only
 python main.py --no-market-review     # Stock analysis only
 python main.py --stocks 600519,300750 # Specify stocks
+python main.py --portfolio futu       # Use live Futu OpenD positions as analysis scope
 python main.py --dry-run              # Fetch data only, no AI analysis
 python main.py --no-notify            # Don't send notifications
 python main.py --schedule             # Scheduled task mode
 python main.py --debug                # Debug mode (verbose logging)
 python main.py --workers 5            # Specify concurrency
 ```
+
+#### Live Futu OpenD analysis scope
+
+`python main.py --portfolio futu` is an explicit, read-only analysis-scope source. It queries `ACTIVE` `REAL` Futu NORMAL or MASTER securities accounts, keeps only non-zero `LONG` positions that OpenD definitively classifies as `STOCK`, and converts mainland A-share, Hong Kong, and U.S. symbols to the project format. Short and zero positions, ETFs/options and other non-stock instruments, B shares, and currently unsupported markets are skipped.
+
+When selected, the live scope overrides both `--stocks` and `STOCK_LIST`. A successfully read empty portfolio remains an empty list and never falls back to the static watchlist. Account discovery, position queries, security classification, and code-conversion failures fail the run explicitly instead of analyzing a partial untrusted scope. Scheduled mode queries OpenD on every actual execution rather than caching startup holdings. Existing behavior is unchanged when `--portfolio` is omitted.
+
+The endpoint defaults to `127.0.0.1:11111` and can be changed with `FUTU_OPEND_HOST` / `FUTU_OPEND_PORT`. `FUTU_ACC_ID` selects one eligible live account; when empty, all eligible accounts are merged. `FUTU_SECURITY_FIRM=NONE` uses SDK auto-detection. Inside Docker, `127.0.0.1` refers to the container itself, so configure a trusted OpenD host reachable from the container network. The integration only calls account-list, position-list, and security-basic-information queries; it never unlocks trading or places, modifies, or cancels orders. This first phase does not write live positions into portfolio management.
 
 ---
 
