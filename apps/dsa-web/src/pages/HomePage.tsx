@@ -33,7 +33,6 @@ import { useUiLanguage } from '../contexts/UiLanguageContext';
 import {
   ANALYSIS_WORKBENCH_SEGMENT_VALUES,
   APP_ROUTE_PATHS,
-  REPORT_ROUTE_QUERY_KEYS,
   SIGNAL_CENTER_SCOPE_VALUES,
   SIGNAL_CENTER_TAB_VALUES,
   buildAnalysisWorkbenchHref,
@@ -45,6 +44,7 @@ import type { DecisionSignalItem } from '../types/decisionSignals';
 import type { SetupStatusResponse } from '../types/systemConfig';
 import { buildDecisionActionLabelMap } from '../utils/decisionAction';
 import { getDecisionSignalPresentation } from '../utils/decisionSignalPresentation';
+import { buildDeepLink } from '../utils/deepLink';
 import { formatDateTime } from '../utils/format';
 import {
   dismissOnboarding,
@@ -53,6 +53,24 @@ import {
 import { getUiListSeparator } from '../utils/uiLocale';
 
 export const HOME_CONFIGURABLE_STORAGE_KEY = 'dsa.home.configurable.expanded';
+
+function readHomeConfigurableExpanded(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(HOME_CONFIGURABLE_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeHomeConfigurableExpanded(expanded: boolean): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(HOME_CONFIGURABLE_STORAGE_KEY, expanded ? '1' : '0');
+  } catch {
+    // Persistence is best-effort; the in-memory disclosure state remains usable.
+  }
+}
 
 const SIGNAL_PAGE_SIZE = 12;
 const FOCUS_ITEM_LIMIT = 3;
@@ -168,7 +186,7 @@ const HomePage: React.FC = () => {
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
   const [onboardingDismissed, setOnboardingDismissed] = useState(readOnboardingDismissed);
   const [configurableExpanded, setConfigurableExpanded] = useState(
-    () => window.localStorage.getItem(HOME_CONFIGURABLE_STORAGE_KEY) === '1',
+    readHomeConfigurableExpanded,
   );
 
   useRouteFocusTarget({
@@ -236,7 +254,7 @@ const HomePage: React.FC = () => {
   const toggleConfigurable = useCallback(() => {
     setConfigurableExpanded((expanded) => {
       const next = !expanded;
-      window.localStorage.setItem(HOME_CONFIGURABLE_STORAGE_KEY, next ? '1' : '0');
+      writeHomeConfigurableExpanded(next);
       return next;
     });
   }, []);
@@ -526,10 +544,10 @@ const HomePage: React.FC = () => {
               <button
                 type="button"
                 className="flex min-h-14 w-full items-center justify-between gap-3 text-left"
-                onClick={() => navigate({
-                  pathname: APP_ROUTE_PATHS.researchMarket,
-                  search: `?${REPORT_ROUTE_QUERY_KEYS.recordId}=${latestMarketReview.id}`,
-                })}
+                onClick={() => navigate(buildDeepLink({
+                  page: 'market-review',
+                  recordId: latestMarketReview.id,
+                }))}
               >
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-semibold text-foreground">

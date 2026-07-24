@@ -240,6 +240,31 @@ function buildHistoryParams(page: number) {
   };
 }
 
+function hasMoreHistoryPages(response: HistoryListResponse): boolean {
+  return response.limit > 0 && response.page * response.limit < response.total;
+}
+
+function isStockAnalysisHistoryItem(item: HistoryItem): boolean {
+  return item.reportType !== 'market_review' && item.stockCode !== MARKET_REVIEW_HISTORY_CODE;
+}
+
+async function fetchStockAnalysisHistoryPage(startPage: number): Promise<HistoryListResponse> {
+  let page = startPage;
+  while (true) {
+    const response = await historyApi.getList(buildHistoryParams(page));
+    const stockItems = response.items.filter(isStockAnalysisHistoryItem);
+    const stockResponse = {
+      ...response,
+      page,
+      items: stockItems,
+    };
+    if (stockItems.length > 0 || !hasMoreHistoryPages(stockResponse)) {
+      return stockResponse;
+    }
+    page += 1;
+  }
+}
+
 function buildMarketReviewHistoryParams(page: number) {
   return {
     stockCode: MARKET_REVIEW_HISTORY_CODE,
@@ -450,32 +475,37 @@ function fetchHistoryOutcome(
 
   const promise = (async (): Promise<FetchHistoryOutcome> => {
     try {
-      const response = await historyApi.getList(buildHistoryParams(page));
+      const response = await fetchStockAnalysisHistoryPage(page);
       if (requestId !== historyRequestSeq) {
         return { status: 'superseded', requestId };
       }
 
       if (silent && reset) {
-        const existingIds = new Set(get().historyItems.map((item) => item.id));
+        const state = get();
+        const existingIds = new Set(state.historyItems.map((item) => item.id));
         const newItems = response.items.filter((item) => !existingIds.has(item.id));
-        if (newItems.length > 0) {
-          set({ historyItems: [...newItems, ...get().historyItems] });
-        }
+        const effectivePage = Math.max(state.currentPage, response.page);
+        set({
+          historyItems: newItems.length > 0
+            ? [...newItems, ...state.historyItems]
+            : state.historyItems,
+          currentPage: effectivePage,
+          hasMore: hasMoreHistoryPages({ ...response, page: effectivePage }),
+        });
       } else if (reset) {
         set({
           historyItems: response.items,
-          currentPage: 1,
+          currentPage: response.page,
         });
       } else {
         set({
-          historyItems: [...get().historyItems, ...response.items],
-          currentPage: page,
+          historyItems: dedupeHistoryItems([...get().historyItems, ...response.items]),
+          currentPage: response.page,
         });
       }
 
       if (!silent) {
-        const totalLoaded = reset ? response.items.length : get().historyItems.length;
-        set({ hasMore: totalLoaded < response.total });
+        set({ hasMore: hasMoreHistoryPages(response) });
       }
 
       const visibleIds = new Set(get().historyItems.map((item) => item.id));
@@ -689,8 +719,8 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
       const visibleIds = new Set(outcome.response.items.map((item) => item.id));
       set({
         historyItems: outcome.response.items,
-        currentPage: 1,
-        hasMore: outcome.response.items.length < outcome.response.total,
+        currentPage: outcome.response.page,
+        hasMore: hasMoreHistoryPages(outcome.response),
         selectedHistoryIds: get().selectedHistoryIds.filter((id) => visibleIds.has(id)),
       });
     }

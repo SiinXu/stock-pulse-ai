@@ -11,7 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Bundled `constraints.txt` / `build-constraints.txt` into the packaged desktop backend and resolved them from `sys._MEIPASS`, so the AlphaSift repair install pins runtime and PEP 517 build dependencies on the desktop artifact too instead of degrading to `--no-deps` only.
 - [Fixed] Prevented Windows API and desktop startup from hanging on a cold MIME database by initializing built-in mappings without scanning the registry before registering frontend asset types.
 - [Added] Added opt-in `--portfolio futu` analysis scope loading from non-zero long stock positions in eligible live Futu OpenD accounts, with A-share/Hong Kong/U.S. symbol normalization and no changes to the default static stock-list behavior.
-- [Changed] Slimmed Web Home into a source-aware three-block attention hub, moved report and Run Flow ownership plus confirmed history deletion to Analysis Workbench, kept same-source Run Flow snapshots visible during stream-error refreshes, and retained canonical redirects for legacy Home analysis links.
 - [Tests] Added a shared `mockCompletedSetupStatus` Playwright helper to the `smoke`, `report-markdown`, and `infrastructure-acceptance` specs so default-on beginner preferences no longer displace professional-mode assertions for analysis submission, full-report access, or report body content.
 - [Fixed] Preserved structured diagnostic fields in prose log lines by preventing whitespace prose from triggering the composite-key walker's bounded fail-closed path and removing a sensitive-word ambiguity from the bot request-size log, while retaining fail-closed text/mapping parity for sensitive whitespace and punctuation labels.
 - [Added] Embedded additive `schema_version` tags in the `Report`, `RunFlowSnapshot`, and `DecisionSignalPresentation` serialized artifacts (default `report-v1` / `run-flow-v1` / `decision-signal-presentation-v1`); historical payloads that omit the field deserialize as the v1 default, and the versioning guard test plus migration docs inventory were extended accordingly.
@@ -342,6 +341,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Unified Web decision signals, alert rules, delivery history, and outcome review under `/signals` with URL-scoped filters and legacy redirects.
 - [Added] Added the `/research/analysis` workbench with URL-backed launch, running-task, and history segments; watchlist and file batch submission; report and Run Flow deep links; completion actions; and a collapsible Research navigation entry.
 - [Fixed] Synchronized Signal Center URL stock context before paint so immediate browser Back and Forward navigation cannot retain the newer stock under an older URL entry.
+- [Changed] Slimmed Web Home into a source-aware three-block attention hub with best-effort disclosure persistence, moved complete stock-report history plus report and Run Flow ownership and confirmed deletion to Analysis Workbench, kept same-source Run Flow snapshots visible during stream-error refreshes, and retained canonical redirects for legacy Home analysis links.
 
 ## [3.26.3] - 2026-07-15
 

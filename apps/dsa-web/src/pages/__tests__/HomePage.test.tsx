@@ -172,6 +172,27 @@ describe('HomePage attention hub', () => {
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
 
+  it('keeps the configurable area usable when browser preference storage fails', async () => {
+    const storagePrototype = Object.getPrototypeOf(window.localStorage) as Storage;
+    const getItem = vi.spyOn(storagePrototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('Storage denied', 'SecurityError');
+    });
+    renderHome();
+
+    const configurable = await screen.findByRole('button', { name: /Configurable area/ });
+    expect(configurable).toHaveAttribute('aria-expanded', 'false');
+    getItem.mockRestore();
+
+    const setItem = vi.spyOn(storagePrototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Storage full', 'QuotaExceededError');
+    });
+    fireEvent.click(configurable);
+
+    expect(configurable).toHaveAttribute('aria-expanded', 'true');
+    expect(document.getElementById('home-configurable-content')).toBeVisible();
+    setItem.mockRestore();
+  });
+
   it('uses the filtered reassessment total instead of the active-signal page window', async () => {
     vi.mocked(decisionSignalsApi.list).mockImplementation(async (params) => (
       params?.expiresTo

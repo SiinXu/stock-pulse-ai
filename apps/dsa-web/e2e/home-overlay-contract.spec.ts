@@ -44,6 +44,17 @@ const COMPLETED_TASK_ITEM = {
   created_at: '2026-07-16T08:00:00Z',
 };
 
+const MARKET_REVIEW_PAGE = Array.from({ length: 20 }, (_, index) => ({
+  id: 100 + index,
+  query_id: `market-review-${index}`,
+  stock_code: 'MARKET',
+  stock_name: 'Market review',
+  report_type: 'market_review',
+  sentiment_score: 50,
+  operation_advice: 'Review',
+  created_at: `2026-07-${String(23 - index).padStart(2, '0')}T08:00:00Z`,
+}));
+
 const REPORTS: Record<number, Record<string, unknown>> = {
   1: {
     meta: {
@@ -139,6 +150,7 @@ function deferred() {
 type HomeApiOptions = {
   delayFirstRecord?: boolean;
   deferCompletedTask?: boolean;
+  marketReviewOnlyFirstHistoryPage?: boolean;
   watchlistCodes?: string[];
   recordFailure?: {
     recordId: number;
@@ -234,12 +246,27 @@ async function installHomeApiFixture(page: Page, options: HomeApiOptions = {}) {
       historyRequests.push(url.search);
       const reportType = url.searchParams.get('report_type');
       const stockCode = url.searchParams.get('stock_code');
+      const page = Number(url.searchParams.get('page') || 1);
+      if (options.marketReviewOnlyFirstHistoryPage && !reportType && !stockCode) {
+        const items = page === 1
+          ? MARKET_REVIEW_PAGE
+          : page === 2
+            ? fixtureHistoryItems
+            : [];
+        await fulfillJson(route, {
+          total: MARKET_REVIEW_PAGE.length + fixtureHistoryItems.length,
+          page,
+          limit: Number(url.searchParams.get('limit') || 20),
+          items,
+        });
+        return;
+      }
       const items = reportType === 'market_review'
         ? []
         : fixtureHistoryItems.filter((item) => !stockCode || item.stock_code === stockCode);
       await fulfillJson(route, {
         total: items.length,
-        page: Number(url.searchParams.get('page') || 1),
+        page,
         limit: Number(url.searchParams.get('limit') || 20),
         items,
       });
@@ -870,6 +897,19 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
     await expectSearchParams(page, { keep: 'yes', recordId: '2' });
     expect(fixture.detailRequests.slice(deleteRequestIndex)).toEqual([2]);
     expect(await page.evaluate(() => window.history.length)).toBe(historyLength);
+  });
+
+  test('history continues past a market-review-only first page before deciding it is empty', async ({ page }) => {
+    const fixture = await openFixtureHome(
+      page,
+      `${APP_ROUTE_PATHS.researchAnalysis}?segment=history`,
+      { marketReviewOnlyFirstHistoryPage: true },
+    );
+
+    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+    expect(fixture.historyRequests.some((search) => new URLSearchParams(search).get('page') === '1')).toBe(true);
+    expect(fixture.historyRequests.some((search) => new URLSearchParams(search).get('page') === '2')).toBe(true);
+    await expect(page.getByText('No analysis history', { exact: true })).toHaveCount(0);
   });
 
   test('a 401 report deep link keeps its localized error and removes only recordId', async ({ page }) => {
