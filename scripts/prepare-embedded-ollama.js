@@ -78,6 +78,15 @@ async function assertFileChecksum(filePath, expectedSha256, fsImpl = fs) {
   return actualSha256;
 }
 
+async function calculateRequiredFileSha256(rootDir, requiredPaths, fsImpl = fs) {
+  const hashes = {};
+  for (const relativePath of requiredPaths) {
+    const resourcePath = resolveContainedPath(rootDir, relativePath);
+    hashes[relativePath] = await calculateFileSha256(resourcePath, fsImpl);
+  }
+  return hashes;
+}
+
 function openDownload(url, {
   httpsImpl = https,
   redirectCount = 0,
@@ -230,7 +239,7 @@ function extractArchive({ archivePath, artifact, stagingDir, platform, spawnSync
   }
 }
 
-function buildPreparedManifest(config, artifact, platform, arch) {
+function buildPreparedManifest(config, artifact, platform, arch, requiredFileSha256) {
   return {
     schemaVersion: 1,
     runtime: config.runtime,
@@ -240,6 +249,7 @@ function buildPreparedManifest(config, artifact, platform, arch) {
     supportedArchitectures: artifact.architectures,
     binaryPath: artifact.binaryPath,
     requiredPaths: artifact.requiredPaths,
+    requiredFileSha256,
     archive: {
       fileName: artifact.fileName,
       sha256: artifact.sha256,
@@ -247,14 +257,83 @@ function buildPreparedManifest(config, artifact, platform, arch) {
   };
 }
 
-function preparedRuntimeIsCurrent(outputDir, expectedManifest, artifact, platform) {
+async function assertPreparedRuntimeMatchesManifest(
+  rootDir,
+  manifest,
+  artifact,
+  platform,
+  arch,
+  fsImpl = fs
+) {
+  if (manifest.schemaVersion !== 1
+    || manifest.runtime !== 'ollama'
+    || manifest.platform !== platform
+    || manifest.architecture !== arch
+    || manifest.binaryPath !== artifact.binaryPath
+    || JSON.stringify(manifest.supportedArchitectures) !== JSON.stringify(artifact.architectures)
+    || JSON.stringify(manifest.requiredPaths) !== JSON.stringify(artifact.requiredPaths)
+    || !manifest.archive
+    || manifest.archive.fileName !== artifact.fileName
+    || manifest.archive.sha256 !== artifact.sha256
+    || !manifest.requiredFileSha256
+    || typeof manifest.requiredFileSha256 !== 'object'
+    || Array.isArray(manifest.requiredFileSha256)
+    || JSON.stringify(Object.keys(manifest.requiredFileSha256).sort())
+      !== JSON.stringify([...artifact.requiredPaths].sort())) {
+    throw new Error(`Embedded Ollama prepared manifest is invalid for ${platform}/${arch}.`);
+  }
+
+  validatePreparedRuntime(rootDir, artifact, platform, fsImpl);
+  for (const relativePath of artifact.requiredPaths) {
+    const expectedSha256 = manifest.requiredFileSha256[relativePath];
+    if (!/^[a-f0-9]{64}$/.test(String(expectedSha256 || ''))) {
+      throw new Error(`Embedded Ollama required-file checksum is invalid: ${relativePath}`);
+    }
+    await assertFileChecksum(resolveContainedPath(rootDir, relativePath), expectedSha256, fsImpl);
+  }
+  return true;
+}
+
+async function verifyPreparedOllama({
+  platform = process.platform,
+  arch = process.arch,
+  configPath = CONFIG_PATH,
+  outputDir = DEFAULT_OUTPUT_DIR,
+  fsImpl = fs,
+} = {}) {
+  const config = readRuntimeConfig(configPath);
+  const artifact = selectArtifact(config, platform, arch);
+  const manifestPath = path.join(outputDir, PREPARED_MANIFEST_FILE);
+  const manifest = JSON.parse(fsImpl.readFileSync(manifestPath, 'utf-8'));
+  if (manifest.version !== config.version) {
+    throw new Error(`Embedded Ollama prepared version does not match ${config.version}.`);
+  }
+  await assertPreparedRuntimeMatchesManifest(
+    outputDir,
+    manifest,
+    artifact,
+    platform,
+    arch,
+    fsImpl
+  );
+  return manifest;
+}
+
+async function preparedRuntimeIsCurrent(outputDir, expectedManifest, artifact, platform, fsImpl = fs) {
   try {
     const manifestPath = path.join(outputDir, PREPARED_MANIFEST_FILE);
-    const actualManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+    const actualManifest = JSON.parse(fsImpl.readFileSync(manifestPath, 'utf-8'));
     if (JSON.stringify(actualManifest) !== JSON.stringify(expectedManifest)) {
       return false;
     }
-    validatePreparedRuntime(outputDir, artifact, platform);
+    await assertPreparedRuntimeMatchesManifest(
+      outputDir,
+      actualManifest,
+      artifact,
+      platform,
+      actualManifest.architecture,
+      fsImpl
+    );
     return true;
   } catch (_error) {
     return false;
@@ -280,13 +359,24 @@ async function prepareEmbeddedOllama({
     archiveOverride,
     downloadImpl,
   });
-  const preparedManifest = buildPreparedManifest(config, artifact, platform, arch);
+  let preparedManifest;
   const stagingDir = `${outputDir}.tmp-${process.pid}-${Date.now()}`;
   fs.rmSync(stagingDir, { recursive: true, force: true });
   fs.mkdirSync(stagingDir, { recursive: true });
   try {
     extractArchive({ archivePath, artifact, stagingDir, platform, spawnSyncImpl });
     validatePreparedRuntime(stagingDir, artifact, platform);
+    const requiredFileSha256 = await calculateRequiredFileSha256(
+      stagingDir,
+      artifact.requiredPaths
+    );
+    preparedManifest = buildPreparedManifest(
+      config,
+      artifact,
+      platform,
+      arch,
+      requiredFileSha256
+    );
     fs.writeFileSync(
       path.join(stagingDir, PREPARED_MANIFEST_FILE),
       `${JSON.stringify(preparedManifest, null, 2)}\n`,
@@ -337,8 +427,10 @@ if (require.main === module) {
 module.exports = {
   PREPARED_MANIFEST_FILE,
   assertFileChecksum,
+  assertPreparedRuntimeMatchesManifest,
   buildPreparedManifest,
   calculateFileSha256,
+  calculateRequiredFileSha256,
   ensureVerifiedArchive,
   parseArguments,
   prepareEmbeddedOllama,
@@ -347,4 +439,5 @@ module.exports = {
   resolveContainedPath,
   selectArtifact,
   validatePreparedRuntime,
+  verifyPreparedOllama,
 };

@@ -33,6 +33,26 @@ test('embedded Ollama manifest pins official artifacts for every desktop target'
   );
 });
 
+test('third-party notices cover native components in the complete Ollama archives', () => {
+  const repositoryRoot = path.resolve(__dirname, '..', '..', '..');
+  const notices = fs.readFileSync(path.join(repositoryRoot, 'THIRD_PARTY_NOTICES'), 'utf-8');
+  for (const component of [
+    'Ollama',
+    'llama.cpp and ggml',
+    'MLX, including JACCL',
+    'pocketfft',
+    'Metal-cpp 26',
+    'LLVM runtime libraries',
+    'mingw-w64 runtime',
+    'NVIDIA CUDA Runtime and cuBLAS',
+    'Microsoft Visual C++ runtime libraries',
+  ]) {
+    assert.ok(notices.includes(component), `missing notice for ${component}`);
+  }
+  assert.match(notices, /Apache License\s+Version 2\.0, January 2004/);
+  assert.match(notices, /LLVM Exceptions to the Apache 2\.0 License/);
+});
+
 test('embedded Ollama checksum verification reads the real artifact path', async (t) => {
   const tmpDir = createTemporaryDirectory(t, 'dsa-ollama-sha-');
   const archivePath = path.join(tmpDir, 'runtime.tgz');
@@ -144,14 +164,38 @@ test('preparation verifies an archive before atomically publishing its runtime',
     JSON.parse(fs.readFileSync(path.join(outputDir, 'runtime-manifest.json'), 'utf-8')),
     result.manifest
   );
+  assert.deepEqual(Object.keys(result.manifest.requiredFileSha256).sort(), [
+    'llama-server',
+    'ollama',
+  ]);
   assert.equal(
-    prepareScript.preparedRuntimeIsCurrent(
+    await prepareScript.preparedRuntimeIsCurrent(
       outputDir,
       result.manifest,
       prepareScript.selectArtifact(prepareScript.readRuntimeConfig(configPath), 'darwin', 'arm64'),
       'darwin'
     ),
     true
+  );
+
+  fs.writeFileSync(path.join(outputDir, 'llama-server'), 'corrupt helper bytes');
+  assert.equal(
+    await prepareScript.preparedRuntimeIsCurrent(
+      outputDir,
+      result.manifest,
+      prepareScript.selectArtifact(prepareScript.readRuntimeConfig(configPath), 'darwin', 'arm64'),
+      'darwin'
+    ),
+    false
+  );
+  await assert.rejects(
+    prepareScript.verifyPreparedOllama({
+      platform: 'darwin',
+      arch: 'arm64',
+      configPath,
+      outputDir,
+    }),
+    /checksum mismatch/
   );
 });
 

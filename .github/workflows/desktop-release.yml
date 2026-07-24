@@ -88,12 +88,18 @@ jobs:
             throw 'No win-unpacked directory found under apps/dsa-desktop/dist.'
           }
           $embeddedRuntime = Join-Path $winUnpacked 'resources/ollama/ollama.exe'
+          $embeddedHelper = Join-Path $winUnpacked 'resources/ollama/lib/ollama/llama-server.exe'
           $embeddedManifest = Join-Path $winUnpacked 'resources/ollama/runtime-manifest.json'
           $thirdPartyNotices = Join-Path $winUnpacked 'resources/THIRD_PARTY_NOTICES'
-          foreach ($requiredPath in @($embeddedRuntime, $embeddedManifest, $thirdPartyNotices)) {
+          foreach ($requiredPath in @($embeddedRuntime, $embeddedHelper, $embeddedManifest, $thirdPartyNotices)) {
             if (-not (Test-Path $requiredPath -PathType Leaf)) {
               throw "Desktop package is missing required embedded runtime resource: $requiredPath"
             }
+          }
+          $embeddedRoot = Join-Path $winUnpacked 'resources/ollama'
+          node -e "const p=require('./scripts/prepare-embedded-ollama'); p.verifyPreparedOllama({platform:'win32',arch:'x64',outputDir:process.argv[1]}).then(m=>console.log('verified embedded Ollama',m.version,m.platform,m.architecture)).catch(e=>{console.error(e);process.exit(1)})" $embeddedRoot
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Embedded Ollama manifest or required-file checksum validation failed.'
           }
           New-Item -ItemType Directory -Path 'dist/release-assets' -Force | Out-Null
           $exeTarget = "dist/release-assets/$expectedInstallerName"
@@ -225,8 +231,10 @@ jobs:
           trap 'hdiutil detach "$mount_dir" >/dev/null 2>&1 || true; rmdir "$mount_dir" >/dev/null 2>&1 || true' EXIT
           app_bundle="$mount_dir/StockPulse.app"
           test -x "$app_bundle/Contents/Resources/ollama/ollama"
+          test -f "$app_bundle/Contents/Resources/ollama/llama-server"
           test -f "$app_bundle/Contents/Resources/ollama/runtime-manifest.json"
           test -f "$app_bundle/Contents/Resources/THIRD_PARTY_NOTICES"
+          node -e 'const p=require("./scripts/prepare-embedded-ollama"); p.verifyPreparedOllama({platform:"darwin",arch:process.argv[2],outputDir:process.argv[1]}).then(m=>console.log("verified embedded Ollama",m.version,m.platform,m.architecture)).catch(e=>{console.error(e);process.exit(1)})' "$app_bundle/Contents/Resources/ollama" '${{ matrix.arch }}'
           hdiutil detach "$mount_dir" >/dev/null
           rmdir "$mount_dir"
           trap - EXIT

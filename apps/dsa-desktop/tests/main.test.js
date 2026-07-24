@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const Module = require('node:module');
 const { EventEmitter } = require('node:events');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -187,6 +188,9 @@ test('desktop package exposes StockPulse while retaining the stable upgrade appI
   assert.match(releaseWorkflow, /stockpulse-windows-installer-/);
   assert.match(releaseWorkflow, /stockpulse-windows-noinstall-/);
   assert.match(releaseWorkflow, /stockpulse-macos-/);
+  assert.match(releaseWorkflow, /lib\/ollama\/llama-server\.exe/);
+  assert.match(releaseWorkflow, /Resources\/ollama\/llama-server/);
+  assert.equal((releaseWorkflow.match(/verifyPreparedOllama/g) || []).length, 2);
   assert.match(updaterVerification, /stockpulse-windows-installer-/);
   assert.match(installerScript, /!macro customInstall\b/);
   assert.match(installerScript, /Software\\Classes\\stockpulse\\shell\\open\\command/);
@@ -2878,13 +2882,16 @@ function createEmbeddedRuntimeFixture(t, {
   const requiredPaths = platform === 'win32'
     ? ['ollama.exe', 'lib/ollama/llama-server.exe']
     : ['ollama', 'llama-server'];
+  const requiredFileSha256 = {};
   for (const relativePath of requiredPaths) {
+    const content = `fixture:${relativePath}`;
+    requiredFileSha256[relativePath] = crypto.createHash('sha256').update(content).digest('hex');
     if (relativePath === omitRequiredPath) {
       continue;
     }
     const absolutePath = path.join(rootDir, relativePath);
     fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
-    fs.writeFileSync(absolutePath, `fixture:${relativePath}`);
+    fs.writeFileSync(absolutePath, content);
     if (platform === 'darwin') {
       fs.chmodSync(absolutePath, 0o755);
     }
@@ -2898,6 +2905,7 @@ function createEmbeddedRuntimeFixture(t, {
     supportedArchitectures: platform === 'darwin' ? ['arm64', 'x64'] : ['x64'],
     binaryPath,
     requiredPaths,
+    requiredFileSha256,
     archive: {
       fileName: platform === 'darwin' ? 'ollama-darwin.tgz' : 'ollama-windows-amd64.zip',
       sha256: 'a'.repeat(64),
@@ -3067,6 +3075,24 @@ test('local model binary resolution rejects missing and non-working embedded res
   });
   assert.equal(corruptResult, null);
   assert.deepEqual(corruptRecords.map((record) => record.command), ['ollama', corrupt.command]);
+});
+
+test('local model binary resolution rejects an embedded runtime with corrupt helper bytes', async (t) => {
+  const mainModule = loadMainModule(t);
+  const embedded = createEmbeddedRuntimeFixture(t);
+  fs.writeFileSync(path.join(embedded.rootDir, 'llama-server'), 'corrupt helper bytes');
+  const records = [];
+
+  const resolved = await mainModule.resolveLocalModelBinary({
+    embeddedRoot: embedded.rootDir,
+    platform: 'darwin',
+    arch: 'arm64',
+    spawnImpl: makeRuntimeAvailabilitySpawn(records, () => 'error'),
+    logImpl: () => undefined,
+  });
+
+  assert.equal(resolved, null);
+  assert.deepEqual(records.map((record) => record.command), ['ollama']);
 });
 
 test('embedded runtime validation supports the packaged Windows layout', (t) => {
@@ -3260,7 +3286,7 @@ test('starting a missing runtime degrades gracefully without throwing', async (t
   assert.match(state.message, /not installed/i);
 });
 
-test('stopping the runtime only terminates the desktop-managed process', (t) => {
+test('stopping the runtime only terminates the desktop-managed process', async (t) => {
   const mainModule = loadMainModule(t);
   mainModule.__setLocalModelStateForTest(null);
   const managed = new EventEmitter();
@@ -3275,10 +3301,68 @@ test('stopping the runtime only terminates the desktop-managed process', (t) => 
   };
   mainModule.__setLocalModelServeProcessForTest(managed);
 
-  const state = mainModule.stopManagedLocalModelRuntime();
+  const state = await mainModule.stopManagedLocalModelRuntime();
   assert.equal(killed, true);
   assert.equal(state.status, mainModule.DESKTOP_LOCAL_MODEL_STATUS.STOPPED);
   assert.equal(mainModule.__getLocalModelServeProcessForTest(), null);
+});
+
+test('Windows runtime stop waits for taskkill before clearing managed state', async (t) => {
+  const mainModule = loadMainModule(t, { platform: 'win32' });
+  mainModule.__setLocalModelStateForTest(null);
+  const managed = new EventEmitter();
+  managed.pid = 9292;
+  managed.exitCode = null;
+  managed.signalCode = null;
+  const terminator = new EventEmitter();
+  const spawnCalls = [];
+  mainModule.__setLocalModelServeProcessForTest(managed);
+
+  let settled = false;
+  const pending = mainModule.stopManagedLocalModelRuntime({
+    platform: 'win32',
+    timeoutMs: 1000,
+    spawnImpl: (command, args, options) => {
+      spawnCalls.push({ command, args, options });
+      return terminator;
+    },
+  }).then((state) => {
+    settled = true;
+    return state;
+  });
+
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(settled, false);
+  assert.equal(mainModule.__getLocalModelServeProcessForTest(), managed);
+  assert.deepEqual(spawnCalls, [{
+    command: 'taskkill',
+    args: ['/PID', '9292', '/T', '/F'],
+    options: { windowsHide: true, stdio: 'ignore' },
+  }]);
+
+  managed.exitCode = 0;
+  managed.emit('exit', 0);
+  const state = await pending;
+  assert.equal(state.status, mainModule.DESKTOP_LOCAL_MODEL_STATUS.STOPPED);
+  assert.equal(mainModule.__getLocalModelServeProcessForTest(), null);
+});
+
+test('Windows runtime stop fails closed when taskkill cannot terminate the process', async (t) => {
+  const mainModule = loadMainModule(t, { platform: 'win32' });
+  const managed = new EventEmitter();
+  managed.pid = 9393;
+  managed.exitCode = null;
+  managed.signalCode = null;
+  mainModule.__setLocalModelServeProcessForTest(managed);
+
+  const pending = mainModule.stopManagedLocalModelRuntime({
+    platform: 'win32',
+    timeoutMs: 20,
+    spawnImpl: () => new EventEmitter(),
+  });
+
+  await assert.rejects(pending, /Ollama did not stop within 20ms/);
+  assert.equal(mainModule.__getLocalModelServeProcessForTest(), managed);
 });
 
 test('pull refuses names outside the curated allowlist before any network call', async (t) => {

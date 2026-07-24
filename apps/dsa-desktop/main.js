@@ -11,6 +11,7 @@ const {
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { loadDesktopLocalModelPresets } = require('./local-model-catalog');
 const { spawn } = require('child_process');
 const net = require('net');
@@ -112,6 +113,8 @@ const DESKTOP_LOCAL_MODEL_BASE_URL_ENV_KEY = 'LLM_OLLAMA_BASE_URL';
 const DESKTOP_LOCAL_MODEL_REQUEST_TIMEOUT_MS = 4000;
 const DESKTOP_LOCAL_MODEL_DETECT_TIMEOUT_MS = 4000;
 const DESKTOP_LOCAL_MODEL_START_TIMEOUT_MS = 20000;
+const DESKTOP_LOCAL_MODEL_STOP_FORCE_AFTER_MS = 3000;
+const DESKTOP_LOCAL_MODEL_STOP_TIMEOUT_MS = 5000;
 const DESKTOP_LOCAL_MODEL_PULL_TIMEOUT_MS = 30 * 60 * 1000;
 const DESKTOP_LOCAL_MODEL_NAME_PATTERN =
   /^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)?(?::[a-z0-9]+(?:[._-][a-z0-9]+)*)?$/i;
@@ -2181,7 +2184,7 @@ async function installDownloadedUpdate() {
   let backupRoot = null;
   try {
     logLine('[update] stop managed local model runtime and backend before backing up runtime data');
-    stopManagedLocalModelRuntime();
+    await stopManagedLocalModelRuntime();
     await stopBackend();
     backupRoot = resolveUpdateBackupRoot();
     cleanupUpdateBackupRoot();
@@ -2771,6 +2774,24 @@ function resolveContainedLocalModelResource(rootDir, relativePath) {
   return candidate;
 }
 
+function calculateLocalModelFileSha256(filePath, fsImpl = fs) {
+  const hash = crypto.createHash('sha256');
+  const buffer = Buffer.allocUnsafe(1024 * 1024);
+  const fileDescriptor = fsImpl.openSync(filePath, 'r');
+  try {
+    let bytesRead = 0;
+    do {
+      bytesRead = fsImpl.readSync(fileDescriptor, buffer, 0, buffer.length, null);
+      if (bytesRead > 0) {
+        hash.update(buffer.subarray(0, bytesRead));
+      }
+    } while (bytesRead > 0);
+  } finally {
+    fsImpl.closeSync(fileDescriptor);
+  }
+  return hash.digest('hex');
+}
+
 function resolveEmbeddedLocalModelRuntime({
   rootDir = resolveEmbeddedLocalModelRoot(),
   platform = process.platform,
@@ -2792,12 +2813,21 @@ function resolveEmbeddedLocalModelRuntime({
       || !manifest.supportedArchitectures.includes(arch)
       || manifest.binaryPath !== expectedBinaryPath
       || !Array.isArray(manifest.requiredPaths)
-      || !expectedRequiredPaths.every((entry) => manifest.requiredPaths.includes(entry))) {
+      || JSON.stringify(manifest.requiredPaths) !== JSON.stringify(expectedRequiredPaths)
+      || !manifest.requiredFileSha256
+      || typeof manifest.requiredFileSha256 !== 'object'
+      || Array.isArray(manifest.requiredFileSha256)
+      || JSON.stringify(Object.keys(manifest.requiredFileSha256).sort())
+        !== JSON.stringify([...expectedRequiredPaths].sort())) {
       return null;
     }
     for (const relativePath of expectedRequiredPaths) {
       const resourcePath = resolveContainedLocalModelResource(rootDir, relativePath);
-      if (!resourcePath || !fsImpl.lstatSync(resourcePath).isFile()) {
+      const expectedSha256 = manifest.requiredFileSha256[relativePath];
+      if (!resourcePath
+        || !fsImpl.lstatSync(resourcePath).isFile()
+        || !/^[a-f0-9]{64}$/.test(String(expectedSha256 || ''))
+        || calculateLocalModelFileSha256(resourcePath, fsImpl) !== expectedSha256) {
         return null;
       }
     }
@@ -3284,9 +3314,12 @@ async function startManagedLocalModelRuntime({
   if (localModelServeProcess
     && localModelServeProcess.exitCode === null
     && !localModelServeProcess.signalCode) {
-    terminateManagedLocalModelProcess(localModelServeProcess);
-    localModelServeProcess = null;
-    localModelServeRuntime = null;
+    const processToStop = localModelServeProcess;
+    await terminateManagedLocalModelProcess(processToStop, { spawnImpl, platform });
+    if (localModelServeProcess === processToStop) {
+      localModelServeProcess = null;
+      localModelServeRuntime = null;
+    }
   }
 
   const runtimeBinary = detection.runtimeBinary;
@@ -3376,26 +3409,66 @@ async function startManagedLocalModelRuntime({
   });
 }
 
-function terminateManagedLocalModelProcess(child) {
+function isManagedLocalModelProcessRunning(child) {
+  return Boolean(child && child.exitCode === null && !child.signalCode);
+}
+
+async function terminateManagedLocalModelProcess(child, {
+  spawnImpl = spawn,
+  platform = process.platform,
+  forceAfterMs = DESKTOP_LOCAL_MODEL_STOP_FORCE_AFTER_MS,
+  timeoutMs = DESKTOP_LOCAL_MODEL_STOP_TIMEOUT_MS,
+} = {}) {
   if (!child || child.exitCode !== null || child.signalCode) {
     return;
   }
-  try {
-    if (isWindows) {
-      spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true })
-        .on('error', () => undefined);
-    } else if (typeof child.kill === 'function') {
-      child.kill('SIGTERM');
+
+  let forceTimer = null;
+  if (platform === 'win32') {
+    spawnImpl(
+      'taskkill',
+      ['/PID', String(child.pid), '/T', '/F'],
+      { windowsHide: true, stdio: 'ignore' }
+    ).on('error', () => undefined);
+  } else if (typeof child.kill === 'function') {
+    child.kill('SIGTERM');
+    if (isManagedLocalModelProcessRunning(child)) {
+      forceTimer = setTimeout(() => {
+        if (!isManagedLocalModelProcessRunning(child)) {
+          return;
+        }
+        try {
+          child.kill('SIGKILL');
+        } catch (_error) {
+        }
+      }, Math.min(forceAfterMs, timeoutMs));
     }
-  } catch (error) {
-    logLine(`[local-model] failed to stop runtime: ${error instanceof Error ? error.message : String(error)}`);
+  } else {
+    throw new Error('Managed Ollama process cannot be terminated.');
+  }
+
+  const exited = await waitForBackendExit(child, timeoutMs);
+  if (forceTimer) {
+    clearTimeout(forceTimer);
+  }
+  if (!exited) {
+    throw new Error(`Ollama did not stop within ${timeoutMs}ms.`);
   }
 }
 
-function stopManagedLocalModelRuntime() {
-  terminateManagedLocalModelProcess(localModelServeProcess);
-  localModelServeProcess = null;
-  localModelServeRuntime = null;
+async function stopManagedLocalModelRuntime(options = {}) {
+  const processToStop = localModelServeProcess;
+  try {
+    await terminateManagedLocalModelProcess(processToStop, options);
+  } catch (error) {
+    const errorCode = error && typeof error.code === 'string' ? error.code : 'unknown';
+    logLine(`[local-model] failed to stop runtime code=${errorCode}`);
+    throw error;
+  }
+  if (localModelServeProcess === processToStop) {
+    localModelServeProcess = null;
+    localModelServeRuntime = null;
+  }
   return setLocalModelState({
     status: DESKTOP_LOCAL_MODEL_STATUS.STOPPED,
     managed: false,
@@ -4063,7 +4136,7 @@ app.on('before-quit', () => {
     desktopTray.destroy();
   }
   desktopTray = null;
-  stopManagedLocalModelRuntime();
+  void stopManagedLocalModelRuntime().catch(() => undefined);
   void stopBackend();
 });
 
