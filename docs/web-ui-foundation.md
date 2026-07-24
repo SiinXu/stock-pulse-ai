@@ -96,8 +96,8 @@ owned values, and preserves unrelated non-sensitive query parameters. The
 shared route guard applies that normalization before a product page renders,
 so every major route consumes the same validation and sensitive-key policy.
 
-The current shareable state contract includes Home report and Run Flow
-identity, Home stock prefill and workspace view, Chat session/report context,
+The current shareable state contract includes Analysis Workbench segment,
+report, stock prefill, and Run Flow identity, Chat session/report context,
 Portfolio account scope, stock-details period/range, Decision Signals stock,
 signal, view, and filter context, and the existing page-owned filter codecs.
 Research Discover and Research Backtest use one typed route-state codec across
@@ -129,7 +129,8 @@ An invalid stock path is replaced with safe Home state before the stock page
 can issue requests. Draft text, unsaved forms, notification payloads, and
 other potentially sensitive state stay out of URLs. A valid stock prefill or
 selected stock context may be represented, but draft stock text is not written
-to the URL and a restored Home stock never auto-submits analysis.
+to the URL and a restored Workbench stock never auto-submits analysis. Legacy
+Home analysis parameters are normalized into the Workbench before Home renders.
 
 Electron currently consumes the same browser routes after loading its private
 local Web origin. External custom-protocol registration and OS `open-url` or
@@ -143,8 +144,9 @@ stores only allowlisted, normalized route snapshots for Home, Chat, Portfolio,
 Decision Signals, Research Market, Research Discover, Research Analysis,
 Research Backtest, and stock details. On a fresh document
 load, a bare major-route URL may replace itself once with the last snapshot for
-that route. Explicit URL state always wins, and later in-app navigation is not
-overridden by the initial restore guard.
+that route, except bare Home, which always remains the attention hub instead of
+restoring old analysis context. Explicit URL state always wins, and later in-app
+navigation is not overridden by the initial restore guard.
 
 An active Screening task keeps its opaque task ID for status recovery, but its
 stored run parameters are only a fallback for a bare Discover URL. Any explicit
@@ -158,21 +160,23 @@ disabled only when there is no safe retained custom ID to present. Wholly
 malformed owned input normalizes to explicit canonical defaults
 instead of becoming bare, preserving the same precedence across refresh.
 
-Home continuity includes the validated task/history Run Flow identity owned by
-the Home URL. A same-stock return restores the active process drawer; carrying a
-different stock drops report and Run Flow identities whose affinity cannot be
-proven. The current explicit route also wins immediately over a stale snapshot,
-so clearing a destination filter cannot be undone by its own Sidebar link.
+Research Analysis continuity includes the validated task/history Run Flow
+identity owned by the Workbench URL. A same-stock return restores its active
+detail Drawer; carrying a different stock drops report and Run Flow identities
+whose affinity cannot be proven. Home never receives that destination snapshot,
+so its Sidebar link cannot loop back into Workbench. The current explicit route
+also wins immediately over a stale snapshot, so clearing a destination filter
+cannot be undone by its own Sidebar link.
 
-Application navigation carries the current validated stock context into Home,
-Chat, Decision Signals, and Research Backtest. Destination-specific state such
+Application navigation carries the current validated stock context into Chat,
+Decision Signals, and Research Backtest. Destination-specific state such
 as a Chat session, Portfolio account, Decision Signals tab/filter set, Research
 Discover parameters, or Research Backtest range remains scoped to that
 destination. Clearing a
 route's URL-owned state overwrites its snapshot, so the persistence layer
 cannot resurrect filters or selections the user intentionally removed.
 Decision Signal details with a source report provide a one-click handoff to the
-canonical Home report and history Run Flow URL for the same stock.
+canonical Workbench history URL for the same stock.
 
 Chat distinguishes an unconsumed report handoff from an active conversation
 context. The first form preloads the follow-up draft. After that draft is sent,
@@ -191,7 +195,7 @@ persisted by this layer.
 
 Logout and authenticated-session expiry clear all StockPulse workflow traces
 from both current `sessionStorage` and the known legacy `localStorage` keys,
-abort and reset in-memory Chat state, and reset the Home dashboard store.
+abort and reset in-memory Chat state, and reset the shared analysis dashboard store.
 Durable non-sensitive preferences such as UI language, theme, and sidebar
 presentation remain intact. A completed logout replaces the active route with a
 plain `/login`, without a redirect containing the prior workflow identity.
@@ -406,7 +410,12 @@ for either its own destination or an active descendant.
 
 Canonical Research paths are `/research/market`, `/research/discover`,
 `/research/analysis`, and `/research/backtest`. Analysis Workbench owns the
-`launch`, `tasks`, and `history` segments as URL state on that single route. The
+`launch`, `tasks`, and `history` segments as URL state on that single route, and
+its history segment owns report comparison, full Markdown, and Run Flow detail
+Drawers. Home renders exactly Today's Focus, To-dos, and Signal summary before a
+collapsed configurable area. Legacy Home analysis URLs with `recordId`, Run Flow,
+stock, or analysis-workspace state use replace navigation into the corresponding
+Workbench segment while preserving safe unrelated query and hash state. The
 legacy `/screening` and `/backtest` URLs use the shared
 replace-redirect contract and preserve query parameters and hash state. The
 canonical Signal Center path is `/signals`; legacy `/decision-signals` and

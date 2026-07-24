@@ -29,6 +29,7 @@ from api.v1.schemas.system_config import (
     DiscoverLLMChannelModelsRequest,
     GenerationBackendStatusPreviewRequest,
     ImportSystemConfigRequest,
+    LocalModelCatalogResponse,
     SystemConfigResponse,
     TestGenerationBackendRequest,
     TestLLMChannelRequest,
@@ -575,6 +576,19 @@ class SystemConfigApiTestCase(unittest.TestCase):
                 "base_url", "api_key", "api_keys", "models", "extra_headers", "enabled",
             },
         )
+
+    def test_get_llm_local_model_catalog_exposes_fixed_install_contracts(self) -> None:
+        payload = system_config.get_llm_local_model_catalog()
+        response = LocalModelCatalogResponse.model_validate(payload)
+        models = {model["id"]: model for model in payload["models"]}
+
+        self.assertEqual(response.verified_at.isoformat(), payload["verified_at"])
+        self.assertEqual(payload["schema_version"], 1)
+        self.assertEqual(len(models), 7)
+        self.assertEqual(models["qwen3-8b"]["install"]["ollama_tag"], "qwen3:8b")
+        self.assertEqual(models["gemma4-12b"]["q4"]["quantization"], "Q4_K_M")
+        self.assertEqual(models["fin-r1-7b"]["install"]["status"], "conversion_required")
+        self.assertEqual(models["xuanyuan-6b-chat"]["install"]["method"], "guided_import")
 
     def test_config_schema_preserves_ui_placement_metadata(self) -> None:
         payload = system_config.get_system_config_schema(service=self.service).model_dump()

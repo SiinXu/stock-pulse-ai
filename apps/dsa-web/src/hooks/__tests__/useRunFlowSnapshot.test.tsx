@@ -140,6 +140,38 @@ describe('useRunFlowSnapshot', () => {
     await waitFor(() => expect(analysisApi.getTaskFlow).toHaveBeenCalledTimes(2));
   });
 
+  it('keeps a successful same-source snapshot visible while a stream-error refetch is pending', async () => {
+    const initialRequest = createDeferred<RunFlowSnapshot>();
+    const refreshedRequest = createDeferred<RunFlowSnapshot>();
+    vi.mocked(analysisApi.getTaskFlow)
+      .mockReturnValueOnce(initialRequest.promise)
+      .mockReturnValueOnce(refreshedRequest.promise);
+
+    const { result } = renderHook(() => useRunFlowSnapshot({
+      source: { type: 'task', taskId: 'task-1' },
+      enabled: true,
+    }));
+
+    act(() => {
+      initialRequest.resolve(snapshot);
+    });
+    await waitFor(() => expect(result.current.snapshot).toEqual(snapshot));
+
+    act(() => {
+      taskStreamCalls.at(-1)?.onError?.(new Event('error'));
+    });
+
+    await waitFor(() => expect(analysisApi.getTaskFlow).toHaveBeenCalledTimes(2));
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.snapshot).toEqual(snapshot);
+
+    act(() => {
+      refreshedRequest.resolve({ ...snapshot, status: 'success' });
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.snapshot?.status).toBe('success');
+  });
+
   it('updates started live flow nodes in place when finish events arrive', async () => {
     vi.mocked(analysisApi.getTaskFlow).mockResolvedValue(snapshot);
 

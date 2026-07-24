@@ -25,6 +25,9 @@ describe('deepLink', () => {
       contextState: 'active',
     })).toBe('/chat?stock=HK00700&name=Tencent&recordId=7&context=active');
     expect(buildDeepLink({ page: 'portfolio', accountId: 3 })).toBe('/portfolio?account=3');
+    expect(buildDeepLink({ page: 'market-review', recordId: 42 })).toBe(
+      `${APP_ROUTE_PATHS.researchMarket}?recordId=42`,
+    );
     expect(buildDeepLink({
       page: 'decision-signals',
       stockCode: 'aapl',
@@ -39,6 +42,14 @@ describe('deepLink', () => {
     })).toBe('/stocks/7203.T?period=weekly&days=120');
   });
 
+  it('parses canonical Market Review report state through the typed target', () => {
+    const parsed = parseDeepLink(`${APP_ROUTE_PATHS.researchMarket}?recordId=007&keep=yes`);
+
+    expect(parsed.target).toEqual({ page: 'market-review', recordId: 7 });
+    expect(parsed.normalizedHref).toBe(`${APP_ROUTE_PATHS.researchMarket}?recordId=7&keep=yes`);
+    expect(parsed.issues).toEqual([]);
+  });
+
   it('parses and canonicalizes Home state while preserving unrelated parameters', () => {
     const parsed = parseDeepLink('/?ref=notification&recordId=007&stock=00700.HK&workspace=today');
 
@@ -49,6 +60,19 @@ describe('deepLink', () => {
       workspace: 'today',
     });
     expect(parsed.normalizedHref).toBe('/?ref=notification&recordId=7&stock=HK00700&workspace=today');
+    expect(parsed.issues).toEqual([]);
+  });
+
+  it('preserves the legacy Home history workspace for the route redirect owner', () => {
+    const parsed = parseDeepLink('/?workspace=history&keep=yes');
+
+    expect(parsed.target).toEqual({
+      page: 'home',
+      recordId: undefined,
+      stockCode: undefined,
+      workspace: 'history',
+    });
+    expect(parsed.normalizedHref).toBe('/?workspace=history&keep=yes');
     expect(parsed.issues).toEqual([]);
   });
 

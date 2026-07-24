@@ -37,9 +37,9 @@ import type {
   StockQuote,
 } from '../types/stocks';
 import { aggregateCandles, summarizeCandles } from '../utils/klineAggregate';
-import { buildDeepLink } from '../utils/deepLink';
 import {
   SIGNAL_CENTER_TAB_VALUES,
+  buildAnalysisWorkbenchHref,
   buildSignalCenterHref,
 } from '../routing/routes';
 import { normalizeStockCode } from '../utils/stockCode';
@@ -293,7 +293,7 @@ const StockDetailsPage: React.FC = () => {
             <PlusCircle className="h-4 w-4" aria-hidden="true" />
             {watchState === 'added' ? t('stocks.workspace.watchlistAdded') : t('stocks.workspace.watchlistAdd')}
           </Button>
-          <Button type="button" variant="secondary" size="comfortable" onClick={() => navigate(buildDeepLink({ page: 'home', stockCode: canonicalCode }))}>
+          <Button type="button" variant="secondary" size="comfortable" onClick={() => navigate(buildAnalysisWorkbenchHref({ stock: canonicalCode }))}>
             <Sparkles className="h-4 w-4" aria-hidden="true" />
             {t('stocks.workspace.analyze')}
           </Button>

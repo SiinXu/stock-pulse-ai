@@ -1172,13 +1172,6 @@ a {
   padding: 0.125rem 0.5rem;
 }
 
-.history-batch-delete-button {
-  min-height: 2.75rem;
-  padding: 0 0.5rem;
-  @apply text-xxs;
-  line-height: 1;
-}
-
 .history-select-all-checkbox {
   position: relative;
   top: 0;

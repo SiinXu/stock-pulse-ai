@@ -31,6 +31,7 @@
     },
     "files": [
       "main.js",
+      "local-model-catalog.js",
       "assistant-preload.js",
       "model-preload.js",
       "preload.js",
@@ -40,6 +41,10 @@
       {
         "from": "../../.env.example",
         "to": ".env.example"
+      },
+      {
+        "from": "../../src/llm/local_model_catalog.json",
+        "to": "local-model-catalog.json"
       },
       {
         "from": "../../dist/backend/stock_analysis",

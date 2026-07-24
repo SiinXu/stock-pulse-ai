@@ -56,6 +56,16 @@ P6_SIGNAL_LINKED_SCHEMAS = (
     "PortfolioDecisionSignalRiskItem",
     "PortfolioRiskResponse",
 )
+LOCAL_MODEL_CATALOG_SCHEMAS = (
+    "LocalModelCatalogEntry",
+    "LocalModelCatalogResponse",
+    "LocalModelCatalogText",
+    "LocalModelDesktopMetadata",
+    "LocalModelInstall",
+    "LocalModelLicense",
+    "LocalModelQ4Artifact",
+    "LocalModelUpstream",
+)
 
 
 def _collect_component_schema_refs(node: Any) -> set[str]:
@@ -180,11 +190,23 @@ def test_decision_signal_static_api_spec_matches_runtime_paths() -> None:
     assert status_schema["enum"] == ["active", "expired", "invalidated", "closed", "archived"]
 
 
+def test_local_model_catalog_static_api_spec_matches_runtime_path() -> None:
+    static_spec_path = Path(__file__).resolve().parents[1] / "docs" / "architecture" / "api_spec.json"
+    static_spec = json.loads(static_spec_path.read_text(encoding="utf-8"))
+    runtime_spec = create_app().openapi()
+    path = "/api/v1/system/config/llm/local-models"
+
+    assert static_spec["paths"][path] == runtime_spec["paths"][path]
+    for schema_name in LOCAL_MODEL_CATALOG_SCHEMAS:
+        assert static_spec["components"]["schemas"][schema_name] == runtime_spec["components"]["schemas"][schema_name]
+
+
 def test_v1_prefix_is_applied_at_app_mount_level() -> None:
     assert api_v1_router.prefix == ""
 
     runtime_paths = create_app().openapi()["paths"]
     assert "/api/v1/history" in runtime_paths
     assert "/api/v1/decision-signals" in runtime_paths
+    assert "/api/v1/system/config/llm/local-models" in runtime_paths
     assert "/api/v1/history/" not in runtime_paths
     assert "/api/v1/decision-signals/" not in runtime_paths

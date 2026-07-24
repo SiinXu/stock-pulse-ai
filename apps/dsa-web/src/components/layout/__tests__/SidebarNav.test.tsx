@@ -122,14 +122,14 @@ describe('SidebarNav', () => {
       .toHaveAttribute('href', APP_ROUTE_PATHS.researchDiscover);
   });
 
-  it('carries the current stock into stock-aware navigation destinations', () => {
+  it('keeps Home context-free while carrying stock into stock-aware destinations', () => {
     render(
       <MemoryRouter initialEntries={['/stocks/AAPL']}>
         <SidebarNav />
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole('link', { name: '首页' })).toHaveAttribute('href', '/?stock=AAPL');
+    expect(screen.getByRole('link', { name: '首页' })).toHaveAttribute('href', APP_ROUTE_PATHS.home);
     expect(screen.getByRole('link', { name: 'Agent' })).toHaveAttribute('href', `${APP_ROUTE_PATHS.agent}?stock=AAPL`);
     expect(screen.getByRole('link', { name: '回测' })).toHaveAttribute('href', `${APP_ROUTE_PATHS.researchBacktest}?code=AAPL`);
   });

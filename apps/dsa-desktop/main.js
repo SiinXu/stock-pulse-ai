@@ -11,6 +11,7 @@ const {
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { loadDesktopLocalModelPresets } = require('./local-model-catalog');
 const { spawn } = require('child_process');
 const net = require('net');
 const http = require('http');
@@ -111,34 +112,13 @@ const DESKTOP_LOCAL_MODEL_DETECT_TIMEOUT_MS = 4000;
 const DESKTOP_LOCAL_MODEL_START_TIMEOUT_MS = 20000;
 const DESKTOP_LOCAL_MODEL_PULL_TIMEOUT_MS = 30 * 60 * 1000;
 const DESKTOP_LOCAL_MODEL_NAME_PATTERN =
-  /^[a-z0-9]+(?:[._-][a-z0-9]+)*(?::[a-z0-9]+(?:[._-][a-z0-9]+)*)?$/i;
+  /^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)?(?::[a-z0-9]+(?:[._-][a-z0-9]+)*)?$/i;
 const DESKTOP_LOCAL_MODEL_MAX_NAME_LENGTH = 96;
 const DESKTOP_LOCAL_MODEL_INSTALL_GUIDE_URL = 'https://ollama.com/download';
-// Curated recommended presets with hardware guidance. Only these ids may be
-// pulled from the desktop UI; arbitrary user-typed names are never downloaded.
-const DESKTOP_LOCAL_MODEL_PRESETS = Object.freeze([
-  Object.freeze({
-    id: 'llama3.2:3b',
-    label: 'Llama 3.2 3B',
-    approxSizeGb: 2.0,
-    minRamGb: 8,
-    guidance: 'Lightweight general model. Runs on 8 GB RAM machines.',
-  }),
-  Object.freeze({
-    id: 'qwen3:4b',
-    label: 'Qwen3 4B',
-    approxSizeGb: 2.6,
-    minRamGb: 8,
-    guidance: 'Compact reasoning model. Comfortable on 8-16 GB RAM.',
-  }),
-  Object.freeze({
-    id: 'qwen3:8b',
-    label: 'Qwen3 8B',
-    approxSizeGb: 5.2,
-    minRamGb: 16,
-    guidance: 'Balanced quality for 16 GB RAM or more.',
-  }),
-]);
+const DESKTOP_LOCAL_MODEL_PRESETS_ARG_PREFIX = '--stockpulse-local-model-presets=';
+// The checked-in catalog is the only allowlist authority. Arbitrary
+// user-provided model names are never downloaded by the desktop shell.
+const DESKTOP_LOCAL_MODEL_PRESETS = loadDesktopLocalModelPresets();
 const DESKTOP_LOCAL_MODEL_PRESET_IDS = Object.freeze(
   new Set(DESKTOP_LOCAL_MODEL_PRESETS.map((preset) => preset.id))
 );
@@ -3348,6 +3328,9 @@ async function createLocalModelWindow({ BrowserWindowClass = BrowserWindow } = {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      additionalArguments: [
+        `${DESKTOP_LOCAL_MODEL_PRESETS_ARG_PREFIX}${encodeURIComponent(JSON.stringify(DESKTOP_LOCAL_MODEL_PRESETS))}`,
+      ],
     },
   });
   localModelWindow = createdWindow;

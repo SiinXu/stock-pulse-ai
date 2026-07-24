@@ -1,0 +1,377 @@
+{
+  "schema_version": 1,
+  "verified_at": "2026-07-23",
+  "models": [
+    {
+      "id": "qwen3-4b",
+      "section": "general",
+      "display_name": {
+        "en": "Qwen3 4B",
+        "zh": "Qwen3 4B（轻量档）"
+      },
+      "capability_summary": {
+        "en": "Compact multilingual reasoning model for routine local analysis.",
+        "zh": "适合日常本地分析的轻量多语言推理模型。"
+      },
+      "capabilities": [
+        "general",
+        "reasoning",
+        "multilingual"
+      ],
+      "q4": {
+        "quantization": "Q4_K_M",
+        "size_bytes": 2497280480,
+        "source_kind": "official_ollama",
+        "source_url": "https://ollama.com/library/qwen3:4b",
+        "source_revision": "sha256:3e4cb14174460404e7a233e531675303b2fbf7749c02f91864fe311ab6344e4f"
+      },
+      "memory_tier": "light",
+      "recommended_ram_gb": 8,
+      "license": {
+        "identifier": "Apache-2.0",
+        "name": "Apache License 2.0",
+        "evidence_url": "https://huggingface.co/Qwen/Qwen3-4B/blob/main/LICENSE",
+        "redistribution": "allowed_with_notice",
+        "standalone_license_file": true
+      },
+      "upstream": {
+        "primary_url": "https://ollama.com/library/qwen3:4b",
+        "huggingface_url": "https://huggingface.co/Qwen/Qwen3-4B",
+        "modelscope_url": null,
+        "revision": "ollama:qwen3:4b"
+      },
+      "install": {
+        "method": "ollama_pull",
+        "status": "available",
+        "ollama_tag": "qwen3:4b",
+        "planned_ollama_tag": null,
+        "download_url": "https://ollama.com/library/qwen3:4b",
+        "hosted_by_stockpulse": false,
+        "minimum_runtime_version": null
+      },
+      "desktop": {
+        "recommended": true,
+        "role": "lightweight",
+        "guidance_en": "Lightweight default for machines with 8 GB RAM."
+      }
+    },
+    {
+      "id": "qwen3-8b",
+      "section": "general",
+      "display_name": {
+        "en": "Qwen3 8B",
+        "zh": "Qwen3 8B（默认档）"
+      },
+      "capability_summary": {
+        "en": "Balanced multilingual reasoning model and the default local recommendation.",
+        "zh": "兼顾质量与资源占用的多语言推理模型，作为默认本地推荐。"
+      },
+      "capabilities": [
+        "general",
+        "reasoning",
+        "multilingual"
+      ],
+      "q4": {
+        "quantization": "Q4_K_M",
+        "size_bytes": 5225374496,
+        "source_kind": "official_ollama",
+        "source_url": "https://ollama.com/library/qwen3:8b",
+        "source_revision": "sha256:a3de86cd1c132c822487ededd47a324c50491393e6565cd14bafa40d0b8e686f"
+      },
+      "memory_tier": "standard",
+      "recommended_ram_gb": 16,
+      "license": {
+        "identifier": "Apache-2.0",
+        "name": "Apache License 2.0",
+        "evidence_url": "https://huggingface.co/Qwen/Qwen3-8B/blob/main/LICENSE",
+        "redistribution": "allowed_with_notice",
+        "standalone_license_file": true
+      },
+      "upstream": {
+        "primary_url": "https://ollama.com/library/qwen3:8b",
+        "huggingface_url": "https://huggingface.co/Qwen/Qwen3-8B",
+        "modelscope_url": null,
+        "revision": "ollama:qwen3:8b"
+      },
+      "install": {
+        "method": "ollama_pull",
+        "status": "available",
+        "ollama_tag": "qwen3:8b",
+        "planned_ollama_tag": null,
+        "download_url": "https://ollama.com/library/qwen3:8b",
+        "hosted_by_stockpulse": false,
+        "minimum_runtime_version": null
+      },
+      "desktop": {
+        "recommended": true,
+        "role": "default",
+        "guidance_en": "Balanced default for machines with 16 GB RAM or more."
+      }
+    },
+    {
+      "id": "gemma4-12b",
+      "section": "general",
+      "display_name": {
+        "en": "Gemma 4 12B",
+        "zh": "Gemma 4 12B（高配档）"
+      },
+      "capability_summary": {
+        "en": "Higher-capacity native multimodal model for text, image, and audio inputs.",
+        "zh": "面向文本、图像与音频输入的高配原生多模态模型。"
+      },
+      "capabilities": [
+        "general",
+        "reasoning",
+        "multimodal",
+        "agentic"
+      ],
+      "q4": {
+        "quantization": "Q4_K_M",
+        "size_bytes": 7556497632,
+        "source_kind": "official_ollama",
+        "source_url": "https://ollama.com/library/gemma4:12b",
+        "source_revision": "sha256:c805f5b265d8e695c44f4065dfc368206cd8026447604925fef8db57ee32ee23"
+      },
+      "memory_tier": "high",
+      "recommended_ram_gb": 24,
+      "license": {
+        "identifier": "Apache-2.0",
+        "name": "Apache License 2.0",
+        "evidence_url": "https://ollama.com/library/gemma4:12b/blobs/0d542e0c8804",
+        "redistribution": "allowed_with_notice",
+        "standalone_license_file": true
+      },
+      "upstream": {
+        "primary_url": "https://ollama.com/library/gemma4:12b",
+        "huggingface_url": "https://huggingface.co/google/gemma-4-12B-it",
+        "modelscope_url": null,
+        "revision": "ollama:gemma4:12b"
+      },
+      "install": {
+        "method": "ollama_pull",
+        "status": "available",
+        "ollama_tag": "gemma4:12b",
+        "planned_ollama_tag": null,
+        "download_url": "https://ollama.com/library/gemma4:12b",
+        "hosted_by_stockpulse": false,
+        "minimum_runtime_version": "0.30.5"
+      },
+      "desktop": {
+        "recommended": true,
+        "role": "high_performance",
+        "guidance_en": "Native multimodal option for machines with 24 GB RAM or more."
+      }
+    },
+    {
+      "id": "deepseek-r1-8b",
+      "section": "general",
+      "display_name": {
+        "en": "DeepSeek-R1 8B",
+        "zh": "DeepSeek-R1 8B（推理加强）"
+      },
+      "capability_summary": {
+        "en": "Reasoning-focused distilled model for analysis that benefits from explicit deliberation.",
+        "zh": "适合需要显式思考过程的分析任务的推理蒸馏模型。"
+      },
+      "capabilities": [
+        "general",
+        "reasoning"
+      ],
+      "q4": {
+        "quantization": "Q4_K_M",
+        "size_bytes": 5225373760,
+        "source_kind": "official_ollama",
+        "source_url": "https://ollama.com/library/deepseek-r1:8b",
+        "source_revision": "sha256:e6a7edc1a4d7d9b2de136a221a57336b76316cfe53a252aeba814496c5ae439d"
+      },
+      "memory_tier": "standard",
+      "recommended_ram_gb": 16,
+      "license": {
+        "identifier": "MIT",
+        "name": "MIT License",
+        "evidence_url": "https://huggingface.co/deepseek-ai/DeepSeek-R1-0528-Qwen3-8B/blob/main/LICENSE",
+        "redistribution": "allowed_with_notice",
+        "standalone_license_file": true
+      },
+      "upstream": {
+        "primary_url": "https://ollama.com/library/deepseek-r1:8b",
+        "huggingface_url": "https://huggingface.co/deepseek-ai/DeepSeek-R1-0528-Qwen3-8B",
+        "modelscope_url": null,
+        "revision": "ollama:deepseek-r1:8b"
+      },
+      "install": {
+        "method": "ollama_pull",
+        "status": "available",
+        "ollama_tag": "deepseek-r1:8b",
+        "planned_ollama_tag": null,
+        "download_url": "https://ollama.com/library/deepseek-r1:8b",
+        "hosted_by_stockpulse": false,
+        "minimum_runtime_version": null
+      },
+      "desktop": {
+        "recommended": true,
+        "role": "reasoning",
+        "guidance_en": "Reasoning-focused option for machines with 16 GB RAM or more."
+      }
+    },
+    {
+      "id": "dianjin-r1-7b",
+      "section": "finance",
+      "display_name": {
+        "en": "DianJin-R1 7B",
+        "zh": "通义点金 DianJin-R1 7B"
+      },
+      "capability_summary": {
+        "en": "Chinese financial reasoning model trained from Qwen2.5-7B-Instruct.",
+        "zh": "基于 Qwen2.5-7B-Instruct 训练的中文金融推理模型。"
+      },
+      "capabilities": [
+        "finance",
+        "reasoning",
+        "chinese"
+      ],
+      "q4": {
+        "quantization": "Q4_K_M",
+        "size_bytes": 4683073824,
+        "source_kind": "community_gguf",
+        "source_url": "https://huggingface.co/mradermacher/DianJin-R1-7B-GGUF",
+        "source_revision": "8bb83a31fc908d378b6453a46c72bc3254724ca2"
+      },
+      "memory_tier": "standard",
+      "recommended_ram_gb": 16,
+      "license": {
+        "identifier": "MIT",
+        "name": "MIT License",
+        "evidence_url": "https://huggingface.co/DianJin/DianJin-R1-7B/blob/main/README.md",
+        "redistribution": "allowed_with_notice",
+        "standalone_license_file": false
+      },
+      "upstream": {
+        "primary_url": "https://huggingface.co/DianJin/DianJin-R1-7B",
+        "huggingface_url": "https://huggingface.co/DianJin/DianJin-R1-7B",
+        "modelscope_url": "https://modelscope.cn/models/tongyi_dianjin/DianJin-R1-7B",
+        "revision": "2c22344cec9f39e3cb134e3e419ab63b56720bfa"
+      },
+      "install": {
+        "method": "planned_ollama_package",
+        "status": "conversion_required",
+        "ollama_tag": null,
+        "planned_ollama_tag": "stockpulse/dianjin-r1-7b:q4_k_m",
+        "download_url": "https://huggingface.co/DianJin/DianJin-R1-7B",
+        "hosted_by_stockpulse": false,
+        "minimum_runtime_version": null
+      },
+      "desktop": {
+        "recommended": false,
+        "role": null,
+        "guidance_en": "A project-owned converted artifact is not published yet."
+      }
+    },
+    {
+      "id": "fin-r1-7b",
+      "section": "finance",
+      "display_name": {
+        "en": "Fin-R1 7B",
+        "zh": "Fin-R1 7B（上海财大 + FinStep.AI）"
+      },
+      "capability_summary": {
+        "en": "Seven-billion-parameter model for complex financial reasoning and calculations.",
+        "zh": "面向复杂金融推理与计算的 7B 模型。"
+      },
+      "capabilities": [
+        "finance",
+        "reasoning",
+        "multilingual"
+      ],
+      "q4": {
+        "quantization": "Q4_K_M",
+        "size_bytes": 4683073760,
+        "source_kind": "community_gguf",
+        "source_url": "https://huggingface.co/mradermacher/Fin-R1-GGUF",
+        "source_revision": "1daf04baeda30b120b2e5c586b296e453f9f439c"
+      },
+      "memory_tier": "standard",
+      "recommended_ram_gb": 16,
+      "license": {
+        "identifier": "Apache-2.0",
+        "name": "Apache License 2.0",
+        "evidence_url": "https://github.com/SUFE-AIFLM-Lab/Fin-R1#readme",
+        "redistribution": "allowed_with_notice",
+        "standalone_license_file": false
+      },
+      "upstream": {
+        "primary_url": "https://huggingface.co/SUFE-AIFLM-Lab/Fin-R1",
+        "huggingface_url": "https://huggingface.co/SUFE-AIFLM-Lab/Fin-R1",
+        "modelscope_url": null,
+        "revision": "026768c4a015b591b54b240743edeac1de0970fa"
+      },
+      "install": {
+        "method": "planned_ollama_package",
+        "status": "conversion_required",
+        "ollama_tag": null,
+        "planned_ollama_tag": "stockpulse/fin-r1-7b:q4_k_m",
+        "download_url": "https://huggingface.co/SUFE-AIFLM-Lab/Fin-R1",
+        "hosted_by_stockpulse": false,
+        "minimum_runtime_version": null
+      },
+      "desktop": {
+        "recommended": false,
+        "role": null,
+        "guidance_en": "Fin-R1-Pro is 32B; Fin-R1 is the current runnable 7B selection."
+      }
+    },
+    {
+      "id": "xuanyuan-6b-chat",
+      "section": "finance",
+      "display_name": {
+        "en": "XuanYuan 6B Chat",
+        "zh": "度小满轩辕 XuanYuan 6B Chat"
+      },
+      "capability_summary": {
+        "en": "Chinese financial dialogue model with a compact LLaMA-like architecture.",
+        "zh": "采用类 LLaMA 架构的轻量中文金融对话模型。"
+      },
+      "capabilities": [
+        "finance",
+        "dialogue",
+        "chinese"
+      ],
+      "q4": {
+        "quantization": "Q4_K_M",
+        "size_bytes": 3863640192,
+        "source_kind": "community_gguf",
+        "source_url": "https://huggingface.co/mradermacher/XuanYuan-6B-Chat-GGUF",
+        "source_revision": "e64ff463bac5adcb327c3e1e9c6537503e503b7d"
+      },
+      "memory_tier": "standard",
+      "recommended_ram_gb": 16,
+      "license": {
+        "identifier": "Llama-2-Community",
+        "name": "Llama 2 Community License metadata",
+        "evidence_url": "https://huggingface.co/Duxiaoman-DI/XuanYuan-6B-Chat/blob/main/README.md",
+        "redistribution": "guided_only",
+        "standalone_license_file": false
+      },
+      "upstream": {
+        "primary_url": "https://huggingface.co/Duxiaoman-DI/XuanYuan-6B-Chat",
+        "huggingface_url": "https://huggingface.co/Duxiaoman-DI/XuanYuan-6B-Chat",
+        "modelscope_url": "https://modelscope.cn/models/Duxiaoman-DI/XuanYuan-6B-Chat/summary",
+        "revision": "8d7ac23f67e43499be1c1b17f4fa200fcfe6187a"
+      },
+      "install": {
+        "method": "guided_import",
+        "status": "license_review_required",
+        "ollama_tag": null,
+        "planned_ollama_tag": null,
+        "download_url": "https://huggingface.co/Duxiaoman-DI/XuanYuan-6B-Chat",
+        "hosted_by_stockpulse": false,
+        "minimum_runtime_version": null
+      },
+      "desktop": {
+        "recommended": false,
+        "role": null,
+        "guidance_en": "Download from the official repository and import locally after reviewing its terms."
+      }
+    }
+  ]
+}
