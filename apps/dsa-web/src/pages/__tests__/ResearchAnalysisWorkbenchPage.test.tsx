@@ -282,13 +282,23 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     expect(within(tasksTab).getByText('1')).toBeInTheDocument();
     expect(screen.getByText('Apple')).toBeInTheDocument();
     expect(screen.queryByText('Market review task')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '查看 Apple 运行流' }));
+    const runFlowTrigger = screen.getByRole('button', { name: '查看 Apple 运行流' });
+    runFlowTrigger.focus();
+    fireEvent.click(runFlowTrigger);
 
     expect(await screen.findByTestId('run-flow-panel')).toHaveTextContent('task');
+    const runFlowDrawer = screen.getByRole('dialog', { name: '运行流' });
+    expect(runFlowDrawer).toHaveAttribute('data-drawer-variant', 'detail');
+    expect(runFlowDrawer).toHaveAttribute('data-drawer-size', 'wide');
     const search = new URLSearchParams(screen.getByTestId('location').textContent?.split('?')[1]);
     expect(search.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow))
       .toBe(RUN_FLOW_ROUTE_QUERY_VALUES.task);
     expect(search.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowTaskId)).toBe('task-7');
+
+    fireEvent.keyDown(runFlowDrawer, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '运行流' })).not.toBeInTheDocument());
+    expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow)).toBeNull();
+    expect(runFlowTrigger).toHaveFocus();
   });
 
   it('loads a historical report from a recordId deep link and opens its RunFlow', async () => {

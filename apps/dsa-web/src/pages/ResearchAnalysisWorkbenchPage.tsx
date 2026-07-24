@@ -28,9 +28,9 @@ import {
   Badge,
   Button,
   Checkbox,
+  Drawer,
   EmptyState,
   InlineAlert,
-  Modal,
   PageHeader,
   SegmentedControl,
   Select,
@@ -1090,11 +1090,12 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
       </TabPanel>
 
       {runFlowDialog.open ? (
-        <Modal
+        <Drawer
           isOpen
           onClose={closeRunFlow}
           title={t('runFlow.drawerTitle')}
-          size="fullscreen"
+          variant="detail"
+          size="wide"
         >
           <RunFlowPanel
             key={`${runFlowDialog.source.type}-${runFlowDialog.source.type === 'task' ? runFlowDialog.source.taskId : runFlowDialog.source.recordId}`}
@@ -1102,7 +1103,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
             title={runFlowDialog.title}
             onUnavailable={handleUnavailableRunFlow}
           />
-        </Modal>
+        </Drawer>
       ) : null}
     </AppPage>
   );
