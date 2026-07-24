@@ -47,6 +47,7 @@ This is the entry point for project documentation. The README covers the project
 | Document | Contents |
 | --- | --- |
 | [Bot Commands (EN)](bot-command_EN.md) | Bot commands, webhooks, platform integration, and callback behavior |
+| [Community Intelligence Agent Tool Contract](community-intel-tool.md) | Phase A stock-scoped ToolSurface input/output, degradation, security boundaries, limitations, and rollback |
 | [Kronos K-line Forecasting Agent Tool](kronos-agent-tool.md) | Optional local model setup, registration gates, output contract, limitations, verification, and rollback |
 | [Bot Platform Docs](bot/) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) | Feishu, DingTalk, Discord, and related Bot configuration screenshots and notes |
 | [Real-Time Alert Center](alerts.md) <sub><sub>![P4 Badge](https://img.shields.io/badge/P4-yellow?style=flat)</sub></sub> (Chinese-only) | EventMonitor baseline, Web rule management, notification attempts, cooldown state, and phase boundaries |

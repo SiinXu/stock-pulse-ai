@@ -44,6 +44,7 @@
 | 文档 | 内容 |
 | --- | --- |
 | [Bot 命令与接入](bot-command.md) | Bot 命令、Webhook、平台接入和回调说明 |
+| [社区情报 Agent Tool 合同（英文）](community-intel-tool.md) | Phase A 股票域 ToolSurface 输入/输出、降级、安全边界、局限与回滚 |
 | [Kronos K 线预测 Agent Tool（英文）](kronos-agent-tool.md) | 可选本地模型启用、注册门槛、输出契约、局限、验证与回滚 |
 | [Bot 平台配置](bot/) | 飞书、钉钉、Discord 等 Bot 配置截图和补充说明 |
 | [实时告警中心](alerts.md) | EventMonitor 基线、Web 规则管理、通知结果、冷却状态和 Phase 边界 |
