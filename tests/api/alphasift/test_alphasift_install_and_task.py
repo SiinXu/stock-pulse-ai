@@ -137,7 +137,8 @@ class AlphaSiftOpportunitiesApiTestCase(_AlphaSiftApiTestCaseBase):
             payload = alphasift_endpoint.alphasift_screen_task_status("screen-task-1")
 
         self.assertEqual(payload.status, "completed")
-        self.assertEqual(payload.result["candidate_count"], 0)
+        self.assertIsNotNone(payload.result)
+        self.assertEqual(payload.result.candidate_count, 0)
 
     def test_screen_task_status_does_not_expose_legacy_diagnostic_text(self) -> None:
         secret_marker = "Authorization: Bearer sk-alphasift-secret-marker"
@@ -241,7 +242,14 @@ class AlphaSiftOpportunitiesApiTestCase(_AlphaSiftApiTestCaseBase):
             patch("src.services.alphasift_service.refresh_auth_state") as refresh_mock,
             patch("src.services.alphasift_service.is_auth_enabled", return_value=True),
             patch("src.services.alphasift_service.verify_session", return_value=True) as verify_session_mock,
-            patch("src.services.alphasift_service._install_alphasift", return_value={"installed": True}) as install_mock,
+            patch(
+                "src.services.alphasift_service._install_alphasift",
+                return_value={
+                    "installed": True,
+                    "already_installed": False,
+                    "install_spec_is_default": True,
+                },
+            ) as install_mock,
         ):
             payload = alphasift_endpoint.alphasift_install(request=request, config=config)
 

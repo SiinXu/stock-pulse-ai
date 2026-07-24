@@ -4,13 +4,26 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Type, TypeVar
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from api.deps import get_config_dep
 from api.v1.errors import api_error
+from api.v1.schemas.alphasift import (
+    AlphaSiftHotspotDetailResponse,
+    AlphaSiftHotspotsResponse,
+    AlphaSiftInstallResponse,
+    AlphaSiftScreenAccepted,
+    AlphaSiftScreenRequest,
+    AlphaSiftScreenResponse,
+    AlphaSiftScreenTaskStatus,
+    AlphaSiftStatusResponse,
+    AlphaSiftStrategiesResponse,
+    AlphaSiftStrategyResponse,
+)
+from api.v1.schemas.common import ErrorResponse
 from src.config import Config
 from src.services.alphasift_service import AlphaSiftService
 from src.services.task_queue import (
@@ -22,47 +35,16 @@ from src.services.task_queue import (
 
 router = APIRouter()
 
-
-class AlphaSiftScreenRequest(BaseModel):
-    market: str = Field("cn", min_length=1, max_length=16)
-    strategy: str = Field("dual_low", min_length=1, max_length=64)
-    max_results: int = Field(20, ge=1, le=100)
+ResponseModelT = TypeVar("ResponseModelT", bound=BaseModel)
 
 
-class AlphaSiftStrategyResponse(BaseModel):
-    id: str
-    name: str = ""
-    title: str = ""
-    description: str = ""
-    category: str = ""
-    tag: str = ""
-    tags: List[str] = Field(default_factory=list)
-    market_scope: List[str] = Field(default_factory=list)
-    market: str = ""
+def _validated_payload(
+    model: Type[ResponseModelT],
+    payload: Any,
+) -> Dict[str, Any]:
+    """Validate service output before exposing its serialized transport form."""
 
-
-class AlphaSiftScreenAccepted(BaseModel):
-    task_id: str
-    trace_id: str
-    status: str = "pending"
-    message: str
-    message_code: str = "task.screening.queued"
-    message_params: Dict[str, Any] = Field(default_factory=dict)
-    strategy: str
-    market: str
-    max_results: int
-
-
-class AlphaSiftScreenTaskStatus(BaseModel):
-    task_id: str
-    trace_id: Optional[str] = None
-    status: str
-    progress: int = 0
-    message: Optional[str] = None
-    message_code: str = "task.status"
-    message_params: Dict[str, Any] = Field(default_factory=dict)
-    error: Optional[str] = None
-    result: Optional[Dict[str, Any]] = None
+    return model.model_validate(payload).model_dump(exclude_unset=True)
 
 
 def _service(config: Config) -> AlphaSiftService:
@@ -77,20 +59,33 @@ def _screening_task_not_found(task_id: str) -> HTTPException:
     )
 
 
-@router.get("/status")
+@router.get(
+    "/status",
+    response_model=AlphaSiftStatusResponse,
+    response_model_exclude_unset=True,
+)
 def alphasift_status(config: Config = Depends(get_config_dep)) -> Dict[str, Any]:
-    return _service(config).status()
+    return _validated_payload(AlphaSiftStatusResponse, _service(config).status())
 
 
-@router.get("/strategies")
+@router.get(
+    "/strategies",
+    response_model=AlphaSiftStrategiesResponse,
+    response_model_exclude_unset=True,
+)
 def alphasift_strategies(
     request: Request,
     config: Config = Depends(get_config_dep),
 ) -> Dict[str, Any]:
-    return _service(config).strategies()
+    return _validated_payload(AlphaSiftStrategiesResponse, _service(config).strategies())
 
 
-@router.get("/hotspots")
+@router.get(
+    "/hotspots",
+    response_model=AlphaSiftHotspotsResponse,
+    response_model_exclude_unset=True,
+    responses={422: {"model": ErrorResponse}},
+)
 def alphasift_hotspots(
     provider: str = Query("", max_length=32),
     top: int = Query(12, ge=1, le=50),
@@ -104,15 +99,23 @@ def alphasift_hotspots(
         if isinstance(include_details, bool)
         else bool(getattr(include_details, "default", False))
     )
-    return _service(config).hotspots(
-        provider=provider,
-        top=top,
-        refresh=refresh_value,
-        include_details=include_details_value,
+    return _validated_payload(
+        AlphaSiftHotspotsResponse,
+        _service(config).hotspots(
+            provider=provider,
+            top=top,
+            refresh=refresh_value,
+            include_details=include_details_value,
+        ),
     )
 
 
-@router.get("/hotspots/{topic:path}")
+@router.get(
+    "/hotspots/{topic:path}",
+    response_model=AlphaSiftHotspotDetailResponse,
+    response_model_exclude_unset=True,
+    responses={422: {"model": ErrorResponse}},
+)
 def alphasift_hotspot_detail(
     topic: str,
     provider: str = Query("", max_length=32),
@@ -120,18 +123,38 @@ def alphasift_hotspot_detail(
     config: Config = Depends(get_config_dep),
 ) -> Dict[str, Any]:
     refresh_value = refresh if isinstance(refresh, bool) else bool(getattr(refresh, "default", False))
-    return _service(config).hotspot_detail(topic=topic, provider=provider, refresh=refresh_value)
+    return _validated_payload(
+        AlphaSiftHotspotDetailResponse,
+        _service(config).hotspot_detail(
+            topic=topic,
+            provider=provider,
+            refresh=refresh_value,
+        ),
+    )
 
 
-@router.post("/install")
+@router.post(
+    "/install",
+    response_model=AlphaSiftInstallResponse,
+    response_model_exclude_unset=True,
+)
 def alphasift_install(
     request: Request,
     config: Config = Depends(get_config_dep),
 ) -> Dict[str, Any]:
-    return _service(config).install(request=request)
+    return _validated_payload(
+        AlphaSiftInstallResponse,
+        _service(config).install(request=request),
+    )
 
 
-@router.post("/screen/tasks", status_code=202, response_model=AlphaSiftScreenAccepted)
+@router.post(
+    "/screen/tasks",
+    status_code=202,
+    response_model=AlphaSiftScreenAccepted,
+    response_model_exclude_unset=True,
+    responses={422: {"model": ErrorResponse}},
+)
 def alphasift_start_screen_task(
     request: AlphaSiftScreenRequest,
     http_request: Request,
@@ -146,10 +169,13 @@ def alphasift_start_screen_task(
             20,
             "正在执行 AlphaSift 选股，外部数据源较慢时会持续后台运行",
         )
-        result = _service(config).screen(
-            strategy=request.strategy,
-            market=request.market,
-            max_results=request.max_results,
+        result = _validated_payload(
+            AlphaSiftScreenResponse,
+            _service(config).screen(
+                strategy=request.strategy,
+                market=request.market,
+                max_results=request.max_results,
+            ),
         )
         task_queue.update_task_progress(
             task_id,
@@ -181,13 +207,22 @@ def alphasift_start_screen_task(
     )
 
 
-@router.get("/screen/tasks/{task_id}", response_model=AlphaSiftScreenTaskStatus)
+@router.get(
+    "/screen/tasks/{task_id}",
+    response_model=AlphaSiftScreenTaskStatus,
+    response_model_exclude_unset=True,
+    responses={404: {"model": ErrorResponse}},
+)
 def alphasift_screen_task_status(task_id: str) -> AlphaSiftScreenTaskStatus:
     task = get_task_queue().get_task(task_id)
     if task is None or task.report_type != "alphasift_screen":
         raise _screening_task_not_found(task_id)
 
-    result = task.result if task.status == QueueTaskStatus.COMPLETED and isinstance(task.result, dict) else None
+    result = (
+        AlphaSiftScreenResponse.model_validate(task.result)
+        if task.status == QueueTaskStatus.COMPLETED and isinstance(task.result, dict)
+        else None
+    )
     return AlphaSiftScreenTaskStatus(
         task_id=task.task_id,
         trace_id=task.trace_id or task.task_id,
@@ -201,14 +236,22 @@ def alphasift_screen_task_status(task_id: str) -> AlphaSiftScreenTaskStatus:
     )
 
 
-@router.post("/screen")
+@router.post(
+    "/screen",
+    response_model=AlphaSiftScreenResponse,
+    response_model_exclude_unset=True,
+    responses={422: {"model": ErrorResponse}},
+)
 def alphasift_screen(
     request: AlphaSiftScreenRequest,
     http_request: Request,
     config: Config = Depends(get_config_dep),
 ) -> Dict[str, Any]:
-    return _service(config).screen(
-        strategy=request.strategy,
-        market=request.market,
-        max_results=request.max_results,
+    return _validated_payload(
+        AlphaSiftScreenResponse,
+        _service(config).screen(
+            strategy=request.strategy,
+            market=request.market,
+            max_results=request.max_results,
+        ),
     )

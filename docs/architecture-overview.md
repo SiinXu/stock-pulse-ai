@@ -104,6 +104,20 @@ path-filter, container-smoke, and reference-update coverage.
 | `api/` | HTTP routing, middleware, lifespan, transport schemas, SSE and static asset delivery | A second business lifecycle or task status authority. |
 | Report and notification paths | `src/schemas/report_schema.py`, `src/services/report_renderer.py`, `templates/`, `src/core/stages/delivery.py`, and notification modules | A `src/reports/` package; no such package exists in the current tree. |
 
+### DTO Conventions
+
+New public request and response DTOs under `api/v1/schemas/` use Pydantic v2.
+Endpoint and service boundaries validate untrusted mappings with
+`model_validate`; adapters that require a plain serialized mapping use
+`model_dump` only after validation. Public DTOs explicitly choose their alias,
+default, and extra-field behavior so API evolution does not silently change the
+wire contract. Stable internal contracts may remain dataclasses or TypedDicts
+when validation and serialization would not justify migration churn.
+
+Pydantic DTOs do not select the Agent runtime. Production Agent assembly remains
+Native; the optional PydanticAI test/evidence adapter follows its separate ADR
+and is not an API schema dependency.
+
 ## Analysis Execution Paths
 
 ### CLI And Scheduler

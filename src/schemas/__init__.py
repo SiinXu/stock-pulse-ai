@@ -4,7 +4,9 @@
 DSA Schemas
 ===================================
 
-Pydantic schemas for report output validation and internal contracts.
+Internal analysis and domain contracts. This package intentionally includes
+Pydantic models, dataclasses, and TypedDicts according to boundary needs;
+public HTTP request and response DTOs live in ``api/v1/schemas``.
 """
 
 from src.schemas.analysis_context_pack import (
