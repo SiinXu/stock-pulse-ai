@@ -2,13 +2,11 @@
 
 # 📈 StockPulse · 智能股票分析系统
 
-[![GitHub stars](https://img.shields.io/github/stars/SiinXu/stock-pulse-ai?style=social)](https://github.com/SiinXu/stock-pulse-ai/stargazers)
-[![CI](https://github.com/SiinXu/stock-pulse-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/SiinXu/stock-pulse-ai/actions/workflows/ci.yml)
-[![License: MIT + AGPL-3.0](https://img.shields.io/badge/License-MIT%20%2B%20AGPL--3.0-blue.svg)](LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Ready-2088FF?logo=github-actions&logoColor=white)](https://github.com/features/actions)
+<a href="https://github.com/SiinXu/stock-pulse-ai/stargazers"><img src="https://img.shields.io/github/stars/SiinXu/stock-pulse-ai?style=flat&logo=github&label=Stars&color=2088FF" alt="GitHub stars" /></a> <a href="https://github.com/SiinXu/stock-pulse-ai/actions/workflows/ci.yml"><img src="https://github.com/SiinXu/stock-pulse-ai/actions/workflows/ci.yml/badge.svg" alt="CI" /></a> <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT%20%2B%20AGPL--3.0-blue.svg" alt="License: MIT + AGPL-3.0" /></a> <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="Python 3.10+" /></a> <a href="https://github.com/features/actions"><img src="https://img.shields.io/badge/GitHub%20Actions-Ready-2088FF?logo=github-actions&logoColor=white" alt="GitHub Actions" /></a>
 
 > 🤖 基于 AI 大模型的 A股/港股/美股/日股/韩股/台股自选股智能分析系统，每日自动分析并推送「决策仪表盘」到企业微信/飞书/Telegram/Discord/Slack/邮箱
+
+**多 Agent 协作 · 插件化扩展 · 每日自动分析 · 零成本 GitHub Actions**
 
 [**产品预览**](#-产品预览) · [**功能特性**](#-功能特性) · [**快速开始**](#-快速开始) · [**推送效果**](#-推送效果) · [**文档中心**](docs/INDEX.md) · [**完整指南**](docs/full-guide.md)
 
@@ -17,7 +15,7 @@
 </div>
 
 > [!NOTE]
-> **StockPulse** 是 [ZhuLinsen/daily_stock_analysis](https://github.com/ZhuLinsen/daily_stock_analysis) 的独立维护 fork。上游原始代码遵循 MIT License，StockPulse 新增与大幅修改的代码遵循 AGPL-3.0。StockPulse 不是上游团队发布的官方版本。感谢原作者和贡献者；完整授权条款见 [LICENSE](LICENSE)。
+> **StockPulse** 是基于 [ZhuLinsen/daily_stock_analysis](https://github.com/ZhuLinsen/daily_stock_analysis) 的开源 fork，持续迭代，欢迎社区共建。上游原始代码遵循 MIT License，StockPulse 新增与大幅修改的代码遵循 AGPL-3.0。StockPulse 不是上游团队发布的官方版本。感谢原作者和贡献者；完整授权条款见 [LICENSE](LICENSE)。
 
 ## 🗂️ 目录导览
 
@@ -39,12 +37,25 @@
   <img src="docs/assets/readme_workspace_tour_20260510.gif" alt="StockPulse Web 工作台演示" width="720">
 </p>
 
+## 🎯 为什么是 StockPulse
+
+同类工具多是「单模型跑一遍、给个结论」，StockPulse 的差异在于：
+
+- **多 Agent 协同决策，而非单模型直出**：情报 / 风险 / 决策 Agent 分工协作，内置冲突检测与风险否决，决策依据可逐条复核（实验性）。
+- **插件化架构，能力可插拔**：数据源、分析策略、Agent 工具、通知渠道、报告模板、事件钩子六类扩展点统一注册，内置能力与自定义扩展走同一套插件系统，便于二次开发。
+- **六大市场，一套流程**：A股、港股、美股、日股、韩股、台股及 ETF 共用同一分析管线，数据源与能力边界透明可查。
+- **零成本自动化**：GitHub Actions 每个交易日自动分析并推送，无需服务器。
+- **本地模型优先**：支持 Ollama 等本地模型，敏感数据可不出本地。
+- **全渠道推送**：企业微信、飞书、Telegram、Discord、Slack、邮件开箱即用。
+
 ## ✨ 功能特性
 
 | 能力 | 覆盖内容 |
 |------|------|
 | AI 决策报告 | 核心结论、评分、趋势、买卖点位、风险警报、催化因素、操作检查清单 |
 | 多市场数据聚合 | 覆盖 A股、港股、美股、日股、韩股、台股和 ETF，支持行情、K 线、技术指标、新闻、公告、基本面与报告辅助数据；不同市场的数据源和能力边界见 [市场支持边界](docs/market-support.md) |
+| 多 Agent 协作 | 情报 / 风险 / 决策 Agent 协同分析、冲突检测与风险否决，给出可复核的决策依据（实验性） |
+| 插件化架构 | 数据源、分析策略、Agent 工具、通知渠道、报告模板、事件钩子六类扩展点统一注册，内置能力与自定义扩展走同一插件系统 |
 | Web / 桌面工作台 | 手动分析、任务进度、历史报告、完整 Markdown、回测、持仓、配置管理、浅色 / 深色主题 |
 | Agent 策略问股 | 多轮追问，支持均线、缠论、波浪、趋势、热点、事件、成长、预期等 15 种内置策略，覆盖 Web/Bot/API |
 | 智能导入与补全 | 图片、CSV/Excel、剪贴板导入；股票代码/名称/拼音/别名补全 |
@@ -62,6 +73,24 @@
 | 社交舆情 | [Stock Sentiment API](https://api.adanos.org/docs)（Reddit / X / Polymarket，仅美股，可选） |
 
 > 项目默认内置 AkShare、Baostock、YFinance 等免费行情源，可零配置运行；免费源受上游限流、接口变动和网络波动影响，稳定性不保证。长期定时、批量分析或更稳定行情建议配置 TickFlow、Tushare、Longbridge 等 token 型数据源，适用市场、Actions 映射和 fallback 规则见 [数据源配置](docs/full-guide.md#数据源配置)。
+
+## 🏗️ 架构与体验升级
+
+项目持续演进，以下为已交付的部分重点，完整记录见 [CHANGELOG](docs/CHANGELOG.md)：
+
+**架构**
+
+- **模块化收敛**：市场、通知、分析编排、搜索、存储等核心模块归包与拆分，并打破多处循环依赖，降低维护成本。
+- **插件化落地**：数据源、策略、工具、通知、报告、事件六类扩展点统一注册，插件启动组合已接入运行流程。
+- **Agent 运行时统一**：规范执行句柄与工具会话生命周期，Native 运行时为默认。
+- **数据库迁移框架**：有序迁移、校验和与单事务隔离，覆盖 Desktop / Docker / Actions。
+
+**体验**
+
+- **统一设计系统**：语义化 Surface、按钮、数据表等共享组件契约，清理散乱的自定义样式。
+- **信息架构重构**：研究导航分组、用量并入设置、覆盖层级与深链 / URL 状态统一。
+- **可访问性与触控**：≥ 44px 触控目标、粗指针命中优化、动态视口与键盘导航。
+- **更多能力**：桌面悬浮助手、十语国际化与 Web Chat 深度研究模式。
 
 ## 🚀 快速开始
 
@@ -254,9 +283,38 @@ python main.py --webui-only
 - 支持均线金叉、缠论、波浪理论、多头趋势、热点题材、事件驱动、成长质量、预期重估等内置策略
 - 支持实时行情、K 线、技术指标、新闻和风险信息调用
 - 支持多轮追问、会话导出、发送到通知渠道和后台执行
-- 支持自定义策略文件与多 Agent 编排（实验性）
+- 支持自定义策略文件、插件化扩展与多 Agent 协作编排（情报 / 风险 / 决策 Agent 协同与冲突检测，实验性）
 
 > Agent 具体参数、`skill` 命名兼容、多 Agent 模式和预算护栏见 [完整指南](docs/full-guide.md#本地-webui-管理界面) 与 [LLM 配置指南](docs/LLM_CONFIG_GUIDE.md)。
+
+## 🗺️ 路线图
+
+以下为规划方向，非当前已交付能力，最终以实际发布为准：
+
+- **插件生态**：开放更多第三方数据源、策略与工具插件，完善插件的发现、安装与治理。
+- **多 Agent 协作转正**：从实验性走向稳定，强化共识形成与冲突消解。
+- **决策自我迭代**：基于历史预测结果的追踪与误差分析，驱动策略持续优化。
+- **多资产扩展**：在股票之外探索加密货币等更多资产类型的接入。
+- **自然语言交互增强**：更强的对话式 Agent 操作与自动化编排。
+
+> 有想法或需求？欢迎在 [Issues](https://github.com/SiinXu/stock-pulse-ai/issues) 中讨论。
+
+## ❓ 常见问题
+
+**StockPulse 是什么？**
+一个开源的 AI 股票分析系统，覆盖 A股、港股、美股、日股、韩股、台股及 ETF，每日自动生成「决策仪表盘」并推送到企业微信、飞书、Telegram、Discord、Slack、邮箱。
+
+**需要会编程吗？**
+不需要。Fork 仓库、配置几个 Secret、启用 GitHub Actions 即可零成本运行；也支持本地 / Docker 部署和桌面客户端。
+
+**支持哪些 AI 模型？**
+Anspire、AIHubMix、Gemini、OpenAI 兼容、DeepSeek、通义千问、Claude、Ollama 本地模型等，可自由切换。
+
+**要花钱吗？**
+核心流程零成本：GitHub Actions 免费额度 + 内置免费行情源即可运行；需要更稳定行情或更强模型时再按需配置。
+
+**它能替我做投资决策吗？**
+不能。StockPulse 仅供学习与研究，所有分析与结论不构成投资建议，请独立判断、自担风险。
 
 ## 📬 项目链接
 
@@ -269,7 +327,7 @@ python main.py --webui-only
 - **上游原始代码**：MIT License（Copyright © 2026 ZhuLinsen）
 - **StockPulse 新增与大幅修改的代码**：GNU Affero General Public License v3.0（AGPL-3.0）
 
-完整说明见 [LICENSE](LICENSE) 文件。通过网络提供本软件服务（包括 Web 界面、API 或 Agent 平台）时，必须遵守 AGPL-3.0 的相应要求。StockPulse 保留上游项目的版权与许可声明，并作为独立项目持续维护。
+完整说明见 [LICENSE](LICENSE) 文件。通过网络提供本软件服务（包括 Web 界面、API 或 Agent 平台）时，必须遵守 AGPL-3.0 的相应要求。StockPulse 保留上游项目的版权与许可声明，作为开源项目持续维护。
 
 欢迎在二次开发或引用时注明 StockPulse 与上游项目的代码来源。
 
@@ -278,3 +336,11 @@ python main.py --webui-only
 本项目仅供学习和研究使用，不构成任何投资建议。股市有风险，投资需谨慎。作者不对使用本项目产生的任何损失负责。
 
 ---
+
+<div align="center">
+
+**觉得 StockPulse 有用？点亮 Star ⭐ 支持一下，也欢迎参与共建 ❤️**
+
+用 ❤️ 打造，献给每一位关注开源与理性投资的你。
+
+</div>
