@@ -1,0 +1,79 @@
+# 个人投资框架后端合同
+
+[中文](personal-investment-framework.md) | [English](personal-investment-framework_EN.md)
+
+## 当前范围
+
+本阶段只交付 Issue #465 的后端切片：单机账户的版本化存储、CRUD/历史 API、乐观并发控制，以及供后续分析装配读取的稳定 adapter。当前版本**不包含**完整 Web 页面、导入/导出、自动交易，也没有把框架真实注入 Single / Multi / Research prompt 或报告。调用 `InvestmentFrameworkContextReader` 只代表读取边界稳定，不能据此宣称 Agent 已遵循个人框架。
+
+## 账户与权限边界
+
+当前产品只有可选的单一管理员会话，没有可作为授权主体的 user/tenant principal。框架因此固定在服务端 `local` scope：API 不接受 `owner_id`、`user_id` 或 tenant 字段，不能由客户端选择其他身份。`ADMIN_AUTH_ENABLED=true` 时，该 API 与其他 `/api/v1/*` 路径一样需要有效管理员 session cookie；关闭认证时沿用现有本机部署语义。本阶段不提前实现 #230 的多租户账户或 RBAC。
+
+## 内容 Schema
+
+每个版本保存一份严格的 `InvestmentFrameworkContent`：
+
+- `schema_version`：持久化内容合同版本，当前为 `investment-framework-content-v1`；请求省略时使用当前版本。
+- `title`：框架名称。
+- `description`：可选说明。
+- `root_node_id` + `decision_tree`：以稳定 node ID 和 branch target 表示的决策树；terminal branch 使用 `outcome`。
+- `evaluation_dimensions`：名称、相对权重、criteria 和可选说明。
+- `risk_rules`：明确的风险/仓位规则。
+- `tracking_criteria`：持续跟踪条件。
+- `free_form_rules`：无法结构化表达的补充规则。
+
+未知字段和标量类型强制转换都会被拒绝，例如 JSON body 中的字符串 `"1"` 不能代替整数 revision，字符串 `"25"` 不能代替数值 weight；响应 DTO 同样不会掩盖服务层类型漂移。`DELETE` 的 revision 仍按 HTTP query 参数的既有 typed parsing 规则处理。该严格边界同样用于持久化内容读取，旧数据中的类型漂移或未知 `schema_version` 会 fail closed，而不会在读取时被静默转换。框架必须至少包含一种实际 criteria；树引用必须指向已声明 node，所有 node 必须从 root 可达且不能形成环，node ID 和维度名称必须唯一。权重范围是 `0..100` 的相对权重，本阶段不强制总和等于 100。
+
+## 存储与版本语义
+
+Migration `202607240003_investment_framework_schema` 新增：
+
+- `investment_frameworks`：local aggregate、`latest_version`、可空 `active_version`、独立单调递增 `revision` 和时间戳。
+- `investment_framework_versions`：不可变 content JSON、version、change summary 和创建时间；`(framework_id, version)` 唯一。
+
+创建时 `version=1`、`active_version=1`、`revision=1`。每次 `PUT` 都创建新版本并使它 active；不会原地改写历史。停用只清空 `active_version` 并递增 revision，历史仍可读取；停用状态下再次 `PUT` 会创建新版本并重新激活。框架已经停用时，只有携带**当前** `expected_revision` 的重复停用才是幂等 no-op；使用第一次停用前的旧 revision 重试仍返回 `409`，不会绕过乐观并发保护。
+
+每次读取和 mutation 都会在同一 repository session 内验证完整 aggregate：只能有一个 `local` aggregate，版本必须由 1 到 `latest_version` 连续且全部归属该 aggregate，`active_version` 必须为空或等于 latest，并且所有历史内容和 change summary 都必须通过严格解码。可达 revision 状态有明确边界：latest version 为 `N` 时，active aggregate 必须满足 `N <= revision <= 2N-1`，inactive aggregate 必须满足 `N+1 <= revision <= 2N`。验证会先把实际历史行数与持久化 counter 比较，再枚举实际行；损坏的超大 counter 不会触发与其声明值成比例的合成 range 分配。孤儿/外部 owner 版本、缺口、未来版本、不可能的 revision/active 组合、畸形时间戳、过深嵌套或其他损坏内容、无效 change summary 都会 fail closed 为 data error；这些损坏不能被 create/delete 掩盖，也不能被 context reader 当作“未配置”。
+
+Create、update 或 deactivate flush 后，repository 会使 ORM identity state 过期、重新读取持久化行，并在 commit 前证明请求的 aggregate transition 与完整不可变历史 fingerprint 完全一致。若数据库 trigger 或其他 write-side 行为改变了请求内容、counter、active 状态、summary、timestamp 或旧版本，整笔 transaction 都会回滚；响应只从重新读取的持久化状态序列化。
+
+`DELETE` 与停用不同：它在 revision guard 下删除 aggregate 及所有历史版本，之后可以重新从 version 1 创建。删除不可逆；需要保留历史时必须使用 deactivate。
+
+## API
+
+| Method | Path | Contract |
+| --- | --- | --- |
+| `POST` | `/api/v1/investment-framework` | 创建 local framework；已存在返回 `409` |
+| `GET` | `/api/v1/investment-framework` | 读取 latest version；inactive 时仍返回内容并令 `is_active=false` |
+| `PUT` | `/api/v1/investment-framework` | 携带 `expected_revision` 创建并激活新版本 |
+| `GET` | `/api/v1/investment-framework/history` | 按 version 降序读取完整不可变历史 |
+| `POST` | `/api/v1/investment-framework/deactivate` | 携带 `expected_revision` 停用，保留历史 |
+| `DELETE` | `/api/v1/investment-framework?expected_revision=N` | 删除 aggregate 与全部历史 |
+
+所有 mutation 的 `expected_revision` 都针对 aggregate state，而不是 content version。只有确证的 revision 漂移返回稳定 `409 investment_framework_revision_conflict`，`params.current_revision` 告知客户端刷新后重试；version-history constraint 不一致会 fail closed 为服务端 data error，不能伪装成可重试的 revision conflict。不存在返回 `404 investment_framework_not_found`，请求 schema 错误返回现有稳定 `422 validation_error` envelope。
+
+历史端点当前一次返回完整历史，不提供分页。该行为保持本切片的简单合同，但长期频繁更新会使读取成本和响应体随版本数增长；引入分页时必须另行定义兼容的顺序、游标和 total 语义。
+
+## 分析上下文读取边界
+
+`src.services.investment_framework_context.InvestmentFrameworkContextReader.read()` 返回：
+
+- active framework 存在时：顶层 frozen 的 `investment-framework-context-v1` 只读 adapter payload，包含 framework ID、content version、严格 content 和更新时间。嵌套 content 是从持久化 JSON 解码出的 detached snapshot；调用方在内存中的修改不会写回数据库，但不应把它当作深度不可变对象。
+- 未创建或已停用时：`None`，现有分析路径不做任何变化。
+- 持久化内容损坏时：fail closed 抛出 data error，不把损坏误报成“未配置”。
+
+该 reader 目前没有接入 `AnalysisContextPack` 或 Agent prompt。后续真实接线必须在 Single / Multi / Research 各装配入口统一处理优先级、上下文大小、报告披露和回归测试。
+
+## 迁移与回滚
+
+Fresh 数据库由 SQLAlchemy metadata 建表，registered migration 验证 shape 后记录 applied row；受支持 legacy 数据库在同一启动事务中得到等价表。Migration 直接执行也会幂等创建并验证两张表，包括有序列名、SQLite affinity、nullability、default、primary key、精确 unique constraint、foreign key，以及会改变语义的 DDL token。验证固定读取 `main` schema，并要求完整 canonical object inventory：两张目标表、每张表恰好一个预期的 SQLite unique-constraint autoindex、aggregate 表没有 foreign key，且目标表不存在 TEMP object、trigger 或显式 index。带有额外 conflict policy、重复 constraint、`AUTOINCREMENT`、`CHECK`、`COLLATE`、`MATCH`、`DEFERRABLE`、generated-column、辅助 schema object 等隐藏语义的同名 lookalike/shadow，会与类型或约束漂移一样 fail closed，不写 applied row。DDL、验证和 applied row 任一步失败时整笔事务回滚，不留下半张表或伪 applied 状态。
+
+生产 migration 是 forward-only：
+
+1. 升级前停止写入并备份数据库。
+2. 若只需停止框架影响，先调用 deactivate；当前分析本来就没有 prompt 注入。
+3. 若必须回滚应用与 schema，停止新客户端写入，恢复 migration 前数据库备份，并同时部署匹配的旧代码。
+4. 不要手工删除 `schema_migrations` 记录或直接删表伪造降级；旧代码看到未知更高 migration 会按现有合同 fail closed。
+
+回滚 PR 代码但保留新 migration 数据库并不是支持的旧版本恢复方式。若保留当前或更高版本代码，新增空表本身不会改变没有框架时的分析行为。

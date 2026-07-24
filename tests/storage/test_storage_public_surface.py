@@ -25,6 +25,7 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     DecisionSignalMemoryFlagRecord
     DecisionSignalOutcomeRecord DecisionSignalRecord Dict Float ForeignKey
     FundamentalSnapshot INTELLIGENCE_ITEM_NULL_SCOPE_VALUE Index Integer
+    InvestmentFrameworkRecord InvestmentFrameworkVersionRecord
     IntegrityError IntelligenceItem IntelligenceSource
     LEGACY_BASELINE_MIGRATION LLMUsage List MigrationError NewsIntel
     OperationalError Optional PORTFOLIO_LEGACY_IDEMPOTENCY_GUARD_TRIGGER
@@ -87,9 +88,11 @@ EXPECTED_SCHEMA_DEFINITIONS = (
     "SecurityAuditEventRecord",
     "ScheduledTaskRecord",
     "ScheduledTaskRunRecord",
+    "InvestmentFrameworkRecord",
+    "InvestmentFrameworkVersionRecord",
 )
 EXPECTED_SCHEMA_AST_HASH = (
-    "0b983eec1e9de49dbadd68f92317d481b4f08bf00fa00db578341f74bea43921"
+    "e85bd20322a0d7b9814287b2baa4ae8e72106163cc3921e0b4cf35f727a3c47e"
 )
 EXPECTED_SCHEMA_MODELS = (
     "DatabaseSchemaMigration",
@@ -126,6 +129,8 @@ EXPECTED_SCHEMA_MODELS = (
     "SecurityAuditEventRecord",
     "ScheduledTaskRecord",
     "ScheduledTaskRunRecord",
+    "InvestmentFrameworkRecord",
+    "InvestmentFrameworkVersionRecord",
 )
 EXPECTED_SCHEMA_TABLES = (
     "schema_migrations",
@@ -162,6 +167,8 @@ EXPECTED_SCHEMA_TABLES = (
     "security_audit_events",
     "scheduled_tasks",
     "scheduled_task_runs",
+    "investment_frameworks",
+    "investment_framework_versions",
 )
 EXPECTED_SCHEMA_METHODS = {
     "StockDaily": ("__repr__", "to_dict"),
@@ -191,6 +198,10 @@ EXPECTED_UTC_COLUMN_CALLBACKS = (
     ("scheduled_task_runs", "created_at", "default"),
     ("scheduled_task_runs", "updated_at", "default"),
     ("scheduled_task_runs", "updated_at", "onupdate"),
+    ("investment_frameworks", "created_at", "default"),
+    ("investment_frameworks", "updated_at", "default"),
+    ("investment_frameworks", "updated_at", "onupdate"),
+    ("investment_framework_versions", "created_at", "default"),
 )
 
 EXPECTED_GROUPS = (

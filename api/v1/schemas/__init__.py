@@ -125,6 +125,15 @@ from api.v1.schemas.scheduled_tasks import (
     StockAnalysisScheduledPayload,
     UnsupportedScheduledTaskItem,
 )
+from api.v1.schemas.investment_framework import (
+    InvestmentFrameworkCreateRequest,
+    InvestmentFrameworkDeactivateRequest,
+    InvestmentFrameworkDeleteResponse,
+    InvestmentFrameworkHistoryItem,
+    InvestmentFrameworkHistoryResponse,
+    InvestmentFrameworkResponse,
+    InvestmentFrameworkUpdateRequest,
+)
 from api.v1.schemas.decision_signals import (
     DecisionProfile,
     DecisionSignalCreateRequest,
@@ -253,6 +262,14 @@ __all__ = [
     "ScheduledTaskTodayResponse",
     "StockAnalysisScheduledPayload",
     "UnsupportedScheduledTaskItem",
+    # investment framework
+    "InvestmentFrameworkCreateRequest",
+    "InvestmentFrameworkDeactivateRequest",
+    "InvestmentFrameworkDeleteResponse",
+    "InvestmentFrameworkHistoryItem",
+    "InvestmentFrameworkHistoryResponse",
+    "InvestmentFrameworkResponse",
+    "InvestmentFrameworkUpdateRequest",
     # decision signals
     "DecisionProfile",
     "DecisionSignalCreateRequest",

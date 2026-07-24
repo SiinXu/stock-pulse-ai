@@ -34,6 +34,9 @@ from src.migrations.versions.v202607240001_security_audit_events import (
 from src.migrations.versions.v202607240002_scheduled_task_schema import (
     MIGRATION as SCHEDULED_TASK_SCHEMA_MIGRATION,
 )
+from src.migrations.versions.v202607240003_investment_framework_schema import (
+    MIGRATION as INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION,
+)
 
 
 MIGRATIONS: Tuple[Migration, ...] = validate_registry(
@@ -47,6 +50,7 @@ MIGRATIONS: Tuple[Migration, ...] = validate_registry(
         INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION,
         SECURITY_AUDIT_EVENTS_MIGRATION,
         SCHEDULED_TASK_SCHEMA_MIGRATION,
+        INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION,
     )
 )
 

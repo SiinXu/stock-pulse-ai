@@ -16,6 +16,7 @@ branch for the old value.
 from __future__ import annotations
 
 import dataclasses
+from datetime import datetime, timezone
 
 from src.agent.runtime.events import RUNTIME_EVENT_SCHEMA_VERSION, RuntimeEvent
 from src.llm.usage import (
@@ -35,6 +36,12 @@ from src.schemas.decision_scale import (
 from src.schemas.decision_signal_presentation import (
     DECISION_SIGNAL_PRESENTATION_SCHEMA_VERSION,
     build_decision_signal_presentation,
+)
+from src.schemas.investment_framework import (
+    INVESTMENT_FRAMEWORK_CONTENT_SCHEMA_VERSION,
+    INVESTMENT_FRAMEWORK_CONTEXT_SCHEMA_VERSION,
+    InvestmentFrameworkAnalysisContext,
+    InvestmentFrameworkContent,
 )
 from src.schemas.market_structure import (
     MARKET_STRUCTURE_SCHEMA_VERSION,
@@ -74,6 +81,14 @@ def test_serialized_artifact_version_constants_match_documented_inventory() -> N
         == "decision-signal-presentation-v1"
     )
     assert SCHEDULED_TASK_SCHEMA_VERSION == 2
+    assert (
+        INVESTMENT_FRAMEWORK_CONTENT_SCHEMA_VERSION
+        == "investment-framework-content-v1"
+    )
+    assert (
+        INVESTMENT_FRAMEWORK_CONTEXT_SCHEMA_VERSION
+        == "investment-framework-context-v1"
+    )
 
 
 def test_analysis_context_pack_serialization_emits_version() -> None:
@@ -184,3 +199,25 @@ def test_security_audit_event_serialization_emits_version() -> None:
         correlation_id="0123456789abcdef0123456789abcdef",
     )
     assert event.model_dump()["schema_version"] == SECURITY_AUDIT_SCHEMA_VERSION
+
+
+def test_investment_framework_serialization_emits_versions() -> None:
+    content = InvestmentFrameworkContent(
+        title="Versioned criteria",
+        risk_rules=["Keep position sizing bounded"],
+    )
+    context = InvestmentFrameworkAnalysisContext(
+        framework_id=1,
+        framework_version=1,
+        content=content,
+        updated_at=datetime(2026, 7, 25, tzinfo=timezone.utc),
+    )
+
+    assert (
+        content.model_dump()["schema_version"]
+        == INVESTMENT_FRAMEWORK_CONTENT_SCHEMA_VERSION
+    )
+    assert (
+        context.model_dump()["schema_version"]
+        == INVESTMENT_FRAMEWORK_CONTEXT_SCHEMA_VERSION
+    )

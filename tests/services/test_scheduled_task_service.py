@@ -12,7 +12,7 @@ from sqlalchemy import event, inspect, select
 
 from src.config import Config
 from src.core.trading_calendar import MarketSessionStatus
-from src.migrations.registry import SCHEDULED_TASK_SCHEMA_MIGRATION, TARGET_VERSION
+from src.migrations.registry import SCHEDULED_TASK_SCHEMA_MIGRATION, get_migrations
 from src.repositories.scheduled_task_repo import ScheduledTaskRepository
 from src.schemas.scheduled_task import (
     MAX_SCHEDULED_TASK_EXECUTION_GENERATION,
@@ -335,7 +335,9 @@ def test_schema_migration_and_models_create_both_tables(database) -> None:
     }.issubset({
         column["name"] for column in inspector.get_columns("scheduled_task_runs")
     })
-    assert TARGET_VERSION == SCHEDULED_TASK_SCHEMA_MIGRATION.id
+    migrations = get_migrations()
+    assert SCHEDULED_TASK_SCHEMA_MIGRATION in migrations
+    assert migrations.index(SCHEDULED_TASK_SCHEMA_MIGRATION) < len(migrations) - 1
     with database.get_session() as session:
         applied = session.execute(
             select(DatabaseSchemaMigration).where(
