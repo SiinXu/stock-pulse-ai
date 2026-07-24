@@ -256,6 +256,43 @@ def test_rejects_partial_or_unknown_security_classification(monkeypatch) -> None
         portfolio.load_futu_stock_codes()
 
 
+@pytest.mark.parametrize(
+    "code",
+    [
+        "US.600519",
+        "US.HK.00700",
+        "US.SPX",
+        "HK.AAPL",
+        "HK.600519",
+        "HK.US.AAPL",
+        "SH.000001",
+        "SH.HK.00700",
+        "SH.AAPL",
+        "SZ.600519",
+        "SZ.HK.00700",
+        "SZ.AAPL",
+    ],
+)
+def test_rejects_confirmed_stock_code_inconsistent_with_futu_market(
+    code,
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("FUTU_ACC_ID", raising=False)
+    api, _trade_contexts, quote_contexts = _fake_api(
+        [_row()],
+        {101: [_position("US.AAPL"), _position(code)]},
+        {"US.AAPL": "STOCK", code: "STOCK"},
+    )
+
+    with patch.object(portfolio, "_load_futu_api", return_value=api), pytest.raises(
+        portfolio.FutuPortfolioError,
+        match="STOCK code inconsistent with its market",
+    ):
+        portfolio.load_futu_stock_codes()
+
+    assert quote_contexts[0].closed
+
+
 def test_connection_settings_use_safe_defaults_and_reject_ipv6(monkeypatch) -> None:
     monkeypatch.delenv("FUTU_OPEND_HOST", raising=False)
     monkeypatch.delenv("FUTU_OPEND_PORT", raising=False)

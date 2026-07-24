@@ -9,6 +9,8 @@ import os
 from dataclasses import dataclass
 from typing import Any, Iterable, List, Optional
 
+from data_provider.us_index_mapping import is_us_stock_code
+from src.services.stock_code_utils import normalize_code
 from src.services.stock_list_parser import normalize_stock_codes
 from src.utils.sanitize import log_safe_exception
 
@@ -297,11 +299,15 @@ def _analysis_candidate(futu_code: str) -> Optional[str]:
     if not separator or not symbol:
         return None
     if market == "US":
-        return symbol
+        return symbol if is_us_stock_code(symbol) else None
+
+    normalized = normalize_code(futu_code)
+    if normalized is None:
+        return None
     if market == "HK":
-        return f"HK{symbol}"
+        return f"HK{normalized}"
     if market in {"SH", "SZ"}:
-        return futu_code
+        return normalized
     return None
 
 
@@ -379,13 +385,16 @@ def _filter_and_normalize_stocks(
             ", ".join(unsupported),
         )
 
-    candidates = [
-        candidate
-        for code in position_codes
-        if code in confirmed_stocks
-        for candidate in [_analysis_candidate(code)]
-        if candidate is not None
-    ]
+    candidates = []
+    for code in position_codes:
+        if code not in confirmed_stocks:
+            continue
+        candidate = _analysis_candidate(code)
+        if candidate is None:
+            raise FutuPortfolioError(
+                f"Futu returned a STOCK code inconsistent with its market: {code}"
+            )
+        candidates.append(candidate)
     try:
         return normalize_stock_codes(candidates, reject_invalid=True)
     except ValueError as exc:
