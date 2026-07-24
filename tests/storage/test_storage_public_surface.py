@@ -28,7 +28,8 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     IntegrityError IntelligenceItem IntelligenceSource
     LEGACY_BASELINE_MIGRATION LLMUsage List MigrationError NewsIntel
     OperationalError Optional PORTFOLIO_LEGACY_IDEMPOTENCY_GUARD_TRIGGER
-    PROVIDER_TRACE_RETENTION_LIMIT PortfolioAccount PortfolioCashLedger
+    PROVIDER_TRACE_RETENTION_LIMIT PortfolioAccount PortfolioAccountKind
+    PortfolioCashLedger
     PortfolioCorporateAction PortfolioDailySnapshot PortfolioFxRate
     PortfolioIdempotencyRecord PortfolioPosition PortfolioPositionLot
     PortfolioTrade Session StockDaily String T TYPE_CHECKING Text Tuple
@@ -116,6 +117,7 @@ EXPECTED_SCHEMA_MODELS = (
     "DecisionSignalOutcomeRecord",
     "DecisionSignalFeedbackRecord",
     "DecisionSignalMemoryFlagRecord",
+    "PortfolioAccountKind",
 )
 EXPECTED_SCHEMA_TABLES = (
     "schema_migrations",
@@ -148,6 +150,7 @@ EXPECTED_SCHEMA_TABLES = (
     "decision_signal_outcomes",
     "decision_signal_feedback",
     "decision_signal_memory_flags",
+    "portfolio_account_kinds",
 )
 EXPECTED_SCHEMA_METHODS = {
     "StockDaily": ("__repr__", "to_dict"),
@@ -168,6 +171,9 @@ EXPECTED_UTC_COLUMN_CALLBACKS = (
     ("decision_signal_memory_flags", "created_at", "default"),
     ("decision_signal_memory_flags", "updated_at", "default"),
     ("decision_signal_memory_flags", "updated_at", "onupdate"),
+    ("portfolio_account_kinds", "created_at", "default"),
+    ("portfolio_account_kinds", "updated_at", "default"),
+    ("portfolio_account_kinds", "updated_at", "onupdate"),
 )
 
 EXPECTED_GROUPS = (

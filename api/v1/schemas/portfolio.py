@@ -22,6 +22,10 @@ class PortfolioAccountCreateRequest(BaseModel):
     market: Literal["cn", "hk", "us", "jp", "kr", "tw"] = "cn"
     base_currency: str = Field("CNY", min_length=3, max_length=8)
     owner_id: Optional[str] = Field(None, max_length=64)
+    account_type: Literal["real", "paper"] = Field(
+        "real",
+        description="'paper' creates a forward-simulation account seeded with paper cash; 'real' is the default.",
+    )
 
 
 class PortfolioAccountUpdateRequest(BaseModel):
@@ -41,6 +45,7 @@ class PortfolioAccountItem(BaseModel):
     market: str
     base_currency: str
     is_active: bool
+    account_type: str = "real"
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
@@ -67,6 +72,30 @@ class PortfolioTradeCreateRequest(BaseModel):
     currency: Optional[str] = Field(None, min_length=3, max_length=8)
     trade_uid: Optional[str] = Field(None, max_length=128)
     note: Optional[str] = Field(None, max_length=255)
+
+
+class PaperTradeCreateRequest(BaseModel):
+    operation_id: Optional[str] = Field(
+        None,
+        max_length=128,
+        description=PORTFOLIO_IDEMPOTENCY_KEY_DESCRIPTION,
+    )
+    symbol: str = Field(..., min_length=1, max_length=16)
+    trade_date: date
+    side: Literal["buy", "sell"]
+    quantity: float = Field(..., gt=0)
+    price: Optional[float] = Field(
+        None,
+        gt=0,
+        description="Explicit fill price; when omitted the latest available close at/before trade_date is used (fees/slippage ignored in the MVP).",
+    )
+    note: Optional[str] = Field(None, max_length=255)
+
+
+class PaperTradeCreatedResponse(BaseModel):
+    id: int
+    price: float
+    price_source: str
 
 
 class PortfolioCashLedgerCreateRequest(BaseModel):
