@@ -533,13 +533,15 @@ class LocalModelService:
                 return pending
 
             _config_version, values = self._config_snapshot()
-            client = self._client_factory(self._base_url(values))
+            base_url = self._base_url(values)
             # Fail before accepting a task so the UI can immediately offer the
             # manual command instead of polling a predictably failed worker.
-            client.list_installed_models()
+            self._client_factory(base_url).list_installed_models()
             task_id = uuid.uuid4().hex
 
             def run_pull() -> Dict[str, Any]:
+                client = self._client_factory(base_url)
+
                 def update(progress: OllamaPullProgress) -> None:
                     self._task_queue.update_task_progress(
                         task_id,
