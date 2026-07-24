@@ -60,7 +60,7 @@ describe('localModelsApi', () => {
     });
   });
 
-  it('sends only model identity and assignment to lifecycle endpoints', async () => {
+  it('sends lifecycle identity and an opaque recovery token without a caller runtime target', async () => {
     post.mockResolvedValue({ data: { task_id: 'task-1' } });
     deleteRequest.mockResolvedValue({ data: { success: true } });
 
@@ -68,6 +68,7 @@ describe('localModelsApi', () => {
     await localModelsApi.assign('qwen3:4b', 'agent');
     await localModelsApi.deleteModel('qwen3:4b');
     await localModelsApi.unregister('qwen3:4b');
+    await localModelsApi.restoreRegistration('qwen3:4b', 'recovery-2');
 
     expect(post).toHaveBeenNthCalledWith(1, '/api/v1/local-models/pulls', {
       model_id: 'qwen3:4b',
@@ -81,6 +82,10 @@ describe('localModelsApi', () => {
     });
     expect(deleteRequest).toHaveBeenNthCalledWith(2, '/api/v1/local-models/registrations', {
       data: { model_id: 'qwen3:4b' },
+    });
+    expect(post).toHaveBeenNthCalledWith(3, '/api/v1/local-models/registrations', {
+      model_id: 'qwen3:4b',
+      recovery_token: 'recovery-2',
     });
     expect(JSON.stringify(post.mock.calls)).not.toContain('base_url');
   });

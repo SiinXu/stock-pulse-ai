@@ -128,3 +128,7 @@ export interface LocalModelMutationResponse extends LocalModelConfiguration {
   skippedMaskedCount: number;
   reloadTriggered: boolean;
 }
+
+export interface LocalModelUnregistrationResponse extends LocalModelMutationResponse {
+  recoveryToken?: string | null;
+}

@@ -77,6 +77,12 @@ const CAPABILITY_TEXT_KEYS = {
   dialogue: 'capabilityDialogue',
 } as const;
 
+const MEMORY_TIER_TEXT_KEYS = {
+  light: 'memoryTierLight',
+  standard: 'memoryTierStandard',
+  high: 'memoryTierHigh',
+} as const;
+
 function runtimeRoute(value: string): string {
   return decodeModelRef(value)?.runtimeRoute ?? value.trim();
 }
@@ -414,6 +420,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
             <div className="flex flex-wrap gap-1.5">
               <Badge>{formatUiText(text.size, { size: `${size} GB` })}</Badge>
               <Badge>{formatUiText(text.memory, { ram: model.recommendedRamGb })}</Badge>
+              <Badge>{text[MEMORY_TIER_TEXT_KEYS[model.memoryTier]]}</Badge>
               <Badge>{model.license.identifier}</Badge>
               {installed ? <Badge variant="success"><Check aria-hidden="true" />{text.installed}</Badge> : null}
               {registered && !primary && !agent ? <Badge variant="info">{text.registered}</Badge> : null}

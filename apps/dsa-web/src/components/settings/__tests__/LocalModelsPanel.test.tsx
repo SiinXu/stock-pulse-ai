@@ -74,6 +74,7 @@ const FINANCE_MODEL: LocalModelCatalogEntry = {
   displayName: { en: 'Fin-R1 7B', zh: 'Fin-R1 7B' },
   capabilitySummary: { en: 'Finance reasoning model.', zh: '金融推理模型。' },
   capabilities: ['finance', 'reasoning'],
+  memoryTier: 'standard',
   recommendedRamGb: 16,
   install: {
     method: 'planned_ollama_package',
@@ -138,9 +139,11 @@ describe('LocalModelsPanel', () => {
     expect(within(general).getByText('Qwen3 4B')).toBeInTheDocument();
     expect(within(general).getByText('Q4 · 2.5 GB')).toBeInTheDocument();
     expect(within(general).getByText('8 GB RAM')).toBeInTheDocument();
+    expect(within(general).getByText('Light tier')).toBeInTheDocument();
     expect(within(general).getByText('Apache-2.0')).toBeInTheDocument();
     expect(within(general).getByText('Recommended tier')).toBeInTheDocument();
     const finance = screen.getByTestId('local-model-fin-r1-7b');
+    expect(within(finance).getByText('Standard tier')).toBeInTheDocument();
     expect(within(finance).getByText('Conversion pending')).toBeInTheDocument();
     expect(within(finance).getByRole('button', { name: 'Open download guide' })).toBeEnabled();
   });

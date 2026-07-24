@@ -14,8 +14,10 @@ from api.v1.schemas.local_models import (
     LocalModelMutationResponse,
     LocalModelPullAccepted,
     LocalModelPullStatus,
+    LocalModelRegistrationRestoreRequest,
     LocalModelRequest,
     LocalModelRuntimeResponse,
+    LocalModelUnregistrationResponse,
 )
 from src.services.local_model_service import (
     LocalModelError,
@@ -170,19 +172,44 @@ def delete_local_model(
         _raise_local_model_error(exc, model_id=request.model_id)
 
 
-@router.delete("/registrations", response_model=LocalModelMutationResponse)
+@router.delete("/registrations", response_model=LocalModelUnregistrationResponse)
 def unregister_local_model(
     request: LocalModelRequest,
     service: LocalModelService = Depends(get_local_model_service),
-) -> LocalModelMutationResponse:
+) -> LocalModelUnregistrationResponse:
     """Validate and remove configuration before desktop deletes local weights."""
     try:
         payload = service.unregister_model(request.model_id)
         payload["success"] = True
         payload["deleted"] = True
-        return LocalModelMutationResponse.model_validate(payload)
+        return LocalModelUnregistrationResponse.model_validate(payload)
     except (LocalModelError, ConfigValidationError, ConfigConflictError) as exc:
         _raise_local_model_error(exc, model_id=request.model_id)
     except Exception as exc:  # broad-exception: fallback_recorded - sanitized API boundary
         log_safe_exception(logger, "Local model unregister failed", exc, error_code="local_model_unregister_failed")
+        _raise_local_model_error(exc, model_id=request.model_id)
+
+
+@router.post("/registrations", response_model=LocalModelMutationResponse)
+def restore_local_model_registration(
+    request: LocalModelRegistrationRestoreRequest,
+    service: LocalModelService = Depends(get_local_model_service),
+) -> LocalModelMutationResponse:
+    """Consume a desktop unregister rollback without probing a stopped runtime."""
+    try:
+        payload = service.restore_registration(
+            request.model_id,
+            recovery_token=request.recovery_token,
+        )
+        payload["success"] = True
+        return LocalModelMutationResponse.model_validate(payload)
+    except (LocalModelError, ConfigValidationError, ConfigConflictError) as exc:
+        _raise_local_model_error(exc, model_id=request.model_id)
+    except Exception as exc:  # broad-exception: fallback_recorded - sanitized API boundary
+        log_safe_exception(
+            logger,
+            "Local model registration restore failed",
+            exc,
+            error_code="local_model_registration_restore_failed",
+        )
         _raise_local_model_error(exc, model_id=request.model_id)

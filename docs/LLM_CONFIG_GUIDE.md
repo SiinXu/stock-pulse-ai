@@ -151,7 +151,7 @@ LITELLM_MODEL=ollama/qwen3:8b
 
 下载成功后，后端通过 `SystemConfigService` 把模型追加到 `LLM_OLLAMA_MODELS`、确保 `LLM_CHANNELS` 包含 `ollama`，并热加载配置。只有当前确实没有主模型时才自动选择 `ollama/<id>`；已有主模型保持不变，面板会询问是否显式切换。Agent 模型通过独立操作设置，不会隐式替换主模型。首次启动向导的“本地模型”分支嵌入同一个面板，完成后直接进入分析工作台，无需编辑 `.env` 或打开终端。
 
-备用顺序继续由现有多渠道配置和 **设置 -> AI 与模型 -> 可靠性** 中的模型 fallback 编辑器管理，本地模型中心不引入第二套 fallback 配置。Catalog 中标记为 guided-only 的金融模型只显示转换/许可证指引，不提供直接下载。正在作为主模型或 Agent 模型使用的权重必须先切换任务模型后才能删除。
+备用顺序继续由现有多渠道配置和 **设置 -> AI 与模型 -> 可靠性** 中的模型 fallback 编辑器管理，本地模型中心不引入第二套 fallback 配置。Catalog 中标记为 guided-only 的金融模型只显示转换/许可证指引，不提供直接下载。被主模型、Agent、Vision、fallback 或当前隐式主 channel 引用的权重，必须先切换相应任务模型后才能删除。Desktop 只有在实际取消注册后才会收到一个短时、一次性的恢复 token；若删除失败，它可用该 token 恢复原 catalog 注册。恢复不要求 Ollama 在线，且 token 绑定模型和取消注册后的精确配置版本，不会覆盖并发配置修改，也不能用于注册其他模型。
 
 > **恭喜！小白读到这里就可以去运行程序了！**
 > 想测测看通没通？在主目录打开命令行输入：`python scripts/check_env.py --llm`

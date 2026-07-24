@@ -2929,6 +2929,46 @@
       }
     },
     "/api/v1/local-models/registrations": {
+      "post": {
+        "tags": [
+          "LocalModels"
+        ],
+        "summary": "Restore Local Model Registration",
+        "description": "Consume a desktop unregister rollback without probing a stopped runtime.",
+        "operationId": "restore_local_model_registration_api_v1_local_models_registrations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalModelRegistrationRestoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalModelMutationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "tags": [
           "LocalModels"
@@ -2952,7 +2992,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LocalModelMutationResponse"
+                  "$ref": "#/components/schemas/LocalModelUnregistrationResponse"
                 }
               }
             }
@@ -8725,6 +8765,31 @@
         "title": "LocalModelPullStatus",
         "description": "Polling response for one local model pull task."
       },
+      "LocalModelRegistrationRestoreRequest": {
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*(?::[A-Za-z0-9][A-Za-z0-9._-]*)?$",
+            "title": "Model Id"
+          },
+          "recovery_token": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Recovery Token"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model_id",
+          "recovery_token"
+        ],
+        "title": "LocalModelRegistrationRestoreRequest",
+        "description": "Consume a short-lived rollback capability issued by unregister."
+      },
       "LocalModelRequest": {
         "properties": {
           "model_id": {
@@ -8782,6 +8847,102 @@
         ],
         "title": "LocalModelRuntimeResponse",
         "description": "Runtime availability plus saved assignment state."
+      },
+      "LocalModelUnregistrationResponse": {
+        "properties": {
+          "config_version": {
+            "type": "string",
+            "title": "Config Version"
+          },
+          "registered_models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Registered Models"
+          },
+          "primary_model": {
+            "type": "string",
+            "title": "Primary Model",
+            "default": ""
+          },
+          "agent_model": {
+            "type": "string",
+            "title": "Agent Model",
+            "default": ""
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "selected_primary": {
+            "type": "boolean",
+            "title": "Selected Primary",
+            "default": false
+          },
+          "selected_agent": {
+            "type": "boolean",
+            "title": "Selected Agent",
+            "default": false
+          },
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted",
+            "default": false
+          },
+          "updated_keys": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Updated Keys"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "applied_count": {
+            "type": "integer",
+            "title": "Applied Count",
+            "default": 0
+          },
+          "skipped_masked_count": {
+            "type": "integer",
+            "title": "Skipped Masked Count",
+            "default": 0
+          },
+          "reload_triggered": {
+            "type": "boolean",
+            "title": "Reload Triggered",
+            "default": false
+          },
+          "recovery_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recovery Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "config_version",
+          "model_id"
+        ],
+        "title": "LocalModelUnregistrationResponse",
+        "description": "Unregister result with an optional one-time desktop rollback capability."
       },
       "TaskStatusEnum": {
         "type": "string",

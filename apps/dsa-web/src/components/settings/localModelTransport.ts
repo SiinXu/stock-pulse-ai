@@ -265,10 +265,19 @@ function createDesktopTransport(bridge: DesktopLocalModelBridge): LocalModelTran
             // Restore conservatively when desktop cannot confirm deletion state.
           }
           if (weightsRemain) {
+            if (!configuration.recoveryToken) {
+              throw new LocalModelTransportError(
+                'local_model_delete_recovery_failed',
+                'Local model deletion failed and no registration recovery was issued',
+              );
+            }
             try {
-              await localModelsApi.assign(modelId, 'auto');
+              await localModelsApi.restoreRegistration(modelId, configuration.recoveryToken);
             } catch {
-              // The original deletion error remains the actionable UI result.
+              throw new LocalModelTransportError(
+                'local_model_delete_recovery_failed',
+                'Local model deletion failed and registration could not be restored',
+              );
             }
           }
         }

@@ -15,6 +15,7 @@ const api = vi.hoisted(() => ({
   assign: vi.fn(),
   deleteModel: vi.fn(),
   unregister: vi.fn(),
+  restoreRegistration: vi.fn(),
 }));
 
 vi.mock('../../../api/localModels', () => ({ localModelsApi: api }));
@@ -203,6 +204,7 @@ describe('localModelTransport', () => {
       appliedCount: 1,
       skippedMaskedCount: 0,
       reloadTriggered: true,
+      recoveryToken: 'recovery-1',
     };
     api.unregister.mockResolvedValue(mutation);
 
@@ -240,9 +242,10 @@ describe('localModelTransport', () => {
       appliedCount: 1,
       skippedMaskedCount: 0,
       reloadTriggered: true,
+      recoveryToken: 'recovery-1',
     };
     api.unregister.mockResolvedValue(mutation);
-    api.assign.mockResolvedValue({ ...mutation, deleted: false });
+    api.restoreRegistration.mockResolvedValue({ ...mutation, deleted: false });
     vi.mocked(bridge.remove).mockResolvedValue({ ok: false, error: 'delete-failed' });
     vi.mocked(bridge.detect).mockResolvedValue({
       status: 'running',
@@ -253,7 +256,54 @@ describe('localModelTransport', () => {
       __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
     ).rejects.toMatchObject({ code: 'delete-failed' });
     expect(bridge.detect).toHaveBeenCalledTimes(1);
-    expect(api.assign).toHaveBeenCalledWith('qwen3:4b', 'auto');
+    expect(api.restoreRegistration).toHaveBeenCalledWith('qwen3:4b', 'recovery-1');
+  });
+
+  it('classifies a missing rollback capability as deletion recovery failure', async () => {
+    const bridge = createDesktopBridge();
+    api.unregister.mockResolvedValue({
+      ...CONFIGURATION,
+      success: true,
+      modelId: 'qwen3:4b',
+      selectedPrimary: false,
+      selectedAgent: false,
+      deleted: true,
+      updatedKeys: ['LLM_OLLAMA_MODELS'],
+      warnings: [],
+      appliedCount: 1,
+      skippedMaskedCount: 0,
+      reloadTriggered: true,
+    });
+    vi.mocked(bridge.remove).mockResolvedValue({ ok: false, error: 'delete-failed' });
+
+    await expect(
+      __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
+    ).rejects.toMatchObject({ code: 'local_model_delete_recovery_failed' });
+    expect(api.restoreRegistration).not.toHaveBeenCalled();
+  });
+
+  it('classifies a rejected rollback as deletion recovery failure', async () => {
+    const bridge = createDesktopBridge();
+    api.unregister.mockResolvedValue({
+      ...CONFIGURATION,
+      success: true,
+      modelId: 'qwen3:4b',
+      selectedPrimary: false,
+      selectedAgent: false,
+      deleted: true,
+      updatedKeys: ['LLM_OLLAMA_MODELS'],
+      warnings: [],
+      appliedCount: 1,
+      skippedMaskedCount: 0,
+      reloadTriggered: true,
+      recoveryToken: 'recovery-1',
+    });
+    api.restoreRegistration.mockRejectedValue(new Error('conflict'));
+    vi.mocked(bridge.remove).mockResolvedValue({ ok: false, error: 'delete-failed' });
+
+    await expect(
+      __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
+    ).rejects.toMatchObject({ code: 'local_model_delete_recovery_failed' });
   });
 
   it('restores registration when a stopped runtime cannot confirm weight state', async () => {
@@ -270,9 +320,10 @@ describe('localModelTransport', () => {
       appliedCount: 1,
       skippedMaskedCount: 0,
       reloadTriggered: true,
+      recoveryToken: 'recovery-1',
     };
     api.unregister.mockResolvedValue(mutation);
-    api.assign.mockResolvedValue({ ...mutation, deleted: false });
+    api.restoreRegistration.mockResolvedValue({ ...mutation, deleted: false });
     vi.mocked(bridge.remove).mockResolvedValue({ ok: false, error: 'delete-failed' });
     vi.mocked(bridge.detect).mockResolvedValue({
       status: 'stopped',
@@ -282,7 +333,7 @@ describe('localModelTransport', () => {
     await expect(
       __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
     ).rejects.toMatchObject({ code: 'delete-failed' });
-    expect(api.assign).toHaveBeenCalledWith('qwen3:4b', 'auto');
+    expect(api.restoreRegistration).toHaveBeenCalledWith('qwen3:4b', 'recovery-1');
   });
 
   it('keeps registration removed when the running runtime confirms weights are gone', async () => {
@@ -310,7 +361,7 @@ describe('localModelTransport', () => {
     await expect(
       __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
     ).rejects.toMatchObject({ code: 'delete-failed' });
-    expect(api.assign).not.toHaveBeenCalled();
+    expect(api.restoreRegistration).not.toHaveBeenCalled();
   });
 
   it('does not create registration while recovering an externally installed model', async () => {
@@ -335,6 +386,6 @@ describe('localModelTransport', () => {
       __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
     ).rejects.toMatchObject({ code: 'delete-failed' });
     expect(bridge.detect).not.toHaveBeenCalled();
-    expect(api.assign).not.toHaveBeenCalled();
+    expect(api.restoreRegistration).not.toHaveBeenCalled();
   });
 });

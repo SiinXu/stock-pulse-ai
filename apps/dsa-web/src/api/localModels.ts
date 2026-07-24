@@ -8,6 +8,7 @@ import type {
   LocalModelPullAccepted,
   LocalModelPullStatus,
   LocalModelRuntimeState,
+  LocalModelUnregistrationResponse,
 } from '../types/localModels';
 
 
@@ -64,10 +65,21 @@ export const localModelsApi = {
     return toCamelCase<LocalModelMutationResponse>(response.data);
   },
 
-  async unregister(modelId: string): Promise<LocalModelMutationResponse> {
+  async unregister(modelId: string): Promise<LocalModelUnregistrationResponse> {
     const response = await apiClient.delete<Record<string, unknown>>(
       '/api/v1/local-models/registrations',
       { data: modelPayload(modelId) },
+    );
+    return toCamelCase<LocalModelUnregistrationResponse>(response.data);
+  },
+
+  async restoreRegistration(
+    modelId: string,
+    recoveryToken: string,
+  ): Promise<LocalModelMutationResponse> {
+    const response = await apiClient.post<Record<string, unknown>>(
+      '/api/v1/local-models/registrations',
+      { ...modelPayload(modelId), recovery_token: recoveryToken },
     );
     return toCamelCase<LocalModelMutationResponse>(response.data);
   },

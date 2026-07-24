@@ -17,8 +17,10 @@ from src.services.local_model_service import (
     LocalModelInUseError,
     LocalModelNotInstalledError,
     LocalModelRuntimeUnavailableError,
+    LocalModelService,
 )
 from src.services.task_queue import TaskInfo, TaskStatus
+from tests.system_config_service_test_support import _SystemConfigServiceTestCaseBase
 
 
 class _FakeLocalModelService:
@@ -60,7 +62,11 @@ class _FakeLocalModelService:
             }
         )
         self.delete_model = Mock(return_value=self.configure_model.return_value | {"deleted": True})
-        self.unregister_model = Mock(return_value=self.configure_model.return_value | {"deleted": True})
+        self.unregister_model = Mock(
+            return_value=self.configure_model.return_value
+            | {"deleted": True, "recovery_token": "registration-recovery-1"}
+        )
+        self.restore_registration = Mock(return_value=self.configure_model.return_value)
 
     def get_runtime_status(self):
         return {
@@ -91,6 +97,72 @@ async def _request(service: _FakeLocalModelService, method: str, path: str, **kw
     transport = httpx.ASGITransport(app=_build_app(service), raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         return await client.request(method, path, **kwargs)
+
+
+class LocalModelApiIntegrationTestCase(_SystemConfigServiceTestCaseBase):
+    """Exercise the API, service, and optimistic configuration boundary together."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self._rewrite_env(
+            "ADMIN_AUTH_ENABLED=true",
+            "LLM_CONFIG_MODE=channels",
+            "LLM_CHANNELS=cloud,ollama",
+            "LLM_CLOUD_PROVIDER=openai",
+            "LLM_CLOUD_PROTOCOL=openai",
+            "LLM_CLOUD_API_KEY=secret-value",
+            "LLM_CLOUD_MODELS=gpt-4o",
+            "LLM_CLOUD_ENABLED=true",
+            "LLM_OLLAMA_PROVIDER=ollama",
+            "LLM_OLLAMA_PROTOCOL=ollama",
+            "LLM_OLLAMA_MODELS=qwen3:4b",
+            "LLM_OLLAMA_ENABLED=true",
+            "LITELLM_MODEL=openai/gpt-4o",
+        )
+        self.runtime_probe_count = 0
+
+        test_case = self
+
+        class _StoppedRuntime:
+            def list_installed_models(self):
+                test_case.runtime_probe_count += 1
+                raise AssertionError("registration recovery must not probe Ollama")
+
+        task_queue = Mock()
+        task_queue.list_pending_tasks.return_value = []
+        self.local_model_service = LocalModelService(
+            system_config_service=self.service,
+            task_queue=task_queue,
+            pullable_model_ids=lambda: {"qwen3:4b"},
+            client_factory=lambda _base_url: _StoppedRuntime(),
+        )
+
+    def test_unregister_then_restore_crosses_the_real_config_boundary_offline(self) -> None:
+        unregistered = asyncio.run(
+            _request(
+                self.local_model_service,
+                "DELETE",
+                "/api/v1/local-models/registrations",
+                json={"model_id": "qwen3:4b"},
+            )
+        )
+        self.assertEqual(unregistered.status_code, 200, unregistered.text)
+
+        restored = asyncio.run(
+            _request(
+                self.local_model_service,
+                "POST",
+                "/api/v1/local-models/registrations",
+                json={
+                    "model_id": "qwen3:4b",
+                    "recovery_token": unregistered.json()["recovery_token"],
+                },
+            )
+        )
+
+        self.assertEqual(restored.status_code, 200, restored.text)
+        self.assertEqual(restored.json()["registered_models"], ["qwen3:4b"])
+        self.assertEqual(self.runtime_probe_count, 0)
 
 
 def test_runtime_response_combines_transport_and_configuration_state() -> None:
@@ -241,6 +313,41 @@ def test_assignment_rejects_a_catalog_model_missing_from_the_runtime() -> None:
     assert "manual_command" not in response.json().get("params", {})
 
 
+def test_registration_restore_passes_the_server_issued_recovery_token() -> None:
+    service = _FakeLocalModelService()
+
+    response = asyncio.run(
+        _request(
+            service,
+            "POST",
+            "/api/v1/local-models/registrations",
+            json={"model_id": "qwen3:4b", "recovery_token": "registration-recovery-1"},
+        )
+    )
+
+    assert response.status_code == 200
+    service.restore_registration.assert_called_once_with(
+        "qwen3:4b",
+        recovery_token="registration-recovery-1",
+    )
+
+
+def test_registration_restore_rejects_a_caller_supplied_config_version() -> None:
+    service = _FakeLocalModelService()
+
+    response = asyncio.run(
+        _request(
+            service,
+            "POST",
+            "/api/v1/local-models/registrations",
+            json={"model_id": "qwen3:4b", "config_version": "current-version"},
+        )
+    )
+
+    assert response.status_code == 422
+    service.restore_registration.assert_not_called()
+
+
 def test_static_openapi_contains_the_local_model_contract() -> None:
     root = Path(__file__).resolve().parents[1]
     static = json.loads(
@@ -265,8 +372,10 @@ def test_static_openapi_contains_the_local_model_contract() -> None:
         "LocalModelPullAccepted",
         "LocalModelPullResult",
         "LocalModelPullStatus",
+        "LocalModelRegistrationRestoreRequest",
         "LocalModelRequest",
         "LocalModelRuntimeResponse",
+        "LocalModelUnregistrationResponse",
     ):
         assert static["components"]["schemas"][schema] == runtime["components"][
             "schemas"

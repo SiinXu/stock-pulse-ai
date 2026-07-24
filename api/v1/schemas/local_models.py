@@ -27,6 +27,12 @@ class LocalModelAssignmentRequest(LocalModelRequest):
     assignment: Literal["auto", "primary", "agent"] = "auto"
 
 
+class LocalModelRegistrationRestoreRequest(LocalModelRequest):
+    """Consume a short-lived rollback capability issued by unregister."""
+
+    recovery_token: str = Field(..., min_length=1, max_length=128)
+
+
 class LocalModelConfigurationResponse(BaseModel):
     """Caller-safe local model configuration state."""
 
@@ -95,3 +101,9 @@ class LocalModelMutationResponse(LocalModelConfigurationResponse):
     applied_count: int = 0
     skipped_masked_count: int = 0
     reload_triggered: bool = False
+
+
+class LocalModelUnregistrationResponse(LocalModelMutationResponse):
+    """Unregister result with an optional one-time desktop rollback capability."""
+
+    recovery_token: Optional[str] = None

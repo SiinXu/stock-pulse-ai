@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Fixed] Rejected all non-global and IANA special-purpose IPv4 and IPv6 results when resolving pinned embedded Ollama download hosts, including mixed DNS responses and IPv4-mapped forms.
+- [Fixed] Hardened local model lifecycle mutations with bounded Ollama response streaming, serialized runtime operations, complete task-reference deletion checks, optimistic Desktop registration recovery, and explicit memory-tier labels.
 - [Fixed] Updated compatible desktop transitive dependencies and pinned `app-builder-lib` to patched `tar` 7.5.19, removing the critical build-chain and updater production-closure findings while deferring the breaking Electron runtime upgrade.
 - [Docs] Clarified when contributors should use declarative Skill packages, trusted system plugins, or a new ADR, including plugin trust and deferred-surface boundaries.
 - [Added] Added a unified Settings local model center for Web and Desktop with catalog-backed recommendations, server-owned Ollama proxying, background pull progress, zero-config activation, explicit primary and Agent assignment, protected deletion, and a shared first-run flow.

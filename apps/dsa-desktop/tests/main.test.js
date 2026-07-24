@@ -3628,6 +3628,20 @@ test('desktop deletion rejects every active assignment before network activity',
 
   fs.writeFileSync(
     envFile,
+    'VISION_MODEL=modelref:v1:local_ollama:ollama%2Fqwen3%3A8b\n'
+  );
+  const visionRefResult = await mainModule.removeLocalModel('qwen3:8b', { requestImpl, envFile });
+  assert.equal(visionRefResult.error, 'model-in-use');
+
+  fs.writeFileSync(
+    envFile,
+    'LITELLM_FALLBACK_MODELS=openai/gpt-5,modelref:v1:local_ollama:ollama%2Fqwen3%3A8b\n'
+  );
+  const fallbackRefResult = await mainModule.removeLocalModel('qwen3:8b', { requestImpl, envFile });
+  assert.equal(fallbackRefResult.error, 'model-in-use');
+
+  fs.writeFileSync(
+    envFile,
     [
       'LLM_CONFIG_MODE=channels',
       'LLM_CHANNELS=ollama',
@@ -3639,6 +3653,34 @@ test('desktop deletion rejects every active assignment before network activity',
   const implicitResult = await mainModule.removeLocalModel('qwen3:8b', { requestImpl, envFile });
   assert.equal(implicitResult.error, 'model-in-use');
   assert.equal(requestImpl.calls.length, 0);
+});
+
+test('desktop deletion ignores an implicit channel model when YAML wins auto mode', async (t) => {
+  const mainModule = loadMainModule(t);
+  mainModule.__setLocalModelStateForTest(null);
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-localmodel-yaml-'));
+  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+  const envFile = path.join(tmpDir, '.env');
+  fs.writeFileSync(
+    envFile,
+    [
+      'LLM_CONFIG_MODE=auto',
+      'LITELLM_CONFIG=/tmp/litellm.yaml',
+      'LLM_CHANNELS=ollama',
+      'LLM_OLLAMA_MODELS=qwen3:8b',
+      'LLM_OLLAMA_ENABLED=true',
+      '',
+    ].join('\n')
+  );
+  const requestImpl = makeStagedJsonRequest([
+    { statusCode: 200, jsonBody: {} },
+    { statusCode: 200, jsonBody: { models: [] } },
+  ]);
+
+  const result = await mainModule.removeLocalModel('qwen3:8b', { requestImpl, envFile });
+
+  assert.deepEqual(result, { ok: true, modelId: 'qwen3:8b' });
+  assert.equal(requestImpl.calls[0].target.pathname, '/api/delete');
 });
 
 test('local model IPC rejects foreign renderers and serves the main Web window', async (t) => {

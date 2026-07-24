@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import secrets
 import threading
 import time
 import uuid
@@ -16,6 +17,7 @@ import requests
 
 from src.llm.model_ref import decode_model_ref
 from src.services.system_config_service import (
+    ConfigConflictError,
     ConfigValidationError,
     SystemConfigService,
 )
@@ -35,6 +37,7 @@ LOCAL_MODEL_ID_PATTERN = re.compile(
     r"(?::[A-Za-z0-9][A-Za-z0-9._-]*)?$"
 )
 LOCAL_MODEL_MAX_ID_LENGTH = 128
+LOCAL_MODEL_REGISTRATION_RECOVERY_TTL_SECONDS = 5.0 * 60.0
 LocalModelAssignment = Literal["auto", "primary", "agent"]
 
 
@@ -188,6 +191,17 @@ class OllamaPullProgress:
 
     percent: Optional[int]
     status: str
+
+
+@dataclass(frozen=True)
+class _LocalModelRegistrationRecovery:
+    """One short-lived rollback capability issued by a successful unregister."""
+
+    model_id: str
+    config_version: str
+    previous_channels: tuple[str, ...]
+    previous_models: tuple[str, ...]
+    expires_at: float
 
 
 class OllamaRuntimeClient:
@@ -372,7 +386,9 @@ class LocalModelService:
         self._task_queue = task_queue
         self._pullable_model_ids = pullable_model_ids
         self._client_factory = client_factory
+        self._task_lock = threading.RLock()
         self._operation_lock = threading.RLock()
+        self._registration_recoveries: Dict[str, _LocalModelRegistrationRecovery] = {}
 
     @staticmethod
     def _split_csv(value: Any) -> List[str]:
@@ -608,14 +624,122 @@ class LocalModelService:
 
     def unregister_model(self, model_id: Any) -> Dict[str, Any]:
         """Remove a non-active model from the Ollama connection configuration."""
-        with self._operation_lock:
+        with self._task_lock, self._operation_lock:
             normalized = self._require_pullable(model_id)
+            if self._pending_pull(normalized) is not None:
+                raise LocalModelInUseError(
+                    "Wait for the active model download before deleting it"
+                )
             config_version, values = self._config_snapshot()
-            return self._unregister_model_from_snapshot(
+            current_models = self._split_csv(values.get("LLM_OLLAMA_MODELS"))
+            was_registered = any(
+                item.lower() == normalized.lower() for item in current_models
+            )
+            result = self._unregister_model_from_snapshot(
                 normalized,
                 config_version=config_version,
                 values=values,
             )
+            now = time.monotonic()
+            self._registration_recoveries = {
+                token: recovery
+                for token, recovery in self._registration_recoveries.items()
+                if recovery.expires_at > now
+                and recovery.model_id.lower() != normalized.lower()
+            }
+            if not was_registered:
+                return result
+
+            recovery_token = secrets.token_urlsafe(32)
+            self._registration_recoveries[recovery_token] = (
+                _LocalModelRegistrationRecovery(
+                    model_id=normalized,
+                    config_version=str(result.get("config_version") or ""),
+                    previous_channels=tuple(
+                        self._split_csv(values.get("LLM_CHANNELS"))
+                    ),
+                    previous_models=tuple(current_models),
+                    expires_at=now + LOCAL_MODEL_REGISTRATION_RECOVERY_TTL_SECONDS,
+                )
+            )
+            return {**result, "recovery_token": recovery_token}
+
+    def restore_registration(
+        self,
+        model_id: Any,
+        *,
+        recovery_token: Any,
+    ) -> Dict[str, Any]:
+        """Consume one server-issued unregister rollback without probing Ollama."""
+        with self._operation_lock:
+            normalized = self._require_pullable(model_id)
+            token = str(recovery_token or "").strip()
+            if not token or len(token) > 128:
+                raise LocalModelValidationError(
+                    "A valid registration recovery token is required"
+                )
+
+            now = time.monotonic()
+            self._registration_recoveries = {
+                candidate: recovery
+                for candidate, recovery in self._registration_recoveries.items()
+                if recovery.expires_at > now
+            }
+            recovery = self._registration_recoveries.get(token)
+            if recovery is None or recovery.model_id.lower() != normalized.lower():
+                raise LocalModelValidationError(
+                    "The registration recovery token is invalid or expired"
+                )
+
+            # A valid token is single-use even when a later optimistic write is
+            # rejected, so it cannot be replayed after configuration changes.
+            del self._registration_recoveries[token]
+            current_version, values = self._config_snapshot()
+            if current_version != recovery.config_version:
+                raise ConfigConflictError(current_version=current_version)
+
+            current_models = self._split_csv(values.get("LLM_OLLAMA_MODELS"))
+            expected_models = [
+                item
+                for item in recovery.previous_models
+                if item.lower() != normalized.lower()
+            ]
+            expected_channels = list(recovery.previous_channels)
+            if not expected_models:
+                expected_channels = [
+                    item for item in expected_channels if item.lower() != "ollama"
+                ]
+            if (
+                [item.lower() for item in current_models]
+                != [item.lower() for item in expected_models]
+                or [item.lower() for item in self._split_csv(values.get("LLM_CHANNELS"))]
+                != [item.lower() for item in expected_channels]
+            ):
+                raise LocalModelValidationError(
+                    "The registration recovery no longer matches configuration"
+                )
+
+            result = self._system_config_service.update(
+                config_version=recovery.config_version,
+                items=[
+                    {
+                        "key": "LLM_CHANNELS",
+                        "value": ",".join(recovery.previous_channels),
+                    },
+                    {
+                        "key": "LLM_OLLAMA_MODELS",
+                        "value": ",".join(recovery.previous_models),
+                    },
+                ],
+                reload_now=True,
+                validate_connectivity=False,
+                actor="local_model_registration_restore",
+            )
+            return {
+                **result,
+                **self.get_configuration(),
+                "model_id": normalized,
+            }
 
     def _unregister_model_from_snapshot(
         self,
@@ -724,7 +848,7 @@ class LocalModelService:
     def start_pull(self, model_id: Any) -> TaskInfo:
         """Submit one allowlisted pull to the shared background task queue."""
         normalized = self._require_pullable(model_id)
-        with self._operation_lock:
+        with self._task_lock:
             pending = self._pending_pull(normalized)
             if pending is not None:
                 return pending
@@ -804,7 +928,7 @@ class LocalModelService:
 
     def delete_model(self, model_id: Any) -> Dict[str, Any]:
         """Validate and unregister one catalog model before deleting its weights."""
-        with self._operation_lock:
+        with self._task_lock, self._operation_lock:
             return self._delete_model(model_id)
 
     def _delete_model(self, model_id: Any) -> Dict[str, Any]:
@@ -837,7 +961,14 @@ class LocalModelService:
         client = self._client_factory(base_url)
         try:
             client.delete_model(normalized)
-        except Exception:  # broad-exception: fallback_recorded - recover config after runtime failure
+        except Exception as exc:  # broad-exception: fallback_recorded - recover config after runtime failure
+            log_safe_exception(
+                logger,
+                "Local model deletion failed",
+                exc,
+                error_code="local_model_delete_failed",
+                context={"model_id": normalized},
+            )
             weights_remain = True
             try:
                 installed = client.list_installed_models()

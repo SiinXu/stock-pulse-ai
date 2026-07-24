@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import threading
 from typing import Dict, List, Optional
 from unittest.mock import Mock
 
@@ -24,6 +25,7 @@ from src.services.local_model_service import (
     normalize_ollama_base_url,
 )
 from src.services.task_queue import TaskInfo
+from src.services.system_config_service import ConfigConflictError
 from tests._llm_env_isolation import strip_ambient_llm_env
 from tests.system_config_service_test_support import _SystemConfigServiceTestCaseBase
 
@@ -648,6 +650,149 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertEqual(second.task_id, first.task_id)
         self.assertEqual(client.list_calls, 1)
 
+    def test_pull_allows_unrelated_assignment_while_activation_keeps_snapshot_guard(self) -> None:
+        pull_started = threading.Event()
+        release_pull = threading.Event()
+        assignment_finished = threading.Event()
+        pull_result: Dict[str, object] = {}
+
+        class _BlockingPullClient(_FakeRuntimeClient):
+            def pull_model(self, model_id: str, *, on_progress) -> None:
+                pull_started.set()
+                self.assert_released = release_pull.wait(timeout=5)
+                super().pull_model(model_id, on_progress=on_progress)
+
+        client = _BlockingPullClient()
+        self._rewrite_env("ADMIN_AUTH_ENABLED=true")
+        service, queue, _client = self._local_service(client=client)
+        service.start_pull("qwen3:4b")
+
+        def run_pull() -> None:
+            pull_result.update(queue.run_task())
+
+        pull_thread = threading.Thread(target=run_pull)
+        pull_thread.start()
+        self.assertTrue(pull_started.wait(timeout=5))
+
+        def assign() -> None:
+            service.configure_model("stockpulse/finance:latest", assignment="agent")
+            assignment_finished.set()
+
+        assignment_thread = threading.Thread(target=assign)
+        assignment_thread.start()
+        assignment_thread.join(timeout=5)
+        self.assertFalse(assignment_thread.is_alive())
+        self.assertTrue(assignment_finished.is_set())
+
+        release_pull.set()
+        pull_thread.join(timeout=5)
+        self.assertFalse(pull_thread.is_alive())
+        self.assertTrue(client.assert_released)
+        self.assertFalse(pull_result["activated"])
+
+    def test_registration_restore_is_optimistic_and_does_not_probe_runtime(self) -> None:
+        self._rewrite_env(
+            "ADMIN_AUTH_ENABLED=true",
+            "LLM_CONFIG_MODE=channels",
+            "LLM_CHANNELS=cloud,ollama",
+            "LLM_CLOUD_PROVIDER=openai",
+            "LLM_CLOUD_PROTOCOL=openai",
+            "LLM_CLOUD_API_KEY=secret-value",
+            "LLM_CLOUD_MODELS=gpt-4o",
+            "LLM_CLOUD_ENABLED=true",
+            "LLM_OLLAMA_PROVIDER=ollama",
+            "LLM_OLLAMA_PROTOCOL=ollama",
+            "LLM_OLLAMA_MODELS=qwen3:4b",
+            "LLM_OLLAMA_ENABLED=true",
+            "LITELLM_MODEL=openai/gpt-4o",
+        )
+        service, _queue, client = self._local_service()
+        unregistered = service.unregister_model("qwen3:4b")
+        client.list_installed_models = Mock(
+            side_effect=AssertionError("registration restore must not probe Ollama")
+        )
+
+        restored = service.restore_registration(
+            "qwen3:4b",
+            recovery_token=unregistered["recovery_token"],
+        )
+
+        self.assertIn("qwen3:4b", restored["registered_models"])
+        self.assertEqual(self.manager.read_config_map()["LLM_CHANNELS"], "cloud,ollama")
+
+    def test_registration_restore_rejects_a_stale_config_version(self) -> None:
+        self._rewrite_env(
+            "ADMIN_AUTH_ENABLED=true",
+            "LLM_CONFIG_MODE=channels",
+            "LLM_CHANNELS=cloud,ollama",
+            "LLM_CLOUD_PROVIDER=openai",
+            "LLM_CLOUD_PROTOCOL=openai",
+            "LLM_CLOUD_API_KEY=secret-value",
+            "LLM_CLOUD_MODELS=gpt-4o",
+            "LLM_CLOUD_ENABLED=true",
+            "LLM_OLLAMA_PROVIDER=ollama",
+            "LLM_OLLAMA_PROTOCOL=ollama",
+            "LLM_OLLAMA_MODELS=qwen3:4b",
+            "LLM_OLLAMA_ENABLED=true",
+            "LITELLM_MODEL=openai/gpt-4o",
+        )
+        service, _queue, _client = self._local_service()
+        unregistered = service.unregister_model("qwen3:4b")
+        current_version, _values = service._config_snapshot()
+        self.service.update(
+            config_version=current_version,
+            items=[{"key": "LOG_LEVEL", "value": "DEBUG"}],
+            reload_now=False,
+            validate_connectivity=False,
+            actor="test",
+        )
+
+        with self.assertRaises(ConfigConflictError):
+            service.restore_registration(
+                "qwen3:4b",
+                recovery_token=unregistered["recovery_token"],
+            )
+
+        with self.assertRaises(LocalModelValidationError):
+            service.restore_registration(
+                "qwen3:4b",
+                recovery_token=unregistered["recovery_token"],
+            )
+
+        self.assertEqual(self.manager.read_config_map()["LLM_OLLAMA_MODELS"], "")
+
+    def test_registration_restore_rejects_an_unrelated_model_or_unissued_token(self) -> None:
+        self._rewrite_env(
+            "ADMIN_AUTH_ENABLED=true",
+            "LLM_CONFIG_MODE=channels",
+            "LLM_CHANNELS=cloud,ollama",
+            "LLM_CLOUD_PROVIDER=openai",
+            "LLM_CLOUD_PROTOCOL=openai",
+            "LLM_CLOUD_API_KEY=secret-value",
+            "LLM_CLOUD_MODELS=gpt-4o",
+            "LLM_CLOUD_ENABLED=true",
+            "LLM_OLLAMA_PROVIDER=ollama",
+            "LLM_OLLAMA_PROTOCOL=ollama",
+            "LLM_OLLAMA_MODELS=qwen3:4b",
+            "LLM_OLLAMA_ENABLED=true",
+            "LITELLM_MODEL=openai/gpt-4o",
+        )
+        service, _queue, _client = self._local_service()
+        unregistered = service.unregister_model("qwen3:4b")
+
+        with self.assertRaises(LocalModelValidationError):
+            service.restore_registration(
+                "stockpulse/finance:latest",
+                recovery_token=unregistered["recovery_token"],
+            )
+        with self.assertRaises(LocalModelValidationError):
+            service.restore_registration(
+                "qwen3:4b",
+                recovery_token="never-issued",
+            )
+
+        self.assertEqual(self.manager.read_config_map()["LLM_OLLAMA_MODELS"], "")
+
     def test_delete_rejects_a_model_with_an_active_pull_before_runtime_mutation(self) -> None:
         self._rewrite_env("ADMIN_AUTH_ENABLED=true")
         service, _queue, client = self._local_service()
@@ -657,6 +802,33 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
             service.delete_model("qwen3:4b")
 
         self.assertEqual(client.deleted, [])
+
+    def test_unregister_rejects_a_model_with_an_active_pull(self) -> None:
+        self._rewrite_env(
+            "ADMIN_AUTH_ENABLED=true",
+            "LLM_CONFIG_MODE=channels",
+            "LLM_CHANNELS=cloud,ollama",
+            "LLM_CLOUD_PROVIDER=openai",
+            "LLM_CLOUD_PROTOCOL=openai",
+            "LLM_CLOUD_API_KEY=secret-value",
+            "LLM_CLOUD_MODELS=gpt-4o",
+            "LLM_CLOUD_ENABLED=true",
+            "LLM_OLLAMA_PROVIDER=ollama",
+            "LLM_OLLAMA_PROTOCOL=ollama",
+            "LLM_OLLAMA_MODELS=qwen3:4b",
+            "LLM_OLLAMA_ENABLED=true",
+            "LITELLM_MODEL=openai/gpt-4o",
+        )
+        service, _queue, _client = self._local_service()
+        service.start_pull("qwen3:4b")
+
+        with self.assertRaises(LocalModelInUseError):
+            service.unregister_model("qwen3:4b")
+
+        self.assertEqual(
+            self.manager.read_config_map()["LLM_OLLAMA_MODELS"],
+            "qwen3:4b",
+        )
 
     def test_pull_does_not_activate_against_a_changed_runtime_snapshot(self) -> None:
         self._rewrite_env(
