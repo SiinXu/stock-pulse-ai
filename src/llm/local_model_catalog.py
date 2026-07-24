@@ -189,8 +189,17 @@ def _validate_model(model: Any, index: int, seen_ids: set[str], seen_tags: set[s
         )
     if install["method"] == "guided_import":
         _require(
-            install["status"] == "license_review_required" and ollama_tag is None,
+            install["status"] == "license_review_required"
+            and ollama_tag is None
+            and planned_tag is None
+            and license_data["redistribution"] == "guided_only"
+            and not install["hosted_by_stockpulse"],
             f"{field} guided import state is inconsistent",
+        )
+    if license_data["redistribution"] == "guided_only":
+        _require(
+            install["method"] == "guided_import",
+            f"{field} guided-only license must use guided import",
         )
     if install["hosted_by_stockpulse"]:
         _require(
@@ -202,6 +211,8 @@ def _validate_model(model: Any, index: int, seen_ids: set[str], seen_tags: set[s
     _require(isinstance(desktop["recommended"], bool), f"{field}.desktop.recommended must be boolean")
     role = _require_optional_text(desktop["role"], f"{field}.desktop.role")
     _require_text(desktop["guidance_en"], f"{field}.desktop.guidance_en")
+    if license_data["redistribution"] == "guided_only":
+        _require(not desktop["recommended"], f"{field} guided-only model cannot be a desktop recommendation")
     if desktop["recommended"]:
         _require(section == "general", f"{field} desktop presets must be general models")
         _require(

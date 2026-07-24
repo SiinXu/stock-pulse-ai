@@ -39,6 +39,7 @@ function deriveDesktopLocalModelPresets(catalog) {
     const tag = model?.install?.ollama_tag;
     if (
       model.section !== 'general' ||
+      model?.license?.redistribution !== 'allowed_with_notice' ||
       model?.install?.method !== 'ollama_pull' ||
       model?.install?.status !== 'available' ||
       typeof tag !== 'string' ||

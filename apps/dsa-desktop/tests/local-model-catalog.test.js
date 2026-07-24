@@ -38,3 +38,13 @@ test('desktop projection rejects duplicate pull tags', () => {
     /Invalid desktop local model preset/
   );
 });
+
+test('desktop projection rejects a guided-only pull recommendation', () => {
+  const catalog = JSON.parse(fs.readFileSync(resolveLocalModelCatalogPath(), 'utf8'));
+  catalog.models[0].license.redistribution = 'guided_only';
+
+  assert.throws(
+    () => deriveDesktopLocalModelPresets(catalog),
+    /Invalid desktop local model preset/
+  );
+});

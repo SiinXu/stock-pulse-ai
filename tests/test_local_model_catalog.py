@@ -77,3 +77,35 @@ def test_catalog_rejects_a_non_pullable_desktop_recommendation() -> None:
 
     with pytest.raises(LocalModelCatalogError, match="desktop presets must be general"):
         validate_local_model_catalog(invalid)
+
+
+def test_catalog_rejects_a_guided_only_pullable_recommendation() -> None:
+    invalid = deepcopy(get_local_model_catalog())
+    general = next(model for model in invalid["models"] if model["section"] == "general")
+    general["license"]["redistribution"] = "guided_only"
+
+    with pytest.raises(LocalModelCatalogError, match="guided-only license must use guided import"):
+        validate_local_model_catalog(invalid)
+
+
+@pytest.mark.parametrize(
+    ("field_path", "value", "message"),
+    (
+        (("install", "status"), "available", "guided import state is inconsistent"),
+        (("install", "ollama_tag"), "restricted:latest", "guided import state is inconsistent"),
+        (("install", "planned_ollama_tag"), "stockpulse/restricted:q4", "guided import state is inconsistent"),
+        (("install", "hosted_by_stockpulse"), True, "guided import state is inconsistent"),
+        (("desktop", "recommended"), True, "guided-only model cannot be a desktop recommendation"),
+    ),
+)
+def test_guided_import_rejects_distribution_contract_drift(
+    field_path: tuple[str, str],
+    value: object,
+    message: str,
+) -> None:
+    invalid = deepcopy(get_local_model_catalog())
+    guided = next(model for model in invalid["models"] if model["license"]["redistribution"] == "guided_only")
+    guided[field_path[0]][field_path[1]] = value
+
+    with pytest.raises(LocalModelCatalogError, match=message):
+        validate_local_model_catalog(invalid)
