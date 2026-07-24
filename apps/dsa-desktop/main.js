@@ -11,6 +11,7 @@ const {
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { loadDesktopLocalModelPresets } = require('./local-model-catalog');
 const { spawn } = require('child_process');
 const net = require('net');
@@ -42,6 +43,7 @@ let desktopDeepLinkFlushPromise = null;
 let localModelWindow = null;
 let localModelWindowLoadPromise = null;
 let localModelServeProcess = null;
+let localModelServeRuntime = null;
 let localModelState = null;
 let localModelOperationInFlight = false;
 
@@ -98,23 +100,32 @@ const DESKTOP_DEEP_LINK_EXACT_PATHS = Object.freeze(new Set([
   '/usage',
 ]));
 const DESKTOP_DEEP_LINK_STOCK_PATH_PATTERN = /^\/stocks\/[A-Za-z0-9.]{1,16}$/;
-// Local model lifecycle (issue #203): the desktop shell manages an Ollama
-// runtime and its models without ever building a shell command line. The
-// binary name is a fixed allowlist entry and the only spawn arguments are the
-// hardcoded `--version` probe and `serve`; user-influenced values (model
-// names) travel exclusively over loopback HTTP request bodies.
+// Local model lifecycle (issue #203): process launches always use a resolved,
+// allowlisted Ollama executable plus fixed argument arrays. User-influenced
+// model names travel exclusively over loopback HTTP request bodies.
 const DESKTOP_LOCAL_MODEL_RUNTIME = 'ollama';
-const DESKTOP_LOCAL_MODEL_BINARY = 'ollama';
+const DESKTOP_LOCAL_MODEL_SYSTEM_BINARY = 'ollama';
+const DESKTOP_LOCAL_MODEL_EMBEDDED_RESOURCE_DIR = 'ollama';
+const DESKTOP_LOCAL_MODEL_EMBEDDED_MANIFEST_FILE = 'runtime-manifest.json';
+const DESKTOP_LOCAL_MODEL_MODELS_RELATIVE_PATH = path.join('data', 'ollama', 'models');
 const DESKTOP_LOCAL_MODEL_DEFAULT_BASE_URL = 'http://127.0.0.1:11434';
 const DESKTOP_LOCAL_MODEL_BASE_URL_ENV_KEY = 'LLM_OLLAMA_BASE_URL';
 const DESKTOP_LOCAL_MODEL_REQUEST_TIMEOUT_MS = 4000;
 const DESKTOP_LOCAL_MODEL_DETECT_TIMEOUT_MS = 4000;
 const DESKTOP_LOCAL_MODEL_START_TIMEOUT_MS = 20000;
+const DESKTOP_LOCAL_MODEL_STOP_FORCE_AFTER_MS = 3000;
+const DESKTOP_LOCAL_MODEL_STOP_TIMEOUT_MS = 5000;
 const DESKTOP_LOCAL_MODEL_PULL_TIMEOUT_MS = 30 * 60 * 1000;
 const DESKTOP_LOCAL_MODEL_NAME_PATTERN =
   /^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)?(?::[a-z0-9]+(?:[._-][a-z0-9]+)*)?$/i;
 const DESKTOP_LOCAL_MODEL_MAX_NAME_LENGTH = 96;
 const DESKTOP_LOCAL_MODEL_INSTALL_GUIDE_URL = 'https://ollama.com/download';
+const DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE = Object.freeze({
+  SYSTEM: 'system',
+  EMBEDDED: 'embedded',
+  EXTERNAL_SERVICE: 'external-service',
+  UNAVAILABLE: 'unavailable',
+});
 const DESKTOP_LOCAL_MODEL_PRESETS_ARG_PREFIX = '--stockpulse-local-model-presets=';
 // The checked-in catalog is the only allowlist authority. Arbitrary
 // user-provided model names are never downloaded by the desktop shell.
@@ -160,6 +171,7 @@ const DESKTOP_UPDATE_RUNTIME_RELATIVE_FILES = Object.freeze([
   path.join('data', 'stock_analysis.db-wal'),
   path.join('data', 'stock_analysis.db-shm'),
   DESKTOP_PROVIDER_DAILY_CACHE_RELATIVE_PATH,
+  DESKTOP_LOCAL_MODEL_MODELS_RELATIVE_PATH,
   path.join('data', 'alphasift', 'hotspots.json'),
   path.join('data', 'alphasift', 'hotspot.history.jsonl'),
   path.join('data', 'alphasift', 'hotspot_details'),
@@ -2171,7 +2183,8 @@ async function installDownloadedUpdate() {
   });
   let backupRoot = null;
   try {
-    logLine('[update] stop backend and backup runtime data before install');
+    logLine('[update] stop managed local model runtime and backend before backing up runtime data');
+    await stopManagedLocalModelRuntime();
     await stopBackend();
     backupRoot = resolveUpdateBackupRoot();
     cleanupUpdateBackupRoot();
@@ -2700,12 +2713,183 @@ function resolveLocalModelEnvPath() {
   return path.join(resolveAppDir(), '.env');
 }
 
-function resolveLocalModelSpawnEnv(sourceEnv = process.env) {
+function resolveLocalModelModelsDir(appDir = resolveAppDir()) {
+  return path.join(appDir, DESKTOP_LOCAL_MODEL_MODELS_RELATIVE_PATH);
+}
+
+function resolveLocalModelServeHost(baseUrl = resolveLocalModelBaseUrl()) {
+  try {
+    const parsed = new URL(baseUrl);
+    const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    if (parsed.protocol !== 'http:'
+      || !['127.0.0.1', 'localhost', '::1'].includes(hostname)) {
+      return null;
+    }
+    return parsed.host;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function resolveLocalModelSpawnEnv(sourceEnv = process.env, {
+  runtimeSource = DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE.SYSTEM,
+  baseUrl = resolveLocalModelBaseUrl(),
+  appDir = resolveAppDir(),
+} = {}) {
   const env = { ...sourceEnv };
   if (isMac) {
     env.PATH = extendMacDesktopBackendPath(sourceEnv.PATH);
   }
+  if (runtimeSource === DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE.EMBEDDED) {
+    const serveHost = resolveLocalModelServeHost(baseUrl);
+    if (!serveHost) {
+      throw new Error('Embedded Ollama requires a loopback HTTP base URL.');
+    }
+    env.OLLAMA_HOST = serveHost;
+    env.OLLAMA_MODELS = resolveLocalModelModelsDir(appDir);
+  }
   return env;
+}
+
+function resolveEmbeddedLocalModelRoot({
+  appIsPackaged = app.isPackaged,
+  resourcesPath = process.resourcesPath,
+  desktopRoot = __dirname,
+} = {}) {
+  if (appIsPackaged) {
+    return path.join(resourcesPath, DESKTOP_LOCAL_MODEL_EMBEDDED_RESOURCE_DIR);
+  }
+  return path.join(desktopRoot, 'vendor', DESKTOP_LOCAL_MODEL_EMBEDDED_RESOURCE_DIR);
+}
+
+function resolveContainedLocalModelResource(rootDir, relativePath) {
+  if (!relativePath || path.isAbsolute(relativePath)) {
+    return null;
+  }
+  const root = path.resolve(rootDir);
+  const candidate = path.resolve(root, relativePath);
+  if (candidate !== root && !candidate.startsWith(`${root}${path.sep}`)) {
+    return null;
+  }
+  return candidate;
+}
+
+function calculateLocalModelFileSha256(filePath, fsImpl = fs) {
+  const hash = crypto.createHash('sha256');
+  const buffer = Buffer.allocUnsafe(1024 * 1024);
+  const fileDescriptor = fsImpl.openSync(filePath, 'r');
+  try {
+    let bytesRead = 0;
+    do {
+      bytesRead = fsImpl.readSync(fileDescriptor, buffer, 0, buffer.length, null);
+      if (bytesRead > 0) {
+        hash.update(buffer.subarray(0, bytesRead));
+      }
+    } while (bytesRead > 0);
+  } finally {
+    fsImpl.closeSync(fileDescriptor);
+  }
+  return hash.digest('hex');
+}
+
+function collectLocalModelRuntimeFilePaths(rootDir, fsImpl = fs) {
+  const root = path.resolve(rootDir);
+  const realRoot = fsImpl.realpathSync(root);
+  const files = [];
+  const walk = (directory, relativeDirectory = '') => {
+    const entries = fsImpl.readdirSync(directory, { withFileTypes: true })
+      .sort((left, right) => left.name.localeCompare(right.name, 'en'));
+    for (const entry of entries) {
+      const relativePath = relativeDirectory
+        ? path.join(relativeDirectory, entry.name)
+        : entry.name;
+      const normalizedPath = relativePath.split(path.sep).join('/');
+      if (normalizedPath === DESKTOP_LOCAL_MODEL_EMBEDDED_MANIFEST_FILE) {
+        continue;
+      }
+      const resourcePath = resolveContainedLocalModelResource(root, relativePath);
+      if (!resourcePath) {
+        throw new Error(`Embedded runtime path escaped its root: ${relativePath}`);
+      }
+      const linkStats = fsImpl.lstatSync(resourcePath);
+      if (linkStats.isDirectory()) {
+        walk(resourcePath, relativePath);
+        continue;
+      }
+      const stats = fsImpl.statSync(resourcePath);
+      const realResourcePath = fsImpl.realpathSync(resourcePath);
+      if ((realResourcePath !== realRoot && !realResourcePath.startsWith(`${realRoot}${path.sep}`))
+        || !stats.isFile()) {
+        throw new Error(`Unsupported embedded runtime entry: ${relativePath}`);
+      }
+      files.push(normalizedPath);
+    }
+  };
+  walk(root);
+  return files.sort();
+}
+
+function resolveEmbeddedLocalModelRuntime({
+  rootDir = resolveEmbeddedLocalModelRoot(),
+  platform = process.platform,
+  arch = process.arch,
+  fsImpl = fs,
+} = {}) {
+  const expectedBinaryPath = platform === 'win32' ? 'ollama.exe' : 'ollama';
+  const expectedRequiredPaths = platform === 'win32'
+    ? ['ollama.exe', 'lib/ollama/llama-server.exe']
+    : ['ollama', 'llama-server'];
+  try {
+    const manifestPath = path.join(rootDir, DESKTOP_LOCAL_MODEL_EMBEDDED_MANIFEST_FILE);
+    const manifest = JSON.parse(fsImpl.readFileSync(manifestPath, 'utf-8'));
+    const runtimeFilePaths = collectLocalModelRuntimeFilePaths(rootDir, fsImpl);
+    if (manifest.schemaVersion !== 2
+      || manifest.runtime !== DESKTOP_LOCAL_MODEL_RUNTIME
+      || manifest.platform !== platform
+      || !/^v\d+\.\d+\.\d+$/.test(String(manifest.version || ''))
+      || !Array.isArray(manifest.supportedArchitectures)
+      || !manifest.supportedArchitectures.includes(arch)
+      || manifest.binaryPath !== expectedBinaryPath
+      || !Array.isArray(manifest.requiredPaths)
+      || JSON.stringify(manifest.requiredPaths) !== JSON.stringify(expectedRequiredPaths)
+      || !manifest.fileSha256
+      || typeof manifest.fileSha256 !== 'object'
+      || Array.isArray(manifest.fileSha256)
+      || JSON.stringify(Object.keys(manifest.fileSha256).sort())
+        !== JSON.stringify(runtimeFilePaths)
+      || expectedRequiredPaths.some((relativePath) => !runtimeFilePaths.includes(relativePath))
+      || !manifest.archive
+      || !Number.isSafeInteger(manifest.archive.sizeBytes)
+      || manifest.archive.sizeBytes <= 0
+      || !/^[a-f0-9]{64}$/.test(String(manifest.archive.sha256 || ''))) {
+      return null;
+    }
+    for (const relativePath of runtimeFilePaths) {
+      const resourcePath = resolveContainedLocalModelResource(rootDir, relativePath);
+      const expectedSha256 = manifest.fileSha256[relativePath];
+      if (!resourcePath
+        || !fsImpl.statSync(resourcePath).isFile()
+        || !/^[a-f0-9]{64}$/.test(String(expectedSha256 || ''))
+        || calculateLocalModelFileSha256(resourcePath, fsImpl) !== expectedSha256) {
+        return null;
+      }
+    }
+    const command = resolveContainedLocalModelResource(rootDir, expectedBinaryPath);
+    if (!command) {
+      return null;
+    }
+    if (platform === 'darwin') {
+      fsImpl.accessSync(command, fs.constants.X_OK);
+    }
+    return {
+      command,
+      rootDir: path.resolve(rootDir),
+      source: DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE.EMBEDDED,
+      version: manifest.version,
+    };
+  } catch (_error) {
+    return null;
+  }
 }
 
 function requestLocalModelJson({
@@ -2900,14 +3084,16 @@ function extractLocalModelNames(tagsResponse) {
 }
 
 function probeLocalModelBinary({
+  command = DESKTOP_LOCAL_MODEL_SYSTEM_BINARY,
   spawnImpl = spawn,
   timeoutMs = DESKTOP_LOCAL_MODEL_DETECT_TIMEOUT_MS,
+  sourceEnv = process.env,
 } = {}) {
   return new Promise((resolve) => {
     let child;
     try {
-      child = spawnImpl(DESKTOP_LOCAL_MODEL_BINARY, ['--version'], {
-        env: resolveLocalModelSpawnEnv(),
+      child = spawnImpl(command, ['--version'], {
+        env: resolveLocalModelSpawnEnv(sourceEnv),
         windowsHide: true,
         stdio: 'ignore',
       });
@@ -2939,10 +3125,65 @@ function probeLocalModelBinary({
   });
 }
 
+async function resolveLocalModelBinary({
+  spawnImpl = spawn,
+  timeoutMs = DESKTOP_LOCAL_MODEL_DETECT_TIMEOUT_MS,
+  sourceEnv = process.env,
+  embeddedRoot = resolveEmbeddedLocalModelRoot(),
+  platform = process.platform,
+  arch = process.arch,
+  fsImpl = fs,
+  logImpl = logLine,
+} = {}) {
+  const systemAvailable = await probeLocalModelBinary({
+    command: DESKTOP_LOCAL_MODEL_SYSTEM_BINARY,
+    spawnImpl,
+    timeoutMs,
+    sourceEnv,
+  });
+  if (systemAvailable) {
+    logImpl('[local-model] runtime resolution source=system');
+    return {
+      command: DESKTOP_LOCAL_MODEL_SYSTEM_BINARY,
+      rootDir: null,
+      source: DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE.SYSTEM,
+      version: null,
+    };
+  }
+
+  const embeddedRuntime = resolveEmbeddedLocalModelRuntime({
+    rootDir: embeddedRoot,
+    platform,
+    arch,
+    fsImpl,
+  });
+  if (embeddedRuntime) {
+    const embeddedAvailable = await probeLocalModelBinary({
+      command: embeddedRuntime.command,
+      spawnImpl,
+      timeoutMs,
+      sourceEnv,
+    });
+    if (embeddedAvailable) {
+      logImpl(`[local-model] runtime resolution source=embedded version=${embeddedRuntime.version}`);
+      return embeddedRuntime;
+    }
+  }
+
+  logImpl('[local-model] runtime resolution source=unavailable');
+  return null;
+}
+
 async function detectLocalModelRuntime({
   baseUrl = resolveLocalModelBaseUrl(),
   requestImpl = null,
   spawnImpl = spawn,
+  embeddedRoot = resolveEmbeddedLocalModelRoot(),
+  platform = process.platform,
+  arch = process.arch,
+  fsImpl = fs,
+  sourceEnv = process.env,
+  logImpl = logLine,
 } = {}) {
   const managed = Boolean(
     localModelServeProcess
@@ -2956,15 +3197,30 @@ async function detectLocalModelRuntime({
       timeoutMs: DESKTOP_LOCAL_MODEL_DETECT_TIMEOUT_MS,
       requestImpl,
     });
+    const runtimeSource = managed && localModelServeRuntime
+      ? localModelServeRuntime.source
+      : DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE.EXTERNAL_SERVICE;
+    logImpl(`[local-model] runtime resolution source=${runtimeSource} running=true`);
     return {
       status: DESKTOP_LOCAL_MODEL_STATUS.RUNNING,
       installed: true,
       installedModels: extractLocalModelNames(tags),
       managed,
       baseUrl,
+      runtimeSource,
+      runtimeBinary: null,
     };
   } catch (_error) {
-    const installed = await probeLocalModelBinary({ spawnImpl });
+    const runtimeBinary = await resolveLocalModelBinary({
+      spawnImpl,
+      embeddedRoot,
+      platform,
+      arch,
+      fsImpl,
+      sourceEnv,
+      logImpl,
+    });
+    const installed = Boolean(runtimeBinary);
     return {
       status: installed
         ? DESKTOP_LOCAL_MODEL_STATUS.STOPPED
@@ -2973,8 +3229,17 @@ async function detectLocalModelRuntime({
       installedModels: [],
       managed: false,
       baseUrl,
+      runtimeSource: runtimeBinary
+        ? runtimeBinary.source
+        : DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE.UNAVAILABLE,
+      runtimeBinary,
     };
   }
+}
+
+function toPublicLocalModelDetection(detection) {
+  const { runtimeBinary: _runtimeBinary, ...publicDetection } = detection;
+  return publicDetection;
 }
 
 function buildLocalModelState(overrides = {}) {
@@ -2985,6 +3250,7 @@ function buildLocalModelState(overrides = {}) {
     installedModels: [],
     registeredModels: [],
     managed: false,
+    runtimeSource: DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE.UNAVAILABLE,
     baseUrl: DESKTOP_LOCAL_MODEL_DEFAULT_BASE_URL,
     operation: null,
     progress: null,
@@ -3032,7 +3298,7 @@ async function refreshLocalModelState({ requestImpl = null, spawnImpl = spawn } 
   const baseUrl = resolveLocalModelBaseUrl();
   const detection = await detectLocalModelRuntime({ baseUrl, requestImpl, spawnImpl });
   return setLocalModelState({
-    ...detection,
+    ...toPublicLocalModelDetection(detection),
     registeredModels: readRegisteredLocalModels(),
     operation: null,
     progress: null,
@@ -3040,15 +3306,31 @@ async function refreshLocalModelState({ requestImpl = null, spawnImpl = spawn } 
 }
 
 async function startManagedLocalModelRuntime({
+  baseUrl = resolveLocalModelBaseUrl(),
   requestImpl = null,
   spawnImpl = spawn,
   startTimeoutMs = DESKTOP_LOCAL_MODEL_START_TIMEOUT_MS,
+  embeddedRoot = resolveEmbeddedLocalModelRoot(),
+  platform = process.platform,
+  arch = process.arch,
+  fsImpl = fs,
+  sourceEnv = process.env,
+  appDir = resolveAppDir(),
 } = {}) {
-  const baseUrl = resolveLocalModelBaseUrl();
-  const detection = await detectLocalModelRuntime({ baseUrl, requestImpl, spawnImpl });
+  const detection = await detectLocalModelRuntime({
+    baseUrl,
+    requestImpl,
+    spawnImpl,
+    embeddedRoot,
+    platform,
+    arch,
+    fsImpl,
+    sourceEnv,
+  });
+  const publicDetection = toPublicLocalModelDetection(detection);
   if (detection.status === DESKTOP_LOCAL_MODEL_STATUS.RUNNING) {
     return setLocalModelState({
-      ...detection,
+      ...publicDetection,
       registeredModels: readRegisteredLocalModels(),
       operation: null,
       message: '',
@@ -3056,7 +3338,7 @@ async function startManagedLocalModelRuntime({
   }
   if (detection.status === DESKTOP_LOCAL_MODEL_STATUS.NOT_INSTALLED) {
     return setLocalModelState({
-      ...detection,
+      ...publicDetection,
       registeredModels: readRegisteredLocalModels(),
       operation: null,
       message: 'Ollama is not installed. Install it to run local models.',
@@ -3064,7 +3346,7 @@ async function startManagedLocalModelRuntime({
   }
 
   setLocalModelState({
-    ...detection,
+    ...publicDetection,
     status: DESKTOP_LOCAL_MODEL_STATUS.STARTING,
     operation: 'start',
     message: '',
@@ -3075,22 +3357,45 @@ async function startManagedLocalModelRuntime({
   if (localModelServeProcess
     && localModelServeProcess.exitCode === null
     && !localModelServeProcess.signalCode) {
-    terminateManagedLocalModelProcess(localModelServeProcess);
-    localModelServeProcess = null;
+    const processToStop = localModelServeProcess;
+    await terminateManagedLocalModelProcess(processToStop, { spawnImpl, platform });
+    if (localModelServeProcess === processToStop) {
+      localModelServeProcess = null;
+      localModelServeRuntime = null;
+    }
+  }
+
+  const runtimeBinary = detection.runtimeBinary;
+  if (!runtimeBinary) {
+    return setLocalModelState({
+      ...publicDetection,
+      status: DESKTOP_LOCAL_MODEL_STATUS.NOT_INSTALLED,
+      operation: null,
+      message: 'Ollama is not installed. Install it to run local models.',
+    });
   }
 
   let child;
   try {
-    child = spawnImpl(DESKTOP_LOCAL_MODEL_BINARY, ['serve'], {
-      env: resolveLocalModelSpawnEnv(),
+    const spawnOptions = {
+      env: resolveLocalModelSpawnEnv(sourceEnv, {
+        runtimeSource: runtimeBinary.source,
+        baseUrl,
+        appDir,
+      }),
       windowsHide: true,
       stdio: 'ignore',
       detached: false,
-    });
+    };
+    if (runtimeBinary.source === DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE.EMBEDDED) {
+      spawnOptions.cwd = runtimeBinary.rootDir;
+    }
+    child = spawnImpl(runtimeBinary.command, ['serve'], spawnOptions);
   } catch (error) {
-    logLine(`[local-model] failed to start runtime: ${error instanceof Error ? error.message : String(error)}`);
+    const errorCode = error && typeof error.code === 'string' ? error.code : 'unknown';
+    logLine(`[local-model] failed to start runtime source=${runtimeBinary.source} code=${errorCode}`);
     return setLocalModelState({
-      ...detection,
+      ...publicDetection,
       status: DESKTOP_LOCAL_MODEL_STATUS.ERROR,
       operation: null,
       message: 'Could not start the local model runtime.',
@@ -3098,13 +3403,16 @@ async function startManagedLocalModelRuntime({
   }
 
   localModelServeProcess = child;
+  localModelServeRuntime = runtimeBinary;
   child.on('exit', () => {
     if (localModelServeProcess === child) {
       localModelServeProcess = null;
+      localModelServeRuntime = null;
     }
   });
   child.on('error', (error) => {
-    logLine(`[local-model] runtime process error: ${error instanceof Error ? error.message : String(error)}`);
+    const errorCode = error && typeof error.code === 'string' ? error.code : 'unknown';
+    logLine(`[local-model] runtime process error source=${runtimeBinary.source} code=${errorCode}`);
   });
 
   const deadline = Date.now() + startTimeoutMs;
@@ -3123,6 +3431,7 @@ async function startManagedLocalModelRuntime({
         installedModels: extractLocalModelNames(tags),
         registeredModels: readRegisteredLocalModels(),
         managed: true,
+        runtimeSource: runtimeBinary.source,
         baseUrl,
         operation: null,
         message: '',
@@ -3136,31 +3445,73 @@ async function startManagedLocalModelRuntime({
     status: DESKTOP_LOCAL_MODEL_STATUS.ERROR,
     installed: true,
     managed: Boolean(localModelServeProcess),
+    runtimeSource: runtimeBinary.source,
     baseUrl,
     operation: null,
     message: 'The local model runtime did not become ready in time.',
   });
 }
 
-function terminateManagedLocalModelProcess(child) {
+function isManagedLocalModelProcessRunning(child) {
+  return Boolean(child && child.exitCode === null && !child.signalCode);
+}
+
+async function terminateManagedLocalModelProcess(child, {
+  spawnImpl = spawn,
+  platform = process.platform,
+  forceAfterMs = DESKTOP_LOCAL_MODEL_STOP_FORCE_AFTER_MS,
+  timeoutMs = DESKTOP_LOCAL_MODEL_STOP_TIMEOUT_MS,
+} = {}) {
   if (!child || child.exitCode !== null || child.signalCode) {
     return;
   }
-  try {
-    if (isWindows) {
-      spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true })
-        .on('error', () => undefined);
-    } else if (typeof child.kill === 'function') {
-      child.kill('SIGTERM');
+
+  let forceTimer = null;
+  if (platform === 'win32') {
+    spawnImpl(
+      'taskkill',
+      ['/PID', String(child.pid), '/T', '/F'],
+      { windowsHide: true, stdio: 'ignore' }
+    ).on('error', () => undefined);
+  } else if (typeof child.kill === 'function') {
+    child.kill('SIGTERM');
+    if (isManagedLocalModelProcessRunning(child)) {
+      forceTimer = setTimeout(() => {
+        if (!isManagedLocalModelProcessRunning(child)) {
+          return;
+        }
+        try {
+          child.kill('SIGKILL');
+        } catch (_error) {
+        }
+      }, Math.min(forceAfterMs, timeoutMs));
     }
-  } catch (error) {
-    logLine(`[local-model] failed to stop runtime: ${error instanceof Error ? error.message : String(error)}`);
+  } else {
+    throw new Error('Managed Ollama process cannot be terminated.');
+  }
+
+  const exited = await waitForBackendExit(child, timeoutMs);
+  if (forceTimer) {
+    clearTimeout(forceTimer);
+  }
+  if (!exited) {
+    throw new Error(`Ollama did not stop within ${timeoutMs}ms.`);
   }
 }
 
-function stopManagedLocalModelRuntime() {
-  terminateManagedLocalModelProcess(localModelServeProcess);
-  localModelServeProcess = null;
+async function stopManagedLocalModelRuntime(options = {}) {
+  const processToStop = localModelServeProcess;
+  try {
+    await terminateManagedLocalModelProcess(processToStop, options);
+  } catch (error) {
+    const errorCode = error && typeof error.code === 'string' ? error.code : 'unknown';
+    logLine(`[local-model] failed to stop runtime code=${errorCode}`);
+    throw error;
+  }
+  if (localModelServeProcess === processToStop) {
+    localModelServeProcess = null;
+    localModelServeRuntime = null;
+  }
   return setLocalModelState({
     status: DESKTOP_LOCAL_MODEL_STATUS.STOPPED,
     managed: false,
@@ -3828,7 +4179,7 @@ app.on('before-quit', () => {
     desktopTray.destroy();
   }
   desktopTray = null;
-  stopManagedLocalModelRuntime();
+  void stopManagedLocalModelRuntime().catch(() => undefined);
   void stopBackend();
 });
 
@@ -3853,6 +4204,7 @@ module.exports = {
   DESKTOP_LOCAL_MODEL_STATE_EVENT,
   DESKTOP_LOCAL_MODEL_INSTALL_GUIDE_URL,
   DESKTOP_LOCAL_MODEL_PRESETS,
+  DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE,
   DESKTOP_LOCAL_MODEL_STATUS,
   DESKTOP_PROTOCOL,
   DESKTOP_PROTOCOL_HOST,
@@ -3880,6 +4232,12 @@ module.exports = {
   normalizeLocalModelName,
   isAllowedLocalModelPreset,
   resolveLocalModelBaseUrl,
+  resolveLocalModelModelsDir,
+  resolveLocalModelServeHost,
+  resolveLocalModelSpawnEnv,
+  resolveEmbeddedLocalModelRoot,
+  resolveEmbeddedLocalModelRuntime,
+  resolveLocalModelBinary,
   extractLocalModelNames,
   probeLocalModelBinary,
   detectLocalModelRuntime,
@@ -3964,6 +4322,12 @@ module.exports = {
   },
   __setLocalModelServeProcessForTest(processRef = null) {
     localModelServeProcess = processRef;
+    if (!processRef) {
+      localModelServeRuntime = null;
+    }
+  },
+  __setLocalModelServeRuntimeForTest(runtimeRef = null) {
+    localModelServeRuntime = runtimeRef;
   },
   __getLocalModelServeProcessForTest() {
     return localModelServeProcess;

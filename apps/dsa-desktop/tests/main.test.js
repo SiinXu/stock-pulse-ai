@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const Module = require('node:module');
 const { EventEmitter } = require('node:events');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -187,6 +188,9 @@ test('desktop package exposes StockPulse while retaining the stable upgrade appI
   assert.match(releaseWorkflow, /stockpulse-windows-installer-/);
   assert.match(releaseWorkflow, /stockpulse-windows-noinstall-/);
   assert.match(releaseWorkflow, /stockpulse-macos-/);
+  assert.match(releaseWorkflow, /lib\/ollama\/llama-server\.exe/);
+  assert.match(releaseWorkflow, /Resources\/ollama\/llama-server/);
+  assert.equal((releaseWorkflow.match(/verifyPreparedOllama/g) || []).length, 2);
   assert.match(updaterVerification, /stockpulse-windows-installer-/);
   assert.match(installerScript, /!macro customInstall\b/);
   assert.match(installerScript, /Software\\Classes\\stockpulse\\shell\\open\\command/);
@@ -1771,6 +1775,12 @@ test('desktop update backup list preserves the daily provider cache', (t) => {
   assert.ok(files.includes(path.join('data', 'provider_cache', 'daily')));
 });
 
+test('desktop update backup list preserves embedded Ollama models', (t) => {
+  const mainModule = loadMainModule(t);
+  const files = mainModule.DESKTOP_UPDATE_RUNTIME_RELATIVE_FILES || [];
+  assert.ok(files.includes(path.join('data', 'ollama', 'models')));
+});
+
 test('desktop update backup and restore preserve generation backend env keys', (t) => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-desktop-env-backup-'));
   const appDir = path.join(tempRoot, 'app');
@@ -2860,6 +2870,87 @@ function makeLocalModelSpawn(records, { serveStaysAlive = true } = {}) {
   };
 }
 
+function createEmbeddedRuntimeFixture(t, {
+  platform = 'darwin',
+  arch = 'arm64',
+  omitRequiredPath = '',
+  omitRuntimePath = '',
+} = {}) {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-embedded-ollama-'));
+  const rootDir = path.join(tmpDir, 'ollama');
+  fs.mkdirSync(rootDir, { recursive: true });
+  const binaryPath = platform === 'win32' ? 'ollama.exe' : 'ollama';
+  const requiredPaths = platform === 'win32'
+    ? ['ollama.exe', 'lib/ollama/llama-server.exe']
+    : ['ollama', 'llama-server'];
+  const dependencyPath = platform === 'win32'
+    ? 'lib/ollama/libllama-server-impl.dll'
+    : 'libllama-server-impl.dylib';
+  const runtimePaths = [...requiredPaths, dependencyPath].sort();
+  const fileSha256 = {};
+  for (const relativePath of runtimePaths) {
+    const content = `fixture:${relativePath}`;
+    fileSha256[relativePath] = crypto.createHash('sha256').update(content).digest('hex');
+    if (relativePath === omitRequiredPath || relativePath === omitRuntimePath) {
+      continue;
+    }
+    const absolutePath = path.join(rootDir, relativePath);
+    fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+    fs.writeFileSync(absolutePath, content);
+    if (platform === 'darwin') {
+      fs.chmodSync(absolutePath, 0o755);
+    }
+  }
+  fs.writeFileSync(path.join(rootDir, 'runtime-manifest.json'), JSON.stringify({
+    schemaVersion: 2,
+    runtime: 'ollama',
+    version: 'v0.32.3',
+    platform,
+    architecture: arch,
+    supportedArchitectures: platform === 'darwin' ? ['arm64', 'x64'] : ['x64'],
+    binaryPath,
+    requiredPaths,
+    fileSha256,
+    archive: {
+      fileName: platform === 'darwin' ? 'ollama-darwin.tgz' : 'ollama-windows-amd64.zip',
+      sizeBytes: 123,
+      sha256: 'a'.repeat(64),
+    },
+  }));
+  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+  return {
+    rootDir,
+    command: path.join(rootDir, binaryPath),
+    dependencyPath,
+  };
+}
+
+function makeRuntimeAvailabilitySpawn(records, resolveExitCode) {
+  return (command, args, options) => {
+    records.push({ command, args: [...args], options });
+    const child = new EventEmitter();
+    child.pid = 8181;
+    child.exitCode = null;
+    child.signalCode = null;
+    child.kill = () => {
+      child.exitCode = 0;
+      return true;
+    };
+    const exitCode = resolveExitCode(command, args);
+    setImmediate(() => {
+      if (exitCode === 'error') {
+        child.emit('error', new Error('ENOENT'));
+        return;
+      }
+      if (exitCode != null) {
+        child.exitCode = exitCode;
+        child.emit('exit', exitCode);
+      }
+    });
+    return child;
+  };
+}
+
 test('local model names accept curated tags and reject injection payloads', (t) => {
   const mainModule = loadMainModule(t);
 
@@ -2917,6 +3008,144 @@ test('installed model names are parsed and sanitized from the tags payload', (t)
   );
   assert.deepEqual(mainModule.extractLocalModelNames(null), []);
   assert.deepEqual(mainModule.extractLocalModelNames({ models: 'nope' }), []);
+});
+
+test('local model binary resolution prefers a working system install', async (t) => {
+  const mainModule = loadMainModule(t);
+  const embedded = createEmbeddedRuntimeFixture(t);
+  const records = [];
+  const logs = [];
+
+  const resolved = await mainModule.resolveLocalModelBinary({
+    embeddedRoot: embedded.rootDir,
+    platform: 'darwin',
+    arch: 'arm64',
+    spawnImpl: makeRuntimeAvailabilitySpawn(records, () => 0),
+    logImpl: (line) => logs.push(line),
+  });
+
+  assert.equal(resolved.source, mainModule.DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE.SYSTEM);
+  assert.equal(resolved.command, 'ollama');
+  assert.deepEqual(records.map((record) => record.command), ['ollama']);
+  assert.deepEqual(logs, ['[local-model] runtime resolution source=system']);
+});
+
+test('local model binary resolution falls back to a valid embedded runtime', async (t) => {
+  const mainModule = loadMainModule(t);
+  const embedded = createEmbeddedRuntimeFixture(t);
+  const records = [];
+  const logs = [];
+
+  const resolved = await mainModule.resolveLocalModelBinary({
+    embeddedRoot: embedded.rootDir,
+    platform: 'darwin',
+    arch: 'arm64',
+    spawnImpl: makeRuntimeAvailabilitySpawn(
+      records,
+      (command) => command === 'ollama' ? 'error' : 0
+    ),
+    logImpl: (line) => logs.push(line),
+  });
+
+  assert.equal(resolved.source, mainModule.DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE.EMBEDDED);
+  assert.equal(resolved.command, embedded.command);
+  assert.deepEqual(records.map((record) => record.command), ['ollama', embedded.command]);
+  assert.ok(logs.some((line) => line.includes('source=embedded version=v0.32.3')));
+  assert.ok(logs.every((line) => !line.includes(embedded.rootDir)));
+});
+
+test('local model binary resolution rejects missing and non-working embedded resources', async (t) => {
+  const mainModule = loadMainModule(t);
+  const incomplete = createEmbeddedRuntimeFixture(t, { omitRequiredPath: 'llama-server' });
+  const incompleteRecords = [];
+  const incompleteResult = await mainModule.resolveLocalModelBinary({
+    embeddedRoot: incomplete.rootDir,
+    platform: 'darwin',
+    arch: 'arm64',
+    spawnImpl: makeRuntimeAvailabilitySpawn(incompleteRecords, () => 'error'),
+    logImpl: () => undefined,
+  });
+  assert.equal(incompleteResult, null);
+  assert.deepEqual(incompleteRecords.map((record) => record.command), ['ollama']);
+
+  const corrupt = createEmbeddedRuntimeFixture(t);
+  const corruptRecords = [];
+  const corruptResult = await mainModule.resolveLocalModelBinary({
+    embeddedRoot: corrupt.rootDir,
+    platform: 'darwin',
+    arch: 'arm64',
+    spawnImpl: makeRuntimeAvailabilitySpawn(
+      corruptRecords,
+      (command) => command === 'ollama' ? 'error' : 1
+    ),
+    logImpl: () => undefined,
+  });
+  assert.equal(corruptResult, null);
+  assert.deepEqual(corruptRecords.map((record) => record.command), ['ollama', corrupt.command]);
+});
+
+test('local model binary resolution rejects an embedded runtime with corrupt helper bytes', async (t) => {
+  const mainModule = loadMainModule(t);
+  const embedded = createEmbeddedRuntimeFixture(t);
+  fs.writeFileSync(path.join(embedded.rootDir, 'llama-server'), 'corrupt helper bytes');
+  const records = [];
+
+  const resolved = await mainModule.resolveLocalModelBinary({
+    embeddedRoot: embedded.rootDir,
+    platform: 'darwin',
+    arch: 'arm64',
+    spawnImpl: makeRuntimeAvailabilitySpawn(records, () => 'error'),
+    logImpl: () => undefined,
+  });
+
+  assert.equal(resolved, null);
+  assert.deepEqual(records.map((record) => record.command), ['ollama']);
+});
+
+test('local model binary resolution rejects missing or corrupt embedded dependency files', async (t) => {
+  const mainModule = loadMainModule(t);
+  const missing = createEmbeddedRuntimeFixture(t);
+  fs.rmSync(path.join(missing.rootDir, missing.dependencyPath));
+  const missingRecords = [];
+  assert.equal(await mainModule.resolveLocalModelBinary({
+    embeddedRoot: missing.rootDir,
+    platform: 'darwin',
+    arch: 'arm64',
+    spawnImpl: makeRuntimeAvailabilitySpawn(missingRecords, () => 'error'),
+    logImpl: () => undefined,
+  }), null);
+  assert.deepEqual(missingRecords.map((record) => record.command), ['ollama']);
+
+  const corrupt = createEmbeddedRuntimeFixture(t);
+  fs.writeFileSync(path.join(corrupt.rootDir, corrupt.dependencyPath), 'corrupt library bytes');
+  const corruptRecords = [];
+  assert.equal(await mainModule.resolveLocalModelBinary({
+    embeddedRoot: corrupt.rootDir,
+    platform: 'darwin',
+    arch: 'arm64',
+    spawnImpl: makeRuntimeAvailabilitySpawn(corruptRecords, () => 'error'),
+    logImpl: () => undefined,
+  }), null);
+  assert.deepEqual(corruptRecords.map((record) => record.command), ['ollama']);
+});
+
+test('embedded runtime validation supports the packaged Windows layout', (t) => {
+  const mainModule = loadMainModule(t, { platform: 'win32' });
+  const embedded = createEmbeddedRuntimeFixture(t, { platform: 'win32', arch: 'x64' });
+
+  assert.deepEqual(
+    mainModule.resolveEmbeddedLocalModelRuntime({
+      rootDir: embedded.rootDir,
+      platform: 'win32',
+      arch: 'x64',
+    }),
+    {
+      command: embedded.command,
+      rootDir: embedded.rootDir,
+      source: mainModule.DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE.EMBEDDED,
+      version: 'v0.32.3',
+    }
+  );
 });
 
 test('detection reports running with installed models when the runtime answers', async (t) => {
@@ -2978,6 +3207,11 @@ test('starting the runtime spawns a whitelisted daemon with array arguments only
     requestImpl,
     spawnImpl: makeLocalModelSpawn(records),
     startTimeoutMs: 3000,
+    sourceEnv: {
+      PATH: '/custom/bin',
+      OLLAMA_HOST: '127.0.0.1:22345',
+      OLLAMA_MODELS: '/existing/system-models',
+    },
   });
 
   const serveCall = records.find((call) => Array.isArray(call.args) && call.args.includes('serve'));
@@ -2985,8 +3219,84 @@ test('starting the runtime spawns a whitelisted daemon with array arguments only
   assert.equal(serveCall.command, 'ollama');
   assert.deepEqual(serveCall.args, ['serve']);
   assert.notEqual(serveCall.options.shell, true);
+  assert.equal(serveCall.options.env.OLLAMA_HOST, '127.0.0.1:22345');
+  assert.equal(serveCall.options.env.OLLAMA_MODELS, '/existing/system-models');
   assert.equal(state.status, mainModule.DESKTOP_LOCAL_MODEL_STATUS.RUNNING);
   assert.equal(state.managed, true);
+  assert.equal(state.runtimeSource, mainModule.DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE.SYSTEM);
+
+  mainModule.__setLocalModelServeProcessForTest(null);
+});
+
+test('starting reuses an already healthy Ollama endpoint without spawning', async (t) => {
+  const mainModule = loadMainModule(t);
+  mainModule.__setLocalModelStateForTest(null);
+
+  const state = await mainModule.startManagedLocalModelRuntime({
+    baseUrl: 'http://127.0.0.1:11434',
+    requestImpl: makeStagedJsonRequest([
+      { statusCode: 200, jsonBody: { models: [{ name: 'qwen3:8b' }] } },
+    ]),
+    spawnImpl: () => {
+      throw new Error('spawn must not run for a healthy endpoint');
+    },
+  });
+
+  assert.equal(state.status, mainModule.DESKTOP_LOCAL_MODEL_STATUS.RUNNING);
+  assert.equal(state.managed, false);
+  assert.equal(
+    state.runtimeSource,
+    mainModule.DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE.EXTERNAL_SERVICE
+  );
+});
+
+test('starting the embedded runtime isolates its host, models, and working directory', async (t) => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-embedded-model-data-'));
+  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+  const mainModule = loadMainModule(t);
+  const embedded = createEmbeddedRuntimeFixture(t);
+  const records = [];
+  mainModule.__setLocalModelStateForTest(null);
+
+  const spawnImpl = makeRuntimeAvailabilitySpawn(records, (command, args) => {
+    if (command === 'ollama') {
+      return 'error';
+    }
+    if (args.includes('--version')) {
+      return 0;
+    }
+    return null;
+  });
+  const state = await mainModule.startManagedLocalModelRuntime({
+    baseUrl: 'http://127.0.0.1:11434',
+    requestImpl: makeStagedJsonRequest([
+      { connectionError: true },
+      { statusCode: 200, jsonBody: { models: [] } },
+    ]),
+    spawnImpl,
+    embeddedRoot: embedded.rootDir,
+    platform: 'darwin',
+    arch: 'arm64',
+    sourceEnv: {
+      PATH: '/custom/bin',
+      OLLAMA_HOST: '127.0.0.1:22345',
+      OLLAMA_MODELS: '/ambient/models',
+    },
+    appDir: tmpDir,
+    startTimeoutMs: 3000,
+  });
+
+  const serveCall = records.find((call) => call.args.includes('serve'));
+  assert.ok(serveCall);
+  assert.equal(serveCall.command, embedded.command);
+  assert.equal(serveCall.options.cwd, embedded.rootDir);
+  assert.equal(serveCall.options.env.OLLAMA_HOST, '127.0.0.1:11434');
+  assert.equal(
+    serveCall.options.env.OLLAMA_MODELS,
+    path.join(tmpDir, 'data', 'ollama', 'models')
+  );
+  assert.equal(state.runtimeSource, mainModule.DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE.EMBEDDED);
+  assert.equal(Object.hasOwn(state, 'runtimeBinary'), false);
 
   mainModule.__setLocalModelServeProcessForTest(null);
 });
@@ -3010,7 +3320,7 @@ test('starting a missing runtime degrades gracefully without throwing', async (t
   assert.match(state.message, /not installed/i);
 });
 
-test('stopping the runtime only terminates the desktop-managed process', (t) => {
+test('stopping the runtime only terminates the desktop-managed process', async (t) => {
   const mainModule = loadMainModule(t);
   mainModule.__setLocalModelStateForTest(null);
   const managed = new EventEmitter();
@@ -3025,10 +3335,68 @@ test('stopping the runtime only terminates the desktop-managed process', (t) => 
   };
   mainModule.__setLocalModelServeProcessForTest(managed);
 
-  const state = mainModule.stopManagedLocalModelRuntime();
+  const state = await mainModule.stopManagedLocalModelRuntime();
   assert.equal(killed, true);
   assert.equal(state.status, mainModule.DESKTOP_LOCAL_MODEL_STATUS.STOPPED);
   assert.equal(mainModule.__getLocalModelServeProcessForTest(), null);
+});
+
+test('Windows runtime stop waits for taskkill before clearing managed state', async (t) => {
+  const mainModule = loadMainModule(t, { platform: 'win32' });
+  mainModule.__setLocalModelStateForTest(null);
+  const managed = new EventEmitter();
+  managed.pid = 9292;
+  managed.exitCode = null;
+  managed.signalCode = null;
+  const terminator = new EventEmitter();
+  const spawnCalls = [];
+  mainModule.__setLocalModelServeProcessForTest(managed);
+
+  let settled = false;
+  const pending = mainModule.stopManagedLocalModelRuntime({
+    platform: 'win32',
+    timeoutMs: 1000,
+    spawnImpl: (command, args, options) => {
+      spawnCalls.push({ command, args, options });
+      return terminator;
+    },
+  }).then((state) => {
+    settled = true;
+    return state;
+  });
+
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(settled, false);
+  assert.equal(mainModule.__getLocalModelServeProcessForTest(), managed);
+  assert.deepEqual(spawnCalls, [{
+    command: 'taskkill',
+    args: ['/PID', '9292', '/T', '/F'],
+    options: { windowsHide: true, stdio: 'ignore' },
+  }]);
+
+  managed.exitCode = 0;
+  managed.emit('exit', 0);
+  const state = await pending;
+  assert.equal(state.status, mainModule.DESKTOP_LOCAL_MODEL_STATUS.STOPPED);
+  assert.equal(mainModule.__getLocalModelServeProcessForTest(), null);
+});
+
+test('Windows runtime stop fails closed when taskkill cannot terminate the process', async (t) => {
+  const mainModule = loadMainModule(t, { platform: 'win32' });
+  const managed = new EventEmitter();
+  managed.pid = 9393;
+  managed.exitCode = null;
+  managed.signalCode = null;
+  mainModule.__setLocalModelServeProcessForTest(managed);
+
+  const pending = mainModule.stopManagedLocalModelRuntime({
+    platform: 'win32',
+    timeoutMs: 20,
+    spawnImpl: () => new EventEmitter(),
+  });
+
+  await assert.rejects(pending, /Ollama did not stop within 20ms/);
+  assert.equal(mainModule.__getLocalModelServeProcessForTest(), managed);
 });
 
 test('pull refuses names outside the curated allowlist before any network call', async (t) => {
@@ -3235,6 +3603,16 @@ test('desktop package ships the isolated local model surface', () => {
   );
 
   assert.ok(packageMetadata.build.files.includes('model-preload.js'));
+  assert.equal(
+    packageMetadata.scripts['prepare:ollama'],
+    'node ../../scripts/prepare-embedded-ollama.js'
+  );
+  assert.equal(packageMetadata.scripts.prebuild, 'npm run prepare:ollama');
+  assert.equal(packageMetadata.scripts['build:electron'], 'electron-builder');
+  assert.ok(packageMetadata.build.extraResources.some((entry) =>
+    entry.from === 'vendor/ollama' && entry.to === 'ollama'));
+  assert.ok(packageMetadata.build.extraResources.some((entry) =>
+    entry.from === '../../THIRD_PARTY_NOTICES' && entry.to === 'THIRD_PARTY_NOTICES'));
   assert.match(modelPage, /connect-src 'none'/);
   assert.match(modelPage, /script-src 'self'/);
   assert.match(modelPage, /id="presetList"/);
