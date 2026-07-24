@@ -1566,6 +1566,31 @@ describe('DecisionSignalsPage', () => {
     expect(screen.getByText('当前查看：MSFT')).toBeInTheDocument();
   });
 
+  it('reconciles the displayed stock when URL search changes under the same history key', async () => {
+    window.history.pushState({}, '', buildSignalCenterHref({ stock: 'AAPL' }));
+
+    renderPage();
+
+    expect(await screen.findByText('当前查看：AAPL')).toBeInTheDocument();
+    submitCurrentStock('MSFT');
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get(
+      SIGNAL_CENTER_ROUTE_QUERY_KEYS.stock,
+    )).toBe('MSFT'));
+    expect(await screen.findByText('当前查看：MSFT')).toBeInTheDocument();
+
+    const currentHistoryState = window.history.state;
+    act(() => {
+      window.history.replaceState(
+        currentHistoryState,
+        '',
+        buildSignalCenterHref({ stock: 'AAPL' }),
+      );
+      window.dispatchEvent(new PopStateEvent('popstate', { state: currentHistoryState }));
+    });
+
+    expect(await screen.findByText('当前查看：AAPL')).toBeInTheDocument();
+  });
+
   it('reconciles the displayed stock after a same-page deep-link push', async () => {
     window.history.pushState({}, '', buildSignalCenterHref({ stock: 'AAPL' }));
     renderPage(

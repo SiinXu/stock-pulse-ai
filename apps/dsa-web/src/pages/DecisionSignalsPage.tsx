@@ -1438,29 +1438,30 @@ const DecisionSignalsPage: React.FC = () => {
     clearStockContext(true);
   }, [clearStockContext]);
 
-  const stockLocationKeyRef = useRef<string | null>(null);
+  const activeStockContextRef = useRef(activeStockContext);
+  const applyStockContextRef = useRef(applyStockContext);
+  const clearStockContextRef = useRef(clearStockContext);
+  activeStockContextRef.current = activeStockContext;
+  applyStockContextRef.current = applyStockContext;
+  clearStockContextRef.current = clearStockContext;
+
+  // Location events own URL reconciliation. Reading current state and callbacks
+  // through refs avoids treating an optimistic stock selection as navigation.
   useEffect(() => {
-    if (stockLocationKeyRef.current === routeLocation.key) return;
-    stockLocationKeyRef.current = routeLocation.key;
     const urlStock = new URLSearchParams(routeLocation.search)
       .get(SIGNAL_CENTER_ROUTE_QUERY_KEYS.stock)
       ?.trim() ?? '';
+    const currentStockContext = activeStockContextRef.current;
     if (urlStock) {
       if (
-        activeStockContext
-        && areStockCodesEquivalent(activeStockContext.code, urlStock)
+        currentStockContext
+        && areStockCodesEquivalent(currentStockContext.code, urlStock)
       ) return;
-      applyStockContext({ code: urlStock }, false);
+      applyStockContextRef.current({ code: urlStock }, false);
       return;
     }
-    if (activeStockContext) clearStockContext(false);
-  }, [
-    activeStockContext,
-    applyStockContext,
-    clearStockContext,
-    routeLocation.key,
-    routeLocation.search,
-  ]);
+    if (currentStockContext) clearStockContextRef.current(false);
+  }, [routeLocation]);
 
   const handleTimelineSearch = useCallback(() => {
     if (!activeStockContext) return;
