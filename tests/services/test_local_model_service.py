@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import threading
 from typing import Dict, List, Optional
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import requests
 
@@ -790,6 +790,43 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
                 "qwen3:4b",
                 recovery_token="never-issued",
             )
+        service.unregister_model("qwen3:4b")
+        with self.assertRaises(LocalModelValidationError):
+            service.restore_registration(
+                "qwen3:4b",
+                recovery_token=unregistered["recovery_token"],
+            )
+
+        self.assertEqual(self.manager.read_config_map()["LLM_OLLAMA_MODELS"], "")
+
+    def test_registration_restore_rejects_an_expired_token(self) -> None:
+        self._rewrite_env(
+            "ADMIN_AUTH_ENABLED=true",
+            "LLM_CONFIG_MODE=channels",
+            "LLM_CHANNELS=cloud,ollama",
+            "LLM_CLOUD_PROVIDER=openai",
+            "LLM_CLOUD_PROTOCOL=openai",
+            "LLM_CLOUD_API_KEY=secret-value",
+            "LLM_CLOUD_MODELS=gpt-4o",
+            "LLM_CLOUD_ENABLED=true",
+            "LLM_OLLAMA_PROVIDER=ollama",
+            "LLM_OLLAMA_PROTOCOL=ollama",
+            "LLM_OLLAMA_MODELS=qwen3:4b",
+            "LLM_OLLAMA_ENABLED=true",
+            "LITELLM_MODEL=openai/gpt-4o",
+        )
+        service, _queue, _client = self._local_service()
+
+        with patch(
+            "src.services.local_model_service.time.monotonic",
+            side_effect=[100.0, 401.0],
+        ):
+            unregistered = service.unregister_model("qwen3:4b")
+            with self.assertRaises(LocalModelValidationError):
+                service.restore_registration(
+                    "qwen3:4b",
+                    recovery_token=unregistered["recovery_token"],
+                )
 
         self.assertEqual(self.manager.read_config_map()["LLM_OLLAMA_MODELS"], "")
 
