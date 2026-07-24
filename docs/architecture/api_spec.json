@@ -2801,6 +2801,48 @@
         }
       }
     },
+    "/api/v1/local-models/desktop-activations": {
+      "post": {
+        "tags": [
+          "LocalModels"
+        ],
+        "summary": "Activate Desktop Local Model",
+        "description": "Activate a Desktop pull only if its configuration and runtime stayed fixed.",
+        "operationId": "activate_desktop_local_model_api_v1_local_models_desktop_activations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalModelDesktopActivationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalModelMutationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/local-models/models": {
       "delete": {
         "tags": [
@@ -3010,70 +3052,6 @@
         }
       }
     },
-    "/api/v1/local-models/runtime": {
-      "get": {
-        "tags": [
-          "LocalModels"
-        ],
-        "summary": "Get Local Model Runtime",
-        "description": "Return runtime availability and current saved assignments.",
-        "operationId": "get_local_model_runtime_api_v1_local_models_runtime_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LocalModelRuntimeResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/local-models/desktop-activations": {
-      "post": {
-        "tags": [
-          "LocalModels"
-        ],
-        "summary": "Activate Desktop Local Model",
-        "description": "Activate a Desktop pull only if its configuration and runtime stayed fixed.",
-        "operationId": "activate_desktop_local_model_api_v1_local_models_desktop_activations_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LocalModelDesktopActivationRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LocalModelMutationResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/local-models/registration-recoveries/finalize": {
       "post": {
         "tags": [
@@ -3109,6 +3087,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/local-models/runtime": {
+      "get": {
+        "tags": [
+          "LocalModels"
+        ],
+        "summary": "Get Local Model Runtime",
+        "description": "Return runtime availability and current saved assignments.",
+        "operationId": "get_local_model_runtime_api_v1_local_models_runtime_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalModelRuntimeResponse"
                 }
               }
             }
@@ -8645,6 +8645,72 @@
         "title": "LocalModelConfigurationResponse",
         "description": "Caller-safe local model configuration state."
       },
+      "LocalModelDesktopActivationRequest": {
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*(?::[A-Za-z0-9][A-Za-z0-9._-]*)?$",
+            "title": "Model Id"
+          },
+          "expected_config_version": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Expected Config Version"
+          },
+          "expected_runtime_identity": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64,
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Expected Runtime Identity"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model_id",
+          "expected_config_version",
+          "expected_runtime_identity"
+        ],
+        "title": "LocalModelDesktopActivationRequest",
+        "description": "Activate a Desktop pull only against its original configuration snapshot."
+      },
+      "LocalModelDesktopUnregistrationRequest": {
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*(?::[A-Za-z0-9][A-Za-z0-9._-]*)?$",
+            "title": "Model Id"
+          },
+          "expected_config_version": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Expected Config Version"
+          },
+          "expected_runtime_identity": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64,
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Expected Runtime Identity"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model_id",
+          "expected_config_version",
+          "expected_runtime_identity"
+        ],
+        "title": "LocalModelDesktopUnregistrationRequest",
+        "description": "Unregister before Desktop deletion using one immutable runtime snapshot."
+      },
       "LocalModelMutationResponse": {
         "properties": {
           "config_version": {
@@ -9019,72 +9085,6 @@
         ],
         "title": "TaskStatusEnum",
         "description": "Canonical process-local task lifecycle states."
-      },
-      "LocalModelDesktopActivationRequest": {
-        "properties": {
-          "model_id": {
-            "type": "string",
-            "maxLength": 128,
-            "minLength": 1,
-            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*(?::[A-Za-z0-9][A-Za-z0-9._-]*)?$",
-            "title": "Model Id"
-          },
-          "expected_config_version": {
-            "type": "string",
-            "maxLength": 128,
-            "minLength": 1,
-            "title": "Expected Config Version"
-          },
-          "expected_runtime_identity": {
-            "type": "string",
-            "maxLength": 64,
-            "minLength": 64,
-            "pattern": "^[0-9a-f]{64}$",
-            "title": "Expected Runtime Identity"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "model_id",
-          "expected_config_version",
-          "expected_runtime_identity"
-        ],
-        "title": "LocalModelDesktopActivationRequest",
-        "description": "Activate a Desktop pull only against its original configuration snapshot."
-      },
-      "LocalModelDesktopUnregistrationRequest": {
-        "properties": {
-          "model_id": {
-            "type": "string",
-            "maxLength": 128,
-            "minLength": 1,
-            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*(?::[A-Za-z0-9][A-Za-z0-9._-]*)?$",
-            "title": "Model Id"
-          },
-          "expected_config_version": {
-            "type": "string",
-            "maxLength": 128,
-            "minLength": 1,
-            "title": "Expected Config Version"
-          },
-          "expected_runtime_identity": {
-            "type": "string",
-            "maxLength": 64,
-            "minLength": 64,
-            "pattern": "^[0-9a-f]{64}$",
-            "title": "Expected Runtime Identity"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "model_id",
-          "expected_config_version",
-          "expected_runtime_identity"
-        ],
-        "title": "LocalModelDesktopUnregistrationRequest",
-        "description": "Unregister before Desktop deletion using one immutable runtime snapshot."
       }
     },
     "securitySchemes": {
