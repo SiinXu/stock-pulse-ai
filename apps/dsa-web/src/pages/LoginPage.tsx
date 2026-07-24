@@ -11,7 +11,7 @@ import { useAuth } from '../hooks';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { resolveLoginRedirect } from '../utils/loginRedirect';
 import { getLoginConnectionStatus } from '../utils/loginConnection';
-import { SettingsAlert } from '../components/settings';
+import { SettingsAlert } from '../components/settings/SettingsAlert';
 
 const CONNECTION_STATUS_TEXT = {
   https: 'login.secureConnection',

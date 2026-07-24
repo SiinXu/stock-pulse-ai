@@ -99,15 +99,10 @@ class _SystemConfigSetupMethods:
             if not enabled:
                 continue
 
-            base_url = (effective_map.get(f"{prefix}_BASE_URL") or "").strip()
-            if name.lower() == "anspire" and not base_url:
-                base_url = (
-                    effective_map.get("ANSPIRE_LLM_BASE_URL")
-                    or ANSPIRE_LLM_BASE_URL_DEFAULT
-                ).strip()
-            protocol = (effective_map.get(f"{prefix}_PROTOCOL") or "").strip()
-            if name.lower() == "anspire" and not protocol:
-                protocol = "openai"
+            protocol, base_url = llm_channel_map.resolve_connection_transport(
+                effective_map,
+                name,
+            )
             api_key = (
                 (effective_map.get(f"{prefix}_API_KEYS") or "").strip()
                 or (effective_map.get(f"{prefix}_API_KEY") or "").strip()

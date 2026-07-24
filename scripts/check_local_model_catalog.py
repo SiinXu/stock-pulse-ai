@@ -74,7 +74,7 @@ def ensure_desktop_consumes_catalog() -> None:
 
     consumer_expectations = {
         "apps/dsa-desktop/main.js": "loadDesktopLocalModelPresets",
-        "apps/dsa-desktop/model-preload.js": "--stockpulse-local-model-presets=",
+        "apps/dsa-desktop/preload.js": "stockPulseLocalModels",
     }
     for relative_path, expected in consumer_expectations.items():
         content = (ROOT / relative_path).read_text(encoding="utf-8")
@@ -83,6 +83,17 @@ def ensure_desktop_consumes_catalog() -> None:
         for tag in EXPECTED_DESKTOP_TAGS:
             if tag in content:
                 fail(f"{relative_path} duplicates catalog tag {tag!r}")
+
+    retired_paths = (
+        "apps/dsa-desktop/model-preload.js",
+        "apps/dsa-desktop/renderer/local-models.html",
+        "apps/dsa-desktop/renderer/local-models.js",
+    )
+    for relative_path in retired_paths:
+        if (ROOT / relative_path).exists():
+            fail(f"retired standalone local-model surface still exists: {relative_path}")
+    if "model-preload.js" in build.get("files", []):
+        fail("desktop package still includes the retired model-preload.js")
 
 
 def ensure_backend_packages_catalog() -> None:

@@ -11,6 +11,7 @@ import { IntelligentImport } from '../../components/settings/IntelligentImport';
 import { IntelligenceSourcesPanel } from '../../components/settings/IntelligenceSourcesPanel';
 import { LLMChannelEditor } from '../../components/settings/LLMChannelEditor';
 import { LLMConfigModeBanner } from '../../components/settings/LLMConfigModeBanner';
+import { LocalModelsPanel } from '../../components/settings/LocalModelsPanel';
 import { ModelFallbackEditor } from '../../components/settings/ModelFallbackEditor';
 import { ModelMultiSelect } from '../../components/settings/ModelMultiSelect';
 import { MultiSelectDropdown } from '../../components/settings/MultiSelectDropdown';
@@ -222,6 +223,11 @@ const LLMConfigModeBannerStory = () => {
     issues: scenario === 'error' ? [{ key: 'LLM_CONFIG_MODE', code: 'fixture', severity: 'error', message: text.error }] : [],
   };
   return <LLMConfigModeBanner status={status} configVersion="fixture-v1" onMigrated={() => undefined} />;
+};
+
+const LocalModelsPanelStory = () => {
+  const { language } = useStoryText();
+  return <LocalModelsPanel language={language} />;
 };
 
 const ModelFallbackEditorStory = () => {
@@ -463,6 +469,7 @@ export const SETTINGS_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'intelligence-sources-panel': IntelligenceSourcesPanel,
   'llm-channel-editor': LLMChannelEditorStory,
   'llm-config-mode-banner': LLMConfigModeBannerStory,
+  'local-models-panel': LocalModelsPanelStory,
   'model-fallback-editor': ModelFallbackEditorStory,
   'model-multi-select': ModelMultiSelectStory,
   'multi-select-dropdown': MultiSelectDropdownStory,

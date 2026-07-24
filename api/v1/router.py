@@ -22,6 +22,7 @@ from api.v1.endpoints import (
     health,
     history,
     intelligence,
+    local_models,
     portfolio,
     scorecard,
     stocks,
@@ -109,6 +110,12 @@ router.include_router(
     intelligence.router,
     prefix="/intelligence",
     tags=["Intelligence"]
+)
+
+router.include_router(
+    local_models.router,
+    prefix="/local-models",
+    tags=["LocalModels"],
 )
 
 router.include_router(
