@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Set
 
 from src.data.stock_index_loader import get_stock_symbol_index_set
-from src.services.stock_code_utils import canonicalize_analysis_stock_code
+from src.services.stock_list_parser import normalize_stock_codes
 
 
 SWITCH_CLEANUP_KEYS = {
@@ -294,7 +294,8 @@ def _normalize_stock_code(value: Any) -> str:
     text = value.strip()
     if not text:
         return ""
-    return canonicalize_analysis_stock_code(text) or ""
+    normalized = normalize_stock_codes([text])
+    return normalized[0] if normalized else ""
 
 
 def _is_denied_candidate(

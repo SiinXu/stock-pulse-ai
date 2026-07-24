@@ -119,6 +119,7 @@ EXPECTED_ARGUMENT_DEFAULTS = {
     "no_notify": False,
     "no_run_immediately": False,
     "port": None,
+    "portfolio": None,
     "schedule": False,
     "serve": False,
     "serve_only": False,
@@ -206,6 +207,7 @@ def test_moved_cli_functions_keep_facade_metadata_and_globals() -> None:
     (
         (["main.py"], {}),
         (["main.py", "--dry-run"], {"dry_run": True}),
+        (["main.py", "--portfolio", "futu"], {"portfolio": "futu"}),
         (
             ["main.py", "--serve-only", "--host", "0.0.0.0", "--port", "9000"],
             {"serve_only": True, "host": "0.0.0.0", "port": 9000},
@@ -251,10 +253,10 @@ def test_help_output_remains_byte_identical() -> None:
     )
 
     assert result.returncode == 0, result.stderr.decode()
-    assert len(result.stdout.decode()) == 2148
-    assert len(result.stdout) == 3004
+    assert len(result.stdout.decode()) == 2284
+    assert len(result.stdout) == 3208
     assert hashlib.sha256(result.stdout).hexdigest() == (
-        "a381c5aa8b121a2f38380f0d33bf85a92b0e47a711f7d60eeb43da805ea5e26d"
+        "f11311a6d51d8170fb8637984c8f5c585299ba98f770ec3aebf5d2707d8dcef2"
     )
 
 
