@@ -463,8 +463,11 @@ describe('localModelTransport', () => {
       appliedCount: 1,
       skippedMaskedCount: 0,
       reloadTriggered: true,
+      recoveryToken: 'recovery-1',
     };
     api.unregister.mockResolvedValue(mutation);
+    const finalized = { ...mutation, deleted: true };
+    api.finalizeUnregistration.mockResolvedValue(finalized);
     vi.mocked(bridge.remove).mockResolvedValue({
       ok: false,
       error: 'delete-failed',
@@ -478,8 +481,12 @@ describe('localModelTransport', () => {
 
     await expect(
       __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
-    ).rejects.toMatchObject({ code: 'delete-failed' });
+    ).resolves.toEqual(finalized);
     expect(api.restoreRegistration).not.toHaveBeenCalled();
+    expect(api.finalizeUnregistration).toHaveBeenCalledWith(
+      'qwen3:4b',
+      'recovery-1',
+    );
   });
 
   it('does not create registration while recovering an externally installed model', async () => {

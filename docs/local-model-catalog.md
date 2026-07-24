@@ -204,8 +204,9 @@ configuration and rejects activation or unregistration when either snapshot
 value changed during the operation. While a Desktop deletion recovery is
 pending, the backend reserves that model against concurrent local-model
 registration. Successful weight deletion retries recovery revocation once. If
-acknowledgement remains unavailable, the token cannot restore weights that the
-original runtime no longer reports and expires after its short TTL.
+acknowledgement remains unavailable, deletion still succeeds, but the token
+cannot restore weights that the original runtime no longer reports and expires
+after its short TTL.
 
 Run `python scripts/check_local_model_catalog.py` after every catalog or desktop
 packaging change.

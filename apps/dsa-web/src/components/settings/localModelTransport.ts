@@ -343,7 +343,7 @@ function createDesktopTransport(bridge: DesktopLocalModelBridge): LocalModelTran
               );
             }
           } else if (configuration.recoveryToken) {
-            await finalizeDeletedRegistration(
+            return finalizeDeletedRegistration(
               modelId,
               configuration.recoveryToken,
               configuration,
