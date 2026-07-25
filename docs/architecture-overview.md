@@ -93,7 +93,7 @@ path-filter, container-smoke, and reference-update coverage.
 
 | Area | Owns | Does not own |
 | --- | --- | --- |
-| `src/application_services.py` | Lazy access to Config, DatabaseManager, SearchService, and AnalysisTaskQueue plus explicit injection | Full dependency injection for every caller; adoption is currently incremental. |
+| `src/application_services.py` | Lazy access to Config, DatabaseManager, SearchService, and AnalysisTaskQueue; process plugin lifecycle and root-owned extension adapters/catalogs; explicit injection | Full dependency injection for every caller; adoption is currently incremental. |
 | `src/services/` | Application use cases, task queue adapter, scheduling, analysis, history, portfolio, alerts, intelligence, and rendering services | HTTP transport schemas or provider-specific normalization. |
 | `src/core/pipeline.py` and `src/core/stages/` | Analysis orchestration, typed stage outcomes, analysis stages, rendering, and dispatch sequencing | Transport lifecycle or persistent query APIs. |
 | `data_provider/` | Market/provider adapters, capability routing, normalization, layered daily caching, priority fallback, health, and circuit control | Product task lifecycle or report presentation. |
