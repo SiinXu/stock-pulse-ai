@@ -80,7 +80,7 @@ def _observation(**overrides: Any) -> CommunityIntelObservation:
             CommunityIntelCitation(
                 source_id="fixture_forum",
                 reference_id="thread-101",
-                url="https://example.invalid/community/thread-101",
+                url="https://community.example.com/thread-101",
             ),
         ),
         "gaps": (),
@@ -132,6 +132,23 @@ def test_scope_deny_occurs_before_provider_dispatch() -> None:
     assert result["ok"] is False
     assert result["error"]["code"] == "stock_scope_violation"
     assert provider.calls == []
+
+
+@pytest.mark.parametrize("stock_code", ["HK00700", "hk700", "00700.HK", "00700"])
+def test_hk_aliases_stay_canonical_after_scope_authorization(stock_code: str) -> None:
+    provider = _Provider(_observation(stock_code="HK00700"))
+    session = _session(provider, expected_stock_code="HK00700")
+
+    result = session.execute(
+        COMMUNITY_INTEL_TOOL_NAME,
+        {"stock_code": stock_code, "window_days": 7, "language_hint": "en"},
+    )
+
+    assert result["ok"] is True
+    assert provider.calls == [
+        {"stock_code": "HK00700", "window_days": 7, "language_hint": "en"}
+    ]
+    assert result["result"]["stock_code"] == "HK00700"
 
 
 def test_tool_surface_timeout_is_typed_and_late_result_is_not_published() -> None:
@@ -187,6 +204,26 @@ def test_invalid_provider_output_returns_typed_degradation(invalid_result: Any) 
     assert result["result"]["reason_code"] == "invalid_provider_output"
 
 
+def test_constructed_observation_rejects_raw_nested_citation_mapping() -> None:
+    observation = _observation().model_copy(
+        update={
+            "citations": (
+                {
+                    "source_id": "fixture_forum",
+                    "reference_id": "raw-nested-reference",
+                    "url": "https://community.example.com/raw-reference",
+                },
+            )
+        }
+    )
+
+    _, result = _execute(_Provider(observation))
+
+    assert result["ok"] is True
+    assert result["result"]["reason_code"] == "invalid_provider_output"
+    assert "raw-reference" not in result["result_text"]
+
+
 def test_provider_cannot_change_stock_window_or_language_scope() -> None:
     _, result = _execute(_Provider(_observation(stock_code="MSFT")))
     assert result["result"]["reason_code"] == "invalid_provider_output"
@@ -211,7 +248,7 @@ def test_result_redacts_secrets_from_text_and_citation_url() -> None:
                     CommunityIntelCitation(
                         source_id="fixture_forum",
                         reference_id=f"post-{secret}",
-                        url=f"https://example.invalid/post?api_key={secret}",
+                        url=f"https://community.example.com/post?api_key={secret}",
                     ),
                 ),
             )
@@ -220,6 +257,86 @@ def test_result_redacts_secrets_from_text_and_citation_url() -> None:
     assert secret not in result["result_text"]
     assert result["result"]["citations"][0]["url"] is None
     assert result["result"]["reason_code"] == "partial_coverage"
+
+
+@pytest.mark.parametrize(
+    "citation_url",
+    [
+        "http://127.0.0.1:8000/admin?view=1",
+        "http://169.254.169.254/latest/meta-data/",
+        "http://metadata.google.internal/computeMetadata/v1/",
+        "http://service.local/private",
+        "http://[::1]/admin",
+        "http://intranet/admin",
+        "http://service.internal/private",
+        "http://router.home.arpa/status",
+        "https://fixture.invalid/reference",
+        "https://fixture.test/reference",
+        "https://fixture.example/reference",
+        "https://hidden.onion/reference",
+        "https://service.alt/reference",
+        "https://service.corp/reference",
+        "https://router.home/reference",
+        "https://gateway.mail/reference",
+        "https://resolver.arpa/reference",
+        "https://ipv4only.arpa/reference",
+        "https://1.10.in-addr.arpa/reference",
+        "https://1.168.192.in-addr.arpa/reference",
+        "https://d.f.ip6.arpa/reference",
+    ],
+)
+def test_bound_session_rejects_non_public_citation_targets_even_if_allowlisted(
+    monkeypatch: pytest.MonkeyPatch,
+    citation_url: str,
+) -> None:
+    monkeypatch.setenv(
+        "OUTBOUND_HTTP_ALLOWLIST",
+        "127.0.0.1:8000,169.254.169.254,metadata.google.internal,service.local,::1,"
+        "intranet,service.internal,router.home.arpa,fixture.invalid,fixture.test,"
+        "fixture.example,hidden.onion,service.alt,service.corp,router.home,gateway.mail,"
+        "resolver.arpa,ipv4only.arpa,1.10.in-addr.arpa,1.168.192.in-addr.arpa,d.f.ip6.arpa",
+    )
+    unsafe_citation = CommunityIntelCitation.model_construct(
+        source_id="fixture_forum",
+        reference_id="internal-reference",
+        url=citation_url,
+    )
+    observation = _observation().model_copy(
+        update={"citations": (unsafe_citation,)},
+    )
+
+    _, result = _execute(_Provider(observation))
+
+    assert result["ok"] is True
+    assert result["result"]["reason_code"] == "invalid_provider_output"
+    assert citation_url not in result["result_text"]
+
+
+def test_redacted_citation_reserves_a_deterministic_capped_gap_slot() -> None:
+    provider_gaps = tuple(f"provider_gap_{index}" for index in range(8))
+    secret = "sk_live_abcdefghijklmnop"
+
+    _, result = _execute(
+        _Provider(
+            _observation(
+                citations=(
+                    CommunityIntelCitation(
+                        source_id="fixture_forum",
+                        reference_id="thread-101",
+                        url=f"https://community.example.com/post?api_key={secret}",
+                    ),
+                ),
+                gaps=provider_gaps,
+            )
+        )
+    )
+
+    assert result["ok"] is True
+    assert result["result"]["citations"][0]["url"] is None
+    assert result["result"]["gaps"] == [
+        *provider_gaps[:7],
+        "citation_url_redacted",
+    ]
 
 
 def test_argument_bounds_reject_before_provider_dispatch() -> None:
@@ -242,3 +359,45 @@ def test_result_is_strict_json_without_raw_provider_objects() -> None:
     _, result = _execute(_Provider(_observation()))
     decoded = json.loads(result["result_text"])
     assert decoded == result["result"]
+
+
+def test_maximum_valid_observation_exceeding_eight_kib_degrades() -> None:
+    coverage = tuple(
+        CommunityIntelCoverage(
+            source_id=f"source_{index}",
+            status="available",
+            as_of="2026-07-24T12:00:00Z",
+        )
+        for index in range(4)
+    )
+    citations = tuple(
+        CommunityIntelCitation(
+            source_id=f"source_{index % 4}",
+            reference_id=(f"reference {index} " + "market evidence " * 12)[:160],
+            url=(
+                f"https://source-{index}.example.com/"
+                + "market/discussion/topic/" * 19
+                + str(index)
+            )[:500],
+        )
+        for index in range(6)
+    )
+    observation = _observation(
+        summary=("Balanced market discussion with bounded evidence. " * 30)[:1200],
+        confidence_basis=("Multiple bounded sources support this assessment. " * 6)[:240],
+        themes=tuple(
+            (f"theme {index} " + "market discussion " * 5)[:80]
+            for index in range(8)
+        ),
+        coverage=coverage,
+        citations=citations,
+        gaps=tuple(
+            (f"gap {index} " + "source coverage remains incomplete " * 4)[:120]
+            for index in range(8)
+        ),
+    )
+
+    _, result = _execute(_Provider(observation))
+
+    assert result["ok"] is True
+    assert result["result"]["reason_code"] == "output_too_large"

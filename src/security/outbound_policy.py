@@ -16,6 +16,7 @@ from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Tuple
 from urllib.parse import urljoin, urlsplit
 
 import requests
+import tldextract
 
 from src.utils.sanitize import sanitize_diagnostic_text
 
@@ -32,6 +33,12 @@ _METADATA_HOSTS = frozenset(
         "metadata.azure.internal",
         "metadata.google.internal",
     }
+)
+# Reference validation uses only the dependency's bundled PSL snapshot and has
+# no cache directory, remote refresh, DNS lookup, or request side effect.
+_PUBLIC_SUFFIX_EXTRACTOR = tldextract.TLDExtract(
+    cache_dir=None,
+    suffix_list_urls=(),
 )
 _METADATA_IPS = frozenset(
     {
@@ -360,6 +367,49 @@ def validate_outbound_url(
     except OSError:
         _reject_target("dns_resolution_failed", target)
     _validate_addrinfos(addr_infos, target)
+    return target
+
+
+def _has_public_reference_hostname_syntax(hostname: str) -> bool:
+    if len(hostname) > 253 or "." not in hostname:
+        return False
+    labels = hostname.split(".")
+    return all(
+        label
+        and len(label) <= 63
+        and label[0].isalnum()
+        and label[-1].isalnum()
+        and all(char.isascii() and (char.isalnum() or char == "-") for char in label)
+        for label in labels
+    )
+
+
+def _has_public_reference_suffix(hostname: str) -> bool:
+    if (
+        hostname == "arpa"
+        or hostname.endswith(".arpa")
+        or hostname == "onion"
+        or hostname.endswith(".onion")
+    ):
+        return False
+    return bool(_PUBLIC_SUFFIX_EXTRACTOR(hostname).suffix)
+
+
+def validate_public_reference_url(raw_url: str) -> OutboundTarget:
+    """Validate a network-free HTTP(S) reference against public namespaces.
+
+    This helper deliberately ignores the operator allowlist and does not resolve
+    DNS. It establishes static reference eligibility, not current reachability.
+    """
+
+    target = _inspect_target(raw_url, allowlist=())
+    if target.literal_ip is not None:
+        return target
+    if (
+        not _has_public_reference_hostname_syntax(target.hostname)
+        or not _has_public_reference_suffix(target.hostname)
+    ):
+        _reject_target("non_public_hostname", target)
     return target
 
 

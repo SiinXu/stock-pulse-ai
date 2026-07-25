@@ -11,6 +11,7 @@ from src.security.outbound_policy import (
     safe_post,
     safe_request,
     validate_outbound_url,
+    validate_public_reference_url,
 )
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "safe_post",
     "safe_request",
     "validate_outbound_url",
+    "validate_public_reference_url",
 ]

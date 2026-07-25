@@ -35,7 +35,7 @@ limit, or cost behavior.
 
 | Field | Contract |
 | --- | --- |
-| `stock_code` | Required provider-portable stock value; it must also match the frozen analysis stock scope |
+| `stock_code` | Required provider-portable stock value; it must also match the frozen analysis stock scope, and accepted HK prefix/suffix/bare aliases are projected through the same ToolSurface canonical identity |
 | `window_days` | Optional integer, default `7`, minimum `1`, hard maximum `30` |
 | `language_hint` | Optional `en` or `zh`, default `en` |
 
@@ -62,14 +62,29 @@ same strict shape:
 Provider observations use immutable Pydantic v2 models with strict types,
 forbidden extra fields, finite confidence bounds, timezone-aware ordered
 timestamps, unique source coverage, and citations tied to a covered source.
+The handler revalidates the complete observation and every nested evidence
+model before projection, including instances created through unchecked model
+construction helpers.
 The tool rejects a mapping, free-form text, raw post list, mismatched stock,
 mismatched window, or mismatched language as invalid provider output.
 
 Prompt-facing strings pass through the central sensitive-data sanitizer.
-Counts and field lengths are capped, and the complete serialized result has an
-8 KiB hard limit. A citation URL replaced by the sanitizer is omitted while its
-safe source/reference id is retained and `citation_url_redacted` is recorded as
-an evidence gap.
+Citation URLs must also pass the central deterministic public-reference check
+without using an operator allowlist or DNS lookup. The check rejects private or
+restricted literal addresses, single-label hostnames, invalid hostname syntax,
+A hostname must have a suffix recognized by the pinned `tldextract` bundled
+Public Suffix List snapshot; unknown and private-use suffixes such as `.corp`,
+`.home`, `.mail`, `.internal`, `.local`, `.invalid`, `.test`, `.example`, and
+`.alt` fail closed. The `.arpa` infrastructure/reverse tree and `.onion` remain
+explicitly ineligible even though the snapshot recognizes them. This validation
+does not refresh the snapshot, write a cache, resolve DNS, or make an HTTP
+request. It establishes static namespace eligibility rather than current DNS
+reachability. Counts and field lengths are capped, and the complete serialized
+result has an 8 KiB hard limit.
+A citation URL replaced by the sanitizer is omitted while its safe
+source/reference id is retained. The capped gap list always reserves its final
+slot for `citation_url_redacted`, dropping the last provider-supplied gap when
+all eight slots were already occupied.
 
 ## Degradation Contract
 
@@ -121,9 +136,11 @@ Every result includes:
 ## Verification And Rollback
 
 Deterministic tests cover allowed execution, real stock-scope denial before
-provider dispatch, hard ToolSurface timeout, provider timeout, empty/no-key
-states, provider failure, invalid output, redaction, payload size, strict JSON,
-and absence from the default catalog. Tests do not access a real provider.
+provider dispatch, HK alias canonicalization after authorization, hard
+ToolSurface timeout, provider timeout, empty/no-key states, provider failure,
+invalid and non-public citation output, redaction with a full gap list, payload
+size, strict JSON, and absence from the default catalog. Tests do not access a
+real provider.
 
 Rollback is a revert of the Phase A pull request. There is no database
 migration, configuration value, remote data, default registry entry, API
