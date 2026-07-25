@@ -912,6 +912,28 @@ class AnalysisTaskQueue:
         for task_id in task_ids:
             future = self.executor.submit(self._execute_command, task_id)
             self._futures[task_id] = future
+            callback = self._commands[task_id].on_done
+            if callback is not None:
+                future.add_done_callback(
+                    lambda _future, on_done=callback: self._run_completion_cleanup(
+                        on_done
+                    )
+                )
+
+    @staticmethod
+    def _run_completion_cleanup(callback: Callable[[], Any]) -> None:
+        """Run resource cleanup without changing the command's terminal state."""
+        try:
+            callback()
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate cleanup failures
+            log_safe_exception(
+                logger,
+                "Task completion cleanup failed",
+                exc,
+                error_code="task_completion_cleanup_failed",
+                level=logging.WARNING,
+                exception_redaction_values=exception_chain_redaction_values(exc),
+            )
 
     def submit(self, command: TaskCommand) -> str:
         """Submit one immutable command through the canonical execution port."""

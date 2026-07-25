@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Docs] Added verified local-model sizes, RAM tiers, upstream repositories, license conclusions, GGUF conversion guidance, distribution boundaries, and Ollama configuration.
 - [Added] An optional, default-off Kronos K-line forecasting Agent Tool with isolated dependencies, eagerly validated local-only weights, strict scoped input/default bounds, probabilistic direction and volatility output, and mandatory investment-risk disclosure.
 - [Fixed] Enforced strict Kronos state-dict loading and lossless, provider-portable Agent Tool plugin definitions before registration.
+- [Added] Added a versioned data-only Model Pack format, integrity-checked offline GGUF import through Web and Desktop Ollama transports, deterministic release packaging, and actionable validation/runtime failure guidance.
 - [Fixed] Bundled `constraints.txt` / `build-constraints.txt` into the packaged desktop backend and resolved them from `sys._MEIPASS`, so the AlphaSift repair install pins runtime and PEP 517 build dependencies on the desktop artifact too instead of degrading to `--no-deps` only.
 - [Added] Bundled a pinned, checksum-verified Ollama runtime with Windows x64 and macOS desktop packages, preserving system Ollama precedence while isolating embedded model data and retaining it across managed Windows updates.
 - [Fixed] Prevented Windows API and desktop startup from hanging on a cold MIME database by initializing built-in mappings without scanning the registry before registering frontend asset types.

@@ -24,6 +24,7 @@ from api.v1.endpoints import (
     investment_framework,
     intelligence,
     local_models,
+    model_packs,
     portfolio,
     scheduled_tasks,
     scorecard,
@@ -143,6 +144,12 @@ router.include_router(
     scheduled_tasks.router,
     prefix="/scheduled-tasks",
     tags=["ScheduledTasks"]
+)
+
+router.include_router(
+    model_packs.router,
+    prefix="/model-packs",
+    tags=["ModelPacks"],
 )
 
 router.include_router(

@@ -3,6 +3,7 @@
 
 import asyncio
 import gc
+import logging
 import sys
 import threading
 import time
@@ -390,6 +391,32 @@ def test_worker_claimed_prestart_cancel_runs_cleanup(task_queue) -> None:
     assert task_id not in task_queue._futures
     assert task_id not in task_queue._event_history
     assert task_id not in task_queue._task_idempotency_keys
+
+
+def test_on_done_failure_cannot_change_terminal_state(task_queue, caplog) -> None:
+    task_queue._executor = SynchronousExecutor()
+
+    def fail_cleanup() -> None:
+        raise RuntimeError("private cleanup detail")
+
+    with caplog.at_level(logging.WARNING):
+        task_id = task_queue.submit(
+            TaskCommand(
+                kind="cleanup_failure",
+                run=lambda _context: {"result_ref": "kept"},
+                on_done=fail_cleanup,
+            )
+        )
+
+    snapshot = task_queue.get(task_id)
+    assert snapshot.status == TaskStatus.COMPLETED
+    assert snapshot.result_ref == "kept"
+    assert "Task completion cleanup failed" in caplog.text
+    assert "private cleanup detail" not in caplog.text
+    terminal_events = [
+        event for event in task_queue._event_history[task_id] if event.terminal
+    ]
+    assert [event.type for event in terminal_events] == [TaskEventType.COMPLETED]
 
 
 def test_concurrent_cancel_callers_keep_claimed_task_pinned_until_snapshots(

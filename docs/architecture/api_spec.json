@@ -2679,22 +2679,22 @@
               }
             }
           },
-          "401": {
-            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "400": {
             "description": "历史报告不适用或持久化被风控阻断",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DecisionSignalReassessErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3155,16 +3155,6 @@
             },
             "description": "Bad Request"
           },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Internal Server Error"
-          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -3174,6 +3164,16 @@
                 }
               }
             }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         }
       },
@@ -3225,16 +3225,6 @@
               }
             }
           },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Internal Server Error"
-          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -3244,6 +3234,16 @@
                 }
               }
             }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         }
       }
@@ -3291,16 +3291,6 @@
             },
             "description": "Bad Request"
           },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Internal Server Error"
-          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -3310,6 +3300,16 @@
                 }
               }
             }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         }
       }
@@ -3354,16 +3354,6 @@
             },
             "description": "Not Found"
           },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Internal Server Error"
-          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -3373,6 +3363,16 @@
                 }
               }
             }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         }
       }
@@ -3427,16 +3427,6 @@
             },
             "description": "Conflict"
           },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Internal Server Error"
-          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -3446,6 +3436,16 @@
                 }
               }
             }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         }
       }
@@ -3500,16 +3500,6 @@
             },
             "description": "Conflict"
           },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Internal Server Error"
-          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -3519,6 +3509,16 @@
                 }
               }
             }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         }
       }
@@ -3575,16 +3575,6 @@
             },
             "description": "Not Found"
           },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Internal Server Error"
-          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -3594,6 +3584,16 @@
                 }
               }
             }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         }
       }
@@ -3825,16 +3825,6 @@
             },
             "description": "Conflict"
           },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Internal Server Error"
-          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -3844,6 +3834,16 @@
                 }
               }
             }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         }
       },
@@ -3943,16 +3943,6 @@
             },
             "description": "Conflict"
           },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Internal Server Error"
-          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -3962,6 +3952,16 @@
                 }
               }
             }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         }
       },
@@ -4014,16 +4014,6 @@
             },
             "description": "Conflict"
           },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Internal Server Error"
-          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -4033,6 +4023,16 @@
                 }
               }
             }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         }
       }
@@ -4136,8 +4136,175 @@
               }
             }
           },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/model-packs/import": {
+      "post": {
+        "tags": [
+          "ModelPacks"
+        ],
+        "summary": "Import a local Model Pack",
+        "description": "Stage a Model Pack for background validation and import. The Ollama target is read only from server configuration.",
+        "operationId": "import_model_pack_api_v1_model_packs_import_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_model_pack_api_v1_model_packs_import_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Model Pack import accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelPackImportAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid upload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Upload exceeds the bounded staging limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "507": {
+            "description": "Insufficient staging disk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/model-packs/desktop-activations": {
+      "post": {
+        "tags": [
+          "ModelPacks"
+        ],
+        "summary": "Activate a Desktop-validated Model Pack",
+        "description": "Register a model created by the isolated Desktop importer against an immutable server-owned configuration and runtime snapshot.",
+        "operationId": "activate_desktop_model_pack_api_v1_model_packs_desktop_activations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelPackDesktopActivationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalModelMutationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/model-packs/imports/{task_id}": {
+      "get": {
+        "tags": [
+          "ModelPacks"
+        ],
+        "summary": "Get Model Pack import status",
+        "description": "Return one Model Pack import projected through the shared task contract.",
+        "operationId": "get_model_pack_import_api_v1_model_packs_imports__task_id__get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Model Pack import status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelPackImportStatus"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Import task not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -4291,7 +4458,7 @@
         "properties": {
           "expected_revision": {
             "type": "integer",
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Expected Revision"
           }
         },
@@ -4390,12 +4557,12 @@
           },
           "framework_id": {
             "type": "integer",
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Framework Id"
           },
           "deleted_through_version": {
             "type": "integer",
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Deleted Through Version"
           }
         },
@@ -4418,8 +4585,8 @@
           },
           "weight": {
             "type": "number",
-            "maximum": 100.0,
-            "minimum": 0.0,
+            "maximum": 100,
+            "minimum": 0,
             "title": "Weight"
           },
           "criteria": {
@@ -4459,7 +4626,7 @@
         "properties": {
           "version": {
             "type": "integer",
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Version"
           },
           "is_active": {
@@ -4500,19 +4667,19 @@
         "properties": {
           "framework_id": {
             "type": "integer",
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Framework Id"
           },
           "latest_version": {
             "type": "integer",
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Latest Version"
           },
           "active_version": {
             "anyOf": [
               {
                 "type": "integer",
-                "minimum": 1.0
+                "minimum": 1
               },
               {
                 "type": "null"
@@ -4522,7 +4689,7 @@
           },
           "revision": {
             "type": "integer",
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Revision"
           },
           "items": {
@@ -4534,7 +4701,7 @@
           },
           "total": {
             "type": "integer",
-            "minimum": 0.0,
+            "minimum": 0,
             "title": "Total"
           }
         },
@@ -4552,7 +4719,7 @@
         "properties": {
           "framework_id": {
             "type": "integer",
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Framework Id"
           },
           "scope": {
@@ -4562,14 +4729,14 @@
           },
           "version": {
             "type": "integer",
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Version"
           },
           "active_version": {
             "anyOf": [
               {
                 "type": "integer",
-                "minimum": 1.0
+                "minimum": 1
               },
               {
                 "type": "null"
@@ -4579,7 +4746,7 @@
           },
           "revision": {
             "type": "integer",
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Revision"
           },
           "is_active": {
@@ -4635,7 +4802,7 @@
         "properties": {
           "expected_revision": {
             "type": "integer",
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Expected Revision"
           },
           "content": {
@@ -9653,7 +9820,7 @@
         "properties": {
           "source_report_id": {
             "type": "integer",
-            "exclusiveMinimum": 0.0,
+            "exclusiveMinimum": 0,
             "title": "Source Report Id"
           },
           "decision_profile": {
@@ -9821,7 +9988,7 @@
           },
           "recommended_ram_gb": {
             "type": "integer",
-            "exclusiveMinimum": 0.0,
+            "exclusiveMinimum": 0,
             "title": "Recommended Ram Gb"
           },
           "license": {
@@ -10058,7 +10225,7 @@
           },
           "size_bytes": {
             "type": "integer",
-            "exclusiveMinimum": 0.0,
+            "exclusiveMinimum": 0,
             "title": "Size Bytes"
           },
           "source_kind": {
@@ -10134,7 +10301,7 @@
         "properties": {
           "model_id": {
             "type": "string",
-            "maxLength": 128,
+            "maxLength": 242,
             "minLength": 1,
             "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*(?::[A-Za-z0-9][A-Za-z0-9._-]*)?$",
             "title": "Model Id"
@@ -10180,6 +10347,13 @@
             "type": "string",
             "title": "Agent Model",
             "default": ""
+          },
+          "imported_models": {
+            "items": {
+              "$ref": "#/components/schemas/ImportedLocalModelMetadata"
+            },
+            "type": "array",
+            "title": "Imported Models"
           }
         },
         "type": "object",
@@ -10193,7 +10367,7 @@
         "properties": {
           "model_id": {
             "type": "string",
-            "maxLength": 128,
+            "maxLength": 242,
             "minLength": 1,
             "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*(?::[A-Za-z0-9][A-Za-z0-9._-]*)?$",
             "title": "Model Id"
@@ -10226,7 +10400,7 @@
         "properties": {
           "model_id": {
             "type": "string",
-            "maxLength": 128,
+            "maxLength": 242,
             "minLength": 1,
             "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*(?::[A-Za-z0-9][A-Za-z0-9._-]*)?$",
             "title": "Model Id"
@@ -10277,6 +10451,13 @@
             "type": "string",
             "title": "Agent Model",
             "default": ""
+          },
+          "imported_models": {
+            "items": {
+              "$ref": "#/components/schemas/ImportedLocalModelMetadata"
+            },
+            "type": "array",
+            "title": "Imported Models"
           },
           "success": {
             "type": "boolean",
@@ -10403,8 +10584,8 @@
           },
           "progress": {
             "type": "integer",
-            "maximum": 100.0,
-            "minimum": 0.0,
+            "maximum": 100,
+            "minimum": 0,
             "title": "Progress",
             "default": 0
           },
@@ -10447,7 +10628,7 @@
         "properties": {
           "model_id": {
             "type": "string",
-            "maxLength": 128,
+            "maxLength": 242,
             "minLength": 1,
             "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*(?::[A-Za-z0-9][A-Za-z0-9._-]*)?$",
             "title": "Model Id"
@@ -10472,7 +10653,7 @@
         "properties": {
           "model_id": {
             "type": "string",
-            "maxLength": 128,
+            "maxLength": 242,
             "minLength": 1,
             "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*(?::[A-Za-z0-9][A-Za-z0-9._-]*)?$",
             "title": "Model Id"
@@ -10548,6 +10729,13 @@
             "type": "string",
             "title": "Agent Model",
             "default": ""
+          },
+          "imported_models": {
+            "items": {
+              "$ref": "#/components/schemas/ImportedLocalModelMetadata"
+            },
+            "type": "array",
+            "title": "Imported Models"
           },
           "success": {
             "type": "boolean",
@@ -10751,8 +10939,8 @@
           },
           "max_attempts": {
             "type": "integer",
-            "maximum": 3.0,
-            "minimum": 1.0,
+            "maximum": 3,
+            "minimum": 1,
             "title": "Max Attempts",
             "default": 1
           }
@@ -11445,6 +11633,254 @@
             "minimum": 0
           }
         }
+      },
+      "Body_import_model_pack_api_v1_model_packs_import_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "description": "A .modelpack or ZIP archive"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_import_model_pack_api_v1_model_packs_import_post"
+      },
+      "ImportedLocalModelMetadata": {
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "maxLength": 242,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*(?::[A-Za-z0-9][A-Za-z0-9._-]*)?$",
+            "title": "Model Id"
+          },
+          "display_name": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Display Name"
+          },
+          "minimum_memory_gb": {
+            "type": "integer",
+            "maximum": 2048.0,
+            "minimum": 1.0,
+            "title": "Minimum Memory Gb"
+          },
+          "license_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "License Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model_id",
+          "display_name",
+          "minimum_memory_gb",
+          "license_id"
+        ],
+        "title": "ImportedLocalModelMetadata",
+        "description": "Validated Model Pack presentation fields for one configured runtime."
+      },
+      "ModelPackDesktopActivationRequest": {
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "maxLength": 242,
+            "minLength": 1,
+            "pattern": "^(?:[A-Za-z0-9_][A-Za-z0-9_-]{0,79}/)?[A-Za-z0-9_][A-Za-z0-9._-]{0,79}:[A-Za-z0-9_][A-Za-z0-9._-]{0,79}$",
+            "title": "Model Id"
+          },
+          "display_name": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Display Name"
+          },
+          "minimum_memory_gb": {
+            "type": "integer",
+            "maximum": 2048.0,
+            "minimum": 1.0,
+            "title": "Minimum Memory Gb"
+          },
+          "license_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9.+-]{0,127}$",
+            "title": "License Id"
+          },
+          "expected_config_version": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Expected Config Version"
+          },
+          "expected_runtime_identity": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 64,
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Expected Runtime Identity"
+          },
+          "desktop_attestation": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Desktop Attestation"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model_id",
+          "display_name",
+          "minimum_memory_gb",
+          "license_id",
+          "expected_config_version",
+          "expected_runtime_identity",
+          "desktop_attestation"
+        ],
+        "title": "ModelPackDesktopActivationRequest",
+        "description": "Manifest fields returned by the isolated Desktop validator."
+      },
+      "ModelPackImportAccepted": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "accepted"
+          },
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "message_code": {
+            "type": "string",
+            "title": "Message Code",
+            "default": "local_model.import.queued"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "message"
+        ],
+        "title": "ModelPackImportAccepted",
+        "description": "Accepted background Model Pack task."
+      },
+      "ModelPackImportResult": {
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "minimum_memory_gb": {
+            "type": "integer",
+            "title": "Minimum Memory Gb"
+          },
+          "license_id": {
+            "type": "string",
+            "title": "License Id"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "activated": {
+            "type": "boolean",
+            "title": "Activated"
+          },
+          "selected_primary": {
+            "type": "boolean",
+            "title": "Selected Primary",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "model_id",
+          "display_name",
+          "minimum_memory_gb",
+          "license_id",
+          "activated"
+        ],
+        "title": "ModelPackImportResult",
+        "description": "Completed Model Pack import result."
+      },
+      "ModelPackImportStatus": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatusEnum"
+          },
+          "progress": {
+            "type": "integer",
+            "maximum": 100,
+            "minimum": 0,
+            "title": "Progress"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelPackImportResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "status",
+          "progress"
+        ],
+        "title": "ModelPackImportStatus",
+        "description": "Canonical task status and optional completed import result."
       }
     },
     "securitySchemes": {

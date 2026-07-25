@@ -130,6 +130,7 @@ function transport(overrides: Partial<LocalModelTransport> = {}): LocalModelTran
     canControlRuntime: false,
     getRuntime: vi.fn().mockResolvedValue(AVAILABLE_RUNTIME),
     pull: vi.fn(),
+    importPack: vi.fn(),
     remove: vi.fn(),
     assign: vi.fn(),
     openInstallGuide: vi.fn(),
@@ -500,5 +501,132 @@ describe('LocalModelsPanel', () => {
     expect(await screen.findByText('Ollama is unavailable')).toBeInTheDocument();
     expect(screen.getByText('ollama pull qwen3:4b')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Download' })).toBeDisabled();
+  });
+
+  it('uploads a Model Pack from Web and renders unknown manifest metadata', async () => {
+    const importedRuntime: LocalModelRuntimeState = {
+      ...AVAILABLE_RUNTIME,
+      installedModels: ['licensed/finance:q4'],
+      configuration: {
+        ...AVAILABLE_RUNTIME.configuration,
+        configVersion: 'config-2',
+        registeredModels: ['licensed/finance:q4'],
+        importedModels: [{
+          modelId: 'licensed/finance:q4',
+          displayName: 'Licensed Finance Q4',
+          minimumMemoryGb: 16,
+          licenseId: 'LicenseRef-Finance',
+        }],
+      },
+    };
+    const importPack = vi.fn().mockImplementation(async (_file, onProgress) => {
+      onProgress({ modelId: '', percent: 80, status: 'creating' });
+      return {
+        modelId: 'licensed/finance:q4',
+        displayName: 'Licensed Finance Q4',
+        minimumMemoryGb: 16,
+        licenseId: 'LicenseRef-Finance',
+        warnings: ['extra'],
+        activated: true,
+        selectedPrimary: false,
+      };
+    });
+    createTransport.mockReturnValue(transport({
+      getRuntime: vi.fn()
+        .mockResolvedValueOnce(AVAILABLE_RUNTIME)
+        .mockResolvedValue(importedRuntime),
+      importPack,
+    }));
+
+    const view = renderPanel();
+    await screen.findByRole('button', { name: 'Import Model Pack' });
+    const input = view.container.querySelector('input[type="file"]');
+    const file = new File(['pack'], 'finance.modelpack', { type: 'application/zip' });
+    fireEvent.change(input as HTMLInputElement, { target: { files: [file] } });
+
+    expect(await screen.findByText(
+      'licensed/finance:q4 was verified, created, and registered.',
+    )).toBeInTheDocument();
+    expect(screen.getByText('Import completed, but 1 undeclared files were ignored.')).toBeInTheDocument();
+    const imported = screen.getByTestId('local-model-imported-licensed/finance:q4');
+    expect(within(imported).getByText('Licensed Finance Q4')).toBeInTheDocument();
+    expect(within(imported).getByText('LicenseRef-Finance')).toBeInTheDocument();
+    expect(importPack).toHaveBeenCalledWith(file, expect.any(Function), expect.any(AbortSignal));
+  });
+
+  it('keeps catalog presentation authoritative for an imported matching model', async () => {
+    createTransport.mockReturnValue(transport({
+      getRuntime: vi.fn().mockResolvedValue({
+        ...AVAILABLE_RUNTIME,
+        installedModels: ['qwen3:4b'],
+        configuration: {
+          ...AVAILABLE_RUNTIME.configuration,
+          registeredModels: ['qwen3:4b'],
+          importedModels: [{
+            modelId: 'qwen3:4b',
+            displayName: 'Untrusted replacement name',
+            minimumMemoryGb: 99,
+            licenseId: 'LicenseRef-Other',
+          }],
+        },
+      }),
+    }));
+
+    renderPanel();
+
+    expect(await screen.findByText('Qwen3 4B')).toBeInTheDocument();
+    expect(screen.queryByText('Untrusted replacement name')).not.toBeInTheDocument();
+    expect(screen.queryByText('Imported models')).not.toBeInTheDocument();
+  });
+
+  it('does not offer pullable-only deletion for a planned catalog import', async () => {
+    const plannedModelId = FINANCE_MODEL.install.plannedOllamaTag as string;
+    const remove = vi.fn();
+    createTransport.mockReturnValue(transport({
+      getRuntime: vi.fn().mockResolvedValue({
+        ...AVAILABLE_RUNTIME,
+        installedModels: [plannedModelId],
+        configuration: {
+          ...AVAILABLE_RUNTIME.configuration,
+          registeredModels: [plannedModelId],
+          importedModels: [{
+            modelId: plannedModelId,
+            displayName: 'Untrusted replacement name',
+            minimumMemoryGb: 99,
+            licenseId: 'LicenseRef-Other',
+          }],
+        },
+      }),
+      remove,
+    }));
+
+    renderPanel();
+
+    const finance = await screen.findByTestId('local-model-fin-r1-7b');
+    expect(within(finance).getByText('Fin-R1 7B')).toBeInTheDocument();
+    expect(within(finance).getByText('Installed')).toBeInTheDocument();
+    expect(within(finance).queryByRole('button', { name: 'Delete model' })).not.toBeInTheDocument();
+    expect(remove).not.toHaveBeenCalled();
+  });
+
+  it('maps Model Pack integrity failures to localized actionable copy', async () => {
+    createTransport.mockReturnValue(transport({
+      importPack: vi.fn().mockRejectedValue(new LocalModelTransportError(
+        'hash_mismatch',
+        'private path details',
+      )),
+    }));
+
+    const view = renderPanel();
+    await screen.findByRole('button', { name: 'Import Model Pack' });
+    const input = view.container.querySelector('input[type="file"]');
+    fireEvent.change(input as HTMLInputElement, {
+      target: { files: [new File(['pack'], 'bad.modelpack')] },
+    });
+
+    expect(await screen.findByText(
+      'Model Pack integrity verification failed. Do not use it; download it again from a trusted source.',
+    )).toBeInTheDocument();
+    expect(screen.queryByText('private path details')).not.toBeInTheDocument();
   });
 });

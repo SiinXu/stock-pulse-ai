@@ -1054,6 +1054,44 @@ test('buildBackendEnvironment extends macOS GUI PATH with Homebrew CLI directori
   assert.equal(env.DATABASE_PATH, '/tmp/dsa/data.db');
   assert.equal(env.LOG_DIR, '/tmp/dsa/logs');
   assert.equal(env.WEBUI_HOST, '127.0.0.1');
+  assert.match(env[mainModule.DESKTOP_MODEL_PACK_ATTESTATION_ENV], /^[0-9a-f]{64}$/);
+});
+
+test('Desktop Model Pack attestation binds validated metadata to one short-lived token', (t) => {
+  const mainModule = loadMainModule(t);
+  const secret = 'a'.repeat(64);
+  const nowMs = 1784966400000;
+  const token = mainModule.createDesktopModelPackAttestation({
+    modelId: 'licensed/finance:q4',
+    displayName: '\u00a0Licensed Finance Q4\u00a0',
+    minimumMemoryGb: 16,
+    licenseId: 'LicenseRef-Finance',
+    expectedConfigVersion: 'config-1',
+    expectedRuntimeIdentity: LOCAL_MODEL_RUNTIME_IDENTITY,
+  }, {
+    secret,
+    nowMs,
+    randomBytes: () => Buffer.from('b'.repeat(32), 'hex'),
+  });
+  const [encodedPayload, signature] = token.split('.');
+  const payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf-8'));
+
+  assert.equal(
+    signature,
+    crypto.createHmac('sha256', secret).update(encodedPayload, 'ascii').digest('hex')
+  );
+  assert.deepEqual(payload, {
+    version: 1,
+    issuedAt: nowMs,
+    expiresAt: nowMs + mainModule.DESKTOP_MODEL_PACK_ATTESTATION_TTL_MS,
+    nonce: 'b'.repeat(32),
+    modelId: 'licensed/finance:q4',
+    displayName: '\u00a0Licensed Finance Q4\u00a0',
+    minimumMemoryGb: 16,
+    licenseId: 'LicenseRef-Finance',
+    expectedConfigVersion: 'config-1',
+    expectedRuntimeIdentity: LOCAL_MODEL_RUNTIME_IDENTITY,
+  });
 });
 
 test('buildBackendEnvironment keeps non-macOS PATH unchanged', (t) => {
@@ -2999,6 +3037,7 @@ test('local model names accept curated tags and reject injection payloads', (t) 
     'deepseek-r1:8b',
     'qwen2.5-coder:7b',
     'stockpulse/fin-r1-7b:q4_k_m',
+    `${'n'.repeat(80)}/${'m'.repeat(80)}:${'t'.repeat(80)}`,
   ]) {
     assert.equal(mainModule.normalizeLocalModelName(valid), valid);
   }
@@ -3785,8 +3824,13 @@ test('local model IPC rejects foreign renderers and serves the main Web window',
   mainModule.__setLocalModelStateForTest(null);
 
   const detectHandler = mainModule.__getIpcMainHandler('desktop-local-model:detect');
+  const importHandler = mainModule.__getIpcMainHandler('desktop-local-model:import-pack');
   await assert.rejects(
     async () => detectHandler({ sender: { id: 'other' } }),
+    /Unauthorized local model IPC sender/
+  );
+  await assert.rejects(
+    async () => importHandler({ sender: { id: 'other' } }),
     /Unauthorized local model IPC sender/
   );
 
@@ -3810,6 +3854,91 @@ test('local model IPC rejects foreign renderers and serves the main Web window',
   await mainModule.stopManagedLocalModelRuntime();
   assert.equal(stateEvents.at(-1).channel, mainModule.DESKTOP_LOCAL_MODEL_STATE_EVENT);
   assert.equal(stateEvents.at(-1).payload.status, 'stopped');
+});
+
+test('desktop Model Pack picker supports an archive or unpacked directory', async (t) => {
+  const mainModule = loadMainModule(t);
+  const calls = [];
+  const dialogImpl = {
+    showMessageBox: async () => ({ response: calls.length === 0 ? 0 : 1 }),
+    showOpenDialog: async (_window, options) => {
+      calls.push(options);
+      return {
+        canceled: false,
+        filePaths: [options.properties[0] === 'openFile' ? '/safe/model.modelpack' : '/safe/model'],
+      };
+    },
+  };
+
+  assert.equal(
+    await mainModule.selectDesktopModelPackSource({ dialogImpl }),
+    '/safe/model.modelpack'
+  );
+  assert.equal(
+    await mainModule.selectDesktopModelPackSource({ dialogImpl }),
+    '/safe/model'
+  );
+  assert.deepEqual(calls[0].properties, ['openFile']);
+  assert.deepEqual(calls[0].filters, [
+    { name: 'Model Packs', extensions: ['modelpack', 'zip'] },
+  ]);
+  assert.deepEqual(calls[1].properties, ['openDirectory']);
+});
+
+test('desktop Model Pack import uses the trusted runtime snapshot without mutating config', async (t) => {
+  const mainModule = loadMainModule(t);
+  mainModule.__setLocalModelStateForTest(null);
+  const importCalls = [];
+  const result = await mainModule.importDesktopModelPack({
+    expectedConfigVersion: 'config-1',
+    selectSource: async () => '/safe/model.modelpack',
+    detectRuntime: async ({ baseUrl }) => ({
+      status: mainModule.DESKTOP_LOCAL_MODEL_STATUS.RUNNING,
+      installed: true,
+      installedModels: [],
+      managed: false,
+      baseUrl,
+      runtimeSource: mainModule.DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE.EXTERNAL_SERVICE,
+      runtimeBinary: null,
+    }),
+    resolveRuntimeBinary: async () => ({
+      command: '/trusted/ollama',
+      source: mainModule.DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE.SYSTEM,
+      rootDir: null,
+    }),
+    importPack: async (source, options) => {
+      importCalls.push({ source, options });
+      options.onProgress(35, 'Model Pack verified');
+      return {
+        modelId: 'licensed/finance:q4',
+        displayName: 'Licensed Finance Q4',
+        minimumMemoryGb: 16,
+        licenseId: 'LicenseRef-Finance',
+        warnings: [],
+      };
+    },
+    refreshState: async () => undefined,
+    createAttestation: (payload) => {
+      assert.equal(payload.expectedConfigVersion, 'config-1');
+      assert.equal(payload.expectedRuntimeIdentity, LOCAL_MODEL_RUNTIME_IDENTITY);
+      return 'desktop-attestation';
+    },
+  });
+
+  assert.equal(importCalls[0].source, '/safe/model.modelpack');
+  assert.equal(importCalls[0].options.runtimeCommand, '/trusted/ollama');
+  assert.equal(importCalls[0].options.env.OLLAMA_HOST, 'http://127.0.0.1:11434');
+  assert.deepEqual(result, {
+    ok: true,
+    modelId: 'licensed/finance:q4',
+    displayName: 'Licensed Finance Q4',
+    minimumMemoryGb: 16,
+    licenseId: 'LicenseRef-Finance',
+    warnings: [],
+    runtimeIdentity: LOCAL_MODEL_RUNTIME_IDENTITY,
+    desktopAttestation: 'desktop-attestation',
+  });
+  assert.equal(Object.hasOwn(result, 'source'), false);
 });
 
 test('desktop package retires the standalone model surface and keeps embedded runtime assets', () => {

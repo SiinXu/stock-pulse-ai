@@ -231,6 +231,11 @@ class TaskCommand:
         repr=False,
         compare=False,
     )
+    on_done: Optional[Callable[[], Any]] = field(
+        default=None,
+        repr=False,
+        compare=False,
+    )
 
     def __post_init__(self) -> None:
         kind = str(self.kind or "").strip()
@@ -240,6 +245,8 @@ class TaskCommand:
             raise TypeError("Task command run must be callable")
         if self.retry_factory is not None and not callable(self.retry_factory):
             raise TypeError("Task command retry_factory must be callable")
+        if self.on_done is not None and not callable(self.on_done):
+            raise TypeError("Task command on_done must be callable")
         if not _ERROR_CODE.fullmatch(str(self.failure_error_code or "")):
             raise ValueError("Task command failure_error_code is invalid")
         key = str(self.idempotency_key or "").strip()
@@ -277,6 +284,7 @@ class TaskCommand:
             trace_id=None,
             idempotency_key=uuid.uuid4().hex,
             idempotency_fingerprint="",
+            on_done=None,
         )
 
 
