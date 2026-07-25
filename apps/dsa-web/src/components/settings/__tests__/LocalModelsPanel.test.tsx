@@ -263,6 +263,120 @@ describe('LocalModelsPanel', () => {
     expect(onModelReady).toHaveBeenCalledWith('qwen3:8b');
   });
 
+  it('shows a non-destructive warning when deletion finalization is unconfirmed', async () => {
+    const installedRuntime: LocalModelRuntimeState = {
+      ...AVAILABLE_RUNTIME,
+      installedModels: ['qwen3:4b'],
+      configuration: {
+        ...AVAILABLE_RUNTIME.configuration,
+        registeredModels: ['qwen3:4b'],
+      },
+    };
+    const removedRuntime: LocalModelRuntimeState = {
+      ...installedRuntime,
+      installedModels: [],
+      configuration: {
+        ...installedRuntime.configuration,
+        configVersion: 'config-2',
+        registeredModels: [],
+      },
+    };
+    const remove = vi.fn().mockResolvedValue({
+      ...removedRuntime.configuration,
+      success: true,
+      modelId: 'qwen3:4b',
+      selectedPrimary: false,
+      selectedAgent: false,
+      deleted: true,
+      updatedKeys: ['LLM_OLLAMA_MODELS'],
+      warnings: ['local_model_delete_finalize_unconfirmed'],
+      appliedCount: 1,
+      skippedMaskedCount: 0,
+      reloadTriggered: true,
+    });
+    createTransport.mockReturnValue(transport({
+      getRuntime: vi.fn()
+        .mockResolvedValueOnce(installedRuntime)
+        .mockResolvedValue(removedRuntime),
+      remove,
+    }));
+
+    renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete model' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+    expect(await screen.findByText(
+      'The model was deleted, but final cleanup was not confirmed. Configuration changes may be briefly blocked; refresh and try again shortly.',
+    )).toBeInTheDocument();
+    expect(remove).toHaveBeenCalledWith('qwen3:4b');
+  });
+
+  it('keeps the explicit first-run selection when a different model is deleted', async () => {
+    getCatalog.mockResolvedValue({
+      schemaVersion: 1,
+      verifiedAt: '2026-07-23',
+      models: [GENERAL_MODEL, GENERAL_MODEL_8B, FINANCE_MODEL],
+    });
+    const installedRuntime: LocalModelRuntimeState = {
+      ...AVAILABLE_RUNTIME,
+      installedModels: ['qwen3:4b', 'qwen3:8b'],
+      configuration: {
+        ...AVAILABLE_RUNTIME.configuration,
+        registeredModels: ['qwen3:4b', 'qwen3:8b'],
+      },
+    };
+    const removedRuntime: LocalModelRuntimeState = {
+      ...installedRuntime,
+      installedModels: ['qwen3:8b'],
+      configuration: {
+        ...installedRuntime.configuration,
+        configVersion: 'config-2',
+        registeredModels: ['qwen3:8b'],
+      },
+    };
+    const remove = vi.fn().mockResolvedValue({
+      ...removedRuntime.configuration,
+      success: true,
+      modelId: 'qwen3:4b',
+      selectedPrimary: false,
+      selectedAgent: false,
+      deleted: true,
+      updatedKeys: ['LLM_OLLAMA_MODELS'],
+      warnings: [],
+      appliedCount: 1,
+      skippedMaskedCount: 0,
+      reloadTriggered: true,
+    });
+    createTransport.mockReturnValue(transport({
+      getRuntime: vi.fn()
+        .mockResolvedValueOnce(installedRuntime)
+        .mockResolvedValue(removedRuntime),
+      remove,
+    }));
+    const onModelReady = vi.fn();
+
+    renderPanel({
+      selectedModelId: 'qwen3:8b',
+      selectModelLabel: 'Select model',
+      selectedModelLabel: 'Selected model',
+      onModelReady,
+    });
+    const firstModel = await screen.findByTestId('local-model-qwen3-4b');
+    fireEvent.click(within(firstModel).getByRole('button', { name: 'Delete model' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+    await vi.waitFor(() => {
+      expect(remove).toHaveBeenCalledWith('qwen3:4b');
+      expect(within(firstModel).queryByRole('button', { name: 'Delete model' })).not.toBeInTheDocument();
+    });
+    const selectedModel = screen.getByTestId('local-model-qwen3-8b');
+    expect(within(selectedModel).getByRole('button', { name: 'Selected model' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(onModelReady).not.toHaveBeenCalled();
+  });
+
   it('marks a downloaded model ready without replacing the existing primary', async () => {
     const readyRuntime: LocalModelRuntimeState = {
       ...AVAILABLE_RUNTIME,

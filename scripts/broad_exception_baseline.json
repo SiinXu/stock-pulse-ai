@@ -20,7 +20,6 @@
     {"path":"api/v1/endpoints/analysis.py","scope":"<module>._load_sync_fundamental_sources","caught":["Exception"],"digest":"1f80a0f67cc47a61cfcba088f2502f2acd44c8c4ddda172e809f708694ac57c1"},
     {"path":"api/v1/endpoints/analysis.py","scope":"<module>.get_analysis_status","caught":["Exception"],"digest":"fb9d34b2ebb4e3ad523f5fd19f535c39347fa792484bc386a2184d66351c2521"},
     {"path":"api/v1/endpoints/auth.py","scope":"<module>._apply_auth_enabled","caught":["Exception"],"digest":"5a9c603247ec1f1e14a59ea5162fd90366b3a3b734686510cce1c5506045f135"},
-    {"path":"api/v1/endpoints/auth.py","scope":"<module>._apply_auth_enabled","caught":["Exception"],"digest":"adc5e874cd5a60f81c060ffeb23b3802b8e8bef93a4893bb020796bb4dcdbaf1"},
     {"path":"api/v1/endpoints/decision_signals.py","scope":"<module>.create_signal","caught":["Exception"],"digest":"f80d48d490bd78acac2e3e653b4319471199621f9a07e055178791b7b0effd08"},
     {"path":"api/v1/endpoints/decision_signals.py","scope":"<module>.get_feedback","caught":["Exception"],"digest":"b19dd59ca772c284f8f725941bf5986600f7405b4a11ae1358762c43b8f47bd1"},
     {"path":"api/v1/endpoints/decision_signals.py","scope":"<module>.get_latest_active","caught":["Exception"],"digest":"bda4fc604194aa33037774b3e213025a45bd5920337474a7682ed51947e47616"},

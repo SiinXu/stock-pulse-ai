@@ -145,6 +145,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
   const [activeOperation, setActiveOperation] = useState<ActiveOperation | null>(null);
   const [progress, setProgress] = useState<LocalModelProgress | null>(null);
   const [actionError, setActionError] = useState('');
+  const [actionWarning, setActionWarning] = useState('');
   const [manualCommand, setManualCommand] = useState('');
   const [copiedModel, setCopiedModel] = useState('');
   const [readyModel, setReadyModel] = useState('');
@@ -156,6 +157,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
     setIsLoading(true);
     setCatalogFailed(false);
     setActionError('');
+    setActionWarning('');
     try {
       const [catalog, nextRuntime] = await Promise.all([
         localModelsApi.getCatalog(),
@@ -218,7 +220,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
 
   useEffect(() => {
     const selected = selectedModelId.trim();
-    if (!selected || activeOperation !== null) return;
+    if (isLoading || runtime === null || !selected || activeOperation !== null) return;
     const selectedReady = models.some((model) => {
       const tag = model.install.ollamaTag;
       return Boolean(
@@ -238,9 +240,11 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
     configuration.agentModel,
     configuration.primaryModel,
     installedModels,
+    isLoading,
     models,
     onModelReady,
     registeredModels,
+    runtime,
     selectedModelId,
   ]);
 
@@ -338,12 +342,19 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
     setDeleteModel(null);
     setActiveOperation({ kind: 'delete', modelId });
     setActionError('');
+    setActionWarning('');
     try {
       const result = await transport.remove(modelId);
       await updateConfiguration(result);
       await refreshRuntime();
-      setReadyModel('');
-      onModelReady?.('');
+      setReadyModel((current) => current.toLowerCase() === modelId.toLowerCase() ? '' : current);
+      setPrimaryPromptModel((current) => current.toLowerCase() === modelId.toLowerCase() ? '' : current);
+      if (selectedModelId.trim().toLowerCase() === modelId.toLowerCase()) {
+        onModelReady?.('');
+      }
+      if (result.warnings.includes('local_model_delete_finalize_unconfirmed')) {
+        setActionWarning(text.deleteFinalizeUnconfirmed);
+      }
     } catch {
       setActionError(text.actionFailed);
     } finally {
@@ -664,6 +675,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
             )}
           />
         ) : null}
+        {actionWarning ? <InlineAlert variant="warning" message={actionWarning} /> : null}
         {actionError ? <InlineAlert variant="danger" message={actionError} /> : null}
         {manualCommand ? (
           <InlineAlert

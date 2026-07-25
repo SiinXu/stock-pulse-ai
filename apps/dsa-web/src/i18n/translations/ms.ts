@@ -3753,6 +3753,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.analysisWorkbench.viewReport": "Lihat laporan",
   "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.ai_models.views.local_models.label": "Local Models",
   "locales.settingsLocalModels.SETTINGS_LOCAL_MODELS_TEXT.actionFailed": "The operation did not complete. Refresh status and try again.",
+  "locales.settingsLocalModels.SETTINGS_LOCAL_MODELS_TEXT.deleteFinalizeUnconfirmed": "The model was deleted, but final cleanup was not confirmed. Configuration changes may be briefly blocked; refresh and try again shortly.",
   "locales.settingsLocalModels.SETTINGS_LOCAL_MODELS_TEXT.agent": "Agent model",
   "locales.settingsLocalModels.SETTINGS_LOCAL_MODELS_TEXT.capabilityAgentic": "Agent",
   "locales.settingsLocalModels.SETTINGS_LOCAL_MODELS_TEXT.capabilityChinese": "Chinese",

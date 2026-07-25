@@ -34,6 +34,7 @@ from src.auth import (
 )
 from src.config import Config, setup_env
 from src.core.config_manager import ConfigManager
+from src.services.system_config_service import ConfigConflictError
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -113,7 +114,9 @@ def _apply_auth_enabled(enabled: bool, request: Request | None = None) -> bool:
                 mask_token="******",
             )
             manager_applied = True
-        except Exception as exc:
+        except ConfigConflictError:
+            raise
+        except Exception as exc:  # broad-exception: fallback_recorded - keep legacy direct-manager fallback
             log_safe_exception(
                 logger,
                 "Auth toggle via shared SystemConfigService failed; falling back",
@@ -283,22 +286,35 @@ async def auth_update_settings(request: Request, body: AuthSettingsRequest):
                 return _auth_error(401, "invalid_password", "当前密码错误")
             clear_rate_limit(ip)
 
+    try:
+        auth_applied = _apply_auth_enabled(target_enabled, request=request)
+    except ConfigConflictError as exc:
+        return error_json_response(
+            409,
+            "config_conflict",
+            "Configuration has changed, please reload and retry",
+            params={"current_config_version": exc.current_version},
+        )
+    if not auth_applied:
+        return _auth_error(500, "internal_error", "Failed to update auth settings")
+
     if target_enabled != current_enabled:
-        if not _apply_auth_enabled(target_enabled, request=request):
-            return _auth_error(500, "internal_error", "Failed to update auth settings")
         if not rotate_session_secret():
-            rollback_ok = _apply_auth_enabled(current_enabled, request=request)
+            try:
+                rollback_ok = _apply_auth_enabled(current_enabled, request=request)
+            except ConfigConflictError:
+                rollback_ok = False
             if not rollback_ok:
                 logger.error("Failed to roll back auth state after session secret rotation failure")
             return _auth_error(500, "internal_error", "Failed to rotate session secret")
-    else:
-        if not _apply_auth_enabled(target_enabled, request=request):
-            return _auth_error(500, "internal_error", "Failed to update auth settings")
 
     if target_enabled:
         session_val = create_session()
         if not session_val:
-            rollback_ok = _apply_auth_enabled(current_enabled, request=request)
+            try:
+                rollback_ok = _apply_auth_enabled(current_enabled, request=request)
+            except ConfigConflictError:
+                rollback_ok = False
             if not rollback_ok:
                 logger.error("Failed to roll back auth state after session creation failure")
             return _auth_error(500, "internal_error", "Failed to create session")
