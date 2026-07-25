@@ -1,7 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { loginAsE2eAdmin, mockCompletedSetupStatus } from './auth-fixture';
 
-
 test.describe('Human approval real-backend closure', () => {
   test('Home opens approvals, updates the rule, and decides a durable proposal', async ({ page }) => {
     await mockCompletedSetupStatus(page);
