@@ -418,18 +418,35 @@ class _RenderingMethods:
         ma_label = _nlabel("Moving Averages", "均线", "이동평균")
         volume_analysis_label = _nlabel("Volume", "量能", "거래량")
         news_heading = _nlabel("News Flow", "消息面", "뉴스 흐름")
-        if getattr(config, 'report_renderer_enabled', False) and results:
-            from src.services.report_renderer import render
-            out = render(
-                platform='markdown',
-                results=results,
-                report_date=report_date,
-                summary_only=self._report_summary_only,
-                extra_context={
-                    **self._get_history_compare_context(results),
-                    "report_language": report_language,
-                },
+        if results:
+            from src.services.report_renderer import render, render_plugin_template
+
+            base_render_kwargs = {
+                "platform": "markdown",
+                "results": results,
+                "report_date": report_date,
+                "summary_only": self._report_summary_only,
+            }
+            extra_context: Optional[Dict[str, Any]] = None
+
+            def build_extra_context() -> Dict[str, Any]:
+                nonlocal extra_context
+                if extra_context is None:
+                    extra_context = {
+                        **self._get_history_compare_context(results),
+                        "report_language": report_language,
+                    }
+                return extra_context
+
+            out = render_plugin_template(
+                **base_render_kwargs,
+                extra_context_factory=build_extra_context,
             )
+            if not out and getattr(config, 'report_renderer_enabled', False):
+                out = render(
+                    **base_render_kwargs,
+                    extra_context=build_extra_context(),
+                )
             if out:
                 return out
 
@@ -758,15 +775,19 @@ class _RenderingMethods:
         config = get_config()
         report_language = self._get_report_language(results)
         labels = get_report_labels(report_language)
-        if getattr(config, 'report_renderer_enabled', False) and results:
-            from src.services.report_renderer import render
-            out = render(
-                platform='wechat',
-                results=results,
-                report_date=datetime.now().strftime('%Y-%m-%d'),
-                summary_only=self._report_summary_only,
-                extra_context={"report_language": report_language},
-            )
+        if results:
+            from src.services.report_renderer import render, render_plugin_template
+
+            render_kwargs = {
+                "platform": "wechat",
+                "results": results,
+                "report_date": datetime.now().strftime('%Y-%m-%d'),
+                "summary_only": self._report_summary_only,
+                "extra_context": {"report_language": report_language},
+            }
+            out = render_plugin_template(**render_kwargs)
+            if not out and getattr(config, 'report_renderer_enabled', False):
+                out = render(**render_kwargs)
             if out:
                 return out
 
@@ -1022,15 +1043,19 @@ class _RenderingMethods:
         report_language = self._get_report_language(results)
         labels = get_report_labels(report_language)
         config = get_config()
-        if getattr(config, 'report_renderer_enabled', False) and results:
-            from src.services.report_renderer import render
-            out = render(
-                platform='brief',
-                results=results,
-                report_date=report_date,
-                summary_only=False,
-                extra_context={"report_language": report_language},
-            )
+        if results:
+            from src.services.report_renderer import render, render_plugin_template
+
+            render_kwargs = {
+                "platform": "brief",
+                "results": results,
+                "report_date": report_date,
+                "summary_only": False,
+                "extra_context": {"report_language": report_language},
+            }
+            out = render_plugin_template(**render_kwargs)
+            if not out and getattr(config, 'report_renderer_enabled', False):
+                out = render(**render_kwargs)
             if out:
                 return out
         # Fallback: brief summary from dashboard report

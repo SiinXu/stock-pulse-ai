@@ -555,6 +555,19 @@ def _validate_direct_install_target(
         )
 
 
+def get_installed_application_services() -> Optional[ApplicationServices]:
+    """Return the transition-visible composition root without installing one."""
+
+    with _services_lock:
+        if _services_transition_active:
+            return (
+                _services
+                if _services is not None
+                else _services_transition_target
+            )
+        return _services
+
+
 def get_application_services() -> ApplicationServices:
     """Return the installed composition root, creating a default one lazily."""
     while True:

@@ -18,6 +18,7 @@ from src.application_services import (
     ApplicationServices,
     PLUGIN_APPLICATION_VERSION,
     get_application_services,
+    get_installed_application_services,
     reset_application_services,
     set_application_services,
 )
@@ -182,6 +183,16 @@ def test_get_application_services_is_stable_until_reset():
     assert first is second
     reset_application_services()
     assert get_application_services() is not first
+
+
+def test_get_installed_application_services_never_creates_a_default_root():
+    assert get_installed_application_services() is None
+    assert application_services_mod._services is None
+
+    isolated = ApplicationServices(plugins_dir="")
+    set_application_services(isolated)
+
+    assert get_installed_application_services() is isolated
 
 
 def test_set_and_reset_isolated_root(monkeypatch):
@@ -364,12 +375,17 @@ def test_close_requested_during_plugin_start_converges_to_disabled():
 
 
 def test_plugin_load_can_resolve_the_already_installed_root():
-    observed_roots: list[ApplicationServices] = []
+    observed_roots: list[tuple[ApplicationServices, ApplicationServices | None]] = []
 
     class _RootAwarePlugin(_RecordingPlugin):
         def onload(self, context: PluginContext) -> None:
             super().onload(context)
-            observed_roots.append(get_application_services())
+            observed_roots.append(
+                (
+                    get_application_services(),
+                    get_installed_application_services(),
+                )
+            )
 
     events: list[str] = []
     plugin = _RootAwarePlugin("test.root-aware", events)
@@ -377,7 +393,7 @@ def test_plugin_load_can_resolve_the_already_installed_root():
 
     set_application_services(services)
 
-    assert observed_roots == [services]
+    assert observed_roots == [(services, services)]
     assert events == ["load:test.root-aware"]
 
 
