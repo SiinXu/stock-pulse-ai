@@ -1,3 +1,143 @@
+# StockPulse packaging metadata (PEP 621).
+#
+# Pin authority remains constraints.txt + build-constraints.txt via
+# scripts/check_dependency_locks.py. Application installs must still use the
+# constrained requirements path documented in docs/full-guide.md:
+#
+#   python -m pip install --upgrade --constraint constraints.txt pip
+#   python -m pip install --build-constraint build-constraints.txt -r requirements.txt
+#   python -m pip check
+#
+# Optional groups below map to requirements-*.txt extras. Prefer those
+# requirements files (with the same constraints) for reproducible installs.
+# Do not resolve this project unconstrained against PyPI.
+#
+# Note: experimental PydanticAI package names must not appear in this file
+# (tests/agent/runtime/test_native_default.py). Install that optional set only
+# via requirements-pydanticai.txt under constraints.
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stock-pulse-ai"
+version = "0.0.0"
+description = "StockPulse intelligent multi-market stock analysis system (A-shares, HK, US, and more)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [
+    { name = "SiinXu and StockPulse contributors" },
+]
+keywords = [
+    "stock-analysis",
+    "llm",
+    "trading",
+    "fastapi",
+    "a-share",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+# Core dependency *names* and declared ranges align with requirements.txt.
+# Installed versions are still resolved through constraints.txt at install time.
+dependencies = [
+    "python-dotenv>=1.0.0",
+    "tenacity>=8.2.0",
+    "sqlalchemy>=2.0.0",
+    "schedule>=1.2.0",
+    "exchange-calendars>=4.13.0",
+    "efinance>=0.5.5",
+    "akshare>=1.12.0",
+    "tushare>=1.4.0",
+    "pytdx>=1.72",
+    "baostock>=0.8.0",
+    "yfinance>=0.2.0",
+    'longbridge==0.2.74; platform_system == "Linux" and python_version < "3.12"',
+    'longbridge>=4.0.5,<5; platform_system != "Linux" or python_version >= "3.12"',
+    "tickflow>=0.1.24",
+    "futu-api==10.8.6808",
+    "alphasift @ git+https://github.com/ZhuLinsen/alphasift.git@9f522747caafd3c0b1ddb7e14d5cf44c8580b6cf",
+    "lark-oapi>=1.0.0",
+    "pandas>=2.0.0",
+    "pypinyin>=0.50.0",
+    "openpyxl>=3.1.0",
+    "numpy>=1.24.0",
+    "json-repair>=0.55.1",
+    "orjson>=3.10,<4",
+    "litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0",
+    "tiktoken>=0.8.0,<0.12.0",
+    "openai>=1.0.0",
+    "PyYAML>=6.0",
+    "tavily-python>=0.3.0",
+    "google-search-results>=2.4.0",
+    "requests>=2.31.0",
+    "tldextract>=5.3,<6",
+    "markdown2>=2.4.0",
+    "imgkit>=1.2.0",
+    "fake-useragent>=1.4.0",
+    "httpx[socks]",
+    "dingtalk-stream>=0.24.3",
+    "discord.py>=2.0.0",
+    "PyNaCl>=1.5.0",
+    "newspaper3k>=0.2.8",
+    "lxml_html_clean",
+    "jinja2>=3.1.0",
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "python-multipart>=0.0.6",
+]
+
+[project.optional-dependencies]
+# Empty sentinel: the experimental adapter's locked package set is only declared
+# in requirements-pydanticai.txt so default manifests stay free of that stack.
+# Install with:
+#   python -m pip install --build-constraint build-constraints.txt -r requirements-pydanticai.txt
+pydanticai = []
+# Local Kronos Agent Tool inference stack (mirrors requirements-kronos.txt names).
+kronos = [
+    "torch",
+    "einops",
+    "huggingface-hub",
+    "safetensors",
+    "tqdm",
+]
+# Desktop packaging toolchain on top of the core app dependencies.
+desktop = [
+    "pyinstaller",
+]
+# Backend CI / local dev tooling (mirrors .github/requirements-ci.txt add-ons).
+dev = [
+    "flake8>=7,<8",
+    "pip-audit",
+    "pytest>=9.0.3,<10",
+    "uv==0.11.31",
+]
+
+[project.urls]
+Homepage = "https://github.com/SiinXu/stock-pulse-ai"
+Repository = "https://github.com/SiinXu/stock-pulse-ai"
+Issues = "https://github.com/SiinXu/stock-pulse-ai/issues"
+Changelog = "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/CHANGELOG.md"
+Documentation = "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/INDEX.md"
+License = "https://github.com/SiinXu/stock-pulse-ai/blob/main/LICENSE"
+
+# Application repository: metadata and optional dependency groups only.
+# Runtime code is imported from the source tree, not as an installed library.
+[tool.setuptools]
+packages = []
+
 [tool.black]
 line-length = 120
 target-version = ['py310', 'py311', 'py312']
