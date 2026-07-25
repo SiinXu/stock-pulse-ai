@@ -15,6 +15,11 @@
 # Note: experimental PydanticAI package names must not appear in this file
 # (tests/agent/runtime/test_native_default.py). Install that optional set only
 # via requirements-pydanticai.txt under constraints.
+#
+# Application install entrypoint remains requirements.txt (it embeds
+# -c constraints.txt). This file is packaging metadata + optional group
+# discovery only; do not treat it as a second pin authority.
+# Product release versions use git tags / GitHub Releases, not [project].version.
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -22,6 +27,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stock-pulse-ai"
+# Packaging metadata placeholder only; not the StockPulse product release version.
 version = "0.0.0"
 description = "StockPulse intelligent multi-market stock analysis system (A-shares, HK, US, and more)"
 readme = "README.md"
@@ -100,12 +106,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Empty sentinel: the experimental adapter's locked package set is only declared
-# in requirements-pydanticai.txt so default manifests stay free of that stack.
+# Empty sentinel on purpose: the experimental adapter's locked package set is
+# only declared in requirements-pydanticai.txt so default manifests stay free
+# of that stack. `pip install '.[pydanticai]'` does NOT install the POC packages.
 # Install with:
-#   python -m pip install --build-constraint build-constraints.txt -r requirements-pydanticai.txt
+#   python -m pip install --constraint constraints.txt \
+#     --build-constraint build-constraints.txt -r requirements-pydanticai.txt
 pydanticai = []
 # Local Kronos Agent Tool inference stack (mirrors requirements-kronos.txt names).
+# Always resolve with constraints.txt; unpinned names here are not a lock.
 kronos = [
     "torch",
     "einops",
@@ -113,11 +122,13 @@ kronos = [
     "safetensors",
     "tqdm",
 ]
-# Desktop packaging toolchain on top of the core app dependencies.
+# Desktop packaging toolchain. `pip install '.[desktop]'` adds pyinstaller on
+# top of [project].dependencies; prefer requirements-desktop.txt + constraints.
 desktop = [
     "pyinstaller",
 ]
 # Backend CI / local dev tooling (mirrors .github/requirements-ci.txt add-ons).
+# Resolve with constraints.txt; do not use unconstrained pip install '.[dev]'.
 dev = [
     "flake8>=7,<8",
     "pip-audit",
