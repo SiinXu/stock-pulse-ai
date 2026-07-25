@@ -51,7 +51,11 @@ def _echo_registry() -> ToolRegistry:
             description="Echoes the message back",
             parameters=[ToolParameter(name="message", type="string", description="Message")],
             handler=lambda message: {"echo": message},
-            policy=ToolPolicy.declared(read_only=True, side_effects=[], permissions=["test:read"]),
+            policy=ToolPolicy.declared(
+                read_only=True,
+                side_effects=[],
+                permissions=["analysis_context:read"],
+            ),
         )
     )
     return registry
@@ -90,7 +94,7 @@ def _bound_session() -> BoundToolSession:
         _echo_registry(),
         execution_id="ex-real-bridge",
         allowed_tools=["echo"],
-        granted_permissions=["test:read"],
+        granted_permissions=["analysis_context:read"],
         security_audit=SecurityAuditRecorderStub(),
     )
 

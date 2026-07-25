@@ -726,7 +726,8 @@ def test_real_tool_surface_rejects_bad_code_and_window_before_handler(
         stock_scope=StockScope(
             expected_stock_code="600519",
             allowed_stock_codes={"600519"},
-        )
+        ),
+        granted_capabilities=frozenset(tool.policy.permissions),
     )
 
     invalid_code = surface.execute_tool(
@@ -778,7 +779,8 @@ def test_ready_tool_executes_with_structured_disclaimer_and_bounded_schema(
             stock_scope=StockScope(
                 expected_stock_code="600519",
                 allowed_stock_codes={"600519"},
-            )
+            ),
+            granted_capabilities=frozenset(tool.policy.permissions),
         ),
     )
 

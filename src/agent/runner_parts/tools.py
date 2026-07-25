@@ -56,7 +56,11 @@ def _execute_tools(
         """Execute one tool with an optional per-dispatch completion fence."""
         if completion_fence is None:
             return execute_runner_tool_call_via_session(tc_item, tool_session)
-        with bind_runner_tool_completion_guard(completion_fence.claim_completion):
+        with bind_runner_tool_completion_guard(
+            completion_fence.claim_completion,
+            dispatch_guard=completion_fence.claim_dispatch,
+            deadline_monotonic=completion_fence.deadline_monotonic,
+        ):
             return execute_runner_tool_call_via_session(tc_item, tool_session)
 
     def _build_timeout_execution_result(tc_item):

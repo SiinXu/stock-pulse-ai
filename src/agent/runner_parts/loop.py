@@ -102,23 +102,37 @@ def run_agent_loop(
         )
 
     start_time = time.time()
+    session_deadline_monotonic = (
+        time.monotonic() + float(max_wall_clock_seconds)
+        if max_wall_clock_seconds is not None
+        and max_wall_clock_seconds > 0
+        else None
+    )
     tool_calls_log: List[Dict[str, Any]] = []
     # Single tool authority for the whole run: every tool call in every step is
-    # dispatched through this bound session. Native runs it in
-    # ``enforce_access_policy=False`` compatibility mode so replay-frozen core
-    # behavior is preserved while the direct ToolRegistry path is retired.
-    # Definitions marked ``enforce_contract`` (including plugin tools) still
-    # receive ToolSurface argument and scope validation. The session's internal
-    # non-retriable memo replaces the previous ad-hoc per-run cache dict.
+    # dispatched through this strict bound session. Grants are derived only
+    # from application-owned, validated registry declarations; model output
+    # cannot add a capability. The session's internal non-retriable memo
+    # replaces the previous ad-hoc per-run cache dict.
+    allowed_tools = tool_registry.list_names()
     tool_session = BoundToolSession(
         tool_registry,
         execution_id=str(uuid.uuid4()),
-        allowed_tools=tool_registry.list_names(),
+        allowed_tools=allowed_tools,
+        granted_permissions=tool_registry.supported_declared_capabilities(
+            allowed_tools
+        ),
         stock_scope=stock_scope,
+        call_timeout_seconds=(
+            tool_call_timeout_seconds
+            if tool_call_timeout_seconds is not None
+            and tool_call_timeout_seconds > 0
+            else None
+        ),
+        deadline_monotonic=session_deadline_monotonic,
         cancelled_check=cancelled_check,
         backend="native",
         principal="native-runtime",
-        enforce_access_policy=False,
         security_audit=_get_security_audit_service(),
     )
     total_tokens = 0

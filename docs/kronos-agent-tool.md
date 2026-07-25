@@ -31,12 +31,13 @@ Docker, reports, and notifications continue without Kronos.
 
 The plugin registers a declared `ToolDefinition` through the existing
 `agent_tool` extension point. Calls still pass through the same
-`ToolRegistry`, ToolSurface, stock-scope, timeout, serialization, audit, and
-completion boundaries as core tools. Plugin definitions opt in to mandatory
-contract enforcement, so argument and scope validation remains active even on
-the native compatibility runner. Optional defaults are validated against their
-schema and materialized before scope checks; the scoped `stock_code` identity is
-always required. The Agent can supply only:
+ToolSurface capability, stock-scope, recursive outbound-URL, timeout,
+serialization, audit, and completion boundaries as core tools. The strict
+native runner grants the declared `market_data:read` and
+`local_model:execute` capabilities from the application-owned registry; a model
+response cannot add either grant. Optional defaults are validated against their
+schema and materialized before scope checks; the scoped `stock_code` identity
+is always required. The Agent can supply only:
 
 - `stock_code`: a bounded A-share, Hong Kong, or U.S. symbol;
 - `lookback_days`: 30 through 512;

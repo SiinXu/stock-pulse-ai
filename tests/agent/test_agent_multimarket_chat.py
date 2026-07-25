@@ -30,12 +30,19 @@ from src.agent.runtime.lifecycle import classify_result_terminal_state
 from src.agent.runtime_facts import project_agent_runtime_metadata
 from src.agent.soul import get_agent_soul_metadata
 from src.agent.stock_scope import resolve_stock_scope
+from src.agent.tool_surface import ToolSurface
 from src.agent.tools.data_tools import (
     get_realtime_quote_tool,
     get_stock_info_tool,
 )
+from src.agent.tools.execution import ToolAccessContext
 from src.agent.tools.market_tools import get_market_indices_tool
-from src.agent.tools.registry import ToolDefinition, ToolParameter, ToolRegistry
+from src.agent.tools.registry import (
+    ToolDefinition,
+    ToolParameter,
+    ToolPolicy,
+    ToolRegistry,
+)
 from src.market_context import detect_market
 from src.services.stock_code_utils import canonicalize_analysis_stock_code
 
@@ -1343,6 +1350,11 @@ def _stock_registry(executed: list[str]) -> ToolRegistry:
             ],
             handler=lambda stock_code: executed.append(stock_code)
             or {"stock_code": stock_code, "price": 100},
+            policy=ToolPolicy.declared(
+                read_only=True,
+                permissions=["market_data:read"],
+                scope_dimensions=["stock"],
+            ),
         )
     )
     return registry
@@ -1368,6 +1380,11 @@ def _market_capability_registry() -> ToolRegistry:
                     )
                 ],
                 handler=lambda stock_code: {"stock_code": stock_code},
+                policy=ToolPolicy.declared(
+                    read_only=True,
+                    permissions=["market_data:read"],
+                    scope_dimensions=["stock"],
+                ),
             )
         )
     return registry
@@ -1431,8 +1448,16 @@ def test_chat_market_indices_dispatch_binds_the_active_market(
         "src.agent.tools.market_tools._get_fetcher_manager",
         return_value=manager,
     ):
-        result = chat_registry.execute("get_market_indices")
+        execution = ToolSurface(chat_registry).execute_tool(
+            "get_market_indices",
+            {},
+            ToolAccessContext(
+                granted_capabilities=frozenset({"market_data:read"})
+            ),
+        )
 
+    assert execution["ok"] is True
+    result = execution["result"]
     assert result["region"] == expected_region
     manager.get_main_indices.assert_called_once_with(region=expected_region)
     region_parameter = chat_registry.get("get_market_indices").parameters[0]
@@ -1474,9 +1499,24 @@ def test_us_suffix_dispatches_quote_and_fundamentals_with_bare_symbol() -> None:
         "src.agent.tools.data_tools._get_fetcher_manager",
         return_value=manager,
     ):
-        registry.execute("get_realtime_quote", stock_code=canonical_code)
-        registry.execute("get_stock_info", stock_code=canonical_code)
+        access_context = ToolAccessContext(
+            stock_scope=resolve_stock_scope(canonical_code, None).stock_scope,
+            granted_capabilities=frozenset({"market_data:read"}),
+        )
+        surface = ToolSurface(registry)
+        quote_result = surface.execute_tool(
+            "get_realtime_quote",
+            {"stock_code": canonical_code},
+            access_context,
+        )
+        info_result = surface.execute_tool(
+            "get_stock_info",
+            {"stock_code": canonical_code},
+            access_context,
+        )
 
+    assert quote_result["ok"] is True
+    assert info_result["ok"] is True
     assert canonical_code == "AAPL"
     manager.get_realtime_quote.assert_called_once_with("AAPL")
     manager.get_fundamental_context.assert_called_once_with("AAPL")
@@ -1534,6 +1574,10 @@ def test_single_agent_non_cn_chat_cannot_dispatch_fully_filtered_tool(
             description="A-share sector rankings",
             parameters=[],
             handler=lambda: executed.append("get_sector_rankings") or {"sectors": []},
+            policy=ToolPolicy.declared(
+                read_only=True,
+                permissions=["market_data:read"],
+            ),
         )
     )
     adapter = MagicMock()

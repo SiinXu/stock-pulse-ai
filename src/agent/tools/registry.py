@@ -11,12 +11,40 @@ Provides:
 import json
 import inspect
 import logging
+import math
+import re
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional
 
 logger = logging.getLogger(__name__)
 
 SUPPORTED_TOOL_SURFACE_SCOPE_DIMENSIONS = frozenset({"stock"})
+SUPPORTED_AGENT_TOOL_CAPABILITIES = frozenset({
+    "analysis_context:read",
+    "backtest:read",
+    "community_intel:read",
+    "intel:read",
+    "local_model:execute",
+    "market_data:read",
+    "news:read",
+    "portfolio:read",
+})
+SUPPORTED_AGENT_TOOL_PARAMETER_TYPES = frozenset({
+    "array",
+    "boolean",
+    "integer",
+    "number",
+    "object",
+    "string",
+})
+_MAX_AGENT_TOOL_CAPABILITIES = len(SUPPORTED_AGENT_TOOL_CAPABILITIES)
+_MAX_AGENT_TOOL_PARAMETERS = 128
+_MAX_AGENT_TOOL_DEFAULT_DEPTH = 12
+_MAX_AGENT_TOOL_DEFAULT_NODES = 512
+_CAPABILITY_NAME_PATTERN = re.compile(
+    r"^[a-z][a-z0-9_]{0,31}:[a-z][a-z0-9_]{0,31}$"
+)
+_PARAMETER_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
 
 
 # ============================================================
@@ -73,6 +101,9 @@ class ToolPolicy:
             "read_only": self.read_only,
             "side_effects": list(self.side_effects),
             "permissions": list(self.permissions),
+            # ``permissions`` is retained for descriptor compatibility. Agent
+            # execution treats the same bounded values as capabilities.
+            "capabilities": list(self.permissions),
             "policy_status": self.policy_status,
         }
 
@@ -175,7 +206,11 @@ class ToolRegistry:
 
         registry = ToolRegistry()
         registry.register(tool_def)
-        registry.execute("get_realtime_quote", stock_code="600519")
+        ToolSurface(registry).execute_tool(
+            "get_realtime_quote",
+            {"stock_code": "600519"},
+            access_context,
+        )
     """
 
     def __init__(self):
@@ -236,6 +271,14 @@ class ToolRegistry:
         issues: List[Dict[str, Any]] = []
         for tool_def in self._tools.values():
             policy = tool_def.policy
+            if not isinstance(policy, ToolPolicy):
+                if strict:
+                    issues.append({
+                        "tool": tool_def.name,
+                        "code": "policy_unknown",
+                        "message": "Tool policy is not declared.",
+                    })
+                continue
             if policy.policy_status != "declared":
                 if strict:
                     issues.append({
@@ -252,17 +295,47 @@ class ToolRegistry:
                 })
             if not strict:
                 continue
+            capability_error = validate_tool_capability_contract(tool_def)
+            if capability_error is not None:
+                issues.append({
+                    "tool": tool_def.name,
+                    "code": capability_error["code"],
+                    "message": capability_error["message"],
+                    **capability_error["details"],
+                })
+            schema_error = validate_tool_schema_contract(tool_def)
+            if schema_error is not None:
+                issues.append({
+                    "tool": tool_def.name,
+                    "code": schema_error["code"],
+                    "message": schema_error["message"],
+                    **schema_error["details"],
+                })
+            if type(policy.scope_dimensions) is not list:
+                issues.append({
+                    "tool": tool_def.name,
+                    "code": "invalid_scope_metadata",
+                    "message": "Tool scope metadata must be a list.",
+                })
+                continue
             unsupported_scopes = [
                 dimension
                 for dimension in policy.scope_dimensions
-                if dimension not in SUPPORTED_TOOL_SURFACE_SCOPE_DIMENSIONS
+                if (
+                    type(dimension) is not str
+                    or dimension not in SUPPORTED_TOOL_SURFACE_SCOPE_DIMENSIONS
+                )
             ]
             for dimension in unsupported_scopes:
                 issues.append({
                     "tool": tool_def.name,
                     "code": "unsupported_scope_dimension",
-                    "message": f"Tool declares unsupported scope dimension: {dimension}.",
-                    "dimension": dimension,
+                    "message": "Tool declares an unsupported scope dimension.",
+                    "dimension": (
+                        dimension
+                        if type(dimension) is str
+                        else type(dimension).__name__
+                    ),
                 })
             has_stock_param = any(param.name == "stock_code" for param in tool_def.parameters)
             declares_stock_scope = "stock" in policy.scope_dimensions
@@ -280,22 +353,351 @@ class ToolRegistry:
                 })
         return issues
 
+    def supported_declared_capabilities(
+        self,
+        tool_names: Optional[Iterable[str]] = None,
+    ) -> frozenset[str]:
+        """Return application-owned grants for valid registered tool policies.
+
+        Invalid and unsupported declarations are deliberately omitted. The
+        ToolSurface independently rejects those tools before handler dispatch.
+        """
+        selected = (
+            self.list_names()
+            if tool_names is None
+            else [
+                name
+                for name in tool_names
+                if isinstance(name, str) and name.strip()
+            ]
+        )
+        capabilities = set()
+        for name in selected:
+            tool_def = self.resolve(name)
+            if (
+                tool_def is not None
+                and validate_tool_capability_contract(tool_def) is None
+                and validate_tool_schema_contract(tool_def) is None
+            ):
+                capabilities.update(tool_def.policy.permissions)
+        return frozenset(capabilities)
+
     # ----- Execution -----
 
     def execute(self, name: str, **kwargs) -> Any:
-        """Execute a registered tool by name.
+        """Reject legacy direct execution outside the ToolSurface authority."""
+        raise RuntimeError("direct_tool_execution_disabled")
 
-        Returns the result as a JSON-serializable value.
-        Raises ``KeyError`` if tool not found.
-        Raises the handler's exception on execution failure.
 
-        Tool names must match the registry exactly.
-        """
-        tool_def = self.resolve(name)
-        if tool_def is None:
-            raise KeyError(f"Tool '{name}' not found in registry. Available: {self.list_names()}")
+def validate_tool_capability_contract(
+    tool_def: ToolDefinition,
+) -> Optional[Dict[str, Any]]:
+    """Return one stable fail-closed capability-contract error."""
+    policy = tool_def.policy
+    if not isinstance(policy, ToolPolicy):
+        return {
+            "code": "policy_undeclared",
+            "message": "Tool policy is not declared.",
+            "details": {"policy_status": "invalid"},
+        }
+    if policy.policy_status != "declared":
+        return {
+            "code": "policy_undeclared",
+            "message": "Tool policy is not declared.",
+            "details": {"policy_status": policy.policy_status},
+        }
+    if type(policy.read_only) is not bool:
+        return {
+            "code": "policy_undeclared",
+            "message": "Tool policy is incomplete.",
+            "details": {"policy_status": "incomplete"},
+        }
+    if type(policy.permissions) is not list:
+        return {
+            "code": "unsupported_capability",
+            "message": "Tool declares unsupported executable capabilities.",
+            "details": {
+                "invalid_capabilities": ["invalid_collection"],
+                "duplicate_capabilities": [],
+                "unsupported_capabilities": [],
+                "supported_capabilities": sorted(
+                    SUPPORTED_AGENT_TOOL_CAPABILITIES
+                ),
+            },
+        }
 
-        return tool_def.handler(**kwargs)
+    declared = list(policy.permissions)
+    if not declared:
+        return {
+            "code": "capability_undeclared",
+            "message": "Tool declares no executable capabilities.",
+            "details": {
+                "required_capabilities": [],
+                "supported_capabilities": sorted(
+                    SUPPORTED_AGENT_TOOL_CAPABILITIES
+                ),
+            },
+        }
+    if len(declared) > _MAX_AGENT_TOOL_CAPABILITIES:
+        return {
+            "code": "unsupported_capability",
+            "message": "Tool declares unsupported executable capabilities.",
+            "details": {
+                "invalid_capabilities": ["too_many_capabilities"],
+                "duplicate_capabilities": [],
+                "unsupported_capabilities": [],
+                "supported_capabilities": sorted(
+                    SUPPORTED_AGENT_TOOL_CAPABILITIES
+                ),
+            },
+        }
+
+    invalid = sorted({
+        type(value).__name__
+        for value in declared
+        if type(value) is not str
+    })
+    strings = [value for value in declared if type(value) is str]
+    noncanonical = any(value != value.strip() for value in strings)
+    normalized = [value for value in strings if value]
+    malformed = sorted({
+        "invalid_name"
+        for value in normalized
+        if _CAPABILITY_NAME_PATTERN.fullmatch(value) is None
+    })
+    if any(not value for value in strings):
+        malformed.append("invalid_name")
+    if noncanonical:
+        malformed.append("noncanonical_name")
+    duplicates = sorted({
+        value
+        for value in normalized
+        if (
+            _CAPABILITY_NAME_PATTERN.fullmatch(value) is not None
+            and normalized.count(value) > 1
+        )
+    })
+    unsupported = sorted({
+        value
+        for value in normalized
+        if (
+            _CAPABILITY_NAME_PATTERN.fullmatch(value) is not None
+            and value not in SUPPORTED_AGENT_TOOL_CAPABILITIES
+        )
+    })
+    if invalid or malformed or duplicates or unsupported:
+        return {
+            "code": "unsupported_capability",
+            "message": "Tool declares unsupported executable capabilities.",
+            "details": {
+                "invalid_capabilities": invalid + malformed,
+                "duplicate_capabilities": duplicates,
+                "unsupported_capabilities": unsupported,
+                "supported_capabilities": sorted(
+                    SUPPORTED_AGENT_TOOL_CAPABILITIES
+                ),
+            },
+        }
+    return None
+
+
+def validate_tool_schema_contract(
+    tool_def: ToolDefinition,
+) -> Optional[Dict[str, Any]]:
+    """Return one bounded fail-closed tool-definition schema error."""
+    if not isinstance(tool_def, ToolDefinition):
+        return _schema_contract_error(["invalid_definition"])
+    if not callable(tool_def.handler):
+        return _schema_contract_error(["invalid_handler"])
+    if type(tool_def.parameters) is not list:
+        return _schema_contract_error(["invalid_parameter_collection"])
+    if len(tool_def.parameters) > _MAX_AGENT_TOOL_PARAMETERS:
+        return _schema_contract_error(["too_many_parameters"])
+
+    issues: List[str] = []
+    names: List[str] = []
+    for index, parameter in enumerate(tool_def.parameters):
+        field = f"parameters[{index}]"
+        if not isinstance(parameter, ToolParameter):
+            issues.append(f"{field}.definition")
+            continue
+        if (
+            type(parameter.name) is not str
+            or _PARAMETER_NAME_PATTERN.fullmatch(parameter.name) is None
+        ):
+            issues.append(f"{field}.name")
+        else:
+            names.append(parameter.name)
+        if (
+            type(parameter.description) is not str
+            or not parameter.description.strip()
+        ):
+            issues.append(f"{field}.description")
+        if (
+            type(parameter.type) is not str
+            or parameter.type not in SUPPORTED_AGENT_TOOL_PARAMETER_TYPES
+        ):
+            issues.append(f"{field}.type")
+        if type(parameter.required) is not bool:
+            issues.append(f"{field}.required")
+
+        enum_is_valid = parameter.enum is None or (
+            type(parameter.enum) is list
+            and bool(parameter.enum)
+            and all(_is_bounded_json_scalar(value) for value in parameter.enum)
+        )
+        if not enum_is_valid:
+            issues.append(f"{field}.enum")
+        if parameter.pattern is not None:
+            if parameter.type != "string" or type(parameter.pattern) is not str:
+                issues.append(f"{field}.pattern")
+            else:
+                try:
+                    re.compile(parameter.pattern)
+                except re.error:
+                    issues.append(f"{field}.pattern")
+
+        bounds_valid = True
+        for bound in (parameter.minimum, parameter.maximum):
+            if bound is not None and (
+                parameter.type not in {"integer", "number"}
+                or isinstance(bound, bool)
+                or not isinstance(bound, (int, float))
+                or (isinstance(bound, float) and not math.isfinite(bound))
+            ):
+                bounds_valid = False
+        if (
+            bounds_valid
+            and parameter.minimum is not None
+            and parameter.maximum is not None
+            and parameter.minimum > parameter.maximum
+        ):
+            bounds_valid = False
+        if not bounds_valid:
+            issues.append(f"{field}.bounds")
+
+        if type(parameter.required) is bool:
+            if parameter.required and parameter.default is not None:
+                issues.append(f"{field}.default")
+            elif (
+                not parameter.required
+                and parameter.default is not None
+                and not _parameter_default_is_valid(parameter)
+            ):
+                issues.append(f"{field}.default")
+
+    if len(names) != len(set(names)):
+        issues.append("duplicate_parameter_name")
+    if issues:
+        return _schema_contract_error(issues)
+    return None
+
+
+def _schema_contract_error(issues: Iterable[str]) -> Dict[str, Any]:
+    bounded = list(dict.fromkeys(issues))[:32]
+    return {
+        "code": "schema_contract_violation",
+        "message": "Tool declares an invalid argument schema.",
+        "details": {"invalid_schema_fields": bounded},
+    }
+
+
+def _is_bounded_json_scalar(value: Any) -> bool:
+    return (
+        type(value) in {str, bool, int}
+        or (type(value) is float and math.isfinite(value))
+    )
+
+
+def _parameter_default_is_valid(parameter: ToolParameter) -> bool:
+    value = parameter.default
+    if parameter.type == "string":
+        type_matches = type(value) is str
+    elif parameter.type == "integer":
+        type_matches = type(value) is int
+    elif parameter.type == "number":
+        type_matches = type(value) in {int, float} and (
+            type(value) is int or math.isfinite(value)
+        )
+    elif parameter.type == "boolean":
+        type_matches = type(value) is bool
+    elif parameter.type == "array":
+        type_matches = type(value) is list
+    elif parameter.type == "object":
+        type_matches = type(value) is dict
+    else:
+        return False
+    if not type_matches or not _is_bounded_json_value(value):
+        return False
+    try:
+        json.dumps(value, allow_nan=False, sort_keys=True)
+    except (RecursionError, TypeError, ValueError):
+        return False
+    if parameter.enum is not None:
+        if (
+            type(parameter.enum) is not list
+            or not all(_is_bounded_json_scalar(item) for item in parameter.enum)
+            or value not in parameter.enum
+        ):
+            return False
+    if parameter.pattern is not None and type(value) is str:
+        if type(parameter.pattern) is not str:
+            return False
+        try:
+            if re.search(parameter.pattern, value) is None:
+                return False
+        except re.error:
+            return False
+    if parameter.type in {"integer", "number"}:
+        for bound in (parameter.minimum, parameter.maximum):
+            if bound is not None and (
+                isinstance(bound, bool)
+                or not isinstance(bound, (int, float))
+                or (isinstance(bound, float) and not math.isfinite(bound))
+            ):
+                return False
+        if parameter.minimum is not None and value < parameter.minimum:
+            return False
+        if parameter.maximum is not None and value > parameter.maximum:
+            return False
+    return True
+
+
+def _is_bounded_json_value(value: Any) -> bool:
+    """Validate one default without unbounded recursion or container walks."""
+    node_count = 0
+    active_containers: set[int] = set()
+
+    def _walk(candidate: Any, depth: int) -> bool:
+        nonlocal node_count
+        node_count += 1
+        if (
+            depth > _MAX_AGENT_TOOL_DEFAULT_DEPTH
+            or node_count > _MAX_AGENT_TOOL_DEFAULT_NODES
+        ):
+            return False
+        if candidate is None or type(candidate) in {str, bool, int}:
+            return True
+        if type(candidate) is float:
+            return math.isfinite(candidate)
+        if type(candidate) not in {list, dict}:
+            return False
+
+        identity = id(candidate)
+        if identity in active_containers:
+            return False
+        active_containers.add(identity)
+        try:
+            if type(candidate) is list:
+                return all(_walk(item, depth + 1) for item in candidate)
+            return all(
+                type(key) is str and _walk(item, depth + 1)
+                for key, item in candidate.items()
+            )
+        finally:
+            active_containers.remove(identity)
+
+    return _walk(value, 0)
 
 
 # ============================================================

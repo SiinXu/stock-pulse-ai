@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import re
 import time
 from contextlib import contextmanager
@@ -43,25 +44,44 @@ class RunnerToolCall(Protocol):
 
 
 RunnerToolCompletionGuard = Callable[[Callable[[], None]], None]
+RunnerToolDispatchGuard = Callable[[Callable[[], None]], None]
 _RUNNER_TOOL_COMPLETION_GUARD: ContextVar[Optional[RunnerToolCompletionGuard]] = (
     ContextVar("runner_tool_completion_guard", default=None)
+)
+_RUNNER_TOOL_DISPATCH_GUARD: ContextVar[Optional[RunnerToolDispatchGuard]] = (
+    ContextVar("runner_tool_dispatch_guard", default=None)
+)
+_RUNNER_TOOL_DEADLINE_MONOTONIC: ContextVar[Optional[float]] = ContextVar(
+    "runner_tool_deadline_monotonic",
+    default=None,
 )
 
 
 @contextmanager
 def bind_runner_tool_completion_guard(
     guard: RunnerToolCompletionGuard,
+    *,
+    dispatch_guard: Optional[RunnerToolDispatchGuard] = None,
+    deadline_monotonic: Optional[float] = None,
 ) -> Iterator[None]:
-    """Bind one dispatch completion fence without changing the bridge API."""
-    token = _RUNNER_TOOL_COMPLETION_GUARD.set(guard)
+    """Bind one runner timeout fence across dispatch and completion."""
+    completion_token = _RUNNER_TOOL_COMPLETION_GUARD.set(guard)
+    dispatch_token = _RUNNER_TOOL_DISPATCH_GUARD.set(dispatch_guard)
+    deadline_token = _RUNNER_TOOL_DEADLINE_MONOTONIC.set(deadline_monotonic)
     try:
         yield
     finally:
-        _RUNNER_TOOL_COMPLETION_GUARD.reset(token)
+        _RUNNER_TOOL_DEADLINE_MONOTONIC.reset(deadline_token)
+        _RUNNER_TOOL_DISPATCH_GUARD.reset(dispatch_token)
+        _RUNNER_TOOL_COMPLETION_GUARD.reset(completion_token)
 
 
 _SUMMARY_LIMIT = 500
 _HOME_PATH_PATTERN = re.compile(r"(/Users/[^/\s]+|/home/[^/\s]+)(/[^\s,;]*)?")
+_MAX_TOOL_ARGUMENT_INSPECTION_DEPTH = 12
+_MAX_TOOL_ARGUMENT_INSPECTION_NODES = 512
+_MAX_TOOL_CACHE_TEXT_CHARS = 16_384
+_CACHE_VALUE_UNAVAILABLE = object()
 
 
 @dataclass
@@ -75,14 +95,13 @@ class ToolAccessContext:
     backend: Optional[str] = None
     session_id: Optional[str] = None
     timeout_seconds: Optional[float] = None
+    deadline_monotonic: Optional[float] = None
+    cancelled_check: Optional[Callable[[], bool]] = None
     max_result_bytes: Optional[int] = None
     audit_context: Dict[str, Any] = field(default_factory=dict)
-    # When False the surface skips its declared-contract validation (argument
-    # schema + scope-dimension contract) and applies the legacy stock-scope
-    # guard keyed on the presence of a ``stock_code`` parameter. This mirrors
-    # the historical native runner path byte-for-byte so the same
-    # ``BoundToolSession`` authority can serve native replay without the
-    # stricter checks reserved for external runtimes.
+    granted_capabilities: frozenset[str] = field(default_factory=frozenset)
+    # Retained for call-site compatibility. Security contracts are always
+    # enforced by ToolSurface; callers cannot use this field to bypass them.
     enforce_contract: bool = True
 
 
@@ -150,18 +169,98 @@ def _build_tool_cache_key(tool_name: str, arguments: Dict[str, Any]) -> Optional
     if not isinstance(arguments, dict):
         return None
 
-    normalized_args: Dict[str, Any] = {}
-    for key, value in arguments.items():
-        if key == "stock_code":
-            normalized_args[key] = _normalize_tool_stock_code(value)
-        else:
-            normalized_args[key] = value
+    normalized_args = _bounded_tool_arguments(
+        arguments,
+        normalize_stock_code=True,
+    )
+    if normalized_args is None:
+        return None
 
     try:
-        payload = json.dumps(normalized_args, ensure_ascii=False, sort_keys=True, default=str)
-    except (TypeError, ValueError):
+        payload = json.dumps(
+            normalized_args,
+            allow_nan=False,
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    except (RecursionError, TypeError, ValueError):
         return None
     return f"{tool_name}:{payload}"
+
+
+def _bounded_tool_arguments(
+    arguments: Dict[str, Any],
+    *,
+    normalize_stock_code: bool,
+) -> Optional[Dict[str, Any]]:
+    """Copy JSON arguments within the shared ToolSurface inspection bounds."""
+    node_count = 0
+    text_chars = 0
+    active_containers: set[int] = set()
+
+    def _copy(value: Any, *, depth: int) -> Any:
+        nonlocal node_count, text_chars
+        node_count += 1
+        if (
+            depth > _MAX_TOOL_ARGUMENT_INSPECTION_DEPTH
+            or node_count > _MAX_TOOL_ARGUMENT_INSPECTION_NODES
+        ):
+            return _CACHE_VALUE_UNAVAILABLE
+        if value is None or type(value) in {bool, int}:
+            if type(value) is int and value.bit_length() > 4096:
+                return _CACHE_VALUE_UNAVAILABLE
+            return value
+        if type(value) is float:
+            return value if math.isfinite(value) else _CACHE_VALUE_UNAVAILABLE
+        if type(value) is str:
+            text_chars += len(value)
+            return (
+                value
+                if text_chars <= _MAX_TOOL_CACHE_TEXT_CHARS
+                else _CACHE_VALUE_UNAVAILABLE
+            )
+        if type(value) not in {dict, list}:
+            return _CACHE_VALUE_UNAVAILABLE
+
+        identity = id(value)
+        if identity in active_containers:
+            return _CACHE_VALUE_UNAVAILABLE
+        active_containers.add(identity)
+        try:
+            if type(value) is list:
+                copied_list = []
+                for item in value:
+                    copied_item = _copy(item, depth=depth + 1)
+                    if copied_item is _CACHE_VALUE_UNAVAILABLE:
+                        return _CACHE_VALUE_UNAVAILABLE
+                    copied_list.append(copied_item)
+                return copied_list
+
+            copied_dict: Dict[str, Any] = {}
+            for key, item in value.items():
+                if type(key) is not str:
+                    return _CACHE_VALUE_UNAVAILABLE
+                text_chars += len(key)
+                if text_chars > _MAX_TOOL_CACHE_TEXT_CHARS:
+                    return _CACHE_VALUE_UNAVAILABLE
+                copied_item = _copy(item, depth=depth + 1)
+                if copied_item is _CACHE_VALUE_UNAVAILABLE:
+                    return _CACHE_VALUE_UNAVAILABLE
+                copied_dict[key] = (
+                    _normalize_tool_stock_code(copied_item)
+                    if (
+                        normalize_stock_code
+                        and depth == 0
+                        and key == "stock_code"
+                    )
+                    else copied_item
+                )
+            return copied_dict
+        finally:
+            active_containers.remove(identity)
+
+    copied = _copy(arguments, depth=0)
+    return copied if type(copied) is dict else None
 
 
 def _is_non_retriable_tool_result(result: Any) -> bool:
@@ -200,9 +299,25 @@ def _guard_tool_stock_scope(
     arguments: Dict[str, Any],
     stock_scope: Optional[StockScope],
 ) -> Optional[Dict[str, Any]]:
+    return _guard_tool_definition_stock_scope(
+        tool_registry.resolve(tool_name),
+        arguments,
+        stock_scope,
+    )
+
+
+def _guard_tool_definition_stock_scope(
+    tool_def: Any,
+    arguments: Dict[str, Any],
+    stock_scope: Optional[StockScope],
+) -> Optional[Dict[str, Any]]:
+    """Guard one captured definition without re-resolving a mutable registry."""
     if stock_scope is None or not isinstance(arguments, dict):
         return None
-    if not _is_stock_scoped_tool(tool_registry, tool_name):
+    if tool_def is None or not any(
+        param.name == "stock_code"
+        for param in getattr(tool_def, "parameters", ())
+    ):
         return None
     if "stock_code" not in arguments:
         return None
@@ -236,17 +351,29 @@ def execute_runner_tool_call_via_session(
     runner loop consumes: ``(tool_call, res_str, ok, dur, cached, guard_result)``.
 
     This is the only bridge between the native runner and the bound session; it
-    never touches the tool registry directly, so the session remains the single
-    tool-dispatch authority. Byte-exactness with the historical direct path is
-    preserved because the session runs in native-compatibility mode (see
-    :class:`~src.agent.runtime.tool_session.BoundToolSession`): the serialized
-    ``result_text`` is produced by the same :func:`serialize_tool_result` /
-    :func:`serialize_tool_error_result` helpers on the same inputs.
+    never touches the tool registry directly, so ToolSurface remains the single
+    tool-dispatch authority. The session applies its frozen allowlist and grants
+    before ToolSurface enforces capability, schema, scope, and outbound policy.
+    The serialized ``result_text`` uses the shared
+    :func:`serialize_tool_result` / :func:`serialize_tool_error_result`
+    helpers.
     """
     t0 = time.time()
     name = tool_call.name
     arguments = tool_call.arguments
-    safe_arguments = redact_sensitive_data(arguments)
+    bounded_arguments = (
+        _bounded_tool_arguments(
+            arguments,
+            normalize_stock_code=False,
+        )
+        if isinstance(arguments, dict)
+        else None
+    )
+    safe_arguments = redact_sensitive_data(
+        bounded_arguments
+        if bounded_arguments is not None
+        else {"arguments_redacted": True}
+    )
     tool_call.arguments = (
         safe_arguments if isinstance(safe_arguments, dict) else {}
     )
@@ -263,18 +390,30 @@ def execute_runner_tool_call_via_session(
     cached = bool(cache_key) and session.is_non_retriable_cached(cache_key)
 
     completion_guard = _RUNNER_TOOL_COMPLETION_GUARD.get()
-    if completion_guard is None:
+    dispatch_guard = _RUNNER_TOOL_DISPATCH_GUARD.get()
+    call_deadline_monotonic = _RUNNER_TOOL_DEADLINE_MONOTONIC.get()
+    if (
+        completion_guard is None
+        and dispatch_guard is None
+        and call_deadline_monotonic is None
+    ):
         result = session.execute(name, arguments)
     else:
-        token = _RUNNER_TOOL_COMPLETION_GUARD.set(None)
+        completion_token = _RUNNER_TOOL_COMPLETION_GUARD.set(None)
+        dispatch_token = _RUNNER_TOOL_DISPATCH_GUARD.set(None)
+        deadline_token = _RUNNER_TOOL_DEADLINE_MONOTONIC.set(None)
         try:
             result = session.execute(
                 name,
                 arguments,
+                dispatch_guard=dispatch_guard,
                 completion_guard=completion_guard,
+                call_deadline_monotonic=call_deadline_monotonic,
             )
         finally:
-            _RUNNER_TOOL_COMPLETION_GUARD.reset(token)
+            _RUNNER_TOOL_DEADLINE_MONOTONIC.reset(deadline_token)
+            _RUNNER_TOOL_DISPATCH_GUARD.reset(dispatch_token)
+            _RUNNER_TOOL_COMPLETION_GUARD.reset(completion_token)
 
     res_str = result["result_text"]
     # A non-retriable cache hit is reported as a non-success skip, exactly like

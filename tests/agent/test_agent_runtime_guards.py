@@ -29,7 +29,12 @@ from src.agent.runtime.guards import (
 )
 from src.agent.runtime.tool_session import BoundToolSession
 from src.agent.runtime_facts import DegradationBoundary
-from src.agent.tools.registry import ToolDefinition, ToolParameter, ToolRegistry
+from src.agent.tools.registry import (
+    ToolDefinition,
+    ToolParameter,
+    ToolPolicy,
+    ToolRegistry,
+)
 from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 
@@ -58,6 +63,10 @@ def _echo_registry(handler=None):
                 )
             ],
             handler=handler or (lambda message: {"echo": message}),
+            policy=ToolPolicy.declared(
+                read_only=True,
+                permissions=["analysis_context:read"],
+            ),
         )
     )
     return registry
@@ -247,6 +256,72 @@ def test_runtime_policy_tool_timeout_is_enforced_and_logged(caplog):
     )
 
 
+def test_timeout_during_attempt_audit_prevents_late_handler_dispatch():
+    attempt_entered = threading.Event()
+    release_attempt = threading.Event()
+    completion_recorded = threading.Event()
+    caller_returned = threading.Event()
+    handler_calls = []
+
+    class _BlockingAttemptAudit(SecurityAuditRecorderStub):
+        def record_attempt(self, **fields):
+            attempt_entered.set()
+            assert release_attempt.wait(timeout=2)
+            super().record_attempt(**fields)
+
+        def record_completion(self, **fields):
+            super().record_completion(**fields)
+            completion_recorded.set()
+
+    registry = _echo_registry(
+        lambda message: handler_calls.append(message) or {"echo": message}
+    )
+    session = BoundToolSession(
+        registry,
+        execution_id="attempt-audit-timeout",
+        allowed_tools=["echo"],
+        granted_permissions=["analysis_context:read"],
+        security_audit=_BlockingAttemptAudit(),
+    )
+    tool_calls_log = []
+    result_holder = {}
+
+    def _run_tools():
+        result_holder["results"] = _execute_tools(
+            [
+                ToolCall(
+                    id="audit-blocked",
+                    name="echo",
+                    arguments={"message": "must-not-run"},
+                )
+            ],
+            session,
+            step=1,
+            progress_callback=None,
+            tool_calls_log=tool_calls_log,
+            tool_wait_timeout_seconds=0.01,
+        )
+        caller_returned.set()
+
+    caller = threading.Thread(target=_run_tools)
+    caller.start()
+    assert attempt_entered.wait(timeout=1)
+    assert caller_returned.wait(timeout=1)
+
+    assert handler_calls == []
+    assert session.dispatched_calls == 0
+    assert tool_calls_log[0]["timeout"] is True
+
+    release_attempt.set()
+    assert completion_recorded.wait(timeout=1)
+    caller.join(timeout=1)
+
+    assert handler_calls == []
+    assert session.dispatched_calls == 0
+    assert session.dropped_results == 1
+    assert json.loads(result_holder["results"][0]["result_str"])["timeout"] is True
+
+
 def test_tool_completion_claim_wins_before_future_publication(monkeypatch):
     adapter = MagicMock()
     adapter.call_with_tools.side_effect = [
@@ -325,8 +400,8 @@ def test_rejected_completion_claim_wins_before_future_publication(monkeypatch):
         registry,
         execution_id="rejected-completion",
         allowed_tools=["echo"],
+        granted_permissions=["analysis_context:read"],
         max_tool_calls=0,
-        enforce_access_policy=False,
         security_audit=SecurityAuditRecorderStub(),
     )
     tool_calls_log = []
@@ -402,7 +477,17 @@ def test_fence_deadline_timeout_is_logged_when_future_publishes(caplog, monkeypa
 
     with caplog.at_level(logging.WARNING), patch(
         "src.agent.runner.time.monotonic",
-        side_effect=[0.0, 2.0],
+        side_effect=[
+            0.0,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            2.0,
+        ],
     ):
         result = run_agent_loop(
             messages=[],
@@ -447,7 +532,26 @@ def test_parallel_fence_deadline_timeouts_are_logged(caplog, monkeypatch):
 
     with caplog.at_level(logging.WARNING), patch(
         "src.agent.runner.time.monotonic",
-        side_effect=[0.0, 2.0, 0.0, 2.0],
+        side_effect=[
+            0.0,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            2.0,
+            0.0,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            2.0,
+        ],
     ):
         result = run_agent_loop(
             messages=[],

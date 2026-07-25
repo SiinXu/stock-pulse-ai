@@ -5,7 +5,7 @@ Tests for ToolRegistry, ToolDefinition, ToolParameter, and SkillManager.
 Covers:
 - Tool registration, lookup, listing, and removal
 - Multi-provider schema generation (Gemini / OpenAI / Anthropic)
-- Tool execution and error handling
+- Direct-execution denial outside ToolSurface
 - @tool decorator with type-hint inference
 - SkillManager registration, activation, and prompt generation
 """
@@ -157,49 +157,54 @@ class TestToolRegistry(unittest.TestCase):
         self.assertTrue("t" in self.registry)
         self.assertFalse("z" in self.registry)
 
-    def test_execute_success(self):
+    def test_direct_execute_is_disabled_for_registered_tool(self):
         tool = _make_tool("exec_test")
         self.registry.register(tool)
-        result = self.registry.execute("exec_test", stock_code="600519", days=10)
-        self.assertEqual(result, {"code": "600519", "days": 10})
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "direct_tool_execution_disabled",
+        ):
+            self.registry.execute("exec_test", stock_code="600519", days=10)
 
     def test_resolve_does_not_accept_default_colon_namespaced_tool_name(self):
         tool = _make_tool("exec_test")
         self.registry.register(tool)
 
         self.assertIsNone(self.registry.resolve("default_api:exec_test"))
-        with self.assertRaises(KeyError):
-            self.registry.execute("default_api:exec_test", stock_code="600519", days=10)
 
     def test_resolve_does_not_accept_dotted_suffix_tool_name(self):
         tool = _make_tool("exec_test")
         self.registry.register(tool)
 
         self.assertIsNone(self.registry.resolve("gemini_api.exec_test"))
-        with self.assertRaises(KeyError):
-            self.registry.execute("gemini_api.exec_test", stock_code="600519", days=10)
 
     def test_resolve_does_not_accept_non_default_colon_namespace(self):
         tool = _make_tool("exec_test")
         self.registry.register(tool)
 
         self.assertIsNone(self.registry.resolve("gemini_api:exec_test"))
-        with self.assertRaises(KeyError):
-            self.registry.execute("gemini_api:exec_test", stock_code="600519", days=10)
 
-    def test_execute_default_param(self):
+    def test_direct_execute_is_disabled_for_defaulted_tool(self):
         tool = _make_tool("default_test")
         self.registry.register(tool)
-        result = self.registry.execute("default_test", stock_code="600519")
-        self.assertEqual(result["days"], 30)
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "direct_tool_execution_disabled",
+        ):
+            self.registry.execute("default_test", stock_code="600519")
 
-    def test_execute_not_found(self):
-        with self.assertRaises(KeyError):
+    def test_direct_execute_is_disabled_for_unknown_tool(self):
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "direct_tool_execution_disabled",
+        ):
             self.registry.execute("not_exist", stock_code="600519")
 
-    def test_execute_handler_error(self):
+    def test_direct_execute_never_dispatches_handler(self):
+        calls = []
+
         def bad_handler(**kwargs):
-            raise ValueError("boom")
+            calls.append(kwargs)
 
         tool = ToolDefinition(
             name="bad_tool",
@@ -208,8 +213,12 @@ class TestToolRegistry(unittest.TestCase):
             handler=bad_handler,
         )
         self.registry.register(tool)
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "direct_tool_execution_disabled",
+        ):
             self.registry.execute("bad_tool")
+        self.assertEqual(calls, [])
 
 
 # ============================================================

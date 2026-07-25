@@ -75,13 +75,13 @@ EXPECTED_GROUPS = (
         "_runner_loop",
         "_LOOP_FUNCTION_NAMES",
         ("run_agent_loop",),
-        "a01297a7bb4c9f7c4c578372519c50b0e14e254e4113a8fd9d494ad666263ee0",
+        "c8d8d98a563a86f919be79cac84fd2db8ca0c21db9250ab78266178e687d05a1",
     ),
     (
         "_runner_tools",
         "_TOOL_FUNCTION_NAMES",
         ("_execute_tools",),
-        "4c5160138e6335109c26fa28668c38923e7b0a24a4c5b2cebd0903b8894f276b",
+        "18363417f7a1db86460ada96d2d2796e5e19582da2bba42233541ceb74c11203",
     ),
 )
 
@@ -152,7 +152,7 @@ EXPECTED_RETAINED_HELPER_AST_HASH = (
     "7e20269836fe2492cbb25356dff13ec293999574892b02e1d486dbac78143009"
 )
 EXPECTED_RETAINED_CLASS_AST_HASH = (
-    "761e946e0551e1fa4a8a44b74be744f0de2f3ec6909730a1c62226e594ecea23"
+    "3a1f17f2e966bd0151a861dcf2eada14b30879bbbdc5fd6cf4b9ba566e17ee12"
 )
 
 
@@ -346,7 +346,14 @@ def test_runner_dataclass_fence_and_reload_ownership_stay_on_facade():
     )
     assert old_parse_result.__dataclass_params__.frozen is True
 
-    for name in ("__init__", "mark_timed_out", "timed_out", "claim_completion"):
+    for name in (
+        "__init__",
+        "mark_timed_out",
+        "timed_out",
+        "deadline_monotonic",
+        "claim_dispatch",
+        "claim_completion",
+    ):
         function = _descriptor_function(old_fence.__dict__[name])
         assert isinstance(function, FunctionType)
         assert function.__globals__ is vars(module)

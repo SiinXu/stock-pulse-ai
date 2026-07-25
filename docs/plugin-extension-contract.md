@@ -601,9 +601,23 @@ must use exact JSON scalar/container types, and object keys must be strings.
 Defaults are materialized before validation and scope checks, and a stock-scoped
 `stock_code` identity must be required. The plugin registry delegates to
 `ToolRegistry`; every execution continues through the Tool Surface and its
-argument, stock-scope, timeout, serialization, audit, and completion guards.
-Per-definition enforcement keeps argument and scope checks active for plugin
-tools even while existing core tools use the native compatibility mode.
+capability, argument, stock-scope, recursively nested outbound-URL, timeout,
+serialization, audit, and completion guards. Direct `ToolRegistry.execute`
+dispatch is disabled, and neither core nor plugin tools can disable those
+security contracts.
+
+`ToolPolicy.permissions` is retained as the compatibility field for executable
+capability declarations and is also published as `capabilities` in the public
+descriptor. Every Agent Tool must declare one or more of the currently
+supported capabilities: `analysis_context:read`, `backtest:read`,
+`community_intel:read`, `intel:read`, `local_model:execute`,
+`market_data:read`, `news:read`, or `portfolio:read`. Unsupported, duplicate,
+empty, or execution-ungranted declarations fail closed before the handler.
+The `agent_tool` registration contract remains major version `1`: syntactically
+valid v1 definitions can still register, while the existing ToolSurface policy
+authority now denies unsafe capability declarations at execution. This is a
+security-policy tightening under ADR-007's retained ToolSurface authority, not
+a registration payload removal, rename, or type change.
 
 Registration follows the existing Agent exposure model: the default single
 Agent receives the process tool catalog, while multi-agent specialists receive
@@ -616,10 +630,12 @@ supplies an exact-owner native adapter backed by the cached `ToolRegistry`;
 unload removes only the definition registered by that plugin from the exact
 registry instance selected during registration.
 
-This is an interim ToolSurface subset, not completion of the process sandbox in
-#191. External plugins remain reviewed, process-equivalent Python; manifest
-permissions are descriptive and do not constrain handler code or raw network
-access.
+This completes the ToolSurface execution boundary in #191, not an OS or Python
+process-containment sandbox. URL-bearing tool-call arguments use the shared
+outbound policy, but external plugin handlers remain reviewed,
+process-equivalent Python and can initiate raw network or other process access
+internally. The top-level plugin manifest `permissions` list remains
+descriptive; it is distinct from enforced `ToolPolicy.permissions`.
 
 ### Notification Channels
 

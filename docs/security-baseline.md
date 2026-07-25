@@ -160,7 +160,6 @@ This table is a scope and ownership map, not an exploit guide. Sensitive impleme
 | Gap | Current boundary | Follow-up |
 | --- | --- | --- |
 | Multi-user identity, role and workspace authorization, consent, data ownership, export, deletion, and privacy audit are not implemented. | `AUTH-05`, `COMP-04` | [#230](https://github.com/SiinXu/stock-pulse-ai/issues/230) |
-| Agent tool schema, capability, data-scope, and network enforcement is not yet one complete deny-by-default sandbox. | `INPUT-04`, `NET-04`, `AUDIT-02` | [#191](https://github.com/SiinXu/stock-pulse-ai/issues/191), coordinated with [#137](https://github.com/SiinXu/stock-pulse-ai/issues/137) and [#214](https://github.com/SiinXu/stock-pulse-ai/issues/214) |
 | Structured Agent observability is not yet a complete queryable cross-stage event and trace foundation. | `AUDIT-01`, `AUDIT-02` | [#222](https://github.com/SiinXu/stock-pulse-ai/issues/222) |
 | Backup/restore, auth-policy and session-invalidation changes, protected exports, HITL decisions, and remaining privileged boundaries are not yet connected to the Phase 1 durable security-audit contract. | `AUDIT-01` through `AUDIT-04` | [#535](https://github.com/SiinXu/stock-pulse-ai/issues/535) |
 | Analysis reports do not yet provide a complete exportable, redacted evidence chain and audit package. | `AUDIT-05` | [#127](https://github.com/SiinXu/stock-pulse-ai/issues/127) |
@@ -177,6 +176,7 @@ These completed tracks are implementation evidence, not open gaps. Residual risk
 | Core security and compliance baseline definition | `AUTH-*`, `INPUT-*`, `SECRET-*`, `NET-*`, `AUDIT-*`, `SUPPLY-*`, `COMP-*` | [#228](https://github.com/SiinXu/stock-pulse-ai/issues/228) (completed) |
 | Fail-closed unauthenticated public-bind startup policy | `AUTH-01`, `AUTH-02` | [#534](https://github.com/SiinXu/stock-pulse-ai/issues/534) (completed) |
 | Shared SSRF and outbound egress policy | `NET-01` through `NET-06` | [#171](https://github.com/SiinXu/stock-pulse-ai/issues/171) (completed) |
+| Strict Agent ToolSurface execution sandbox | `INPUT-04`, `NET-04`, `AUDIT-02` | [#191](https://github.com/SiinXu/stock-pulse-ai/issues/191): registered tools require a supported declared capability and an execution-owned grant; schema, stock scope, recursively nested URL arguments, and bounded argument inspection fail closed before handler dispatch; denials use redacted structured and durable audit evidence |
 | Central sensitive-data redaction expansion | `SECRET-03` | [#176](https://github.com/SiinXu/stock-pulse-ai/issues/176) (completed) |
 | Dependency and workflow supply-chain hardening | `SUPPLY-01` through `SUPPLY-05` | [#326](https://github.com/SiinXu/stock-pulse-ai/issues/326) (completed) |
 | Constrained AlphaSift repair installation | `SUPPLY-01` | [#359](https://github.com/SiinXu/stock-pulse-ai/issues/359) (completed by [#531](https://github.com/SiinXu/stock-pulse-ai/pull/531)) |

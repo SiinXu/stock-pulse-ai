@@ -40,7 +40,12 @@ from src.agent.stock_scope import StockScope, resolve_stock_scope
 from src.agent.tools.data_tools import get_capital_flow_tool
 from src.agent.tools.execution import execute_runner_tool_call_via_session
 from src.agent.runtime.tool_session import BoundToolSession
-from src.agent.tools.registry import ToolRegistry, ToolDefinition, ToolParameter
+from src.agent.tools.registry import (
+    ToolDefinition,
+    ToolParameter,
+    ToolPolicy,
+    ToolRegistry,
+)
 from src.analysis_context_pack_prompt import format_analysis_context_pack_prompt_section
 from src.config import Config
 from src.llm.usage import normalize_litellm_usage
@@ -66,6 +71,10 @@ def _make_registry_with_echo():
             ToolParameter(name="message", type="string", description="Message to echo"),
         ],
         handler=lambda message: {"echo": message},
+        policy=ToolPolicy.declared(
+            read_only=True,
+            permissions=["analysis_context:read"],
+        ),
     )
     registry.register(tool)
     return registry
@@ -82,6 +91,11 @@ def _make_stock_registry(executed_calls):
                 ToolParameter(name="stock_code", type="string", description="Stock code"),
             ],
             handler=lambda stock_code: executed_calls.append(("quote", stock_code)) or {"stock_code": stock_code},
+            policy=ToolPolicy.declared(
+                read_only=True,
+                permissions=["market_data:read"],
+                scope_dimensions=["stock"],
+            ),
         )
     )
     registry.register(
@@ -96,6 +110,11 @@ def _make_stock_registry(executed_calls):
                 "stock_code": stock_code,
                 "stock_name": stock_name,
             },
+            policy=ToolPolicy.declared(
+                read_only=True,
+                permissions=["news:read"],
+                scope_dimensions=["stock"],
+            ),
         )
     )
     registry.register(
@@ -106,6 +125,10 @@ def _make_stock_registry(executed_calls):
                 ToolParameter(name="message", type="string", description="Message to echo"),
             ],
             handler=lambda message: executed_calls.append(("echo", message)) or {"echo": message},
+            policy=ToolPolicy.declared(
+                read_only=True,
+                permissions=["analysis_context:read"],
+            ),
         )
     )
     return registry
@@ -213,6 +236,10 @@ class TestAgentExecutor(unittest.TestCase):
                     ToolParameter(name="message", type="string", description="Message to echo"),
                 ],
                 handler=lambda message: executed_calls.append(("echo", message)) or {"echo": message},
+                policy=ToolPolicy.declared(
+                    read_only=True,
+                    permissions=["analysis_context:read"],
+                ),
             )
         )
         adapter = _make_mock_adapter()
@@ -647,11 +674,14 @@ class TestAgentExecutor(unittest.TestCase):
 
         self.assertTrue(result.success)
         self.assertEqual(executed_calls, [])
-        self.assertTrue(result.tool_calls_log[0]["guarded"])
-        self.assertEqual(result.tool_calls_log[0]["requested_stock_code"], "123456")
+        self.assertFalse(result.tool_calls_log[0]["success"])
+        self.assertNotIn("guarded", result.tool_calls_log[0])
         tool_messages = [msg for msg in result.messages if msg.get("role") == "tool"]
         self.assertEqual(len(tool_messages), 1)
-        self.assertIn("stock_scope_violation", tool_messages[0]["content"])
+        self.assertEqual(
+            json.loads(tool_messages[0]["content"])["code"],
+            "invalid_arguments",
+        )
 
     def test_run_agent_loop_allows_explicit_allowed_stock_code_and_hk_equivalent(self):
         executed_calls = []
@@ -1588,6 +1618,10 @@ class TestAgentExecutor(unittest.TestCase):
             description="Always fails",
             parameters=[],
             handler=_always_fail,
+            policy=ToolPolicy.declared(
+                read_only=True,
+                permissions=["analysis_context:read"],
+            ),
         )
         registry.register(tool)
         adapter = _make_mock_adapter()
@@ -1675,8 +1709,8 @@ class TestAgentExecutor(unittest.TestCase):
         self.assertEqual(
             json.loads(tool_messages[0]["content"]),
             {
-                "error": "Tool not found.",
-                "code": "tool_not_found",
+                "error": "Tool is not in the session allowlist.",
+                "code": "tool_not_allowed",
                 "retriable": False,
             },
         )
@@ -1688,7 +1722,6 @@ class TestAgentExecutor(unittest.TestCase):
             registry,
             execution_id="malformed-test",
             allowed_tools=registry.list_names(),
-            enforce_access_policy=False,
             security_audit=SecurityAuditRecorderStub(),
         )
 
@@ -1820,6 +1853,11 @@ class TestAgentExecutor(unittest.TestCase):
                     ToolParameter(name="stock_code", type="string", description="Stock code"),
                 ],
                 handler=_quote,
+                policy=ToolPolicy.declared(
+                    read_only=True,
+                    permissions=["market_data:read"],
+                    scope_dimensions=["stock"],
+                ),
             )
         )
         adapter = _make_mock_adapter()
@@ -1974,6 +2012,10 @@ class TestAgentExecutor(unittest.TestCase):
                     ToolParameter(name="message", type="string", description="Message to echo"),
                 ],
                 handler=_maybe_slow_echo,
+                policy=ToolPolicy.declared(
+                    read_only=True,
+                    permissions=["analysis_context:read"],
+                ),
             )
         )
         adapter = _make_mock_adapter()
@@ -2028,6 +2070,10 @@ class TestAgentExecutor(unittest.TestCase):
                     ToolParameter(name="message", type="string", description="Message to echo"),
                 ],
                 handler=_slow_echo,
+                policy=ToolPolicy.declared(
+                    read_only=True,
+                    permissions=["analysis_context:read"],
+                ),
             )
         )
         adapter = _make_mock_adapter()

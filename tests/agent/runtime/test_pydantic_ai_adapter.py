@@ -279,7 +279,11 @@ def _echo_registry() -> ToolRegistry:
             description="Echoes the message",
             parameters=[ToolParameter(name="message", type="string", description="Message")],
             handler=lambda message: {"echo": message},
-            policy=ToolPolicy.declared(read_only=True, side_effects=[], permissions=["test:read"]),
+            policy=ToolPolicy.declared(
+                read_only=True,
+                side_effects=[],
+                permissions=["analysis_context:read"],
+            ),
         )
     )
     return registry
@@ -506,7 +510,7 @@ def test_live_cancel_fences_wire_response_before_tool_dispatch():
         _echo_registry(),
         execution_id="ex-cancel-fence",
         allowed_tools=["echo"],
-        granted_permissions=["test:read"],
+        granted_permissions=["analysis_context:read"],
         security_audit=SecurityAuditRecorderStub(),
     )
     adapter = PydanticAIRuntimeAdapter(
@@ -535,7 +539,7 @@ def test_live_cancel_fences_direct_model_tool_call_before_dispatch():
         _echo_registry(),
         execution_id="ex-direct-cancel-fence",
         allowed_tools=["echo"],
-        granted_permissions=["test:read"],
+        granted_permissions=["analysis_context:read"],
         security_audit=SecurityAuditRecorderStub(),
     )
     adapter = PydanticAIRuntimeAdapter(
@@ -563,7 +567,7 @@ def test_live_deadline_fences_direct_model_tool_call_before_dispatch():
         _echo_registry(),
         execution_id="ex-direct-deadline-fence",
         allowed_tools=["echo"],
-        granted_permissions=["test:read"],
+        granted_permissions=["analysis_context:read"],
         security_audit=SecurityAuditRecorderStub(),
     )
     adapter = PydanticAIRuntimeAdapter(
@@ -596,7 +600,7 @@ def test_cancel_accepted_before_atomic_dispatch_claim_prevents_tool_call():
         _echo_registry(),
         execution_id="ex-atomic-dispatch-cancel",
         allowed_tools=["echo"],
-        granted_permissions=["test:read"],
+        granted_permissions=["analysis_context:read"],
         security_audit=SecurityAuditRecorderStub(),
     )
     adapter = PydanticAIRuntimeAdapter(
@@ -658,7 +662,7 @@ def test_atomic_dispatch_claim_does_not_hold_lock_during_tool_call():
             policy=ToolPolicy.declared(
                 read_only=True,
                 side_effects=[],
-                permissions=["test:read"],
+                permissions=["analysis_context:read"],
             ),
         )
     )
@@ -666,7 +670,7 @@ def test_atomic_dispatch_claim_does_not_hold_lock_during_tool_call():
         registry,
         execution_id="ex-inflight-dispatch-cancel",
         allowed_tools=["echo"],
-        granted_permissions=["test:read"],
+        granted_permissions=["analysis_context:read"],
         security_audit=SecurityAuditRecorderStub(),
     )
     adapter = PydanticAIRuntimeAdapter(
@@ -767,7 +771,7 @@ def test_live_handle_subscribes_to_tool_events_before_terminal():
         _echo_registry(),
         execution_id="ex-live-events",
         allowed_tools=["echo"],
-        granted_permissions=["test:read"],
+        granted_permissions=["analysis_context:read"],
         security_audit=SecurityAuditRecorderStub(),
     )
     adapter = PydanticAIRuntimeAdapter(
@@ -844,7 +848,7 @@ def test_tool_call_routes_through_bound_session():
         _echo_registry(),
         execution_id="ex-tool-1",
         allowed_tools=["echo"],
-        granted_permissions=["test:read"],
+        granted_permissions=["analysis_context:read"],
         security_audit=SecurityAuditRecorderStub(),
     )
     adapter = PydanticAIRuntimeAdapter(
@@ -866,7 +870,7 @@ def test_gate_rejection_is_fail_closed_at_dispatch():
         _echo_registry(),
         execution_id="ex-tool-2",
         allowed_tools=["echo"],
-        granted_permissions=[],  # missing 'test:read'
+        granted_permissions=[],  # missing 'analysis_context:read'
         security_audit=SecurityAuditRecorderStub(),
     )
     adapter = PydanticAIRuntimeAdapter(
@@ -934,7 +938,7 @@ def test_tool_calls_emit_events_through_shared_emitter():
         _echo_registry(),
         execution_id="ex-evt-1",
         allowed_tools=["echo"],
-        granted_permissions=["test:read"],
+        granted_permissions=["analysis_context:read"],
         security_audit=SecurityAuditRecorderStub(),
     )
     adapter = PydanticAIRuntimeAdapter(

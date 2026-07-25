@@ -19,7 +19,12 @@ from src.agent.orchestrator import AgentOrchestrator
 from src.agent.protocols import AgentContext, StageResult, StageStatus
 from src.agent.runner import run_agent_loop
 from src.agent.stream_events import stream_event
-from src.agent.tools.registry import ToolDefinition, ToolParameter, ToolRegistry
+from src.agent.tools.registry import (
+    ToolDefinition,
+    ToolParameter,
+    ToolPolicy,
+    ToolRegistry,
+)
 
 
 def _make_registry() -> ToolRegistry:
@@ -32,6 +37,10 @@ def _make_registry() -> ToolRegistry:
                 ToolParameter(name="message", type="string", description="Message"),
             ],
             handler=lambda message: {"echo": message},
+            policy=ToolPolicy.declared(
+                read_only=True,
+                permissions=["analysis_context:read"],
+            ),
         )
     )
     return registry

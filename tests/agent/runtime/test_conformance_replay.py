@@ -159,13 +159,9 @@ def _run_case_pydantic(case):
             registry,
             execution_id=f"conformance-{case['id']}",
             allowed_tools=registry.list_names(),
+            granted_permissions=registry.supported_declared_capabilities(),
             backend=_EXPERIMENTAL_RUNTIME,
             principal=_EXPERIMENTAL_RUNTIME,
-            # Pass-through access policy reproduces the native run loop's
-            # replay-frozen tool dispatch byte-for-byte so the equivalence
-            # comparison is apples-to-apples; the strict fail-closed gate is
-            # exercised by test_tool_session.py and test_pydantic_ai_real_bridge.py.
-            enforce_access_policy=False,
             deadline_monotonic=deadline,
             security_audit=SecurityAuditRecorderStub(),
         )

@@ -25,6 +25,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from src.agent.llm_adapter import LLMToolAdapter
 from src.agent.runner import RunLoopResult, run_agent_loop
+from src.agent.stock_scope import StockScope, resolve_stock_scope
 from src.agent.tools.registry import ToolRegistry
 from src.utils.sanitize import log_safe_exception
 
@@ -91,6 +92,8 @@ class ResearchAgent:
         tokens_used = 0
         all_findings: List[Dict[str, Any]] = []
         questions: List[str] = [query]
+        scope_resolution = resolve_stock_scope(query, context)
+        effective_context = scope_resolution.effective_context
 
         # Phase 1: Decompose
         if self._is_timed_out(started_at, timeout_seconds):
@@ -107,7 +110,7 @@ class ResearchAgent:
 
         sub_questions = self._decompose_query(
             query,
-            context,
+            effective_context,
             timeout_seconds=self._remaining_timeout_seconds(started_at, timeout_seconds),
         )
         tokens_used += sub_questions.get("tokens", 0)
@@ -149,8 +152,9 @@ class ResearchAgent:
 
             finding = self._research_sub_question(
                 question,
-                context,
+                effective_context,
                 tokens_used,
+                stock_scope=scope_resolution.stock_scope,
                 timeout_seconds=self._remaining_timeout_seconds(started_at, timeout_seconds),
             )
             tokens_used += finding.get("tokens", 0)
@@ -182,7 +186,7 @@ class ResearchAgent:
             self._synthesise_report(
                 query,
                 all_findings,
-                context,
+                effective_context,
                 timeout_seconds=self._remaining_timeout_seconds(started_at, timeout_seconds),
             )
             if all_findings
@@ -332,7 +336,7 @@ Return a JSON object:
                 raw = re.sub(r'\s*```$', '', raw)
             parsed = json.loads(raw)
             return {"questions": parsed.get("questions", [query]), "tokens": tokens}
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Fall back to the original query when decomposition fails.
             log_safe_exception(
                 logger,
                 "Research query decomposition failed",
@@ -349,6 +353,8 @@ Return a JSON object:
         question: str,
         context: Optional[Dict[str, Any]],
         current_tokens: int,
+        *,
+        stock_scope: Optional[StockScope],
         timeout_seconds: Optional[float] = None,
     ) -> Dict[str, Any]:
         """Research a single sub-question using the agent loop."""
@@ -362,6 +368,7 @@ Return a JSON object:
                 "error": "Deep research timed out before sub-question execution",
             }
         remaining_budget = self.token_budget - current_tokens
+        effective_context = dict(context or {})
 
         system = f"""\
 You are a research agent investigating a specific question.
@@ -370,8 +377,10 @@ your findings in 2-4 paragraphs.  Be factual and cite sources.
 Token budget remaining: ~{remaining_budget}
 """
         stock_context = ""
-        if context and context.get("stock_code"):
-            stock_context = f" (related to stock {context['stock_code']})"
+        if effective_context.get("stock_code"):
+            stock_context = (
+                f" (related to stock {effective_context['stock_code']})"
+            )
 
         messages = [
             {"role": "system", "content": system},
@@ -387,6 +396,7 @@ Token budget remaining: ~{remaining_budget}
                 max_steps=4,
                 max_wall_clock_seconds=timeout_seconds,
                 tool_call_timeout_seconds=timeout_seconds,
+                stock_scope=stock_scope,
             )
             if not result.success and self._looks_like_timeout_error(result.error):
                 return {
@@ -403,7 +413,7 @@ Token budget remaining: ~{remaining_budget}
                 "tokens": result.total_tokens,
                 "success": result.success,
             }
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Preserve the bounded research result contract for one failed sub-question.
             log_safe_exception(
                 logger,
                 "Research sub-question execution failed",
