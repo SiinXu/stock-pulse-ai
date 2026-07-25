@@ -227,11 +227,14 @@ license layer. See the official
 [Ollama create API](https://docs.ollama.com/api/create) for the downstream
 runtime contract.
 
-Cancellation is checked after validation, before any Web blob work, and again
-after a blob check or upload before StockPulse issues the irreversible
-`/api/create` request. If cancellation arrives while that request is already in
-flight, StockPulse prevents activation and registration, but Ollama may retain
-the model created by the request.
+Cancellation is checked after validation, before the Web blob probe, after the
+probe and immediately before an upload, after the blob is ready, and again
+after the create-progress update immediately before StockPulse issues the
+irreversible `/api/create` request. If cancellation arrives while a blob upload
+is already in flight, that content-addressed upload may finish but model
+creation is fenced. If it arrives while `/api/create` is already in flight,
+StockPulse prevents activation and registration, but Ollama may retain the
+model created by the request.
 
 ## Publisher Workflow
 

@@ -165,8 +165,11 @@ class OllamaHttpModelPackExecutor:
         base_url: str,
         gguf_path: Path,
         digest: str,
-    ) -> None:
-        """Ensure Ollama stores the verified GGUF content-addressed blob."""
+        is_cancel_requested: Callable[[], bool],
+    ) -> bool:
+        """Ensure Ollama stores the blob unless cancellation wins first."""
+        if is_cancel_requested():
+            return False
         blob_url = f"{base_url}/api/blobs/sha256:{digest}"
         head_response = self._request("HEAD", blob_url)
         try:
@@ -175,7 +178,7 @@ class OllamaHttpModelPackExecutor:
             status_code = 0
         try:
             if status_code == 200:
-                return
+                return True
             if status_code != 404:
                 self._require_status(
                     head_response,
@@ -184,8 +187,12 @@ class OllamaHttpModelPackExecutor:
                 )
         finally:
             self._close_response(head_response)
+        if is_cancel_requested():
+            return False
         try:
             with gguf_path.open("rb") as file_obj:
+                if is_cancel_requested():
+                    return False
                 response = self._request(
                     "POST",
                     blob_url,
@@ -206,6 +213,7 @@ class OllamaHttpModelPackExecutor:
             self._require_status(response, accepted={200, 201}, operation="GGUF upload")
         finally:
             self._close_response(response)
+        return True
 
     @staticmethod
     def _create_payload(inspected: InspectedModelPack) -> Dict[str, Any]:
@@ -240,15 +248,18 @@ class OllamaHttpModelPackExecutor:
         digest = inspected.manifest.file_for_role("gguf").sha256
         if on_progress is not None:
             on_progress(45, "Uploading the verified GGUF data to Ollama")
-        self._ensure_blob(
+        blob_ready = self._ensure_blob(
             base_url=base_url,
             gguf_path=inspected.gguf_path,
             digest=digest,
+            is_cancel_requested=cancel_requested,
         )
-        if cancel_requested():
+        if not blob_ready or cancel_requested():
             return False
         if on_progress is not None:
             on_progress(75, "Creating the Ollama model")
+        if cancel_requested():
+            return False
         response = self._request(
             "POST",
             f"{base_url}/api/create",

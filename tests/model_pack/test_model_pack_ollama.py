@@ -211,6 +211,66 @@ def test_http_executor_cancellation_after_blob_upload_skips_create(
     assert all(not url.endswith("/api/create") for _method, url in requests_seen)
 
 
+def test_http_executor_cancellation_during_blob_check_skips_upload(
+    tmp_path: Path,
+) -> None:
+    pack_path = _write_pack(tmp_path / "cancel-during-blob-check")
+    requests_seen = []
+    cancelled = False
+
+    def requester(method: str, url: str, **_kwargs):
+        nonlocal cancelled
+        requests_seen.append((method, url))
+        assert method == "HEAD"
+        cancelled = True
+        return _Response(404)
+
+    executor = OllamaHttpModelPackExecutor(
+        base_url_provider=lambda: "http://127.0.0.1:11434",
+        requester=requester,
+    )
+    with inspect_model_pack(pack_path) as inspected:
+        created = executor.create(
+            inspected,
+            is_cancel_requested=lambda: cancelled,
+        )
+
+    assert created is False
+    assert [method for method, _url in requests_seen] == ["HEAD"]
+
+
+def test_http_executor_cancellation_at_create_progress_skips_create(
+    tmp_path: Path,
+) -> None:
+    pack_path = _write_pack(tmp_path / "cancel-at-create-progress")
+    requests_seen = []
+    cancelled = False
+
+    def requester(method: str, url: str, **_kwargs):
+        requests_seen.append((method, url))
+        assert method == "HEAD"
+        return _Response(200)
+
+    def record_progress(percent: int, _message: str) -> None:
+        nonlocal cancelled
+        if percent == 75:
+            cancelled = True
+
+    executor = OllamaHttpModelPackExecutor(
+        base_url_provider=lambda: "http://127.0.0.1:11434",
+        requester=requester,
+    )
+    with inspect_model_pack(pack_path) as inspected:
+        created = executor.create(
+            inspected,
+            on_progress=record_progress,
+            is_cancel_requested=lambda: cancelled,
+        )
+
+    assert created is False
+    assert [method for method, _url in requests_seen] == ["HEAD"]
+
+
 def test_web_pack_inspection_uses_the_portable_manifest_text_contract(
     tmp_path: Path,
 ) -> None:
