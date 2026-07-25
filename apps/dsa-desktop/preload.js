@@ -80,8 +80,10 @@ function createLocalModelBridge({ renderer = ipcRenderer } = {}) {
         expectedRuntimeIdentity,
       });
     },
-    importPack() {
-      return renderer.invoke(DESKTOP_LOCAL_MODEL_IMPORT_PACK_CHANNEL);
+    importPack(expectedConfigVersion) {
+      return renderer.invoke(DESKTOP_LOCAL_MODEL_IMPORT_PACK_CHANNEL, {
+        expectedConfigVersion,
+      });
     },
     openInstallGuide() {
       return renderer.invoke(DESKTOP_LOCAL_MODEL_OPEN_GUIDE_CHANNEL);

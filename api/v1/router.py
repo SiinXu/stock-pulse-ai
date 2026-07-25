@@ -143,7 +143,7 @@ router.include_router(
 router.include_router(
     scheduled_tasks.router,
     prefix="/scheduled-tasks",
-    tags=["ScheduledTasks"],
+    tags=["ScheduledTasks"]
 )
 
 router.include_router(

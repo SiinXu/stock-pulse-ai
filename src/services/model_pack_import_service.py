@@ -127,6 +127,10 @@ class ModelPackImportService:
         runtime_identity = get_ollama_runtime_identity(base_url)
         executor = self._executor_factory(lambda: base_url)
 
+        def cleanup_import_source() -> None:
+            if cleanup_path is not None:
+                shutil.rmtree(cleanup_path, ignore_errors=True)
+
         def run_import(context: TaskRunContext) -> Dict[str, Any]:
             try:
                 with inspect_model_pack(source_path) as inspected:
@@ -210,8 +214,7 @@ class ModelPackImportService:
                 self._record_failure(context.task_id, exc)
                 raise
             finally:
-                if cleanup_path is not None:
-                    shutil.rmtree(cleanup_path, ignore_errors=True)
+                cleanup_import_source()
 
         command = TaskCommand(
             kind=MODEL_PACK_IMPORT_TASK_KIND,
@@ -223,8 +226,13 @@ class ModelPackImportService:
                 "message": "Model Pack import queued",
             },
             failure_error_code="model_pack_import_failed",
+            on_done=cleanup_import_source,
         )
-        task_id = self._task_queue.submit(command)
+        try:
+            task_id = self._task_queue.submit(command)
+        except BaseException:  # broad-exception: cleanup - release staging when queue admission fails
+            cleanup_import_source()
+            raise
         task = self._task_queue.get_task(task_id)
         if task is None:  # pragma: no cover - queue adapter invariant
             raise RuntimeError("Accepted Model Pack import task is unavailable")

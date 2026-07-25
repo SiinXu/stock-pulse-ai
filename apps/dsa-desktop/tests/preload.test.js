@@ -220,9 +220,9 @@ test('createLocalModelBridge delegates lifecycle actions and removes state liste
     channel: preloadModule.DESKTOP_LOCAL_MODEL_PULL_CHANNEL,
     payload: { modelId: 'qwen3:8b' },
   });
-  assert.deepEqual(await bridge.importPack(), {
+  assert.deepEqual(await bridge.importPack('config-1'), {
     channel: preloadModule.DESKTOP_LOCAL_MODEL_IMPORT_PACK_CHANNEL,
-    payload: undefined,
+    payload: { expectedConfigVersion: 'config-1' },
   });
   assert.deepEqual(await bridge.remove('qwen3:8b', LOCAL_MODEL_RUNTIME_IDENTITY), {
     channel: preloadModule.DESKTOP_LOCAL_MODEL_REMOVE_CHANNEL,

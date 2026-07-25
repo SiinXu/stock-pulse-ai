@@ -15,6 +15,7 @@ from src.model_pack import (
     ModelPackError,
     ModelPackImporter,
     inspect_model_pack,
+    parse_manifest,
 )
 
 
@@ -135,7 +136,33 @@ def test_directory_rejects_an_unbounded_extra_file_inventory(tmp_path: Path) -> 
         with inspect_model_pack(pack_path):
             pass
 
-    _assert_error(error, "invalid_archive", "too many files")
+    _assert_error(error, "invalid_archive", "too many entries")
+
+
+def test_directory_counts_empty_directories_toward_the_inventory_limit(
+    tmp_path: Path,
+) -> None:
+    pack_path = _write_pack(tmp_path / "too-many-directories")
+    for index in range(MAX_MODEL_PACK_ENTRIES):
+        (pack_path / f"empty-{index:03d}").mkdir()
+
+    with pytest.raises(ModelPackError) as error:
+        with inspect_model_pack(pack_path):
+            pass
+
+    _assert_error(error, "invalid_archive", "too many entries")
+
+
+def test_manifest_reserves_its_own_filename_for_the_metadata_entry(tmp_path: Path) -> None:
+    pack_path = _write_pack(tmp_path / "reserved-manifest")
+    manifest = json.loads((pack_path / "manifest.json").read_text(encoding="utf-8"))
+    manifest["modelfile"] = "Manifest.json"
+    manifest["files"][1]["path"] = "Manifest.json"
+
+    with pytest.raises(ModelPackError) as error:
+        parse_manifest(manifest)
+
+    _assert_error(error, "invalid_manifest", "reserved manifest.json")
 
 
 def test_inspect_directory_uses_a_private_snapshot_until_cleanup(tmp_path: Path) -> None:

@@ -40,6 +40,7 @@ interface DesktopOperationResult {
   minimumMemoryGb?: unknown;
   licenseId?: unknown;
   warnings?: unknown;
+  desktopAttestation?: unknown;
 }
 
 export interface DesktopLocalModelBridge {
@@ -49,7 +50,7 @@ export interface DesktopLocalModelBridge {
   stop: () => Promise<DesktopLocalModelState>;
   pull: (modelId: string) => Promise<DesktopOperationResult>;
   remove: (modelId: string, expectedRuntimeIdentity: string) => Promise<DesktopOperationResult>;
-  importPack: () => Promise<DesktopOperationResult>;
+  importPack: (expectedConfigVersion: string) => Promise<DesktopOperationResult>;
   openInstallGuide: () => Promise<boolean>;
   onStateChange: (listener: (state: DesktopLocalModelState) => void) => (() => void) | void;
 }
@@ -492,7 +493,7 @@ function createDesktopTransport(bridge: DesktopLocalModelBridge): LocalModelTran
         if (nextProgress && state.operation === 'import') onProgress(nextProgress);
       });
       try {
-        const result = await bridge.importPack();
+        const result = await bridge.importPack(configuration.configVersion);
         if (result.canceled === true) return null;
         if (result.ok !== true) {
           throw new LocalModelTransportError(
@@ -509,7 +510,11 @@ function createDesktopTransport(bridge: DesktopLocalModelBridge): LocalModelTran
         const runtimeIdentity = typeof result.runtimeIdentity === 'string'
           ? result.runtimeIdentity
           : '';
-        if (!modelId || !displayName || !minimumMemoryGb || !licenseId || !runtimeIdentity) {
+        const desktopAttestation = typeof result.desktopAttestation === 'string'
+          ? result.desktopAttestation
+          : '';
+        if (!modelId || !displayName || !minimumMemoryGb || !licenseId
+          || !runtimeIdentity || !desktopAttestation) {
           throw new LocalModelTransportError(
             'local_model_runtime_snapshot_missing',
             'Desktop did not return a complete validated Model Pack snapshot',
@@ -522,6 +527,7 @@ function createDesktopTransport(bridge: DesktopLocalModelBridge): LocalModelTran
             manifest,
             configuration.configVersion,
             runtimeIdentity,
+            desktopAttestation,
           );
         } catch (error) {
           const parsed = getParsedApiError(error, 'en');

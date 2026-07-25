@@ -173,6 +173,10 @@ def parse_manifest(raw: Mapping[str, Any]) -> ModelPackManifest:
             raw_file.get("path"),
             field_name=f"files[{index}].path",
         )
+        if path.casefold() == MANIFEST_FILENAME.casefold():
+            raise _invalid_manifest(
+                f"files[{index}].path cannot use the reserved manifest.json name"
+            )
         role = _require_text(
             raw_file.get("role"),
             field_name=f"files[{index}].role",

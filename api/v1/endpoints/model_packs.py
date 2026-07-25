@@ -22,7 +22,11 @@ from api.v1.schemas.local_models import LocalModelMutationResponse
 from src.services.local_model_service import LocalModelError, LocalModelService
 from src.services.model_pack_import_service import ModelPackImportService
 from src.services.system_config_service import ConfigConflictError, ConfigValidationError
-from src.model_pack import MAX_MODEL_PACK_BYTES, ModelPackError
+from src.model_pack import (
+    MAX_MODEL_PACK_BYTES,
+    ModelPackError,
+    consume_desktop_model_pack_attestation,
+)
 from src.utils.sanitize import log_safe_exception
 
 
@@ -161,6 +165,15 @@ def activate_desktop_model_pack(
     local_model_service: LocalModelService = Depends(get_local_model_service),
 ) -> LocalModelMutationResponse:
     try:
+        consume_desktop_model_pack_attestation(
+            request.desktop_attestation,
+            model_id=request.model_id,
+            display_name=request.display_name,
+            minimum_memory_gb=request.minimum_memory_gb,
+            license_id=request.license_id,
+            expected_config_version=request.expected_config_version,
+            expected_runtime_identity=request.expected_runtime_identity,
+        )
         payload = service.activate_desktop_import(
             local_model_service,
             model_id=request.model_id,

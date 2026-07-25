@@ -251,8 +251,18 @@ def _read_directory_manifest(root: Path) -> Tuple[ModelPackManifest, bytes]:
 
 def _directory_inventory(root: Path) -> Tuple[str, ...]:
     names: List[str] = []
+    paths: List[Path] = []
+    entry_count = 0
     try:
-        for path in sorted(root.rglob("*"), key=lambda item: item.as_posix()):
+        for path in root.rglob("*"):
+            entry_count += 1
+            if entry_count > MAX_MODEL_PACK_ENTRIES:
+                raise _error(
+                    "invalid_archive",
+                    "Model Pack contains too many entries. Rebuild it with only declared data.",
+                )
+            paths.append(path)
+        for path in sorted(paths, key=lambda item: item.as_posix()):
             if path.is_symlink():
                 relative = path.relative_to(root).as_posix()
                 raise _error(
@@ -261,11 +271,6 @@ def _directory_inventory(root: Path) -> Tuple[str, ...]:
                 )
             if path.is_file():
                 names.append(path.relative_to(root).as_posix())
-                if len(names) > MAX_MODEL_PACK_ENTRIES:
-                    raise _error(
-                        "invalid_archive",
-                        "Model Pack contains too many files. Rebuild it with only declared data.",
-                    )
             elif not path.is_dir():
                 relative = path.relative_to(root).as_posix()
                 raise _error(

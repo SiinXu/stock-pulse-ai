@@ -28,9 +28,13 @@ supported model-import entry point.
   It calls `ollama create` with a fixed argument array and `shell=false`. Pack
   content is never added to a command line except for the validated model id
   and StockPulse-owned extracted Modelfile path.
-- Desktop returns validated manifest metadata and an opaque runtime identity to
-  the Web panel. The backend then checks the original configuration/runtime
-  snapshot before using the same activation path as a catalog download.
+- Desktop returns validated manifest metadata, an opaque runtime identity, and
+  a short-lived one-time attestation to the Web panel. The attestation binds
+  the exact validated fields to an ephemeral secret shared only by Electron
+  main and its managed backend; an ordinary API caller cannot register
+  unvalidated metadata. The backend consumes it and checks the original
+  configuration/runtime snapshot before using the same activation path as a
+  catalog download.
 
 After successful creation, StockPulse adds `ollama` to `LLM_CHANNELS`, adds the
 model id to `LLM_OLLAMA_MODELS`, enables that channel, and reloads configuration
@@ -142,8 +146,8 @@ Extra regular files produce warnings and are not extracted from an archive.
 Missing declared files fail import. Unsafe archive names, duplicate
 case-insensitive names, nested paths, and symbolic links fail import even when
 they are not declared. Directory and archive inventories are capped at 256
-files, and the archive plus the sum of declared payload sizes are each capped
-at 64 GiB.
+entries (including empty directories), and the archive plus the sum of
+declared payload sizes are each capped at 64 GiB.
 
 ### Constrained Modelfile
 
@@ -252,7 +256,7 @@ create a Release.
 
 ## Configuration And Rollback
 
-Model Pack import adds no environment keys. It reuses:
+Model Pack import adds no user-configurable environment keys. It reuses:
 
 - `LLM_CHANNELS`;
 - `LLM_OLLAMA_PROVIDER`;
@@ -262,6 +266,11 @@ Model Pack import adds no environment keys. It reuses:
 - `LLM_OLLAMA_ENABLED`;
 - existing primary/Agent assignment keys when the user explicitly selects
   those roles.
+
+Packaged Desktop launches its managed backend with a random, process-lifetime
+attestation key. This internal key is replaced on every Desktop start, is not a
+user configuration option, is never written to `.env`, and is not exposed by
+the preload bridge.
 
 There is no `LITELLM_FALLBACK_MODELS` setting. Multi-provider fallback remains
 the existing ordered `LLM_CHANNELS` behavior and Local Models assignment UI.

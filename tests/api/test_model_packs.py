@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
+import json
 import shutil
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -10,7 +15,44 @@ from fastapi.testclient import TestClient
 
 from api.deps import get_local_model_service, get_model_pack_import_service
 from api.v1.endpoints import model_packs
-from src.model_pack import ModelPackError
+from src.model_pack import (
+    DESKTOP_MODEL_PACK_ATTESTATION_ENV,
+    DESKTOP_MODEL_PACK_ATTESTATION_TTL_MS,
+    ModelPackError,
+)
+
+
+_DESKTOP_ATTESTATION_SECRET = "a" * 64
+
+
+def _desktop_attestation(monkeypatch, *, nonce: str) -> str:
+    monkeypatch.setenv("DSA_DESKTOP_MODE", "true")
+    monkeypatch.setenv(
+        DESKTOP_MODEL_PACK_ATTESTATION_ENV,
+        _DESKTOP_ATTESTATION_SECRET,
+    )
+    issued_at = int(time.time() * 1000)
+    payload = {
+        "version": 1,
+        "issuedAt": issued_at,
+        "expiresAt": issued_at + DESKTOP_MODEL_PACK_ATTESTATION_TTL_MS,
+        "nonce": nonce,
+        "modelId": "licensed/finance:q4",
+        "displayName": "Licensed Finance Q4",
+        "minimumMemoryGb": 16,
+        "licenseId": "LicenseRef-Finance",
+        "expectedConfigVersion": "config-1",
+        "expectedRuntimeIdentity": "a" * 64,
+    }
+    encoded = base64.urlsafe_b64encode(
+        json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii").rstrip("=")
+    signature = hmac.new(
+        _DESKTOP_ATTESTATION_SECRET.encode("ascii"),
+        encoded.encode("ascii"),
+        hashlib.sha256,
+    ).hexdigest()
+    return f"{encoded}.{signature}"
 
 
 class _ModelPackService:
@@ -239,9 +281,12 @@ def test_openapi_import_contract_has_no_caller_controlled_target_url() -> None:
     assert "url" not in str(component["properties"]).lower()
 
 
-def test_desktop_activation_reuses_server_snapshot_without_accepting_a_target_url() -> None:
+def test_desktop_activation_reuses_server_snapshot_without_accepting_a_target_url(
+    monkeypatch,
+) -> None:
     service = _ModelPackService()
     client = _client(service)
+    attestation = _desktop_attestation(monkeypatch, nonce="4" * 32)
 
     response = client.post(
         "/model-packs/desktop-activations",
@@ -252,6 +297,7 @@ def test_desktop_activation_reuses_server_snapshot_without_accepting_a_target_ur
             "license_id": "LicenseRef-Finance",
             "expected_config_version": "config-1",
             "expected_runtime_identity": "a" * 64,
+            "desktop_attestation": attestation,
         },
     )
 
@@ -268,7 +314,7 @@ def test_desktop_activation_reuses_server_snapshot_without_accepting_a_target_ur
     assert "url" not in str(component).lower()
 
 
-def test_desktop_activation_returns_a_stable_registration_failure() -> None:
+def test_desktop_activation_returns_a_stable_registration_failure(monkeypatch) -> None:
     service = _ModelPackService()
     def reject_activation(*_args, **_kwargs):
         raise ModelPackError(
@@ -278,6 +324,7 @@ def test_desktop_activation_returns_a_stable_registration_failure() -> None:
 
     service.activate_desktop_import = reject_activation
     client = _client(service)
+    attestation = _desktop_attestation(monkeypatch, nonce="5" * 32)
 
     response = client.post(
         "/model-packs/desktop-activations",
@@ -288,8 +335,31 @@ def test_desktop_activation_returns_a_stable_registration_failure() -> None:
             "license_id": "LicenseRef-Finance",
             "expected_config_version": "config-1",
             "expected_runtime_identity": "a" * 64,
+            "desktop_attestation": attestation,
         },
     )
 
     assert response.status_code == 409
     assert response.json()["detail"]["error"] == "registration_failed"
+
+
+def test_desktop_activation_rejects_forged_metadata_without_validation() -> None:
+    service = _ModelPackService()
+    client = _client(service)
+
+    response = client.post(
+        "/model-packs/desktop-activations",
+        json={
+            "model_id": "unknown/arbitrary:q4",
+            "display_name": "Forged presentation",
+            "minimum_memory_gb": 1,
+            "license_id": "LicenseRef-Forged",
+            "expected_config_version": "config-1",
+            "expected_runtime_identity": "a" * 64,
+            "desktop_attestation": "forged.invalid",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["error"] == "desktop_attestation_invalid"
+    assert service.desktop_activations == []

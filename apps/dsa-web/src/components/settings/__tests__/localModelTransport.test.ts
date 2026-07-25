@@ -66,6 +66,7 @@ function createDesktopBridge(): DesktopLocalModelBridge {
       licenseId: 'LicenseRef-Finance',
       warnings: [],
       runtimeIdentity: RUNTIME_IDENTITY,
+      desktopAttestation: 'desktop-attestation',
     }),
     openInstallGuide: vi.fn().mockResolvedValue(true),
     onStateChange: vi.fn().mockReturnValue(() => undefined),
@@ -266,7 +267,7 @@ describe('localModelTransport', () => {
       displayName: 'Licensed Finance Q4',
       activated: true,
     });
-    expect(bridge.importPack).toHaveBeenCalledTimes(1);
+    expect(bridge.importPack).toHaveBeenCalledWith('config-1');
     expect(packApi.activateDesktop).toHaveBeenCalledWith(
       {
         modelId: 'licensed/finance:q4',
@@ -276,6 +277,7 @@ describe('localModelTransport', () => {
       },
       'config-1',
       RUNTIME_IDENTITY,
+      'desktop-attestation',
     );
     expect(api.getConfiguration.mock.invocationCallOrder[0]).toBeLessThan(
       vi.mocked(bridge.importPack).mock.invocationCallOrder[0],

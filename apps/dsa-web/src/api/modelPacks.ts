@@ -51,6 +51,7 @@ export const modelPacksApi = {
     >,
     expectedConfigVersion: string,
     expectedRuntimeIdentity: string,
+    desktopAttestation: string,
   ): Promise<LocalModelMutationResponse> {
     const response = await apiClient.post<Record<string, unknown>>(
       '/api/v1/model-packs/desktop-activations',
@@ -61,6 +62,7 @@ export const modelPacksApi = {
         license_id: result.licenseId,
         expected_config_version: expectedConfigVersion,
         expected_runtime_identity: expectedRuntimeIdentity,
+        desktop_attestation: desktopAttestation,
       },
     );
     return toCamelCase<LocalModelMutationResponse>(response.data);

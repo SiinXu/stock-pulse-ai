@@ -1054,6 +1054,44 @@ test('buildBackendEnvironment extends macOS GUI PATH with Homebrew CLI directori
   assert.equal(env.DATABASE_PATH, '/tmp/dsa/data.db');
   assert.equal(env.LOG_DIR, '/tmp/dsa/logs');
   assert.equal(env.WEBUI_HOST, '127.0.0.1');
+  assert.match(env[mainModule.DESKTOP_MODEL_PACK_ATTESTATION_ENV], /^[0-9a-f]{64}$/);
+});
+
+test('Desktop Model Pack attestation binds validated metadata to one short-lived token', (t) => {
+  const mainModule = loadMainModule(t);
+  const secret = 'a'.repeat(64);
+  const nowMs = 1784966400000;
+  const token = mainModule.createDesktopModelPackAttestation({
+    modelId: 'licensed/finance:q4',
+    displayName: 'Licensed Finance Q4',
+    minimumMemoryGb: 16,
+    licenseId: 'LicenseRef-Finance',
+    expectedConfigVersion: 'config-1',
+    expectedRuntimeIdentity: LOCAL_MODEL_RUNTIME_IDENTITY,
+  }, {
+    secret,
+    nowMs,
+    randomBytes: () => Buffer.from('b'.repeat(32), 'hex'),
+  });
+  const [encodedPayload, signature] = token.split('.');
+  const payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf-8'));
+
+  assert.equal(
+    signature,
+    crypto.createHmac('sha256', secret).update(encodedPayload, 'ascii').digest('hex')
+  );
+  assert.deepEqual(payload, {
+    version: 1,
+    issuedAt: nowMs,
+    expiresAt: nowMs + mainModule.DESKTOP_MODEL_PACK_ATTESTATION_TTL_MS,
+    nonce: 'b'.repeat(32),
+    modelId: 'licensed/finance:q4',
+    displayName: 'Licensed Finance Q4',
+    minimumMemoryGb: 16,
+    licenseId: 'LicenseRef-Finance',
+    expectedConfigVersion: 'config-1',
+    expectedRuntimeIdentity: LOCAL_MODEL_RUNTIME_IDENTITY,
+  });
 });
 
 test('buildBackendEnvironment keeps non-macOS PATH unchanged', (t) => {
@@ -3851,6 +3889,7 @@ test('desktop Model Pack import uses the trusted runtime snapshot without mutati
   mainModule.__setLocalModelStateForTest(null);
   const importCalls = [];
   const result = await mainModule.importDesktopModelPack({
+    expectedConfigVersion: 'config-1',
     selectSource: async () => '/safe/model.modelpack',
     detectRuntime: async ({ baseUrl }) => ({
       status: mainModule.DESKTOP_LOCAL_MODEL_STATUS.RUNNING,
@@ -3878,6 +3917,11 @@ test('desktop Model Pack import uses the trusted runtime snapshot without mutati
       };
     },
     refreshState: async () => undefined,
+    createAttestation: (payload) => {
+      assert.equal(payload.expectedConfigVersion, 'config-1');
+      assert.equal(payload.expectedRuntimeIdentity, LOCAL_MODEL_RUNTIME_IDENTITY);
+      return 'desktop-attestation';
+    },
   });
 
   assert.equal(importCalls[0].source, '/safe/model.modelpack');
@@ -3891,6 +3935,7 @@ test('desktop Model Pack import uses the trusted runtime snapshot without mutati
     licenseId: 'LicenseRef-Finance',
     warnings: [],
     runtimeIdentity: LOCAL_MODEL_RUNTIME_IDENTITY,
+    desktopAttestation: 'desktop-attestation',
   });
   assert.equal(Object.hasOwn(result, 'source'), false);
 });

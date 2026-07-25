@@ -912,6 +912,9 @@ class AnalysisTaskQueue:
         for task_id in task_ids:
             future = self.executor.submit(self._execute_command, task_id)
             self._futures[task_id] = future
+            callback = self._commands[task_id].on_done
+            if callback is not None:
+                future.add_done_callback(lambda _future, on_done=callback: on_done())
 
     def submit(self, command: TaskCommand) -> str:
         """Submit one immutable command through the canonical execution port."""

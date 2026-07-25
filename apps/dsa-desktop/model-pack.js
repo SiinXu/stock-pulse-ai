@@ -153,6 +153,9 @@ function parseModelPackManifest(payload) {
     }
     assertExactKeys(entry, ['path', 'role', 'sha256', 'size_bytes'], `files[${index}]`);
     const entryPath = requireFilename(entry.path, `files[${index}].path`);
+    if (entryPath.toLowerCase() === MODEL_PACK_MANIFEST_FILENAME) {
+      throw invalidManifest(`files[${index}].path cannot use the reserved manifest.json name`);
+    }
     const role = requireText(entry.role, `files[${index}].role`, 16);
     const digest = requireText(entry.sha256, `files[${index}].sha256`, 64).toLowerCase();
     if (!MODEL_PACK_REQUIRED_ROLES.includes(role)) {
@@ -505,12 +508,20 @@ function unexpectedWarning(name) {
 async function readDirectoryInventory(root) {
   const files = [];
   const pending = [''];
+  let entryCount = 0;
   while (pending.length) {
     const relativeRoot = pending.shift();
     const entries = await fs.promises.readdir(path.join(root, relativeRoot), {
       withFileTypes: true,
     });
     for (const entry of entries) {
+      entryCount += 1;
+      if (entryCount > MODEL_PACK_MAX_ENTRIES) {
+        throw new ModelPackError(
+          'invalid_archive',
+          'Model Pack contains too many entries. Rebuild it with only declared data.'
+        );
+      }
       const relativePath = relativeRoot
         ? `${relativeRoot}/${entry.name}`
         : entry.name;
@@ -524,12 +535,6 @@ async function readDirectoryInventory(root) {
         pending.push(relativePath);
       } else if (entry.isFile()) {
         files.push(relativePath);
-        if (files.length > MODEL_PACK_MAX_ENTRIES) {
-          throw new ModelPackError(
-            'invalid_archive',
-            'Model Pack contains too many files. Rebuild it with only declared data.'
-          );
-        }
       } else {
         throw new ModelPackError(
           'unsafe_package_entry',

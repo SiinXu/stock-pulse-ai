@@ -183,6 +183,23 @@ test('manifest rejects declared payloads above the shared 64 GiB limit', () => {
   }
 });
 
+test('manifest reserves its own filename for metadata', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-model-pack-reserved-'));
+  const { manifest } = writePack(tempRoot);
+  manifest.modelfile = 'Manifest.json';
+  manifest.files[1].path = 'Manifest.json';
+  try {
+    assert.throws(
+      () => parseModelPackManifest(Buffer.from(JSON.stringify(manifest))),
+      (error) => error instanceof ModelPackError
+        && error.code === 'invalid_manifest'
+        && /reserved manifest\.json/i.test(error.userMessage)
+    );
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test('directory inspection rejects an unbounded extra file inventory', async () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-model-pack-count-'));
   const { root } = writePack(tempRoot);
@@ -193,6 +210,24 @@ test('directory inspection rejects an unbounded extra file inventory', async () 
     await assert.rejects(
       inspectModelPack(root, { diskFreeProvider: enoughDisk }),
       (error) => error instanceof ModelPackError && error.code === 'invalid_archive'
+    );
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('directory inspection counts empty directories toward the entry limit', async () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-model-pack-dir-count-'));
+  const { root } = writePack(tempRoot);
+  try {
+    for (let index = 0; index < MODEL_PACK_MAX_ENTRIES; index += 1) {
+      fs.mkdirSync(path.join(root, `empty-${String(index).padStart(3, '0')}`));
+    }
+    await assert.rejects(
+      inspectModelPack(root, { diskFreeProvider: enoughDisk }),
+      (error) => error instanceof ModelPackError
+        && error.code === 'invalid_archive'
+        && /too many entries/i.test(error.userMessage)
     );
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });

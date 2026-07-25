@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import threading
+from concurrent.futures import Future
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -123,6 +124,30 @@ class _RecordingExecutor:
             on_progress(75, "Creating the Ollama model")
 
 
+class _DeferredExecutor:
+    def __init__(self) -> None:
+        self.calls = []
+
+    def submit(self, function, *args, **kwargs):
+        future = Future()
+        self.calls.append((function, args, kwargs, future))
+        return future
+
+    def shutdown(self, wait=True, cancel_futures=False) -> None:
+        del wait
+        if cancel_futures:
+            for _function, _args, _kwargs, future in self.calls:
+                future.cancel()
+
+
+class _FailingExecutor:
+    def submit(self, _function, *_args, **_kwargs):
+        raise RuntimeError("submission failed")
+
+    def shutdown(self, wait=True, cancel_futures=False) -> None:
+        del wait, cancel_futures
+
+
 @pytest.fixture
 def task_queue():
     original = AnalysisTaskQueue._instance
@@ -222,6 +247,45 @@ def test_import_service_preserves_actionable_validation_failure(
     assert status["result"] is None
     assert calls == [("base_url", "http://127.0.0.1:11434")]
     assert config.updates == []
+    assert not staging.exists()
+
+
+@pytest.mark.parametrize("terminalizer", ["cancel", "shutdown"])
+def test_prestart_terminalization_cleans_staged_upload(
+    tmp_path: Path,
+    task_queue: AnalysisTaskQueue,
+    terminalizer: str,
+) -> None:
+    staging = tmp_path / "staging"
+    pack = _write_pack(staging / "pack")
+    executor = _DeferredExecutor()
+    task_queue._executor = executor
+    service, _config, _registry = _services(tmp_path, task_queue)
+
+    task = service.start_import(pack, cleanup_root=staging)
+    assert staging.exists()
+
+    if terminalizer == "cancel":
+        assert task_queue.cancel(task.task_id).status == TaskStatusEnum.CANCELLED
+    else:
+        task_queue.shutdown()
+
+    assert not staging.exists()
+    assert executor.calls[0][3].cancelled()
+
+
+def test_queue_submission_failure_cleans_staged_upload(
+    tmp_path: Path,
+    task_queue: AnalysisTaskQueue,
+) -> None:
+    staging = tmp_path / "staging"
+    pack = _write_pack(staging / "pack")
+    task_queue._executor = _FailingExecutor()
+    service, _config, _registry = _services(tmp_path, task_queue)
+
+    with pytest.raises(RuntimeError, match="submission failed"):
+        service.start_import(pack, cleanup_root=staging)
+
     assert not staging.exists()
 
 

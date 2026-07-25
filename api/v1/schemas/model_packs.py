@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from api.v1.schemas.local_models import LOCAL_MODEL_ID_PATTERN
+from src.model_pack import MAX_DESKTOP_MODEL_PACK_ATTESTATION_BYTES
 from src.model_pack.manifest import LICENSE_ID_PATTERN
 from src.task_execution import TaskStatusEnum
 
@@ -41,6 +42,9 @@ class ModelPackDesktopActivationRequest(BaseModel):
     expected_config_version: str = Field(..., min_length=1, max_length=128)
     expected_runtime_identity: str = Field(
         ..., min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$"
+    )
+    desktop_attestation: str = Field(
+        ..., min_length=1, max_length=MAX_DESKTOP_MODEL_PACK_ATTESTATION_BYTES
     )
 
     @field_validator("display_name")

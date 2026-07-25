@@ -11727,6 +11727,12 @@
             "minLength": 64,
             "pattern": "^[0-9a-f]{64}$",
             "title": "Expected Runtime Identity"
+          },
+          "desktop_attestation": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Desktop Attestation"
           }
         },
         "additionalProperties": false,
@@ -11737,7 +11743,8 @@
           "minimum_memory_gb",
           "license_id",
           "expected_config_version",
-          "expected_runtime_identity"
+          "expected_runtime_identity",
+          "desktop_attestation"
         ],
         "title": "ModelPackDesktopActivationRequest",
         "description": "Manifest fields returned by the isolated Desktop validator."

@@ -153,6 +153,9 @@ const DESKTOP_LOCAL_MODEL_REMOVE_CHANNEL = 'desktop-local-model:remove';
 const DESKTOP_LOCAL_MODEL_IMPORT_PACK_CHANNEL = 'desktop-local-model:import-pack';
 const DESKTOP_LOCAL_MODEL_OPEN_GUIDE_CHANNEL = 'desktop-local-model:open-guide';
 const DESKTOP_LOCAL_MODEL_STATE_EVENT = 'desktop-local-model:state';
+const DESKTOP_MODEL_PACK_ATTESTATION_ENV = 'STOCKPULSE_DESKTOP_MODEL_PACK_ATTESTATION_KEY';
+const DESKTOP_MODEL_PACK_ATTESTATION_TTL_MS = 5 * 60 * 1000;
+const desktopModelPackAttestationKey = crypto.randomBytes(32).toString('hex');
 const PUBLIC_BIND_HOSTS = Object.freeze(new Set(['0.0.0.0', '::', '[::]', '*']));
 const MAC_DESKTOP_CLI_PATH_ENTRIES = Object.freeze([
   '/opt/homebrew/bin',
@@ -1540,6 +1543,7 @@ function buildBackendEnvironment({
   port = null,
   host = null,
   sourceEnv = process.env,
+  modelPackAttestationKey = desktopModelPackAttestationKey,
 }) {
   const selectedPort = Number(port);
   const selectedHost = normalizeBackendBindHost(
@@ -1565,6 +1569,10 @@ function buildBackendEnvironment({
     DINGTALK_STREAM_ENABLED: 'false',
     FEISHU_STREAM_ENABLED: 'false',
   };
+  if (!/^[0-9a-f]{64}$/.test(String(modelPackAttestationKey || ''))) {
+    throw new TypeError('Desktop Model Pack attestation key is invalid');
+  }
+  env[DESKTOP_MODEL_PACK_ATTESTATION_ENV] = modelPackAttestationKey;
 
   if (Number.isInteger(selectedPort) && selectedPort >= 1 && selectedPort <= 65535) {
     env.WEBUI_PORT = String(selectedPort);
@@ -2719,6 +2727,59 @@ function getLocalModelRuntimeIdentity(baseUrl) {
   return crypto.createHash('sha256').update(parsed.origin, 'utf8').digest('hex');
 }
 
+function createDesktopModelPackAttestation({
+  modelId,
+  displayName,
+  minimumMemoryGb,
+  licenseId,
+  expectedConfigVersion,
+  expectedRuntimeIdentity,
+}, {
+  secret = desktopModelPackAttestationKey,
+  nowMs = Date.now(),
+  randomBytes = crypto.randomBytes,
+} = {}) {
+  const configVersion = String(expectedConfigVersion || '').trim();
+  if (!configVersion || configVersion.length > 128 || /[\u0000-\u001f]/.test(configVersion)) {
+    throw new ModelPackError(
+      'desktop_attestation_invalid',
+      'Refresh Local Models and import the Model Pack again.'
+    );
+  }
+  if (!/^[0-9a-f]{64}$/.test(String(secret || ''))
+    || !/^[0-9a-f]{64}$/.test(String(expectedRuntimeIdentity || ''))) {
+    throw new ModelPackError(
+      'desktop_attestation_invalid',
+      'Desktop Model Pack validation could not be verified. Import the pack again.'
+    );
+  }
+  const issuedAt = Math.trunc(Number(nowMs));
+  if (!Number.isSafeInteger(issuedAt) || issuedAt < 1) {
+    throw new TypeError('Desktop Model Pack attestation time is invalid');
+  }
+  const nonce = randomBytes(16).toString('hex');
+  if (!/^[0-9a-f]{32}$/.test(nonce)) {
+    throw new TypeError('Desktop Model Pack attestation nonce is invalid');
+  }
+  const payload = {
+    version: 1,
+    issuedAt,
+    expiresAt: issuedAt + DESKTOP_MODEL_PACK_ATTESTATION_TTL_MS,
+    nonce,
+    modelId,
+    displayName,
+    minimumMemoryGb,
+    licenseId,
+    expectedConfigVersion: configVersion,
+    expectedRuntimeIdentity,
+  };
+  const encodedPayload = Buffer.from(JSON.stringify(payload), 'utf-8').toString('base64url');
+  const signature = crypto.createHmac('sha256', secret)
+    .update(encodedPayload, 'ascii')
+    .digest('hex');
+  return `${encodedPayload}.${signature}`;
+}
+
 function resolveLocalModelEnvPath() {
   return path.join(resolveAppDir(), '.env');
 }
@@ -3821,7 +3882,17 @@ async function importDesktopModelPack({
   resolveRuntimeBinary = resolveLocalModelBinary,
   importPack = importModelPack,
   refreshState = refreshLocalModelState,
+  expectedConfigVersion = '',
+  createAttestation = createDesktopModelPackAttestation,
 } = {}) {
+  const configVersion = String(expectedConfigVersion || '').trim();
+  if (!configVersion || configVersion.length > 128 || /[\u0000-\u001f]/.test(configVersion)) {
+    return {
+      ok: false,
+      error: 'desktop_attestation_invalid',
+      message: 'Refresh Local Models and import the Model Pack again.',
+    };
+  }
   const source = await selectSource({ dialogImpl, windowRef: mainWindow });
   if (!source) {
     return { ok: false, canceled: true };
@@ -3876,10 +3947,16 @@ async function importDesktopModelPack({
       },
     });
     await refreshState({ spawnImpl });
+    const desktopAttestation = createAttestation({
+      ...result,
+      expectedConfigVersion: configVersion,
+      expectedRuntimeIdentity: runtimeIdentity,
+    });
     return {
       ok: true,
       ...result,
       runtimeIdentity,
+      desktopAttestation,
     };
   } catch (error) {
     const code = error instanceof ModelPackError ? error.code : 'model_pack_import_failed';
@@ -4000,9 +4077,11 @@ ipcMain.handle(DESKTOP_LOCAL_MODEL_REMOVE_CHANNEL, (event, payload = {}) => {
     { expectedRuntimeIdentity: payload && payload.expectedRuntimeIdentity }
   ));
 });
-ipcMain.handle(DESKTOP_LOCAL_MODEL_IMPORT_PACK_CHANNEL, (event) => {
+ipcMain.handle(DESKTOP_LOCAL_MODEL_IMPORT_PACK_CHANNEL, (event, payload = {}) => {
   assertLocalModelSender(event);
-  return runLocalModelOperation(() => importDesktopModelPack());
+  return runLocalModelOperation(() => importDesktopModelPack({
+    expectedConfigVersion: payload && payload.expectedConfigVersion,
+  }));
 });
 ipcMain.handle(DESKTOP_LOCAL_MODEL_OPEN_GUIDE_CHANNEL, async (event) => {
   assertLocalModelSender(event);
@@ -4385,6 +4464,8 @@ module.exports = {
   DESKTOP_LOCAL_MODEL_IMPORT_PACK_CHANNEL,
   DESKTOP_LOCAL_MODEL_OPEN_GUIDE_CHANNEL,
   DESKTOP_LOCAL_MODEL_STATE_EVENT,
+  DESKTOP_MODEL_PACK_ATTESTATION_ENV,
+  DESKTOP_MODEL_PACK_ATTESTATION_TTL_MS,
   DESKTOP_LOCAL_MODEL_INSTALL_GUIDE_URL,
   DESKTOP_LOCAL_MODEL_MAX_JSON_BYTES,
   DESKTOP_LOCAL_MODEL_MAX_EVENT_BYTES,
@@ -4405,6 +4486,7 @@ module.exports = {
   evaluateReleaseUpdate,
   buildBackendUrl,
   buildBackendEnvironment,
+  createDesktopModelPackAttestation,
   extendMacDesktopBackendPath,
   extractReleaseMetadata,
   fetchLatestReleaseJson,

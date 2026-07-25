@@ -1,6 +1,12 @@
 """Versioned, data-only local Model Pack validation and import contracts."""
 
 from src.model_pack.errors import ModelPackError
+from src.model_pack.desktop_attestation import (
+    DESKTOP_MODEL_PACK_ATTESTATION_ENV,
+    DESKTOP_MODEL_PACK_ATTESTATION_TTL_MS,
+    MAX_DESKTOP_MODEL_PACK_ATTESTATION_BYTES,
+    consume_desktop_model_pack_attestation,
+)
 from src.model_pack.importer import ModelPackExecutor, ModelPackImporter
 from src.model_pack.manifest import (
     MANIFEST_FILENAME,
@@ -33,9 +39,12 @@ from src.model_pack.validation import (
 __all__ = [
     "ALLOWED_INSTRUCTIONS",
     "DEFAULT_OLLAMA_BASE_URL",
+    "DESKTOP_MODEL_PACK_ATTESTATION_ENV",
+    "DESKTOP_MODEL_PACK_ATTESTATION_TTL_MS",
     "InspectedModelPack",
     "MANIFEST_FILENAME",
     "MAX_LICENSE_BYTES",
+    "MAX_DESKTOP_MODEL_PACK_ATTESTATION_BYTES",
     "MAX_MODEL_PACK_ENTRIES",
     "MAX_MODEL_PACK_BYTES",
     "MODEL_PACK_FORMAT_VERSION",
@@ -49,6 +58,7 @@ __all__ = [
     "ModelPackRegistry",
     "OllamaHttpModelPackExecutor",
     "ParsedModelfile",
+    "consume_desktop_model_pack_attestation",
     "inspect_model_pack",
     "normalize_ollama_native_base_url",
     "parse_manifest",

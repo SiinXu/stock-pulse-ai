@@ -57,6 +57,27 @@ def test_builder_outputs_a_valid_pack_and_release_checksum(tmp_path: Path) -> No
         assert inspected.modelfile.parameters == {"temperature": 0.2}
 
 
+def test_builder_rejects_a_payload_named_like_the_reserved_manifest(tmp_path: Path) -> None:
+    gguf, modelfile, license_file = _sources(tmp_path)
+    reserved_modelfile = tmp_path / "Manifest.json"
+    modelfile.rename(reserved_modelfile)
+
+    with pytest.raises(ModelPackError) as error:
+        build_model_pack(
+            gguf_path=gguf,
+            modelfile_path=reserved_modelfile,
+            license_file_path=license_file,
+            model_id="stockpulse/test:q4",
+            display_name="StockPulse Test",
+            license_id="Apache-2.0",
+            minimum_memory_gb=8,
+            output_path=tmp_path / "test.modelpack",
+        )
+
+    assert error.value.code == "invalid_manifest"
+    assert "reserved manifest.json" in error.value.user_message
+
+
 def test_builder_is_deterministic_for_the_same_sources(tmp_path: Path) -> None:
     first_dir = tmp_path / "first"
     second_dir = tmp_path / "second"

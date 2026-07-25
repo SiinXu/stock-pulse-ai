@@ -65,6 +65,7 @@ describe('modelPacksApi', () => {
       },
       'config-1',
       RUNTIME_IDENTITY,
+      'desktop-attestation',
     );
 
     expect(get).toHaveBeenCalledWith('/api/v1/model-packs/imports/pack%2F1');
@@ -75,6 +76,7 @@ describe('modelPacksApi', () => {
       license_id: 'LicenseRef-Finance',
       expected_config_version: 'config-1',
       expected_runtime_identity: RUNTIME_IDENTITY,
+      desktop_attestation: 'desktop-attestation',
     });
     expect(JSON.stringify(post.mock.calls[0][1])).not.toContain('url');
   });
