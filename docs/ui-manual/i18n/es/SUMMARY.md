@@ -1,0 +1,17 @@
+# Summary
+
+* [Manual de interfaz de StockPulse](README.md)
+* [Shell](01-shell.md)
+* [Inicio](02-home.md)
+* [Mesa de análisis](03-analysis-workbench.md)
+* [Revisión de mercado](04-market-review.md)
+* [Chat Agent](05-agent-chat.md)
+* [Centro de señales](06-signals.md)
+* [Cartera](07-portfolio.md)
+* [Leer informes](08-reading-reports.md)
+* [Backtest](09-backtest.md)
+* [Ajustes](10-settings.md)
+* [Flujos diarios](11-daily-workflows.md)
+* [Discover](12-discover.md)
+* [Espacio de cotización](13-stock-details.md)
+* [Campos de ajustes](14-settings-fields.md)

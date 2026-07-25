@@ -112,6 +112,19 @@ Clean `/` stays on Home. Legacy `recordId` links may redirect into Workbench his
 
 ---
 
+
+
+## Today’s scheduled tasks (if your build has them)
+
+Newer / unmerged builds may show a **Today’s scheduled tasks** read-only block on Home:
+
+- Lists tasks that already ran or will run today (analysis, research brief, risk check, …).  
+- Statuses may include running, waiting retry, skipped.  
+- **Not** the place to edit schedules — use Settings → System & Security → Scheduling.  
+- Empty list for today is normal when nothing is planned.
+
+See `docs/scheduled-tasks.md` for implementation detail.
+
 ## Glossary
 
 | Term | Plain meaning |

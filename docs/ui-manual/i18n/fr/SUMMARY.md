@@ -1,0 +1,17 @@
+# Summary
+
+* [Manuel d'interface StockPulse](README.md)
+* [Shell](01-shell.md)
+* [Accueil](02-home.md)
+* [Banc d'analyse](03-analysis-workbench.md)
+* [Revue de marché](04-market-review.md)
+* [Chat Agent](05-agent-chat.md)
+* [Centre de signaux](06-signals.md)
+* [Portefeuille](07-portfolio.md)
+* [Lire les rapports](08-reading-reports.md)
+* [Backtest](09-backtest.md)
+* [Paramètres](10-settings.md)
+* [Flux quotidiens](11-daily-workflows.md)
+* [Discover](12-discover.md)
+* [Espace cotation](13-stock-details.md)
+* [Champs paramètres](14-settings-fields.md)

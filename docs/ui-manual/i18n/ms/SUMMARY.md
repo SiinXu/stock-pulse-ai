@@ -1,0 +1,17 @@
+# Summary
+
+* [Manual operasi UI StockPulse](README.md)
+* [Shell](01-shell.md)
+* [Laman utama](02-home.md)
+* [Workbench analisis](03-analysis-workbench.md)
+* [Ulasan pasaran](04-market-review.md)
+* [Sembang Agent](05-agent-chat.md)
+* [Pusat isyarat](06-signals.md)
+* [Portfolio](07-portfolio.md)
+* [Membaca laporan](08-reading-reports.md)
+* [Backtest](09-backtest.md)
+* [Tetapan](10-settings.md)
+* [Aliran harian](11-daily-workflows.md)
+* [Discover](12-discover.md)
+* [Ruang saham](13-stock-details.md)
+* [Medan tetapan](14-settings-fields.md)

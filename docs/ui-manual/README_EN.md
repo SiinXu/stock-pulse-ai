@@ -91,3 +91,7 @@ Most people only need **01 + 02 + 03 + 08 + 11** in the first week.
 ## Preview (GitBook-compatible)
 
 Local Honkit preview: see [GITBOOK.md](GITBOOK.md).
+
+## Multi-language packs
+
+Product UI supports 10 languages. Manual packs: [i18n/README.md](i18n/README.md).

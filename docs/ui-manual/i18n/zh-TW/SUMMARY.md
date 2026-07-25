@@ -1,0 +1,17 @@
+# Summary
+
+* [手冊首頁](README.md)
+* [01-shell](01-shell.md)
+* [02-home](02-home.md)
+* [03-analysis-workbench](03-analysis-workbench.md)
+* [04-market-review](04-market-review.md)
+* [05-agent-chat](05-agent-chat.md)
+* [06-signals](06-signals.md)
+* [07-portfolio](07-portfolio.md)
+* [08-reading-reports](08-reading-reports.md)
+* [09-backtest](09-backtest.md)
+* [10-settings](10-settings.md)
+* [11-daily-workflows](11-daily-workflows.md)
+* [12-discover](12-discover.md)
+* [13-stock-details](13-stock-details.md)
+* [14-settings-fields](14-settings-fields.md)

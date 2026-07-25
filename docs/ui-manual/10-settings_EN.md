@@ -82,6 +82,21 @@ Zero to first report; English UI + `zh` reports; silent Telegram → test push; 
 
 ---
 
+
+
+## Upcoming UI (not necessarily on main yet)
+
+These appear on **unmerged feature branches / open PRs**. **Trust whether your running build shows them.**
+
+| Capability | Likely entry | Notes |
+| --- | --- | --- |
+| **Local model pack import** | Settings → AI & Models → Local Models | Versioned pack archives, private snapshot binding, activate |
+| **Home scheduled tasks (today)** | Home read-only list | Today’s ran/upcoming tasks (analysis, research brief, risk check); not the scheduler editor |
+| **Personal investment framework** | Settings / research surfaces as shipped | Versioned framework context for analysis; research only |
+| **Notification channel plugins** | Settings → Notifications / plugins | Extra channel plugins beyond built-ins |
+
+If your UI lacks an entry, your build does not include that merge yet.
+
 ## Related
 
 - [02 Home](02-home_EN.md) · [06 Signal Center](06-signals_EN.md) · [Beginner setup](../beginner-client-setup_EN.md) · [LLM guide](../LLM_CONFIG_GUIDE_EN.md)

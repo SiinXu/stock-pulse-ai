@@ -98,3 +98,7 @@ flowchart LR
 ## 在线 / 本地预览（GitBook 兼容）
 
 本目录可用 Honkit（GitBook 兼容）本地预览，说明见 [GITBOOK.md](GITBOOK.md)。
+
+## Multi-language packs
+
+Product UI supports 10 languages. Manual packs: [i18n/README.md](i18n/README.md).

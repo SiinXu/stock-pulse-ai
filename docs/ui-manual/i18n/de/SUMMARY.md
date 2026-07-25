@@ -1,0 +1,17 @@
+# Summary
+
+* [StockPulse UI-Bedienungsanleitung](README.md)
+* [Shell](01-shell.md)
+* [Startseite](02-home.md)
+* [Analyse-Workbench](03-analysis-workbench.md)
+* [Marktüberblick](04-market-review.md)
+* [Agent-Chat](05-agent-chat.md)
+* [Signalcenter](06-signals.md)
+* [Portfolio](07-portfolio.md)
+* [Berichte lesen](08-reading-reports.md)
+* [Backtest](09-backtest.md)
+* [Einstellungen](10-settings.md)
+* [Tagesabläufe](11-daily-workflows.md)
+* [Discover](12-discover.md)
+* [Aktien-Workspace](13-stock-details.md)
+* [Einstellungsfelder](14-settings-fields.md)
