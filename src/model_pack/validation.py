@@ -185,6 +185,74 @@ def _check_disk(
         )
 
 
+@contextmanager
+def _snapshot_archive(
+    source_path: Path,
+    *,
+    disk_usage: DiskUsage,
+) -> Iterator[Path]:
+    """Copy one opened archive into bounded private storage exactly once."""
+    temp_root = Path(tempfile.gettempdir())
+    with _open_regular_payload(source_path, source_path.name) as (
+        source_file,
+        source_size,
+    ):
+        if source_size < 1:
+            raise _error(
+                "unsupported_archive",
+                "Select a Model Pack directory, .modelpack file, or ZIP archive.",
+            )
+        if source_size > MAX_MODEL_PACK_BYTES:
+            raise _error(
+                "model_pack_too_large",
+                "This Model Pack exceeds the 64 GiB limit. Build or select a smaller pack.",
+            )
+        _check_disk(
+            temp_root,
+            payload_size=source_size,
+            archive=False,
+            disk_usage=disk_usage,
+        )
+        with tempfile.TemporaryDirectory(
+            prefix="stockpulse-model-pack-archive-",
+        ) as temp_dir:
+            snapshot_path = Path(temp_dir) / "source.modelpack"
+            remaining = source_size
+            try:
+                with snapshot_path.open("xb") as snapshot:
+                    while remaining:
+                        chunk = source_file.read(min(_HASH_CHUNK_SIZE, remaining))
+                        if not chunk:
+                            raise _error(
+                                "invalid_archive",
+                                (
+                                    "The selected archive changed while it was copied. "
+                                    "Stop modifying it and try again."
+                                ),
+                            )
+                        snapshot.write(chunk)
+                        remaining -= len(chunk)
+                    if source_file.read(1):
+                        raise _error(
+                            "invalid_archive",
+                            (
+                                "The selected archive changed while it was copied. "
+                                "Stop modifying it and try again."
+                            ),
+                        )
+            except ModelPackError:
+                raise
+            except OSError as exc:
+                raise _error(
+                    "file_read_failed",
+                    (
+                        "Could not snapshot the selected Model Pack. "
+                        "Check permissions and free disk space, then try again."
+                    ),
+                ) from exc
+            yield snapshot_path
+
+
 def _unexpected_file_warning(path: str) -> str:
     """Return the stable warning for one undeclared regular file."""
     return f"Unexpected file is not part of the manifest: {path}"
@@ -682,7 +750,7 @@ def _inspect_archive(
         _check_disk(
             temp_root,
             payload_size=payload_size,
-            archive=True,
+            archive=False,
             disk_usage=disk_usage,
         )
         with tempfile.TemporaryDirectory(prefix="stockpulse-model-pack-") as temp_dir:
@@ -736,20 +804,21 @@ def inspect_model_pack(
             "model_pack_too_large",
             "This Model Pack exceeds the 64 GiB limit. Build or select a smaller pack.",
         )
-    try:
-        zip_compatible = is_zipfile(path)
-    except OSError as exc:
-        raise _error(
-            "file_read_failed",
-            "Could not read the selected Model Pack. Check permissions and try again.",
-        ) from exc
-    if not zip_compatible:
-        raise _error(
-            "unsupported_archive",
-            "Select a Model Pack directory, .modelpack file, or ZIP archive.",
-        )
-    with _inspect_archive(path, disk_usage=disk_usage) as inspected:
-        yield inspected
+    with _snapshot_archive(path, disk_usage=disk_usage) as snapshot_path:
+        try:
+            zip_compatible = is_zipfile(snapshot_path)
+        except OSError as exc:
+            raise _error(
+                "file_read_failed",
+                "Could not read the selected Model Pack. Check permissions and try again.",
+            ) from exc
+        if not zip_compatible:
+            raise _error(
+                "unsupported_archive",
+                "Select a Model Pack directory, .modelpack file, or ZIP archive.",
+            )
+        with _inspect_archive(snapshot_path, disk_usage=disk_usage) as inspected:
+            yield inspected
 
 
 __all__ = [

@@ -555,6 +555,10 @@ async function checkDisk(
   const payloadSize = verifiedPayloadSize === null
     ? manifest.files.reduce((total, entry) => total + entry.sizeBytes, 0)
     : verifiedPayloadSize;
+  await checkDiskForBytes(location, payloadSize, archive, diskFreeProvider);
+}
+
+async function checkDiskForBytes(location, payloadSize, archive, diskFreeProvider) {
   let freeBytes;
   try {
     freeBytes = Number(await diskFreeProvider(location));
@@ -571,6 +575,62 @@ async function checkDisk(
       'insufficient_disk_space',
       `Not enough disk space to import this Model Pack. Free at least ${gib} GiB and try again.`
     );
+  }
+}
+
+async function snapshotArchive(source, temporaryRoot, diskFreeProvider) {
+  const opened = await openStableRegularFile(
+    source,
+    'The selected Model Pack must be a regular archive file. Select it again.'
+  );
+  let output = null;
+  const snapshotPath = path.join(temporaryRoot, 'source.modelpack');
+  try {
+    if (opened.size < 1) {
+      throw new ModelPackError(
+        'invalid_archive',
+        'The selected file is not a readable Model Pack archive. Download it again.'
+      );
+    }
+    if (opened.size > MODEL_PACK_MAX_BYTES) {
+      throw new ModelPackError(
+        'model_pack_too_large',
+        'This Model Pack exceeds the 64 GiB limit. Build or select a smaller pack.'
+      );
+    }
+    await checkDiskForBytes(os.tmpdir(), opened.size, false, diskFreeProvider);
+    output = await fs.promises.open(snapshotPath, 'wx', 0o600);
+    const chunk = Buffer.alloc(Math.min(MODEL_PACK_HASH_CHUNK_SIZE, opened.size));
+    let remaining = opened.size;
+    while (remaining > 0) {
+      const requested = Math.min(chunk.length, remaining);
+      const { bytesRead } = await opened.handle.read(chunk, 0, requested, null);
+      if (bytesRead < 1) {
+        throw new ModelPackError(
+          'invalid_archive',
+          'The selected archive changed while it was copied. Stop modifying it and try again.'
+        );
+      }
+      await writeAll(output, chunk, bytesRead);
+      remaining -= bytesRead;
+    }
+    const extra = Buffer.alloc(1);
+    const { bytesRead: extraBytes } = await opened.handle.read(extra, 0, 1, null);
+    if (extraBytes > 0) {
+      throw new ModelPackError(
+        'invalid_archive',
+        'The selected archive changed while it was copied. Stop modifying it and try again.'
+      );
+    }
+    return snapshotPath;
+  } finally {
+    try {
+      if (output !== null) {
+        await output.close();
+      }
+    } finally {
+      await opened.handle.close();
+    }
   }
 }
 
@@ -1065,50 +1125,48 @@ async function inspectDirectory(source, diskFreeProvider) {
 }
 
 async function inspectArchive(source, diskFreeProvider) {
-  let catalog;
-  try {
-    catalog = await readZipInventory(source);
-  } catch (error) {
-    if (error instanceof ModelPackError) {
-      throw error;
-    }
-    throw new ModelPackError(
-      'invalid_archive',
-      'The selected file is not a readable Model Pack archive. Download it again.'
-    );
-  }
-  const manifest = parseModelPackManifest(catalog.manifestPayload);
-  validateManifestRoleSizes(manifest);
-  const expected = new Set([
-    MODEL_PACK_MANIFEST_FILENAME,
-    ...manifest.files.map((entry) => entry.path),
-  ]);
-  for (const name of expected) {
-    if (!catalog.inventory.has(name)) {
-      throw new ModelPackError(
-        'missing_file',
-        `Model Pack is missing ${name}. Download or build the pack again.`
-      );
-    }
-  }
-  const warnings = [...catalog.inventory.keys()]
-    .filter((name) => !expected.has(name))
-    .map(unexpectedWarning)
-    .sort();
-  await checkDisk(os.tmpdir(), manifest, true, diskFreeProvider);
   const temporaryRoot = await fs.promises.mkdtemp(
     path.join(os.tmpdir(), 'stockpulse-model-pack-')
   );
   try {
-    await extractZipFiles(source, temporaryRoot, expected, manifest);
+    const snapshotPath = await snapshotArchive(source, temporaryRoot, diskFreeProvider);
+    const catalog = await readZipInventory(snapshotPath);
+    const manifest = parseModelPackManifest(catalog.manifestPayload);
+    validateManifestRoleSizes(manifest);
+    const expected = new Set([
+      MODEL_PACK_MANIFEST_FILENAME,
+      ...manifest.files.map((entry) => entry.path),
+    ]);
+    for (const name of expected) {
+      if (!catalog.inventory.has(name)) {
+        throw new ModelPackError(
+          'missing_file',
+          `Model Pack is missing ${name}. Download or build the pack again.`
+        );
+      }
+    }
+    const warnings = [...catalog.inventory.keys()]
+      .filter((name) => !expected.has(name))
+      .map(unexpectedWarning)
+      .sort();
+    await checkDisk(os.tmpdir(), manifest, false, diskFreeProvider);
+    const extractedRoot = path.join(temporaryRoot, 'payload');
+    await fs.promises.mkdir(extractedRoot, { mode: 0o700 });
+    await extractZipFiles(snapshotPath, extractedRoot, expected, manifest);
     return await buildInspection(
-      temporaryRoot,
+      extractedRoot,
       manifest,
       warnings,
       () => fs.promises.rm(temporaryRoot, { recursive: true, force: true })
     );
   } catch (error) {
     await fs.promises.rm(temporaryRoot, { recursive: true, force: true });
+    if (!(error instanceof ModelPackError)) {
+      throw new ModelPackError(
+        'invalid_archive',
+        'The selected file is not a readable Model Pack archive. Download it again.'
+      );
+    }
     throw error;
   }
 }

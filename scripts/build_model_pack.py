@@ -73,6 +73,118 @@ def _default_output_name(model_id: str) -> str:
     return f"{slug or 'model'}-v{MODEL_PACK_FORMAT_VERSION}.modelpack"
 
 
+def _validate_output_target(path: Path, *, label: str) -> None:
+    """Require an existing publication target to be a replaceable regular file."""
+    try:
+        path_stat = path.lstat()
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise ModelPackError(
+            "invalid_output_path",
+            f"{label} could not be inspected. Check permissions and try again.",
+        ) from exc
+    if path.is_symlink() or not stat.S_ISREG(path_stat.st_mode):
+        raise ModelPackError(
+            "invalid_output_path",
+            f"{label} must be a regular file path, not a directory or symbolic link.",
+        )
+
+
+def _move_existing_to_backup(path: Path, *, label: str) -> Optional[Path]:
+    """Move one existing regular output aside for transactional rollback."""
+    try:
+        path_stat = path.lstat()
+    except FileNotFoundError:
+        return None
+    if path.is_symlink() or not stat.S_ISREG(path_stat.st_mode):
+        raise ModelPackError(
+            "invalid_output_path",
+            f"{label} must be a regular file path, not a directory or symbolic link.",
+        )
+    backup_fd, backup_name = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        suffix=".bak",
+        dir=path.parent,
+    )
+    os.close(backup_fd)
+    backup = Path(backup_name)
+    backup.unlink()
+    os.replace(path, backup)
+    return backup
+
+
+def _publish_output_pair(
+    artifact_temporary: Path,
+    checksum_temporary: Path,
+    destination: Path,
+    checksum_path: Path,
+) -> None:
+    """Publish both outputs and restore the prior pair on ordinary failures."""
+    destination_backup: Optional[Path] = None
+    checksum_backup: Optional[Path] = None
+    artifact_published = False
+    checksum_published = False
+    try:
+        _validate_output_target(destination, label="Output")
+        _validate_output_target(checksum_path, label="Checksum output")
+        destination_backup = _move_existing_to_backup(destination, label="Output")
+        checksum_backup = _move_existing_to_backup(
+            checksum_path,
+            label="Checksum output",
+        )
+        os.replace(artifact_temporary, destination)
+        artifact_published = True
+        os.replace(checksum_temporary, checksum_path)
+        checksum_published = True
+    except BaseException as exc:
+        rollback_errors = []
+        for published, path in (
+            (checksum_published, checksum_path),
+            (artifact_published, destination),
+        ):
+            if published:
+                try:
+                    path.unlink(missing_ok=True)
+                except OSError as rollback_error:
+                    rollback_errors.append(rollback_error)
+        for backup, path in (
+            (destination_backup, destination),
+            (checksum_backup, checksum_path),
+        ):
+            if backup is not None:
+                try:
+                    os.replace(backup, path)
+                except OSError as rollback_error:
+                    rollback_errors.append(rollback_error)
+        if rollback_errors:
+            raise ModelPackError(
+                "output_publish_failed",
+                (
+                    "Could not publish or restore the Model Pack outputs. "
+                    "Inspect the output directory before trying again."
+                ),
+            ) from exc
+        if isinstance(exc, OSError):
+            raise ModelPackError(
+                "output_publish_failed",
+                (
+                    "Could not publish the Model Pack and checksum. "
+                    "Check output permissions and try again."
+                ),
+            ) from exc
+        raise
+    else:
+        for backup in (destination_backup, checksum_backup):
+            if backup is not None:
+                try:
+                    backup.unlink(missing_ok=True)
+                except OSError:
+                    # Publication is complete; a stale private backup is safer
+                    # than reporting failure after the matching pair is live.
+                    pass
+
+
 def _file_entry(path: Path, role: str) -> Dict[str, object]:
     """Build one bounded manifest entry from a stable source-file read."""
     digest = hashlib.sha256()
@@ -329,7 +441,7 @@ def build_model_pack(
     minimum_memory_gb: int,
     output_path: Optional[Path] = None,
 ) -> Tuple[Path, Path]:
-    """Build one validated archive and its release checksum atomically."""
+    """Build one validated archive and publish it with a matching checksum."""
     gguf = _require_regular_file(gguf_path, label="GGUF file")
     modelfile = _require_regular_file(modelfile_path, label="Modelfile")
     license_file = _require_regular_file(license_file_path, label="License file")
@@ -361,6 +473,8 @@ def build_model_pack(
             "Output and checksum paths cannot overwrite a Model Pack source file.",
         )
     destination.parent.mkdir(parents=True, exist_ok=True)
+    _validate_output_target(destination, label="Output")
+    _validate_output_target(checksum_path, label="Checksum output")
     temporary: Optional[Path] = None
     checksum_temporary: Optional[Path] = None
 
@@ -416,9 +530,13 @@ def build_model_pack(
             f"{artifact_digest}  {destination.name}\n",
             encoding="ascii",
         )
-        os.replace(temporary, destination)
+        _publish_output_pair(
+            temporary,
+            checksum_temporary,
+            destination,
+            checksum_path,
+        )
         temporary = None
-        os.replace(checksum_temporary, checksum_path)
         checksum_temporary = None
     except BaseException:
         if temporary is not None:

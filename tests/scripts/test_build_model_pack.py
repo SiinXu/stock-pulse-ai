@@ -347,6 +347,53 @@ def test_builder_does_not_overwrite_a_source_with_the_checksum(tmp_path: Path) -
     assert checksum_source.read_text(encoding="utf-8") == "Apache License test text\n"
 
 
+def test_builder_rejects_non_file_checksum_target_before_publishing(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "release.modelpack"
+    checksum = tmp_path / "release.modelpack.sha256"
+    checksum.mkdir()
+
+    with pytest.raises(ModelPackError) as error:
+        _build(tmp_path, output)
+
+    assert error.value.code == "invalid_output_path"
+    assert not output.exists()
+    assert checksum.is_dir()
+
+
+def test_builder_restores_the_previous_pair_when_checksum_publish_fails(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    output = tmp_path / "release.modelpack"
+    checksum = tmp_path / "release.modelpack.sha256"
+    output.write_bytes(b"previous artifact")
+    checksum.write_text("previous checksum\n", encoding="ascii")
+    original_replace = model_pack_builder.os.replace
+
+    def fail_new_checksum(source, destination) -> None:
+        source_path = Path(source)
+        destination_path = Path(destination)
+        if (
+            destination_path == checksum
+            and source_path.suffix == ".tmp"
+        ):
+            raise OSError("simulated checksum publication failure")
+        original_replace(source, destination)
+
+    monkeypatch.setattr(model_pack_builder.os, "replace", fail_new_checksum)
+
+    with pytest.raises(ModelPackError) as error:
+        _build(tmp_path, output)
+
+    assert error.value.code == "output_publish_failed"
+    assert output.read_bytes() == b"previous artifact"
+    assert checksum.read_text(encoding="ascii") == "previous checksum\n"
+    assert list(tmp_path.glob(".*.tmp")) == []
+    assert list(tmp_path.glob(".*.bak")) == []
+
+
 def test_builder_preserves_unrelated_legacy_temp_names(tmp_path: Path) -> None:
     legacy_temp = tmp_path / ".release.modelpack.tmp"
     legacy_temp.write_text("keep", encoding="utf-8")

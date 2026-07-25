@@ -54,8 +54,11 @@ and keyed by an opaque Ollama runtime identity. A catalog match always uses
 catalog presentation; manifest presentation is shown only for unknown models.
 
 The import needs working space for validation/extraction and for Ollama's model
-store. StockPulse checks free space before extraction, but Ollama may use a
-different disk. A later Ollama disk failure is therefore still possible.
+store. Archive imports first copy the opened archive into bounded private
+storage so pathname replacement cannot change the bytes between inventory and
+extraction. StockPulse checks free space before that snapshot and again before
+extraction, but Ollama may use a different disk. A later Ollama disk failure is
+therefore still possible.
 
 ### Failure Guidance
 
@@ -217,7 +220,8 @@ The builder:
 - writes canonical `manifest.json`;
 - stores the already-compressed GGUF without recompressing it;
 - writes stable ZIP order, timestamp, and permissions;
-- atomically replaces the output; and
+- publishes the archive and whole-artifact checksum through same-directory
+  atomic replacements, restoring the prior pair if ordinary publication fails; and
 - creates `example-finance-q4-v1.modelpack.sha256` for the entire artifact.
 
 Verify from a clean directory before publishing:

@@ -38,12 +38,15 @@ def _write_pack(
     modelfile: str = "FROM ./weights.gguf\nPARAMETER temperature 0.2\n",
     include_license: bool = True,
     tamper_gguf: bool = False,
+    model_id: str = "stockpulse-test:latest",
+    display_name: str = "StockPulse Test Model",
+    gguf_payload: bytes = b"GGUF-test-weights",
 ) -> Path:
     root.mkdir(parents=True)
     gguf_path = root / "weights.gguf"
     modelfile_path = root / "Modelfile"
     license_path = root / "LICENSE"
-    gguf_path.write_bytes(b"GGUF-test-weights")
+    gguf_path.write_bytes(gguf_payload)
     modelfile_path.write_text(modelfile, encoding="utf-8")
     if include_license:
         license_path.write_text("Test license text\n", encoding="utf-8")
@@ -70,8 +73,8 @@ def _write_pack(
     ]
     manifest = {
         "format_version": format_version,
-        "model_id": "stockpulse-test:latest",
-        "display_name": "StockPulse Test Model",
+        "model_id": model_id,
+        "display_name": display_name,
         "gguf_file": "weights.gguf",
         "modelfile": "Modelfile",
         "license": {"id": "LicenseRef-Test", "file": "LICENSE"},
@@ -319,6 +322,57 @@ def test_inspect_valid_archive_extracts_only_declared_data(tmp_path: Path) -> No
         assert inspected.license_path.read_text(encoding="utf-8") == "Test license text\n"
 
     assert not extracted_root.exists()
+
+
+def test_archive_path_replacement_cannot_change_the_private_snapshot(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    alpha = _write_pack(
+        tmp_path / "alpha",
+        model_id="stockpulse/alpha:q4",
+        display_name="Alpha",
+        gguf_payload=b"GGUF-alpha-snapshot",
+    )
+    bravo = _write_pack(
+        tmp_path / "bravo",
+        model_id="stockpulse/bravo:q4",
+        display_name="Bravo",
+        gguf_payload=b"GGUF-bravo-replacement",
+    )
+    selected = _zip_pack(alpha, tmp_path / "selected.modelpack")
+    replacement = _zip_pack(bravo, tmp_path / "replacement.modelpack")
+    with ZipFile(replacement, "a", compression=ZIP_DEFLATED) as archive:
+        archive.writestr("padding.bin", b"x" * 4096)
+    alpha_size = selected.stat().st_size
+    bravo_size = replacement.stat().st_size
+    assert bravo_size > alpha_size
+    monkeypatch.setattr(
+        model_pack_validation,
+        "MAX_MODEL_PACK_BYTES",
+        (alpha_size + bravo_size) // 2,
+    )
+    real_is_zipfile = model_pack_validation.is_zipfile
+    replaced = False
+
+    def replace_selected_before_probe(candidate: Path) -> bool:
+        nonlocal replaced
+        if not replaced:
+            replacement.replace(selected)
+            replaced = True
+        return real_is_zipfile(candidate)
+
+    monkeypatch.setattr(
+        model_pack_validation,
+        "is_zipfile",
+        replace_selected_before_probe,
+    )
+
+    with inspect_model_pack(selected) as inspected:
+        assert replaced is True
+        assert inspected.manifest.model_id == "stockpulse/alpha:q4"
+        assert inspected.gguf_path.read_bytes() == b"GGUF-alpha-snapshot"
+        assert inspected.warnings == ()
 
 
 @pytest.mark.parametrize(

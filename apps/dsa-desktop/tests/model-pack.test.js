@@ -20,10 +20,19 @@ function sha256(buffer) {
   return crypto.createHash('sha256').update(buffer).digest('hex');
 }
 
-function writePack(root, { modelfileText = 'FROM ./weights.gguf\n', tamper = false } = {}) {
+function writePack(
+  root,
+  {
+    modelfileText = 'FROM ./weights.gguf\n',
+    tamper = false,
+    modelId = 'stockpulse/desktop-test:q4',
+    displayName = 'Desktop Test',
+    ggufPayload = Buffer.from('GGUF-desktop-test'),
+  } = {}
+) {
   fs.mkdirSync(root, { recursive: true });
   const files = {
-    'weights.gguf': Buffer.from('GGUF-desktop-test'),
+    'weights.gguf': Buffer.from(ggufPayload),
     Modelfile: Buffer.from(modelfileText),
     LICENSE: Buffer.from('Desktop test license\n'),
   };
@@ -32,8 +41,8 @@ function writePack(root, { modelfileText = 'FROM ./weights.gguf\n', tamper = fal
   }
   const manifest = {
     format_version: 1,
-    model_id: 'stockpulse/desktop-test:q4',
-    display_name: 'Desktop Test',
+    model_id: modelId,
+    display_name: displayName,
     gguf_file: 'weights.gguf',
     modelfile: 'Modelfile',
     license: { id: 'LicenseRef-Test', file: 'LICENSE' },
@@ -441,6 +450,49 @@ test('archive inspection extracts declared files only and removes temporary data
     ]);
     await inspected.cleanup();
     assert.equal(fs.existsSync(extractedRoot), false);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('archive inspection keeps one private snapshot across inventory and extraction', async () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-model-pack-zip-snapshot-'));
+  const alphaRoot = path.join(tempRoot, 'alpha');
+  const bravoRoot = path.join(tempRoot, 'bravo');
+  writePack(alphaRoot, {
+    modelId: 'stockpulse/alpha:q4',
+    displayName: 'Alpha',
+    ggufPayload: Buffer.from('GGUF-alpha-snapshot'),
+  });
+  writePack(bravoRoot, {
+    modelId: 'stockpulse/bravo:q4',
+    displayName: 'Bravo',
+    ggufPayload: Buffer.from('GGUF-bravo-replacement'),
+  });
+  const selected = archiveFromDirectory(alphaRoot, path.join(tempRoot, 'selected.modelpack'));
+  const replacement = archiveFromDirectory(
+    bravoRoot,
+    path.join(tempRoot, 'replacement.modelpack'),
+    [['unsafe-extra.txt', Buffer.from('replacement-only')]]
+  );
+  let diskChecks = 0;
+  try {
+    const inspected = await inspectModelPack(selected, {
+      diskFreeProvider: () => {
+        diskChecks += 1;
+        if (diskChecks === 2) {
+          fs.renameSync(replacement, selected);
+        }
+        return enoughDisk();
+      },
+    });
+    assert.equal(diskChecks, 2);
+    assert.equal(inspected.manifest.modelId, 'stockpulse/alpha:q4');
+    assert.equal(fs.readFileSync(inspected.ggufPath, 'utf-8'), 'GGUF-alpha-snapshot');
+    assert.equal(fs.existsSync(path.join(inspected.root, 'unsafe-extra.txt')), false);
+    const privateRoot = path.dirname(inspected.root);
+    await inspected.cleanup();
+    assert.equal(fs.existsSync(privateRoot), false);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
