@@ -423,6 +423,47 @@ describe('localModelTransport', () => {
     ).rejects.toMatchObject({ code: 'local_model_delete_recovery_failed' });
   });
 
+  it('treats a missing-weight recovery verdict as confirmed deletion', async () => {
+    const bridge = createDesktopBridge();
+    const mutation = {
+      ...CONFIGURATION,
+      success: true,
+      modelId: 'qwen3:4b',
+      selectedPrimary: false,
+      selectedAgent: false,
+      deleted: false,
+      updatedKeys: ['LLM_OLLAMA_MODELS'],
+      warnings: [],
+      appliedCount: 1,
+      skippedMaskedCount: 0,
+      reloadTriggered: true,
+      recoveryToken: 'recovery-1',
+    };
+    api.unregister.mockResolvedValue(mutation);
+    api.restoreRegistration.mockRejectedValue(Object.assign(new Error('weights missing'), {
+      parsedError: {
+        title: 'Request failed',
+        message: 'Request failed',
+        rawMessage: 'weights missing',
+        status: 409,
+        category: 'http_error',
+        code: 'local_model_not_installed',
+      },
+    }));
+    vi.mocked(bridge.remove).mockResolvedValue({
+      ok: false,
+      error: 'delete-failed',
+      weightsMutationAttempted: true,
+    });
+
+    await expect(
+      __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
+    ).resolves.toEqual({ ...mutation, deleted: true });
+    expect(bridge.detect).toHaveBeenCalledTimes(2);
+    expect(api.restoreRegistration).toHaveBeenCalledWith('qwen3:4b', 'recovery-1');
+    expect(api.finalizeUnregistration).not.toHaveBeenCalled();
+  });
+
   it('restores registration when a stopped runtime cannot confirm weight state', async () => {
     const bridge = createDesktopBridge();
     const mutation = {
