@@ -9,15 +9,18 @@ import json
 import logging
 import os
 import re
+import threading
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Tuple
 
 from dotenv import dotenv_values
 
 from src.config import Config, setup_env
 from src.core.config_manager import ConfigManager
+from src.services.config import ConfigConflictError
 from src.utils.sanitize import log_safe_exception, sanitize_diagnostic_text
 
 logger = logging.getLogger(__name__)
@@ -72,6 +75,77 @@ class RuntimeConfigTransaction:
         }
         self._active_snapshot = self._read_env_snapshot()
         self._active_version = manager.get_config_version()
+        self._update_lease_lock = threading.RLock()
+        self._active_update_lease: Optional[Tuple[str, float]] = None
+        self._update_lease_context = threading.local()
+
+    def acquire_update_lease(self, token: str, *, ttl_seconds: float) -> None:
+        """Reserve configuration writes for one cross-request mutation capability."""
+        normalized = str(token or "").strip()
+        ttl = float(ttl_seconds)
+        if not normalized or len(normalized) > 128 or ttl <= 0:
+            raise ValueError("A valid unexpired configuration update lease is required")
+        deadline = time.monotonic() + ttl
+        with self._update_lease_lock:
+            self._prune_update_lease_locked()
+            if (
+                self._active_update_lease is not None
+                and self._active_update_lease[0] != normalized
+            ):
+                raise ConfigConflictError(
+                    current_version=self._manager.get_config_version()
+                )
+            self._active_update_lease = (normalized, deadline)
+
+    def release_update_lease(self, token: str) -> bool:
+        """Release a matching configuration write reservation idempotently."""
+        normalized = str(token or "").strip()
+        with self._update_lease_lock:
+            self._prune_update_lease_locked()
+            if (
+                self._active_update_lease is None
+                or self._active_update_lease[0] != normalized
+            ):
+                return False
+            self._active_update_lease = None
+            return True
+
+    @contextmanager
+    def authorize_update_lease(self, token: str) -> Iterator[None]:
+        """Present a lease capability only for writes in the current thread."""
+        previous = getattr(self._update_lease_context, "token", None)
+        self._update_lease_context.token = str(token or "").strip()
+        try:
+            yield
+        finally:
+            if previous is None:
+                try:
+                    del self._update_lease_context.token
+                except AttributeError:
+                    pass
+            else:
+                self._update_lease_context.token = previous
+
+    def guard_update_lease(self) -> None:
+        """Reject a configuration write while another capability owns mutation."""
+        presented = getattr(self._update_lease_context, "token", None)
+        with self._update_lease_lock:
+            self._prune_update_lease_locked()
+            if (
+                self._active_update_lease is not None
+                and self._active_update_lease[0] != presented
+            ):
+                raise ConfigConflictError(
+                    current_version=self._manager.get_config_version()
+                )
+
+    def _prune_update_lease_locked(self) -> None:
+        """Expire a stale lease while its lock is held."""
+        if (
+            self._active_update_lease is not None
+            and self._active_update_lease[1] <= time.monotonic()
+        ):
+            self._active_update_lease = None
 
     @property
     def lock(self) -> Any:

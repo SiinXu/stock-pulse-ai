@@ -316,6 +316,8 @@ async def app_lifespan(app: FastAPI):
         app.state.runtime_scheduler_service.reconcile_from_config(
             run_immediately=runtime_run_immediately,
         )
+    if hasattr(app.state, "local_model_service"):
+        delattr(app.state, "local_model_service")
     app.state.system_config_service = SystemConfigService(
         runtime_scheduler=app.state.runtime_scheduler_service,
     )
@@ -328,6 +330,8 @@ async def app_lifespan(app: FastAPI):
             refresh_task.cancel()
             with suppress(asyncio.CancelledError):
                 await refresh_task
+        if hasattr(app.state, "local_model_service"):
+            delattr(app.state, "local_model_service")
         if hasattr(app.state, "system_config_service"):
             delattr(app.state, "system_config_service")
         runtime_scheduler = getattr(app.state, "runtime_scheduler_service", None)

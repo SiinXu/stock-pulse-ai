@@ -213,19 +213,41 @@ function createDesktopTransport(bridge: DesktopLocalModelBridge): LocalModelTran
     ]);
     return normalizeDesktopState(state, configuration);
   };
+  const confirmedDeletion = (
+    unregistered: LocalModelMutationResponse,
+  ): LocalModelMutationResponse => ({
+    ...unregistered,
+    deleted: true,
+  });
   const finalizeDeletedRegistration = async (
     modelId: string,
     recoveryToken: string,
     unregistered: LocalModelMutationResponse,
   ): Promise<LocalModelMutationResponse> => {
+    let finalizationWarning = false;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         return await localModelsApi.finalizeUnregistration(modelId, recoveryToken);
-      } catch {
-        // The first response may have been lost after the idempotent revocation.
+      } catch (error) {
+        const parsed = getParsedApiError(error, 'en');
+        finalizationWarning = true;
+        if (parsed.status !== undefined || ![
+          'local_connection_failed',
+          'upstream_network',
+          'upstream_timeout',
+          'unknown',
+        ].includes(parsed.category)) {
+          break;
+        }
+        // Retry once because the first response may have been lost after revocation.
       }
     }
-    return { ...unregistered, deleted: true };
+    return {
+      ...confirmedDeletion(unregistered),
+      warnings: finalizationWarning
+        ? [...unregistered.warnings, 'local_model_delete_finalize_unconfirmed']
+        : unregistered.warnings,
+    };
   };
   const confirmWeightsRemain = async (modelId: string): Promise<boolean> => {
     try {
@@ -244,10 +266,14 @@ function createDesktopTransport(bridge: DesktopLocalModelBridge): LocalModelTran
   const restoreDeletionReservation = async (
     modelId: string,
     recoveryToken: string,
-  ): Promise<void> => {
+  ): Promise<'restored' | 'deleted'> => {
     try {
       await localModelsApi.restoreRegistration(modelId, recoveryToken);
-    } catch {
+      return 'restored';
+    } catch (error) {
+      if (getParsedApiError(error, 'en').code === 'local_model_not_installed') {
+        return 'deleted';
+      }
       throw new LocalModelTransportError(
         'local_model_delete_recovery_failed',
         'Local model deletion failed and registration could not be restored',
@@ -340,7 +366,11 @@ function createDesktopTransport(bridge: DesktopLocalModelBridge): LocalModelTran
             configuration,
           );
         }
-        await restoreDeletionReservation(modelId, configuration.recoveryToken);
+        const recovery = await restoreDeletionReservation(
+          modelId,
+          configuration.recoveryToken,
+        );
+        if (recovery === 'deleted') return confirmedDeletion(configuration);
         throw error;
       }
       if (result.ok !== true) {
@@ -349,7 +379,11 @@ function createDesktopTransport(bridge: DesktopLocalModelBridge): LocalModelTran
           weightsRemain = await confirmWeightsRemain(modelId);
         }
         if (weightsRemain) {
-          await restoreDeletionReservation(modelId, configuration.recoveryToken);
+          const recovery = await restoreDeletionReservation(
+            modelId,
+            configuration.recoveryToken,
+          );
+          if (recovery === 'deleted') return confirmedDeletion(configuration);
         } else {
           return finalizeDeletedRegistration(
             modelId,

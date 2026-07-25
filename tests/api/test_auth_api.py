@@ -27,6 +27,7 @@ from api.middlewares.auth import AuthMiddleware
 from api.middlewares.error_handler import add_error_handlers
 from api.v1.endpoints import auth as auth_endpoint
 from src.config import Config
+from src.services.system_config_service import SystemConfigService
 
 
 def _reset_auth_globals() -> None:
@@ -447,6 +448,44 @@ class AuthApiTestCase(unittest.TestCase):
             status_response = asyncio.run(auth_endpoint.auth_status(self._build_request()))
         self.assertFalse(status_response["authEnabled"])
         self.assertFalse(status_response["passwordSet"])
+
+    def test_auth_settings_cannot_bypass_local_model_configuration_lease(self) -> None:
+        auth.set_initial_password("passwd6")
+        service = SystemConfigService()
+        lease_token = "pending-local-model-delete"
+        service._runtime_config_transaction.acquire_update_lease(
+            lease_token,
+            ttl_seconds=30,
+        )
+        app = FastAPI()
+        app.state.system_config_service = service
+        app.include_router(auth_endpoint.router, prefix="/api/v1/auth")
+
+        try:
+            with patch.object(
+                auth,
+                "_is_auth_enabled_from_env",
+                side_effect=self._read_auth_enabled_from_env,
+            ):
+                response = TestClient(app).post(
+                    "/api/v1/auth/settings",
+                    json={
+                        "authEnabled": False,
+                        "currentPassword": "passwd6",
+                    },
+                )
+        finally:
+            service._runtime_config_transaction.release_update_lease(lease_token)
+
+        self.assertEqual(response.status_code, 409)
+        payload = response.json()
+        self.assertEqual(payload["error"], "config_conflict")
+        self.assertEqual(
+            payload["message"],
+            "Configuration has changed, please reload and retry",
+        )
+        self.assertIn("current_config_version", payload["params"])
+        self.assertIn("ADMIN_AUTH_ENABLED=true", self.env_path.read_text(encoding="utf-8"))
 
     def test_auth_settings_disable_requires_current_password_when_auth_enabled(self) -> None:
         with patch.object(auth, "_is_auth_enabled_from_env", side_effect=self._read_auth_enabled_from_env):
