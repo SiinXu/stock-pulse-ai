@@ -4,8 +4,17 @@
 
 from .agent_tools import (
     AgentToolRegistrationBackend,
+    build_agent_tool_extension_contract,
     build_agent_tool_extension_registry,
     validate_agent_tool_definition,
+)
+from .analysis_strategies import (
+    AnalysisStrategyCatalogSnapshot,
+    AnalysisStrategyDefinition,
+    AnalysisStrategyRegistry,
+    RegisteredAnalysisStrategy,
+    build_analysis_strategy_extension_contract,
+    validate_analysis_strategy_definition,
 )
 from .constants import PLUGIN_APPLICATION_VERSION
 from .errors import PluginContextClosedError, PluginError, PluginRegistryError
@@ -39,9 +48,13 @@ from .registry import (
     RegistrationHandle,
     default_extension_contracts,
 )
+from .runtime import build_application_extension_registry
 
 __all__ = [
     "AgentToolRegistrationBackend",
+    "AnalysisStrategyCatalogSnapshot",
+    "AnalysisStrategyDefinition",
+    "AnalysisStrategyRegistry",
     "EXTENSION_POINTS",
     "ExternalPluginLoader",
     "ExternalPluginResult",
@@ -68,9 +81,14 @@ __all__ = [
     "ReportTemplate",
     "RegistrationHandle",
     "SUPPORTED_REPORT_PLATFORMS",
+    "RegisteredAnalysisStrategy",
+    "build_agent_tool_extension_contract",
     "build_agent_tool_extension_registry",
+    "build_analysis_strategy_extension_contract",
+    "build_application_extension_registry",
     "default_extension_contracts",
     "normalize_report_platform",
     "validate_agent_tool_definition",
     "validate_report_template",
+    "validate_analysis_strategy_definition",
 ]

@@ -558,7 +558,10 @@ class _PipelineMethods:
                 skill_instructions=self.skill_instructions,
                 technical_skill_policy=self.technical_skill_policy,
             )
-            router = SkillRouter()
+            router = SkillRouter(
+                skill_manager=self.skill_manager,
+                config=self.config,
+            )
             selected = router.select_skills(ctx)
             if not selected:
                 return []
@@ -568,6 +571,7 @@ class _PipelineMethods:
             for skill_id in selected[:3]:  # cap at 3 concurrent skills
                 agent = self._prepare_agent(SkillAgent(
                     skill_id=skill_id,
+                    skill_manager=self.skill_manager,
                     **common_kwargs,
                 ))
                 if tool_registry is not self.tool_registry:

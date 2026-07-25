@@ -27,14 +27,24 @@ class SkillAgent(BaseAgent):
 
     max_steps = 4
 
-    def __init__(self, skill_id: Optional[str] = None, strategy_id: Optional[str] = None, **kwargs):
+    def __init__(
+        self,
+        skill_id: Optional[str] = None,
+        strategy_id: Optional[str] = None,
+        skill_manager=None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         resolved_skill_id = skill_id or strategy_id
         if not resolved_skill_id:
             raise ValueError("skill_id is required")
         self.skill_id = resolved_skill_id
         self.agent_name = build_skill_agent_name(resolved_skill_id)
-        self._skill = self._load_skill(resolved_skill_id)
+        self._skill = (
+            skill_manager.get(resolved_skill_id)
+            if skill_manager is not None
+            else self._load_skill(resolved_skill_id)
+        )
 
         if self._skill:
             tool_names = self._skill.required_tools

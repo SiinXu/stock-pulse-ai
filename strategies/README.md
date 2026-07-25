@@ -1,6 +1,6 @@
 # 交易策略目录 / Trading Strategies
 
-本目录存放 **自然语言交易策略文件**（YAML 格式）。系统启动时自动加载此目录下所有 `.yaml` 文件。
+本目录存放 **自然语言交易策略文件**（YAML 格式）。系统加载根目录 YAML，以及明确保留的内置集合（当前为 `personas/`）；自定义目录的 YAML 发现规则仍仅限顶层。
 
 对用户和文档，我们继续把这些能力称为“策略”；在代码、配置和 API 字段里，它们统一命名为 `skill`，你可以把它理解为“可复用的策略能力包”。
 
@@ -100,5 +100,6 @@ AGENT_SKILL_DIR=./my_skills
 
 - 如果需求只包含自然语言分析规则、提示词、激活元数据，或声明 specialist Skill 依赖的现有 Agent 工具，请使用本目录的 YAML，或 `AGENT_SKILL_DIR` 下的 YAML / `SKILL.md`。这类 Skill 不执行 Python，也不能注册新工具或数据源。
 - `required_tools` 只在 specialist 模式创建 `SkillAgent` 时缩小该 specialist 的工具集；`allowed_tools` 仅作为导入的 metadata 保留，不是 runtime 权限 allowlist。prompt-only 与 Single-Agent 路径不会应用按 Skill 划分的工具访问控制；通用工具权限需求不属于策略 Skill。
-- 如果需求必须执行受信任的 Python，并且属于数据源、分析策略、Agent 工具、通知渠道、报告模板或事件 Hook 之一，请先检查[插件扩展机制选择矩阵](../docs/plugin-extension-contract.md#choosing-an-extension-mechanism)及其实现状态。只有已经接入运行时的扩展点可用。
+- 如果一个已审核的受信任 Python 插件需要随生命周期发布分析策略定义，可使用已接入的 `analysis_strategy` 扩展点；它只向同一个 `SkillManager` catalog 注册 `Skill`，不能替代 `StrategyEngine`、覆盖内置/自定义同名策略或改变最多三个 specialist 的上限。字段、冲突、加载与信任边界见 [Analysis Strategy 插件作者指南（英文）](../docs/analysis-strategy-plugin-authoring.md)。
+- 数据源、Agent 工具或其他系统扩展需求，请先检查[插件扩展机制选择矩阵](../docs/plugin-extension-contract.md#choosing-an-extension-mechanism)及其实现状态。只有已经接入运行时且绑定到正确原生 authority 的扩展点可用。
 - UI 组件、Settings 面板、自定义命令、远程 marketplace、自动安装依赖、hot reload、connector / MCP 或新的扩展点需要先完成独立设计与 ADR；不要通过策略目录或相近的插件注册项绕过该边界。

@@ -5,7 +5,7 @@ startup layer holds them in one place and tests can inject isolated instances.
 
 Design notes:
 - Each service defaults to the module's existing accessor
-  (``Config.get_instance``, ``DatabaseManager.get_instance``,
+  (``get_config``, ``DatabaseManager.get_instance``,
   ``get_search_service``, ``get_task_queue``). A default composition root is a
   transparent pass-through: behaviour is identical to calling the accessor
   directly, and it never caches, so it always reflects the current singleton.
@@ -16,13 +16,14 @@ Design notes:
 - Plugin composition starts only after the root is installed. Built-ins supplied
   by the composition caller are registered first, then an explicitly configured
   external directory is scanned, and the resulting snapshot is loaded with
-  per-plugin fault isolation.
+  per-plugin fault isolation. The root-owned Analysis Strategy catalog is bound
+  into that same manager and consumed by the existing Skill runtime.
 
 Only the singletons that actually exist in this codebase are held: Config,
-DatabaseManager, SearchService, AnalysisTaskQueue, and the process plugin
-manager. There is no process-wide cache, auth rate limiter or shared thread pool
-singleton to own, so none is invented here (thread pools are owned per-pipeline /
-per-queue instance).
+DatabaseManager, SearchService, AnalysisTaskQueue, the process plugin manager,
+and its Analysis Strategy catalog. There is no process-wide cache, auth rate
+limiter or shared thread pool singleton to own, so none is invented here (thread
+pools are owned per-pipeline / per-queue instance).
 ``system_config_service`` is already composed in the FastAPI lifespan
 (``api/app.py``) and keeps its app-scoped lifecycle; this root does not modify
 or take over ``system_config_service.py``.
@@ -41,6 +42,8 @@ from src.plugins.constants import PLUGIN_APPLICATION_VERSION
 if TYPE_CHECKING:  # import for typing only; avoids runtime import cycles
     from src.config import Config
     from src.plugins import (
+        AnalysisStrategyCatalogSnapshot,
+        AnalysisStrategyRegistry,
         ExternalPluginResult,
         Plugin,
         PluginManager,
@@ -59,6 +62,16 @@ def _get_process_agent_tool_registry():
     return get_tool_registry()
 
 
+def _get_declarative_analysis_strategy_names(config: "Config") -> tuple[str, ...]:
+    """Resolve the current built-in/custom names without reading plugin state."""
+
+    from src.agent.runtime_assembly import build_declarative_skill_manager
+
+    return tuple(
+        skill.name for skill in build_declarative_skill_manager(config).list_skills()
+    )
+
+
 class ApplicationServices:
     """Composition root holding process-wide service singletons.
 
@@ -75,6 +88,9 @@ class ApplicationServices:
         search: Optional["SearchService"] = None,
         task_queue: Optional["AnalysisTaskQueue"] = None,
         plugin_manager: Optional["PluginManager"] = None,
+        analysis_strategy_registry: Optional[
+            "AnalysisStrategyRegistry"
+        ] = None,
         builtin_plugins: Optional[Iterable["Plugin"]] = None,
         plugins_dir: str | Path | None = None,
         plugin_application_version: str = PLUGIN_APPLICATION_VERSION,
@@ -83,17 +99,56 @@ class ApplicationServices:
         self._database = database
         self._search = search
         self._task_queue = task_queue
+        from src.plugins import AnalysisStrategyRegistry
+
+        if (
+            analysis_strategy_registry is not None
+            and not isinstance(analysis_strategy_registry, AnalysisStrategyRegistry)
+        ):
+            raise TypeError("analysis strategy registry is invalid")
         plugin_manager_was_provided = plugin_manager is not None
         if plugin_manager is None:
-            from src.plugins import PluginManager, build_agent_tool_extension_registry
+            from src.plugins import (
+                PluginManager,
+                build_analysis_strategy_extension_contract,
+                build_application_extension_registry,
+            )
 
+            if analysis_strategy_registry is None:
+                analysis_strategy_registry = AnalysisStrategyRegistry(
+                    lambda: _get_declarative_analysis_strategy_names(self.config)
+                )
             plugin_manager = PluginManager(
                 application_version=plugin_application_version,
-                registry=build_agent_tool_extension_registry(
+                registry=build_application_extension_registry(
                     _get_process_agent_tool_registry,
+                    additional_contracts={
+                        "analysis_strategy": (
+                            build_analysis_strategy_extension_contract(
+                                analysis_strategy_registry
+                            )
+                        ),
+                    },
                 ),
             )
+        else:
+            configured_backend = plugin_manager.registry.native_backend(
+                "analysis_strategy"
+            )
+            if analysis_strategy_registry is None:
+                if isinstance(configured_backend, AnalysisStrategyRegistry):
+                    analysis_strategy_registry = configured_backend
+                elif configured_backend is not None:
+                    raise TypeError(
+                        "plugin manager uses an unsupported analysis strategy backend"
+                    )
+            elif configured_backend is not analysis_strategy_registry:
+                raise ValueError(
+                    "plugin manager and analysis strategy registry must be paired"
+                )
         self._plugin_manager = plugin_manager
+        self._analysis_strategy_registry = analysis_strategy_registry
+        self._analysis_strategy_catalog_token = object()
         if builtin_plugins is None and not plugin_manager_was_provided:
             from src.plugins.builtin import get_configured_builtin_plugins
 
@@ -120,9 +175,9 @@ class ApplicationServices:
     def config(self) -> "Config":
         if self._config is not None:
             return self._config
-        from src.config import Config
+        from src.config import get_config
 
-        return Config.get_instance()
+        return get_config()
 
     @property
     def database(self) -> "DatabaseManager":
@@ -153,6 +208,35 @@ class ApplicationServices:
         """Return the process plugin lifecycle and registration authority."""
 
         return self._plugin_manager
+
+    @property
+    def analysis_strategy_registry(self) -> Optional["AnalysisStrategyRegistry"]:
+        """Return the paired plugin Skill snapshot authority when configured."""
+
+        return self._analysis_strategy_registry
+
+    def analysis_strategy_snapshot(self) -> "AnalysisStrategyCatalogSnapshot":
+        """Return one registry/native generation without a partial transition."""
+
+        if self._analysis_strategy_registry is None:
+            from src.plugins import AnalysisStrategyCatalogSnapshot
+
+            return AnalysisStrategyCatalogSnapshot(
+                catalog_token=self._analysis_strategy_catalog_token,
+                generation=0,
+                registrations=(),
+            )
+        while True:
+            generation = self._analysis_strategy_registry.generation
+            registrations = self._plugin_manager.registrations(
+                "analysis_strategy"
+            )
+            snapshot = self._analysis_strategy_registry.snapshot(registrations)
+            if (
+                snapshot.generation == generation
+                and self._analysis_strategy_registry.generation == generation
+            ):
+                return snapshot
 
     @property
     def builtin_plugin_results(self) -> tuple["PluginOperationResult", ...]:

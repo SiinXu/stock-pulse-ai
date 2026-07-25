@@ -438,6 +438,17 @@ class ExtensionRegistry:
             entry = self._entries.get((extension_point, registration_id))
             return None if entry is None or entry.recovery_only else entry.registration
 
+    def native_backend(
+        self,
+        extension_point: ExtensionPoint,
+    ) -> NativeRegistrationBackend | None:
+        """Return the immutable point backend for composition pairing checks."""
+
+        contract = self._contracts.get(extension_point)
+        if contract is None:
+            raise ValueError("unsupported extension point")
+        return contract.backend
+
     def _owns(
         self,
         extension_point: ExtensionPoint,
