@@ -421,19 +421,32 @@ class _RenderingMethods:
         if results:
             from src.services.report_renderer import render, render_plugin_template
 
-            render_kwargs = {
+            base_render_kwargs = {
                 "platform": "markdown",
                 "results": results,
                 "report_date": report_date,
                 "summary_only": self._report_summary_only,
-                "extra_context": {
-                    **self._get_history_compare_context(results),
-                    "report_language": report_language,
-                },
             }
-            out = render_plugin_template(**render_kwargs)
+            extra_context: Optional[Dict[str, Any]] = None
+
+            def build_extra_context() -> Dict[str, Any]:
+                nonlocal extra_context
+                if extra_context is None:
+                    extra_context = {
+                        **self._get_history_compare_context(results),
+                        "report_language": report_language,
+                    }
+                return extra_context
+
+            out = render_plugin_template(
+                **base_render_kwargs,
+                extra_context_factory=build_extra_context,
+            )
             if not out and getattr(config, 'report_renderer_enabled', False):
-                out = render(**render_kwargs)
+                out = render(
+                    **base_render_kwargs,
+                    extra_context=build_extra_context(),
+                )
             if out:
                 return out
 

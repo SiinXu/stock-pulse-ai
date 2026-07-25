@@ -5,8 +5,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -70,6 +70,11 @@ class _ExplodingString(str):
         raise AssertionError("string subclass comparison must not run")
 
 
+class _ExplodingPlatforms:
+    def __contains__(self, platform: object) -> bool:
+        raise RuntimeError("token=platform-secret")
+
+
 class _TemplatePlugin(Plugin):
     def __init__(
         self,
@@ -117,15 +122,22 @@ def _result() -> AnalysisResult:
 
 
 @pytest.fixture
-def manager(monkeypatch: pytest.MonkeyPatch) -> PluginManager:
+def manager() -> PluginManager:
     plugin_manager = PluginManager(application_version=PLUGIN_APPLICATION_VERSION)
-    root = SimpleNamespace(plugin_manager=plugin_manager)
-    monkeypatch.setattr(
-        application_services,
-        "get_application_services",
-        lambda: root,
+    application_services.set_application_services(
+        application_services.ApplicationServices(
+            plugin_manager=plugin_manager,
+            plugins_dir="",
+        )
     )
     return plugin_manager
+
+
+@pytest.fixture(autouse=True)
+def _clean_application_services() -> Iterator[None]:
+    application_services.reset_application_services()
+    yield
+    application_services.reset_application_services()
 
 
 def test_default_contract_accepts_valid_template_and_rejects_invalid_shape(
@@ -146,6 +158,52 @@ def test_default_contract_accepts_valid_template_and_rejects_invalid_shape(
     assert [item.registration_id for item in manager.registrations("report_template")] == [
         "valid-template"
     ]
+
+
+def test_fallback_only_render_does_not_install_or_start_application_services() -> None:
+    config = Config(stock_list=[], report_renderer_enabled=False)
+
+    assert application_services.get_installed_application_services() is None
+    with patch("src.notification.get_config", return_value=config):
+        rendered = NotificationService().generate_brief_report(
+            [_result()],
+            report_date="2026-07-24",
+        )
+
+    assert "Kweichow Moutai" in rendered
+    assert application_services.get_installed_application_services() is None
+
+
+def test_fallback_only_markdown_does_not_build_history_context() -> None:
+    config = Config(stock_list=[], report_renderer_enabled=False)
+    service = NotificationService()
+
+    with patch("src.notification.get_config", return_value=config), patch.object(
+        service,
+        "_get_history_compare_context",
+        side_effect=AssertionError("history context must remain lazy"),
+    ):
+        rendered = service.generate_dashboard_report(
+            [_result()],
+            report_date="2026-07-24",
+        )
+
+    assert "Kweichow Moutai" in rendered
+    assert application_services.get_installed_application_services() is None
+
+
+def test_installed_root_report_template_is_selected() -> None:
+    plugin_manager = PluginManager(application_version=PLUGIN_APPLICATION_VERSION)
+    root = application_services.ApplicationServices(
+        plugin_manager=plugin_manager,
+        plugins_dir="",
+    )
+    application_services.set_application_services(root)
+    template = _Template("installed-template", frozenset({"brief"}), "installed")
+    _load(plugin_manager, "installed-plugin", (template, 100))
+
+    assert application_services.get_installed_application_services() is root
+    assert render_plugin_template("brief", [_result()]) == "installed"
 
 
 def test_duplicate_template_id_fails_closed_without_replacing_owner(
@@ -232,6 +290,34 @@ def test_candidate_failures_and_invalid_results_continue_safely(
     assert "renderer-secret" not in caplog.text
     assert "report_template_rendering_failed" in caplog.text
     assert "report_template_result_invalid" in caplog.text
+
+
+def test_platform_check_failure_does_not_block_later_candidate(
+    manager: PluginManager,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    invalid = _Template(
+        "invalid-platforms",
+        frozenset({"markdown"}),
+        "not selected",
+    )
+    winner = _Template("winner", frozenset({"markdown"}), "safe report")
+    _load(
+        manager,
+        "platform-isolation-plugin",
+        (invalid, 1),
+        (winner, 2),
+    )
+    invalid.platforms = _ExplodingPlatforms()  # type: ignore[assignment]
+    caplog.set_level(logging.WARNING)
+
+    rendered = render_plugin_template("markdown", [_result()])
+
+    assert rendered == "safe report"
+    assert invalid.requests == []
+    assert len(winner.requests) == 1
+    assert "platform-secret" not in caplog.text
+    assert "report_template_platform_check_failed" in caplog.text
 
 
 def test_request_is_normalized_and_context_is_deeply_immutable(

@@ -11,7 +11,7 @@ Any expensive data preparation should be injected by the caller via extra_contex
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from src.analyzer import AnalysisResult
 from src.config import get_config
@@ -78,6 +78,8 @@ def render_plugin_template(
     report_date: Optional[str] = None,
     summary_only: bool = False,
     extra_context: Optional[Dict[str, Any]] = None,
+    *,
+    extra_context_factory: Optional[Callable[[], Dict[str, Any]]] = None,
 ) -> Optional[str]:
     """Render the first matching enabled plugin candidate, if one succeeds."""
 
@@ -87,9 +89,12 @@ def render_plugin_template(
     if normalized_platform is None:
         return None
     try:
-        from src.application_services import get_application_services
+        from src.application_services import get_installed_application_services
 
-        registrations = get_application_services().plugin_manager.registrations(
+        services = get_installed_application_services()
+        if services is None:
+            return None
+        registrations = services.plugin_manager.registrations(
             "report_template"
         )
     except Exception as exc:  # broad-exception: fallback_recorded - Plugin lookup failure preserves both legacy report fallbacks.
@@ -102,12 +107,36 @@ def render_plugin_template(
             context={"platform": normalized_platform},
         )
         return None
-    if not registrations:
+    matching_registrations = []
+    for registration in registrations:
+        try:
+            matches_platform = (
+                normalized_platform in registration.implementation.platforms
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - One invalid capability declaration cannot block later candidates or legacy fallbacks.
+            log_safe_exception(
+                logger,
+                "Report template plugin platform check failed",
+                exc,
+                error_code="report_template_platform_check_failed",
+                level=logging.WARNING,
+                context={
+                    "platform": normalized_platform,
+                    "plugin_id": registration.plugin_id,
+                    "template_id": registration.registration_id,
+                },
+            )
+            continue
+        if matches_platform:
+            matching_registrations.append(registration)
+    if not matching_registrations:
         return None
 
     if report_date is None:
         report_date = datetime.now().strftime("%Y-%m-%d")
     try:
+        if extra_context_factory is not None:
+            extra_context = extra_context_factory()
         frozen_extra_context = freeze_json_metadata(extra_context)
         request = ReportRenderRequest(
             platform=normalized_platform,
@@ -128,11 +157,9 @@ def render_plugin_template(
         )
         return None
 
-    for registration in registrations:
+    for registration in matching_registrations:
         implementation = registration.implementation
         try:
-            if normalized_platform not in implementation.platforms:
-                continue
             rendered = implementation.render(request)
         except Exception as exc:  # broad-exception: fallback_recorded - One renderer cannot block later candidates or legacy fallbacks.
             log_safe_exception(
