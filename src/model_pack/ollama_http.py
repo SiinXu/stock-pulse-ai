@@ -9,10 +9,14 @@ import requests
 
 from src.model_pack.errors import ModelPackError
 from src.model_pack.models import InspectedModelPack
+from src.llm.provider_catalog_data import get_static_provider
 from src.security.outbound_policy import OutboundPolicyError, safe_request
 
 
-DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434"
+_OLLAMA_PROVIDER = get_static_provider("ollama")
+if _OLLAMA_PROVIDER is None:  # pragma: no cover - checked-in catalog invariant
+    raise RuntimeError("The Ollama provider is missing from the provider catalog")
+DEFAULT_OLLAMA_BASE_URL = str(_OLLAMA_PROVIDER["default_base_url"])
 DEFAULT_OLLAMA_IMPORT_TIMEOUT_SECONDS = 30 * 60
 MAX_OLLAMA_RESPONSE_BYTES = 1024 * 1024
 

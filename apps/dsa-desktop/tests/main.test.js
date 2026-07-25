@@ -3785,8 +3785,13 @@ test('local model IPC rejects foreign renderers and serves the main Web window',
   mainModule.__setLocalModelStateForTest(null);
 
   const detectHandler = mainModule.__getIpcMainHandler('desktop-local-model:detect');
+  const importHandler = mainModule.__getIpcMainHandler('desktop-local-model:import-pack');
   await assert.rejects(
     async () => detectHandler({ sender: { id: 'other' } }),
+    /Unauthorized local model IPC sender/
+  );
+  await assert.rejects(
+    async () => importHandler({ sender: { id: 'other' } }),
     /Unauthorized local model IPC sender/
   );
 
@@ -3810,6 +3815,84 @@ test('local model IPC rejects foreign renderers and serves the main Web window',
   await mainModule.stopManagedLocalModelRuntime();
   assert.equal(stateEvents.at(-1).channel, mainModule.DESKTOP_LOCAL_MODEL_STATE_EVENT);
   assert.equal(stateEvents.at(-1).payload.status, 'stopped');
+});
+
+test('desktop Model Pack picker supports an archive or unpacked directory', async (t) => {
+  const mainModule = loadMainModule(t);
+  const calls = [];
+  const dialogImpl = {
+    showMessageBox: async () => ({ response: calls.length === 0 ? 0 : 1 }),
+    showOpenDialog: async (_window, options) => {
+      calls.push(options);
+      return {
+        canceled: false,
+        filePaths: [options.properties[0] === 'openFile' ? '/safe/model.modelpack' : '/safe/model'],
+      };
+    },
+  };
+
+  assert.equal(
+    await mainModule.selectDesktopModelPackSource({ dialogImpl }),
+    '/safe/model.modelpack'
+  );
+  assert.equal(
+    await mainModule.selectDesktopModelPackSource({ dialogImpl }),
+    '/safe/model'
+  );
+  assert.deepEqual(calls[0].properties, ['openFile']);
+  assert.deepEqual(calls[0].filters, [
+    { name: 'Model Packs', extensions: ['modelpack', 'zip'] },
+  ]);
+  assert.deepEqual(calls[1].properties, ['openDirectory']);
+});
+
+test('desktop Model Pack import uses the trusted runtime snapshot without mutating config', async (t) => {
+  const mainModule = loadMainModule(t);
+  mainModule.__setLocalModelStateForTest(null);
+  const importCalls = [];
+  const result = await mainModule.importDesktopModelPack({
+    selectSource: async () => '/safe/model.modelpack',
+    detectRuntime: async ({ baseUrl }) => ({
+      status: mainModule.DESKTOP_LOCAL_MODEL_STATUS.RUNNING,
+      installed: true,
+      installedModels: [],
+      managed: false,
+      baseUrl,
+      runtimeSource: mainModule.DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE.EXTERNAL_SERVICE,
+      runtimeBinary: null,
+    }),
+    resolveRuntimeBinary: async () => ({
+      command: '/trusted/ollama',
+      source: mainModule.DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE.SYSTEM,
+      rootDir: null,
+    }),
+    importPack: async (source, options) => {
+      importCalls.push({ source, options });
+      options.onProgress(35, 'Model Pack verified');
+      return {
+        modelId: 'licensed/finance:q4',
+        displayName: 'Licensed Finance Q4',
+        minimumMemoryGb: 16,
+        licenseId: 'LicenseRef-Finance',
+        warnings: [],
+      };
+    },
+    refreshState: async () => undefined,
+  });
+
+  assert.equal(importCalls[0].source, '/safe/model.modelpack');
+  assert.equal(importCalls[0].options.runtimeCommand, '/trusted/ollama');
+  assert.equal(importCalls[0].options.env.OLLAMA_HOST, 'http://127.0.0.1:11434');
+  assert.deepEqual(result, {
+    ok: true,
+    modelId: 'licensed/finance:q4',
+    displayName: 'Licensed Finance Q4',
+    minimumMemoryGb: 16,
+    licenseId: 'LicenseRef-Finance',
+    warnings: [],
+    runtimeIdentity: LOCAL_MODEL_RUNTIME_IDENTITY,
+  });
+  assert.equal(Object.hasOwn(result, 'source'), false);
 });
 
 test('desktop package retires the standalone model surface and keeps embedded runtime assets', () => {

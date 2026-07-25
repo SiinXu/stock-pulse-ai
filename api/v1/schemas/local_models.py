@@ -60,6 +60,18 @@ class LocalModelConfigurationResponse(BaseModel):
     registered_models: List[str] = Field(default_factory=list)
     primary_model: str = ""
     agent_model: str = ""
+    imported_models: List["ImportedLocalModelMetadata"] = Field(default_factory=list)
+
+
+class ImportedLocalModelMetadata(BaseModel):
+    """Validated Model Pack presentation fields for one configured runtime."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    model_id: str = Field(..., min_length=1, max_length=128, pattern=LOCAL_MODEL_ID_PATTERN)
+    display_name: str = Field(..., min_length=1, max_length=160)
+    minimum_memory_gb: int = Field(..., ge=1, le=2048)
+    license_id: str = Field(..., min_length=1, max_length=128)
 
 
 class LocalModelRuntimeResponse(BaseModel):

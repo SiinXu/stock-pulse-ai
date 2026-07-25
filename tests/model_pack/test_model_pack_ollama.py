@@ -13,7 +13,6 @@ from src.model_pack import (
     inspect_model_pack,
     normalize_ollama_native_base_url,
 )
-from src.services.local_model_activation import LocalModelActivationService
 
 
 def _sha256(path: Path) -> str:
@@ -186,83 +185,3 @@ def test_http_executor_requires_private_target_allowlisting(tmp_path: Path) -> N
 
     assert error.value.code == "ollama_access_blocked"
     assert "OUTBOUND_HTTP_ALLOWLIST" in error.value.user_message
-
-
-class _FakeSystemConfigService:
-    def __init__(self, values):
-        self.values = dict(values)
-        self.update_calls = []
-
-    def get_config(self, include_schema: bool):
-        assert include_schema is False
-        return {
-            "config_version": "version-before",
-            "items": [
-                {"key": key, "value": value}
-                for key, value in self.values.items()
-            ],
-        }
-
-    def update(self, **kwargs):
-        self.update_calls.append(kwargs)
-        return {
-            "config_version": "version-after",
-            "reload_triggered": kwargs["reload_now"],
-        }
-
-
-def test_activation_reuses_system_config_update_and_preserves_existing_values() -> None:
-    config_service = _FakeSystemConfigService(
-        {
-            "LLM_CHANNELS": "primary,ollama",
-            "LLM_OLLAMA_BASE_URL": "http://localhost:11434/v1",
-            "LLM_OLLAMA_MODELS": "qwen3:8b",
-        }
-    )
-
-    result = LocalModelActivationService(config_service).activate(
-        "stockpulse/finance-test:q4"
-    )
-
-    assert result == {
-        "channels": "primary,ollama",
-        "models": "qwen3:8b,stockpulse/finance-test:q4",
-        "config_version": "version-after",
-        "reload_triggered": True,
-    }
-    assert config_service.update_calls == [
-        {
-            "config_version": "version-before",
-            "items": [
-                {"key": "LLM_CHANNELS", "value": "primary,ollama"},
-                {"key": "LLM_OLLAMA_PROVIDER", "value": "ollama"},
-                {"key": "LLM_OLLAMA_PROTOCOL", "value": "ollama"},
-                {"key": "LLM_OLLAMA_BASE_URL", "value": "http://localhost:11434"},
-                {
-                    "key": "LLM_OLLAMA_MODELS",
-                    "value": "qwen3:8b,stockpulse/finance-test:q4",
-                },
-                {"key": "LLM_OLLAMA_ENABLED", "value": "true"},
-            ],
-            "reload_now": True,
-            "actor": "local_model_activation",
-        }
-    ]
-
-
-def test_activation_is_idempotent_for_channel_and_model() -> None:
-    config_service = _FakeSystemConfigService(
-        {
-            "LLM_CHANNELS": "OLLAMA",
-            "LLM_OLLAMA_MODELS": "stockpulse/finance-test:q4",
-        }
-    )
-
-    result = LocalModelActivationService(
-        config_service,
-        reload_now=False,
-    ).activate("stockpulse/finance-test:q4")
-
-    assert result["channels"] == "OLLAMA"
-    assert result["models"] == "stockpulse/finance-test:q4"
-    assert result["reload_triggered"] is False

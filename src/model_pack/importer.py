@@ -73,7 +73,17 @@ class ModelPackImporter:
                 minimum_memory_gb=inspected.manifest.minimum_memory_gb,
                 license_id=inspected.manifest.license.id,
                 warnings=inspected.warnings,
-                registration=registration,
+                activated=bool(
+                    registration is not None
+                    and (
+                        not isinstance(registration, dict)
+                        or registration.get("activated", True)
+                    )
+                ),
+                selected_primary=bool(
+                    isinstance(registration, dict)
+                    and registration.get("selected_primary")
+                ),
             )
 
 

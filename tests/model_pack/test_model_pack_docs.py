@@ -21,6 +21,9 @@ def test_model_pack_document_covers_format_user_and_publisher_contracts() -> Non
         "manifest.json",
         "OUTBOUND_HTTP_ALLOWLIST",
         "under 2 GiB",
+        "limited to 64 GiB",
+        "model_pack_registry.json",
+        "bundled runtime as fallback",
         "does not publish weights",
     ):
         assert required in document
@@ -50,12 +53,14 @@ def test_static_openapi_contains_the_runtime_model_pack_contract() -> None:
     for path in (
         "/api/v1/model-packs/import",
         "/api/v1/model-packs/imports/{task_id}",
+        "/api/v1/model-packs/desktop-activations",
     ):
         assert static["paths"][path] == runtime["paths"][path]
     for schema in (
         "ModelPackImportAccepted",
         "ModelPackImportResult",
         "ModelPackImportStatus",
+        "ModelPackDesktopActivationRequest",
     ):
         assert static["components"]["schemas"][schema] == runtime["components"][
             "schemas"

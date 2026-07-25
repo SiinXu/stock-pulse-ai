@@ -16,15 +16,21 @@ supported model-import entry point.
 - Desktop accepts a `.modelpack`/`.zip` file or an unpacked Model Pack
   directory. The native picker asks which source type to select.
 - Web accepts a `.modelpack` or `.zip` upload. The server stages the upload and
-  removes the staging directory when the background task ends.
+  removes the staging directory when the background task ends. Uploads,
+  archives, and declared payloads are limited to 64 GiB.
 - The Web request cannot provide an Ollama URL. StockPulse reads
   `LLM_OLLAMA_BASE_URL` from saved server configuration.
 - A private or loopback Web Ollama target must also be allowed by the existing
   outbound policy, for example
   `OUTBOUND_HTTP_ALLOWLIST=127.0.0.1:11434`.
-- Desktop calls the fixed `ollama` executable with an argument array and
-  `shell=false`. Pack content is never added to a command line except for the
-  validated model id and StockPulse-owned extracted Modelfile path.
+- Desktop uses the currently resolved trusted Ollama executable: a working
+  system installation takes precedence, with the bundled runtime as fallback.
+  It calls `ollama create` with a fixed argument array and `shell=false`. Pack
+  content is never added to a command line except for the validated model id
+  and StockPulse-owned extracted Modelfile path.
+- Desktop returns validated manifest metadata and an opaque runtime identity to
+  the Web panel. The backend then checks the original configuration/runtime
+  snapshot before using the same activation path as a catalog download.
 
 After successful creation, StockPulse adds `ollama` to `LLM_CHANNELS`, adds the
 model id to `LLM_OLLAMA_MODELS`, enables that channel, and reloads configuration
@@ -32,6 +38,12 @@ through the same path used by Local Model downloads. An existing primary model
 is not replaced. If no primary model exists, the Local Models activation flow
 may select the imported Ollama route so the first analysis can run without
 manual environment editing.
+
+Validated presentation metadata for imported models that are absent from the
+catalog is stored in `model_pack_registry.json` beside `DATABASE_PATH`. The
+bounded JSON registry is written atomically with owner-only file permissions
+and keyed by an opaque Ollama runtime identity. A catalog match always uses
+catalog presentation; manifest presentation is shown only for unknown models.
 
 The import needs working space for validation/extraction and for Ollama's model
 store. StockPulse checks free space before extraction, but Ollama may use a
@@ -47,11 +59,14 @@ different disk. A later Ollama disk failure is therefore still possible.
 | `unsafe_archive_entry` | The archive contains a nested, duplicate, traversal, or symbolic-link entry | Rebuild it with `scripts/build_model_pack.py` |
 | `unsafe_modelfile` | Modelfile references an external path or unsupported instruction | Remove that instruction and rebuild |
 | `invalid_gguf` | The declared weight does not have the GGUF header | Select the correct converted weight |
+| `model_pack_too_large` | The upload, archive, or declared payload exceeds 64 GiB | Select or build a smaller pack |
+| `invalid_archive` | The archive is unreadable or contains more than 256 files | Re-download it or rebuild it with only declared data |
 | `insufficient_disk_space` | Staging/import free space is below the preflight requirement | Free the amount shown and retry |
 | `ollama_access_blocked` | The configured private target is not allowed by outbound policy | Add the exact trusted host and port to `OUTBOUND_HTTP_ALLOWLIST` |
 | `ollama_unavailable` | Ollama cannot be reached or started | Start Ollama and verify `LLM_OLLAMA_BASE_URL` |
 | `ollama_create_failed` | Ollama rejected or could not finish model creation | Check Ollama compatibility/logs, then rebuild or retry |
 | `registration_failed` | Ollama created the model but StockPulse could not activate it | Open Local Models and register the installed model |
+| `config_version_conflict` | Configuration or runtime changed during Desktop import | Refresh Local Models and retry the activation |
 
 ## Format Version 1
 
@@ -126,7 +141,9 @@ Field rules:
 Extra regular files produce warnings and are not extracted from an archive.
 Missing declared files fail import. Unsafe archive names, duplicate
 case-insensitive names, nested paths, and symbolic links fail import even when
-they are not declared.
+they are not declared. Directory and archive inventories are capped at 256
+files, and the archive plus the sum of declared payload sizes are each capped
+at 64 GiB.
 
 ### Constrained Modelfile
 
@@ -249,7 +266,10 @@ Model Pack import adds no environment keys. It reuses:
 There is no `LITELLM_FALLBACK_MODELS` setting. Multi-provider fallback remains
 the existing ordered `LLM_CHANNELS` behavior and Local Models assignment UI.
 
-To roll back code, revert the Model Pack change. No database or file-format
-migration is required. A model already created in Ollama remains an ordinary
-local Ollama model; remove it with the Local Models controls. Restore saved
-configuration through the existing `.env` backup/import workflow if needed.
+To roll back code, revert the Model Pack change. No database migration is
+required; the additive `model_pack_registry.json` file can be retained or
+removed. A model already created in Ollama remains an ordinary local Ollama
+model. Reassign active routes, remove its id from the normal Ollama channel
+configuration, and run `ollama rm <model-id>` if the catalog-only deletion
+control does not list it. Restore saved configuration through the existing
+`.env` backup/import workflow if needed.

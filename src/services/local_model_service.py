@@ -45,6 +45,7 @@ LOCAL_MODEL_RUNTIME_IDENTITY_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 LOCAL_MODEL_MAX_ID_LENGTH = 128
 LOCAL_MODEL_REGISTRATION_RECOVERY_TTL_SECONDS = 5.0 * 60.0
 LocalModelAssignment = Literal["auto", "primary", "agent"]
+ImportedModelMetadataProvider = Callable[[str], Iterable[Mapping[str, Any]]]
 
 
 class _LocalModelPullActivationHandler(Protocol):
@@ -432,12 +433,14 @@ class LocalModelService:
         pullable_model_ids: Callable[[], Iterable[str]],
         client_factory: Callable[[str], OllamaRuntimeClient] = OllamaRuntimeClient,
         activation_handler: Optional[_LocalModelPullActivationHandler] = None,
+        imported_model_metadata: Optional[ImportedModelMetadataProvider] = None,
     ) -> None:
         self._system_config_service = system_config_service
         self._task_queue = task_queue
         self._pullable_model_ids = pullable_model_ids
         self._client_factory = client_factory
         self._activation_handler = activation_handler
+        self._imported_model_metadata = imported_model_metadata or (lambda _identity: ())
         self._accepts_pull_activation = True
         self._task_lock = threading.RLock()
         self._operation_lock = threading.RLock()
@@ -517,6 +520,48 @@ class LocalModelService:
                     updates=updates,
                 )
                 return {
+                    "model_id": normalized,
+                    "activated": True,
+                    "selected_primary": selected_primary,
+                }
+
+            accepted, result = commit_final_result(commit_activation)
+            return result if accepted else None
+
+    def _activate_completed_import(
+        self,
+        normalized: str,
+        *,
+        config_version: str,
+        values: Mapping[str, str],
+        base_url: str,
+        metadata: Mapping[str, Any],
+        is_cancel_requested: Callable[[], bool],
+        commit_final_result: Callable[
+            [Callable[[], Any]], tuple[bool, Any]
+        ],
+        persist_metadata: Callable[[], Any],
+    ) -> Optional[Dict[str, Any]]:
+        """Atomically activate a validated imported model through the live lifespan."""
+        normalized = normalize_local_model_id(normalized)
+        with self._operation_lock:
+            if not self._accepts_pull_activation or is_cancel_requested():
+                return None
+            updates, selected_primary = self._build_model_configuration_update(
+                normalized,
+                assignment="auto",
+                values=values,
+                base_url=base_url,
+            )
+
+            def commit_activation() -> Dict[str, Any]:
+                persist_metadata()
+                self._persist_model_configuration(
+                    config_version=config_version,
+                    updates=updates,
+                )
+                return {
+                    **dict(metadata),
                     "model_id": normalized,
                     "activated": True,
                     "selected_primary": selected_primary,
@@ -687,14 +732,60 @@ class LocalModelService:
             )
         return normalized
 
+    def _imported_models(self, base_url: str) -> List[Dict[str, Any]]:
+        """Return detached metadata for the currently configured runtime."""
+        runtime_identity = get_ollama_runtime_identity(base_url)
+        entries: List[Dict[str, Any]] = []
+        for raw in self._imported_model_metadata(runtime_identity):
+            if not isinstance(raw, Mapping):
+                continue
+            try:
+                model_id = normalize_local_model_id(raw.get("model_id"))
+                minimum_memory_gb = int(raw.get("minimum_memory_gb"))
+            except (LocalModelValidationError, TypeError, ValueError):
+                continue
+            display_name = str(raw.get("display_name") or "").strip()
+            license_id = str(raw.get("license_id") or "").strip()
+            if (
+                not display_name
+                or len(display_name) > 160
+                or not license_id
+                or not 1 <= minimum_memory_gb <= 2048
+            ):
+                continue
+            entries.append(
+                {
+                    "model_id": model_id,
+                    "display_name": display_name,
+                    "minimum_memory_gb": minimum_memory_gb,
+                    "license_id": license_id,
+                }
+            )
+        return entries
+
+    def _require_configurable(self, normalized: str, *, base_url: str) -> None:
+        """Allow catalog models and models admitted by validated Model Pack import."""
+        if normalized in self._allowed_model_ids():
+            return
+        if any(
+            entry["model_id"].lower() == normalized.lower()
+            for entry in self._imported_models(base_url)
+        ):
+            return
+        raise LocalModelNotAllowedError(
+            "The selected model is not catalog-backed or registered by Model Pack import"
+        )
+
     def get_configuration(self) -> Dict[str, Any]:
         """Return caller-safe local model assignment state."""
         config_version, values = self._config_snapshot()
+        base_url = self._base_url(values)
         return {
             "config_version": config_version,
             "registered_models": self._split_csv(values.get("LLM_OLLAMA_MODELS")),
             "primary_model": str(values.get("LITELLM_MODEL") or "").strip(),
             "agent_model": str(values.get("AGENT_LITELLM_MODEL") or "").strip(),
+            "imported_models": self._imported_models(base_url),
         }
 
     def configure_model(
@@ -705,7 +796,7 @@ class LocalModelService:
     ) -> Dict[str, Any]:
         """Register one model and optionally assign it without stealing an existing default."""
         with self._operation_lock:
-            normalized = self._require_pullable(model_id)
+            normalized = normalize_local_model_id(model_id)
             return self._register_installed_model(normalized, assignment=assignment)
 
     def activate_desktop_model(
@@ -733,6 +824,41 @@ class LocalModelService:
                 base_url=base_url,
             )
 
+    def activate_desktop_imported_model(
+        self,
+        model_id: Any,
+        *,
+        expected_config_version: Any,
+        expected_runtime_identity: Any,
+        persist_metadata: Callable[[], Any],
+    ) -> Dict[str, Any]:
+        """Register a Desktop-validated import against its immutable runtime snapshot."""
+        with self._operation_lock:
+            normalized = normalize_local_model_id(model_id)
+            config_version, values = self._config_snapshot()
+            base_url = self._require_expected_runtime_snapshot(
+                config_version=config_version,
+                values=values,
+                expected_config_version=expected_config_version,
+                expected_runtime_identity=expected_runtime_identity,
+            )
+            installed = {
+                item.lower()
+                for item in self._client_factory(base_url).list_installed_models()
+            }
+            if normalized.lower() not in installed:
+                raise LocalModelNotInstalledError(
+                    "The imported model is not installed in the configured runtime"
+                )
+            return self._configure_model_from_snapshot_locked(
+                normalized,
+                assignment="auto",
+                config_version=config_version,
+                values=values,
+                base_url=base_url,
+                before_persist=persist_metadata,
+            )
+
     def _register_installed_model(
         self,
         normalized: str,
@@ -745,6 +871,7 @@ class LocalModelService:
 
         config_version, values = self._config_snapshot()
         base_url = self._base_url(values)
+        self._require_configurable(normalized, base_url=base_url)
         return self._register_installed_model_from_snapshot(
             normalized,
             assignment=assignment,
@@ -807,6 +934,7 @@ class LocalModelService:
         config_version: str,
         values: Mapping[str, str],
         base_url: str,
+        before_persist: Optional[Callable[[], Any]] = None,
     ) -> Dict[str, Any]:
         updates, selected_primary = self._build_model_configuration_update(
             normalized,
@@ -814,6 +942,8 @@ class LocalModelService:
             values=values,
             base_url=base_url,
         )
+        if before_persist is not None:
+            before_persist()
         result = self._persist_model_configuration(
             config_version=config_version,
             updates=updates,

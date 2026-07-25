@@ -11,6 +11,7 @@ from src.model_pack.models import ModelPackFile, ModelPackLicense, ModelPackMani
 MODEL_PACK_FORMAT_VERSION = 1
 MANIFEST_FILENAME = "manifest.json"
 MAX_MANIFEST_BYTES = 1024 * 1024
+MAX_MODEL_PACK_BYTES = 64 * 1024 * 1024 * 1024
 MAX_METADATA_TEXT_LENGTH = 160
 MODEL_ID_PATTERN = re.compile(
     r"^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:/[a-z0-9]+(?:[._-][a-z0-9]+)*)?"
@@ -210,6 +211,11 @@ def parse_manifest(raw: Mapping[str, Any]) -> ModelPackManifest:
 
     if seen_roles != REQUIRED_FILE_ROLES:
         raise _invalid_manifest("files must include gguf, modelfile, and license roles")
+    if sum(entry.size_bytes for entry in files) > MAX_MODEL_PACK_BYTES:
+        raise ModelPackError(
+            "model_pack_too_large",
+            "This Model Pack exceeds the 64 GiB limit. Build or select a smaller pack.",
+        )
     role_paths: Dict[str, str] = {entry.role: entry.path for entry in files}
     if role_paths["gguf"] != gguf_file:
         raise _invalid_manifest("gguf_file must match the file with role gguf")
@@ -233,6 +239,7 @@ def parse_manifest(raw: Mapping[str, Any]) -> ModelPackManifest:
 __all__ = [
     "MANIFEST_FILENAME",
     "MAX_MANIFEST_BYTES",
+    "MAX_MODEL_PACK_BYTES",
     "MODEL_PACK_FORMAT_VERSION",
     "MODEL_ID_PATTERN",
     "parse_manifest",

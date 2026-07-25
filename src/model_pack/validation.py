@@ -13,6 +13,7 @@ from src.model_pack.errors import ModelPackError
 from src.model_pack.manifest import (
     MANIFEST_FILENAME,
     MAX_MANIFEST_BYTES,
+    MAX_MODEL_PACK_BYTES,
     parse_manifest_bytes,
 )
 from src.model_pack.models import InspectedModelPack, ModelPackManifest
@@ -23,6 +24,7 @@ _HASH_CHUNK_SIZE = 1024 * 1024
 _DISK_RESERVE_MIN_BYTES = 64 * 1024 * 1024
 _DISK_RESERVE_MAX_BYTES = 512 * 1024 * 1024
 MAX_LICENSE_BYTES = 2 * 1024 * 1024
+MAX_MODEL_PACK_ENTRIES = 256
 DiskUsage = Callable[[Path], object]
 
 
@@ -259,6 +261,11 @@ def _directory_inventory(root: Path) -> Tuple[str, ...]:
                 )
             if path.is_file():
                 names.append(path.relative_to(root).as_posix())
+                if len(names) > MAX_MODEL_PACK_ENTRIES:
+                    raise _error(
+                        "invalid_archive",
+                        "Model Pack contains too many files. Rebuild it with only declared data.",
+                    )
             elif not path.is_dir():
                 relative = path.relative_to(root).as_posix()
                 raise _error(
@@ -348,6 +355,11 @@ def _zip_inventory(archive: ZipFile) -> Dict[str, object]:
     inventory: Dict[str, object] = {}
     casefold_names = set()
     for entry in archive.infolist():
+        if len(inventory) >= MAX_MODEL_PACK_ENTRIES:
+            raise _error(
+                "invalid_archive",
+                "Model Pack contains too many files. Rebuild it with only declared data.",
+            )
         if entry.is_dir() or not _safe_archive_name(entry.filename):
             raise _error(
                 "unsafe_archive_entry",
@@ -509,6 +521,11 @@ def inspect_model_pack(
             "pack_not_found",
             "The selected Model Pack is not a regular file or directory. Select it again.",
         )
+    if source_stat.st_size > MAX_MODEL_PACK_BYTES:
+        raise _error(
+            "model_pack_too_large",
+            "This Model Pack exceeds the 64 GiB limit. Build or select a smaller pack.",
+        )
     try:
         zip_compatible = is_zipfile(path)
     except OSError as exc:
@@ -525,4 +542,9 @@ def inspect_model_pack(
         yield inspected
 
 
-__all__ = ["MAX_LICENSE_BYTES", "inspect_model_pack"]
+__all__ = [
+    "MAX_LICENSE_BYTES",
+    "MAX_MODEL_PACK_BYTES",
+    "MAX_MODEL_PACK_ENTRIES",
+    "inspect_model_pack",
+]

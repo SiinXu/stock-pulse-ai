@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from api.v1.schemas.local_models import LOCAL_MODEL_ID_PATTERN
+from src.model_pack.manifest import LICENSE_ID_PATTERN
 from src.task_execution import TaskStatusEnum
 
 
@@ -21,7 +23,33 @@ class ModelPackImportResult(BaseModel):
     minimum_memory_gb: int
     license_id: str
     warnings: List[str] = Field(default_factory=list)
-    registration: Optional[Dict[str, Any]] = None
+    activated: bool
+    selected_primary: bool = False
+
+
+class ModelPackDesktopActivationRequest(BaseModel):
+    """Manifest fields returned by the isolated Desktop validator."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    model_id: str = Field(..., min_length=1, max_length=96, pattern=LOCAL_MODEL_ID_PATTERN)
+    display_name: str = Field(..., min_length=1, max_length=160)
+    minimum_memory_gb: int = Field(..., ge=1, le=2048)
+    license_id: str = Field(
+        ..., min_length=1, max_length=128, pattern=LICENSE_ID_PATTERN.pattern
+    )
+    expected_config_version: str = Field(..., min_length=1, max_length=128)
+    expected_runtime_identity: str = Field(
+        ..., min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$"
+    )
+
+    @field_validator("display_name")
+    @classmethod
+    def validate_display_name(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized or any(ord(character) < 32 for character in normalized):
+            raise ValueError("display_name must be visible text")
+        return normalized
 
 
 class ModelPackImportStatus(BaseModel):
@@ -35,6 +63,7 @@ class ModelPackImportStatus(BaseModel):
 
 __all__ = [
     "ModelPackImportAccepted",
+    "ModelPackDesktopActivationRequest",
     "ModelPackImportResult",
     "ModelPackImportStatus",
 ]

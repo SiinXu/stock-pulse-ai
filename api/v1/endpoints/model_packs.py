@@ -10,19 +10,26 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
-from api.deps import get_model_pack_import_service
+from api.deps import get_local_model_service, get_model_pack_import_service
+from api.v1.endpoints.local_models import _raise_local_model_error
 from api.v1.schemas.common import ErrorResponse
 from api.v1.schemas.model_packs import (
+    ModelPackDesktopActivationRequest,
     ModelPackImportAccepted,
     ModelPackImportStatus,
 )
+from api.v1.schemas.local_models import LocalModelMutationResponse
+from src.services.local_model_service import LocalModelError, LocalModelService
 from src.services.model_pack_import_service import ModelPackImportService
+from src.services.system_config_service import ConfigConflictError, ConfigValidationError
+from src.model_pack import MAX_MODEL_PACK_BYTES, ModelPackError
 from src.utils.sanitize import log_safe_exception
 
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 _UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024
+MAX_MODEL_PACK_UPLOAD_BYTES = MAX_MODEL_PACK_BYTES
 _SUPPORTED_ARCHIVE_SUFFIXES = frozenset({".modelpack", ".zip"})
 
 
@@ -50,6 +57,17 @@ def _stage_upload(upload: UploadFile) -> tuple[Path, Path]:
                     chunk = upload.file.read(_UPLOAD_CHUNK_SIZE)
                     if not chunk:
                         break
+                    if total_bytes + len(chunk) > MAX_MODEL_PACK_UPLOAD_BYTES:
+                        raise HTTPException(
+                            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                            detail={
+                                "error": "model_pack_too_large",
+                                "message": (
+                                    "This Model Pack exceeds the 64 GiB upload limit. "
+                                    "Select a smaller pack or import it from Desktop."
+                                ),
+                            },
+                        )
                     total_bytes += len(chunk)
                     output.write(chunk)
         finally:
@@ -87,6 +105,7 @@ def _stage_upload(upload: UploadFile) -> tuple[Path, Path]:
     responses={
         202: {"description": "Model Pack import accepted"},
         400: {"description": "Invalid upload", "model": ErrorResponse},
+        413: {"description": "Upload exceeds the bounded staging limit", "model": ErrorResponse},
         507: {"description": "Insufficient staging disk", "model": ErrorResponse},
     },
     summary="Import a local Model Pack",
@@ -125,6 +144,49 @@ def import_model_pack(
         task_id=task.task_id,
         message="Model Pack import queued.",
     )
+
+
+@router.post(
+    "/desktop-activations",
+    response_model=LocalModelMutationResponse,
+    summary="Activate a Desktop-validated Model Pack",
+    description=(
+        "Register a model created by the isolated Desktop importer against an "
+        "immutable server-owned configuration and runtime snapshot."
+    ),
+)
+def activate_desktop_model_pack(
+    request: ModelPackDesktopActivationRequest,
+    service: ModelPackImportService = Depends(get_model_pack_import_service),
+    local_model_service: LocalModelService = Depends(get_local_model_service),
+) -> LocalModelMutationResponse:
+    try:
+        payload = service.activate_desktop_import(
+            local_model_service,
+            model_id=request.model_id,
+            display_name=request.display_name,
+            minimum_memory_gb=request.minimum_memory_gb,
+            license_id=request.license_id,
+            expected_config_version=request.expected_config_version,
+            expected_runtime_identity=request.expected_runtime_identity,
+        )
+        payload["success"] = True
+        return LocalModelMutationResponse.model_validate(payload)
+    except (LocalModelError, ConfigValidationError, ConfigConflictError) as exc:
+        _raise_local_model_error(exc, model_id=request.model_id)
+    except ModelPackError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"error": exc.code, "message": exc.user_message},
+        ) from exc
+    except Exception as exc:  # broad-exception: fallback_recorded - sanitized API boundary
+        log_safe_exception(
+            logger,
+            "Desktop Model Pack activation failed",
+            exc,
+            error_code="model_pack_desktop_activation_failed",
+        )
+        _raise_local_model_error(exc, model_id=request.model_id)
 
 
 @router.get(

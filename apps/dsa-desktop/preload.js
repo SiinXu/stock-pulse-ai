@@ -12,6 +12,7 @@ const DESKTOP_LOCAL_MODEL_START_CHANNEL = 'desktop-local-model:start';
 const DESKTOP_LOCAL_MODEL_STOP_CHANNEL = 'desktop-local-model:stop';
 const DESKTOP_LOCAL_MODEL_PULL_CHANNEL = 'desktop-local-model:pull';
 const DESKTOP_LOCAL_MODEL_REMOVE_CHANNEL = 'desktop-local-model:remove';
+const DESKTOP_LOCAL_MODEL_IMPORT_PACK_CHANNEL = 'desktop-local-model:import-pack';
 const DESKTOP_LOCAL_MODEL_OPEN_GUIDE_CHANNEL = 'desktop-local-model:open-guide';
 const DESKTOP_LOCAL_MODEL_STATE_EVENT = 'desktop-local-model:state';
 
@@ -79,6 +80,9 @@ function createLocalModelBridge({ renderer = ipcRenderer } = {}) {
         expectedRuntimeIdentity,
       });
     },
+    importPack() {
+      return renderer.invoke(DESKTOP_LOCAL_MODEL_IMPORT_PACK_CHANNEL);
+    },
     openInstallGuide() {
       return renderer.invoke(DESKTOP_LOCAL_MODEL_OPEN_GUIDE_CHANNEL);
     },
@@ -109,6 +113,7 @@ module.exports = {
   DESKTOP_LOCAL_MODEL_STOP_CHANNEL,
   DESKTOP_LOCAL_MODEL_PULL_CHANNEL,
   DESKTOP_LOCAL_MODEL_REMOVE_CHANNEL,
+  DESKTOP_LOCAL_MODEL_IMPORT_PACK_CHANNEL,
   DESKTOP_LOCAL_MODEL_OPEN_GUIDE_CHANNEL,
   DESKTOP_LOCAL_MODEL_STATE_EVENT,
   createDesktopBridge,

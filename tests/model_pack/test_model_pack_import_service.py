@@ -2,14 +2,23 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 from pathlib import Path
-from types import SimpleNamespace
+from typing import Any, Dict, Optional
 
+import pytest
+
+from src.model_pack.registry import ModelPackRegistry
+from src.services.local_model_service import (
+    LocalModelService,
+    get_ollama_runtime_identity,
+)
 from src.services.model_pack_import_service import (
     MODEL_PACK_IMPORT_TASK_KIND,
     ModelPackImportService,
 )
-from src.services.task_queue import TaskStatus
+from src.services.task_queue import AnalysisTaskQueue
+from src.task_execution import TaskCommand, TaskStatusEnum
 
 
 def _sha256(path: Path) -> str:
@@ -59,92 +68,53 @@ def _write_pack(root: Path, *, tampered: bool = False) -> Path:
     return root
 
 
-class _Task:
-    def __init__(self, *, task_id: str, report_type: str) -> None:
-        self.task_id = task_id
-        self.report_type = report_type
-        self.status = TaskStatus.PENDING
-        self.progress = 0
-        self.result = None
-        self._error = None
-        self._message = "Model Pack import queued"
-
-    def public_error(self):
-        return self._error
-
-    def public_message(self):
-        return self._message
-
-
-class _SynchronousTaskQueue:
-    def __init__(self) -> None:
-        self.tasks = {}
-        self.progress = []
-
-    def submit_background_task(self, run_task, **kwargs):
-        task = _Task(task_id=kwargs["task_id"], report_type=kwargs["report_type"])
-        self.tasks[task.task_id] = task
-        task.status = TaskStatus.PROCESSING
-        try:
-            task.result = run_task()
-        except Exception:
-            task.status = TaskStatus.FAILED
-            task._error = kwargs["failure_error_code"]
-            task._message = "Task failed"
-        else:
-            task.status = TaskStatus.COMPLETED
-            task.progress = 100
-            task._message = "Task completed"
-        return task
-
-    def update_task_progress(
-        self,
-        task_id,
-        progress,
-        message,
-        *,
-        message_code,
-        message_params,
-    ):
-        task = self.tasks[task_id]
-        task.progress = progress
-        task._message = message
-        self.progress.append(
-            (task_id, progress, message, message_code, message_params)
-        )
-
-    def get_task(self, task_id):
-        return self.tasks.get(task_id)
-
-
 class _ConfigService:
     def __init__(self) -> None:
-        self.updates = []
+        self._lock = threading.RLock()
+        self.version = "before"
         self.values = {
             "LLM_CHANNELS": "primary",
             "LLM_OLLAMA_BASE_URL": "http://127.0.0.1:11434",
             "LLM_OLLAMA_MODELS": "",
         }
+        self.updates: list[Dict[str, Any]] = []
+        self.update_started: Optional[threading.Event] = None
+        self.release_update: Optional[threading.Event] = None
 
     def get_config(self, include_schema: bool):
         assert include_schema is False
-        return {
-            "config_version": "before",
-            "items": [
-                {"key": key, "value": value}
-                for key, value in self.values.items()
-            ],
-        }
+        with self._lock:
+            return {
+                "config_version": self.version,
+                "items": [
+                    {"key": key, "value": value}
+                    for key, value in self.values.items()
+                ],
+            }
 
     def update(self, **kwargs):
-        self.updates.append(kwargs)
-        for item in kwargs["items"]:
-            self.values[item["key"]] = item["value"]
-        return {"config_version": "after", "reload_triggered": True}
+        if self.update_started is not None:
+            self.update_started.set()
+        if self.release_update is not None:
+            assert self.release_update.wait(timeout=5)
+        with self._lock:
+            assert kwargs["config_version"] == self.version
+            self.updates.append(kwargs)
+            for item in kwargs["items"]:
+                self.values[item["key"]] = item["value"]
+            self.version = "after"
+            return {
+                "config_version": self.version,
+                "updated_keys": [item["key"] for item in kwargs["items"]],
+                "warnings": [],
+                "applied_count": len(kwargs["items"]),
+                "skipped_masked_count": 0,
+                "reload_triggered": True,
+            }
 
 
 class _RecordingExecutor:
-    def __init__(self, events) -> None:
+    def __init__(self, events: list[tuple[str, str]]) -> None:
         self.events = events
 
     def create(self, inspected, *, on_progress=None):
@@ -153,89 +123,186 @@ class _RecordingExecutor:
             on_progress(75, "Creating the Ollama model")
 
 
-def test_import_service_uses_shared_task_lifecycle_and_cleans_staging(tmp_path: Path) -> None:
-    staging = tmp_path / "staging"
-    pack = _write_pack(staging / "pack")
-    queue = _SynchronousTaskQueue()
-    config = _ConfigService()
-    executor_events = []
+@pytest.fixture
+def task_queue():
+    original = AnalysisTaskQueue._instance
+    AnalysisTaskQueue._instance = None
+    queue = AnalysisTaskQueue(max_workers=1)
+    try:
+        yield queue
+    finally:
+        queue.shutdown()
+        AnalysisTaskQueue._instance = original
+
+
+def _services(
+    tmp_path: Path,
+    queue: AnalysisTaskQueue,
+    *,
+    config: Optional[_ConfigService] = None,
+    events: Optional[list[tuple[str, str]]] = None,
+) -> tuple[ModelPackImportService, _ConfigService, ModelPackRegistry]:
+    config = config or _ConfigService()
+    events = events if events is not None else []
+    registry = ModelPackRegistry(tmp_path / "model-packs.json")
+    local_models = LocalModelService(
+        system_config_service=config,
+        task_queue=queue,
+        pullable_model_ids=lambda: {"qwen3:4b"},
+        client_factory=lambda _base_url: None,
+        imported_model_metadata=registry.list_for_runtime,
+    )
     service = ModelPackImportService(
         system_config_service=config,
         task_queue=queue,
+        registry=registry,
         executor_factory=lambda base_url_provider: (
-            executor_events.append(("base_url", base_url_provider()))
-            or _RecordingExecutor(executor_events)
+            events.append(("base_url", base_url_provider()))
+            or _RecordingExecutor(events)
+        ),
+        activation_handler=lambda normalized, **kwargs: (
+            local_models._activate_completed_import(normalized, **kwargs)
         ),
     )
+    return service, config, registry
+
+
+def test_import_service_uses_atomic_task_commit_and_cleans_staging(
+    tmp_path: Path,
+    task_queue: AnalysisTaskQueue,
+) -> None:
+    staging = tmp_path / "staging"
+    pack = _write_pack(staging / "pack")
+    events: list[tuple[str, str]] = []
+    service, config, registry = _services(tmp_path, task_queue, events=events)
 
     task = service.start_import(pack, cleanup_root=staging)
+    task_queue._futures[task.task_id].result(timeout=5)
     status = service.get_import(task.task_id)
 
-    assert status == {
-        "task_id": task.task_id,
-        "status": "completed",
-        "progress": 100,
-        "error": None,
-        "message": "Task completed",
-        "result": {
-            "model_id": "stockpulse/service-test:q4",
-            "display_name": "Service Test",
-            "minimum_memory_gb": 8,
-            "license_id": "LicenseRef-Test",
-            "warnings": (),
-            "registration": {
-                "channels": "primary,ollama",
-                "models": "stockpulse/service-test:q4",
-                "config_version": "after",
-                "reload_triggered": True,
-            },
-        },
+    assert status is not None
+    assert status["status"] == "completed"
+    assert status["result"] == {
+        "model_id": "stockpulse/service-test:q4",
+        "display_name": "Service Test",
+        "minimum_memory_gb": 8,
+        "license_id": "LicenseRef-Test",
+        "warnings": [],
+        "activated": True,
+        "selected_primary": True,
     }
-    assert executor_events == [
+    assert events == [
         ("base_url", "http://127.0.0.1:11434"),
         ("create", "stockpulse/service-test:q4"),
     ]
-    assert queue.progress[0][1:] == (
-        75,
-        "Creating the Ollama model",
-        "local_model.import.progress",
-        {},
-    )
     assert config.values["LLM_OLLAMA_MODELS"] == "stockpulse/service-test:q4"
+    assert registry.list_for_runtime(
+        get_ollama_runtime_identity("http://127.0.0.1:11434")
+    )[0]["display_name"] == "Service Test"
     assert not staging.exists()
 
 
-def test_import_service_preserves_actionable_validation_failure(tmp_path: Path) -> None:
+def test_import_service_preserves_actionable_validation_failure(
+    tmp_path: Path,
+    task_queue: AnalysisTaskQueue,
+) -> None:
     staging = tmp_path / "staging"
     pack = _write_pack(staging / "pack", tampered=True)
-    queue = _SynchronousTaskQueue()
-    calls = []
-    service = ModelPackImportService(
-        system_config_service=_ConfigService(),
-        task_queue=queue,
-        executor_factory=lambda _base_url_provider: SimpleNamespace(
-            create=lambda *_args, **_kwargs: calls.append("create")
-        ),
-    )
+    calls: list[tuple[str, str]] = []
+    service, config, _registry = _services(tmp_path, task_queue, events=calls)
 
     task = service.start_import(pack, cleanup_root=staging)
+    task_queue._futures[task.task_id].result(timeout=5)
     status = service.get_import(task.task_id)
 
+    assert status is not None
     assert status["status"] == "failed"
     assert status["error"] == "hash_mismatch"
     assert "Download or build the pack again" in status["message"]
     assert status["result"] is None
-    assert calls == []
+    assert calls == [("base_url", "http://127.0.0.1:11434")]
+    assert config.updates == []
     assert not staging.exists()
 
 
-def test_import_status_does_not_project_other_task_kinds() -> None:
-    queue = _SynchronousTaskQueue()
-    queue.tasks["other"] = _Task(task_id="other", report_type="stock_analysis")
-    service = ModelPackImportService(
-        system_config_service=_ConfigService(),
-        task_queue=queue,
-    )
+def test_failure_code_survives_import_service_lifespan_replacement(
+    tmp_path: Path,
+    task_queue: AnalysisTaskQueue,
+) -> None:
+    pack = _write_pack(tmp_path / "pack", tampered=True)
+    service, config, _registry = _services(tmp_path, task_queue)
+    task = service.start_import(pack)
+    task_queue._futures[task.task_id].result(timeout=5)
 
-    assert service.get_import("other") is None
+    replacement, _config, _replacement_registry = _services(
+        tmp_path / "replacement",
+        task_queue,
+        config=config,
+    )
+    status = replacement.get_import(task.task_id)
+
+    assert status is not None
+    assert status["error"] == "hash_mismatch"
+    assert "Download or build the pack again" in status["message"]
+
+
+@pytest.mark.parametrize(
+    ("winner", "expected_status"),
+    [
+        ("cancel", TaskStatusEnum.CANCELLED),
+        ("shutdown", TaskStatusEnum.INTERRUPTED),
+    ],
+)
+def test_final_registration_rejects_cancel_and_shutdown_winners(
+    tmp_path: Path,
+    task_queue: AnalysisTaskQueue,
+    winner: str,
+    expected_status: TaskStatusEnum,
+) -> None:
+    pack = _write_pack(tmp_path / "pack")
+    service, config, registry = _services(tmp_path, task_queue)
+    commit_reached = threading.Event()
+    release_commit = threading.Event()
+    original_commit = task_queue._commit_final_result
+
+    def delay_commit(task_id, operation):
+        commit_reached.set()
+        assert release_commit.wait(timeout=5)
+        return original_commit(task_id, operation)
+
+    task_queue._commit_final_result = delay_commit
+    task = service.start_import(pack)
+    future = task_queue._futures[task.task_id]
+    assert commit_reached.wait(timeout=5)
+
+    if winner == "cancel":
+        assert task_queue.cancel(task.task_id).status == TaskStatusEnum.CANCEL_REQUESTED
+    else:
+        task_queue.shutdown()
+    release_commit.set()
+    future.result(timeout=5)
+
+    assert task_queue.get(task.task_id).status == expected_status
+    assert config.updates == []
+    assert config.values["LLM_OLLAMA_MODELS"] == ""
+    runtime_identity = "0" * 64
+    assert registry.list_for_runtime(runtime_identity) == ()
+
+
+def test_import_status_does_not_project_other_task_kinds(
+    tmp_path: Path,
+    task_queue: AnalysisTaskQueue,
+) -> None:
+    service, _config, _registry = _services(tmp_path, task_queue)
+    other_id = task_queue.submit(
+        TaskCommand(
+            kind="stock_analysis",
+            run=lambda _context: {"ok": True},
+            metadata={"stock_code": "AAPL", "report_type": "stock_analysis"},
+        )
+    )
+    task_queue._futures[other_id].result(timeout=5)
+
+    assert service.get_import(other_id) is None
     assert service.get_import("missing") is None
+    assert MODEL_PACK_IMPORT_TASK_KIND == "model_pack_import"

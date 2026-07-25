@@ -14,6 +14,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const os = require('os');
 const { loadDesktopLocalModelPresets } = require('./local-model-catalog');
+const { ModelPackError, importModelPack } = require('./model-pack');
 const { spawn } = require('child_process');
 const net = require('net');
 const http = require('http');
@@ -149,6 +150,7 @@ const DESKTOP_LOCAL_MODEL_START_CHANNEL = 'desktop-local-model:start';
 const DESKTOP_LOCAL_MODEL_STOP_CHANNEL = 'desktop-local-model:stop';
 const DESKTOP_LOCAL_MODEL_PULL_CHANNEL = 'desktop-local-model:pull';
 const DESKTOP_LOCAL_MODEL_REMOVE_CHANNEL = 'desktop-local-model:remove';
+const DESKTOP_LOCAL_MODEL_IMPORT_PACK_CHANNEL = 'desktop-local-model:import-pack';
 const DESKTOP_LOCAL_MODEL_OPEN_GUIDE_CHANNEL = 'desktop-local-model:open-guide';
 const DESKTOP_LOCAL_MODEL_STATE_EVENT = 'desktop-local-model:state';
 const PUBLIC_BIND_HOSTS = Object.freeze(new Set(['0.0.0.0', '::', '[::]', '*']));
@@ -2743,6 +2745,7 @@ function resolveLocalModelSpawnEnv(sourceEnv = process.env, {
   runtimeSource = DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE.SYSTEM,
   baseUrl = resolveLocalModelBaseUrl(),
   appDir = resolveAppDir(),
+  clientOnly = false,
 } = {}) {
   const env = { ...sourceEnv };
   if (isMac) {
@@ -2753,8 +2756,10 @@ function resolveLocalModelSpawnEnv(sourceEnv = process.env, {
     if (!serveHost) {
       throw new Error('Embedded Ollama requires a loopback HTTP base URL.');
     }
-    env.OLLAMA_HOST = serveHost;
+    env.OLLAMA_HOST = clientOnly ? baseUrl : serveHost;
     env.OLLAMA_MODELS = resolveLocalModelModelsDir(appDir);
+  } else if (clientOnly) {
+    env.OLLAMA_HOST = baseUrl;
   }
   return env;
 }
@@ -3774,6 +3779,123 @@ async function removeLocalModel(rawModelId, {
   };
 }
 
+async function selectDesktopModelPackSource({
+  dialogImpl = dialog,
+  windowRef = mainWindow,
+} = {}) {
+  const sourceType = await dialogImpl.showMessageBox(windowRef, {
+    type: 'question',
+    buttons: ['Choose Model Pack file', 'Choose unpacked folder', 'Cancel'],
+    defaultId: 0,
+    cancelId: 2,
+    title: 'Import Model Pack',
+    message: 'Choose the Model Pack source',
+    detail: 'Select a .modelpack or .zip file, or an unpacked Model Pack folder.',
+    noLink: true,
+  });
+  if (!sourceType || sourceType.response === 2) {
+    return null;
+  }
+  const selectDirectory = sourceType.response === 1;
+  const selection = await dialogImpl.showOpenDialog(windowRef, {
+    title: selectDirectory ? 'Choose unpacked Model Pack folder' : 'Choose Model Pack file',
+    buttonLabel: 'Import',
+    properties: [selectDirectory ? 'openDirectory' : 'openFile'],
+    filters: selectDirectory
+      ? undefined
+      : [{ name: 'Model Packs', extensions: ['modelpack', 'zip'] }],
+  });
+  if (!selection || selection.canceled || !Array.isArray(selection.filePaths)) {
+    return null;
+  }
+  return selection.filePaths.length === 1 ? selection.filePaths[0] : null;
+}
+
+async function importDesktopModelPack({
+  dialogImpl = dialog,
+  spawnImpl = spawn,
+  sourceEnv = process.env,
+  appDir = resolveAppDir(),
+  selectSource = selectDesktopModelPackSource,
+  detectRuntime = detectLocalModelRuntime,
+  resolveRuntimeBinary = resolveLocalModelBinary,
+  importPack = importModelPack,
+  refreshState = refreshLocalModelState,
+} = {}) {
+  const source = await selectSource({ dialogImpl, windowRef: mainWindow });
+  if (!source) {
+    return { ok: false, canceled: true };
+  }
+
+  const baseUrl = resolveLocalModelBaseUrl();
+  const runtimeIdentity = getLocalModelRuntimeIdentity(baseUrl);
+  const detection = await detectRuntime({ baseUrl, spawnImpl, sourceEnv });
+  if (detection.status !== DESKTOP_LOCAL_MODEL_STATUS.RUNNING) {
+    return {
+      ok: false,
+      error: 'ollama_unavailable',
+      message: 'Start the local model runtime, then import the Model Pack again.',
+    };
+  }
+
+  const runtimeBinary = localModelServeRuntime || await resolveRuntimeBinary({
+    spawnImpl,
+    sourceEnv,
+  });
+  if (!runtimeBinary || typeof runtimeBinary.command !== 'string') {
+    return {
+      ok: false,
+      error: 'ollama_unavailable',
+      message: 'Install the Ollama command-line runtime, then import the Model Pack again.',
+    };
+  }
+
+  setLocalModelState({
+    ...toPublicLocalModelDetection(detection),
+    operation: 'import',
+    progress: { modelId: '', percent: 0, status: 'Validating Model Pack' },
+    message: '',
+  });
+  try {
+    const result = await importPack(source, {
+      spawnImpl,
+      runtimeCommand: runtimeBinary.command,
+      env: resolveLocalModelSpawnEnv(sourceEnv, {
+        runtimeSource: runtimeBinary.source,
+        baseUrl,
+        appDir,
+        clientOnly: true,
+      }),
+      onProgress: (percent, message) => {
+        const boundedPercent = Math.max(0, Math.min(100, Number(percent) || 0));
+        setLocalModelState({
+          operation: 'import',
+          progress: { modelId: '', percent: boundedPercent, status: String(message || '') },
+          message: '',
+        });
+      },
+    });
+    await refreshState({ spawnImpl });
+    return {
+      ok: true,
+      ...result,
+      runtimeIdentity,
+    };
+  } catch (error) {
+    const code = error instanceof ModelPackError ? error.code : 'model_pack_import_failed';
+    const message = error instanceof ModelPackError
+      ? error.userMessage
+      : 'Could not import this Model Pack. Check the file and try again.';
+    logLine(`[local-model] Model Pack import failed code=${code}`);
+    setLocalModelState({
+      operation: null,
+      progress: null,
+      message,
+    });
+    return { ok: false, error: code, message };
+  }
+}
+
 async function openLocalModelsSettings() {
   if (!isDesktopWindowAvailable(mainWindow)) {
     return false;
@@ -3877,6 +3999,10 @@ ipcMain.handle(DESKTOP_LOCAL_MODEL_REMOVE_CHANNEL, (event, payload = {}) => {
     payload && payload.modelId,
     { expectedRuntimeIdentity: payload && payload.expectedRuntimeIdentity }
   ));
+});
+ipcMain.handle(DESKTOP_LOCAL_MODEL_IMPORT_PACK_CHANNEL, (event) => {
+  assertLocalModelSender(event);
+  return runLocalModelOperation(() => importDesktopModelPack());
 });
 ipcMain.handle(DESKTOP_LOCAL_MODEL_OPEN_GUIDE_CHANNEL, async (event) => {
   assertLocalModelSender(event);
@@ -4256,6 +4382,7 @@ module.exports = {
   DESKTOP_LOCAL_MODEL_STOP_CHANNEL,
   DESKTOP_LOCAL_MODEL_PULL_CHANNEL,
   DESKTOP_LOCAL_MODEL_REMOVE_CHANNEL,
+  DESKTOP_LOCAL_MODEL_IMPORT_PACK_CHANNEL,
   DESKTOP_LOCAL_MODEL_OPEN_GUIDE_CHANNEL,
   DESKTOP_LOCAL_MODEL_STATE_EVENT,
   DESKTOP_LOCAL_MODEL_INSTALL_GUIDE_URL,
@@ -4305,6 +4432,8 @@ module.exports = {
   stopManagedLocalModelRuntime,
   pullLocalModel,
   removeLocalModel,
+  importDesktopModelPack,
+  selectDesktopModelPackSource,
   isLocalModelAssigned,
   decodeConfiguredModelRoute,
   resolveLocalModelTotalMemoryGb,

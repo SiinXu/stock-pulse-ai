@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from src.storage import DatabaseManager
 from src.config import get_config, Config
+from src.model_pack import ModelPackRegistry
 from src.services.system_config_service import SystemConfigService
 from src.services.runtime_scheduler import RuntimeSchedulerService
 from src.services.local_model_service import LocalModelService, get_pullable_local_model_ids
@@ -125,6 +126,11 @@ def get_local_model_service(request: Request) -> LocalModelService:
                             **kwargs,
                         )
                     ),
+                    imported_model_metadata=lambda runtime_identity: (
+                        get_model_pack_registry(request).list_for_runtime(
+                            runtime_identity
+                        )
+                    ),
                 )
                 request.app.state.local_model_service = service
     return service
@@ -205,6 +211,40 @@ def _activate_active_local_model_pull(
         )
 
 
+def _activate_active_model_pack_import(
+    request: Request,
+    normalized: str,
+    *,
+    config_version: str,
+    values: Mapping[str, str],
+    base_url: str,
+    metadata: Mapping[str, Any],
+    is_cancel_requested: Callable[[], bool],
+    commit_final_result: Callable[
+        [Callable[[], Any]], tuple[bool, Any]
+    ],
+    persist_metadata: Callable[[], Any],
+) -> Optional[Dict[str, Any]]:
+    """Commit imported-model registration through the current lifespan authority."""
+    with _LOCAL_MODEL_SERVICE_INIT_LOCK:
+        if (
+            getattr(request.app.state, "local_model_services_active", True) is False
+            or is_cancel_requested()
+        ):
+            return None
+        service = get_local_model_service(request)
+        return service._activate_completed_import(
+            normalized,
+            config_version=config_version,
+            values=values,
+            base_url=base_url,
+            metadata=metadata,
+            is_cancel_requested=is_cancel_requested,
+            commit_final_result=commit_final_result,
+            persist_metadata=persist_metadata,
+        )
+
+
 def begin_local_model_service_lifespan(
     app: object,
     system_config_service: SystemConfigService,
@@ -215,6 +255,8 @@ def begin_local_model_service_lifespan(
         if previous is not None:
             previous.retire_pull_activation()
             delattr(app.state, "local_model_service")
+        if hasattr(app.state, "model_pack_import_service"):
+            delattr(app.state, "model_pack_import_service")
         app.state.system_config_service = system_config_service
         app.state.local_model_services_active = True
 
@@ -227,6 +269,8 @@ def end_local_model_service_lifespan(app: object) -> None:
         if service is not None:
             service.retire_pull_activation()
             delattr(app.state, "local_model_service")
+        if hasattr(app.state, "model_pack_import_service"):
+            delattr(app.state, "model_pack_import_service")
         if hasattr(app.state, "system_config_service"):
             delattr(app.state, "system_config_service")
 
@@ -240,13 +284,36 @@ def get_scheduled_task_service(request: Request) -> ScheduledTaskService:
     return service
 
 
+def get_model_pack_registry(request: Request) -> ModelPackRegistry:
+    """Get the app-shared persistent metadata registry for validated imports."""
+    registry = getattr(request.app.state, "model_pack_registry", None)
+    if registry is None:
+        with _LOCAL_MODEL_SERVICE_INIT_LOCK:
+            registry = getattr(request.app.state, "model_pack_registry", None)
+            if registry is None:
+                registry = ModelPackRegistry()
+                request.app.state.model_pack_registry = registry
+    return registry
+
+
 def get_model_pack_import_service(request: Request) -> ModelPackImportService:
     """Get the app-lifecycle shared Model Pack import service."""
     service = getattr(request.app.state, "model_pack_import_service", None)
     if service is None:
-        service = ModelPackImportService(
-            system_config_service=get_system_config_service(request),
-            task_queue=get_task_queue(),
-        )
-        request.app.state.model_pack_import_service = service
+        with _LOCAL_MODEL_SERVICE_INIT_LOCK:
+            service = getattr(request.app.state, "model_pack_import_service", None)
+            if service is None:
+                service = ModelPackImportService(
+                    system_config_service=get_system_config_service(request),
+                    task_queue=get_task_queue(),
+                    activation_handler=lambda normalized, **kwargs: (
+                        _activate_active_model_pack_import(
+                            request,
+                            normalized,
+                            **kwargs,
+                        )
+                    ),
+                    registry=get_model_pack_registry(request),
+                )
+                request.app.state.model_pack_import_service = service
     return service

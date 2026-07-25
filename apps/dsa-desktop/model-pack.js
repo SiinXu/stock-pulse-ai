@@ -12,6 +12,8 @@ const MODEL_PACK_MANIFEST_FILENAME = 'manifest.json';
 const MODEL_PACK_MAX_MANIFEST_BYTES = 1024 * 1024;
 const MODEL_PACK_MAX_MODELFILE_BYTES = 1024 * 1024;
 const MODEL_PACK_MAX_LICENSE_BYTES = 2 * 1024 * 1024;
+const MODEL_PACK_MAX_BYTES = 64 * 1024 * 1024 * 1024;
+const MODEL_PACK_MAX_ENTRIES = 256;
 const MODEL_PACK_HASH_CHUNK_SIZE = 1024 * 1024;
 const MODEL_PACK_DISK_RESERVE_MIN_BYTES = 64 * 1024 * 1024;
 const MODEL_PACK_DISK_RESERVE_MAX_BYTES = 512 * 1024 * 1024;
@@ -179,6 +181,12 @@ function parseModelPackManifest(payload) {
   });
   if (MODEL_PACK_REQUIRED_ROLES.some((role) => !seenRoles.has(role))) {
     throw invalidManifest('files must include gguf, modelfile, and license roles');
+  }
+  if (files.reduce((total, entry) => total + entry.sizeBytes, 0) > MODEL_PACK_MAX_BYTES) {
+    throw new ModelPackError(
+      'model_pack_too_large',
+      'This Model Pack exceeds the 64 GiB limit. Build or select a smaller pack.'
+    );
   }
   const rolePaths = Object.fromEntries(files.map((entry) => [entry.role, entry.path]));
   if (rolePaths.gguf !== ggufFile) {
@@ -516,6 +524,12 @@ async function readDirectoryInventory(root) {
         pending.push(relativePath);
       } else if (entry.isFile()) {
         files.push(relativePath);
+        if (files.length > MODEL_PACK_MAX_ENTRIES) {
+          throw new ModelPackError(
+            'invalid_archive',
+            'Model Pack contains too many files. Rebuild it with only declared data.'
+          );
+        }
       } else {
         throw new ModelPackError(
           'unsafe_package_entry',
@@ -620,6 +634,12 @@ async function readZipInventory(archivePath) {
     zipFile.on('error', fail);
     zipFile.on('entry', async (entry) => {
       try {
+        if (inventory.size >= MODEL_PACK_MAX_ENTRIES) {
+          throw new ModelPackError(
+            'invalid_archive',
+            'Model Pack contains too many files. Rebuild it with only declared data.'
+          );
+        }
         if (!safeArchiveFilename(entry.fileName) || isZipSymlink(entry)) {
           throw new ModelPackError(
             'unsafe_archive_entry',
@@ -931,6 +951,12 @@ async function inspectModelPack(source, { diskFreeProvider = defaultDiskFreeByte
       'Select a Model Pack directory, .modelpack file, or ZIP archive.'
     );
   }
+  if (sourceStat.size > MODEL_PACK_MAX_BYTES) {
+    throw new ModelPackError(
+      'model_pack_too_large',
+      'This Model Pack exceeds the 64 GiB limit. Build or select a smaller pack.'
+    );
+  }
   return inspectArchive(sourcePath, diskFreeProvider);
 }
 
@@ -940,13 +966,17 @@ function spawnOllamaCreate(
     spawnImpl = spawn,
     timeoutMs = MODEL_PACK_CREATE_TIMEOUT_MS,
     env = process.env,
+    runtimeCommand = MODEL_PACK_OLLAMA_BINARY,
   } = {}
 ) {
+  if (typeof runtimeCommand !== 'string' || !runtimeCommand.trim() || /[\u0000\r\n]/.test(runtimeCommand)) {
+    throw new TypeError('runtimeCommand must be a trusted executable path');
+  }
   return new Promise((resolve, reject) => {
     let child;
     try {
       child = spawnImpl(
-        MODEL_PACK_OLLAMA_BINARY,
+        runtimeCommand,
         ['create', inspected.manifest.modelId, '-f', inspected.modelfilePath],
         {
           cwd: inspected.root,
@@ -1015,30 +1045,30 @@ function spawnOllamaCreate(
 async function importModelPack(
   source,
   {
-    registerModel,
     spawnImpl = spawn,
     onProgress = () => undefined,
     diskFreeProvider = defaultDiskFreeBytes,
     timeoutMs = MODEL_PACK_CREATE_TIMEOUT_MS,
     env = process.env,
+    runtimeCommand = MODEL_PACK_OLLAMA_BINARY,
   } = {}
 ) {
-  if (typeof registerModel !== 'function') {
-    throw new TypeError('registerModel must be a function');
-  }
   const inspected = await inspectModelPack(source, { diskFreeProvider });
   try {
     onProgress(35, 'Model Pack verified');
-    await spawnOllamaCreate(inspected, { spawnImpl, timeoutMs, env });
-    onProgress(90, 'Activating the imported model');
-    const registration = await registerModel(inspected.manifest.modelId);
+    await spawnOllamaCreate(inspected, {
+      spawnImpl,
+      timeoutMs,
+      env,
+      runtimeCommand,
+    });
+    onProgress(90, 'Model created in Ollama');
     return {
       modelId: inspected.manifest.modelId,
       displayName: inspected.manifest.displayName,
       minimumMemoryGb: inspected.manifest.minimumMemoryGb,
       licenseId: inspected.manifest.license.id,
       warnings: [...inspected.warnings],
-      registration,
     };
   } finally {
     await inspected.cleanup();
@@ -1050,6 +1080,8 @@ module.exports = {
   MODEL_PACK_CREATE_TIMEOUT_MS,
   MODEL_PACK_FORMAT_VERSION,
   MODEL_PACK_MANIFEST_FILENAME,
+  MODEL_PACK_MAX_BYTES,
+  MODEL_PACK_MAX_ENTRIES,
   MODEL_PACK_OLLAMA_BINARY,
   ModelPackError,
   importModelPack,

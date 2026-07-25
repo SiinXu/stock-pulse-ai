@@ -375,6 +375,7 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
         queue: Optional[_FakeTaskQueue] = None,
         client: Optional[_FakeRuntimeClient] = None,
         activation_handler: Optional[Callable[..., Optional[Dict[str, Any]]]] = None,
+        imported_model_metadata: Optional[Callable[[str], List[Dict[str, Any]]]] = None,
     ) -> tuple[LocalModelService, _FakeTaskQueue, _FakeRuntimeClient]:
         queue = queue or _FakeTaskQueue()
         client = client or _FakeRuntimeClient()
@@ -384,6 +385,7 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
             pullable_model_ids=lambda: {"qwen3:4b", "stockpulse/finance:latest"},
             client_factory=lambda _base_url: client,
             activation_handler=activation_handler,
+            imported_model_metadata=imported_model_metadata,
         )
         return service, queue, client
 
@@ -438,6 +440,74 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
             service.configure_model("licensed/finance:q4", assignment="auto")
 
         self.assertNotIn("LLM_OLLAMA_MODELS", self.manager.read_config_map())
+
+    def test_validated_imported_model_can_be_reassigned_but_not_deleted(self) -> None:
+        self._rewrite_env(
+            "ADMIN_AUTH_ENABLED=true",
+            "LLM_OLLAMA_BASE_URL=http://127.0.0.1:11434",
+        )
+        seen_identities: List[str] = []
+
+        def imported(runtime_identity: str) -> List[Dict[str, Any]]:
+            seen_identities.append(runtime_identity)
+            return [
+                {
+                    "model_id": "licensed/finance:q4",
+                    "display_name": "Licensed Finance Q4",
+                    "minimum_memory_gb": 16,
+                    "license_id": "LicenseRef-Finance",
+                }
+            ]
+
+        service, _queue, client = self._local_service(
+            client=_FakeRuntimeClient(installed=["licensed/finance:q4"]),
+            imported_model_metadata=imported,
+        )
+
+        result = service.configure_model("licensed/finance:q4", assignment="auto")
+        configuration = service.get_configuration()
+
+        self.assertTrue(result["selected_primary"])
+        self.assertEqual(
+            configuration["imported_models"][0]["display_name"],
+            "Licensed Finance Q4",
+        )
+        self.assertTrue(seen_identities)
+        self.assertTrue(all(len(identity) == 64 for identity in seen_identities))
+        with self.assertRaises(LocalModelNotAllowedError):
+            service.delete_model("licensed/finance:q4")
+        self.assertEqual(client.deleted, [])
+
+    def test_desktop_import_requires_snapshot_and_persists_metadata_before_config(self) -> None:
+        self._rewrite_env(
+            "ADMIN_AUTH_ENABLED=true",
+            "LLM_OLLAMA_BASE_URL=http://127.0.0.1:11434",
+        )
+        service, _queue, client = self._local_service(
+            client=_FakeRuntimeClient(installed=["licensed/finance:q4"]),
+        )
+        configuration = service.get_configuration()
+        runtime_identity = get_ollama_runtime_identity("http://127.0.0.1:11434")
+        events: List[str] = []
+
+        with self.assertRaises(ConfigConflictError):
+            service.activate_desktop_imported_model(
+                "licensed/finance:q4",
+                expected_config_version="stale",
+                expected_runtime_identity=runtime_identity,
+                persist_metadata=lambda: events.append("metadata"),
+            )
+
+        result = service.activate_desktop_imported_model(
+            "licensed/finance:q4",
+            expected_config_version=configuration["config_version"],
+            expected_runtime_identity=runtime_identity,
+            persist_metadata=lambda: events.append("metadata"),
+        )
+
+        self.assertEqual(events, ["metadata"])
+        self.assertTrue(result["selected_primary"])
+        self.assertEqual(client.list_calls, 1)
 
     def test_desktop_activation_rejects_changed_config_or_runtime_before_probe(self) -> None:
         self._rewrite_env(

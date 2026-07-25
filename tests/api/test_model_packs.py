@@ -8,8 +8,9 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from api.deps import get_model_pack_import_service
+from api.deps import get_local_model_service, get_model_pack_import_service
 from api.v1.endpoints import model_packs
+from src.model_pack import ModelPackError
 
 
 class _ModelPackService:
@@ -17,6 +18,7 @@ class _ModelPackService:
         self.started = []
         self.statuses = {}
         self.raise_on_start = None
+        self.desktop_activations = []
 
     def start_import(self, source: Path, *, cleanup_root: Path):
         if self.raise_on_start is not None:
@@ -35,11 +37,37 @@ class _ModelPackService:
     def get_import(self, task_id: str):
         return self.statuses.get(task_id)
 
+    def activate_desktop_import(self, local_model_service, **kwargs):
+        self.desktop_activations.append((local_model_service, kwargs))
+        return {
+            "config_version": "config-2",
+            "registered_models": [kwargs["model_id"]],
+            "primary_model": f"ollama/{kwargs['model_id']}",
+            "agent_model": "",
+            "imported_models": [
+                {
+                    "model_id": kwargs["model_id"],
+                    "display_name": kwargs["display_name"],
+                    "minimum_memory_gb": kwargs["minimum_memory_gb"],
+                    "license_id": kwargs["license_id"],
+                }
+            ],
+            "model_id": kwargs["model_id"],
+            "selected_primary": True,
+            "selected_agent": False,
+            "updated_keys": ["LLM_OLLAMA_MODELS"],
+            "warnings": [],
+            "applied_count": 1,
+            "skipped_masked_count": 0,
+            "reload_triggered": True,
+        }
+
 
 def _client(service: _ModelPackService) -> TestClient:
     app = FastAPI()
     app.include_router(model_packs.router, prefix="/model-packs")
     app.dependency_overrides[get_model_pack_import_service] = lambda: service
+    app.dependency_overrides[get_local_model_service] = lambda: "local-model-service"
     return TestClient(app)
 
 
@@ -89,6 +117,21 @@ def test_import_upload_rejects_unsupported_or_empty_files() -> None:
     assert unsupported.json()["detail"]["error"] == "unsupported_archive"
     assert empty.status_code == 400
     assert empty.json()["detail"]["error"] == "empty_model_pack"
+    assert service.started == []
+
+
+def test_import_upload_rejects_bytes_beyond_the_staging_limit(monkeypatch) -> None:
+    service = _ModelPackService()
+    client = _client(service)
+    monkeypatch.setattr(model_packs, "MAX_MODEL_PACK_UPLOAD_BYTES", 4)
+
+    response = client.post(
+        "/model-packs/import",
+        files={"file": ("large.modelpack", b"12345", "application/zip")},
+    )
+
+    assert response.status_code == 413
+    assert response.json()["detail"]["error"] == "model_pack_too_large"
     assert service.started == []
 
 
@@ -153,7 +196,8 @@ def test_import_status_projects_actionable_result_and_not_found() -> None:
             "minimum_memory_gb": 8,
             "license_id": "Apache-2.0",
             "warnings": ["Unexpected file is not part of the manifest: notes.txt"],
-            "registration": {"models": "stockpulse/test:q4"},
+            "activated": True,
+            "selected_primary": False,
         },
     }
     client = _client(service)
@@ -193,3 +237,59 @@ def test_openapi_import_contract_has_no_caller_controlled_target_url() -> None:
     assert set(component["properties"]) == {"file"}
     assert "base_url" not in str(component).lower()
     assert "url" not in str(component["properties"]).lower()
+
+
+def test_desktop_activation_reuses_server_snapshot_without_accepting_a_target_url() -> None:
+    service = _ModelPackService()
+    client = _client(service)
+
+    response = client.post(
+        "/model-packs/desktop-activations",
+        json={
+            "model_id": "licensed/finance:q4",
+            "display_name": "Licensed Finance Q4",
+            "minimum_memory_gb": 16,
+            "license_id": "LicenseRef-Finance",
+            "expected_config_version": "config-1",
+            "expected_runtime_identity": "a" * 64,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["model_id"] == "licensed/finance:q4"
+    assert service.desktop_activations[0][0] == "local-model-service"
+    assert "url" not in str(service.desktop_activations[0][1]).lower()
+
+    schema = client.get("/openapi.json").json()
+    request_schema = schema["paths"]["/model-packs/desktop-activations"]["post"][
+        "requestBody"
+    ]["content"]["application/json"]["schema"]
+    component = schema["components"]["schemas"][request_schema["$ref"].split("/")[-1]]
+    assert "url" not in str(component).lower()
+
+
+def test_desktop_activation_returns_a_stable_registration_failure() -> None:
+    service = _ModelPackService()
+    def reject_activation(*_args, **_kwargs):
+        raise ModelPackError(
+            "registration_failed",
+            "The model was created, but StockPulse could not register it.",
+        )
+
+    service.activate_desktop_import = reject_activation
+    client = _client(service)
+
+    response = client.post(
+        "/model-packs/desktop-activations",
+        json={
+            "model_id": "licensed/finance:q4",
+            "display_name": "Licensed Finance Q4",
+            "minimum_memory_gb": 16,
+            "license_id": "LicenseRef-Finance",
+            "expected_config_version": "config-1",
+            "expected_runtime_identity": "a" * 64,
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["error"] == "registration_failed"

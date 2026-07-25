@@ -16,13 +16,19 @@ from src.model_pack.models import (
     ModelPackManifest,
     ParsedModelfile,
 )
+from src.model_pack.registry import ModelPackRegistry
 from src.model_pack.modelfile import ALLOWED_INSTRUCTIONS, parse_modelfile
 from src.model_pack.ollama_http import (
     DEFAULT_OLLAMA_BASE_URL,
     OllamaHttpModelPackExecutor,
     normalize_ollama_native_base_url,
 )
-from src.model_pack.validation import MAX_LICENSE_BYTES, inspect_model_pack
+from src.model_pack.validation import (
+    MAX_LICENSE_BYTES,
+    MAX_MODEL_PACK_ENTRIES,
+    MAX_MODEL_PACK_BYTES,
+    inspect_model_pack,
+)
 
 __all__ = [
     "ALLOWED_INSTRUCTIONS",
@@ -30,6 +36,8 @@ __all__ = [
     "InspectedModelPack",
     "MANIFEST_FILENAME",
     "MAX_LICENSE_BYTES",
+    "MAX_MODEL_PACK_ENTRIES",
+    "MAX_MODEL_PACK_BYTES",
     "MODEL_PACK_FORMAT_VERSION",
     "ModelPackError",
     "ModelPackExecutor",
@@ -38,6 +46,7 @@ __all__ = [
     "ModelPackImporter",
     "ModelPackLicense",
     "ModelPackManifest",
+    "ModelPackRegistry",
     "OllamaHttpModelPackExecutor",
     "ParsedModelfile",
     "inspect_model_pack",

@@ -10,6 +10,8 @@ from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 import pytest
 
 from src.model_pack import (
+    MAX_MODEL_PACK_ENTRIES,
+    MAX_MODEL_PACK_BYTES,
     ModelPackError,
     ModelPackImporter,
     inspect_model_pack,
@@ -108,6 +110,32 @@ def test_inspect_valid_directory_verifies_real_files_and_reports_extras(tmp_path
         assert inspected.warnings == (
             "Unexpected file is not part of the manifest: release-notes.txt",
         )
+
+
+def test_manifest_rejects_declared_payloads_above_the_shared_limit(tmp_path: Path) -> None:
+    pack_path = _write_pack(tmp_path / "oversized")
+    manifest_path = pack_path / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["files"][0]["size_bytes"] = MAX_MODEL_PACK_BYTES + 1
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ModelPackError) as error:
+        with inspect_model_pack(pack_path):
+            pass
+
+    _assert_error(error, "model_pack_too_large", "64 GiB")
+
+
+def test_directory_rejects_an_unbounded_extra_file_inventory(tmp_path: Path) -> None:
+    pack_path = _write_pack(tmp_path / "too-many-files")
+    for index in range(MAX_MODEL_PACK_ENTRIES):
+        (pack_path / f"extra-{index:03d}").write_text("x", encoding="utf-8")
+
+    with pytest.raises(ModelPackError) as error:
+        with inspect_model_pack(pack_path):
+            pass
+
+    _assert_error(error, "invalid_archive", "too many files")
 
 
 def test_inspect_directory_uses_a_private_snapshot_until_cleanup(tmp_path: Path) -> None:
@@ -360,7 +388,8 @@ def test_importer_validates_then_creates_and_registers_the_model(tmp_path: Path)
     assert result.model_id == "stockpulse-test:latest"
     assert result.display_name == "StockPulse Test Model"
     assert result.minimum_memory_gb == 8
-    assert result.registration == {"models": "stockpulse-test:latest"}
+    assert result.activated is True
+    assert result.selected_primary is False
     assert events == [
         ("create", "stockpulse-test:latest"),
         ("progress", (80, "Creating the Ollama model")),

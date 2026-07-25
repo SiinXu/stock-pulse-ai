@@ -46,6 +46,12 @@ type MockState = {
     registeredModels: string[];
     primaryModel: string;
     agentModel: string;
+    importedModels: Array<{
+      modelId: string;
+      displayName: string;
+      minimumMemoryGb: number;
+      licenseId: string;
+    }>;
   };
   localModelPullModel: string | null;
   authStatus: {
@@ -290,11 +296,21 @@ export function installPlaygroundApiMock(
     intelligenceSources: profile === 'empty'
       ? []
       : fixtureIntelligenceSources.map((item) => ({ ...item })),
-    installedLocalModels: profile === 'empty' ? [] : ['qwen2.5:7b'],
+    installedLocalModels: profile === 'empty'
+      ? []
+      : ['qwen2.5:7b', 'licensed/offline-finance:q4'],
     localModelConfiguration: {
-      registeredModels: profile === 'empty' ? [] : ['qwen2.5:7b'],
+      registeredModels: profile === 'empty'
+        ? []
+        : ['qwen2.5:7b', 'licensed/offline-finance:q4'],
       primaryModel: profile === 'empty' ? '' : 'ollama/qwen2.5:7b',
       agentModel: '',
+      importedModels: profile === 'empty' ? [] : [{
+        modelId: 'licensed/offline-finance:q4',
+        displayName: 'Offline Finance Q4',
+        minimumMemoryGb: 12,
+        licenseId: 'LicenseRef-Finance',
+      }],
     },
     localModelPullModel: null,
     authStatus: {
@@ -456,6 +472,12 @@ export function installPlaygroundApiMock(
     registered_models: state.localModelConfiguration.registeredModels,
     primary_model: state.localModelConfiguration.primaryModel,
     agent_model: state.localModelConfiguration.agentModel,
+    imported_models: state.localModelConfiguration.importedModels.map((model) => ({
+      model_id: model.modelId,
+      display_name: model.displayName,
+      minimum_memory_gb: model.minimumMemoryGb,
+      license_id: model.licenseId,
+    })),
   });
   const localModelMutationResponse = (
     modelId: string,
@@ -541,6 +563,34 @@ export function installPlaygroundApiMock(
         model_id: modelId,
         activated: true,
         selected_primary: state.localModelConfiguration.primaryModel === `ollama/${modelId}`,
+      },
+    }];
+  });
+  mock.onPost('/api/v1/model-packs/import').reply(() => {
+    if (profile === 'error') return [503, errorPayload];
+    return [202, {
+      status: 'accepted',
+      task_id: 'fixture-model-pack-import',
+      message: 'Model Pack import queued.',
+      message_code: 'local_model.import.queued',
+    }];
+  });
+  mock.onGet(/\/api\/v1\/model-packs\/imports\/[^/]+$/).reply(() => {
+    if (profile === 'error') return [503, errorPayload];
+    return [200, {
+      task_id: 'fixture-model-pack-import',
+      status: 'completed',
+      progress: 100,
+      error: null,
+      message: 'Task completed',
+      result: {
+        model_id: 'licensed/offline-finance:q4',
+        display_name: 'Offline Finance Q4',
+        minimum_memory_gb: 12,
+        license_id: 'LicenseRef-Finance',
+        warnings: [],
+        activated: true,
+        selected_primary: false,
       },
     }];
   });

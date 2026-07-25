@@ -8,6 +8,7 @@ const test = require('node:test');
 
 const {
   ModelPackError,
+  MODEL_PACK_MAX_ENTRIES,
   importModelPack,
   inspectModelPack,
   parseModelPackManifest,
@@ -167,6 +168,37 @@ test('manifest and Modelfile parsers enforce the shared data-only contract', () 
   }
 });
 
+test('manifest rejects declared payloads above the shared 64 GiB limit', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-model-pack-limit-'));
+  const { root } = writePack(tempRoot);
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf-8'));
+    manifest.files[0].size_bytes = (64 * 1024 * 1024 * 1024) + 1;
+    assert.throws(
+      () => parseModelPackManifest(Buffer.from(JSON.stringify(manifest))),
+      (error) => error instanceof ModelPackError && error.code === 'model_pack_too_large'
+    );
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('directory inspection rejects an unbounded extra file inventory', async () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-model-pack-count-'));
+  const { root } = writePack(tempRoot);
+  try {
+    for (let index = 0; index < MODEL_PACK_MAX_ENTRIES; index += 1) {
+      fs.writeFileSync(path.join(root, `extra-${String(index).padStart(3, '0')}`), 'x');
+    }
+    await assert.rejects(
+      inspectModelPack(root, { diskFreeProvider: enoughDisk }),
+      (error) => error instanceof ModelPackError && error.code === 'invalid_archive'
+    );
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test('directory inspection verifies hashes and reports unlisted files', async () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-model-pack-dir-'));
   const { root } = writePack(tempRoot);
@@ -300,20 +332,18 @@ test('archive inspection rejects duplicate names before extraction', async () =>
   }
 });
 
-test('desktop import spawns fixed Ollama arguments then registers the model', async () => {
+test('desktop import spawns trusted Ollama command with fixed argument positions', async () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-model-pack-import-'));
   const source = path.join(tempRoot, 'source');
   writePack(source);
   const archive = archiveFromDirectory(source, path.join(tempRoot, 'test.modelpack'));
   const calls = [];
   const progress = [];
-  let processExited = false;
   const spawnImpl = (command, args, options) => {
     calls.push({ command, args: [...args], options });
     const child = new EventEmitter();
     child.kill = () => true;
     setImmediate(() => {
-      processExited = true;
       child.emit('exit', 0, null);
     });
     return child;
@@ -321,18 +351,14 @@ test('desktop import spawns fixed Ollama arguments then registers the model', as
   try {
     const result = await importModelPack(archive, {
       spawnImpl,
+      runtimeCommand: '/trusted/embedded/ollama',
       diskFreeProvider: enoughDisk,
       onProgress: (percent, message) => progress.push([percent, message]),
-      registerModel: (modelId) => {
-        assert.equal(processExited, true);
-        calls.push({ register: modelId });
-        return { models: modelId };
-      },
     });
 
     assert.equal(result.modelId, 'stockpulse/desktop-test:q4');
-    assert.deepEqual(result.registration, { models: 'stockpulse/desktop-test:q4' });
-    assert.equal(calls[0].command, 'ollama');
+    assert.equal(result.displayName, 'Desktop Test');
+    assert.equal(calls[0].command, '/trusted/embedded/ollama');
     assert.deepEqual(calls[0].args.slice(0, 3), [
       'create',
       'stockpulse/desktop-test:q4',
@@ -341,10 +367,9 @@ test('desktop import spawns fixed Ollama arguments then registers the model', as
     assert.match(calls[0].args[3], /Modelfile$/);
     assert.equal(calls[0].options.shell, false);
     assert.equal(calls[0].options.stdio, 'ignore');
-    assert.deepEqual(calls[1], { register: 'stockpulse/desktop-test:q4' });
     assert.deepEqual(progress, [
       [35, 'Model Pack verified'],
-      [90, 'Activating the imported model'],
+      [90, 'Model created in Ollama'],
     ]);
     assert.equal(fs.existsSync(calls[0].options.cwd), false);
   } finally {
@@ -352,7 +377,7 @@ test('desktop import spawns fixed Ollama arguments then registers the model', as
   }
 });
 
-test('validation failures never spawn Ollama or register a model', async () => {
+test('validation failures never spawn Ollama', async () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-model-pack-no-spawn-'));
   writePack(tempRoot, { tamper: true });
   const calls = [];
@@ -360,7 +385,6 @@ test('validation failures never spawn Ollama or register a model', async () => {
     await assert.rejects(
       importModelPack(tempRoot, {
         spawnImpl: () => calls.push('spawn'),
-        registerModel: () => calls.push('register'),
         diskFreeProvider: enoughDisk,
       }),
       (error) => error instanceof ModelPackError && error.code === 'hash_mismatch'

@@ -60,7 +60,8 @@ class ModelPackImportResult:
     minimum_memory_gb: int
     license_id: str
     warnings: Tuple[str, ...]
-    registration: Any = None
+    activated: bool
+    selected_primary: bool = False
 
 
 __all__ = [

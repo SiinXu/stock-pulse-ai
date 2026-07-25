@@ -53,6 +53,7 @@ test('preload exposes desktop version from BrowserWindow additionalArguments', (
   assert.deepEqual(Object.keys(exposed.stockPulseLocalModels).sort(), [
     'detect',
     'getState',
+    'importPack',
     'onStateChange',
     'openInstallGuide',
     'pull',
@@ -218,6 +219,10 @@ test('createLocalModelBridge delegates lifecycle actions and removes state liste
   assert.deepEqual(await bridge.pull('qwen3:8b'), {
     channel: preloadModule.DESKTOP_LOCAL_MODEL_PULL_CHANNEL,
     payload: { modelId: 'qwen3:8b' },
+  });
+  assert.deepEqual(await bridge.importPack(), {
+    channel: preloadModule.DESKTOP_LOCAL_MODEL_IMPORT_PACK_CHANNEL,
+    payload: undefined,
   });
   assert.deepEqual(await bridge.remove('qwen3:8b', LOCAL_MODEL_RUNTIME_IDENTITY), {
     channel: preloadModule.DESKTOP_LOCAL_MODEL_REMOVE_CHANNEL,
