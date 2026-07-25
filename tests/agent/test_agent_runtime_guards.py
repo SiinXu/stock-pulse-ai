@@ -570,12 +570,19 @@ def test_parallel_fence_deadline_timeouts_are_logged(caplog, monkeypatch):
 
 def test_timed_out_late_result_cannot_populate_session_cache():
     handler_calls = []
+    first_handler_started = threading.Event()
+    release_first_handler = threading.Event()
+    first_handler_finished = threading.Event()
 
     def _handler(message):
         handler_calls.append(message)
         if len(handler_calls) == 1:
-            time.sleep(0.04)
-            return {"error": "late failure", "retriable": False}
+            first_handler_started.set()
+            assert release_first_handler.wait(timeout=2)
+            try:
+                return {"error": "late failure", "retriable": False}
+            finally:
+                first_handler_finished.set()
         return {"echo": message}
 
     responses = iter(
@@ -602,7 +609,9 @@ def test_timed_out_late_result_cannot_populate_session_cache():
     def _next_response(*_args, **_kwargs):
         response = next(responses)
         if response.content == "second":
-            time.sleep(0.06)
+            assert first_handler_started.wait(timeout=1)
+            release_first_handler.set()
+            assert first_handler_finished.wait(timeout=1)
         return response
 
     adapter.call_with_tools.side_effect = _next_response
@@ -612,7 +621,7 @@ def test_timed_out_late_result_cannot_populate_session_cache():
         tool_registry=_echo_registry(_handler),
         llm_adapter=adapter,
         max_steps=4,
-        runtime_guard_policy=_policy(tool_timeout_seconds=0.01),
+        runtime_guard_policy=_policy(tool_timeout_seconds=0.1),
     )
 
     assert result.success is True
