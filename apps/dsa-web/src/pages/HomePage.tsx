@@ -11,6 +11,7 @@ import {
   ClipboardCheck,
   PlayCircle,
   RefreshCw,
+  ShieldAlert,
   X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -348,6 +349,7 @@ const HomePage: React.FC = () => {
     scope: SIGNAL_CENTER_SCOPE_VALUES.all,
     tab: SIGNAL_CENTER_TAB_VALUES.review,
   });
+  const approvalsHref = APP_ROUTE_PATHS.approvals;
 
   return (
     <WorkspacePage data-testid="home-attention-hub" contentClassName="space-y-6">
@@ -489,6 +491,16 @@ const HomePage: React.FC = () => {
           padding="md"
           actions={<ClipboardCheck className="h-5 w-5 text-warning" aria-hidden="true" />}
         >
+          <div className="mb-3 grid">
+            <Button
+              variant="outline"
+              size="default"
+              onClick={() => navigate(approvalsHref)}
+            >
+              <ShieldAlert className="h-4 w-4" aria-hidden="true" />
+              {t('home.reviewApprovals')}
+            </Button>
+          </div>
           {isLoading ? (
             <StatePanel state="loading" title={t('common.loading')} size="compact" />
           ) : !availability.reassessments ? (

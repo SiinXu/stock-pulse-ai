@@ -280,7 +280,8 @@ const zh = {
   'home.todayFocus': '今日焦点',
   'home.todayFocusDescription': '最新有效信号，按时间优先展示。',
   'home.todos': '待办',
-  'home.todosDescription': '需要人工判断的再评估事项；审批入口暂不显示。',
+  'home.todosDescription': '需要人工判断的再评估事项和限时安全审批。',
+  'home.reviewApprovals': '查看人工审批',
   'home.triggeredAlerts': '触发告警',
   'home.unknownTaskStatus': '收到未知任务状态：{status}',
 
@@ -1505,7 +1506,8 @@ const en: Record<UiTextKey, string> = {
   'home.todayFocus': 'Today\'s Focus',
   'home.todayFocusDescription': 'The latest active signals, ordered by recency.',
   'home.todos': 'To-dos',
-  'home.todosDescription': 'Reassessments that need judgment; approvals stay hidden until available.',
+  'home.todosDescription': 'Reassessments and time-limited safety approvals that need judgment.',
+  'home.reviewApprovals': 'Review human approvals',
   'home.triggeredAlerts': 'Triggered alerts',
   'home.unknownTaskStatus': 'Received unknown task status: {status}',
 

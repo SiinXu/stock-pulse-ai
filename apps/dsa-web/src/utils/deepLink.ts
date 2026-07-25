@@ -594,6 +594,7 @@ export function parseDeepLink(input: string, origin = DEFAULT_ORIGIN): ParsedDee
       });
     } else if (!new Set<string>([
       LEGACY_ROUTE_PATHS.alerts,
+      APP_ROUTE_PATHS.approvals,
       APP_ROUTE_PATHS.settings,
       LEGACY_ROUTE_PATHS.usage,
     ]).has(url.pathname)) {

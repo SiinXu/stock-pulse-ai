@@ -31,6 +31,7 @@ This is the entry point for project documentation. The README covers the project
 | [Data-source Priority, Health, and Degradation](data-source-stability_EN.md) | Static/realtime priority, health scoring, adaptive ordering, fallback chains, deployment profiles, and troubleshooting |
 | [Sensitive-Data Redaction](security-sensitive-data-redaction.md) | Redaction coverage, Agent trace behavior, debug guarantees, limits, incident response, and rollback |
 | [Durable Security Audit Phase 1](security-audit.md) | Event schema, representative privileged paths, administrator query access, retention, failure semantics, and rollback |
+| [Human-in-the-Loop Approval Safety Gate](human-approvals_EN.md) | Default-off risk-bypass approval, CAS state machine, authenticated APIs, Home to-do entry, and migration rollback |
 | [Changelog](CHANGELOG.md) | Release notes, capability changes, and migration notes |
 
 ## Configuration

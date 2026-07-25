@@ -192,6 +192,7 @@ describe('HomePage attention hub', () => {
     expect(within(core).getByRole('heading', { name: "Today's Focus" })).toBeInTheDocument();
     expect(within(core).getByRole('heading', { name: 'To-dos' })).toBeInTheDocument();
     expect(within(core).getByRole('heading', { name: 'Signal summary' })).toBeInTheDocument();
+    expect(within(core).getByRole('button', { name: 'Review human approvals' })).toBeInTheDocument();
     for (const block of within(core).getAllByRole('region')) {
       expect(block).toHaveAttribute('data-surface-level', 'canvas');
     }

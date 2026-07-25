@@ -28,6 +28,7 @@
 | [完整配置与部署指南](full-guide.md) | 环境准备、运行方式、配置说明、部署路径和常见问题 |
 | [FAQ](FAQ.md) | 常见配置、模型、通知、部署和运行问题 |
 | [持久安全审计 Phase 1（英文）](security-audit.md) | 事件合同、代表性特权路径、管理员查询、保留、失败语义与回滚 |
+| [人工审批安全门禁](human-approvals.md) | 默认关闭的风控绕过审批、CAS 状态机、认证 API、Web 待办入口与迁移回滚 |
 | [数据源稳定性与故障处理图示](data-source-stability.md) | Tushare、TickFlow、AkShare、Efinance、YFinance、Longbridge 等已接入源的使用场景、fallback 链路和推荐配置 |
 | [更新日志](CHANGELOG.md) | 版本变化、能力调整和迁移说明 |
 

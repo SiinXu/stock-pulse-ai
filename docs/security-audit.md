@@ -5,6 +5,14 @@ SQLite database under the versioned `security-audit-v1` contract. This trail is
 separate from application logs, Agent runtime events, Run Diagnostics, and the
 cross-stage observability work tracked by #222.
 
+Human approval proposal creation/reuse, every state transition, one-shot
+consumption, and final risk-bypass authorization use this same mandatory
+attempt/completion service. Their metadata is limited to proposal ids, stable
+risk/status enums, and CAS versions. See
+[Human-in-the-Loop Approval Safety Gate](human-approvals_EN.md); prompts,
+cookies, credentials, full model parameters, and unbounded reasoning are not
+approval audit fields.
+
 ## Event Contract
 
 Every row is append-oriented and contains:

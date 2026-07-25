@@ -43,6 +43,7 @@ class RiskApplicationReason(str, Enum):
     )
     RISK_VETO_APPLIED = "risk_veto_applied"
     RISK_DOWNGRADE_APPLIED = "risk_downgrade_applied"
+    RISK_CONTROL_BYPASS_APPROVED = "risk_control_bypass_approved"
 
 
 _APPLIED_REASONS = frozenset({
@@ -62,6 +63,7 @@ def classify_risk_application_reason(
     trigger: RiskTrigger,
     override_enabled: bool,
     applied: bool,
+    bypassed: bool = False,
 ) -> RiskApplicationReason:
     """Classify one application from normalized runtime facts."""
     trigger = RiskTrigger(trigger)
@@ -71,6 +73,8 @@ def classify_risk_application_reason(
         return RiskApplicationReason.NO_OVERRIDE_TRIGGER
     if not override_enabled:
         return RiskApplicationReason.OVERRIDE_DISABLED
+    if bypassed:
+        return RiskApplicationReason.RISK_CONTROL_BYPASS_APPROVED
     if not applied:
         return RiskApplicationReason.POST_RISK_SIGNAL_ALREADY_WITHIN_RISK_LIMIT
     if trigger == RiskTrigger.RISK_VETO:
@@ -85,12 +89,25 @@ def validate_risk_application_transition(
     post_risk_signal: DashboardDecisionSignal,
     from_signal: Optional[DashboardDecisionSignal],
     to_signal: Optional[DashboardDecisionSignal],
+    bypassed: bool = False,
+    approval_id: Optional[str] = None,
 ) -> None:
     """Reject internally contradictory application records."""
     reason = RiskApplicationReason(reason)
     post_risk_signal = DashboardDecisionSignal(post_risk_signal)
     from_signal = DashboardDecisionSignal(from_signal) if from_signal is not None else None
     to_signal = DashboardDecisionSignal(to_signal) if to_signal is not None else None
+
+    if bypassed:
+        if applied or from_signal is not None or to_signal is not None:
+            raise ValueError("approved risk bypass cannot carry an override transition")
+        if reason is not RiskApplicationReason.RISK_CONTROL_BYPASS_APPROVED:
+            raise ValueError("approved risk bypass requires its stable reason")
+        if not isinstance(approval_id, str) or len(approval_id) != 32:
+            raise ValueError("approved risk bypass requires a bounded approval id")
+        return
+    if approval_id is not None:
+        raise ValueError("non-bypassed risk application cannot carry an approval id")
 
     if not applied:
         if from_signal is not None or to_signal is not None:
@@ -169,6 +186,8 @@ class RiskOverrideApplication:
     post_risk_signal: DashboardDecisionSignal
     from_signal: Optional[DashboardDecisionSignal] = None
     to_signal: Optional[DashboardDecisionSignal] = None
+    bypassed: bool = False
+    approval_id: Optional[str] = None
 
     def __post_init__(self) -> None:
         """Normalize enum values and reject contradictory application facts."""
@@ -191,6 +210,7 @@ class RiskOverrideApplication:
             trigger=self.trigger,
             override_enabled=self.override_enabled,
             applied=self.applied,
+            bypassed=self.bypassed,
         )
         if self.reason != expected_reason:
             raise ValueError(
@@ -202,6 +222,8 @@ class RiskOverrideApplication:
             post_risk_signal=self.post_risk_signal,
             from_signal=self.from_signal,
             to_signal=self.to_signal,
+            bypassed=self.bypassed,
+            approval_id=self.approval_id,
         )
 
 
@@ -236,6 +258,31 @@ def build_risk_override_application(plan: RiskOverridePlan) -> RiskOverrideAppli
         applied=False,
         reason=reason,
         post_risk_signal=current_signal,
+    )
+
+
+def build_approved_risk_bypass_application(
+    plan: RiskOverridePlan,
+    *,
+    approval_id: str,
+) -> RiskOverrideApplication:
+    """Represent an approved one-shot bypass without a contradictory transition."""
+    if (
+        plan.current_signal is None
+        or plan.will_apply is not True
+        or plan.trigger is RiskTrigger.NONE
+    ):
+        raise ValueError("approved risk bypass requires an applicable risk override")
+    current_signal = DashboardDecisionSignal(plan.current_signal)
+    return RiskOverrideApplication(
+        evidence_present=plan.evidence_present,
+        override_enabled=plan.override_enabled,
+        trigger=plan.trigger,
+        applied=False,
+        reason=RiskApplicationReason.RISK_CONTROL_BYPASS_APPROVED,
+        post_risk_signal=current_signal,
+        bypassed=True,
+        approval_id=approval_id,
     )
 
 

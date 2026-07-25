@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Added] Added a default-off Human-in-the-Loop risk-control bypass with owner-scoped durable proposals, versioned CAS decisions, one-shot consumption, mandatory security auditing, authenticated additive APIs, and a Home-linked approvals page.
 - [Changed] Enforced a deny-by-default Agent ToolSurface with bounded executable capabilities, mandatory execution-owned grants, strict schema and stock-scope checks, recursive outbound URL policy validation, redacted denial audits, and no direct ToolRegistry execution bypass.
 - [Added] Added five opt-in investment committee Persona Skills with bounded built-in discovery, desktop packaging coverage, explicit existing-tool lists, differentiated evidence and risk lenses, and mandatory research-only, non-affiliation, and investment-risk disclosures.
 - [Added] Added a default-off, tool-free bounded Critic before Native Multi decisions with strict pass/retry/fail-soft output, one catalog-backed whitelist retry budget, atomic evidence replacement, and internal trace/stream metadata while preserving StrategyEngine authority.

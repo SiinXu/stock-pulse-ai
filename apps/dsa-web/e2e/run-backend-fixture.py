@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timedelta, timezone
 import os
 from pathlib import Path
 import shutil
@@ -176,6 +177,8 @@ def _prepare_runtime(
     from src.analyzer import AnalysisResult
     from src.config import Config
     from src.services.history_service import HistoryService
+    from src.repositories.approval_repo import ApprovalRepository
+    from src.schemas.approvals import ApprovalContext, ApprovalRiskSource
     from src.storage import DatabaseManager
 
     Config._instance = None
@@ -205,6 +208,24 @@ def _prepare_runtime(
     markdown = HistoryService(db).get_markdown_report(str(record_id)) or ""
     if REPORT_MARKER not in markdown:
         raise RuntimeError("Seeded Playwright report cannot be rendered as Markdown")
+
+    approval_now = datetime.now(timezone.utc)
+    ApprovalRepository(db).create_or_get_proposal(
+        proposal_id="e2e251approvalproposal0000000000",
+        owner="local_admin",
+        risk_source=ApprovalRiskSource.RISK_VETO,
+        idempotency_key="e2e251" + ("0" * 58),
+        execution_id="e2e-approval-execution",
+        context=ApprovalContext(
+            stock_code="AAPL",
+            original_signal="buy",
+            conservative_signal="hold",
+            risk_source=ApprovalRiskSource.RISK_VETO,
+            risk_summary="A risk veto would replace the original buy signal.",
+        ),
+        expires_at=approval_now + timedelta(hours=1),
+        now=approval_now,
+    )
 
     DatabaseManager.reset_instance()
     Config._instance = None

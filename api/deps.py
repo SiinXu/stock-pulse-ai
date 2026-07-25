@@ -28,6 +28,7 @@ from src.services.security_audit_service import (
     get_security_audit_service as _build_security_audit_service,
     require_security_audit_recorder,
 )
+from src.services.approval_service import ApprovalService
 from src.services.scheduled_task_service import ScheduledTaskService
 from src.services.task_queue import get_task_queue
 
@@ -83,6 +84,11 @@ def get_database_manager() -> DatabaseManager:
         DatabaseManager: 数据库管理器单例对象
     """
     return DatabaseManager.get_instance()
+
+
+def get_approval_service() -> ApprovalService:
+    """Build the approval service lazily against the process database."""
+    return ApprovalService()
 
 
 def get_system_config_service(request: Request) -> SystemConfigService:

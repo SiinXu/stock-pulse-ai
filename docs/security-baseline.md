@@ -4,6 +4,14 @@ Status: Maintainer baseline
 Last reviewed: 2026-07-23
 Applies to: StockPulse backend, API, Web and desktop clients, Agent and Bot integrations, data providers, notifications, reports, automation, and release workflows
 
+The optional Agent risk-control exception is defined in
+[Human-in-the-Loop Approval Safety Gate](human-approvals_EN.md) and its
+[Chinese counterpart](human-approvals.md). It is default-off, restricted to
+the existing `risk_veto` and `risk_downgrade` categories, requires enabled
+administrator authentication, and fails closed to the conservative result.
+An approved proposal is not authority until the same owner consumes it once
+through versioned CAS before expiry.
+
 ## Scope
 
 This document defines the minimum security and compliance expectations for StockPulse. It is a review baseline, not a certification, legal opinion, privacy policy, penetration-test report, or claim that every requirement is already implemented. The [current gaps](#current-gaps) section records incomplete coverage and links each public remediation track.

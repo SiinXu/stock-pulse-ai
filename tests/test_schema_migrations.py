@@ -32,6 +32,7 @@ from src.migrations.legacy_profiles import (
     match_legacy_schema_profile,
 )
 from src.migrations.registry import (
+    APPROVAL_GATE_SCHEMA_MIGRATION,
     DECISION_SIGNAL_PROFILE_MIGRATION,
     INTELLIGENCE_ITEM_SCOPE_MIGRATION,
     INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION,
@@ -427,6 +428,7 @@ def test_production_registry_is_stable_unique_and_strictly_ordered_across_import
         SECURITY_AUDIT_EVENTS_MIGRATION.id,
         SCHEDULED_TASK_SCHEMA_MIGRATION.id,
         INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION.id,
+        APPROVAL_GATE_SCHEMA_MIGRATION.id,
     )
     assert reloaded.TARGET_VERSION == ids[-1]
     assert all(len(checksum) == 64 for _, _, checksum in after)
