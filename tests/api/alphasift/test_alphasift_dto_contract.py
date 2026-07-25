@@ -47,6 +47,38 @@ def test_screen_request_preserves_defaults_aliases_and_extra_policy() -> None:
     }
 
 
+def test_legacy_screen_payload_keeps_request_coercion_and_extra_policy() -> None:
+    service = MagicMock()
+    service.screen.return_value = {
+        "enabled": True,
+        "candidates": [],
+        "candidate_count": 0,
+    }
+
+    with patch("api.v1.endpoints.alphasift._service", return_value=service):
+        response = _test_client().post(
+            "/api/v1/alphasift/screen",
+            json={
+                "market": "cn",
+                "strategy": "dual_low",
+                "max_results": "7",
+                "future_flag": True,
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "enabled": True,
+        "candidates": [],
+        "candidate_count": 0,
+    }
+    service.screen.assert_called_once_with(
+        strategy="dual_low",
+        market="cn",
+        max_results=7,
+    )
+
+
 @pytest.mark.parametrize(
     "payload",
     (
@@ -93,6 +125,31 @@ def test_response_boundary_preserves_known_and_extension_fields() -> None:
     assert response.json() == payload
 
 
+def test_sync_response_rejects_coercible_core_types() -> None:
+    payload = {
+        "enabled": "false",
+        "available": "true",
+        "install_spec_is_default": 1,
+    }
+    with pytest.raises(ValidationError) as caught:
+        AlphaSiftStatusResponse.model_validate(payload)
+
+    error_locations = {tuple(error["loc"]) for error in caught.value.errors()}
+    assert {
+        ("enabled",),
+        ("available",),
+        ("install_spec_is_default",),
+    } <= error_locations
+
+    service = MagicMock()
+    service.status.return_value = payload
+    with patch("api.v1.endpoints.alphasift._service", return_value=service):
+        response = _test_client().get("/api/v1/alphasift/status")
+
+    assert response.status_code == 500
+    assert response.json()["error"] == "internal_error"
+
+
 def test_invalid_service_payload_fails_closed_at_response_boundary() -> None:
     with pytest.raises(ValidationError):
         AlphaSiftStatusResponse.model_validate({
@@ -134,6 +191,61 @@ def test_task_status_preserves_minimal_nested_result_shape() -> None:
     assert response.json()["result"] == result
 
 
+def test_background_screen_rejects_coercible_core_types() -> None:
+    task = TaskInfo(
+        task_id="screen-task-background",
+        trace_id="screen-task-background",
+        stock_code="alphasift_screen",
+        status=QueueTaskStatus.PENDING,
+        message="AlphaSift screening queued",
+        report_type="alphasift_screen",
+    )
+    queue = MagicMock()
+    queue.submit_background_task.return_value = task
+    service = MagicMock()
+    service.screen.return_value = {
+        "enabled": True,
+        "candidates": [],
+        "candidate_count": "0",
+    }
+
+    with (
+        patch("api.v1.endpoints.alphasift.get_task_queue", return_value=queue),
+        patch("api.v1.endpoints.alphasift._service", return_value=service),
+    ):
+        alphasift_endpoint.alphasift_start_screen_task(
+            AlphaSiftScreenRequest(),
+            http_request=MagicMock(),
+            config=MagicMock(),
+        )
+        run_screen = queue.submit_background_task.call_args.args[0]
+        with pytest.raises(ValidationError):
+            run_screen()
+
+
+def test_completed_task_rejects_coercible_core_types() -> None:
+    task = TaskInfo(
+        task_id="screen-task-completed",
+        trace_id="screen-task-completed",
+        stock_code="alphasift_screen",
+        status=QueueTaskStatus.COMPLETED,
+        progress=100,
+        message="Screening completed",
+        result={"enabled": True, "candidates": [], "candidate_count": "0"},
+        report_type="alphasift_screen",
+    )
+    queue = MagicMock()
+    queue.get_task.return_value = task
+
+    with patch("api.v1.endpoints.alphasift.get_task_queue", return_value=queue):
+        response = _test_client().get(
+            "/api/v1/alphasift/screen/tasks/screen-task-completed",
+        )
+
+    assert response.status_code == 500
+    assert response.json()["error"] == "internal_error"
+
+
 def test_screen_response_rejects_missing_or_wrong_core_fields() -> None:
     with pytest.raises(ValidationError):
         AlphaSiftScreenResponse.model_validate({
@@ -147,6 +259,46 @@ def test_screen_response_rejects_missing_or_wrong_core_fields() -> None:
             "candidates": {},
             "candidate_count": 0,
         })
+
+
+@pytest.mark.parametrize(
+    "payload",
+    (
+        {"enabled": True, "candidates": [], "candidate_count": "0"},
+        {
+            "enabled": True,
+            "candidates": [
+                {
+                    "rank": "1",
+                    "code": "600519",
+                    "name": "Kweichow Moutai",
+                    "reason": "candidate",
+                    "raw": {},
+                },
+            ],
+            "candidate_count": 1,
+        },
+        {
+            "enabled": True,
+            "candidates": [
+                {
+                    "rank": 1,
+                    "code": "600519",
+                    "name": "Kweichow Moutai",
+                    "score": "88.5",
+                    "reason": "candidate",
+                    "raw": {},
+                },
+            ],
+            "candidate_count": 1,
+        },
+    ),
+)
+def test_screen_response_rejects_coercible_numeric_core_fields(
+    payload: dict[str, object],
+) -> None:
+    with pytest.raises(ValidationError):
+        AlphaSiftScreenResponse.model_validate(payload)
 
 
 def test_alphasift_openapi_declares_the_complete_route_group() -> None:
@@ -179,3 +331,11 @@ def test_alphasift_openapi_declares_the_complete_route_group() -> None:
             "application/json"
         ]["schema"]
         assert validation_schema["$ref"] == "#/components/schemas/ErrorResponse"
+
+    request_component = schema["components"]["schemas"]["AlphaSiftScreenRequest"]
+    assert "max_results" in request_component["properties"]
+    assert "maxResults" not in request_component["properties"]
+    assert request_component["properties"]["max_results"]["default"] == 20
+
+    for component in expected_responses.values():
+        assert schema["components"]["schemas"][component]["additionalProperties"] is True
