@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import hmac
@@ -12,8 +13,13 @@ from types import SimpleNamespace
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from starlette.formparsers import MultiPartParser
 
 from api.deps import get_local_model_service, get_model_pack_import_service
+from api.middlewares.model_pack_upload import (
+    MODEL_PACK_IMPORT_PATH,
+    ModelPackUploadLimitMiddleware,
+)
 from api.v1.endpoints import model_packs
 from src.model_pack import (
     DESKTOP_MODEL_PACK_ATTESTATION_ENV,
@@ -105,12 +111,37 @@ class _ModelPackService:
         }
 
 
-def _client(service: _ModelPackService) -> TestClient:
+def _app(
+    service: _ModelPackService,
+    *,
+    max_request_bytes: int | None = None,
+) -> FastAPI:
     app = FastAPI()
+    if max_request_bytes is None:
+        app.add_middleware(
+            ModelPackUploadLimitMiddleware,
+            import_path="/model-packs/import",
+        )
+    else:
+        app.add_middleware(
+            ModelPackUploadLimitMiddleware,
+            import_path="/model-packs/import",
+            max_request_bytes=max_request_bytes,
+        )
     app.include_router(model_packs.router, prefix="/model-packs")
     app.dependency_overrides[get_model_pack_import_service] = lambda: service
     app.dependency_overrides[get_local_model_service] = lambda: "local-model-service"
-    return TestClient(app)
+    return app
+
+
+def _client(
+    service: _ModelPackService,
+    *,
+    max_request_bytes: int | None = None,
+) -> TestClient:
+    return TestClient(
+        _app(service, max_request_bytes=max_request_bytes)
+    )
 
 
 def test_import_upload_uses_fixed_staging_name_and_returns_task() -> None:
@@ -174,6 +205,162 @@ def test_import_upload_rejects_bytes_beyond_the_staging_limit(monkeypatch) -> No
 
     assert response.status_code == 413
     assert response.json()["detail"]["error"] == "model_pack_too_large"
+    assert service.started == []
+
+
+def test_import_rejects_declared_oversize_before_multipart_parser(
+    monkeypatch,
+) -> None:
+    service = _ModelPackService()
+    parser_called = False
+
+    async def fail_if_parsed(_parser):
+        nonlocal parser_called
+        parser_called = True
+        raise AssertionError("multipart parser must not receive an oversized body")
+
+    monkeypatch.setattr(MultiPartParser, "parse", fail_if_parsed)
+    client = _client(service, max_request_bytes=1024)
+
+    response = client.post(
+        "/model-packs/import",
+        files={
+            "file": (
+                "large.modelpack",
+                b"x" * (2 * 1024 * 1024),
+                "application/zip",
+            )
+        },
+    )
+
+    assert response.status_code == 413
+    assert response.json()["error"] == "model_pack_too_large"
+    assert parser_called is False
+    assert service.started == []
+
+
+def test_import_rejects_chunked_oversize_without_forwarding_bytes_past_limit() -> None:
+    forwarded = bytearray()
+    sent = []
+
+    async def downstream(scope, receive, send):
+        assert scope["path"] == MODEL_PACK_IMPORT_PATH
+        while True:
+            message = await receive()
+            forwarded.extend(message.get("body", b""))
+            if not message.get("more_body", False):
+                break
+        await send({"type": "http.response.start", "status": 204, "headers": []})
+        await send({"type": "http.response.body", "body": b""})
+
+    messages = iter(
+        [
+            {"type": "http.request", "body": b"123", "more_body": True},
+            {"type": "http.request", "body": b"456", "more_body": True},
+            {"type": "http.request", "body": b"789", "more_body": False},
+        ]
+    )
+
+    async def receive():
+        return next(messages)
+
+    async def send(message):
+        sent.append(message)
+
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "POST",
+        "scheme": "http",
+        "path": MODEL_PACK_IMPORT_PATH,
+        "raw_path": MODEL_PACK_IMPORT_PATH.encode("ascii"),
+        "query_string": b"",
+        "headers": [
+            (b"content-type", b"multipart/form-data; boundary=model-pack"),
+            (b"transfer-encoding", b"chunked"),
+        ],
+        "client": ("127.0.0.1", 1234),
+        "server": ("testserver", 80),
+    }
+
+    asyncio.run(
+        ModelPackUploadLimitMiddleware(
+            downstream,
+            max_request_bytes=4,
+        )(scope, receive, send)
+    )
+
+    assert bytes(forwarded) == b"1234"
+    assert sent[0]["type"] == "http.response.start"
+    assert sent[0]["status"] == 413
+    body = json.loads(sent[1]["body"])
+    assert body["error"] == "model_pack_too_large"
+
+
+def test_chunked_multipart_oversize_returns_413_before_endpoint() -> None:
+    service = _ModelPackService()
+    app = _app(service, max_request_bytes=128)
+    boundary = b"model-pack"
+    body = (
+        b"--"
+        + boundary
+        + b"\r\nContent-Disposition: form-data; name=\"file\"; "
+        + b"filename=\"large.modelpack\"\r\n"
+        + b"Content-Type: application/zip\r\n\r\n"
+        + (b"x" * 512)
+        + b"\r\n--"
+        + boundary
+        + b"--\r\n"
+    )
+    chunks = iter(
+        [
+            {"type": "http.request", "body": body[:96], "more_body": True},
+            {"type": "http.request", "body": body[96:256], "more_body": True},
+            {"type": "http.request", "body": body[256:], "more_body": False},
+        ]
+    )
+    sent = []
+
+    async def receive():
+        return next(chunks)
+
+    async def send(message):
+        sent.append(message)
+
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "POST",
+        "scheme": "http",
+        "path": "/model-packs/import",
+        "raw_path": b"/model-packs/import",
+        "query_string": b"",
+        "headers": [
+            (
+                b"content-type",
+                b"multipart/form-data; boundary=model-pack",
+            ),
+            (b"transfer-encoding", b"chunked"),
+        ],
+        "client": ("127.0.0.1", 1234),
+        "server": ("testserver", 80),
+        "app": app,
+    }
+
+    asyncio.run(app(scope, receive, send))
+
+    response_start = next(
+        message for message in sent if message["type"] == "http.response.start"
+    )
+    response_body = b"".join(
+        message.get("body", b"")
+        for message in sent
+        if message["type"] == "http.response.body"
+    )
+    assert response_start["status"] == 413
+    assert json.loads(response_body)["error"] == "model_pack_too_large"
     assert service.started == []
 
 

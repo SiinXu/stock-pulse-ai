@@ -11,6 +11,10 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
 from api.deps import get_local_model_service, get_model_pack_import_service
+from api.middlewares.model_pack_upload import (
+    MAX_MODEL_PACK_UPLOAD_BYTES,
+    model_pack_too_large_detail,
+)
 from api.v1.endpoints.local_models import _raise_local_model_error
 from api.v1.schemas.common import ErrorResponse
 from api.v1.schemas.model_packs import (
@@ -23,7 +27,6 @@ from src.services.local_model_service import LocalModelError, LocalModelService
 from src.services.model_pack_import_service import ModelPackImportService
 from src.services.system_config_service import ConfigConflictError, ConfigValidationError
 from src.model_pack import (
-    MAX_MODEL_PACK_BYTES,
     ModelPackError,
     consume_desktop_model_pack_attestation,
 )
@@ -33,7 +36,6 @@ from src.utils.sanitize import log_safe_exception
 logger = logging.getLogger(__name__)
 router = APIRouter()
 _UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024
-MAX_MODEL_PACK_UPLOAD_BYTES = MAX_MODEL_PACK_BYTES
 _SUPPORTED_ARCHIVE_SUFFIXES = frozenset({".modelpack", ".zip"})
 
 
@@ -64,13 +66,7 @@ def _stage_upload(upload: UploadFile) -> tuple[Path, Path]:
                     if total_bytes + len(chunk) > MAX_MODEL_PACK_UPLOAD_BYTES:
                         raise HTTPException(
                             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-                            detail={
-                                "error": "model_pack_too_large",
-                                "message": (
-                                    "This Model Pack exceeds the 64 GiB upload limit. "
-                                    "Select a smaller pack or import it from Desktop."
-                                ),
-                            },
+                            detail=model_pack_too_large_detail(),
                         )
                     total_bytes += len(chunk)
                     output.write(chunk)

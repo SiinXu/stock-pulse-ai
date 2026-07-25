@@ -194,6 +194,7 @@ from api.deps import (
 )
 from api.middlewares.auth import add_auth_middleware
 from api.middlewares.error_handler import add_error_handlers
+from api.middlewares.model_pack_upload import ModelPackUploadLimitMiddleware
 from api.v1.schemas.common import HealthResponse
 from src.auth import is_auth_enabled
 from src.data.stock_index_loader import find_existing_stock_index_path
@@ -422,6 +423,7 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
         _warn_if_open_cors_without_auth()
         allowed_origins = ["*"]
     
+    app.add_middleware(ModelPackUploadLimitMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins,

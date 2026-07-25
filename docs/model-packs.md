@@ -17,7 +17,11 @@ supported model-import entry point.
   directory. The native picker asks which source type to select.
 - Web accepts a `.modelpack` or `.zip` upload. The server stages the upload and
   removes the staging directory when the background task ends. Uploads,
-  archives, and declared payloads are limited to 64 GiB.
+  archives, and declared payloads are limited to 64 GiB. Before Starlette can
+  parse or spool the multipart file, ASGI ingress enforces `Content-Length` and
+  counts chunked request bytes. The complete multipart envelope is limited to
+  64 GiB plus 1 MiB of bounded form overhead; the file itself remains limited
+  to exactly 64 GiB.
 - The Web request cannot provide an Ollama URL. StockPulse reads
   `LLM_OLLAMA_BASE_URL` from saved server configuration.
 - A private or loopback Web Ollama target must also be allowed by the existing
