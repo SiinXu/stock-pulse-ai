@@ -252,6 +252,29 @@ class PluginManager:
 
         return self._registry.registrations(extension_point)
 
+    def enabled_registrations(
+        self,
+        extension_point: ExtensionPoint | None = None,
+    ) -> tuple[ExtensionRegistration, ...]:
+        """Return registrations owned by lifecycle-stable enabled plugins."""
+
+        with self._lock:
+            if (
+                self._activation_allowed is not None
+                and not self._activation_allowed()
+            ):
+                return ()
+            enabled_plugin_ids = {
+                plugin_id
+                for plugin_id, record in self._plugins.items()
+                if record.state == "enabled" and record.transition is None
+            }
+            return tuple(
+                registration
+                for registration in self._registry.registrations(extension_point)
+                if registration.plugin_id in enabled_plugin_ids
+            )
+
     def _shutdown_plugin_ids(self) -> tuple[str, ...]:
         """Return plugins whose owned lifecycle state still needs shutdown."""
 

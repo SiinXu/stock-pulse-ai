@@ -4,7 +4,9 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import logging
+import threading
 from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import patch
@@ -192,6 +194,31 @@ def test_fallback_only_markdown_does_not_build_history_context() -> None:
     assert application_services.get_installed_application_services() is None
 
 
+@pytest.mark.parametrize("register_nonmatching_template", (False, True))
+def test_installed_root_skips_history_without_matching_markdown_candidate(
+    manager: PluginManager,
+    register_nonmatching_template: bool,
+) -> None:
+    template = _Template("brief-only", frozenset({"brief"}), "not selected")
+    if register_nonmatching_template:
+        _load(manager, "brief-only-plugin", (template, 100))
+    config = Config(stock_list=[], report_renderer_enabled=False)
+    service = NotificationService()
+
+    with patch("src.notification.get_config", return_value=config), patch.object(
+        service,
+        "_get_history_compare_context",
+        side_effect=AssertionError("history context must remain lazy"),
+    ):
+        rendered = service.generate_dashboard_report(
+            [_result()],
+            report_date="2026-07-24",
+        )
+
+    assert "Kweichow Moutai" in rendered
+    assert template.requests == []
+
+
 def test_installed_root_report_template_is_selected() -> None:
     plugin_manager = PluginManager(application_version=PLUGIN_APPLICATION_VERSION)
     root = application_services.ApplicationServices(
@@ -204,6 +231,43 @@ def test_installed_root_report_template_is_selected() -> None:
 
     assert application_services.get_installed_application_services() is root
     assert render_plugin_template("brief", [_result()]) == "installed"
+
+
+def test_root_shutdown_excludes_template_while_onunload_is_running() -> None:
+    unload_started = threading.Event()
+    release_unload = threading.Event()
+
+    class BlockingUnloadPlugin(_TemplatePlugin):
+        def onunload(self) -> None:
+            self.unload_count += 1
+            unload_started.set()
+            assert release_unload.wait(timeout=2)
+
+    template = _Template("closing-template", frozenset({"brief"}), "closing")
+    plugin = BlockingUnloadPlugin("closing-plugin", ((template, 100),))
+    root = application_services.ApplicationServices(
+        builtin_plugins=(plugin,),
+        plugins_dir="",
+    )
+    application_services.set_application_services(root)
+    assert root.plugin_load_results[0].success is True
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        reset_future = executor.submit(application_services.reset_application_services)
+        assert unload_started.wait(timeout=2)
+        assert application_services.get_installed_application_services() is root
+        render_future = executor.submit(render_plugin_template, "brief", [_result()])
+        try:
+            assert render_future.done() is False
+            assert template.requests == []
+        finally:
+            release_unload.set()
+
+        reset_future.result(timeout=2)
+        assert render_future.result(timeout=2) is None
+
+    assert template.requests == []
+    assert application_services.get_installed_application_services() is None
 
 
 def test_duplicate_template_id_fails_closed_without_replacing_owner(
@@ -403,14 +467,57 @@ def test_aggregate_report_paths_select_plugins_before_jinja(
     _load(manager, "all-platform-plugin", (template, 100))
     config = Config(stock_list=[], report_renderer_enabled=False)
 
+    service = NotificationService()
+    history_context = {"history_by_code": {"600519": []}}
     with patch("src.notification.get_config", return_value=config), patch(
         "src.services.report_renderer.render"
-    ) as jinja_render:
-        service = NotificationService()
+    ) as jinja_render, patch.object(
+        service,
+        "_get_history_compare_context",
+        return_value=history_context,
+    ) as build_history:
         rendered = getattr(service, method_name)([_result()])
 
     assert rendered == f"plugin:{platform}"
     jinja_render.assert_not_called()
+    assert build_history.call_count == (1 if platform == "markdown" else 0)
+    if platform == "markdown":
+        assert template.requests[0].extra_context["history_by_code"] == {
+            "600519": ()
+        }
+
+
+def test_declined_markdown_template_builds_history_once_for_jinja_fallback(
+    manager: PluginManager,
+) -> None:
+    declined = _Template("declined-markdown", frozenset({"markdown"}), None)
+    _load(manager, "declined-markdown-plugin", (declined, 100))
+    config = Config(stock_list=[], report_renderer_enabled=True)
+    service = NotificationService()
+    history_context = {"history_by_code": {"600519": []}}
+
+    with patch("src.notification.get_config", return_value=config), patch(
+        "src.services.report_renderer.render",
+        return_value="jinja fallback",
+    ) as jinja_render, patch.object(
+        service,
+        "_get_history_compare_context",
+        return_value=history_context,
+    ) as build_history:
+        rendered = service.generate_dashboard_report(
+            [_result()],
+            report_date="2026-07-24",
+        )
+
+    assert rendered == "jinja fallback"
+    build_history.assert_called_once()
+    jinja_render.assert_called_once()
+    assert declined.requests[0].extra_context["history_by_code"] == {
+        "600519": ()
+    }
+    jinja_context = jinja_render.call_args.kwargs["extra_context"]
+    assert jinja_context["history_by_code"] is history_context["history_by_code"]
+    assert jinja_context["report_language"] == "en"
 
 
 def test_all_declined_templates_continue_to_jinja_fallback(

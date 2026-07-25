@@ -259,6 +259,39 @@ def test_concurrent_load_calls_invoke_onload_once() -> None:
     assert plugin.load_count == 1
 
 
+def test_enabled_registrations_wait_for_disable_and_exclude_unloading_plugin() -> None:
+    manager = _manager()
+    unload_started = threading.Event()
+    release_unload = threading.Event()
+
+    class BlockingUnloadPlugin(_RecordingPlugin):
+        def onunload(self) -> None:
+            self.unload_count += 1
+            unload_started.set()
+            assert release_unload.wait(timeout=2)
+
+    plugin = BlockingUnloadPlugin(_manifest("blocking-unload"), ("daily",))
+    assert manager.register(plugin, source="builtin").success is True
+    assert manager.load("blocking-unload").success is True
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        disable_future = executor.submit(manager.disable, "blocking-unload")
+        assert unload_started.wait(timeout=2)
+        snapshot_future = executor.submit(
+            manager.enabled_registrations,
+            "report_template",
+        )
+        try:
+            assert snapshot_future.done() is False
+        finally:
+            release_unload.set()
+
+        assert disable_future.result(timeout=2).success is True
+        assert snapshot_future.result(timeout=2) == ()
+
+    assert manager.registrations("report_template") == ()
+
+
 def test_context_rejects_registration_after_onload_returns() -> None:
     manager = PluginManager(application_version="2.0.0")
     plugin = _RecordingPlugin(_manifest("context-plugin"))

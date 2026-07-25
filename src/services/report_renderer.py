@@ -94,7 +94,7 @@ def render_plugin_template(
         services = get_installed_application_services()
         if services is None:
             return None
-        registrations = services.plugin_manager.registrations(
+        registrations = services.plugin_manager.enabled_registrations(
             "report_template"
         )
     except Exception as exc:  # broad-exception: fallback_recorded - Plugin lookup failure preserves both legacy report fallbacks.

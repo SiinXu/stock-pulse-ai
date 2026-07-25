@@ -720,7 +720,10 @@ before continuing. Duplicate template IDs are rejected by the canonical
 identity rule above. Contract version 1 accepts only the exact `markdown`,
 `wechat`, and `brief` platform values. The request carries a tuple snapshot of
 the current results and a detached, deeply immutable JSON-compatible
-`extra_context` mapping.
+`extra_context` mapping. Candidate discovery includes only registrations owned
+by lifecycle-stable enabled plugins. A disable or root shutdown that already
+started is excluded before selection; a disable that starts after selection
+does not cancel the in-flight render snapshot.
 
 If no plugin candidate renders, the core calls the existing Jinja renderer
 under its current `REPORT_RENDERER_ENABLED` setting. If that renderer is
