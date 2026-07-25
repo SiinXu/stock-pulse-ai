@@ -26,10 +26,12 @@ from src.analyzer import AnalysisResult, GeminiAnalyzer
 from src.llm.generation_backend import GenerationError
 from src.services.run_diagnostics import (
     current_diagnostic_snapshot,
+    get_current_diagnostic_context,
     record_history_run,
     record_notification_run,
 )
 from src.schemas.market_light import MARKET_LIGHT_REGIONS
+from src.plugins.event_hooks import dispatch_market_review_event
 from src.utils.sanitize import log_safe_exception
 
 
@@ -222,11 +224,24 @@ def run_market_review(
     )
     run_markets = _resolve_market_review_regions(raw_region)
     persist_region = ','.join(run_markets) if len(run_markets) > 1 else run_markets[0]
+    diagnostic_context = get_current_diagnostic_context()
+    event_trace_id = (
+        getattr(diagnostic_context, "trace_id", None)
+        if diagnostic_context is not None
+        else None
+    ) or history_query_id
     logger.info(
         "[MarketReview] component=market_review action=start trigger_source=%s query_id=%s region=%s",
         trigger_source,
         history_query_id,
         persist_region,
+    )
+    dispatch_market_review_event(
+        "market_review.started",
+        task_id=history_query_id,
+        trace_id=event_trace_id,
+        market_region=persist_region,
+        trigger_source=trigger_source,
     )
 
     try:
@@ -427,6 +442,14 @@ def run_market_review(
                     attempts=0,
                 )
             
+            dispatch_market_review_event(
+                "market_review.completed",
+                task_id=history_query_id,
+                trace_id=event_trace_id,
+                market_region=persist_region,
+                trigger_source=trigger_source,
+                result_reference=history_query_id,
+            )
             if return_structured:
                 return MarketReviewRunResult(
                     report=review_report,
@@ -448,8 +471,16 @@ def run_market_review(
                 "region": persist_region,
             },
         )
+        dispatch_market_review_event(
+            "market_review.failed",
+            task_id=history_query_id,
+            trace_id=event_trace_id,
+            market_region=persist_region,
+            trigger_source=trigger_source,
+            error_code="market_review_generation_backend_failed",
+        )
         raise
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - Emit a stable failed event before preserving the existing None fallback.
         log_safe_exception(
             logger,
             "Market review execution failed",
@@ -461,7 +492,24 @@ def run_market_review(
                 "region": persist_region,
             },
         )
+        dispatch_market_review_event(
+            "market_review.failed",
+            task_id=history_query_id,
+            trace_id=event_trace_id,
+            market_region=persist_region,
+            trigger_source=trigger_source,
+            error_code="market_review_execution_failed",
+        )
+        return None
     
+    dispatch_market_review_event(
+        "market_review.failed",
+        task_id=history_query_id,
+        trace_id=event_trace_id,
+        market_region=persist_region,
+        trigger_source=trigger_source,
+        error_code="market_review_no_report",
+    )
     return None
 
 

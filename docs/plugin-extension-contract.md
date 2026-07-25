@@ -31,8 +31,9 @@ exact native registry. `PLUGINS_DIR` alone discovers and manages package
 lifecycle; it can activate only implementations whose point is bound by that
 composition root. The default process root binds Agent Tools to its cached
 `ToolRegistry`, Analysis Strategies to its root-owned declarative catalog
-adapter, and Report Templates to the existing aggregate report render paths.
-Data Provider plugin execution still requires programmatic composition with
+adapter, Report Templates to the existing aggregate report render paths, and
+Event Hooks to the stock-analysis and market-review lifecycle paths. Data
+Provider plugin execution still requires programmatic composition with
 `PluginManager(registry=manager.plugin_registry)`. A listed but unbound point
 needs explicit wiring under the accepted contract, while a new surface requires
 an ADR instead of an implicit registry expansion.
@@ -46,14 +47,14 @@ an ADR instead of an implicit registry expansion.
 
 | Surface | Current authority | Track X delivery |
 | --- | --- | --- |
-| Plugin lifecycle, manifest, registry | `src/plugins/` core; Data Provider, Analysis Strategy, Agent Tool, and Report Template native adapters are wired, while unconfigured points fail closed | #273 X2a core implemented; #541 Report Template validator implemented |
+| Plugin lifecycle, manifest, registry | `src/plugins/` core; Data Provider, Analysis Strategy, Agent Tool, Report Template, and Event Hook contracts are wired, while unconfigured points fail closed | #273 X2a core implemented; #541 Report Template and #542 Event Hook validators implemented |
 | Built-in/external startup wiring | `src/application_services.py` composition root | #273 X2b implemented |
 | Data Providers | `DataProvider`, `BaseFetcher`, and `DataFetcherManager` | #276 X3 native adapter implemented; caller must inject the target manager registry |
 | Analysis Strategies | `Skill`, `SkillManager`, `StrategyEngine` | Default process definition adapter wired; `SkillManager` and `StrategyEngine` remain authoritative |
 | Agent Tools | `ToolDefinition`, `ToolRegistry`, Tool Surface | Default process adapter wired; strict registration validation remains fail-closed |
 | Notification Channels | `NotificationChannel`, sender mixins, `NotificationService` | Contract only in this batch |
 | Report Templates | `src/services/report_renderer.py`, `templates/report_*.j2` | #541 runtime selection implemented; Jinja and hard-coded fallbacks retained |
-| Event Hooks | Task and Agent runtime event streams | Contract only in this batch |
+| Event Hooks | `src/plugins/event_hooks.py` plus the stock-analysis and market-review lifecycle paths | Six observational lifecycle events wired; Task/Agent/SSE streams remain separate |
 
 "Contract only" means a plugin cannot yet rely on runtime wiring for that
 extension point. It does not mean the existing core path is deprecated.
@@ -786,7 +787,27 @@ and unrestricted tool results.
 These Hooks do not replace `TaskEventStream`, Agent runtime events, SSE, or
 pipeline diagnostics. Started events are emitted only after core admission;
 terminal events observe the already-decided terminal state and cannot mutate or
-veto it. Runtime wiring is deferred.
+veto it. The current emission boundaries are `process_single_stock` after its
+resolve/admission stage and `run_market_review` after its task identity and
+normalized region are fixed.
+
+Version 1 projects only these fields:
+
+- every event carries `task_id` plus the top-level `trace_id`;
+- started events carry `stock_code` or `market_region` and `trigger_source`;
+- terminal events carry the same subject plus `terminal_status`;
+- completed events may carry `result_reference` (the stable task/query ID);
+- failed events carry only a stable `error_code`, never exception text.
+
+All string fields pass through the shared diagnostic sanitizer before the
+payload is detached and deeply frozen. Candidate discovery reads only the
+already-installed composition root and registrations owned by lifecycle-stable
+enabled plugins; dispatch never installs a root. A disable or root shutdown
+that already started is excluded before callback selection, while a lifecycle
+transition that starts after selection does not cancel the in-flight snapshot.
+Hook return values are ignored. Adding a new optional field or event name follows
+the additive version-1 policy below; renaming/removing a field or changing
+ordering, isolation, or mutability requires a new contract major.
 
 ## Versioning
 

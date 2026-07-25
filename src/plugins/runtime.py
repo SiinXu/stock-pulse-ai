@@ -9,6 +9,7 @@ from collections.abc import Callable, Mapping
 from src.agent.tools.registry import ToolRegistry
 
 from .agent_tools import build_agent_tool_extension_contract
+from .event_hooks import event_hook_extension_contract
 from .registry import (
     ExtensionContract,
     ExtensionPoint,
@@ -22,7 +23,7 @@ def build_application_extension_registry(
     *,
     additional_contracts: Mapping[ExtensionPoint, ExtensionContract] | None = None,
 ) -> ExtensionRegistry:
-    """Build one process registry from the Agent Tool and explicit point seams."""
+    """Build one process registry from the implemented extension point seams."""
 
     contracts = dict(default_extension_contracts())
     if additional_contracts is not None:
@@ -30,4 +31,5 @@ def build_application_extension_registry(
     contracts["agent_tool"] = build_agent_tool_extension_contract(
         agent_tool_registry
     )
+    contracts["event_hook"] = event_hook_extension_contract()
     return ExtensionRegistry(contracts)
