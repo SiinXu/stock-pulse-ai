@@ -4,7 +4,7 @@
 
 StockPulse 使用仓库内的 Python Migration Runner 管理 SQLite Schema 演进。第一阶段不引入 Alembic，也不一次性替换已有的 `Base.metadata.create_all()` 和 startup `_ensure_*` 兼容逻辑，而是逐项把 startup DDL 转成正式 migration。
 
-当前生产 registry 的目标版本是 `202607240002_scheduled_task_schema`。`202607160001_migration_runner_registry` 建立有序 registry 所需的 additive metadata；`202607190001`~`202607190005` 依次把原先由 startup `_ensure_*` 兼容步骤补写的 `llm_usage` 遥测列，`decision_signals` 的 `decision_profile` 列/索引/回填，`portfolio_idempotency_records` 的 scope 列/唯一索引/规范化/guard trigger，`intelligence_items` 的 legacy scope 值规范化，以及 `intelligence_items` 从 legacy url 唯一到 scoped 复合唯一键的重建改为正式 migration；`202607240001` 新增 append-oriented `security_audit_events` 表及查询索引；`202607240002` 新增版本化 scheduled-task 定义、definition/generation/dispatch 栅栏、准入失败计数、通知结果与运行记录表。历史库会幂等补齐，fresh 库由 metadata 建表后 migration 为 no-op。启动路径不执行临时业务 schema DDL 兼容步骤。
+当前生产 registry 的目标版本是 `202607240003_investment_framework_schema`。`202607160001_migration_runner_registry` 建立有序 registry 所需的 additive metadata；`202607190001`~`202607190005` 依次把原先由 startup `_ensure_*` 兼容步骤补写的 `llm_usage` 遥测列，`decision_signals` 的 `decision_profile` 列/索引/回填，`portfolio_idempotency_records` 的 scope 列/唯一索引/规范化/guard trigger，`intelligence_items` 的 legacy scope 值规范化，以及 `intelligence_items` 从 legacy url 唯一到 scoped 复合唯一键的重建改为正式 migration；`202607240001_security_audit_events` 新增 append-oriented `security_audit_events` 表及查询索引；`202607240002_scheduled_task_schema` 新增版本化 scheduled-task 定义、definition/generation/dispatch 栅栏、准入失败计数、通知结果与运行记录表；`202607240003_investment_framework_schema` 新增个人投资框架 aggregate 与不可变版本历史表。历史库会幂等补齐，fresh 库由 metadata 建表后 migration 为 no-op。启动路径不执行临时业务 schema DDL 兼容步骤。完整业务与回滚合同见[个人投资框架后端合同](personal-investment-framework.md)。
 
 数据模型版本化在本仓库分两个正交层次：**DB schema 层**由下文的有序 migration runner 管理（表/列/索引形状演进）；**序列化领域 artifact 层**由内嵌的版本标签管理（持久化或跨模块传递的 payload 内部契约），见文末「序列化 artifact 版本化」。
 
@@ -76,14 +76,14 @@ Fresh DB 仅在初始化锁内、`create_all()` 前检查不到用户表时被�
 
 ### 历史 DB
 
-历史数据库先在初始化锁内验证已有 registry，再运行现有 `_ensure_*` 兼容步骤，然后在同一事务内应用有序 runner，最后证明 baseline。当前明确支持以下真实发布边界：
+历史数据库先在初始化锁内验证已有 registry，再在同一事务内运行 `metadata.create_all`、应用有序 runner，最后证明 baseline。当前明确支持以下真实发布边界：
 
 - `v3.0.0`、`v3.4.0`、`v3.20.0`：没有 registry 时，必须匹配对应固定 release profile。
 - `v3.21.0`、`v3.26.3`：必须携带已知 legacy baseline row；checksum 列可尚未存在。
 
 Pre-baseline profile 固定记录来源 tag/commit，并完整校验该版本的必需表、列顺序、SQLite type affinity、主键、`NOT NULL`、默认值、唯一键及 collation、外键和 `WITHOUT ROWID` / `STRICT` option；partial/expression unique index、显式 `ON CONFLICT` 策略和已知后续版本表也进入 fail-closed 边界。匹配按新到旧顺序执行，残缺的较新库不能降级命中较旧 profile。兼容修复后还必须精确证明当前 ORM baseline 并通过 `PRAGMA foreign_key_check`，之后才可写 baseline row。普通同名残缺表、缺约束表、错误 affinity、部分 profile 或只有无关表的 SQLite 文件会 fail closed，整笔兼容事务回滚。自定义额外表不会作为 profile 证据，也不能替代任何必需表。无法识别的旧库不会被当作 Fresh DB 或自动 stamp；请先停止写入并完整备份，再由维护者确认来源版本和显式迁移路径。
 
-升级不删除现有业务表、字段或数据。`llm_usage`、`decision_signals`、`portfolio_idempotency_records` 与 `intelligence_items` 的全部 startup 兼容步骤已分别转为 `202607190001`~`202607190005` 正式 migration；startup 路径不再执行业务 schema DDL 兼容步骤，只保留 `create_all`（fresh baseline 建表）与 baseline 记录登记，其余 schema 演进都必须通过新增的独立 migration 完成。
+升级不删除现有业务表、字段或数据。`llm_usage`、`decision_signals`、`portfolio_idempotency_records` 与 `intelligence_items` 的全部 startup 兼容步骤已分别转为 `202607190001`~`202607190005` 正式 migration，个人投资框架表由 `202607240003` 管理；startup 路径不再执行业务 schema DDL 兼容步骤，只保留 `create_all`（fresh baseline 建表）与 baseline 记录登记，其余 schema 演进都必须通过新增的独立 migration 完成。
 
 ## 状态与校验 CLI
 
@@ -190,7 +190,9 @@ CI Docker smoke 除了导入 `src.migrations.registry`、调用 `get_migrations(
 | `RunFlowSnapshot` | `RUN_FLOW_SCHEMA_VERSION` | `run-flow-v1` | `schema_version` | 任务 / 历史 run-flow API 响应（按需构建，无专用列） |
 | `DecisionSignalPresentation` | `DECISION_SIGNAL_PRESENTATION_SCHEMA_VERSION` | `decision-signal-presentation-v1` | `schema_version` | DecisionSignal 展示对象（由 DB 行按需构建，无专用列） |
 | Security audit event | `SECURITY_AUDIT_SCHEMA_VERSION` | `security-audit-v1` | `schema_version` | `security_audit_events.schema_version` |
-| Scheduled task definition | `SCHEDULED_TASK_SCHEMA_VERSION` | `1` | `schema_version` | `scheduled_tasks` 定义及 `/api/v1/scheduled-tasks` payload |
+| Scheduled task definition | `SCHEDULED_TASK_SCHEMA_VERSION` | `2`（仍支持 v1） | `schema_version` | `scheduled_tasks` 定义及 `/api/v1/scheduled-tasks` payload |
+| `InvestmentFrameworkContent` | `INVESTMENT_FRAMEWORK_CONTENT_SCHEMA_VERSION` | `investment-framework-content-v1` | `schema_version` | `investment_framework_versions.content_json` |
+| `InvestmentFrameworkAnalysisContext` | `INVESTMENT_FRAMEWORK_CONTEXT_SCHEMA_VERSION` | `investment-framework-context-v1` | `schema_version` | 按需构建的只读分析上下文 adapter |
 
 清单与实际常量由守护测试 `tests/test_data_model_versioning_guard.py` 绑定，任何常量漂移或序列化时丢弃版本字段都会被捕获。
 
@@ -201,6 +203,7 @@ CI Docker smoke 除了导入 `src.migrations.registry`、调用 `get_migrations(
 - **生产者始终写入当前版本标签**：序列化必须带上版本字段，禁止在 dump 时丢弃它（守护测试对此回归覆盖）。
 - **消费者遇到不认识的版本必须优雅降级**：跳过该区块 / 返回空 / 回落默认值，绝不因历史 payload 版本不符而硬失败。既有实现：`src/market_structure_prompt.py` 与 `src/utils/data_processing.py` 在 `schema_version` 不匹配时跳过；`AnalysisContextPack.pack_version` 用 `Literal` 拒绝未知值。
 - Scheduled-task API 会把未知版本定义投影为不解析 payload 的 opaque 元数据；mutation 返回稳定冲突，due slot 只写入一次 `interrupted` 栅栏且不改动 definition 任一字段，因此旧应用既不会执行也不会重写新版本合同。
+- 个人投资框架读取拒绝未知或损坏的持久化内容版本，并返回稳定 data error；不会把损坏误报成未配置，也不会让 Agent 静默使用已漂移的判断标准。未来接入分析装配时必须把该错误显式降级为不注入并附带可见诊断。
 - **不原地改写历史 payload**：历史记录按其内嵌版本解释，不做批量“升级”改写。若持久化落点（列 / 表）本身要变形，走上文 DB migration；payload 内版本与 DB migration 各司其职。
 
 ### 升级某个序列化版本的流程

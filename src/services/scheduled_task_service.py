@@ -7,7 +7,8 @@ import logging
 import threading
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Dict, Mapping, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, Mapping, Optional
+from zoneinfo import ZoneInfo
 
 from src.core.trading_calendar import (
     MARKET_EXCHANGE,
@@ -19,9 +20,13 @@ from src.core.trading_calendar import (
 from src.repositories.scheduled_task_repo import ScheduledTaskRepository
 from src.schemas.scheduled_task import (
     NonTradingDayPolicy,
+    MAX_SCHEDULED_TASK_EXECUTION_GENERATION,
     SCHEDULED_NOTIFICATION_STATUSES,
+    SCHEDULED_RESEARCH_TASK_SCHEMA_VERSION,
     SCHEDULED_TASK_RETRY_DELAY_SECONDS,
     SCHEDULED_TASK_SCHEMA_VERSION,
+    STOCK_ANALYSIS_SCHEDULED_TASK_SCHEMA_VERSION,
+    SUPPORTED_SCHEDULED_TASK_SCHEMA_VERSIONS,
     ScheduleKind,
     ScheduledRunStatus,
     ScheduledTaskType,
@@ -38,12 +43,16 @@ from src.services.stock_code_utils import resolve_index_stock_code_for_analysis
 from src.task_execution import TaskNotFoundError, TaskRetryInProgressError, TaskStatus
 from src.utils.sanitize import log_safe_exception
 
+if TYPE_CHECKING:
+    from src.storage import ScheduledTaskRecord, ScheduledTaskRunRecord
+
 logger = logging.getLogger(__name__)
 
 _REPORT_TYPES = frozenset({"brief", "simple", "detailed", "full"})
 _MAX_ATTEMPTS = 3
 _MAX_DISPATCH_FAILURES = 3
 _MAX_NOTIFICATION_CHANNELS = 16
+_RISK_CHECK_SKILL_ID = "persona_tail_risk"
 
 
 class ScheduledTaskError(Exception):
@@ -53,7 +62,7 @@ class ScheduledTaskError(Exception):
 
 
 class ScheduledTaskValidationError(ScheduledTaskError):
-    """Raised when a requested version-one definition is invalid."""
+    """Raised when a requested supported definition is invalid."""
 
     error_code = "scheduled_task_validation_error"
 
@@ -69,7 +78,7 @@ class ScheduledTaskNotFoundError(ScheduledTaskError):
 
 
 class ScheduledTaskContractError(ScheduledTaskError):
-    """Raised when persisted version-one data violates its contract."""
+    """Raised when persisted supported data violates its contract."""
 
     error_code = "scheduled_task_contract_error"
 
@@ -90,6 +99,17 @@ class ScheduledTaskUnsupportedSchemaError(ScheduledTaskError):
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _available_agent_skill_ids() -> frozenset[str]:
+    """Resolve the canonical Agent skill catalog lazily at dispatch time."""
+    from src.agent.runtime_assembly import get_skill_manager
+
+    return frozenset(
+        str(skill.name)
+        for skill in get_skill_manager().list_skills()
+        if str(getattr(skill, "name", "")).strip()
+    )
 
 
 def _json_list(raw_value: str, *, field_name: str) -> list[str]:
@@ -127,8 +147,27 @@ def _sanitized_channels(value: Any) -> list[str]:
     return channels
 
 
+def _exact_persisted_int(
+    value: Any,
+    *,
+    field_name: str,
+    minimum: int,
+    maximum: Optional[int] = None,
+) -> int:
+    """Return a bounded persisted integer without accepting lossy coercions."""
+    if (
+        type(value) is not int
+        or value < minimum
+        or (maximum is not None and value > maximum)
+    ):
+        raise ScheduledTaskContractError(
+            f"Persisted scheduled task {field_name} is invalid"
+        )
+    return value
+
+
 class ScheduledTaskService:
-    """Create, claim, dispatch, and reconcile version-one scheduled tasks."""
+    """Create, claim, dispatch, and reconcile versioned scheduled tasks."""
 
     def __init__(
         self,
@@ -138,6 +177,7 @@ class ScheduledTaskService:
         task_queue: Any = None,
         clock=_utc_now,
         market_session_provider=classify_market_session,
+        agent_skill_ids_provider=_available_agent_skill_ids,
     ) -> None:
         self._repository = repository
         self._repository_factory = repository_factory
@@ -145,6 +185,7 @@ class ScheduledTaskService:
         self._task_queue = task_queue
         self._clock = clock
         self._market_session_provider = market_session_provider
+        self._agent_skill_ids_provider = agent_skill_ids_provider
         self._tick_lock = threading.Lock()
 
     @property
@@ -188,9 +229,25 @@ class ScheduledTaskService:
             )
         return payload
 
+    @staticmethod
+    def _schema_is_supported(schema_version: Any) -> bool:
+        """Classify exact supported versions while keeping future rows opaque."""
+        exact_version = _exact_persisted_int(
+            schema_version,
+            field_name="schema version",
+            minimum=1,
+        )
+        if exact_version in SUPPORTED_SCHEDULED_TASK_SCHEMA_VERSIONS:
+            return True
+        if exact_version > SCHEDULED_TASK_SCHEMA_VERSION:
+            return False
+        raise ScheduledTaskContractError(
+            "Persisted scheduled task schema version is invalid"
+        )
+
     @classmethod
     def _validate_persisted_task(cls, row) -> Dict[str, Any]:
-        if row.schema_version != SCHEDULED_TASK_SCHEMA_VERSION:
+        if not cls._schema_is_supported(row.schema_version):
             raise ScheduledTaskUnsupportedSchemaError(
                 str(row.id or ""),
                 row.schema_version,
@@ -245,21 +302,17 @@ class ScheduledTaskService:
             raise ScheduledTaskContractError(
                 "Persisted scheduled task enablement is inconsistent"
             )
-        try:
-            execution_generation = int(row.execution_generation)
-        except (TypeError, ValueError) as exc:
-            raise ScheduledTaskContractError(
-                "Persisted scheduled task execution generation is invalid"
-            ) from exc
-        if execution_generation < 1:
-            raise ScheduledTaskContractError(
-                "Persisted scheduled task execution generation is invalid"
-            )
+        _exact_persisted_int(
+            row.execution_generation,
+            field_name="execution generation",
+            minimum=1,
+            maximum=MAX_SCHEDULED_TASK_EXECUTION_GENERATION,
+        )
         return normalized
 
     @classmethod
     def _task_item(cls, row) -> Dict[str, Any]:
-        if row.schema_version != SCHEDULED_TASK_SCHEMA_VERSION:
+        if not cls._schema_is_supported(row.schema_version):
             return {
                 "compatibility": "unsupported_schema",
                 "id": str(row.id or ""),
@@ -296,7 +349,7 @@ class ScheduledTaskService:
     def _run_item(cls, row) -> Dict[str, Any]:
         try:
             status = ScheduledRunStatus(row.status)
-        except ValueError as exc:
+        except (TypeError, ValueError) as exc:
             raise ScheduledTaskContractError(
                 "Persisted scheduled task run status is invalid"
             ) from exc
@@ -312,27 +365,29 @@ class ScheduledTaskService:
             raise ScheduledTaskContractError(
                 "Persisted scheduled task run ownership is invalid"
             )
-        attempt_count = int(row.attempt_count)
-        if not 0 <= attempt_count <= _MAX_ATTEMPTS:
-            raise ScheduledTaskContractError(
-                "Persisted scheduled task run attempt count is invalid"
-            )
-        dispatch_failure_count = int(row.dispatch_failure_count)
-        if not 0 <= dispatch_failure_count <= _MAX_DISPATCH_FAILURES:
-            raise ScheduledTaskContractError(
-                "Persisted scheduled task run dispatch failure count is invalid"
-            )
-        try:
-            definition_schema_version = int(row.definition_schema_version)
-            definition_generation = int(row.definition_generation)
-        except (TypeError, ValueError) as exc:
-            raise ScheduledTaskContractError(
-                "Persisted scheduled task run definition snapshot is invalid"
-            ) from exc
-        if definition_schema_version < 1 or definition_generation < 1:
-            raise ScheduledTaskContractError(
-                "Persisted scheduled task run definition snapshot is invalid"
-            )
+        attempt_count = _exact_persisted_int(
+            row.attempt_count,
+            field_name="run attempt count",
+            minimum=0,
+            maximum=_MAX_ATTEMPTS,
+        )
+        dispatch_failure_count = _exact_persisted_int(
+            row.dispatch_failure_count,
+            field_name="run dispatch failure count",
+            minimum=0,
+            maximum=_MAX_DISPATCH_FAILURES,
+        )
+        _exact_persisted_int(
+            row.definition_schema_version,
+            field_name="run definition schema snapshot",
+            minimum=1,
+        )
+        _exact_persisted_int(
+            row.definition_generation,
+            field_name="run definition generation snapshot",
+            minimum=1,
+            maximum=MAX_SCHEDULED_TASK_EXECUTION_GENERATION,
+        )
         dispatch_token = row.dispatch_token
         if status == ScheduledRunStatus.DISPATCHING:
             if not isinstance(dispatch_token, str) or not dispatch_token:
@@ -392,9 +447,12 @@ class ScheduledTaskService:
             raise ScheduledTaskValidationError("Scheduled task must be an object")
         schema_version = contract.get(
             "schema_version",
-            SCHEDULED_TASK_SCHEMA_VERSION,
+            STOCK_ANALYSIS_SCHEDULED_TASK_SCHEMA_VERSION,
         )
-        if schema_version != SCHEDULED_TASK_SCHEMA_VERSION:
+        if (
+            type(schema_version) is not int
+            or schema_version not in SUPPORTED_SCHEDULED_TASK_SCHEMA_VERSIONS
+        ):
             raise ScheduledTaskValidationError(
                 f"Unsupported scheduled task schema_version: {schema_version}"
             )
@@ -408,9 +466,19 @@ class ScheduledTaskService:
         task_type = str(
             contract.get("task_type") or ScheduledTaskType.STOCK_ANALYSIS.value
         ).strip()
-        if task_type != ScheduledTaskType.STOCK_ANALYSIS.value:
+        supported_task_types = {member.value for member in ScheduledTaskType}
+        if task_type not in supported_task_types:
             raise ScheduledTaskValidationError(
                 f"Unsupported scheduled task type: {task_type}"
+            )
+        expected_schema_version = (
+            STOCK_ANALYSIS_SCHEDULED_TASK_SCHEMA_VERSION
+            if task_type == ScheduledTaskType.STOCK_ANALYSIS.value
+            else SCHEDULED_RESEARCH_TASK_SCHEMA_VERSION
+        )
+        if schema_version != expected_schema_version:
+            raise ScheduledTaskValidationError(
+                f"{task_type} requires schema_version {expected_schema_version}"
             )
 
         schedule = contract.get("schedule")
@@ -447,11 +515,13 @@ class ScheduledTaskService:
         payload = contract.get("payload")
         if not isinstance(payload, Mapping):
             raise ScheduledTaskValidationError("Scheduled task payload is required")
-        allowed_payload_keys = {"stock_code", "report_type", "notify"}
+        allowed_payload_keys = {"stock_code", "notify"}
+        if task_type == ScheduledTaskType.STOCK_ANALYSIS.value:
+            allowed_payload_keys.add("report_type")
         unexpected_keys = set(payload) - allowed_payload_keys
         if unexpected_keys:
             raise ScheduledTaskValidationError(
-                "Unsupported stock analysis payload fields: "
+                f"Unsupported {task_type} payload fields: "
                 + ", ".join(sorted(str(key) for key in unexpected_keys))
             )
         stock_code = resolve_index_stock_code_for_analysis(
@@ -470,27 +540,29 @@ class ScheduledTaskService:
             raise ScheduledTaskValidationError(
                 "payload.stock_code market must match schedule.calendar_market"
             )
-        report_type = str(payload.get("report_type") or "detailed").strip().lower()
-        if report_type not in _REPORT_TYPES:
-            raise ScheduledTaskValidationError(
-                f"Unsupported report_type: {report_type}"
-            )
         notify = payload.get("notify", True)
         if not isinstance(notify, bool):
             raise ScheduledTaskValidationError("payload.notify must be a boolean")
+        normalized_payload = {
+            "stock_code": stock_code,
+            "notify": notify,
+        }
+        if task_type == ScheduledTaskType.STOCK_ANALYSIS.value:
+            report_type = str(
+                payload.get("report_type") or "detailed"
+            ).strip().lower()
+            if report_type not in _REPORT_TYPES:
+                raise ScheduledTaskValidationError(
+                    f"Unsupported report_type: {report_type}"
+                )
+            normalized_payload["report_type"] = report_type
 
         enabled = contract.get("enabled", True)
         if not isinstance(enabled, bool):
             raise ScheduledTaskValidationError("enabled must be a boolean")
         max_attempts = contract.get("max_attempts", 1)
-        if isinstance(max_attempts, bool):
+        if type(max_attempts) is not int:
             raise ScheduledTaskValidationError("max_attempts must be an integer")
-        try:
-            max_attempts = int(max_attempts)
-        except (TypeError, ValueError) as exc:
-            raise ScheduledTaskValidationError(
-                "max_attempts must be an integer"
-            ) from exc
         if not 1 <= max_attempts <= _MAX_ATTEMPTS:
             raise ScheduledTaskValidationError(
                 f"max_attempts must be between 1 and {_MAX_ATTEMPTS}"
@@ -505,11 +577,7 @@ class ScheduledTaskService:
             "timezone": timezone_name,
             "calendar_market": calendar_market,
             "non_trading_day_policy": non_trading_day_policy,
-            "payload": {
-                "stock_code": stock_code,
-                "report_type": report_type,
-                "notify": notify,
-            },
+            "payload": normalized_payload,
             "enabled": enabled,
             "max_attempts": max_attempts,
         }
@@ -520,7 +588,7 @@ class ScheduledTaskService:
         *,
         now: Optional[datetime] = None,
     ) -> Dict[str, Any]:
-        """Validate and persist one version-one scheduled definition."""
+        """Validate and persist one supported scheduled definition."""
         normalized = self._normalize_contract(contract)
         now_value = self._now(now or self._clock())
         next_run = None
@@ -600,6 +668,14 @@ class ScheduledTaskService:
         contract = self._validate_persisted_task(existing)
         if bool(existing.enabled) is bool(enabled):
             return self._task_item(existing)
+        if (
+            existing.execution_generation
+            >= MAX_SCHEDULED_TASK_EXECUTION_GENERATION
+            and enabled
+        ):
+            raise ScheduledTaskContractError(
+                "Scheduled task execution generation cannot advance"
+            )
         now_value = self._now(now or self._clock())
         next_run = None
         if enabled:
@@ -636,12 +712,126 @@ class ScheduledTaskService:
             "total": self.repository.count_runs(task_id),
         }
 
+    def list_today(
+        self,
+        *,
+        timezone_name: str = "UTC",
+        now: Optional[datetime] = None,
+    ) -> Dict[str, Any]:
+        """Return occurrences on today's calendar date in one display timezone."""
+        try:
+            canonical_timezone = validate_timezone(timezone_name)
+        except ValueError as exc:
+            raise ScheduledTaskValidationError(str(exc)) from exc
+        generated_at = as_utc_aware(now or self._clock())
+        display_timezone = ZoneInfo(canonical_timezone)
+        local_date = generated_at.astimezone(display_timezone).date()
+        local_start = datetime.combine(
+            local_date,
+            datetime.min.time(),
+            tzinfo=display_timezone,
+        )
+        local_end = local_start + timedelta(days=1)
+        start = as_utc_naive(local_start)
+        end = as_utc_naive(local_end)
+
+        runs = self.repository.list_runs_between(start=start, end=end)
+        next_tasks = self.repository.list_next_occurrences_between(
+            start=start,
+            end=end,
+        )
+        tasks_by_id = {task.id: task for task in next_tasks}
+        missing_task_ids = [
+            run.task_id for run in runs if run.task_id not in tasks_by_id
+        ]
+        for task in self.repository.list_tasks_by_ids(missing_task_ids):
+            tasks_by_id[task.id] = task
+
+        items = []
+        occurrence_keys = set()
+        for run in runs:
+            task = tasks_by_id.get(run.task_id)
+            if task is None:
+                logger.warning(
+                    "Skipping orphaned scheduled task occurrence "
+                    "[error_code=%s task_id=%s run_id=%s]",
+                    "scheduled_task_today_definition_missing",
+                    run.task_id,
+                    run.id,
+                )
+                continue
+            try:
+                run_item = self._run_item(run)
+            except ScheduledTaskContractError as exc:
+                log_safe_exception(
+                    logger,
+                    "Skipping invalid scheduled task occurrence from today view",
+                    exc,
+                    error_code="scheduled_task_today_run_invalid",
+                    context={"task_id": run.task_id, "run_id": run.id},
+                    level=logging.WARNING,
+                )
+                continue
+            try:
+                task_item = self._task_item(task)
+            except ScheduledTaskContractError as exc:
+                log_safe_exception(
+                    logger,
+                    "Skipping invalid scheduled task definition from today view",
+                    exc,
+                    error_code="scheduled_task_today_definition_invalid",
+                    context={"task_id": task.id, "run_id": run.id},
+                    level=logging.WARNING,
+                )
+                continue
+            occurrence_key = (run.task_id, run.scheduled_for)
+            occurrence_keys.add(occurrence_key)
+            items.append({
+                "task": task_item,
+                "scheduled_for": self._aware_or_none(run.scheduled_for),
+                "status": run_item["status"],
+                "run": run_item,
+            })
+        for task in next_tasks:
+            occurrence_key = (task.id, task.next_run_at)
+            if occurrence_key in occurrence_keys:
+                continue
+            try:
+                task_item = self._task_item(task)
+            except ScheduledTaskContractError as exc:
+                log_safe_exception(
+                    logger,
+                    "Skipping invalid scheduled task definition from today view",
+                    exc,
+                    error_code="scheduled_task_today_definition_invalid",
+                    context={"task_id": task.id},
+                    level=logging.WARNING,
+                )
+                continue
+            items.append({
+                "task": task_item,
+                "scheduled_for": self._aware_or_none(task.next_run_at),
+                "status": "scheduled",
+                "run": None,
+            })
+        items.sort(key=lambda item: (
+            item["scheduled_for"],
+            item["task"]["id"],
+        ))
+        return {
+            "date": local_date,
+            "timezone": canonical_timezone,
+            "generated_at": generated_at,
+            "items": items,
+            "total": len(items),
+        }
+
     def has_enabled_tasks(self) -> bool:
         """Return whether persistence contains any enabled definition."""
         return self.repository.has_enabled_tasks()
 
     def next_run_at(self) -> Optional[datetime]:
-        """Return the next executable v1 occurrence, ignoring future schemas."""
+        """Return the next supported occurrence while ignoring future schemas."""
         rows = self.repository.list_tasks(enabled=True, limit=500)
         supported_rows = []
         for row in rows:
@@ -674,7 +864,7 @@ class ScheduledTaskService:
                 )
                 return {"reconciled": 0, "claimed": 0, "skipped": 0}
             claimed = 0
-            skipped = 0
+            skipped = self._recover_supported_schema_fences(now_value)
             try:
                 due_tasks = self.repository.list_due_tasks(now=now_value)
             except Exception as exc:  # broad-exception: fallback_recorded - the owned polling loop retries due lookup next interval.
@@ -736,10 +926,120 @@ class ScheduledTaskService:
         finally:
             self._tick_lock.release()
 
+    def _recover_supported_schema_fences(self, now: datetime) -> int:
+        """Advance slots fenced only because an older binary lacked the schema."""
+        recovered = 0
+        try:
+            rows = self.repository.list_schema_unsupported_fences(
+                now=now,
+                supported_schema_versions=sorted(
+                    SUPPORTED_SCHEDULED_TASK_SCHEMA_VERSIONS
+                ),
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - polling retries rollback-fence discovery on the next interval.
+            log_safe_exception(
+                logger,
+                "Scheduled task schema-fence discovery failed; polling will retry",
+                exc,
+                error_code="scheduled_task_schema_fence_discovery_failed",
+            )
+            return 0
+        for task, run in rows:
+            try:
+                contract = self._validate_persisted_task(task)
+                self._run_item(run)
+                if (
+                    run.status != ScheduledRunStatus.INTERRUPTED.value
+                    or run.error_code != "scheduled_task_schema_unsupported"
+                    or run.task_id != task.id
+                    or run.scheduled_for != task.next_run_at
+                    or run.definition_schema_version != task.schema_version
+                    or run.definition_generation != task.execution_generation
+                ):
+                    raise ScheduledTaskContractError(
+                        "Persisted schema fence snapshot is inconsistent"
+                    )
+                next_run = next_daily_run_at(
+                    schedule_time=contract["schedule_time"],
+                    timezone_name=contract["timezone"],
+                    after=max(now, task.next_run_at),
+                )
+                if self.repository.advance_schema_unsupported_fence(
+                    task_id=task.id,
+                    expected_schema_version=task.schema_version,
+                    expected_execution_generation=task.execution_generation,
+                    expected_next_run_at=task.next_run_at,
+                    expected_run_id=run.id,
+                    next_run_at=next_run,
+                    updated_at=now,
+                ):
+                    recovered += 1
+            except ScheduledTaskContractError as exc:
+                try:
+                    disabled = self.repository.disable_corrupt_task(
+                        task_id=task.id,
+                        expected_schema_version=task.schema_version,
+                        expected_execution_generation=(
+                            task.execution_generation
+                        ),
+                        expected_next_run_at=task.next_run_at,
+                        updated_at=now,
+                    )
+                except Exception as quarantine_exc:  # broad-exception: fallback_recorded - polling retries failed corrupt-fence quarantine.
+                    log_safe_exception(
+                        logger,
+                        "Scheduled task corrupt schema-fence quarantine failed",
+                        quarantine_exc,
+                        error_code=(
+                            "scheduled_task_schema_fence_quarantine_failed"
+                        ),
+                        context={"task_id": task.id, "run_id": run.id},
+                    )
+                else:
+                    if disabled:
+                        recovered += 1
+                log_safe_exception(
+                    logger,
+                    "Invalid scheduled task schema fence quarantined",
+                    exc,
+                    error_code="scheduled_task_schema_fence_invalid",
+                    context={"task_id": task.id, "run_id": run.id},
+                    level=logging.WARNING,
+                )
+            except Exception as exc:  # broad-exception: fallback_recorded - one corrupt rollback fence must not block unrelated schedules.
+                log_safe_exception(
+                    logger,
+                    "Scheduled task schema-fence recovery failed closed",
+                    exc,
+                    error_code="scheduled_task_schema_fence_recovery_failed",
+                    context={"task_id": task.id, "run_id": run.id},
+                    level=logging.WARNING,
+                )
+        return recovered
+
     def _reconcile_active_runs(self, now: datetime) -> int:
         reconciled = 0
         for run in self.repository.list_active_runs():
             try:
+                try:
+                    self._run_item(run)
+                except ScheduledTaskContractError as exc:
+                    self._finish_run(
+                        run.id,
+                        status=ScheduledRunStatus.INTERRUPTED,
+                        now=now,
+                        error_code="scheduled_task_run_invalid",
+                    )
+                    log_safe_exception(
+                        logger,
+                        "Scheduled task run interrupted by invalid persisted state",
+                        exc,
+                        error_code="scheduled_task_run_invalid",
+                        context={"run_id": run.id, "task_id": run.task_id},
+                        level=logging.WARNING,
+                    )
+                    reconciled += 1
+                    continue
                 task = self.repository.get_task(run.task_id)
                 if task is None:
                     self._finish_run(
@@ -767,16 +1067,49 @@ class ScheduledTaskService:
                             level=logging.WARNING,
                         )
                     except ScheduledTaskContractError as exc:
-                        disabled = self.repository.set_enabled(
-                            task.id,
-                            expected_schema_version=task.schema_version,
-                            expected_execution_generation=(
-                                task.execution_generation
-                            ),
-                            enabled=False,
-                            next_run_at=None,
-                            updated_at=now,
-                        )
+                        try:
+                            self._schema_is_supported(task.schema_version)
+                            generation = _exact_persisted_int(
+                                task.execution_generation,
+                                field_name="execution generation",
+                                minimum=1,
+                                maximum=(
+                                    MAX_SCHEDULED_TASK_EXECUTION_GENERATION
+                                ),
+                            )
+                            if (
+                                generation
+                                >= MAX_SCHEDULED_TASK_EXECUTION_GENERATION
+                            ):
+                                raise ScheduledTaskContractError(
+                                    "Persisted scheduled task execution "
+                                    "generation cannot advance"
+                                )
+                        except ScheduledTaskContractError:
+                            disabled = (
+                                task
+                                if self.repository.disable_corrupt_task(
+                                    task_id=task.id,
+                                    expected_schema_version=task.schema_version,
+                                    expected_execution_generation=(
+                                        task.execution_generation
+                                    ),
+                                    expected_next_run_at=task.next_run_at,
+                                    updated_at=now,
+                                )
+                                else None
+                            )
+                        else:
+                            disabled = self.repository.set_enabled(
+                                task.id,
+                                expected_schema_version=task.schema_version,
+                                expected_execution_generation=(
+                                    task.execution_generation
+                                ),
+                                enabled=False,
+                                next_run_at=None,
+                                updated_at=now,
+                            )
                         if disabled is None:
                             self._reconcile_definition_after_cas_miss(run, now)
                         else:
@@ -922,6 +1255,26 @@ class ScheduledTaskService:
         scheduled_for = task.next_run_at
         if scheduled_for is None:
             return False
+        try:
+            self._schema_is_supported(task.schema_version)
+            generation = _exact_persisted_int(
+                task.execution_generation,
+                field_name="execution generation",
+                minimum=1,
+                maximum=MAX_SCHEDULED_TASK_EXECUTION_GENERATION,
+            )
+            if generation >= MAX_SCHEDULED_TASK_EXECUTION_GENERATION:
+                raise ScheduledTaskContractError(
+                    "Persisted scheduled task execution generation cannot advance"
+                )
+        except ScheduledTaskContractError:
+            return self.repository.disable_corrupt_task(
+                task_id=task.id,
+                expected_schema_version=task.schema_version,
+                expected_execution_generation=task.execution_generation,
+                expected_next_run_at=scheduled_for,
+                updated_at=now,
+            )
         run = self.repository.quarantine_due_task(
             task_id=task.id,
             expected_schema_version=task.schema_version,
@@ -1076,7 +1429,12 @@ class ScheduledTaskService:
         *,
         error_code: str,
     ) -> Dict[str, Any]:
-        failure_count = int(run.dispatch_failure_count) + 1
+        failure_count = _exact_persisted_int(
+            run.dispatch_failure_count,
+            field_name="run dispatch failure count",
+            minimum=0,
+            maximum=_MAX_DISPATCH_FAILURES,
+        ) + 1
         terminal = failure_count >= _MAX_DISPATCH_FAILURES
         return {
             "status": (
@@ -1115,7 +1473,12 @@ class ScheduledTaskService:
         return {
             "status": ScheduledRunStatus.RUNNING.value,
             "dispatch_token": None,
-            "attempt_count": int(run.attempt_count) + 1,
+            "attempt_count": _exact_persisted_int(
+                run.attempt_count,
+                field_name="run attempt count",
+                minimum=0,
+                maximum=_MAX_ATTEMPTS,
+            ) + 1,
             "execution_task_ids_json": json.dumps(
                 execution_history + [execution_id]
             ),
@@ -1142,14 +1505,48 @@ class ScheduledTaskService:
             return
         queue = self._queue()
 
-        def update_factory(task, current_run) -> Dict[str, Any]:
+        def update_factory(
+            task: ScheduledTaskRecord,
+            current_run: ScheduledTaskRunRecord,
+        ) -> Dict[str, Any]:
+            try:
+                self._run_item(current_run)
+            except ScheduledTaskContractError as exc:
+                log_safe_exception(
+                    logger,
+                    "Scheduled task run rejected before queue admission",
+                    exc,
+                    error_code="scheduled_task_run_invalid",
+                    context={
+                        "task_id": current_run.task_id,
+                        "run_id": current_run.id,
+                    },
+                    level=logging.WARNING,
+                )
+                return self._interrupted_admission_fields(
+                    now,
+                    error_code="scheduled_task_run_invalid",
+                )
             try:
                 contract = self._validate_persisted_task(task)
             except ScheduledTaskContractError as exc:
-                task.enabled = False
-                task.execution_generation = int(task.execution_generation) + 1
-                task.next_run_at = None
-                task.updated_at = now
+                try:
+                    generation = _exact_persisted_int(
+                        task.execution_generation,
+                        field_name="execution generation",
+                        minimum=1,
+                        maximum=MAX_SCHEDULED_TASK_EXECUTION_GENERATION,
+                    )
+                except ScheduledTaskContractError:
+                    pass
+                else:
+                    task.enabled = False
+                    task.execution_generation = min(
+                        generation + 1,
+                        MAX_SCHEDULED_TASK_EXECUTION_GENERATION,
+                    )
+                    task.next_run_at = None
+                    task.updated_at = now
                 log_safe_exception(
                     logger,
                     "Scheduled task definition disabled before queue admission",
@@ -1163,7 +1560,7 @@ class ScheduledTaskService:
                     error_code="scheduled_task_definition_invalid",
                 )
 
-            if int(current_run.attempt_count) >= int(task.max_attempts):
+            if current_run.attempt_count >= contract["max_attempts"]:
                 return {
                     **self._interrupted_admission_fields(
                         now,
@@ -1235,13 +1632,56 @@ class ScheduledTaskService:
                 )
 
             payload = contract["payload"]
+            submission = {
+                "stock_codes": [str(payload["stock_code"])],
+                "query_source": "scheduled_task",
+                "report_type": str(payload.get("report_type") or "detailed"),
+                "notify": bool(payload.get("notify", True)),
+            }
+            if contract["task_type"] == ScheduledTaskType.RESEARCH_BRIEF.value:
+                submission["report_type"] = "brief"
+            elif contract["task_type"] == ScheduledTaskType.RISK_CHECK.value:
+                submission["skills"] = [_RISK_CHECK_SKILL_ID]
+                submission["strict_skill_selection"] = True
+                try:
+                    skill_ids = frozenset(self._agent_skill_ids_provider())
+                except Exception as exc:  # broad-exception: fallback_recorded - catalog discovery failure follows bounded admission retry semantics.
+                    log_safe_exception(
+                        logger,
+                        "Scheduled risk-check capability discovery failed",
+                        exc,
+                        error_code=(
+                            "scheduled_task_research_capability_unavailable"
+                        ),
+                        context={
+                            "run_id": current_run.id,
+                            "task_id": current_run.task_id,
+                        },
+                    )
+                    return self._dispatch_failure_fields(
+                        current_run,
+                        now,
+                        error_code=(
+                            "scheduled_task_research_capability_unavailable"
+                        ),
+                    )
+                if _RISK_CHECK_SKILL_ID not in skill_ids:
+                    logger.error(
+                        "Scheduled risk-check capability is unavailable "
+                        "[error_code=%s task_id=%s run_id=%s]",
+                        "scheduled_task_research_capability_unavailable",
+                        current_run.task_id,
+                        current_run.id,
+                    )
+                    return self._dispatch_failure_fields(
+                        current_run,
+                        now,
+                        error_code=(
+                            "scheduled_task_research_capability_unavailable"
+                        ),
+                    )
             try:
-                accepted, duplicates = queue.submit_tasks_batch(
-                    stock_codes=[str(payload["stock_code"])],
-                    query_source="scheduled_task",
-                    report_type=str(payload.get("report_type") or "detailed"),
-                    notify=bool(payload.get("notify", True)),
-                )
+                accepted, duplicates = queue.submit_tasks_batch(**submission)
             except Exception as exc:  # broad-exception: fallback_recorded - canonical batch submission rolls back rejected queue state.
                 log_safe_exception(
                     logger,
@@ -1296,7 +1736,7 @@ class ScheduledTaskService:
         try:
             result = self.repository.update_run_under_definition_fence(
                 run_id=run.id,
-                expected_schema_version=SCHEDULED_TASK_SCHEMA_VERSION,
+                expected_schema_version=run.definition_schema_version,
                 expected_dispatch_token=dispatch_token,
                 allowed_run_statuses=[ScheduledRunStatus.DISPATCHING.value],
                 now=now,
@@ -1433,7 +1873,21 @@ class ScheduledTaskService:
         }
 
     def _reconcile_run(self, run, task, now: datetime) -> None:
-        status = ScheduledRunStatus(run.status)
+        run_item = self._run_item(run)
+        contract = self._validate_persisted_task(task)
+        task_generation = _exact_persisted_int(
+            task.execution_generation,
+            field_name="execution generation",
+            minimum=1,
+            maximum=MAX_SCHEDULED_TASK_EXECUTION_GENERATION,
+        )
+        run_generation = _exact_persisted_int(
+            run.definition_generation,
+            field_name="run definition generation snapshot",
+            minimum=1,
+            maximum=MAX_SCHEDULED_TASK_EXECUTION_GENERATION,
+        )
+        status = ScheduledRunStatus(run_item["status"])
         if status == ScheduledRunStatus.DISPATCHING:
             dispatch_token = str(run.dispatch_token or "")
             if dispatch_token:
@@ -1467,7 +1921,7 @@ class ScheduledTaskService:
                     error_code=f"scheduled_task_disabled_before_{phase}",
                 )
                 return
-            if int(task.execution_generation) != int(run.definition_generation):
+            if task_generation != run_generation:
                 self._finish_run(
                     run.id,
                     status=ScheduledRunStatus.INTERRUPTED,
@@ -1517,7 +1971,6 @@ class ScheduledTaskService:
         if not snapshot.status.terminal:
             return
         if snapshot.status == TaskStatus.COMPLETED:
-            contract = self._validate_persisted_task(task)
             result_refs = [snapshot.result_ref] if snapshot.result_ref else []
             notification_fields = self._completed_notification_fields(
                 queue=queue,
@@ -1547,7 +2000,7 @@ class ScheduledTaskService:
                 error_code="scheduled_task_disabled_before_retry",
             )
             return
-        if int(task.execution_generation) != int(run.definition_generation):
+        if task_generation != run_generation:
             self._finish_run(
                 run.id,
                 status=ScheduledRunStatus.INTERRUPTED,
@@ -1564,7 +2017,7 @@ class ScheduledTaskService:
         )
         error_code = snapshot.error_code or "scheduled_task_execution_failed"
         if current_execution_id not in owned_ids:
-            if int(run.attempt_count) < int(task.max_attempts):
+            if run_item["attempt_count"] < contract["max_attempts"]:
                 self.repository.update_run(
                     run.id,
                     {
@@ -1584,7 +2037,7 @@ class ScheduledTaskService:
                     now=now,
                     error_code="scheduled_task_coalesced_execution_failed",
                 )
-        elif int(run.attempt_count) < int(task.max_attempts):
+        elif run_item["attempt_count"] < contract["max_attempts"]:
             self.repository.update_run(
                 run.id,
                 {

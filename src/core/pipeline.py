@@ -38,7 +38,11 @@ from src.analyzer import (
     populate_decision_action_fields,
     stabilize_decision_with_structure,
 )
-from src.notification import NotificationService, NotificationChannel
+from src.notification import (
+    ChannelAttemptResult as _ChannelAttemptResult,
+    NotificationChannel,
+    NotificationService,
+)
 from src.report_language import (
     get_placeholder_text,
     get_unknown_text,
@@ -86,7 +90,10 @@ from src.services.run_diagnostics import (
 from src.services.decision_signal_extractor import extract_and_persist_from_analysis_result
 from src.services.decision_signal_summary import summarize_decision_signal
 from src.schemas.request_context import AnalysisRequestContext
-from src.utils.sanitize import log_safe_exception
+from src.utils.sanitize import (
+    log_safe_exception,
+    sanitize_exception_chain as _sanitize_exception_chain,
+)
 from src.enums import ReportType
 from src.stock_analyzer import StockTrendAnalyzer, TrendAnalysisResult
 from src.core.trading_calendar import (
@@ -107,6 +114,7 @@ from src.core.stages.analysis import _AnalysisStageMixin
 from src.core.stages.delivery import (
     _DeliveryStageMixin,
     _SINGLE_STOCK_NOTIFY_LOCK_INIT_GUARD,
+    _run_plugin_delivery_attempt,
 )
 from src.core.stages.orchestration import _OrchestrationStageMixin
 from src.core.stages.persistence import (
@@ -226,6 +234,8 @@ class StockAnalysisPipeline(_DeliveryStageMixin):
         portfolio_context: Optional[Dict[str, Any]] = None,
         daily_market_context_enabled: Optional[bool] = None,
         daily_market_context_allow_generate: bool = True,
+        *,
+        strict_skill_selection: bool = False,
     ):
         """Initialize the analysis pipeline and its request-scoped services.
 
@@ -245,6 +255,7 @@ class StockAnalysisPipeline(_DeliveryStageMixin):
         )
         self.progress_callback = progress_callback
         self.analysis_skills = list(analysis_skills) if analysis_skills is not None else None
+        self.strict_skill_selection = bool(strict_skill_selection)
         self.analysis_phase = analysis_phase or "auto"
         self.portfolio_context = dict(portfolio_context) if isinstance(portfolio_context, dict) else None
         self.daily_market_context_enabled = (
@@ -259,7 +270,11 @@ class StockAnalysisPipeline(_DeliveryStageMixin):
         self.fetcher_manager = DataFetcherManager()
         # No longer create akshare_fetcher separately, use fetcher_manager to get enhanced data
         self.trend_analyzer = StockTrendAnalyzer()  # Technical analyzer
-        self.analyzer = GeminiAnalyzer(config=self.config, skills=self.analysis_skills)
+        self.analyzer = GeminiAnalyzer(
+            config=self.config,
+            skills=self.analysis_skills,
+            strict_skill_selection=self.strict_skill_selection,
+        )
         self.notifier = NotificationService(request_context=request_context)
         self.market_structure_service = MarketStructureService(fetcher_manager=self.fetcher_manager)
         self.market_hotspot_service: Optional[MarketHotspotService] = None

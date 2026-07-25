@@ -64,10 +64,14 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 report_type="full",
                 query_id="q1",
                 skills=request_skills,
+                strict_skill_selection=True,
             )
 
         self.assertEqual(result, {"stock_code": "600519"})
         self.assertEqual(pipeline_cls.call_args.kwargs["analysis_skills"], request_skills)
+        self.assertTrue(
+            pipeline_cls.call_args.kwargs["strict_skill_selection"]
+        )
 
     def test_analysis_service_passes_request_context_to_pipeline(self) -> None:
         from src.schemas.request_context import (

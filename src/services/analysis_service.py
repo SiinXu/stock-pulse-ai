@@ -69,6 +69,8 @@ class AnalysisService:
         report_language: Optional[str] = None,
         use_memory: Optional[bool] = None,
         request_context: Optional[AnalysisRequestContext] = None,
+        *,
+        strict_skill_selection: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """
         执行股票分析
@@ -130,6 +132,7 @@ class AnalysisService:
                 query_source=query_source or "api",
                 progress_callback=progress_callback,
                 analysis_skills=skills,
+                strict_skill_selection=strict_skill_selection,
                 analysis_phase=analysis_phase,
                 portfolio_context=portfolio_context,
             )

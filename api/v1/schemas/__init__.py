@@ -112,6 +112,7 @@ from api.v1.schemas.alerts import (
 )
 from api.v1.schemas.scheduled_tasks import (
     DailyScheduleRequest,
+    ResearchScheduledPayload,
     ScheduledTaskCreateRequest,
     ScheduledTaskDefinitionItem,
     ScheduledTaskItem,
@@ -119,8 +120,19 @@ from api.v1.schemas.scheduled_tasks import (
     ScheduledTaskRunItem,
     ScheduledTaskRunListResponse,
     ScheduledTaskStatusResponse,
+    ScheduledTaskTodayItem,
+    ScheduledTaskTodayResponse,
     StockAnalysisScheduledPayload,
     UnsupportedScheduledTaskItem,
+)
+from api.v1.schemas.investment_framework import (
+    InvestmentFrameworkCreateRequest,
+    InvestmentFrameworkDeactivateRequest,
+    InvestmentFrameworkDeleteResponse,
+    InvestmentFrameworkHistoryItem,
+    InvestmentFrameworkHistoryResponse,
+    InvestmentFrameworkResponse,
+    InvestmentFrameworkUpdateRequest,
 )
 from api.v1.schemas.decision_signals import (
     DecisionProfile,
@@ -238,6 +250,7 @@ __all__ = [
     "AlertTriggerListResponse",
     # scheduled tasks
     "DailyScheduleRequest",
+    "ResearchScheduledPayload",
     "ScheduledTaskCreateRequest",
     "ScheduledTaskDefinitionItem",
     "ScheduledTaskItem",
@@ -245,8 +258,18 @@ __all__ = [
     "ScheduledTaskRunItem",
     "ScheduledTaskRunListResponse",
     "ScheduledTaskStatusResponse",
+    "ScheduledTaskTodayItem",
+    "ScheduledTaskTodayResponse",
     "StockAnalysisScheduledPayload",
     "UnsupportedScheduledTaskItem",
+    # investment framework
+    "InvestmentFrameworkCreateRequest",
+    "InvestmentFrameworkDeactivateRequest",
+    "InvestmentFrameworkDeleteResponse",
+    "InvestmentFrameworkHistoryItem",
+    "InvestmentFrameworkHistoryResponse",
+    "InvestmentFrameworkResponse",
+    "InvestmentFrameworkUpdateRequest",
     # decision signals
     "DecisionProfile",
     "DecisionSignalCreateRequest",

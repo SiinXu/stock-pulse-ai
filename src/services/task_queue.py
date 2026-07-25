@@ -269,6 +269,7 @@ class AnalysisTaskCoalescingContract:
     portfolio_context: Any
     query_source: str
     context_bound: bool
+    strict_skill_selection: bool = False
 
     @classmethod
     def from_metadata(
@@ -293,6 +294,9 @@ class AnalysisTaskCoalescingContract:
             force_refresh=bool(metadata.get("force_refresh", False)),
             notify=bool(metadata.get("notify", True)),
             skills=deep_freeze(raw_skills),
+            strict_skill_selection=bool(
+                metadata.get("strict_skill_selection", False)
+            ),
             report_language=(
                 normalize_report_language(raw_report_language, default="")
                 if raw_report_language is not None
@@ -1167,6 +1171,7 @@ class AnalysisTaskQueue:
         report_language: Optional[str],
         use_memory: Optional[bool] = None,
         request_context: Optional[AnalysisRequestContext] = None,
+        strict_skill_selection: bool = False,
     ) -> TaskCommand:
         metadata = {
             "stock_code": stock_code,
@@ -1180,6 +1185,7 @@ class AnalysisTaskQueue:
             "force_refresh": bool(force_refresh),
             "notify": bool(notify),
             "skills": copy.deepcopy(skills),
+            "strict_skill_selection": bool(strict_skill_selection),
             "report_language": report_language,
             "use_memory": use_memory,
             "context_bound": request_context is not None,
@@ -1201,6 +1207,7 @@ class AnalysisTaskQueue:
                 force_refresh=force_refresh,
                 notify=notify,
                 skills=copy.deepcopy(skills),
+                strict_skill_selection=strict_skill_selection,
                 report_language=report_language,
                 use_memory=use_memory,
                 request_context=request_context,
@@ -1237,6 +1244,8 @@ class AnalysisTaskQueue:
         report_language: Optional[str] = None,
         use_memory: Optional[bool] = None,
         request_context: Optional[AnalysisRequestContext] = None,
+        *,
+        strict_skill_selection: bool = False,
     ) -> TaskInfo:
         """
         Submit a single analysis task.
@@ -1273,6 +1282,7 @@ class AnalysisTaskQueue:
             analysis_phase=analysis_phase,
             force_refresh=force_refresh,
             skills=skills,
+            strict_skill_selection=strict_skill_selection,
             report_language=report_language,
             use_memory=use_memory,
             request_context=request_context,
@@ -1297,6 +1307,8 @@ class AnalysisTaskQueue:
         report_language: Optional[str] = None,
         use_memory: Optional[bool] = None,
         request_context: Optional[AnalysisRequestContext] = None,
+        *,
+        strict_skill_selection: bool = False,
     ) -> Tuple[List[TaskInfo], List[DuplicateTaskError]]:
         """
         Submit analysis tasks in batch.
@@ -1330,6 +1342,7 @@ class AnalysisTaskQueue:
                 force_refresh=force_refresh,
                 notify=notify,
                 skills=copy.deepcopy(skills),
+                strict_skill_selection=strict_skill_selection,
                 report_language=report_language,
                 use_memory=use_memory,
                 request_context=request_context,
@@ -1744,6 +1757,9 @@ class AnalysisTaskQueue:
             send_notification=bool(metadata.get("notify", True)),
             progress_callback=on_progress,
             skills=copy.deepcopy(metadata.get("skills")),
+            strict_skill_selection=bool(
+                metadata.get("strict_skill_selection", False)
+            ),
             analysis_phase=str(metadata.get("analysis_phase") or "auto"),
             query_source=str(metadata.get("query_source") or "api"),
             portfolio_context=copy.deepcopy(metadata.get("portfolio_context")),

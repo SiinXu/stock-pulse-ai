@@ -71,6 +71,7 @@ class GeminiAnalyzer:
         skill_instructions: Optional[str] = None,
         default_skill_policy: Optional[str] = None,
         use_legacy_default_prompt: Optional[bool] = None,
+        strict_skill_selection: bool = False,
     ):
         """Initialize LLM Analyzer via LiteLLM.
 
@@ -79,6 +80,7 @@ class GeminiAnalyzer:
         """
         self._config_override = config
         self._requested_skills = list(skills) if skills is not None else None
+        self._strict_skill_selection = bool(strict_skill_selection)
         self._skill_instructions_override = skill_instructions
         self._default_skill_policy_override = default_skill_policy
         self._use_legacy_default_prompt_override = use_legacy_default_prompt
@@ -122,9 +124,14 @@ class GeminiAnalyzer:
         if resolved_state is None:
             from src.agent.factory import resolve_skill_prompt_state
 
+            resolver_kwargs = {
+                "skills": getattr(self, "_requested_skills", None),
+            }
+            if bool(getattr(self, "_strict_skill_selection", False)):
+                resolver_kwargs["strict_skill_selection"] = True
             prompt_state = resolve_skill_prompt_state(
                 self._get_runtime_config(),
-                skills=getattr(self, "_requested_skills", None),
+                **resolver_kwargs,
             )
             resolved_state = {
                 "skill_instructions": prompt_state.skill_instructions,
