@@ -96,6 +96,19 @@ class EventHookRegistration:
     callback: EventHook
 
 
+def _is_deferred_callback(callback: object) -> bool:
+    candidates = (callback, getattr(callback, "__call__", None))
+    return any(
+        candidate is not None
+        and (
+            inspect.iscoroutinefunction(candidate)
+            or inspect.isgeneratorfunction(candidate)
+            or inspect.isasyncgenfunction(candidate)
+        )
+        for candidate in candidates
+    )
+
+
 def validate_event_hook_registration(implementation: object) -> bool:
     """Return whether a registration satisfies the version-one hook contract."""
 
@@ -107,6 +120,7 @@ def validate_event_hook_registration(implementation: object) -> bool:
         and bool(implementation.event_names)
         and implementation.event_names <= EVENT_HOOK_NAMES
         and callable(implementation.callback)
+        and not _is_deferred_callback(implementation.callback)
     ):
         return False
     try:

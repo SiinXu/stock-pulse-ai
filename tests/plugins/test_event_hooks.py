@@ -122,6 +122,18 @@ def _dispatch_started(task_id: str = "task-1") -> None:
     )
 
 
+async def _async_callback(event: PluginEvent) -> None:
+    del event
+
+
+def _generator_callback(event: PluginEvent):
+    yield event
+
+
+async def _async_generator_callback(event: PluginEvent):
+    yield event
+
+
 def test_contract_accepts_exactly_the_six_initial_event_names() -> None:
     assert EVENT_HOOK_NAMES == {
         "analysis.started",
@@ -152,9 +164,19 @@ def test_contract_accepts_exactly_the_six_initial_event_names() -> None:
     [
         lambda: None,
         lambda event, required: None,
+        _generator_callback,
+        _async_callback,
+        _async_generator_callback,
+    ],
+    ids=[
+        "zero-argument",
+        "extra-required-argument",
+        "generator",
+        "coroutine",
+        "async-generator",
     ],
 )
-def test_contract_rejects_callbacks_that_cannot_accept_one_event(callback) -> None:
+def test_contract_rejects_incompatible_callback_shapes(callback) -> None:
     invalid = _HookPlugin(
         "event.invalid-callback",
         "invalid-callback-hook",
