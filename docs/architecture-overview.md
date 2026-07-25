@@ -104,6 +104,19 @@ path-filter, container-smoke, and reference-update coverage.
 | `api/` | HTTP routing, middleware, lifespan, transport schemas, SSE and static asset delivery | A second business lifecycle or task status authority. |
 | Report and notification paths | `src/schemas/report_schema.py`, `src/services/report_renderer.py`, `templates/`, `src/core/stages/delivery.py`, and notification modules | A `src/reports/` package; no such package exists in the current tree. |
 
+### API DTO Conventions
+
+New or migrated HTTP request, response, and service-boundary DTOs use Pydantic
+v2 APIs (`model_validate` and `model_dump`) with an explicit `model_config`.
+Request aliases, defaults, coercion, and extra-field behavior are compatibility
+decisions that must be tested. Response and service core fields validate
+strictly and fail closed; `extra="allow"` is reserved for documented
+forward-compatible extension fields and does not relax declared fields.
+
+Internal domain contracts can remain Pydantic models, dataclasses, or
+`TypedDict`s according to their boundary needs. This convention does not change
+the Native Agent production runtime or adopt PydanticAI as its orchestrator.
+
 ## Analysis Execution Paths
 
 ### CLI And Scheduler

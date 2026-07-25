@@ -11,7 +11,7 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 class AlphaSiftResponseModel(BaseModel):
     """Preserve forward-compatible adapter fields at the public API boundary."""
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", strict=True)
 
 
 class AlphaSiftScreenRequest(BaseModel):
