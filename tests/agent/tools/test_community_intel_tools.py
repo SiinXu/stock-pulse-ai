@@ -24,6 +24,7 @@ from src.agent.tools.community_intel_tools import (
 )
 from src.agent.tools.registry import ToolRegistry
 from src.agent.tools.search_tools import ALL_SEARCH_TOOLS
+from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 
 class _Provider:
@@ -106,6 +107,7 @@ def _session(
         backend="test",
         call_timeout_seconds=call_timeout_seconds,
         max_result_bytes=COMMUNITY_INTEL_MAX_RESULT_BYTES,
+        security_audit=SecurityAuditRecorderStub(),
     )
 
 

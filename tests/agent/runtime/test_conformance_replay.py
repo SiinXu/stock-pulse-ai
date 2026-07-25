@@ -63,6 +63,7 @@ from tests.agent_runtime_replay import (
     make_case_config,
     run_case,
 )
+from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 from tests.agent.runtime._pydantic_ai_dependency import require_pydantic_ai
 
@@ -166,6 +167,7 @@ def _run_case_pydantic(case):
             # exercised by test_tool_session.py and test_pydantic_ai_real_bridge.py.
             enforce_access_policy=False,
             deadline_monotonic=deadline,
+            security_audit=SecurityAuditRecorderStub(),
         )
         adapter = PydanticAIRuntimeAdapter(
             llm_adapter=replay, executor=executor, tool_session=session

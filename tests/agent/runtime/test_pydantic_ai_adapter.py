@@ -59,6 +59,7 @@ from src.agent.tools.registry import (
 )
 
 from tests.agent.runtime._pydantic_ai_dependency import require_pydantic_ai
+from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 pydantic_ai = require_pydantic_ai()
 
@@ -506,6 +507,7 @@ def test_live_cancel_fences_wire_response_before_tool_dispatch():
         execution_id="ex-cancel-fence",
         allowed_tools=["echo"],
         granted_permissions=["test:read"],
+        security_audit=SecurityAuditRecorderStub(),
     )
     adapter = PydanticAIRuntimeAdapter(
         llm_adapter=_BlockingToolCallAdapter(),
@@ -534,6 +536,7 @@ def test_live_cancel_fences_direct_model_tool_call_before_dispatch():
         execution_id="ex-direct-cancel-fence",
         allowed_tools=["echo"],
         granted_permissions=["test:read"],
+        security_audit=SecurityAuditRecorderStub(),
     )
     adapter = PydanticAIRuntimeAdapter(
         model=_blocking_tool_call_model(started, release),
@@ -561,6 +564,7 @@ def test_live_deadline_fences_direct_model_tool_call_before_dispatch():
         execution_id="ex-direct-deadline-fence",
         allowed_tools=["echo"],
         granted_permissions=["test:read"],
+        security_audit=SecurityAuditRecorderStub(),
     )
     adapter = PydanticAIRuntimeAdapter(
         model=_blocking_tool_call_model(started, release),
@@ -593,6 +597,7 @@ def test_cancel_accepted_before_atomic_dispatch_claim_prevents_tool_call():
         execution_id="ex-atomic-dispatch-cancel",
         allowed_tools=["echo"],
         granted_permissions=["test:read"],
+        security_audit=SecurityAuditRecorderStub(),
     )
     adapter = PydanticAIRuntimeAdapter(
         model=_tool_then_final_model(
@@ -662,6 +667,7 @@ def test_atomic_dispatch_claim_does_not_hold_lock_during_tool_call():
         execution_id="ex-inflight-dispatch-cancel",
         allowed_tools=["echo"],
         granted_permissions=["test:read"],
+        security_audit=SecurityAuditRecorderStub(),
     )
     adapter = PydanticAIRuntimeAdapter(
         model=_tool_then_final_model(
@@ -762,6 +768,7 @@ def test_live_handle_subscribes_to_tool_events_before_terminal():
         execution_id="ex-live-events",
         allowed_tools=["echo"],
         granted_permissions=["test:read"],
+        security_audit=SecurityAuditRecorderStub(),
     )
     adapter = PydanticAIRuntimeAdapter(
         model=_tool_then_blocking_final_model(
@@ -838,6 +845,7 @@ def test_tool_call_routes_through_bound_session():
         execution_id="ex-tool-1",
         allowed_tools=["echo"],
         granted_permissions=["test:read"],
+        security_audit=SecurityAuditRecorderStub(),
     )
     adapter = PydanticAIRuntimeAdapter(
         model=_tool_then_final_model("echo", {"message": "hi"}, '{"signal": "buy"}'),
@@ -859,6 +867,7 @@ def test_gate_rejection_is_fail_closed_at_dispatch():
         execution_id="ex-tool-2",
         allowed_tools=["echo"],
         granted_permissions=[],  # missing 'test:read'
+        security_audit=SecurityAuditRecorderStub(),
     )
     adapter = PydanticAIRuntimeAdapter(
         model=_tool_then_final_model("echo", {"message": "hi"}, '{"signal": "hold"}'),
@@ -926,6 +935,7 @@ def test_tool_calls_emit_events_through_shared_emitter():
         execution_id="ex-evt-1",
         allowed_tools=["echo"],
         granted_permissions=["test:read"],
+        security_audit=SecurityAuditRecorderStub(),
     )
     adapter = PydanticAIRuntimeAdapter(
         model=_tool_then_final_model("echo", {"message": "hi"}, '{"signal": "buy"}'),
@@ -956,7 +966,12 @@ def test_toolset_exposes_only_allowed_tools():
             handler=lambda: {"x": 1},
         )
     )
-    session = BoundToolSession(registry, execution_id="ex-tool-3", allowed_tools=["echo"])
+    session = BoundToolSession(
+        registry,
+        execution_id="ex-tool-3",
+        allowed_tools=["echo"],
+        security_audit=SecurityAuditRecorderStub(),
+    )
     toolset = build_bound_session_toolset(session)
     tool_names = {t.name for t in toolset.tools.values()}
     assert tool_names == {"echo"}

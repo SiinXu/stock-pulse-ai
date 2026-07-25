@@ -30,6 +30,7 @@ from src.agent.runtime.guards import (
 from src.agent.runtime.tool_session import BoundToolSession
 from src.agent.runtime_facts import DegradationBoundary
 from src.agent.tools.registry import ToolDefinition, ToolParameter, ToolRegistry
+from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 
 def _policy(**overrides):
@@ -326,6 +327,7 @@ def test_rejected_completion_claim_wins_before_future_publication(monkeypatch):
         allowed_tools=["echo"],
         max_tool_calls=0,
         enforce_access_policy=False,
+        security_audit=SecurityAuditRecorderStub(),
     )
     tool_calls_log = []
     monkeypatch.setattr("src.agent.runner.ThreadPoolExecutor", _InlineExecutor)

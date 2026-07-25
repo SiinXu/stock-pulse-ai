@@ -15,6 +15,7 @@ from src.services.history_loader import (
     reset_frozen_target_date,
     set_frozen_target_date,
 )
+from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 
 class _FakeToolCall:
@@ -47,6 +48,7 @@ def _native_session(registry: ToolRegistry) -> BoundToolSession:
         execution_id="frozen-context-test",
         allowed_tools=registry.list_names(),
         enforce_access_policy=False,
+        security_audit=SecurityAuditRecorderStub(),
     )
 
 

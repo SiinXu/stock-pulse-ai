@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Required valid security-audit dependencies on privileged API and ToolSession paths, prevented tool completion-audit retries from duplicating side effects, and bounded arbitrary-size configuration key evidence without limiting updates.
 - [Fixed] Restored backend CI compatibility after the Agent Soul, Persona catalog, and AlphaSift DTO contract merges without extending those features' runtime scope.
 - [Added] Wired trusted `analysis_strategy` plugins into the root-owned Skill catalog with detached definitions, fail-closed conflicts, lifecycle-aware cache invalidation, and unchanged declarative precedence and StrategyEngine authority.
 - [Added] Added a versioned Agent Soul charter with one fail-closed composer across Native Single, Multi, and Chat prompts, truthful analysis-history metadata, and additive Chat API run identity.
@@ -17,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Standardized the AlphaSift HTTP DTO boundary on explicit Pydantic v2 request compatibility and strict response core fields, preserving forward-compatible extensions while rejecting malformed service and completed-task payloads.
 - [Added] Added a loadable, network-free reference Data Provider plugin and author guide covering opt-in discovery, lifecycle diagnostics, compatibility, trust, and manager-owned routing boundaries.
 - [Added] Wired trusted `report_template` plugins into ordered Markdown, WeChat, and brief report selection while preserving Jinja and hard-coded fallbacks.
+- [Added] Added a versioned, pre-persistence-redacted, 90-day durable security audit trail with administrator-only query access and fail-closed login, sensitive configuration, ToolSession, and asynchronous analysis decision coverage.
 - [Fixed] Rejected all non-global and IANA special-purpose IPv4 and IPv6 results when resolving pinned embedded Ollama download hosts, including mixed DNS responses and IPv4-mapped forms.
 - [Added] Added a unified Settings local model center for Web and Desktop with catalog-backed recommendations, canonical cancellable Ollama pull tasks with bounded streaming and absolute deadlines, zero-config activation, explicit primary and Agent assignment, protected catalog-only deletion, bounded configuration-mutation reservations, original-runtime weight-verified recovery, race-safe deletion completion, non-destructive finalization warnings, and an explicit-selection first-run flow.
 - [Fixed] Updated compatible desktop transitive dependencies and pinned `app-builder-lib` to patched `tar` 7.5.19, removing the critical build-chain and updater production-closure findings while deferring the breaking Electron runtime upgrade.

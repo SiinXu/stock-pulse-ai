@@ -15,6 +15,7 @@ from fastapi import HTTPException
 
 from tests._llm_env_isolation import restore_ambient_llm_env, strip_ambient_llm_env
 from tests.litellm_stub import ensure_litellm_stub
+from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 ensure_litellm_stub()
 
@@ -516,6 +517,7 @@ class SystemConfigRuntimeReliabilityTestCase(unittest.TestCase):
             response = system_config_api.update_system_config(
                 request=request,
                 service=service,
+                security_audit=SecurityAuditRecorderStub(),
             )
 
         self.assertTrue(response.success)

@@ -26,9 +26,11 @@ deadline and budget) remain active in both modes; external runtime adapters
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import threading
 import time
+import uuid
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Tuple
 
 from src.agent.tool_surface import ToolSurface, build_tool_error_result
@@ -38,8 +40,28 @@ from src.agent.tools.execution import (
     _is_non_retriable_tool_result,
 )
 from src.agent.tools.registry import ToolRegistry
+from src.services.security_audit_service import (
+    SecurityAuditRecorder,
+    SecurityAuditUnavailable,
+    require_security_audit_recorder,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def _bounded_audit_identity(value: Any, *, fallback: str) -> str:
+    text = value.strip() if isinstance(value, str) else ""
+    if (
+        text
+        and len(text) <= 128
+        and text[0].isalnum()
+        and all(character.isalnum() or character in "_.:@/-" for character in text)
+    ):
+        return text
+    if not text:
+        return fallback
+    digest = hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()[:16]
+    return f"sha256:{digest}"
 
 
 class ExecutionFenceRejected(Exception):
@@ -81,6 +103,7 @@ class BoundToolSession:
         audit_context: Optional[Mapping[str, Any]] = None,
         surface: Optional[ToolSurface] = None,
         enforce_access_policy: bool = True,
+        security_audit: SecurityAuditRecorder,
     ) -> None:
         if not isinstance(execution_id, str) or not execution_id.strip():
             raise ValueError("BoundToolSession requires a non-empty execution_id")
@@ -113,6 +136,7 @@ class BoundToolSession:
         # its replay-frozen behaviour while still dispatching through one
         # authority. Lifecycle gates below stay active regardless.
         self._enforce_access_policy = bool(enforce_access_policy)
+        self._security_audit = require_security_audit_recorder(security_audit)
         base_audit_context: Dict[str, Any] = {"execution_id": execution_id}
         if stage is not None:
             base_audit_context["stage"] = stage
@@ -205,6 +229,75 @@ class BoundToolSession:
     # ----- Execution -----
 
     def execute(
+        self,
+        name: str,
+        arguments: Any,
+        *,
+        dispatch_guard: Optional[Callable[[Callable[[], None]], None]] = None,
+        completion_guard: Optional[Callable[[Callable[[], None]], None]] = None,
+        on_dispatched: Optional[Callable[[], None]] = None,
+    ) -> Dict[str, Any]:
+        """Audit one attempt/completion around the real session permission layer."""
+        correlation_id = uuid.uuid4().hex
+        target_id = _bounded_audit_identity(name, fallback="invalid")
+        common = dict(
+            event_type="tool.execute",
+            actor_type="runtime_principal",
+            actor_id=_bounded_audit_identity(self._principal, fallback="unknown"),
+            execution_id=self._execution_id,
+            action="tool.execute",
+            target_type="tool",
+            target_id=target_id,
+            correlation_id=correlation_id,
+            metadata={"backend": self._backend or "unknown"},
+        )
+        try:
+            self._security_audit.record_attempt(**common)
+        except SecurityAuditUnavailable:
+            return self._security_audit_unavailable_result(
+                name=name,
+                arguments=arguments,
+                phase="attempt",
+            )
+
+        result = self._execute_tool_call(
+            name,
+            arguments,
+            dispatch_guard=dispatch_guard,
+            completion_guard=completion_guard,
+            on_dispatched=on_dispatched,
+        )
+        error = result.get("error") if isinstance(result, dict) else None
+        error_code = error.get("code") if isinstance(error, dict) else None
+        denied_codes = {
+            "invalid_tool_name",
+            "tool_not_allowed",
+            "tool_not_found",
+            "policy_undeclared",
+            "permission_denied",
+            "stock_scope_violation",
+        }
+        outcome = "success" if result.get("ok") is True else (
+            "denied" if error_code in denied_codes else "failure"
+        )
+        reason_code = "tool_succeeded" if outcome == "success" else (
+            error_code if isinstance(error_code, str) and error_code else "tool_failed"
+        )
+        try:
+            self._security_audit.record_completion(
+                **common,
+                outcome=outcome,
+                reason_code=reason_code,
+            )
+        except SecurityAuditUnavailable:
+            return self._security_audit_unavailable_result(
+                name=name,
+                arguments=arguments,
+                phase="completion",
+            )
+        return result
+
+    def _execute_tool_call(
         self,
         name: str,
         arguments: Any,
@@ -342,6 +435,45 @@ class BoundToolSession:
                 self._non_retriable_results[cache_key] = result
             self._audit_trail.append(result["audit"])
             return result
+
+    def _security_audit_unavailable_result(
+        self,
+        *,
+        name: str,
+        arguments: Any,
+        phase: str,
+    ) -> Dict[str, Any]:
+        started_at = time.time()
+        tool_name = name if isinstance(name, str) else ""
+        completion_failed = phase == "completion"
+        result = build_tool_error_result(
+            tool_name=tool_name,
+            code="security_audit_unavailable",
+            message=(
+                "Security audit completion could not be persisted; tool execution "
+                "may already have occurred and must not be retried."
+                if completion_failed
+                else "Security audit storage is unavailable; tool execution was rejected."
+            ),
+            started_at=started_at,
+            context=self._build_call_context(tool_name),
+            retriable=not completion_failed,
+            details={
+                "phase": phase,
+                "execution_may_have_occurred": completion_failed,
+            },
+            arguments=arguments,
+        )
+        cache_key = (
+            _build_tool_cache_key(tool_name, arguments)
+            if completion_failed and isinstance(arguments, dict)
+            else None
+        )
+        with self._lock:
+            if cache_key is not None:
+                self._non_retriable_results[cache_key] = result
+            self._audit_trail.append(result["audit"])
+        return result
 
     # ----- Gates (called with lock held) -----
 

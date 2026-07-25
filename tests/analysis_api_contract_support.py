@@ -20,6 +20,7 @@ _MODULE_ENV_FILE.write_text("STOCK_LIST=600519,000001\n", encoding="utf-8")
 os.environ["ENV_FILE"] = str(_MODULE_ENV_FILE)
 
 from tests.litellm_stub import ensure_litellm_stub
+from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 ensure_litellm_stub()
 
@@ -27,7 +28,7 @@ try:
     from api.app import create_app
     from api.v1.endpoints import analysis as analysis_endpoint_module
     from api.v1.endpoints.analysis import (
-        trigger_analysis,
+        trigger_analysis as _trigger_analysis,
         trigger_market_review,
         _handle_sync_analysis,
         _build_analysis_report,
@@ -35,6 +36,11 @@ try:
         get_analysis_status,
         get_task_list,
     )
+
+    def trigger_analysis(*args, **kwargs):
+        """Call the endpoint with its mandatory audit dependency explicitly."""
+        kwargs["security_audit"] = SecurityAuditRecorderStub()
+        return _trigger_analysis(*args, **kwargs)
 except Exception:  # pragma: no cover - optional dependency environments
     create_app = None
     analysis_endpoint_module = None

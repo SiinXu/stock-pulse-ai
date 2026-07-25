@@ -63,6 +63,9 @@ from src.agent.runtime.guards import (
 )
 from src.agent.stock_scope import StockScope
 from src.agent.runtime.lifecycle import UsageRecorder, get_default_usage_recorder
+from src.services.security_audit_service import (
+    get_security_audit_service as _get_security_audit_service,
+)
 from src.utils.data_processing import normalize_report_signal_attribution
 
 logger = logging.getLogger(__name__)
@@ -339,6 +342,7 @@ _RUNNER_COMPAT_EXPORTS = (
     contextvars,
     execute_runner_tool_call_via_session,
     get_default_usage_recorder,
+    _get_security_audit_service,
     has_reserved_explanation_field,
     json,
     log_runtime_guard_event,

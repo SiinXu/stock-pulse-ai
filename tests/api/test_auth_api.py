@@ -28,6 +28,7 @@ from api.middlewares.error_handler import add_error_handlers
 from api.v1.endpoints import auth as auth_endpoint
 from src.config import Config
 from src.services.system_config_service import SystemConfigService
+from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 
 def _reset_auth_globals() -> None:
@@ -55,6 +56,7 @@ class AuthApiTestCase(unittest.TestCase):
         os.environ["ENV_FILE"] = str(self.env_path)
         os.environ["DATABASE_PATH"] = str(self.data_dir / "test.db")
         Config.reset_instance()
+        self.audit = SecurityAuditRecorderStub()
 
         self.auth_patcher = patch.object(auth, "_is_auth_enabled_from_env", return_value=True)
         self.data_dir_patcher = patch.object(auth, "_get_data_dir", return_value=self.data_dir)
@@ -100,6 +102,7 @@ class AuthApiTestCase(unittest.TestCase):
             auth_endpoint.auth_login(
                 self._build_request(),
                 auth_endpoint.LoginRequest(password="newpass123", passwordConfirm="newpass123"),
+                security_audit=self.audit,
             )
         )
         self.assertEqual(response.status_code, 200)
@@ -133,6 +136,7 @@ class AuthApiTestCase(unittest.TestCase):
             auth_endpoint.auth_login(
                 self._build_request(),
                 auth_endpoint.LoginRequest(password="pass1", passwordConfirm="pass2"),
+                security_audit=self.audit,
             )
         )
         self.assertEqual(response.status_code, 400)
@@ -143,6 +147,7 @@ class AuthApiTestCase(unittest.TestCase):
             auth_endpoint.auth_login(
                 self._build_request(),
                 auth_endpoint.LoginRequest(password="mypass456", passwordConfirm="mypass456"),
+                security_audit=self.audit,
             )
         )
         self.assertEqual(first_response.status_code, 200)
@@ -151,6 +156,7 @@ class AuthApiTestCase(unittest.TestCase):
             auth_endpoint.auth_login(
                 self._build_request(),
                 auth_endpoint.LoginRequest(password="mypass456"),
+                security_audit=self.audit,
             )
         )
         self.assertEqual(response.status_code, 200)
@@ -161,6 +167,7 @@ class AuthApiTestCase(unittest.TestCase):
             auth_endpoint.auth_login(
                 self._build_request(),
                 auth_endpoint.LoginRequest(password="correct", passwordConfirm="correct"),
+                security_audit=self.audit,
             )
         )
         self.assertEqual(first_response.status_code, 200)
@@ -169,6 +176,7 @@ class AuthApiTestCase(unittest.TestCase):
             auth_endpoint.auth_login(
                 self._build_request(),
                 auth_endpoint.LoginRequest(password="wrong"),
+                security_audit=self.audit,
             )
         )
         self.assertEqual(response.status_code, 401)
@@ -183,6 +191,7 @@ class AuthApiTestCase(unittest.TestCase):
             auth_endpoint.auth_login(
                 self._build_request(),
                 auth_endpoint.LoginRequest(password="passwd6", passwordConfirm="passwd6"),
+                security_audit=self.audit,
             )
         )
         self.assertEqual(login_response.status_code, 200)
@@ -207,6 +216,7 @@ class AuthApiTestCase(unittest.TestCase):
             auth_endpoint.auth_login(
                 self._build_request(),
                 auth_endpoint.LoginRequest(password="oldpass6", passwordConfirm="oldpass6"),
+                security_audit=self.audit,
             )
         )
         self.assertEqual(first_response.status_code, 200)
@@ -227,6 +237,7 @@ class AuthApiTestCase(unittest.TestCase):
             auth_endpoint.auth_login(
                 self._build_request(),
                 auth_endpoint.LoginRequest(password="actual6", passwordConfirm="actual6"),
+                security_audit=self.audit,
             )
         )
         self.assertEqual(first_response.status_code, 200)

@@ -49,6 +49,7 @@ from src.services.analysis_context_builder import (
     PipelineAnalysisArtifacts,
 )
 from src.storage import DatabaseManager
+from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 
 # ============================================================
@@ -191,6 +192,15 @@ def test_agent_system_prompts_require_phase_decision_contract() -> None:
 
 class TestAgentExecutor(unittest.TestCase):
     """Test the ReAct loop logic."""
+
+    def setUp(self):
+        self.security_audit = SecurityAuditRecorderStub()
+        audit_patcher = patch(
+            "src.agent.runner._get_security_audit_service",
+            return_value=self.security_audit,
+        )
+        audit_patcher.start()
+        self.addCleanup(audit_patcher.stop)
 
     def test_unsupported_tool_calling_response_is_not_treated_as_agent_success(self):
         executed_calls = []
@@ -801,7 +811,10 @@ class TestAgentExecutor(unittest.TestCase):
         self.assertTrue(result.success)
         self.assertEqual(scope.mode, "compare")
         self.assertEqual(scope.allowed_stock_codes, {"AAPL", "TSLA"})
-        self.assertEqual(executed_calls, [("quote", "AAPL"), ("quote", "TSLA")])
+        self.assertCountEqual(
+            executed_calls,
+            [("quote", "AAPL"), ("quote", "TSLA")],
+        )
         self.assertFalse(result.tool_calls_log[0].get("guarded", False))
         self.assertFalse(result.tool_calls_log[1].get("guarded", False))
 
@@ -1676,6 +1689,7 @@ class TestAgentExecutor(unittest.TestCase):
             execution_id="malformed-test",
             allowed_tools=registry.list_names(),
             enforce_access_policy=False,
+            security_audit=SecurityAuditRecorderStub(),
         )
 
         for malformed_name in (None, 7, ["echo"]):

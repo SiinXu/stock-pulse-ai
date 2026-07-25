@@ -12,6 +12,7 @@ StockPulse applies one central redaction rule set before operational data crosse
 - Agent progress/SSE metadata, Tool Surface audit previews, and execution-trace arguments.
 - Provider errors from model discovery, channel capability tests, Hermes, local CLI backends, and AlphaSift public diagnostics.
 - Single-agent provider protocol traces before persistence.
+- Durable `security-audit-v1` events before the repository or SQLite boundary.
 
 The central implementation is `src/utils/sanitize.py`. Callers that already have the exact runtime credential can also pass it as an exact redaction value; this closes gaps for provider-specific tokens that do not have a recognizable prefix.
 
@@ -29,6 +30,17 @@ The shared rules cover:
 Public payload redaction preserves ordinary text, normal public URLs, numeric values, and collection structure. Credential-bearing HTTP(S) URLs are redacted completely by default; the established Run Diagnostics display keeps only the host after removing userinfo, as do non-HTTP DSNs, so operators can identify the failing service. Logs use the stricter diagnostic formatter and redact every HTTP(S) URL.
 
 The canonical markers are `[REDACTED]` and `[REDACTED_URL]`. Existing Run Diagnostics responses retain their compatible `<redacted>` and `<redacted-url>` display markers.
+
+Durable security-audit events use the same recursive redactor before schema
+validation and repository dispatch. Audit metadata is additionally bounded to
+two nested collection levels, 16 object keys, 64 items per list, and 256
+characters per string. Arbitrary-size System Configuration writes use a
+bounded key sample plus complete-set count and SHA-256 evidence; submitted
+values are not included. If sanitization or validation cannot produce the
+strict contract, the privileged operation fails closed with
+`security_audit_unavailable`; it never persists the original payload as a
+fallback. See
+[Durable Security Audit Phase 1](security-audit.md).
 
 ## Agent Trace Behavior
 

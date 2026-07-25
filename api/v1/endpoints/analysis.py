@@ -29,7 +29,10 @@ from typing import Optional, Union, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from api.deps import get_config_dep
+from api.deps import (
+    get_config_dep,
+    require_security_audit_service,
+)
 from api.v1.errors import api_error, error_body
 from api.v1.schemas.analysis import (
     AnalyzeRequest,
@@ -87,6 +90,12 @@ from src.services.task_queue import (
 from src.task_execution import TaskEventType, TaskStatusEnum, deep_thaw
 from src.services.run_diagnostics import build_run_diagnostic_summary
 from src.services.run_flow import build_task_run_flow_snapshot
+from src.services.security_audit_service import (
+    SecurityAuditRecorder,
+    SecurityAuditService,
+    SecurityAuditUnavailable,
+    require_security_audit_recorder,
+)
 from src.utils.data_processing import (
     normalize_model_used,
     parse_json_field,
@@ -102,6 +111,55 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 _SUPPORTED_FREE_TEXT_RE = re.compile(r"^[A-Za-z0-9.*\-+\u3400-\u9fff\s]+$")
+
+
+def _require_analysis_audit_service(value: object) -> SecurityAuditRecorder:
+    try:
+        return require_security_audit_recorder(value)
+    except SecurityAuditUnavailable:
+        raise api_error(
+            503,
+            "security_audit_unavailable",
+            "Security audit storage is unavailable",
+        ) from None
+
+
+def _record_analysis_submission_audit(
+    service: SecurityAuditRecorder,
+    *,
+    phase: str,
+    correlation_id: str,
+    stock_code: str,
+    outcome: str = "pending",
+    reason_code: str = "attempt_started",
+    metadata: dict[str, Any] | None = None,
+) -> None:
+    common = dict(
+        event_type="analysis.submit",
+        actor_type="api_client",
+        actor_id="analysis_submitter",
+        execution_id=correlation_id,
+        action="analysis.submit",
+        target_type="stock",
+        target_id=stock_code,
+        correlation_id=correlation_id,
+        metadata=metadata or {},
+    )
+    try:
+        if phase == "attempt":
+            service.record_attempt(**common)
+        else:
+            service.record_completion(
+                **common,
+                outcome=outcome,
+                reason_code=reason_code,
+            )
+    except SecurityAuditUnavailable:
+        raise api_error(
+            503,
+            "security_audit_unavailable",
+            "Security audit storage is unavailable",
+        )
 
 
 def _get_task_trace_id(task: Any) -> Optional[str]:
@@ -282,13 +340,15 @@ def _resolve_and_normalize_input(raw_value: str) -> str:
         400: {"description": "请求参数错误", "model": ErrorResponse},
         409: {"description": "股票正在分析中，拒绝重复提交", "model": DuplicateTaskErrorResponse},
         500: {"description": "分析失败", "model": ErrorResponse},
+        503: {"description": "Security audit unavailable", "model": ErrorResponse},
     },
     summary="触发股票分析",
     description="启动 AI 智能分析任务，支持同步和异步模式。异步模式下相同股票代码不允许重复提交。"
 )
 def trigger_analysis(
         request: AnalyzeRequest,
-        config: Config = Depends(get_config_dep)
+        config: Config = Depends(get_config_dep),
+        security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
 ) -> Union[AnalysisResultResponse, JSONResponse]:
     """
     触发股票分析
@@ -358,12 +418,18 @@ def trigger_analysis(
         return _handle_sync_analysis(stock_codes[0], request)
 
     # Async mode submits one task per stock.
-    return _handle_async_analysis_batch(stock_codes, request)
+    return _handle_async_analysis_batch(
+        stock_codes,
+        request,
+        security_audit=_require_analysis_audit_service(security_audit),
+    )
 
 
 def _handle_async_analysis_batch(
     stock_codes: list,
-    request: AnalyzeRequest
+    request: AnalyzeRequest,
+    *,
+    security_audit: SecurityAuditRecorder,
 ) -> JSONResponse:
     """
     Handle asynchronous analysis requests, including batch submission.
@@ -402,7 +468,67 @@ def _handle_async_analysis_batch(
     if use_memory is not None:
         submit_kwargs["use_memory"] = use_memory
 
-    accepted_tasks, duplicate_errors = task_queue.submit_tasks_batch(**submit_kwargs)
+    correlations = {
+        stock_code: SecurityAuditService.new_correlation_id()
+        for stock_code in stock_codes
+    }
+    audit_metadata = {
+        "report_type": request.report_type,
+        "analysis_phase": analysis_phase,
+        "batch_size": len(stock_codes),
+    }
+    for stock_code in stock_codes:
+        _record_analysis_submission_audit(
+            security_audit,
+            phase="attempt",
+            correlation_id=correlations[stock_code],
+            stock_code=stock_code,
+            metadata=audit_metadata,
+        )
+
+    try:
+        accepted_tasks, duplicate_errors = task_queue.submit_tasks_batch(**submit_kwargs)
+    except Exception:
+        for stock_code in stock_codes:
+            _record_analysis_submission_audit(
+                security_audit,
+                phase="completion",
+                correlation_id=correlations[stock_code],
+                stock_code=stock_code,
+                outcome="failure",
+                reason_code="task_submission_failed",
+                metadata=audit_metadata,
+            )
+        raise
+
+    accepted_codes = {
+        normalize_stock_code(task.stock_code)
+        for task in accepted_tasks
+    }
+    duplicate_codes = {
+        normalize_stock_code(duplicate.stock_code)
+        for duplicate in duplicate_errors
+    }
+    for stock_code in stock_codes:
+        normalized_stock_code = normalize_stock_code(stock_code)
+        if normalized_stock_code in accepted_codes:
+            outcome = "accepted"
+            reason_code = "task_accepted"
+        elif normalized_stock_code in duplicate_codes:
+            outcome = "rejected"
+            reason_code = "duplicate_task"
+        else:
+            outcome = "failure"
+            reason_code = "submission_not_resolved"
+        _record_analysis_submission_audit(
+            security_audit,
+            phase="completion",
+            correlation_id=correlations[stock_code],
+            stock_code=stock_code,
+            outcome=outcome,
+            reason_code=reason_code,
+            metadata=audit_metadata,
+        )
 
     accepted = [
         BatchTaskAcceptedItem(
