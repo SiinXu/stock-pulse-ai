@@ -164,13 +164,17 @@ capped at 2 MiB.
 The only accepted instructions are:
 
 - `FROM`: exactly once and only `./<gguf_file>` or `<gguf_file>`;
-- `PARAMETER`: a safe parameter name and a scalar value;
-- `TEMPLATE`: once, either one line or a triple-quoted block;
-- `SYSTEM`: once, either one line or a triple-quoted block.
+- `PARAMETER`: a safe parameter name and a scalar value; each name appears
+  once except `stop`, which may repeat and becomes an ordered value list;
+- `TEMPLATE`: once, either unquoted one-line text or a triple-quoted block;
+- `SYSTEM`: once, either unquoted one-line text or a triple-quoted block.
 
 All other instructions are rejected, including `ADAPTER`, `LICENSE`, and
 `MESSAGE`. In particular, `FROM` cannot name an absolute path, parent path,
-registry model, URL, or file outside the pack.
+registry model, URL, or file outside the pack. Single-line `TEMPLATE` and
+`SYSTEM` values with outer quotes, and repeated scalar parameters other than
+`stop`, are rejected so Web native-create and Desktop Modelfile parsing cannot
+interpret one valid pack differently.
 
 ```text
 FROM ./example-finance-q4.gguf
@@ -181,8 +185,9 @@ Distinguish reported facts from inference."""
 ```
 
 The Web path translates the validated fields to Ollama's native blob and
-`/api/create` APIs. The Desktop path gives the validated Modelfile to
-`ollama create`. See the official
+`/api/create` APIs. The Desktop path gives the same constrained Modelfile to
+`ollama create`; the quoted-text and repeatability rules above keep both
+transports semantically aligned. See the official
 [Ollama create API](https://docs.ollama.com/api/create) for the downstream
 runtime contract.
 

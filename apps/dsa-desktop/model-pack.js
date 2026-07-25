@@ -27,6 +27,7 @@ const MODEL_PACK_LICENSE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9.+-]{0,127}$/;
 const MODEL_PACK_PARAMETER_NAME_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
 const MODEL_PACK_REQUIRED_ROLES = Object.freeze(['gguf', 'modelfile', 'license']);
 const MODEL_PACK_ALLOWED_INSTRUCTIONS = new Set(['FROM', 'PARAMETER', 'TEMPLATE', 'SYSTEM']);
+const MODEL_PACK_REPEATABLE_PARAMETERS = new Set(['stop']);
 
 class ModelPackError extends Error {
   constructor(code, userMessage, details = {}) {
@@ -241,6 +242,13 @@ function parseMultilineValue(lines, index, initial, instruction) {
     );
   }
   if (!value.startsWith('"""')) {
+    if (value.startsWith('"') || value.startsWith("'") || value.startsWith('`')) {
+      throw new ModelPackError(
+        'unsafe_modelfile',
+        `${instruction} single-line text must not use outer quotes. ` +
+          'Use unquoted text or a triple-quoted block and rebuild the pack.'
+      );
+    }
     return { value, nextIndex: index };
   }
   const initialRemainder = value.slice(3);
@@ -348,6 +356,13 @@ function parseModelPackModelfile(payload, expectedGgufFile) {
       }
       const parsed = parseParameterValue(value);
       if (Object.hasOwn(parameters, name)) {
+        if (!MODEL_PACK_REPEATABLE_PARAMETERS.has(name)) {
+          throw new ModelPackError(
+            'unsafe_modelfile',
+            `PARAMETER ${name} may appear only once. ` +
+              'Only stop may be repeated; rebuild the pack.'
+          );
+        }
         parameters[name] = Array.isArray(parameters[name])
           ? [...parameters[name], parsed]
           : [parameters[name], parsed];

@@ -164,6 +164,21 @@ test('manifest and Modelfile parsers enforce the shared data-only contract', () 
     );
     assert.equal(manifest.modelId, 'stockpulse/desktop-test:q4');
     assert.equal(modelfile.fromFile, 'weights.gguf');
+    const portable = parseModelPackModelfile(
+      Buffer.from(
+        'FROM ./weights.gguf\n' +
+        'PARAMETER temperature 0.2\n' +
+        'PARAMETER stop "END"\n' +
+        'PARAMETER stop "DONE"\n' +
+        'SYSTEM """Portable system text"""\n'
+      ),
+      'weights.gguf'
+    );
+    assert.deepEqual(portable.parameters, {
+      temperature: 0.2,
+      stop: ['END', 'DONE'],
+    });
+    assert.equal(portable.system, 'Portable system text');
 
     assert.throws(
       () => parseModelPackModelfile(
@@ -172,6 +187,23 @@ test('manifest and Modelfile parsers enforce the shared data-only contract', () 
       ),
       (error) => error instanceof ModelPackError && error.code === 'unsafe_modelfile'
     );
+    for (const ambiguous of [
+      'SYSTEM "quoted system text"',
+      'TEMPLATE `quoted template text`',
+      'PARAMETER temperature 0.1\nPARAMETER temperature 0.2',
+    ]) {
+      assert.throws(
+        () => parseModelPackModelfile(
+          Buffer.from(`FROM ./weights.gguf\n${ambiguous}\n`),
+          'weights.gguf'
+        ),
+        (error) => (
+          error instanceof ModelPackError
+          && error.code === 'unsafe_modelfile'
+          && /rebuild the pack/i.test(error.userMessage)
+        )
+      );
+    }
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

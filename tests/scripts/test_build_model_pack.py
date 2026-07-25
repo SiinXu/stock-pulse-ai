@@ -210,6 +210,40 @@ def test_builder_rejects_unsafe_modelfile_before_writing(tmp_path: Path) -> None
     assert not output.exists()
 
 
+@pytest.mark.parametrize(
+    "ambiguous_instruction",
+    [
+        'SYSTEM "quoted system text"',
+        "PARAMETER temperature 0.1\nPARAMETER temperature 0.2",
+    ],
+)
+def test_builder_rejects_transport_ambiguous_modelfile_syntax(
+    tmp_path: Path,
+    ambiguous_instruction: str,
+) -> None:
+    gguf, modelfile, license_file = _sources(tmp_path)
+    modelfile.write_text(
+        f"FROM ./weights.gguf\n{ambiguous_instruction}\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "ambiguous.modelpack"
+
+    with pytest.raises(ModelPackError) as error:
+        build_model_pack(
+            gguf_path=gguf,
+            modelfile_path=modelfile,
+            license_file_path=license_file,
+            model_id="stockpulse/test:q4",
+            display_name="StockPulse Test",
+            license_id="Apache-2.0",
+            minimum_memory_gb=8,
+            output_path=output,
+        )
+
+    assert error.value.code == "unsafe_modelfile"
+    assert not output.exists()
+
+
 def test_builder_rejects_symbolic_link_sources(tmp_path: Path) -> None:
     gguf, modelfile, license_file = _sources(tmp_path)
     linked_gguf = tmp_path / "linked.gguf"

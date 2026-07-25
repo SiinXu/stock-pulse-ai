@@ -18,6 +18,7 @@ from src.model_pack import (
     ModelPackImporter,
     inspect_model_pack,
     parse_manifest,
+    parse_modelfile,
 )
 from src.model_pack.manifest import MAX_MANIFEST_BYTES
 from src.model_pack.modelfile import MAX_MODELFILE_BYTES
@@ -435,6 +436,48 @@ def test_inspect_rejects_external_from_after_real_hash_validation(tmp_path: Path
             pass
 
     _assert_error(error, "unsafe_modelfile", "FROM must reference weights.gguf")
+
+
+@pytest.mark.parametrize(
+    "ambiguous_instruction",
+    [
+        'SYSTEM "quoted system text"',
+        "TEMPLATE `quoted template text`",
+        "PARAMETER temperature 0.1\nPARAMETER temperature 0.2",
+    ],
+)
+def test_modelfile_rejects_transport_ambiguous_syntax(
+    ambiguous_instruction: str,
+) -> None:
+    with pytest.raises(ModelPackError) as error:
+        parse_modelfile(
+            (
+                f"FROM ./weights.gguf\n{ambiguous_instruction}\n"
+            ).encode("utf-8"),
+            expected_gguf_file="weights.gguf",
+        )
+
+    assert error.value.code == "unsafe_modelfile"
+    assert "rebuild the pack" in error.value.user_message
+
+
+def test_modelfile_keeps_only_stop_as_a_repeatable_parameter() -> None:
+    parsed = parse_modelfile(
+        (
+            "FROM ./weights.gguf\n"
+            "PARAMETER temperature 0.2\n"
+            'PARAMETER stop "END"\n'
+            'PARAMETER stop "DONE"\n'
+            'SYSTEM """Portable system text"""\n'
+        ).encode("utf-8"),
+        expected_gguf_file="weights.gguf",
+    )
+
+    assert parsed.parameters == {
+        "temperature": 0.2,
+        "stop": ["END", "DONE"],
+    }
+    assert parsed.system == "Portable system text"
 
 
 def test_inspect_rejects_non_utf8_license_before_create(tmp_path: Path) -> None:

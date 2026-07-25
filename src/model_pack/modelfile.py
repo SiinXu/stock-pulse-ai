@@ -11,6 +11,7 @@ from src.model_pack.models import ParsedModelfile
 MAX_MODELFILE_BYTES = 1024 * 1024
 ALLOWED_INSTRUCTIONS = frozenset({"FROM", "PARAMETER", "TEMPLATE", "SYSTEM"})
 PARAMETER_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+REPEATABLE_PARAMETERS = frozenset({"stop"})
 
 
 def _unsafe(message: str) -> ModelPackError:
@@ -46,6 +47,11 @@ def _parse_text_value(
             f"{instruction} requires text. Fix the Modelfile and rebuild the pack."
         )
     if not value.startswith('"""'):
+        if value.startswith(('"', "'", "`")):
+            raise _unsafe(
+                f"{instruction} single-line text must not use outer quotes. "
+                "Use unquoted text or a triple-quoted block and rebuild the pack."
+            )
         return value, index
 
     remainder = value[3:]
@@ -143,6 +149,13 @@ def parse_modelfile(payload: bytes, *, expected_gguf_file: str) -> ParsedModelfi
                 )
             parsed_value = _parse_data_value(value)
             if normalized_name in parameters:
+                if normalized_name not in REPEATABLE_PARAMETERS:
+                    raise _unsafe(
+                        (
+                            f"PARAMETER {normalized_name} may appear only once. "
+                            "Only stop may be repeated; rebuild the pack."
+                        )
+                    )
                 previous = parameters[normalized_name]
                 if isinstance(previous, list):
                     previous.append(parsed_value)
@@ -186,5 +199,6 @@ def parse_modelfile(payload: bytes, *, expected_gguf_file: str) -> ParsedModelfi
 __all__ = [
     "ALLOWED_INSTRUCTIONS",
     "MAX_MODELFILE_BYTES",
+    "REPEATABLE_PARAMETERS",
     "parse_modelfile",
 ]

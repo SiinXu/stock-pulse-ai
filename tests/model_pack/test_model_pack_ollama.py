@@ -31,7 +31,8 @@ def _write_pack(root: Path) -> Path:
         (
             "FROM ./finance.gguf\n"
             "PARAMETER temperature 0.1\n"
-            "PARAMETER stop END\n"
+            'PARAMETER stop "END"\n'
+            'PARAMETER stop "DONE"\n'
             'SYSTEM """You are a finance model.\nUse cited evidence."""\n'
         ),
         encoding="utf-8",
@@ -141,7 +142,7 @@ def test_http_executor_uploads_verified_blob_then_creates_from_controlled_fields
         "files": {"finance.gguf": f"sha256:{digest}"},
         "license": "LicenseRef-Finance terms\n",
         "stream": False,
-        "parameters": {"temperature": 0.1, "stop": "END"},
+        "parameters": {"temperature": 0.1, "stop": ["END", "DONE"]},
         "system": "You are a finance model.\nUse cited evidence.",
     }
     assert progress == [
