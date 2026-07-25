@@ -147,6 +147,30 @@ def test_contract_accepts_exactly_the_six_initial_event_names() -> None:
     assert services.plugin_manager.registrations("event_hook") == ()
 
 
+@pytest.mark.parametrize(
+    "callback",
+    [
+        lambda: None,
+        lambda event, required: None,
+    ],
+)
+def test_contract_rejects_callbacks_that_cannot_accept_one_event(callback) -> None:
+    invalid = _HookPlugin(
+        "event.invalid-callback",
+        "invalid-callback-hook",
+        frozenset({"analysis.started"}),
+        callback,
+    )
+
+    services = _install_plugins(invalid)
+
+    assert services.plugin_load_results[0].success is False
+    assert services.plugin_load_results[0].error_code == (
+        "extension_implementation_invalid"
+    )
+    assert services.plugin_manager.registrations("event_hook") == ()
+
+
 def test_priority_failure_isolation_sanitization_and_immutable_snapshot(
     caplog: pytest.LogCaptureFixture,
 ) -> None:

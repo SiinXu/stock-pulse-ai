@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -98,7 +99,7 @@ class EventHookRegistration:
 def validate_event_hook_registration(implementation: object) -> bool:
     """Return whether a registration satisfies the version-one hook contract."""
 
-    return bool(
+    if not (
         type(implementation) is EventHookRegistration
         and type(implementation.hook_id) is str
         and bool(implementation.hook_id)
@@ -106,7 +107,13 @@ def validate_event_hook_registration(implementation: object) -> bool:
         and bool(implementation.event_names)
         and implementation.event_names <= EVENT_HOOK_NAMES
         and callable(implementation.callback)
-    )
+    ):
+        return False
+    try:
+        inspect.signature(implementation.callback).bind(object())
+    except (TypeError, ValueError):
+        return False
+    return True
 
 
 def event_hook_extension_contract() -> ExtensionContract:
