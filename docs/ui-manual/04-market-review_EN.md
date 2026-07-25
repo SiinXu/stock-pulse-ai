@@ -1,25 +1,92 @@
 # 04 Market review
 
-Path: **Research → Market review**.
+Market review answers:
 
-## Steps
+> **What is the overall market mood for this session?**
 
-1. Open the market review page.
-2. Click **Run review** (label may vary).
-3. Wait for the task to finish; read the error if it fails.
-4. Open the review from history when you only need to re-read it.
+It does **not** answer “should I buy this one stock?”. Keep distance between index strength and your individual holdings.
 
-## Typical report content
+> **Difference from single-stock analysis**  
+> - **Analysis workbench**: research one symbol  
+> - **Market review**: market-wide picture (indices, breadth, sectors, sentiment)
 
-- Major indices
-- Breadth-style market overview when available
-- Sector or theme performance
-- Clues, risks, and planning-style notes
+> Research only — **not investment advice**.
 
-## Reading notes
+## How to open
 
-- **Post-market** fits full-session review language best.
-- **Intraday** runs may warn that the daily bar is incomplete—do not treat partial session data as a full close.
-- Stock history is not the primary market-review archive.
+| Way | Path |
+| --- | --- |
+| Nav | **Research → Market review** |
+| URL | `/research/market` |
+| Palette | search “market” / “review” |
+| Auto-run deep link | `/research/market?action=run` (some Home todos use this) |
+
+If you only want history, open the clean URL `/research/market` without `action=run` so you do not trigger a run by accident.
+
+## When to use
+
+| Scenario | Suggestion |
+| --- | --- |
+| After the close | Run once; note the main theme and two risks |
+| Intraday thermometer | Allowed, but treat “incomplete daily bar” as first-class |
+| History already exists | Prefer opening history over re-running every day |
+| Combine with watchlist | Review themes → Workbench on specific codes |
+
+## What you will see
+
+1. **Trigger review** control — submits one market-level job.  
+2. **Feedback area** — submitting / running / done / failed / timeout.  
+3. **Review history** — previous market diaries; multi-select delete may be available.  
+4. **Report pane** — summary and body for the selected history row.  
+5. Optional **run flow** — stage breakdown for debugging.
+
+### Recommended after-close steps
+
+1. Open Market review.  
+2. Trigger review (label as in UI).  
+3. Wait for completion; on failure read model / network / data-source errors.  
+4. Open the newest history row.  
+5. Read in order: indices → breadth → sectors → risks / data quality.  
+6. Pick at most 1–2 themes and open [03 Analysis workbench](03-analysis-workbench_EN.md) for individual codes.
+
+## Common report blocks
+
+| Block | What you are reading | Easy misread |
+| --- | --- | --- |
+| Major indices | Market direction | “Index up = go all-in” |
+| Breadth | Advancers vs decliners | “Breadth always continues” |
+| Sectors / themes | Who led today | “Every name in a hot sector is chaseable” |
+| Risk summary | What to watch | “Official order ticket” |
+| Data quality | Degradation / session incompleteness | Overconfidence after ignoring it |
+
+## Glossary
+
+| Term | Meaning |
+| --- | --- |
+| Breadth | How widely advances/declines are shared |
+| Sector rotation | Capital rotating across themes |
+| Incomplete daily bar | Today’s bar is not final—discount bravado |
+| Run flow | Which stage a job is stuck on |
+| recordId | Id of one historical review row |
+
+## Use cases
+
+**A — Minimal close process**  
+Trigger → note “main theme + two risks” → at most two related watchlist names into Workbench.
+
+**B — Intraday caution**  
+Strong narrative mid-session + incomplete bar / quality warnings → thermometer only; reassess after the close.
+
+**C — History only**  
+Clean URL → compare yesterday vs today themes → save one model call.
+
+**D — Failure**  
+Model error → Settings test connection; data error → data sources; then trigger once.
+
+## Related
+
+- [03 Analysis workbench](03-analysis-workbench_EN.md)  
+- [08 Reading reports](08-reading-reports_EN.md)  
+- [11 Daily workflows](11-daily-workflows_EN.md)  
 
 Previous: [03 Analysis workbench](03-analysis-workbench_EN.md) · Next: [05 Agent chat](05-agent-chat_EN.md)
