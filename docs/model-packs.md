@@ -31,7 +31,8 @@ supported model-import entry point.
   system installation takes precedence, with the bundled runtime as fallback.
   It calls `ollama create` with a fixed argument array and `shell=false`. Pack
   content is never added to a command line except for the validated model id
-  and StockPulse-owned extracted Modelfile path.
+  and a StockPulse-owned canonical Modelfile path generated from the validated
+  projection.
 - Desktop returns validated manifest metadata, an opaque runtime identity, and
   a short-lived one-time attestation to the Web panel. The attestation binds
   the exact validated fields to an ephemeral secret shared only by Electron
@@ -91,7 +92,9 @@ Modelfile
 LICENSE
 ```
 
-File names may contain ASCII letters, digits, `.`, `_`, and `-`; paths,
+File names may contain ASCII letters, digits, `.`, `_`, and `-`; they cannot
+end in `.`, and Win32 device basenames such as `CON`, `NUL`, `COM1`, and `LPT1`
+are reserved. Paths,
 subdirectories, and symbolic links are not valid declared payloads. A release
 archive uses ZIP container semantics and normally uses the `.modelpack`
 extension. `.zip` is also accepted.
@@ -141,8 +144,8 @@ Field rules:
 | Field | Contract |
 | --- | --- |
 | `format_version` | Integer `1` |
-| `model_id` | Safe Ollama id, optionally `namespace/model:tag` |
-| `display_name` | Non-empty user-visible name, at most 160 characters |
+| `model_id` | ASCII Ollama id, optionally `namespace/model:tag` |
+| `display_name` | Non-empty user-visible name, at most 160 Unicode scalar values |
 | `gguf_file` | Root-level `.gguf` filename matching role `gguf` |
 | `modelfile` | Root-level filename matching role `modelfile` |
 | `license.id` | SPDX identifier or `LicenseRef-*` identifier |
@@ -153,7 +156,8 @@ Field rules:
 Extra regular files produce warnings and are not extracted from an archive.
 Missing declared files fail import. Unsafe archive names, duplicate
 case-insensitive names, nested paths, and symbolic links fail import even when
-they are not declared. Directory and archive inventories are capped at 256
+they are not declared. Every archive member name uses the same portable ASCII
+filename alphabet as a declared payload. Directory and archive inventories are capped at 256
 entries (including empty directories), and the archive plus the sum of
 declared payload sizes are each capped at 64 GiB. `manifest.json` and the
 constrained Modelfile are each capped at 1 MiB; the UTF-8 license payload is
@@ -164,8 +168,9 @@ capped at 2 MiB.
 The only accepted instructions are:
 
 - `FROM`: exactly once and only `./<gguf_file>` or `<gguf_file>`;
-- `PARAMETER`: a safe parameter name and a scalar value; each name appears
-  once except `stop`, which may repeat and becomes an ordered value list;
+- `PARAMETER`: one supported lowercase Ollama option with its declared value
+  type; each name appears once except `stop`, which may repeat and becomes an
+  ordered string list;
 - `TEMPLATE`: once, either unquoted one-line text or a triple-quoted block;
 - `SYSTEM`: once, either unquoted one-line text or a triple-quoted block.
 
@@ -176,6 +181,28 @@ registry model, URL, or file outside the pack. Single-line `TEMPLATE` and
 `stop`, are rejected so Web native-create and Desktop Modelfile parsing cannot
 interpret one valid pack differently.
 
+The portable grammar uses UTF-8 without a byte-order mark, LF or CRLF line
+endings, ASCII instruction/parameter names, and ASCII space (`U+0020`) for
+indentation and instruction/value separation. Tabs, bare carriage returns,
+Unicode line separators, and byte-order marks are rejected. Text may contain
+Unicode letters, marks, numbers, punctuation, symbols, ASCII spaces, and block
+newlines; format characters and other runes that Ollama would silently discard
+are rejected.
+
+Supported parameters and types are:
+
+| Type | Parameters | Accepted form |
+| --- | --- | --- |
+| Integer | `num_ctx`, `num_batch`, `num_gpu`, `main_gpu`, `num_thread`, `draft_num_predict`, `num_keep`, `seed`, `num_predict`, `top_k`, `repeat_last_n` | Canonical base-10 integer within `-(2^53-1)` through `2^53-1` |
+| Float | `top_p`, `min_p`, `typical_p`, `temperature`, `repeat_penalty`, `presence_penalty`, `frequency_penalty` | Finite JSON number that neither overflows nor underflows Ollama's 32-bit float; normalized to that portable value |
+| Boolean | `use_mmap` | Lowercase `true` or `false` |
+| String list | `stop` | Double-quoted text; may repeat |
+
+Unknown, differently cased, or type-mismatched parameters are rejected.
+Double quotes around `stop` values are delimiters only: backslash sequences are
+preserved literally to match Ollama's parser, while inner double quotes are
+rejected as ambiguous. `null`, containers, and non-finite numbers are rejected.
+
 ```text
 FROM ./example-finance-q4.gguf
 PARAMETER temperature 0.2
@@ -185,9 +212,14 @@ Distinguish reported facts from inference."""
 ```
 
 The Web path translates the validated fields to Ollama's native blob and
-`/api/create` APIs. The Desktop path gives the same constrained Modelfile to
-`ollama create`; the quoted-text and repeatability rules above keep both
-transports semantically aligned. See the official
+`/api/create` APIs. The Desktop path gives `ollama create` a canonical LF
+Modelfile generated from that same validated projection. This preserves
+delimiter-only triple-block leading newlines, CRLF-authored content, parameter
+names, and parameter types consistently across both transports. Non-ASCII
+boundary whitespace is rejected because Ollama would silently discard it. The
+separately validated license remains Model Pack distribution
+and StockPulse registry metadata; neither transport adds it as an Ollama
+license layer. See the official
 [Ollama create API](https://docs.ollama.com/api/create) for the downstream
 runtime contract.
 

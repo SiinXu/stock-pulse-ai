@@ -17,6 +17,8 @@ import requests
 
 from src.llm.model_ref import decode_model_ref
 from src.llm.provider_catalog import get_provider
+from src.model_pack.errors import ModelPackError
+from src.model_pack.manifest import normalize_manifest_text
 from src.services.system_config_service import (
     ConfigConflictError,
     ConfigValidationError,
@@ -743,15 +745,25 @@ class LocalModelService:
             try:
                 model_id = normalize_local_model_id(raw.get("model_id"))
                 minimum_memory_gb = int(raw.get("minimum_memory_gb"))
-            except (LocalModelValidationError, TypeError, ValueError):
+                display_name = normalize_manifest_text(
+                    raw.get("display_name"),
+                    field_name="display_name",
+                    max_length=160,
+                )
+                license_id = normalize_manifest_text(
+                    raw.get("license_id"),
+                    field_name="license.id",
+                    max_length=128,
+                )
+            except (
+                LocalModelValidationError,
+                ModelPackError,
+                TypeError,
+                ValueError,
+            ):
                 continue
-            display_name = str(raw.get("display_name") or "").strip()
-            license_id = str(raw.get("license_id") or "").strip()
             if (
-                not display_name
-                or len(display_name) > 160
-                or not license_id
-                or not 1 <= minimum_memory_gb <= 2048
+                not 1 <= minimum_memory_gb <= 2048
             ):
                 continue
             entries.append(

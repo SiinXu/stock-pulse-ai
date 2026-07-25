@@ -11,7 +11,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from starlette.formparsers import MultiPartParser
 
@@ -31,7 +31,12 @@ from src.model_pack import (
 _DESKTOP_ATTESTATION_SECRET = "a" * 64
 
 
-def _desktop_attestation(monkeypatch, *, nonce: str) -> str:
+def _desktop_attestation(
+    monkeypatch,
+    *,
+    nonce: str,
+    display_name: str = "Licensed Finance Q4",
+) -> str:
     monkeypatch.setenv("DSA_DESKTOP_MODE", "true")
     monkeypatch.setenv(
         DESKTOP_MODEL_PACK_ATTESTATION_ENV,
@@ -44,7 +49,7 @@ def _desktop_attestation(monkeypatch, *, nonce: str) -> str:
         "expiresAt": issued_at + DESKTOP_MODEL_PACK_ATTESTATION_TTL_MS,
         "nonce": nonce,
         "modelId": "licensed/finance:q4",
-        "displayName": "Licensed Finance Q4",
+        "displayName": display_name,
         "minimumMemoryGb": 16,
         "licenseId": "LicenseRef-Finance",
         "expectedConfigVersion": "config-1",
@@ -394,6 +399,32 @@ def test_stage_upload_cleans_private_files_after_stream_failure(
     assert not staging_root.exists()
 
 
+def test_stage_upload_maps_staging_root_enospc_to_507(monkeypatch) -> None:
+    closed = False
+
+    class UploadFile:
+        def close(self) -> None:
+            nonlocal closed
+            closed = True
+
+    def no_staging_space(*, prefix: str) -> str:
+        assert prefix == "stockpulse-model-pack-upload-"
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(model_packs.tempfile, "mkdtemp", no_staging_space)
+    upload = SimpleNamespace(
+        filename="test.modelpack",
+        file=UploadFile(),
+    )
+
+    with pytest.raises(HTTPException) as error:
+        model_packs._stage_upload(upload)
+
+    assert error.value.status_code == 507
+    assert error.value.detail["error"] == "insufficient_disk_space"
+    assert closed is True
+
+
 def test_import_submission_failure_is_sanitized() -> None:
     service = _ModelPackService()
     service.raise_on_start = RuntimeError("secret /private/path")
@@ -499,6 +530,35 @@ def test_desktop_activation_reuses_server_snapshot_without_accepting_a_target_ur
     ]["content"]["application/json"]["schema"]
     component = schema["components"]["schemas"][request_schema["$ref"].split("/")[-1]]
     assert "url" not in str(component).lower()
+
+
+def test_desktop_activation_preserves_portable_non_ascii_display_boundaries(
+    monkeypatch,
+) -> None:
+    service = _ModelPackService()
+    client = _client(service)
+    display_name = "\u00a0Licensed Finance Q4\u00a0"
+    attestation = _desktop_attestation(
+        monkeypatch,
+        nonce="6" * 32,
+        display_name=display_name,
+    )
+
+    response = client.post(
+        "/model-packs/desktop-activations",
+        json={
+            "model_id": "licensed/finance:q4",
+            "display_name": display_name,
+            "minimum_memory_gb": 16,
+            "license_id": "LicenseRef-Finance",
+            "expected_config_version": "config-1",
+            "expected_runtime_identity": "a" * 64,
+            "desktop_attestation": attestation,
+        },
+    )
+
+    assert response.status_code == 200
+    assert service.desktop_activations[0][1]["display_name"] == display_name
 
 
 def test_desktop_activation_returns_a_stable_registration_failure(monkeypatch) -> None:

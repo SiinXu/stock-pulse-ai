@@ -11,8 +11,10 @@ from src.model_pack.importer import ModelPackExecutor, ModelPackImporter
 from src.model_pack.manifest import (
     MANIFEST_FILENAME,
     MODEL_PACK_FORMAT_VERSION,
+    normalize_manifest_text,
     parse_manifest,
     parse_manifest_bytes,
+    strip_portable_whitespace,
 )
 from src.model_pack.models import (
     InspectedModelPack,
@@ -61,7 +63,9 @@ __all__ = [
     "consume_desktop_model_pack_attestation",
     "inspect_model_pack",
     "normalize_ollama_native_base_url",
+    "normalize_manifest_text",
     "parse_manifest",
     "parse_manifest_bytes",
     "parse_modelfile",
+    "strip_portable_whitespace",
 ]

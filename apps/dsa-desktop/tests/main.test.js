@@ -1063,7 +1063,7 @@ test('Desktop Model Pack attestation binds validated metadata to one short-lived
   const nowMs = 1784966400000;
   const token = mainModule.createDesktopModelPackAttestation({
     modelId: 'licensed/finance:q4',
-    displayName: 'Licensed Finance Q4',
+    displayName: '\u00a0Licensed Finance Q4\u00a0',
     minimumMemoryGb: 16,
     licenseId: 'LicenseRef-Finance',
     expectedConfigVersion: 'config-1',
@@ -1086,7 +1086,7 @@ test('Desktop Model Pack attestation binds validated metadata to one short-lived
     expiresAt: nowMs + mainModule.DESKTOP_MODEL_PACK_ATTESTATION_TTL_MS,
     nonce: 'b'.repeat(32),
     modelId: 'licensed/finance:q4',
-    displayName: 'Licensed Finance Q4',
+    displayName: '\u00a0Licensed Finance Q4\u00a0',
     minimumMemoryGb: 16,
     licenseId: 'LicenseRef-Finance',
     expectedConfigVersion: 'config-1',

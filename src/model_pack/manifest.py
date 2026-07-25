@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from typing import Any, Dict, Iterable, Mapping
 
@@ -16,12 +17,26 @@ MAX_METADATA_TEXT_LENGTH = 160
 MODEL_ID_PATTERN = re.compile(
     r"^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:/[a-z0-9]+(?:[._-][a-z0-9]+)*)?"
     r"(?::[a-z0-9]+(?:[._-][a-z0-9]+)*)?$",
-    re.IGNORECASE,
+    re.ASCII | re.IGNORECASE,
 )
-SAFE_FILENAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+SAFE_FILENAME_PATTERN = re.compile(
+    r"^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9_-])?$"
+)
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 LICENSE_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9.+-]{0,127}$")
 REQUIRED_FILE_ROLES = frozenset({"gguf", "modelfile", "license"})
+MAX_PORTABLE_JSON_INTEGER = (2**53) - 1
+_PORTABLE_TRIM_CHARACTERS = " \t\n\r\f\v"
+_WINDOWS_RESERVED_BASENAMES = frozenset(
+    {
+        "AUX",
+        "CON",
+        "NUL",
+        "PRN",
+        *(f"COM{index}" for index in range(1, 10)),
+        *(f"LPT{index}" for index in range(1, 10)),
+    }
+)
 
 _MANIFEST_KEYS = frozenset(
     {
@@ -64,7 +79,12 @@ def _require_exact_keys(
         raise _invalid_manifest(f"{location} has unsupported fields {', '.join(extra)}")
 
 
-def _require_text(
+def strip_portable_whitespace(value: str) -> str:
+    """Trim only the ASCII whitespace shared by Python and JavaScript."""
+    return value.strip(_PORTABLE_TRIM_CHARACTERS)
+
+
+def normalize_manifest_text(
     value: Any,
     *,
     field_name: str,
@@ -73,22 +93,48 @@ def _require_text(
     """Normalize one bounded visible metadata string."""
     if not isinstance(value, str):
         raise _invalid_manifest(f"{field_name} must be text")
-    normalized = value.strip()
-    if not normalized or len(normalized) > max_length:
+    normalized = strip_portable_whitespace(value)
+    scalar_length = len(normalized)
+    if not normalized or scalar_length > max_length:
         raise _invalid_manifest(
             f"{field_name} must contain between 1 and {max_length} characters"
         )
+    if any(0xD800 <= ord(character) <= 0xDFFF for character in normalized):
+        raise _invalid_manifest(f"{field_name} contains invalid Unicode")
     if any(ord(character) < 32 for character in normalized):
         raise _invalid_manifest(f"{field_name} contains control characters")
     return normalized
 
 
+def is_portable_pack_filename(value: str) -> bool:
+    """Return whether one leaf is portable across supported filesystems."""
+    if SAFE_FILENAME_PATTERN.fullmatch(value) is None or value in {".", ".."}:
+        return False
+    basename = value.split(".", 1)[0].upper()
+    return basename not in _WINDOWS_RESERVED_BASENAMES
+
+
 def validate_pack_filename(value: Any, *, field_name: str) -> str:
     """Validate one root-level portable payload filename."""
-    filename = _require_text(value, field_name=field_name, max_length=128)
-    if not SAFE_FILENAME_PATTERN.fullmatch(filename) or filename in {".", ".."}:
+    filename = normalize_manifest_text(value, field_name=field_name, max_length=128)
+    if not is_portable_pack_filename(filename):
         raise _invalid_manifest(f"{field_name} must be a root-level safe filename")
     return filename
+
+
+def _normalize_json_integer(value: Any, *, field_name: str) -> int:
+    """Normalize one finite semantic JSON integer shared with JavaScript."""
+    if isinstance(value, bool):
+        raise _invalid_manifest(f"{field_name} must be an integer")
+    if isinstance(value, int):
+        normalized = value
+    elif isinstance(value, float) and math.isfinite(value) and value.is_integer():
+        normalized = int(value)
+    else:
+        raise _invalid_manifest(f"{field_name} must be an integer")
+    if abs(normalized) > MAX_PORTABLE_JSON_INTEGER:
+        raise _invalid_manifest(f"{field_name} must be a safe integer")
+    return normalized
 
 
 def parse_manifest_bytes(payload: bytes) -> ModelPackManifest:
@@ -98,12 +144,12 @@ def parse_manifest_bytes(payload: bytes) -> ModelPackManifest:
             f"manifest.json must contain between 1 and {MAX_MANIFEST_BYTES} bytes"
         )
     try:
-        decoded = payload.decode("utf-8-sig")
+        decoded = payload.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise _invalid_manifest("manifest.json must use UTF-8") from exc
     try:
         raw = json.loads(decoded)
-    except (json.JSONDecodeError, ValueError) as exc:
+    except (json.JSONDecodeError, RecursionError, ValueError) as exc:
         raise _invalid_manifest("manifest.json must contain valid JSON") from exc
     if not isinstance(raw, dict):
         raise _invalid_manifest("the root value must be an object")
@@ -114,9 +160,10 @@ def parse_manifest(raw: Mapping[str, Any]) -> ModelPackManifest:
     """Parse one strict format-v1 manifest without accepting extra fields."""
     _require_exact_keys(raw, _MANIFEST_KEYS, location="the manifest")
 
-    format_version = raw.get("format_version")
-    if not isinstance(format_version, int) or isinstance(format_version, bool):
-        raise _invalid_manifest("format_version must be an integer")
+    format_version = _normalize_json_integer(
+        raw.get("format_version"),
+        field_name="format_version",
+    )
     if format_version != MODEL_PACK_FORMAT_VERSION:
         raise ModelPackError(
             "unsupported_format_version",
@@ -130,11 +177,18 @@ def parse_manifest(raw: Mapping[str, Any]) -> ModelPackManifest:
             },
         )
 
-    model_id = _require_text(raw.get("model_id"), field_name="model_id", max_length=96)
+    model_id = normalize_manifest_text(
+        raw.get("model_id"),
+        field_name="model_id",
+        max_length=96,
+    )
     if not MODEL_ID_PATTERN.fullmatch(model_id):
         raise _invalid_manifest("model_id is not a valid Ollama model name")
 
-    display_name = _require_text(raw.get("display_name"), field_name="display_name")
+    display_name = normalize_manifest_text(
+        raw.get("display_name"),
+        field_name="display_name",
+    )
     gguf_file = validate_pack_filename(raw.get("gguf_file"), field_name="gguf_file")
     if not gguf_file.lower().endswith(".gguf"):
         raise _invalid_manifest("gguf_file must end in .gguf")
@@ -144,7 +198,7 @@ def parse_manifest(raw: Mapping[str, Any]) -> ModelPackManifest:
     if not isinstance(raw_license, dict):
         raise _invalid_manifest("license must be an object")
     _require_exact_keys(raw_license, _LICENSE_KEYS, location="license")
-    license_id = _require_text(
+    license_id = normalize_manifest_text(
         raw_license.get("id"),
         field_name="license.id",
         max_length=128,
@@ -156,12 +210,11 @@ def parse_manifest(raw: Mapping[str, Any]) -> ModelPackManifest:
         field_name="license.file",
     )
 
-    minimum_memory_gb = raw.get("minimum_memory_gb")
-    if (
-        not isinstance(minimum_memory_gb, int)
-        or isinstance(minimum_memory_gb, bool)
-        or not 1 <= minimum_memory_gb <= 2048
-    ):
+    minimum_memory_gb = _normalize_json_integer(
+        raw.get("minimum_memory_gb"),
+        field_name="minimum_memory_gb",
+    )
+    if not 1 <= minimum_memory_gb <= 2048:
         raise _invalid_manifest("minimum_memory_gb must be an integer from 1 to 2048")
 
     raw_files = raw.get("files")
@@ -183,26 +236,25 @@ def parse_manifest(raw: Mapping[str, Any]) -> ModelPackManifest:
             raise _invalid_manifest(
                 f"files[{index}].path cannot use the reserved manifest.json name"
             )
-        role = _require_text(
+        role = normalize_manifest_text(
             raw_file.get("role"),
             field_name=f"files[{index}].role",
             max_length=16,
         )
         if role not in REQUIRED_FILE_ROLES:
             raise _invalid_manifest(f"files[{index}].role is unsupported")
-        digest = _require_text(
+        digest = normalize_manifest_text(
             raw_file.get("sha256"),
             field_name=f"files[{index}].sha256",
             max_length=64,
         ).lower()
         if not SHA256_PATTERN.fullmatch(digest):
             raise _invalid_manifest(f"files[{index}].sha256 must be 64 lowercase hex characters")
-        size_bytes = raw_file.get("size_bytes")
-        if (
-            not isinstance(size_bytes, int)
-            or isinstance(size_bytes, bool)
-            or size_bytes < 1
-        ):
+        size_bytes = _normalize_json_integer(
+            raw_file.get("size_bytes"),
+            field_name=f"files[{index}].size_bytes",
+        )
+        if size_bytes < 1:
             raise _invalid_manifest(f"files[{index}].size_bytes must be a positive integer")
         if path.casefold() in seen_paths:
             raise _invalid_manifest("files contains duplicate paths")

@@ -4,6 +4,7 @@ const { EventEmitter } = require('node:events');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { Writable } = require('node:stream');
 const test = require('node:test');
 
 const {
@@ -168,17 +169,36 @@ test('manifest and Modelfile parsers enforce the shared data-only contract', () 
       Buffer.from(
         'FROM ./weights.gguf\n' +
         'PARAMETER temperature 0.2\n' +
+        'PARAMETER num_ctx 8192\n' +
+        'PARAMETER use_mmap true\n' +
         'PARAMETER stop "END"\n' +
         'PARAMETER stop "DONE"\n' +
+        'PARAMETER stop "\\n"\n' +
         'SYSTEM """Portable system text"""\n'
       ),
       'weights.gguf'
     );
     assert.deepEqual(portable.parameters, {
       temperature: 0.2,
-      stop: ['END', 'DONE'],
+      num_ctx: 8192,
+      use_mmap: true,
+      stop: ['END', 'DONE', '\\n'],
     });
     assert.equal(portable.system, 'Portable system text');
+    assert.deepEqual(
+      parseModelPackModelfile(
+        Buffer.from('FROM ./weights.gguf\nPARAMETER stop "END"\n'),
+        'weights.gguf'
+      ).parameters,
+      { stop: ['END'] }
+    );
+    assert.deepEqual(
+      parseModelPackModelfile(
+        Buffer.from('FROM ./weights.gguf\nPARAMETER temperature 0.10000000001\n'),
+        'weights.gguf'
+      ).parameters,
+      { temperature: 0.1 }
+    );
 
     assert.throws(
       () => parseModelPackModelfile(
@@ -191,6 +211,34 @@ test('manifest and Modelfile parsers enforce the shared data-only contract', () 
       'SYSTEM "quoted system text"',
       'TEMPLATE `quoted template text`',
       'PARAMETER temperature 0.1\nPARAMETER temperature 0.2',
+      'FROM\t./weights.gguf',
+      'SYSTEM \uFEFF"quoted system text"',
+      'SYSTEM safe\u2028ADAPTER ./outside.gguf',
+      'PARAMETER temperature NaN',
+      'PARAMETER temperature Infinity',
+      'PARAMETER temperature 1e999',
+      'PARAMETER temperature 1e39',
+      'PARAMETER temperature 1e-999',
+      'PARAMETER num_ctx 9007199254740992',
+      'PARAMETER num_ctx 9007199254740992.0',
+      'PARAMETER num_ctx 1.0',
+      'PARAMETER num_ctx 1e20',
+      'PARAMETER num_ctx 99999999999999999999999999999999999999999999999999',
+      'PARAMETER future_option 1',
+      'PARAMETER TEMPERATURE 0.1',
+      'PARAMETER use_mmap 1',
+      'PARAMETER stop true',
+      'ſYSTEM portable text',
+      'PARAMETER Key value',
+      'SYSTEM a\u200Db',
+      'PARAMETER stop "a\u200Bb"',
+      'TEMPLATE \u00A0template text\u00A0',
+      'PARAMETER stop "a\\"b"',
+      'PARAMETER stop "unclosed',
+      'PARAMETER stop unquoted',
+      'PARAMETER stop null',
+      'PARAMETER stop [1]',
+      'PARAMETER stop {"value":1}',
     ]) {
       assert.throws(
         () => parseModelPackModelfile(
@@ -204,9 +252,113 @@ test('manifest and Modelfile parsers enforce the shared data-only contract', () 
         )
       );
     }
+    const portableLines = parseModelPackModelfile(
+      Buffer.from(
+        'FROM ./weights.gguf\r\n' +
+        'PARAMETER temperature 0.2\r\n' +
+        'SYSTEM portable text\r\n'
+      ),
+      'weights.gguf'
+    );
+    assert.equal(portableLines.fromFile, 'weights.gguf');
+    assert.deepEqual(portableLines.parameters, { temperature: 0.2 });
+    assert.equal(portableLines.system, 'portable text');
+    const tripleBlocks = parseModelPackModelfile(
+      Buffer.from(
+        'FROM ./weights.gguf\r\n' +
+        'SYSTEM """\r\nsystem text\r\n"""\r\n' +
+        'TEMPLATE """\r\ntemplate text\r\n"""\r\n'
+      ),
+      'weights.gguf'
+    );
+    assert.equal(tripleBlocks.system, '\nsystem text\n');
+    assert.equal(tripleBlocks.template, '\ntemplate text\n');
+    assert.throws(
+      () => parseModelPackModelfile(
+        Buffer.from('\uFEFFFROM ./weights.gguf\n'),
+        'weights.gguf'
+      ),
+      (error) => error instanceof ModelPackError
+        && error.code === 'unsafe_modelfile'
+        && /byte-order mark/.test(error.userMessage)
+    );
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
+});
+
+test('manifest uses ASCII model ids and Unicode scalar display lengths', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-model-pack-unicode-'));
+  const { manifest } = writePack(tempRoot);
+  try {
+    manifest.display_name = '😀'.repeat(160);
+    const parsed = parseModelPackManifest(Buffer.from(JSON.stringify(manifest)));
+    assert.equal([...parsed.displayName].length, 160);
+
+    manifest.model_id = 'K:q4';
+    assert.throws(
+      () => parseModelPackManifest(Buffer.from(JSON.stringify(manifest))),
+      (error) => error instanceof ModelPackError
+        && error.code === 'invalid_manifest'
+        && /model_id/.test(error.userMessage)
+    );
+
+    manifest.model_id = 'stockpulse/portable:q4';
+    manifest.display_name = '😀'.repeat(161);
+    assert.throws(
+      () => parseModelPackManifest(Buffer.from(JSON.stringify(manifest))),
+      (error) => error instanceof ModelPackError
+        && error.code === 'invalid_manifest'
+        && /160 characters/.test(error.userMessage)
+    );
+
+    manifest.display_name = '\uD800';
+    assert.throws(
+      () => parseModelPackManifest(Buffer.from(JSON.stringify(manifest))),
+      (error) => error instanceof ModelPackError
+        && error.code === 'invalid_manifest'
+        && /invalid Unicode/.test(error.userMessage)
+    );
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('manifest normalizes semantic JSON integers across transports', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-model-pack-integers-'));
+  const { manifest } = writePack(tempRoot);
+  try {
+    manifest.format_version = 1.0;
+    manifest.minimum_memory_gb = 8.0;
+    manifest.files = manifest.files.map((entry) => ({
+      ...entry,
+      size_bytes: Number(`${entry.size_bytes}.0`),
+    }));
+    const parsed = parseModelPackManifest(Buffer.from(JSON.stringify(manifest)));
+    assert.equal(parsed.formatVersion, 1);
+    assert.equal(parsed.minimumMemoryGb, 8);
+    assert.ok(parsed.files.every((entry) => Number.isSafeInteger(entry.sizeBytes)));
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('manifest maps deeply nested JSON to a stable validation error', () => {
+  const depth = 1200;
+  const payload = Buffer.from(
+    '{"format_version":1,"model_id":"stockpulse/deep:q4","display_name":' +
+    '['.repeat(depth) +
+    '"deep"' +
+    ']'.repeat(depth) +
+    ',"gguf_file":"weights.gguf","modelfile":"Modelfile",' +
+    '"license":{"id":"LicenseRef-Test","file":"LICENSE"},' +
+    '"minimum_memory_gb":8,"files":[]}'
+  );
+
+  assert.throws(
+    () => parseModelPackManifest(payload),
+    (error) => error instanceof ModelPackError && error.code === 'invalid_manifest'
+  );
 });
 
 test('manifest rejects declared payloads above the shared 64 GiB limit', () => {
@@ -236,6 +388,25 @@ test('manifest reserves its own filename for metadata', () => {
         && error.code === 'invalid_manifest'
         && /reserved manifest\.json/i.test(error.userMessage)
     );
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('manifest rejects cross-platform unsafe payload filenames', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-model-pack-filenames-'));
+  const { manifest } = writePack(tempRoot);
+  try {
+    for (const unsafeFilename of ['CON', 'nul.txt', 'LICENSE.']) {
+      manifest.license.file = unsafeFilename;
+      manifest.files.find((entry) => entry.role === 'license').path = unsafeFilename;
+      assert.throws(
+        () => parseModelPackManifest(Buffer.from(JSON.stringify(manifest))),
+        (error) => error instanceof ModelPackError
+          && error.code === 'invalid_manifest'
+          && /root-level safe filename/.test(error.userMessage)
+      );
+    }
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
@@ -569,19 +740,76 @@ test('archive inspection rejects duplicate names before extraction', async () =>
   }
 });
 
+test('archive inspection rejects non-ASCII member identity before extraction', async () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-model-pack-unicode-entry-'));
+  const source = path.join(tempRoot, 'source');
+  writePack(source);
+  const archive = archiveFromDirectory(
+    source,
+    path.join(tempRoot, 'unicode-entry.modelpack'),
+    [
+      ['ſ.txt', Buffer.from('unicode')],
+      ['s.txt', Buffer.from('ascii')],
+    ]
+  );
+  try {
+    await assert.rejects(
+      inspectModelPack(archive, { diskFreeProvider: enoughDisk }),
+      (error) => error instanceof ModelPackError
+        && error.code === 'unsafe_archive_entry'
+    );
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('archive inspection rejects Windows-reserved extra members', async () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-model-pack-reserved-entry-'));
+  const source = path.join(tempRoot, 'source');
+  writePack(source);
+  const archive = archiveFromDirectory(
+    source,
+    path.join(tempRoot, 'reserved-entry.modelpack'),
+    [['CON.txt', Buffer.from('reserved')]]
+  );
+  try {
+    await assert.rejects(
+      inspectModelPack(archive, { diskFreeProvider: enoughDisk }),
+      (error) => error instanceof ModelPackError
+        && error.code === 'unsafe_archive_entry'
+    );
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test('desktop import spawns trusted Ollama command with fixed argument positions', async () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-model-pack-import-'));
   const source = path.join(tempRoot, 'source');
-  writePack(source);
+  writePack(source, {
+    modelfileText:
+      'FROM ./weights.gguf\r\n' +
+      'PARAMETER num_ctx 8192\r\n' +
+      'PARAMETER use_mmap true\r\n' +
+      'PARAMETER stop "END"\r\n' +
+      'SYSTEM """\r\nsystem text\r\n"""\r\n' +
+      'TEMPLATE template text\r\n',
+  });
   const archive = archiveFromDirectory(source, path.join(tempRoot, 'test.modelpack'));
   const calls = [];
   const progress = [];
   const spawnImpl = (command, args, options) => {
-    calls.push({ command, args: [...args], options });
+    calls.push({
+      command,
+      args: [...args],
+      options,
+      canonicalModelfile: fs.readFileSync(args[3], 'utf8'),
+    });
     const child = new EventEmitter();
     child.kill = () => true;
     setImmediate(() => {
       child.emit('exit', 0, null);
+      child.emit('close', 0, null);
     });
     return child;
   };
@@ -602,6 +830,16 @@ test('desktop import spawns trusted Ollama command with fixed argument positions
       '-f',
     ]);
     assert.match(calls[0].args[3], /Modelfile$/);
+    assert.equal(
+      calls[0].canonicalModelfile,
+      'FROM ./weights.gguf\n' +
+      'PARAMETER num_ctx 8192\n' +
+      'PARAMETER use_mmap true\n' +
+      'PARAMETER stop "END"\n' +
+      'TEMPLATE """template text"""\n' +
+      'SYSTEM """\nsystem text\n"""\n'
+    );
+    assert.doesNotMatch(calls[0].canonicalModelfile, /LICENSE/u);
     assert.equal(calls[0].options.shell, false);
     assert.equal(calls[0].options.stdio, 'ignore');
     assert.deepEqual(progress, [
@@ -609,6 +847,59 @@ test('desktop import spawns trusted Ollama command with fixed argument positions
       [90, 'Model created in Ollama'],
     ]);
     assert.equal(fs.existsSync(calls[0].options.cwd), false);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('post-preflight staging ENOSPC stays actionable', async (t) => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-model-pack-enospc-'));
+  writePack(tempRoot);
+  const diskError = Object.assign(new Error('disk full'), { code: 'ENOSPC' });
+  t.mock.method(fs.promises, 'writeFile', async () => {
+    throw diskError;
+  });
+
+  try {
+    await assert.rejects(
+      inspectModelPack(tempRoot, { diskFreeProvider: enoughDisk }),
+      (error) => error instanceof ModelPackError
+        && error.code === 'insufficient_disk_space'
+        && /Free disk space/.test(error.userMessage)
+    );
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('archive output errors close extraction streams before typed cleanup', async (t) => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-model-pack-stream-'));
+  const source = path.join(tempRoot, 'source');
+  writePack(source);
+  const archive = archiveFromDirectory(source, path.join(tempRoot, 'test.modelpack'));
+  let outputClosed = false;
+
+  class BrokenOutput extends Writable {
+    _write(_chunk, _encoding, callback) {
+      const error = Object.assign(new Error('injected output failure'), { code: 'EIO' });
+      callback(error);
+    }
+  }
+
+  t.mock.method(fs, 'createWriteStream', () => {
+    const output = new BrokenOutput({ emitClose: true });
+    output.once('close', () => {
+      outputClosed = true;
+    });
+    return output;
+  });
+
+  try {
+    await assert.rejects(
+      inspectModelPack(archive, { diskFreeProvider: enoughDisk }),
+      (error) => error instanceof ModelPackError && error.code === 'invalid_archive'
+    );
+    assert.equal(outputClosed, true);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
@@ -627,6 +918,43 @@ test('validation failures never spawn Ollama', async () => {
       (error) => error instanceof ModelPackError && error.code === 'hash_mismatch'
     );
     assert.deepEqual(calls, []);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('Ollama timeout waits for child close before staging cleanup', async () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-model-pack-timeout-'));
+  writePack(tempRoot);
+  const child = new EventEmitter();
+  let inspectedRoot = null;
+  let killed = false;
+  child.kill = () => {
+    killed = true;
+    return true;
+  };
+
+  try {
+    const pending = importModelPack(tempRoot, {
+      diskFreeProvider: enoughDisk,
+      timeoutMs: 5,
+      spawnImpl: (_command, _args, options) => {
+        inspectedRoot = options.cwd;
+        return child;
+      },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.equal(killed, true);
+    assert.equal(fs.existsSync(inspectedRoot), true);
+    child.emit('exit', null, 'SIGTERM');
+    assert.equal(fs.existsSync(inspectedRoot), true);
+    child.emit('close', null, 'SIGTERM');
+
+    await assert.rejects(
+      pending,
+      (error) => error instanceof ModelPackError && error.code === 'ollama_create_timeout'
+    );
+    assert.equal(fs.existsSync(inspectedRoot), false);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

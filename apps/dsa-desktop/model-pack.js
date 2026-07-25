@@ -18,16 +18,51 @@ const MODEL_PACK_HASH_CHUNK_SIZE = 1024 * 1024;
 const MODEL_PACK_DISK_RESERVE_MIN_BYTES = 64 * 1024 * 1024;
 const MODEL_PACK_DISK_RESERVE_MAX_BYTES = 512 * 1024 * 1024;
 const MODEL_PACK_CREATE_TIMEOUT_MS = 30 * 60 * 1000;
+const MODEL_PACK_TERMINATION_GRACE_MS = 5000;
 const MODEL_PACK_OLLAMA_BINARY = 'ollama';
 const MODEL_PACK_MODEL_ID_PATTERN =
-  /^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)?(?::[a-z0-9]+(?:[._-][a-z0-9]+)*)?$/i;
-const MODEL_PACK_SAFE_FILENAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+  /^[A-Za-z0-9]+(?:[._-][A-Za-z0-9]+)*(?:\/[A-Za-z0-9]+(?:[._-][A-Za-z0-9]+)*)?(?::[A-Za-z0-9]+(?:[._-][A-Za-z0-9]+)*)?$/;
+const MODEL_PACK_SAFE_FILENAME_PATTERN =
+  /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9_-])?$/;
 const MODEL_PACK_SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const MODEL_PACK_LICENSE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9.+-]{0,127}$/;
-const MODEL_PACK_PARAMETER_NAME_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
+const MODEL_PACK_INSTRUCTION_NAME_PATTERN = /^[A-Za-z]+$/;
+const MODEL_PACK_PARAMETER_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
 const MODEL_PACK_REQUIRED_ROLES = Object.freeze(['gguf', 'modelfile', 'license']);
 const MODEL_PACK_ALLOWED_INSTRUCTIONS = new Set(['FROM', 'PARAMETER', 'TEMPLATE', 'SYSTEM']);
 const MODEL_PACK_REPEATABLE_PARAMETERS = new Set(['stop']);
+const MODEL_PACK_MAX_PORTABLE_INTEGER = Number.MAX_SAFE_INTEGER;
+const MODEL_PACK_PARAMETER_TYPES = Object.freeze({
+  num_ctx: 'integer',
+  num_batch: 'integer',
+  num_gpu: 'integer',
+  main_gpu: 'integer',
+  use_mmap: 'boolean',
+  num_thread: 'integer',
+  draft_num_predict: 'integer',
+  num_keep: 'integer',
+  seed: 'integer',
+  num_predict: 'integer',
+  top_k: 'integer',
+  top_p: 'float',
+  min_p: 'float',
+  typical_p: 'float',
+  repeat_last_n: 'integer',
+  temperature: 'float',
+  repeat_penalty: 'float',
+  presence_penalty: 'float',
+  frequency_penalty: 'float',
+  stop: 'string_list',
+});
+const MODEL_PACK_INTEGER_VALUE_PATTERN = /^-?(?:0|[1-9][0-9]*)$/;
+const MODEL_PACK_WINDOWS_RESERVED_BASENAMES = new Set([
+  'AUX',
+  'CON',
+  'NUL',
+  'PRN',
+  ...Array.from({ length: 9 }, (_unused, index) => `COM${index + 1}`),
+  ...Array.from({ length: 9 }, (_unused, index) => `LPT${index + 1}`),
+]);
 
 class ModelPackError extends Error {
   constructor(code, userMessage, details = {}) {
@@ -63,19 +98,58 @@ function requireText(value, fieldName, maxLength = 160) {
   if (typeof value !== 'string') {
     throw invalidManifest(`${fieldName} must be text`);
   }
-  const normalized = value.trim();
-  if (!normalized || normalized.length > maxLength) {
+  const normalized = trimPortableWhitespace(value);
+  const characters = [...normalized];
+  if (!normalized || characters.length > maxLength) {
     throw invalidManifest(`${fieldName} must contain between 1 and ${maxLength} characters`);
   }
-  if ([...normalized].some((character) => character.charCodeAt(0) < 32)) {
+  if (characters.some((character) => {
+    const codePoint = character.codePointAt(0);
+    return codePoint >= 0xd800 && codePoint <= 0xdfff;
+  })) {
+    throw invalidManifest(`${fieldName} contains invalid Unicode`);
+  }
+  if (characters.some((character) => character.codePointAt(0) < 32)) {
     throw invalidManifest(`${fieldName} contains control characters`);
   }
   return normalized;
 }
 
+function trimPortableWhitespace(value) {
+  return value.replace(/^[\t\n\v\f\r ]+|[\t\n\v\f\r ]+$/g, '');
+}
+
+function trimModelPackSpaces(value) {
+  return value.replace(/^ +| +$/g, '');
+}
+
+function requireOllamaPrintableText(value, instruction) {
+  for (const character of value) {
+    if (
+      character !== '\n'
+      && character !== ' '
+      && !/^[\p{L}\p{M}\p{N}\p{P}\p{S}]$/u.test(character)
+    ) {
+      throw new ModelPackError(
+        'unsafe_modelfile',
+        `${instruction} contains text Ollama cannot preserve. ` +
+          'Fix the Modelfile and rebuild the pack.'
+      );
+    }
+  }
+  return value;
+}
+
+function isPortablePackFilename(value) {
+  if (!MODEL_PACK_SAFE_FILENAME_PATTERN.test(value) || value === '.' || value === '..') {
+    return false;
+  }
+  return !MODEL_PACK_WINDOWS_RESERVED_BASENAMES.has(value.split('.', 1)[0].toUpperCase());
+}
+
 function requireFilename(value, fieldName) {
   const filename = requireText(value, fieldName, 128);
-  if (!MODEL_PACK_SAFE_FILENAME_PATTERN.test(filename) || filename === '.' || filename === '..') {
+  if (!isPortablePackFilename(filename)) {
     throw invalidManifest(`${fieldName} must be a root-level safe filename`);
   }
   return filename;
@@ -214,27 +288,119 @@ function parseModelPackManifest(payload) {
   });
 }
 
-function parseParameterValue(rawValue) {
-  const value = rawValue.trim();
+function parseQuotedParameterText(rawValue) {
+  const value = trimModelPackSpaces(rawValue);
   if (!value) {
     throw new ModelPackError(
       'unsafe_modelfile',
       'PARAMETER requires a name and value. Fix the Modelfile and rebuild the pack.'
     );
   }
+  if (value.length < 2 || !(value.startsWith('"') && value.endsWith('"'))) {
+    throw new ModelPackError(
+      'unsafe_modelfile',
+      'PARAMETER stop values must use one complete pair of double quotes. ' +
+        'Fix the Modelfile and rebuild the pack.'
+    );
+  }
+  const inner = value.slice(1, -1);
+  if (inner.includes('"')) {
+    throw new ModelPackError(
+      'unsafe_modelfile',
+      'PARAMETER quoted text must not contain inner double quotes. ' +
+        'Fix the Modelfile and rebuild the pack.'
+    );
+  }
+  return requireOllamaPrintableText(inner, 'PARAMETER stop');
+}
+
+function parseParameterValue(name, rawValue) {
+  const value = trimModelPackSpaces(rawValue);
+  if (!value) {
+    throw new ModelPackError(
+      'unsafe_modelfile',
+      'PARAMETER requires a name and value. Fix the Modelfile and rebuild the pack.'
+    );
+  }
+  const parameterType = MODEL_PACK_PARAMETER_TYPES[name];
+  if (parameterType === 'string_list') {
+    return parseQuotedParameterText(value);
+  }
+  if (parameterType === 'boolean') {
+    if (value !== 'true' && value !== 'false') {
+      throw new ModelPackError(
+        'unsafe_modelfile',
+        `PARAMETER ${name} requires lowercase true or false. ` +
+          'Fix the Modelfile and rebuild the pack.'
+      );
+    }
+    return value === 'true';
+  }
+  if (parameterType === 'integer') {
+    if (!MODEL_PACK_INTEGER_VALUE_PATTERN.test(value)) {
+      throw new ModelPackError(
+        'unsafe_modelfile',
+        `PARAMETER ${name} requires a base-10 integer. ` +
+          'Fix the Modelfile and rebuild the pack.'
+      );
+    }
+    const parsed = Number(value);
+    if (!Number.isSafeInteger(parsed)) {
+      throw new ModelPackError(
+        'unsafe_modelfile',
+        'PARAMETER integers must be within the portable JSON safe range. ' +
+          'Fix the Modelfile and rebuild the pack.'
+      );
+    }
+    return Object.is(parsed, -0) ? 0 : parsed;
+  }
   try {
     const parsed = JSON.parse(value);
-    if (parsed === null || Array.isArray(parsed) || typeof parsed === 'object') {
-      return value;
+    if (typeof parsed !== 'number' || !Number.isFinite(parsed)) {
+      throw new ModelPackError(
+        'unsafe_modelfile',
+        `PARAMETER ${name} requires a finite JSON number. Fix the Modelfile and rebuild the pack.`
+      );
     }
-    return parsed;
-  } catch (_error) {
-    return value;
+    const portableFloat = Math.fround(parsed);
+    if (!Number.isFinite(portableFloat)) {
+      throw new ModelPackError(
+        'unsafe_modelfile',
+        `PARAMETER ${name} must fit Ollama's finite 32-bit float range. ` +
+          'Fix the Modelfile and rebuild the pack.'
+      );
+    }
+    const nonzeroMantissa = /[1-9]/.test(value.split(/[eE]/u, 1)[0]);
+    if (nonzeroMantissa && portableFloat === 0) {
+      throw new ModelPackError(
+        'unsafe_modelfile',
+        `PARAMETER ${name} must not underflow Ollama's 32-bit float range. ` +
+          'Fix the Modelfile and rebuild the pack.'
+      );
+    }
+    if (portableFloat === 0) {
+      return 0;
+    }
+    for (let precision = 1; precision <= 9; precision += 1) {
+      const candidate = Number(portableFloat.toPrecision(precision));
+      if (Object.is(Math.fround(candidate), portableFloat)) {
+        return candidate;
+      }
+    }
+    throw new Error('finite float32 must have a portable decimal projection');
+  } catch (error) {
+    if (error instanceof ModelPackError) {
+      throw error;
+    }
+    throw new ModelPackError(
+      'unsafe_modelfile',
+      `PARAMETER ${name} requires a finite JSON number. Fix the Modelfile and rebuild the pack.`
+    );
   }
 }
 
 function parseMultilineValue(lines, index, initial, instruction) {
-  const value = initial.trim();
+  const value = trimModelPackSpaces(initial);
   if (!value) {
     throw new ModelPackError(
       'unsafe_modelfile',
@@ -249,31 +415,43 @@ function parseMultilineValue(lines, index, initial, instruction) {
           'Use unquoted text or a triple-quoted block and rebuild the pack.'
       );
     }
-    return { value, nextIndex: index };
+    return {
+      value: requireOllamaPrintableText(value, instruction),
+      nextIndex: index,
+    };
   }
   const initialRemainder = value.slice(3);
   const sameLineEnd = initialRemainder.indexOf('"""');
   if (sameLineEnd >= 0) {
-    if (initialRemainder.slice(sameLineEnd + 3).trim()) {
+    if (trimModelPackSpaces(initialRemainder.slice(sameLineEnd + 3))) {
       throw new ModelPackError(
         'unsafe_modelfile',
         `${instruction} has content after its closing delimiter. Rebuild the pack.`
       );
     }
-    return { value: initialRemainder.slice(0, sameLineEnd), nextIndex: index };
+    return {
+      value: requireOllamaPrintableText(
+        initialRemainder.slice(0, sameLineEnd),
+        instruction
+      ),
+      nextIndex: index,
+    };
   }
-  const block = initialRemainder ? [initialRemainder] : [];
+  const block = [initialRemainder];
   for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
     const end = lines[cursor].indexOf('"""');
     if (end >= 0) {
       block.push(lines[cursor].slice(0, end));
-      if (lines[cursor].slice(end + 3).trim()) {
+      if (trimModelPackSpaces(lines[cursor].slice(end + 3))) {
         throw new ModelPackError(
           'unsafe_modelfile',
           `${instruction} has content after its closing delimiter. Rebuild the pack.`
         );
       }
-      return { value: block.join('\n'), nextIndex: cursor };
+      return {
+        value: requireOllamaPrintableText(block.join('\n'), instruction),
+        nextIndex: cursor,
+      };
     }
     block.push(lines[cursor]);
   }
@@ -296,26 +474,59 @@ function parseModelPackModelfile(payload, expectedGgufFile) {
   }
   let text;
   try {
-    text = new TextDecoder('utf-8', { fatal: true }).decode(payload);
+    text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(payload);
   } catch (_error) {
     throw new ModelPackError('unsafe_modelfile', 'Modelfile must use UTF-8. Rebuild the pack.');
   }
   if (text.includes('\0')) {
     throw new ModelPackError('unsafe_modelfile', 'Modelfile contains a null byte. Rebuild the pack.');
   }
-  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/);
+  if (text.includes('\uFEFF')) {
+    throw new ModelPackError(
+      'unsafe_modelfile',
+      'Modelfile must not contain a UTF-8 byte-order mark; rebuild the pack.'
+    );
+  }
+  if (/[\u0085\u2028\u2029]/u.test(text)) {
+    throw new ModelPackError(
+      'unsafe_modelfile',
+      'Modelfile must use LF or CRLF line endings; rebuild the pack.'
+    );
+  }
+  text = text.replace(/\r\n/g, '\n');
+  if (text.includes('\r')) {
+    throw new ModelPackError(
+      'unsafe_modelfile',
+      'Modelfile must use LF or CRLF line endings; rebuild the pack.'
+    );
+  }
+  if (/[\t\v\f]/u.test(text)) {
+    throw new ModelPackError(
+      'unsafe_modelfile',
+      'Modelfile syntax must use ASCII spaces, not tabs or other separators. ' +
+        'Fix the file and rebuild the pack.'
+    );
+  }
+  const lines = text.split('\n');
   let fromFile = null;
   const parameters = {};
   let template = null;
   let system = null;
   for (let index = 0; index < lines.length; index += 1) {
-    const stripped = lines[index].trim();
+    const stripped = trimModelPackSpaces(lines[index]);
     if (!stripped || stripped.startsWith('#')) {
       continue;
     }
-    const separator = stripped.search(/\s/);
-    const instruction = (separator < 0 ? stripped : stripped.slice(0, separator)).toUpperCase();
-    const rawValue = separator < 0 ? '' : stripped.slice(separator).trim();
+    const separator = stripped.indexOf(' ');
+    const rawInstruction = separator < 0 ? stripped : stripped.slice(0, separator);
+    if (!MODEL_PACK_INSTRUCTION_NAME_PATTERN.test(rawInstruction)) {
+      throw new ModelPackError(
+        'unsafe_modelfile',
+        'Modelfile instruction names must use ASCII letters. Fix the file and rebuild the pack.'
+      );
+    }
+    const instruction = rawInstruction.toUpperCase();
+    const rawValue = separator < 0 ? '' : trimModelPackSpaces(stripped.slice(separator));
     if (!MODEL_PACK_ALLOWED_INSTRUCTIONS.has(instruction)) {
       throw new ModelPackError(
         'unsafe_modelfile',
@@ -345,29 +556,38 @@ function parseModelPackModelfile(payload, expectedGgufFile) {
       }
       fromFile = candidate;
     } else if (instruction === 'PARAMETER') {
-      const valueSeparator = rawValue.search(/\s/);
-      const name = (valueSeparator < 0 ? rawValue : rawValue.slice(0, valueSeparator)).toLowerCase();
-      const value = valueSeparator < 0 ? '' : rawValue.slice(valueSeparator).trim();
-      if (!MODEL_PACK_PARAMETER_NAME_PATTERN.test(name) || !value) {
+      const valueSeparator = rawValue.indexOf(' ');
+      const rawName = valueSeparator < 0 ? rawValue : rawValue.slice(0, valueSeparator);
+      const value = valueSeparator < 0 ? '' : trimModelPackSpaces(rawValue.slice(valueSeparator));
+      if (!MODEL_PACK_PARAMETER_NAME_PATTERN.test(rawName) || !value) {
         throw new ModelPackError(
           'unsafe_modelfile',
           'PARAMETER requires a safe name and value. Fix the Modelfile and rebuild the pack.'
         );
       }
-      const parsed = parseParameterValue(value);
-      if (Object.hasOwn(parameters, name)) {
-        if (!MODEL_PACK_REPEATABLE_PARAMETERS.has(name)) {
+      if (!Object.hasOwn(MODEL_PACK_PARAMETER_TYPES, rawName)) {
+        throw new ModelPackError(
+          'unsafe_modelfile',
+          `PARAMETER ${rawName} is not a supported lowercase Ollama option. ` +
+            'Fix the Modelfile and rebuild the pack.'
+        );
+      }
+      const parsed = parseParameterValue(rawName, value);
+      if (Object.hasOwn(parameters, rawName)) {
+        if (!MODEL_PACK_REPEATABLE_PARAMETERS.has(rawName)) {
           throw new ModelPackError(
             'unsafe_modelfile',
-            `PARAMETER ${name} may appear only once. ` +
+            `PARAMETER ${rawName} may appear only once. ` +
               'Only stop may be repeated; rebuild the pack.'
           );
         }
-        parameters[name] = Array.isArray(parameters[name])
-          ? [...parameters[name], parsed]
-          : [parameters[name], parsed];
+        parameters[rawName] = Array.isArray(parameters[rawName])
+          ? [...parameters[rawName], parsed]
+          : [parameters[rawName], parsed];
       } else {
-        parameters[name] = parsed;
+        parameters[rawName] = MODEL_PACK_REPEATABLE_PARAMETERS.has(rawName)
+          ? [parsed]
+          : parsed;
       }
     } else {
       const parsed = parseMultilineValue(lines, index, rawValue, instruction);
@@ -553,6 +773,45 @@ function diskRequiredBytes(payloadSize, archive) {
     Math.max(MODEL_PACK_DISK_RESERVE_MIN_BYTES, Math.floor(payloadSize / 20))
   );
   return payloadSize * (archive ? 2 : 1) + reserve;
+}
+
+function insufficientDiskSpaceError() {
+  return new ModelPackError(
+    'insufficient_disk_space',
+    'Not enough disk space to stage this Model Pack. Free disk space and try again.'
+  );
+}
+
+function rethrowIfInsufficientDisk(error) {
+  if (error && error.code === 'ENOSPC') {
+    throw insufficientDiskSpaceError();
+  }
+}
+
+async function createTemporaryRoot() {
+  try {
+    return await fs.promises.mkdtemp(
+      path.join(os.tmpdir(), 'stockpulse-model-pack-')
+    );
+  } catch (error) {
+    rethrowIfInsufficientDisk(error);
+    throw error;
+  }
+}
+
+async function removeTemporaryRoot(temporaryRoot, { preserveError = false } = {}) {
+  try {
+    await fs.promises.rm(temporaryRoot, {
+      recursive: true,
+      force: true,
+      maxRetries: 3,
+      retryDelay: 50,
+    });
+  } catch (error) {
+    if (!preserveError) {
+      throw error;
+    }
+  }
 }
 
 async function defaultDiskFreeBytes(location) {
@@ -819,6 +1078,7 @@ function safeArchiveFilename(name) {
     && name !== '.'
     && name !== '..'
     && !name.includes('/')
+    && isPortablePackFilename(name)
   );
 }
 
@@ -1006,9 +1266,47 @@ async function extractZipFiles(archivePath, destination, expectedNames, manifest
           flags: 'wx',
           mode: 0o600,
         });
-        input.on('error', fail);
-        output.on('error', fail);
-        output.on('finish', () => zipFile.readEntry());
+        let streamFailed = false;
+        const destroyAndWait = (stream) => {
+          if (!stream || stream.closed) {
+            return Promise.resolve();
+          }
+          return new Promise((done) => {
+            let finished = false;
+            const finish = () => {
+              if (finished) {
+                return;
+              }
+              finished = true;
+              clearTimeout(fallback);
+              done();
+            };
+            const fallback = setTimeout(finish, 1000);
+            if (typeof fallback.unref === 'function') {
+              fallback.unref();
+            }
+            stream.once('close', finish);
+            stream.destroy();
+          });
+        };
+        const failStreams = (streamError) => {
+          if (streamFailed) {
+            return;
+          }
+          streamFailed = true;
+          input.unpipe(output);
+          Promise.allSettled([
+            destroyAndWait(input),
+            destroyAndWait(output),
+          ]).then(() => fail(streamError));
+        };
+        input.once('error', failStreams);
+        output.once('error', failStreams);
+        output.once('close', () => {
+          if (!streamFailed) {
+            zipFile.readEntry();
+          }
+        });
         input.pipe(output);
       });
     });
@@ -1020,6 +1318,26 @@ async function extractZipFiles(archivePath, destination, expectedNames, manifest
     });
     zipFile.readEntry();
   });
+}
+
+function serializeCanonicalModelfile(manifest, modelfile) {
+  const lines = [`FROM ./${manifest.ggufFile}`];
+  for (const [name, rawValue] of Object.entries(modelfile.parameters)) {
+    const values = Array.isArray(rawValue) ? rawValue : [rawValue];
+    for (const value of values) {
+      const serialized = typeof value === 'string'
+        ? `"${value}"`
+        : JSON.stringify(value);
+      lines.push(`PARAMETER ${name} ${serialized}`);
+    }
+  }
+  if (modelfile.template !== null) {
+    lines.push(`TEMPLATE """${modelfile.template}"""`);
+  }
+  if (modelfile.system !== null) {
+    lines.push(`SYSTEM """${modelfile.system}"""`);
+  }
+  return `${lines.join('\n')}\n`;
 }
 
 async function buildInspection(root, manifest, warnings, cleanup) {
@@ -1045,12 +1363,21 @@ async function buildInspection(root, manifest, warnings, cleanup) {
       'The declared license must be UTF-8 text. Rebuild the pack.'
     );
   }
+  const canonicalModelfilePath = path.join(
+    root,
+    `.stockpulse-create-${crypto.randomBytes(16).toString('hex')}.Modelfile`
+  );
+  await fs.promises.writeFile(
+    canonicalModelfilePath,
+    serializeCanonicalModelfile(manifest, parsedModelfile),
+    { flag: 'wx', mode: 0o600, encoding: 'utf8' }
+  );
   return {
     root,
     manifest,
     modelfile: parsedModelfile,
     ggufPath: path.join(root, manifest.ggufFile),
-    modelfilePath: path.join(root, manifest.modelfile),
+    modelfilePath: canonicalModelfilePath,
     licensePath: path.join(root, manifest.license.file),
     warnings,
     cleanup,
@@ -1094,9 +1421,7 @@ async function inspectDirectory(source, diskFreeProvider) {
     diskFreeProvider,
     verifiedPayloadSize
   );
-  const temporaryRoot = await fs.promises.mkdtemp(
-    path.join(os.tmpdir(), 'stockpulse-model-pack-')
-  );
+  const temporaryRoot = await createTemporaryRoot();
   let currentName = MODEL_PACK_MANIFEST_FILENAME;
   try {
     await fs.promises.writeFile(
@@ -1119,13 +1444,14 @@ async function inspectDirectory(source, diskFreeProvider) {
       temporaryRoot,
       manifest,
       warnings,
-      () => fs.promises.rm(temporaryRoot, { recursive: true, force: true })
+      () => removeTemporaryRoot(temporaryRoot)
     );
   } catch (error) {
-    await fs.promises.rm(temporaryRoot, { recursive: true, force: true });
+    await removeTemporaryRoot(temporaryRoot, { preserveError: true });
     if (error instanceof ModelPackError) {
       throw error;
     }
+    rethrowIfInsufficientDisk(error);
     if (error && error.code === 'ENOENT') {
       throw new ModelPackError(
         'missing_file',
@@ -1140,9 +1466,7 @@ async function inspectDirectory(source, diskFreeProvider) {
 }
 
 async function inspectArchive(source, diskFreeProvider) {
-  const temporaryRoot = await fs.promises.mkdtemp(
-    path.join(os.tmpdir(), 'stockpulse-model-pack-')
-  );
+  const temporaryRoot = await createTemporaryRoot();
   try {
     const snapshotPath = await snapshotArchive(source, temporaryRoot, diskFreeProvider);
     const catalog = await readZipInventory(snapshotPath);
@@ -1172,10 +1496,11 @@ async function inspectArchive(source, diskFreeProvider) {
       extractedRoot,
       manifest,
       warnings,
-      () => fs.promises.rm(temporaryRoot, { recursive: true, force: true })
+      () => removeTemporaryRoot(temporaryRoot)
     );
   } catch (error) {
-    await fs.promises.rm(temporaryRoot, { recursive: true, force: true });
+    await removeTemporaryRoot(temporaryRoot, { preserveError: true });
+    rethrowIfInsufficientDisk(error);
     if (!(error instanceof ModelPackError)) {
       throw new ModelPackError(
         'invalid_archive',
@@ -1260,12 +1585,21 @@ function spawnOllamaCreate(
       return;
     }
     let settled = false;
+    let timedOut = false;
+    let terminationGraceTimer = null;
+    let forceWaitTimer = null;
+    const timeoutError = new ModelPackError(
+      'ollama_create_timeout',
+      'Ollama did not finish creating the model in time. Check Ollama and try again.'
+    );
     const finish = (error) => {
       if (settled) {
         return;
       }
       settled = true;
       clearTimeout(timer);
+      clearTimeout(terminationGraceTimer);
+      clearTimeout(forceWaitTimer);
       if (error) {
         reject(error);
       } else {
@@ -1273,15 +1607,27 @@ function spawnOllamaCreate(
       }
     };
     const timer = setTimeout(() => {
+      timedOut = true;
       if (child && typeof child.kill === 'function') {
-        child.kill();
+        try {
+          child.kill();
+        } catch (_error) {
+          // Continue to the bounded forced-termination path.
+        }
       }
-      finish(
-        new ModelPackError(
-          'ollama_create_timeout',
-          'Ollama did not finish creating the model in time. Check Ollama and try again.'
-        )
-      );
+      terminationGraceTimer = setTimeout(() => {
+        if (child && typeof child.kill === 'function') {
+          try {
+            child.kill('SIGKILL');
+          } catch (_error) {
+            // The final bounded wait still prevents an unbounded import task.
+          }
+        }
+        forceWaitTimer = setTimeout(
+          () => finish(timeoutError),
+          MODEL_PACK_TERMINATION_GRACE_MS
+        );
+      }, MODEL_PACK_TERMINATION_GRACE_MS);
     }, Math.max(1, Number(timeoutMs) || MODEL_PACK_CREATE_TIMEOUT_MS));
     child.once('error', () => {
       finish(
@@ -1291,7 +1637,11 @@ function spawnOllamaCreate(
         )
       );
     });
-    child.once('exit', (code, signal) => {
+    child.once('close', (code, signal) => {
+      if (timedOut) {
+        finish(timeoutError);
+        return;
+      }
       if (code === 0 && !signal) {
         finish();
         return;

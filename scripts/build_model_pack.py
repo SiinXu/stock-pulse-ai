@@ -47,6 +47,9 @@ def sha256_file(path: Path) -> str:
 def _require_regular_file(path: Path, *, label: str) -> Path:
     """Resolve one required source while rejecting links and non-files."""
     candidate = path.expanduser()
+    if not candidate.is_absolute():
+        candidate = Path.cwd() / candidate
+    candidate = candidate.parent.resolve() / candidate.name
     try:
         source_stat = candidate.lstat()
     except FileNotFoundError as exc:
@@ -64,7 +67,7 @@ def _require_regular_file(path: Path, *, label: str) -> Path:
             "invalid_source_file",
             f"{label} must be a regular file, not a directory or symbolic link.",
         )
-    return candidate.resolve()
+    return candidate
 
 
 def _default_output_name(model_id: str) -> str:
@@ -114,13 +117,45 @@ def _move_existing_to_backup(path: Path, *, label: str) -> Optional[Path]:
     return backup
 
 
+def _validate_no_source_alias(
+    path: Path,
+    *,
+    label: str,
+    protected_sources: Iterable[Path],
+) -> None:
+    """Reject an existing publication leaf that aliases any source inode."""
+    for source in protected_sources:
+        if path == source:
+            raise ModelPackError(
+                "invalid_output_path",
+                "Output and checksum paths cannot overwrite a Model Pack source file.",
+            )
+        try:
+            aliases_source = os.path.samefile(path, source)
+        except FileNotFoundError:
+            aliases_source = False
+        except OSError as exc:
+            raise ModelPackError(
+                "invalid_output_path",
+                f"{label} could not be compared with the source files.",
+            ) from exc
+        if aliases_source:
+            raise ModelPackError(
+                "invalid_output_path",
+                "Output and checksum paths cannot overwrite a Model Pack source file.",
+            )
+
+
 def _publish_output_pair(
     artifact_temporary: Path,
     checksum_temporary: Path,
     destination: Path,
     checksum_path: Path,
+    *,
+    protected_sources: Iterable[Path] = (),
 ) -> None:
     """Publish both outputs and restore the prior pair on ordinary failures."""
+    protected_sources = tuple(protected_sources)
     destination_backup: Optional[Path] = None
     checksum_backup: Optional[Path] = None
     artifact_published = False
@@ -128,6 +163,16 @@ def _publish_output_pair(
     try:
         _validate_output_target(destination, label="Output")
         _validate_output_target(checksum_path, label="Checksum output")
+        _validate_no_source_alias(
+            destination,
+            label="Output",
+            protected_sources=protected_sources,
+        )
+        _validate_no_source_alias(
+            checksum_path,
+            label="Checksum output",
+            protected_sources=protected_sources,
+        )
         destination_backup = _move_existing_to_backup(destination, label="Output")
         checksum_backup = _move_existing_to_backup(
             checksum_path,
@@ -193,10 +238,14 @@ def _file_entry(path: Path, role: str) -> Dict[str, object]:
         path_stat = path.lstat()
         with path.open("rb") as file_obj:
             opened_stat = os.fstat(file_obj.fileno())
+            current_stat = path.lstat()
             if (
                 not stat.S_ISREG(path_stat.st_mode)
+                or not stat.S_ISREG(current_stat.st_mode)
                 or not stat.S_ISREG(opened_stat.st_mode)
                 or (path_stat.st_dev, path_stat.st_ino)
+                != (opened_stat.st_dev, opened_stat.st_ino)
+                or (current_stat.st_dev, current_stat.st_ino)
                 != (opened_stat.st_dev, opened_stat.st_ino)
             ):
                 raise ModelPackError(
@@ -251,6 +300,67 @@ def _file_entry(path: Path, role: str) -> Dict[str, object]:
     }
 
 
+def _read_bounded_regular_file(
+    path: Path,
+    *,
+    max_bytes: int,
+    too_large_code: str,
+    too_large_message: str,
+) -> bytes:
+    """Read exact bounded bytes from one identity-checked regular-file handle."""
+    try:
+        path_stat = path.lstat()
+        with path.open("rb") as file_obj:
+            opened_stat = os.fstat(file_obj.fileno())
+            current_stat = path.lstat()
+            if (
+                not stat.S_ISREG(path_stat.st_mode)
+                or not stat.S_ISREG(current_stat.st_mode)
+                or not stat.S_ISREG(opened_stat.st_mode)
+                or (path_stat.st_dev, path_stat.st_ino)
+                != (opened_stat.st_dev, opened_stat.st_ino)
+                or (current_stat.st_dev, current_stat.st_ino)
+                != (opened_stat.st_dev, opened_stat.st_ino)
+            ):
+                raise ModelPackError(
+                    "source_changed",
+                    f"{path.name} changed while it was opened. Stop modifying it and retry.",
+                )
+            size = opened_stat.st_size
+            if size > max_bytes:
+                raise ModelPackError(too_large_code, too_large_message)
+            remaining = size
+            chunks = []
+            while remaining:
+                chunk = file_obj.read(min(_COPY_CHUNK_SIZE, remaining))
+                if not chunk:
+                    raise ModelPackError(
+                        "source_changed",
+                        f"{path.name} changed while it was read. Stop modifying it and retry.",
+                    )
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            if file_obj.read(1):
+                raise ModelPackError(
+                    "source_changed",
+                    f"{path.name} changed while it was read. Stop modifying it and retry.",
+                )
+            final_stat = os.fstat(file_obj.fileno())
+            if final_stat.st_size != size:
+                raise ModelPackError(
+                    "source_changed",
+                    f"{path.name} changed while it was read. Stop modifying it and retry.",
+                )
+            return b"".join(chunks)
+    except ModelPackError:
+        raise
+    except OSError as exc:
+        raise ModelPackError(
+            "invalid_source_file",
+            f"{path.name} could not be read. Check permissions and try again.",
+        ) from exc
+
+
 def _bytes_entry(path: Path, role: str, payload: bytes) -> Dict[str, object]:
     """Build one manifest entry from the exact canonical bytes to be archived."""
     return {
@@ -279,20 +389,15 @@ def build_manifest(
             "GGUF, Modelfile, and license text must have distinct file names.",
         )
     gguf_entry = _file_entry(gguf, "gguf")
-    if modelfile.stat().st_size > MAX_MODELFILE_BYTES:
-        raise ModelPackError(
-            "unsafe_modelfile",
+    modelfile_bytes = _read_bounded_regular_file(
+        modelfile,
+        max_bytes=MAX_MODELFILE_BYTES,
+        too_large_code="unsafe_modelfile",
+        too_large_message=(
             f"Modelfile must not exceed {MAX_MODELFILE_BYTES} bytes. "
-            "Reduce it and rebuild the pack.",
-        )
-    with modelfile.open("rb") as modelfile_source:
-        modelfile_bytes = modelfile_source.read(MAX_MODELFILE_BYTES + 1)
-    if len(modelfile_bytes) > MAX_MODELFILE_BYTES:
-        raise ModelPackError(
-            "unsafe_modelfile",
-            f"Modelfile must not exceed {MAX_MODELFILE_BYTES} bytes. "
-            "Reduce it and rebuild the pack.",
-        )
+            "Reduce it and rebuild the pack."
+        ),
+    )
     parsed_modelfile = parse_modelfile(
         modelfile_bytes,
         expected_gguf_file=gguf.name,
@@ -302,18 +407,14 @@ def build_manifest(
             "unsafe_modelfile",
             f"Modelfile FROM must reference ./{gguf.name}.",
         )
-    if license_file.stat().st_size > MAX_LICENSE_BYTES:
-        raise ModelPackError(
-            "invalid_license_file",
-            f"The license file must not exceed {MAX_LICENSE_BYTES} bytes.",
-        )
-    with license_file.open("rb") as license_source:
-        license_bytes = license_source.read(MAX_LICENSE_BYTES + 1)
-    if len(license_bytes) > MAX_LICENSE_BYTES:
-        raise ModelPackError(
-            "invalid_license_file",
-            f"The license file must not exceed {MAX_LICENSE_BYTES} bytes.",
-        )
+    license_bytes = _read_bounded_regular_file(
+        license_file,
+        max_bytes=MAX_LICENSE_BYTES,
+        too_large_code="invalid_license_file",
+        too_large_message=(
+            f"The license file must not exceed {MAX_LICENSE_BYTES} bytes."
+        ),
+    )
     try:
         license_bytes.decode("utf-8")
     except UnicodeDecodeError as exc:
@@ -380,10 +481,14 @@ def _write_file(
         path_stat = source.lstat()
         with source.open("rb") as input_file:
             opened_stat = os.fstat(input_file.fileno())
+            current_stat = source.lstat()
             if (
                 not stat.S_ISREG(path_stat.st_mode)
+                or not stat.S_ISREG(current_stat.st_mode)
                 or not stat.S_ISREG(opened_stat.st_mode)
                 or (path_stat.st_dev, path_stat.st_ino)
+                != (opened_stat.st_dev, opened_stat.st_ino)
+                or (current_stat.st_dev, current_stat.st_ino)
                 != (opened_stat.st_dev, opened_stat.st_ino)
                 or opened_stat.st_size != expected_size
             ):
@@ -455,11 +560,16 @@ def build_model_pack(
         minimum_memory_gb=minimum_memory_gb,
     )
 
-    destination = (
+    destination_requested = (
         output_path.expanduser()
         if output_path is not None
         else Path.cwd() / _default_output_name(model_id)
-    ).resolve()
+    )
+    if not destination_requested.is_absolute():
+        destination_requested = Path.cwd() / destination_requested
+    destination = (
+        destination_requested.parent.resolve() / destination_requested.name
+    )
     if destination.suffix.lower() not in {".modelpack", ".zip"}:
         raise ModelPackError(
             "invalid_output_path",
@@ -467,14 +577,19 @@ def build_model_pack(
         )
     checksum_path = destination.with_name(f"{destination.name}.sha256")
     sources = {gguf, modelfile, license_file}
-    if destination in sources or checksum_path in sources:
-        raise ModelPackError(
-            "invalid_output_path",
-            "Output and checksum paths cannot overwrite a Model Pack source file.",
-        )
     destination.parent.mkdir(parents=True, exist_ok=True)
     _validate_output_target(destination, label="Output")
     _validate_output_target(checksum_path, label="Checksum output")
+    _validate_no_source_alias(
+        destination,
+        label="Output",
+        protected_sources=sources,
+    )
+    _validate_no_source_alias(
+        checksum_path,
+        label="Checksum output",
+        protected_sources=sources,
+    )
     temporary: Optional[Path] = None
     checksum_temporary: Optional[Path] = None
 
@@ -535,6 +650,7 @@ def build_model_pack(
             checksum_temporary,
             destination,
             checksum_path,
+            protected_sources=sources,
         )
         temporary = None
         checksum_temporary = None

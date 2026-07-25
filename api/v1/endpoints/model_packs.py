@@ -39,6 +39,17 @@ _UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024
 _SUPPORTED_ARCHIVE_SUFFIXES = frozenset({".modelpack", ".zip"})
 
 
+def _insufficient_staging_disk() -> HTTPException:
+    """Return the stable API error for any staging ENOSPC boundary."""
+    return HTTPException(
+        status_code=status.HTTP_507_INSUFFICIENT_STORAGE,
+        detail={
+            "error": "insufficient_disk_space",
+            "message": "Not enough server disk space to stage this Model Pack.",
+        },
+    )
+
+
 def _remove_staging(staging_root: Path) -> None:
     """Remove one private upload staging directory idempotently."""
     shutil.rmtree(staging_root, ignore_errors=True)
@@ -55,7 +66,13 @@ def _stage_upload(upload: UploadFile) -> tuple[Path, Path]:
                 "message": "Select a .modelpack or .zip Model Pack file.",
             },
         )
-    staging_root = Path(tempfile.mkdtemp(prefix="stockpulse-model-pack-upload-"))
+    try:
+        staging_root = Path(tempfile.mkdtemp(prefix="stockpulse-model-pack-upload-"))
+    except OSError as exc:
+        upload.file.close()
+        if exc.errno == errno.ENOSPC:
+            raise _insufficient_staging_disk() from exc
+        raise
     staged_path = staging_root / f"upload{original_suffix}"
     total_bytes = 0
     try:
@@ -77,13 +94,7 @@ def _stage_upload(upload: UploadFile) -> tuple[Path, Path]:
     except OSError as exc:
         _remove_staging(staging_root)
         if exc.errno == errno.ENOSPC:
-            raise HTTPException(
-                status_code=status.HTTP_507_INSUFFICIENT_STORAGE,
-                detail={
-                    "error": "insufficient_disk_space",
-                    "message": "Not enough server disk space to stage this Model Pack.",
-                },
-            ) from exc
+            raise _insufficient_staging_disk() from exc
         raise
     except Exception:  # broad-exception: cleanup - Remove private staging before the API boundary sanitizes upload failures.
         _remove_staging(staging_root)

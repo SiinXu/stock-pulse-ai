@@ -6,8 +6,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from api.v1.schemas.local_models import LOCAL_MODEL_ID_PATTERN
-from src.model_pack import MAX_DESKTOP_MODEL_PACK_ATTESTATION_BYTES
-from src.model_pack.manifest import LICENSE_ID_PATTERN
+from src.model_pack import MAX_DESKTOP_MODEL_PACK_ATTESTATION_BYTES, ModelPackError
+from src.model_pack.manifest import LICENSE_ID_PATTERN, normalize_manifest_text
 from src.task_execution import TaskStatusEnum
 
 
@@ -55,10 +55,14 @@ class ModelPackDesktopActivationRequest(BaseModel):
     @classmethod
     def validate_display_name(cls, value: str) -> str:
         """Normalize visible Desktop metadata before attestation binding."""
-        normalized = value.strip()
-        if not normalized or any(ord(character) < 32 for character in normalized):
-            raise ValueError("display_name must be visible text")
-        return normalized
+        try:
+            return normalize_manifest_text(
+                value,
+                field_name="display_name",
+                max_length=160,
+            )
+        except ModelPackError as exc:
+            raise ValueError("display_name must be visible text") from exc
 
 
 class ModelPackImportStatus(BaseModel):

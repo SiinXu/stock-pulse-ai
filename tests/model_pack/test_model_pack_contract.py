@@ -18,6 +18,7 @@ from src.model_pack import (
     ModelPackImporter,
     inspect_model_pack,
     parse_manifest,
+    parse_manifest_bytes,
     parse_modelfile,
 )
 from src.model_pack.manifest import MAX_MANIFEST_BYTES
@@ -171,6 +172,105 @@ def test_manifest_reserves_its_own_filename_for_the_metadata_entry(tmp_path: Pat
         parse_manifest(manifest)
 
     _assert_error(error, "invalid_manifest", "reserved manifest.json")
+
+
+@pytest.mark.parametrize("unsafe_filename", ["CON", "nul.txt", "LICENSE."])
+def test_manifest_rejects_cross_platform_unsafe_payload_filenames(
+    tmp_path: Path,
+    unsafe_filename: str,
+) -> None:
+    pack_path = _write_pack(tmp_path / "unsafe-filename")
+    manifest = json.loads((pack_path / "manifest.json").read_text(encoding="utf-8"))
+    manifest["license"]["file"] = unsafe_filename
+    license_entry = next(
+        entry for entry in manifest["files"] if entry["role"] == "license"
+    )
+    license_entry["path"] = unsafe_filename
+
+    with pytest.raises(ModelPackError) as error:
+        parse_manifest(manifest)
+
+    _assert_error(error, "invalid_manifest", "root-level safe filename")
+
+
+def test_manifest_uses_ascii_model_ids_and_unicode_scalar_display_lengths(
+    tmp_path: Path,
+) -> None:
+    pack_path = _write_pack(tmp_path / "portable-manifest")
+    manifest = json.loads((pack_path / "manifest.json").read_text(encoding="utf-8"))
+    manifest["display_name"] = "😀" * 160
+
+    parsed = parse_manifest(manifest)
+
+    assert parsed.display_name == "😀" * 160
+    manifest["model_id"] = "K:q4"
+    with pytest.raises(ModelPackError) as error:
+        parse_manifest(manifest)
+    _assert_error(error, "invalid_manifest", "model_id")
+
+    manifest["model_id"] = "stockpulse/portable:q4"
+    manifest["display_name"] = "😀" * 161
+    with pytest.raises(ModelPackError) as error:
+        parse_manifest(manifest)
+    _assert_error(error, "invalid_manifest", "160 characters")
+
+
+def test_manifest_rejects_unpaired_unicode_surrogates() -> None:
+    payload = (
+        '{"format_version":1,"model_id":"stockpulse/surrogate:q4",'
+        '"display_name":"\\ud800","gguf_file":"weights.gguf",'
+        '"modelfile":"Modelfile","license":{"id":"LicenseRef-Test",'
+        '"file":"LICENSE"},"minimum_memory_gb":8,"files":['
+        '{"path":"weights.gguf","role":"gguf","sha256":"'
+        + ("0" * 64)
+        + '","size_bytes":4},'
+        '{"path":"Modelfile","role":"modelfile","sha256":"'
+        + ("0" * 64)
+        + '","size_bytes":1},'
+        '{"path":"LICENSE","role":"license","sha256":"'
+        + ("0" * 64)
+        + '","size_bytes":1}]}'
+    ).encode("ascii")
+
+    with pytest.raises(ModelPackError) as error:
+        parse_manifest_bytes(payload)
+
+    _assert_error(error, "invalid_manifest", "invalid Unicode")
+
+
+def test_manifest_normalizes_semantic_json_integers_across_transports(
+    tmp_path: Path,
+) -> None:
+    pack_path = _write_pack(tmp_path / "semantic-integers")
+    manifest = json.loads((pack_path / "manifest.json").read_text(encoding="utf-8"))
+    manifest["format_version"] = 1.0
+    manifest["minimum_memory_gb"] = 8.0
+    for entry in manifest["files"]:
+        entry["size_bytes"] = float(entry["size_bytes"])
+
+    parsed = parse_manifest(manifest)
+
+    assert parsed.format_version == 1
+    assert parsed.minimum_memory_gb == 8
+    assert all(isinstance(entry.size_bytes, int) for entry in parsed.files)
+
+
+def test_manifest_maps_deep_json_to_a_stable_validation_error() -> None:
+    depth = 1200
+    payload = (
+        '{"format_version":1,"model_id":"stockpulse/deep:q4","display_name":'
+        + ("[" * depth)
+        + '"deep"'
+        + ("]" * depth)
+        + ',"gguf_file":"weights.gguf","modelfile":"Modelfile",'
+        '"license":{"id":"LicenseRef-Test","file":"LICENSE"},'
+        '"minimum_memory_gb":8,"files":[]}'
+    ).encode("utf-8")
+
+    with pytest.raises(ModelPackError) as error:
+        parse_manifest_bytes(payload)
+
+    _assert_error(error, "invalid_manifest", "valid JSON")
 
 
 def test_inspect_directory_uses_a_private_snapshot_until_cleanup(tmp_path: Path) -> None:
@@ -444,6 +544,31 @@ def test_inspect_rejects_external_from_after_real_hash_validation(tmp_path: Path
         'SYSTEM "quoted system text"',
         "TEMPLATE `quoted template text`",
         "PARAMETER temperature 0.1\nPARAMETER temperature 0.2",
+        "FROM\t./weights.gguf",
+        'SYSTEM \ufeff"quoted system text"',
+        "SYSTEM safe\u2028ADAPTER ./outside.gguf",
+        "PARAMETER temperature NaN",
+        "PARAMETER temperature Infinity",
+        "PARAMETER temperature 1e999",
+        "PARAMETER temperature 1e39",
+        "PARAMETER temperature 1e-999",
+        "PARAMETER num_ctx 9007199254740992",
+        "PARAMETER num_ctx 9007199254740992.0",
+        "PARAMETER num_ctx 1.0",
+        "PARAMETER num_ctx 1e20",
+        "PARAMETER num_ctx 99999999999999999999999999999999999999999999999999",
+        "PARAMETER future_option 1",
+        "PARAMETER TEMPERATURE 0.1",
+        "PARAMETER use_mmap 1",
+        "PARAMETER stop true",
+        "ſYSTEM portable text",
+        "PARAMETER Key value",
+        'PARAMETER stop "a\\"b"',
+        'PARAMETER stop "unclosed',
+        "PARAMETER stop unquoted",
+        "PARAMETER stop null",
+        "PARAMETER stop [1]",
+        'PARAMETER stop {"value":1}',
     ],
 )
 def test_modelfile_rejects_transport_ambiguous_syntax(
@@ -461,13 +586,49 @@ def test_modelfile_rejects_transport_ambiguous_syntax(
     assert "rebuild the pack" in error.value.user_message
 
 
+def test_modelfile_accepts_only_the_documented_portable_line_grammar() -> None:
+    parsed = parse_modelfile(
+        (
+            b"FROM ./weights.gguf\r\n"
+            b"PARAMETER temperature 0.2\r\n"
+            b"SYSTEM portable text\r\n"
+        ),
+        expected_gguf_file="weights.gguf",
+    )
+
+    assert parsed.from_file == "weights.gguf"
+    assert parsed.parameters == {"temperature": 0.2}
+    assert parsed.system == "portable text"
+
+    with pytest.raises(ModelPackError) as error:
+        parse_modelfile(
+            b"\xef\xbb\xbfFROM ./weights.gguf\n",
+            expected_gguf_file="weights.gguf",
+        )
+    _assert_error(error, "unsafe_modelfile", "byte-order mark")
+
+
 def test_modelfile_keeps_only_stop_as_a_repeatable_parameter() -> None:
+    single_stop = parse_modelfile(
+        b'FROM ./weights.gguf\nPARAMETER stop "END"\n',
+        expected_gguf_file="weights.gguf",
+    )
+    assert single_stop.parameters == {"stop": ["END"]}
+    normalized_float = parse_modelfile(
+        b"FROM ./weights.gguf\nPARAMETER temperature 0.10000000001\n",
+        expected_gguf_file="weights.gguf",
+    )
+    assert normalized_float.parameters == {"temperature": 0.1}
+
     parsed = parse_modelfile(
         (
             "FROM ./weights.gguf\n"
             "PARAMETER temperature 0.2\n"
+            "PARAMETER num_ctx 8192\n"
+            "PARAMETER use_mmap true\n"
             'PARAMETER stop "END"\n'
             'PARAMETER stop "DONE"\n'
+            r'PARAMETER stop "\n"' + "\n"
             'SYSTEM """Portable system text"""\n'
         ).encode("utf-8"),
         expected_gguf_file="weights.gguf",
@@ -475,9 +636,45 @@ def test_modelfile_keeps_only_stop_as_a_repeatable_parameter() -> None:
 
     assert parsed.parameters == {
         "temperature": 0.2,
-        "stop": ["END", "DONE"],
+        "num_ctx": 8192,
+        "use_mmap": True,
+        "stop": ["END", "DONE", r"\n"],
     }
     assert parsed.system == "Portable system text"
+
+
+def test_modelfile_preserves_delimiter_only_triple_block_boundaries() -> None:
+    parsed = parse_modelfile(
+        (
+            'FROM ./weights.gguf\r\n'
+            'SYSTEM """\r\nsystem text\r\n"""\r\n'
+            'TEMPLATE """\r\ntemplate text\r\n"""\r\n'
+        ).encode("utf-8"),
+        expected_gguf_file="weights.gguf",
+    )
+
+    assert parsed.system == "\nsystem text\n"
+    assert parsed.template == "\ntemplate text\n"
+
+
+@pytest.mark.parametrize(
+    "instruction",
+    [
+        "SYSTEM a\u200db",
+        'PARAMETER stop "a\u200bb"',
+        "TEMPLATE \u00a0template text\u00a0",
+    ],
+)
+def test_modelfile_rejects_text_ollama_would_silently_drop(
+    instruction: str,
+) -> None:
+    with pytest.raises(ModelPackError) as error:
+        parse_modelfile(
+            f"FROM ./weights.gguf\n{instruction}\n".encode("utf-8"),
+            expected_gguf_file="weights.gguf",
+        )
+
+    _assert_error(error, "unsafe_modelfile", "cannot preserve")
 
 
 def test_inspect_rejects_non_utf8_license_before_create(tmp_path: Path) -> None:
@@ -576,6 +773,35 @@ def test_inspect_rejects_duplicate_archive_names(tmp_path: Path) -> None:
     _assert_error(error, "unsafe_archive_entry", "duplicate file names")
 
 
+def test_inspect_rejects_non_ascii_archive_member_identity(tmp_path: Path) -> None:
+    source = _write_pack(tmp_path / "source")
+    archive = _zip_pack(source, tmp_path / "unicode-entry.modelpack")
+    with ZipFile(archive, "a") as zip_file:
+        zip_file.writestr("ſ.txt", b"unicode")
+        zip_file.writestr("s.txt", b"ascii")
+
+    with pytest.raises(ModelPackError) as error:
+        with inspect_model_pack(archive):
+            pass
+
+    _assert_error(error, "unsafe_archive_entry", "safe root-level file")
+
+
+def test_inspect_rejects_windows_reserved_extra_archive_members(
+    tmp_path: Path,
+) -> None:
+    source = _write_pack(tmp_path / "source")
+    archive = _zip_pack(source, tmp_path / "reserved-entry.modelpack")
+    with ZipFile(archive, "a") as zip_file:
+        zip_file.writestr("CON.txt", b"reserved")
+
+    with pytest.raises(ModelPackError) as error:
+        with inspect_model_pack(archive):
+            pass
+
+    _assert_error(error, "unsafe_archive_entry", "safe root-level file")
+
+
 def test_inspect_rejects_undeclared_archive_symbolic_links(tmp_path: Path) -> None:
     source = _write_pack(tmp_path / "source")
     archive = _zip_pack(source, tmp_path / "symlink.modelpack")
@@ -605,6 +831,28 @@ def test_inspect_rejects_insufficient_disk_before_archive_extraction(tmp_path: P
             pass
 
     _assert_error(error, "insufficient_disk_space", "Free at least")
+
+
+def test_directory_snapshot_normalizes_a_post_preflight_disk_fill(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    pack_path = _write_pack(tmp_path / "post-preflight-enospc")
+
+    def no_space_during_copy(*_args, **_kwargs) -> None:
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(
+        model_pack_validation,
+        "_copy_directory_payload",
+        no_space_during_copy,
+    )
+
+    with pytest.raises(ModelPackError) as error:
+        with inspect_model_pack(pack_path):
+            pass
+
+    _assert_error(error, "insufficient_disk_space", "Free disk space")
 
 
 def test_importer_validates_then_creates_and_registers_the_model(tmp_path: Path) -> None:

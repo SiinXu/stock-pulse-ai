@@ -31,8 +31,11 @@ def _write_pack(root: Path) -> Path:
         (
             "FROM ./finance.gguf\n"
             "PARAMETER temperature 0.1\n"
+            "PARAMETER num_ctx 8192\n"
+            "PARAMETER use_mmap true\n"
             'PARAMETER stop "END"\n'
             'PARAMETER stop "DONE"\n'
+            r'PARAMETER stop "\n"' + "\n"
             'SYSTEM """You are a finance model.\nUse cited evidence."""\n'
         ),
         encoding="utf-8",
@@ -140,9 +143,13 @@ def test_http_executor_uploads_verified_blob_then_creates_from_controlled_fields
     assert create_payload == {
         "model": "stockpulse/finance-test:q4",
         "files": {"finance.gguf": f"sha256:{digest}"},
-        "license": "LicenseRef-Finance terms\n",
         "stream": False,
-        "parameters": {"temperature": 0.1, "stop": ["END", "DONE"]},
+        "parameters": {
+            "temperature": 0.1,
+            "num_ctx": 8192,
+            "use_mmap": True,
+            "stop": ["END", "DONE", r"\n"],
+        },
         "system": "You are a finance model.\nUse cited evidence.",
     }
     assert progress == [
@@ -150,6 +157,27 @@ def test_http_executor_uploads_verified_blob_then_creates_from_controlled_fields
         (75, "Creating the Ollama model"),
         (90, "Activating the imported model"),
     ]
+
+
+def test_web_pack_inspection_uses_the_portable_manifest_text_contract(
+    tmp_path: Path,
+) -> None:
+    pack_path = _write_pack(tmp_path / "portable-web-pack")
+    manifest_path = pack_path / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["display_name"] = "😀" * 81
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with inspect_model_pack(pack_path) as inspected:
+        assert inspected.manifest.display_name == "😀" * 81
+
+    manifest["model_id"] = "K:q4"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ModelPackError) as error:
+        with inspect_model_pack(pack_path):
+            pass
+    assert error.value.code == "invalid_manifest"
+    assert "model_id" in error.value.user_message
 
 
 def test_http_executor_translates_unreachable_ollama_without_exposing_traceback(

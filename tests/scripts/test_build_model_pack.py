@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 from pathlib import Path
 from zipfile import ZIP_STORED, ZipFile
 
@@ -78,6 +79,33 @@ def test_builder_rejects_a_payload_named_like_the_reserved_manifest(tmp_path: Pa
 
     assert error.value.code == "invalid_manifest"
     assert "reserved manifest.json" in error.value.user_message
+
+
+@pytest.mark.parametrize("unsafe_filename", ["CON", "nul.txt", "LICENSE."])
+def test_builder_rejects_cross_platform_unsafe_source_filenames(
+    tmp_path: Path,
+    unsafe_filename: str,
+) -> None:
+    gguf, modelfile, license_file = _sources(tmp_path)
+    unsafe_license = tmp_path / unsafe_filename
+    license_file.rename(unsafe_license)
+    output = tmp_path / "unsafe-filename.modelpack"
+
+    with pytest.raises(ModelPackError) as error:
+        build_model_pack(
+            gguf_path=gguf,
+            modelfile_path=modelfile,
+            license_file_path=unsafe_license,
+            model_id="stockpulse/test:q4",
+            display_name="StockPulse Test",
+            license_id="Apache-2.0",
+            minimum_memory_gb=8,
+            output_path=output,
+        )
+
+    assert error.value.code == "invalid_manifest"
+    assert "root-level safe filename" in error.value.user_message
+    assert not output.exists()
 
 
 def test_builder_is_deterministic_for_the_same_sources(tmp_path: Path) -> None:
@@ -244,6 +272,136 @@ def test_builder_rejects_transport_ambiguous_modelfile_syntax(
     assert not output.exists()
 
 
+@pytest.mark.parametrize(
+    "ambiguous_instruction",
+    [
+        "FROM\t./weights.gguf",
+        'SYSTEM \ufeff"quoted system text"',
+        "SYSTEM safe\u2028ADAPTER ./outside.gguf",
+        "PARAMETER temperature NaN",
+        "PARAMETER temperature 1e999",
+        "PARAMETER temperature 1e39",
+        "PARAMETER temperature 1e-999",
+        "PARAMETER num_ctx 9007199254740992",
+        "PARAMETER num_ctx 1.0",
+        "PARAMETER future_option 1",
+        "PARAMETER TEMPERATURE 0.1",
+        "PARAMETER use_mmap 1",
+        "PARAMETER stop true",
+        'PARAMETER stop "a\\"b"',
+        'PARAMETER stop "unclosed',
+        "PARAMETER stop unquoted",
+        "PARAMETER stop null",
+        "PARAMETER stop [1]",
+    ],
+)
+def test_builder_rejects_nonportable_modelfile_grammar(
+    tmp_path: Path,
+    ambiguous_instruction: str,
+) -> None:
+    gguf, modelfile, license_file = _sources(tmp_path)
+    modelfile.write_text(
+        f"FROM ./weights.gguf\n{ambiguous_instruction}\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "nonportable.modelpack"
+
+    with pytest.raises(ModelPackError) as error:
+        build_model_pack(
+            gguf_path=gguf,
+            modelfile_path=modelfile,
+            license_file_path=license_file,
+            model_id="stockpulse/test:q4",
+            display_name="StockPulse Test",
+            license_id="Apache-2.0",
+            minimum_memory_gb=8,
+            output_path=output,
+        )
+
+    assert error.value.code == "unsafe_modelfile"
+    assert not output.exists()
+
+
+def test_builder_uses_portable_manifest_text_contract(tmp_path: Path) -> None:
+    gguf, modelfile, license_file = _sources(tmp_path)
+    output = tmp_path / "unicode.modelpack"
+
+    artifact, _checksum = build_model_pack(
+        gguf_path=gguf,
+        modelfile_path=modelfile,
+        license_file_path=license_file,
+        model_id="stockpulse/unicode:q4",
+        display_name="😀" * 160,
+        license_id="Apache-2.0",
+        minimum_memory_gb=8,
+        output_path=output,
+    )
+    with inspect_model_pack(artifact) as inspected:
+        assert inspected.manifest.display_name == "😀" * 160
+
+    invalid_output = tmp_path / "invalid-model-id.modelpack"
+    with pytest.raises(ModelPackError) as error:
+        build_model_pack(
+            gguf_path=gguf,
+            modelfile_path=modelfile,
+            license_file_path=license_file,
+            model_id="K:q4",
+            display_name="Portable",
+            license_id="Apache-2.0",
+            minimum_memory_gb=8,
+            output_path=invalid_output,
+        )
+    assert error.value.code == "invalid_manifest"
+    assert not invalid_output.exists()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="symbolic-link replacement requires POSIX")
+@pytest.mark.parametrize("source_role", ["modelfile", "license"])
+def test_builder_rejects_text_source_replacement_between_lstat_and_open(
+    tmp_path: Path,
+    monkeypatch,
+    source_role: str,
+) -> None:
+    gguf, modelfile, license_file = _sources(tmp_path)
+    source = modelfile if source_role == "modelfile" else license_file
+    replacement = tmp_path / f"{source_role}-replacement"
+    replacement.write_text(
+        "FROM ./weights.gguf\n" if source_role == "modelfile" else "private text\n",
+        encoding="utf-8",
+    )
+    original = tmp_path / f"{source.name}.original"
+    output = tmp_path / f"{source_role}-swap.modelpack"
+    original_open = Path.open
+    swapped = False
+
+    def swap_before_open(path_obj: Path, *args, **kwargs):
+        nonlocal swapped
+        mode = args[0] if args else kwargs.get("mode", "r")
+        if path_obj == source and mode == "rb" and not swapped:
+            swapped = True
+            source.rename(original)
+            source.symlink_to(replacement)
+        return original_open(path_obj, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", swap_before_open)
+
+    with pytest.raises(ModelPackError) as error:
+        build_model_pack(
+            gguf_path=gguf,
+            modelfile_path=modelfile,
+            license_file_path=license_file,
+            model_id="stockpulse/test:q4",
+            display_name="StockPulse Test",
+            license_id="Apache-2.0",
+            minimum_memory_gb=8,
+            output_path=output,
+        )
+
+    assert error.value.code == "source_changed"
+    assert swapped is True
+    assert not output.exists()
+
+
 def test_builder_rejects_symbolic_link_sources(tmp_path: Path) -> None:
     gguf, modelfile, license_file = _sources(tmp_path)
     linked_gguf = tmp_path / "linked.gguf"
@@ -262,6 +420,55 @@ def test_builder_rejects_symbolic_link_sources(tmp_path: Path) -> None:
         )
 
     assert error.value.code == "invalid_source_file"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="symbolic-link output requires POSIX")
+def test_builder_rejects_an_existing_output_symlink_without_clobbering_target(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "unrelated.modelpack"
+    target.write_bytes(b"unrelated data")
+    output = tmp_path / "release.modelpack"
+    output.symlink_to(target)
+
+    with pytest.raises(ModelPackError) as error:
+        _build(tmp_path, output)
+
+    assert error.value.code == "invalid_output_path"
+    assert output.is_symlink()
+    assert target.read_bytes() == b"unrelated data"
+    assert not target.with_name(f"{target.name}.sha256").exists()
+    assert not output.with_name(f"{output.name}.sha256").exists()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="hard-link aliases require POSIX")
+@pytest.mark.parametrize("alias_leaf", ["output", "checksum"])
+def test_builder_rejects_existing_output_aliases_to_source_files(
+    tmp_path: Path,
+    alias_leaf: str,
+) -> None:
+    gguf, modelfile, license_file = _sources(tmp_path)
+    output = tmp_path / "release.modelpack"
+    checksum = output.with_name(f"{output.name}.sha256")
+    alias = output if alias_leaf == "output" else checksum
+    os.link(license_file, alias)
+    original_license = license_file.read_bytes()
+
+    with pytest.raises(ModelPackError) as error:
+        build_model_pack(
+            gguf_path=gguf,
+            modelfile_path=modelfile,
+            license_file_path=license_file,
+            model_id="stockpulse/test:q4",
+            display_name="StockPulse Test",
+            license_id="Apache-2.0",
+            minimum_memory_gb=8,
+            output_path=output,
+        )
+
+    assert error.value.code == "invalid_output_path"
+    assert license_file.read_bytes() == original_license
+    assert alias.read_bytes() == original_license
 
 
 def test_builder_rejects_oversized_modelfile_before_full_read(

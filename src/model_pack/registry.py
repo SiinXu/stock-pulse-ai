@@ -9,7 +9,13 @@ import threading
 from pathlib import Path
 from typing import Any, Dict, Iterable, Mapping, Tuple
 
-from src.model_pack.manifest import LICENSE_ID_PATTERN, MODEL_ID_PATTERN
+from src.model_pack.errors import ModelPackError
+from src.model_pack.manifest import (
+    LICENSE_ID_PATTERN,
+    MODEL_ID_PATTERN,
+    normalize_manifest_text,
+    strip_portable_whitespace,
+)
 
 
 MODEL_PACK_REGISTRY_SCHEMA_VERSION = 1
@@ -36,10 +42,27 @@ def _validated_entry(raw: Any) -> Dict[str, Any] | None:
         "license_id",
     }:
         return None
-    runtime_identity = str(raw.get("runtime_identity") or "").strip().lower()
-    model_id = str(raw.get("model_id") or "").strip()
-    display_name = str(raw.get("display_name") or "").strip()
-    license_id = str(raw.get("license_id") or "").strip()
+    runtime_identity = strip_portable_whitespace(
+        str(raw.get("runtime_identity") or "")
+    ).lower()
+    try:
+        model_id = normalize_manifest_text(
+            raw.get("model_id"),
+            field_name="model_id",
+            max_length=96,
+        )
+        display_name = normalize_manifest_text(
+            raw.get("display_name"),
+            field_name="display_name",
+            max_length=160,
+        )
+        license_id = normalize_manifest_text(
+            raw.get("license_id"),
+            field_name="license.id",
+            max_length=128,
+        )
+    except ModelPackError:
+        return None
     minimum_memory_gb = raw.get("minimum_memory_gb")
     if (
         len(runtime_identity) != _RUNTIME_IDENTITY_LENGTH
@@ -90,7 +113,13 @@ class ModelPackRegistry:
             return ()
         try:
             raw = json.loads(self._path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
+        except (
+            OSError,
+            RecursionError,
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+            ValueError,
+        ):
             return ()
         if (
             not isinstance(raw, dict)
@@ -171,7 +200,9 @@ class ModelPackRegistry:
 
     def list_for_runtime(self, runtime_identity: str) -> Tuple[Dict[str, Any], ...]:
         """Return detached metadata for one opaque configured runtime identity."""
-        normalized = str(runtime_identity or "").strip().lower()
+        normalized = strip_portable_whitespace(
+            str(runtime_identity or "")
+        ).lower()
         if (
             len(normalized) != _RUNTIME_IDENTITY_LENGTH
             or any(character not in "0123456789abcdef" for character in normalized)

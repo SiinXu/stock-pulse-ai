@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import hashlib
 import os
 import shutil
@@ -15,6 +16,7 @@ from src.model_pack.manifest import (
     MANIFEST_FILENAME,
     MAX_MANIFEST_BYTES,
     MAX_MODEL_PACK_BYTES,
+    is_portable_pack_filename,
     parse_manifest_bytes,
 )
 from src.model_pack.models import InspectedModelPack, ModelPackFile, ModelPackManifest
@@ -32,6 +34,26 @@ DiskUsage = Callable[[Path], object]
 def _error(code: str, message: str) -> ModelPackError:
     """Return one stable actionable validation error."""
     return ModelPackError(code, message)
+
+
+def _raise_if_insufficient_disk(exc: OSError) -> None:
+    """Normalize a post-preflight disk-fill race to the public storage error."""
+    if exc.errno == errno.ENOSPC:
+        raise _error(
+            "insufficient_disk_space",
+            "Not enough disk space to stage this Model Pack. Free disk space and try again.",
+        ) from exc
+
+
+@contextmanager
+def _private_temporary_directory(*, prefix: str) -> Iterator[str]:
+    """Create private staging while preserving actionable disk errors."""
+    try:
+        with tempfile.TemporaryDirectory(prefix=prefix) as temp_dir:
+            yield temp_dir
+    except OSError as exc:
+        _raise_if_insufficient_disk(exc)
+        raise
 
 
 def _sha256(path: Path) -> str:
@@ -213,7 +235,7 @@ def _snapshot_archive(
             archive=False,
             disk_usage=disk_usage,
         )
-        with tempfile.TemporaryDirectory(
+        with _private_temporary_directory(
             prefix="stockpulse-model-pack-archive-",
         ) as temp_dir:
             snapshot_path = Path(temp_dir) / "source.modelpack"
@@ -243,6 +265,7 @@ def _snapshot_archive(
             except ModelPackError:
                 raise
             except OSError as exc:
+                _raise_if_insufficient_disk(exc)
                 raise _error(
                     "file_read_failed",
                     (
@@ -268,6 +291,7 @@ def _safe_archive_name(name: str) -> bool:
         and not path.is_absolute()
         and len(path.parts) == 1
         and path.parts[0] not in {".", ".."}
+        and is_portable_pack_filename(name)
     )
 
 
@@ -340,6 +364,7 @@ def _build_inspection(
     try:
         modelfile_payload = modelfile_path.read_bytes()
     except OSError as exc:
+        _raise_if_insufficient_disk(exc)
         raise _error(
             "file_read_failed",
             f"Could not read {manifest.modelfile}. Check file permissions and try again.",
@@ -536,6 +561,7 @@ def _copy_directory_payload(
             f"Model Pack is missing {current_name}. Download or build the pack again.",
         ) from exc
     except OSError as exc:
+        _raise_if_insufficient_disk(exc)
         raise _error(
             "file_read_failed",
             "Could not snapshot the Model Pack directory. Check permissions and try again.",
@@ -613,7 +639,7 @@ def _inspect_directory(
         archive=True,
         disk_usage=disk_usage,
     )
-    with tempfile.TemporaryDirectory(prefix="stockpulse-model-pack-") as temp_dir:
+    with _private_temporary_directory(prefix="stockpulse-model-pack-") as temp_dir:
         snapshot_root = Path(temp_dir)
         _copy_directory_payload(
             root,
@@ -715,6 +741,8 @@ def _extract_declared_files(
             with archive.open(info, "r") as source, target.open("wb") as output:
                 shutil.copyfileobj(source, output, length=_HASH_CHUNK_SIZE)
         except (BadZipFile, OSError, RuntimeError) as exc:
+            if isinstance(exc, OSError):
+                _raise_if_insufficient_disk(exc)
             raise _error(
                 "invalid_archive",
                 f"Could not extract {name}. Download the pack again.",
@@ -753,7 +781,7 @@ def _inspect_archive(
             archive=False,
             disk_usage=disk_usage,
         )
-        with tempfile.TemporaryDirectory(prefix="stockpulse-model-pack-") as temp_dir:
+        with _private_temporary_directory(prefix="stockpulse-model-pack-") as temp_dir:
             extracted_root = Path(temp_dir)
             _extract_declared_files(
                 archive,

@@ -453,7 +453,7 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
             return [
                 {
                     "model_id": "licensed/finance:q4",
-                    "display_name": "Licensed Finance Q4",
+                    "display_name": "\u00a0Licensed Finance Q4\u00a0",
                     "minimum_memory_gb": 16,
                     "license_id": "LicenseRef-Finance",
                 }
@@ -470,7 +470,7 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertTrue(result["selected_primary"])
         self.assertEqual(
             configuration["imported_models"][0]["display_name"],
-            "Licensed Finance Q4",
+            "\u00a0Licensed Finance Q4\u00a0",
         )
         self.assertTrue(seen_identities)
         self.assertTrue(all(len(identity) == 64 for identity in seen_identities))

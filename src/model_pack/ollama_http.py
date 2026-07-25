@@ -212,17 +212,9 @@ class OllamaHttpModelPackExecutor:
         """Project only validated data fields into Ollama's create payload."""
         manifest = inspected.manifest
         digest = manifest.file_for_role("gguf").sha256
-        try:
-            license_text = inspected.license_path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError) as exc:
-            raise ModelPackError(
-                "invalid_license_file",
-                "The declared license must be readable UTF-8 text. Rebuild the Model Pack.",
-            ) from exc
         payload: Dict[str, Any] = {
             "model": manifest.model_id,
             "files": {manifest.gguf_file: f"sha256:{digest}"},
-            "license": license_text,
             "stream": False,
         }
         if inspected.modelfile.parameters:
