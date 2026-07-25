@@ -93,7 +93,9 @@ def normalize_stock_code(stock_code: str) -> str:
 
     return code
 
+
 ETF_PREFIXES = ("51", "52", "56", "58", "15", "16", "18")
+
 
 def _is_us_market(code: str) -> bool:
     """判断是否为美股/美股指数代码（不含中文前后缀）。"""
@@ -101,6 +103,7 @@ def _is_us_market(code: str) -> bool:
 
     normalized = (code or "").strip().upper()
     return is_us_index_code(normalized) or is_us_stock_code(normalized)
+
 
 def _is_hk_market(code: str) -> bool:
     """
@@ -119,13 +122,16 @@ def _is_hk_market(code: str) -> bool:
         return True
     return False
 
+
 def _is_jp_market(code: str) -> bool:
     """判定是否为日本 Yahoo Finance suffix 代码（如 7203.T）。"""
     return is_suffix_market_symbol(code, "jp")
 
+
 def _is_kr_market(code: str) -> bool:
     """判定是否为韩国 Yahoo Finance suffix 代码（如 005930.KS / 035720.KQ）。"""
     return is_suffix_market_symbol(code, "kr")
+
 
 def _is_tw_market(code: str) -> bool:
     """判定是否为台湾 Yahoo Finance suffix 代码（TWSE 上市 2330.TW / TPEx 上柜 6505.TWO）。
@@ -135,6 +141,7 @@ def _is_tw_market(code: str) -> bool:
     """
     return is_suffix_market_symbol(code, "tw")
 
+
 def _is_etf_code(code: str) -> bool:
     """判定 A 股 ETF 基金代码（保守规则）。"""
     normalized = normalize_stock_code(code)
@@ -143,6 +150,7 @@ def _is_etf_code(code: str) -> bool:
         and len(normalized) == 6
         and normalized.startswith(ETF_PREFIXES)
     )
+
 
 def _market_tag(code: str) -> str:
     """返回市场标签: cn/us/hk/jp/kr/tw."""
@@ -157,6 +165,7 @@ def _market_tag(code: str) -> str:
     if _is_tw_market(code):
         return "tw"
     return "cn"
+
 
 def is_bse_code(code: str) -> bool:
     """
@@ -178,6 +187,7 @@ def is_bse_code(code: str) -> bool:
 
     return c.startswith(("92", "43", "81", "82", "83", "87", "88"))
 
+
 def is_st_stock(name: str) -> bool:
     """
     Check if the stock is an ST or *ST stock based on its name.
@@ -186,6 +196,7 @@ def is_st_stock(name: str) -> bool:
     """
     n = (name or "").upper()
     return 'ST' in n
+
 
 def is_kc_cy_stock(code: str) -> bool:
     """
@@ -197,6 +208,7 @@ def is_kc_cy_stock(code: str) -> bool:
     """
     c = (code or "").strip().split(".")[0]
     return c.startswith("688") or c.startswith("30")
+
 
 def canonical_stock_code(code: str) -> str:
     """
@@ -213,6 +225,7 @@ def canonical_stock_code(code: str) -> str:
         'hk00700' -> 'HK00700'
     """
     return (code or "").strip().upper()
+
 
 __all__ = [
     "ETF_PREFIXES",

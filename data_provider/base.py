@@ -129,21 +129,21 @@ def summarize_exception(exc: Exception) -> Tuple[str, str]:
 # Symbol / market normalization helpers live in symbol_normalization.py.
 # Re-export here so data_provider.base remains the compatibility facade
 # (ADR-006): public names, patch targets, and existing imports stay stable.
-from .symbol_normalization import (  # noqa: E402
-    ETF_PREFIXES,
-    _is_etf_code,
-    _is_hk_market,
-    _is_jp_market,
-    _is_kr_market,
-    _is_tw_market,
-    _is_us_market,
-    _market_tag,
-    canonical_stock_code,
-    is_bse_code,
-    is_kc_cy_stock,
-    is_st_stock,
-    normalize_stock_code,
-)
+from . import symbol_normalization as _symbol_normalization  # noqa: E402
+
+ETF_PREFIXES = _symbol_normalization.ETF_PREFIXES
+_is_etf_code = _symbol_normalization._is_etf_code
+_is_hk_market = _symbol_normalization._is_hk_market
+_is_jp_market = _symbol_normalization._is_jp_market
+_is_kr_market = _symbol_normalization._is_kr_market
+_is_tw_market = _symbol_normalization._is_tw_market
+_is_us_market = _symbol_normalization._is_us_market
+_market_tag = _symbol_normalization._market_tag
+canonical_stock_code = _symbol_normalization.canonical_stock_code
+is_bse_code = _symbol_normalization.is_bse_code
+is_kc_cy_stock = _symbol_normalization.is_kc_cy_stock
+is_st_stock = _symbol_normalization.is_st_stock
+normalize_stock_code = _symbol_normalization.normalize_stock_code
 
 
 def _coerce_chip_metric(value: Any) -> Optional[float]:
