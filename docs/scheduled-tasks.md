@@ -2,18 +2,22 @@
 
 ## Scope
 
-The scheduled-task skeleton stores deterministic daily stock-analysis tasks and
-runs them through the existing process-local `AnalysisTaskQueue ->
+The scheduled-task model stores deterministic daily stock-analysis and bounded
+research tasks and runs them through the existing process-local
+`AnalysisTaskQueue ->
 AnalysisService` boundary. It does not add a natural-language scheduler,
-workflow engine, worker service, second analysis pipeline, or scheduling UI.
+workflow engine, worker service, second analysis pipeline, or scheduling
+management UI. Home exposes only a read-only projection of today's occurrences.
 
-Schema version 1 supports one stock analysis per definition. A later task type
-must reuse the task definition, occurrence claim, run-status, retry, and runtime
-ownership contracts below rather than introducing another scheduler.
+Schema version 1 supports one configurable stock analysis per definition.
+Schema version 2 adds the predefined `research_brief` and `risk_check` types.
+Both versions use the same task table, occurrence claim, run statuses, retry
+limits, history, notification projection, and runtime ownership contract.
 
 ## Definition Contract
 
-`POST /api/v1/scheduled-tasks` accepts this shape:
+`POST /api/v1/scheduled-tasks` continues to accept the schema-v1 stock-analysis
+shape:
 
 ```json
 {
@@ -37,7 +41,39 @@ ownership contracts below rather than introducing another scheduler.
 }
 ```
 
-- `schema_version` must be `1`.
+Research definitions use schema version 2 and a deliberately smaller payload:
+
+```json
+{
+  "schema_version": 2,
+  "name": "AAPL downside review",
+  "task_type": "risk_check",
+  "schedule": {
+    "kind": "daily",
+    "time": "09:30",
+    "timezone": "America/New_York",
+    "calendar_market": "us",
+    "non_trading_day_policy": "skip"
+  },
+  "payload": {
+    "stock_code": "AAPL",
+    "notify": true
+  },
+  "enabled": true,
+  "max_attempts": 2
+}
+```
+
+- `stock_analysis` requires schema version `1`; `research_brief` and
+  `risk_check` require schema version `2`. Version and task type cannot be
+  mixed.
+- `research_brief` always submits the canonical brief report contract.
+  `risk_check` submits the canonical detailed report contract with the
+  `persona_tail_risk` entry from the effective canonical Agent skill catalog.
+  A configured custom skill with that same stable ID follows the existing
+  catalog override rule; this schedule contract does not pin the bundled file.
+  Research payloads cannot supply arbitrary prompts, report modes, skills,
+  credentials, or provider configuration.
 - `kind` must be `daily`; `time` uses 24-hour `HH:MM` in the supplied IANA
   timezone.
 - `calendar_market` is one of `cn`, `hk`, `us`, `jp`, `kr`, or `tw` and must
@@ -68,8 +104,9 @@ All routes use the existing `/api/v1` authentication policy:
 
 | Method | Route | Behavior |
 | --- | --- | --- |
-| `POST` | `/scheduled-tasks` | Create a schema-v1 definition. |
+| `POST` | `/scheduled-tasks` | Create a supported schema-v1 or schema-v2 definition. |
 | `GET` | `/scheduled-tasks` | List definitions, optionally filtered by `enabled`. |
+| `GET` | `/scheduled-tasks/today?timezone=<IANA>` | List past and upcoming occurrences on today's date in the requested display timezone. |
 | `GET` | `/scheduled-tasks/{task_id}/status` | Return the definition and latest run. |
 | `POST` | `/scheduled-tasks/{task_id}/enable` | Enable and calculate the next future occurrence. |
 | `POST` | `/scheduled-tasks/{task_id}/disable` | Disable and clear `next_run_at`. |
@@ -81,15 +118,28 @@ queue. A conflict-waiting occurrence that has not submitted or adopted a
 compatible execution is interrupted instead of dispatching after disable. An
 already submitted execution may finish and still record success, but a failure
 after disable is interrupted instead of creating a retry or resubmission.
-Each enable/disable transition advances an internal execution generation. A
+Each normal enable/disable transition advances an internal execution
+generation. At SQLite's terminal generation ceiling, disable still clears the
+occurrence without incrementing the generation, while re-enable is rejected. A
 disable followed by re-enable therefore cannot revive an occurrence that was
 already waiting to dispatch or retry under the older definition state.
 
-Responses use a `compatibility` discriminator. Schema-v1 definitions return
-`supported` and the complete definition. An unknown future schema returns
+The `today` projection combines durable runs with enabled definitions whose
+next occurrence is later on the same local calendar date. Its range uses local
+midnight boundaries, so daylight-saving transition dates correctly span 23 or
+25 UTC hours. Completed and disabled definitions remain visible through their
+durable run, while disabled definitions with no run are not projected. The
+projection is read-only and does not claim, execute, retry, or mutate a task.
+Each item is isolated: an occurrence whose definition was concurrently deleted,
+or a corrupt definition or run, is omitted without making the rest of the Home
+card unavailable.
+
+Responses use a `compatibility` discriminator. Schema-v1 and schema-v2
+definitions return `supported` and the complete definition. An unknown future schema returns
 `unsupported_schema` plus only `id`, `schema_version`, `name`, enablement,
 timing, and timestamps; schedule and payload fields are not parsed or exposed.
-Status and run-history reads remain available, while enable/disable returns
+This opaque projection also applies to the `today` route. Status and run-history
+reads remain available, while enable/disable returns
 `409 scheduled_task_schema_unsupported` without changing any definition field.
 
 The database mutation is authoritative. If the immediate best-effort runtime
@@ -104,12 +154,22 @@ Each due slot is claimed by atomically advancing the definition's
 constraint, so repeated polls cannot claim or dispatch the same occurrence.
 After downtime, the service claims at most one overdue occurrence and advances
 directly to the next future daily time; it does not replay an unbounded backlog.
-Every persisted definition is validated through the same schema-v1 contract
-before it is mutated, claimed, or reconciled. An unsupported future definition
+Every persisted definition is validated through its matching schema-v1 or
+schema-v2 contract before it is mutated, claimed, or reconciled. An unsupported future definition
 is never parsed or rewritten. Its due slot receives one `interrupted` occurrence
-as a fence, and the due query excludes that same slot on later polls. A corrupt
-schema-v1 definition is atomically disabled and records one `interrupted`
-quarantine occurrence. Enablement, supported claims, and v1 quarantine writes
+as a fence, and the due query excludes that same slot on later polls. When code
+that supports the schema returns, it atomically advances this exact
+schema/generation fence to the next future daily occurrence without replaying
+the old slot. A corrupt supported definition is atomically disabled and records
+one `interrupted` quarantine occurrence. If the schema version or execution
+generation itself is not an exact positive integer, it cannot form a truthful
+run snapshot: the definition is atomically disabled without an occurrence and
+its generation is moved, under the same SQLite writer lock, above every valid
+persisted run snapshot for that task. If the signed SQLite generation ceiling
+is reached, disabling still clears the next occurrence without incrementing the
+generation, while re-enabling remains rejected until operator repair.
+Enablement, supported
+claims, and supported-definition quarantine writes
 all compare the expected schema version in the same database statement; a CAS
 miss is re-read and reclassified before any later action.
 
@@ -140,11 +200,11 @@ Analysis submission reuses the canonical task queue's stock deduplication. If
 an active task has the same canonical stock and complete execution contract, the
 occurrence observes it instead of creating duplicate analysis and notification
 side effects. The contract covers normalized report type, analysis phase,
-force-refresh, notification, ordered skills, report language, decision-memory
-override, portfolio context, query source, and whether contextual reply targets
-are bound. `detailed` and `full` normalize to the same report mode; `None` and an
-explicit empty or disabled value remain distinct where execution distinguishes
-them.
+force-refresh, notification, ordered skills, skill-selection strictness, report
+language, decision-memory override, portfolio context, query source, and
+whether contextual reply targets are bound. `detailed` and `full` normalize to
+the same report mode; `None` and an explicit empty or disabled value remain
+distinct where execution distinguishes them.
 
 An incompatible active task moves the occurrence to `retry_wait` without adding
 an execution ID or consuming `max_attempts`; after the fixed 30-second interval,
@@ -155,6 +215,16 @@ attempts remain, the occurrence submits again rather than retrying someone
 else's task. Only a task ID created by the occurrence can use the queue's retry
 operation. `execution_task_ids` remains append-only audit history, with the last
 ID representing the execution currently being observed.
+
+If the required effective-catalog risk-check skill is unavailable during
+admission, no fallback analysis is submitted. The occurrence uses the existing
+queue-admission failure counter, waits 30 seconds between probes, and becomes
+`failed` after three admission failures without consuming an analysis attempt.
+Queue metadata also marks this selection strict, so if the catalog entry
+disappears before the Analyzer or Agent resolves it, execution fails and follows
+the normal bounded execution retry path instead of silently activating default
+skills. Once admitted, all other execution failure and retry behavior is
+identical to schema-v1 stock analysis.
 
 `attempt_count` increases only when a newly accepted or exactly compatible
 coalesced execution ID is durable. Queue shutdown, executor rejection, and
@@ -230,16 +300,18 @@ retry ownership remain process-local.
 
 ## Persistence And Rollback
 
-Migration `202607240002_scheduled_task_schema` adds `scheduled_tasks` and
-`scheduled_task_runs`, including internal definition snapshots, execution
-generation, dispatch reservations, admission-failure counts, and notification
-outcomes. It is additive and preserves existing configuration, global schedule
-behavior, analysis history, and task-queue API fields.
+Migration `202607240002_scheduled_task_schema` already supplies
+`scheduled_tasks` and `scheduled_task_runs`, including internal definition
+snapshots, execution generation, dispatch reservations, admission-failure
+counts, and notification outcomes. Schema-v2 research tasks reuse those tables;
+this feature adds no database migration or configuration.
 
-The normal code rollback is to revert the feature PR. An older application will
-fail closed when it sees the unknown higher migration, so production rollback
-must restore a matching pre-upgrade database backup as described in
-[`database-migrations_EN.md`](database-migrations_EN.md). If the data is known
-to be disposable, a maintainer may remove both new tables and the corresponding
-registry state only as a planned maintenance operation; the application does
-not provide a destructive down migration.
+The normal code rollback is to revert the research-task feature. The preceding
+schema-v1 application keeps stock-analysis definitions working and exposes
+schema-v2 definitions as opaque unsupported records without mutating or
+executing them. If the older application observes a due schema-v2 slot, it
+records only the terminal unsupported-schema fence and leaves the definition
+unchanged. Re-deploying schema-v2 code detects that exact fence, advances the
+definition to its next future daily occurrence, and never replays the old
+possibly stale slot. No database restore, manual enable toggle, or destructive
+table operation is required for this rollback.

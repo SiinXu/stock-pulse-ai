@@ -3122,7 +3122,7 @@
           "ScheduledTasks"
         ],
         "summary": "Create scheduled task",
-        "description": "Create one version-one scheduled task.",
+        "description": "Create one supported scheduled task.",
         "operationId": "create_scheduled_task_api_v1_scheduled_tasks_post",
         "requestBody": {
           "required": true,
@@ -3224,6 +3224,72 @@
                 }
               }
             }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/scheduled-tasks/today": {
+      "get": {
+        "tags": [
+          "ScheduledTasks"
+        ],
+        "summary": "List today's scheduled task occurrences",
+        "description": "Return today's past and upcoming occurrences in one display timezone.",
+        "operationId": "list_today_scheduled_tasks_api_v1_scheduled_tasks_today_get",
+        "parameters": [
+          {
+            "name": "timezone",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "default": "UTC",
+              "title": "Timezone"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduledTaskTodayResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
           },
           "500": {
             "content": {
@@ -9740,13 +9806,38 @@
           "calendar_market"
         ],
         "title": "DailyScheduleRequest",
-        "description": "Version-one daily wall-clock schedule."
+        "description": "Daily wall-clock schedule shared by supported task schemas."
+      },
+      "ResearchScheduledPayload": {
+        "properties": {
+          "stock_code": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Stock Code"
+          },
+          "notify": {
+            "type": "boolean",
+            "title": "Notify",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "stock_code"
+        ],
+        "title": "ResearchScheduledPayload",
+        "description": "Schema-v2 single-symbol research payload."
       },
       "ScheduledTaskCreateRequest": {
         "properties": {
           "schema_version": {
             "type": "integer",
-            "const": 1,
+            "enum": [
+              1,
+              2
+            ],
             "title": "Schema Version",
             "default": 1
           },
@@ -9758,7 +9849,11 @@
           },
           "task_type": {
             "type": "string",
-            "const": "stock_analysis",
+            "enum": [
+              "stock_analysis",
+              "research_brief",
+              "risk_check"
+            ],
             "title": "Task Type",
             "default": "stock_analysis"
           },
@@ -9766,7 +9861,15 @@
             "$ref": "#/components/schemas/DailyScheduleRequest"
           },
           "payload": {
-            "$ref": "#/components/schemas/StockAnalysisScheduledPayload"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResearchScheduledPayload"
+              },
+              {
+                "$ref": "#/components/schemas/StockAnalysisScheduledPayload"
+              }
+            ],
+            "title": "Payload"
           },
           "enabled": {
             "type": "boolean",
@@ -9789,7 +9892,7 @@
           "payload"
         ],
         "title": "ScheduledTaskCreateRequest",
-        "description": "Request body for one version-one scheduled definition."
+        "description": "Request body for a supported scheduled definition."
       },
       "ScheduledTaskItem": {
         "properties": {
@@ -9819,7 +9922,15 @@
             "$ref": "#/components/schemas/DailyScheduleRequest"
           },
           "payload": {
-            "$ref": "#/components/schemas/StockAnalysisScheduledPayload"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResearchScheduledPayload"
+              },
+              {
+                "$ref": "#/components/schemas/StockAnalysisScheduledPayload"
+              }
+            ],
+            "title": "Payload"
           },
           "enabled": {
             "type": "boolean",
@@ -9867,7 +9978,7 @@
           "updated_at"
         ],
         "title": "ScheduledTaskItem",
-        "description": "Fully understood version-one scheduled definition."
+        "description": "Fully understood supported scheduled definition."
       },
       "ScheduledTaskListResponse": {
         "properties": {
@@ -10122,6 +10233,105 @@
         ],
         "title": "ScheduledTaskStatusResponse",
         "description": "Definition compatibility projection and latest occurrence."
+      },
+      "ScheduledTaskTodayItem": {
+        "properties": {
+          "task": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ScheduledTaskItem"
+              },
+              {
+                "$ref": "#/components/schemas/UnsupportedScheduledTaskItem"
+              }
+            ],
+            "title": "Task",
+            "discriminator": {
+              "propertyName": "compatibility",
+              "mapping": {
+                "supported": "#/components/schemas/ScheduledTaskItem",
+                "unsupported_schema": "#/components/schemas/UnsupportedScheduledTaskItem"
+              }
+            }
+          },
+          "scheduled_for": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Scheduled For"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "scheduled",
+              "dispatching",
+              "running",
+              "retry_wait",
+              "succeeded",
+              "failed",
+              "skipped",
+              "interrupted"
+            ],
+            "title": "Status"
+          },
+          "run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScheduledTaskRunItem"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "task",
+          "scheduled_for",
+          "status"
+        ],
+        "title": "ScheduledTaskTodayItem",
+        "description": "One scheduled occurrence on the requested local calendar date."
+      },
+      "ScheduledTaskTodayResponse": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduledTaskTodayItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "date",
+          "timezone",
+          "generated_at",
+          "total"
+        ],
+        "title": "ScheduledTaskTodayResponse",
+        "description": "Timezone-aware read projection for today's scheduled occurrences."
       },
       "StockAnalysisScheduledPayload": {
         "properties": {

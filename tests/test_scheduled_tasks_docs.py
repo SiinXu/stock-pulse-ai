@@ -51,6 +51,17 @@ def test_scheduled_task_topic_is_indexed_and_documents_runtime_boundaries() -> N
         "dispatch_failure_count",
         "notification_failed_channels",
         "does not change the occurrence from `succeeded`",
+        "research_brief",
+        "risk_check",
+        "persona_tail_risk",
+        "/scheduled-tasks/today?timezone=<IANA>",
+        "23 or",
+        "25 UTC hours",
+        "adds no database migration or configuration",
+        "schema-v2 definitions as opaque unsupported records",
+        "effective canonical Agent skill catalog",
+        "never replays the old",
+        "Each item is isolated",
     ):
         assert required in topic
     assert "both valid UTC instants are eligible" not in topic
@@ -59,6 +70,8 @@ def test_scheduled_task_topic_is_indexed_and_documents_runtime_boundaries() -> N
     assert "Amends: [ADR-004]" in schedule_adr
     assert "at most once per schedule-local date" in schedule_adr
     assert "never replays the whole analysis" in schedule_adr
+    assert "next future occurrence" in schedule_adr
+    assert "structural-corruption quarantine" in schedule_adr
     assert "ScheduledTaskService.tick()" in architecture
 
 

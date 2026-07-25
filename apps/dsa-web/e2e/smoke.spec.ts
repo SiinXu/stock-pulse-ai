@@ -164,6 +164,33 @@ test.describe('web smoke', () => {
   });
 
   test('home page shows the attention hub and keeps configurable content collapsed', async ({ page }) => {
+    await page.route('**/api/v1/scheduled-tasks/today*', async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        json: {
+          date: '2026-07-25',
+          timezone: 'Asia/Shanghai',
+          generated_at: '2026-07-25T12:00:00Z',
+          total: 1,
+          items: [{
+            task: {
+              compatibility: 'supported',
+              id: 'scheduled-risk-aapl',
+              schema_version: 2,
+              name: 'AAPL downside review',
+              task_type: 'risk_check',
+              enabled: true,
+              next_run_at: '2026-07-25T10:00:00Z',
+              created_at: '2026-07-24T20:00:00Z',
+              updated_at: '2026-07-24T20:00:00Z',
+            },
+            scheduled_for: '2026-07-25T10:00:00Z',
+            status: 'retry_wait',
+            run: null,
+          }],
+        },
+      });
+    });
     await mockCompletedSetupStatus(page);
     await login(page);
 
@@ -177,6 +204,25 @@ test.describe('web smoke', () => {
     const configurable = page.getByRole('button', { name: /可配置区/ });
     await expect(configurable).toHaveAttribute('aria-expanded', 'false');
     await expect(page.locator('#home-configurable-content')).toBeHidden();
+
+    await configurable.click();
+    const scheduledTasks = page.getByRole('region', {
+      name: '今日定时任务',
+      exact: true,
+    });
+    await expect(scheduledTasks).toBeVisible();
+    await expect(scheduledTasks.getByText('AAPL downside review')).toBeVisible();
+    await expect(scheduledTasks.getByText(/风险检查/)).toBeVisible();
+    await expect(scheduledTasks.getByText('等待重试')).toBeVisible();
+    const scheduledTaskList = scheduledTasks.getByRole('region', {
+      name: '今日定时任务列表',
+    });
+    await expect(scheduledTaskList).toHaveAttribute('tabindex', '0');
+    await expect(scheduledTaskList.getByRole('list')).toBeVisible();
+    await expect(scheduledTaskList.getByRole('listitem')).toHaveCount(1);
+    await scheduledTaskList.focus();
+    await expect(scheduledTaskList).toBeFocused();
+    await expect(scheduledTasks.getByRole('button')).toHaveCount(0);
   });
 
   test('chat page allows entering a question and starts a request', async ({ page }) => {

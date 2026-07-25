@@ -122,6 +122,7 @@ def _resolve_selected_skill_ids(
     configured_skills: Optional[List[str]],
     default_skills: List[str],
     available_skill_ids: set[str],
+    strict_skill_selection: bool = False,
 ) -> tuple[List[str], bool]:
     """Resolve active skill ids and whether they came from a valid explicit selection."""
     selection_source = None
@@ -140,6 +141,11 @@ def _resolve_selected_skill_ids(
         available_skill_ids=available_skill_ids,
     )
     if unknown_skill_ids:
+        if strict_skill_selection:
+            raise ValueError(
+                "Unknown explicitly selected Agent skill ids: "
+                + ", ".join(unknown_skill_ids)
+            )
         logger.warning(
             "[AgentFactory] Ignoring unknown %s skill ids: %s",
             selection_source,
@@ -286,6 +292,8 @@ def get_skill_manager(config: Optional[Config] = None):
 def resolve_skill_prompt_state(
     config: Optional[Config] = None,
     skills: Optional[List[str]] = None,
+    *,
+    strict_skill_selection: bool = False,
 ) -> SkillPromptState:
     """Resolve active skills and prompt fragments for analyzer / agent entrypoints."""
     if config is None:
@@ -318,6 +326,7 @@ def resolve_skill_prompt_state(
         configured_skills=configured_skills,
         default_skills=default_skills,
         available_skill_ids=available_skill_ids,
+        strict_skill_selection=strict_skill_selection,
     )
 
     use_legacy_default_prompt = _should_use_legacy_default_prompt(
@@ -347,6 +356,8 @@ def resolve_skill_prompt_state(
 def build_agent_executor(
     config: Optional[Config] = None,
     skills: Optional[List[str]] = None,
+    *,
+    strict_skill_selection: bool = False,
 ):
     """Build and return a configured AgentExecutor (or future orchestrator).
 
@@ -374,7 +385,11 @@ def build_agent_executor(
     from src.agent.llm_adapter import LLMToolAdapter
 
     registry = get_tool_registry()
-    prompt_state = resolve_skill_prompt_state(config, skills=skills)
+    prompt_state = resolve_skill_prompt_state(
+        config,
+        skills=skills,
+        strict_skill_selection=strict_skill_selection,
+    )
     skill_manager = prompt_state.skill_manager
     logger.info(
         "[AgentFactory] Resolved skill prompt state: skills=%s (arch=%s, explicit=%s, legacy_default_prompt=%s)",

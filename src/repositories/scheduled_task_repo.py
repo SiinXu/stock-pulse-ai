@@ -9,7 +9,10 @@ from typing import Any, Callable, Dict, List, Optional, Sequence
 from sqlalchemy import desc, func, insert, literal, select, update
 from sqlalchemy.exc import IntegrityError
 
-from src.schemas.scheduled_task import ACTIVE_SCHEDULED_RUN_STATUSES
+from src.schemas.scheduled_task import (
+    ACTIVE_SCHEDULED_RUN_STATUSES,
+    MAX_SCHEDULED_TASK_EXECUTION_GENERATION,
+)
 from src.storage import DatabaseManager, ScheduledTaskRecord, ScheduledTaskRunRecord
 
 
@@ -92,6 +95,51 @@ class ScheduledTaskRepository:
         with self.db.get_session() as session:
             return int(session.execute(query).scalar() or 0)
 
+    def list_tasks_by_ids(
+        self,
+        task_ids: Sequence[str],
+    ) -> List[ScheduledTaskRecord]:
+        """Return definitions for a bounded identifier set."""
+        canonical_ids = list(dict.fromkeys(str(task_id) for task_id in task_ids))
+        if not canonical_ids:
+            return []
+        with self.db.get_session() as session:
+            rows = session.execute(
+                select(ScheduledTaskRecord)
+                .where(ScheduledTaskRecord.id.in_(canonical_ids))
+                .order_by(ScheduledTaskRecord.id)
+            ).scalars().all()
+            for row in rows:
+                session.expunge(row)
+            return list(rows)
+
+    def list_next_occurrences_between(
+        self,
+        *,
+        start: datetime,
+        end: datetime,
+        limit: int = 500,
+    ) -> List[ScheduledTaskRecord]:
+        """List enabled definitions whose next occurrence is in [start, end)."""
+        with self.db.get_session() as session:
+            rows = session.execute(
+                select(ScheduledTaskRecord)
+                .where(
+                    ScheduledTaskRecord.enabled.is_(True),
+                    ScheduledTaskRecord.next_run_at.is_not(None),
+                    ScheduledTaskRecord.next_run_at >= start,
+                    ScheduledTaskRecord.next_run_at < end,
+                )
+                .order_by(
+                    ScheduledTaskRecord.next_run_at,
+                    ScheduledTaskRecord.id,
+                )
+                .limit(max(1, min(int(limit), 500)))
+            ).scalars().all()
+            for row in rows:
+                session.expunge(row)
+            return list(rows)
+
     def set_enabled(
         self,
         task_id: str,
@@ -115,7 +163,10 @@ class ScheduledTaskRepository:
                 )
                 .values(
                     enabled=enabled,
-                    execution_generation=expected_execution_generation + 1,
+                    execution_generation=min(
+                        expected_execution_generation + 1,
+                        MAX_SCHEDULED_TASK_EXECUTION_GENERATION,
+                    ),
                     next_run_at=next_run_at,
                     updated_at=updated_at,
                 )
@@ -158,6 +209,111 @@ class ScheduledTaskRepository:
             for row in rows:
                 session.expunge(row)
             return list(rows)
+
+    def list_schema_unsupported_fences(
+        self,
+        *,
+        now: datetime,
+        supported_schema_versions: Sequence[int],
+        limit: int = 100,
+    ) -> List[tuple[ScheduledTaskRecord, ScheduledTaskRunRecord]]:
+        """List due slots that only an older binary marked schema-unsupported."""
+        versions = list(dict.fromkeys(supported_schema_versions))
+        if not versions:
+            return []
+        with self.db.get_session() as session:
+            rows = session.execute(
+                select(ScheduledTaskRecord, ScheduledTaskRunRecord)
+                .join(
+                    ScheduledTaskRunRecord,
+                    (
+                        ScheduledTaskRunRecord.task_id
+                        == ScheduledTaskRecord.id
+                    )
+                    & (
+                        ScheduledTaskRunRecord.scheduled_for
+                        == ScheduledTaskRecord.next_run_at
+                    )
+                    & (
+                        ScheduledTaskRunRecord.definition_schema_version
+                        == ScheduledTaskRecord.schema_version
+                    )
+                    & (
+                        ScheduledTaskRunRecord.definition_generation
+                        == ScheduledTaskRecord.execution_generation
+                    ),
+                )
+                .where(
+                    ScheduledTaskRecord.enabled.is_(True),
+                    ScheduledTaskRecord.schema_version.in_(versions),
+                    ScheduledTaskRecord.next_run_at.is_not(None),
+                    ScheduledTaskRecord.next_run_at <= now,
+                    ScheduledTaskRunRecord.status == "interrupted",
+                    ScheduledTaskRunRecord.error_code
+                    == "scheduled_task_schema_unsupported",
+                )
+                .order_by(
+                    ScheduledTaskRecord.next_run_at,
+                    ScheduledTaskRecord.id,
+                )
+                .limit(max(1, min(int(limit), 500)))
+            ).all()
+            result = []
+            for task, run in rows:
+                session.expunge(task)
+                session.expunge(run)
+                result.append((task, run))
+            return result
+
+    def advance_schema_unsupported_fence(
+        self,
+        *,
+        task_id: str,
+        expected_schema_version: int,
+        expected_execution_generation: int,
+        expected_next_run_at: datetime,
+        expected_run_id: str,
+        next_run_at: datetime,
+        updated_at: datetime,
+    ) -> bool:
+        """Advance one now-supported fence without replaying its old occurrence."""
+        matching_fence = (
+            select(ScheduledTaskRunRecord.id)
+            .where(
+                ScheduledTaskRunRecord.id == expected_run_id,
+                ScheduledTaskRunRecord.task_id == task_id,
+                ScheduledTaskRunRecord.scheduled_for
+                == expected_next_run_at,
+                ScheduledTaskRunRecord.definition_schema_version
+                == expected_schema_version,
+                ScheduledTaskRunRecord.definition_generation
+                == expected_execution_generation,
+                ScheduledTaskRunRecord.status == "interrupted",
+                ScheduledTaskRunRecord.error_code
+                == "scheduled_task_schema_unsupported",
+            )
+            .exists()
+        )
+        with self.db.get_session() as session:
+            result = session.execute(
+                update(ScheduledTaskRecord)
+                .where(
+                    ScheduledTaskRecord.id == task_id,
+                    ScheduledTaskRecord.schema_version
+                    == expected_schema_version,
+                    ScheduledTaskRecord.execution_generation
+                    == expected_execution_generation,
+                    ScheduledTaskRecord.enabled.is_(True),
+                    ScheduledTaskRecord.next_run_at == expected_next_run_at,
+                    matching_fence,
+                )
+                .values(next_run_at=next_run_at, updated_at=updated_at)
+            )
+            if result.rowcount != 1:
+                session.rollback()
+                return False
+            session.commit()
+            return True
 
     def claim_due_occurrence(
         self,
@@ -315,6 +471,72 @@ class ScheduledTaskRepository:
             session.refresh(run)
             return self._detach(session, run)
 
+    def disable_corrupt_task(
+        self,
+        *,
+        task_id: str,
+        expected_schema_version: Any,
+        expected_execution_generation: Any,
+        expected_next_run_at: Optional[datetime],
+        updated_at: datetime,
+    ) -> bool:
+        """Disable corruption above all valid snapshots, or at the terminal ceiling."""
+        session = self.db.get_session()
+        try:
+            session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+            task = session.get(ScheduledTaskRecord, task_id)
+            if (
+                task is None
+                or type(task.schema_version) is not type(expected_schema_version)
+                or task.schema_version != expected_schema_version
+                or type(task.execution_generation)
+                is not type(expected_execution_generation)
+                or task.execution_generation != expected_execution_generation
+                or task.enabled is not True
+                or task.next_run_at != expected_next_run_at
+            ):
+                session.rollback()
+                return False
+
+            max_snapshot = session.execute(
+                select(func.max(ScheduledTaskRunRecord.definition_generation))
+                .where(
+                    ScheduledTaskRunRecord.task_id == task_id,
+                    func.typeof(
+                        ScheduledTaskRunRecord.definition_generation
+                    ) == "integer",
+                    ScheduledTaskRunRecord.definition_generation >= 1,
+                    ScheduledTaskRunRecord.definition_generation
+                    <= MAX_SCHEDULED_TASK_EXECUTION_GENERATION,
+                )
+            ).scalar()
+            valid_generations = [
+                int(max_snapshot or 0),
+            ]
+            if (
+                type(task.execution_generation) is int
+                and 1
+                <= task.execution_generation
+                <= MAX_SCHEDULED_TASK_EXECUTION_GENERATION
+            ):
+                valid_generations.append(task.execution_generation)
+            highest_valid_generation = max(valid_generations)
+            replacement_generation = min(
+                highest_valid_generation + 1,
+                MAX_SCHEDULED_TASK_EXECUTION_GENERATION,
+            )
+            task.enabled = False
+            task.execution_generation = replacement_generation
+            task.next_run_at = None
+            task.updated_at = updated_at
+            session.commit()
+            return True
+        except Exception:  # broad-exception: cleanup - roll back before re-raising.
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
     def reserve_run_admission(
         self,
         *,
@@ -388,15 +610,23 @@ class ScheduledTaskRepository:
                 return finish("run_missing")
             if task is None:
                 return finish("task_missing")
-            if task.schema_version != expected_schema_version:
+            if (
+                type(task.schema_version) is not int
+                or type(expected_schema_version) is not int
+                or task.schema_version != expected_schema_version
+            ):
                 return finish("schema_changed")
-            if task.schema_version != run.definition_schema_version:
+            if (
+                type(run.definition_schema_version) is not int
+                or task.schema_version != run.definition_schema_version
+            ):
                 return finish("schema_changed")
             if run.dispatch_token != expected_dispatch_token:
                 return finish("reservation_changed")
             if (
-                int(task.execution_generation)
-                != int(run.definition_generation)
+                type(task.execution_generation) is not int
+                or type(run.definition_generation) is not int
+                or task.execution_generation != run.definition_generation
             ):
                 return finish("generation_changed")
             if not bool(task.enabled):
@@ -492,6 +722,32 @@ class ScheduledTaskRepository:
                 .order_by(
                     desc(ScheduledTaskRunRecord.scheduled_for),
                     desc(ScheduledTaskRunRecord.created_at),
+                )
+                .limit(max(1, min(int(limit), 500)))
+            ).scalars().all()
+            for row in rows:
+                session.expunge(row)
+            return list(rows)
+
+    def list_runs_between(
+        self,
+        *,
+        start: datetime,
+        end: datetime,
+        limit: int = 500,
+    ) -> List[ScheduledTaskRunRecord]:
+        """List occurrence records scheduled in [start, end)."""
+        with self.db.get_session() as session:
+            rows = session.execute(
+                select(ScheduledTaskRunRecord)
+                .where(
+                    ScheduledTaskRunRecord.scheduled_for >= start,
+                    ScheduledTaskRunRecord.scheduled_for < end,
+                )
+                .order_by(
+                    ScheduledTaskRunRecord.scheduled_for,
+                    ScheduledTaskRunRecord.task_id,
+                    ScheduledTaskRunRecord.id,
                 )
                 .limit(max(1, min(int(limit), 500)))
             ).scalars().all()

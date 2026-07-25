@@ -92,6 +92,29 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
         self.assertIn("### 技能 1: 波段低吸", prompt)
         self.assertNotIn("专注于趋势交易", prompt)
 
+    def test_analysis_prompt_forwards_strict_skill_selection(self) -> None:
+        with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
+            analyzer = GeminiAnalyzer(
+                skills=["persona_tail_risk"],
+                strict_skill_selection=True,
+            )
+
+        fake_state = SimpleNamespace(
+            skill_instructions="### Persona: Tail Risk",
+            default_skill_policy="",
+        )
+        with patch(
+            "src.agent.factory.resolve_skill_prompt_state",
+            return_value=fake_state,
+        ) as resolver:
+            analyzer._get_analysis_system_prompt("en", stock_code="AAPL")
+
+        resolver.assert_called_once_with(
+            analyzer._get_runtime_config(),
+            skills=["persona_tail_risk"],
+            strict_skill_selection=True,
+        )
+
     def test_analysis_prompt_uses_injected_skill_sections_instead_of_hardcoded_trend_baseline(self) -> None:
         with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
             analyzer = GeminiAnalyzer(

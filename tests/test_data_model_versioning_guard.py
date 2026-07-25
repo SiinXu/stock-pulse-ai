@@ -73,7 +73,7 @@ def test_serialized_artifact_version_constants_match_documented_inventory() -> N
         DECISION_SIGNAL_PRESENTATION_SCHEMA_VERSION
         == "decision-signal-presentation-v1"
     )
-    assert SCHEDULED_TASK_SCHEMA_VERSION == 1
+    assert SCHEDULED_TASK_SCHEMA_VERSION == 2
 
 
 def test_analysis_context_pack_serialization_emits_version() -> None:

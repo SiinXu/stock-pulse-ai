@@ -1,4 +1,4 @@
-"""Scheduled-task API endpoints for schema version 1."""
+"""Scheduled-task API endpoints for supported versioned definitions."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from api.v1.schemas.scheduled_tasks import (
     ScheduledTaskListResponse,
     ScheduledTaskRunListResponse,
     ScheduledTaskStatusResponse,
+    ScheduledTaskTodayResponse,
 )
 from src.services.runtime_scheduler import RuntimeSchedulerService
 from src.services.scheduled_task_service import (
@@ -79,7 +80,7 @@ def create_scheduled_task(
     service: ScheduledTaskService = Depends(get_scheduled_task_service),
     runtime_scheduler: RuntimeSchedulerService = Depends(get_runtime_scheduler_service),
 ) -> ScheduledTaskItem:
-    """Create one version-one scheduled task."""
+    """Create one supported scheduled task."""
     try:
         item = service.create_task(request.model_dump())
         response = ScheduledTaskItem.model_validate(item)
@@ -123,6 +124,33 @@ def list_scheduled_tasks(
         log_safe_exception(
             logger,
             "List scheduled tasks failed",
+            exc,
+            error_code="scheduled_task_api_internal_error",
+        )
+        raise api_error(500, "internal_error", "Scheduled task operation failed")
+
+
+@router.get(
+    "/today",
+    response_model=ScheduledTaskTodayResponse,
+    responses={400: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    summary="List today's scheduled task occurrences",
+)
+def list_today_scheduled_tasks(
+    timezone: str = Query("UTC", min_length=1, max_length=64),
+    service: ScheduledTaskService = Depends(get_scheduled_task_service),
+) -> ScheduledTaskTodayResponse:
+    """Return today's past and upcoming occurrences in one display timezone."""
+    try:
+        return ScheduledTaskTodayResponse.model_validate(
+            service.list_today(timezone_name=timezone)
+        )
+    except ScheduledTaskError as exc:
+        raise _service_error(exc)
+    except Exception as exc:  # broad-exception: fallback_recorded - API boundary logs diagnostics and returns a stable envelope.
+        log_safe_exception(
+            logger,
+            "List today's scheduled tasks failed",
             exc,
             error_code="scheduled_task_api_internal_error",
         )

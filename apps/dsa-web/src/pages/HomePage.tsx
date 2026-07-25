@@ -17,8 +17,10 @@ import { useNavigate } from 'react-router-dom';
 import { alertsApi } from '../api/alerts';
 import { decisionSignalsApi } from '../api/decisionSignals';
 import { historyApi } from '../api/history';
+import { scheduledTasksApi } from '../api/scheduledTasks';
 import { systemConfigApi } from '../api/systemConfig';
 import {
+  Badge,
   Button,
   EmptyState,
   IconButton,
@@ -41,6 +43,10 @@ import {
 } from '../routing/routes';
 import type { HistoryItem, StockReportType } from '../types/analysis';
 import type { DecisionSignalItem } from '../types/decisionSignals';
+import type {
+  ScheduledTaskOccurrenceStatus,
+  ScheduledTaskTodayItem,
+} from '../types/scheduledTasks';
 import type { SetupStatusResponse } from '../types/systemConfig';
 import { buildDecisionActionLabelMap } from '../utils/decisionAction';
 import { getDecisionSignalPresentation } from '../utils/decisionSignalPresentation';
@@ -84,6 +90,7 @@ type HomeAttentionAvailability = {
   alerts: boolean;
   marketReview: boolean;
   recentAnalyses: boolean;
+  scheduledTasks: boolean;
 };
 
 type HomeAttentionData = {
@@ -93,6 +100,7 @@ type HomeAttentionData = {
   triggeredAlertTotal: number | null;
   latestMarketReview: HistoryItem | null;
   recentAnalyses: HistoryItem[];
+  scheduledTasks: ScheduledTaskTodayItem[];
 };
 
 type HomeAttentionLoadResult = {
@@ -108,6 +116,7 @@ const EMPTY_ATTENTION_DATA: HomeAttentionData = {
   triggeredAlertTotal: null,
   latestMarketReview: null,
   recentAnalyses: [],
+  scheduledTasks: [],
 };
 
 const EMPTY_ATTENTION_AVAILABILITY: HomeAttentionAvailability = {
@@ -116,7 +125,59 @@ const EMPTY_ATTENTION_AVAILABILITY: HomeAttentionAvailability = {
   alerts: false,
   marketReview: false,
   recentAnalyses: false,
+  scheduledTasks: false,
 };
+
+type UiTranslator = ReturnType<typeof useUiLanguage>['t'];
+type ScheduledTaskBadgeVariant =
+  | 'default'
+  | 'info'
+  | 'success'
+  | 'warning'
+  | 'danger';
+
+function getBrowserTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
+}
+
+function getScheduledTaskTypeLabel(
+  taskType: string | undefined,
+  t: UiTranslator,
+): string {
+  if (taskType === 'stock_analysis') return t('home.scheduledTaskTypeAnalysis');
+  if (taskType === 'research_brief') return t('home.scheduledTaskTypeResearchBrief');
+  if (taskType === 'risk_check') return t('home.scheduledTaskTypeRiskCheck');
+  return t('home.scheduledTaskTypeUnknown');
+}
+
+function getScheduledTaskStatusPresentation(
+  status: ScheduledTaskOccurrenceStatus,
+  t: UiTranslator,
+): { label: string; variant: ScheduledTaskBadgeVariant } {
+  if (status === 'succeeded') {
+    return { label: t('taskPanel.completed'), variant: 'success' };
+  }
+  if (status === 'failed') {
+    return { label: t('taskPanel.failed'), variant: 'danger' };
+  }
+  if (status === 'interrupted') {
+    return { label: t('taskPanel.interrupted'), variant: 'warning' };
+  }
+  if (status === 'skipped') {
+    return { label: t('home.scheduledTaskSkipped'), variant: 'default' };
+  }
+  if (status === 'running' || status === 'dispatching') {
+    return { label: t('taskPanel.processing'), variant: 'info' };
+  }
+  if (status === 'retry_wait') {
+    return { label: t('home.scheduledTaskRetryWait'), variant: 'warning' };
+  }
+  return { label: t('taskPanel.pending'), variant: 'default' };
+}
 
 async function fetchHomeAttentionData(): Promise<HomeAttentionLoadResult> {
   const reassessmentCutoff = new Date(Date.now() + REASSESSMENT_WINDOW_MS).toISOString();
@@ -131,18 +192,26 @@ async function fetchHomeAttentionData(): Promise<HomeAttentionLoadResult> {
       }),
       alertsApi.listTriggers({ status: 'triggered', page: 1, pageSize: 1 }),
       historyApi.getList({ reportType: 'market_review', page: 1, limit: 1 }),
+      scheduledTasksApi.getToday({ timezone: getBrowserTimezone() }),
     ]),
     Promise.allSettled(STOCK_REPORT_TYPES.map((reportType) => (
       historyApi.getList({ reportType, page: 1, limit: RECENT_ANALYSIS_LIMIT })
     ))),
   ]);
-  const [signalsResult, reassessmentsResult, alertsResult, marketReviewResult] = coreResults;
+  const [
+    signalsResult,
+    reassessmentsResult,
+    alertsResult,
+    marketReviewResult,
+    scheduledTasksResult,
+  ] = coreResults;
   const availability: HomeAttentionAvailability = {
     activeSignals: signalsResult.status === 'fulfilled',
     reassessments: reassessmentsResult.status === 'fulfilled',
     alerts: alertsResult.status === 'fulfilled',
     marketReview: marketReviewResult.status === 'fulfilled',
     recentAnalyses: recentAnalysisResults.every((result) => result.status === 'fulfilled'),
+    scheduledTasks: scheduledTasksResult.status === 'fulfilled',
   };
   const recentAnalyses = recentAnalysisResults
     .flatMap((result) => (result.status === 'fulfilled' ? result.value.items : []))
@@ -166,6 +235,9 @@ async function fetchHomeAttentionData(): Promise<HomeAttentionLoadResult> {
         ? marketReviewResult.value.items[0] ?? null
         : null,
       recentAnalyses,
+      scheduledTasks: scheduledTasksResult.status === 'fulfilled'
+        ? scheduledTasksResult.value.items
+        : [],
     },
     availability,
     failedSourceCount: Object.values(availability).filter((available) => !available).length,
@@ -522,7 +594,7 @@ const HomePage: React.FC = () => {
           />
         </button>
 
-        <div id="home-configurable-content" className="mt-4 grid gap-4 lg:grid-cols-2" hidden={!configurableExpanded}>
+        <div id="home-configurable-content" className="mt-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-3" hidden={!configurableExpanded}>
           <Section
             title={t('home.morningReport')}
             level="section"
@@ -620,6 +692,67 @@ const HomePage: React.FC = () => {
                     {t('home.startAnalysisTitle')}
                   </Button>
                 )}
+              />
+            )}
+          </Section>
+
+          <Section
+            title={t('home.scheduledTasksToday')}
+            description={t('home.scheduledTasksTodayDescription')}
+            level="section"
+            padding="md"
+            actions={<CalendarClock className="h-5 w-5 text-primary" aria-hidden="true" />}
+          >
+            {isLoading ? (
+              <StatePanel state="loading" title={t('common.loading')} size="compact" titleAs="p" />
+            ) : !availability.scheduledTasks ? (
+              <StatePanel
+                state="partial"
+                title={t('home.partialDataTitle')}
+                description={t('home.partialDataMessage')}
+                action={<Button variant="secondary" size="default" onClick={handleRefresh}>{t('common.retry')}</Button>}
+                size="compact"
+                titleAs="p"
+              />
+            ) : data.scheduledTasks.length > 0 ? (
+              <div
+                role="region"
+                aria-label={t('home.scheduledTasksListLabel')}
+                tabIndex={0}
+                className="max-h-72 overflow-y-auto rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                data-testid="today-scheduled-tasks"
+              >
+                <ul className="divide-y divide-border/70">
+                  {data.scheduledTasks.map((item) => {
+                    const status = getScheduledTaskStatusPresentation(item.status, t);
+                    return (
+                      <li
+                        key={`${item.task.id}-${item.scheduledFor}`}
+                        className="flex min-h-12 items-center justify-between gap-3 py-2"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-medium text-foreground">
+                            {item.task.name}
+                          </span>
+                          <span className="mt-0.5 block truncate text-xs text-secondary-text">
+                            {getScheduledTaskTypeLabel(item.task.taskType, t)}
+                            {' · '}
+                            {formatDateTime(item.scheduledFor, language)}
+                          </span>
+                        </span>
+                        <Badge variant={status.variant} className="shrink-0">
+                          {status.label}
+                        </Badge>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : (
+              <EmptyState
+                compact
+                title={t('home.noScheduledTasksTodayTitle')}
+                description={t('home.noScheduledTasksTodayDescription')}
               />
             )}
           </Section>

@@ -190,7 +190,7 @@ The ordered migration registry above governs the **DB schema layer**. In additio
 | `RunFlowSnapshot` | `RUN_FLOW_SCHEMA_VERSION` | `run-flow-v1` | `schema_version` | task / history run-flow API responses (built on demand, no dedicated column) |
 | `DecisionSignalPresentation` | `DECISION_SIGNAL_PRESENTATION_SCHEMA_VERSION` | `decision-signal-presentation-v1` | `schema_version` | DecisionSignal presentation object (built on demand from DB rows, no dedicated column) |
 | Security audit event | `SECURITY_AUDIT_SCHEMA_VERSION` | `security-audit-v1` | `schema_version` | `security_audit_events.schema_version` |
-| Scheduled task definition | `SCHEDULED_TASK_SCHEMA_VERSION` | `1` | `schema_version` | `scheduled_tasks` definition and `/api/v1/scheduled-tasks` payloads |
+| Scheduled task definition | `SCHEDULED_TASK_SCHEMA_VERSION` | `2` (v1 remains supported) | `schema_version` | `scheduled_tasks` definition and `/api/v1/scheduled-tasks` payloads |
 
 The inventory is bound to the actual constants by the guard test `tests/test_data_model_versioning_guard.py`; any constant drift or dropping a version field during serialization is caught.
 
