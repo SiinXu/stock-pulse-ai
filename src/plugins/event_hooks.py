@@ -129,9 +129,12 @@ def _sanitize_event_text(
 
 
 def _resolve_event_hook_registrations() -> tuple[ExtensionRegistration, ...]:
-    from src.application_services import get_application_services
+    from src.application_services import get_installed_application_services
 
-    return get_application_services().plugin_manager.registrations("event_hook")
+    services = get_installed_application_services()
+    if services is None:
+        return ()
+    return services.plugin_manager.enabled_registrations("event_hook")
 
 
 def _dispatch_event(

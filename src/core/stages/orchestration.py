@@ -262,6 +262,8 @@ class _OrchestrationStageMixin:
         Returns:
             AnalysisResult 或 None
         """
+        from src.plugins.event_hooks import dispatch_analysis_event
+
         logger.info("========== Processing %s ==========", code)
 
         from src.services.history_loader import set_frozen_target_date, reset_frozen_target_date
@@ -321,6 +323,16 @@ class _OrchestrationStageMixin:
             if frozen_target_token is not None:
                 reset_frozen_target_date(frozen_target_token)
             raise
+
+        analysis_event_started = not skip_analysis
+        if analysis_event_started:
+            dispatch_analysis_event(
+                "analysis.started",
+                task_id=effective_query_id,
+                trace_id=effective_trace_id,
+                stock_code=code,
+                trigger_source=getattr(self, "query_source", None) or "system",
+            )
 
         try:
             self._emit_progress(12, f"{code}：正在准备分析任务")
@@ -449,6 +461,25 @@ class _OrchestrationStageMixin:
                     fallback_code=code,
                 )
 
+            if analysis_event_started:
+                if result and result.success:
+                    dispatch_analysis_event(
+                        "analysis.completed",
+                        task_id=effective_query_id,
+                        trace_id=effective_trace_id,
+                        stock_code=code,
+                        trigger_source=getattr(self, "query_source", None) or "system",
+                        result_reference=effective_query_id,
+                    )
+                else:
+                    dispatch_analysis_event(
+                        "analysis.failed",
+                        task_id=effective_query_id,
+                        trace_id=effective_trace_id,
+                        stock_code=code,
+                        trigger_source=getattr(self, "query_source", None) or "system",
+                        error_code="analysis_failed",
+                    )
             return result
 
         except Exception as e:  # broad-exception: fallback_recorded - Per-stock failures are safely logged so the batch can continue.
@@ -465,6 +496,15 @@ class _OrchestrationStageMixin:
                 error_code="pipeline_stock_processing_failed",
                 context={"stock_code": code},
             )
+            if analysis_event_started:
+                dispatch_analysis_event(
+                    "analysis.failed",
+                    task_id=effective_query_id,
+                    trace_id=effective_trace_id,
+                    stock_code=code,
+                    trigger_source=getattr(self, "query_source", None) or "system",
+                    error_code="analysis_failed",
+                )
             return None
         finally:
             reset_run_diagnostic_context(diag_token)

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Required valid security-audit dependencies on privileged API and ToolSession paths, prevented tool completion-audit retries from duplicating side effects, and bounded arbitrary-size configuration key evidence without limiting updates.
 - [Fixed] Prevented local-model pull workers retained by the process task queue from activating through a retired FastAPI lifespan and bypassing the current configuration mutation lease.
 - [Fixed] Linearized late local-model pull activation with FastAPI lifespan retirement, task cancellation, queue shutdown, and the current configuration mutation lease.
+- [Added] Wired trusted plugin event hooks to six observational stock-analysis and market-review lifecycle events with sanitized immutable payloads, deterministic ordering, unload cleanup, and callback failure isolation.
 - [Fixed] Restored backend CI compatibility after the Agent Soul, Persona catalog, and AlphaSift DTO contract merges without extending those features' runtime scope.
 - [Added] Wired trusted `analysis_strategy` plugins into the root-owned Skill catalog with detached definitions, fail-closed conflicts, lifecycle-aware cache invalidation, and unchanged declarative precedence and StrategyEngine authority.
 - [Added] Added a versioned Agent Soul charter with one fail-closed composer across Native Single, Multi, and Chat prompts, truthful analysis-history metadata, and additive Chat API run identity.
