@@ -13,6 +13,16 @@
 
 **结论：推荐使用 Docker Compose，迁移最快最方便！**
 
+### 部署前必读：安全边界
+
+StockPulse 是**单管理员 / 本地优先**产品，不是多租户 SaaS：
+
+- 开启 `ADMIN_AUTH_ENABLED` 只表示保护管理员会话，**不等于**用户隔离或 RBAC。
+- `PLUGINS_DIR` 加载的是与进程同权的**可信 Python 代码**，不是应用商店沙箱。
+- 非本机 HTTP 监听在关闭认证时默认**拒绝启动**；`ALLOW_INSECURE_PUBLIC_BIND=true` 仅紧急逃生。
+
+完整清单与条款见 [安全基线 · 运维安全边界](security-baseline.md#operator-security-boundaries-deployers)。
+
 ---
 
 ## 🐳 方案一：Docker Compose 部署（推荐）

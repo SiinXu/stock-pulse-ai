@@ -12,6 +12,8 @@
 | 配置大模型渠道 | [LLM 配置指南](LLM_CONFIG_GUIDE.md) | [LLM 服务商配置指南](llm-providers.md) |
 | 配置推送通知 | [通知能力基线](notifications.md) | [完整配置与部署指南](full-guide.md) |
 | 部署到服务器或云平台 | [部署指南](DEPLOY.md) | [云端 WebUI 部署](deploy-webui-cloud.md)、[Zeabur 部署](docker/zeabur-deployment.md) |
+| **公网 / 非本机暴露前先确认安全边界** | [安全基线 · 运维安全边界（英文专节）](security-baseline.md#operator-security-boundaries-deployers) | [部署指南](DEPLOY.md)、[出站 HTTP 安全策略（英文）](security-outbound-policy.md) |
+| 理解插件信任模型（非应用商店沙箱） | [插件扩展契约（英文）](plugin-extension-contract.md) | [安全基线 · 运维安全边界](security-baseline.md#operator-security-boundaries-deployers) |
 | 使用 Bot / IM 接入 | [Bot 命令与接入](bot-command.md) | [Bot 平台配置](bot/) |
 | 排查运行问题 | [FAQ](FAQ.md) | [更新日志](CHANGELOG.md) |
 | 处理数据源失败或降级 | [数据源稳定性与故障处理图示](data-source-stability.md) | [英文版](data-source-stability_EN.md)、[FAQ](FAQ.md) |
