@@ -127,12 +127,16 @@ source /opt/stock-analyzer/venv/bin/activate
 
 ### 2. 安装依赖
 
+默认应用依赖必须同时使用 `constraints.txt` 与 `build-constraints.txt`。不要省略其中任一约束文件。可选能力（Kronos / 桌面打包 / CI 开发工具 / 实验性 PydanticAI）在默认安装之后，用对应的 `requirements-*.txt` 或 `.github/requirements-ci.txt` 并继续带上同一套约束；细节见 [完整配置与部署指南 · 安装依赖](full-guide.md#安装依赖)。`pyproject.toml` extras 仅作组名发现，锁权威仍是 constraints。
+
 ```bash
 cd /opt/stock-analyzer
 python -m pip install --upgrade --constraint constraints.txt pip -i https://pypi.tuna.tsinghua.edu.cn/simple
 python -m pip install --build-constraint build-constraints.txt -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 python -m pip check
 ```
+
+Docker 镜像构建路径同样在 Dockerfile 内使用 `constraints.txt` / `build-constraints.txt` + `requirements.txt`，与本地源码权威路径一致，只是固定在镜像构建时所在提交。GitHub Actions 后端门使用 `.github/requirements-ci.txt`（包含 `requirements.txt`）叠加测试工具，不会另立 pin 权威。
 
 ### 3. 配置环境变量
 
