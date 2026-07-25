@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import threading
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 from unittest.mock import Mock, patch
 
 import requests
@@ -369,6 +369,7 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
         *,
         queue: Optional[_FakeTaskQueue] = None,
         client: Optional[_FakeRuntimeClient] = None,
+        activation_handler: Optional[Callable[..., Optional[Dict[str, Any]]]] = None,
     ) -> tuple[LocalModelService, _FakeTaskQueue, _FakeRuntimeClient]:
         queue = queue or _FakeTaskQueue()
         client = client or _FakeRuntimeClient()
@@ -377,6 +378,7 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
             task_queue=queue,
             pullable_model_ids=lambda: {"qwen3:4b", "stockpulse/finance:latest"},
             client_factory=lambda _base_url: client,
+            activation_handler=activation_handler,
         )
         return service, queue, client
 
@@ -963,6 +965,58 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
 
         self.assertEqual(client.pulled, ["qwen3:4b"])
         self.assertFalse(result["activated"])
+        self.assertEqual(
+            queue.tasks["local-model-pull-task"].status,
+            TaskStatusEnum.CANCELLED,
+        )
+        self.assertNotIn("LLM_OLLAMA_MODELS", self.manager.read_config_map())
+
+    def test_pull_rechecks_cancellation_after_activation_resolution(self) -> None:
+        activation_started = threading.Event()
+        release_activation = threading.Event()
+        service_holder: Dict[str, LocalModelService] = {}
+
+        def activate(
+            normalized,
+            *,
+            config_version,
+            values,
+            base_url,
+            is_cancel_requested,
+        ):
+            activation_started.set()
+            assert release_activation.wait(timeout=5)
+            return service_holder["service"]._activate_completed_pull(
+                normalized,
+                config_version=config_version,
+                values=values,
+                base_url=base_url,
+                is_cancel_requested=is_cancel_requested,
+            )
+
+        queue = _FakeTaskQueue()
+        self._rewrite_env("ADMIN_AUTH_ENABLED=true")
+        service, _queue, client = self._local_service(
+            queue=queue,
+            activation_handler=activate,
+        )
+        service_holder["service"] = service
+        service.start_pull("qwen3:4b")
+        worker_result: Dict[str, Any] = {}
+
+        worker = threading.Thread(
+            target=lambda: worker_result.update(queue.run_task())
+        )
+        worker.start()
+        self.assertTrue(activation_started.wait(timeout=5))
+        queue.cancel_requested = True
+        release_activation.set()
+        worker.join(timeout=5)
+
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(client.pulled, ["qwen3:4b"])
+        self.assertFalse(worker_result["activated"])
+        self.assertFalse(worker_result["selected_primary"])
         self.assertEqual(
             queue.tasks["local-model-pull-task"].status,
             TaskStatusEnum.CANCELLED,

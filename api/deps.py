@@ -11,7 +11,7 @@ API 依赖注入模块
 """
 
 import threading
-from typing import Any, Generator, Optional, Protocol, cast
+from typing import Any, Callable, Dict, Generator, Mapping, Optional, Protocol, cast
 
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy.orm import Session
@@ -116,8 +116,12 @@ def get_local_model_service(request: Request) -> LocalModelService:
                     system_config_service=get_system_config_service(request),
                     task_queue=get_task_queue(),
                     pullable_model_ids=get_pullable_local_model_ids,
-                    activation_service_provider=lambda: _get_active_local_model_service(
-                        request
+                    activation_handler=lambda normalized, **kwargs: (
+                        _activate_active_local_model_pull(
+                            request,
+                            normalized,
+                            **kwargs,
+                        )
                     ),
                 )
                 request.app.state.local_model_service = service
@@ -167,6 +171,32 @@ def _get_active_local_model_service(request: Request) -> Optional[LocalModelServ
         if getattr(request.app.state, "local_model_services_active", True) is False:
             return None
         return get_local_model_service(request)
+
+
+def _activate_active_local_model_pull(
+    request: Request,
+    normalized: str,
+    *,
+    config_version: str,
+    values: Mapping[str, str],
+    base_url: str,
+    is_cancel_requested: Callable[[], bool],
+) -> Optional[Dict[str, Any]]:
+    """Linearize late pull activation with lifespan shutdown and cancellation."""
+    with _LOCAL_MODEL_SERVICE_INIT_LOCK:
+        if (
+            getattr(request.app.state, "local_model_services_active", True) is False
+            or is_cancel_requested()
+        ):
+            return None
+        service = get_local_model_service(request)
+        return service._activate_completed_pull(
+            normalized,
+            config_version=config_version,
+            values=values,
+            base_url=base_url,
+            is_cancel_requested=is_cancel_requested,
+        )
 
 
 def begin_local_model_service_lifespan(

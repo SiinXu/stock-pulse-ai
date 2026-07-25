@@ -251,6 +251,89 @@ def test_app_lifespan_rebinds_local_model_configuration_authority() -> None:
     scheduler_services[1].stop.assert_called_once()
 
 
+def test_local_model_lifespan_shutdown_waits_for_admitted_activation() -> None:
+    app = FastAPI()
+    request = SimpleNamespace(app=app)
+    activation_started = threading.Event()
+    release_activation = threading.Event()
+    shutdown_waiting_for_lifecycle = threading.Event()
+    shutdown_finished = threading.Event()
+    activation_observed_active = []
+    activation_result = {}
+
+    def activate(*_args, **_kwargs):
+        activation_started.set()
+        assert release_activation.wait(timeout=5)
+        activation_observed_active.append(app.state.local_model_services_active)
+        return {"selected_primary": False}
+
+    service = SimpleNamespace(
+        _activate_completed_pull=Mock(side_effect=activate),
+        retire_pull_activation=Mock(),
+    )
+    app.state.local_model_services_active = True
+    app.state.local_model_service = service
+    app.state.system_config_service = object()
+
+    class _ObservedLifecycleLock:
+        def __init__(self) -> None:
+            self.lock = threading.RLock()
+
+        def __enter__(self):
+            if threading.current_thread().name == "local-model-shutdown":
+                shutdown_waiting_for_lifecycle.set()
+            return self.lock.__enter__()
+
+        def __exit__(self, *args):
+            return self.lock.__exit__(*args)
+
+    def run_activation() -> None:
+        activation_result["value"] = api_deps._activate_active_local_model_pull(
+            request,
+            "qwen3:4b",
+            config_version="config-1",
+            values={},
+            base_url="http://127.0.0.1:11434",
+            is_cancel_requested=lambda: False,
+        )
+
+    def shutdown() -> None:
+        api_deps.end_local_model_service_lifespan(app)
+        shutdown_finished.set()
+
+    with patch.object(
+        api_deps,
+        "_LOCAL_MODEL_SERVICE_INIT_LOCK",
+        _ObservedLifecycleLock(),
+    ):
+        activation_thread = threading.Thread(target=run_activation)
+        activation_thread.start()
+        assert activation_started.wait(timeout=5)
+        shutdown_thread = threading.Thread(
+            target=shutdown,
+            name="local-model-shutdown",
+        )
+        shutdown_thread.start()
+        assert shutdown_waiting_for_lifecycle.wait(timeout=5)
+        shutdown_thread.join(timeout=0.1)
+
+        assert shutdown_thread.is_alive()
+        assert app.state.local_model_services_active is True
+        release_activation.set()
+        activation_thread.join(timeout=5)
+        shutdown_thread.join(timeout=5)
+
+    assert not activation_thread.is_alive()
+    assert not shutdown_thread.is_alive()
+    assert shutdown_finished.is_set()
+    assert activation_observed_active == [True]
+    assert activation_result["value"] == {"selected_primary": False}
+    assert app.state.local_model_services_active is False
+    assert not hasattr(app.state, "local_model_service")
+    assert not hasattr(app.state, "system_config_service")
+    service.retire_pull_activation.assert_called_once()
+
+
 class LocalModelApiIntegrationTestCase(_SystemConfigServiceTestCaseBase):
     """Exercise the API, service, and optimistic configuration boundary together."""
 

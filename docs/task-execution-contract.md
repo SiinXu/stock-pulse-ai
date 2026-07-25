@@ -179,7 +179,9 @@ pull resolves the current lifespan-owned `LocalModelService` before activating
 configuration. A retired service cannot activate a late worker, and an inactive
 application lifespan is never revived solely to finish activation. This keeps
 configuration mutation leases and local-model recovery reservations under the
-current application authority while preserving canonical task polling.
+current application authority while preserving canonical task polling. Current
+service resolution and activation share one lifespan fence, and cancellation is
+checked again after that resolution immediately before configuration mutation.
 
 This task does not add HTTP cancel/retry routes, an external broker, cross-process
 task sharing, or durable recovery after an ungraceful process loss.

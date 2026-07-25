@@ -10,7 +10,7 @@ import secrets
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Iterable, List, Literal, Mapping, Optional, Sequence, Set
+from typing import Any, Callable, Dict, Iterable, List, Literal, Mapping, Optional, Protocol, Sequence, Set
 from urllib.parse import urlsplit, urlunsplit
 
 import requests
@@ -45,6 +45,18 @@ LOCAL_MODEL_RUNTIME_IDENTITY_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 LOCAL_MODEL_MAX_ID_LENGTH = 128
 LOCAL_MODEL_REGISTRATION_RECOVERY_TTL_SECONDS = 5.0 * 60.0
 LocalModelAssignment = Literal["auto", "primary", "agent"]
+
+
+class _LocalModelPullActivationHandler(Protocol):
+    def __call__(
+        self,
+        normalized: str,
+        *,
+        config_version: str,
+        values: Mapping[str, str],
+        base_url: str,
+        is_cancel_requested: Callable[[], bool],
+    ) -> Optional[Dict[str, Any]]: ...
 
 
 logger = logging.getLogger(__name__)
@@ -416,15 +428,13 @@ class LocalModelService:
         task_queue: AnalysisTaskQueue,
         pullable_model_ids: Callable[[], Iterable[str]],
         client_factory: Callable[[str], OllamaRuntimeClient] = OllamaRuntimeClient,
-        activation_service_provider: Optional[
-            Callable[[], Optional["LocalModelService"]]
-        ] = None,
+        activation_handler: Optional[_LocalModelPullActivationHandler] = None,
     ) -> None:
         self._system_config_service = system_config_service
         self._task_queue = task_queue
         self._pullable_model_ids = pullable_model_ids
         self._client_factory = client_factory
-        self._activation_service_provider = activation_service_provider
+        self._activation_handler = activation_handler
         self._accepts_pull_activation = True
         self._task_lock = threading.RLock()
         self._operation_lock = threading.RLock()
@@ -482,10 +492,11 @@ class LocalModelService:
         config_version: str,
         values: Mapping[str, str],
         base_url: str,
+        is_cancel_requested: Callable[[], bool],
     ) -> Optional[Dict[str, Any]]:
         """Activate through the current live service or decline after retirement."""
         with self._operation_lock:
-            if not self._accepts_pull_activation:
+            if not self._accepts_pull_activation or is_cancel_requested():
                 return None
             return self._configure_model_from_snapshot_locked(
                 normalized,
@@ -1135,20 +1146,22 @@ class LocalModelService:
                         "selected_primary": False,
                     }
                 try:
-                    activation_service = (
-                        self._activation_service_provider()
-                        if self._activation_service_provider is not None
-                        else self
-                    )
                     activation = (
-                        activation_service._activate_completed_pull(
+                        self._activation_handler(
                             normalized,
                             config_version=config_version,
                             values=values,
                             base_url=base_url,
+                            is_cancel_requested=context.is_cancel_requested,
                         )
-                        if activation_service is not None
-                        else None
+                        if self._activation_handler is not None
+                        else self._activate_completed_pull(
+                            normalized,
+                            config_version=config_version,
+                            values=values,
+                            base_url=base_url,
+                            is_cancel_requested=context.is_cancel_requested,
+                        )
                     )
                     if activation is None:
                         return {
