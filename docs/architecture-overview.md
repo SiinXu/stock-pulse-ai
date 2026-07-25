@@ -256,12 +256,17 @@ flowchart TB
   SINGLE -->|guarded analysis result| RESULT[Analysis result and dashboard]
 
   ASSEMBLY -->|active instructions and catalog| MULTI[Multi-Agent orchestration]
-  MULTI -->|technical, intelligence, and risk opinions| ENGINE[StrategyEngine<br/>partition, aggregate, synthesize]
+  MULTI -->|technical, intelligence, risk,<br/>and specialist opinions| EVIDENCE[Pre-Decision evidence]
   MULTI -->|specialist mode only, after technical opinion| ROUTER[SkillRouter]
   MANAGER -->|available catalog| ROUTER
   ROUTER -->|up to three selected skill ids| AGENTS[SkillAgent specialists]
   MANAGER -->|registered definition and required tools| AGENTS
-  AGENTS -->|skill opinions| ENGINE
+  AGENTS -->|skill opinions| EVIDENCE
+  EVIDENCE -->|flag off, or Chat| ENGINE[StrategyEngine<br/>partition, aggregate, synthesize]
+  EVIDENCE -->|AGENT_CRITIC_ENABLED=true<br/>non-Chat Native Multi only| CRITIC[Bounded Critic<br/>one tool-free call]
+  CRITIC -->|pass or fail_soft limitation| ENGINE
+  CRITIC -->|one retry: entered intel<br/>or catalog-backed skill| RETRY[Isolated whitelist stage retry]
+  RETRY -->|completed evidence or<br/>fail-soft limitation| ENGINE
   ENGINE -->|valid evidence and consensus| DECISION[DecisionAgent]
   ENGINE -->|deterministic strategy_synthesis when skill evidence exists| RESULT
   DECISION -->|guarded decision| RESULT
@@ -292,13 +297,24 @@ The catalog and execution flow has these stages:
    opinion exists. At most three `SkillAgent` specialists execute their selected
    definitions. Other modes can still receive active skill prompt instructions
    without creating specialist agents.
-5. `StrategyEngine` is the current class name for the authoritative skill-opinion
+5. When `AGENT_CRITIC_ENABLED=true`, a non-Chat Native Multi run inserts one
+   Soul-composed, tool-free Critic over the completed pre-Decision evidence.
+   The default-off, Single, and Chat paths bypass it. A valid `retry` verdict
+   must explain its reason and can spend the fixed global budget of one only on
+   an already-entered `intel` stage or an already-entered catalog-backed
+   `SkillAgent`. The retry runs against isolated context and does not re-enter
+   the Critic or relax the ordinary stage-entry guard. Invalid output,
+   unavailable targets, failed retries, and low optional budget fail soft with
+   explicit limitations while preserving Decision's minimum budget.
+6. `StrategyEngine` is the current class name for the authoritative skill-opinion
    evidence facade. It removes invalid skill signals to diagnostics, retains
    valid and non-skill opinions, applies eligible aggregation and synthesis, and
    provides the consensus evidence consumed by `DecisionAgent`. Backtest history
    can influence eligible skill weights; Backtesting does not become a Pipeline
    stage.
-6. The orchestrator rejects an LLM-authored `strategy_synthesis` and attaches the
+7. The Critic can identify evidence limitations but cannot author
+   `strategy_synthesis` or the investment decision. The orchestrator rejects an
+   LLM-authored `strategy_synthesis` and attaches the
    deterministic engine result to the dashboard. History and report renderers
    consume that evidence downstream.
 
@@ -309,7 +325,7 @@ The catalog and execution flow has these stages:
 | Enabled `analysis_strategy` plugin | Trusted Python lifecycle publishes a validated, detached `Skill` definition into the root-owned catalog | Cannot replace built-ins, custom definitions, another plugin, `SkillManager`, or `StrategyEngine`; use the [author guide](analysis-strategy-plugin-authoring.md) |
 | `src/agent/skills/` | Canonical product runtime: model, loaders, `SkillManager`, defaults, `SkillRouter`, `SkillAgent`, aggregation, synthesis, and `StrategyEngine` | Source of truth for current Skill/Strategy execution semantics |
 | `src/agent/runtime_assembly.py` | Tool and Skill catalog assembly, activation, prompt-state resolution, and Single/Multi executor construction | `src/agent/factory.py` remains a compatibility facade, not another authority |
-| `src/agent/orchestrator.py` and `src/agent/orchestrator_parts/` | Public `AgentOrchestrator` facade plus private pipeline, execution, dashboard, and chat method owners | The facade retains the legacy class, import, patch, reflection, and reload surface; the parts are internal implementation owners, not another runtime |
+| `src/agent/orchestrator.py` and `src/agent/orchestrator_parts/` | Public `AgentOrchestrator` facade plus private pipeline, execution, dashboard, chat, and optional bounded-Critic coordination owners | The facade retains the legacy class, import, patch, reflection, and reload surface; the parts are internal implementation owners, the Critic is default-off and non-Chat Native Multi only, and neither creates another runtime or synthesis authority |
 | `src/agent/strategies/` | Re-exports legacy `StrategyAgent`, `StrategyRouter`, and `StrategyAggregator` names from `src/agent/skills/` | Compatibility aliases only; do not add a parallel implementation here |
 | `.claude/skills/` | Repository collaboration workflows for issue analysis, PR analysis, and issue fixing | Not scanned by `SkillManager` and not part of product runtime architecture |
 
@@ -351,6 +367,10 @@ separately owned contract.
   test/evidence POC with no config, environment, API, Web, Desktop, or Bot
   selector and no runtime fallback. See [ADR-001](architecture/ADR-001-agent-runtime.md)
   and [ADR-002](architecture/ADR-002-pydanticai-runtime-reinstatement.md).
+- The bounded Critic is an optional, default-off stage only in non-Chat Native
+  Multi. It has no tools, cannot synthesize a strategy or decision, and can
+  admit at most one isolated retry of an already-entered intelligence or
+  catalog-backed Skill stage while reserving the existing Decision boundary.
 - Database schema changes run through the ordered migration registry. Startup
   compatibility work must not create a second schema-mutation path.
 - Provider fallback keeps configured priority and market capability boundaries;

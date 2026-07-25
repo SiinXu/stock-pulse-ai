@@ -1758,13 +1758,25 @@ A: 检查是否启用了 Actions，以及 cron 表达式是否正确（注意是
 
 更多问题请 [提交 Issue](https://github.com/SiinXu/stock-pulse-ai/issues)
 
+## 有界 Multi-Agent Critic
+
+`AGENT_CRITIC_ENABLED=false`（默认）保持现有行为。设为 `true` 时，仅 Native Multi 的非 Chat 分析会在已完成的 technical/intel/risk/specialist 意见之后、`DecisionAgent` 之前增加一次无工具 Critic LLM 调用。Single、Multi Chat 和关闭该配置的日批/普通分析不进入该阶段。
+
+Critic 只能返回 `pass`、`retry` 或 `fail_soft`。`retry` 在当前合同下必须且只能指定一个固定白名单目标，并至少提供一条有界 reason：`intelligence`（映射已进入的 `intel` Stage）或 `skill:<id>`（`id` 必须存在于当前 Skill catalog，且该 Skill Stage 已在本次 run 中进入）。`fail_soft` 必须至少提供一条 reason 或 missing-evidence，使 Decision 收到明确 limitation。非法/未知输出、没有解释的非 pass verdict、目录中不存在的 Skill、未进入的 Stage 或不足的剩余 Pipeline 时间都会 fail-closed 为 `fail_soft`，且不会消耗 retry budget。若剩余时间不能同时覆盖可选 Critic/重试和 Decision 的最低 15 秒预算，可选工作会让出预算并留下 `budget_skipped` 或 `unavailable` trace；Decision 仍按既有权威边界执行。
+
+每条 run 的全局 Critic retry budget 固定为 1，同一目标不会重复。白名单重试走独立的一次性预算路径，不会放宽 `AGENT_MAX_STAGE_ENTRIES` 或建立通用 Stage 重入机制。重试在隔离 context 中移除目标的旧 opinion/data；只有返回 `COMPLETED` 且产生新目标 evidence 时才原子替换共享 context。失败、超时或无新 evidence 时保留首次 Stage 的 context、结果和 telemetry，并把限制交给 Decision。
+
+`StrategyEngine` 仍在既有 Decision 边界唯一负责 Skill evidence partition 和 `strategy_synthesis`；Critic 只读、无 ToolSurface、不能生成最终投资决策。Critic 的 verdict、reasons、missing evidence、requested/executed targets、budget consumption 和 retry status 写入内部 `AgentContext.meta`、`StageResult.meta` 与 `critic_verdict` / `critic_retry_start` / `critic_retry_done` progress events，不扩张持久化的 runtime-facts 或公开 Chat metadata。
+
+成本边界：开启后每条符合条件的 Multi run 固定最多增加 1 次 Critic LLM 调用；只有 `retry` verdict 再增加最多 1 次白名单 Stage 的 LLM/工具执行。两者都受现有 `AGENT_ORCHESTRATOR_TIMEOUT_S` 剩余预算约束，且其 timeout 会排除为 Decision 保留的最低预算。回滚时关闭或删除 `AGENT_CRITIC_ENABLED`；无需数据迁移或清理。
+
 ## Agent 运行时护栏
 
 Agent 的超时分为三层：`AGENT_TOOL_TIMEOUT_S` 默认以 120 秒限制单次工具调用；`AGENT_TECHNICAL_AGENT_TIMEOUT_S`、`AGENT_INTEL_AGENT_TIMEOUT_S`、`AGENT_RISK_AGENT_TIMEOUT_S`、`AGENT_DECISION_AGENT_TIMEOUT_S`、`AGENT_PORTFOLIO_AGENT_TIMEOUT_S` 和 `AGENT_SKILL_AGENT_TIMEOUT_S` 可为对应 Stage 设置独立上限；`AGENT_ORCHESTRATOR_TIMEOUT_S` 默认以 600 秒限制 single-agent 整体循环或 multi-agent Pipeline。多个预算同时生效时使用剩余时间最短的一项，超时后的工具结果会被运行时 fence 丢弃，不会回写为成功结果。Multi-agent Stage 会在隔离的上下文副本中执行，只有按时返回 `COMPLETED` 才提交状态；超时后的 late state 和 progress 不会进入后续 Stage。Python 无法强制终止已经运行的原生线程，因此自定义 Stage 或工具 handler 仍可能在后台结束并产生自身的外部副作用，但不能回写已接受的 Agent 上下文或 tool-session 缓存。Progress callback 是同步 hook，必须及时返回；仓库支持的 SSE 与 runtime adapter 只负责入队或发布，不会同步等待下游。Stage fence 会保证已接受的 callback 排在关闭之前，但不会尝试抢占已经进入任意调用方 callback 的代码。
 
-`AGENT_MAX_IDENTICAL_TOOL_CALLS=3` 允许同一运行中相同工具名与规范化参数最多执行三次，第 4 次会在 dispatch 前停止当前 Agent；`AGENT_MAX_STAGE_ENTRIES=1` 允许同名 Stage 每条 Pipeline 进入一次，再次进入会直接硬停。数值项设为 `0` 可单独关闭对应护栏。循环日志只记录工具名和参数签名的短哈希，不记录参数原文。
+`AGENT_MAX_IDENTICAL_TOOL_CALLS=3` 允许同一运行中相同工具名与规范化参数最多执行三次，第 4 次会在 dispatch 前停止当前 Agent；`AGENT_MAX_STAGE_ENTRIES=1` 允许同名 Stage 每条普通 Pipeline 进入一次，再次进入会直接硬停。有界 Critic 的唯一白名单重试是显式、独立计 budget 的专用路径；它不修改应用于普通 Pipeline 入口的重入护栏。数值项设为 `0` 可单独关闭对应护栏。循环日志只记录工具名和参数签名的短哈希，不记录参数原文。
 
-`AGENT_STAGE_FAILURE_POLICY=isolate` 是默认策略：`intel`、`risk` 和 specialist/skill 等既有非关键 Stage 发生失败或未捕获异常时，会记录失败并走降级路径继续；`technical` 与 `decision` 仍为关键边界。设置为 `fail_fast` 后，任一 Stage 失败都会停止 Pipeline。护栏以 `agent_runtime_guard {JSON}` 输出低敏结构化日志，事件包括 `tool_timeout`、`run_timeout`、`tool_loop_detected`、`stage_loop_detected`、`stage_exception_captured`、`stage_timeout`、`stage_failure_isolated` 和 `stage_failure_fail_fast`。这些内部日志不改变公开 SSE、API、报告或 Web/Desktop 契约。
+`AGENT_STAGE_FAILURE_POLICY=isolate` 是默认策略：`intel`、`risk` 和 specialist/skill 等既有非关键 Stage 发生失败或未捕获异常时，会记录失败并走降级路径继续；`technical` 与 `decision` 仍为关键边界。设置为 `fail_fast` 后，任一普通 Stage 失败都会停止 Pipeline。有界 Critic 及其专用的一次重试是明确例外：两者失败时始终保留既有证据、记录 `fail_soft` 限制并继续进入 Decision，避免可选验证器取代最终决策或把开启开关变成新的硬失败点。护栏以 `agent_runtime_guard {JSON}` 输出低敏结构化日志，事件包括 `tool_timeout`、`run_timeout`、`tool_loop_detected`、`stage_loop_detected`、`stage_exception_captured`、`stage_timeout`、`stage_failure_isolated` 和 `stage_failure_fail_fast`。这些内部日志不改变公开 SSE、API、报告或 Web/Desktop 契约。
 
 ## Agent 工具数据缓存与持久化
 

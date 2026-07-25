@@ -200,6 +200,33 @@ should sum to 100; all-zero means no effective signal and must not be faked.
             )
             parts.append("")
 
+        critic_trace = ctx.meta.get("critic_trace")
+        if not self._is_chat_mode(ctx) and isinstance(critic_trace, dict):
+            critic_projection = {
+                key: critic_trace.get(key)
+                for key in (
+                    "verdict",
+                    "reasons",
+                    "missing_evidence",
+                    "retry_targets_requested",
+                    "retry_targets_executed",
+                    "retry_budget_consumed",
+                    "retry_budget_remaining",
+                    "retry_status",
+                )
+            }
+            parts.append("## Bounded Critic Trace (limitations only)")
+            parts.append(
+                json.dumps(critic_projection, ensure_ascii=False, default=str)
+            )
+            parts.append(
+                "Use fail_soft reasons and missing_evidence only as explicit data "
+                "limitations. Use completed retry evidence from the evidence chain. "
+                "Do not treat this trace as a strategy opinion or author a separate "
+                "strategy synthesis from it."
+            )
+            parts.append("")
+
         # Feed risk flags
         if ctx.risk_flags:
             parts.append("## Risk Flags")
