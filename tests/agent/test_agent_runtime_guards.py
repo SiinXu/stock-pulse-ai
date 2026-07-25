@@ -572,17 +572,20 @@ def test_timed_out_late_result_cannot_populate_session_cache():
     handler_calls = []
     first_handler_started = threading.Event()
     release_first_handler = threading.Event()
-    first_handler_finished = threading.Event()
+    late_completion_recorded = threading.Event()
+
+    class _LateCompletionAudit(SecurityAuditRecorderStub):
+        def record_completion(self, **fields):
+            super().record_completion(**fields)
+            if fields.get("reason_code") == "late_result_dropped":
+                late_completion_recorded.set()
 
     def _handler(message):
         handler_calls.append(message)
         if len(handler_calls) == 1:
             first_handler_started.set()
             assert release_first_handler.wait(timeout=2)
-            try:
-                return {"error": "late failure", "retriable": False}
-            finally:
-                first_handler_finished.set()
+            return {"error": "late failure", "retriable": False}
         return {"echo": message}
 
     responses = iter(
@@ -611,24 +614,162 @@ def test_timed_out_late_result_cannot_populate_session_cache():
         if response.content == "second":
             assert first_handler_started.wait(timeout=1)
             release_first_handler.set()
-            assert first_handler_finished.wait(timeout=1)
+            # Wait for the detached session worker to cross its completion
+            # fence, attempt any cache write, and persist the late-drop audit.
+            assert late_completion_recorded.wait(timeout=1)
         return response
 
     adapter.call_with_tools.side_effect = _next_response
 
-    result = run_agent_loop(
-        messages=[],
-        tool_registry=_echo_registry(_handler),
-        llm_adapter=adapter,
-        max_steps=4,
-        runtime_guard_policy=_policy(tool_timeout_seconds=0.1),
-    )
+    with patch(
+        "src.agent.runner._get_security_audit_service",
+        return_value=_LateCompletionAudit(),
+    ):
+        result = run_agent_loop(
+            messages=[],
+            tool_registry=_echo_registry(_handler),
+            llm_adapter=adapter,
+            max_steps=4,
+            runtime_guard_policy=_policy(tool_timeout_seconds=0.1),
+        )
 
     assert result.success is True
+    assert late_completion_recorded.is_set()
     assert handler_calls == ["same", "same"]
     assert result.tool_calls_log[0]["timeout"] is True
     assert result.tool_calls_log[1]["success"] is True
     assert result.tool_calls_log[1]["cached"] is False
+
+
+def test_unknown_tool_name_is_canonicalized_across_runner_traces(caplog):
+    canary = "prompt_secret_tool_canary_987654321"
+    progress_events = []
+    adapter = MagicMock()
+    adapter.call_with_tools.side_effect = [
+        LLMResponse(
+            content="",
+            tool_calls=[
+                ToolCall(id="unknown", name=canary, arguments={}),
+            ],
+            provider="test",
+        ),
+        LLMResponse(content="done", provider="test"),
+    ]
+
+    with caplog.at_level(logging.INFO), patch(
+        "src.agent.runner._get_security_audit_service",
+        return_value=SecurityAuditRecorderStub(),
+    ):
+        result = run_agent_loop(
+            messages=[],
+            tool_registry=_echo_registry(),
+            llm_adapter=adapter,
+            max_steps=3,
+            progress_callback=progress_events.append,
+        )
+
+    second_model_input = adapter.call_with_tools.call_args_list[1].args[0]
+    visible_trace = str({
+        "logs": [record.getMessage() for record in caplog.records],
+        "progress": progress_events,
+        "tool_calls_log": result.tool_calls_log,
+        "messages": result.messages,
+        "second_model_input": second_model_input,
+    })
+    assert result.success is True
+    assert canary not in visible_trace
+    assert "unrecognized" in visible_trace
+
+
+def test_native_descriptors_and_execution_share_one_frozen_binding():
+    original_calls = []
+    replacement_calls = []
+
+    class _ReplacingRegistry(ToolRegistry):
+        def __init__(self):
+            super().__init__()
+            self._replaced = False
+
+        def list_names(self):
+            names = super().list_names()
+            if not self._replaced:
+                self._replaced = True
+                self.register(
+                    ToolDefinition(
+                        name="echo",
+                        description="Replacement integer echo.",
+                        parameters=[
+                            ToolParameter(
+                                name="value",
+                                type="integer",
+                                description="Value",
+                            ),
+                        ],
+                        handler=lambda value: replacement_calls.append(value)
+                        or {"value": value},
+                        policy=ToolPolicy.declared(
+                            read_only=True,
+                            permissions=["analysis_context:read"],
+                        ),
+                    )
+                )
+            return names
+
+        def to_openai_tools(self):
+            raise AssertionError("live registry descriptors must not be used")
+
+    registry = _ReplacingRegistry()
+    registry.register(
+        ToolDefinition(
+            name="echo",
+            description="Original string echo.",
+            parameters=[
+                ToolParameter(
+                    name="message",
+                    type="string",
+                    description="Message",
+                ),
+            ],
+            handler=lambda message: original_calls.append(message),
+            policy=ToolPolicy.declared(
+                read_only=True,
+                permissions=["analysis_context:read"],
+            ),
+        )
+    )
+    adapter = MagicMock()
+    adapter.call_with_tools.side_effect = [
+        LLMResponse(
+            content="",
+            tool_calls=[
+                ToolCall(id="replacement", name="echo", arguments={"value": 7}),
+            ],
+            provider="test",
+        ),
+        LLMResponse(content="done", provider="test"),
+    ]
+
+    with patch(
+        "src.agent.runner._get_security_audit_service",
+        return_value=SecurityAuditRecorderStub(),
+    ):
+        result = run_agent_loop(
+            messages=[],
+            tool_registry=registry,
+            llm_adapter=adapter,
+            max_steps=3,
+        )
+
+    declarations = adapter.call_with_tools.call_args_list[0].args[1]
+    assert declarations[0]["function"]["parameters"]["properties"] == {
+        "value": {
+            "type": "integer",
+            "description": "Value",
+        },
+    }
+    assert result.success is True
+    assert original_calls == []
+    assert replacement_calls == [7]
 
 
 def test_full_run_timeout_emits_structured_guard_event(caplog):

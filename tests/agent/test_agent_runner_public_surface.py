@@ -75,13 +75,13 @@ EXPECTED_GROUPS = (
         "_runner_loop",
         "_LOOP_FUNCTION_NAMES",
         ("run_agent_loop",),
-        "c8d8d98a563a86f919be79cac84fd2db8ca0c21db9250ab78266178e687d05a1",
+        "2d98fc27b7383e57d9fcb3cb04b37b875ad603960264f1ddf2f857a2061aeed7",
     ),
     (
         "_runner_tools",
         "_TOOL_FUNCTION_NAMES",
         ("_execute_tools",),
-        "18363417f7a1db86460ada96d2d2796e5e19582da2bba42233541ceb74c11203",
+        "a4b1b9ee8d52ebdf254b9d941c6cd0bea930196164e589f753a2656ea2ef48d9",
     ),
 )
 

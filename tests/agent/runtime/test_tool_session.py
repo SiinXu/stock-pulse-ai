@@ -157,6 +157,32 @@ def test_session_freezes_identity_and_allowlist():
     assert session.granted_capabilities == frozenset({_TEST_CAPABILITY})
 
 
+def test_session_preserves_valid_tool_definition_subclasses():
+    class _CustomToolDefinition(ToolDefinition):
+        pass
+
+    calls = []
+    registry = ToolRegistry()
+    registry.register(
+        _CustomToolDefinition(
+            name="custom",
+            description="Custom definition subclass.",
+            parameters=[],
+            handler=lambda: calls.append("ran") or {"ok": True},
+            policy=ToolPolicy.declared(
+                read_only=True,
+                permissions=[_TEST_CAPABILITY],
+            ),
+        )
+    )
+    session = _session(registry, allowed_tools=["custom"])
+
+    result = session.execute("custom", {})
+
+    assert result["ok"] is True
+    assert calls == ["ran"]
+
+
 # ---------------------------------------------------------------------------
 # Success parity with the direct surface path
 # ---------------------------------------------------------------------------
@@ -262,6 +288,145 @@ def test_non_string_tool_name_is_invalid():
     session = _session(_echo_registry())
     result = session.execute(None, {})
     assert result["error"]["code"] == "invalid_tool_name"
+
+
+def test_unknown_model_tool_name_is_canonicalized_in_results_and_audits():
+    canary = "prompt_secret_canary_123456789"
+    recorder = SecurityAuditRecorderStub()
+    session = _session(_echo_registry(), security_audit=recorder)
+
+    result = session.execute(canary, {})
+
+    assert result["error"]["code"] == "tool_not_allowed"
+    assert result["tool_name"] == "unrecognized"
+    assert canary not in str(result)
+    assert canary not in str(session.audit_trail)
+    assert [event["target_id"] for event in recorder.attempts] == ["unrecognized"]
+    assert [event["target_id"] for event in recorder.completions] == ["unrecognized"]
+    assert canary not in str(recorder.attempts)
+    assert canary not in str(recorder.completions)
+
+
+def test_session_rejects_same_name_replacement_and_registry_aba():
+    original_calls = []
+    replacement_calls = []
+    registry = _echo_registry(original_calls)
+    original = registry.resolve("echo")
+    session = _session(registry)
+    replacement = ToolDefinition(
+        name="echo",
+        description="Replacement with a different contract.",
+        parameters=[],
+        handler=lambda: replacement_calls.append("ran"),
+        policy=ToolPolicy.declared(
+            read_only=True,
+            permissions=[_TEST_CAPABILITY],
+        ),
+    )
+
+    registry.unregister("echo")
+    registry.register(replacement)
+    replaced = session.execute("echo", {"message": "must-not-run"})
+    registry.unregister("echo")
+    registry.register(original)
+    restored = session.execute("echo", {"message": "must-not-run"})
+
+    assert replaced["error"]["code"] == "tool_not_found"
+    assert replaced["error"]["details"]["reason"] == "definition_changed"
+    assert restored["error"]["code"] == "tool_not_found"
+    assert restored["error"]["details"]["reason"] == "definition_changed"
+    assert original_calls == []
+    assert replacement_calls == []
+    assert session.dispatched_calls == 0
+
+
+def test_session_rejects_in_place_definition_mutation_and_keeps_descriptor_snapshot():
+    calls = []
+    registry = _echo_registry(calls)
+    live_definition = registry.resolve("echo")
+    session = _session(registry)
+    descriptor_before = session.describe_tools()
+
+    live_definition.parameters[0].required = False
+    live_definition.handler = lambda message=None: calls.append("mutated")
+    result = session.execute("echo", {})
+
+    assert result["error"]["code"] == "tool_not_found"
+    assert result["error"]["details"]["reason"] == "definition_changed"
+    assert result["tool_name"] == "unrecognized"
+    assert session.describe_tools() == descriptor_before
+    assert calls == []
+    assert session.dispatched_calls == 0
+
+
+def test_session_rechecks_live_definition_at_handler_boundary():
+    for mutation in ("unregister", "replace", "aba", "in_place"):
+        calls = []
+        registry = _echo_registry(calls)
+        original = registry.resolve("echo")
+        session = _session(registry)
+
+        def _mutate_live_definition():
+            if mutation == "unregister":
+                registry.unregister("echo")
+            elif mutation == "replace":
+                registry.register(
+                    ToolDefinition(
+                        name="echo",
+                        description="Replacement.",
+                        parameters=[],
+                        handler=lambda: calls.append("replacement"),
+                        policy=ToolPolicy.declared(
+                            read_only=True,
+                            permissions=[_TEST_CAPABILITY],
+                        ),
+                    )
+                )
+            elif mutation == "aba":
+                registry.unregister("echo")
+                registry.register(original)
+            else:
+                original.handler = lambda message: calls.append("mutated")
+
+        result = session.execute(
+            "echo",
+            {"message": "must-not-run"},
+            on_dispatched=_mutate_live_definition,
+        )
+
+        assert result["error"]["code"] == "tool_not_found", mutation
+        assert result["error"]["details"] == {
+            "reason": "definition_changed",
+            "handler_started": False,
+        }
+        assert calls == []
+        assert session.dispatched_calls == 0
+
+
+def test_session_rechecks_live_definition_after_cancellation_callback():
+    calls = []
+    registry = _echo_registry(calls)
+    armed = {"value": False}
+
+    def _cancel_probe():
+        if armed["value"]:
+            registry.unregister("echo")
+        return False
+
+    session = _session(registry, cancelled_check=_cancel_probe)
+    result = session.execute(
+        "echo",
+        {"message": "must-not-run"},
+        on_dispatched=lambda: armed.update(value=True),
+    )
+
+    assert result["error"]["code"] == "tool_not_found"
+    assert result["error"]["details"] == {
+        "reason": "definition_changed",
+        "handler_started": False,
+    }
+    assert calls == []
+    assert session.dispatched_calls == 0
 
 
 def test_undeclared_policy_is_rejected():

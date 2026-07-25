@@ -8,6 +8,7 @@ Provides:
 - @tool decorator for easy tool registration
 """
 
+import copy
 import json
 import inspect
 import logging
@@ -58,7 +59,7 @@ class ToolParameter:
     type: str  # "string" | "number" | "integer" | "boolean" | "array" | "object"
     description: str
     required: bool = True
-    enum: Optional[List[str]] = None
+    enum: Optional[List[Any]] = None
     default: Any = None
     minimum: Optional[float] = None
     maximum: Optional[float] = None
@@ -195,6 +196,166 @@ class ToolDefinition:
         }
 
 
+def _strict_contract_value_equal(
+    current: Any,
+    snapshot: Any,
+    *,
+    _depth: int = 0,
+    _seen: Optional[set[tuple[int, int]]] = None,
+) -> bool:
+    """Compare bounded contract values without Python bool/int aliasing."""
+    if type(current) is not type(snapshot) or _depth > 16:
+        return False
+    if current is None or type(current) in {str, bool, int, float}:
+        return current == snapshot
+    if _seen is None:
+        _seen = set()
+    pair = (id(current), id(snapshot))
+    if pair in _seen:
+        return True
+    _seen.add(pair)
+    if type(current) in {list, tuple}:
+        return len(current) == len(snapshot) and all(
+            _strict_contract_value_equal(
+                left,
+                right,
+                _depth=_depth + 1,
+                _seen=_seen,
+            )
+            for left, right in zip(current, snapshot)
+        )
+    if type(current) is dict:
+        return (
+            len(current) == len(snapshot)
+            and all(
+                key in snapshot
+                and _strict_contract_value_equal(
+                    value,
+                    snapshot[key],
+                    _depth=_depth + 1,
+                    _seen=_seen,
+                )
+                for key, value in current.items()
+            )
+        )
+    return current is snapshot
+
+
+def _tool_definition_matches_snapshot(
+    current: ToolDefinition,
+    snapshot: ToolDefinition,
+) -> bool:
+    """Return whether a live definition still matches its frozen binding."""
+    if (
+        not isinstance(current, ToolDefinition)
+        or not isinstance(snapshot, ToolDefinition)
+        or type(current) is not type(snapshot)
+        or current.handler is not snapshot.handler
+    ):
+        return False
+    scalar_fields = ("name", "description", "category", "enforce_contract")
+    if any(
+        not _strict_contract_value_equal(
+            getattr(current, field_name),
+            getattr(snapshot, field_name),
+        )
+        for field_name in scalar_fields
+    ):
+        return False
+    if type(current.parameters) is not list or type(snapshot.parameters) is not list:
+        return _strict_contract_value_equal(
+            current.parameters,
+            snapshot.parameters,
+        )
+    if len(current.parameters) != len(snapshot.parameters):
+        return False
+    parameter_fields = (
+        "name",
+        "type",
+        "description",
+        "required",
+        "enum",
+        "default",
+        "minimum",
+        "maximum",
+        "pattern",
+    )
+    for live_parameter, frozen_parameter in zip(
+        current.parameters,
+        snapshot.parameters,
+    ):
+        if (
+            type(live_parameter) is not type(frozen_parameter)
+            or not all(
+                _strict_contract_value_equal(
+                    getattr(live_parameter, field_name),
+                    getattr(frozen_parameter, field_name),
+                )
+                for field_name in parameter_fields
+            )
+        ):
+            return False
+    policy_fields = (
+        "read_only",
+        "side_effects",
+        "permissions",
+        "policy_status",
+        "scope_dimensions",
+    )
+    if not isinstance(current.policy, ToolPolicy) or not isinstance(
+        snapshot.policy,
+        ToolPolicy,
+    ):
+        return _strict_contract_value_equal(current.policy, snapshot.policy)
+    return type(current.policy) is type(snapshot.policy) and all(
+        _strict_contract_value_equal(
+            getattr(current.policy, field_name),
+            getattr(snapshot.policy, field_name),
+        )
+        for field_name in policy_fields
+    )
+
+
+def _freeze_tool_definition(tool_def: ToolDefinition) -> ToolDefinition:
+    """Copy mutable definition state without traversing the handler closure."""
+    frozen = object.__new__(type(tool_def))
+    for field_name, value in vars(tool_def).items():
+        frozen_value = (
+            value
+            if field_name == "handler"
+            else copy.deepcopy(value)
+        )
+        object.__setattr__(frozen, field_name, frozen_value)
+    return frozen
+
+
+@dataclass(frozen=True)
+class ToolDefinitionBinding:
+    """Immutable execution snapshot plus its live registry generation."""
+
+    name: str
+    source: ToolDefinition
+    snapshot: ToolDefinition
+    generation: int
+
+    def is_current(self, registry: "ToolRegistry") -> bool:
+        return (
+            registry.resolve(self.name) is self.source
+            and registry.definition_version(self.name) == self.generation
+            and _tool_definition_matches_snapshot(
+                self.source,
+                self.snapshot,
+            )
+        )
+
+    def matches_snapshot(self, candidate: ToolDefinition) -> bool:
+        """Return whether another isolated copy has the same bound contract."""
+        return _tool_definition_matches_snapshot(
+            candidate,
+            self.snapshot,
+        )
+
+
 # ============================================================
 # Tool Registry
 # ============================================================
@@ -215,6 +376,7 @@ class ToolRegistry:
 
     def __init__(self):
         self._tools: Dict[str, ToolDefinition] = {}
+        self._definition_versions: Dict[str, int] = {}
 
     # ----- Registration -----
 
@@ -222,12 +384,19 @@ class ToolRegistry:
         """Register a tool definition."""
         if tool_def.name in self._tools:
             logger.warning(f"Tool '{tool_def.name}' already registered, overwriting")
+        self._definition_versions[tool_def.name] = (
+            self._definition_versions.get(tool_def.name, 0) + 1
+        )
         self._tools[tool_def.name] = tool_def
         logger.debug(f"Registered tool: {tool_def.name} (category={tool_def.category})")
 
     def unregister(self, name: str) -> None:
         """Remove a registered tool."""
-        self._tools.pop(name, None)
+        if name in self._tools:
+            self._definition_versions[name] = (
+                self._definition_versions.get(name, 0) + 1
+            )
+            self._tools.pop(name, None)
 
     # ----- Query -----
 
@@ -238,6 +407,30 @@ class ToolRegistry:
     def resolve(self, name: str) -> Optional[ToolDefinition]:
         """Return a tool definition by exact registered name."""
         return self._tools.get(name)
+
+    def definition_version(self, name: str) -> int:
+        """Return the monotonic registration generation for one exact name."""
+        return self._definition_versions.get(name, 0)
+
+    def bind_definition(self, name: str) -> Optional[ToolDefinitionBinding]:
+        """Freeze one exact live definition for a single execution boundary."""
+        live_definition = self.resolve(name)
+        if live_definition is None:
+            return None
+        try:
+            frozen_definition = _freeze_tool_definition(live_definition)
+        except Exception as exc:  # broad-exception: cleanup - Reject definitions whose mutable contract cannot be isolated.
+            raise ValueError(
+                f"Tool definition '{name}' cannot be frozen"
+            ) from exc
+        if frozen_definition is live_definition:
+            raise ValueError(f"Tool definition '{name}' cannot be isolated")
+        return ToolDefinitionBinding(
+            name=name,
+            source=live_definition,
+            snapshot=frozen_definition,
+            generation=self.definition_version(name),
+        )
 
     def list_tools(self, category: Optional[str] = None) -> List[ToolDefinition]:
         """List all tools, optionally filtered by category."""
@@ -544,7 +737,11 @@ def validate_tool_schema_contract(
         enum_is_valid = parameter.enum is None or (
             type(parameter.enum) is list
             and bool(parameter.enum)
-            and all(_is_bounded_json_scalar(value) for value in parameter.enum)
+            and all(
+                _is_bounded_json_scalar(value)
+                and _json_scalar_matches_parameter_type(parameter.type, value)
+                for value in parameter.enum
+            )
         )
         if not enum_is_valid:
             issues.append(f"{field}.enum")
@@ -609,6 +806,30 @@ def _is_bounded_json_scalar(value: Any) -> bool:
     )
 
 
+def _json_scalar_matches_parameter_type(parameter_type: Any, value: Any) -> bool:
+    """Return whether one enum scalar has the declared JSON Schema type."""
+    if parameter_type == "string":
+        return type(value) is str
+    if parameter_type == "boolean":
+        return type(value) is bool
+    if parameter_type == "integer":
+        return type(value) is int
+    if parameter_type == "number":
+        return type(value) in {int, float} and (
+            type(value) is int or math.isfinite(value)
+        )
+    return False
+
+
+def _json_scalar_equal(left: Any, right: Any) -> bool:
+    """Compare JSON scalars without Python's bool/int equality alias."""
+    if type(left) is bool or type(right) is bool:
+        return type(left) is type(right) and left == right
+    if type(left) in {int, float} and type(right) in {int, float}:
+        return left == right
+    return type(left) is type(right) and left == right
+
+
 def _parameter_default_is_valid(parameter: ToolParameter) -> bool:
     value = parameter.default
     if parameter.type == "string":
@@ -637,7 +858,7 @@ def _parameter_default_is_valid(parameter: ToolParameter) -> bool:
         if (
             type(parameter.enum) is not list
             or not all(_is_bounded_json_scalar(item) for item in parameter.enum)
-            or value not in parameter.enum
+            or not any(_json_scalar_equal(value, item) for item in parameter.enum)
         ):
             return False
     if parameter.pattern is not None and type(value) is str:

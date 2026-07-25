@@ -46,7 +46,14 @@ def _execute_tools(
     from src.utils.sanitize import redact_sensitive_data, redact_sensitive_text
 
     def _safe_tool_trace_name(value: Any) -> str:
-        return redact_sensitive_text(value) if isinstance(value, str) else ""
+        canonicalize = getattr(tool_session, "canonical_tool_name", None)
+        if callable(canonicalize):
+            return canonicalize(value)
+        return (
+            redact_sensitive_text(value, redact_opaque_tokens=True)
+            if isinstance(value, str)
+            else ""
+        )
 
     def _safe_tool_trace_arguments(value: Any) -> Dict[str, Any]:
         redacted = redact_sensitive_data(value)

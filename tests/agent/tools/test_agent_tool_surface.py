@@ -311,6 +311,85 @@ def test_direct_surface_denies_unknown_parameter_schema_type() -> None:
     assert calls == []
 
 
+def test_direct_surface_denies_cross_type_enum_contracts_without_dispatch() -> None:
+    calls = []
+    registry = ToolRegistry()
+    for name, parameter_type, enum_value in (
+        ("integer_bool_enum", "integer", True),
+        ("number_bool_enum", "number", True),
+        ("boolean_integer_enum", "boolean", 1),
+    ):
+        registry.register(
+            ToolDefinition(
+                name=name,
+                description="Cross-type enum contract",
+                parameters=[
+                    ToolParameter(
+                        name="value",
+                        type=parameter_type,
+                        description="Value",
+                        enum=[enum_value],
+                    ),
+                ],
+                handler=lambda value, marker=name: calls.append((marker, value)),
+                policy=_test_policy(),
+            )
+        )
+
+    for name, argument in (
+        ("integer_bool_enum", 1),
+        ("number_bool_enum", 1),
+        ("boolean_integer_enum", True),
+    ):
+        result = ToolSurface(registry).execute_tool(
+            name,
+            {"value": argument},
+            _authorized_context(),
+        )
+        assert result["error"]["code"] == "schema_contract_violation"
+        assert result["error"]["details"]["invalid_schema_fields"] == [
+            "parameters[0].enum"
+        ]
+
+    assert calls == []
+
+
+def test_runtime_enum_comparison_keeps_boolean_distinct_from_number() -> None:
+    calls = []
+    registry = ToolRegistry()
+    registry.register(
+        ToolDefinition(
+            name="number_enum",
+            description="Numeric enum",
+            parameters=[
+                ToolParameter(
+                    name="value",
+                    type="number",
+                    description="Value",
+                    enum=[1],
+                ),
+            ],
+            handler=lambda value: calls.append(value),
+            policy=_test_policy(),
+        )
+    )
+
+    result = ToolSurface(registry).execute_tool(
+        "number_enum",
+        {"value": True},
+        _authorized_context(),
+    )
+    compatible = ToolSurface(registry).execute_tool(
+        "number_enum",
+        {"value": 1.0},
+        _authorized_context(),
+    )
+
+    assert result["error"]["code"] == "invalid_arguments"
+    assert compatible["ok"] is True
+    assert calls == [1.0]
+
+
 def test_deep_optional_default_fails_as_structured_schema_denial() -> None:
     calls = []
     nested_default = []
@@ -523,6 +602,74 @@ def test_replaced_definition_cannot_dispatch_stale_preflight_handler() -> None:
     assert session.dispatched_calls == 0
 
 
+def test_direct_surface_rejects_in_place_mutation_after_preflight() -> None:
+    validation_entered = threading.Event()
+    release_validation = threading.Event()
+    original_calls = []
+    mutated_calls = []
+    registry = _registry_with_url_payload(original_calls)
+    live_definition = registry.resolve("fetch_payload")
+    result_holder = {}
+
+    def _pause_outbound_validation(url):
+        validation_entered.set()
+        assert release_validation.wait(timeout=2)
+        return url
+
+    def _execute():
+        result_holder["result"] = ToolSurface(registry).execute_tool(
+            "fetch_payload",
+            {"payload": {"target_url": "https://example.com/data"}},
+            _authorized_context(),
+        )
+
+    with patch(
+        "src.agent.tool_surface.validate_outbound_url",
+        side_effect=_pause_outbound_validation,
+    ):
+        worker = threading.Thread(target=_execute)
+        worker.start()
+        assert validation_entered.wait(timeout=1)
+        live_definition.parameters = []
+        live_definition.policy.permissions.clear()
+        live_definition.handler = lambda: mutated_calls.append("ran")
+        release_validation.set()
+        worker.join(timeout=1)
+
+    assert not worker.is_alive()
+    assert result_holder["result"]["error"]["code"] == "tool_not_found"
+    assert result_holder["result"]["error"]["details"] == {
+        "reason": "definition_changed"
+    }
+    assert original_calls == []
+    assert mutated_calls == []
+
+
+def test_direct_surface_rechecks_binding_after_cancellation_callback() -> None:
+    calls = []
+    registry = _registry_with_echo(calls)
+    armed = {"value": False}
+
+    def _cancel_probe():
+        if armed["value"]:
+            registry.unregister("echo")
+        return False
+
+    result = ToolSurface(registry).execute_tool(
+        "echo",
+        {"message": "must-not-run"},
+        _authorized_context(cancelled_check=_cancel_probe),
+        dispatch_guard=lambda _definition: armed.update(value=True),
+    )
+
+    assert result["error"]["code"] == "tool_not_found"
+    assert result["error"]["details"] == {
+        "reason": "definition_changed",
+        "handler_started": False,
+    }
+    assert calls == []
+
+
 def test_nested_camel_case_url_key_is_validated_as_url_bearing() -> None:
     calls = []
     result = ToolSurface(_registry_with_url_payload(calls)).execute_tool(
@@ -668,10 +815,30 @@ def test_cancellation_during_outbound_policy_prevents_handler_dispatch() -> None
 def test_rejects_unregistered_namespaced_and_unknown_tools() -> None:
     surface = ToolSurface(_registry_with_echo())
 
-    assert surface.execute_tool("default_api:echo", {}, None)["error"]["code"] == "invalid_tool_name"
-    assert surface.execute_tool("provider.tool", {}, None)["error"]["code"] == "invalid_tool_name"
-    assert surface.execute_tool("provider:tool", {}, None)["error"]["code"] == "invalid_tool_name"
-    assert surface.execute_tool("missing", {}, None)["error"]["code"] == "tool_not_found"
+    for name, code in (
+        ("default_api:echo", "invalid_tool_name"),
+        ("provider.tool", "invalid_tool_name"),
+        ("provider:tool", "invalid_tool_name"),
+        ("missing", "tool_not_found"),
+    ):
+        result = surface.execute_tool(name, {}, None)
+        assert result["error"]["code"] == code
+        assert result["tool_name"] == "unrecognized"
+        assert name not in str(result)
+
+
+def test_direct_surface_unknown_canary_is_absent_from_denial_audit() -> None:
+    canary = "prompt_secret_surface_canary_123456789"
+
+    result = ToolSurface(_registry_with_echo()).execute_tool(
+        canary,
+        {},
+        None,
+    )
+
+    assert result["error"]["code"] == "tool_not_found"
+    assert result["tool_name"] == "unrecognized"
+    assert canary not in str(result)
 
 
 def test_rejects_non_string_tool_names_without_rendering_them() -> None:
@@ -681,7 +848,7 @@ def test_rejects_non_string_tool_names_without_rendering_them() -> None:
         result = surface.execute_tool(malformed_name, {}, None)
 
         assert result["ok"] is False
-        assert result["tool_name"] == ""
+        assert result["tool_name"] == "unrecognized"
         assert result["error"]["code"] == "invalid_tool_name"
 
 
@@ -928,6 +1095,7 @@ def test_stock_scope_guard_uses_captured_definition_across_registry_aba() -> Non
             super().__init__()
             self._sequence = iter(
                 [
+                    scoped_definition,
                     scoped_definition,
                     transient_unscoped_definition,
                     scoped_definition,

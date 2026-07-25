@@ -267,7 +267,7 @@ def test_hostile_skill_cannot_expand_the_runtime_tool_surface() -> None:
 
     assert result.success is True
     assert adapter.call_with_tools.call_args_list[0].args[1] == []
-    assert result.tool_calls_log[0]["tool"] == "hidden_tool"
+    assert result.tool_calls_log[0]["tool"] == "unrecognized"
     assert result.tool_calls_log[0]["success"] is False
     assert "unavailable" in result.content
 

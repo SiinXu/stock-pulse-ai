@@ -1064,7 +1064,7 @@ class TestAgentExecutor(unittest.TestCase):
         self.assertEqual(executed_calls, [])
         self.assertFalse(result.tool_calls_log[0]["success"])
         self.assertNotIn("guarded", result.tool_calls_log[0])
-        self.assertEqual(result.tool_calls_log[0]["tool"], "default_api:search_stock_news")
+        self.assertEqual(result.tool_calls_log[0]["tool"], "unrecognized")
         tool_messages = [msg for msg in result.messages if msg.get("role") == "tool"]
         self.assertEqual(len(tool_messages), 1)
         self.assertEqual(
@@ -1813,20 +1813,35 @@ class TestAgentExecutor(unittest.TestCase):
                     default=str,
                 )
                 self.assertNotIn(canary, visible)
-                self.assertTrue(all(entry["tool"] == "" for entry in result.tool_calls_log))
+                self.assertTrue(
+                    all(
+                        entry["tool"] == "unrecognized"
+                        for entry in result.tool_calls_log
+                    )
+                )
                 assistant_tool_calls = next(
                     message["tool_calls"]
                     for message in result.messages
                     if message.get("role") == "assistant" and message.get("tool_calls")
                 )
-                self.assertTrue(all(call["name"] == "" for call in assistant_tool_calls))
+                self.assertTrue(
+                    all(
+                        call["name"] == "unrecognized"
+                        for call in assistant_tool_calls
+                    )
+                )
                 tool_messages = [
                     message for message in result.messages if message.get("role") == "tool"
                 ]
-                self.assertTrue(all(message["name"] == "" for message in tool_messages))
                 self.assertTrue(
                     all(
-                        event.get("tool", "") == ""
+                        message["name"] == "unrecognized"
+                        for message in tool_messages
+                    )
+                )
+                self.assertTrue(
+                    all(
+                        event.get("tool", "") == "unrecognized"
                         for event in progress_events
                         if event.get("type") in {"tool_start", "tool_done"}
                     )

@@ -115,6 +115,9 @@ class ToolSurface:
         dispatch_guard: Optional[
             Callable[[ToolDefinition], Optional[ToolDispatchRejection]]
         ] = None,
+        pre_handler_guard: Optional[
+            Callable[[ToolDefinition], Optional[ToolDispatchRejection]]
+        ] = None,
     ) -> Dict[str, Any]:
         """Execute one registered tool by exact name and return structured output."""
         ctx = context or ToolAccessContext()
@@ -124,7 +127,7 @@ class ToolSurface:
         tool_name = name if type(name) is str else ""
         if not tool_name.strip():
             return self._error_result(
-                tool_name="",
+                tool_name="unrecognized",
                 code="invalid_tool_name",
                 message="Tool name must exactly match a registered StockPulse tool.",
                 started_at=started_at,
@@ -132,12 +135,11 @@ class ToolSurface:
                 retriable=False,
                 arguments=arguments,
             )
-        tool_def = self._registry.resolve(tool_name)
-
-        if tool_def is None:
+        live_tool_def = self._registry.resolve(tool_name)
+        if live_tool_def is None:
             if isinstance(name, str) and (":" in name or "." in name):
                 return self._error_result(
-                    tool_name=tool_name,
+                    tool_name="unrecognized",
                     code="invalid_tool_name",
                     message="Tool name must exactly match a registered StockPulse tool.",
                     started_at=started_at,
@@ -146,7 +148,7 @@ class ToolSurface:
                     arguments=arguments,
                 )
             return self._error_result(
-                tool_name=tool_name,
+                tool_name="unrecognized",
                 code="tool_not_found",
                 message="Tool not found.",
                 started_at=started_at,
@@ -154,6 +156,54 @@ class ToolSurface:
                 retriable=False,
                 arguments=arguments,
             )
+        initial_capability_error = validate_tool_capability_contract(live_tool_def)
+        if initial_capability_error is not None:
+            return self._error_result(
+                tool_name=tool_name,
+                code=initial_capability_error["code"],
+                message=initial_capability_error["message"],
+                started_at=started_at,
+                context=ctx,
+                retriable=False,
+                details=initial_capability_error["details"],
+                arguments=arguments,
+            )
+        initial_schema_error = validate_tool_schema_contract(live_tool_def)
+        if initial_schema_error is not None:
+            return self._error_result(
+                tool_name=tool_name,
+                code=initial_schema_error["code"],
+                message=initial_schema_error["message"],
+                started_at=started_at,
+                context=ctx,
+                retriable=False,
+                details=initial_schema_error["details"],
+                arguments=arguments,
+            )
+        try:
+            tool_binding = self._registry.bind_definition(tool_name)
+        except ValueError:
+            return self._error_result(
+                tool_name=tool_name,
+                code="schema_contract_violation",
+                message="Tool definition cannot be isolated for execution.",
+                started_at=started_at,
+                context=ctx,
+                retriable=False,
+                details={"reason": "definition_not_isolatable"},
+                arguments=arguments,
+            )
+        if tool_binding is None:
+            return self._error_result(
+                tool_name="unrecognized",
+                code="tool_not_found",
+                message="Tool not found.",
+                started_at=started_at,
+                context=ctx,
+                retriable=False,
+                arguments=arguments,
+            )
+        tool_def = tool_binding.snapshot
 
         capability_error = validate_tool_capability_contract(tool_def)
         if capability_error is not None:
@@ -326,7 +376,7 @@ class ToolSurface:
                 arguments=arguments,
             )
 
-        if self._registry.resolve(tool_name) is not tool_def:
+        if not tool_binding.is_current(self._registry):
             return self._error_result(
                 tool_name=tool_name,
                 code="tool_not_found",
@@ -354,7 +404,10 @@ class ToolSurface:
                 )
 
         def _invoke_handler() -> Any:
-            if self._registry.resolve(tool_name) is not tool_def:
+            fence_error = _execution_fence_error(ctx, dispatch_deadline)
+            if fence_error is not None:
+                raise _HandlerDispatchBlocked(fence_error)
+            if not tool_binding.is_current(self._registry):
                 raise _HandlerDispatchBlocked({
                     "code": "tool_not_found",
                     "message": "Tool definition changed before handler dispatch.",
@@ -364,9 +417,16 @@ class ToolSurface:
                         "handler_started": False,
                     },
                 })
-            fence_error = _execution_fence_error(ctx, dispatch_deadline)
-            if fence_error is not None:
-                raise _HandlerDispatchBlocked(fence_error)
+            if pre_handler_guard is not None:
+                pre_handler_rejection = pre_handler_guard(tool_def)
+                if pre_handler_rejection is not None:
+                    code, message, details = pre_handler_rejection
+                    raise _HandlerDispatchBlocked({
+                        "code": code,
+                        "message": message,
+                        "retriable": False,
+                        "details": details,
+                    })
             return tool_def.handler(**arguments)
 
         timeout = _remaining_dispatch_timeout(dispatch_deadline)
@@ -915,7 +975,10 @@ def validate_tool_parameter_value(
     elif expected and not isinstance(value, expected):
         return f"argument {param.name} must be {param.type}"
 
-    if param.enum and value not in param.enum:
+    if param.enum and not any(
+        _json_scalar_equal(value, enum_value)
+        for enum_value in param.enum
+    ):
         return f"argument {param.name} must be one of: {', '.join(map(str, param.enum))}"
     if param.pattern is not None and isinstance(value, str):
         try:
@@ -932,6 +995,15 @@ def validate_tool_parameter_value(
         if param.maximum is not None and value > param.maximum:
             return f"argument {param.name} must be <= {param.maximum:g}"
     return None
+
+
+def _json_scalar_equal(left: Any, right: Any) -> bool:
+    """Compare JSON scalars without Python's bool/int equality alias."""
+    if type(left) is bool or type(right) is bool:
+        return type(left) is type(right) and left == right
+    if type(left) in {int, float} and type(right) in {int, float}:
+        return left == right
+    return type(left) is type(right) and left == right
 
 
 def _truncate_text_bytes(text: str, max_bytes: int) -> tuple[str, bool]:

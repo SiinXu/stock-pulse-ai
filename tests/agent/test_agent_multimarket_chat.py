@@ -1623,7 +1623,7 @@ def test_single_agent_non_cn_chat_cannot_dispatch_fully_filtered_tool(
     assert result.success is True
     assert adapter.call_with_tools.call_args_list[0].args[1] == []
     assert executed == []
-    assert result.tool_calls_log[0]["tool"] == "get_sector_rankings"
+    assert result.tool_calls_log[0]["tool"] == "unrecognized"
     assert result.tool_calls_log[0]["success"] is False
 
 
