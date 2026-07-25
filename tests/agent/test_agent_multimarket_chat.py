@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -18,10 +19,16 @@ from src.agent.conversation import ConversationSession
 from src.agent.executor import AgentExecutor, AgentResult
 from src.agent.llm_adapter import LLMResponse, ToolCall
 from src.agent.orchestrator import AgentOrchestrator, OrchestratorResult
+from src.agent.public_contract import (
+    AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
+    AGENT_CHAT_FAILURE_MESSAGE,
+)
 from src.agent.runner import RunLoopResult, run_agent_loop
 from src.agent.runtime.contract import ExecutionState
 from src.agent.runtime.guards import RuntimeGuardPolicy
 from src.agent.runtime.lifecycle import classify_result_terminal_state
+from src.agent.runtime_facts import project_agent_runtime_metadata
+from src.agent.soul import get_agent_soul_metadata
 from src.agent.stock_scope import resolve_stock_scope
 from src.agent.tools.data_tools import (
     get_realtime_quote_tool,
@@ -1919,6 +1926,158 @@ def test_multi_agent_chat_runs_each_comparison_symbol_in_its_own_scope() -> None
     session.update_market_context.assert_called_once_with(
         {},
         anchor_user_message_id=11,
+    )
+
+
+@pytest.mark.parametrize(
+    ("exception_type", "leg_timed_out", "expected_timed_out"),
+    [
+        (RuntimeError, False, False),
+        (RuntimeError, True, False),
+        (TimeoutError, False, True),
+    ],
+)
+def test_multi_agent_chat_synthesis_exception_preserves_verified_soul_failure(
+    caplog,
+    exception_type,
+    leg_timed_out: bool,
+    expected_timed_out: bool,
+) -> None:
+    secret = "sk_live_comparison_synthesis_secret"
+    adapter = MagicMock()
+    orchestrator = AgentOrchestrator(
+        tool_registry=_market_capability_registry(),
+        llm_adapter=adapter,
+        config=SimpleNamespace(agent_orchestrator_timeout_s=60),
+        runtime_guard_policy=RuntimeGuardPolicy(),
+    )
+    session = MagicMock()
+    session.get_market_context.return_value = {}
+    add_message = MagicMock(side_effect=[11, 12])
+    executed = []
+
+    def fake_execute(ctx, **_kwargs):
+        executed.append(ctx.stock_code)
+        if ctx.stock_code == "AAPL":
+            return OrchestratorResult(
+                success=True,
+                content="AAPL analysis",
+                tool_calls_log=[{"symbol": "AAPL"}],
+                total_steps=2,
+                total_tokens=5,
+                provider="leg-provider",
+                model="leg-model-a",
+                timed_out=leg_timed_out,
+            )
+        return OrchestratorResult(
+            success=True,
+            content="HK00700 analysis",
+            tool_calls_log=[{"symbol": "HK00700"}],
+            total_steps=3,
+            total_tokens=7,
+            provider="leg-provider",
+            model="leg-model-b",
+        )
+
+    caplog.set_level(logging.ERROR, logger="src.agent.orchestrator")
+    with patch.object(
+        orchestrator,
+        "_execute_pipeline",
+        side_effect=fake_execute,
+    ), patch(
+        "src.agent.orchestrator.build_visible_chat_history",
+        return_value=[],
+    ), patch(
+        "src.agent.conversation.conversation_manager.get_or_create",
+        return_value=session,
+    ), patch(
+        "src.agent.conversation.conversation_manager.add_message",
+        add_message,
+    ), patch(
+        "src.agent.orchestrator.run_agent_loop",
+        side_effect=exception_type(f"provider rejected api_key={secret}"),
+    ):
+        result = orchestrator.chat(
+            "compare AAPL and HK00700",
+            "multi-synthesis-failure",
+        )
+
+    assert executed == ["AAPL", "HK00700"]
+    assert result.success is False
+    assert result.content == ""
+    assert result.error == AGENT_CHAT_FAILURE_MESSAGE
+    assert result.timed_out is expected_timed_out
+    assert classify_result_terminal_state(result) is (
+        ExecutionState.TIMED_OUT if expected_timed_out else ExecutionState.FAILED
+    )
+    assert result.tool_calls_log == [
+        {"symbol": "AAPL"},
+        {"symbol": "HK00700"},
+    ]
+    assert result.total_steps == 5
+    assert result.total_tokens == 12
+    assert result.provider == "leg-provider"
+    assert result.model == "leg-model-a, leg-model-b"
+    assert project_agent_runtime_metadata(result.runtime_facts) == (
+        get_agent_soul_metadata()
+    )
+    assert add_message.call_args_list == [
+        call(
+            "multi-synthesis-failure",
+            "user",
+            "compare AAPL and HK00700",
+        ),
+        call(
+            "multi-synthesis-failure",
+            "assistant",
+            AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
+        ),
+    ]
+    rendered_logs = "\n".join(record.getMessage() for record in caplog.records)
+    assert secret not in rendered_logs
+    assert secret not in repr(result)
+
+
+def test_multi_agent_synthesis_exception_yields_to_late_cancellation() -> None:
+    orchestrator = AgentOrchestrator(
+        tool_registry=_market_capability_registry(),
+        llm_adapter=MagicMock(),
+        config=SimpleNamespace(agent_orchestrator_timeout_s=60),
+        runtime_guard_policy=RuntimeGuardPolicy(),
+    )
+    scope = resolve_stock_scope("compare AAPL and HK00700", None).stock_scope
+    market_context = build_agent_chat_market_context(
+        {},
+        scope,
+        "en",
+        per_symbol_tool_scopes=True,
+    )
+    cancellation_checks = iter((False, True))
+
+    with patch(
+        "src.agent.orchestrator.run_agent_loop",
+        side_effect=RuntimeError("synthesis stopped during cancellation"),
+    ):
+        result = orchestrator._synthesize_multi_symbol_chat(
+            message="compare AAPL and HK00700",
+            market_context=market_context,
+            report_language="en",
+            per_symbol_results=[
+                (
+                    "AAPL",
+                    OrchestratorResult(success=True, content="AAPL analysis"),
+                ),
+            ],
+            cancelled_check=lambda: next(cancellation_checks),
+            timeout_seconds=30,
+        )
+
+    assert result.success is False
+    assert result.cancelled is True
+    assert result.content == ""
+    assert result.timed_out is False
+    assert project_agent_runtime_metadata(result.runtime_facts) == (
+        get_agent_soul_metadata()
     )
 
 
