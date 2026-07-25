@@ -27,6 +27,13 @@ from enum import Enum
 from typing import Optional, Dict, List, Any, Tuple, Literal, Callable
 
 from data_provider.base import canonical_stock_code, normalize_stock_code
+from src.schemas.request_context import AnalysisRequestContext
+from src.services.run_diagnostics import (
+    activate_run_diagnostic_context,
+    get_current_diagnostic_context,
+    reset_run_diagnostic_context,
+)
+from src.services.stock_code_utils import resolve_index_stock_code_for_analysis
 from src.task_execution import (
     TaskCommand,
     TaskEvent,
@@ -44,19 +51,12 @@ from src.task_execution import (
     deep_freeze,
     deep_thaw,
 )
-from src.services.run_diagnostics import (
-    activate_run_diagnostic_context,
-    get_current_diagnostic_context,
-    reset_run_diagnostic_context,
-)
-from src.schemas.request_context import AnalysisRequestContext
 from src.utils.analysis_metadata import SELECTION_SOURCES
 from src.utils.sanitize import (
     exception_chain_redaction_values,
     log_safe_exception,
     sanitize_exception_chain,
 )
-from src.services.stock_code_utils import resolve_index_stock_code_for_analysis
 
 logger = logging.getLogger(__name__)
 
@@ -251,15 +251,47 @@ class TaskInfo:
         )
 
 
+@dataclass(frozen=True)
+class AnalysisTaskCoalescingContract:
+    """Immutable side-effect contract captured for an active stock analysis."""
+
+    stock_code: str
+    report_type: str
+    notify: bool
+
+    @classmethod
+    def from_command(
+        cls,
+        command: Optional[TaskCommand],
+    ) -> Optional['AnalysisTaskCoalescingContract']:
+        if command is None or command.kind != "stock_analysis":
+            return None
+        metadata = deep_thaw(command.metadata)
+        stock_code = resolve_index_stock_code_for_analysis(
+            str(metadata.get("stock_code") or "")
+        )
+        if not stock_code:
+            return None
+        return cls(
+            stock_code=stock_code,
+            report_type=str(metadata.get("report_type") or "detailed"),
+            notify=bool(metadata.get("notify", True)),
+        )
+
+
 class DuplicateTaskError(Exception):
-    """
-    重复提交异常
-    
-    当股票已在分析中时抛出此异常
-    """
-    def __init__(self, stock_code: str, existing_task_id: str):
+    """Raised when a stock already has an active analysis task."""
+
+    def __init__(
+        self,
+        stock_code: str,
+        existing_task_id: str,
+        *,
+        existing_contract: Optional[AnalysisTaskCoalescingContract] = None,
+    ):
         self.stock_code = stock_code
         self.existing_task_id = existing_task_id
+        self.existing_contract = existing_contract
         super().__init__(f"股票 {stock_code} 正在分析中 (task_id: {existing_task_id})")
 
 
@@ -809,6 +841,9 @@ class AnalysisTaskQueue:
             raise DuplicateTaskError(
                 str(metadata.get("stock_code") or command.dedupe_key),
                 existing_task_id,
+                existing_contract=AnalysisTaskCoalescingContract.from_command(
+                    self._commands.get(existing_task_id)
+                ),
             )
 
         task_id = task_id or uuid.uuid4().hex

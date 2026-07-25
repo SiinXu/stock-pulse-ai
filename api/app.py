@@ -204,6 +204,7 @@ from src.services.runtime_scheduler import (
     RUNTIME_SCHEDULER_FORCE_ENABLED_ENV,
     RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV,
     RUNTIME_SCHEDULER_SUPPRESS_START_ENV,
+    SCHEDULED_TASK_OWNER_ENV,
     RuntimeSchedulerService,
 )
 from src.services.scheduled_task_service import ScheduledTaskService
@@ -306,10 +307,21 @@ async def app_lifespan(app: FastAPI):
             "on",
         }
     runtime_scheduler_args = _load_runtime_scheduler_args()
+    scheduled_task_owner_override = os.getenv(SCHEDULED_TASK_OWNER_ENV)
+    if scheduled_task_owner_override is None:
+        scheduled_task_owner = runtime_owns_schedule
+    else:
+        scheduled_task_owner = scheduled_task_owner_override.strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
     os.environ.pop(RUNTIME_SCHEDULER_FORCE_ENABLED_ENV, None)
     os.environ.pop(RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV, None)
     os.environ.pop(RUNTIME_SCHEDULER_SUPPRESS_START_ENV, None)
     os.environ.pop(RUNTIME_SCHEDULER_ARGS_ENV, None)
+    os.environ.pop(SCHEDULED_TASK_OWNER_ENV, None)
     scheduled_task_service = ScheduledTaskService()
     app.state.scheduled_task_service = scheduled_task_service
     runtime_scheduler_service = RuntimeSchedulerService(
@@ -318,13 +330,15 @@ async def app_lifespan(app: FastAPI):
         run_immediately_in_background=True,
         schedule_args_overrides=runtime_scheduler_args,
         scheduled_task_service=scheduled_task_service,
-        personalized_schedule_enabled=not runtime_suppress_start,
+        personalized_schedule_enabled=(
+            runtime_owns_schedule and scheduled_task_owner
+        ),
+        legacy_schedule_enabled=not runtime_suppress_start,
     )
     app.state.runtime_scheduler_service = runtime_scheduler_service
-    if not runtime_suppress_start:
-        app.state.runtime_scheduler_service.reconcile_from_config(
-            run_immediately=runtime_run_immediately,
-        )
+    app.state.runtime_scheduler_service.reconcile_from_config(
+        run_immediately=runtime_run_immediately,
+    )
     begin_local_model_service_lifespan(
         app,
         SystemConfigService(

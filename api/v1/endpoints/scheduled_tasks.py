@@ -19,9 +19,11 @@ from api.v1.schemas.scheduled_tasks import (
 )
 from src.services.runtime_scheduler import RuntimeSchedulerService
 from src.services.scheduled_task_service import (
+    ScheduledTaskContractError,
     ScheduledTaskError,
     ScheduledTaskNotFoundError,
     ScheduledTaskService,
+    ScheduledTaskValidationError,
 )
 from src.utils.sanitize import log_safe_exception
 
@@ -30,8 +32,34 @@ router = APIRouter()
 
 
 def _service_error(exc: ScheduledTaskError):
-    status_code = 404 if isinstance(exc, ScheduledTaskNotFoundError) else 400
+    if isinstance(exc, ScheduledTaskNotFoundError):
+        status_code = 404
+    elif isinstance(exc, ScheduledTaskValidationError):
+        status_code = 400
+    elif isinstance(exc, ScheduledTaskContractError):
+        status_code = 500
+    else:
+        status_code = 500
     return api_error(status_code, exc.error_code, str(exc))
+
+
+def _reconcile_after_mutation(
+    runtime_scheduler: RuntimeSchedulerService,
+    *,
+    operation: str,
+    task_id: str,
+) -> None:
+    try:
+        runtime_scheduler.reconcile_scheduled_tasks()
+    except Exception as exc:  # broad-exception: fallback_recorded - the committed mutation is authoritative and the owner loop retries discovery.
+        log_safe_exception(
+            logger,
+            "Scheduled task runtime reconciliation deferred",
+            exc,
+            error_code="scheduled_task_runtime_reconcile_deferred",
+            level=logging.WARNING,
+            context={"operation": operation, "task_id": task_id},
+        )
 
 
 @router.post(
@@ -48,8 +76,13 @@ def create_scheduled_task(
 ) -> ScheduledTaskItem:
     try:
         item = service.create_task(request.model_dump())
-        runtime_scheduler.reconcile_scheduled_tasks()
-        return ScheduledTaskItem(**item)
+        response = ScheduledTaskItem(**item)
+        _reconcile_after_mutation(
+            runtime_scheduler,
+            operation="create",
+            task_id=response.id,
+        )
+        return response
     except ScheduledTaskError as exc:
         raise _service_error(exc)
     except Exception as exc:  # broad-exception: fallback_recorded - API boundary logs diagnostics and returns a stable envelope.
@@ -126,8 +159,13 @@ def enable_scheduled_task(
 ) -> ScheduledTaskItem:
     try:
         item = service.set_enabled(task_id, True)
-        runtime_scheduler.reconcile_scheduled_tasks()
-        return ScheduledTaskItem(**item)
+        response = ScheduledTaskItem(**item)
+        _reconcile_after_mutation(
+            runtime_scheduler,
+            operation="enable",
+            task_id=response.id,
+        )
+        return response
     except ScheduledTaskError as exc:
         raise _service_error(exc)
     except Exception as exc:  # broad-exception: fallback_recorded - API boundary logs diagnostics and returns a stable envelope.
@@ -153,8 +191,13 @@ def disable_scheduled_task(
 ) -> ScheduledTaskItem:
     try:
         item = service.set_enabled(task_id, False)
-        runtime_scheduler.reconcile_scheduled_tasks()
-        return ScheduledTaskItem(**item)
+        response = ScheduledTaskItem(**item)
+        _reconcile_after_mutation(
+            runtime_scheduler,
+            operation="disable",
+            task_id=response.id,
+        )
+        return response
     except ScheduledTaskError as exc:
         raise _service_error(exc)
     except Exception as exc:  # broad-exception: fallback_recorded - API boundary logs diagnostics and returns a stable envelope.

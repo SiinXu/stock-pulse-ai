@@ -163,6 +163,52 @@ class ScheduledTaskRepository:
             session.refresh(run)
             return self._detach(session, run)
 
+    def quarantine_due_task(
+        self,
+        *,
+        task_id: str,
+        expected_next_run_at: datetime,
+        run_fields: Dict[str, Any],
+        updated_at: datetime,
+    ) -> Optional[ScheduledTaskRunRecord]:
+        """Disable one incompatible due definition and record it atomically."""
+        with self.db.get_session() as session:
+            result = session.execute(
+                update(ScheduledTaskRecord)
+                .where(
+                    ScheduledTaskRecord.id == task_id,
+                    ScheduledTaskRecord.enabled.is_(True),
+                    ScheduledTaskRecord.next_run_at == expected_next_run_at,
+                )
+                .values(
+                    enabled=False,
+                    next_run_at=None,
+                    updated_at=updated_at,
+                )
+            )
+            if result.rowcount != 1:
+                session.rollback()
+                return None
+            run = ScheduledTaskRunRecord(**run_fields)
+            session.add(run)
+            try:
+                session.commit()
+            except IntegrityError:
+                session.rollback()
+                existing = session.execute(
+                    select(ScheduledTaskRunRecord.id)
+                    .where(
+                        ScheduledTaskRunRecord.task_id == task_id,
+                        ScheduledTaskRunRecord.scheduled_for == expected_next_run_at,
+                    )
+                    .limit(1)
+                ).scalar_one_or_none()
+                if existing is not None:
+                    return None
+                raise
+            session.refresh(run)
+            return self._detach(session, run)
+
     def get_run(self, run_id: str) -> Optional[ScheduledTaskRunRecord]:
         with self.db.get_session() as session:
             row = session.execute(

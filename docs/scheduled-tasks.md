@@ -43,7 +43,9 @@ ownership contracts below rather than introducing another scheduler.
 - `calendar_market` is one of `cn`, `hk`, `us`, `jp`, `kr`, or `tw` and must
   match the normalized stock code's market.
 - `non_trading_day_policy=skip` records a terminal skipped occurrence without
-  dispatching analysis. `run` dispatches on both trading and non-trading days.
+  dispatching analysis only when the market is confidently classified as
+  closed. If classification is unavailable, the occurrence is interrupted and
+  no analysis is dispatched. `run` dispatches without consulting the calendar.
 - `max_attempts` is bounded from 1 through 3. The default is one attempt.
 - Unknown definition or payload fields are rejected; arbitrary commands,
   prompts, credentials, and provider configuration are not persisted here.
@@ -70,6 +72,11 @@ Enable and disable are idempotent. Disabling prevents later occurrences but
 does not cancel an analysis that was already submitted to the canonical task
 queue.
 
+The database mutation is authoritative. If the immediate best-effort runtime
+reconciliation fails after a create, enable, or disable commit, the API still
+returns the committed result and logs `scheduled_task_runtime_reconcile_deferred`;
+the owner loop retries discovery on its next polling interval.
+
 ## Occurrence And Execution Semantics
 
 Each due slot is claimed by atomically advancing the definition's
@@ -77,6 +84,10 @@ Each due slot is claimed by atomically advancing the definition's
 constraint, so repeated polls cannot claim or dispatch the same occurrence.
 After downtime, the service claims at most one overdue occurrence and advances
 directly to the next future daily time; it does not replay an unbounded backlog.
+Every persisted definition is validated through the same schema-v1 contract
+before it is read, enabled, claimed, or reconciled. An unsupported future or
+corrupt due definition is atomically disabled and records one `interrupted`
+occurrence instead of being executed again on every poll.
 
 The run statuses are:
 
@@ -88,13 +99,16 @@ The run statuses are:
 | `succeeded` | The canonical analysis completed; available result references are stored. |
 | `failed` | The bounded attempts ended or a non-owned coalesced analysis failed. |
 | `skipped` | The selected market was closed and policy was `skip`. |
-| `interrupted` | Execution identity was lost across the process boundary; no blind redispatch occurs. |
+| `interrupted` | Execution identity, definition validity, or required calendar classification was unavailable; no blind dispatch occurs. |
 
 Analysis submission reuses the canonical task queue's stock deduplication. If
-the same stock is already running, the occurrence observes that task instead of
-creating duplicate analysis and notification side effects. Only a task ID
-created by the occurrence can be retried. A retry receives a new canonical task
-ID and is included in the same scheduled run record.
+an active task has exactly the same canonical `stock_code`, `report_type`, and
+`notify` contract, the occurrence observes it instead of creating duplicate
+analysis and notification side effects. Any mismatch is terminal for the
+scheduled occurrence and is never treated as scheduled success. Only a task ID
+created by the occurrence can be retried. Each retry receives a new canonical
+task ID; `execution_task_ids` is append-only audit history, with the last ID
+representing the execution currently being observed.
 
 The execution authority is process-local, as documented in
 [`task-execution-contract.md`](task-execution-contract.md). The durable
@@ -106,31 +120,39 @@ requires a separate architecture decision and is out of scope.
 
 ## Trading Calendar Behavior
 
-The scheduler calls the existing `src.core.trading_calendar.is_market_open`
-boundary for the occurrence's local date. That boundary intentionally fails
-open when `exchange-calendars` is unavailable or cannot classify the date, so a
-`skip` definition runs in that degradation case rather than being silently
-dropped. The locked application requirements include `exchange-calendars`; an
-operator who requires strict holiday skipping should treat calendar import or
-range warnings as an environment fault.
+For `skip`, the scheduler calls the strict
+`src.core.trading_calendar.classify_market_session` boundary for the
+occurrence's local date. `OPEN` dispatches, `CLOSED` records `skipped`, and
+`UNKNOWN` records `interrupted` with
+`scheduled_task_calendar_unavailable`; financial work is never dispatched when
+classification is unavailable. The legacy `is_market_open` helper remains
+fail-open for its existing callers, so this stricter behavior is isolated to
+persisted scheduled tasks.
 
 ## Runtime Ownership
 
 No new scheduler loop is introduced:
 
-- Direct `uvicorn server:app` and Web/API/Desktop runtimes attach one
-  `scheduled_tasks` background callback to `RuntimeSchedulerService`. Persisted
-  tasks can keep that shared loop active while legacy `SCHEDULE_ENABLED` remains
-  false; the existing system scheduler status still reports the legacy setting.
+- Direct `uvicorn server:app` and normal `python main.py --serve` runtimes own
+  one `scheduled_tasks` background callback in `RuntimeSchedulerService`. The
+  owner loop starts without querying scheduled-task persistence and retries
+  transient database discovery failures on later polling intervals. It remains
+  available while legacy `SCHEDULE_ENABLED` is false; the existing system
+  scheduler status still reports only the legacy setting.
 - `python main.py --schedule` and the Docker image's default analyzer command
   attach the same callback to the existing standalone `Scheduler`.
 - `python main.py --serve --schedule` keeps the existing API-owned schedule
   handoff and therefore has one owner.
-- `python main.py --serve-only` deliberately suppresses schedule ownership. In
-  the provided Docker Compose topology, the `analyzer` service executes
-  persisted tasks and the `server` service provides CRUD/status APIs. Starting
-  only `server` stores definitions but does not execute them; start `analyzer`
-  for scheduled execution.
+- Generic `python main.py --serve-only` is a persisted-task non-owner. In the
+  provided Docker Compose topology, the `analyzer` service executes persisted
+  tasks and the `server` service provides CRUD/status APIs. Starting only
+  `server` stores definitions but does not execute them; start `analyzer` for
+  scheduled execution.
+- Desktop starts the same `--serve-only` entrypoint with
+  `DSA_DESKTOP_MODE=true`; that backend owns persisted tasks while continuing
+  to suppress the legacy environment-driven daily job. The internal
+  `DSA_SCHEDULED_TASK_OWNER` handoff keeps these deployment roles explicit; it
+  is not a second operator-facing scheduling switch.
 
 Do not run multiple analyzer processes against the same task database. SQLite
 claiming prevents duplicate due-slot rows, but canonical execution state and

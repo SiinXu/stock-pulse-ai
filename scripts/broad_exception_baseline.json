@@ -343,7 +343,6 @@
     {"path":"src/core/trading_calendar.py","scope":"<module>.get_effective_trading_date","caught":["Exception"],"digest":"d02a26da3942cd15ef056653df5be364c9cb472eceb37ecf8d6a60c61ff6195b"},
     {"path":"src/core/trading_calendar.py","scope":"<module>.get_open_markets_today","caught":["Exception"],"digest":"2d19bd4a94f29ec14a620889eb7cc0727094fc2843ff833620d7b30092053d62"},
     {"path":"src/core/trading_calendar.py","scope":"<module>.infer_market_phase","caught":["Exception"],"digest":"3b1ee646c9a63f726b0a2640a3679b0191fcafd34b78fb05957fa6d025447b09"},
-    {"path":"src/core/trading_calendar.py","scope":"<module>.is_market_open","caught":["Exception"],"digest":"3781852da809ee5d0362d6f9b924025f98c07ea84458cd475a956625947f8b87"},
     {"path":"src/feishu_doc.py","scope":"<module>.FeishuDocManager.create_daily_doc","caught":["Exception"],"digest":"6b2bb73c4ad25517f3a088a9852c80efe63ed7ecd0c051b91630e93f5dc1b98c"},
     {"path":"src/llm/local_cli_backend.py","scope":"<module>.LocalCliGenerationBackend._emit_progress","caught":["Exception"],"digest":"10c2d859a9bced633d7c915fb43eb13bb34b434f3096b7b8d57652c9b97f009b"},
     {"path":"src/llm/local_cli_backend.py","scope":"<module>.LocalCliGenerationBackend._terminate_process_group","caught":["Exception"],"digest":"661142105a7e02da33ec9a495111207832787a8bf972d465d9781e7f4cbbde31"},

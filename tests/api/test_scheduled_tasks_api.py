@@ -13,15 +13,18 @@ from api.v1.endpoints import scheduled_tasks
 from src.config import Config
 from src.repositories.scheduled_task_repo import ScheduledTaskRepository
 from src.services.scheduled_task_service import ScheduledTaskService
-from src.storage import DatabaseManager
+from src.storage import DatabaseManager, ScheduledTaskRecord
 
 
 class FakeRuntimeScheduler:
     def __init__(self) -> None:
         self.reconcile_calls = 0
+        self.error = None
 
     def reconcile_scheduled_tasks(self) -> None:
         self.reconcile_calls += 1
+        if self.error is not None:
+            raise self.error
 
 
 @pytest.fixture
@@ -42,7 +45,7 @@ def client(tmp_path):
     app.state.runtime_scheduler_service = runtime_scheduler
     try:
         with TestClient(app) as test_client:
-            yield test_client, runtime_scheduler
+            yield test_client, runtime_scheduler, service
     finally:
         DatabaseManager.reset_instance()
         Config.reset_instance()
@@ -71,7 +74,7 @@ def create_payload():
 
 
 def test_create_list_status_toggle_and_run_history(client) -> None:
-    test_client, runtime_scheduler = client
+    test_client, runtime_scheduler, _service = client
 
     created_response = test_client.post(
         "/api/v1/scheduled-tasks",
@@ -113,7 +116,7 @@ def test_create_list_status_toggle_and_run_history(client) -> None:
 
 
 def test_invalid_iana_timezone_is_rejected_without_creating_task(client) -> None:
-    test_client, runtime_scheduler = client
+    test_client, runtime_scheduler, _service = client
     payload = create_payload()
     payload["schedule"]["timezone"] = "Mars/Olympus"
 
@@ -123,6 +126,42 @@ def test_invalid_iana_timezone_is_rejected_without_creating_task(client) -> None
     assert response.json()["detail"]["error"] == "scheduled_task_validation_error"
     assert test_client.get("/api/v1/scheduled-tasks").json()["total"] == 0
     assert runtime_scheduler.reconcile_calls == 0
+
+
+def test_committed_create_remains_successful_when_runtime_reconcile_is_deferred(
+    client,
+) -> None:
+    test_client, runtime_scheduler, _service = client
+    runtime_scheduler.error = RuntimeError("scheduler thread unavailable")
+
+    response = test_client.post(
+        "/api/v1/scheduled-tasks",
+        json=create_payload(),
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["enabled"] is True
+    assert runtime_scheduler.reconcile_calls == 1
+    listed = test_client.get("/api/v1/scheduled-tasks").json()
+    assert listed["total"] == 1
+    assert listed["items"][0]["id"] == response.json()["id"]
+
+
+def test_persisted_contract_error_is_not_mapped_to_client_validation(client) -> None:
+    test_client, _runtime_scheduler, service = client
+    created = test_client.post(
+        "/api/v1/scheduled-tasks",
+        json=create_payload(),
+    ).json()
+    with service.repository.db.get_session() as session:
+        row = session.get(ScheduledTaskRecord, created["id"])
+        row.schema_version = 2
+        session.commit()
+
+    response = test_client.get("/api/v1/scheduled-tasks")
+
+    assert response.status_code == 500
+    assert response.json()["detail"]["error"] == "scheduled_task_contract_error"
 
 
 def test_static_openapi_contains_exact_scheduled_task_contract() -> None:

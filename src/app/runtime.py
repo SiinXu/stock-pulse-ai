@@ -343,6 +343,7 @@ def _coordinate_service_runtime(
             RUNTIME_SCHEDULER_FORCE_ENABLED_ENV,
             RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV,
             RUNTIME_SCHEDULER_SUPPRESS_START_ENV,
+            SCHEDULED_TASK_OWNER_ENV,
         )
 
         # The API runtime scheduler owns schedules once the Web/API service starts.
@@ -351,8 +352,18 @@ def _coordinate_service_runtime(
         os.environ.pop(CLI_SCHEDULER_OWNER_ENV, None)
         if args.serve_only:
             os.environ[RUNTIME_SCHEDULER_SUPPRESS_START_ENV] = "true"
+            desktop_mode = os.getenv("DSA_DESKTOP_MODE", "").strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
+            os.environ[SCHEDULED_TASK_OWNER_ENV] = (
+                "true" if desktop_mode else "false"
+            )
         else:
             os.environ.pop(RUNTIME_SCHEDULER_SUPPRESS_START_ENV, None)
+            os.environ[SCHEDULED_TASK_OWNER_ENV] = "true"
         runtime_schedule_requested = not args.serve_only and (
             args.schedule or config.schedule_enabled
         )

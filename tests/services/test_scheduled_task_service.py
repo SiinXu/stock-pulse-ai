@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import Future
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
@@ -9,13 +10,23 @@ import pytest
 from sqlalchemy import inspect, select
 
 from src.config import Config
+from src.core.trading_calendar import MarketSessionStatus
 from src.migrations.registry import SCHEDULED_TASK_SCHEMA_MIGRATION, TARGET_VERSION
 from src.repositories.scheduled_task_repo import ScheduledTaskRepository
 from src.services.scheduled_task_service import (
+    ScheduledTaskContractError,
     ScheduledTaskService,
     ScheduledTaskValidationError,
 )
-from src.storage import DatabaseManager, DatabaseSchemaMigration
+from src.services.task_queue import (
+    AnalysisTaskCoalescingContract,
+    AnalysisTaskQueue,
+)
+from src.storage import (
+    DatabaseManager,
+    DatabaseSchemaMigration,
+    ScheduledTaskRecord,
+)
 from src.task_execution import TaskNotFoundError, TaskSnapshot, TaskStatus
 
 
@@ -78,9 +89,15 @@ class MissingRetrySourceQueue(FakeTaskQueue):
 
 
 class CoalescingTaskQueue(FakeTaskQueue):
-    def __init__(self, *, existing_status: TaskStatus) -> None:
+    def __init__(
+        self,
+        *,
+        existing_status: TaskStatus,
+        existing_contract: AnalysisTaskCoalescingContract,
+    ) -> None:
         super().__init__()
         self.existing_task_id = "existing-execution"
+        self.existing_contract = existing_contract
         self.snapshots[self.existing_task_id] = self._snapshot(
             self.existing_task_id,
             existing_status,
@@ -88,7 +105,18 @@ class CoalescingTaskQueue(FakeTaskQueue):
 
     def submit_tasks_batch(self, **kwargs):
         self.submit_calls.append(kwargs)
-        return [], [SimpleNamespace(existing_task_id=self.existing_task_id)]
+        return [], [SimpleNamespace(
+            existing_task_id=self.existing_task_id,
+            existing_contract=self.existing_contract,
+        )]
+
+
+class DeferredExecutor:
+    def submit(self, *_args, **_kwargs):
+        return Future()
+
+    def shutdown(self, *_args, **_kwargs):
+        return None
 
 
 @pytest.fixture
@@ -101,6 +129,19 @@ def database(tmp_path):
     finally:
         DatabaseManager.reset_instance()
         Config.reset_instance()
+
+
+@pytest.fixture
+def real_task_queue():
+    original = AnalysisTaskQueue._instance
+    AnalysisTaskQueue._instance = None
+    queue = AnalysisTaskQueue(max_workers=1)
+    queue._executor = DeferredExecutor()
+    try:
+        yield queue
+    finally:
+        queue.shutdown()
+        AnalysisTaskQueue._instance = original
 
 
 def task_contract(
@@ -130,12 +171,21 @@ def task_contract(
     }
 
 
-def build_service(database, queue=None, *, market_open=True):
+def build_service(
+    database,
+    queue=None,
+    *,
+    market_status=MarketSessionStatus.OPEN,
+    market_session_provider=None,
+):
     return ScheduledTaskService(
         repository=ScheduledTaskRepository(database),
         task_queue=queue or FakeTaskQueue(),
         clock=lambda: NOW,
-        market_open_provider=lambda _market, _date: market_open,
+        market_session_provider=(
+            market_session_provider
+            or (lambda _market, _date: market_status)
+        ),
     )
 
 
@@ -213,7 +263,11 @@ def test_due_occurrence_dispatches_once_and_persists_success(database) -> None:
 
 def test_non_trading_day_skip_records_run_without_side_effect(database) -> None:
     queue = FakeTaskQueue()
-    service = build_service(database, queue, market_open=False)
+    service = build_service(
+        database,
+        queue,
+        market_status=MarketSessionStatus.CLOSED,
+    )
     task = service.create_task(task_contract(policy="skip"), now=NOW)
 
     result = service.tick(now=DUE)
@@ -228,7 +282,11 @@ def test_non_trading_day_skip_records_run_without_side_effect(database) -> None:
 
 def test_non_trading_day_run_policy_dispatches(database) -> None:
     queue = FakeTaskQueue()
-    service = build_service(database, queue, market_open=False)
+    service = build_service(
+        database,
+        queue,
+        market_status=MarketSessionStatus.CLOSED,
+    )
     service.create_task(task_contract(policy="run"), now=NOW)
 
     result = service.tick(now=DUE)
@@ -237,8 +295,43 @@ def test_non_trading_day_run_policy_dispatches(database) -> None:
     assert len(queue.submit_calls) == 1
 
 
+@pytest.mark.parametrize(
+    "market_session_provider",
+    [
+        lambda _market, _date: MarketSessionStatus.UNKNOWN,
+        lambda _market, _date: (_ for _ in ()).throw(RuntimeError("calendar down")),
+    ],
+)
+def test_unknown_calendar_never_dispatches_financial_work(
+    database,
+    market_session_provider,
+) -> None:
+    queue = FakeTaskQueue()
+    service = build_service(
+        database,
+        queue,
+        market_session_provider=market_session_provider,
+    )
+    task = service.create_task(task_contract(policy="skip"), now=NOW)
+
+    result = service.tick(now=DUE)
+
+    assert result == {"reconciled": 0, "claimed": 0, "skipped": 1}
+    assert queue.submit_calls == []
+    run = service.list_runs(task["id"])["items"][0]
+    assert run["status"] == "interrupted"
+    assert run["error_code"] == "scheduled_task_calendar_unavailable"
+
+
 def test_due_occurrence_coalesces_with_existing_canonical_analysis(database) -> None:
-    queue = CoalescingTaskQueue(existing_status=TaskStatus.PENDING)
+    queue = CoalescingTaskQueue(
+        existing_status=TaskStatus.PENDING,
+        existing_contract=AnalysisTaskCoalescingContract(
+            stock_code="600519",
+            report_type="detailed",
+            notify=False,
+        ),
+    )
     service = build_service(database, queue)
     task = service.create_task(task_contract(max_attempts=3), now=NOW)
 
@@ -256,6 +349,183 @@ def test_due_occurrence_coalesces_with_existing_canonical_analysis(database) -> 
     assert failed["status"] == "failed"
     assert failed["error_code"] == "scheduled_task_coalesced_execution_failed"
     assert queue.retry_calls == []
+
+
+@pytest.mark.parametrize(
+    ("report_type", "notify"),
+    [("brief", False), ("detailed", True)],
+)
+def test_real_queue_rejects_mismatched_coalescing_contract(
+    database,
+    real_task_queue,
+    report_type,
+    notify,
+) -> None:
+    accepted, duplicates = real_task_queue.submit_tasks_batch(
+        ["600519"],
+        report_type=report_type,
+        notify=notify,
+    )
+    assert len(accepted) == 1
+    assert duplicates == []
+    service = build_service(database, real_task_queue)
+    task = service.create_task(task_contract(max_attempts=3), now=NOW)
+
+    service.tick(now=DUE)
+
+    failed = service.get_status(task["id"])["latest_run"]
+    assert failed["status"] == "failed"
+    assert failed["attempt_count"] == 1
+    assert failed["execution_task_ids"] == []
+    assert failed["error_code"] == "scheduled_task_coalesced_contract_mismatch"
+
+
+def test_real_queue_accepts_exact_coalescing_contract_without_owning_retry(
+    database,
+    real_task_queue,
+) -> None:
+    accepted, duplicates = real_task_queue.submit_tasks_batch(
+        ["600519"],
+        report_type="detailed",
+        notify=False,
+    )
+    assert duplicates == []
+    existing_task_id = accepted[0].task_id
+    service = build_service(database, real_task_queue)
+    task = service.create_task(task_contract(max_attempts=3), now=NOW)
+
+    service.tick(now=DUE)
+    running = service.get_status(task["id"])["latest_run"]
+    assert running["execution_task_ids"] == [existing_task_id]
+
+    with real_task_queue._data_lock:
+        existing = real_task_queue._tasks[existing_task_id]
+        existing.status = TaskStatus.COMPLETED
+        existing.result_ref = "matched-result"
+    service.tick(now=DUE + timedelta(seconds=1))
+
+    succeeded = service.get_status(task["id"])["latest_run"]
+    assert succeeded["status"] == "succeeded"
+    assert succeeded["result_refs"] == ["matched-result"]
+
+
+def test_service_defers_repository_initialization_until_first_use() -> None:
+    calls = []
+    repository = SimpleNamespace(has_enabled_tasks=lambda: False)
+    service = ScheduledTaskService(
+        repository_factory=lambda: calls.append("created") or repository,
+    )
+
+    assert calls == []
+    assert service.has_enabled_tasks() is False
+    assert calls == ["created"]
+
+
+def test_tick_retries_repository_discovery_after_transient_failure() -> None:
+    class FlakyRepository:
+        def __init__(self):
+            self.calls = 0
+
+        def list_active_runs(self):
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError("database unavailable")
+            return []
+
+        def list_due_tasks(self, *, now):
+            return []
+
+    repository = FlakyRepository()
+    service = ScheduledTaskService(repository=repository, clock=lambda: NOW)
+
+    assert service.tick(now=NOW) == {"reconciled": 0, "claimed": 0, "skipped": 0}
+    assert service.tick(now=NOW) == {"reconciled": 0, "claimed": 0, "skipped": 0}
+    assert repository.calls == 2
+
+
+def test_future_persisted_schema_fails_list_and_status_closed(database) -> None:
+    service = build_service(database)
+    task = service.create_task(task_contract(), now=NOW)
+    with database.get_session() as session:
+        row = session.get(ScheduledTaskRecord, task["id"])
+        row.schema_version = 2
+        session.commit()
+
+    with pytest.raises(ScheduledTaskContractError):
+        service.list_tasks()
+    with pytest.raises(ScheduledTaskContractError):
+        service.get_status(task["id"])
+
+
+@pytest.mark.parametrize(
+    ("field_name", "value"),
+    [
+        ("schema_version", 2),
+        ("task_type", "research"),
+        ("schedule_kind", "weekly"),
+        ("non_trading_day_policy", "unknown"),
+        (
+            "payload_json",
+            '{"notify":false,"report_type":"future","stock_code":"600519"}',
+        ),
+    ],
+)
+def test_tick_quarantines_incompatible_definition_once(
+    database,
+    field_name,
+    value,
+) -> None:
+    queue = FakeTaskQueue()
+    service = build_service(database, queue)
+    task = service.create_task(task_contract(), now=NOW)
+    with database.get_session() as session:
+        row = session.get(ScheduledTaskRecord, task["id"])
+        setattr(row, field_name, value)
+        session.commit()
+
+    first = service.tick(now=DUE)
+    second = service.tick(now=DUE + timedelta(seconds=1))
+
+    assert first == {"reconciled": 0, "claimed": 0, "skipped": 1}
+    assert second == {"reconciled": 0, "claimed": 0, "skipped": 0}
+    assert queue.submit_calls == []
+    with database.get_session() as session:
+        persisted = session.get(ScheduledTaskRecord, task["id"])
+        assert persisted.enabled is False
+        assert persisted.next_run_at is None
+    runs = service.list_runs(task["id"])
+    assert runs["total"] == 1
+    assert runs["items"][0]["status"] == "interrupted"
+    assert runs["items"][0]["error_code"] == "scheduled_task_definition_invalid"
+
+
+def test_tick_quarantines_incompatible_definition_with_active_run(database) -> None:
+    queue = FakeTaskQueue()
+    service = build_service(database, queue)
+    task = service.create_task(task_contract(max_attempts=3), now=NOW)
+    service.tick(now=DUE)
+    running = service.get_status(task["id"])["latest_run"]
+    assert running["status"] == "running"
+
+    with database.get_session() as session:
+        row = session.get(ScheduledTaskRecord, task["id"])
+        row.schema_version = 2
+        session.commit()
+
+    first = service.tick(now=DUE + timedelta(seconds=1))
+    second = service.tick(now=DUE + timedelta(seconds=2))
+
+    assert first == {"reconciled": 1, "claimed": 0, "skipped": 0}
+    assert second == {"reconciled": 0, "claimed": 0, "skipped": 0}
+    assert len(queue.submit_calls) == 1
+    with database.get_session() as session:
+        persisted = session.get(ScheduledTaskRecord, task["id"])
+        assert persisted.enabled is False
+        assert persisted.next_run_at is None
+    interrupted = service.list_runs(task["id"])["items"][0]
+    assert interrupted["status"] == "interrupted"
+    assert interrupted["execution_task_ids"] == running["execution_task_ids"]
+    assert interrupted["error_code"] == "scheduled_task_definition_invalid"
 
 
 def test_failed_execution_retries_once_then_stops_at_bound(database) -> None:
@@ -280,6 +550,30 @@ def test_failed_execution_retries_once_then_stops_at_bound(database) -> None:
     assert failed["attempt_count"] == 2
     assert failed["error_code"] == "analysis_failed"
     assert len(queue.retry_calls) == 1
+    assert failed["execution_task_ids"] == ["execution-1", "execution-2"]
+
+
+def test_execution_ids_remain_append_only_across_multiple_retries(database) -> None:
+    queue = FakeTaskQueue(
+        initial_status=TaskStatus.FAILED,
+        retry_status=TaskStatus.FAILED,
+    )
+    service = build_service(database, queue)
+    task = service.create_task(task_contract(max_attempts=3), now=NOW)
+
+    service.tick(now=DUE)
+    service.tick(now=DUE + timedelta(seconds=30))
+    service.tick(now=DUE + timedelta(seconds=60))
+
+    failed = service.get_status(task["id"])["latest_run"]
+    assert failed["status"] == "failed"
+    assert failed["attempt_count"] == 3
+    assert failed["execution_task_ids"] == [
+        "execution-1",
+        "execution-2",
+        "execution-3",
+    ]
+    assert queue.retry_calls == ["execution-1", "execution-2"]
 
 
 def test_retry_wait_is_interrupted_when_process_local_execution_is_lost(

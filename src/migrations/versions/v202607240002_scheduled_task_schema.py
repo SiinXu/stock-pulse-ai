@@ -2,9 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """Create the versioned scheduled-task definition and run-record tables."""
 
-from sqlalchemy.engine import Connection
-
-from src.migrations.types import Migration
+from src.migrations.types import Migration, MigrationExecution
 
 
 MIGRATION_ID = "202607240002_scheduled_task_schema"
@@ -72,12 +70,12 @@ _INDEX_STATEMENTS = (
 )
 
 
-def upgrade(connection: Connection) -> None:
+def upgrade(execution: MigrationExecution) -> None:
     """Create additive tables and indexes when metadata has not done so."""
     for statement in _TABLE_STATEMENTS:
-        connection.exec_driver_sql(statement)
+        execution.exec_driver_sql(statement)
     for statement in _INDEX_STATEMENTS:
-        connection.exec_driver_sql(statement)
+        execution.exec_driver_sql(statement)
 
 
 MIGRATION = Migration.from_source_file(

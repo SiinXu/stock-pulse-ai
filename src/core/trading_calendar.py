@@ -86,6 +86,14 @@ class MarketPhase(str, Enum):
     UNKNOWN = "unknown"
 
 
+class MarketSessionStatus(str, Enum):
+    """Strict trading-session classification for fail-closed consumers."""
+
+    OPEN = "open"
+    CLOSED = "closed"
+    UNKNOWN = "unknown"
+
+
 @dataclass
 class MarketPhaseContext:
     """Runtime market-phase context for stock analysis plumbing."""
@@ -149,6 +157,29 @@ def get_market_for_stock(code: str) -> Optional[str]:
     return None
 
 
+def classify_market_session(market: str, check_date: date) -> MarketSessionStatus:
+    """Classify one market date without collapsing lookup failures into open."""
+    if not _XCALS_AVAILABLE or market not in MARKET_EXCHANGE:
+        return MarketSessionStatus.UNKNOWN
+    try:
+        calendar = xcals.get_calendar(MARKET_EXCHANGE[market])
+        return (
+            MarketSessionStatus.OPEN
+            if calendar.is_session(check_date)
+            else MarketSessionStatus.CLOSED
+        )
+    except Exception as exc:  # broad-exception: fallback_recorded - Calendar lookup failures are logged and classified as unknown for strict callers.
+        log_safe_exception(
+            logger,
+            "Trading calendar session lookup failed",
+            exc,
+            error_code="trading_calendar_session_lookup_failed",
+            level=logging.WARNING,
+            context={"market": market},
+        )
+        return MarketSessionStatus.UNKNOWN
+
+
 def is_market_open(market: str, check_date: date) -> bool:
     """
     Check if the given market is open on the given date.
@@ -162,25 +193,7 @@ def is_market_open(market: str, check_date: date) -> bool:
     Returns:
         True if trading day (or fail-open), False otherwise
     """
-    if not _XCALS_AVAILABLE:
-        return True
-    ex = MARKET_EXCHANGE.get(market)
-    if not ex:
-        return True
-    try:
-        cal = xcals.get_calendar(ex)
-        session = datetime(check_date.year, check_date.month, check_date.day)
-        return cal.is_session(session)
-    except Exception as exc:
-        log_safe_exception(
-            logger,
-            "Trading calendar market-open lookup failed open",
-            exc,
-            error_code="trading_calendar_market_open_failed_open",
-            level=logging.WARNING,
-            context={"market": market},
-        )
-        return True
+    return classify_market_session(market, check_date) != MarketSessionStatus.CLOSED
 
 
 def get_market_now(

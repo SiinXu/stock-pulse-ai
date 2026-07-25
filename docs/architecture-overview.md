@@ -34,6 +34,8 @@ flowchart LR
   BOT -->|/batch| PIPE
   API[FastAPI<br/>server.py and api/] -->|async task| QUEUE[Process-local task queue<br/>src/services/task_queue.py]
   API -->|synchronous use case| SERVICES[Application services<br/>src/services/]
+  API -->|scheduled-task CRUD| SCHEDULES[(Definitions and occurrence audit<br/>scheduled_tasks and scheduled_task_runs)]
+  SCHEDULES -->|due occurrence via existing runtime scheduler| QUEUE
   QUEUE -->|execute task| SERVICES
   SERVICES -->|invoke analysis| PIPE[StockAnalysisPipeline<br/>src/core/pipeline.py]
   PIPE -->|fetch through adapters| DATA[Market providers<br/>data_provider/]
@@ -148,6 +150,23 @@ is not an external broker, durable scheduler, or multi-worker coordination
 service. See
 [ADR-004](adr/ADR-004-process-local-task-execution-authority.md) and the
 [task execution contract](task-execution-contract.md).
+
+### Persisted Scheduled Occurrences
+
+```text
+scheduled-task CRUD -> ScheduledTaskRepository
+RuntimeSchedulerService or standalone Scheduler -> ScheduledTaskService.tick()
+  -> atomic definition claim and ScheduledRun occurrence/audit projection
+  -> AnalysisTaskQueue -> AnalysisService.analyze_stock()
+```
+
+The persisted `ScheduledRun` status and execution-ID history describe one due
+occurrence; they do not own canonical task lifecycle. Exact coalescing, retry,
+and completion are observed through the process-local queue defined by ADR-004.
+Normal API and Desktop backends own one polling callback, while Docker's
+`--serve-only` server defers persisted execution to the analyzer process. See
+the [scheduled-task contract](scheduled-tasks.md) for the deployment matrix and
+strict trading-calendar behavior.
 
 ### Direct API Services
 
@@ -318,6 +337,9 @@ separately owned contract.
   injected through one object.
 - The task authority is process-local. Durable recovery or multi-worker state
   requires a new decision and implementation.
+- Scheduled-task definitions and occurrence audit are durable, but their
+  runtime callback submits through the same process-local task authority; they
+  do not establish a broker, worker lease, or distributed exactly-once model.
 - Agent production assembly is Native-only. PydanticAI is an optional Single RUN
   test/evidence POC with no config, environment, API, Web, Desktop, or Bot
   selector and no runtime fallback. See [ADR-001](architecture/ADR-001-agent-runtime.md)
@@ -334,6 +356,7 @@ separately owned contract.
 - [Foundation pipeline and product layer](foundation-product-architecture.md)
 - [ADR registry and process](adr/README.md)
 - [Task execution contract](task-execution-contract.md)
+- [Scheduled tasks](scheduled-tasks.md)
 - [Data-source stability and fallback](data-source-stability.md)
 - [Analysis Context Pack](analysis-context-pack.md)
 - [Agent stream events](agent-stream-events.md)

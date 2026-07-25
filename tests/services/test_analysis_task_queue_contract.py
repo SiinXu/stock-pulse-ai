@@ -11,6 +11,7 @@ from tests.analysis_api_contract_support import (
     restore_test_environment,
     unittest,
 )
+from src.services.task_queue import AnalysisTaskCoalescingContract
 
 
 def setUpModule() -> None:
@@ -150,6 +151,14 @@ class BatchTaskQueueContractTestCase(unittest.TestCase):
         self.assertEqual(len(duplicates_again), 1)
         self.assertEqual(duplicates_again[0].stock_code, "600519.SH")
         self.assertEqual(duplicates_again[0].existing_task_id, accepted[0].task_id)
+        self.assertEqual(
+            duplicates_again[0].existing_contract,
+            AnalysisTaskCoalescingContract(
+                stock_code="600519",
+                report_type="detailed",
+                notify=True,
+            ),
+        )
 
     def test_submit_task_rejects_blank_stock_code(self) -> None:
         queue = AnalysisTaskQueue(max_workers=1)

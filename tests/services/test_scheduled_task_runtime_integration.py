@@ -58,7 +58,7 @@ class FakeScheduledTaskService:
         self.ticks = 0
 
     def has_enabled_tasks(self):
-        return self.enabled
+        raise AssertionError("owner loop startup must not query persistence")
 
     def tick(self):
         self.ticks += 1
@@ -95,4 +95,32 @@ def test_personalized_tasks_use_existing_runtime_loop_without_legacy_daily_job()
         scheduled_tasks.enabled = False
         service.reconcile_scheduled_tasks()
 
-    assert scheduler.stopped is True
+    assert scheduler.stopped is False
+    assert len(FakeScheduler.instances) == 1
+
+
+def test_non_owner_never_starts_persisted_task_loop() -> None:
+    FakeScheduler.instances = []
+    config = SimpleNamespace(
+        schedule_enabled=False,
+        schedule_time="18:00",
+        schedule_times=["18:00"],
+    )
+    service = RuntimeSchedulerService(
+        config_provider=lambda: config,
+        owns_schedule=True,
+        scheduled_task_service=FakeScheduledTaskService(),
+        personalized_schedule_enabled=False,
+        legacy_schedule_enabled=False,
+    )
+
+    with patch(
+        "src.services.runtime_scheduler.Scheduler",
+        FakeScheduler,
+    ), patch(
+        "src.services.runtime_scheduler.threading.Thread",
+        NoopThread,
+    ):
+        service.reconcile_from_config()
+
+    assert FakeScheduler.instances == []

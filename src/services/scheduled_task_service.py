@@ -7,12 +7,13 @@ import logging
 import threading
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Mapping, Optional
+from typing import Any, Callable, Dict, Mapping, Optional
 
 from src.core.trading_calendar import (
     MARKET_EXCHANGE,
+    MarketSessionStatus,
+    classify_market_session,
     get_market_for_stock,
-    is_market_open,
 )
 from src.repositories.scheduled_task_repo import ScheduledTaskRepository
 from src.schemas.scheduled_task import (
@@ -29,8 +30,9 @@ from src.schemas.scheduled_task import (
     validate_daily_time,
     validate_timezone,
 )
-from src.task_execution import TaskNotFoundError, TaskStatus
+from src.services.task_queue import AnalysisTaskCoalescingContract
 from src.services.stock_code_utils import resolve_index_stock_code_for_analysis
+from src.task_execution import TaskNotFoundError, TaskStatus
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -88,15 +90,30 @@ class ScheduledTaskService:
         self,
         *,
         repository: Optional[ScheduledTaskRepository] = None,
+        repository_factory: Callable[[], ScheduledTaskRepository] = ScheduledTaskRepository,
         task_queue: Any = None,
         clock=_utc_now,
-        market_open_provider=is_market_open,
+        market_session_provider=classify_market_session,
     ) -> None:
-        self.repository = repository or ScheduledTaskRepository()
+        self._repository = repository
+        self._repository_factory = repository_factory
+        self._repository_lock = threading.Lock()
         self._task_queue = task_queue
         self._clock = clock
-        self._market_open_provider = market_open_provider
+        self._market_session_provider = market_session_provider
         self._tick_lock = threading.Lock()
+
+    @property
+    def repository(self) -> ScheduledTaskRepository:
+        """Initialize persistence only when a request or background tick needs it."""
+        repository = self._repository
+        if repository is None:
+            with self._repository_lock:
+                repository = self._repository
+                if repository is None:
+                    repository = self._repository_factory()
+                    self._repository = repository
+        return repository
 
     def _queue(self):
         if self._task_queue is not None:
@@ -128,22 +145,77 @@ class ScheduledTaskService:
         return payload
 
     @classmethod
-    def _task_item(cls, row) -> Dict[str, Any]:
-        return {
-            "id": row.id,
+    def _validate_persisted_task(cls, row) -> Dict[str, Any]:
+        payload = cls._decode_payload(row.payload_json)
+        try:
+            normalized = cls._normalize_contract({
+                "schema_version": row.schema_version,
+                "name": row.name,
+                "task_type": row.task_type,
+                "schedule": {
+                    "kind": row.schedule_kind,
+                    "time": row.schedule_time,
+                    "timezone": row.timezone,
+                    "calendar_market": row.calendar_market,
+                    "non_trading_day_policy": row.non_trading_day_policy,
+                },
+                "payload": payload,
+                "enabled": bool(row.enabled),
+                "max_attempts": row.max_attempts,
+            })
+        except ScheduledTaskValidationError as exc:
+            raise ScheduledTaskContractError(
+                "Persisted scheduled task contract is unsupported or corrupt"
+            ) from exc
+
+        expected_values = {
             "schema_version": row.schema_version,
             "name": row.name,
             "task_type": row.task_type,
-            "schedule": {
-                "kind": row.schedule_kind,
-                "time": row.schedule_time,
-                "timezone": row.timezone,
-                "calendar_market": row.calendar_market,
-                "non_trading_day_policy": row.non_trading_day_policy,
-            },
-            "payload": cls._decode_payload(row.payload_json),
+            "schedule_kind": row.schedule_kind,
+            "schedule_time": row.schedule_time,
+            "timezone": row.timezone,
+            "calendar_market": row.calendar_market,
+            "non_trading_day_policy": row.non_trading_day_policy,
+            "payload": payload,
             "enabled": bool(row.enabled),
             "max_attempts": row.max_attempts,
+        }
+        if any(normalized[key] != value for key, value in expected_values.items()):
+            raise ScheduledTaskContractError(
+                "Persisted scheduled task contract is not canonical"
+            )
+        task_id = str(row.id or "")
+        if not task_id or len(task_id) > 32:
+            raise ScheduledTaskContractError("Persisted scheduled task id is invalid")
+        if row.created_at is None or row.updated_at is None:
+            raise ScheduledTaskContractError(
+                "Persisted scheduled task timestamps are incomplete"
+            )
+        if bool(row.enabled) != (row.next_run_at is not None):
+            raise ScheduledTaskContractError(
+                "Persisted scheduled task enablement is inconsistent"
+            )
+        return normalized
+
+    @classmethod
+    def _task_item(cls, row) -> Dict[str, Any]:
+        contract = cls._validate_persisted_task(row)
+        return {
+            "id": row.id,
+            "schema_version": contract["schema_version"],
+            "name": contract["name"],
+            "task_type": contract["task_type"],
+            "schedule": {
+                "kind": contract["schedule_kind"],
+                "time": contract["schedule_time"],
+                "timezone": contract["timezone"],
+                "calendar_market": contract["calendar_market"],
+                "non_trading_day_policy": contract["non_trading_day_policy"],
+            },
+            "payload": contract["payload"],
+            "enabled": contract["enabled"],
+            "max_attempts": contract["max_attempts"],
             "next_run_at": cls._aware_or_none(row.next_run_at),
             "created_at": cls._aware_or_none(row.created_at),
             "updated_at": cls._aware_or_none(row.updated_at),
@@ -151,16 +223,36 @@ class ScheduledTaskService:
 
     @classmethod
     def _run_item(cls, row) -> Dict[str, Any]:
+        try:
+            status = ScheduledRunStatus(row.status)
+        except ValueError as exc:
+            raise ScheduledTaskContractError(
+                "Persisted scheduled task run status is invalid"
+            ) from exc
+        execution_task_ids = _json_list(
+            row.execution_task_ids_json,
+            field_name="execution_task_ids",
+        )
+        owned_execution_task_ids = _json_list(
+            row.owned_execution_task_ids_json,
+            field_name="owned_execution_task_ids",
+        )
+        if not set(owned_execution_task_ids).issubset(execution_task_ids):
+            raise ScheduledTaskContractError(
+                "Persisted scheduled task run ownership is invalid"
+            )
+        attempt_count = int(row.attempt_count)
+        if not 0 <= attempt_count <= _MAX_ATTEMPTS:
+            raise ScheduledTaskContractError(
+                "Persisted scheduled task run attempt count is invalid"
+            )
         return {
             "id": row.id,
             "task_id": row.task_id,
             "scheduled_for": cls._aware_or_none(row.scheduled_for),
-            "status": row.status,
-            "attempt_count": row.attempt_count,
-            "execution_task_ids": _json_list(
-                row.execution_task_ids_json,
-                field_name="execution_task_ids",
-            ),
+            "status": status.value,
+            "attempt_count": attempt_count,
+            "execution_task_ids": execution_task_ids,
             "result_refs": _json_list(
                 row.result_refs_json,
                 field_name="result_refs",
@@ -378,14 +470,15 @@ class ScheduledTaskService:
         existing = self.repository.get_task(task_id)
         if existing is None:
             raise ScheduledTaskNotFoundError(task_id)
+        contract = self._validate_persisted_task(existing)
         if bool(existing.enabled) is bool(enabled):
             return self._task_item(existing)
         now_value = self._now(now or self._clock())
         next_run = None
         if enabled:
             next_run = next_daily_run_at(
-                schedule_time=existing.schedule_time,
-                timezone_name=existing.timezone,
+                schedule_time=contract["schedule_time"],
+                timezone_name=contract["timezone"],
                 after=now_value,
             )
         row = self.repository.set_enabled(
@@ -412,6 +505,8 @@ class ScheduledTaskService:
 
     def next_run_at(self) -> Optional[datetime]:
         rows = self.repository.list_tasks(enabled=True, limit=500)
+        for row in rows:
+            self._validate_persisted_task(row)
         values = [row.next_run_at for row in rows if row.next_run_at is not None]
         return self._aware_or_none(min(values)) if values else None
 
@@ -421,15 +516,50 @@ class ScheduledTaskService:
             return {"reconciled": 0, "claimed": 0, "skipped": 0}
         try:
             now_value = self._now(now or self._clock())
-            reconciled = self._reconcile_active_runs(now_value)
+            try:
+                reconciled = self._reconcile_active_runs(now_value)
+            except Exception as exc:  # broad-exception: fallback_recorded - the owned polling loop retries database discovery next interval.
+                log_safe_exception(
+                    logger,
+                    "Scheduled task discovery failed; polling will retry",
+                    exc,
+                    error_code="scheduled_task_discovery_failed",
+                )
+                return {"reconciled": 0, "claimed": 0, "skipped": 0}
             claimed = 0
             skipped = 0
-            for task in self.repository.list_due_tasks(now=now_value):
+            try:
+                due_tasks = self.repository.list_due_tasks(now=now_value)
+            except Exception as exc:  # broad-exception: fallback_recorded - the owned polling loop retries due lookup next interval.
+                log_safe_exception(
+                    logger,
+                    "Scheduled task due lookup failed; polling will retry",
+                    exc,
+                    error_code="scheduled_task_due_lookup_failed",
+                )
+                return {
+                    "reconciled": reconciled,
+                    "claimed": 0,
+                    "skipped": 0,
+                }
+            for task in due_tasks:
                 try:
                     result = self._claim_and_dispatch(task, now_value)
                     if result == "claimed":
                         claimed += 1
                     elif result == "skipped":
+                        skipped += 1
+                except ScheduledTaskContractError as exc:
+                    quarantined = self._quarantine_due_task(task, now_value)
+                    log_safe_exception(
+                        logger,
+                        "Scheduled task definition quarantined",
+                        exc,
+                        error_code="scheduled_task_definition_quarantined",
+                        context={"task_id": task.id},
+                        level=logging.WARNING,
+                    )
+                    if quarantined:
                         skipped += 1
                 except Exception as exc:  # broad-exception: fallback_recorded - isolate one persisted definition and log a stable task id.
                     log_safe_exception(
@@ -460,7 +590,31 @@ class ScheduledTaskService:
                         error_code="scheduled_task_definition_missing",
                     )
                 else:
-                    self._reconcile_run(run, task, now)
+                    try:
+                        self._validate_persisted_task(task)
+                    except ScheduledTaskContractError as exc:
+                        self.repository.set_enabled(
+                            task.id,
+                            enabled=False,
+                            next_run_at=None,
+                            updated_at=now,
+                        )
+                        self._finish_run(
+                            run.id,
+                            status=ScheduledRunStatus.INTERRUPTED,
+                            now=now,
+                            error_code="scheduled_task_definition_invalid",
+                        )
+                        log_safe_exception(
+                            logger,
+                            "Scheduled task definition disabled during reconciliation",
+                            exc,
+                            error_code="scheduled_task_definition_quarantined",
+                            context={"task_id": task.id, "run_id": run.id},
+                            level=logging.WARNING,
+                        )
+                    else:
+                        self._reconcile_run(run, task, now)
                 reconciled += 1
             except Exception as exc:  # broad-exception: fallback_recorded - one corrupt run must not block other due tasks.
                 log_safe_exception(
@@ -472,29 +626,78 @@ class ScheduledTaskService:
                 )
         return reconciled
 
+    def _quarantine_due_task(self, task, now: datetime) -> bool:
+        scheduled_for = task.next_run_at
+        if scheduled_for is None:
+            return False
+        run = self.repository.quarantine_due_task(
+            task_id=task.id,
+            expected_next_run_at=scheduled_for,
+            run_fields={
+                "id": uuid.uuid4().hex,
+                "task_id": task.id,
+                "scheduled_for": scheduled_for,
+                "status": ScheduledRunStatus.INTERRUPTED.value,
+                "attempt_count": 0,
+                "execution_task_ids_json": "[]",
+                "owned_execution_task_ids_json": "[]",
+                "result_refs_json": "[]",
+                "error_code": "scheduled_task_definition_invalid",
+                "next_attempt_at": None,
+                "started_at": None,
+                "finished_at": now,
+                "created_at": now,
+                "updated_at": now,
+            },
+            updated_at=now,
+        )
+        return run is not None
+
+    def _classify_market_session(self, market: str, local_date) -> MarketSessionStatus:
+        try:
+            return MarketSessionStatus(
+                self._market_session_provider(market, local_date)
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - scheduled financial work fails closed when classification is unavailable.
+            log_safe_exception(
+                logger,
+                "Scheduled task calendar classification failed closed",
+                exc,
+                error_code="scheduled_task_calendar_lookup_failed",
+                context={"market": market},
+                level=logging.WARNING,
+            )
+            return MarketSessionStatus.UNKNOWN
+
     def _claim_and_dispatch(self, task, now: datetime) -> Optional[str]:
+        contract = self._validate_persisted_task(task)
         scheduled_for = task.next_run_at
         if scheduled_for is None:
             return None
         next_run = next_daily_run_at(
-            schedule_time=task.schedule_time,
-            timezone_name=task.timezone,
+            schedule_time=contract["schedule_time"],
+            timezone_name=contract["timezone"],
             after=max(now, scheduled_for),
         )
         local_date = scheduled_local_date(
             scheduled_for,
-            timezone_name=task.timezone,
+            timezone_name=contract["timezone"],
         )
-        should_skip = (
-            task.non_trading_day_policy == NonTradingDayPolicy.SKIP.value
-            and not self._market_open_provider(task.calendar_market, local_date)
-        )
+        terminal_status = None
+        terminal_error = None
+        if contract["non_trading_day_policy"] == NonTradingDayPolicy.SKIP.value:
+            session_status = self._classify_market_session(
+                contract["calendar_market"],
+                local_date,
+            )
+            if session_status == MarketSessionStatus.CLOSED:
+                terminal_status = ScheduledRunStatus.SKIPPED
+                terminal_error = "non_trading_day"
+            elif session_status == MarketSessionStatus.UNKNOWN:
+                terminal_status = ScheduledRunStatus.INTERRUPTED
+                terminal_error = "scheduled_task_calendar_unavailable"
         run_id = uuid.uuid4().hex
-        run_status = (
-            ScheduledRunStatus.SKIPPED
-            if should_skip
-            else ScheduledRunStatus.DISPATCHING
-        )
+        run_status = terminal_status or ScheduledRunStatus.DISPATCHING
         run = self.repository.claim_due_occurrence(
             task_id=task.id,
             expected_next_run_at=scheduled_for,
@@ -508,10 +711,10 @@ class ScheduledTaskService:
                 "execution_task_ids_json": "[]",
                 "owned_execution_task_ids_json": "[]",
                 "result_refs_json": "[]",
-                "error_code": "non_trading_day" if should_skip else None,
+                "error_code": terminal_error,
                 "next_attempt_at": None,
-                "started_at": None if should_skip else now,
-                "finished_at": now if should_skip else None,
+                "started_at": None if terminal_status is not None else now,
+                "finished_at": now if terminal_status is not None else None,
                 "created_at": now,
                 "updated_at": now,
             },
@@ -519,36 +722,71 @@ class ScheduledTaskService:
         )
         if run is None:
             return None
-        if should_skip:
+        if terminal_status is not None:
             return "skipped"
-        self._dispatch_run(run, task, now)
+        self._dispatch_run(run, task, now, contract=contract)
         return "claimed"
 
-    def _dispatch_run(self, run, task, now: datetime) -> None:
+    def _dispatch_run(
+        self,
+        run,
+        task,
+        now: datetime,
+        *,
+        contract: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        contract = contract or self._validate_persisted_task(task)
         attempt_count = int(run.attempt_count) + 1
-        execution_ids: list[str] = []
+        execution_history = _json_list(
+            run.execution_task_ids_json,
+            field_name="execution_task_ids",
+        )
+        owned_history = _json_list(
+            run.owned_execution_task_ids_json,
+            field_name="owned_execution_task_ids",
+        )
+        dispatched_ids: list[str] = []
         try:
-            payload = self._decode_payload(task.payload_json)
+            payload = contract["payload"]
             accepted, duplicates = self._queue().submit_tasks_batch(
                 stock_codes=[str(payload["stock_code"])],
                 query_source="scheduled_task",
                 report_type=str(payload.get("report_type") or "detailed"),
                 notify=bool(payload.get("notify", True)),
             )
-            owned_ids = [accepted_task.task_id for accepted_task in accepted]
-            coalesced_ids = [error.existing_task_id for error in duplicates]
-            execution_ids = owned_ids + coalesced_ids
-            if len(execution_ids) != 1:
+            if len(accepted) + len(duplicates) != 1:
                 raise ScheduledTaskContractError(
                     "Scheduled stock analysis did not resolve one execution task"
                 )
+            owned_ids = [accepted_task.task_id for accepted_task in accepted]
+            coalesced_ids: list[str] = []
+            if duplicates:
+                duplicate = duplicates[0]
+                expected_contract = AnalysisTaskCoalescingContract(
+                    stock_code=payload["stock_code"],
+                    report_type=payload["report_type"],
+                    notify=payload["notify"],
+                )
+                if duplicate.existing_contract != expected_contract:
+                    self._finish_run(
+                        run.id,
+                        status=ScheduledRunStatus.FAILED,
+                        now=now,
+                        error_code="scheduled_task_coalesced_contract_mismatch",
+                        attempt_count=attempt_count,
+                    )
+                    return
+                coalesced_ids = [duplicate.existing_task_id]
+            dispatched_ids = owned_ids + coalesced_ids
+            execution_ids = execution_history + dispatched_ids
+            all_owned_ids = owned_history + owned_ids
             updated = self.repository.update_run(
                 run.id,
                 {
                     "status": ScheduledRunStatus.RUNNING.value,
                     "attempt_count": attempt_count,
                     "execution_task_ids_json": json.dumps(execution_ids),
-                    "owned_execution_task_ids_json": json.dumps(owned_ids),
+                    "owned_execution_task_ids_json": json.dumps(all_owned_ids),
                     "error_code": None,
                     "next_attempt_at": None,
                     "started_at": run.started_at or now,
@@ -568,7 +806,7 @@ class ScheduledTaskService:
                 error_code="scheduled_task_dispatch_failed",
                 context={"run_id": run.id, "task_id": run.task_id},
             )
-            if execution_ids:
+            if dispatched_ids:
                 self._finish_run(
                     run.id,
                     status=ScheduledRunStatus.INTERRUPTED,
@@ -582,8 +820,8 @@ class ScheduledTaskService:
                     {
                         "status": ScheduledRunStatus.RETRY_WAIT.value,
                         "attempt_count": attempt_count,
-                        "execution_task_ids_json": "[]",
-                        "owned_execution_task_ids_json": "[]",
+                        "execution_task_ids_json": json.dumps(execution_history),
+                        "owned_execution_task_ids_json": json.dumps(owned_history),
                         "error_code": "scheduled_task_dispatch_failed",
                         "next_attempt_at": now
                         + timedelta(seconds=SCHEDULED_TASK_RETRY_DELAY_SECONDS),
@@ -628,7 +866,7 @@ class ScheduledTaskService:
             run.execution_task_ids_json,
             field_name="execution_task_ids",
         )
-        if len(execution_ids) != 1:
+        if not execution_ids:
             self._finish_run(
                 run.id,
                 status=ScheduledRunStatus.FAILED,
@@ -637,7 +875,8 @@ class ScheduledTaskService:
             )
             return
         try:
-            snapshot = self._queue().get(execution_ids[0])
+            current_execution_id = execution_ids[-1]
+            snapshot = self._queue().get(current_execution_id)
         except TaskNotFoundError:
             self._finish_run(
                 run.id,
@@ -671,7 +910,7 @@ class ScheduledTaskService:
             )
         )
         error_code = snapshot.error_code or "scheduled_task_execution_failed"
-        if execution_ids[0] not in owned_ids:
+        if current_execution_id not in owned_ids:
             self._finish_run(
                 run.id,
                 status=ScheduledRunStatus.FAILED,
@@ -702,13 +941,11 @@ class ScheduledTaskService:
             run.execution_task_ids_json,
             field_name="execution_task_ids",
         )
-        owned_ids = set(
-            _json_list(
-                run.owned_execution_task_ids_json,
-                field_name="owned_execution_task_ids",
-            )
+        owned_history = _json_list(
+            run.owned_execution_task_ids_json,
+            field_name="owned_execution_task_ids",
         )
-        if len(execution_ids) != 1 or execution_ids[0] not in owned_ids:
+        if not execution_ids or execution_ids[-1] not in set(owned_history):
             self._finish_run(
                 run.id,
                 status=ScheduledRunStatus.FAILED,
@@ -719,14 +956,16 @@ class ScheduledTaskService:
         attempt_count = int(run.attempt_count) + 1
         child_id: Optional[str] = None
         try:
-            child_id = self._queue().retry(execution_ids[0])
+            child_id = self._queue().retry(execution_ids[-1])
             updated = self.repository.update_run(
                 run.id,
                 {
                     "status": ScheduledRunStatus.RUNNING.value,
                     "attempt_count": attempt_count,
-                    "execution_task_ids_json": json.dumps([child_id]),
-                    "owned_execution_task_ids_json": json.dumps([child_id]),
+                    "execution_task_ids_json": json.dumps(execution_ids + [child_id]),
+                    "owned_execution_task_ids_json": json.dumps(
+                        owned_history + [child_id]
+                    ),
                     "error_code": None,
                     "next_attempt_at": None,
                     "updated_at": now,
