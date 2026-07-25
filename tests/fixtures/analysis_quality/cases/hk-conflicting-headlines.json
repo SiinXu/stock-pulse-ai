@@ -1,0 +1,144 @@
+{
+  "id": "hk-conflicting-headlines",
+  "scenario": "conflicting_headlines",
+  "market": "HK",
+  "license": "synthetic-fixture",
+  "notes": "Hong Kong case with opposing headlines; risk surface must reflect the conflict rather than pick a silent winner.",
+  "frozen_inputs": {
+    "stock_code": "00700",
+    "stock_name": "Tencent Holdings",
+    "as_of": "2026-07-01T16:00:00+08:00",
+    "market_data": {
+      "current_price": 380.2,
+      "ma5": 378.0,
+      "ma10": 372.5,
+      "ma20": 365.0,
+      "volume_ratio": 1.45,
+      "turnover_rate": 0.42
+    },
+    "news": [
+      {
+        "headline": "Broker upgrades platform growth outlook",
+        "as_of": "2026-07-01T08:00:00+08:00",
+        "source": "synthetic-wire-a",
+        "tone": "positive"
+      },
+      {
+        "headline": "Regulatory review rumors weigh on ad segment",
+        "as_of": "2026-07-01T10:30:00+08:00",
+        "source": "synthetic-wire-b",
+        "tone": "negative"
+      }
+    ],
+    "fundamentals": {
+      "pe_ttm": 18.6,
+      "revenue_yoy": 0.08
+    },
+    "sources": {
+      "market_data": {
+        "present": true,
+        "as_of": "2026-07-01T16:00:00+08:00",
+        "provider": "synthetic-fixture"
+      },
+      "news": {
+        "present": true,
+        "as_of": "2026-07-01T10:30:00+08:00",
+        "provider": "synthetic-wire"
+      },
+      "fundamentals": {
+        "present": true,
+        "as_of": "2026-06-28T00:00:00+08:00",
+        "provider": "synthetic-fixture"
+      }
+    }
+  },
+  "report": {
+    "schema_version": "report-v1",
+    "stock_name": "Tencent Holdings",
+    "sentiment_score": 52,
+    "trend_prediction": "volatile / mixed",
+    "operation_advice": "Hold with tight risk",
+    "decision_type": "hold",
+    "confidence_level": "low",
+    "dashboard": {
+      "core_conclusion": {
+        "one_sentence": "Technicals are constructive, but headlines conflict so size stays conservative.",
+        "signal_type": "hold",
+        "time_sensitivity": "intraday"
+      },
+      "data_perspective": {
+        "trend_status": {
+          "ma_alignment": "bullish",
+          "is_bullish": true,
+          "trend_score": 64
+        },
+        "price_position": {
+          "current_price": 380.2,
+          "ma5": 378.0,
+          "ma10": 372.5,
+          "ma20": 365.0
+        },
+        "volume_analysis": {
+          "volume_ratio": 1.45,
+          "volume_status": "elevated",
+          "turnover_rate": 0.42,
+          "volume_meaning": "Elevated volume coincides with conflicting news flow."
+        }
+      },
+      "intelligence": {
+        "latest_news": "Broker upgrades platform growth outlook; Regulatory review rumors weigh on ad segment",
+        "risk_alerts": [
+          "Conflicting headlines: growth upgrade vs regulatory review rumors.",
+          "Do not collapse opposing news into a single uncontested catalyst."
+        ],
+        "positive_catalysts": [
+          "Broker upgrades platform growth outlook"
+        ],
+        "sentiment_summary": "News set is mixed; confidence is reduced until conflict resolves."
+      },
+      "battle_plan": {
+        "sniper_points": {
+          "ideal_buy": 372.5,
+          "stop_loss": 364.0,
+          "take_profit": 392.0
+        },
+        "position_strategy": {
+          "suggested_position": "reduce_new_entries",
+          "risk_control": "Prefer confirmation after headline conflict settles."
+        },
+        "action_checklist": [
+          "Track both headline threads",
+          "Keep stop under MA20 zone"
+        ]
+      }
+    },
+    "analysis_summary": "Price and volume support a constructive technical bias, but news conflict caps confidence.",
+    "key_points": "current_price 380.2; volume_ratio 1.45; mixed headlines",
+    "risk_warning": "Not investment advice. Conflicting public headlines raise event risk; this is not a directional alpha claim.",
+    "news_summary": "Upgrade narrative coexists with regulatory-review rumors; both are retained as unresolved tension.",
+    "data_sources": "market_data@2026-07-01T16:00:00+08:00; news@2026-07-01T10:30:00+08:00; fundamentals@2026-06-28T00:00:00+08:00",
+    "search_performed": true
+  },
+  "expectations": {
+    "require_schema_version": "report-v1",
+    "require_risk_warning": true,
+    "numeric_paths": {
+      "dashboard.data_perspective.price_position.current_price": 380.2,
+      "dashboard.data_perspective.price_position.ma5": 378.0,
+      "dashboard.data_perspective.price_position.ma10": 372.5,
+      "dashboard.data_perspective.price_position.ma20": 365.0,
+      "dashboard.data_perspective.volume_analysis.volume_ratio": 1.45,
+      "dashboard.data_perspective.volume_analysis.turnover_rate": 0.42
+    },
+    "required_source_keys_present": [
+      "market_data",
+      "news",
+      "fundamentals"
+    ],
+    "required_gaps": [],
+    "required_substrings": [
+      "conflict"
+    ],
+    "forbid_traceback_leakage": true
+  }
+}

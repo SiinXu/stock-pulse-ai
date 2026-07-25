@@ -1,0 +1,128 @@
+{
+  "id": "us-missing-fundamentals",
+  "scenario": "missing_provider_fields",
+  "market": "US",
+  "license": "synthetic-fixture",
+  "notes": "US case where fundamentals are unavailable; gaps must be explicit rather than silently omitted.",
+  "frozen_inputs": {
+    "stock_code": "AAPL",
+    "stock_name": "Apple Inc.",
+    "as_of": "2026-07-01T16:00:00-04:00",
+    "market_data": {
+      "current_price": 214.25,
+      "ma5": 212.1,
+      "ma10": 209.4,
+      "ma20": 205.0,
+      "volume_ratio": 0.92,
+      "turnover_rate": null
+    },
+    "news": [
+      {
+        "headline": "Product cycle commentary remains mixed",
+        "as_of": "2026-07-01T12:00:00-04:00",
+        "source": "synthetic-wire"
+      }
+    ],
+    "fundamentals": null,
+    "sources": {
+      "market_data": {
+        "present": true,
+        "as_of": "2026-07-01T16:00:00-04:00",
+        "provider": "synthetic-fixture"
+      },
+      "news": {
+        "present": true,
+        "as_of": "2026-07-01T12:00:00-04:00",
+        "provider": "synthetic-wire"
+      },
+      "fundamentals": {
+        "present": false,
+        "gap": "fundamentals_unavailable"
+      }
+    }
+  },
+  "report": {
+    "schema_version": "report-v1",
+    "stock_name": "Apple Inc.",
+    "sentiment_score": 55,
+    "trend_prediction": "range-bound",
+    "operation_advice": "Watch",
+    "decision_type": "hold",
+    "confidence_level": "low",
+    "dashboard": {
+      "core_conclusion": {
+        "one_sentence": "Technical structure is intact, but fundamentals are unavailable so confidence stays low.",
+        "signal_type": "watch",
+        "time_sensitivity": "session"
+      },
+      "data_perspective": {
+        "trend_status": {
+          "ma_alignment": "mildly_bullish",
+          "is_bullish": true,
+          "trend_score": 58
+        },
+        "price_position": {
+          "current_price": 214.25,
+          "ma5": 212.1,
+          "ma10": 209.4,
+          "ma20": 205.0
+        },
+        "volume_analysis": {
+          "volume_ratio": 0.92,
+          "volume_status": "soft",
+          "volume_meaning": "Volume is slightly below the recent average."
+        }
+      },
+      "intelligence": {
+        "latest_news": "Product cycle commentary remains mixed",
+        "risk_alerts": [
+          "fundamentals_unavailable: PE and revenue fields are missing from frozen inputs.",
+          "Do not invent fundamental metrics when the source is absent."
+        ],
+        "positive_catalysts": [],
+        "earnings_outlook": "gap:fundamentals_unavailable",
+        "sentiment_summary": "News tone is mixed; no fundamental confirmation available."
+      },
+      "battle_plan": {
+        "sniper_points": {
+          "ideal_buy": 209.4,
+          "stop_loss": 204.0,
+          "take_profit": 220.0
+        },
+        "position_strategy": {
+          "suggested_position": "wait",
+          "risk_control": "Avoid size increases until fundamentals gap is closed."
+        },
+        "action_checklist": [
+          "Mark fundamentals as gap",
+          "Re-run when provider fields return"
+        ]
+      }
+    },
+    "analysis_summary": "Price holds above MA10, but fundamentals_unavailable blocks full valuation context.",
+    "key_points": "current_price 214.25; fundamentals gap present",
+    "risk_warning": "Not investment advice. Missing fundamentals reduce confidence; treat valuation claims as unavailable.",
+    "fundamental_analysis": "gap:fundamentals_unavailable",
+    "data_sources": "market_data@2026-07-01T16:00:00-04:00; news@2026-07-01T12:00:00-04:00; fundamentals=missing:fundamentals_unavailable",
+    "search_performed": true
+  },
+  "expectations": {
+    "require_schema_version": "report-v1",
+    "require_risk_warning": true,
+    "numeric_paths": {
+      "dashboard.data_perspective.price_position.current_price": 214.25,
+      "dashboard.data_perspective.price_position.ma5": 212.1,
+      "dashboard.data_perspective.price_position.ma10": 209.4,
+      "dashboard.data_perspective.price_position.ma20": 205.0,
+      "dashboard.data_perspective.volume_analysis.volume_ratio": 0.92
+    },
+    "required_source_keys_present": [
+      "market_data",
+      "news"
+    ],
+    "required_gaps": [
+      "fundamentals_unavailable"
+    ],
+    "forbid_traceback_leakage": true
+  }
+}

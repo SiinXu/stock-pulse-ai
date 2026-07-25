@@ -1,0 +1,130 @@
+{
+  "id": "a-limited-fields",
+  "scenario": "limited_fields",
+  "market": "A",
+  "license": "synthetic-fixture",
+  "notes": "Limited-session case: volume and turnover are unavailable (halt-like / thin feed). Gaps must be explicit.",
+  "frozen_inputs": {
+    "stock_code": "000001",
+    "stock_name": "Ping An Bank",
+    "as_of": "2026-07-01T10:15:00+08:00",
+    "market_data": {
+      "current_price": 11.28,
+      "ma5": 11.2,
+      "ma10": 11.05,
+      "ma20": 10.9,
+      "volume_ratio": null,
+      "turnover_rate": null
+    },
+    "news": [],
+    "fundamentals": {
+      "pe_ttm": 5.1,
+      "revenue_yoy": 0.03
+    },
+    "sources": {
+      "market_data": {
+        "present": true,
+        "as_of": "2026-07-01T10:15:00+08:00",
+        "provider": "synthetic-fixture",
+        "limitations": [
+          "volume_ratio_unavailable",
+          "turnover_rate_unavailable"
+        ]
+      },
+      "news": {
+        "present": false,
+        "gap": "news_feed_empty"
+      },
+      "fundamentals": {
+        "present": true,
+        "as_of": "2026-06-30T00:00:00+08:00",
+        "provider": "synthetic-fixture"
+      }
+    }
+  },
+  "report": {
+    "schema_version": "report-v1",
+    "stock_name": "Ping An Bank",
+    "sentiment_score": 48,
+    "trend_prediction": "cautious / data-limited",
+    "operation_advice": "Watch",
+    "decision_type": "hold",
+    "confidence_level": "low",
+    "dashboard": {
+      "core_conclusion": {
+        "one_sentence": "Price sits above short MAs, but volume fields and news feed are unavailable.",
+        "signal_type": "watch",
+        "time_sensitivity": "session"
+      },
+      "data_perspective": {
+        "trend_status": {
+          "ma_alignment": "mildly_bullish",
+          "is_bullish": true,
+          "trend_score": 50
+        },
+        "price_position": {
+          "current_price": 11.28,
+          "ma5": 11.2,
+          "ma10": 11.05,
+          "ma20": 10.9
+        },
+        "volume_analysis": {
+          "volume_status": "unavailable",
+          "volume_meaning": "gap:volume_ratio_unavailable; gap:turnover_rate_unavailable"
+        }
+      },
+      "intelligence": {
+        "latest_news": "gap:news_feed_empty",
+        "risk_alerts": [
+          "volume_ratio_unavailable",
+          "turnover_rate_unavailable",
+          "news_feed_empty: no headlines in frozen inputs."
+        ],
+        "positive_catalysts": [],
+        "sentiment_summary": "News feed empty; volume confirmation unavailable."
+      },
+      "battle_plan": {
+        "sniper_points": {
+          "ideal_buy": 11.05,
+          "stop_loss": 10.85,
+          "take_profit": 11.6
+        },
+        "position_strategy": {
+          "suggested_position": "wait",
+          "risk_control": "Do not size up while volume and news gaps remain open."
+        },
+        "action_checklist": [
+          "Wait for volume fields",
+          "Refresh news feed"
+        ]
+      }
+    },
+    "analysis_summary": "Limited field coverage: price path is visible, volume and news are explicit gaps.",
+    "key_points": "current_price 11.28; volume_ratio unavailable; news_feed_empty",
+    "risk_warning": "Not investment advice. Limited market fields and empty news reduce reliability of any directional claim.",
+    "volume_analysis": "gap:volume_ratio_unavailable; gap:turnover_rate_unavailable",
+    "news_summary": "gap:news_feed_empty",
+    "data_sources": "market_data@2026-07-01T10:15:00+08:00 (limited); news=missing:news_feed_empty; fundamentals@2026-06-30T00:00:00+08:00",
+    "search_performed": false
+  },
+  "expectations": {
+    "require_schema_version": "report-v1",
+    "require_risk_warning": true,
+    "numeric_paths": {
+      "dashboard.data_perspective.price_position.current_price": 11.28,
+      "dashboard.data_perspective.price_position.ma5": 11.2,
+      "dashboard.data_perspective.price_position.ma10": 11.05,
+      "dashboard.data_perspective.price_position.ma20": 10.9
+    },
+    "required_source_keys_present": [
+      "market_data",
+      "fundamentals"
+    ],
+    "required_gaps": [
+      "volume_ratio_unavailable",
+      "turnover_rate_unavailable",
+      "news_feed_empty"
+    ],
+    "forbid_traceback_leakage": true
+  }
+}
