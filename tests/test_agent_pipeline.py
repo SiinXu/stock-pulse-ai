@@ -28,9 +28,24 @@ ensure_litellm_stub()
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
-def _builtin_strategy_names() -> set[str]:
+def _yaml_skill_names(directory: Path) -> set[str]:
+    return {
+        path.stem
+        for pattern in ("*.yaml", "*.yml")
+        for path in directory.glob(pattern)
+    }
+
+
+def _builtin_skill_names() -> set[str]:
     strategies_dir = Path(__file__).resolve().parent.parent / "strategies"
-    return {path.stem for path in strategies_dir.glob("*.yaml")}
+    return _yaml_skill_names(strategies_dir) | _yaml_skill_names(
+        strategies_dir / "personas"
+    )
+
+
+def _builtin_persona_names() -> set[str]:
+    strategies_dir = Path(__file__).resolve().parent.parent / "strategies"
+    return _yaml_skill_names(strategies_dir / "personas")
 
 
 # ============================================================
@@ -1480,7 +1495,7 @@ class TestPipelineSkillRegistration(unittest.TestCase):
         from src.agent.skills.base import SkillManager
 
         skill_manager = SkillManager()
-        expected = _builtin_strategy_names()
+        expected = _builtin_skill_names()
         count = skill_manager.load_builtin_strategies()
         self.assertEqual(count, len(expected))
 
@@ -1489,6 +1504,13 @@ class TestPipelineSkillRegistration(unittest.TestCase):
 
         names = {s.name for s in skills}
         self.assertEqual(names, expected)
+
+        personas = [
+            skill for skill in skills if skill.name in _builtin_persona_names()
+        ]
+        self.assertEqual({skill.name for skill in personas}, _builtin_persona_names())
+        self.assertTrue(all(not skill.default_active for skill in personas))
+        self.assertTrue(all(not skill.default_router for skill in personas))
 
         # All should be disabled by default
         active = skill_manager.list_active_skills()
@@ -2917,10 +2939,15 @@ class TestSkillActivation(unittest.TestCase):
 
         skill_manager = SkillManager()
         count = skill_manager.load_builtin_strategies()
-        self.assertEqual(count, len(_builtin_strategy_names()), "Should load all built-in strategies from YAML")
+        self.assertEqual(
+            count,
+            len(_builtin_skill_names()),
+            "Should load all built-in skills from YAML",
+        )
 
         default_ids = get_default_active_skill_ids(skill_manager.list_skills())
         self.assertEqual(default_ids, ["bull_trend"])
+        self.assertTrue(_builtin_persona_names().isdisjoint(default_ids))
         skill_manager.activate(default_ids)
 
         active = skill_manager.list_active_skills()
