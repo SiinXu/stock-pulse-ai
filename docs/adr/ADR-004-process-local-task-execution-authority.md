@@ -1,10 +1,10 @@
 # ADR-004: Use One Process-Local Task Execution Authority
 
-- Status: `Accepted (retrospective)`
+- Status: `Accepted (retrospective)`, amended by [ADR-008](ADR-008-persisted-schedule-process-local-execution-boundary.md)
 - Decision date: 2026-07-20
 - Recorded: 2026-07-21
 - Decision owners: StockPulse maintainers
-- References: [PR #90](https://github.com/SiinXu/stock-pulse-ai/pull/90), [PR #99](https://github.com/SiinXu/stock-pulse-ai/pull/99), [PR #103](https://github.com/SiinXu/stock-pulse-ai/pull/103), [`docs/task-execution-contract.md`](../task-execution-contract.md)
+- References: [PR #90](https://github.com/SiinXu/stock-pulse-ai/pull/90), [PR #99](https://github.com/SiinXu/stock-pulse-ai/pull/99), [PR #103](https://github.com/SiinXu/stock-pulse-ai/pull/103), [`docs/task-execution-contract.md`](../task-execution-contract.md), [ADR-008](ADR-008-persisted-schedule-process-local-execution-boundary.md)
 
 ## Context
 
@@ -38,14 +38,6 @@ The authority keeps these boundaries:
   cooperative;
 - the queue is process-local and in-memory, not durable or multi-process.
 
-Persisted scheduled tasks do not create a second execution authority.
-`ScheduledRun` is an occurrence/audit projection: it records the due slot,
-aggregate observation status, append-only canonical execution IDs, result
-references, and bounded retry timing. Each referenced execution still derives
-its lifecycle from `AnalysisTaskQueue`; the scheduled projection may observe or
-request a retry only through that authority and must fail closed when the
-process-local execution identity is unavailable.
-
 The living [task execution contract](../task-execution-contract.md) remains
 authoritative for transitions, retry reservations, SSE compatibility, overflow,
 and shutdown mechanics.
@@ -60,6 +52,3 @@ and shutdown mechanics.
   would create divergent state and require a new ADR and implementation.
 - There is no durable recovery after process loss; graceful shutdown can only
   classify known active work as `interrupted`.
-- Durable schedule definitions and occurrence claims can prevent repeated
-  due-slot dispatch, but their aggregate statuses do not provide durable task
-  execution recovery or distributed exactly-once semantics.

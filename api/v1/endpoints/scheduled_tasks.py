@@ -23,6 +23,7 @@ from src.services.scheduled_task_service import (
     ScheduledTaskError,
     ScheduledTaskNotFoundError,
     ScheduledTaskService,
+    ScheduledTaskUnsupportedSchemaError,
     ScheduledTaskValidationError,
 )
 from src.utils.sanitize import log_safe_exception
@@ -32,10 +33,13 @@ router = APIRouter()
 
 
 def _service_error(exc: ScheduledTaskError):
+    """Map a scheduled-task domain error to the stable API envelope."""
     if isinstance(exc, ScheduledTaskNotFoundError):
         status_code = 404
     elif isinstance(exc, ScheduledTaskValidationError):
         status_code = 400
+    elif isinstance(exc, ScheduledTaskUnsupportedSchemaError):
+        status_code = 409
     elif isinstance(exc, ScheduledTaskContractError):
         status_code = 500
     else:
@@ -49,6 +53,7 @@ def _reconcile_after_mutation(
     operation: str,
     task_id: str,
 ) -> None:
+    """Refresh runtime ownership after a committed definition mutation."""
     try:
         runtime_scheduler.reconcile_scheduled_tasks()
     except Exception as exc:  # broad-exception: fallback_recorded - the committed mutation is authoritative and the owner loop retries discovery.
@@ -74,6 +79,7 @@ def create_scheduled_task(
     service: ScheduledTaskService = Depends(get_scheduled_task_service),
     runtime_scheduler: RuntimeSchedulerService = Depends(get_runtime_scheduler_service),
 ) -> ScheduledTaskItem:
+    """Create one version-one scheduled task."""
     try:
         item = service.create_task(request.model_dump())
         response = ScheduledTaskItem(**item)
@@ -106,6 +112,7 @@ def list_scheduled_tasks(
     limit: int = Query(100, ge=1, le=500),
     service: ScheduledTaskService = Depends(get_scheduled_task_service),
 ) -> ScheduledTaskListResponse:
+    """List understood definitions and opaque future-version projections."""
     try:
         return ScheduledTaskListResponse(
             **service.list_tasks(enabled=enabled, limit=limit)
@@ -132,6 +139,7 @@ def get_scheduled_task_status(
     task_id: str,
     service: ScheduledTaskService = Depends(get_scheduled_task_service),
 ) -> ScheduledTaskStatusResponse:
+    """Return one definition and its latest occurrence status."""
     try:
         return ScheduledTaskStatusResponse(**service.get_status(task_id))
     except ScheduledTaskError as exc:
@@ -149,7 +157,11 @@ def get_scheduled_task_status(
 @router.post(
     "/{task_id}/enable",
     response_model=ScheduledTaskItem,
-    responses={404: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    responses={
+        404: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
     summary="Enable scheduled task",
 )
 def enable_scheduled_task(
@@ -157,6 +169,7 @@ def enable_scheduled_task(
     service: ScheduledTaskService = Depends(get_scheduled_task_service),
     runtime_scheduler: RuntimeSchedulerService = Depends(get_runtime_scheduler_service),
 ) -> ScheduledTaskItem:
+    """Enable one understood scheduled definition."""
     try:
         item = service.set_enabled(task_id, True)
         response = ScheduledTaskItem(**item)
@@ -181,7 +194,11 @@ def enable_scheduled_task(
 @router.post(
     "/{task_id}/disable",
     response_model=ScheduledTaskItem,
-    responses={404: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    responses={
+        404: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
     summary="Disable scheduled task",
 )
 def disable_scheduled_task(
@@ -189,6 +206,7 @@ def disable_scheduled_task(
     service: ScheduledTaskService = Depends(get_scheduled_task_service),
     runtime_scheduler: RuntimeSchedulerService = Depends(get_runtime_scheduler_service),
 ) -> ScheduledTaskItem:
+    """Disable one understood scheduled definition."""
     try:
         item = service.set_enabled(task_id, False)
         response = ScheduledTaskItem(**item)
@@ -221,6 +239,7 @@ def list_scheduled_task_runs(
     limit: int = Query(100, ge=1, le=500),
     service: ScheduledTaskService = Depends(get_scheduled_task_service),
 ) -> ScheduledTaskRunListResponse:
+    """List occurrence history without interpreting future payload schemas."""
     try:
         return ScheduledTaskRunListResponse(**service.list_runs(task_id, limit=limit))
     except ScheduledTaskError as exc:

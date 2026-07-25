@@ -1,7 +1,7 @@
 # StockPulse Architecture Overview
 
 - Status: `Living`
-- Last verified: 2026-07-22
+- Last verified: 2026-07-24
 - Scope: current technical component boundaries, process entrypoints, and analysis data flow
 
 This document is the technical view of the current implementation. For
@@ -162,7 +162,9 @@ RuntimeSchedulerService or standalone Scheduler -> ScheduledTaskService.tick()
 
 The persisted `ScheduledRun` status and execution-ID history describe one due
 occurrence; they do not own canonical task lifecycle. Exact coalescing, retry,
-and completion are observed through the process-local queue defined by ADR-004.
+and completion are observed through the process-local queue defined by ADR-004
+and the persisted boundary in
+[ADR-008](adr/ADR-008-persisted-schedule-process-local-execution-boundary.md).
 Normal API and Desktop backends own one polling callback, while Docker's
 `--serve-only` server defers persisted execution to the analyzer process. See
 the [scheduled-task contract](scheduled-tasks.md) for the deployment matrix and
@@ -357,6 +359,7 @@ separately owned contract.
 - [ADR registry and process](adr/README.md)
 - [Task execution contract](task-execution-contract.md)
 - [Scheduled tasks](scheduled-tasks.md)
+- [Persisted schedule boundary](adr/ADR-008-persisted-schedule-process-local-execution-boundary.md)
 - [Data-source stability and fallback](data-source-stability.md)
 - [Analysis Context Pack](analysis-context-pack.md)
 - [Agent stream events](agent-stream-events.md)

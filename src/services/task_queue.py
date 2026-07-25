@@ -24,9 +24,11 @@ from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from enum import Enum
-from typing import Optional, Dict, List, Any, Tuple, Literal, Callable
+from typing import Optional, Dict, List, Any, Tuple, Literal, Callable, Mapping
 
 from data_provider.base import canonical_stock_code, normalize_stock_code
+from src.enums import ReportType
+from src.report_language import normalize_report_language
 from src.schemas.request_context import AnalysisRequestContext
 from src.services.run_diagnostics import (
     activate_run_diagnostic_context,
@@ -253,30 +255,66 @@ class TaskInfo:
 
 @dataclass(frozen=True)
 class AnalysisTaskCoalescingContract:
-    """Immutable side-effect contract captured for an active stock analysis."""
+    """Immutable result and side-effect contract for one stock analysis."""
 
     stock_code: str
     report_type: str
+    analysis_phase: str
+    force_refresh: bool
     notify: bool
+    skills: Any
+    report_language: Optional[str]
+    use_memory: Optional[bool]
+    portfolio_context: Any
+    query_source: str
+    context_bound: bool
+
+    @classmethod
+    def from_metadata(
+        cls,
+        metadata: Mapping[str, Any],
+    ) -> Optional['AnalysisTaskCoalescingContract']:
+        """Build the normalized execution contract from command metadata."""
+        stock_code = _dedupe_stock_code_key(
+            str(metadata.get("stock_code") or "")
+        )
+        if not stock_code:
+            return None
+        raw_skills = metadata.get("skills")
+        raw_use_memory = metadata.get("use_memory")
+        raw_report_language = metadata.get("report_language")
+        return cls(
+            stock_code=stock_code,
+            report_type=ReportType.from_str(
+                str(metadata.get("report_type") or "detailed")
+            ).value,
+            analysis_phase=str(metadata.get("analysis_phase") or "auto"),
+            force_refresh=bool(metadata.get("force_refresh", False)),
+            notify=bool(metadata.get("notify", True)),
+            skills=deep_freeze(raw_skills),
+            report_language=(
+                normalize_report_language(raw_report_language, default="")
+                if raw_report_language is not None
+                else None
+            ),
+            use_memory=(
+                bool(raw_use_memory) if raw_use_memory is not None else None
+            ),
+            portfolio_context=deep_freeze(metadata.get("portfolio_context")),
+            query_source=str(metadata.get("query_source") or "api"),
+            context_bound=bool(metadata.get("context_bound", False)),
+        )
 
     @classmethod
     def from_command(
         cls,
         command: Optional[TaskCommand],
     ) -> Optional['AnalysisTaskCoalescingContract']:
+        """Build the normalized execution contract from an immutable command."""
         if command is None or command.kind != "stock_analysis":
             return None
         metadata = deep_thaw(command.metadata)
-        stock_code = resolve_index_stock_code_for_analysis(
-            str(metadata.get("stock_code") or "")
-        )
-        if not stock_code:
-            return None
-        return cls(
-            stock_code=stock_code,
-            report_type=str(metadata.get("report_type") or "detailed"),
-            notify=bool(metadata.get("notify", True)),
-        )
+        return cls.from_metadata(metadata)
 
 
 class DuplicateTaskError(Exception):
@@ -288,10 +326,12 @@ class DuplicateTaskError(Exception):
         existing_task_id: str,
         *,
         existing_contract: Optional[AnalysisTaskCoalescingContract] = None,
+        requested_contract: Optional[AnalysisTaskCoalescingContract] = None,
     ):
         self.stock_code = stock_code
         self.existing_task_id = existing_task_id
         self.existing_contract = existing_contract
+        self.requested_contract = requested_contract
         super().__init__(f"股票 {stock_code} 正在分析中 (task_id: {existing_task_id})")
 
 
@@ -844,6 +884,7 @@ class AnalysisTaskQueue:
                 existing_contract=AnalysisTaskCoalescingContract.from_command(
                     self._commands.get(existing_task_id)
                 ),
+                requested_contract=AnalysisTaskCoalescingContract.from_command(command),
             )
 
         task_id = task_id or uuid.uuid4().hex
@@ -1129,6 +1170,7 @@ class AnalysisTaskQueue:
             "skills": copy.deepcopy(skills),
             "report_language": report_language,
             "use_memory": use_memory,
+            "context_bound": request_context is not None,
             "message": "任务已加入队列",
             "message_code": "task.queued",
             "message_params": {"stock_code": stock_code},

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Literal, Optional
+from typing import Annotated, List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -13,6 +13,8 @@ ReportType = Literal["brief", "simple", "detailed", "full"]
 
 
 class DailyScheduleRequest(BaseModel):
+    """Version-one daily wall-clock schedule."""
+
     kind: Literal["daily"] = "daily"
     time: str = Field(pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")
     timezone: str = Field(min_length=1, max_length=64)
@@ -23,6 +25,8 @@ class DailyScheduleRequest(BaseModel):
 
 
 class StockAnalysisScheduledPayload(BaseModel):
+    """Version-one stock-analysis execution payload."""
+
     stock_code: str = Field(min_length=1, max_length=32)
     report_type: ReportType = "detailed"
     notify: bool = True
@@ -31,6 +35,8 @@ class StockAnalysisScheduledPayload(BaseModel):
 
 
 class ScheduledTaskCreateRequest(BaseModel):
+    """Request body for one version-one scheduled definition."""
+
     schema_version: Literal[1] = 1
     name: str = Field(min_length=1, max_length=128)
     task_type: Literal["stock_analysis"] = "stock_analysis"
@@ -43,6 +49,9 @@ class ScheduledTaskCreateRequest(BaseModel):
 
 
 class ScheduledTaskItem(BaseModel):
+    """Fully understood version-one scheduled definition."""
+
+    compatibility: Literal["supported"] = "supported"
     id: str
     schema_version: int
     name: str
@@ -56,12 +65,35 @@ class ScheduledTaskItem(BaseModel):
     updated_at: datetime
 
 
+class UnsupportedScheduledTaskItem(BaseModel):
+    """Opaque projection of a definition written by a newer application."""
+
+    compatibility: Literal["unsupported_schema"] = "unsupported_schema"
+    id: str
+    schema_version: int
+    name: str
+    enabled: bool
+    next_run_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+ScheduledTaskDefinitionItem = Annotated[
+    Union[ScheduledTaskItem, UnsupportedScheduledTaskItem],
+    Field(discriminator="compatibility"),
+]
+
+
 class ScheduledTaskListResponse(BaseModel):
-    items: List[ScheduledTaskItem] = Field(default_factory=list)
+    """Collection response containing supported and opaque definitions."""
+
+    items: List[ScheduledTaskDefinitionItem] = Field(default_factory=list)
     total: int
 
 
 class ScheduledTaskRunItem(BaseModel):
+    """Durable aggregate projection for one scheduled occurrence."""
+
     id: str
     task_id: str
     scheduled_for: datetime
@@ -86,10 +118,14 @@ class ScheduledTaskRunItem(BaseModel):
 
 
 class ScheduledTaskRunListResponse(BaseModel):
+    """Collection response for one definition's occurrence history."""
+
     items: List[ScheduledTaskRunItem] = Field(default_factory=list)
     total: int
 
 
 class ScheduledTaskStatusResponse(BaseModel):
-    task: ScheduledTaskItem
+    """Definition compatibility projection and latest occurrence."""
+
+    task: ScheduledTaskDefinitionItem
     latest_run: Optional[ScheduledTaskRunItem] = None

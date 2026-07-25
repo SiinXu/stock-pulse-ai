@@ -83,6 +83,7 @@ def test_create_list_status_toggle_and_run_history(client) -> None:
     assert created_response.status_code == 201, created_response.text
     created = created_response.json()
     task_id = created["id"]
+    assert created["compatibility"] == "supported"
     assert created["schema_version"] == 1
     assert created["next_run_at"].endswith("Z")
 
@@ -147,8 +148,8 @@ def test_committed_create_remains_successful_when_runtime_reconcile_is_deferred(
     assert listed["items"][0]["id"] == response.json()["id"]
 
 
-def test_persisted_contract_error_is_not_mapped_to_client_validation(client) -> None:
-    test_client, _runtime_scheduler, service = client
+def test_future_schema_is_opaque_and_mutation_returns_conflict(client) -> None:
+    test_client, runtime_scheduler, service = client
     created = test_client.post(
         "/api/v1/scheduled-tasks",
         json=create_payload(),
@@ -156,12 +157,35 @@ def test_persisted_contract_error_is_not_mapped_to_client_validation(client) -> 
     with service.repository.db.get_session() as session:
         row = session.get(ScheduledTaskRecord, created["id"])
         row.schema_version = 2
+        row.payload_json = "not-v1-json"
         session.commit()
 
     response = test_client.get("/api/v1/scheduled-tasks")
+    status_response = test_client.get(
+        f"/api/v1/scheduled-tasks/{created['id']}/status"
+    )
+    mutation_response = test_client.post(
+        f"/api/v1/scheduled-tasks/{created['id']}/disable"
+    )
 
-    assert response.status_code == 500
-    assert response.json()["detail"]["error"] == "scheduled_task_contract_error"
+    assert response.status_code == 200
+    opaque = response.json()["items"][0]
+    assert opaque["compatibility"] == "unsupported_schema"
+    assert opaque["schema_version"] == 2
+    assert "payload" not in opaque
+    assert "schedule" not in opaque
+    assert status_response.status_code == 200
+    assert status_response.json()["task"] == opaque
+    assert mutation_response.status_code == 409
+    assert mutation_response.json()["detail"]["error"] == (
+        "scheduled_task_schema_unsupported"
+    )
+    assert runtime_scheduler.reconcile_calls == 1
+    with service.repository.db.get_session() as session:
+        persisted = session.get(ScheduledTaskRecord, created["id"])
+        assert persisted.schema_version == 2
+        assert persisted.payload_json == "not-v1-json"
+        assert persisted.enabled is True
 
 
 def test_static_openapi_contains_exact_scheduled_task_contract() -> None:
@@ -192,6 +216,7 @@ def test_static_openapi_contains_exact_scheduled_task_contract() -> None:
         "ScheduledTaskRunListResponse",
         "ScheduledTaskStatusResponse",
         "StockAnalysisScheduledPayload",
+        "UnsupportedScheduledTaskItem",
     ]
     for path in paths:
         assert static["paths"][path] == runtime["paths"][path]

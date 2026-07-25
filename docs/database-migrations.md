@@ -200,6 +200,7 @@ CI Docker smoke 除了导入 `src.migrations.registry`、调用 `get_migrations(
 - **破坏性变更才升级版本**：重命名 / 删除 / 改语义 / 改类型属破坏性变更，必须把版本常量升到新值（如 `market-structure-v2`），并保留对旧值的读取处理。已发布的版本值不复用、不回收。
 - **生产者始终写入当前版本标签**：序列化必须带上版本字段，禁止在 dump 时丢弃它（守护测试对此回归覆盖）。
 - **消费者遇到不认识的版本必须优雅降级**：跳过该区块 / 返回空 / 回落默认值，绝不因历史 payload 版本不符而硬失败。既有实现：`src/market_structure_prompt.py` 与 `src/utils/data_processing.py` 在 `schema_version` 不匹配时跳过；`AnalysisContextPack.pack_version` 用 `Literal` 拒绝未知值。
+- Scheduled-task API 会把未知版本定义投影为不解析 payload 的 opaque 元数据；mutation 返回稳定冲突，due slot 只写入一次 `interrupted` 栅栏且不改动 definition 任一字段，因此旧应用既不会执行也不会重写新版本合同。
 - **不原地改写历史 payload**：历史记录按其内嵌版本解释，不做批量“升级”改写。若持久化落点（列 / 表）本身要变形，走上文 DB migration；payload 内版本与 DB migration 各司其职。
 
 ### 升级某个序列化版本的流程

@@ -53,7 +53,9 @@ ownership contracts below rather than introducing another scheduler.
 Times are stored as UTC-naive values under the repository's SQLite convention
 and returned by the API as UTC timestamps. The IANA timezone remains part of
 the definition, so daylight-saving changes are applied when calculating each
-next occurrence.
+next occurrence. During a fall-back fold, both valid UTC instants are eligible
+in chronological order. If the configured wall time does not exist during a
+spring-forward gap, that local date is skipped rather than silently shifted.
 
 ## API
 
@@ -70,7 +72,15 @@ All routes use the existing `/api/v1` authentication policy:
 
 Enable and disable are idempotent. Disabling prevents later occurrences but
 does not cancel an analysis that was already submitted to the canonical task
-queue.
+queue. A conflict-waiting occurrence that has not submitted or adopted a
+compatible execution is interrupted instead of dispatching after disable.
+
+Responses use a `compatibility` discriminator. Schema-v1 definitions return
+`supported` and the complete definition. An unknown future schema returns
+`unsupported_schema` plus only `id`, `schema_version`, `name`, enablement,
+timing, and timestamps; schedule and payload fields are not parsed or exposed.
+Status and run-history reads remain available, while enable/disable returns
+`409 scheduled_task_schema_unsupported` without changing any definition field.
 
 The database mutation is authoritative. If the immediate best-effort runtime
 reconciliation fails after a create, enable, or disable commit, the API still
@@ -85,9 +95,11 @@ constraint, so repeated polls cannot claim or dispatch the same occurrence.
 After downtime, the service claims at most one overdue occurrence and advances
 directly to the next future daily time; it does not replay an unbounded backlog.
 Every persisted definition is validated through the same schema-v1 contract
-before it is read, enabled, claimed, or reconciled. An unsupported future or
-corrupt due definition is atomically disabled and records one `interrupted`
-occurrence instead of being executed again on every poll.
+before it is mutated, claimed, or reconciled. An unsupported future definition
+is never parsed or rewritten. Its due slot receives one `interrupted` occurrence
+as a fence, and the due query excludes that same slot on later polls. A corrupt
+schema-v1 definition is atomically disabled and records one `interrupted`
+quarantine occurrence.
 
 The run statuses are:
 
@@ -95,23 +107,36 @@ The run statuses are:
 | --- | --- |
 | `dispatching` | The occurrence is claimed but its canonical task ID is not yet durable. |
 | `running` | The canonical analysis task is pending or processing. |
-| `retry_wait` | An owned failed analysis is waiting for the fixed 30-second retry boundary. |
+| `retry_wait` | A failed compatible execution is waiting for retry, or an incompatible active stock task is waiting for a new submission probe after 30 seconds. |
 | `succeeded` | The canonical analysis completed; available result references are stored. |
-| `failed` | The bounded attempts ended or a non-owned coalesced analysis failed. |
+| `failed` | The bounded compatible execution attempts ended. |
 | `skipped` | The selected market was closed and policy was `skip`. |
 | `interrupted` | Execution identity, definition validity, or required calendar classification was unavailable; no blind dispatch occurs. |
 
 Analysis submission reuses the canonical task queue's stock deduplication. If
-an active task has exactly the same canonical `stock_code`, `report_type`, and
-`notify` contract, the occurrence observes it instead of creating duplicate
-analysis and notification side effects. Any mismatch is terminal for the
-scheduled occurrence and is never treated as scheduled success. Only a task ID
-created by the occurrence can be retried. Each retry receives a new canonical
-task ID; `execution_task_ids` is append-only audit history, with the last ID
-representing the execution currently being observed.
+an active task has the same canonical stock and complete execution contract, the
+occurrence observes it instead of creating duplicate analysis and notification
+side effects. The contract covers normalized report type, analysis phase,
+force-refresh, notification, ordered skills, report language, decision-memory
+override, portfolio context, query source, and whether contextual reply targets
+are bound. `detailed` and `full` normalize to the same report mode; `None` and an
+explicit empty or disabled value remain distinct where execution distinguishes
+them.
+
+An incompatible active task moves the occurrence to `retry_wait` without adding
+an execution ID or consuming `max_attempts`; after the fixed 30-second interval,
+the queue is probed again. This serializes legitimate same-stock schedules while
+ensuring one active analysis at a time. Compatible accepted or coalesced
+executions consume attempts. If a non-owned compatible execution fails and
+attempts remain, the occurrence submits again rather than retrying someone
+else's task. Only a task ID created by the occurrence can use the queue's retry
+operation. `execution_task_ids` remains append-only audit history, with the last
+ID representing the execution currently being observed.
 
 The execution authority is process-local, as documented in
-[`task-execution-contract.md`](task-execution-contract.md). The durable
+[`task-execution-contract.md`](task-execution-contract.md) and
+[ADR-008](adr/ADR-008-persisted-schedule-process-local-execution-boundary.md).
+The durable
 occurrence claim prevents duplicate polling, but it does not claim distributed
 exactly-once execution. If a process exits after queue submission and before
 the task ID is stored, the run becomes `interrupted` and fails closed instead
@@ -122,7 +147,8 @@ requires a separate architecture decision and is out of scope.
 
 For `skip`, the scheduler calls the strict
 `src.core.trading_calendar.classify_market_session` boundary for the
-occurrence's local date. `OPEN` dispatches, `CLOSED` records `skipped`, and
+occurrence instant converted to the selected market's exchange timezone, not
+the user-selected schedule timezone. `OPEN` dispatches, `CLOSED` records `skipped`, and
 `UNKNOWN` records `interrupted` with
 `scheduled_task_calendar_unavailable`; financial work is never dispatched when
 classification is unavailable. The legacy `is_market_open` helper remains

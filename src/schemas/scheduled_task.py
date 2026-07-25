@@ -105,16 +105,34 @@ def next_daily_run_at(
     canonical_time = validate_daily_time(schedule_time)
     canonical_timezone = validate_timezone(timezone_name)
     after_utc = as_utc_aware(after)
-    local_after = after_utc.astimezone(ZoneInfo(canonical_timezone))
+    schedule_timezone = ZoneInfo(canonical_timezone)
+    local_after = after_utc.astimezone(schedule_timezone)
     hour, minute = (int(part) for part in canonical_time.split(":"))
-    candidate = datetime.combine(
-        local_after.date(),
-        time(hour=hour, minute=minute),
-        tzinfo=ZoneInfo(canonical_timezone),
-    )
-    if candidate <= local_after:
-        candidate += timedelta(days=1)
-    return candidate.astimezone(timezone.utc).replace(tzinfo=None)
+    wall_time = time(hour=hour, minute=minute)
+
+    # A local wall time can map to two UTC instants during a fall-back fold, or
+    # to no instant during a spring-forward gap. Round-tripping each fold makes
+    # both cases explicit and keeps the returned occurrence strictly monotonic.
+    for day_offset in range(4):
+        wall_datetime = datetime.combine(
+            local_after.date() + timedelta(days=day_offset),
+            wall_time,
+        )
+        valid_instants = set()
+        for fold in (0, 1):
+            local_candidate = wall_datetime.replace(
+                tzinfo=schedule_timezone,
+                fold=fold,
+            )
+            candidate_utc = local_candidate.astimezone(timezone.utc)
+            round_trip = candidate_utc.astimezone(schedule_timezone)
+            if round_trip.replace(tzinfo=None) == wall_datetime:
+                valid_instants.add(candidate_utc)
+        for candidate_utc in sorted(valid_instants):
+            if candidate_utc > after_utc:
+                return candidate_utc.replace(tzinfo=None)
+
+    raise RuntimeError("Unable to resolve the next daily schedule occurrence")
 
 
 def scheduled_local_date(

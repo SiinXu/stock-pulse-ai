@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from concurrent.futures import Future
-from datetime import datetime, timedelta
+from concurrent.futures import Future, ThreadPoolExecutor
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -13,9 +13,11 @@ from src.config import Config
 from src.core.trading_calendar import MarketSessionStatus
 from src.migrations.registry import SCHEDULED_TASK_SCHEMA_MIGRATION, TARGET_VERSION
 from src.repositories.scheduled_task_repo import ScheduledTaskRepository
+from src.schemas.scheduled_task import next_daily_run_at
 from src.services.scheduled_task_service import (
     ScheduledTaskContractError,
     ScheduledTaskService,
+    ScheduledTaskUnsupportedSchemaError,
     ScheduledTaskValidationError,
 )
 from src.services.task_queue import (
@@ -98,16 +100,24 @@ class CoalescingTaskQueue(FakeTaskQueue):
         super().__init__()
         self.existing_task_id = "existing-execution"
         self.existing_contract = existing_contract
+        self.coalesce = True
         self.snapshots[self.existing_task_id] = self._snapshot(
             self.existing_task_id,
             existing_status,
         )
 
     def submit_tasks_batch(self, **kwargs):
+        if not self.coalesce:
+            return super().submit_tasks_batch(**kwargs)
         self.submit_calls.append(kwargs)
+        requested_contract = AnalysisTaskCoalescingContract.from_metadata({
+            **kwargs,
+            "stock_code": kwargs["stock_codes"][0],
+        })
         return [], [SimpleNamespace(
             existing_task_id=self.existing_task_id,
             existing_contract=self.existing_contract,
+            requested_contract=requested_contract,
         )]
 
 
@@ -171,6 +181,46 @@ def task_contract(
     }
 
 
+def analysis_contract(**overrides) -> AnalysisTaskCoalescingContract:
+    metadata = {
+        "stock_code": "600519",
+        "report_type": "detailed",
+        "analysis_phase": "auto",
+        "force_refresh": False,
+        "notify": False,
+        "skills": None,
+        "report_language": None,
+        "use_memory": None,
+        "portfolio_context": None,
+        "query_source": "scheduled_task",
+        "context_bound": False,
+    }
+    metadata.update(overrides)
+    contract = AnalysisTaskCoalescingContract.from_metadata(metadata)
+    assert contract is not None
+    return contract
+
+
+def definition_values(row) -> dict:
+    return {
+        "id": row.id,
+        "schema_version": row.schema_version,
+        "name": row.name,
+        "task_type": row.task_type,
+        "schedule_kind": row.schedule_kind,
+        "schedule_time": row.schedule_time,
+        "timezone": row.timezone,
+        "calendar_market": row.calendar_market,
+        "non_trading_day_policy": row.non_trading_day_policy,
+        "payload_json": row.payload_json,
+        "enabled": row.enabled,
+        "max_attempts": row.max_attempts,
+        "next_run_at": row.next_run_at,
+        "created_at": row.created_at,
+        "updated_at": row.updated_at,
+    }
+
+
 def build_service(
     database,
     queue=None,
@@ -231,6 +281,53 @@ def test_stock_market_must_match_trading_calendar(database) -> None:
         match="stock_code market must match",
     ):
         service.create_task(contract, now=NOW)
+
+
+def test_daily_schedule_selects_second_fall_back_fold_after_first_passed() -> None:
+    result = next_daily_run_at(
+        schedule_time="01:30",
+        timezone_name="America/New_York",
+        after=datetime(2026, 11, 1, 6, 15, tzinfo=timezone.utc),
+    )
+
+    assert result == datetime(2026, 11, 1, 6, 30)
+
+
+def test_daily_schedule_skips_nonexistent_spring_forward_wall_time() -> None:
+    result = next_daily_run_at(
+        schedule_time="02:30",
+        timezone_name="America/New_York",
+        after=datetime(2026, 3, 8, 6, 0, tzinfo=timezone.utc),
+    )
+
+    assert result == datetime(2026, 3, 9, 6, 30)
+
+
+def test_market_calendar_uses_exchange_date_not_schedule_timezone(database) -> None:
+    observed_dates = []
+    queue = FakeTaskQueue()
+    service = build_service(
+        database,
+        queue,
+        market_session_provider=lambda _market, session_date: (
+            observed_dates.append(session_date) or MarketSessionStatus.CLOSED
+        ),
+    )
+    contract = task_contract()
+    contract["schedule"].update({
+        "time": "08:00",
+        "timezone": "Asia/Tokyo",
+        "calendar_market": "us",
+    })
+    contract["payload"]["stock_code"] = "AAPL"
+    due = datetime(2026, 7, 5, 23, 0)
+    service.create_task(contract, now=due - timedelta(minutes=1))
+
+    result = service.tick(now=due)
+
+    assert result == {"reconciled": 0, "claimed": 0, "skipped": 1}
+    assert observed_dates == [date(2026, 7, 5)]
+    assert queue.submit_calls == []
 
 
 def test_due_occurrence_dispatches_once_and_persists_success(database) -> None:
@@ -323,14 +420,12 @@ def test_unknown_calendar_never_dispatches_financial_work(
     assert run["error_code"] == "scheduled_task_calendar_unavailable"
 
 
-def test_due_occurrence_coalesces_with_existing_canonical_analysis(database) -> None:
+def test_failed_compatible_external_execution_is_resubmitted_not_retried(
+    database,
+) -> None:
     queue = CoalescingTaskQueue(
         existing_status=TaskStatus.PENDING,
-        existing_contract=AnalysisTaskCoalescingContract(
-            stock_code="600519",
-            report_type="detailed",
-            notify=False,
-        ),
+        existing_contract=analysis_contract(),
     )
     service = build_service(database, queue)
     task = service.create_task(task_contract(max_attempts=3), now=NOW)
@@ -345,9 +440,22 @@ def test_due_occurrence_coalesces_with_existing_canonical_analysis(database) -> 
     queue.set_status(queue.existing_task_id, TaskStatus.FAILED)
     service.tick(now=DUE + timedelta(seconds=1))
 
-    failed = service.get_status(task["id"])["latest_run"]
-    assert failed["status"] == "failed"
-    assert failed["error_code"] == "scheduled_task_coalesced_execution_failed"
+    waiting = service.get_status(task["id"])["latest_run"]
+    assert waiting["status"] == "retry_wait"
+    assert waiting["attempt_count"] == 1
+    assert waiting["error_code"] == "scheduled_task_coalesced_execution_failed"
+    assert queue.retry_calls == []
+
+    queue.coalesce = False
+    service.tick(now=DUE + timedelta(seconds=31))
+
+    running = service.get_status(task["id"])["latest_run"]
+    assert running["status"] == "running"
+    assert running["attempt_count"] == 2
+    assert running["execution_task_ids"] == [
+        queue.existing_task_id,
+        "execution-1",
+    ]
     assert queue.retry_calls == []
 
 
@@ -355,7 +463,7 @@ def test_due_occurrence_coalesces_with_existing_canonical_analysis(database) -> 
     ("report_type", "notify"),
     [("brief", False), ("detailed", True)],
 )
-def test_real_queue_rejects_mismatched_coalescing_contract(
+def test_real_queue_waits_for_mismatched_contract_then_dispatches(
     database,
     real_task_queue,
     report_type,
@@ -373,11 +481,25 @@ def test_real_queue_rejects_mismatched_coalescing_contract(
 
     service.tick(now=DUE)
 
-    failed = service.get_status(task["id"])["latest_run"]
-    assert failed["status"] == "failed"
-    assert failed["attempt_count"] == 1
-    assert failed["execution_task_ids"] == []
-    assert failed["error_code"] == "scheduled_task_coalesced_contract_mismatch"
+    waiting = service.get_status(task["id"])["latest_run"]
+    assert waiting["status"] == "retry_wait"
+    assert waiting["attempt_count"] == 0
+    assert waiting["execution_task_ids"] == []
+    assert waiting["error_code"] == "scheduled_task_execution_conflict"
+
+    with real_task_queue._data_lock:
+        real_task_queue._terminalize_locked(
+            real_task_queue._tasks[accepted[0].task_id],
+            TaskStatus.COMPLETED,
+            result={"stock_code": "600519"},
+        )
+    service.tick(now=DUE + timedelta(seconds=30))
+
+    running = service.get_status(task["id"])["latest_run"]
+    assert running["status"] == "running"
+    assert running["attempt_count"] == 1
+    assert len(running["execution_task_ids"]) == 1
+    assert running["execution_task_ids"][0] != accepted[0].task_id
 
 
 def test_real_queue_accepts_exact_coalescing_contract_without_owning_retry(
@@ -388,6 +510,7 @@ def test_real_queue_accepts_exact_coalescing_contract_without_owning_retry(
         ["600519"],
         report_type="detailed",
         notify=False,
+        query_source="scheduled_task",
     )
     assert duplicates == []
     existing_task_id = accepted[0].task_id
@@ -407,6 +530,115 @@ def test_real_queue_accepts_exact_coalescing_contract_without_owning_retry(
     succeeded = service.get_status(task["id"])["latest_run"]
     assert succeeded["status"] == "succeeded"
     assert succeeded["result_refs"] == ["matched-result"]
+
+
+def test_disable_interrupts_conflict_wait_before_any_dispatch(
+    database,
+    real_task_queue,
+) -> None:
+    accepted, duplicates = real_task_queue.submit_tasks_batch(
+        ["600519"],
+        force_refresh=True,
+    )
+    assert len(accepted) == 1
+    assert duplicates == []
+    service = build_service(database, real_task_queue)
+    task = service.create_task(task_contract(max_attempts=1), now=NOW)
+    service.tick(now=DUE)
+    waiting = service.get_status(task["id"])["latest_run"]
+    assert waiting["status"] == "retry_wait"
+    assert waiting["attempt_count"] == 0
+
+    service.set_enabled(task["id"], False, now=DUE + timedelta(seconds=1))
+    service.tick(now=DUE + timedelta(seconds=1))
+
+    interrupted = service.get_status(task["id"])["latest_run"]
+    assert interrupted["status"] == "interrupted"
+    assert interrupted["attempt_count"] == 0
+    assert interrupted["execution_task_ids"] == []
+    assert interrupted["error_code"] == "scheduled_task_disabled_before_dispatch"
+    assert len(real_task_queue._tasks) == 1
+
+
+def test_same_stock_different_schedules_execute_serially_with_one_attempt(
+    database,
+    real_task_queue,
+) -> None:
+    service = build_service(database, real_task_queue)
+    brief_contract = task_contract(max_attempts=1)
+    brief_contract["payload"]["report_type"] = "brief"
+    detailed_contract = task_contract(max_attempts=1)
+    detailed_contract["payload"]["notify"] = True
+    tasks = [
+        service.create_task(brief_contract, now=NOW),
+        service.create_task(detailed_contract, now=NOW),
+    ]
+
+    service.tick(now=DUE)
+
+    first_states = [service.get_status(item["id"])["latest_run"] for item in tasks]
+    running = next(run for run in first_states if run["status"] == "running")
+    waiting = next(run for run in first_states if run["status"] == "retry_wait")
+    assert running["attempt_count"] == 1
+    assert waiting["attempt_count"] == 0
+    assert len(real_task_queue._analyzing_stocks) == 1
+
+    with real_task_queue._data_lock:
+        real_task_queue._terminalize_locked(
+            real_task_queue._tasks[running["execution_task_ids"][0]],
+            TaskStatus.COMPLETED,
+            result={"stock_code": "600519"},
+        )
+    service.tick(now=DUE + timedelta(seconds=30))
+
+    second_states = [service.get_status(item["id"])["latest_run"] for item in tasks]
+    assert sorted(run["status"] for run in second_states) == ["running", "succeeded"]
+    second_running = next(run for run in second_states if run["status"] == "running")
+    assert second_running["attempt_count"] == 1
+    assert len(real_task_queue._analyzing_stocks) == 1
+
+    with real_task_queue._data_lock:
+        real_task_queue._terminalize_locked(
+            real_task_queue._tasks[second_running["execution_task_ids"][-1]],
+            TaskStatus.COMPLETED,
+            result={"stock_code": "600519"},
+        )
+    service.tick(now=DUE + timedelta(seconds=31))
+
+    assert [
+        service.get_status(item["id"])["latest_run"]["status"]
+        for item in tasks
+    ] == ["succeeded", "succeeded"]
+
+
+def test_identical_schedules_share_one_canonical_execution(database, real_task_queue) -> None:
+    service = build_service(database, real_task_queue)
+    tasks = [
+        service.create_task(task_contract(max_attempts=1), now=NOW),
+        service.create_task(task_contract(max_attempts=1), now=NOW),
+    ]
+
+    service.tick(now=DUE)
+
+    runs = [service.get_status(item["id"])["latest_run"] for item in tasks]
+    execution_ids = {run["execution_task_ids"][0] for run in runs}
+    assert len(execution_ids) == 1
+    assert all(run["status"] == "running" for run in runs)
+    assert len(real_task_queue._tasks) == 1
+
+    execution_id = execution_ids.pop()
+    with real_task_queue._data_lock:
+        real_task_queue._terminalize_locked(
+            real_task_queue._tasks[execution_id],
+            TaskStatus.COMPLETED,
+            result={"stock_code": "600519"},
+        )
+    service.tick(now=DUE + timedelta(seconds=1))
+
+    assert [
+        service.get_status(item["id"])["latest_run"]["status"]
+        for item in tasks
+    ] == ["succeeded", "succeeded"]
 
 
 def test_service_defers_repository_initialization_until_first_use() -> None:
@@ -443,24 +675,39 @@ def test_tick_retries_repository_discovery_after_transient_failure() -> None:
     assert repository.calls == 2
 
 
-def test_future_persisted_schema_fails_list_and_status_closed(database) -> None:
+def test_future_schema_reads_as_opaque_and_mutations_preserve_definition(database) -> None:
     service = build_service(database)
     task = service.create_task(task_contract(), now=NOW)
     with database.get_session() as session:
         row = session.get(ScheduledTaskRecord, task["id"])
         row.schema_version = 2
+        row.payload_json = "not-v1-json"
         session.commit()
+        expected = definition_values(row)
 
-    with pytest.raises(ScheduledTaskContractError):
-        service.list_tasks()
-    with pytest.raises(ScheduledTaskContractError):
-        service.get_status(task["id"])
+    listed = service.list_tasks()
+    opaque = listed["items"][0]
+    assert listed["total"] == 1
+    assert opaque == {
+        "compatibility": "unsupported_schema",
+        "id": task["id"],
+        "schema_version": 2,
+        "name": "Morning analysis",
+        "enabled": True,
+        "next_run_at": expected["next_run_at"].replace(tzinfo=timezone.utc),
+        "created_at": expected["created_at"].replace(tzinfo=timezone.utc),
+        "updated_at": expected["updated_at"].replace(tzinfo=timezone.utc),
+    }
+    assert service.get_status(task["id"])["task"] == opaque
+    with pytest.raises(ScheduledTaskUnsupportedSchemaError):
+        service.set_enabled(task["id"], False, now=NOW)
+    with database.get_session() as session:
+        assert definition_values(session.get(ScheduledTaskRecord, task["id"])) == expected
 
 
 @pytest.mark.parametrize(
     ("field_name", "value"),
     [
-        ("schema_version", 2),
         ("task_type", "research"),
         ("schedule_kind", "weekly"),
         ("non_trading_day_policy", "unknown"),
@@ -499,7 +746,38 @@ def test_tick_quarantines_incompatible_definition_once(
     assert runs["items"][0]["error_code"] == "scheduled_task_definition_invalid"
 
 
-def test_tick_quarantines_incompatible_definition_with_active_run(database) -> None:
+def test_future_schema_due_slot_is_fenced_once_without_definition_rewrite(
+    database,
+) -> None:
+    queue = FakeTaskQueue()
+    service_a = build_service(database, queue)
+    task = service_a.create_task(task_contract(), now=NOW)
+    with database.get_session() as session:
+        row = session.get(ScheduledTaskRecord, task["id"])
+        row.schema_version = 2
+        row.payload_json = "not-v1-json"
+        session.commit()
+        expected = definition_values(row)
+    service_b = build_service(database, queue)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(lambda service: service.tick(now=DUE), [service_a, service_b]))
+    follow_up = service_a.tick(now=DUE + timedelta(seconds=1))
+
+    assert sum(result["skipped"] for result in results) == 1
+    assert follow_up == {"reconciled": 0, "claimed": 0, "skipped": 0}
+    assert queue.submit_calls == []
+    with database.get_session() as session:
+        assert definition_values(session.get(ScheduledTaskRecord, task["id"])) == expected
+    runs = service_a.list_runs(task["id"])
+    assert runs["total"] == 1
+    assert runs["items"][0]["status"] == "interrupted"
+    assert runs["items"][0]["error_code"] == "scheduled_task_schema_unsupported"
+
+
+def test_future_schema_interrupts_active_projection_without_rewriting_definition(
+    database,
+) -> None:
     queue = FakeTaskQueue()
     service = build_service(database, queue)
     task = service.create_task(task_contract(max_attempts=3), now=NOW)
@@ -511,6 +789,7 @@ def test_tick_quarantines_incompatible_definition_with_active_run(database) -> N
         row = session.get(ScheduledTaskRecord, task["id"])
         row.schema_version = 2
         session.commit()
+        expected = definition_values(row)
 
     first = service.tick(now=DUE + timedelta(seconds=1))
     second = service.tick(now=DUE + timedelta(seconds=2))
@@ -520,12 +799,11 @@ def test_tick_quarantines_incompatible_definition_with_active_run(database) -> N
     assert len(queue.submit_calls) == 1
     with database.get_session() as session:
         persisted = session.get(ScheduledTaskRecord, task["id"])
-        assert persisted.enabled is False
-        assert persisted.next_run_at is None
+        assert definition_values(persisted) == expected
     interrupted = service.list_runs(task["id"])["items"][0]
     assert interrupted["status"] == "interrupted"
     assert interrupted["execution_task_ids"] == running["execution_task_ids"]
-    assert interrupted["error_code"] == "scheduled_task_definition_invalid"
+    assert interrupted["error_code"] == "scheduled_task_schema_unsupported"
 
 
 def test_failed_execution_retries_once_then_stops_at_bound(database) -> None:
