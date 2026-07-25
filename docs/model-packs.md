@@ -65,7 +65,8 @@ different disk. A later Ollama disk failure is therefore still possible.
 | `missing_manifest` / `missing_file` | Required data is absent | Download or build the complete pack again |
 | `size_mismatch` / `hash_mismatch` | Payload integrity does not match the manifest | Do not use the pack; re-download it from the trusted source |
 | `unsafe_archive_entry` | The archive contains a nested, duplicate, traversal, or symbolic-link entry | Rebuild it with `scripts/build_model_pack.py` |
-| `unsafe_modelfile` | Modelfile references an external path or unsupported instruction | Remove that instruction and rebuild |
+| `unsafe_modelfile` | Modelfile exceeds 1 MiB, references an external path, or uses an unsupported instruction | Reduce or correct the Modelfile and rebuild |
+| `invalid_license_file` | The license exceeds 2 MiB or is not valid UTF-8 text | Use the complete bounded UTF-8 license text and rebuild |
 | `invalid_gguf` | The declared weight does not have the GGUF header | Select the correct converted weight |
 | `model_pack_too_large` | The upload, archive, or declared payload exceeds 64 GiB | Select or build a smaller pack |
 | `invalid_archive` | The archive is unreadable or contains more than 256 files | Re-download it or rebuild it with only declared data |
@@ -151,7 +152,9 @@ Missing declared files fail import. Unsafe archive names, duplicate
 case-insensitive names, nested paths, and symbolic links fail import even when
 they are not declared. Directory and archive inventories are capped at 256
 entries (including empty directories), and the archive plus the sum of
-declared payload sizes are each capped at 64 GiB.
+declared payload sizes are each capped at 64 GiB. `manifest.json` and the
+constrained Modelfile are each capped at 1 MiB; the UTF-8 license payload is
+capped at 2 MiB.
 
 ### Constrained Modelfile
 
@@ -208,7 +211,8 @@ python3 scripts/build_model_pack.py \
 
 The builder:
 
-- validates GGUF magic and the Modelfile subset;
+- validates GGUF magic, the 1 MiB Modelfile limit and subset, and the 2 MiB
+  UTF-8 license limit;
 - computes each payload SHA-256 and byte size;
 - writes canonical `manifest.json`;
 - stores the already-compressed GGUF without recompressing it;

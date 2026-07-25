@@ -91,6 +91,101 @@ def test_builder_is_deterministic_for_the_same_sources(tmp_path: Path) -> None:
     assert first.read_bytes() == second.read_bytes()
 
 
+def test_builder_archives_the_exact_validated_modelfile_and_license_bytes(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    gguf, modelfile, license_file = _sources(tmp_path)
+    original_modelfile = modelfile.read_bytes()
+    original_license = license_file.read_bytes()
+    output = tmp_path / "canonical-text.modelpack"
+    original_write_bytes = model_pack_builder._write_bytes
+
+    def mutate_after_manifest(
+        archive,
+        filename: str,
+        payload: bytes,
+        **kwargs,
+    ) -> None:
+        if filename == "manifest.json":
+            modelfile.write_text("FROM /private/outside.gguf\n", encoding="utf-8")
+            license_file.write_bytes(b"\xff\xfe")
+        original_write_bytes(archive, filename, payload, **kwargs)
+
+    monkeypatch.setattr(
+        model_pack_builder,
+        "_write_bytes",
+        mutate_after_manifest,
+    )
+
+    artifact, _checksum = build_model_pack(
+        gguf_path=gguf,
+        modelfile_path=modelfile,
+        license_file_path=license_file,
+        model_id="stockpulse/test:q4",
+        display_name="StockPulse Test",
+        license_id="Apache-2.0",
+        minimum_memory_gb=8,
+        output_path=output,
+    )
+
+    with ZipFile(artifact) as archive:
+        assert archive.read("Modelfile") == original_modelfile
+        assert archive.read("LICENSE") == original_license
+    with inspect_model_pack(artifact) as inspected:
+        assert inspected.modelfile.from_file == "weights.gguf"
+
+
+@pytest.mark.parametrize("same_size", [False, True])
+def test_builder_rejects_gguf_mutation_after_manifest_validation(
+    tmp_path: Path,
+    monkeypatch,
+    same_size: bool,
+) -> None:
+    gguf, modelfile, license_file = _sources(tmp_path)
+    output = tmp_path / "changing-gguf.modelpack"
+    original_write_bytes = model_pack_builder._write_bytes
+
+    def mutate_after_manifest(
+        archive,
+        filename: str,
+        payload: bytes,
+        **kwargs,
+    ) -> None:
+        if filename == "manifest.json":
+            if same_size:
+                original = gguf.read_bytes()
+                gguf.write_bytes(original[:-1] + bytes([original[-1] ^ 1]))
+            else:
+                with gguf.open("ab") as file_obj:
+                    file_obj.write(b"growth")
+        original_write_bytes(archive, filename, payload, **kwargs)
+
+    monkeypatch.setattr(
+        model_pack_builder,
+        "_write_bytes",
+        mutate_after_manifest,
+    )
+
+    with pytest.raises(ModelPackError) as error:
+        build_model_pack(
+            gguf_path=gguf,
+            modelfile_path=modelfile,
+            license_file_path=license_file,
+            model_id="stockpulse/test:q4",
+            display_name="StockPulse Test",
+            license_id="Apache-2.0",
+            minimum_memory_gb=8,
+            output_path=output,
+        )
+
+    assert error.value.code == "source_changed"
+    assert "Stop modifying" in error.value.user_message
+    assert not output.exists()
+    assert not output.with_name(f"{output.name}.sha256").exists()
+    assert list(tmp_path.glob(f".{output.name}.*.tmp")) == []
+
+
 def test_builder_rejects_unsafe_modelfile_before_writing(tmp_path: Path) -> None:
     gguf, modelfile, license_file = _sources(tmp_path)
     modelfile.write_text(

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import shutil
 import stat
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Callable, Dict, Iterator, List, Optional, Tuple
+from typing import BinaryIO, Callable, Dict, Iterator, List, Optional, Tuple
 from zipfile import BadZipFile, ZipFile, is_zipfile
 
 from src.model_pack.errors import ModelPackError
@@ -16,7 +17,7 @@ from src.model_pack.manifest import (
     MAX_MODEL_PACK_BYTES,
     parse_manifest_bytes,
 )
-from src.model_pack.models import InspectedModelPack, ModelPackManifest
+from src.model_pack.models import InspectedModelPack, ModelPackFile, ModelPackManifest
 from src.model_pack.modelfile import MAX_MODELFILE_BYTES, parse_modelfile
 
 
@@ -46,6 +47,104 @@ def _sha256(path: Path) -> str:
             f"Could not read {path.name}. Check file permissions and try again.",
         ) from exc
     return digest.hexdigest()
+
+
+def _same_file_identity(first: os.stat_result, second: os.stat_result) -> bool:
+    """Return whether two stat results identify the same filesystem object."""
+    return (first.st_dev, first.st_ino) == (second.st_dev, second.st_ino)
+
+
+@contextmanager
+def _open_regular_payload(path: Path, name: str) -> Iterator[Tuple[BinaryIO, int]]:
+    """Open one declared source through a stable verified regular-file handle."""
+    file_obj: Optional[BinaryIO] = None
+    try:
+        path_stat = path.lstat()
+        if not stat.S_ISREG(path_stat.st_mode):
+            raise _error(
+                "unsafe_package_entry",
+                (
+                    f"{name} must be a regular file inside the Model Pack. "
+                    "Build the pack again."
+                ),
+            )
+        file_obj = path.open("rb")
+        opened_stat = os.fstat(file_obj.fileno())
+        if (
+            not stat.S_ISREG(opened_stat.st_mode)
+            or not _same_file_identity(path_stat, opened_stat)
+        ):
+            raise _error(
+                "unsafe_package_entry",
+                (
+                    f"{name} changed while it was opened. "
+                    "Stop modifying the Model Pack and try again."
+                ),
+            )
+    except ModelPackError:
+        if file_obj is not None:
+            file_obj.close()
+        raise
+    except FileNotFoundError as exc:
+        if file_obj is not None:
+            file_obj.close()
+        raise _error(
+            "missing_file",
+            f"Model Pack is missing {name}. Download or build the pack again.",
+        ) from exc
+    except OSError as exc:
+        if file_obj is not None:
+            file_obj.close()
+        raise _error(
+            "file_read_failed",
+            f"Could not read {name}. Check file permissions and try again.",
+        ) from exc
+    assert file_obj is not None
+    try:
+        yield file_obj, opened_stat.st_size
+    finally:
+        file_obj.close()
+
+
+def _validate_role_size(file_entry: ModelPackFile, size_bytes: int) -> None:
+    """Validate one declared or actual size against its role-specific cap."""
+    path = file_entry.path
+    role = file_entry.role
+    if role == "modelfile" and size_bytes > MAX_MODELFILE_BYTES:
+        raise _error(
+            "unsafe_modelfile",
+            (
+                f"{path} exceeds the {MAX_MODELFILE_BYTES}-byte limit. "
+                "Reduce it and rebuild the pack."
+            ),
+        )
+    if role == "license" and size_bytes > MAX_LICENSE_BYTES:
+        raise _error(
+            "invalid_license_file",
+            (
+                f"{path} exceeds the {MAX_LICENSE_BYTES}-byte limit. "
+                "Use the plain-text license and rebuild the pack."
+            ),
+        )
+
+
+def _validate_declared_size(file_entry: ModelPackFile, actual_size: int) -> None:
+    """Validate one actual payload size against its declaration and role cap."""
+    if actual_size != file_entry.size_bytes:
+        raise _error(
+            "size_mismatch",
+            (
+                f"{file_entry.path} has the wrong size. "
+                "Download or build the pack again."
+            ),
+        )
+    _validate_role_size(file_entry, actual_size)
+
+
+def _validate_manifest_role_sizes(manifest: ModelPackManifest) -> None:
+    """Reject role-specific declared sizes before any payload copy or extraction."""
+    for file_entry in manifest.files:
+        _validate_role_size(file_entry, file_entry.size_bytes)
 
 
 def _disk_required_bytes(payload_size: int, *, archive: bool) -> int:
@@ -134,30 +233,7 @@ def _validate_payload_files(
                 "file_read_failed",
                 f"Could not read {file_entry.path}. Check file permissions and try again.",
             ) from exc
-        if actual_size != file_entry.size_bytes:
-            raise _error(
-                "size_mismatch",
-                (
-                    f"{file_entry.path} has the wrong size. "
-                    "Download or build the pack again."
-                ),
-            )
-        if file_entry.role == "modelfile" and actual_size > MAX_MODELFILE_BYTES:
-            raise _error(
-                "unsafe_modelfile",
-                (
-                    f"{file_entry.path} exceeds the {MAX_MODELFILE_BYTES}-byte limit. "
-                    "Reduce it and rebuild the pack."
-                ),
-            )
-        if file_entry.role == "license" and actual_size > MAX_LICENSE_BYTES:
-            raise _error(
-                "invalid_license_file",
-                (
-                    f"{file_entry.path} exceeds the {MAX_LICENSE_BYTES}-byte limit. "
-                    "Use the plain-text license and rebuild the pack."
-                ),
-            )
+        _validate_declared_size(file_entry, actual_size)
         if _sha256(path) != file_entry.sha256:
             raise _error(
                 "hash_mismatch",
@@ -231,31 +307,49 @@ def _build_inspection(
 def _read_directory_manifest(root: Path) -> Tuple[ModelPackManifest, bytes]:
     """Read and parse the regular root manifest from a directory."""
     manifest_path = root / MANIFEST_FILENAME
-    if not manifest_path.exists():
-        raise _error(
-            "missing_manifest",
-            "Model Pack is missing manifest.json. Download or build the pack again.",
-        )
-    if manifest_path.is_symlink() or not manifest_path.is_file():
-        raise _error(
-            "unsafe_package_entry",
-            "manifest.json must be a regular file. Build the pack again.",
-        )
+    file_obj: Optional[BinaryIO] = None
     try:
-        if manifest_path.stat().st_size > MAX_MANIFEST_BYTES:
+        path_stat = manifest_path.lstat()
+        if not stat.S_ISREG(path_stat.st_mode):
+            raise _error(
+                "unsafe_package_entry",
+                "manifest.json must be a regular file. Build the pack again.",
+            )
+        file_obj = manifest_path.open("rb")
+        opened_stat = os.fstat(file_obj.fileno())
+        if (
+            not stat.S_ISREG(opened_stat.st_mode)
+            or not _same_file_identity(path_stat, opened_stat)
+        ):
+            raise _error(
+                "unsafe_package_entry",
+                (
+                    "manifest.json changed while it was opened. "
+                    "Stop modifying the Model Pack and try again."
+                ),
+            )
+        payload = file_obj.read(MAX_MANIFEST_BYTES + 1)
+        if len(payload) > MAX_MANIFEST_BYTES:
             raise _error(
                 "invalid_manifest",
                 "manifest.json is too large. Build the pack again with the current tool.",
             )
-        payload = manifest_path.read_bytes()
         return parse_manifest_bytes(payload), payload
     except ModelPackError:
         raise
+    except FileNotFoundError as exc:
+        raise _error(
+            "missing_manifest",
+            "Model Pack is missing manifest.json. Download or build the pack again.",
+        ) from exc
     except OSError as exc:
         raise _error(
             "file_read_failed",
             "Could not read manifest.json. Check file permissions and try again.",
         ) from exc
+    finally:
+        if file_obj is not None:
+            file_obj.close()
 
 
 def _directory_inventory(root: Path) -> Tuple[str, ...]:
@@ -303,23 +397,69 @@ def _copy_directory_payload(
     manifest: ModelPackManifest,
     manifest_payload: bytes,
 ) -> None:
-    """Copy only declared regular payload data into a private snapshot."""
+    """Copy exact declared bytes into a private snapshot through stable handles."""
     current_name = MANIFEST_FILENAME
     try:
         (destination / MANIFEST_FILENAME).write_bytes(manifest_payload)
+        copied_bytes = 0
         for file_entry in manifest.files:
             current_name = file_entry.path
             source = source_root / file_entry.path
-            source_stat = source.lstat()
-            if source.is_symlink() or not stat.S_ISREG(source_stat.st_mode):
+            digest = hashlib.sha256()
+            with _open_regular_payload(
+                source,
+                file_entry.path,
+            ) as (input_file, opened_size):
+                if opened_size != file_entry.size_bytes:
+                    raise _error(
+                        "size_mismatch",
+                        (
+                            f"{file_entry.path} changed while it was copied. "
+                            "Stop modifying the Model Pack and try again."
+                        ),
+                    )
+                _validate_declared_size(file_entry, opened_size)
+                target = destination / file_entry.path
+                remaining = file_entry.size_bytes
+                with target.open("xb") as output_file:
+                    while remaining:
+                        chunk = input_file.read(min(_HASH_CHUNK_SIZE, remaining))
+                        if not chunk:
+                            raise _error(
+                                "size_mismatch",
+                                (
+                                    f"{file_entry.path} changed while it was copied. "
+                                    "Stop modifying the Model Pack and try again."
+                                ),
+                            )
+                        output_file.write(chunk)
+                        digest.update(chunk)
+                        remaining -= len(chunk)
+                        copied_bytes += len(chunk)
+                        if copied_bytes > MAX_MODEL_PACK_BYTES:
+                            raise _error(
+                                "model_pack_too_large",
+                                (
+                                    "This Model Pack exceeds the 64 GiB limit. "
+                                    "Build or select a smaller pack."
+                                ),
+                            )
+                    if input_file.read(1):
+                        raise _error(
+                            "size_mismatch",
+                            (
+                                f"{file_entry.path} changed while it was copied. "
+                                "Stop modifying the Model Pack and try again."
+                            ),
+                        )
+            if digest.hexdigest() != file_entry.sha256:
                 raise _error(
-                    "unsafe_package_entry",
+                    "hash_mismatch",
                     (
-                        f"{file_entry.path} must be a regular file inside the Model Pack. "
-                        "Build the pack again."
+                        f"{file_entry.path} failed SHA-256 verification. "
+                        "Download or build the pack again."
                     ),
                 )
-            shutil.copyfile(source, destination / file_entry.path)
     except ModelPackError:
         raise
     except FileNotFoundError as exc:
@@ -334,6 +474,53 @@ def _copy_directory_payload(
         ) from exc
 
 
+def _prevalidate_directory_payloads(
+    root: Path,
+    manifest: ModelPackManifest,
+) -> int:
+    """Validate source types and actual sizes before disk admission or copying."""
+    total_size = 0
+    for file_entry in manifest.files:
+        path = root / file_entry.path
+        try:
+            path_stat = path.lstat()
+        except FileNotFoundError as exc:
+            raise _error(
+                "missing_file",
+                (
+                    f"Model Pack is missing {file_entry.path}. "
+                    "Download or build the pack again."
+                ),
+            ) from exc
+        except OSError as exc:
+            raise _error(
+                "file_read_failed",
+                (
+                    f"Could not read {file_entry.path}. "
+                    "Check file permissions and try again."
+                ),
+            ) from exc
+        if not stat.S_ISREG(path_stat.st_mode):
+            raise _error(
+                "unsafe_package_entry",
+                (
+                    f"{file_entry.path} must be a regular file inside the Model Pack. "
+                    "Build the pack again."
+                ),
+            )
+        _validate_declared_size(file_entry, path_stat.st_size)
+        total_size += path_stat.st_size
+        if total_size > MAX_MODEL_PACK_BYTES:
+            raise _error(
+                "model_pack_too_large",
+                (
+                    "This Model Pack exceeds the 64 GiB limit. "
+                    "Build or select a smaller pack."
+                ),
+            )
+    return total_size
+
+
 @contextmanager
 def _inspect_directory(
     root: Path,
@@ -342,6 +529,7 @@ def _inspect_directory(
 ) -> Iterator[InspectedModelPack]:
     """Inspect a directory through a private immutable snapshot."""
     manifest, manifest_payload = _read_directory_manifest(root)
+    _validate_manifest_role_sizes(manifest)
     expected = {MANIFEST_FILENAME, *(entry.path for entry in manifest.files)}
     inventory = _directory_inventory(root)
     warnings = tuple(
@@ -349,7 +537,7 @@ def _inspect_directory(
         for name in inventory
         if name not in expected
     )
-    payload_size = sum(entry.size_bytes for entry in manifest.files)
+    payload_size = _prevalidate_directory_payloads(root, manifest)
     temp_root = Path(tempfile.gettempdir())
     _check_disk(
         temp_root,
@@ -482,6 +670,7 @@ def _inspect_archive(
     with archive:
         inventory = _zip_inventory(archive)
         manifest = _read_zip_manifest(archive, inventory)
+        _validate_manifest_role_sizes(manifest)
         expected = {MANIFEST_FILENAME, *(entry.path for entry in manifest.files)}
         warnings = tuple(
             _unexpected_file_warning(name)

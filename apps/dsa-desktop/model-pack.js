@@ -395,12 +395,94 @@ async function sha256File(filePath) {
   });
 }
 
-async function readBoundedFile(filePath, maxBytes, code, message) {
-  const fileStat = await fs.promises.stat(filePath);
-  if (fileStat.size < 1 || fileStat.size > maxBytes) {
-    throw new ModelPackError(code, message);
+function sameFileIdentity(first, second) {
+  return first.dev === second.dev && first.ino === second.ino;
+}
+
+async function openStableRegularFile(filePath, unsafeMessage) {
+  const pathStat = await fs.promises.lstat(filePath);
+  if (!pathStat.isFile() || pathStat.isSymbolicLink()) {
+    throw new ModelPackError('unsafe_package_entry', unsafeMessage);
   }
-  return fs.promises.readFile(filePath);
+  const handle = await fs.promises.open(filePath, 'r');
+  try {
+    const openedStat = await handle.stat();
+    if (!openedStat.isFile() || !sameFileIdentity(pathStat, openedStat)) {
+      throw new ModelPackError(
+        'unsafe_package_entry',
+        `${path.basename(filePath)} changed while it was opened. ` +
+          'Stop modifying the Model Pack and try again.'
+      );
+    }
+    return { handle, size: openedStat.size };
+  } catch (error) {
+    await handle.close();
+    throw error;
+  }
+}
+
+async function readBoundedFile(filePath, maxBytes, code, message) {
+  const opened = await openStableRegularFile(
+    filePath,
+    `${path.basename(filePath)} must be a regular file inside the Model Pack. ` +
+      'Build the pack again.'
+  );
+  try {
+    if (opened.size < 1 || opened.size > maxBytes) {
+      throw new ModelPackError(code, message);
+    }
+    const payload = Buffer.alloc(maxBytes + 1);
+    let offset = 0;
+    while (offset < payload.length) {
+      const { bytesRead } = await opened.handle.read(
+        payload,
+        offset,
+        payload.length - offset,
+        null
+      );
+      if (bytesRead === 0) {
+        break;
+      }
+      offset += bytesRead;
+    }
+    if (offset < 1 || offset > maxBytes) {
+      throw new ModelPackError(code, message);
+    }
+    return payload.subarray(0, offset);
+  } finally {
+    await opened.handle.close();
+  }
+}
+
+function validateRoleSize(entry, sizeBytes) {
+  if (entry.role === 'modelfile' && sizeBytes > MODEL_PACK_MAX_MODELFILE_BYTES) {
+    throw new ModelPackError(
+      'unsafe_modelfile',
+      `${entry.path} exceeds the safe size limit. Reduce it and rebuild the pack.`
+    );
+  }
+  if (entry.role === 'license' && sizeBytes > MODEL_PACK_MAX_LICENSE_BYTES) {
+    throw new ModelPackError(
+      'invalid_license_file',
+      `${entry.path} exceeds the safe size limit. Use plain-text terms and rebuild the pack.`
+    );
+  }
+}
+
+function validateDeclaredSize(entry, actualSize) {
+  if (actualSize !== entry.sizeBytes) {
+    throw new ModelPackError(
+      'size_mismatch',
+      `${entry.path} has the wrong size. Download or build the pack again.`
+    );
+  }
+  validateRoleSize(entry, actualSize);
+}
+
+function validateManifestRoleSizes(manifest) {
+  for (const entry of manifest.files) {
+    validateRoleSize(entry, entry.sizeBytes);
+  }
 }
 
 async function validatePayload(root, manifest) {
@@ -424,24 +506,7 @@ async function validatePayload(root, manifest) {
         `${entry.path} must be a regular file inside the Model Pack. Build the pack again.`
       );
     }
-    if (fileStat.size !== entry.sizeBytes) {
-      throw new ModelPackError(
-        'size_mismatch',
-        `${entry.path} has the wrong size. Download or build the pack again.`
-      );
-    }
-    if (entry.role === 'modelfile' && fileStat.size > MODEL_PACK_MAX_MODELFILE_BYTES) {
-      throw new ModelPackError(
-        'unsafe_modelfile',
-        `${entry.path} exceeds the safe size limit. Reduce it and rebuild the pack.`
-      );
-    }
-    if (entry.role === 'license' && fileStat.size > MODEL_PACK_MAX_LICENSE_BYTES) {
-      throw new ModelPackError(
-        'invalid_license_file',
-        `${entry.path} exceeds the safe size limit. Use plain-text terms and rebuild the pack.`
-      );
-    }
+    validateDeclaredSize(entry, fileStat.size);
     const digest = await sha256File(filePath);
     if (digest !== entry.sha256) {
       throw new ModelPackError(
@@ -480,8 +545,16 @@ async function defaultDiskFreeBytes(location) {
   return Number(statfs.bavail * statfs.bsize);
 }
 
-async function checkDisk(location, manifest, archive, diskFreeProvider) {
-  const payloadSize = manifest.files.reduce((total, entry) => total + entry.sizeBytes, 0);
+async function checkDisk(
+  location,
+  manifest,
+  archive,
+  diskFreeProvider,
+  verifiedPayloadSize = null
+) {
+  const payloadSize = verifiedPayloadSize === null
+    ? manifest.files.reduce((total, entry) => total + entry.sizeBytes, 0)
+    : verifiedPayloadSize;
   let freeBytes;
   try {
     freeBytes = Number(await diskFreeProvider(location));
@@ -498,6 +571,122 @@ async function checkDisk(location, manifest, archive, diskFreeProvider) {
       'insufficient_disk_space',
       `Not enough disk space to import this Model Pack. Free at least ${gib} GiB and try again.`
     );
+  }
+}
+
+async function prevalidateDirectoryPayloads(root, manifest) {
+  let totalSize = 0;
+  for (const entry of manifest.files) {
+    const filePath = path.join(root, entry.path);
+    let fileStat;
+    try {
+      fileStat = await fs.promises.lstat(filePath);
+    } catch (error) {
+      if (error && error.code === 'ENOENT') {
+        throw new ModelPackError(
+          'missing_file',
+          `Model Pack is missing ${entry.path}. Download or build the pack again.`
+        );
+      }
+      throw error;
+    }
+    if (!fileStat.isFile() || fileStat.isSymbolicLink()) {
+      throw new ModelPackError(
+        'unsafe_package_entry',
+        `${entry.path} must be a regular file inside the Model Pack. Build the pack again.`
+      );
+    }
+    validateDeclaredSize(entry, fileStat.size);
+    totalSize += fileStat.size;
+    if (totalSize > MODEL_PACK_MAX_BYTES) {
+      throw new ModelPackError(
+        'model_pack_too_large',
+        'This Model Pack exceeds the 64 GiB limit. Build or select a smaller pack.'
+      );
+    }
+  }
+  return totalSize;
+}
+
+async function writeAll(handle, payload, length) {
+  let offset = 0;
+  while (offset < length) {
+    const { bytesWritten } = await handle.write(
+      payload,
+      offset,
+      length - offset,
+      null
+    );
+    if (bytesWritten < 1) {
+      throw new Error('destination write made no progress');
+    }
+    offset += bytesWritten;
+  }
+}
+
+async function copyDeclaredFile(sourcePath, destinationPath, entry, copyState) {
+  const opened = await openStableRegularFile(
+    sourcePath,
+    `${entry.path} must be a regular file inside the Model Pack. Build the pack again.`
+  );
+  let output = null;
+  try {
+    if (opened.size !== entry.sizeBytes) {
+      throw new ModelPackError(
+        'size_mismatch',
+        `${entry.path} changed while it was copied. ` +
+          'Stop modifying the Model Pack and try again.'
+      );
+    }
+    validateDeclaredSize(entry, opened.size);
+    output = await fs.promises.open(destinationPath, 'wx', 0o600);
+    const digest = crypto.createHash('sha256');
+    const chunk = Buffer.alloc(Math.min(MODEL_PACK_HASH_CHUNK_SIZE, entry.sizeBytes));
+    let remaining = entry.sizeBytes;
+    while (remaining > 0) {
+      const requested = Math.min(chunk.length, remaining);
+      const { bytesRead } = await opened.handle.read(chunk, 0, requested, null);
+      if (bytesRead < 1) {
+        throw new ModelPackError(
+          'size_mismatch',
+          `${entry.path} changed while it was copied. ` +
+            'Stop modifying the Model Pack and try again.'
+        );
+      }
+      await writeAll(output, chunk, bytesRead);
+      digest.update(chunk.subarray(0, bytesRead));
+      remaining -= bytesRead;
+      copyState.bytes += bytesRead;
+      if (copyState.bytes > MODEL_PACK_MAX_BYTES) {
+        throw new ModelPackError(
+          'model_pack_too_large',
+          'This Model Pack exceeds the 64 GiB limit. Build or select a smaller pack.'
+        );
+      }
+    }
+    const extra = Buffer.alloc(1);
+    const { bytesRead: extraBytes } = await opened.handle.read(extra, 0, 1, null);
+    if (extraBytes > 0) {
+      throw new ModelPackError(
+        'size_mismatch',
+        `${entry.path} changed while it was copied. ` +
+          'Stop modifying the Model Pack and try again.'
+      );
+    }
+    if (digest.digest('hex') !== entry.sha256) {
+      throw new ModelPackError(
+        'hash_mismatch',
+        `${entry.path} failed SHA-256 verification. Download or build the pack again.`
+      );
+    }
+  } finally {
+    try {
+      if (output !== null) {
+        await output.close();
+      }
+    } finally {
+      await opened.handle.close();
+    }
   }
 }
 
@@ -797,13 +986,6 @@ async function inspectDirectory(source, diskFreeProvider) {
   const manifestPath = path.join(source, MODEL_PACK_MANIFEST_FILENAME);
   let manifestPayload;
   try {
-    const manifestStat = await fs.promises.lstat(manifestPath);
-    if (!manifestStat.isFile() || manifestStat.isSymbolicLink()) {
-      throw new ModelPackError(
-        'unsafe_package_entry',
-        'manifest.json must be a regular file. Build the pack again.'
-      );
-    }
     manifestPayload = await readBoundedFile(
       manifestPath,
       MODEL_PACK_MAX_MANIFEST_BYTES,
@@ -820,6 +1002,7 @@ async function inspectDirectory(source, diskFreeProvider) {
     throw error;
   }
   const manifest = parseModelPackManifest(manifestPayload);
+  validateManifestRoleSizes(manifest);
   const inventory = await readDirectoryInventory(source);
   const expected = new Set([
     MODEL_PACK_MANIFEST_FILENAME,
@@ -828,7 +1011,14 @@ async function inspectDirectory(source, diskFreeProvider) {
   const warnings = inventory
     .filter((name) => !expected.has(name))
     .map(unexpectedWarning);
-  await checkDisk(os.tmpdir(), manifest, true, diskFreeProvider);
+  const verifiedPayloadSize = await prevalidateDirectoryPayloads(source, manifest);
+  await checkDisk(
+    os.tmpdir(),
+    manifest,
+    true,
+    diskFreeProvider,
+    verifiedPayloadSize
+  );
   const temporaryRoot = await fs.promises.mkdtemp(
     path.join(os.tmpdir(), 'stockpulse-model-pack-')
   );
@@ -839,20 +1029,15 @@ async function inspectDirectory(source, diskFreeProvider) {
       manifestPayload,
       { flag: 'wx', mode: 0o600 }
     );
+    const copyState = { bytes: 0 };
     for (const fileEntry of manifest.files) {
       currentName = fileEntry.path;
       const sourcePath = path.join(source, fileEntry.path);
-      const sourceStat = await fs.promises.lstat(sourcePath);
-      if (!sourceStat.isFile() || sourceStat.isSymbolicLink()) {
-        throw new ModelPackError(
-          'unsafe_package_entry',
-          `${fileEntry.path} must be a regular file inside the Model Pack. Build the pack again.`
-        );
-      }
-      await fs.promises.copyFile(
+      await copyDeclaredFile(
         sourcePath,
         path.join(temporaryRoot, fileEntry.path),
-        fs.constants.COPYFILE_EXCL
+        fileEntry,
+        copyState
       );
     }
     return await buildInspection(
@@ -893,6 +1078,7 @@ async function inspectArchive(source, diskFreeProvider) {
     );
   }
   const manifest = parseModelPackManifest(catalog.manifestPayload);
+  validateManifestRoleSizes(manifest);
   const expected = new Set([
     MODEL_PACK_MANIFEST_FILENAME,
     ...manifest.files.map((entry) => entry.path),

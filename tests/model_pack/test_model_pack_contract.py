@@ -9,7 +9,9 @@ from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 import pytest
 
+import src.model_pack.validation as model_pack_validation
 from src.model_pack import (
+    MAX_LICENSE_BYTES,
     MAX_MODEL_PACK_ENTRIES,
     MAX_MODEL_PACK_BYTES,
     ModelPackError,
@@ -17,6 +19,8 @@ from src.model_pack import (
     inspect_model_pack,
     parse_manifest,
 )
+from src.model_pack.manifest import MAX_MANIFEST_BYTES
+from src.model_pack.modelfile import MAX_MODELFILE_BYTES
 
 
 def _sha256(path: Path) -> str:
@@ -182,6 +186,126 @@ def test_inspect_directory_uses_a_private_snapshot_until_cleanup(tmp_path: Path)
         )
 
     assert not snapshot_root.exists()
+
+
+def test_directory_rejects_actual_size_before_snapshot_copy(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    pack_path = _write_pack(tmp_path / "declared-size-mismatch")
+    (pack_path / "weights.gguf").write_bytes(b"GGUF" + b"x" * (4 * 1024 * 1024))
+
+    def reject_snapshot(*_args, **_kwargs) -> None:
+        raise AssertionError("a size mismatch must fail before snapshot copying")
+
+    monkeypatch.setattr(
+        model_pack_validation,
+        "_copy_directory_payload",
+        reject_snapshot,
+    )
+
+    with pytest.raises(ModelPackError) as error:
+        with inspect_model_pack(pack_path):
+            pass
+
+    _assert_error(error, "size_mismatch", "Download or build the pack again")
+
+
+def test_directory_rejects_growth_between_preflight_and_bounded_copy(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    pack_path = _write_pack(tmp_path / "growing-payload")
+    gguf_path = pack_path / "weights.gguf"
+
+    def grow_after_preflight(*_args, **_kwargs) -> None:
+        with gguf_path.open("ab") as file_obj:
+            file_obj.write(b"x" * (4 * 1024 * 1024))
+
+    monkeypatch.setattr(model_pack_validation, "_check_disk", grow_after_preflight)
+
+    with pytest.raises(ModelPackError) as error:
+        with inspect_model_pack(pack_path):
+            pass
+
+    _assert_error(error, "size_mismatch", "Stop modifying the Model Pack")
+
+
+def test_directory_manifest_growth_is_read_with_a_hard_byte_bound(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    pack_path = _write_pack(tmp_path / "growing-manifest")
+    manifest_path = pack_path / "manifest.json"
+    original_open = Path.open
+
+    class BoundedReader:
+        def __init__(self, file_obj) -> None:
+            self._file_obj = file_obj
+
+        def fileno(self) -> int:
+            return self._file_obj.fileno()
+
+        def read(self, size: int = -1) -> bytes:
+            assert size == MAX_MANIFEST_BYTES + 1
+            return self._file_obj.read(size)
+
+        def close(self) -> None:
+            self._file_obj.close()
+
+    def open_with_growth(path: Path, *args, **kwargs):
+        file_obj = original_open(path, *args, **kwargs)
+        if path == manifest_path and args and args[0] == "rb":
+            with original_open(manifest_path, "ab") as output:
+                output.write(b"x" * (MAX_MANIFEST_BYTES + 1))
+            return BoundedReader(file_obj)
+        return file_obj
+
+    monkeypatch.setattr(Path, "open", open_with_growth)
+
+    with pytest.raises(ModelPackError) as error:
+        with inspect_model_pack(pack_path):
+            pass
+
+    _assert_error(error, "invalid_manifest", "too large")
+
+
+@pytest.mark.parametrize(
+    ("role", "limit", "code"),
+    [
+        ("modelfile", MAX_MODELFILE_BYTES, "unsafe_modelfile"),
+        ("license", MAX_LICENSE_BYTES, "invalid_license_file"),
+    ],
+)
+def test_archive_rejects_declared_role_size_before_extraction(
+    tmp_path: Path,
+    monkeypatch,
+    role: str,
+    limit: int,
+    code: str,
+) -> None:
+    source = _write_pack(tmp_path / role)
+    manifest_path = source / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    entry = next(item for item in manifest["files"] if item["role"] == role)
+    entry["size_bytes"] = limit + 1
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    archive = _zip_pack(source, tmp_path / f"{role}.modelpack")
+
+    def reject_extraction(*_args, **_kwargs) -> None:
+        raise AssertionError("an oversized role must fail before extraction")
+
+    monkeypatch.setattr(
+        model_pack_validation,
+        "_extract_declared_files",
+        reject_extraction,
+    )
+
+    with pytest.raises(ModelPackError) as error:
+        with inspect_model_pack(archive):
+            pass
+
+    _assert_error(error, code, "limit")
 
 
 def test_inspect_valid_archive_extracts_only_declared_data(tmp_path: Path) -> None:

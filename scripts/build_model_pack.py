@@ -8,7 +8,6 @@ import hashlib
 import json
 import os
 import re
-import shutil
 import stat
 import sys
 import tempfile
@@ -75,12 +74,78 @@ def _default_output_name(model_id: str) -> str:
 
 
 def _file_entry(path: Path, role: str) -> Dict[str, object]:
-    """Build one manifest file entry from a validated source."""
+    """Build one bounded manifest entry from a stable source-file read."""
+    digest = hashlib.sha256()
+    prefix = bytearray()
+    try:
+        path_stat = path.lstat()
+        with path.open("rb") as file_obj:
+            opened_stat = os.fstat(file_obj.fileno())
+            if (
+                not stat.S_ISREG(path_stat.st_mode)
+                or not stat.S_ISREG(opened_stat.st_mode)
+                or (path_stat.st_dev, path_stat.st_ino)
+                != (opened_stat.st_dev, opened_stat.st_ino)
+            ):
+                raise ModelPackError(
+                    "invalid_source_file",
+                    f"{path.name} changed while it was opened. Stop modifying it and retry.",
+                )
+            size = opened_stat.st_size
+            if size < 1:
+                raise ModelPackError(
+                    "invalid_source_file",
+                    f"{path.name} must not be empty.",
+                )
+            if size > MAX_MODEL_PACK_BYTES:
+                raise ModelPackError(
+                    "model_pack_too_large",
+                    "A Model Pack source exceeds the 64 GiB limit. Use a smaller file.",
+                )
+            remaining = size
+            while remaining:
+                chunk = file_obj.read(min(_COPY_CHUNK_SIZE, remaining))
+                if not chunk:
+                    raise ModelPackError(
+                        "source_changed",
+                        f"{path.name} changed while it was read. Stop modifying it and retry.",
+                    )
+                if len(prefix) < 4:
+                    prefix.extend(chunk[: 4 - len(prefix)])
+                digest.update(chunk)
+                remaining -= len(chunk)
+            if file_obj.read(1):
+                raise ModelPackError(
+                    "source_changed",
+                    f"{path.name} changed while it was read. Stop modifying it and retry.",
+                )
+    except ModelPackError:
+        raise
+    except OSError as exc:
+        raise ModelPackError(
+            "invalid_source_file",
+            f"{path.name} could not be read. Check permissions and try again.",
+        ) from exc
+    if role == "gguf" and bytes(prefix) != b"GGUF":
+        raise ModelPackError(
+            "invalid_gguf",
+            "The selected weight file is not GGUF. Select the correct file and try again.",
+        )
     return {
         "path": path.name,
         "role": role,
-        "sha256": sha256_file(path),
-        "size_bytes": path.stat().st_size,
+        "sha256": digest.hexdigest(),
+        "size_bytes": size,
+    }
+
+
+def _bytes_entry(path: Path, role: str, payload: bytes) -> Dict[str, object]:
+    """Build one manifest entry from the exact canonical bytes to be archived."""
+    return {
+        "path": path.name,
+        "role": role,
+        "sha256": hashlib.sha256(payload).hexdigest(),
+        "size_bytes": len(payload),
     }
 
 
@@ -93,21 +158,15 @@ def build_manifest(
     display_name: str,
     license_id: str,
     minimum_memory_gb: int,
-) -> Dict[str, object]:
-    """Build and validate the canonical manifest for three source files."""
+) -> Tuple[Dict[str, object], bytes, bytes]:
+    """Build the manifest and retain canonical bounded text payload bytes."""
     names = (gguf.name, modelfile.name, license_file.name)
     if len({name.casefold() for name in names}) != len(names):
         raise ModelPackError(
             "duplicate_source_filename",
             "GGUF, Modelfile, and license text must have distinct file names.",
         )
-    with gguf.open("rb") as gguf_file:
-        gguf_magic = gguf_file.read(4)
-    if gguf_magic != b"GGUF":
-        raise ModelPackError(
-            "invalid_gguf",
-            "The selected weight file is not GGUF. Select the correct file and try again.",
-        )
+    gguf_entry = _file_entry(gguf, "gguf")
     if modelfile.stat().st_size > MAX_MODELFILE_BYTES:
         raise ModelPackError(
             "unsafe_modelfile",
@@ -160,13 +219,13 @@ def build_manifest(
         "license": {"id": license_id, "file": license_file.name},
         "minimum_memory_gb": minimum_memory_gb,
         "files": [
-            _file_entry(gguf, "gguf"),
-            _file_entry(modelfile, "modelfile"),
-            _file_entry(license_file, "license"),
+            gguf_entry,
+            _bytes_entry(modelfile, "modelfile", modelfile_bytes),
+            _bytes_entry(license_file, "license", license_bytes),
         ],
     }
     parse_manifest(manifest)
-    return manifest
+    return manifest, modelfile_bytes, license_bytes
 
 
 def _zip_info(filename: str, *, compression: int) -> ZipInfo:
@@ -178,13 +237,20 @@ def _zip_info(filename: str, *, compression: int) -> ZipInfo:
     return info
 
 
-def _write_bytes(archive: ZipFile, filename: str, payload: bytes) -> None:
-    """Write deterministic compressed bytes to an archive."""
+def _write_bytes(
+    archive: ZipFile,
+    filename: str,
+    payload: bytes,
+    *,
+    compression: int = ZIP_DEFLATED,
+) -> None:
+    """Write exact deterministic bytes to an archive."""
+    compresslevel = 9 if compression == ZIP_DEFLATED else None
     archive.writestr(
-        _zip_info(filename, compression=ZIP_DEFLATED),
+        _zip_info(filename, compression=compression),
         payload,
-        compress_type=ZIP_DEFLATED,
-        compresslevel=9,
+        compress_type=compression,
+        compresslevel=compresslevel,
     )
 
 
@@ -193,16 +259,63 @@ def _write_file(
     source: Path,
     *,
     compression: int,
+    expected_size: int,
+    expected_sha256: str,
 ) -> None:
-    """Stream one source file into the archive with fixed metadata."""
-    info = _zip_info(source.name, compression=compression)
-    info.file_size = source.stat().st_size
-    with source.open("rb") as input_file, archive.open(
-        info,
-        "w",
-        force_zip64=True,
-    ) as output_file:
-        shutil.copyfileobj(input_file, output_file, length=_COPY_CHUNK_SIZE)
+    """Stream exactly the declared bytes and reject a changing source."""
+    digest = hashlib.sha256()
+    try:
+        path_stat = source.lstat()
+        with source.open("rb") as input_file:
+            opened_stat = os.fstat(input_file.fileno())
+            if (
+                not stat.S_ISREG(path_stat.st_mode)
+                or not stat.S_ISREG(opened_stat.st_mode)
+                or (path_stat.st_dev, path_stat.st_ino)
+                != (opened_stat.st_dev, opened_stat.st_ino)
+                or opened_stat.st_size != expected_size
+            ):
+                raise ModelPackError(
+                    "source_changed",
+                    f"{source.name} changed while the pack was built. Stop modifying it and retry.",
+                )
+            info = _zip_info(source.name, compression=compression)
+            info.file_size = expected_size
+            with archive.open(info, "w", force_zip64=True) as output_file:
+                remaining = expected_size
+                while remaining:
+                    chunk = input_file.read(min(_COPY_CHUNK_SIZE, remaining))
+                    if not chunk:
+                        raise ModelPackError(
+                            "source_changed",
+                            (
+                                f"{source.name} changed while the pack was built. "
+                                "Stop modifying it and retry."
+                            ),
+                        )
+                    output_file.write(chunk)
+                    digest.update(chunk)
+                    remaining -= len(chunk)
+                if input_file.read(1):
+                    raise ModelPackError(
+                        "source_changed",
+                        (
+                            f"{source.name} changed while the pack was built. "
+                            "Stop modifying it and retry."
+                        ),
+                    )
+    except ModelPackError:
+        raise
+    except OSError as exc:
+        raise ModelPackError(
+            "invalid_source_file",
+            f"{source.name} could not be read. Check permissions and try again.",
+        ) from exc
+    if digest.hexdigest() != expected_sha256:
+        raise ModelPackError(
+            "source_changed",
+            f"{source.name} changed while the pack was built. Stop modifying it and retry.",
+        )
 
 
 def build_model_pack(
@@ -220,7 +333,7 @@ def build_model_pack(
     gguf = _require_regular_file(gguf_path, label="GGUF file")
     modelfile = _require_regular_file(modelfile_path, label="Modelfile")
     license_file = _require_regular_file(license_file_path, label="License file")
-    manifest = build_manifest(
+    manifest, modelfile_bytes, license_bytes = build_manifest(
         gguf=gguf,
         modelfile=modelfile,
         license_file=license_file,
@@ -272,9 +385,26 @@ def build_model_pack(
         os.close(checksum_fd)
         with ZipFile(temporary, "w", allowZip64=True) as archive:
             _write_bytes(archive, "manifest.json", manifest_bytes)
-            _write_file(archive, gguf, compression=ZIP_STORED)
-            _write_file(archive, modelfile, compression=ZIP_DEFLATED)
-            _write_file(archive, license_file, compression=ZIP_DEFLATED)
+            gguf_entry = next(
+                entry for entry in manifest["files"] if entry["role"] == "gguf"
+            )
+            _write_file(
+                archive,
+                gguf,
+                compression=ZIP_STORED,
+                expected_size=int(gguf_entry["size_bytes"]),
+                expected_sha256=str(gguf_entry["sha256"]),
+            )
+            _write_bytes(
+                archive,
+                modelfile.name,
+                modelfile_bytes,
+            )
+            _write_bytes(
+                archive,
+                license_file.name,
+                license_bytes,
+            )
         if temporary.stat().st_size > MAX_MODEL_PACK_BYTES:
             raise ModelPackError(
                 "model_pack_too_large",

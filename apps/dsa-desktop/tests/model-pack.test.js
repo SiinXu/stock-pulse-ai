@@ -200,6 +200,35 @@ test('manifest reserves its own filename for metadata', () => {
   }
 });
 
+test('directory rejects oversized Modelfile and license roles before disk admission', async () => {
+  for (const [role, limit, code] of [
+    ['modelfile', 1024 * 1024, 'unsafe_modelfile'],
+    ['license', 2 * 1024 * 1024, 'invalid_license_file'],
+  ]) {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), `stockpulse-model-pack-${role}-limit-`));
+    const { root } = writePack(tempRoot);
+    const manifestPath = path.join(root, 'manifest.json');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+    manifest.files.find((entry) => entry.role === role).size_bytes = limit + 1;
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+    let diskChecks = 0;
+    try {
+      await assert.rejects(
+        inspectModelPack(root, {
+          diskFreeProvider: () => {
+            diskChecks += 1;
+            return enoughDisk();
+          },
+        }),
+        (error) => error instanceof ModelPackError && error.code === code
+      );
+      assert.equal(diskChecks, 0);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+});
+
 test('directory inspection rejects an unbounded extra file inventory', async () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-model-pack-count-'));
   const { root } = writePack(tempRoot);
@@ -230,6 +259,95 @@ test('directory inspection counts empty directories toward the entry limit', asy
         && /too many entries/i.test(error.userMessage)
     );
   } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('directory inspection rejects actual size before disk admission or snapshot copy', async () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-model-pack-size-first-'));
+  const { root } = writePack(tempRoot);
+  fs.writeFileSync(path.join(root, 'weights.gguf'), Buffer.concat([
+    Buffer.from('GGUF'),
+    Buffer.alloc(4 * 1024 * 1024, 120),
+  ]));
+  let diskChecks = 0;
+  try {
+    await assert.rejects(
+      inspectModelPack(root, {
+        diskFreeProvider: () => {
+          diskChecks += 1;
+          return enoughDisk();
+        },
+      }),
+      (error) => error instanceof ModelPackError && error.code === 'size_mismatch'
+    );
+    assert.equal(diskChecks, 0);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('directory inspection rejects growth between preflight and bounded copy', async () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-model-pack-grow-copy-'));
+  const { root } = writePack(tempRoot);
+  const ggufPath = path.join(root, 'weights.gguf');
+  try {
+    await assert.rejects(
+      inspectModelPack(root, {
+        diskFreeProvider: () => {
+          fs.appendFileSync(ggufPath, Buffer.alloc(4 * 1024 * 1024, 120));
+          return enoughDisk();
+        },
+      }),
+      (error) => (
+        error instanceof ModelPackError
+        && error.code === 'size_mismatch'
+        && /Stop modifying/.test(error.userMessage)
+      )
+    );
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('directory manifest growth is read with a hard byte bound', async () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-model-pack-grow-manifest-'));
+  const { root } = writePack(tempRoot);
+  const manifestPath = path.join(root, 'manifest.json');
+  const maxManifestBytes = 1024 * 1024;
+  const originalOpen = fs.promises.open;
+  let largestRead = 0;
+  fs.promises.open = async (...args) => {
+    const handle = await originalOpen(...args);
+    if (args[0] !== manifestPath || args[1] !== 'r') {
+      return handle;
+    }
+    const originalStat = handle.stat.bind(handle);
+    const originalRead = handle.read.bind(handle);
+    let grew = false;
+    handle.stat = async (...statArgs) => {
+      const result = await originalStat(...statArgs);
+      if (!grew) {
+        fs.appendFileSync(manifestPath, Buffer.alloc(maxManifestBytes + 1, 120));
+        grew = true;
+      }
+      return result;
+    };
+    handle.read = async (buffer, offset, length, position) => {
+      largestRead = Math.max(largestRead, length);
+      assert.ok(length <= maxManifestBytes + 1);
+      return originalRead(buffer, offset, length, position);
+    };
+    return handle;
+  };
+  try {
+    await assert.rejects(
+      inspectModelPack(root, { diskFreeProvider: enoughDisk }),
+      (error) => error instanceof ModelPackError && error.code === 'invalid_manifest'
+    );
+    assert.equal(largestRead, maxManifestBytes + 1);
+  } finally {
+    fs.promises.open = originalOpen;
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 });
