@@ -21,6 +21,7 @@ English | [简体中文](../README.md) | [繁體中文](README_CHT.md)
 > [!NOTE]
 > **StockPulse** is an independently maintained fork of [ZhuLinsen/daily_stock_analysis](https://github.com/ZhuLinsen/daily_stock_analysis). Upstream original code is under the MIT License; new contributions and substantial modifications by StockPulse are under AGPL-3.0. StockPulse is not an official upstream release. Thanks to the original author and contributors; see [LICENSE](../LICENSE) for the full copyright and license terms.
 
+<a id="why-stockpulse"></a>
 ## Why StockPulse (vs upstream)
 
 StockPulse is a **local-first investment research workbench**: data, evidence, strategies, and Agent capabilities under your control—not a “stock-picking oracle.” Upstream `daily_stock_analysis` remains a strong daily-analysis and notification foundation; StockPulse invests further in **extension contracts, security boundaries, and research workflows**.
@@ -29,7 +30,7 @@ StockPulse is a **local-first investment research workbench**: data, evidence, s
 
 | Differentiator | What it means | Read more |
 | --- | --- | --- |
-| Trusted plugin surface | Six extension points (data providers, strategies, Agent tools, notifications, report templates, event hooks). Code loaded via `PLUGINS_DIR` is **in-process trusted code**, not a marketplace sandbox | [Plugin extension contract](plugin-extension-contract.md) |
+| Trusted plugin surface | Trusted plugin extension surface (six points defined in the contract; wiring status varies by point). Code loaded via `PLUGINS_DIR` is **in-process trusted code**, not a marketplace sandbox | [Plugin extension contract](plugin-extension-contract.md) |
 | Agent Soul | A single behavioral charter composed into Native Single / Multi / Chat system prompts (evidence, risk, tool boundaries) | [Agent Soul](agent-soul.md) |
 | Persona Skills | Optional investment-committee Personas (**default off**; enable Skills explicitly) | [Changelog Persona entries](CHANGELOG.md) |
 | Personal investment framework (backend) | Versioned framework storage and API under a single-machine `local` scope; **not** yet fully injected into every analysis prompt or a full Web editor | [Personal investment framework](personal-investment-framework_EN.md) |
@@ -49,7 +50,6 @@ StockPulse is a **local-first investment research workbench**: data, evidence, s
 | --- | --- | --- |
 | Report evidence strata / trust UX | Planned | [#616](https://github.com/SiinXu/stock-pulse-ai/issues/616) |
 | Multi-user / workspace isolation | Planned | [#230](https://github.com/SiinXu/stock-pulse-ai/issues/230) |
-| Operator-facing security-boundary doc polish | Docs track | [#618](https://github.com/SiinXu/stock-pulse-ai/issues/618) |
 
 Broader doc entry points: [English documentation index](INDEX_EN.md). Architecture: [architecture overview](architecture-overview.md).
 
