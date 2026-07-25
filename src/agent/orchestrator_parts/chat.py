@@ -54,8 +54,11 @@ class _ChatMethods:
         """
         from src.agent.executor import AgentResult
 
-        ctx = self._build_context(task, context)
+        scope_resolution = resolve_stock_scope(task, context)
+        ctx = self._build_context(task, scope_resolution.effective_context)
         ctx.meta["response_mode"] = "dashboard"
+        if scope_resolution.stock_scope is not None:
+            ctx.meta["stock_scope"] = scope_resolution.stock_scope
         orch_result = self._execute_pipeline(
             ctx, parse_dashboard=True, cancelled_check=cancelled_check
         )

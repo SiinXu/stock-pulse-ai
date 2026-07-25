@@ -55,6 +55,7 @@ from src.agent import llm_adapter as llm_adapter_module
 from src.agent.runtime.contract import ExecutionContext, ExecutionMode, ExecutionState
 from src.agent.runtime.lifecycle import classify_terminal_state
 from src.agent.runtime.tool_session import BoundToolSession
+from src.agent.stock_scope import resolve_stock_scope
 from tests.agent_runtime_replay import (
     ReplayLLMAdapter,
     build_replay_tool_registry,
@@ -144,6 +145,11 @@ def _run_case_pydantic(case):
     executed_tools = []
     registry = build_replay_tool_registry(executed_tools)
     replay = ReplayLLMAdapter(case["transcript"], config=config)
+    payload = case["input"]
+    scope_resolution = resolve_stock_scope(
+        payload["task"],
+        payload.get("context") or {},
+    )
 
     with patch.object(
         llm_adapter_module, "LLMToolAdapter", new=lambda cfg: replay
@@ -159,25 +165,21 @@ def _run_case_pydantic(case):
             registry,
             execution_id=f"conformance-{case['id']}",
             allowed_tools=registry.list_names(),
+            granted_permissions=registry.supported_declared_capabilities(),
             backend=_EXPERIMENTAL_RUNTIME,
             principal=_EXPERIMENTAL_RUNTIME,
-            # Pass-through access policy reproduces the native run loop's
-            # replay-frozen tool dispatch byte-for-byte so the equivalence
-            # comparison is apples-to-apples; the strict fail-closed gate is
-            # exercised by test_tool_session.py and test_pydantic_ai_real_bridge.py.
-            enforce_access_policy=False,
             deadline_monotonic=deadline,
+            stock_scope=scope_resolution.stock_scope,
             security_audit=SecurityAuditRecorderStub(),
         )
         adapter = PydanticAIRuntimeAdapter(
             llm_adapter=replay, executor=executor, tool_session=session
         )
-        payload = case["input"]
         handle = adapter.execute(
             ExecutionContext(
                 mode=ExecutionMode.RUN,
                 prompt=payload["task"],
-                request_context=payload.get("context") or {},
+                request_context=scope_resolution.effective_context,
                 timeout_seconds=timeout,
             )
         )

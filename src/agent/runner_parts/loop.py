@@ -90,7 +90,6 @@ def run_agent_loop(
         (mutated) messages list.
     """
     labels = thinking_labels or _THINKING_TOOL_LABELS
-    tool_decls = tool_registry.to_openai_tools()
     recorder = usage_recorder if usage_recorder is not None else get_default_usage_recorder()
     guard_policy = runtime_guard_policy or RuntimeGuardPolicy.from_sources()
     if tool_call_timeout_seconds is None:
@@ -102,25 +101,38 @@ def run_agent_loop(
         )
 
     start_time = time.time()
+    session_deadline_monotonic = (
+        time.monotonic() + float(max_wall_clock_seconds)
+        if max_wall_clock_seconds is not None
+        and max_wall_clock_seconds > 0
+        else None
+    )
     tool_calls_log: List[Dict[str, Any]] = []
     # Single tool authority for the whole run: every tool call in every step is
-    # dispatched through this bound session. Native runs it in
-    # ``enforce_access_policy=False`` compatibility mode so replay-frozen core
-    # behavior is preserved while the direct ToolRegistry path is retired.
-    # Definitions marked ``enforce_contract`` (including plugin tools) still
-    # receive ToolSurface argument and scope validation. The session's internal
-    # non-retriable memo replaces the previous ad-hoc per-run cache dict.
+    # dispatched through this strict bound session. Grants are derived only
+    # from application-owned, validated registry declarations; model output
+    # cannot add a capability. The session's internal non-retriable memo
+    # replaces the previous ad-hoc per-run cache dict.
+    allowed_tools = tool_registry.list_names()
     tool_session = BoundToolSession(
         tool_registry,
         execution_id=str(uuid.uuid4()),
-        allowed_tools=tool_registry.list_names(),
+        allowed_tools=allowed_tools,
+        derive_granted_permissions=True,
         stock_scope=stock_scope,
+        call_timeout_seconds=(
+            tool_call_timeout_seconds
+            if tool_call_timeout_seconds is not None
+            and tool_call_timeout_seconds > 0
+            else None
+        ),
+        deadline_monotonic=session_deadline_monotonic,
         cancelled_check=cancelled_check,
         backend="native",
         principal="native-runtime",
-        enforce_access_policy=False,
         security_audit=_get_security_audit_service(),
     )
+    tool_decls = tool_session.describe_openai_tools()
     total_tokens = 0
     provider_used = ""
     models_used: List[str] = []
@@ -287,7 +299,10 @@ def run_agent_loop(
             logger.info(
                 "Agent requesting %d tool call(s): %s",
                 len(tool_calls),
-                [tc.name for tc in tool_calls],
+                [
+                    tool_session.canonical_tool_name(tc.name)
+                    for tc in tool_calls
+                ],
             )
 
             repeat_limit = guard_policy.max_identical_tool_calls
@@ -317,7 +332,7 @@ def run_agent_loop(
                     logger,
                     "tool_loop_detected",
                     scope="tool",
-                    tool=tool_call.name,
+                    tool=tool_session.canonical_tool_name(tool_call.name),
                     signature=runtime_guard_fingerprint(signature),
                     step=step + 1,
                     observed=observed,
@@ -326,7 +341,7 @@ def run_agent_loop(
                 )
                 return _finish(_build_tool_loop_result(
                     step=step + 1,
-                    tool_name=tool_call.name,
+                    tool_name=tool_session.canonical_tool_name(tool_call.name),
                     repeat_limit=repeat_limit,
                     tool_calls_log=tool_calls_log,
                     total_tokens=total_tokens,
@@ -349,7 +364,7 @@ def run_agent_loop(
                 "tool_calls": [
                     {
                         "id": tc.id,
-                        "name": tc.name,
+                        "name": tool_session.canonical_tool_name(tc.name),
                         "arguments": tc.arguments,
                         **({"provider_specific_fields": tc.provider_specific_fields} if tc.provider_specific_fields else {}),
                         **({"thought_signature": tc.thought_signature} if tc.thought_signature is not None else {}),
@@ -386,7 +401,9 @@ def run_agent_loop(
                 messages.append(
                     {
                         "role": "tool",
-                        "name": tr["tc"].name,
+                        "name": tool_session.canonical_tool_name(
+                            tr["tc"].name
+                        ),
                         "tool_call_id": tr["tc"].id,
                         "content": tr["result_str"],
                     }

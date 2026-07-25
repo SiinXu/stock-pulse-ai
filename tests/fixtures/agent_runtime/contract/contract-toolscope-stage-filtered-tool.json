@@ -1,6 +1,6 @@
 {
   "id": "contract-toolscope-stage-filtered-tool",
-  "notes": "Tool scope rejection (multi-agent): the technical agent calls 'search_stock_news', which IS registered in the shared registry but is NOT part of the technical agent's stage-scoped tool subset (expect_unregistered bypasses the harness schema assertion). Characterizes stage-level tool scoping behavior when a stage requests an out-of-scope tool.",
+  "notes": "Tool scope rejection (multi-agent): the technical agent calls 'search_stock_news', which IS registered in the shared registry but is NOT part of the technical agent's stage-scoped tool subset (expect_unregistered bypasses the harness schema assertion). Characterizes stage-level tool scoping and canonical 'unrecognized' traces when a stage requests an out-of-scope tool.",
   "config": {
     "agent_arch": "multi",
     "agent_orchestrator_mode": "standard"
@@ -84,12 +84,12 @@
     "tool_calls": [
       {
         "step": 1,
-        "tool": "search_stock_news",
+        "tool": "unrecognized",
         "arguments": {
           "stock_code": "600519"
         },
         "success": false,
-        "result_length": 74,
+        "result_length": 98,
         "cached": false
       }
     ],

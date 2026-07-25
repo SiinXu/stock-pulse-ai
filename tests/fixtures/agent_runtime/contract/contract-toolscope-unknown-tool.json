@@ -1,6 +1,6 @@
 {
   "id": "contract-toolscope-unknown-tool",
-  "notes": "Tool scope rejection (single-agent): the model calls 'get_fundamental_report', a tool that is not registered anywhere (expect_unregistered bypasses the harness schema assertion). Characterizes how the runner reports an unknown-tool call back to the model and logs it, and that the run still completes when the model recovers with a dashboard.",
+  "notes": "Tool scope rejection (single-agent): the model calls 'get_fundamental_report', a tool that is not registered anywhere (expect_unregistered bypasses the harness schema assertion). Characterizes how the runner canonicalizes the unknown name to 'unrecognized' in traces while returning a denial to the model, and that the run still completes when the model recovers with a dashboard.",
   "input": {
     "task": "分析贵州茅台的投资价值",
     "context": {
@@ -54,12 +54,12 @@
     "tool_calls": [
       {
         "step": 1,
-        "tool": "get_fundamental_report",
+        "tool": "unrecognized",
         "arguments": {
           "stock_code": "600519"
         },
         "success": false,
-        "result_length": 74,
+        "result_length": 98,
         "cached": false
       }
     ],

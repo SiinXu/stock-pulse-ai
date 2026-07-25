@@ -821,6 +821,33 @@ class TestOrchestratorModes(unittest.TestCase):
         orch = self._make_orchestrator("nonsense")
         self.assertEqual(orch.mode, "standard")
 
+    def test_dashboard_run_freezes_resolved_stock_scope(self):
+        from src.agent.orchestrator import OrchestratorResult
+
+        orch = self._make_orchestrator("quick")
+        captured = {}
+
+        def fake_execute_pipeline(ctx, **_kwargs):
+            captured["context"] = ctx
+            return OrchestratorResult(success=True)
+
+        with patch.object(
+            orch,
+            "_execute_pipeline",
+            side_effect=fake_execute_pipeline,
+        ):
+            orch.run(
+                "分析贵州茅台的投资价值",
+                context={"stock_code": "600519", "stock_name": "贵州茅台"},
+            )
+
+        ctx = captured["context"]
+        scope = ctx.meta["stock_scope"]
+        self.assertEqual(scope.mode, "maintain")
+        self.assertEqual(scope.expected_stock_code, "600519")
+        self.assertEqual(scope.allowed_stock_codes, {"600519"})
+        self.assertEqual(ctx.stock_code, "600519")
+
     def test_chain_agents_inherit_orchestrator_max_steps(self):
         """Default/lowered limits cap agents; raised limits hard-override all agents."""
         orch = self._make_orchestrator("full")
@@ -3045,6 +3072,7 @@ class TestResearchAgentFilteredRegistry(unittest.TestCase):
                 "Q1",
                 {},
                 0,
+                stock_scope=None,
                 timeout_seconds=10,
             )
 
@@ -3052,6 +3080,82 @@ class TestResearchAgentFilteredRegistry(unittest.TestCase):
         self.assertTrue(result["timed_out"])
         self.assertIn("insufficient budget", (result["error"] or "").lower())
         self.assertEqual(result["tokens"], 7)
+
+    def test_research_sub_question_freezes_resolved_stock_scope(self):
+        from src.agent.research import ResearchAgent
+        from src.agent.stock_scope import resolve_stock_scope
+
+        agent = ResearchAgent(tool_registry=MagicMock(), llm_adapter=MagicMock())
+        resolution = resolve_stock_scope(
+            "评估贵州茅台的风险",
+            {"stock_code": "600519", "stock_name": "贵州茅台"},
+        )
+        loop_result = SimpleNamespace(
+            success=True,
+            content="done",
+            total_tokens=7,
+            error=None,
+        )
+        with patch.object(
+            agent,
+            "_filtered_registry",
+            return_value=MagicMock(),
+        ), patch(
+            "src.agent.research.run_agent_loop",
+            return_value=loop_result,
+        ) as run_agent_loop_mock:
+            result = agent._research_sub_question(
+                "评估贵州茅台的风险",
+                resolution.effective_context,
+                0,
+                stock_scope=resolution.stock_scope,
+            )
+
+        scope = run_agent_loop_mock.call_args.kwargs["stock_scope"]
+        self.assertTrue(result["success"])
+        self.assertEqual(scope.mode, "maintain")
+        self.assertEqual(scope.expected_stock_code, "600519")
+        self.assertEqual(scope.allowed_stock_codes, {"600519"})
+
+    def test_research_keeps_original_scope_when_model_sub_question_names_other_stock(self):
+        from src.agent.research import ResearchAgent
+
+        agent = ResearchAgent(tool_registry=MagicMock(), llm_adapter=MagicMock())
+        loop_result = SimpleNamespace(
+            success=True,
+            content="bounded finding",
+            total_tokens=7,
+            error=None,
+        )
+        with patch.object(
+            agent,
+            "_decompose_query",
+            return_value={"questions": ["分析 AAPL 的估值"], "tokens": 3},
+        ), patch.object(
+            agent,
+            "_filtered_registry",
+            return_value=MagicMock(),
+        ), patch(
+            "src.agent.research.run_agent_loop",
+            return_value=loop_result,
+        ) as run_agent_loop_mock, patch.object(
+            agent,
+            "_synthesise_report",
+            return_value={"content": "report", "tokens": 5},
+        ):
+            result = agent.research(
+                "分析 600519",
+                {"stock_code": "600519", "stock_name": "贵州茅台"},
+            )
+
+        scope = run_agent_loop_mock.call_args.kwargs["stock_scope"]
+        self.assertTrue(result.success)
+        self.assertEqual(scope.mode, "maintain")
+        self.assertEqual(scope.expected_stock_code, "600519")
+        self.assertEqual(scope.allowed_stock_codes, {"600519"})
+        user_message = run_agent_loop_mock.call_args.kwargs["messages"][1]["content"]
+        self.assertIn("分析 AAPL", user_message)
+        self.assertIn("related to stock 600519", user_message)
 
     def test_research_returns_timeout_result_when_overall_deadline_is_exceeded(self):
         import time as _time

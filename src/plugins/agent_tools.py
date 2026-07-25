@@ -207,8 +207,11 @@ def validate_agent_tool_definition(implementation: object) -> bool:
         not isinstance(policy, ToolPolicy)
         or policy.policy_status != "declared"
         or type(policy.read_only) is not bool
+        or type(policy.side_effects) is not list
         or any(type(item) is not str or not item for item in policy.side_effects)
+        or type(policy.permissions) is not list
         or any(type(item) is not str or not item for item in policy.permissions)
+        or type(policy.scope_dimensions) is not list
         or any(
             type(item) is not str
             or item not in SUPPORTED_TOOL_SURFACE_SCOPE_DIMENSIONS

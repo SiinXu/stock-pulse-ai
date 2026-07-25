@@ -54,7 +54,12 @@ from src.agent.runtime.lifecycle import (
 )
 from src.agent.runtime.native_adapter import NativeRuntimeAdapter
 from src.agent.stream_events import stream_event
-from src.agent.tools.registry import ToolDefinition, ToolParameter, ToolRegistry
+from src.agent.tools.registry import (
+    ToolDefinition,
+    ToolParameter,
+    ToolPolicy,
+    ToolRegistry,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -70,6 +75,10 @@ def _registry(handler=None) -> ToolRegistry:
             description="Echoes the message",
             parameters=[ToolParameter(name="message", type="string", description="Message")],
             handler=handler or (lambda message: {"echo": message}),
+            policy=ToolPolicy.declared(
+                read_only=True,
+                permissions=["analysis_context:read"],
+            ),
         )
     )
     return registry

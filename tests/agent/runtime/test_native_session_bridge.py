@@ -3,11 +3,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """RF-03: native runner routes every tool call through one bound session.
 
-These tests characterize the migration bridge that is *not* exercised by the
+These tests characterize the strict bridge that is *not* exercised by the
 36 replay fixtures (none of which hit the non-retriable cache or the stock
 scope guard) and prove the native path now has a single tool authority:
 
-* the runner builds one native-compatibility ``BoundToolSession`` per run,
+* the runner builds one strict ``BoundToolSession`` per run,
   reuses it across steps and closes it at the terminal state;
 * the migration mapper reproduces the legacy runner 6-tuple, including the
   ``cached`` flag and the reconstructed ``guard_result`` used by the tool log;
@@ -41,6 +41,9 @@ from src.plugins import build_agent_tool_extension_registry
 from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 
+_TEST_CAPABILITY = "analysis_context:read"
+
+
 class _TC:
     """Minimal runner tool-call stand-in."""
 
@@ -54,7 +57,7 @@ def _native_session(registry: ToolRegistry, **overrides) -> BoundToolSession:
     params = {
         "execution_id": "native-bridge-test",
         "allowed_tools": registry.list_names(),
-        "enforce_access_policy": False,
+        "granted_permissions": registry.supported_declared_capabilities(),
         "security_audit": SecurityAuditRecorderStub(),
     }
     params.update(overrides)
@@ -70,6 +73,11 @@ def _quote_registry(recorded=None) -> ToolRegistry:
             description="Realtime quote",
             parameters=[ToolParameter(name="stock_code", type="string", description="Stock")],
             handler=lambda stock_code: calls.append(stock_code) or {"stock_code": stock_code, "price": 1.0},
+            policy=ToolPolicy.declared(
+                read_only=True,
+                permissions=["market_data:read"],
+                scope_dimensions=["stock"],
+            ),
         )
     )
     registry.register(
@@ -78,6 +86,10 @@ def _quote_registry(recorded=None) -> ToolRegistry:
             description="Echo",
             parameters=[ToolParameter(name="message", type="string", description="Message")],
             handler=lambda message: {"echo": message},
+            policy=ToolPolicy.declared(
+                read_only=True,
+                permissions=[_TEST_CAPABILITY],
+            ),
         )
     )
     return registry
@@ -129,6 +141,12 @@ def test_native_run_dispatches_every_tool_through_one_bound_session():
             tool_registry=registry,
             llm_adapter=adapter,
             max_steps=5,
+            max_wall_clock_seconds=60,
+            tool_call_timeout_seconds=12,
+            stock_scope=StockScope(
+                expected_stock_code="600519",
+                allowed_stock_codes={"600519"},
+            ),
         )
 
     assert result.success
@@ -136,6 +154,8 @@ def test_native_run_dispatches_every_tool_through_one_bound_session():
     assert len(seen_sessions) == 2
     assert seen_sessions[0] is seen_sessions[1]
     assert isinstance(seen_sessions[0], BoundToolSession)
+    assert seen_sessions[0]._call_timeout_seconds == 12
+    assert seen_sessions[0]._deadline_monotonic is not None
     # Terminal state closed the session (late-result fence armed).
     assert seen_sessions[0].closed is True
 
@@ -151,13 +171,17 @@ def test_mapper_reports_cached_on_repeated_non_retriable_call():
         ToolDefinition(
             name="denied",
             description="Non-retriable",
-            parameters=[ToolParameter(name="stock_code", type="string", description="Stock")],
-            handler=lambda stock_code: handler_calls.append(stock_code)
+            parameters=[ToolParameter(name="message", type="string", description="Message")],
+            handler=lambda message: handler_calls.append(message)
             or {"error": "denied", "retriable": False},
+            policy=ToolPolicy.declared(
+                read_only=True,
+                permissions=[_TEST_CAPABILITY],
+            ),
         )
     )
     session = _native_session(registry)
-    tc = _TC("denied", {"stock_code": "600519"})
+    tc = _TC("denied", {"message": "same"})
 
     _, first_str, first_ok, _, first_cached, first_guard = execute_runner_tool_call_via_session(tc, session)
     _, second_str, second_ok, _, second_cached, second_guard = execute_runner_tool_call_via_session(tc, session)
@@ -171,7 +195,29 @@ def test_mapper_reports_cached_on_repeated_non_retriable_call():
     assert first_str == second_str
     assert first_guard is None and second_guard is None
     # The memo prevented a second handler invocation.
-    assert handler_calls == ["600519"]
+    assert handler_calls == ["same"]
+
+
+def test_mapper_denies_deep_and_cyclic_arguments_before_dispatch():
+    session = _native_session(_quote_registry())
+    deep_value = []
+    for _ in range(20):
+        deep_value = [deep_value]
+    cyclic_value = {}
+    cyclic_value["self"] = cyclic_value
+
+    for index, value in enumerate((deep_value, cyclic_value)):
+        tool_call = _TC("echo", {"message": value})
+        _, result_text, ok, _, cached, guard_result = (
+            execute_runner_tool_call_via_session(tool_call, session)
+        )
+
+        assert json.loads(result_text)["code"] == "invalid_arguments"
+        assert ok is False
+        assert cached is False
+        assert guard_result is None
+
+    assert session.dispatched_calls == 0
 
 
 # ---------------------------------------------------------------------------
@@ -252,8 +298,8 @@ def test_native_run_unknown_tool_fails_closed_via_session():
     assert result.tool_calls_log[0]["success"] is False
     tool_messages = [m for m in result.messages if m.get("role") == "tool"]
     assert json.loads(tool_messages[0]["content"]) == {
-        "error": "Tool not found.",
-        "code": "tool_not_found",
+        "error": "Tool is not in the session allowlist.",
+        "code": "tool_not_allowed",
         "retriable": False,
     }
 
@@ -273,7 +319,10 @@ def test_native_run_enforces_plugin_tool_schema_before_handler():
             )
         ],
         handler=lambda value: calls.append(value) or {"value": value},
-        policy=ToolPolicy.declared(read_only=True),
+        policy=ToolPolicy.declared(
+            read_only=True,
+            permissions=[_TEST_CAPABILITY],
+        ),
         enforce_contract=True,
     )
     extension_registry = build_agent_tool_extension_registry(registry)
@@ -330,6 +379,7 @@ def test_native_run_rejects_omitted_scoped_plugin_identity_before_handler():
         handler=lambda stock_code: calls.append(stock_code) or {"stock_code": stock_code},
         policy=ToolPolicy.declared(
             read_only=True,
+            permissions=["market_data:read"],
             scope_dimensions=["stock"],
         ),
         enforce_contract=True,
@@ -386,7 +436,10 @@ def test_native_run_materializes_valid_plugin_default_before_handler():
             )
         ],
         handler=lambda value=1: calls.append(value) or {"value": value},
-        policy=ToolPolicy.declared(read_only=True),
+        policy=ToolPolicy.declared(
+            read_only=True,
+            permissions=[_TEST_CAPABILITY],
+        ),
         enforce_contract=True,
     )
     build_agent_tool_extension_registry(registry).register(
@@ -436,9 +489,20 @@ def test_mapper_drops_result_completing_after_session_close():
             description="Blocks until released",
             parameters=[ToolParameter(name="stock_code", type="string", description="Stock")],
             handler=blocking_handler,
+            policy=ToolPolicy.declared(
+                read_only=True,
+                permissions=["market_data:read"],
+                scope_dimensions=["stock"],
+            ),
         )
     )
-    session = _native_session(registry)
+    session = _native_session(
+        registry,
+        stock_scope=StockScope(
+            expected_stock_code="600519",
+            allowed_stock_codes={"600519"},
+        ),
+    )
     holder["session"] = session
     tc = _TC("get_realtime_quote", {"stock_code": "600519"})
 

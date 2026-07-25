@@ -17,7 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from src.agent.runtime.tool_session import BoundToolSession
+from src.agent.runtime.tool_session import BoundToolSession, ExecutionFenceRejected
 from src.agent.stock_scope import StockScope
 from src.agent.tool_surface import ToolSurface
 from src.agent.tools.execution import ToolAccessContext
@@ -31,7 +31,10 @@ from src.services.security_audit_service import SecurityAuditUnavailable
 from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 
-def _echo_registry(calls=None, permissions=("test:read",)) -> ToolRegistry:
+_TEST_CAPABILITY = "analysis_context:read"
+
+
+def _echo_registry(calls=None, permissions=(_TEST_CAPABILITY,)) -> ToolRegistry:
     recorded = calls if calls is not None else []
     registry = ToolRegistry()
     registry.register(
@@ -57,7 +60,7 @@ def _session(registry, **overrides) -> BoundToolSession:
     params = {
         "execution_id": "exec-1",
         "allowed_tools": ["echo"],
-        "granted_permissions": ["test:read"],
+        "granted_permissions": [_TEST_CAPABILITY],
         "security_audit": SecurityAuditRecorderStub(),
     }
     params.update(overrides)
@@ -82,7 +85,7 @@ def test_session_requires_explicit_security_audit_recorder():
             policy=ToolPolicy.declared(
                 read_only=False,
                 side_effects=["test_state"],
-                permissions=["test:write"],
+                permissions=[_TEST_CAPABILITY],
             ),
         )
     )
@@ -116,6 +119,28 @@ def test_session_requires_execution_id():
         )
 
 
+def test_session_access_policy_cannot_be_disabled():
+    with pytest.raises(
+        ValueError,
+        match="access policy cannot be disabled",
+    ):
+        BoundToolSession(
+            _echo_registry(),
+            execution_id="unsafe-bypass",
+            allowed_tools=["echo"],
+            enforce_access_policy=False,
+            security_audit=SecurityAuditRecorderStub(),
+        )
+
+
+def test_session_rejects_alternate_tool_surface_authority():
+    with pytest.raises(TypeError, match="surface"):
+        _session(
+            _echo_registry(),
+            surface=ToolSurface(_echo_registry()),
+        )
+
+
 def test_session_freezes_identity_and_allowlist():
     session = _session(
         _echo_registry(),
@@ -128,7 +153,34 @@ def test_session_freezes_identity_and_allowlist():
     assert session.attempt == 2
     assert session.principal == "native-runtime"
     assert session.allowed_tools == frozenset({"echo"})
-    assert session.granted_permissions == frozenset({"test:read"})
+    assert session.granted_permissions == frozenset({_TEST_CAPABILITY})
+    assert session.granted_capabilities == frozenset({_TEST_CAPABILITY})
+
+
+def test_session_preserves_valid_tool_definition_subclasses():
+    class _CustomToolDefinition(ToolDefinition):
+        pass
+
+    calls = []
+    registry = ToolRegistry()
+    registry.register(
+        _CustomToolDefinition(
+            name="custom",
+            description="Custom definition subclass.",
+            parameters=[],
+            handler=lambda: calls.append("ran") or {"ok": True},
+            policy=ToolPolicy.declared(
+                read_only=True,
+                permissions=[_TEST_CAPABILITY],
+            ),
+        )
+    )
+    session = _session(registry, allowed_tools=["custom"])
+
+    result = session.execute("custom", {})
+
+    assert result["ok"] is True
+    assert calls == ["ran"]
 
 
 # ---------------------------------------------------------------------------
@@ -140,7 +192,13 @@ def test_success_passthrough_matches_direct_surface_result():
     session = _session(registry)
 
     via_session = session.execute("echo", {"message": "hi"})
-    direct = ToolSurface(registry).execute_tool("echo", {"message": "hi"}, ToolAccessContext())
+    direct = ToolSurface(registry).execute_tool(
+        "echo",
+        {"message": "hi"},
+        ToolAccessContext(
+            granted_capabilities=frozenset({_TEST_CAPABILITY})
+        ),
+    )
 
     assert via_session["ok"] is True
     for key in ("ok", "tool_name", "result", "result_text", "error", "diagnostics"):
@@ -188,6 +246,37 @@ def test_dispatch_guard_cannot_claim_one_call_twice():
     assert session.dispatched_calls == 0
 
 
+def test_dispatch_fence_rejection_is_not_misclassified_as_late_result():
+    calls = []
+    session = _session(_echo_registry(calls), max_tool_calls=1)
+
+    def _reject_dispatch(_claim):
+        raise ExecutionFenceRejected(
+            "cancelled",
+            "Execution cancellation was requested; tool call rejected.",
+        )
+
+    def _reject_completion(_claim):
+        raise ExecutionFenceRejected(
+            "cancelled",
+            "Execution cancellation was requested; tool result rejected.",
+        )
+
+    result = session.execute(
+        "echo",
+        {"message": "must-not-run"},
+        dispatch_guard=_reject_dispatch,
+        completion_guard=_reject_completion,
+    )
+
+    assert result["error"]["code"] == "cancelled"
+    assert result["error"]["code"] != "late_result_dropped"
+    assert calls == []
+    assert session.dispatched_calls == 0
+    assert session.dropped_results == 0
+    assert session.audit_trail[-1]["error_code"] == "cancelled"
+
+
 def test_session_audit_carries_execution_identity():
     session = _session(_echo_registry(), stage="intel", attempt=1)
     result = session.execute("echo", {"message": "hi"})
@@ -232,6 +321,145 @@ def test_non_string_tool_name_is_invalid():
     assert result["error"]["code"] == "invalid_tool_name"
 
 
+def test_unknown_model_tool_name_is_canonicalized_in_results_and_audits():
+    canary = "prompt_secret_canary_123456789"
+    recorder = SecurityAuditRecorderStub()
+    session = _session(_echo_registry(), security_audit=recorder)
+
+    result = session.execute(canary, {})
+
+    assert result["error"]["code"] == "tool_not_allowed"
+    assert result["tool_name"] == "unrecognized"
+    assert canary not in str(result)
+    assert canary not in str(session.audit_trail)
+    assert [event["target_id"] for event in recorder.attempts] == ["unrecognized"]
+    assert [event["target_id"] for event in recorder.completions] == ["unrecognized"]
+    assert canary not in str(recorder.attempts)
+    assert canary not in str(recorder.completions)
+
+
+def test_session_rejects_same_name_replacement_and_registry_aba():
+    original_calls = []
+    replacement_calls = []
+    registry = _echo_registry(original_calls)
+    original = registry.resolve("echo")
+    session = _session(registry)
+    replacement = ToolDefinition(
+        name="echo",
+        description="Replacement with a different contract.",
+        parameters=[],
+        handler=lambda: replacement_calls.append("ran"),
+        policy=ToolPolicy.declared(
+            read_only=True,
+            permissions=[_TEST_CAPABILITY],
+        ),
+    )
+
+    registry.unregister("echo")
+    registry.register(replacement)
+    replaced = session.execute("echo", {"message": "must-not-run"})
+    registry.unregister("echo")
+    registry.register(original)
+    restored = session.execute("echo", {"message": "must-not-run"})
+
+    assert replaced["error"]["code"] == "tool_not_found"
+    assert replaced["error"]["details"]["reason"] == "definition_changed"
+    assert restored["error"]["code"] == "tool_not_found"
+    assert restored["error"]["details"]["reason"] == "definition_changed"
+    assert original_calls == []
+    assert replacement_calls == []
+    assert session.dispatched_calls == 0
+
+
+def test_session_rejects_in_place_definition_mutation_and_keeps_descriptor_snapshot():
+    calls = []
+    registry = _echo_registry(calls)
+    live_definition = registry.resolve("echo")
+    session = _session(registry)
+    descriptor_before = session.describe_tools()
+
+    live_definition.parameters[0].required = False
+    live_definition.handler = lambda message=None: calls.append("mutated")
+    result = session.execute("echo", {})
+
+    assert result["error"]["code"] == "tool_not_found"
+    assert result["error"]["details"]["reason"] == "definition_changed"
+    assert result["tool_name"] == "unrecognized"
+    assert session.describe_tools() == descriptor_before
+    assert calls == []
+    assert session.dispatched_calls == 0
+
+
+def test_session_rechecks_live_definition_at_handler_boundary():
+    for mutation in ("unregister", "replace", "aba", "in_place"):
+        calls = []
+        registry = _echo_registry(calls)
+        original = registry.resolve("echo")
+        session = _session(registry)
+
+        def _mutate_live_definition():
+            if mutation == "unregister":
+                registry.unregister("echo")
+            elif mutation == "replace":
+                registry.register(
+                    ToolDefinition(
+                        name="echo",
+                        description="Replacement.",
+                        parameters=[],
+                        handler=lambda: calls.append("replacement"),
+                        policy=ToolPolicy.declared(
+                            read_only=True,
+                            permissions=[_TEST_CAPABILITY],
+                        ),
+                    )
+                )
+            elif mutation == "aba":
+                registry.unregister("echo")
+                registry.register(original)
+            else:
+                original.handler = lambda message: calls.append("mutated")
+
+        result = session.execute(
+            "echo",
+            {"message": "must-not-run"},
+            on_dispatched=_mutate_live_definition,
+        )
+
+        assert result["error"]["code"] == "tool_not_found", mutation
+        assert result["error"]["details"] == {
+            "reason": "definition_changed",
+            "handler_started": False,
+        }
+        assert calls == []
+        assert session.dispatched_calls == 0
+
+
+def test_session_rechecks_live_definition_after_cancellation_callback():
+    calls = []
+    registry = _echo_registry(calls)
+    armed = {"value": False}
+
+    def _cancel_probe():
+        if armed["value"]:
+            registry.unregister("echo")
+        return False
+
+    session = _session(registry, cancelled_check=_cancel_probe)
+    result = session.execute(
+        "echo",
+        {"message": "must-not-run"},
+        on_dispatched=lambda: armed.update(value=True),
+    )
+
+    assert result["error"]["code"] == "tool_not_found"
+    assert result["error"]["details"] == {
+        "reason": "definition_changed",
+        "handler_started": False,
+    }
+    assert calls == []
+    assert session.dispatched_calls == 0
+
+
 def test_undeclared_policy_is_rejected():
     registry = ToolRegistry()
     registry.register(
@@ -251,6 +479,37 @@ def test_undeclared_policy_is_rejected():
     assert result["error"]["details"]["policy_status"] == "unknown"
 
 
+def test_unsupported_capability_is_rejected_before_dispatch():
+    calls = []
+    registry = ToolRegistry()
+    registry.register(
+        ToolDefinition(
+            name="unsafe",
+            description="Tool with an unsupported capability.",
+            parameters=[],
+            handler=lambda: calls.append("ran"),
+            policy=ToolPolicy.declared(
+                read_only=False,
+                permissions=["filesystem:write"],
+            ),
+        )
+    )
+    session = _session(
+        registry,
+        allowed_tools=["unsafe"],
+        granted_permissions=["filesystem:write"],
+    )
+
+    result = session.execute("unsafe", {})
+
+    assert result["error"]["code"] == "unsupported_capability"
+    assert result["error"]["details"]["unsupported_capabilities"] == [
+        "filesystem:write"
+    ]
+    assert calls == []
+    assert session.dispatched_calls == 0
+
+
 def test_missing_permission_is_rejected_with_details():
     calls = []
     session = _session(
@@ -261,6 +520,11 @@ def test_missing_permission_is_rejected_with_details():
     result = session.execute("echo", {"message": "hi"})
 
     assert result["error"]["code"] == "permission_denied"
+    assert result["error"]["details"]["missing_capabilities"] == ["intel:read"]
+    assert result["error"]["details"]["required_capabilities"] == [
+        "intel:read",
+        "market_data:read",
+    ]
     assert result["error"]["details"]["missing_permissions"] == ["intel:read"]
     assert result["error"]["details"]["required_permissions"] == [
         "intel:read",
@@ -269,7 +533,78 @@ def test_missing_permission_is_rejected_with_details():
     assert calls == []
 
 
+def test_invalid_arguments_are_rejected_before_handler_dispatch():
+    calls = []
+    dispatched = []
+    session = _session(_echo_registry(calls), max_tool_calls=1)
+
+    result = session.execute(
+        "echo",
+        {"message": 123},
+        on_dispatched=lambda: dispatched.append("started"),
+    )
+
+    assert result["error"]["code"] == "invalid_arguments"
+    assert calls == []
+    assert dispatched == []
+    assert session.dispatched_calls == 0
+    assert session.execute("echo", {"message": "valid"})["ok"] is True
+    assert session.dispatched_calls == 1
+
+
+def test_deep_and_cyclic_arguments_are_denied_before_cache_or_dispatch():
+    calls = []
+    registry = ToolRegistry()
+    registry.register(
+        ToolDefinition(
+            name="inspect_payload",
+            description="Inspect a JSON payload.",
+            parameters=[
+                ToolParameter(
+                    name="payload",
+                    type="object",
+                    description="Payload",
+                ),
+            ],
+            handler=lambda payload: calls.append(payload) or {"accepted": True},
+            policy=ToolPolicy.declared(
+                read_only=True,
+                permissions=[_TEST_CAPABILITY],
+            ),
+        )
+    )
+    session = _session(
+        registry,
+        allowed_tools=["inspect_payload"],
+        max_tool_calls=1,
+    )
+    deep_payload = {}
+    cursor = deep_payload
+    for _ in range(20):
+        child = {}
+        cursor["child"] = child
+        cursor = child
+    cyclic_payload = {}
+    cyclic_payload["self"] = cyclic_payload
+
+    for payload in (deep_payload, cyclic_payload):
+        result = session.execute(
+            "inspect_payload",
+            {"payload": payload},
+        )
+        assert result["error"]["code"] == "invalid_arguments"
+
+    assert calls == []
+    assert session.dispatched_calls == 0
+    assert session.execute(
+        "inspect_payload",
+        {"payload": {}},
+    )["ok"] is True
+    assert session.dispatched_calls == 1
+
+
 def test_stock_scope_violation_propagates_through_session():
+    calls = []
     registry = ToolRegistry()
     registry.register(
         ToolDefinition(
@@ -278,7 +613,9 @@ def test_stock_scope_violation_propagates_through_session():
             parameters=[
                 ToolParameter(name="stock_code", type="string", description="Stock"),
             ],
-            handler=lambda stock_code: {"code": stock_code},
+            handler=lambda stock_code: calls.append(stock_code) or {
+                "code": stock_code
+            },
             policy=ToolPolicy.declared(
                 read_only=True,
                 permissions=["market_data:read"],
@@ -293,10 +630,58 @@ def test_stock_scope_violation_propagates_through_session():
         stock_scope=StockScope(expected_stock_code="600519", allowed_stock_codes={"600519"}),
     )
 
-    result = session.execute("quote", {"stock_code": "000001"})
+    dispatched = []
+    result = session.execute(
+        "quote",
+        {"stock_code": "000001"},
+        on_dispatched=lambda: dispatched.append("started"),
+    )
 
     assert result["ok"] is False
     assert result["error"]["code"] == "stock_scope_violation"
+    assert calls == []
+    assert dispatched == []
+    assert session.dispatched_calls == 0
+
+
+def test_outbound_denial_does_not_claim_dispatch_or_budget():
+    calls = []
+    registry = ToolRegistry()
+    registry.register(
+        ToolDefinition(
+            name="callback",
+            description="Callback",
+            parameters=[
+                ToolParameter(
+                    name="callback_url",
+                    type="string",
+                    description="Callback URL",
+                ),
+            ],
+            handler=lambda callback_url: calls.append(callback_url),
+            policy=ToolPolicy.declared(
+                read_only=True,
+                permissions=[_TEST_CAPABILITY],
+            ),
+        )
+    )
+    session = _session(
+        registry,
+        allowed_tools=["callback"],
+        max_tool_calls=1,
+    )
+    dispatched = []
+
+    result = session.execute(
+        "callback",
+        {"callback_url": "http://127.0.0.1/private"},
+        on_dispatched=lambda: dispatched.append("started"),
+    )
+
+    assert result["error"]["code"] == "outbound_url_denied"
+    assert calls == []
+    assert dispatched == []
+    assert session.dispatched_calls == 0
 
 
 # ---------------------------------------------------------------------------
@@ -328,7 +713,10 @@ def test_non_retriable_result_is_cached_without_consuming_budget():
             ],
             handler=lambda message: calls.append(message)
             or {"error": "denied", "retriable": False},
-            policy=ToolPolicy.declared(read_only=True, permissions=["test:read"]),
+            policy=ToolPolicy.declared(
+                read_only=True,
+                permissions=[_TEST_CAPABILITY],
+            ),
         )
     )
     session = _session(registry, allowed_tools=["denied"], max_tool_calls=1)
@@ -364,25 +752,18 @@ def test_elapsed_deadline_rejects_before_dispatch():
 def test_call_timeout_is_clamped_to_remaining_deadline():
     captured = {}
 
-    class RecordingSurface:
-        def execute_tool(self, name, arguments, context):
-            captured["context"] = context
-            return {
-                "ok": True,
-                "tool_name": name,
-                "result": None,
-                "result_text": "{}",
-                "error": None,
-                "audit": {"tool_name": name},
-                "diagnostics": {},
-            }
-
     session = _session(
         _echo_registry(),
         call_timeout_seconds=100.0,
         deadline_monotonic=time.monotonic() + 50.0,
-        surface=RecordingSurface(),
     )
+    execute_tool = session._surface.execute_tool
+
+    def _recording_execute_tool(name, arguments, context, **kwargs):
+        captured["context"] = context
+        return execute_tool(name, arguments, context, **kwargs)
+
+    session._surface.execute_tool = _recording_execute_tool
 
     assert session.execute("echo", {"message": "hi"})["ok"] is True
     timeout = captured["context"].timeout_seconds
@@ -423,7 +804,10 @@ def test_result_completing_after_close_is_dropped():
                 ToolParameter(name="message", type="string", description="Message"),
             ],
             handler=closing_handler,
-            policy=ToolPolicy.declared(read_only=True, permissions=["test:read"]),
+            policy=ToolPolicy.declared(
+                read_only=True,
+                permissions=[_TEST_CAPABILITY],
+            ),
         )
     )
     session = _session(registry)
@@ -453,7 +837,10 @@ def test_result_completing_after_cancellation_is_dropped():
                 ToolParameter(name="message", type="string", description="Message"),
             ],
             handler=flipping_handler,
-            policy=ToolPolicy.declared(read_only=True, permissions=["test:read"]),
+            policy=ToolPolicy.declared(
+                read_only=True,
+                permissions=[_TEST_CAPABILITY],
+            ),
         )
     )
     session = _session(
@@ -512,7 +899,8 @@ def test_describe_tools_only_covers_allowed_registry_tools():
 
     assert [d["name"] for d in descriptors] == ["echo"]
     assert "handler" not in descriptors[0]
-    assert descriptors[0]["policy"]["permissions"] == ["test:read"]
+    assert descriptors[0]["policy"]["permissions"] == [_TEST_CAPABILITY]
+    assert descriptors[0]["policy"]["capabilities"] == [_TEST_CAPABILITY]
 
 
 def test_audit_trail_records_rejections_and_successes():

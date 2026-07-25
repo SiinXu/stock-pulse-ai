@@ -50,7 +50,12 @@ except ModuleNotFoundError:  # pragma: no cover
 from src.agent import factory as factory_module
 from src.agent import llm_adapter as llm_adapter_module
 from src.agent.llm_adapter import LLMResponse, ToolCall
-from src.agent.tools.registry import ToolDefinition, ToolParameter, ToolRegistry
+from src.agent.tools.registry import (
+    ToolDefinition,
+    ToolParameter,
+    ToolPolicy,
+    ToolRegistry,
+)
 from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures" / "agent_runtime"
@@ -222,12 +227,24 @@ def build_replay_tool_registry(
             log.append({"tool": name, "arguments": dict(kwargs)})
             return handler(**kwargs)
 
+        stock_scoped = any(
+            parameter.name == "stock_code" for parameter in parameters
+        )
         registry.register(
             ToolDefinition(
                 name=name,
                 description=description,
                 parameters=parameters,
                 handler=wrapped,
+                policy=ToolPolicy.declared(
+                    read_only=True,
+                    permissions=[
+                        "market_data:read"
+                        if stock_scoped
+                        else "analysis_context:read"
+                    ],
+                    scope_dimensions=["stock"] if stock_scoped else [],
+                ),
             )
         )
 

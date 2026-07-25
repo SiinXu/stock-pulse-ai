@@ -15,19 +15,16 @@ never silently degrade. Results that land after the session was closed
 or cancelled are dropped behind a late-result fence.
 
 The native runner now dispatches through this same session too (RF-03):
-there is a single tool authority for every runtime. Native uses the
-``enforce_access_policy=False`` construction so existing core tools retain
-their replay-frozen pass-through behavior. Definitions that explicitly set
-``enforce_contract=True`` still receive ToolSurface argument and scope
-validation on that native path. The lifecycle gates (closed, cancellation,
-deadline and budget) remain active in both modes; external runtime adapters
-(AR-PY-04+) keep the strict default so their access is fully enforced.
+there is a single tool authority for every runtime. Capability, argument,
+scope and outbound-URL contracts are always enforced by ``ToolSurface``;
+the session adds its frozen allowlist and lifecycle gates.
 """
 
 from __future__ import annotations
 
 import hashlib
 import logging
+import math
 import threading
 import time
 import uuid
@@ -39,7 +36,13 @@ from src.agent.tools.execution import (
     _build_tool_cache_key,
     _is_non_retriable_tool_result,
 )
-from src.agent.tools.registry import ToolRegistry
+from src.agent.tools.registry import (
+    ToolDefinition,
+    ToolDefinitionBinding,
+    ToolRegistry,
+    validate_tool_capability_contract,
+    validate_tool_schema_contract,
+)
 from src.services.security_audit_service import (
     SecurityAuditRecorder,
     SecurityAuditUnavailable,
@@ -101,14 +104,15 @@ class BoundToolSession:
         deadline_monotonic: Optional[float] = None,
         cancelled_check: Optional[Callable[[], bool]] = None,
         audit_context: Optional[Mapping[str, Any]] = None,
-        surface: Optional[ToolSurface] = None,
         enforce_access_policy: bool = True,
+        derive_granted_permissions: bool = False,
         security_audit: SecurityAuditRecorder,
     ) -> None:
         if not isinstance(execution_id, str) or not execution_id.strip():
             raise ValueError("BoundToolSession requires a non-empty execution_id")
+        if enforce_access_policy is not True:
+            raise ValueError("BoundToolSession access policy cannot be disabled")
         self._registry = registry
-        self._surface = surface if surface is not None else ToolSurface(registry)
         self._execution_id = execution_id
         self._stage = stage
         self._attempt = attempt
@@ -116,7 +120,32 @@ class BoundToolSession:
         self._allowed_tools = frozenset(
             name for name in allowed_tools if isinstance(name, str) and name.strip()
         )
-        self._granted_permissions = frozenset(granted_permissions)
+        frozen_registry = ToolRegistry()
+        self._tool_bindings: Dict[str, ToolDefinitionBinding] = {}
+        for tool_name in sorted(self._allowed_tools):
+            binding = registry.bind_definition(tool_name)
+            if binding is None:
+                continue
+            frozen_registry.register(binding.snapshot)
+            self._tool_bindings[tool_name] = binding
+        self._surface = ToolSurface(frozen_registry)
+        provided_permissions = frozenset(granted_permissions)
+        if derive_granted_permissions:
+            if provided_permissions:
+                raise ValueError(
+                    "Derived tool capabilities cannot be combined with explicit grants"
+                )
+            derived_permissions = set()
+            for binding in self._tool_bindings.values():
+                tool_def = binding.snapshot
+                if (
+                    validate_tool_capability_contract(tool_def) is None
+                    and validate_tool_schema_contract(tool_def) is None
+                ):
+                    derived_permissions.update(tool_def.policy.permissions)
+            self._granted_permissions = frozenset(derived_permissions)
+        else:
+            self._granted_permissions = provided_permissions
         self._stock_scope = stock_scope
         self._backend = backend
         self._session_id = session_id
@@ -130,12 +159,6 @@ class BoundToolSession:
             float(deadline_monotonic) if deadline_monotonic is not None else None
         )
         self._cancelled_check = cancelled_check
-        # When False the access-policy gates (allowlist, declared policy,
-        # permissions and unknown-name resolution) are delegated to the surface
-        # in equivalent pass-through mode; used by the native runner to preserve
-        # its replay-frozen behaviour while still dispatching through one
-        # authority. Lifecycle gates below stay active regardless.
-        self._enforce_access_policy = bool(enforce_access_policy)
         self._security_audit = require_security_audit_recorder(security_audit)
         base_audit_context: Dict[str, Any] = {"execution_id": execution_id}
         if stage is not None:
@@ -182,6 +205,11 @@ class BoundToolSession:
         return self._granted_permissions
 
     @property
+    def granted_capabilities(self) -> frozenset:
+        """Capability-named alias for the retained permission grant field."""
+        return self._granted_permissions
+
+    @property
     def closed(self) -> bool:
         with self._lock:
             return self._closed
@@ -218,13 +246,21 @@ class BoundToolSession:
 
     def describe_tools(self) -> List[dict]:
         """Neutral descriptors for allowed tools only; never exposes handlers."""
-        descriptors = []
-        for name in sorted(self._allowed_tools):
-            tool_def = self._registry.resolve(name)
-            if tool_def is None:
-                continue
-            descriptors.append(tool_def.to_public_descriptor())
-        return descriptors
+        return [
+            self._tool_bindings[name].snapshot.to_public_descriptor()
+            for name in sorted(self._tool_bindings)
+        ]
+
+    def describe_openai_tools(self) -> List[dict]:
+        """Return provider declarations from the same frozen execution binding."""
+        return [
+            binding.snapshot.to_openai_tool()
+            for _, binding in sorted(self._tool_bindings.items())
+        ]
+
+    def canonical_tool_name(self, value: Any) -> str:
+        """Return a trace-safe name bound to this session or ``unrecognized``."""
+        return self._audit_tool_identity(value)
 
     # ----- Execution -----
 
@@ -235,11 +271,12 @@ class BoundToolSession:
         *,
         dispatch_guard: Optional[Callable[[Callable[[], None]], None]] = None,
         completion_guard: Optional[Callable[[Callable[[], None]], None]] = None,
+        call_deadline_monotonic: Optional[float] = None,
         on_dispatched: Optional[Callable[[], None]] = None,
     ) -> Dict[str, Any]:
         """Audit one attempt/completion around the real session permission layer."""
         correlation_id = uuid.uuid4().hex
-        target_id = _bounded_audit_identity(name, fallback="invalid")
+        target_id = self._audit_tool_identity(name)
         common = dict(
             event_type="tool.execute",
             actor_type="runtime_principal",
@@ -265,17 +302,24 @@ class BoundToolSession:
             arguments,
             dispatch_guard=dispatch_guard,
             completion_guard=completion_guard,
+            call_deadline_monotonic=call_deadline_monotonic,
             on_dispatched=on_dispatched,
         )
         error = result.get("error") if isinstance(result, dict) else None
         error_code = error.get("code") if isinstance(error, dict) else None
         denied_codes = {
+            "capability_undeclared",
             "invalid_tool_name",
+            "invalid_arguments",
+            "outbound_url_denied",
             "tool_not_allowed",
             "tool_not_found",
             "policy_undeclared",
             "permission_denied",
+            "schema_contract_violation",
+            "scope_contract_violation",
             "stock_scope_violation",
+            "unsupported_capability",
         }
         outcome = "success" if result.get("ok") is True else (
             "denied" if error_code in denied_codes else "failure"
@@ -283,9 +327,31 @@ class BoundToolSession:
         reason_code = "tool_succeeded" if outcome == "success" else (
             error_code if isinstance(error_code, str) and error_code else "tool_failed"
         )
+        completion_metadata: Dict[str, Any] = {
+            "backend": self._backend or "unknown",
+        }
+        if outcome == "denied":
+            completion_metadata["denial_code"] = reason_code
+            details = error.get("details") if isinstance(error, dict) else None
+            if isinstance(details, dict):
+                for key in (
+                    "required_capabilities",
+                    "missing_capabilities",
+                    "unsupported_capabilities",
+                    "reason",
+                    "correlation_id",
+                ):
+                    value = details.get(key)
+                    if isinstance(value, str) or (
+                        isinstance(value, list)
+                        and all(isinstance(item, str) for item in value)
+                    ):
+                        completion_metadata[key] = value
+        completion = dict(common)
+        completion["metadata"] = completion_metadata
         try:
             self._security_audit.record_completion(
-                **common,
+                **completion,
                 outcome=outcome,
                 reason_code=reason_code,
             )
@@ -304,6 +370,7 @@ class BoundToolSession:
         *,
         dispatch_guard: Optional[Callable[[Callable[[], None]], None]] = None,
         completion_guard: Optional[Callable[[Callable[[], None]], None]] = None,
+        call_deadline_monotonic: Optional[float] = None,
         on_dispatched: Optional[Callable[[], None]] = None,
     ) -> Dict[str, Any]:
         """Execute one allowed tool through the frozen session gates.
@@ -337,58 +404,31 @@ class BoundToolSession:
                             tool_name=tool_name,
                             arguments=arguments,
                             started_at=started_at,
-                            call_context=self._build_call_context(tool_name),
+                            call_context=self._build_call_context(
+                                tool_name,
+                                call_deadline_monotonic=call_deadline_monotonic,
+                            ),
                             completion_rejection=completion_rejection,
                         )
                     self._audit_trail.append(cached["audit"])
                     return cached
-            call_context = self._build_call_context(tool_name)
+            call_context = self._build_call_context(
+                tool_name,
+                call_deadline_monotonic=call_deadline_monotonic,
+            )
             if rejection is None and (
-                self._deadline_monotonic is not None
+                call_context.deadline_monotonic is not None
                 and call_context.timeout_seconds is not None
                 and call_context.timeout_seconds <= 0
             ):
-                # Deadline elapsed between the gate check and dispatch; a
-                # non-positive timeout would disable the surface timeout guard.
-                rejection = ("deadline_exceeded", "Session deadline exceeded.", None)
-            if rejection is None:
-                if (
-                    self._max_tool_calls is not None
-                    and self._dispatched_calls >= self._max_tool_calls
-                ):
-                    rejection = (
-                        "budget_exhausted",
-                        "Session tool-call budget exhausted.",
-                        {"max_tool_calls": self._max_tool_calls},
-                    )
-                else:
-                    dispatch_claimed = False
-
-                    def _claim_dispatch() -> None:
-                        nonlocal dispatch_claimed
-                        if dispatch_claimed:
-                            raise RuntimeError(
-                                "dispatch_guard claimed one tool call more than once"
-                            )
-                        dispatch_claimed = True
-                        self._dispatched_calls += 1
-
-                    if dispatch_guard is None:
-                        _claim_dispatch()
-                    else:
-                        dispatched_calls_before_guard = self._dispatched_calls
-                        try:
-                            dispatch_guard(_claim_dispatch)
-                        except ExecutionFenceRejected as exc:
-                            self._dispatched_calls = dispatched_calls_before_guard
-                            rejection = (exc.code, exc.message, exc.details)
-                        except BaseException:
-                            self._dispatched_calls = dispatched_calls_before_guard
-                            raise
-                        if rejection is None and not dispatch_claimed:
-                            raise RuntimeError(
-                                "dispatch_guard returned without claiming the tool call"
-                            )
+                # A runner call deadline can elapse while the mandatory attempt
+                # audit is being persisted. Reject before surface preflight so
+                # a non-positive relative timeout cannot disable the fence.
+                rejection = (
+                    "deadline_exceeded",
+                    "Tool call deadline exceeded.",
+                    {"handler_started": False},
+                )
             if rejection is not None:
                 completion_rejection = self._claim_completion_locked(
                     completion_guard,
@@ -412,13 +452,121 @@ class BoundToolSession:
                     rejection=rejection,
                 )
 
-        if on_dispatched is not None:
-            on_dispatched()
-        result = self._surface.execute_tool(tool_name, arguments, call_context)
+        surface_dispatch_claimed = False
+
+        def _claim_surface_dispatch(
+            expected_tool_def: ToolDefinition,
+        ) -> Optional[
+            Tuple[str, str, Optional[Dict[str, Any]]]
+        ]:
+            nonlocal surface_dispatch_claimed
+            with self._lock:
+                dispatch_rejection = self._gate_locked(
+                    tool_name,
+                    expected_tool_def=expected_tool_def,
+                )
+                if (
+                    dispatch_rejection is None
+                    and self._max_tool_calls is not None
+                    and self._dispatched_calls >= self._max_tool_calls
+                ):
+                    dispatch_rejection = (
+                        "budget_exhausted",
+                        "Session tool-call budget exhausted.",
+                        {"max_tool_calls": self._max_tool_calls},
+                    )
+                if dispatch_rejection is not None:
+                    return dispatch_rejection
+
+                def _claim_dispatch() -> None:
+                    nonlocal surface_dispatch_claimed
+                    if surface_dispatch_claimed:
+                        raise RuntimeError(
+                            "dispatch_guard claimed one tool call more than once"
+                        )
+                    surface_dispatch_claimed = True
+                    self._dispatched_calls += 1
+
+                if dispatch_guard is None:
+                    _claim_dispatch()
+                else:
+                    dispatched_calls_before_guard = self._dispatched_calls
+                    try:
+                        dispatch_guard(_claim_dispatch)
+                    except ExecutionFenceRejected as exc:
+                        self._dispatched_calls = dispatched_calls_before_guard
+                        return (exc.code, exc.message, exc.details)
+                    except BaseException:
+                        self._dispatched_calls = dispatched_calls_before_guard
+                        raise
+                    if not surface_dispatch_claimed:
+                        raise RuntimeError(
+                            "dispatch_guard returned without claiming the tool call"
+                        )
+            if on_dispatched is not None:
+                callback_completed = False
+                try:
+                    on_dispatched()
+                    callback_completed = True
+                finally:
+                    if not callback_completed:
+                        with self._lock:
+                            if surface_dispatch_claimed:
+                                self._dispatched_calls -= 1
+                                surface_dispatch_claimed = False
+            return None
+
+        def _verify_surface_handler(
+            expected_tool_def: ToolDefinition,
+        ) -> Optional[Tuple[str, str, Optional[Dict[str, Any]]]]:
+            nonlocal surface_dispatch_claimed
+            with self._lock:
+                handler_rejection = self._gate_locked(
+                    tool_name,
+                    expected_tool_def=expected_tool_def,
+                )
+                if handler_rejection is None:
+                    return None
+                if surface_dispatch_claimed:
+                    self._dispatched_calls -= 1
+                    surface_dispatch_claimed = False
+                code, message, details = handler_rejection
+                return (
+                    code,
+                    message,
+                    {
+                        **(details or {}),
+                        "handler_started": False,
+                    },
+                )
+
+        result = self._surface.execute_tool(
+            tool_name,
+            arguments,
+            call_context,
+            dispatch_guard=_claim_surface_dispatch,
+            pre_handler_guard=_verify_surface_handler,
+        )
 
         with self._lock:
             completion_rejection = self._claim_completion_locked(completion_guard)
+            result_error = result.get("error") if isinstance(result, dict) else None
+            result_error_code = (
+                result_error.get("code") if isinstance(result_error, dict) else None
+            )
+            dispatch_fence_rejection = (
+                not surface_dispatch_claimed
+                and completion_rejection is not None
+                and result_error_code == completion_rejection.code
+            )
 
+            if dispatch_fence_rejection:
+                # The execution fence rejected the dispatch before the handler
+                # started. The matching completion fence observes the same
+                # terminal state, so preserve the original rejection instead
+                # of misclassifying a call that never ran as a late result.
+                self._audit_trail.append(result["audit"])
+                return result
             if (
                 self._closed
                 or self._cancel_requested()
@@ -444,7 +592,7 @@ class BoundToolSession:
         phase: str,
     ) -> Dict[str, Any]:
         started_at = time.time()
-        tool_name = name if isinstance(name, str) else ""
+        tool_name = self._audit_tool_identity(name)
         completion_failed = phase == "completion"
         result = build_tool_error_result(
             tool_name=tool_name,
@@ -515,9 +663,10 @@ class BoundToolSession:
         completion_rejection: Optional[ExecutionFenceRejected],
     ) -> Dict[str, Any]:
         """Audit and return one result rejected at its terminal fence."""
+        audit_tool_name = self._audit_tool_identity(tool_name)
         self._dropped_results += 1
         fenced = build_tool_error_result(
-            tool_name=tool_name,
+            tool_name=audit_tool_name,
             code="late_result_dropped",
             message="Tool result arrived after the session terminal state and was dropped.",
             started_at=started_at,
@@ -537,12 +686,15 @@ class BoundToolSession:
         logger.warning(
             "[ToolSession] dropped late tool result: execution_id=%s tool=%s",
             self._execution_id,
-            tool_name,
+            audit_tool_name,
         )
         return fenced
 
     def _gate_locked(
-        self, tool_name: str
+        self,
+        tool_name: str,
+        *,
+        expected_tool_def: Optional[ToolDefinition] = None,
     ) -> Optional[Tuple[str, str, Optional[Dict[str, Any]]]]:
         if self._closed:
             return ("session_closed", "Tool session is closed.", None)
@@ -554,12 +706,16 @@ class BoundToolSession:
             )
         if self._deadline_exceeded():
             return ("deadline_exceeded", "Session deadline exceeded.", None)
-        if not self._enforce_access_policy:
-            # Native-compatibility: name validity, unknown-tool resolution and
-            # (permissive) access policy are delegated to the surface so the
-            # error contract matches the legacy direct path exactly.
-            return None
         if not tool_name.strip():
+            return (
+                "invalid_tool_name",
+                "Tool name must exactly match a registered StockPulse tool.",
+                None,
+            )
+        if (
+            (":" in tool_name or "." in tool_name)
+            and self._registry.resolve(tool_name) is None
+        ):
             return (
                 "invalid_tool_name",
                 "Tool name must exactly match a registered StockPulse tool.",
@@ -571,23 +727,51 @@ class BoundToolSession:
                 "Tool is not in the session allowlist.",
                 None,
             )
-        tool_def = self._registry.resolve(tool_name)
-        if tool_def is None:
+        binding = self._tool_bindings.get(tool_name)
+        if binding is None:
             return ("tool_not_found", "Tool not found.", None)
-        if tool_def.policy.policy_status != "declared":
+        tool_def = binding.snapshot
+        if not binding.is_current(self._registry):
             return (
-                "policy_undeclared",
-                "Tool policy is not declared; the session requires declared policies.",
-                {"policy_status": tool_def.policy.policy_status},
+                "tool_not_found",
+                "Tool definition changed before dispatch.",
+                {"reason": "definition_changed"},
+            )
+        if (
+            expected_tool_def is not None
+            and not binding.matches_snapshot(expected_tool_def)
+        ):
+            return (
+                "tool_not_found",
+                "Tool definition changed before dispatch.",
+                {"reason": "definition_changed"},
+            )
+        capability_error = validate_tool_capability_contract(tool_def)
+        if capability_error is not None:
+            return (
+                capability_error["code"],
+                capability_error["message"],
+                capability_error["details"],
+            )
+        schema_error = validate_tool_schema_contract(tool_def)
+        if schema_error is not None:
+            return (
+                schema_error["code"],
+                schema_error["message"],
+                schema_error["details"],
             )
         missing = set(tool_def.policy.permissions) - self._granted_permissions
         if missing:
+            required = sorted(tool_def.policy.permissions)
+            missing_capabilities = sorted(missing)
             return (
                 "permission_denied",
-                "Session lacks required tool permissions.",
+                "Session lacks required tool capabilities.",
                 {
-                    "required_permissions": sorted(tool_def.policy.permissions),
-                    "missing_permissions": sorted(missing),
+                    "required_capabilities": required,
+                    "missing_capabilities": missing_capabilities,
+                    "required_permissions": required,
+                    "missing_permissions": missing_capabilities,
                 },
             )
         return None
@@ -601,8 +785,9 @@ class BoundToolSession:
         rejection: Tuple[str, str, Optional[Dict[str, Any]]],
     ) -> Dict[str, Any]:
         code, message, details = rejection
+        audit_tool_name = self._audit_tool_identity(tool_name)
         result = build_tool_error_result(
-            tool_name=tool_name,
+            tool_name=audit_tool_name,
             code=code,
             message=message,
             started_at=started_at,
@@ -615,12 +800,23 @@ class BoundToolSession:
         logger.warning(
             "[ToolSession] rejected tool call: execution_id=%s tool=%s code=%s",
             self._execution_id,
-            tool_name,
+            audit_tool_name,
             code,
         )
         return result
 
     # ----- Helpers -----
+
+    def _audit_tool_identity(self, value: Any) -> str:
+        """Expose exact names only for an unchanged, session-bound definition."""
+        if not isinstance(value, str):
+            return "unrecognized"
+        binding = self._tool_bindings.get(value)
+        if binding is None:
+            return "unrecognized"
+        if not binding.is_current(self._registry):
+            return "unrecognized"
+        return _bounded_audit_identity(value, fallback="unrecognized")
 
     def _cancel_requested(self) -> bool:
         if self._cancelled_check is None:
@@ -633,23 +829,41 @@ class BoundToolSession:
             and time.monotonic() >= self._deadline_monotonic
         )
 
-    def _build_call_context(self, tool_name: str = "") -> ToolAccessContext:
+    def _build_call_context(
+        self,
+        tool_name: str = "",
+        *,
+        call_deadline_monotonic: Optional[float] = None,
+    ) -> ToolAccessContext:
+        del tool_name  # Retained for compatibility with existing call sites.
         timeout = self._call_timeout_seconds
-        if self._deadline_monotonic is not None:
-            remaining = self._deadline_monotonic - time.monotonic()
+        effective_deadline = self._deadline_monotonic
+        if call_deadline_monotonic is not None:
+            try:
+                normalized_call_deadline = float(call_deadline_monotonic)
+            except (TypeError, ValueError):
+                normalized_call_deadline = time.monotonic()
+            if not math.isfinite(normalized_call_deadline):
+                normalized_call_deadline = time.monotonic()
+            effective_deadline = (
+                normalized_call_deadline
+                if effective_deadline is None
+                else min(effective_deadline, normalized_call_deadline)
+            )
+        if effective_deadline is not None:
+            remaining = effective_deadline - time.monotonic()
             timeout = remaining if timeout is None else min(timeout, remaining)
-        tool_def = self._registry.resolve(tool_name)
-        enforce_contract = self._enforce_access_policy or bool(
-            tool_def is not None and tool_def.enforce_contract
-        )
         return ToolAccessContext(
             stock_scope=self._stock_scope,
             backend=self._backend,
             session_id=self._session_id,
             timeout_seconds=timeout,
+            deadline_monotonic=effective_deadline,
+            cancelled_check=self._cancelled_check,
             max_result_bytes=self._max_result_bytes,
             audit_context=dict(self._base_audit_context),
-            enforce_contract=enforce_contract,
+            granted_capabilities=self._granted_permissions,
+            enforce_contract=True,
         )
 
     @staticmethod

@@ -9,7 +9,7 @@ from datetime import date
 from pathlib import Path
 
 from src.agent.runtime.tool_session import BoundToolSession
-from src.agent.tools.registry import ToolDefinition, ToolRegistry
+from src.agent.tools.registry import ToolDefinition, ToolPolicy, ToolRegistry
 from src.services.history_loader import (
     get_frozen_target_date,
     reset_frozen_target_date,
@@ -36,18 +36,27 @@ def _make_spy_registry(tool_names: list[str], observed: list):
 
     registry = ToolRegistry()
     for name in tool_names:
-        td = ToolDefinition(name=name, description="spy", parameters=[], handler=_spy_handler)
+        td = ToolDefinition(
+            name=name,
+            description="spy",
+            parameters=[],
+            handler=_spy_handler,
+            policy=ToolPolicy.declared(
+                read_only=True,
+                permissions=["analysis_context:read"],
+            ),
+        )
         registry.register(td)
     return registry
 
 
 def _native_session(registry: ToolRegistry) -> BoundToolSession:
-    """Native-compatibility session matching the runner's own construction."""
+    """Strict session matching the runner's own construction."""
     return BoundToolSession(
         registry,
         execution_id="frozen-context-test",
         allowed_tools=registry.list_names(),
-        enforce_access_policy=False,
+        granted_permissions=registry.supported_declared_capabilities(),
         security_audit=SecurityAuditRecorderStub(),
     )
 
@@ -102,7 +111,16 @@ class ExecuteToolsFrozenContextTestCase(unittest.TestCase):
         registry = ToolRegistry()
         names = [f"spy_{i}" for i in range(num_tools)]
         for name in names:
-            td = ToolDefinition(name=name, description="spy", parameters=[], handler=_slow_spy)
+            td = ToolDefinition(
+                name=name,
+                description="spy",
+                parameters=[],
+                handler=_slow_spy,
+                policy=ToolPolicy.declared(
+                    read_only=True,
+                    permissions=["analysis_context:read"],
+                ),
+            )
             registry.register(td)
 
         tool_calls = [_FakeToolCall(n) for n in names]

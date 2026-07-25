@@ -381,7 +381,7 @@ def _tool_registry(calls):
             policy=ToolPolicy.declared(
                 read_only=True,
                 side_effects=[],
-                permissions=["test:read"],
+                permissions=["analysis_context:read"],
             ),
         )
     )
@@ -396,7 +396,7 @@ def test_real_bound_tool_session_audits_allow_and_deny() -> None:
         registry,
         execution_id="exec-allow",
         allowed_tools=["echo"],
-        granted_permissions=["test:read"],
+        granted_permissions=["analysis_context:read"],
         principal="test-principal",
         security_audit=audit,
     )
@@ -404,7 +404,7 @@ def test_real_bound_tool_session_audits_allow_and_deny() -> None:
         registry,
         execution_id="exec-deny",
         allowed_tools=[],
-        granted_permissions=["test:read"],
+        granted_permissions=["analysis_context:read"],
         principal="test-principal",
         security_audit=audit,
     )
@@ -421,13 +421,115 @@ def test_real_bound_tool_session_audits_allow_and_deny() -> None:
     )
 
 
+def test_outbound_tool_denial_audit_is_structured_and_redacted() -> None:
+    calls = []
+    audit = _RecordingAudit()
+    registry = ToolRegistry()
+    registry.register(
+        ToolDefinition(
+            name="fetch_callback",
+            description="Fetch a callback URL.",
+            parameters=[
+                ToolParameter(
+                    name="callback_url",
+                    type="string",
+                    description="Callback URL",
+                ),
+            ],
+            handler=lambda callback_url: calls.append(callback_url),
+            policy=ToolPolicy.declared(
+                read_only=True,
+                side_effects=["network_read"],
+                permissions=["analysis_context:read"],
+            ),
+        )
+    )
+    session = BoundToolSession(
+        registry,
+        execution_id="exec-outbound-deny",
+        allowed_tools=["fetch_callback"],
+        granted_permissions=["analysis_context:read"],
+        principal="test-principal",
+        security_audit=audit,
+    )
+    credential_canary = "AUDIT-CREDENTIAL-CANARY"
+
+    result = session.execute(
+        "fetch_callback",
+        {
+            "callback_url": (
+                f"https://agent:{credential_canary}@example.com/private"
+            ),
+        },
+    )
+
+    assert result["error"]["code"] == "outbound_url_denied"
+    assert calls == []
+    completion = audit.completions[0]
+    assert completion["outcome"] == "denied"
+    assert completion["reason_code"] == "outbound_url_denied"
+    assert completion["metadata"]["denial_code"] == "outbound_url_denied"
+    assert completion["metadata"]["reason"] == "credentials_not_allowed"
+    visible = json.dumps(
+        {"result": result, "completion": completion},
+        ensure_ascii=False,
+    )
+    assert credential_canary not in visible
+    assert "agent:" not in visible
+
+
+def test_oversized_capability_declaration_has_bounded_durable_denial() -> None:
+    calls = []
+    repository = _SchemaValidatingAuditRepository()
+    registry = ToolRegistry()
+    registry.register(
+        ToolDefinition(
+            name="oversized_capabilities",
+            description="Oversized capabilities",
+            parameters=[],
+            handler=lambda: calls.append("ran"),
+            policy=ToolPolicy.declared(
+                read_only=True,
+                permissions=[
+                    f"unsupported_{index}:read"
+                    for index in range(
+                        SECURITY_AUDIT_MAX_METADATA_LIST_ITEMS + 1
+                    )
+                ],
+            ),
+        )
+    )
+    session = BoundToolSession(
+        registry,
+        execution_id="exec-capability-bound",
+        allowed_tools=["oversized_capabilities"],
+        security_audit=SecurityAuditService(repository),
+    )
+
+    result = session.execute("oversized_capabilities", {})
+
+    assert result["error"]["code"] == "unsupported_capability"
+    assert result["error"]["details"]["invalid_capabilities"] == [
+        "too_many_capabilities"
+    ]
+    assert calls == []
+    assert [event.phase for event in repository.events] == [
+        "attempt",
+        "completion",
+    ]
+    completion = repository.events[-1]
+    assert completion.outcome == "denied"
+    assert completion.reason_code == "unsupported_capability"
+    assert completion.metadata["denial_code"] == "unsupported_capability"
+
+
 def test_tool_attempt_failure_prevents_handler_dispatch() -> None:
     calls = []
     session = BoundToolSession(
         _tool_registry(calls),
         execution_id="exec-fail-closed",
         allowed_tools=["echo"],
-        granted_permissions=["test:read"],
+        granted_permissions=["analysis_context:read"],
         security_audit=_RecordingAudit(fail_attempt=True),
     )
 
@@ -451,7 +553,7 @@ def test_tool_completion_failure_is_non_retriable_and_deduplicates_mutation() ->
             policy=ToolPolicy.declared(
                 read_only=False,
                 side_effects=["test_state"],
-                permissions=["test:write"],
+                permissions=["analysis_context:read"],
             ),
         )
     )
@@ -459,7 +561,7 @@ def test_tool_completion_failure_is_non_retriable_and_deduplicates_mutation() ->
         registry,
         execution_id="exec-completion-failure",
         allowed_tools=["mutate"],
-        granted_permissions=["test:write"],
+        granted_permissions=["analysis_context:read"],
         security_audit=_RecordingAudit(fail_completion=True),
     )
 

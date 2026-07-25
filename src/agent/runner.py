@@ -238,6 +238,7 @@ class _ToolCompletionFence:
     def __init__(self, timeout_seconds: float) -> None:
         self._lock = threading.Lock()
         self._timed_out = False
+        self._dispatched = False
         self._completed = False
         self._deadline_monotonic = time.monotonic() + timeout_seconds
 
@@ -254,6 +255,26 @@ class _ToolCompletionFence:
         """Return whether this dispatch resolved as a timeout."""
         with self._lock:
             return self._timed_out
+
+    @property
+    def deadline_monotonic(self) -> float:
+        """Return the absolute per-call deadline established before audit."""
+        return self._deadline_monotonic
+
+    def claim_dispatch(self, claim: Callable[[], None]) -> None:
+        """Dispatch only when the runner timeout fence has not won."""
+        with self._lock:
+            if self._dispatched:
+                raise RuntimeError("runner tool dispatch was claimed more than once")
+            if self._timed_out or time.monotonic() >= self._deadline_monotonic:
+                self._timed_out = True
+                raise ExecutionFenceRejected(
+                    "tool_timeout",
+                    "Tool call reached dispatch after the runner timeout.",
+                    {"fence": "tool_timeout"},
+                )
+            claim()
+            self._dispatched = True
 
     def claim_completion(self, claim: Callable[[], None]) -> None:
         """Accept completion only when the runner timeout has not won."""
