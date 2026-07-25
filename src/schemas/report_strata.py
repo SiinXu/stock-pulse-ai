@@ -10,6 +10,7 @@ absent.
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Literal, Optional, Sequence, Union
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
@@ -416,3 +417,55 @@ def _coerce_partial_dict(
 
 
 ReportStrataPayload = Union[ReportStrata, Dict[str, Any]]
+
+
+def attach_report_strata_to_dashboard(
+    dashboard: Optional[Any],
+    *,
+    language: Optional[str] = None,
+    top_level_strata: Optional[Any] = None,
+) -> Dict[str, Any]:
+    """Return a dashboard dict with normalized report_strata for new analysis runs.
+
+    Existing nested strata (or top-level payload) are preserved and filled;
+    missing strata become an empty six-slot structure with disclaimer and
+    framework-not-configured defaults.
+    """
+    if isinstance(dashboard, dict):
+        dash: Dict[str, Any] = dict(dashboard)
+    else:
+        dash = {}
+    payload = dash.get("report_strata")
+    if payload is None and top_level_strata is not None:
+        payload = top_level_strata
+    strata = ensure_report_strata(payload, language=language)
+    dash["report_strata"] = strata.to_public_dict()
+    return dash
+
+
+def project_report_strata_for_api(
+    source: Optional[Any],
+    *,
+    language: Optional[str] = None,
+    log_context: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Project strata for API ReportDetails; log and return None on failure."""
+    try:
+        model = resolve_report_strata(source, language=language, ensure=False)
+        if model is None:
+            return None
+        return model.to_public_dict()
+    except Exception as exc:  # broad-exception: fallback_recorded - projection failure must not break report delivery
+        try:
+            from src.utils.sanitize import log_safe_exception
+        except Exception:
+            return None
+        log_safe_exception(
+            logging.getLogger(__name__),
+            "Report strata projection failed",
+            exc,
+            error_code="report_strata_projection_failed",
+            level=logging.WARNING,
+            context=log_context or {},
+        )
+        return None

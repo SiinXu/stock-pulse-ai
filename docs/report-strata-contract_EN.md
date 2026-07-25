@@ -22,11 +22,15 @@ Issue #616 requires analysis reports to present **fixed evidence strata** so flu
 - Historical reports may omit the field entirely and must still render
 - `AnalysisReportSchema` remains `report-v1` at the outer report level; strata carry their own `schema_version`
 
+## New analysis artifacts
+
+Successful JSON parse paths call `attach_report_strata_to_dashboard`: existing LLM strata are normalized; otherwise an empty six-slot structure is written (framework not configured + disclaimer). New runs therefore always persist the six-slot payload; filled fact lines still depend on model/upstream data quality.
+
 ## Rendering
 
 | Surface | Behavior |
 | --- | --- |
-| Markdown / brief / WeChat templates | When strata present, emit the six sections without merging inference into facts; always print disclaimer |
+| Markdown / brief / WeChat templates | When strata present, emit facts/gaps/inference/risks/framework without merging inference into facts; always print a single report-level disclaimer |
 | Web full-report (`ReportSummary` → `ReportStrata`) | Same section order; disclaimer always shown even when strata are absent |
 | API `ReportDetails.report_strata` | Projected when resolvable from `raw_result` / dashboard |
 

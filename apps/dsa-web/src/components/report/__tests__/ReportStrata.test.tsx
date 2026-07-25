@@ -82,3 +82,42 @@ describe('ReportStrata', () => {
     expect(screen.getByTestId('report-strata-facts')).toHaveTextContent('Close was 1680');
   });
 });
+
+
+  it('renders strata from snake_case rawResult.dashboard.report_strata body fields', () => {
+    const details: ReportDetails = {
+      rawResult: {
+        dashboard: {
+          report_strata: {
+            schema_version: 'report-strata-v1',
+            verified_facts: [
+              {
+                statement: 'Close was 1680 on the last daily bar.',
+                source_id: 'ohlcv:daily',
+                as_of: '2026-07-25T15:00:00+08:00',
+              },
+            ],
+            missing_or_conflicts: [
+              {
+                kind: 'conflict',
+                description: 'Volume sources disagree.',
+                source_ids: ['a', 'b'],
+              },
+            ],
+            model_inference: ['Momentum may improve if volume confirms.'],
+            risks_counter_evidence: ['Break below support invalidates the constructive case.'],
+            framework_alignment: {
+              status: 'not_configured',
+              summary: 'Personal investment framework not configured',
+            },
+            disclaimer: 'AI-generated content for reference only. Not investment advice.',
+          },
+        },
+      },
+    };
+    render(<ReportStrata details={details} language="en" />);
+    expect(screen.getByTestId('report-strata-facts')).toHaveTextContent('Close was 1680');
+    expect(screen.getByTestId('report-strata-inference')).toHaveTextContent('Momentum may improve');
+    expect(screen.getByTestId('report-strata-disclaimer')).toHaveTextContent('Not investment advice');
+  });
+

@@ -1350,6 +1350,13 @@ def get_analysis_status(task_id: str) -> TaskStatus:
                 or extracted_boards.get("sector_rankings") is not None
                 or extracted_boards.get("concept_rankings") is not None
             )
+            from src.schemas.report_strata import project_report_strata_for_api
+
+            report_strata = project_report_strata_for_api(
+                raw_result,
+                language=report_language,
+                log_context={"task_id": task_id, "path": "get_analysis_status"},
+            )
             details = None
             if (
                 any(extracted_fundamental.values())
@@ -1357,16 +1364,9 @@ def get_analysis_status(task_id: str) -> TaskStatus:
                 or market_structure is not None
                 or context_snapshot is not None
                 or analysis_context_pack_overview is not None
+                or report_strata is not None
+                or raw_result is not None
             ):
-                report_strata = None
-                try:
-                    from src.schemas.report_strata import resolve_report_strata
-
-                    report_strata_model = resolve_report_strata(raw_result)
-                    if report_strata_model is not None:
-                        report_strata = report_strata_model.to_public_dict()
-                except Exception:
-                    report_strata = None
                 details = ReportDetails(
                     news_content=getattr(record, "news_content", None),
                     raw_result=raw_result,
@@ -1660,17 +1660,13 @@ def _build_analysis_report(
             break
     analysis_context_pack_overview = extract_analysis_context_pack_overview(context_snapshot)
     api_context_snapshot = sanitize_context_snapshot_for_api(context_snapshot)
-    report_strata = None
-    try:
-        from src.schemas.report_strata import resolve_report_strata
+    from src.schemas.report_strata import project_report_strata_for_api
 
-        report_strata_model = resolve_report_strata(
-            raw_result_data or details_data or fallback_raw_result_payload,
-        )
-        if report_strata_model is not None:
-            report_strata = report_strata_model.to_public_dict()
-    except Exception:
-        report_strata = None
+    report_strata = project_report_strata_for_api(
+        raw_result_data or details_data or fallback_raw_result_payload,
+        language=report_language,
+        log_context={"path": "_build_analysis_report"},
+    )
     details = None
     has_board_details = (
         bool(extracted_boards.get("belong_boards"))

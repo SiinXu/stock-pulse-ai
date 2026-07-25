@@ -45,9 +45,6 @@
 {% set fa = strata.framework_alignment or {} %}
 - {{ fa.summary or labels.framework_not_configured_label }}{% if fa.status %}（{{ fa.status }}）{% endif %}
 
-#### 6. {{ labels.disclaimer_heading }}
-{{ strata.disclaimer or labels.not_investment_advice }}
-
 {% else %}
 **🧾 {{ labels.report_strata_heading }}**
 {% if strata.verified_facts %}

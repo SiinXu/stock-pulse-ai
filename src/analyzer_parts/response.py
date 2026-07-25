@@ -213,6 +213,25 @@ class GeminiAnalyzer:
             # Normalize signal_attribution (LLM may return strings/negative numbers/sums ≠ 100)
             normalize_report_signal_attribution(dashboard)
 
+            # Issue #616: new successful JSON artifacts always carry six strata slots.
+            try:
+                from src.schemas.report_strata import attach_report_strata_to_dashboard
+
+                dashboard = attach_report_strata_to_dashboard(
+                    dashboard,
+                    language=report_language,
+                    top_level_strata=data.get("report_strata"),
+                )
+            except Exception as strata_exc:  # broad-exception: fallback_recorded - strata attach must not block parse
+                log_safe_exception(
+                    logger,
+                    "Failed to attach report strata; continuing without strata",
+                    strata_exc,
+                    error_code="report_strata_attach_failed",
+                    level=logging.WARNING,
+                    context={"symbol": code},
+                )
+
             # Prioritize using AI-returned stock name (if original name is invalid or contains code)
             ai_stock_name = data.get('stock_name')
             if ai_stock_name and (name.startswith('股票') or name == code or 'Unknown' in name):
