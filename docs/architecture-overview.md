@@ -75,7 +75,7 @@ resolve -> fetch -> intelligence -> context -> analyze -> persist -> render -> d
 | `data_provider/` | Provider adapters, capability routing, normalization, caching, fallback, and health control. |
 | `api/` | FastAPI transport, middleware, lifecycle, and public HTTP schemas. |
 | `bot/` | Messaging-platform adapters, dispatch, commands, and stream integrations. |
-| `strategies/` | Built-in natural-language trading Skill definitions loaded from top-level YAML files. |
+| `strategies/` | Built-in natural-language trading Skill definitions loaded from root YAML files and explicitly reserved built-in collections such as `strategies/personas/`. |
 | `templates/` | Jinja report presentation templates consumed by the report renderer. |
 
 `src/`, `data_provider/`, `api/`, and `bot/` intentionally remain separate
@@ -208,7 +208,7 @@ plugin extension point, and a new ADR must follow the
 
 ```mermaid
 flowchart TB
-  BUILTIN[Built-in definitions<br/>strategies/*.yaml] -->|load| MANAGER[SkillManager<br/>src/agent/skills/base.py]
+  BUILTIN[Built-in definitions<br/>strategies root and reserved collections] -->|load| MANAGER[SkillManager<br/>src/agent/skills/base.py]
   CUSTOM[Configured custom directory<br/>top-level YAML or nested SKILL.md] -->|load; same name overrides built-in| MANAGER
   PLUGIN[Enabled analysis_strategy plugins<br/>validated Skill definitions] -->|exact-owner registration| ROOT[ApplicationServices<br/>one PluginManager and native catalog]
   ROOT -->|detached generation snapshot; conflicts fail closed| MANAGER
@@ -232,10 +232,11 @@ flowchart TB
 
 The catalog and execution flow has these stages:
 
-1. `SkillManager` loads built-in top-level YAML definitions from `strategies/`
-   and, when `AGENT_SKILL_DIR` is configured, top-level `*.yaml` / `*.yml` files
-   plus nested `SKILL.md` bundles from that custom directory. A custom definition
-   with the same name replaces the built-in catalog entry.
+1. `SkillManager` loads built-in root YAML definitions from `strategies/` plus
+   the explicitly reserved `strategies/personas/` YAML collection. When
+   `AGENT_SKILL_DIR` is configured, custom discovery remains top-level `*.yaml` /
+   `*.yml` plus nested `SKILL.md`. A custom definition with the same name
+   replaces the built-in catalog entry.
 2. The installed `ApplicationServices` root exposes one `PluginManager` paired
    with one Analysis Strategy native adapter. Enabled plugins contribute
    validated, detached `Skill` definitions only when their names do not collide
@@ -264,7 +265,7 @@ The catalog and execution flow has these stages:
 
 | Surface | Current role | Boundary |
 | --- | --- | --- |
-| `strategies/` | Built-in natural-language Skill definitions in top-level YAML files; the directory name is retained for product language and compatibility | Definition catalog, not a second loader or execution engine |
+| `strategies/` | Built-in natural-language Skill definitions in root YAML files and explicit built-in collections such as `personas/`; the directory name is retained for product language and compatibility | Definition catalog, not a second loader or execution engine |
 | Configured `AGENT_SKILL_DIR` | Optional custom top-level YAML definitions and nested `SKILL.md` bundles | Custom names can override built-ins; no directory is loaded when the setting is empty |
 | Enabled `analysis_strategy` plugin | Trusted Python lifecycle publishes a validated, detached `Skill` definition into the root-owned catalog | Cannot replace built-ins, custom definitions, another plugin, `SkillManager`, or `StrategyEngine`; use the [author guide](analysis-strategy-plugin-authoring.md) |
 | `src/agent/skills/` | Canonical product runtime: model, loaders, `SkillManager`, defaults, `SkillRouter`, `SkillAgent`, aggregation, synthesis, and `StrategyEngine` | Source of truth for current Skill/Strategy execution semantics |

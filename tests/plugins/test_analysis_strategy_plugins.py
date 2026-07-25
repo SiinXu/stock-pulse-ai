@@ -332,6 +332,10 @@ def test_duplicate_invalid_and_declarative_collisions_fail_closed(tmp_path):
         "test.analysis-builtin-collision",
         (_skill("bull_trend"),),
     )
+    persona_collision = _StrategyPlugin(
+        "test.analysis-persona-collision",
+        (_skill("persona_contrarian_deep_value"),),
+    )
     custom_collision = _StrategyPlugin(
         "test.analysis-custom-collision",
         (_skill("custom-reserved"),),
@@ -351,6 +355,7 @@ def test_duplicate_invalid_and_declarative_collisions_fail_closed(tmp_path):
             first,
             duplicate,
             builtin_collision,
+            persona_collision,
             custom_collision,
             invalid,
             healthy,
@@ -370,6 +375,9 @@ def test_duplicate_invalid_and_declarative_collisions_fail_closed(tmp_path):
     assert results["test.analysis-builtin-collision"].error_code == (
         "native_registration_conflict"
     )
+    assert results["test.analysis-persona-collision"].error_code == (
+        "native_registration_conflict"
+    )
     assert results["test.analysis-custom-collision"].error_code == (
         "native_registration_conflict"
     )
@@ -381,6 +389,7 @@ def test_duplicate_invalid_and_declarative_collisions_fail_closed(tmp_path):
     assert catalog.get("plugin-duplicate").source == "plugin:test.analysis-first"
     assert catalog.get("plugin-healthy").source == "plugin:test.analysis-healthy"
     assert catalog.get("bull_trend").source == "builtin"
+    assert catalog.get("persona_contrarian_deep_value").source == "builtin"
     assert catalog.get("custom-reserved").instructions == "Custom directory wins"
 
 
@@ -654,6 +663,30 @@ def test_supplied_plugin_manager_derives_or_rejects_analysis_registry_pair():
         )
 
 
+def test_application_registry_preserves_report_template_validation():
+    class _Template:
+        template_id = "analysis-strategy-rebase-check"
+        platforms = frozenset({"markdown"})
+
+        def render(self, request):
+            del request
+            return "rendered"
+
+    registry = build_application_extension_registry(lambda: object())
+    template = _Template()
+
+    handle = registry.register(
+        plugin_id="test.report-template-preserved",
+        extension_point="report_template",
+        registration_id=template.template_id,
+        implementation=template,
+    )
+
+    assert registry.get("report_template", template.template_id) is not None
+    handle.unregister()
+    assert registry.get("report_template", template.template_id) is None
+
+
 def test_requested_plugin_skills_keep_router_maximum_of_three():
     services = ApplicationServices(
         config=_config(),
@@ -704,5 +737,6 @@ def test_analysis_strategy_documentation_matches_runtime_ownership_contract():
     assert "most strategy authors should use" in author_guide.lower()
     assert "it never creates a second, silently disconnected" in author_guide
     assert "custom-directory value, application-root" in author_guide
+    assert "strategies/personas/" in author_guide
     assert "Enabled analysis_strategy plugins" in architecture
     assert "Analysis Strategy 插件作者指南" in strategy_readme

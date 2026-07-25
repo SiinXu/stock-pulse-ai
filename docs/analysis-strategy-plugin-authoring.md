@@ -123,13 +123,19 @@ custom `PluginManager` must bind its Analysis Strategy contract to the exact
 `AnalysisStrategyRegistry` consumed by that root. `ApplicationServices` derives
 that native backend from the supplied manager or rejects a mismatched explicit
 pair; it never creates a second, silently disconnected strategy registry.
+The caller-supplied registry's reserved-name provider must also resolve the
+declarative names for that same root config. Runtime assembly repeats collision
+checks and excludes an ambiguous plugin definition, but a divergent provider
+would defer the conflict from registration diagnostics to catalog publication.
 
 ## Catalog Precedence And Lifecycle
 
 One resolved catalog feeds Single-Agent prompt assembly, Multi-Agent routing,
 and `SkillAgent` construction:
 
-1. `SkillManager.load_builtin_skills()` loads the complete built-in catalog.
+1. `SkillManager.load_builtin_skills()` loads the complete built-in catalog:
+   root YAML under `strategies/` plus the explicitly reserved
+   `strategies/personas/` YAML collection.
 2. A configured `AGENT_SKILL_DIR` keeps its existing top-level YAML/YML and
    nested `SKILL.md` discovery behavior. A custom name may replace a built-in.
 3. An enabled plugin may add only a name not owned by the resolved built-in or
