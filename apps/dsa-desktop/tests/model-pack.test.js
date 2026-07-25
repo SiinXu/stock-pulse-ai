@@ -1007,14 +1007,23 @@ test('validation failures never spawn Ollama', async () => {
   }
 });
 
-test('Ollama timeout waits for child close before staging cleanup', async () => {
+test('Ollama timeout waits for child close before staging cleanup', { timeout: 5000 }, async () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-model-pack-timeout-'));
   writePack(tempRoot);
   const child = new EventEmitter();
   let inspectedRoot = null;
   let killed = false;
+  let resolveSpawned;
+  let resolveKilled;
+  const spawned = new Promise((resolve) => {
+    resolveSpawned = resolve;
+  });
+  const killObserved = new Promise((resolve) => {
+    resolveKilled = resolve;
+  });
   child.kill = () => {
     killed = true;
+    resolveKilled();
     return true;
   };
 
@@ -1024,20 +1033,23 @@ test('Ollama timeout waits for child close before staging cleanup', async () => 
       timeoutMs: 5,
       spawnImpl: (_command, _args, options) => {
         inspectedRoot = options.cwd;
+        resolveSpawned();
         return child;
       },
     });
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    const rejected = assert.rejects(
+      pending,
+      (error) => error instanceof ModelPackError && error.code === 'ollama_create_timeout'
+    );
+    await spawned;
+    await killObserved;
     assert.equal(killed, true);
     assert.equal(fs.existsSync(inspectedRoot), true);
     child.emit('exit', null, 'SIGTERM');
     assert.equal(fs.existsSync(inspectedRoot), true);
     child.emit('close', null, 'SIGTERM');
 
-    await assert.rejects(
-      pending,
-      (error) => error instanceof ModelPackError && error.code === 'ollama_create_timeout'
-    );
+    await rejected;
     assert.equal(fs.existsSync(inspectedRoot), false);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
