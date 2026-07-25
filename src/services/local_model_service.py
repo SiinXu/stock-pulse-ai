@@ -217,14 +217,13 @@ class OllamaPullProgress:
 
 @dataclass(frozen=True)
 class _LocalModelRegistrationRecovery:
-    """One short-lived rollback capability issued by a successful unregister."""
+    """One short-lived Desktop deletion reservation with optional rollback state."""
 
     model_id: str
     config_version: str
-    runtime_identity: str
+    runtime_base_url: str
     previous_channels: tuple[str, ...]
     previous_models: tuple[str, ...]
-    registration_changed: bool
     expires_at: float
 
 
@@ -589,12 +588,6 @@ class LocalModelService:
         current_version, values = self._config_snapshot()
         if current_version != recovery.config_version:
             raise ConfigConflictError(current_version=current_version)
-        current_runtime_identity = get_ollama_runtime_identity(self._base_url(values))
-        if not secrets.compare_digest(
-            current_runtime_identity,
-            recovery.runtime_identity,
-        ):
-            raise ConfigConflictError(current_version=current_version)
 
         current_models = self._split_csv(values.get("LLM_OLLAMA_MODELS"))
         expected_models = [
@@ -833,7 +826,7 @@ class LocalModelService:
         expected_config_version: Any,
         expected_runtime_identity: Any,
     ) -> Dict[str, Any]:
-        """Remove a non-active model from the Ollama connection configuration."""
+        """Reserve Desktop deletion and remove any non-active registration."""
         with self._task_lock, self._operation_lock:
             normalized = self._require_pullable(model_id)
             self._require_no_pending_unregistration(normalized)
@@ -849,30 +842,37 @@ class LocalModelService:
                 expected_runtime_identity=expected_runtime_identity,
             )
             current_models = self._split_csv(values.get("LLM_OLLAMA_MODELS"))
-            registration_changed = any(
-                item.lower() == normalized.lower() for item in current_models
-            )
-            result = self._unregister_model_from_snapshot(
-                normalized,
-                config_version=config_version,
-                values=values,
-            )
             now = time.monotonic()
-            self._prune_registration_recoveries()
             recovery_token = secrets.token_urlsafe(32)
-            self._registration_recoveries[recovery_token] = (
-                _LocalModelRegistrationRecovery(
-                    model_id=normalized,
-                    config_version=str(result.get("config_version") or ""),
-                    runtime_identity=get_ollama_runtime_identity(base_url),
-                    previous_channels=tuple(
-                        self._split_csv(values.get("LLM_CHANNELS"))
-                    ),
-                    previous_models=tuple(current_models),
-                    registration_changed=registration_changed,
-                    expires_at=now + LOCAL_MODEL_REGISTRATION_RECOVERY_TTL_SECONDS,
-                )
+            expires_at = now + LOCAL_MODEL_REGISTRATION_RECOVERY_TTL_SECONDS
+            transaction = self._system_config_service._runtime_config_transaction
+            transaction.acquire_update_lease(
+                recovery_token,
+                ttl_seconds=LOCAL_MODEL_REGISTRATION_RECOVERY_TTL_SECONDS,
             )
+            try:
+                with transaction.authorize_update_lease(recovery_token):
+                    result = self._unregister_model_from_snapshot(
+                        normalized,
+                        config_version=config_version,
+                        values=values,
+                    )
+                self._prune_registration_recoveries()
+                self._registration_recoveries[recovery_token] = (
+                    _LocalModelRegistrationRecovery(
+                        model_id=normalized,
+                        config_version=str(result.get("config_version") or ""),
+                        runtime_base_url=base_url,
+                        previous_channels=tuple(
+                            self._split_csv(values.get("LLM_CHANNELS"))
+                        ),
+                        previous_models=tuple(current_models),
+                        expires_at=expires_at,
+                    )
+                )
+            except Exception:
+                transaction.release_update_lease(recovery_token)
+                raise
             return {**result, "recovery_token": recovery_token}
 
     def finalize_unregistration(
@@ -890,7 +890,9 @@ class LocalModelService:
                 allow_revoked=True,
             )
             self._revoked_registration_recoveries[token] = recovery
-            self._validate_registration_recovery_configuration(recovery)
+            self._system_config_service._runtime_config_transaction.release_update_lease(
+                token
+            )
             return {
                 **self.get_configuration(),
                 "success": True,
@@ -904,44 +906,64 @@ class LocalModelService:
         *,
         recovery_token: Any,
     ) -> Dict[str, Any]:
-        """Restore one exact Desktop snapshot without probing a stopped runtime."""
+        """Release a reservation and restore removed registration when weights remain."""
         with self._operation_lock:
             normalized = self._require_pullable(model_id)
-            _token, recovery = self._consume_registration_recovery(
+            token, recovery = self._consume_registration_recovery(
                 normalized,
                 recovery_token,
             )
-            current_version, _values = self._validate_registration_recovery_configuration(
-                recovery
-            )
-            if not recovery.registration_changed:
-                return {
-                    **self.get_configuration(),
-                    "success": True,
-                    "model_id": normalized,
-                    "deleted": False,
+            transaction = self._system_config_service._runtime_config_transaction
+            try:
+                current_version, _values = (
+                    self._validate_registration_recovery_configuration(recovery)
+                )
+                was_registered = any(
+                    item.lower() == normalized.lower()
+                    for item in recovery.previous_models
+                )
+                if not was_registered:
+                    return {
+                        **self.get_configuration(),
+                        "success": True,
+                        "model_id": normalized,
+                        "deleted": False,
+                    }
+                installed = {
+                    item.lower()
+                    for item in self._client_factory(
+                        recovery.runtime_base_url
+                    ).list_installed_models()
                 }
-            result = self._system_config_service.update(
-                config_version=current_version,
-                items=[
-                    {
-                        "key": "LLM_CHANNELS",
-                        "value": ",".join(recovery.previous_channels),
-                    },
-                    {
-                        "key": "LLM_OLLAMA_MODELS",
-                        "value": ",".join(recovery.previous_models),
-                    },
-                ],
-                reload_now=True,
-                validate_connectivity=False,
-                actor="local_model_registration_restore",
-            )
-            return {
-                **result,
-                **self.get_configuration(),
-                "model_id": normalized,
-            }
+                if normalized.lower() not in installed:
+                    raise LocalModelNotInstalledError(
+                        "The deleted local model weights cannot be registered again"
+                    )
+
+                with transaction.authorize_update_lease(token):
+                    result = self._system_config_service.update(
+                        config_version=current_version,
+                        items=[
+                            {
+                                "key": "LLM_CHANNELS",
+                                "value": ",".join(recovery.previous_channels),
+                            },
+                            {
+                                "key": "LLM_OLLAMA_MODELS",
+                                "value": ",".join(recovery.previous_models),
+                            },
+                        ],
+                        reload_now=True,
+                        validate_connectivity=False,
+                        actor="local_model_registration_restore",
+                    )
+                return {
+                    **result,
+                    **self.get_configuration(),
+                    "model_id": normalized,
+                }
+            finally:
+                transaction.release_update_lease(token)
 
     def _unregister_model_from_snapshot(
         self,

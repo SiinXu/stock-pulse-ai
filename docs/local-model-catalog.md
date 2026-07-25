@@ -204,13 +204,22 @@ configuration and rejects activation or unregistration when either snapshot
 value changed during the operation. While a Desktop deletion recovery is
 pending, the backend reserves that model against concurrent local-model pulls
 or registration, including models installed directly in Ollama that were not
-registered yet. Every lifecycle registration remains catalog-backed. Recovery
-is single-use and bound to the exact post-reservation configuration and runtime
-identity. For an unregistered model it only releases the reservation and never
-creates a registration. Recovery remains offline without probing a
-stopped or temporarily unavailable runtime. Successful weight deletion retries
-idempotent recovery revocation once. If acknowledgement remains unavailable,
-deletion still succeeds and any unrevoked token expires after its short TTL.
+registered yet. The same bounded lease temporarily rejects every
+`SystemConfigService` write, including task assignment, so configuration cannot
+add a new reference after unregistration but before weight deletion. Finalizing
+the deletion, completing recovery, or reaching the short TTL releases the
+lease. Every lifecycle registration remains catalog-backed. Recovery is
+single-use and bound to the exact post-reservation configuration and original
+runtime. It writes a removed registration back only when that runtime still
+reports the weights; a stopped or unavailable runtime and missing weights all
+reject recovery. For an unregistered model, recovery only releases the
+reservation and never creates a registration. Successful weight deletion
+retries idempotent recovery revocation once. If a network or status response
+leaves the acknowledgement unconfirmed, deletion still succeeds with the
+non-destructive `local_model_delete_finalize_unconfirmed` warning. The token
+cannot restore missing weights and expires after its short TTL; if the backend
+never received finalization, configuration writes may return a version conflict
+for that remaining TTL and can be retried after refresh.
 
 Run `python scripts/check_local_model_catalog.py` after every catalog or desktop
 packaging change.

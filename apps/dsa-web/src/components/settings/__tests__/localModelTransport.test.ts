@@ -269,7 +269,11 @@ describe('localModelTransport', () => {
 
     await expect(
       __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
-    ).resolves.toEqual({ ...mutation, deleted: true });
+    ).resolves.toEqual({
+      ...mutation,
+      deleted: true,
+      warnings: ['local_model_delete_finalize_unconfirmed'],
+    });
     expect(bridge.remove).toHaveBeenCalledWith(
       'qwen3:4b',
       RUNTIME_IDENTITY,
@@ -278,7 +282,7 @@ describe('localModelTransport', () => {
     expect(api.finalizeUnregistration).toHaveBeenCalledTimes(2);
   });
 
-  it('keeps confirmed weight deletion successful across a semantic finalization conflict', async () => {
+  it('keeps confirmed deletion successful with a warning after a finalization conflict', async () => {
     const bridge = createDesktopBridge();
     const mutation = {
       ...CONFIGURATION,
@@ -308,8 +312,12 @@ describe('localModelTransport', () => {
 
     await expect(
       __localModelTransportTest.createDesktopTransport(bridge).remove('qwen3:4b'),
-    ).resolves.toEqual({ ...mutation, deleted: true });
-    expect(api.finalizeUnregistration).toHaveBeenCalledTimes(2);
+    ).resolves.toEqual({
+      ...mutation,
+      deleted: true,
+      warnings: ['local_model_delete_finalize_unconfirmed'],
+    });
+    expect(api.finalizeUnregistration).toHaveBeenCalledTimes(1);
     expect(api.restoreRegistration).not.toHaveBeenCalled();
   });
 

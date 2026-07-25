@@ -92,6 +92,7 @@ class _SystemConfigUpdateMethods:
                 )
 
         with self._runtime_config_transaction.lock:
+            self._runtime_config_transaction.guard_update_lease()
             previous_map = self._manager.read_config_map()
             updates: List[Tuple[str, str]] = []
             sensitive_keys: Set[str] = set()
@@ -240,6 +241,7 @@ class _SystemConfigUpdateMethods:
     ) -> Dict[str, Any]:
         """Restore the previous active config without crossing the auth boundary."""
         with self._runtime_config_transaction.lock:
+            self._runtime_config_transaction.guard_update_lease()
             self._conflict.guard_version(config_version)
             try:
                 target_snapshot = self._runtime_config_transaction.read_last_good_snapshot()
@@ -544,6 +546,7 @@ class _SystemConfigUpdateMethods:
     ) -> None:
         """Apply raw key updates without validation (internal service use only)."""
         with self._runtime_config_transaction.lock:
+            self._runtime_config_transaction.guard_update_lease()
             self._manager.apply_updates(
                 updates=updates,
                 sensitive_keys=set(),

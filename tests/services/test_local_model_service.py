@@ -969,7 +969,7 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
         )
         self.assertNotIn("LLM_OLLAMA_MODELS", self.manager.read_config_map())
 
-    def test_registration_restore_is_offline_and_bound_to_the_original_runtime(self) -> None:
+    def test_registration_restore_requires_weights_on_the_original_runtime(self) -> None:
         self._rewrite_env(
             "ADMIN_AUTH_ENABLED=true",
             "LLM_CONFIG_MODE=channels",
@@ -985,19 +985,37 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
             "LLM_OLLAMA_ENABLED=true",
             "LITELLM_MODEL=openai/gpt-4o",
         )
-        service, _queue, client = self._local_service(
-            client=_FakeRuntimeClient(installed=[]),
-        )
+        service, _queue, client = self._local_service()
         unregistered = self._unregister(service)
+
+        blocked_version, _values = service._config_snapshot()
+        with self.assertRaises(ConfigConflictError):
+            self.service.update(
+                config_version=blocked_version,
+                items=[{"key": "LOG_LEVEL", "value": "DEBUG"}],
+                reload_now=False,
+                validate_connectivity=False,
+                actor="test",
+            )
 
         restored = service.restore_registration(
             "qwen3:4b",
             recovery_token=unregistered["recovery_token"],
         )
 
+        released_version, _values = service._config_snapshot()
+        self.service.update(
+            config_version=released_version,
+            items=[{"key": "LOG_LEVEL", "value": "DEBUG"}],
+            reload_now=False,
+            validate_connectivity=False,
+            actor="test",
+        )
+
         self.assertIn("qwen3:4b", restored["registered_models"])
         self.assertEqual(self.manager.read_config_map()["LLM_CHANNELS"], "cloud,ollama")
-        self.assertEqual(client.list_calls, 0)
+        self.assertEqual(self.manager.read_config_map()["LOG_LEVEL"], "DEBUG")
+        self.assertEqual(client.list_calls, 1)
 
     def test_successful_desktop_delete_finalization_revokes_recovery(self) -> None:
         self._rewrite_env(
@@ -1101,7 +1119,7 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertTrue(finalized["deleted"])
         service.start_pull("qwen3:4b")
 
-    def test_finalize_consumes_recovery_when_post_unregister_config_changed(self) -> None:
+    def test_pending_desktop_delete_blocks_config_assignment_until_finalized(self) -> None:
         self._rewrite_env(
             "ADMIN_AUTH_ENABLED=true",
             "LLM_CONFIG_MODE=channels",
@@ -1117,26 +1135,37 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
         service, _queue, _client = self._local_service()
         unregistered = self._unregister(service)
         current_version, _values = service._config_snapshot()
+
+        with self.assertRaises(ConfigConflictError):
+            self.service.update(
+                config_version=current_version,
+                items=[
+                    {"key": "LLM_CHANNELS", "value": "cloud,ollama"},
+                    {"key": "LLM_OLLAMA_MODELS", "value": "qwen3:4b"},
+                    {"key": "LITELLM_MODEL", "value": "ollama/qwen3:4b"},
+                ],
+                reload_now=False,
+                validate_connectivity=False,
+                actor="test",
+            )
+
+        finalized = service.finalize_unregistration(
+            "qwen3:4b",
+            recovery_token=unregistered["recovery_token"],
+        )
+        released_version, _values = service._config_snapshot()
         self.service.update(
-            config_version=current_version,
+            config_version=released_version,
             items=[{"key": "LOG_LEVEL", "value": "DEBUG"}],
             reload_now=False,
             validate_connectivity=False,
             actor="test",
         )
 
-        with self.assertRaises(ConfigConflictError):
-            service.finalize_unregistration(
-                "qwen3:4b",
-                recovery_token=unregistered["recovery_token"],
-            )
-        with self.assertRaises(LocalModelValidationError):
-            service.restore_registration(
-                "qwen3:4b",
-                recovery_token=unregistered["recovery_token"],
-            )
+        self.assertTrue(finalized["deleted"])
+        self.assertEqual(self.manager.read_config_map()["LOG_LEVEL"], "DEBUG")
 
-    def test_offline_registration_restore_is_optimistic_and_single_use(self) -> None:
+    def test_registration_restore_rejects_when_original_runtime_lacks_weights(self) -> None:
         self._rewrite_env(
             "ADMIN_AUTH_ENABLED=true",
             "LLM_CONFIG_MODE=channels",
@@ -1153,20 +1182,21 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
         unregistered = self._unregister(service)
         client.installed = []
 
-        restored = service.restore_registration(
-            "qwen3:4b",
-            recovery_token=unregistered["recovery_token"],
-        )
+        with self.assertRaises(LocalModelNotInstalledError):
+            service.restore_registration(
+                "qwen3:4b",
+                recovery_token=unregistered["recovery_token"],
+            )
         with self.assertRaises(LocalModelValidationError):
             service.restore_registration(
                 "qwen3:4b",
                 recovery_token=unregistered["recovery_token"],
             )
 
-        self.assertEqual(restored["registered_models"], ["qwen3:4b"])
-        self.assertEqual(client.list_calls, 0)
+        self.assertEqual(self.manager.read_config_map()["LLM_OLLAMA_MODELS"], "")
+        self.assertEqual(client.list_calls, 1)
 
-    def test_registration_restore_rejects_runtime_identity_drift_without_a_probe(self) -> None:
+    def test_registration_restore_probes_the_original_runtime_snapshot(self) -> None:
         self._rewrite_env(
             "ADMIN_AUTH_ENABLED=true",
             "LLM_CONFIG_MODE=channels",
@@ -1182,7 +1212,19 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
             "LLM_OLLAMA_ENABLED=true",
             "LITELLM_MODEL=openai/gpt-4o",
         )
-        service, _queue, client = self._local_service()
+        client = _FakeRuntimeClient()
+        probed_base_urls: List[str] = []
+
+        def client_factory(base_url: str) -> _FakeRuntimeClient:
+            probed_base_urls.append(base_url)
+            return client
+
+        service = LocalModelService(
+            system_config_service=self.service,
+            task_queue=_FakeTaskQueue(),
+            pullable_model_ids=lambda: {"qwen3:4b"},
+            client_factory=client_factory,
+        )
         unregistered = self._unregister(service)
 
         with patch.object(
@@ -1190,14 +1232,14 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
             "_base_url",
             return_value="http://127.0.0.1:11500",
         ):
-            with self.assertRaises(ConfigConflictError):
-                service.restore_registration(
-                    "qwen3:4b",
-                    recovery_token=unregistered["recovery_token"],
-                )
+            restored = service.restore_registration(
+                "qwen3:4b",
+                recovery_token=unregistered["recovery_token"],
+            )
 
-        self.assertEqual(client.list_calls, 0)
-        self.assertEqual(self.manager.read_config_map()["LLM_OLLAMA_MODELS"], "")
+        self.assertEqual(probed_base_urls, ["http://127.0.0.1:11434"])
+        self.assertEqual(client.list_calls, 1)
+        self.assertIn("qwen3:4b", restored["registered_models"])
 
     def test_registration_restore_rejects_a_stale_config_version(self) -> None:
         self._rewrite_env(
@@ -1217,13 +1259,10 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
         )
         service, _queue, _client = self._local_service()
         unregistered = self._unregister(service)
-        current_version, _values = service._config_snapshot()
-        self.service.update(
-            config_version=current_version,
-            items=[{"key": "LOG_LEVEL", "value": "DEBUG"}],
-            reload_now=False,
-            validate_connectivity=False,
-            actor="test",
+        self.manager.apply_updates(
+            updates=[("LOG_LEVEL", "DEBUG")],
+            sensitive_keys=set(),
+            mask_token="******",
         )
 
         with self.assertRaises(ConfigConflictError):
@@ -1238,7 +1277,47 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
                 recovery_token=unregistered["recovery_token"],
             )
 
+        released_version, _values = service._config_snapshot()
+        self.service.update(
+            config_version=released_version,
+            items=[{"key": "LOG_LEVEL", "value": "INFO"}],
+            reload_now=False,
+            validate_connectivity=False,
+            actor="test",
+        )
+
         self.assertEqual(self.manager.read_config_map()["LLM_OLLAMA_MODELS"], "")
+        self.assertEqual(self.manager.read_config_map()["LOG_LEVEL"], "INFO")
+
+    def test_expired_desktop_delete_lease_allows_config_updates(self) -> None:
+        self._rewrite_env("ADMIN_AUTH_ENABLED=true")
+        service, _queue, _client = self._local_service()
+
+        with patch(
+            "src.services.local_model_service.time.monotonic",
+            return_value=100.0,
+        ):
+            unregistered = self._unregister(service)
+
+        with patch(
+            "src.services.local_model_service.time.monotonic",
+            return_value=401.0,
+        ):
+            current_version, _values = service._config_snapshot()
+            self.service.update(
+                config_version=current_version,
+                items=[{"key": "LOG_LEVEL", "value": "DEBUG"}],
+                reload_now=False,
+                validate_connectivity=False,
+                actor="test",
+            )
+            with self.assertRaises(LocalModelValidationError):
+                service.finalize_unregistration(
+                    "qwen3:4b",
+                    recovery_token=unregistered["recovery_token"],
+                )
+
+        self.assertEqual(self.manager.read_config_map()["LOG_LEVEL"], "DEBUG")
 
     def test_registration_restore_rejects_an_unrelated_model_or_unissued_token(self) -> None:
         self._rewrite_env(
@@ -1301,9 +1380,14 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
 
         with patch(
             "src.services.local_model_service.time.monotonic",
-            side_effect=[100.0, 100.0, 100.0, 401.0],
+            return_value=100.0,
         ):
             unregistered = self._unregister(service)
+
+        with patch(
+            "src.services.local_model_service.time.monotonic",
+            return_value=401.0,
+        ):
             with self.assertRaises(LocalModelValidationError):
                 service.restore_registration(
                     "qwen3:4b",

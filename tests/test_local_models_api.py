@@ -164,13 +164,14 @@ class LocalModelApiIntegrationTestCase(_SystemConfigServiceTestCaseBase):
             "LITELLM_MODEL=openai/gpt-4o",
         )
         self.runtime_probe_count = 0
+        self.runtime_models = ["qwen3:4b"]
 
         test_case = self
 
         class _InstalledRuntime:
             def list_installed_models(self):
                 test_case.runtime_probe_count += 1
-                return ["qwen3:4b"]
+                return list(test_case.runtime_models)
 
         task_queue = Mock()
         task_queue.list_pending_tasks.return_value = []
@@ -181,7 +182,7 @@ class LocalModelApiIntegrationTestCase(_SystemConfigServiceTestCaseBase):
             client_factory=lambda _base_url: _InstalledRuntime(),
         )
 
-    def test_unregister_then_restore_stays_offline_across_the_real_api_boundary(self) -> None:
+    def test_unregister_then_restore_probes_weights_across_the_real_api_boundary(self) -> None:
         configuration = self.local_model_service.get_configuration()
         unregistered = asyncio.run(
             _request(
@@ -212,7 +213,43 @@ class LocalModelApiIntegrationTestCase(_SystemConfigServiceTestCaseBase):
 
         self.assertEqual(restored.status_code, 200, restored.text)
         self.assertEqual(restored.json()["registered_models"], ["qwen3:4b"])
-        self.assertEqual(self.runtime_probe_count, 0)
+        self.assertEqual(self.runtime_probe_count, 1)
+
+    def test_restore_rejects_missing_weights_across_the_real_api_boundary(self) -> None:
+        configuration = self.local_model_service.get_configuration()
+        unregistered = asyncio.run(
+            _request(
+                self.local_model_service,
+                "DELETE",
+                "/api/v1/local-models/registrations",
+                json={
+                    "model_id": "qwen3:4b",
+                    "expected_config_version": configuration["config_version"],
+                    "expected_runtime_identity": DEFAULT_RUNTIME_IDENTITY,
+                },
+            )
+        )
+        self.assertEqual(unregistered.status_code, 200, unregistered.text)
+        self.runtime_models = []
+
+        restored = asyncio.run(
+            _request(
+                self.local_model_service,
+                "POST",
+                "/api/v1/local-models/registrations",
+                json={
+                    "model_id": "qwen3:4b",
+                    "recovery_token": unregistered.json()["recovery_token"],
+                },
+            )
+        )
+
+        self.assertEqual(restored.status_code, 409, restored.text)
+        self.assertEqual(
+            self.local_model_service.get_configuration()["registered_models"],
+            [],
+        )
+        self.assertEqual(self.runtime_probe_count, 1)
 
     def test_unregistered_model_receives_a_reservation_without_becoming_registered(self) -> None:
         self._rewrite_env(

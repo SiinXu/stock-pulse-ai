@@ -218,14 +218,31 @@ function createDesktopTransport(bridge: DesktopLocalModelBridge): LocalModelTran
     recoveryToken: string,
     unregistered: LocalModelMutationResponse,
   ): Promise<LocalModelMutationResponse> => {
+    let finalizationWarning = false;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         return await localModelsApi.finalizeUnregistration(modelId, recoveryToken);
-      } catch {
-        // The first response may have been lost after the idempotent revocation.
+      } catch (error) {
+        const parsed = getParsedApiError(error, 'en');
+        finalizationWarning = true;
+        if (parsed.status !== undefined || ![
+          'local_connection_failed',
+          'upstream_network',
+          'upstream_timeout',
+          'unknown',
+        ].includes(parsed.category)) {
+          break;
+        }
+        // Retry once because the first response may have been lost after revocation.
       }
     }
-    return { ...unregistered, deleted: true };
+    return {
+      ...unregistered,
+      deleted: true,
+      warnings: finalizationWarning
+        ? [...unregistered.warnings, 'local_model_delete_finalize_unconfirmed']
+        : unregistered.warnings,
+    };
   };
   const confirmWeightsRemain = async (modelId: string): Promise<boolean> => {
     try {
