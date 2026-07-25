@@ -63,6 +63,7 @@ from src.agent.public_contract import (
 )
 from src.agent.risk_override import (
     RiskOverrideApplication,
+    build_approved_risk_bypass_application as _build_approved_risk_bypass_application,
     build_risk_override_application,
     build_risk_override_plan,
 )
@@ -92,6 +93,11 @@ from src.agent.stream_events import stream_event
 from src.agent.tools.registry import ToolRegistry
 from src.config import AGENT_MAX_STEPS_DEFAULT, get_config
 from src.report_language import normalize_report_language
+from src.schemas.approvals import (
+    ApprovalContext as _ApprovalContext,
+    ApprovalRiskSource as _ApprovalRiskSource,
+)
+from src.services.approval_service import ApprovalService as _ApprovalService
 from src.utils.sanitize import log_safe_exception
 from src.agent.facade_binding import bind_facade_methods as _bind_facade_methods
 from src.agent.orchestrator_parts.chat import _ChatMethods
@@ -112,12 +118,16 @@ _ORCHESTRATOR_COMPAT_EXPORTS = (
     AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
     AGENT_CHAT_FAILURE_MESSAGE,
     AGENT_EXECUTION_FAILURE_MESSAGE,
+    _ApprovalContext,
+    _ApprovalRiskSource,
+    _ApprovalService,
     _critic,
     AgentContext,
     build_agent_chat_market_context,
     build_agent_chat_tool_registry,
     build_agent_disagreement_summary,
     build_agent_runtime_facts,
+    _build_approved_risk_bypass_application,
     build_risk_override_application,
     build_risk_override_plan,
     build_visible_chat_history,

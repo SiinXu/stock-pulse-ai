@@ -1178,6 +1178,60 @@ class SecurityAuditEventRecord(Base):
     )
 
 
+class ApprovalRuleRecord(Base):
+    """Versioned owner-scoped rule for one privileged approval action."""
+
+    __tablename__ = 'approval_rules'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    owner_id = Column(String(128), nullable=False)
+    action = Column(String(64), nullable=False)
+    enabled = Column(Boolean, nullable=False, default=False)
+    risk_sources_json = Column(Text, nullable=False)
+    expires_in_seconds = Column(Integer, nullable=False, default=300)
+    version = Column(Integer, nullable=False, default=1)
+    created_at = Column(DateTime, nullable=False, default=utc_naive_now)
+    updated_at = Column(DateTime, nullable=False, default=utc_naive_now)
+
+    __table_args__ = (
+        UniqueConstraint(
+            'owner_id',
+            'action',
+            name='uix_approval_rule_owner_action',
+        ),
+    )
+
+
+class ApprovalProposalRecord(Base):
+    """Durable one-shot proposal for a risk-control bypass."""
+
+    __tablename__ = 'approval_proposals'
+
+    id = Column(String(32), primary_key=True)
+    owner_id = Column(String(128), nullable=False, index=True)
+    action = Column(String(64), nullable=False, index=True)
+    risk_source = Column(String(32), nullable=False, index=True)
+    status = Column(String(16), nullable=False, index=True)
+    version = Column(Integer, nullable=False, default=1)
+    idempotency_key = Column(String(64), nullable=False, unique=True)
+    execution_id = Column(String(128), nullable=False, index=True)
+    context_json = Column(Text, nullable=False)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    consumed_at = Column(DateTime)
+    decided_at = Column(DateTime)
+    created_at = Column(DateTime, nullable=False, default=utc_naive_now)
+    updated_at = Column(DateTime, nullable=False, default=utc_naive_now)
+
+    __table_args__ = (
+        Index(
+            'ix_approval_proposal_owner_status_expiry',
+            'owner_id',
+            'status',
+            'expires_at',
+        ),
+    )
+
+
 class ScheduledTaskRecord(Base):
     """Versioned persisted definition for one recurring task."""
 

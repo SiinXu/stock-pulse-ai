@@ -7,6 +7,7 @@ from sqlalchemy import create_engine, inspect
 from sqlalchemy.engine import Connection
 
 from src.migrations.registry import (
+    APPROVAL_GATE_SCHEMA_MIGRATION,
     INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION,
     get_migrations,
 )
@@ -32,7 +33,7 @@ def _engine_before_framework_migration(path: Path):
             "applied_at DATETIME NOT NULL, "
             "checksum VARCHAR(64))"
         )
-        for migration in get_migrations()[:-1]:
+        for migration in get_migrations()[:-2]:
             connection.exec_driver_sql(
                 "INSERT INTO schema_migrations "
                 "(version, description, applied_at, checksum) VALUES (?, ?, ?, ?)",
@@ -150,7 +151,7 @@ def test_fresh_database_has_framework_tables_and_applied_migration() -> None:
             "investment_framework_versions",
         }.issubset(_tables(database._engine))
         status = MigrationRunner().status(database._engine)
-        assert status.current_version == INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION.id
+        assert status.current_version == APPROVAL_GATE_SCHEMA_MIGRATION.id
         assert status.pending_ids == ()
     finally:
         DatabaseManager.reset_instance()
@@ -161,7 +162,10 @@ def test_framework_migration_upgrades_legacy_registry_once(tmp_path: Path) -> No
     try:
         result = MigrationRunner().apply_pending(engine)
         assert result.success is True
-        assert result.executed_ids == (INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION.id,)
+        assert result.executed_ids == (
+            INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION.id,
+            APPROVAL_GATE_SCHEMA_MIGRATION.id,
+        )
         assert {
             "investment_frameworks",
             "investment_framework_versions",

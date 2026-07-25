@@ -4,7 +4,7 @@
 
 StockPulse 使用仓库内的 Python Migration Runner 管理 SQLite Schema 演进。第一阶段不引入 Alembic，也不一次性替换已有的 `Base.metadata.create_all()` 和 startup `_ensure_*` 兼容逻辑，而是逐项把 startup DDL 转成正式 migration。
 
-当前生产 registry 的目标版本是 `202607240003_investment_framework_schema`。`202607160001_migration_runner_registry` 建立有序 registry 所需的 additive metadata；`202607190001`~`202607190005` 依次把原先由 startup `_ensure_*` 兼容步骤补写的 `llm_usage` 遥测列，`decision_signals` 的 `decision_profile` 列/索引/回填，`portfolio_idempotency_records` 的 scope 列/唯一索引/规范化/guard trigger，`intelligence_items` 的 legacy scope 值规范化，以及 `intelligence_items` 从 legacy url 唯一到 scoped 复合唯一键的重建改为正式 migration；`202607240001_security_audit_events` 新增 append-oriented `security_audit_events` 表及查询索引；`202607240002_scheduled_task_schema` 新增版本化 scheduled-task 定义、definition/generation/dispatch 栅栏、准入失败计数、通知结果与运行记录表；`202607240003_investment_framework_schema` 新增个人投资框架 aggregate 与不可变版本历史表。历史库会幂等补齐，fresh 库由 metadata 建表后 migration 为 no-op。启动路径不执行临时业务 schema DDL 兼容步骤。完整业务与回滚合同见[个人投资框架后端合同](personal-investment-framework.md)。
+当前生产 registry 的目标版本是 `202607250001_approval_gate_schema`。`202607160001_migration_runner_registry` 建立有序 registry 所需的 additive metadata；`202607190001`~`202607190005` 依次把原先由 startup `_ensure_*` 兼容步骤补写的 `llm_usage` 遥测列，`decision_signals` 的 `decision_profile` 列/索引/回填，`portfolio_idempotency_records` 的 scope 列/唯一索引/规范化/guard trigger，`intelligence_items` 的 legacy scope 值规范化，以及 `intelligence_items` 从 legacy url 唯一到 scoped 复合唯一键的重建改为正式 migration；`202607240001_security_audit_events` 新增 append-oriented `security_audit_events` 表及查询索引；`202607240002_scheduled_task_schema` 新增版本化 scheduled-task 定义、definition/generation/dispatch 栅栏、准入失败计数、通知结果与运行记录表；`202607240003_investment_framework_schema` 新增个人投资框架 aggregate 与不可变版本历史表；`202607250001_approval_gate_schema` 新增 owner-scoped 审批规则和一次性审批提案表。历史库会幂等补齐，fresh 库由 metadata 建表后 migration 验证 shape。启动路径不执行临时业务 schema DDL 兼容步骤。审批表完整业务与回滚合同见[人工审批安全门禁](human-approvals.md#数据迁移与回滚)。
 
 数据模型版本化在本仓库分两个正交层次：**DB schema 层**由下文的有序 migration runner 管理（表/列/索引形状演进）；**序列化领域 artifact 层**由内嵌的版本标签管理（持久化或跨模块传递的 payload 内部契约），见文末「序列化 artifact 版本化」。
 
@@ -83,7 +83,7 @@ Fresh DB 仅在初始化锁内、`create_all()` 前检查不到用户表时被�
 
 Pre-baseline profile 固定记录来源 tag/commit，并完整校验该版本的必需表、列顺序、SQLite type affinity、主键、`NOT NULL`、默认值、唯一键及 collation、外键和 `WITHOUT ROWID` / `STRICT` option；partial/expression unique index、显式 `ON CONFLICT` 策略和已知后续版本表也进入 fail-closed 边界。匹配按新到旧顺序执行，残缺的较新库不能降级命中较旧 profile。兼容修复后还必须精确证明当前 ORM baseline 并通过 `PRAGMA foreign_key_check`，之后才可写 baseline row。普通同名残缺表、缺约束表、错误 affinity、部分 profile 或只有无关表的 SQLite 文件会 fail closed，整笔兼容事务回滚。自定义额外表不会作为 profile 证据，也不能替代任何必需表。无法识别的旧库不会被当作 Fresh DB 或自动 stamp；请先停止写入并完整备份，再由维护者确认来源版本和显式迁移路径。
 
-升级不删除现有业务表、字段或数据。`llm_usage`、`decision_signals`、`portfolio_idempotency_records` 与 `intelligence_items` 的全部 startup 兼容步骤已分别转为 `202607190001`~`202607190005` 正式 migration，个人投资框架表由 `202607240003` 管理；startup 路径不再执行业务 schema DDL 兼容步骤，只保留 `create_all`（fresh baseline 建表）与 baseline 记录登记，其余 schema 演进都必须通过新增的独立 migration 完成。
+升级不删除现有业务表、字段或数据。`llm_usage`、`decision_signals`、`portfolio_idempotency_records` 与 `intelligence_items` 的全部 startup 兼容步骤已分别转为 `202607190001`~`202607190005` 正式 migration，个人投资框架表由 `202607240003` 管理，人工审批规则与提案表由 `202607250001` 管理；startup 路径不再执行业务 schema DDL 兼容步骤，只保留 `create_all`（fresh baseline 建表）与 baseline 记录登记，其余 schema 演进都必须通过新增的独立 migration 完成。
 
 ## 状态与校验 CLI
 

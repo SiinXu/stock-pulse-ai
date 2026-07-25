@@ -9,6 +9,7 @@ export const APP_ROUTE_PATHS = {
   agent: '/chat',
   portfolio: '/portfolio',
   signals: '/signals',
+  approvals: '/approvals',
   stockDetails: '/stocks/:stockCode',
   researchAnalysis: '/research/analysis',
   researchMarket: '/research/market',

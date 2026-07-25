@@ -11,9 +11,16 @@ from src.agent.dashboard_payload import sanitize_agent_dashboard_payload
 from src.agent.protocols import AgentContext, normalize_decision_signal
 from src.agent.risk_override import (
     RiskOverrideApplication,
+    build_approved_risk_bypass_application as _build_approved_risk_bypass_application,
     build_risk_override_application,
     build_risk_override_plan,
 )
+from src.schemas.approvals import (
+    ApprovalContext as _ApprovalContext,
+    ApprovalRiskSource as _ApprovalRiskSource,
+)
+from src.services.approval_service import ApprovalService as _ApprovalService
+from src.utils.sanitize import log_safe_exception
 from src.agent.runner import parse_dashboard_json
 from src.report_language import normalize_report_language
 
@@ -735,6 +742,80 @@ class _DashboardMethods:
             current_signal=current_signal,
             override_enabled=getattr(self.config, "agent_risk_override", True),
         )
+        if plan.will_apply:
+            import uuid
+
+            execution_id = str(
+                ctx.meta.get("approval_execution_id")
+                or ctx.meta.get("execution_id")
+                or uuid.uuid4().hex
+            )[:128]
+            ctx.meta["approval_execution_id"] = execution_id
+            trigger = _ApprovalRiskSource(plan.trigger.value)
+            risk_summary = (
+                "A risk veto would replace the original buy signal."
+                if trigger is _ApprovalRiskSource.RISK_VETO
+                else "A risk downgrade would make the original signal more conservative."
+            )
+            cancelled_check = ctx.meta.get("_approval_cancelled_check")
+            deadline_epoch = ctx.meta.get("_approval_deadline_epoch")
+
+            def approval_cancelled() -> bool:
+                return bool(callable(cancelled_check) and cancelled_check())
+
+            def stop_waiting() -> bool:
+                import time
+
+                return bool(
+                    isinstance(deadline_epoch, (int, float))
+                    and time.time() >= float(deadline_epoch)
+                )
+
+            try:
+                approved = _ApprovalService().await_risk_control_bypass(
+                    execution_id=execution_id,
+                    context=_ApprovalContext(
+                        stock_code=str(ctx.stock_code or "")[:32],
+                        original_signal=plan.current_signal,
+                        conservative_signal=plan.target_signal,
+                        risk_source=trigger,
+                        risk_summary=risk_summary,
+                    ),
+                    cancelled_check=approval_cancelled,
+                    stop_waiting_check=stop_waiting,
+                )
+            except Exception as exc:  # broad-exception: fallback_recorded - Approval failure must preserve the existing conservative result.
+                log_safe_exception(
+                    logger,
+                    "Risk-control approval gate failed closed",
+                    exc,
+                    error_code="approval_gate_failed_closed",
+                )
+                approved = None
+            if approved is not None:
+                ctx.meta["_risk_control_bypass_fallback_application"] = (
+                    build_risk_override_application(plan)
+                )
+                application = _build_approved_risk_bypass_application(
+                    plan,
+                    approval_id=approved.id,
+                )
+                ctx.meta["risk_override_application"] = application
+                ctx.set_data(
+                    "risk_control_bypass_applied",
+                    {
+                        "approval_id": approved.id,
+                        "risk_source": trigger.value,
+                        "signal": plan.current_signal,
+                        "conservative_signal": plan.target_signal,
+                    },
+                )
+                logger.info(
+                    "[Orchestrator] risk-control bypass consumed: trigger=%s approval_id=%s",
+                    trigger.value,
+                    approved.id,
+                )
+                return application
         application = build_risk_override_application(plan)
         ctx.meta["risk_override_application"] = application
         if not application.applied:

@@ -18,6 +18,7 @@ from types import CodeType, FunctionType
 EXPECTED_PUBLIC_EXPORTS = frozenset(
     """
     AgentProviderTurn AlertCooldownRecord AlertNotificationRecord
+    ApprovalProposalRecord ApprovalRuleRecord
     AlertRuleRecord AlertTriggerRecord AnalysisHistory Any BacktestResult
     BacktestSummary Base Boolean CURRENT_SCHEMA_VERSION Callable Column
     ConversationMessage ConversationSummary DatabaseManager
@@ -86,13 +87,15 @@ EXPECTED_SCHEMA_DEFINITIONS = (
     "DecisionSignalOutcomeRecord",
     "DecisionSignalFeedbackRecord",
     "SecurityAuditEventRecord",
+    "ApprovalRuleRecord",
+    "ApprovalProposalRecord",
     "ScheduledTaskRecord",
     "ScheduledTaskRunRecord",
     "InvestmentFrameworkRecord",
     "InvestmentFrameworkVersionRecord",
 )
 EXPECTED_SCHEMA_AST_HASH = (
-    "e85bd20322a0d7b9814287b2baa4ae8e72106163cc3921e0b4cf35f727a3c47e"
+    "d8a0488c52fad2733cfaa5bd4b845e0b2c6562b61d86e12bf616687fa07945a3"
 )
 EXPECTED_SCHEMA_MODELS = (
     "DatabaseSchemaMigration",
@@ -127,6 +130,8 @@ EXPECTED_SCHEMA_MODELS = (
     "DecisionSignalMemoryFlagRecord",
     "PortfolioAccountKind",
     "SecurityAuditEventRecord",
+    "ApprovalRuleRecord",
+    "ApprovalProposalRecord",
     "ScheduledTaskRecord",
     "ScheduledTaskRunRecord",
     "InvestmentFrameworkRecord",
@@ -165,6 +170,8 @@ EXPECTED_SCHEMA_TABLES = (
     "decision_signal_memory_flags",
     "portfolio_account_kinds",
     "security_audit_events",
+    "approval_rules",
+    "approval_proposals",
     "scheduled_tasks",
     "scheduled_task_runs",
     "investment_frameworks",
@@ -192,6 +199,10 @@ EXPECTED_UTC_COLUMN_CALLBACKS = (
     ("portfolio_account_kinds", "created_at", "default"),
     ("portfolio_account_kinds", "updated_at", "default"),
     ("portfolio_account_kinds", "updated_at", "onupdate"),
+    ("approval_rules", "created_at", "default"),
+    ("approval_rules", "updated_at", "default"),
+    ("approval_proposals", "created_at", "default"),
+    ("approval_proposals", "updated_at", "default"),
     ("scheduled_tasks", "created_at", "default"),
     ("scheduled_tasks", "updated_at", "default"),
     ("scheduled_tasks", "updated_at", "onupdate"),

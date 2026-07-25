@@ -16,6 +16,7 @@ from api.v1.endpoints import (
     alerts,
     alphasift,
     analysis,
+    approvals,
     auth,
     backtest,
     decision_signals,
@@ -48,6 +49,12 @@ router.include_router(
     agent.router,
     prefix="/agent",
     tags=["Agent"]
+)
+
+router.include_router(
+    approvals.router,
+    prefix="/approvals",
+    tags=["Approvals"],
 )
 
 router.include_router(

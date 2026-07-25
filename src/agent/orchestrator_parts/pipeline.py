@@ -73,6 +73,10 @@ class _PipelineMethods:
             if timeout_seconds is None
             else max(0.0, float(timeout_seconds))
         )
+        ctx.meta["_approval_cancelled_check"] = cancelled_check
+        ctx.meta["_approval_deadline_epoch"] = (
+            t0 + timeout_s if timeout_s else None
+        )
 
         agents = self._build_agent_chain(ctx)
         specialist_agents_inserted = False
@@ -818,6 +822,53 @@ class _PipelineMethods:
 
         model_str = ", ".join(dict.fromkeys(m for m in models_used if m))
         provider = stats.models_used[0] if stats.models_used else ""
+        final_elapsed_s = time.time() - t0
+
+        if cancelled_check is not None and cancelled_check():
+            logger.info("[Orchestrator] pipeline cancelled after final output")
+            return self._build_cancelled_result(
+                stats,
+                all_tool_calls,
+                models_used,
+                final_elapsed_s,
+                ctx=ctx,
+            )
+
+        if timeout_s and final_elapsed_s >= timeout_s:
+            bypass_fact = ctx.get_data("risk_control_bypass_applied")
+            final_dashboard = ctx.get_data("final_dashboard")
+            fallback_application = ctx.meta.get(
+                "_risk_control_bypass_fallback_application"
+            )
+            if (
+                isinstance(bypass_fact, dict)
+                and isinstance(final_dashboard, dict)
+                and fallback_application is not None
+                and bypass_fact.get("conservative_signal") in {"buy", "hold", "sell"}
+            ):
+                final_dashboard = dict(final_dashboard)
+                final_dashboard["decision_type"] = bypass_fact["conservative_signal"]
+                ctx.set_data("final_dashboard", final_dashboard)
+                ctx.meta["risk_override_application"] = fallback_application
+            log_runtime_guard_event(
+                logger,
+                "run_timeout",
+                level=logging.ERROR,
+                scope="orchestrator",
+                phase="after_final_output",
+                elapsed_seconds=round(final_elapsed_s, 3),
+                limit_seconds=timeout_s,
+            )
+            self._apply_partition_fallback(ctx)
+            return self._build_timeout_result(
+                stats,
+                all_tool_calls,
+                models_used,
+                final_elapsed_s,
+                timeout_s,
+                ctx=ctx,
+                parse_dashboard=parse_dashboard,
+            )
 
         if parse_dashboard and dashboard is None:
             return OrchestratorResult(

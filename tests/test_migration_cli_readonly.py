@@ -21,6 +21,7 @@ from src.config import Config
 from src.migrations import cli as migration_cli
 from src.migrations.engine import read_only_migration_connection
 from src.migrations.registry import (
+    APPROVAL_GATE_SCHEMA_MIGRATION,
     DECISION_SIGNAL_PROFILE_MIGRATION,
     INTELLIGENCE_ITEM_SCOPE_MIGRATION,
     INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION,
@@ -197,6 +198,7 @@ def test_pending_cli_subprocess_is_read_only(
         SECURITY_AUDIT_EVENTS_MIGRATION.id,
         SCHEDULED_TASK_SCHEMA_MIGRATION.id,
         INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION.id,
+        APPROVAL_GATE_SCHEMA_MIGRATION.id,
     ]
     assert payload["target_version"] == TARGET_VERSION
     assert str(db_path) not in completed.stdout
@@ -262,6 +264,7 @@ def test_legacy_registry_without_checksum_is_reported_without_alter(
         SECURITY_AUDIT_EVENTS_MIGRATION.id,
         SCHEDULED_TASK_SCHEMA_MIGRATION.id,
         INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION.id,
+        APPROVAL_GATE_SCHEMA_MIGRATION.id,
     ]
     assert _database_snapshot(db_path) == before
     assert "checksum" not in {row[1] for row in before["registry_columns"]}

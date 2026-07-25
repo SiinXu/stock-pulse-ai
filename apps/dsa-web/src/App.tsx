@@ -46,6 +46,7 @@ const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const ChatPage = lazy(() => import('./pages/ChatPage'));
 const PortfolioPage = lazy(() => import('./pages/PortfolioPage'));
 const SignalCenterPage = lazy(() => import('./pages/DecisionSignalsPage'));
+const ApprovalsPage = lazy(() => import('./pages/ApprovalsPage'));
 const StockScreeningPage = lazy(() => import('./pages/StockScreeningPage'));
 const StockDetailsPage = lazy(() => import('./pages/StockDetailsPage'));
 const ComponentPlaygroundPage = lazy(() => import('./playground/ComponentPlaygroundPage'));
@@ -170,6 +171,7 @@ const routes = [
           { path: APP_ROUTE_PATHS.agent, element: <ChatPage /> },
           { path: APP_ROUTE_PATHS.portfolio, element: <PortfolioPage /> },
           { path: APP_ROUTE_PATHS.signals, element: <SignalCenterPage /> },
+          { path: APP_ROUTE_PATHS.approvals, element: <ApprovalsPage /> },
           { path: APP_ROUTE_PATHS.stockDetails, element: <StockDetailsPage /> },
           { path: APP_ROUTE_PATHS.researchMarket, element: <MarketReviewPage /> },
           { path: APP_ROUTE_PATHS.researchDiscover, element: <StockScreeningPage /> },
