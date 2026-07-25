@@ -61,6 +61,17 @@ cp .env.example .env
 
 共享的数据源、分析管线、领域契约、持久化与领域报告语义应优先归入 foundation pipeline；API DTO 与投影、Web、Desktop、Bot、交互式 Agent 体验及仓库治理归入 product layer，并通过共享契约消费 foundation 能力。跨轨改动必须先确定单一权威并保持领域 Schema、API 投影、任务状态与报告视图兼容，不能在产品入口复制 provider fallback、管线编排或任务生命周期。完整路由、上游移植和许可证来源规则见 [Foundation Pipeline 与 Product Layer](foundation-product-architecture.md)。架构轨不决定许可证。
 
+### 许可证与 SPDX（新文件）
+
+本仓库为双许可证（上游 MIT + StockPulse AGPL-3.0-only）。StockPulse 新编写源码默认使用：
+
+```text
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+```
+
+移植上游 MIT 文件时保留原声明；第三方 vendored 代码不得改标为 StockPulse AGPL。维护者按 [MIT / AGPL 文件归属清单流程](license-ownership-inventory.md) 做渐进覆盖（流程与信号，不是已完成的全库审计）。
+
 ### Commit 规范
 
 使用 [Conventional Commits](https://www.conventionalcommits.org/) 规范：
