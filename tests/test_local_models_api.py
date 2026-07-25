@@ -295,6 +295,7 @@ def test_local_model_lifespan_shutdown_waits_for_admitted_activation() -> None:
             values={},
             base_url="http://127.0.0.1:11434",
             is_cancel_requested=lambda: False,
+            commit_final_result=lambda operation: (True, operation()),
         )
 
     def shutdown() -> None:
@@ -454,6 +455,7 @@ class LocalModelApiIntegrationTestCase(_SystemConfigServiceTestCaseBase):
                 ),
                 append_flow_event=lambda _event: None,
                 is_cancel_requested=lambda: False,
+                commit_final_result=lambda operation: (True, operation()),
             )
             result = command.run(context)
             worker_result.update(result)

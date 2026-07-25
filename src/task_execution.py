@@ -328,6 +328,9 @@ class TaskRunContext:
     update_progress: Callable[[int, Optional[str]], Any] = field(repr=False, compare=False)
     append_flow_event: Callable[[Mapping[str, Any]], Any] = field(repr=False, compare=False)
     is_cancel_requested: Callable[[], bool] = field(repr=False, compare=False)
+    commit_final_result: Callable[
+        [Callable[[], Any]], tuple[bool, Any]
+    ] = field(repr=False, compare=False)
 
 
 TaskExecutionContext = TaskRunContext

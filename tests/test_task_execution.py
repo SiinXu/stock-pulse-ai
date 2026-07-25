@@ -469,6 +469,158 @@ def test_cancel_wins_over_late_completion_with_one_terminal_event(task_queue) ->
     assert [event.type for event in terminal_events] == [TaskEventType.CANCELLED]
 
 
+def test_cancel_after_final_poll_rejects_final_side_effect_commit(task_queue) -> None:
+    commit_reached = threading.Event()
+    release_commit = threading.Event()
+    side_effects = []
+    original_commit = task_queue._commit_final_result
+
+    def delay_commit(task_id, operation):
+        commit_reached.set()
+        assert release_commit.wait(timeout=2)
+        return original_commit(task_id, operation)
+
+    task_queue._commit_final_result = delay_commit
+
+    def run(context):
+        assert not context.is_cancel_requested()
+        accepted, result = context.commit_final_result(
+            lambda: side_effects.append("committed") or {"ok": True}
+        )
+        assert not accepted
+        assert result is None
+        return {"ok": False}
+
+    task_id = task_queue.submit(make_command(run))
+    future = task_queue._futures[task_id]
+    assert commit_reached.wait(timeout=2)
+    assert task_queue.cancel(task_id).status == TaskStatus.CANCEL_REQUESTED
+    release_commit.set()
+    future.result(timeout=2)
+
+    assert side_effects == []
+    assert task_queue.get(task_id).status == TaskStatus.CANCELLED
+
+
+def test_shutdown_after_final_poll_rejects_final_side_effect_commit(task_queue) -> None:
+    commit_reached = threading.Event()
+    release_commit = threading.Event()
+    side_effects = []
+    original_commit = task_queue._commit_final_result
+
+    def delay_commit(task_id, operation):
+        commit_reached.set()
+        assert release_commit.wait(timeout=2)
+        return original_commit(task_id, operation)
+
+    task_queue._commit_final_result = delay_commit
+
+    def run(context):
+        assert not context.is_cancel_requested()
+        accepted, result = context.commit_final_result(
+            lambda: side_effects.append("committed") or {"ok": True}
+        )
+        assert not accepted
+        assert result is None
+        return {"ok": False}
+
+    task_id = task_queue.submit(make_command(run))
+    future = task_queue._futures[task_id]
+    assert commit_reached.wait(timeout=2)
+    task_queue.shutdown()
+    release_commit.set()
+    future.result(timeout=2)
+
+    assert side_effects == []
+    assert task_queue.get(task_id).status == TaskStatus.INTERRUPTED
+
+
+def test_final_side_effect_commit_wins_over_concurrent_cancel(task_queue) -> None:
+    operation_started = threading.Event()
+    release_operation = threading.Event()
+    cancel_finished = threading.Event()
+    side_effects = []
+    cancel_snapshot = []
+
+    def run(context):
+        assert not context.is_cancel_requested()
+
+        def operation():
+            operation_started.set()
+            assert release_operation.wait(timeout=2)
+            side_effects.append("committed")
+            return {"ok": True}
+
+        accepted, result = context.commit_final_result(operation)
+        assert accepted
+        return result
+
+    task_id = task_queue.submit(make_command(run))
+    future = task_queue._futures[task_id]
+    assert operation_started.wait(timeout=2)
+
+    def cancel() -> None:
+        cancel_snapshot.append(task_queue.cancel(task_id))
+        cancel_finished.set()
+
+    cancel_thread = threading.Thread(target=cancel)
+    cancel_thread.start()
+    cancel_thread.join(timeout=0.1)
+    assert cancel_thread.is_alive()
+    assert not cancel_finished.is_set()
+
+    release_operation.set()
+    future.result(timeout=2)
+    cancel_thread.join(timeout=2)
+
+    assert not cancel_thread.is_alive()
+    assert side_effects == ["committed"]
+    assert task_queue.get(task_id).status == TaskStatus.COMPLETED
+    assert [snapshot.status for snapshot in cancel_snapshot] == [TaskStatus.COMPLETED]
+
+
+def test_final_side_effect_commit_wins_over_concurrent_shutdown(task_queue) -> None:
+    operation_started = threading.Event()
+    release_operation = threading.Event()
+    shutdown_finished = threading.Event()
+    side_effects = []
+
+    def run(context):
+        assert not context.is_cancel_requested()
+
+        def operation():
+            operation_started.set()
+            assert release_operation.wait(timeout=2)
+            side_effects.append("committed")
+            return {"ok": True}
+
+        accepted, result = context.commit_final_result(operation)
+        assert accepted
+        return result
+
+    task_id = task_queue.submit(make_command(run))
+    future = task_queue._futures[task_id]
+    assert operation_started.wait(timeout=2)
+
+    def shutdown() -> None:
+        task_queue.shutdown()
+        shutdown_finished.set()
+
+    shutdown_thread = threading.Thread(target=shutdown)
+    shutdown_thread.start()
+    shutdown_thread.join(timeout=0.1)
+    assert shutdown_thread.is_alive()
+    assert not shutdown_finished.is_set()
+
+    release_operation.set()
+    future.result(timeout=2)
+    shutdown_thread.join(timeout=2)
+
+    assert not shutdown_thread.is_alive()
+    assert side_effects == ["committed"]
+    assert task_queue.get(task_id).status == TaskStatus.COMPLETED
+
+
 def test_completed_task_rejects_retry(task_queue) -> None:
     task_queue._executor = SynchronousExecutor()
     task_id = task_queue.submit(make_command(lambda _context: {"ok": True}))

@@ -69,6 +69,14 @@ that arrives after `cancel_requested` resolves to `cancelled`; late progress and
 run-flow events are rejected. Each task records and publishes at most one terminal
 event.
 
+Runners with one bounded final side effect can use
+`TaskRunContext.commit_final_result(operation)`. The queue checks cancellation or
+shutdown, invokes the operation, and publishes `completed` while holding the same
+lifecycle lock. If cancellation or shutdown owns the lock first, the operation is
+not invoked. If the commit owns it first, later cancellation or shutdown observes
+the completed task. Network calls and other unbounded work must remain outside
+this final commit boundary.
+
 A pending command cancelled before execution never invokes its runner. Runners can
 poll `TaskRunContext.is_cancel_requested()`; it also returns true after
 `cancelled` or `interrupted` so a late-running callable observes the stop fence.
@@ -182,6 +190,9 @@ configuration mutation leases and local-model recovery reservations under the
 current application authority while preserving canonical task polling. Current
 service resolution and activation share one lifespan fence, and cancellation is
 checked again after that resolution immediately before configuration mutation.
+The bounded, connectivity-free `SystemConfigService.update()` and the task's
+`completed` transition then share the queue's final-result commit boundary, so a
+cancelled or interrupted pull cannot leave an activation side effect behind.
 
 This task does not add HTTP cancel/retry routes, an external broker, cross-process
 task sharing, or durable recovery after an ungraceful process loss.

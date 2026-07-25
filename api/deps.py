@@ -181,6 +181,9 @@ def _activate_active_local_model_pull(
     values: Mapping[str, str],
     base_url: str,
     is_cancel_requested: Callable[[], bool],
+    commit_final_result: Callable[
+        [Callable[[], Any]], tuple[bool, Any]
+    ],
 ) -> Optional[Dict[str, Any]]:
     """Linearize late pull activation with lifespan shutdown and cancellation."""
     with _LOCAL_MODEL_SERVICE_INIT_LOCK:
@@ -196,6 +199,7 @@ def _activate_active_local_model_pull(
             values=values,
             base_url=base_url,
             is_cancel_requested=is_cancel_requested,
+            commit_final_result=commit_final_result,
         )
 
 
