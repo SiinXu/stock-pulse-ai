@@ -526,12 +526,19 @@ class ScheduledTaskService:
             )
         row = self.repository.set_enabled(
             task_id,
+            expected_schema_version=existing.schema_version,
             enabled=bool(enabled),
             next_run_at=next_run,
             updated_at=now_value,
         )
         if row is None:
-            raise ScheduledTaskNotFoundError(task_id)
+            current = self.repository.get_task(task_id)
+            if current is None:
+                raise ScheduledTaskNotFoundError(task_id)
+            self._validate_persisted_task(current)
+            raise ScheduledTaskContractError(
+                "Scheduled task definition changed during enablement"
+            )
         return self._task_item(row)
 
     def list_runs(self, task_id: str, *, limit: int = 100) -> Dict[str, Any]:
@@ -675,26 +682,30 @@ class ScheduledTaskService:
                             level=logging.WARNING,
                         )
                     except ScheduledTaskContractError as exc:
-                        self.repository.set_enabled(
+                        disabled = self.repository.set_enabled(
                             task.id,
+                            expected_schema_version=task.schema_version,
                             enabled=False,
                             next_run_at=None,
                             updated_at=now,
                         )
-                        self._finish_run(
-                            run.id,
-                            status=ScheduledRunStatus.INTERRUPTED,
-                            now=now,
-                            error_code="scheduled_task_definition_invalid",
-                        )
-                        log_safe_exception(
-                            logger,
-                            "Scheduled task definition disabled during reconciliation",
-                            exc,
-                            error_code="scheduled_task_definition_quarantined",
-                            context={"task_id": task.id, "run_id": run.id},
-                            level=logging.WARNING,
-                        )
+                        if disabled is None:
+                            self._reconcile_definition_after_cas_miss(run, now)
+                        else:
+                            self._finish_run(
+                                run.id,
+                                status=ScheduledRunStatus.INTERRUPTED,
+                                now=now,
+                                error_code="scheduled_task_definition_invalid",
+                            )
+                            log_safe_exception(
+                                logger,
+                                "Scheduled task definition disabled during reconciliation",
+                                exc,
+                                error_code="scheduled_task_definition_quarantined",
+                                context={"task_id": task.id, "run_id": run.id},
+                                level=logging.WARNING,
+                            )
                     else:
                         self._reconcile_run(run, task, now)
                 reconciled += 1
@@ -707,6 +718,41 @@ class ScheduledTaskService:
                     context={"run_id": run.id, "task_id": run.task_id},
                 )
         return reconciled
+
+    def _reconcile_definition_after_cas_miss(self, run, now: datetime) -> None:
+        """Reclassify a definition changed after active-run validation."""
+        current = self.repository.get_task(run.task_id)
+        if current is None:
+            self._finish_run(
+                run.id,
+                status=ScheduledRunStatus.INTERRUPTED,
+                now=now,
+                error_code="scheduled_task_definition_missing",
+            )
+            return
+        try:
+            self._validate_persisted_task(current)
+        except ScheduledTaskUnsupportedSchemaError as exc:
+            self._finish_run(
+                run.id,
+                status=ScheduledRunStatus.INTERRUPTED,
+                now=now,
+                error_code="scheduled_task_schema_unsupported",
+            )
+            log_safe_exception(
+                logger,
+                "Scheduled task run interrupted after definition schema changed",
+                exc,
+                error_code="scheduled_task_schema_unsupported",
+                context={"task_id": current.id, "run_id": run.id},
+                level=logging.WARNING,
+            )
+        except ScheduledTaskContractError:
+            raise ScheduledTaskContractError(
+                "Scheduled task definition changed during quarantine"
+            )
+        else:
+            self._reconcile_run(run, current, now)
 
     def _record_unsupported_due_task(self, task, now: datetime) -> bool:
         """Fence one unsupported due slot without mutating its definition."""
@@ -736,12 +782,53 @@ class ScheduledTaskService:
         )
         return run is not None
 
-    def _quarantine_due_task(self, task, now: datetime) -> bool:
+    def _reclassify_due_after_cas_miss(
+        self,
+        task_id: str,
+        now: datetime,
+    ) -> Optional[str]:
+        """Re-read a due definition after another writer changed its schema."""
+        current = self.repository.get_task(task_id)
+        if (
+            current is None
+            or not bool(current.enabled)
+            or current.next_run_at is None
+            or current.next_run_at > now
+        ):
+            return None
+        try:
+            self._validate_persisted_task(current)
+        except ScheduledTaskUnsupportedSchemaError:
+            return (
+                "skipped"
+                if self._record_unsupported_due_task(current, now)
+                else None
+            )
+        except ScheduledTaskContractError:
+            return (
+                "skipped"
+                if self._quarantine_due_task(
+                    current,
+                    now,
+                    reclassify_on_miss=False,
+                )
+                else None
+            )
+        return None
+
+    def _quarantine_due_task(
+        self,
+        task,
+        now: datetime,
+        *,
+        reclassify_on_miss: bool = True,
+    ) -> bool:
         scheduled_for = task.next_run_at
         if scheduled_for is None:
             return False
         run = self.repository.quarantine_due_task(
             task_id=task.id,
+            expected_schema_version=task.schema_version,
             expected_next_run_at=scheduled_for,
             run_fields={
                 "id": uuid.uuid4().hex,
@@ -761,7 +848,11 @@ class ScheduledTaskService:
             },
             updated_at=now,
         )
-        return run is not None
+        if run is not None:
+            return True
+        if reclassify_on_miss:
+            return self._reclassify_due_after_cas_miss(task.id, now) == "skipped"
+        return False
 
     def _classify_market_session(self, market: str, local_date) -> MarketSessionStatus:
         try:
@@ -810,6 +901,7 @@ class ScheduledTaskService:
         run_status = terminal_status or ScheduledRunStatus.DISPATCHING
         run = self.repository.claim_due_occurrence(
             task_id=task.id,
+            expected_schema_version=task.schema_version,
             expected_next_run_at=scheduled_for,
             next_run_at=next_run,
             run_fields={
@@ -831,7 +923,7 @@ class ScheduledTaskService:
             updated_at=now,
         )
         if run is None:
-            return None
+            return self._reclassify_due_after_cas_miss(task.id, now)
         if terminal_status is not None:
             return "skipped"
         self._dispatch_run(run, task, now, contract=contract)
@@ -968,14 +1060,16 @@ class ScheduledTaskService:
                     field_name="owned_execution_task_ids",
                 )
             )
-            if not bool(task.enabled) and (
-                not execution_ids or execution_ids[-1] not in owned_ids
-            ):
+            if not bool(task.enabled):
                 self._finish_run(
                     run.id,
                     status=ScheduledRunStatus.INTERRUPTED,
                     now=now,
-                    error_code="scheduled_task_disabled_before_dispatch",
+                    error_code=(
+                        "scheduled_task_disabled_before_retry"
+                        if execution_ids
+                        else "scheduled_task_disabled_before_dispatch"
+                    ),
                 )
                 return
             if run.next_attempt_at is not None and run.next_attempt_at > now:
@@ -1026,6 +1120,15 @@ class ScheduledTaskService:
                     "finished_at": now,
                     "updated_at": now,
                 },
+            )
+            return
+
+        if not bool(task.enabled):
+            self._finish_run(
+                run.id,
+                status=ScheduledRunStatus.INTERRUPTED,
+                now=now,
+                error_code="scheduled_task_disabled_before_retry",
             )
             return
 

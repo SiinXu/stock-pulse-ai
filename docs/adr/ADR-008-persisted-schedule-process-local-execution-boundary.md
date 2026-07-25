@@ -38,6 +38,8 @@ The boundary has these rules:
   never parsed, executed, enabled, disabled, or rewritten by the older
   application. A due unknown slot receives one `interrupted` occurrence without
   changing any definition field, and subsequent polls exclude that fenced slot.
+  Every older-application definition write includes the expected schema version
+  in its atomic database predicate and reclassifies a CAS miss.
 - A corrupt current-version definition is not forward-compatible data. It is
   disabled and quarantined with one interrupted occurrence so invalid financial
   work cannot run.
@@ -49,6 +51,9 @@ The boundary has these rules:
   active stock task causes conflict waiting without consuming an execution
   attempt. A compatible external execution may be observed, but only execution
   IDs owned by the occurrence may be retried through the queue.
+- Disabling does not cancel a canonical execution already in flight, but once
+  that execution fails the occurrence is interrupted and cannot create another
+  submission or retry side effect.
 - `max_attempts` bounds accepted or compatible execution attempts. It does not
   count conflict probes that submit no work.
 

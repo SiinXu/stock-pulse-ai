@@ -612,6 +612,9 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
             def reconcile_from_config(self, *, run_immediately=False, clear_enabled_override=False):
                 events.append(("reconcile", run_immediately, clear_enabled_override))
 
+            def reconcile_scheduled_tasks(self):
+                events.append(("reconcile_scheduled_tasks",))
+
             def stop(self):
                 events.append(("stop",))
 
@@ -671,6 +674,9 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
             def reconcile_from_config(self, *, run_immediately=False, clear_enabled_override=False):
                 events.append(("reconcile", run_immediately, clear_enabled_override))
 
+            def reconcile_scheduled_tasks(self):
+                events.append(("reconcile_scheduled_tasks",))
+
             def stop(self):
                 events.append(("stop",))
 
@@ -694,8 +700,8 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
                 pass
 
         self.assertEqual(events, [
-            ("init", True, False, True, True, False),
-            ("reconcile", False, False),
+            ("init", True, False, True, True, True),
+            ("reconcile_scheduled_tasks",),
             ("stop",),
         ])
         self.assertIsNone(os.getenv(RUNTIME_SCHEDULER_SUPPRESS_START_ENV))
@@ -723,10 +729,9 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
 
         kwargs = scheduler_class.call_args.kwargs
         self.assertFalse(kwargs["personalized_schedule_enabled"])
-        self.assertFalse(kwargs["legacy_schedule_enabled"])
-        runtime_scheduler.reconcile_from_config.assert_called_once_with(
-            run_immediately=False,
-        )
+        self.assertTrue(kwargs["legacy_schedule_enabled"])
+        runtime_scheduler.reconcile_scheduled_tasks.assert_called_once_with()
+        runtime_scheduler.reconcile_from_config.assert_not_called()
         self.assertIsNone(os.getenv(SCHEDULED_TASK_OWNER_ENV))
 
     def test_lifespan_health_does_not_eagerly_initialize_scheduled_task_database(self) -> None:

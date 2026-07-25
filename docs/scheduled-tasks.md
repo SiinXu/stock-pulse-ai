@@ -73,7 +73,9 @@ All routes use the existing `/api/v1` authentication policy:
 Enable and disable are idempotent. Disabling prevents later occurrences but
 does not cancel an analysis that was already submitted to the canonical task
 queue. A conflict-waiting occurrence that has not submitted or adopted a
-compatible execution is interrupted instead of dispatching after disable.
+compatible execution is interrupted instead of dispatching after disable. An
+already submitted execution may finish and still record success, but a failure
+after disable is interrupted instead of creating a retry or resubmission.
 
 Responses use a `compatibility` discriminator. Schema-v1 definitions return
 `supported` and the complete definition. An unknown future schema returns
@@ -99,7 +101,9 @@ before it is mutated, claimed, or reconciled. An unsupported future definition
 is never parsed or rewritten. Its due slot receives one `interrupted` occurrence
 as a fence, and the due query excludes that same slot on later polls. A corrupt
 schema-v1 definition is atomically disabled and records one `interrupted`
-quarantine occurrence.
+quarantine occurrence. Enablement, supported claims, and v1 quarantine writes
+all compare the expected schema version in the same database statement; a CAS
+miss is re-read and reclassified before any later action.
 
 The run statuses are:
 
@@ -176,9 +180,11 @@ No new scheduler loop is introduced:
   scheduled execution.
 - Desktop starts the same `--serve-only` entrypoint with
   `DSA_DESKTOP_MODE=true`; that backend owns persisted tasks while continuing
-  to suppress the legacy environment-driven daily job. The internal
-  `DSA_SCHEDULED_TASK_OWNER` handoff keeps these deployment roles explicit; it
-  is not a second operator-facing scheduling switch.
+  to suppress the legacy environment-driven daily job at startup. Saving the
+  existing `SCHEDULE_ENABLED` settings may still start or rebuild that legacy
+  job later, preserving the prior Web/Desktop configuration contract. The
+  internal `DSA_SCHEDULED_TASK_OWNER` handoff keeps these deployment roles
+  explicit; it is not a second operator-facing scheduling switch.
 
 Do not run multiple analyzer processes against the same task database. SQLite
 claiming prevents duplicate due-slot rows, but canonical execution state and

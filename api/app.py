@@ -333,12 +333,15 @@ async def app_lifespan(app: FastAPI):
         personalized_schedule_enabled=(
             runtime_owns_schedule and scheduled_task_owner
         ),
-        legacy_schedule_enabled=not runtime_suppress_start,
+        legacy_schedule_enabled=True,
     )
     app.state.runtime_scheduler_service = runtime_scheduler_service
-    app.state.runtime_scheduler_service.reconcile_from_config(
-        run_immediately=runtime_run_immediately,
-    )
+    if runtime_suppress_start:
+        app.state.runtime_scheduler_service.reconcile_scheduled_tasks()
+    else:
+        app.state.runtime_scheduler_service.reconcile_from_config(
+            run_immediately=runtime_run_immediately,
+        )
     begin_local_model_service_lifespan(
         app,
         SystemConfigService(

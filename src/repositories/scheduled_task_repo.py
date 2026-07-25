@@ -86,24 +86,31 @@ class ScheduledTaskRepository:
         self,
         task_id: str,
         *,
+        expected_schema_version: int,
         enabled: bool,
         next_run_at: Optional[datetime],
         updated_at: datetime,
     ) -> Optional[ScheduledTaskRecord]:
-        """Atomically update one definition's enablement projection."""
+        """Update enablement only while the understood schema still matches."""
         with self.db.get_session() as session:
-            row = session.execute(
-                select(ScheduledTaskRecord)
-                .where(ScheduledTaskRecord.id == task_id)
-                .limit(1)
-            ).scalar_one_or_none()
-            if row is None:
+            result = session.execute(
+                update(ScheduledTaskRecord)
+                .where(
+                    ScheduledTaskRecord.id == task_id,
+                    ScheduledTaskRecord.schema_version
+                    == expected_schema_version,
+                )
+                .values(
+                    enabled=enabled,
+                    next_run_at=next_run_at,
+                    updated_at=updated_at,
+                )
+            )
+            if result.rowcount != 1:
+                session.rollback()
                 return None
-            row.enabled = enabled
-            row.next_run_at = next_run_at
-            row.updated_at = updated_at
             session.commit()
-            session.refresh(row)
+            row = session.get(ScheduledTaskRecord, task_id)
             return self._detach(session, row)
 
     def list_due_tasks(
@@ -142,6 +149,7 @@ class ScheduledTaskRepository:
         self,
         *,
         task_id: str,
+        expected_schema_version: int,
         expected_next_run_at: datetime,
         next_run_at: datetime,
         run_fields: Dict[str, Any],
@@ -153,6 +161,8 @@ class ScheduledTaskRepository:
                 update(ScheduledTaskRecord)
                 .where(
                     ScheduledTaskRecord.id == task_id,
+                    ScheduledTaskRecord.schema_version
+                    == expected_schema_version,
                     ScheduledTaskRecord.enabled.is_(True),
                     ScheduledTaskRecord.next_run_at == expected_next_run_at,
                 )
@@ -236,6 +246,7 @@ class ScheduledTaskRepository:
         self,
         *,
         task_id: str,
+        expected_schema_version: int,
         expected_next_run_at: datetime,
         run_fields: Dict[str, Any],
         updated_at: datetime,
@@ -246,6 +257,8 @@ class ScheduledTaskRepository:
                 update(ScheduledTaskRecord)
                 .where(
                     ScheduledTaskRecord.id == task_id,
+                    ScheduledTaskRecord.schema_version
+                    == expected_schema_version,
                     ScheduledTaskRecord.enabled.is_(True),
                     ScheduledTaskRecord.next_run_at == expected_next_run_at,
                 )

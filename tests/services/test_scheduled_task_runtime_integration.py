@@ -99,6 +99,43 @@ def test_personalized_tasks_use_existing_runtime_loop_without_legacy_daily_job()
     assert len(FakeScheduler.instances) == 1
 
 
+def test_suppressed_start_keeps_later_legacy_settings_reconciliation() -> None:
+    FakeScheduler.instances = []
+    config = SimpleNamespace(
+        schedule_enabled=True,
+        schedule_time="18:00",
+        schedule_times=["18:00"],
+    )
+    service = RuntimeSchedulerService(
+        config_provider=lambda: config,
+        scheduled_task_service=FakeScheduledTaskService(),
+        legacy_schedule_enabled=True,
+    )
+
+    with patch(
+        "src.services.runtime_scheduler.Scheduler",
+        FakeScheduler,
+    ), patch(
+        "src.services.runtime_scheduler.threading.Thread",
+        NoopThread,
+    ):
+        service.reconcile_scheduled_tasks()
+        initial = FakeScheduler.instances[-1]
+        assert initial.daily_tasks == []
+        assert [item["name"] for item in initial.background_tasks] == [
+            "scheduled_tasks"
+        ]
+
+        service.reconcile_from_config()
+        reconciled = FakeScheduler.instances[-1]
+
+    assert initial.stopped is True
+    assert len(reconciled.daily_tasks) == 1
+    assert [item["name"] for item in reconciled.background_tasks] == [
+        "scheduled_tasks"
+    ]
+
+
 def test_non_owner_never_starts_persisted_task_loop() -> None:
     FakeScheduler.instances = []
     config = SimpleNamespace(

@@ -227,8 +227,13 @@ class RuntimeSchedulerService:
             fallback_time=getattr(config, "schedule_time", "18:00"),
         )
 
-    def _is_schedule_enabled(self, config: Config) -> bool:
-        return self._is_legacy_schedule_enabled(config) or (
+    def _is_schedule_enabled(
+        self,
+        config: Config,
+        *,
+        include_legacy: bool = True,
+    ) -> bool:
+        return (include_legacy and self._is_legacy_schedule_enabled(config)) or (
             self._scheduled_task_service is not None
             and self._personalized_schedule_enabled
         )
@@ -303,17 +308,27 @@ class RuntimeSchedulerService:
             thread = threading.Thread(target=target, daemon=True)
             thread.start()
 
-    def start(self, *, run_immediately: bool = False) -> None:
+    def start(
+        self,
+        *,
+        run_immediately: bool = False,
+        include_legacy: bool = True,
+    ) -> None:
         with self._lock:
             if not self._owns_schedule:
                 self.stop()
                 return
             config = self._config_provider()
-            if not self._is_schedule_enabled(config):
+            if not self._is_schedule_enabled(
+                config,
+                include_legacy=include_legacy,
+            ):
                 self.stop()
                 return
             background_tasks = self._current_background_tasks(config)
-            legacy_enabled = self._is_legacy_schedule_enabled(config)
+            legacy_enabled = (
+                include_legacy and self._is_legacy_schedule_enabled(config)
+            )
             self.stop()
             times = normalize_schedule_times(
                 getattr(config, "schedule_times", None),
@@ -364,6 +379,7 @@ class RuntimeSchedulerService:
         *,
         run_immediately: bool = False,
         clear_enabled_override: bool = False,
+        include_legacy: bool = True,
     ) -> None:
         if clear_enabled_override:
             self._force_enabled = False
@@ -371,8 +387,11 @@ class RuntimeSchedulerService:
             self.stop()
             return
         config = self._config_provider()
-        if self._is_schedule_enabled(config):
-            self.start(run_immediately=run_immediately)
+        if self._is_schedule_enabled(config, include_legacy=include_legacy):
+            self.start(
+                run_immediately=run_immediately,
+                include_legacy=include_legacy,
+            )
         else:
             self.stop()
 
@@ -381,13 +400,13 @@ class RuntimeSchedulerService:
         if not self._owns_schedule:
             self.stop()
             return
-        config = self._config_provider()
-        should_run = self._is_schedule_enabled(config)
-        if should_run:
-            if not self._enabled:
-                self.start(run_immediately=False)
-        elif self._enabled:
-            self.stop()
+        if (
+            self._scheduled_task_service is None
+            or not self._personalized_schedule_enabled
+        ):
+            return
+        if not self._enabled:
+            self.start(run_immediately=False, include_legacy=False)
 
     def run_now(self) -> Dict[str, Any]:
         if not self._run_lock.acquire(blocking=False):

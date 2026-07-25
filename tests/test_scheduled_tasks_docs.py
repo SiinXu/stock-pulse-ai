@@ -42,6 +42,9 @@ def test_scheduled_task_topic_is_indexed_and_documents_runtime_boundaries() -> N
         "append-only audit history",
         "DSA_DESKTOP_MODE=true",
         "scheduled_task_runtime_reconcile_deferred",
+        "expected schema version",
+        "after disable is interrupted",
+        "SCHEDULE_ENABLED` settings may still start or rebuild",
     ):
         assert required in topic
     assert "amended by [ADR-008]" in adr
