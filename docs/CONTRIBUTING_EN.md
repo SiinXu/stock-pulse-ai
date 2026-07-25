@@ -62,6 +62,17 @@ Accepted ADRs remain as history. Record a material reversal in a new ADR with re
 
 Shared data-source, analysis-pipeline, domain, persistence, and domain-report semantics belong in the foundation pipeline first. API DTOs and projections, Web, Desktop, Bot, interactive Agent experiences, and repository governance belong in the product layer and consume foundation contracts. A cross-track change must identify one authority and preserve compatibility across domain schemas, API projections, task state, and report views; product entrypoints must not duplicate provider fallback, pipeline orchestration, or task lifecycle. See [Foundation Pipeline And Product Layer](foundation-product-architecture.md) for routing, upstream porting, and license-provenance rules. Architectural track does not determine license.
 
+### License And SPDX For New Files
+
+The repository is dual-licensed (upstream MIT + StockPulse AGPL-3.0-only). New StockPulse-authored source files should use:
+
+```text
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+```
+
+Preserve MIT notices when porting upstream-origin files. Do not relabel third-party vendored code as StockPulse AGPL. Maintainers track progressive file ownership with the [MIT / AGPL file ownership inventory process](license-ownership-inventory.md) (process and coverage signal only—not a completed full-repo audit).
+
 ### Commit Message Convention
 
 This project follows [Conventional Commits](https://www.conventionalcommits.org/):
