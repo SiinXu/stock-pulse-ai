@@ -17,6 +17,12 @@ Every row is append-oriented and contains:
 - one correlation ID reused by the attempt and completion;
 - recursively redacted, size-bounded metadata.
 
+Metadata is bounded to 16 object keys, 256 items per list, 256 characters per
+string, and two nested collection levels. The 256-item list bound covers the
+complete current System Configuration catalog in one correlated audit event
+while retaining explicit headroom for dynamic connection fields. Oversized
+metadata fails closed; key identities are never silently truncated.
+
 Phase 1 records login success and rejection, sensitive System Configuration
 writes, real `BoundToolSession` allow/deny decisions, and asynchronous analysis
 task acceptance or duplicate rejection. It records configuration key names,

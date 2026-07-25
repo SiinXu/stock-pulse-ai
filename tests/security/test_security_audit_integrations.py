@@ -8,8 +8,8 @@ import asyncio
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from fastapi import HTTPException
 import pytest
+from fastapi import HTTPException
 
 from api.v1.endpoints import analysis as analysis_endpoint
 from api.v1.endpoints import auth as auth_endpoint
@@ -19,7 +19,16 @@ from api.v1.schemas.analysis import AnalyzeRequest
 from api.v1.schemas.system_config import UpdateSystemConfigRequest
 from src.agent.runtime.tool_session import BoundToolSession
 from src.agent.tools.registry import ToolDefinition, ToolParameter, ToolPolicy, ToolRegistry
-from src.services.security_audit_service import SecurityAuditUnavailable
+from src.core.config_registry import get_registered_field_keys
+from src.schemas.security_audit import (
+    SECURITY_AUDIT_MAX_METADATA_LIST_ITEMS,
+    SecurityAuditEvent,
+    SecurityAuditEventCreate,
+)
+from src.services.security_audit_service import (
+    SecurityAuditService,
+    SecurityAuditUnavailable,
+)
 from src.services.task_queue import DuplicateTaskError, TaskInfo
 
 
@@ -47,6 +56,24 @@ class _RecordingAudit:
         if self.fail_completion or completion_number == self.fail_completion_at:
             raise SecurityAuditUnavailable()
         self.completions.append(fields)
+
+
+class _SchemaValidatingAuditRepository:
+    def __init__(self) -> None:
+        self.events: list[SecurityAuditEvent] = []
+
+    def apply_retention(self, *, cutoff) -> int:
+        del cutoff
+        return 0
+
+    def append(self, event: SecurityAuditEventCreate) -> SecurityAuditEvent:
+        validated = SecurityAuditEventCreate.model_validate(event.model_dump())
+        persisted = SecurityAuditEvent(
+            id=len(self.events) + 1,
+            **validated.model_dump(),
+        )
+        self.events.append(persisted)
+        return persisted
 
 
 def _request():
@@ -172,6 +199,55 @@ def test_config_success_records_keys_without_values() -> None:
     assert audit.completions[0]["reason_code"] == "config_updated"
     assert audit.attempts[0]["metadata"]["keys"] == ["GEMINI_API_KEY"]
     assert "must-not-persist" not in repr((audit.attempts, audit.completions))
+
+
+def test_config_bulk_update_audits_every_registered_key_through_real_service() -> None:
+    registered_keys = get_registered_field_keys()
+    assert 64 < len(registered_keys) <= SECURITY_AUDIT_MAX_METADATA_LIST_ITEMS
+    expected_keys = sorted(registered_keys)
+    request = UpdateSystemConfigRequest(
+        config_version="version-1",
+        reload_now=False,
+        items=[
+            {"key": key, "value": f"bulk-value-{index}"}
+            for index, key in enumerate(registered_keys)
+        ],
+    )
+    config_service = MagicMock()
+    config_service.update.return_value = {
+        "success": True,
+        "config_version": "version-2",
+        "applied_count": len(registered_keys),
+        "skipped_masked_count": 0,
+        "reload_triggered": False,
+        "updated_keys": registered_keys,
+        "warnings": [],
+    }
+    repository = _SchemaValidatingAuditRepository()
+    audit_service = SecurityAuditService(repository)
+
+    with patch.object(
+        system_config_endpoint,
+        "_config_audit_actor",
+        return_value="local_operator",
+    ):
+        response = system_config_endpoint.update_system_config(
+            request=request,
+            service=config_service,
+            security_audit=audit_service,
+        )
+
+    assert response.success is True
+    config_service.update.assert_called_once()
+    submitted_items = config_service.update.call_args.kwargs["items"]
+    assert [item["key"] for item in submitted_items] == registered_keys
+    assert [event.phase for event in repository.events] == ["attempt", "completion"]
+    assert repository.events[0].correlation_id == repository.events[1].correlation_id
+    assert all(
+        event.metadata["keys"] == expected_keys
+        for event in repository.events
+    )
+    assert "bulk-value-" not in repr(repository.events)
 
 
 def _tool_registry(calls):

@@ -5,11 +5,15 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+
 import pytest
 from sqlalchemy import text
 
 from src.repositories.security_audit_repo import SecurityAuditRepository
-from src.schemas.security_audit import SecurityAuditEventCreate
+from src.schemas.security_audit import (
+    SECURITY_AUDIT_MAX_METADATA_LIST_ITEMS,
+    SecurityAuditEventCreate,
+)
 from src.services.security_audit_service import (
     SecurityAuditService,
     SecurityAuditUnavailable,
@@ -144,4 +148,34 @@ def test_metadata_contract_rejects_unbounded_or_non_json_values() -> None:
             reason_code="attempt_started",
             correlation_id="0123456789abcdef0123456789abcdef",
             metadata={f"key_{index}": index for index in range(17)},
+        )
+
+
+def test_metadata_list_contract_accepts_bound_and_rejects_overflow() -> None:
+    common = {
+        "event_type": "system_config.write",
+        "phase": "attempt",
+        "actor": {"type": "administrator", "id": "local_operator"},
+        "execution_id": "execution",
+        "action": "system_config.write",
+        "target": {"type": "system_config", "id": "runtime"},
+        "outcome": "pending",
+        "reason_code": "attempt_started",
+        "correlation_id": "0123456789abcdef0123456789abcdef",
+    }
+    bounded_keys = [
+        f"CONFIG_KEY_{index}"
+        for index in range(SECURITY_AUDIT_MAX_METADATA_LIST_ITEMS)
+    ]
+
+    event = SecurityAuditEventCreate(
+        **common,
+        metadata={"keys": bounded_keys},
+    )
+
+    assert event.metadata["keys"] == bounded_keys
+    with pytest.raises(ValueError, match="too many items"):
+        SecurityAuditEventCreate(
+            **common,
+            metadata={"keys": [*bounded_keys, "CONFIG_KEY_OVERFLOW"]},
         )

@@ -9,10 +9,10 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-
 SECURITY_AUDIT_SCHEMA_VERSION = "security-audit-v1"
 SECURITY_AUDIT_RETENTION_DAYS = 90
 SECURITY_AUDIT_MAX_PAGE_SIZE = 100
+SECURITY_AUDIT_MAX_METADATA_LIST_ITEMS = 256
 
 SecurityAuditPhase = Literal["attempt", "completion"]
 SecurityAuditOutcome = Literal[
@@ -28,7 +28,6 @@ _STABLE_NAME_PATTERN = r"^[a-z][a-z0-9_.-]{0,63}$"
 _IDENTITY_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_.:@/-]{0,127}$"
 _CORRELATION_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_-]{15,63}$"
 _MAX_METADATA_KEYS = 16
-_MAX_METADATA_LIST_ITEMS = 64
 _MAX_METADATA_STRING_LENGTH = 256
 
 
@@ -65,7 +64,7 @@ def _bounded_metadata_value(value: Any, *, depth: int = 0) -> Any:
             raise ValueError("security audit metadata string is too long")
         return value
     if isinstance(value, (list, tuple)):
-        if len(value) > _MAX_METADATA_LIST_ITEMS:
+        if len(value) > SECURITY_AUDIT_MAX_METADATA_LIST_ITEMS:
             raise ValueError("security audit metadata list has too many items")
         return [
             _bounded_metadata_value(item, depth=depth + 1)

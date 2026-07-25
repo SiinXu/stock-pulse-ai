@@ -32,11 +32,13 @@ Public payload redaction preserves ordinary text, normal public URLs, numeric va
 The canonical markers are `[REDACTED]` and `[REDACTED_URL]`. Existing Run Diagnostics responses retain their compatible `<redacted>` and `<redacted-url>` display markers.
 
 Durable security-audit events use the same recursive redactor before schema
-validation and repository dispatch. Audit metadata is additionally bounded by
-depth, key count, list count, and string length. If sanitization or validation
-cannot produce the strict contract, the privileged operation fails closed with
-`security_audit_unavailable`; it never persists the original payload as a
-fallback. See [Durable Security Audit Phase 1](security-audit.md).
+validation and repository dispatch. Audit metadata is additionally bounded to
+two nested collection levels, 16 object keys, 256 items per list, and 256
+characters per string. If sanitization or validation cannot produce the strict
+contract, the privileged operation fails closed with
+`security_audit_unavailable`; it never truncates identity evidence or persists
+the original payload as a fallback. See
+[Durable Security Audit Phase 1](security-audit.md).
 
 ## Agent Trace Behavior
 
