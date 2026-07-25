@@ -17,7 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from src.agent.runtime.tool_session import BoundToolSession
+from src.agent.runtime.tool_session import BoundToolSession, ExecutionFenceRejected
 from src.agent.stock_scope import StockScope
 from src.agent.tool_surface import ToolSurface
 from src.agent.tools.execution import ToolAccessContext
@@ -244,6 +244,37 @@ def test_dispatch_guard_cannot_claim_one_call_twice():
 
     assert calls == []
     assert session.dispatched_calls == 0
+
+
+def test_dispatch_fence_rejection_is_not_misclassified_as_late_result():
+    calls = []
+    session = _session(_echo_registry(calls), max_tool_calls=1)
+
+    def _reject_dispatch(_claim):
+        raise ExecutionFenceRejected(
+            "cancelled",
+            "Execution cancellation was requested; tool call rejected.",
+        )
+
+    def _reject_completion(_claim):
+        raise ExecutionFenceRejected(
+            "cancelled",
+            "Execution cancellation was requested; tool result rejected.",
+        )
+
+    result = session.execute(
+        "echo",
+        {"message": "must-not-run"},
+        dispatch_guard=_reject_dispatch,
+        completion_guard=_reject_completion,
+    )
+
+    assert result["error"]["code"] == "cancelled"
+    assert result["error"]["code"] != "late_result_dropped"
+    assert calls == []
+    assert session.dispatched_calls == 0
+    assert session.dropped_results == 0
+    assert session.audit_trail[-1]["error_code"] == "cancelled"
 
 
 def test_session_audit_carries_execution_identity():

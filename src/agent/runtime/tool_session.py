@@ -550,7 +550,23 @@ class BoundToolSession:
 
         with self._lock:
             completion_rejection = self._claim_completion_locked(completion_guard)
+            result_error = result.get("error") if isinstance(result, dict) else None
+            result_error_code = (
+                result_error.get("code") if isinstance(result_error, dict) else None
+            )
+            dispatch_fence_rejection = (
+                not surface_dispatch_claimed
+                and completion_rejection is not None
+                and result_error_code == completion_rejection.code
+            )
 
+            if dispatch_fence_rejection:
+                # The execution fence rejected the dispatch before the handler
+                # started. The matching completion fence observes the same
+                # terminal state, so preserve the original rejection instead
+                # of misclassifying a call that never ran as a late result.
+                self._audit_trail.append(result["audit"])
+                return result
             if (
                 self._closed
                 or self._cancel_requested()

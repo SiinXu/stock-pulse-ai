@@ -55,6 +55,7 @@ from src.agent import llm_adapter as llm_adapter_module
 from src.agent.runtime.contract import ExecutionContext, ExecutionMode, ExecutionState
 from src.agent.runtime.lifecycle import classify_terminal_state
 from src.agent.runtime.tool_session import BoundToolSession
+from src.agent.stock_scope import resolve_stock_scope
 from tests.agent_runtime_replay import (
     ReplayLLMAdapter,
     build_replay_tool_registry,
@@ -144,6 +145,11 @@ def _run_case_pydantic(case):
     executed_tools = []
     registry = build_replay_tool_registry(executed_tools)
     replay = ReplayLLMAdapter(case["transcript"], config=config)
+    payload = case["input"]
+    scope_resolution = resolve_stock_scope(
+        payload["task"],
+        payload.get("context") or {},
+    )
 
     with patch.object(
         llm_adapter_module, "LLMToolAdapter", new=lambda cfg: replay
@@ -163,17 +169,17 @@ def _run_case_pydantic(case):
             backend=_EXPERIMENTAL_RUNTIME,
             principal=_EXPERIMENTAL_RUNTIME,
             deadline_monotonic=deadline,
+            stock_scope=scope_resolution.stock_scope,
             security_audit=SecurityAuditRecorderStub(),
         )
         adapter = PydanticAIRuntimeAdapter(
             llm_adapter=replay, executor=executor, tool_session=session
         )
-        payload = case["input"]
         handle = adapter.execute(
             ExecutionContext(
                 mode=ExecutionMode.RUN,
                 prompt=payload["task"],
-                request_context=payload.get("context") or {},
+                request_context=scope_resolution.effective_context,
                 timeout_seconds=timeout,
             )
         )
