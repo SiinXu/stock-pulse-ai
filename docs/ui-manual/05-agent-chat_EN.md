@@ -126,4 +126,30 @@ Workbench is primary; Signal Center may show `agent` sources; Portfolio “analy
 - [06 Signal Center](06-signals_EN.md)
 - [10 Settings](10-settings_EN.md)
 
+
+## Deep dive: session & message actions
+
+| Action | Notes |
+| --- | --- |
+| New conversation | Switch topics cleanly |
+| History list | Delete whole sessions |
+| Send / Stop | Watch generating state |
+| Delete message | Irreversible |
+| Export message/session | Research archive |
+| Notify | Needs notification channels |
+| Watchlist add/remove | Syncs with settings list |
+| Strategies panel | Expand/collapse Skills |
+| Generate analysis | Heavier path; costs quota |
+| Thinking block | Not an order ticket |
+| Context compression | Save; watch unsaved badge |
+
+## Deep dive: error states
+
+Connecting, sendFailure, notifyFailed, follow-up loading, compression save failure — map to model/network/notify settings retries.
+
+## Deep workflow
+
+Report first → continue in chat → invalidation question → levels question → export or create rule → new session when changing symbols.
+
+
 Prev: [04 Market review](04-market-review_EN.md) · Next: [06 Signal Center](06-signals_EN.md)

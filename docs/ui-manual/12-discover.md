@@ -152,4 +152,4 @@ flowchart LR
 - [10 设置](10-settings.md)
 - [AlphaSift 集成说明](../alphasift-integration.md)（实现向，可选）
 
-上一篇：[11 日常工作流](11-daily-workflows.md) · 下一篇：返回 [手册目录](README.md)
+上一篇：[11 日常工作流](11-daily-workflows.md) · 下一篇：[13 个股工作区](13-stock-details.md)

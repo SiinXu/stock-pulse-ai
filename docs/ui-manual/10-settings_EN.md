@@ -167,4 +167,33 @@ Cloud account signup, server ports, Docker maps, Actions secrets — use deploy 
 - [Beginner client setup](../beginner-client-setup.md)
 - [LLM config guide](../LLM_CONFIG_GUIDE_EN.md)
 
+
+## Deep dive: section × view map
+
+Aligned with `settingsInformationArchitecture`. Beginner mode may hide advanced sections.
+
+| Section | Views / what you do |
+| --- | --- |
+| Overview | Readiness chips, jump fixes, smoke run |
+| AI & Models | overview / connections / local_models / task_routing / reliability — add keys, fetch models, primary vs Agent, test, save |
+| Data Sources | market/news keys, intel (often off), providers |
+| Agent Behavior | execution knobs (advanced) |
+| Conversation | context / compression policies |
+| Reports | report language & output density |
+| Alerts & Automation | routing, rate limits, event monitor — rules still in Signal Center |
+| Notifications | channel fields + test push + save |
+| Usage & cost | token/spend board (`section=usage`) |
+| Backtesting | engine toggles (advanced) |
+| System & Security | scheduling, system, web/logs, auth/password, version/updates |
+| Advanced | backend status, developer diagnostics, **config backup** export/import |
+
+### Model Access checklist
+
+Add service → paste key → fetch models → set primary (+ optional Agent) → **Save** → test connection → Home readiness should improve.
+
+### Leave guards
+
+Unsaved badge, leave confirm, discard LLM draft, import overwrites draft warnings.
+
+
 Prev: [09 Backtest](09-backtest_EN.md) · Next: [11 Daily workflows](11-daily-workflows_EN.md)

@@ -39,6 +39,7 @@ Most people only need **01 + 02 + 03 + 08 + 11** in the first week.
 | [03 Analysis workbench](03-analysis-workbench_EN.md) | Start analysis, task progress, history and compare |
 | [04 Market review](04-market-review_EN.md) | Trigger review, read review history |
 | [12 Discover](12-discover_EN.md) | AlphaSift screening, hotspots, candidates → analysis (experimental) |
+| [13 Stock workspace](13-stock-details_EN.md) | `/stocks/:code` quotes & K-lines; jump to analyze / watchlist / rules |
 | [05 Agent chat](05-agent-chat_EN.md) | Multi-turn Q&A and strategy selection |
 | [06 Signal center](06-signals_EN.md) | Suggestion pool, rules, delivery, review (**not** in primary sidebar; bell / palette / `/signals`) |
 | [07 Portfolio](07-portfolio_EN.md) | Sidebar Portfolio; accounts, bookkeeping, import, risk, one-click analysis |
@@ -80,6 +81,6 @@ Most people only need **01 + 02 + 03 + 08 + 11** in the first week.
 - Prefer **live UI** labels when they diverge; fix docs in a PR.
 - Each module should document entry paths, glossary, steps, use cases, and adjacent modules.
 - PRs that change routes/nav/copy should update matching `docs/ui-manual/*` pairs in the same train. Check `routes.ts`, `navigation.ts`, `uiText.ts`, settings IA, and `locales/screening.ts`.
-- Modules 01–12 (including Discover) are expanded for beginners; binary screenshots still pending per [assets/README.md](assets/README.md) (#599).
+- Modules 01–13 cover all primary business routes; 03/05/06/07/10 include deep operational maps against large page implementations. Field-level detail continues as product PRs land; binary screenshots pending [assets/README.md](assets/README.md) (#599).
 
 **Disclaimer**: Output is for learning and research only and is not investment advice.

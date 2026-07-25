@@ -134,4 +134,32 @@ Concentration + drawdown → analyze or open Signal Center on the riskiest name.
 - [03 Analysis Workbench](03-analysis-workbench_EN.md)
 - [11 Daily workflows](11-daily-workflows_EN.md)
 
+
+## Deep dive: accounts
+
+Create (name required, broker, base currency, market), edit, delete with confirm, all-accounts vs single-account. Writes often **blocked** on all-accounts view — select one ledger. Paper accounts if offered: separate narrative from live.
+
+## Deep dive: snapshot & risk
+
+Total equity / market value / cash; FX refresh (stale/latest); sector & position concentration; drawdown monitor; stop-loss proximity; AI risk signal rollup (sell/reduce/alert). Limitation tags (best-effort quotes, partial FX/cost, limited sector metrics) mean lower precision.
+
+## Deep dive: positions table
+
+Account, code, qty, cost, last, MV, unrealized P&L, return %, analyze action, async AI column. Empty → enter/import trades.
+
+## Deep dive: event ledger
+
+| Type | Fields | Effect |
+| --- | --- | --- |
+| trade | code, date, buy/sell, price, qty, fee/tax | Positions |
+| cash | date, in/out, amount, ccy | Cash |
+| corporate | effective date, dividend/split, DPS or ratio | Cost/qty |
+
+Filters, paging, delete with guards. Over-sell blocked. Account required for writes.
+
+## Deep dive: CSV import
+
+Select account → choose file → broker template → **parse/dry-run** → sample-check → **commit** → refresh vs broker app. Respect dry vs actual-write summaries; idempotent retry still needs human preview.
+
+
 Prev: [06 Signal Center](06-signals_EN.md) · Next: [08 Reading reports](08-reading-reports_EN.md)

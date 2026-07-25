@@ -114,3 +114,52 @@ Preference is usually local to the browser/client.
 Continue in chat from a report when the entry exists — see [05 Agent chat](05-agent-chat_EN.md).
 
 Previous: [02 Home](02-home_EN.md) · Next: [04 Market review](04-market-review_EN.md)
+
+
+## Deep dive: segment controls
+
+### Launch (`segment=launch` or default)
+
+| Control | Role | Beginner tip |
+| --- | --- | --- |
+| Symbol input / autocomplete | Codes or search | One symbol first |
+| Fill from watchlist | Batch codes | Trim huge lists |
+| Strategy Skills | Style packs | Optional first run |
+| Beginner / pro, brief / detailed | Report density | Beginner + brief |
+| Start analysis | Submit | UI leans to tasks after |
+| Batch | Multi-symbol | 3–10 per wave |
+| Smart import | Image/CSV/clipboard | **Review codes** before submit |
+
+### Tasks (`segment=tasks`)
+
+| State | Meaning | Action |
+| --- | --- | --- |
+| Queued | Waiting | Do not spam submit |
+| Running | Fetch + LLM | Optional run-flow |
+| Completed | Report ready | **View report** |
+| Failed | Model/network/data | Read error → Settings → retry |
+| Empty | No jobs | Back to launch |
+
+Run-flow URL example: `segment=tasks&runFlow=task&runFlowTaskId=…`
+
+### History (`segment=history`)
+
+List + selection + `recordId` bookmark + multi-delete + history-trend drawer + optional history run-flow. Empty state: pick a row or launch new work.
+
+## Deep dive: batch & Skills
+
+Batch inherits density/strategy/notification settings; partial failure is possible. Skills come from the catalog (including plugins). Report language is independent of UI language. Local CLI backends may block Agent tools but still generate reports.
+
+## Deep dive: failures & cost
+
+| Symptom | Check |
+| --- | --- |
+| Instant fail | Key, test connection, quota |
+| Long queue | Backlog / backend down |
+| Job without report | Error text; filters on history |
+| Bill shock | Large batch + detailed + re-runs |
+
+## Deep use case
+
+Weekend 10-name watchlist: brief + default skill → batch → tasks → re-run failures → read top 3 in history → one price rule in Signal Center.
+

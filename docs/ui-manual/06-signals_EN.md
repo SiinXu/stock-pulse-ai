@@ -172,4 +172,33 @@ Reports extract most signals; Portfolio shows async latest active; Agent may cre
 - [10 Settings](10-settings_EN.md)
 - [DecisionSignal docs](../decision-signals.md), [Alerts](../alerts.md)
 
+
+## Deep dive: feed filters & views
+
+| Dimension | Beginner default |
+| --- | --- |
+| status | **active** |
+| action | all, then narrow |
+| market | your markets |
+| source_type | all |
+| scope | holdings if you bookkeep |
+| stock context | required for timeline/latest |
+
+Sub-views: list, latest-for-stock, timeline (30d/90d/180d, may truncate ~100), stats strip (not the same as global review stats).
+
+Status changes use confirm dialogs; terminal states usually cannot return to active.
+
+### Manual create fields
+
+Basics (code/market/action/time), plan (entry/stop/target/confidence), rationale/evidence; source fixed **manual**; dedup / invalidate opposite actives possible.
+
+## Deep dive: rules & delivery
+
+Create (`createRule=1`), types (price/%/volume/indicators/portfolio/market…), scope, enable, cooldown, dry-run, create-from-signal. History: triggers vs `history=notifications` vs `trigger=id`.
+
+## Deep dive: review engine
+
+Run outcomes with safe defaults; summary counts; global hit/miss/unable stats; style reassess preview/persist with unsupported/blocked paths.
+
+
 Prev: [05 Agent chat](05-agent-chat_EN.md) · Next: [07 Portfolio](07-portfolio_EN.md)

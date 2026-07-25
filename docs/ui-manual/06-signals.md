@@ -215,4 +215,82 @@ flowchart LR
 - [10 设置](10-settings.md)
 - 字段契约：[DecisionSignal 专题](../decision-signals.md)、[告警](../alerts.md)
 
+
+## 深度：信号流筛选与视图
+
+### 常用筛选维度
+
+| 维度 | 含义 | 新手默认 |
+| --- | --- | --- |
+| 状态 status | active / closed / archived / expired / invalidated… | 先 active |
+| 动作 action | 八态方向 | 全部，再收窄 |
+| 市场 market | cn/hk/us… | 你交易的市场 |
+| 来源 source_type | analysis / agent / alert / manual / market_review… | 全部 |
+| 范围 scope | all / holdings / watchlist | 有持仓用 holdings |
+| 股票 stock | 顶部当前股票上下文 | 看时间线前先选股 |
+
+### 信号流子能力（进阶）
+
+| 能力 | 说明 |
+| --- | --- |
+| 列表 | 默认卡片/行浏览 |
+| 最新 | 当前股票的最新 active |
+| 时间线 | 单股历史轨迹；范围 30d/90d/180d；可截断到最近 100 条 |
+| 统计条 | 与 review 全局统计区分口径 |
+
+时间线操作：选股 → 设范围与状态（仅有效 / 全部历史）→ **查询时间线**。
+
+### 状态变更确认
+
+关闭 / 归档等通常有确认框（`confirmStatusTitle` 等）。**终态不可随意回到 active**——需要新分析产生新信号。
+
+### 手工创建信号字段（摘要）
+
+| 分组 | 字段示例 |
+| --- | --- |
+| 基础 | 代码、名称、市场、动作、时间 |
+| 计划 | 入场上下沿、止损、目标、置信度 |
+| 说明 | 证据、理由、失效说明 |
+| 约束 | 来源固定 manual；可能触发去重或使相反 active 失效 |
+
+## 深度：规则 Tab 与告警工作区
+
+规则在信号中心 **规则** Tab，底层是 Alerts 工作区能力：
+
+| 步骤 | 细节 |
+| --- | --- |
+| 新建 | `createRule=1` 或按钮 |
+| 类型 | 价格、涨跌幅、量能、指标、持仓风险、大盘状态等（以选项为准） |
+| 范围 | 单标的 / 自选 / 持仓 |
+| 启用 | 保存后显式启用 |
+| 冷却 | 触发后一段时间内不重复吵 |
+| 试运行 | 有则先 dry-run |
+| 从信号创建 | 信号详情带出标的与上下文 |
+
+推送历史：
+
+| 子视图 | URL 提示 |
+| --- | --- |
+| 触发 | `tab=history` |
+| 通知投递 | `tab=history&history=notifications` |
+| 某条触发 | `trigger=<id>` |
+
+## 深度：再评估与后验引擎
+
+| 操作 | 行为（安全默认） |
+| --- | --- |
+| 运行后验 | 主要补算 active 中缺失/可重试；不默认全量强盖 |
+| 结果摘要 | 评估/新建/更新/跳过计数 |
+| 表现统计 | hit / miss / unable；**全局已复盘**口径提示 |
+| 风格重评估 | 选 profile → 预览 → 可持久化为新信号；缺来源报告会 unsupported；风控可阻断 |
+
+## 深度使用案例
+
+**案例：持仓股只看风险向信号**  
+`scope=holdings` + action 含 reduce/sell/alert → 逐条读失效条件 → 回组合页对数量。
+
+**案例：规则响了但手机没消息**  
+history 触发成功？notifications 渠道失败？→ 设置测试推送 → 修 Token → 再看冷却是否挡住。
+
+
 上一篇：[05 问股对话](05-agent-chat.md) · 下一篇：[07 持仓](07-portfolio.md)

@@ -143,4 +143,4 @@ Poll timeout while job continues → wait for auto-retry; if dead, resubmit and 
 - [10 Settings](10-settings_EN.md)
 - [AlphaSift integration](../alphasift-integration.md) (implementation-oriented)
 
-Prev: [11 Daily workflows](11-daily-workflows_EN.md) · Next: [Manual index](README_EN.md)
+Prev: [11 Daily workflows](11-daily-workflows_EN.md) · Next: [13 Stock workspace](13-stock-details_EN.md)

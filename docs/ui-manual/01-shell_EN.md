@@ -77,6 +77,21 @@ Five top-level domains; secondary tools live under **Research**.
 
 Legacy paths such as `/decision-signals`, `/alerts`, `/backtest`, `/screening` redirect to canonical routes.
 
+### Login (when admin auth is enabled)
+
+| Item | Note |
+| --- | --- |
+| Route | `/login`; protected routes add `?redirect=` |
+| When | Auth / admin password enabled in Settings |
+| After success | Redirect target or Home |
+| Change password | **Settings → System & Security → Auth & Security** |
+
+Without auth, local installs may open the app directly.
+
+### Stock workspace
+
+Quote page `/stocks/:code` — [13 Stock workspace](13-stock-details_EN.md). Not a primary sidebar item.
+
 Labels may shift by version; **trust the live UI**. When product PRs change nav or routes, update this manual in the same release train.
 
 ## Command palette (worth learning)
