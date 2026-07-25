@@ -343,6 +343,7 @@ def _coordinate_service_runtime(
             RUNTIME_SCHEDULER_FORCE_ENABLED_ENV,
             RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV,
             RUNTIME_SCHEDULER_SUPPRESS_START_ENV,
+            SCHEDULED_TASK_OWNER_ENV,
         )
 
         # The API runtime scheduler owns schedules once the Web/API service starts.
@@ -351,8 +352,18 @@ def _coordinate_service_runtime(
         os.environ.pop(CLI_SCHEDULER_OWNER_ENV, None)
         if args.serve_only:
             os.environ[RUNTIME_SCHEDULER_SUPPRESS_START_ENV] = "true"
+            desktop_mode = os.getenv("DSA_DESKTOP_MODE", "").strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
+            os.environ[SCHEDULED_TASK_OWNER_ENV] = (
+                "true" if desktop_mode else "false"
+            )
         else:
             os.environ.pop(RUNTIME_SCHEDULER_SUPPRESS_START_ENV, None)
+            os.environ[SCHEDULED_TASK_OWNER_ENV] = "true"
         runtime_schedule_requested = not args.serve_only and (
             args.schedule or config.schedule_enabled
         )
@@ -464,6 +475,23 @@ def _run_schedule_mode(
         run_full_analysis(runtime_config, args, scheduled_stock_codes)
 
     background_tasks = []
+    from src.schemas.scheduled_task import SCHEDULED_TASK_POLL_INTERVAL_SECONDS
+    from src.services.scheduled_task_service import ScheduledTaskService
+
+    scheduled_task_service = None
+
+    def scheduled_task_tick():
+        nonlocal scheduled_task_service
+        if scheduled_task_service is None:
+            scheduled_task_service = ScheduledTaskService()
+        scheduled_task_service.tick()
+
+    background_tasks.append({
+        "task": scheduled_task_tick,
+        "interval_seconds": SCHEDULED_TASK_POLL_INTERVAL_SECONDS,
+        "run_immediately": True,
+        "name": "scheduled_tasks",
+    })
     if getattr(config, 'agent_event_monitor_enabled', False):
         from src.services.alert_worker import AlertWorker
 

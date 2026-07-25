@@ -28,6 +28,7 @@ from src.services.security_audit_service import (
     get_security_audit_service as _build_security_audit_service,
     require_security_audit_recorder,
 )
+from src.services.scheduled_task_service import ScheduledTaskService
 from src.services.task_queue import get_task_queue
 
 
@@ -227,3 +228,12 @@ def end_local_model_service_lifespan(app: object) -> None:
             delattr(app.state, "local_model_service")
         if hasattr(app.state, "system_config_service"):
             delattr(app.state, "system_config_service")
+
+
+def get_scheduled_task_service(request: Request) -> ScheduledTaskService:
+    """Get the app-lifecycle shared ScheduledTaskService instance."""
+    service = getattr(request.app.state, "scheduled_task_service", None)
+    if service is None:
+        service = ScheduledTaskService()
+        request.app.state.scheduled_task_service = service
+    return service

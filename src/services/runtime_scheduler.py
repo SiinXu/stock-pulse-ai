@@ -21,6 +21,7 @@ RUNTIME_SCHEDULER_FORCE_ENABLED_ENV = "DSA_RUNTIME_SCHEDULER_FORCE_ENABLED"
 RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV = "DSA_RUNTIME_SCHEDULER_RUN_IMMEDIATELY"
 RUNTIME_SCHEDULER_SUPPRESS_START_ENV = "DSA_RUNTIME_SCHEDULER_SUPPRESS_START"
 RUNTIME_SCHEDULER_ARGS_ENV = "DSA_RUNTIME_SCHEDULER_ARGS"
+SCHEDULED_TASK_OWNER_ENV = "DSA_SCHEDULED_TASK_OWNER"
 _RUNTIME_ANALYSIS_LOCK = threading.Lock()
 SCHEDULE_ARGS_OVERRIDE_KEYS = {
     "no_notify",
@@ -117,6 +118,9 @@ class RuntimeSchedulerService:
         run_immediately_in_background: bool = False,
         background_tasks_provider: Optional[Callable[[Config], List[Dict[str, Any]]]] = None,
         schedule_args_overrides: Optional[Dict[str, Any]] = None,
+        scheduled_task_service: Any = None,
+        personalized_schedule_enabled: bool = True,
+        legacy_schedule_enabled: bool = True,
     ) -> None:
         self._config_provider = config_provider
         self._task_runner = task_runner
@@ -131,6 +135,9 @@ class RuntimeSchedulerService:
         self._force_enabled = force_enabled
         self._run_immediately_in_background = run_immediately_in_background
         self._background_tasks_provider = background_tasks_provider
+        self._scheduled_task_service = scheduled_task_service
+        self._personalized_schedule_enabled = personalized_schedule_enabled
+        self._legacy_schedule_enabled = legacy_schedule_enabled
         self._schedule_args_overrides = {
             key: value
             for key, value in (schedule_args_overrides or {}).items()
@@ -143,6 +150,7 @@ class RuntimeSchedulerService:
         self._scheduler: Optional[Scheduler] = None
         self._thread: Optional[threading.Thread] = None
         self._enabled = False
+        self._legacy_enabled = False
         self._last_run_at: Optional[str] = None
         self._last_success_at: Optional[str] = None
         self._last_error: Optional[str] = None
@@ -219,13 +227,38 @@ class RuntimeSchedulerService:
             fallback_time=getattr(config, "schedule_time", "18:00"),
         )
 
-    def _is_schedule_enabled(self, config: Config) -> bool:
-        return self._force_enabled or bool(getattr(config, "schedule_enabled", False))
+    def _is_schedule_enabled(
+        self,
+        config: Config,
+        *,
+        include_legacy: bool = True,
+    ) -> bool:
+        return (include_legacy and self._is_legacy_schedule_enabled(config)) or (
+            self._scheduled_task_service is not None
+            and self._personalized_schedule_enabled
+        )
+
+    def _is_legacy_schedule_enabled(self, config: Config) -> bool:
+        return self._legacy_schedule_enabled and (
+            self._force_enabled
+            or bool(getattr(config, "schedule_enabled", False))
+        )
 
     def _current_background_tasks(self, config: Config) -> List[Dict[str, Any]]:
         if self._background_tasks_provider is not None:
-            return self._background_tasks_provider(config)
-        return self._current_agent_event_monitor_background_tasks(config)
+            tasks = list(self._background_tasks_provider(config))
+        else:
+            tasks = self._current_agent_event_monitor_background_tasks(config)
+        if self._scheduled_task_service is not None and self._personalized_schedule_enabled:
+            from src.schemas.scheduled_task import SCHEDULED_TASK_POLL_INTERVAL_SECONDS
+
+            tasks.append({
+                "task": self._scheduled_task_service.tick,
+                "interval_seconds": SCHEDULED_TASK_POLL_INTERVAL_SECONDS,
+                "run_immediately": True,
+                "name": "scheduled_tasks",
+            })
+        return tasks
 
     def _current_agent_event_monitor_background_tasks(self, config: Config) -> List[Dict[str, Any]]:
         name = "agent_event_monitor"
@@ -275,16 +308,27 @@ class RuntimeSchedulerService:
             thread = threading.Thread(target=target, daemon=True)
             thread.start()
 
-    def start(self, *, run_immediately: bool = False) -> None:
+    def start(
+        self,
+        *,
+        run_immediately: bool = False,
+        include_legacy: bool = True,
+    ) -> None:
         with self._lock:
             if not self._owns_schedule:
                 self.stop()
                 return
             config = self._config_provider()
-            if not self._is_schedule_enabled(config):
+            if not self._is_schedule_enabled(
+                config,
+                include_legacy=include_legacy,
+            ):
                 self.stop()
                 return
             background_tasks = self._current_background_tasks(config)
+            legacy_enabled = (
+                include_legacy and self._is_legacy_schedule_enabled(config)
+            )
             self.stop()
             times = normalize_schedule_times(
                 getattr(config, "schedule_times", None),
@@ -296,10 +340,11 @@ class RuntimeSchedulerService:
                 schedule_times_provider=self._current_times,
                 register_signals=False,
             )
-            if run_immediately and self._run_immediately_in_background:
-                scheduler.set_daily_task(self._run_analysis_once, run_immediately=False)
-            else:
-                scheduler.set_daily_task(self._run_analysis_once, run_immediately=run_immediately)
+            if legacy_enabled:
+                if run_immediately and self._run_immediately_in_background:
+                    scheduler.set_daily_task(self._run_analysis_once, run_immediately=False)
+                else:
+                    scheduler.set_daily_task(self._run_analysis_once, run_immediately=run_immediately)
             for entry in background_tasks:
                 scheduler.add_background_task(
                     entry["task"],
@@ -307,7 +352,7 @@ class RuntimeSchedulerService:
                     run_immediately=entry.get("run_immediately", False),
                     name=entry.get("name"),
                 )
-            if run_immediately and self._run_immediately_in_background:
+            if legacy_enabled and run_immediately and self._run_immediately_in_background:
                 self._run_in_background_thread(self._run_analysis_once)
             thread = threading.Thread(
                 target=scheduler.run,
@@ -317,6 +362,7 @@ class RuntimeSchedulerService:
             self._scheduler = scheduler
             self._thread = thread
             self._enabled = True
+            self._legacy_enabled = legacy_enabled
             thread.start()
 
     def stop(self) -> None:
@@ -326,12 +372,14 @@ class RuntimeSchedulerService:
         self._scheduler = None
         self._thread = None
         self._enabled = False
+        self._legacy_enabled = False
 
     def reconcile_from_config(
         self,
         *,
         run_immediately: bool = False,
         clear_enabled_override: bool = False,
+        include_legacy: bool = True,
     ) -> None:
         if clear_enabled_override:
             self._force_enabled = False
@@ -339,10 +387,26 @@ class RuntimeSchedulerService:
             self.stop()
             return
         config = self._config_provider()
-        if self._is_schedule_enabled(config):
-            self.start(run_immediately=run_immediately)
+        if self._is_schedule_enabled(config, include_legacy=include_legacy):
+            self.start(
+                run_immediately=run_immediately,
+                include_legacy=include_legacy,
+            )
         else:
             self.stop()
+
+    def reconcile_scheduled_tasks(self) -> None:
+        """Ensure the configured owner loop is running after a persisted mutation."""
+        if not self._owns_schedule:
+            self.stop()
+            return
+        if (
+            self._scheduled_task_service is None
+            or not self._personalized_schedule_enabled
+        ):
+            return
+        if not self._enabled:
+            self.start(run_immediately=False, include_legacy=False)
 
     def run_now(self) -> Dict[str, Any]:
         if not self._run_lock.acquire(blocking=False):
@@ -386,7 +450,7 @@ class RuntimeSchedulerService:
                 schedule_times = []
         running = self._run_lock.locked()
         return {
-            "enabled": self._enabled,
+            "enabled": self._legacy_enabled,
             "running": running,
             "schedule_times": schedule_times,
             "next_run_at": next_run,

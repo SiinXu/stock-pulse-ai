@@ -4,7 +4,7 @@
 
 StockPulse 使用仓库内的 Python Migration Runner 管理 SQLite Schema 演进。第一阶段不引入 Alembic，也不一次性替换已有的 `Base.metadata.create_all()` 和 startup `_ensure_*` 兼容逻辑，而是逐项把 startup DDL 转成正式 migration。
 
-当前生产 registry 的目标版本是 `202607240001_security_audit_events`。`202607160001_migration_runner_registry` 建立有序 registry 所需的 additive metadata；`202607190001`~`202607190005` 依次把原先由 startup `_ensure_*` 兼容步骤补写的 `llm_usage` 遥测列，`decision_signals` 的 `decision_profile` 列/索引/回填，`portfolio_idempotency_records` 的 scope 列/唯一索引/规范化/guard trigger，`intelligence_items` 的 legacy scope 值规范化，以及 `intelligence_items` 从 legacy url 唯一到 scoped 复合唯一键的重建改为正式 migration；`202607240001` 新增 append-oriented `security_audit_events` 表及查询索引。历史库会幂等补齐，fresh 库由 metadata 建表后 migration 为 no-op。启动路径不执行临时业务 schema DDL 兼容步骤。
+当前生产 registry 的目标版本是 `202607240002_scheduled_task_schema`。`202607160001_migration_runner_registry` 建立有序 registry 所需的 additive metadata；`202607190001`~`202607190005` 依次把原先由 startup `_ensure_*` 兼容步骤补写的 `llm_usage` 遥测列，`decision_signals` 的 `decision_profile` 列/索引/回填，`portfolio_idempotency_records` 的 scope 列/唯一索引/规范化/guard trigger，`intelligence_items` 的 legacy scope 值规范化，以及 `intelligence_items` 从 legacy url 唯一到 scoped 复合唯一键的重建改为正式 migration；`202607240001` 新增 append-oriented `security_audit_events` 表及查询索引；`202607240002` 新增版本化 scheduled-task 定义、definition/generation/dispatch 栅栏、准入失败计数、通知结果与运行记录表。历史库会幂等补齐，fresh 库由 metadata 建表后 migration 为 no-op。启动路径不执行临时业务 schema DDL 兼容步骤。
 
 数据模型版本化在本仓库分两个正交层次：**DB schema 层**由下文的有序 migration runner 管理（表/列/索引形状演进）；**序列化领域 artifact 层**由内嵌的版本标签管理（持久化或跨模块传递的 payload 内部契约），见文末「序列化 artifact 版本化」。
 
@@ -190,6 +190,7 @@ CI Docker smoke 除了导入 `src.migrations.registry`、调用 `get_migrations(
 | `RunFlowSnapshot` | `RUN_FLOW_SCHEMA_VERSION` | `run-flow-v1` | `schema_version` | 任务 / 历史 run-flow API 响应（按需构建，无专用列） |
 | `DecisionSignalPresentation` | `DECISION_SIGNAL_PRESENTATION_SCHEMA_VERSION` | `decision-signal-presentation-v1` | `schema_version` | DecisionSignal 展示对象（由 DB 行按需构建，无专用列） |
 | Security audit event | `SECURITY_AUDIT_SCHEMA_VERSION` | `security-audit-v1` | `schema_version` | `security_audit_events.schema_version` |
+| Scheduled task definition | `SCHEDULED_TASK_SCHEMA_VERSION` | `1` | `schema_version` | `scheduled_tasks` 定义及 `/api/v1/scheduled-tasks` payload |
 
 清单与实际常量由守护测试 `tests/test_data_model_versioning_guard.py` 绑定，任何常量漂移或序列化时丢弃版本字段都会被捕获。
 
@@ -199,6 +200,7 @@ CI Docker smoke 除了导入 `src.migrations.registry`、调用 `get_migrations(
 - **破坏性变更才升级版本**：重命名 / 删除 / 改语义 / 改类型属破坏性变更，必须把版本常量升到新值（如 `market-structure-v2`），并保留对旧值的读取处理。已发布的版本值不复用、不回收。
 - **生产者始终写入当前版本标签**：序列化必须带上版本字段，禁止在 dump 时丢弃它（守护测试对此回归覆盖）。
 - **消费者遇到不认识的版本必须优雅降级**：跳过该区块 / 返回空 / 回落默认值，绝不因历史 payload 版本不符而硬失败。既有实现：`src/market_structure_prompt.py` 与 `src/utils/data_processing.py` 在 `schema_version` 不匹配时跳过；`AnalysisContextPack.pack_version` 用 `Literal` 拒绝未知值。
+- Scheduled-task API 会把未知版本定义投影为不解析 payload 的 opaque 元数据；mutation 返回稳定冲突，due slot 只写入一次 `interrupted` 栅栏且不改动 definition 任一字段，因此旧应用既不会执行也不会重写新版本合同。
 - **不原地改写历史 payload**：历史记录按其内嵌版本解释，不做批量“升级”改写。若持久化落点（列 / 表）本身要变形，走上文 DB migration；payload 内版本与 DB migration 各司其职。
 
 ### 升级某个序列化版本的流程

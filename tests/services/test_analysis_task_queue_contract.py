@@ -11,6 +11,7 @@ from tests.analysis_api_contract_support import (
     restore_test_environment,
     unittest,
 )
+from src.services.task_queue import AnalysisTaskCoalescingContract
 
 
 def setUpModule() -> None:
@@ -150,6 +151,89 @@ class BatchTaskQueueContractTestCase(unittest.TestCase):
         self.assertEqual(len(duplicates_again), 1)
         self.assertEqual(duplicates_again[0].stock_code, "600519.SH")
         self.assertEqual(duplicates_again[0].existing_task_id, accepted[0].task_id)
+        self.assertEqual(
+            duplicates_again[0].existing_contract,
+            AnalysisTaskCoalescingContract.from_metadata({
+                "stock_code": "600519",
+                "report_type": "detailed",
+                "notify": True,
+            }),
+        )
+        self.assertEqual(duplicates_again[0].existing_contract.report_type, "full")
+        self.assertEqual(duplicates_again[0].existing_contract.analysis_phase, "auto")
+        self.assertEqual(duplicates_again[0].requested_contract.analysis_phase, "intraday")
+
+    def test_duplicate_contract_covers_every_analysis_result_input(self) -> None:
+        cases = [
+            {"report_type": "brief"},
+            {"analysis_phase": "intraday"},
+            {"force_refresh": True},
+            {"notify": False},
+            {"skills": []},
+            {"skills": ["growth_quality"]},
+            {"report_language": "EN"},
+            {"use_memory": False},
+            {"portfolio_context": {"account_id": 7, "quantity": 100}},
+            {"query_source": "portfolio"},
+            {"request_context": object()},
+        ]
+
+        for changed in cases:
+            with self.subTest(changed=tuple(changed)):
+                AnalysisTaskQueue._instance = None
+                queue = AnalysisTaskQueue(max_workers=1)
+                queue._executor = type(
+                    "ExecutorStub",
+                    (),
+                    {"submit": lambda self, *args, **kwargs: Future()},
+                )()
+                accepted, duplicates = queue.submit_tasks_batch(["600519"])
+                self.assertEqual(len(accepted), 1)
+                self.assertEqual(duplicates, [])
+
+                accepted_again, duplicates_again = queue.submit_tasks_batch(
+                    ["600519.SH"],
+                    **changed,
+                )
+
+                self.assertEqual(accepted_again, [])
+                self.assertEqual(len(duplicates_again), 1)
+                duplicate = duplicates_again[0]
+                self.assertIsNotNone(duplicate.existing_contract)
+                self.assertIsNotNone(duplicate.requested_contract)
+                self.assertNotEqual(
+                    duplicate.existing_contract,
+                    duplicate.requested_contract,
+                )
+                if "request_context" in changed:
+                    self.assertFalse(duplicate.existing_contract.context_bound)
+                    self.assertTrue(duplicate.requested_contract.context_bound)
+
+    def test_contract_normalizes_stock_shape_and_report_alias(self) -> None:
+        queue = AnalysisTaskQueue(max_workers=1)
+        queue._executor = type(
+            "ExecutorStub",
+            (),
+            {"submit": lambda self, *args, **kwargs: Future()},
+        )()
+        accepted, duplicates = queue.submit_tasks_batch(
+            ["600519"],
+            report_type="detailed",
+        )
+        self.assertEqual(len(accepted), 1)
+        self.assertEqual(duplicates, [])
+
+        accepted_again, duplicates_again = queue.submit_tasks_batch(
+            ["600519.SH"],
+            report_type="full",
+        )
+
+        self.assertEqual(accepted_again, [])
+        self.assertEqual(len(duplicates_again), 1)
+        self.assertEqual(
+            duplicates_again[0].existing_contract,
+            duplicates_again[0].requested_contract,
+        )
 
     def test_submit_task_rejects_blank_stock_code(self) -> None:
         queue = AnalysisTaskQueue(max_workers=1)

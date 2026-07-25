@@ -31,6 +31,9 @@ from src.migrations.versions.v202607190005_intelligence_item_unique_index import
 from src.migrations.versions.v202607240001_security_audit_events import (
     MIGRATION as SECURITY_AUDIT_EVENTS_MIGRATION,
 )
+from src.migrations.versions.v202607240002_scheduled_task_schema import (
+    MIGRATION as SCHEDULED_TASK_SCHEMA_MIGRATION,
+)
 
 
 MIGRATIONS: Tuple[Migration, ...] = validate_registry(
@@ -43,6 +46,7 @@ MIGRATIONS: Tuple[Migration, ...] = validate_registry(
         INTELLIGENCE_ITEM_SCOPE_MIGRATION,
         INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION,
         SECURITY_AUDIT_EVENTS_MIGRATION,
+        SCHEDULED_TASK_SCHEMA_MIGRATION,
     )
 )
 

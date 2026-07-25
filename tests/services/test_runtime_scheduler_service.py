@@ -22,6 +22,7 @@ from src.services.runtime_scheduler import (
     RUNTIME_SCHEDULER_FORCE_ENABLED_ENV,
     RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV,
     RUNTIME_SCHEDULER_SUPPRESS_START_ENV,
+    SCHEDULED_TASK_OWNER_ENV,
     RuntimeSchedulerService,
 )
 
@@ -538,6 +539,9 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
                 force_enabled=False,
                 run_immediately_in_background=False,
                 schedule_args_overrides=None,
+                scheduled_task_service=None,
+                personalized_schedule_enabled=True,
+                legacy_schedule_enabled=True,
             ):
                 self.owns_schedule = owns_schedule
                 self.force_enabled = force_enabled
@@ -592,11 +596,24 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
                 force_enabled=False,
                 run_immediately_in_background=False,
                 schedule_args_overrides=None,
+                scheduled_task_service=None,
+                personalized_schedule_enabled=True,
+                legacy_schedule_enabled=True,
             ):
-                events.append(("init", owns_schedule, force_enabled, run_immediately_in_background))
+                events.append((
+                    "init",
+                    owns_schedule,
+                    force_enabled,
+                    run_immediately_in_background,
+                    personalized_schedule_enabled,
+                    legacy_schedule_enabled,
+                ))
 
             def reconcile_from_config(self, *, run_immediately=False, clear_enabled_override=False):
                 events.append(("reconcile", run_immediately, clear_enabled_override))
+
+            def reconcile_scheduled_tasks(self):
+                events.append(("reconcile_scheduled_tasks",))
 
             def stop(self):
                 events.append(("stop",))
@@ -621,7 +638,7 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
                 pass
 
         self.assertEqual(events, [
-            ("init", True, True, True),
+            ("init", True, True, True, True, True),
             ("reconcile", True, False),
             ("stop",),
         ])
@@ -641,11 +658,24 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
                 force_enabled=False,
                 run_immediately_in_background=False,
                 schedule_args_overrides=None,
+                scheduled_task_service=None,
+                personalized_schedule_enabled=True,
+                legacy_schedule_enabled=True,
             ):
-                events.append(("init", owns_schedule, force_enabled, run_immediately_in_background))
+                events.append((
+                    "init",
+                    owns_schedule,
+                    force_enabled,
+                    run_immediately_in_background,
+                    personalized_schedule_enabled,
+                    legacy_schedule_enabled,
+                ))
 
             def reconcile_from_config(self, *, run_immediately=False, clear_enabled_override=False):
                 events.append(("reconcile", run_immediately, clear_enabled_override))
+
+            def reconcile_scheduled_tasks(self):
+                events.append(("reconcile_scheduled_tasks",))
 
             def stop(self):
                 events.append(("stop",))
@@ -670,10 +700,67 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
                 pass
 
         self.assertEqual(events, [
-            ("init", True, False, True),
+            ("init", True, False, True, True, True),
+            ("reconcile_scheduled_tasks",),
             ("stop",),
         ])
         self.assertIsNone(os.getenv(RUNTIME_SCHEDULER_SUPPRESS_START_ENV))
+
+    def test_lifespan_respects_crud_only_persisted_task_non_owner(self) -> None:
+        from api.app import create_app
+
+        runtime_scheduler = MagicMock()
+        with tempfile.TemporaryDirectory() as temp_dir, patch.dict(
+            os.environ,
+            {
+                RUNTIME_SCHEDULER_SUPPRESS_START_ENV: "true",
+                SCHEDULED_TASK_OWNER_ENV: "false",
+            },
+            clear=False,
+        ), patch(
+            "api.app.RuntimeSchedulerService",
+            return_value=runtime_scheduler,
+        ) as scheduler_class, patch(
+            "api.app.SystemConfigService",
+        ), patch("api.app._schedule_stock_index_background_refresh"):
+            app = create_app(static_dir=Path(temp_dir))
+            with TestClient(app):
+                pass
+
+        kwargs = scheduler_class.call_args.kwargs
+        self.assertFalse(kwargs["personalized_schedule_enabled"])
+        self.assertTrue(kwargs["legacy_schedule_enabled"])
+        runtime_scheduler.reconcile_scheduled_tasks.assert_called_once_with()
+        runtime_scheduler.reconcile_from_config.assert_not_called()
+        self.assertIsNone(os.getenv(SCHEDULED_TASK_OWNER_ENV))
+
+    def test_lifespan_health_does_not_eagerly_initialize_scheduled_task_database(self) -> None:
+        from api.app import create_app
+
+        class FakeRuntimeSchedulerService:
+            def __init__(self, **_kwargs):
+                return None
+
+            def reconcile_from_config(self, **_kwargs):
+                return None
+
+            def stop(self):
+                return None
+
+        with tempfile.TemporaryDirectory() as temp_dir, patch(
+            "src.repositories.scheduled_task_repo.DatabaseManager.get_instance",
+            side_effect=AssertionError("database initialized during health startup"),
+        ), patch(
+            "api.app.RuntimeSchedulerService",
+            FakeRuntimeSchedulerService,
+        ), patch(
+            "api.app.SystemConfigService",
+        ), patch("api.app._schedule_stock_index_background_refresh"):
+            app = create_app(static_dir=Path(temp_dir))
+            with TestClient(app) as client:
+                response = client.get("/api/health")
+
+        self.assertEqual(response.status_code, 200)
 
     def test_lifespan_passes_runtime_scheduler_args_overrides(self) -> None:
         from api.app import create_app
@@ -697,6 +784,9 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
                 force_enabled=False,
                 run_immediately_in_background=False,
                 schedule_args_overrides=None,
+                scheduled_task_service=None,
+                personalized_schedule_enabled=True,
+                legacy_schedule_enabled=True,
             ):
                 events.append(("init_args", schedule_args_overrides))
 
@@ -741,6 +831,9 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
                 force_enabled=False,
                 run_immediately_in_background=False,
                 schedule_args_overrides=None,
+                scheduled_task_service=None,
+                personalized_schedule_enabled=True,
+                legacy_schedule_enabled=True,
             ):
                 events.append(("init", owns_schedule, force_enabled, run_immediately_in_background))
 

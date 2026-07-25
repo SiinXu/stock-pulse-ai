@@ -1,10 +1,10 @@
 # ADR-004: Use One Process-Local Task Execution Authority
 
-- Status: `Accepted (retrospective)`
+- Status: `Accepted (retrospective)`, amended by [ADR-008](ADR-008-persisted-schedule-process-local-execution-boundary.md)
 - Decision date: 2026-07-20
 - Recorded: 2026-07-21
 - Decision owners: StockPulse maintainers
-- References: [PR #90](https://github.com/SiinXu/stock-pulse-ai/pull/90), [PR #99](https://github.com/SiinXu/stock-pulse-ai/pull/99), [PR #103](https://github.com/SiinXu/stock-pulse-ai/pull/103), [`docs/task-execution-contract.md`](../task-execution-contract.md)
+- References: [PR #90](https://github.com/SiinXu/stock-pulse-ai/pull/90), [PR #99](https://github.com/SiinXu/stock-pulse-ai/pull/99), [PR #103](https://github.com/SiinXu/stock-pulse-ai/pull/103), [`docs/task-execution-contract.md`](../task-execution-contract.md), [ADR-008](ADR-008-persisted-schedule-process-local-execution-boundary.md)
 
 ## Context
 

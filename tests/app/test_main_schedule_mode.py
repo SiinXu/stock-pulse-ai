@@ -435,7 +435,14 @@ class MainScheduleModeTestCase(unittest.TestCase):
             {
                 "schedule_time": "18:00",
                 "run_immediately": True,
-                "background_tasks": [],
+                "background_tasks": [
+                    {
+                        "task": scheduled_call["background_tasks"][0]["task"],
+                        "interval_seconds": 30,
+                        "run_immediately": True,
+                        "name": "scheduled_tasks",
+                    }
+                ],
                 "resolved_schedule_time": "18:00",
             },
         )
@@ -537,8 +544,12 @@ class MainScheduleModeTestCase(unittest.TestCase):
         self.assertEqual(scheduled_call["schedule_time"], "18:00")
         self.assertEqual(scheduled_call["run_immediately"], True)
         self.assertEqual(scheduled_call["resolved_schedule_time"], "18:00")
-        self.assertEqual(len(scheduled_call["background_tasks"]), 1)
-        background_task = scheduled_call["background_tasks"][0]
+        self.assertEqual(len(scheduled_call["background_tasks"]), 2)
+        background_task = next(
+            item
+            for item in scheduled_call["background_tasks"]
+            if item["name"] == "agent_event_monitor"
+        )
         self.assertEqual(background_task["name"], "agent_event_monitor")
         self.assertEqual(background_task["interval_seconds"], 7 * 60)
         self.assertEqual(background_task["run_immediately"], True)
@@ -582,8 +593,11 @@ class MainScheduleModeTestCase(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         worker_cls.assert_called_once()
         run_full_analysis.assert_not_called()
-        self.assertEqual(len(scheduled_call["background_tasks"]), 1)
-        self.assertEqual(scheduled_call["background_tasks"][0]["name"], "agent_event_monitor")
+        self.assertEqual(len(scheduled_call["background_tasks"]), 2)
+        self.assertEqual(
+            {item["name"] for item in scheduled_call["background_tasks"]},
+            {"scheduled_tasks", "agent_event_monitor"},
+        )
 
     def test_check_notify_returns_before_other_modes(self) -> None:
         args = self._make_args(check_notify=True, serve=True, schedule=True, market_review=True)
@@ -725,7 +739,8 @@ class MainScheduleModeTestCase(unittest.TestCase):
         run_full_analysis.assert_called_once_with(config, args, None)
         self.assertEqual(scheduled_call["schedule_time"], "18:00")
         self.assertEqual(scheduled_call["run_immediately"], True)
-        self.assertEqual(scheduled_call["background_tasks"], [])
+        self.assertEqual(len(scheduled_call["background_tasks"]), 1)
+        self.assertEqual(scheduled_call["background_tasks"][0]["name"], "scheduled_tasks")
         safe_log.assert_called_once()
         self.assertIs(safe_log.call_args.args[0], main.logger)
         self.assertEqual(safe_log.call_args.args[1], "FastAPI service startup failed")
@@ -740,6 +755,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
             CLI_SCHEDULER_OWNER_ENV,
             RUNTIME_SCHEDULER_ARGS_ENV,
             RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV,
+            SCHEDULED_TASK_OWNER_ENV,
         )
 
         args = self._make_args(
@@ -760,11 +776,13 @@ class MainScheduleModeTestCase(unittest.TestCase):
         marker_seen_by_server = []
         run_immediately_seen_by_server = []
         runtime_args_seen_by_server = []
+        scheduled_task_owner_seen_by_server = []
 
         def fake_start_api_server(host, port, config):
             marker_seen_by_server.append(os.getenv(CLI_SCHEDULER_OWNER_ENV))
             run_immediately_seen_by_server.append(os.getenv(RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV))
             runtime_args_seen_by_server.append(json.loads(os.getenv(RUNTIME_SCHEDULER_ARGS_ENV, "{}")))
+            scheduled_task_owner_seen_by_server.append(os.getenv(SCHEDULED_TASK_OWNER_ENV))
 
         with patch.dict(
             os.environ,
@@ -783,6 +801,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertEqual(marker_seen_by_server, [None])
         self.assertEqual(run_immediately_seen_by_server, ["true"])
+        self.assertEqual(scheduled_task_owner_seen_by_server, ["true"])
         self.assertEqual(runtime_args_seen_by_server, [{
             "no_notify": True,
             "no_market_review": True,
@@ -907,11 +926,12 @@ class MainScheduleModeTestCase(unittest.TestCase):
         self.assertEqual(run_immediately_seen_by_server, ["false"])
         run_with_schedule.assert_not_called()
 
-    def test_serve_only_suppresses_startup_scheduler_without_disabling_runtime_owner(self) -> None:
+    def test_serve_only_assigns_persisted_tasks_to_external_analyzer(self) -> None:
         from src.services.runtime_scheduler import (
             CLI_SCHEDULER_OWNER_ENV,
             RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV,
             RUNTIME_SCHEDULER_SUPPRESS_START_ENV,
+            SCHEDULED_TASK_OWNER_ENV,
         )
 
         args = self._make_args(serve_only=True, host="127.0.0.1", port=8000)
@@ -919,11 +939,13 @@ class MainScheduleModeTestCase(unittest.TestCase):
         marker_seen_by_server = []
         suppress_seen_by_server = []
         run_immediately_seen_by_server = []
+        scheduled_task_owner_seen_by_server = []
 
         def fake_start_api_server(host, port, config):
             marker_seen_by_server.append(os.getenv(CLI_SCHEDULER_OWNER_ENV))
             suppress_seen_by_server.append(os.getenv(RUNTIME_SCHEDULER_SUPPRESS_START_ENV))
             run_immediately_seen_by_server.append(os.getenv(RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV))
+            scheduled_task_owner_seen_by_server.append(os.getenv(SCHEDULED_TASK_OWNER_ENV))
 
         with patch.dict(
             os.environ,
@@ -943,8 +965,43 @@ class MainScheduleModeTestCase(unittest.TestCase):
         self.assertEqual(marker_seen_by_server, [None])
         self.assertEqual(suppress_seen_by_server, ["true"])
         self.assertEqual(run_immediately_seen_by_server, [None])
+        self.assertEqual(scheduled_task_owner_seen_by_server, ["false"])
         start_bots.assert_called_once_with(config)
         run_with_schedule.assert_not_called()
+
+    def test_desktop_serve_only_owns_persisted_tasks_without_legacy_daily_job(self) -> None:
+        from src.services.runtime_scheduler import (
+            RUNTIME_SCHEDULER_SUPPRESS_START_ENV,
+            SCHEDULED_TASK_OWNER_ENV,
+        )
+
+        args = self._make_args(serve_only=True, host="127.0.0.1", port=8000)
+        config = self._make_config(webui_enabled=False, schedule_enabled=True)
+        ownership = []
+
+        def fake_start_api_server(host, port, config):
+            ownership.append((
+                os.getenv(SCHEDULED_TASK_OWNER_ENV),
+                os.getenv(RUNTIME_SCHEDULER_SUPPRESS_START_ENV),
+            ))
+
+        with (
+            patch.dict(
+                os.environ,
+                {"GITHUB_ACTIONS": "false", "DSA_DESKTOP_MODE": "true"},
+                clear=False,
+            ),
+            patch("main.parse_arguments", return_value=args),
+            patch("main.get_config", return_value=config),
+            patch("main.prepare_webui_frontend_assets", return_value=True),
+            patch("main.start_api_server", side_effect=fake_start_api_server),
+            patch("main.start_bot_stream_clients"),
+            patch("main.time.sleep", side_effect=KeyboardInterrupt),
+        ):
+            exit_code = main.main()
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(ownership, [("true", "true")])
 
     def test_reload_runtime_config_preserves_process_env_overrides(self) -> None:
         self.env_path.write_text(

@@ -145,6 +145,56 @@ class _CloseTimeCalendar(_FakeCalendar):
         return pd.Timestamp(local_close).tz_convert("UTC")
 
 
+class MarketSessionClassificationTestCase(unittest.TestCase):
+    def test_strict_classification_distinguishes_open_closed_and_unknown(self):
+        check_date = date(2026, 3, 27)
+        fake_calendar = _FakeCalendar(
+            sessions=[check_date],
+            close_hour=16,
+            tz_name="America/New_York",
+        )
+        with patch.object(trading_calendar, "_XCALS_AVAILABLE", True), patch.object(
+            trading_calendar,
+            "xcals",
+            _calendar_namespace(fake_calendar),
+            create=True,
+        ):
+            self.assertEqual(
+                trading_calendar.classify_market_session("us", check_date),
+                trading_calendar.MarketSessionStatus.OPEN,
+            )
+            self.assertEqual(
+                trading_calendar.classify_market_session("us", date(2026, 3, 28)),
+                trading_calendar.MarketSessionStatus.CLOSED,
+            )
+
+        with patch.object(trading_calendar, "_XCALS_AVAILABLE", False):
+            self.assertEqual(
+                trading_calendar.classify_market_session("us", check_date),
+                trading_calendar.MarketSessionStatus.UNKNOWN,
+            )
+            self.assertTrue(trading_calendar.is_market_open("us", check_date))
+
+    def test_calendar_exception_is_unknown_but_legacy_boundary_stays_fail_open(self):
+        broken = SimpleNamespace(
+            get_calendar=lambda _exchange: (_ for _ in ()).throw(
+                RuntimeError("calendar unavailable")
+            )
+        )
+        check_date = date(2026, 3, 27)
+        with patch.object(trading_calendar, "_XCALS_AVAILABLE", True), patch.object(
+            trading_calendar,
+            "xcals",
+            broken,
+            create=True,
+        ):
+            self.assertEqual(
+                trading_calendar.classify_market_session("us", check_date),
+                trading_calendar.MarketSessionStatus.UNKNOWN,
+            )
+            self.assertTrue(trading_calendar.is_market_open("us", check_date))
+
+
 class EffectiveTradingDateTestCase(unittest.TestCase):
     def test_weekend_returns_previous_session(self):
         fake_calendar = _FakeCalendar(
