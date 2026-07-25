@@ -213,7 +213,10 @@ single-use and bound to the exact post-reservation configuration and original
 runtime. It writes a removed registration back only when that runtime still
 reports the weights; a stopped or unavailable runtime and missing weights all
 reject recovery. For an unregistered model, recovery only releases the
-reservation and never creates a registration. Successful weight deletion
+reservation and never creates a registration. If Desktop conservatively attempts
+recovery but the backend's final original-runtime probe reports missing weights,
+the shared panel converges on successful deletion and keeps the registration
+removed. Successful weight deletion
 retries idempotent recovery revocation once. If a network or status response
 leaves the acknowledgement unconfirmed, deletion still succeeds with the
 non-destructive `local_model_delete_finalize_unconfirmed` warning. The token
