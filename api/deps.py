@@ -24,6 +24,7 @@ from src.services.local_model_service import LocalModelService, get_pullable_loc
 from src.services.task_queue import get_task_queue
 
 
+_SYSTEM_CONFIG_SERVICE_INIT_LOCK = threading.Lock()
 _LOCAL_MODEL_SERVICE_INIT_LOCK = threading.Lock()
 
 
@@ -73,8 +74,11 @@ def get_system_config_service(request: Request) -> SystemConfigService:
     """Get app-lifecycle shared SystemConfigService instance."""
     service = getattr(request.app.state, "system_config_service", None)
     if service is None:
-        service = SystemConfigService()
-        request.app.state.system_config_service = service
+        with _SYSTEM_CONFIG_SERVICE_INIT_LOCK:
+            service = getattr(request.app.state, "system_config_service", None)
+            if service is None:
+                service = SystemConfigService()
+                request.app.state.system_config_service = service
     return service
 
 
