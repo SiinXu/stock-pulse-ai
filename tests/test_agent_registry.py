@@ -33,6 +33,20 @@ from src.agent.tools.registry import (
 from src.agent.skills.base import Skill, SkillManager
 
 
+_PERSONA_SKILL_NAMES = {
+    "persona_contrarian_deep_value",
+    "persona_disruptive_growth",
+    "persona_mental_models",
+    "persona_tail_risk",
+    "persona_value_moat",
+}
+_PERSONA_COMPLIANCE_COPY = (
+    "Simulated perspectives for learning/research only.",
+    "Not affiliated with, endorsed by, or representing any named individual or firm.",
+    "Not investment advice; markets involve risk.",
+)
+
+
 def _yaml_skill_names(directory: Path) -> set[str]:
     return {
         path.stem
@@ -376,6 +390,22 @@ class TestSkillManager(unittest.TestCase):
         self.assertIn("Instructions for demo", instructions)
         self.assertIn("技能 1:", instructions)
 
+    def test_get_skill_instructions_labels_persona_category(self):
+        persona = _make_skill("persona_demo")
+        persona.category = "persona"
+        framework = _make_skill("framework_demo")
+        framework.category = "framework"
+        self.manager.register(persona)
+        self.manager.register(framework)
+
+        instructions = self.manager.get_skill_instructions()
+
+        self.assertIn("#### 投资视角类技能", instructions)
+        self.assertLess(
+            instructions.index("#### 框架类技能"),
+            instructions.index("#### 投资视角类技能"),
+        )
+
     def test_get_required_tools(self):
         s1 = _make_skill("s1")
         s1.required_tools = ["tool_a", "tool_b"]
@@ -446,6 +476,119 @@ class TestBuiltinSkills(unittest.TestCase):
         self.assertEqual({skill.name for skill in personas}, _builtin_persona_names())
         self.assertTrue(all(not skill.default_active for skill in personas))
         self.assertTrue(all(not skill.default_router for skill in personas))
+
+    def test_persona_pack_contract(self):
+        """Persona skills are distinct, opt-in, compliant, and tool-valid."""
+        from src.agent.skills.defaults import (
+            get_default_active_skill_ids,
+            get_default_router_skill_ids,
+        )
+        from src.agent.tools.analysis_tools import ALL_ANALYSIS_TOOLS
+        from src.agent.tools.backtest_tools import ALL_BACKTEST_TOOLS
+        from src.agent.tools.data_tools import ALL_DATA_TOOLS
+        from src.agent.tools.market_tools import ALL_MARKET_TOOLS
+        from src.agent.tools.search_tools import ALL_SEARCH_TOOLS
+
+        manager = SkillManager()
+        manager.load_builtin_skills()
+        skills = manager.list_skills()
+        personas = {skill.name: skill for skill in skills if skill.category == "persona"}
+        available_tools = {
+            tool.name
+            for tool in (
+                ALL_DATA_TOOLS
+                + ALL_ANALYSIS_TOOLS
+                + ALL_SEARCH_TOOLS
+                + ALL_MARKET_TOOLS
+                + ALL_BACKTEST_TOOLS
+            )
+        }
+
+        self.assertEqual(_builtin_persona_names(), _PERSONA_SKILL_NAMES)
+        self.assertEqual(set(personas), _PERSONA_SKILL_NAMES)
+        self.assertEqual(get_default_active_skill_ids(skills), ["bull_trend"])
+        self.assertEqual(
+            get_default_router_skill_ids(skills),
+            ["bull_trend", "shrink_pullback"],
+        )
+
+        for persona in personas.values():
+            self.assertEqual(Path(persona.entrypoint).parent.name, "personas")
+            self.assertEqual(persona.source, "builtin")
+            self.assertFalse(persona.enabled)
+            self.assertFalse(persona.default_active)
+            self.assertFalse(persona.default_router)
+            self.assertTrue(persona.required_tools)
+            self.assertEqual(len(persona.required_tools), len(set(persona.required_tools)))
+            self.assertLessEqual(set(persona.required_tools), available_tools)
+            for heading in ("Evidence standard", "Risk boundaries", "Output contract"):
+                self.assertIn(heading, persona.instructions)
+            for statement in _PERSONA_COMPLIANCE_COPY:
+                self.assertIn(statement, persona.instructions)
+
+        semantic_markers = {
+            "persona_value_moat": ("moat durability", "margin of safety"),
+            "persona_mental_models": ("inversion", "incentive map"),
+            "persona_contrarian_deep_value": ("consensus mismatch", "catalyst path"),
+            "persona_disruptive_growth": ("adoption curve", "unit economics"),
+            "persona_tail_risk": ("fragility map", "stress scenarios"),
+        }
+        for persona_name, markers in semantic_markers.items():
+            instructions = personas[persona_name].instructions.lower()
+            for marker in markers:
+                self.assertIn(marker, instructions)
+
+        manager.activate(["all"])
+        self.assertTrue(
+            _PERSONA_SKILL_NAMES.issubset(
+                {skill.name for skill in manager.list_active_skills()}
+            )
+        )
+
+    def test_builtin_persona_discovery_is_bounded_and_skips_invalid_yaml(self):
+        """Only the reserved built-in directory gains nested YAML discovery."""
+        import tempfile
+
+        from src.agent.skills import base as skill_base
+
+        valid_yaml = """
+name: {name}
+display_name: {name}
+description: Test skill
+instructions: Test instructions
+"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            personas_dir = root / "personas"
+            ignored_dir = root / "other"
+            personas_dir.mkdir()
+            ignored_dir.mkdir()
+            (root / "root.yaml").write_text(
+                valid_yaml.format(name="root_skill"),
+                encoding="utf-8",
+            )
+            (personas_dir / "nested.yaml").write_text(
+                valid_yaml.format(name="nested_persona"),
+                encoding="utf-8",
+            )
+            (personas_dir / "invalid.yaml").write_text(
+                "name: invalid\n",
+                encoding="utf-8",
+            )
+            (ignored_dir / "ignored.yaml").write_text(
+                valid_yaml.format(name="ignored_nested_skill"),
+                encoding="utf-8",
+            )
+
+            with patch.object(skill_base, "_BUILTIN_SKILLS_DIR", root):
+                manager = SkillManager()
+                count = manager.load_builtin_skills()
+
+        self.assertEqual(count, 2)
+        self.assertEqual(
+            {skill.name for skill in manager.list_skills()},
+            {"root_skill", "nested_persona"},
+        )
 
 
 # ============================================================
@@ -760,6 +903,50 @@ instructions: 自然语言策略描述 {name}
         finally:
             import shutil
             shutil.rmtree(tmpdir)
+
+    def test_custom_loader_keeps_yaml_top_level_and_markdown_recursive(self):
+        """Custom YAML stays top-level while nested SKILL.md bundles load."""
+        import tempfile
+
+        valid_yaml = """
+name: {name}
+display_name: {name}
+description: Test skill
+instructions: Test instructions
+"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            custom_dir = Path(tmpdir)
+            personas_dir = custom_dir / "personas"
+            bundle_dir = custom_dir / "bundles" / "nested_bundle"
+            personas_dir.mkdir()
+            bundle_dir.mkdir(parents=True)
+            (custom_dir / "top_level.yaml").write_text(
+                valid_yaml.format(name="top_level_yaml"),
+                encoding="utf-8",
+            )
+            (personas_dir / "nested.yaml").write_text(
+                valid_yaml.format(name="ignored_nested_yaml"),
+                encoding="utf-8",
+            )
+            (bundle_dir / "SKILL.md").write_text(
+                """---
+name: nested_bundle
+description: Nested custom bundle
+---
+Nested bundle instructions.
+""",
+                encoding="utf-8",
+            )
+
+            manager = SkillManager()
+            count = manager.load_custom_skills(custom_dir)
+
+        self.assertEqual(count, 2)
+        self.assertEqual(
+            {skill.name for skill in manager.list_skills()},
+            {"top_level_yaml", "nested_bundle"},
+        )
+        self.assertIsNone(manager.get("ignored_nested_yaml"))
 
     def test_load_skill_bundle_markdown(self):
         """Load a Claude/Codex-style SKILL.md bundle."""
