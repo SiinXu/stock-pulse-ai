@@ -1,6 +1,6 @@
 # 06 Signal Center: turn advice into something you can revisit
 
-Hi. After analysis, full reports are long. You will not re-read every essay every day. Signal Center stores the important **directional suggestions** as filterable rows you can close, feedback, and score later.
+After analysis, full reports are long. You will not re-read every essay every day. Signal Center stores the important **directional suggestions** as filterable rows you can close, feedback, and score later.
 
 Please set expectations kindly:
 

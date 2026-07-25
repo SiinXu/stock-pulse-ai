@@ -1,6 +1,6 @@
 # 01 Shell: learn the frame around every page
 
-Hi. Content in the middle changes; the **outer frame** usually stays: primary nav, notification bell, command palette, language and theme. Learn it once so you never feel lost.
+Content in the middle changes; the **outer frame** usually stays: primary nav, notification bell, command palette, language and theme. Learn it once so you never feel lost.
 
 > Research only — **not investment advice**.
 

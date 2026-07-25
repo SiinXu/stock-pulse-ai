@@ -1,6 +1,6 @@
 # 11 Daily workflows: the one chapter to keep if you keep only one
 
-Hi. Earlier chapters teach single rooms. This one stitches a **repeatable day**.
+Earlier chapters teach single rooms. This one stitches a **repeatable day**.
 
 One principle: **few and steady**. Fixed entry points; read conclusion and risk first; do not spam the same symbol a dozen times in a day.
 

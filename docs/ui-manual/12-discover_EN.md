@@ -1,6 +1,6 @@
 # 12 Discover: AlphaSift candidates (experimental)
 
-Hi. Nav **Discover**, page title often **AlphaSift screening**. Builds a **shortlist**, then you deepen names on the Workbench. Experimental—not a guaranteed picker.
+Nav **Discover**, page title often **AlphaSift screening**. Builds a **shortlist**, then you deepen names on the Workbench. Experimental—not a guaranteed picker.
 
 > Research only — **not investment advice**. Needs AlphaSift enabled and a healthy adapter.
 

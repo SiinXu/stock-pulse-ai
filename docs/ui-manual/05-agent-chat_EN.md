@@ -1,6 +1,6 @@
 # 05 Agent chat: after the report, ask what still feels fuzzy
 
-Hi. Chat is a **multi-turn research assistant**. Its best use is not “promise me returns from zero”, but:
+Chat is a **multi-turn research assistant**. Its best use is not “promise me returns from zero”, but:
 
 > I already have a report—this section confuses me / I want invalidation / I want a careful compare—let’s talk it through.
 

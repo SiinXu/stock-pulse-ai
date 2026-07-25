@@ -1,6 +1,6 @@
 # 08 Reading reports: a calm order so long text does not win
 
-Hi. When the first report lands, people often either read every paragraph and remember nothing, or glance at “buy/watch” and prepare to act.
+When the first report lands, people often either read every paragraph and remember nothing, or glance at “buy/watch” and prepare to act.
 
 A kinder method is to answer **three questions**:
 

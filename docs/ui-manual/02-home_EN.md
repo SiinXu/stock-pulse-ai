@@ -1,6 +1,6 @@
 # 02 Home: start here after you open the app
 
-Hi. If this is your first time in StockPulse, Home can feel oddly empty—no giant report wall, just a few cards and tips. That is intentional.
+If this is your first time in StockPulse, Home can feel oddly empty—no giant report wall, just a few cards and tips. That is intentional.
 
 Home is an **attention hub**: it helps you decide **what to look at today**, not dump every historical report on the screen. Think of it as the front door. Glance first, then walk into analysis, signals, or portfolio.
 

@@ -1,6 +1,6 @@
 # 07 Portfolio (Holdings): clear books before clever signals
 
-Hi. This module answers a plain question: **what do you hold, roughly at what cost, and is risk bunched in too few names?**
+This module answers a plain question: **what do you hold, roughly at what cost, and is risk bunched in too few names?**
 
 - Portfolio rows are **your facts** (trades, cash, dividends).  
 - AI signals are **research hints** that may appear beside rows.  

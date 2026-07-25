@@ -4,12 +4,9 @@
 > **Out of scope**: Deployment, Docker, GitHub Actions, full environment-variable lists, server ops.  
 > Install and first API key: [Beginner client setup (EN)](../beginner-client-setup_EN.md) · [中文](../beginner-client-setup.md). Deploy: [Full guide (EN)](../full-guide_EN.md).
 
-Hi — welcome.
+If you are opening StockPulse for the first time, the chapters below follow product usage order: where to click, what you will see, and what to do next. If live UI labels differ from this manual, trust the screen.
 
-This manual is written for a **first-time** reader. Chapters use a friendly, explicit tutorial voice: what to click, why it matters, and what to do next. Tables are for quick lookup; prose walks you through calmly. If live UI labels differ, **trust the screen** and send a docs fix.
-
-> 💡 **Friendly reminder**  
-> Output is for **learning and research only** and is **not investment advice**. Make your own risk and compliance decisions before any real trade.
+> > Output is for **learning and research only** and is **not investment advice**. Make your own risk and compliance decisions before any real trade.
 
 ## Suggested reading order
 

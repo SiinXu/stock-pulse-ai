@@ -1,6 +1,6 @@
 # 10 Settings: make the minimum path work, kindly
 
-Hi. Settings looks crowded, but you usually only need three wins first:
+Settings looks crowded, but you usually only need three wins first:
 
 1. **A model that connects** (or there is no report),  
 2. **A few watchlist codes** (or there is no “who”),  

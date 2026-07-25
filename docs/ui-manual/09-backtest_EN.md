@@ -1,6 +1,6 @@
 # 09 Backtest: calibrate trust, don’t gamble the next trade
 
-Hi. This page asks how past **AI suggestions** looked after the fact. It is not a full quant backtester.
+This page asks how past **AI suggestions** looked after the fact. It is not a full quant backtester.
 
 > Metrics are **not** promises of future returns.
 

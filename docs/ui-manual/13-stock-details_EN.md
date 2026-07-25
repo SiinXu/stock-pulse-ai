@@ -1,6 +1,6 @@
 # 13 Stock workspace: quotes and charts before AI
 
-Hi. `/stocks/:stockCode` is the **quote + K-line** page. Full AI reports still live on the [Workbench](03-analysis-workbench_EN.md).
+`/stocks/:stockCode` is the **quote + K-line** page. Full AI reports still live on the [Workbench](03-analysis-workbench_EN.md).
 
 > Best-effort quotes; research only — **not investment advice**.
 

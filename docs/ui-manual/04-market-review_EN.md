@@ -1,6 +1,6 @@
 # 04 Market review: market mood before single names
 
-Hi. Market review answers **how the whole market feels**, not whether one stock is a buy.
+Market review answers **how the whole market feels**, not whether one stock is a buy.
 
 > Research only — **not investment advice**.
 

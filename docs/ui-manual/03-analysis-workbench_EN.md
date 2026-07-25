@@ -1,6 +1,6 @@
 # 03 Analysis Workbench: where reports are born
 
-Hi. If Home is the front door, the Analysis Workbench is the room where work actually happens.
+If Home is the front door, the Analysis Workbench is the room where work actually happens.
 
 You enter symbols, optionally pick a strategy Skill, click start, and the system fetches market/news context then asks a large model to write a research report. You can watch task progress live, then reopen history later to compare older calls.
 
