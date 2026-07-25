@@ -21,7 +21,7 @@ class DailyScheduleRequest(BaseModel):
     calendar_market: CalendarMarket
     non_trading_day_policy: Literal["skip", "run"] = "skip"
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", strict=True)
 
 
 class StockAnalysisScheduledPayload(BaseModel):
@@ -31,7 +31,7 @@ class StockAnalysisScheduledPayload(BaseModel):
     report_type: ReportType = "detailed"
     notify: bool = True
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", strict=True)
 
 
 class ScheduledTaskCreateRequest(BaseModel):
@@ -45,7 +45,7 @@ class ScheduledTaskCreateRequest(BaseModel):
     enabled: bool = True
     max_attempts: int = Field(default=1, ge=1, le=3)
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", strict=True)
 
 
 class ScheduledTaskItem(BaseModel):
@@ -64,6 +64,8 @@ class ScheduledTaskItem(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    model_config = ConfigDict(extra="forbid", strict=True)
+
 
 class UnsupportedScheduledTaskItem(BaseModel):
     """Opaque projection of a definition written by a newer application."""
@@ -77,6 +79,8 @@ class UnsupportedScheduledTaskItem(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    model_config = ConfigDict(extra="forbid", strict=True)
+
 
 ScheduledTaskDefinitionItem = Annotated[
     Union[ScheduledTaskItem, UnsupportedScheduledTaskItem],
@@ -89,6 +93,8 @@ class ScheduledTaskListResponse(BaseModel):
 
     items: List[ScheduledTaskDefinitionItem] = Field(default_factory=list)
     total: int
+
+    model_config = ConfigDict(extra="forbid", strict=True)
 
 
 class ScheduledTaskRunItem(BaseModel):
@@ -130,6 +136,8 @@ class ScheduledTaskRunItem(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    model_config = ConfigDict(extra="forbid", strict=True)
+
 
 class ScheduledTaskRunListResponse(BaseModel):
     """Collection response for one definition's occurrence history."""
@@ -137,9 +145,13 @@ class ScheduledTaskRunListResponse(BaseModel):
     items: List[ScheduledTaskRunItem] = Field(default_factory=list)
     total: int
 
+    model_config = ConfigDict(extra="forbid", strict=True)
+
 
 class ScheduledTaskStatusResponse(BaseModel):
     """Definition compatibility projection and latest occurrence."""
 
     task: ScheduledTaskDefinitionItem
     latest_run: Optional[ScheduledTaskRunItem] = None
+
+    model_config = ConfigDict(extra="forbid", strict=True)

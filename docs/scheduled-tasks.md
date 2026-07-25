@@ -49,6 +49,9 @@ ownership contracts below rather than introducing another scheduler.
 - `max_attempts` is bounded from 1 through 3. The default is one attempt.
 - Unknown definition or payload fields are rejected; arbitrary commands,
   prompts, credentials, and provider configuration are not persisted here.
+- Omitted fields use the documented defaults. Explicit scalar values must use
+  their declared JSON types: string booleans or integers are not coerced, and
+  unknown fields at the definition, schedule, or payload boundary return 422.
 
 Times are stored as UTC-naive values under the repository's SQLite convention
 and returned by the API as UTC timestamps. The IANA timezone remains part of

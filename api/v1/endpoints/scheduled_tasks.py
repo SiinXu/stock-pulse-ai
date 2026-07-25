@@ -82,7 +82,7 @@ def create_scheduled_task(
     """Create one version-one scheduled task."""
     try:
         item = service.create_task(request.model_dump())
-        response = ScheduledTaskItem(**item)
+        response = ScheduledTaskItem.model_validate(item)
         _reconcile_after_mutation(
             runtime_scheduler,
             operation="create",
@@ -114,8 +114,8 @@ def list_scheduled_tasks(
 ) -> ScheduledTaskListResponse:
     """List understood definitions and opaque future-version projections."""
     try:
-        return ScheduledTaskListResponse(
-            **service.list_tasks(enabled=enabled, limit=limit)
+        return ScheduledTaskListResponse.model_validate(
+            service.list_tasks(enabled=enabled, limit=limit)
         )
     except ScheduledTaskError as exc:
         raise _service_error(exc)
@@ -141,7 +141,7 @@ def get_scheduled_task_status(
 ) -> ScheduledTaskStatusResponse:
     """Return one definition and its latest occurrence status."""
     try:
-        return ScheduledTaskStatusResponse(**service.get_status(task_id))
+        return ScheduledTaskStatusResponse.model_validate(service.get_status(task_id))
     except ScheduledTaskError as exc:
         raise _service_error(exc)
     except Exception as exc:  # broad-exception: fallback_recorded - API boundary logs diagnostics and returns a stable envelope.
@@ -172,7 +172,7 @@ def enable_scheduled_task(
     """Enable one understood scheduled definition."""
     try:
         item = service.set_enabled(task_id, True)
-        response = ScheduledTaskItem(**item)
+        response = ScheduledTaskItem.model_validate(item)
         _reconcile_after_mutation(
             runtime_scheduler,
             operation="enable",
@@ -209,7 +209,7 @@ def disable_scheduled_task(
     """Disable one understood scheduled definition."""
     try:
         item = service.set_enabled(task_id, False)
-        response = ScheduledTaskItem(**item)
+        response = ScheduledTaskItem.model_validate(item)
         _reconcile_after_mutation(
             runtime_scheduler,
             operation="disable",
@@ -241,7 +241,9 @@ def list_scheduled_task_runs(
 ) -> ScheduledTaskRunListResponse:
     """List occurrence history without interpreting future payload schemas."""
     try:
-        return ScheduledTaskRunListResponse(**service.list_runs(task_id, limit=limit))
+        return ScheduledTaskRunListResponse.model_validate(
+            service.list_runs(task_id, limit=limit)
+        )
     except ScheduledTaskError as exc:
         raise _service_error(exc)
     except Exception as exc:  # broad-exception: fallback_recorded - API boundary logs diagnostics and returns a stable envelope.

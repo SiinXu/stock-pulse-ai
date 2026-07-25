@@ -9852,6 +9852,7 @@
             "title": "Updated At"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "id",
@@ -9896,6 +9897,7 @@
             "title": "Total"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "total"
@@ -10045,6 +10047,7 @@
             "title": "Updated At"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "id",
@@ -10073,6 +10076,7 @@
             "title": "Total"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "total"
@@ -10111,6 +10115,7 @@
             ]
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "task"
@@ -10198,6 +10203,7 @@
             "title": "Updated At"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "id",

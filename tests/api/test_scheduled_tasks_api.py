@@ -2,14 +2,27 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 import json
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 import pytest
 
 from api.v1.endpoints import scheduled_tasks
+from api.v1.schemas.scheduled_tasks import (
+    DailyScheduleRequest,
+    ScheduledTaskCreateRequest,
+    ScheduledTaskItem,
+    ScheduledTaskListResponse,
+    ScheduledTaskRunItem,
+    ScheduledTaskRunListResponse,
+    ScheduledTaskStatusResponse,
+    StockAnalysisScheduledPayload,
+    UnsupportedScheduledTaskItem,
+)
 from src.config import Config
 from src.repositories.scheduled_task_repo import ScheduledTaskRepository
 from src.services.scheduled_task_service import ScheduledTaskService
@@ -127,6 +140,123 @@ def test_invalid_iana_timezone_is_rejected_without_creating_task(client) -> None
     assert response.json()["detail"]["error"] == "scheduled_task_validation_error"
     assert test_client.get("/api/v1/scheduled-tasks").json()["total"] == 0
     assert runtime_scheduler.reconcile_calls == 0
+
+
+def test_create_request_applies_declared_defaults(client) -> None:
+    test_client, _runtime_scheduler, _service = client
+
+    response = test_client.post(
+        "/api/v1/scheduled-tasks",
+        json={
+            "name": "Default contract",
+            "schedule": {
+                "time": "16:30",
+                "timezone": "America/New_York",
+                "calendar_market": "us",
+            },
+            "payload": {"stock_code": "AAPL"},
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    created = response.json()
+    assert created["schema_version"] == 1
+    assert created["task_type"] == "stock_analysis"
+    assert created["schedule"]["kind"] == "daily"
+    assert created["schedule"]["non_trading_day_policy"] == "skip"
+    assert created["payload"]["report_type"] == "detailed"
+    assert created["payload"]["notify"] is True
+    assert created["enabled"] is True
+    assert created["max_attempts"] == 1
+
+
+@pytest.mark.parametrize("section", ["task", "schedule", "payload"])
+def test_create_request_forbids_extra_fields_at_every_object_boundary(
+    client,
+    section: str,
+) -> None:
+    test_client, runtime_scheduler, _service = client
+    payload = create_payload()
+    target = payload if section == "task" else payload[section]
+    target["unexpected"] = "value"
+
+    response = test_client.post("/api/v1/scheduled-tasks", json=payload)
+
+    assert response.status_code == 422
+    assert test_client.get("/api/v1/scheduled-tasks").json()["total"] == 0
+    assert runtime_scheduler.reconcile_calls == 0
+
+
+@pytest.mark.parametrize(
+    ("path", "coerced_value"),
+    [
+        (("schema_version",), "1"),
+        (("enabled",), "true"),
+        (("max_attempts",), "2"),
+        (("payload", "notify"), "false"),
+    ],
+)
+def test_create_request_rejects_scalar_coercion(
+    client,
+    path: tuple[str, ...],
+    coerced_value: str,
+) -> None:
+    test_client, runtime_scheduler, _service = client
+    payload = create_payload()
+    target = payload
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] = coerced_value
+
+    response = test_client.post("/api/v1/scheduled-tasks", json=payload)
+
+    assert response.status_code == 422
+    assert test_client.get("/api/v1/scheduled-tasks").json()["total"] == 0
+    assert runtime_scheduler.reconcile_calls == 0
+
+
+def test_scheduled_task_dtos_publish_explicit_strict_extra_policy() -> None:
+    models = (
+        DailyScheduleRequest,
+        StockAnalysisScheduledPayload,
+        ScheduledTaskCreateRequest,
+        ScheduledTaskItem,
+        UnsupportedScheduledTaskItem,
+        ScheduledTaskListResponse,
+        ScheduledTaskRunItem,
+        ScheduledTaskRunListResponse,
+        ScheduledTaskStatusResponse,
+    )
+
+    for model in models:
+        assert model.model_config["strict"] is True
+        assert model.model_config["extra"] == "forbid"
+
+
+def test_scheduled_task_response_rejects_coercion_and_extra_fields(client) -> None:
+    test_client, _runtime_scheduler, service = client
+    task_id = test_client.post(
+        "/api/v1/scheduled-tasks",
+        json=create_payload(),
+    ).json()["id"]
+    service_payload = service.get_task(task_id)
+
+    assert ScheduledTaskItem.model_validate(service_payload).id == task_id
+
+    wrong_scalar = deepcopy(service_payload)
+    wrong_scalar["enabled"] = "true"
+    with pytest.raises(ValidationError):
+        ScheduledTaskItem.model_validate(wrong_scalar)
+
+    nested_coercion = deepcopy(service_payload)
+    nested_coercion["payload"]["notify"] = "true"
+    with pytest.raises(ValidationError):
+        ScheduledTaskItem.model_validate(nested_coercion)
+
+    undeclared = deepcopy(service_payload)
+    undeclared["unexpected"] = "value"
+    with pytest.raises(ValidationError):
+        ScheduledTaskItem.model_validate(undeclared)
 
 
 def test_committed_create_remains_successful_when_runtime_reconcile_is_deferred(
