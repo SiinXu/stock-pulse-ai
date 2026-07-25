@@ -115,7 +115,7 @@ class SkillRouter:
 
                 config = get_application_services().config
             return getattr(config, "agent_skill_routing", "auto")
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Config lookup failures are logged before automatic routing is selected.
             log_safe_exception(
                 logger,
                 "Failed to get routing mode; using automatic routing",
@@ -141,7 +141,7 @@ class SkillRouter:
 
             sm = get_skill_manager()
             return list(sm.list_skills())
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Catalog lookup failures are logged before the optional router returns no skills.
             log_safe_exception(
                 logger,
                 "Failed to get available skills",
@@ -170,7 +170,7 @@ class SkillRouter:
                 for skill_id in getattr(config, "agent_skills", []) or []
                 if isinstance(skill_id, str) and skill_id
             ]
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Manual config failures are logged before central defaults are resolved.
             log_safe_exception(
                 logger,
                 "Failed to get manual skills config",
