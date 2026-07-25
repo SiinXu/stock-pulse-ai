@@ -876,6 +876,36 @@ class AnalysisTaskQueue:
                 }
             )
 
+    def _commit_final_result(
+        self,
+        task_id: str,
+        operation: Callable[[], Any],
+    ) -> tuple[bool, Any]:
+        """Linearize one bounded final side effect with task completion."""
+        with self._data_lock:
+            task = self._tasks.get(task_id)
+            if task is None or task.status.terminal:
+                return False, None
+            if task.status == TaskStatus.CANCEL_REQUESTED:
+                self._terminalize_locked(task, TaskStatus.CANCELLED)
+                return False, None
+            if task.status != TaskStatus.PROCESSING:
+                return False, None
+
+            result = operation()
+            transitioned = self._terminalize_locked(
+                task,
+                TaskStatus.COMPLETED,
+                result=result,
+            )
+            if transitioned:
+                logger.info(
+                    "[TaskQueue] Task completed: %s (%s)",
+                    task_id,
+                    task.stock_code,
+                )
+            return transitioned, result if transitioned else None
+
     def cancel(self, task_id: str) -> TaskSnapshot:
         """Request cancellation with a monotonic first-terminal-wins transition."""
         future: Optional[Future]
@@ -1660,6 +1690,10 @@ class AnalysisTaskQueue:
             ),
             append_flow_event=lambda event: self.append_task_flow_event(task_id, dict(event)),
             is_cancel_requested=lambda: self._is_cancel_requested(task_id),
+            commit_final_result=lambda operation: self._commit_final_result(
+                task_id,
+                operation,
+            ),
         )
         diagnostic_token = None
         try:

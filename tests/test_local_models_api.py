@@ -21,13 +21,17 @@ from api import deps as api_deps
 from api.middlewares.error_handler import add_error_handlers
 from api.v1.endpoints import local_models
 from src.services.local_model_service import (
+    LOCAL_MODEL_PULL_TASK_KIND,
     LocalModelInUseError,
     LocalModelNotInstalledError,
     LocalModelRuntimeUnavailableError,
     LocalModelService,
+    OllamaPullProgress,
     get_ollama_runtime_identity,
 )
 from src.services.task_queue import TaskInfo, TaskStatus
+from src.services.system_config_service import SystemConfigService
+from src.task_execution import TaskRunContext
 from tests.system_config_service_test_support import _SystemConfigServiceTestCaseBase
 
 
@@ -200,6 +204,7 @@ def test_app_lifespan_rebinds_local_model_configuration_authority() -> None:
     def construct_local_service(**kwargs):
         return SimpleNamespace(
             system_config_service=kwargs["system_config_service"],
+            retire_pull_activation=Mock(),
         )
 
     async def exercise_two_lifespans():
@@ -212,6 +217,7 @@ def test_app_lifespan_rebinds_local_model_configuration_authority() -> None:
                 resolved.append((system_service, local_service))
             assert not hasattr(app.state, "local_model_service")
             assert not hasattr(app.state, "system_config_service")
+            assert api_deps._get_active_local_model_service(request) is None
         return resolved
 
     with (
@@ -239,8 +245,94 @@ def test_app_lifespan_rebinds_local_model_configuration_authority() -> None:
     assert first[0] is system_services[0]
     assert second[0] is system_services[1]
     assert first[1] is not second[1]
+    first[1].retire_pull_activation.assert_called_once()
+    second[1].retire_pull_activation.assert_called_once()
     scheduler_services[0].stop.assert_called_once()
     scheduler_services[1].stop.assert_called_once()
+
+
+def test_local_model_lifespan_shutdown_waits_for_admitted_activation() -> None:
+    app = FastAPI()
+    request = SimpleNamespace(app=app)
+    activation_started = threading.Event()
+    release_activation = threading.Event()
+    shutdown_waiting_for_lifecycle = threading.Event()
+    shutdown_finished = threading.Event()
+    activation_observed_active = []
+    activation_result = {}
+
+    def activate(*_args, **_kwargs):
+        activation_started.set()
+        assert release_activation.wait(timeout=5)
+        activation_observed_active.append(app.state.local_model_services_active)
+        return {"selected_primary": False}
+
+    service = SimpleNamespace(
+        _activate_completed_pull=Mock(side_effect=activate),
+        retire_pull_activation=Mock(),
+    )
+    app.state.local_model_services_active = True
+    app.state.local_model_service = service
+    app.state.system_config_service = object()
+
+    class _ObservedLifecycleLock:
+        def __init__(self) -> None:
+            self.lock = threading.RLock()
+
+        def __enter__(self):
+            if threading.current_thread().name == "local-model-shutdown":
+                shutdown_waiting_for_lifecycle.set()
+            return self.lock.__enter__()
+
+        def __exit__(self, *args):
+            return self.lock.__exit__(*args)
+
+    def run_activation() -> None:
+        activation_result["value"] = api_deps._activate_active_local_model_pull(
+            request,
+            "qwen3:4b",
+            config_version="config-1",
+            values={},
+            base_url="http://127.0.0.1:11434",
+            is_cancel_requested=lambda: False,
+            commit_final_result=lambda operation: (True, operation()),
+        )
+
+    def shutdown() -> None:
+        api_deps.end_local_model_service_lifespan(app)
+        shutdown_finished.set()
+
+    with patch.object(
+        api_deps,
+        "_LOCAL_MODEL_SERVICE_INIT_LOCK",
+        _ObservedLifecycleLock(),
+    ):
+        activation_thread = threading.Thread(target=run_activation)
+        activation_thread.start()
+        assert activation_started.wait(timeout=5)
+        shutdown_thread = threading.Thread(
+            target=shutdown,
+            name="local-model-shutdown",
+        )
+        shutdown_thread.start()
+        assert shutdown_waiting_for_lifecycle.wait(timeout=5)
+        shutdown_thread.join(timeout=0.1)
+
+        assert shutdown_thread.is_alive()
+        assert app.state.local_model_services_active is True
+        release_activation.set()
+        activation_thread.join(timeout=5)
+        shutdown_thread.join(timeout=5)
+
+    assert not activation_thread.is_alive()
+    assert not shutdown_thread.is_alive()
+    assert shutdown_finished.is_set()
+    assert activation_observed_active == [True]
+    assert activation_result["value"] == {"selected_primary": False}
+    assert app.state.local_model_services_active is False
+    assert not hasattr(app.state, "local_model_service")
+    assert not hasattr(app.state, "system_config_service")
+    service.retire_pull_activation.assert_called_once()
 
 
 class LocalModelApiIntegrationTestCase(_SystemConfigServiceTestCaseBase):
@@ -281,6 +373,163 @@ class LocalModelApiIntegrationTestCase(_SystemConfigServiceTestCaseBase):
             pullable_model_ids=lambda: {"qwen3:4b"},
             client_factory=lambda _base_url: _InstalledRuntime(),
         )
+
+    def test_stale_pull_worker_uses_the_current_lifespan_configuration_lease(self) -> None:
+        self._rewrite_env(
+            "ADMIN_AUTH_ENABLED=true",
+            "LLM_CONFIG_MODE=channels",
+            "LLM_CHANNELS=cloud",
+            "LLM_CLOUD_PROVIDER=openai",
+            "LLM_CLOUD_PROTOCOL=openai",
+            "LLM_CLOUD_API_KEY=secret-value",
+            "LLM_CLOUD_MODELS=gpt-4o",
+            "LLM_CLOUD_ENABLED=true",
+            "LITELLM_MODEL=openai/gpt-4o",
+        )
+        app = FastAPI()
+        request = SimpleNamespace(app=app)
+        pull_started = threading.Event()
+        release_pull = threading.Event()
+        command_holder = {}
+        worker_result = {}
+        pull_task = TaskInfo(
+            task_id="lifespan-pull-task",
+            trace_id="lifespan-pull-task",
+            stock_code="qwen3:4b",
+            status=TaskStatus.PENDING,
+            report_type=LOCAL_MODEL_PULL_TASK_KIND,
+        )
+
+        class _BlockingRuntime:
+            def list_installed_models(self):
+                return ["qwen3:4b", "stockpulse/finance:latest"]
+
+            def pull_model(self, model_id, *, on_progress, is_cancel_requested=None):
+                self.model_id = model_id
+                pull_started.set()
+                assert release_pull.wait(timeout=5)
+                on_progress(OllamaPullProgress(percent=99, status="success"))
+
+        runtime = _BlockingRuntime()
+        queue = Mock()
+        queue.list_pending_tasks.side_effect = lambda: (
+            [pull_task]
+            if "command" in command_holder and pull_task.status in {
+                TaskStatus.PENDING,
+                TaskStatus.PROCESSING,
+                TaskStatus.CANCEL_REQUESTED,
+            }
+            else []
+        )
+        queue.get_task.side_effect = lambda task_id: (
+            pull_task if task_id == pull_task.task_id else None
+        )
+
+        def submit(command):
+            command_holder["command"] = command
+            return pull_task.task_id
+
+        queue.submit.side_effect = submit
+
+        def construct_local_service(**kwargs):
+            return LocalModelService(
+                **kwargs,
+                client_factory=lambda _base_url: runtime,
+            )
+
+        system_services = [
+            SystemConfigService(manager=self.manager),
+            SystemConfigService(manager=self.manager),
+        ]
+        scheduler_services = [Mock(), Mock()]
+
+        def run_pull_worker() -> None:
+            command = command_holder["command"]
+            pull_task.status = TaskStatus.PROCESSING
+            context = TaskRunContext(
+                task_id=pull_task.task_id,
+                trace_id=pull_task.trace_id,
+                command=command,
+                update_progress=lambda progress, _message=None: setattr(
+                    pull_task, "progress", progress
+                ),
+                append_flow_event=lambda _event: None,
+                is_cancel_requested=lambda: False,
+                commit_final_result=lambda operation: (True, operation()),
+            )
+            result = command.run(context)
+            worker_result.update(result)
+            pull_task.result = result
+            pull_task.status = TaskStatus.COMPLETED
+
+        async def exercise_two_lifespans():
+            async with api_app.app_lifespan(app):
+                service_a = api_deps.get_local_model_service(request)
+                accepted = service_a.start_pull("qwen3:4b")
+                assert accepted.task_id == pull_task.task_id
+                worker = threading.Thread(target=run_pull_worker)
+                worker.start()
+                assert pull_started.wait(timeout=5)
+
+            async with api_app.app_lifespan(app):
+                service_b = api_deps.get_local_model_service(request)
+                assert service_b is not service_a
+                service_b._activate_completed_pull = Mock(
+                    wraps=service_b._activate_completed_pull
+                )
+                assert service_b.get_pull(pull_task.task_id)["status"] == "processing"
+                configuration = service_b.get_configuration()
+                reservation = service_b.unregister_model(
+                    "stockpulse/finance:latest",
+                    expected_config_version=configuration["config_version"],
+                    expected_runtime_identity=DEFAULT_RUNTIME_IDENTITY,
+                )
+                release_pull.set()
+                worker.join(timeout=5)
+                assert not worker.is_alive()
+                service_b.finalize_unregistration(
+                    "stockpulse/finance:latest",
+                    recovery_token=reservation["recovery_token"],
+                )
+                return service_a, service_b
+
+        with (
+            patch.object(
+                api_app,
+                "RuntimeSchedulerService",
+                side_effect=scheduler_services,
+            ),
+            patch.object(
+                api_app,
+                "SystemConfigService",
+                side_effect=system_services,
+            ),
+            patch.object(api_app, "_schedule_stock_index_background_refresh"),
+            patch.object(
+                api_deps,
+                "LocalModelService",
+                side_effect=construct_local_service,
+            ),
+            patch.object(api_deps, "get_task_queue", return_value=queue),
+            patch.object(
+                api_deps,
+                "get_pullable_local_model_ids",
+                return_value={"qwen3:4b", "stockpulse/finance:latest"},
+            ),
+            patch(
+                "src.config.get_config",
+                return_value=SimpleNamespace(schedule_run_immediately=False),
+            ),
+        ):
+            service_a, service_b = asyncio.run(exercise_two_lifespans())
+
+        self.assertEqual(runtime.model_id, "qwen3:4b")
+        self.assertFalse(worker_result["activated"])
+        self.assertFalse(worker_result["selected_primary"])
+        self.assertNotIn("LLM_OLLAMA_MODELS", self.manager.read_config_map())
+        service_b._activate_completed_pull.assert_called_once()
+        self.assertFalse(service_a._accepts_pull_activation)
+        self.assertFalse(service_b._accepts_pull_activation)
 
     def test_unregister_then_restore_probes_weights_across_the_real_api_boundary(self) -> None:
         configuration = self.local_model_service.get_configuration()

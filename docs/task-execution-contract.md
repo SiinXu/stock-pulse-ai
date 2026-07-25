@@ -69,6 +69,14 @@ that arrives after `cancel_requested` resolves to `cancelled`; late progress and
 run-flow events are rejected. Each task records and publishes at most one terminal
 event.
 
+Runners with one bounded final side effect can use
+`TaskRunContext.commit_final_result(operation)`. The queue checks cancellation or
+shutdown, invokes the operation, and publishes `completed` while holding the same
+lifecycle lock. If cancellation or shutdown owns the lock first, the operation is
+not invoked. If the commit owns it first, later cancellation or shutdown observes
+the completed task. Network calls and other unbounded work must remain outside
+this final commit boundary.
+
 A pending command cancelled before execution never invokes its runner. Runners can
 poll `TaskRunContext.is_cancel_requested()`; it also returns true after
 `cancelled` or `interrupted` so a late-running callable observes the stop fence.
@@ -159,21 +167,35 @@ cancellation propagates after the stream is closed in `finally`.
 The queue accepts work only while its process-local executor is active. Graceful
 shutdown rejects new submissions and retries, marks every active task
 `interrupted`, wakes retry waiters, closes event streams after queued terminal
-events drain, cancels pending futures, and returns without synchronously waiting
-for active worker callables.
+events drain, and cancels pending futures. It does not wait for arbitrary active
+runner work. If a runner already owns the final-result commit boundary, shutdown
+waits for that bounded operation and its `completed` transition before observing
+the task as terminal.
 
 `ThreadPoolExecutor.shutdown(wait=False)` makes the queue shutdown method return
-without waiting for active workers; it does not terminate running Python threads.
-CPython may still join those workers during interpreter exit. Command runners must
-therefore cooperate by polling `TaskRunContext.is_cancel_requested()` and return
-promptly when it becomes true. This process-local contract does not claim forced
-process termination for an uncooperative runner.
+without waiting for other active worker execution after any admitted final commit
+has released the lifecycle lock; it does not terminate running Python threads.
+CPython may still join those workers during interpreter exit. Command runners
+must therefore cooperate by polling `TaskRunContext.is_cancel_requested()` and
+return promptly when it becomes true. This process-local contract does not claim
+forced process termination for an uncooperative runner.
 
 Local-model pulls are canonical `TaskCommand` runners under this same authority.
 Their bounded Ollama stream checks cancellation before the request, between
 response chunks/events, and immediately before configuration activation. The
 absolute pull deadline remains independent of progress frequency, so a runtime
 cannot keep a task alive indefinitely by continuously emitting partial data.
+Because the process-local queue can outlive one FastAPI lifespan, a completed
+pull resolves the current lifespan-owned `LocalModelService` before activating
+configuration. A retired service cannot activate a late worker, and an inactive
+application lifespan is never revived solely to finish activation. This keeps
+configuration mutation leases and local-model recovery reservations under the
+current application authority while preserving canonical task polling. Current
+service resolution and activation share one lifespan fence, and cancellation is
+checked again after that resolution immediately before configuration mutation.
+The bounded, connectivity-free `SystemConfigService.update()` and the task's
+`completed` transition then share the queue's final-result commit boundary, so a
+cancelled or interrupted pull cannot leave an activation side effect behind.
 
 This task does not add HTTP cancel/retry routes, an external broker, cross-process
 task sharing, or durable recovery after an ungraceful process loss.

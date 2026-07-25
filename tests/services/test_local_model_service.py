@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import threading
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 from unittest.mock import Mock, patch
 
 import requests
@@ -26,7 +26,7 @@ from src.services.local_model_service import (
     normalize_local_model_id,
     normalize_ollama_base_url,
 )
-from src.services.task_queue import TaskInfo
+from src.services.task_queue import AnalysisTaskQueue, TaskInfo
 from src.services.system_config_service import ConfigConflictError, ConfigValidationError
 from src.task_execution import TaskCommand, TaskRunContext, TaskStatusEnum, deep_thaw
 from tests._llm_env_isolation import strip_ambient_llm_env
@@ -109,6 +109,11 @@ class _FakeTaskQueue:
             update_progress=update_progress,
             append_flow_event=lambda _event: None,
             is_cancel_requested=lambda: self.cancel_requested,
+            commit_final_result=lambda operation: (
+                (False, None)
+                if self.cancel_requested
+                else (True, operation())
+            ),
         )
         result = self.command.run(context)
         task.status = (
@@ -369,6 +374,7 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
         *,
         queue: Optional[_FakeTaskQueue] = None,
         client: Optional[_FakeRuntimeClient] = None,
+        activation_handler: Optional[Callable[..., Optional[Dict[str, Any]]]] = None,
     ) -> tuple[LocalModelService, _FakeTaskQueue, _FakeRuntimeClient]:
         queue = queue or _FakeTaskQueue()
         client = client or _FakeRuntimeClient()
@@ -377,6 +383,7 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
             task_queue=queue,
             pullable_model_ids=lambda: {"qwen3:4b", "stockpulse/finance:latest"},
             client_factory=lambda _base_url: client,
+            activation_handler=activation_handler,
         )
         return service, queue, client
 
@@ -969,6 +976,112 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
         )
         self.assertNotIn("LLM_OLLAMA_MODELS", self.manager.read_config_map())
 
+    def test_pull_rechecks_cancellation_after_activation_resolution(self) -> None:
+        activation_started = threading.Event()
+        release_activation = threading.Event()
+        service_holder: Dict[str, LocalModelService] = {}
+
+        def activate(
+            normalized,
+            *,
+            config_version,
+            values,
+            base_url,
+            is_cancel_requested,
+            commit_final_result,
+        ):
+            activation_started.set()
+            assert release_activation.wait(timeout=5)
+            return service_holder["service"]._activate_completed_pull(
+                normalized,
+                config_version=config_version,
+                values=values,
+                base_url=base_url,
+                is_cancel_requested=is_cancel_requested,
+                commit_final_result=commit_final_result,
+            )
+
+        queue = _FakeTaskQueue()
+        self._rewrite_env("ADMIN_AUTH_ENABLED=true")
+        service, _queue, client = self._local_service(
+            queue=queue,
+            activation_handler=activate,
+        )
+        service_holder["service"] = service
+        service.start_pull("qwen3:4b")
+        worker_result: Dict[str, Any] = {}
+
+        worker = threading.Thread(
+            target=lambda: worker_result.update(queue.run_task())
+        )
+        worker.start()
+        self.assertTrue(activation_started.wait(timeout=5))
+        queue.cancel_requested = True
+        release_activation.set()
+        worker.join(timeout=5)
+
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(client.pulled, ["qwen3:4b"])
+        self.assertFalse(worker_result["activated"])
+        self.assertFalse(worker_result["selected_primary"])
+        self.assertEqual(
+            queue.tasks["local-model-pull-task"].status,
+            TaskStatusEnum.CANCELLED,
+        )
+        self.assertNotIn("LLM_OLLAMA_MODELS", self.manager.read_config_map())
+
+    def test_pull_final_config_commit_rejects_cancel_and_shutdown_winners(self) -> None:
+        self._rewrite_env("ADMIN_AUTH_ENABLED=true")
+
+        for winner, expected_status in (
+            ("cancel", TaskStatusEnum.CANCELLED),
+            ("shutdown", TaskStatusEnum.INTERRUPTED),
+        ):
+            with self.subTest(winner=winner):
+                original_instance = AnalysisTaskQueue._instance
+                AnalysisTaskQueue._instance = None
+                queue = AnalysisTaskQueue(max_workers=1)
+                commit_reached = threading.Event()
+                release_commit = threading.Event()
+                original_commit = queue._commit_final_result
+
+                def delay_commit(task_id, operation):
+                    commit_reached.set()
+                    assert release_commit.wait(timeout=5)
+                    return original_commit(task_id, operation)
+
+                queue._commit_final_result = delay_commit
+                service, _queue, client = self._local_service(queue=queue)
+                try:
+                    task = service.start_pull("qwen3:4b")
+                    future = queue._futures[task.task_id]
+                    self.assertTrue(commit_reached.wait(timeout=5))
+
+                    if winner == "cancel":
+                        self.assertEqual(
+                            queue.cancel(task.task_id).status,
+                            TaskStatusEnum.CANCEL_REQUESTED,
+                        )
+                    else:
+                        queue.shutdown()
+
+                    release_commit.set()
+                    future.result(timeout=5)
+
+                    self.assertEqual(client.pulled, ["qwen3:4b"])
+                    self.assertEqual(
+                        queue.get(task.task_id).status,
+                        expected_status,
+                    )
+                    self.assertNotIn(
+                        "LLM_OLLAMA_MODELS",
+                        self.manager.read_config_map(),
+                    )
+                finally:
+                    release_commit.set()
+                    queue.shutdown()
+                    AnalysisTaskQueue._instance = original_instance
+
     def test_registration_restore_requires_weights_on_the_original_runtime(self) -> None:
         self._rewrite_env(
             "ADMIN_AUTH_ENABLED=true",
@@ -1457,7 +1570,7 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
         service, queue, client = self._local_service()
 
         service.start_pull("qwen3:4b")
-        service._configure_model_from_snapshot = Mock(
+        service._activate_completed_pull = Mock(
             side_effect=RuntimeError("unexpected activation failure")
         )
         result = queue.run_task()

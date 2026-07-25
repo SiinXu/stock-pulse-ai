@@ -10,7 +10,7 @@ import secrets
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Iterable, List, Literal, Mapping, Optional, Sequence, Set
+from typing import Any, Callable, Dict, Iterable, List, Literal, Mapping, Optional, Protocol, Sequence, Set
 from urllib.parse import urlsplit, urlunsplit
 
 import requests
@@ -45,6 +45,21 @@ LOCAL_MODEL_RUNTIME_IDENTITY_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 LOCAL_MODEL_MAX_ID_LENGTH = 128
 LOCAL_MODEL_REGISTRATION_RECOVERY_TTL_SECONDS = 5.0 * 60.0
 LocalModelAssignment = Literal["auto", "primary", "agent"]
+
+
+class _LocalModelPullActivationHandler(Protocol):
+    def __call__(
+        self,
+        normalized: str,
+        *,
+        config_version: str,
+        values: Mapping[str, str],
+        base_url: str,
+        is_cancel_requested: Callable[[], bool],
+        commit_final_result: Callable[
+            [Callable[[], Any]], tuple[bool, Any]
+        ],
+    ) -> Optional[Dict[str, Any]]: ...
 
 
 logger = logging.getLogger(__name__)
@@ -416,11 +431,14 @@ class LocalModelService:
         task_queue: AnalysisTaskQueue,
         pullable_model_ids: Callable[[], Iterable[str]],
         client_factory: Callable[[str], OllamaRuntimeClient] = OllamaRuntimeClient,
+        activation_handler: Optional[_LocalModelPullActivationHandler] = None,
     ) -> None:
         self._system_config_service = system_config_service
         self._task_queue = task_queue
         self._pullable_model_ids = pullable_model_ids
         self._client_factory = client_factory
+        self._activation_handler = activation_handler
+        self._accepts_pull_activation = True
         self._task_lock = threading.RLock()
         self._operation_lock = threading.RLock()
         self._registration_recoveries: Dict[str, _LocalModelRegistrationRecovery] = {}
@@ -464,6 +482,48 @@ class LocalModelService:
             if isinstance(item, dict)
         }
         return str(payload.get("config_version") or ""), values
+
+    def retire_pull_activation(self) -> None:
+        """Fence this lifecycle instance against late pull activation."""
+        with self._operation_lock:
+            self._accepts_pull_activation = False
+
+    def _activate_completed_pull(
+        self,
+        normalized: str,
+        *,
+        config_version: str,
+        values: Mapping[str, str],
+        base_url: str,
+        is_cancel_requested: Callable[[], bool],
+        commit_final_result: Callable[
+            [Callable[[], Any]], tuple[bool, Any]
+        ],
+    ) -> Optional[Dict[str, Any]]:
+        """Activate through the current live service or decline after retirement."""
+        with self._operation_lock:
+            if not self._accepts_pull_activation or is_cancel_requested():
+                return None
+            updates, selected_primary = self._build_model_configuration_update(
+                normalized,
+                assignment="auto",
+                values=values,
+                base_url=base_url,
+            )
+
+            def commit_activation() -> Dict[str, Any]:
+                self._persist_model_configuration(
+                    config_version=config_version,
+                    updates=updates,
+                )
+                return {
+                    "model_id": normalized,
+                    "activated": True,
+                    "selected_primary": selected_primary,
+                }
+
+            accepted, result = commit_final_result(commit_activation)
+            return result if accepted else None
 
     @classmethod
     def _has_existing_primary(cls, values: Mapping[str, str]) -> bool:
@@ -748,6 +808,34 @@ class LocalModelService:
         values: Mapping[str, str],
         base_url: str,
     ) -> Dict[str, Any]:
+        updates, selected_primary = self._build_model_configuration_update(
+            normalized,
+            assignment=assignment,
+            values=values,
+            base_url=base_url,
+        )
+        result = self._persist_model_configuration(
+            config_version=config_version,
+            updates=updates,
+        )
+        configuration = self.get_configuration()
+        return {
+            **result,
+            **configuration,
+            "model_id": normalized,
+            "selected_primary": selected_primary,
+            "selected_agent": assignment == "agent",
+        }
+
+    def _build_model_configuration_update(
+        self,
+        normalized: str,
+        *,
+        assignment: LocalModelAssignment,
+        values: Mapping[str, str],
+        base_url: str,
+    ) -> tuple[List[Dict[str, str]], bool]:
+        """Build one validated local-model configuration mutation."""
         self._require_no_pending_unregistration(normalized)
         current_channels = values.get("LLM_CHANNELS", "")
         current_models = values.get("LLM_OLLAMA_MODELS", "")
@@ -803,21 +891,22 @@ class LocalModelService:
             # supersede an existing legacy primary model.
             updates.append({"key": "LLM_CONFIG_MODE", "value": "legacy"})
 
-        result = self._system_config_service.update(
+        return updates, selected_primary
+
+    def _persist_model_configuration(
+        self,
+        *,
+        config_version: str,
+        updates: Sequence[Dict[str, str]],
+    ) -> Dict[str, Any]:
+        """Persist and activate one prevalidated local-model configuration update."""
+        return self._system_config_service.update(
             config_version=config_version,
             items=updates,
             reload_now=True,
             validate_connectivity=False,
             actor="local_model_center",
         )
-        configuration = self.get_configuration()
-        return {
-            **result,
-            **configuration,
-            "model_id": normalized,
-            "selected_primary": selected_primary,
-            "selected_agent": assignment == "agent",
-        }
 
     def unregister_model(
         self,
@@ -1105,13 +1194,31 @@ class LocalModelService:
                         "selected_primary": False,
                     }
                 try:
-                    activation = self._configure_model_from_snapshot(
-                        normalized,
-                        assignment="auto",
-                        config_version=config_version,
-                        values=values,
-                        base_url=base_url,
+                    activation = (
+                        self._activation_handler(
+                            normalized,
+                            config_version=config_version,
+                            values=values,
+                            base_url=base_url,
+                            is_cancel_requested=context.is_cancel_requested,
+                            commit_final_result=context.commit_final_result,
+                        )
+                        if self._activation_handler is not None
+                        else self._activate_completed_pull(
+                            normalized,
+                            config_version=config_version,
+                            values=values,
+                            base_url=base_url,
+                            is_cancel_requested=context.is_cancel_requested,
+                            commit_final_result=context.commit_final_result,
+                        )
                     )
+                    if activation is None:
+                        return {
+                            "model_id": normalized,
+                            "activated": False,
+                            "selected_primary": False,
+                        }
                 except Exception as exc:  # broad-exception: fallback_recorded - download already succeeded
                     log_safe_exception(
                         logger,
@@ -1125,11 +1232,7 @@ class LocalModelService:
                         "activated": False,
                         "selected_primary": False,
                     }
-                return {
-                    "model_id": normalized,
-                    "activated": True,
-                    "selected_primary": bool(activation.get("selected_primary")),
-                }
+                return activation
 
             command = TaskCommand(
                 kind=LOCAL_MODEL_PULL_TASK_KIND,
