@@ -30,7 +30,7 @@ StockPulse is a **local-first investment research workbench**: data, evidence, s
 
 | Differentiator | What it means | Read more |
 | --- | --- | --- |
-| Trusted plugin surface | Trusted plugin extension surface (six points defined in the contract; wiring status varies by point). Code loaded via `PLUGINS_DIR` is **in-process trusted code**, not a marketplace sandbox | [Plugin extension contract](plugin-extension-contract.md) |
+| Trusted plugin surface | Six extension points defined in the contract (wiring status varies by point). Code loaded via `PLUGINS_DIR` is **in-process trusted code**, not a marketplace sandbox | [Plugin extension contract](plugin-extension-contract.md) |
 | Agent Soul | A single behavioral charter composed into Native Single / Multi / Chat system prompts (evidence, risk, tool boundaries) | [Agent Soul](agent-soul.md) |
 | Persona Skills | Optional investment-committee Personas (**default off**; enable Skills explicitly) | [Changelog Persona entries](CHANGELOG.md) |
 | Personal investment framework (backend) | Versioned framework storage and API under a single-machine `local` scope; **not** yet fully injected into every analysis prompt or a full Web editor | [Personal investment framework](personal-investment-framework_EN.md) |

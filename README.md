@@ -28,7 +28,7 @@ StockPulse 定位为**本地优先的投资研究工作台**：把数据、证�
 
 | 差异 | 说明 | 深入阅读 |
 | --- | --- | --- |
-| 可信插件扩展面 | 官方可信插件扩展面（契约定义六类扩展点；接线状态见契约）；`PLUGINS_DIR` 加载的是**进程内可信代码**，不是应用商店沙箱 | [插件扩展契约](docs/plugin-extension-contract.md) |
+| 可信插件扩展面 | 契约定义六类扩展点（接线状态见契约）；`PLUGINS_DIR` 加载的是**进程内可信代码**，不是应用商店沙箱 | [插件扩展契约](docs/plugin-extension-contract.md) |
 | Agent Soul | 在 Native Single / Multi / Chat 的系统提示中统一装配行为宪章（证据、风险、工具边界） | [Agent Soul](docs/agent-soul.md) |
 | Persona Skills | 可选投资委员会 Persona（默认关闭，需显式启用 Skill） | [更新日志 / Persona 条目](docs/CHANGELOG.md) |
 | 个人投资框架（后端） | 单机 `local` 作用域的版本化框架存储与 API；**尚未**完整注入全部分析 Prompt / Web 编辑器 | [个人投资框架合同](docs/personal-investment-framework.md) |
