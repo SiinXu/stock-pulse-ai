@@ -19,6 +19,38 @@
 > [!NOTE]
 > **StockPulse** 是 [ZhuLinsen/daily_stock_analysis](https://github.com/ZhuLinsen/daily_stock_analysis) 的独立维护 fork。上游原始代码遵循 MIT License，StockPulse 新增与大幅修改的代码遵循 AGPL-3.0。StockPulse 不是上游团队发布的官方版本。感谢原作者和贡献者；完整授权条款见 [LICENSE](LICENSE)。
 
+## 为什么选择 StockPulse（相对上游）
+
+StockPulse 定位为**本地优先的投资研究工作台**：把数据、证据、策略与 Agent 能力收敛在你可控的环境里，而不是“一键荐股神器”。上游 `daily_stock_analysis` 仍是优秀的每日分析与推送基础；StockPulse 在 fork 上持续投入**可扩展契约、安全边界与研究工作流**。
+
+### 已交付差异（`main` 上可验证）
+
+| 差异 | 说明 | 深入阅读 |
+| --- | --- | --- |
+| 可信插件扩展面 | 六类扩展点（数据源 / 策略 / Agent 工具 / 通知 / 报告模板 / 事件钩子）；`PLUGINS_DIR` 加载的是**进程内可信代码**，不是应用商店沙箱 | [插件扩展契约](docs/plugin-extension-contract.md) |
+| Agent Soul | 在 Native Single / Multi / Chat 的系统提示中统一装配行为宪章（证据、风险、工具边界） | [Agent Soul](docs/agent-soul.md) |
+| Persona Skills | 可选投资委员会 Persona（默认关闭，需显式启用 Skill） | [更新日志 / Persona 条目](docs/CHANGELOG.md) |
+| 个人投资框架（后端） | 单机 `local` 作用域的版本化框架存储与 API；**尚未**完整注入全部分析 Prompt / Web 编辑器 | [个人投资框架合同](docs/personal-investment-framework.md) |
+| 安全基线与审计 | 单管理员会话、出站 URL 策略、持久安全审计 Phase 1、ToolSurface 默认拒绝等 | [安全基线](docs/security-baseline.md) |
+| 双许可证 | 上游 MIT + StockPulse 新增/大幅修改代码 AGPL-3.0 | [LICENSE](LICENSE) |
+
+### 明确非承诺（请勿误解）
+
+- **不是**多租户 SaaS，也**不是**启用管理员登录后的用户隔离 / RBAC（见 [安全基线 AUTH-05](docs/security-baseline.md) 与议题 [#230](https://github.com/SiinXu/stock-pulse-ai/issues/230)）。
+- **插件 = 与进程同权的可信代码**：可读写环境变量、密钥、数据库与文件；不要加载不可信第三方包。
+- **免费行情源可零配置运行**，但受上游限流与接口变动影响，稳定性不保证。
+- **输出仅供学习与研究**，不构成投资建议，亦非受监管投顾服务。
+
+### 规划中（勿与已交付混淆）
+
+| 方向 | 状态 | 跟踪 |
+| --- | --- | --- |
+| 报告证据层 / 分层信任 UX | 规划 | [#616](https://github.com/SiinXu/stock-pulse-ai/issues/616) |
+| 多用户 / 工作区隔离 | 规划 | [#230](https://github.com/SiinXu/stock-pulse-ai/issues/230) |
+| 部署侧安全边界专题补强 | 文档议题 | [#618](https://github.com/SiinXu/stock-pulse-ai/issues/618) |
+
+更完整的场景入口见 [文档中心](docs/INDEX.md)。架构边界见 [技术架构总览](docs/architecture-overview.md)。
+
 ## 🗂️ 目录导览
 
 | 区域 | 位置与职责 |
