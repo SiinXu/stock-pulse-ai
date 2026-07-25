@@ -292,7 +292,7 @@ python main.py --webui-only
 
 ## 📬 项目链接
 
-[GitHub 仓库](https://github.com/SiinXu/stock-pulse-ai) · [问题反馈](https://github.com/SiinXu/stock-pulse-ai/issues) · [文档中心](https://github.com/SiinXu/stock-pulse-ai/tree/main/docs)
+[GitHub 仓库](https://github.com/SiinXu/stock-pulse-ai) · [问题反馈](https://github.com/SiinXu/stock-pulse-ai/issues) · [文档中心](docs/INDEX.md) · [差异与安全入口](docs/INDEX.md) · [部署安全边界](docs/security-baseline.md#operator-security-boundaries-deployers)
 
 ## 📄 License
 
