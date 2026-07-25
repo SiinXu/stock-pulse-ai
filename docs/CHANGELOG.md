@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Restored backend CI compatibility after the Agent Soul, Persona catalog, and AlphaSift DTO contract merges without extending those features' runtime scope.
 - [Added] Wired trusted `analysis_strategy` plugins into the root-owned Skill catalog with detached definitions, fail-closed conflicts, lifecycle-aware cache invalidation, and unchanged declarative precedence and StrategyEngine authority.
 - [Added] Added a versioned Agent Soul charter with one fail-closed composer across Native Single, Multi, and Chat prompts, truthful analysis-history metadata, and additive Chat API run identity.
+- [Fixed] Hardened the default-off Phase A community-intelligence contract so restricted citation targets cannot enter prompts, Hong Kong aliases retain the ToolSurface-authorized identity, and citation URL redaction always remains visible in capped evidence gaps.
 - [Added] Added a loadable, network-free reference Data Provider plugin and author guide covering opt-in discovery, lifecycle diagnostics, compatibility, trust, and manager-owned routing boundaries.
 - [Added] Wired trusted `report_template` plugins into ordered Markdown, WeChat, and brief report selection while preserving Jinja and hard-coded fallbacks.
 - [Fixed] Rejected all non-global and IANA special-purpose IPv4 and IPv6 results when resolving pinned embedded Ollama download hosts, including mixed DNS responses and IPv4-mapped forms.

@@ -134,6 +134,23 @@ def test_scope_deny_occurs_before_provider_dispatch() -> None:
     assert provider.calls == []
 
 
+@pytest.mark.parametrize("stock_code", ["HK00700", "hk700", "00700.HK", "00700"])
+def test_hk_aliases_stay_canonical_after_scope_authorization(stock_code: str) -> None:
+    provider = _Provider(_observation(stock_code="HK00700"))
+    session = _session(provider, expected_stock_code="HK00700")
+
+    result = session.execute(
+        COMMUNITY_INTEL_TOOL_NAME,
+        {"stock_code": stock_code, "window_days": 7, "language_hint": "en"},
+    )
+
+    assert result["ok"] is True
+    assert provider.calls == [
+        {"stock_code": "HK00700", "window_days": 7, "language_hint": "en"}
+    ]
+    assert result["result"]["stock_code"] == "HK00700"
+
+
 def test_tool_surface_timeout_is_typed_and_late_result_is_not_published() -> None:
     provider = _SlowProvider(_observation())
     session = _session(provider, call_timeout_seconds=0.01)
@@ -220,6 +237,67 @@ def test_result_redacts_secrets_from_text_and_citation_url() -> None:
     assert secret not in result["result_text"]
     assert result["result"]["citations"][0]["url"] is None
     assert result["result"]["reason_code"] == "partial_coverage"
+
+
+@pytest.mark.parametrize(
+    "citation_url",
+    [
+        "http://127.0.0.1:8000/admin?view=1",
+        "http://169.254.169.254/latest/meta-data/",
+        "http://metadata.google.internal/computeMetadata/v1/",
+        "http://service.local/private",
+        "http://[::1]/admin",
+    ],
+)
+def test_bound_session_rejects_non_public_citation_targets_even_if_allowlisted(
+    monkeypatch: pytest.MonkeyPatch,
+    citation_url: str,
+) -> None:
+    monkeypatch.setenv(
+        "OUTBOUND_HTTP_ALLOWLIST",
+        "127.0.0.1:8000,169.254.169.254,metadata.google.internal,service.local,::1",
+    )
+    unsafe_citation = CommunityIntelCitation.model_construct(
+        source_id="fixture_forum",
+        reference_id="internal-reference",
+        url=citation_url,
+    )
+    observation = _observation().model_copy(
+        update={"citations": (unsafe_citation,)},
+    )
+
+    _, result = _execute(_Provider(observation))
+
+    assert result["ok"] is True
+    assert result["result"]["reason_code"] == "invalid_provider_output"
+    assert citation_url not in result["result_text"]
+
+
+def test_redacted_citation_reserves_a_deterministic_capped_gap_slot() -> None:
+    provider_gaps = tuple(f"provider_gap_{index}" for index in range(8))
+    secret = "sk_live_abcdefghijklmnop"
+
+    _, result = _execute(
+        _Provider(
+            _observation(
+                citations=(
+                    CommunityIntelCitation(
+                        source_id="fixture_forum",
+                        reference_id="thread-101",
+                        url=f"https://example.invalid/post?api_key={secret}",
+                    ),
+                ),
+                gaps=provider_gaps,
+            )
+        )
+    )
+
+    assert result["ok"] is True
+    assert result["result"]["citations"][0]["url"] is None
+    assert result["result"]["gaps"] == [
+        *provider_gaps[:7],
+        "citation_url_redacted",
+    ]
 
 
 def test_argument_bounds_reject_before_provider_dispatch() -> None:

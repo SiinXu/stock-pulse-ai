@@ -8,12 +8,12 @@ import json
 import logging
 from datetime import datetime, timedelta
 from typing import Any, Literal, Protocol
-from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
-from data_provider.base import canonical_stock_code, normalize_stock_code
+from src.agent.tools.execution import _normalize_tool_stock_code
 from src.agent.tools.registry import ToolDefinition, ToolParameter, ToolPolicy
+from src.security.outbound_policy import OutboundPolicyError, validate_outbound_url
 from src.utils.sanitize import (
     exception_chain_redaction_values,
     log_safe_exception,
@@ -40,6 +40,8 @@ _MAX_THEME_CHARS = 80
 _MAX_GAP_CHARS = 120
 _MAX_REFERENCE_CHARS = 160
 _MAX_CITATION_URL_CHARS = 500
+_MAX_GAPS = 8
+_CITATION_URL_REDACTED_GAP = "citation_url_redacted"
 
 CommunityIntelTone = Literal["bullish", "bearish", "mixed", "unclear"]
 CommunityIntelVolumeSignal = Literal["low", "normal", "elevated", "unavailable"]
@@ -105,18 +107,11 @@ class CommunityIntelCitation(_StrictCommunityIntelModel):
         if value is None:
             return None
         try:
-            parsed = urlsplit(value)
-            port = parsed.port
-        except ValueError as exc:
-            raise ValueError("citation URL is invalid") from exc
-        if (
-            parsed.scheme.lower() not in {"http", "https"}
-            or not parsed.hostname
-            or parsed.username is not None
-            or parsed.password is not None
-            or port is not None and not 1 <= port <= 65535
-        ):
-            raise ValueError("citation URL must be credential-free HTTP(S)")
+            validate_outbound_url(value, allowlist=(), resolve_dns=False)
+        except OutboundPolicyError as exc:
+            raise ValueError(
+                "citation URL must reference a public HTTP(S) target"
+            ) from exc
         return value
 
 
@@ -135,7 +130,7 @@ class CommunityIntelObservation(_StrictCommunityIntelModel):
     volume_signal: CommunityIntelVolumeSignal
     coverage: tuple[CommunityIntelCoverage, ...] = Field(min_length=1, max_length=4)
     citations: tuple[CommunityIntelCitation, ...] = Field(default=(), max_length=6)
-    gaps: tuple[str, ...] = Field(default=(), max_length=8)
+    gaps: tuple[str, ...] = Field(default=(), max_length=_MAX_GAPS)
 
     @field_validator("as_of", "window_start", "window_end")
     @classmethod
@@ -207,7 +202,7 @@ class CommunityIntelBriefResult(_StrictCommunityIntelModel):
     volume_signal: CommunityIntelVolumeSignal
     coverage: tuple[CommunityIntelCoverage, ...] = Field(default=(), max_length=4)
     citations: tuple[CommunityIntelCitation, ...] = Field(default=(), max_length=6)
-    gaps: tuple[str, ...] = Field(default=(), max_length=8)
+    gaps: tuple[str, ...] = Field(default=(), max_length=_MAX_GAPS)
     disclaimer: str
 
     @field_validator("as_of")
@@ -266,7 +261,10 @@ _DEGRADED_SUMMARIES: dict[CommunityIntelReasonCode, str] = {
 
 
 def _canonical_code(stock_code: str) -> str:
-    return canonical_stock_code(normalize_stock_code(stock_code.strip()))
+    canonical = _normalize_tool_stock_code(stock_code)
+    if not isinstance(canonical, str):
+        raise ValueError("stock code must normalize to a string")
+    return canonical
 
 
 def _safe_text(value: str, max_chars: int) -> str:
@@ -364,8 +362,12 @@ def _project_observation(
     citations = tuple(projected_citations)
     themes = tuple(_safe_text(item, _MAX_THEME_CHARS) for item in observation.themes)
     projected_gaps = [_safe_text(item, _MAX_GAP_CHARS) for item in observation.gaps]
-    if citation_url_redacted and "citation_url_redacted" not in projected_gaps and len(projected_gaps) < 8:
-        projected_gaps.append("citation_url_redacted")
+    if citation_url_redacted:
+        projected_gaps = [
+            item for item in projected_gaps
+            if item != _CITATION_URL_REDACTED_GAP
+        ][:_MAX_GAPS - 1]
+        projected_gaps.append(_CITATION_URL_REDACTED_GAP)
     gaps = tuple(projected_gaps)
     is_partial = bool(gaps) or any(item.status != "available" for item in coverage)
     status: CommunityIntelResultStatus = "degraded" if is_partial else "available"
