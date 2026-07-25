@@ -38,7 +38,11 @@ from src.analyzer import (
     populate_decision_action_fields,
     stabilize_decision_with_structure,
 )
-from src.notification import NotificationService, NotificationChannel
+from src.notification import (
+    ChannelAttemptResult as _ChannelAttemptResult,
+    NotificationChannel,
+    NotificationService,
+)
 from src.report_language import (
     get_placeholder_text,
     get_unknown_text,
@@ -86,7 +90,10 @@ from src.services.run_diagnostics import (
 from src.services.decision_signal_extractor import extract_and_persist_from_analysis_result
 from src.services.decision_signal_summary import summarize_decision_signal
 from src.schemas.request_context import AnalysisRequestContext
-from src.utils.sanitize import log_safe_exception
+from src.utils.sanitize import (
+    log_safe_exception,
+    sanitize_exception_chain as _sanitize_exception_chain,
+)
 from src.enums import ReportType
 from src.stock_analyzer import StockTrendAnalyzer, TrendAnalysisResult
 from src.core.trading_calendar import (
@@ -107,6 +114,7 @@ from src.core.stages.analysis import _AnalysisStageMixin
 from src.core.stages.delivery import (
     _DeliveryStageMixin,
     _SINGLE_STOCK_NOTIFY_LOCK_INIT_GUARD,
+    _run_plugin_delivery_attempt,
 )
 from src.core.stages.orchestration import _OrchestrationStageMixin
 from src.core.stages.persistence import (

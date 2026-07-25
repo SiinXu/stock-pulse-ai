@@ -107,6 +107,7 @@ def test_backend_write_is_rolled_back_when_registration_raises() -> None:
 
     assert backend.items == {}
     assert registry.registrations() == ()
+    assert registry.registration_snapshot_generation("report_template") == 2
 
 
 def test_failed_rollback_retains_quarantined_owner_until_cleanup_retry() -> None:
@@ -130,6 +131,7 @@ def test_failed_rollback_retains_quarantined_owner_until_cleanup_retry() -> None
     assert recovery_handle.active is True
     assert backend.items["daily"] is implementation
     assert registry.registrations() == ()
+    assert registry.registration_snapshot_generation("report_template") == 2
     assert registry.get("report_template", "daily") is None
     _assert_error(
         "extension_registration_conflict",
@@ -146,6 +148,7 @@ def test_failed_rollback_retains_quarantined_owner_until_cleanup_retry() -> None
 
     assert recovery_handle.active is False
     assert backend.items == {}
+    assert registry.registration_snapshot_generation("report_template") == 4
     backend.fail_register_after_write = False
     replacement_handle = registry.register(
         plugin_id="replacement-plugin",
@@ -154,6 +157,7 @@ def test_failed_rollback_retains_quarantined_owner_until_cleanup_retry() -> None
         implementation=_Template("daily"),
     )
     assert replacement_handle.active is True
+    assert registry.registration_snapshot_generation("report_template") == 6
 
 
 def test_unregister_removes_only_exact_owner_and_stale_handle_is_safe() -> None:
@@ -204,10 +208,16 @@ def test_unregister_failure_retains_retryable_ownership() -> None:
 
     assert handle.active is True
     assert registry.get("report_template", "daily") is not None
+    assert registry.registration_snapshot_generation("report_template") == 4
+    assert registry.registrations_snapshot("report_template") == (
+        registry.get("report_template", "daily"),
+    )
 
     backend.fail_unregister = False
     handle.unregister()
     assert handle.active is False
+    assert registry.registrations_snapshot("report_template") == ()
+    assert registry.registration_snapshot_generation("report_template") == 6
 
 
 def test_priority_order_and_metadata_are_detached_and_deeply_immutable() -> None:
@@ -239,6 +249,7 @@ def test_priority_order_and_metadata_are_detached_and_deeply_immutable() -> None
 
     registrations = registry.registrations("report_template")
 
+    assert registry.registrations_snapshot("report_template") == registrations
     assert [registration.registration_id for registration in registrations] == [
         "first",
         "equal",
@@ -298,6 +309,8 @@ def test_registry_rejects_identity_version_metadata_and_validator_drift() -> Non
             identity_resolver=lambda implementation: implementation.template_id,
             supported_versions=frozenset({1}),  # type: ignore[arg-type]
         )
+    with pytest.raises(ValueError):
+        ExtensionContract(identity_resolver=None)
 
 
 def test_unwired_default_contracts_remain_fail_closed() -> None:

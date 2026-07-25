@@ -53,6 +53,7 @@ if TYPE_CHECKING:  # import for typing only; avoids runtime import cycles
         AnalysisStrategyCatalogSnapshot,
         AnalysisStrategyRegistry,
         ExternalPluginResult,
+        NotificationChannelSnapshot,
         NotificationChannelRegistry,
         Plugin,
         PluginManager,
@@ -312,6 +313,24 @@ class ApplicationServices:
         """Return the paired notification adapter authority when configured."""
 
         return self._notification_channel_registry
+
+    def notification_channel_snapshot(
+        self,
+    ) -> tuple["NotificationChannelSnapshot", ...]:
+        """Return adapters owned by lifecycle-stable enabled plugins only."""
+
+        registry = self._notification_channel_registry
+        if registry is None or not self._plugin_activation_allowed():
+            return ()
+        enabled_channel_owners = {
+            registration.registration_id: owner_token
+            for registration, owner_token in (
+                self._plugin_manager.enabled_native_owner_registrations_snapshot(
+                    "notification_channel"
+                )
+            )
+        }
+        return registry.snapshot_for_exact_owners(enabled_channel_owners)
 
     @contextmanager
     def notification_dispatch(self) -> Iterator[None]:

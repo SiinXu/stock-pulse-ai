@@ -36,11 +36,11 @@ def _notification_delivery_snapshot_context(service, route_type):
     from src.notification_routing import ROUTABLE_NOTIFICATION_CHANNELS
     from src.plugins import available_notification_channel_snapshot
 
-    application_services, notification_registry = (
+    application_services, _notification_registry = (
         _ensure_notification_runtime(service)
     )
     with application_services.notification_dispatch():
-        plugin_snapshot = notification_registry.snapshot()
+        plugin_snapshot = application_services.notification_channel_snapshot()
         available_plugins = available_notification_channel_snapshot(
             plugin_snapshot
         )
@@ -151,7 +151,7 @@ class _RoutingMethods:
 
     def is_available(self) -> bool:
         """检查通知服务是否可用（至少有一个渠道或上下文渠道）"""
-        application_services, notification_registry = (
+        application_services, _notification_registry = (
             _ensure_notification_runtime(self)
         )
         with application_services.notification_dispatch():
@@ -160,7 +160,7 @@ class _RoutingMethods:
                 or self._has_context_channel()
                 or bool(
                     _available_notification_channel_snapshot(
-                        notification_registry.snapshot()
+                        application_services.notification_channel_snapshot()
                     )
                 )
             )
@@ -238,14 +238,14 @@ class _RoutingMethods:
     def get_channel_names(self) -> str:
         """获取所有已配置渠道的名称"""
         names = [ChannelDetector.get_channel_name(ch) for ch in self._available_channels]
-        application_services, notification_registry = (
+        application_services, _notification_registry = (
             _ensure_notification_runtime(self)
         )
         with application_services.notification_dispatch():
             names.extend(
                 channel.display_name
                 for channel in _available_notification_channel_snapshot(
-                    notification_registry.snapshot()
+                    application_services.notification_channel_snapshot()
                 )
             )
         if self._has_context_channel():

@@ -271,6 +271,7 @@ class PluginOperationResult:
     success: bool
     state: PluginState
     error_code: str | None = None
+    deferred: bool = False
 
 
 class Plugin:
@@ -377,10 +378,15 @@ that hides a collision in a point-specific registry:
 | Report Template | `ReportTemplate.template_id` |
 | Event Hook | `EventHookRegistration.hook_id` |
 
-The unified registry serializes registration under one manager-owned lock. It
-first validates exact identity equality and checks both its own keyspace and the
-target native registry. Only then may it delegate to the native registry and
-commit ownership. Existing permissive `SkillManager.register()` and
+The unified registry serializes registration under its registry-owned lock. A
+contract with a pre-construction identity resolver first validates exact identity
+equality. A factory contract whose runtime identity exists only on the returned
+implementation may omit that resolver only when it supplies a native backend;
+the registration ID is then canonical before construction, and that backend must
+validate the returned identity before publication. A resolver-less contract
+without a native backend is rejected. The registry checks both its own keyspace
+and the target native registry before native delegation and ownership commit.
+Existing permissive `SkillManager.register()` and
 `ToolRegistry.register()` overwrite behavior must never be called when their
 native key already exists. If delegation or later bookkeeping fails, the new
 native entry and unified reservation are rolled back before the error reaches
@@ -657,18 +663,17 @@ class NotificationChannelAdapter(Protocol):
     ) -> NotificationAdapterResult: ...
 
 
-class NotificationChannelFactory(Protocol):
-    channel_id: str
-    display_name: str
-
-    def __call__(self, config: Config) -> NotificationChannelAdapter: ...
+NotificationChannelFactory = Callable[[Config], NotificationChannelAdapter]
 ```
 
-The factory receives the application configuration and returns one adapter. It
-exposes the same canonical `channel_id` and `display_name` before construction;
-an adapter class with a `Config` constructor is the simplest valid factory.
-This lets the registry reject identity and built-in collisions before executing
-the factory. The returned adapter must repeat the same identity.
+The factory receives the application configuration and returns one adapter. The
+registration ID is the pre-construction canonical identity, so built-in and
+duplicate collisions are rejected before executing the factory. The returned
+adapter must expose the same `channel_id`; its bounded `display_name` is the
+human-readable identity used by diagnostics. Plain functions and adapter classes
+that accept one `Config` argument are both valid version-1 factories. Factories
+and adapter methods may accept additional optional or variadic arguments, but
+must accept the core call shape without requiring more arguments.
 The core, not the adapter, measures latency, binds the canonical channel ID, and
 maps `NotificationAdapterResult` into the existing `ChannelAttemptResult` and
 `NotificationDispatchResult` semantics. One adapter failure must not stop later
@@ -703,10 +708,25 @@ The default process wiring is implemented by
 `src/plugins/notification_channels.py`, the root-owned registry exposed by
 `ApplicationServices`, and the existing `NotificationService` dispatcher.
 Factory validation and native/built-in canonical-ID collision checks happen
-before publication, including exact factory/adapter `channel_id` and
-`display_name` equality plus callable signatures for construction,
-`is_available()`, and `send(request)`. Disable and unload remove the exact owned
-adapter. A root-owned read-side lease retains the complete resolved adapter tuple;
+before publication. The registration ID must equal the returned adapter
+`channel_id`; the adapter display name and callable signatures for construction,
+`is_available()`, and `send(request)` are validated fail-closed. Runtime snapshots
+intersect native registrations with a lock-free immutable snapshot of
+lifecycle-stable `enabled` plugin owners. That owner snapshot is published only
+after `onload()` commits and revoked before disable callbacks begin, so callback
+workers can read it without waiting on the manager or unified-registry lifecycle
+locks. Native adapters are paired to that immutable snapshot by both canonical
+ID and an opaque token created for each native publication. A factory or
+`onload()` worker therefore keeps unrelated stable channels dispatchable while
+its own pending adapter remains invisible; the per-registration token also
+prevents a stale owner from joining a replacement that reuses both the same
+channel ID and the same callable factory or adapter class. An adapter registered
+by an in-progress `onload()` is never dispatched if that load later fails. CLI
+diagnostics report that pending native entry as unknown until the manager commit
+makes it enabled. Disable and unload remove the exact owned adapter. A root-owned
+read-side lease retains the complete resolved adapter tuple;
+aggregate delivery derives both route readiness and its targets from that same
+retained tuple instead of releasing an independent availability preflight.
 concurrent destructive lifecycle work waits before `onunload()`, while a
 same-thread lifecycle request is explicitly deferred until every already-entered
 lease, including nested sends on that reader thread, exits. The writer reservation
@@ -716,7 +736,9 @@ acceptance signal, not a completion signal. Each frozen target therefore complet
 once and the next snapshot omits removed adapters. Availability exceptions and invalid values are
 sanitized, logged, and excluded before dispatch, so they do not create channel
 attempts. Invalid send results and send exceptions are isolated and mapped into
-sanitized channel attempts. Factory construction and `NotificationService`
+sanitized channel attempts. Aggregate delivery preserves the adapter error code,
+retryability, and sanitized diagnostics; confirmed successes and non-retryable
+attempts are fenced from duplicate physical sends. Factory construction and `NotificationService`
 routing both resolve Config from the paired `ApplicationServices` authority.
 Report-only `NotificationService` construction remains lazy and does not install
 or start a default root; the first availability, route, or send operation binds

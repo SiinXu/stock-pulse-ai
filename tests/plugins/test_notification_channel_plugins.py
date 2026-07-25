@@ -22,7 +22,11 @@ from src.application_services import (
 from main import __dispatch_cli
 from src.config import Config
 from src.core.pipeline import StockAnalysisPipeline
-from src.core.pipeline_stage_results import PipelineStageRunner
+from src.core.pipeline_stage_results import (
+    PipelineStageName,
+    PipelineStageRunner,
+    PipelineStageStatus,
+)
 from src.enums import ReportType
 from src.notification import NotificationService
 from src.notification_noise import reset_notification_noise_state
@@ -34,6 +38,7 @@ from src.plugins import (
     PluginContext,
     PluginManager,
     PluginManifest,
+    RegistrationHandle,
     build_application_extension_registry,
     build_notification_channel_extension_contract,
 )
@@ -72,17 +77,21 @@ class _NotificationPlugin(Plugin):
         plugin_id: str,
         factory: object,
         events: list[str] | None = None,
+        *,
+        registration_id: str | None = None,
     ) -> None:
         super().__init__(_manifest(plugin_id))
         self._factory = factory
         self._events = events
+        self._registration_id = registration_id
 
     def onload(self, context: PluginContext) -> None:
         if self._events is not None:
             self._events.append(f"load:{self.manifest.id}")
         context.register(
             "notification_channel",
-            self._factory.channel_id,  # type: ignore[attr-defined]
+            self._registration_id
+            or self._factory.channel_id,  # type: ignore[attr-defined]
             self._factory,
         )
 
@@ -201,6 +210,52 @@ def test_register_route_and_result_mapping_use_the_core_dispatcher(
     assert attempt.retryable is True
     assert "private-token" not in (attempt.diagnostics or "")
     assert "private.example" not in (attempt.diagnostics or "")
+
+
+def test_version_one_plain_callable_factory_remains_compatible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[NotificationRequest] = []
+    configs: list[object] = []
+
+    class Adapter:
+        channel_id = "plain_callable"
+        display_name = "Plain Callable"
+
+        def is_available(self) -> bool:
+            return True
+
+        def send(self, request: NotificationRequest) -> NotificationAdapterResult:
+            calls.append(request)
+            return NotificationAdapterResult(success=True)
+
+    def factory(config: object) -> Adapter:
+        configs.append(config)
+        return Adapter()
+
+    config = _config(notification_report_channels=["plain_callable"])
+    services = _install(
+        monkeypatch,
+        config,
+        _NotificationPlugin(
+            "test.plain-callable",
+            factory,
+            registration_id="plain_callable",
+        ),
+    )
+
+    dispatch = NotificationService().send_with_results(
+        "plain callable report",
+        route_type="report",
+    )
+
+    assert services.plugin_load_results[0].success is True
+    assert configs == [config]
+    assert dispatch.success is True
+    assert [attempt.channel for attempt in dispatch.channel_results] == [
+        "plain_callable"
+    ]
+    assert len(calls) == 1
 
 
 def test_unavailable_or_unmatched_plugin_route_never_falls_back_to_broadcast(
@@ -372,6 +427,55 @@ def test_real_check_notify_formats_plugin_lifecycle_states_without_enum_crash(
     assert "Test disabled_sink (disabled_sink): disabled" in output
     assert "Failed Sink (failed_sink): failed" in output
     assert "unknown_sink (unknown_sink): unknown" in output
+
+
+def test_check_notify_does_not_report_pending_onload_adapter_as_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    registered = threading.Event()
+    release_load = threading.Event()
+    load_results: list[object] = []
+    factory = _adapter_factory("pending_cli", [])
+
+    class BlockingPlugin(Plugin):
+        def onload(self, context: PluginContext) -> None:
+            context.register(
+                "notification_channel",
+                "pending_cli",
+                factory,
+            )
+            registered.set()
+            assert release_load.wait(timeout=5)
+
+    config = _config(notification_report_channels=["pending_cli"])
+    services = ApplicationServices(config=config, plugins_dir="")
+    set_application_services(services)
+    plugin = BlockingPlugin(_manifest("test.pending-cli"))
+    assert services.plugin_manager.register(plugin, source="builtin").success is True
+    loader = threading.Thread(
+        target=lambda: load_results.append(
+            services.plugin_manager.load("test.pending-cli")
+        )
+    )
+    loader.start()
+    assert registered.wait(timeout=5)
+
+    try:
+        exit_code = __dispatch_cli(
+            config,
+            SimpleNamespace(check_notify=True),
+        )
+        output = capsys.readouterr().out
+    finally:
+        release_load.set()
+        loader.join(timeout=5)
+
+    assert loader.is_alive() is False
+    assert load_results[0].success is True
+    assert exit_code == 1
+    assert "Test pending_cli (pending_cli): unknown" in output
+    assert "pending_cli): enabled_unavailable" not in output
 
 
 def test_root_close_records_terminal_unloaded_channel_state(
@@ -737,14 +841,14 @@ def test_factory_failure_is_redacted_and_does_not_block_later_plugin(
 
 
 @pytest.mark.parametrize(
-    "bad_factory",
+    "compatible_factory",
     (
         type(
             "OptionalFactoryArgument",
             (),
             {
-                "channel_id": "bad_signature",
-                "display_name": "Bad Signature",
+                "channel_id": "compatible_signature",
+                "display_name": "Compatible Signature",
                 "__init__": lambda self, _config, optional=None: None,
                 "is_available": lambda self: True,
                 "send": lambda self, request: NotificationAdapterResult(
@@ -752,6 +856,70 @@ def test_factory_failure_is_redacted_and_does_not_block_later_plugin(
                 ),
             },
         ),
+        type(
+            "OptionalAvailabilityArgument",
+            (),
+            {
+                "channel_id": "compatible_signature",
+                "display_name": "Compatible Signature",
+                "__init__": lambda self, _config: None,
+                "is_available": lambda self, optional=None: optional is None,
+                "send": lambda self, request: NotificationAdapterResult(
+                    success=bool(request)
+                ),
+            },
+        ),
+        type(
+            "OptionalSendArgument",
+            (),
+            {
+                "channel_id": "compatible_signature",
+                "display_name": "Compatible Signature",
+                "__init__": lambda self, _config: None,
+                "is_available": lambda self: True,
+                "send": lambda self, request, optional=None: NotificationAdapterResult(
+                    success=bool(request) and optional is None
+                ),
+            },
+        ),
+        type(
+            "VariadicSend",
+            (),
+            {
+                "channel_id": "compatible_signature",
+                "display_name": "Compatible Signature",
+                "__init__": lambda self, _config: None,
+                "is_available": lambda self: True,
+                "send": lambda self, request, *extra: NotificationAdapterResult(
+                    success=bool(request) and not extra
+                ),
+            },
+        ),
+    ),
+)
+def test_version_one_accepts_substitutable_optional_and_variadic_callables(
+    monkeypatch: pytest.MonkeyPatch,
+    compatible_factory: object,
+) -> None:
+    config = _config(notification_report_channels=["compatible_signature"])
+    services = _install(
+        monkeypatch,
+        config,
+        _NotificationPlugin("test.compatible-callable", compatible_factory),
+    )
+
+    dispatch = NotificationService().send_with_results(
+        "compatible callable",
+        route_type="report",
+    )
+
+    assert services.plugin_load_results[0].success is True
+    assert dispatch.success is True
+
+
+@pytest.mark.parametrize(
+    "bad_factory",
+    (
         type(
             "AvailabilityNeedsArgument",
             (),
@@ -779,39 +947,13 @@ def test_factory_failure_is_redacted_and_does_not_block_later_plugin(
             },
         ),
         type(
-            "OptionalAvailabilityArgument",
+            "MismatchedChannelId",
             (),
             {
                 "channel_id": "bad_signature",
                 "display_name": "Bad Signature",
-                "__init__": lambda self, _config: None,
-                "is_available": lambda self, optional=None: optional is None,
-                "send": lambda self, request: NotificationAdapterResult(
-                    success=bool(request)
-                ),
-            },
-        ),
-        type(
-            "VariadicSend",
-            (),
-            {
-                "channel_id": "bad_signature",
-                "display_name": "Bad Signature",
-                "__init__": lambda self, _config: None,
-                "is_available": lambda self: True,
-                "send": lambda self, request, *extra: NotificationAdapterResult(
-                    success=bool(request) and not extra
-                ),
-            },
-        ),
-        type(
-            "MismatchedDisplayName",
-            (),
-            {
-                "channel_id": "bad_signature",
-                "display_name": "Factory Name",
                 "__init__": lambda self, _config: setattr(
-                    self, "display_name", "Adapter Name"
+                    self, "channel_id", "different_channel"
                 ),
                 "is_available": lambda self: True,
                 "send": lambda self, request: NotificationAdapterResult(
@@ -957,26 +1099,201 @@ def test_default_aggregate_pipeline_delivers_plugin_once_with_idempotency(
     assert calls[0].stock_codes == ("600519",)
 
 
+def test_aggregate_pipeline_uses_one_retained_plugin_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Do not release an availability preflight before resolving targets."""
+
+    calls: list[NotificationRequest] = []
+    config = _config(notification_report_channels=["snapshot_sink"])
+    services = _install(
+        monkeypatch,
+        config,
+        _NotificationPlugin(
+            "test.aggregate-snapshot",
+            _adapter_factory("snapshot_sink", calls),
+        ),
+    )
+    service = NotificationService()
+    preflight_calls = 0
+
+    def disable_after_released_preflight() -> bool:
+        nonlocal preflight_calls
+        preflight_calls += 1
+        assert NotificationService.is_available(service) is True
+        result = services.plugin_manager.disable("test.aggregate-snapshot")
+        assert result.success is True
+        assert result.deferred is False
+        return True
+
+    monkeypatch.setattr(
+        service,
+        "is_available",
+        disable_after_released_preflight,
+    )
+    pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+    pipeline._pipeline_stage_runner = PipelineStageRunner()
+    pipeline.notifier = service
+    pipeline.config = config
+    pipeline._generate_aggregate_report = lambda _results, _report_type: "report"
+    pipeline._refresh_saved_diagnostic_snapshot = lambda **_kwargs: None
+    results = [SimpleNamespace(code="600519", query_id="snapshot-query")]
+
+    pipeline._send_notifications(results, ReportType.SIMPLE)
+
+    assert preflight_calls == 0
+    assert len(calls) == 1
+    assert calls[0].content == "report"
+
+
+def test_aggregate_pipeline_preserves_nonretryable_plugin_attempt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[NotificationRequest] = []
+    recorded_runs: list[dict[str, object]] = []
+    config = _config(notification_report_channels=["permanent_sink"])
+    _install(
+        monkeypatch,
+        config,
+        _NotificationPlugin(
+            "test.permanent-sink",
+            _adapter_factory(
+                "permanent_sink",
+                calls,
+                result=NotificationAdapterResult(
+                    success=False,
+                    error_code="permanent_failure",
+                    retryable=False,
+                    diagnostics=(
+                        "token=aggregate-secret "
+                        "https://private.example/permanent"
+                    ),
+                ),
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        "src.core.pipeline.record_notification_run",
+        lambda **kwargs: recorded_runs.append(kwargs),
+    )
+    pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+    pipeline._pipeline_stage_runner = PipelineStageRunner()
+    pipeline.notifier = NotificationService()
+    pipeline.config = config
+    pipeline._generate_aggregate_report = lambda _results, _report_type: "report"
+    pipeline._refresh_saved_diagnostic_snapshot = lambda **_kwargs: None
+    results = [SimpleNamespace(code="600519", query_id="permanent-query")]
+
+    pipeline._send_notifications(results, ReportType.SIMPLE)
+    first_stage = pipeline._pipeline_stage_runner.latest(
+        PipelineStageName.DISPATCH
+    )
+    pipeline._send_notifications(results, ReportType.SIMPLE)
+    second_stage = pipeline._pipeline_stage_runner.latest(
+        PipelineStageName.DISPATCH
+    )
+
+    assert len(calls) == 1
+    assert first_stage is not None
+    assert first_stage.status == PipelineStageStatus.FAILED
+    assert first_stage.retryable is False
+    assert second_stage is not None
+    assert second_stage.status == PipelineStageStatus.FAILED
+    assert second_stage.retryable is False
+    assert [run["channel"] for run in recorded_runs] == ["permanent_sink"]
+    diagnostic = str(recorded_runs[0].get("error_message") or "")
+    assert "permanent_failure" in diagnostic
+    assert "aggregate-secret" not in diagnostic
+    assert "private.example" not in diagnostic
+
+
+def test_aggregate_pipeline_retries_retryable_plugin_attempt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[NotificationRequest] = []
+    recorded_runs: list[dict[str, object]] = []
+    config = _config(notification_report_channels=["retryable_sink"])
+    _install(
+        monkeypatch,
+        config,
+        _NotificationPlugin(
+            "test.retryable-sink",
+            _adapter_factory(
+                "retryable_sink",
+                calls,
+                result=NotificationAdapterResult(
+                    success=False,
+                    error_code="temporary_failure",
+                    retryable=True,
+                ),
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        "src.core.pipeline.record_notification_run",
+        lambda **kwargs: recorded_runs.append(kwargs),
+    )
+    pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+    pipeline._pipeline_stage_runner = PipelineStageRunner()
+    pipeline.notifier = NotificationService()
+    pipeline.config = config
+    pipeline._generate_aggregate_report = lambda _results, _report_type: "report"
+    pipeline._refresh_saved_diagnostic_snapshot = lambda **_kwargs: None
+    results = [SimpleNamespace(code="600519", query_id="retryable-query")]
+
+    pipeline._send_notifications(results, ReportType.SIMPLE)
+    first_stage = pipeline._pipeline_stage_runner.latest(
+        PipelineStageName.DISPATCH
+    )
+    pipeline._send_notifications(results, ReportType.SIMPLE)
+    second_stage = pipeline._pipeline_stage_runner.latest(
+        PipelineStageName.DISPATCH
+    )
+
+    assert len(calls) == 2
+    assert first_stage is not None
+    assert first_stage.status == PipelineStageStatus.FAILED
+    assert first_stage.retryable is True
+    assert second_stage is not None
+    assert second_stage.status == PipelineStageStatus.FAILED
+    assert second_stage.retryable is True
+    assert [run["channel"] for run in recorded_runs] == [
+        "retryable_sink",
+        "retryable_sink",
+    ]
+
+
 def test_builtin_and_plugin_canonical_id_collisions_fail_closed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     first_calls: list[NotificationRequest] = []
     second_calls: list[NotificationRequest] = []
+    builtin_factory_configs: list[object] = []
+    first_factory_configs: list[object] = []
+    second_factory_configs: list[object] = []
     config = _config()
     services = _install(
         monkeypatch,
         config,
         _NotificationPlugin(
             "test.builtin-collision",
-            _adapter_factory("wechat", []),
+            _adapter_factory("wechat", [], configs=builtin_factory_configs),
         ),
         _NotificationPlugin(
             "test.first-owner",
-            _adapter_factory("duplicate_sink", first_calls),
+            _adapter_factory(
+                "duplicate_sink",
+                first_calls,
+                configs=first_factory_configs,
+            ),
         ),
         _NotificationPlugin(
             "test.second-owner",
-            _adapter_factory("duplicate_sink", second_calls),
+            _adapter_factory(
+                "duplicate_sink",
+                second_calls,
+                configs=second_factory_configs,
+            ),
         ),
     )
 
@@ -994,6 +1311,367 @@ def test_builtin_and_plugin_canonical_id_collisions_fail_closed(
         entry.channel_id
         for entry in services.notification_channel_registry.snapshot()
     ] == ["duplicate_sink"]
+    assert builtin_factory_configs == []
+    assert first_factory_configs == [config]
+    assert second_factory_configs == []
+
+
+def test_dispatch_excludes_registration_until_plugin_enable_commits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registered = threading.Event()
+    release_load = threading.Event()
+    adapter_called = threading.Event()
+    load_results: list[object] = []
+    dispatch_results: list[object] = []
+
+    def adapter_send(_request: NotificationRequest) -> NotificationAdapterResult:
+        adapter_called.set()
+        return NotificationAdapterResult(success=True)
+
+    factory = _adapter_factory(
+        "pending_sink",
+        [],
+        send_callback=adapter_send,
+    )
+
+    class FailingAfterRegistrationPlugin(Plugin):
+        def onload(self, context: PluginContext) -> None:
+            context.register(
+                "notification_channel",
+                "pending_sink",
+                factory,
+            )
+            registered.set()
+            assert release_load.wait(timeout=5)
+            raise RuntimeError("fail after native registration")
+
+    config = _config(notification_report_channels=["pending_sink"])
+    services = ApplicationServices(config=config, plugins_dir="")
+    set_application_services(services)
+    plugin = FailingAfterRegistrationPlugin(
+        _manifest("test.pending-enable")
+    )
+    assert services.plugin_manager.register(plugin, source="builtin").success is True
+    loader = threading.Thread(
+        target=lambda: load_results.append(
+            services.plugin_manager.load("test.pending-enable")
+        )
+    )
+    sender = threading.Thread(
+        target=lambda: dispatch_results.append(
+            NotificationService().send_with_results(
+                "pending report",
+                route_type="report",
+            )
+        )
+    )
+    loader.start()
+    assert registered.wait(timeout=5)
+    sender.start()
+
+    try:
+        assert adapter_called.wait(timeout=0.2) is False
+    finally:
+        release_load.set()
+        loader.join(timeout=5)
+        sender.join(timeout=5)
+
+    assert loader.is_alive() is False
+    assert sender.is_alive() is False
+    assert load_results[0].success is False
+    assert dispatch_results[0].status == "no_channel"
+    assert adapter_called.is_set() is False
+
+
+def test_onload_worker_can_dispatch_without_observing_pending_adapter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter_calls: list[NotificationRequest] = []
+    callback_results: list[object] = []
+    snapshot_entered = threading.Event()
+
+    factory = _adapter_factory("callback_sink", adapter_calls)
+    config = _config(notification_report_channels=["callback_sink"])
+    services = ApplicationServices(config=config, plugins_dir="")
+    set_application_services(services)
+    service = NotificationService()
+    real_snapshot = services.notification_channel_snapshot
+
+    def observed_snapshot() -> tuple[object, ...]:
+        snapshot_entered.set()
+        return real_snapshot()
+
+    monkeypatch.setattr(
+        services,
+        "notification_channel_snapshot",
+        observed_snapshot,
+    )
+
+    class CallbackDispatchPlugin(Plugin):
+        worker: threading.Thread | None = None
+
+        def onload(self, context: PluginContext) -> None:
+            context.register(
+                "notification_channel",
+                "callback_sink",
+                factory,
+            )
+            self.worker = threading.Thread(
+                target=lambda: callback_results.append(
+                    service.send_with_results(
+                        "callback report",
+                        route_type="report",
+                    )
+                )
+            )
+            self.worker.start()
+            assert snapshot_entered.wait(timeout=5)
+            self.worker.join(timeout=1)
+            if self.worker.is_alive():
+                raise RuntimeError("callback dispatch did not finish")
+
+    plugin = CallbackDispatchPlugin(_manifest("test.callback-dispatch"))
+    assert services.plugin_manager.register(plugin, source="builtin").success is True
+
+    load_result = services.plugin_manager.load("test.callback-dispatch")
+
+    assert plugin.worker is not None
+    plugin.worker.join(timeout=5)
+    assert plugin.worker.is_alive() is False
+    assert load_result.success is True
+    assert callback_results[0].status == "no_channel"
+    assert adapter_calls == []
+
+    committed_result = service.send_with_results(
+        "committed report",
+        route_type="report",
+    )
+    assert committed_result.success is True
+    assert len(adapter_calls) == 1
+
+
+def test_factory_worker_dispatches_stable_channels_without_registry_lock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stable_calls: list[NotificationRequest] = []
+    pending_calls: list[NotificationRequest] = []
+    factory_dispatches: list[object] = []
+    factory_workers: list[threading.Thread] = []
+    snapshot_entered = threading.Event()
+    config = _config(
+        notification_report_channels=["stable_sink", "factory_sink"]
+    )
+    services = _install(
+        monkeypatch,
+        config,
+        _NotificationPlugin(
+            "test.stable-sink",
+            _adapter_factory("stable_sink", stable_calls),
+        ),
+    )
+    service = NotificationService()
+    real_snapshot = services.notification_channel_snapshot
+
+    def observed_snapshot() -> tuple[object, ...]:
+        snapshot_entered.set()
+        return real_snapshot()
+
+    monkeypatch.setattr(
+        services,
+        "notification_channel_snapshot",
+        observed_snapshot,
+    )
+
+    class Adapter:
+        channel_id = "factory_sink"
+        display_name = "Factory Sink"
+
+        def is_available(self) -> bool:
+            return True
+
+        def send(self, request: NotificationRequest) -> NotificationAdapterResult:
+            pending_calls.append(request)
+            return NotificationAdapterResult(success=True)
+
+    def factory(_config: object) -> Adapter:
+        worker = threading.Thread(
+            target=lambda: factory_dispatches.append(
+                service.send_with_results(
+                    "factory callback",
+                    route_type="report",
+                )
+            )
+        )
+        factory_workers.append(worker)
+        worker.start()
+        assert snapshot_entered.wait(timeout=5)
+        worker.join(timeout=1)
+        if worker.is_alive():
+            raise RuntimeError("factory dispatch did not finish")
+        return Adapter()
+
+    plugin = _NotificationPlugin(
+        "test.factory-worker",
+        factory,
+        registration_id="factory_sink",
+    )
+    assert services.plugin_manager.register(plugin, source="builtin").success is True
+
+    load_result = services.plugin_manager.load("test.factory-worker")
+
+    assert factory_workers
+    factory_workers[0].join(timeout=5)
+    assert factory_workers[0].is_alive() is False
+    assert load_result.success is True
+    assert factory_dispatches[0].success is True
+    assert len(stable_calls) == 1
+    assert pending_calls == []
+
+    committed_result = service.send_with_results(
+        "committed factory",
+        route_type="report",
+    )
+    assert committed_result.success is True
+    assert len(stable_calls) == 2
+    assert len(pending_calls) == 1
+
+
+@pytest.mark.parametrize(
+    ("reuse_factory", "replacement_fails"),
+    [
+        (False, False),
+        (True, False),
+        (True, True),
+    ],
+    ids=[
+        "distinct-factories",
+        "shared-factory",
+        "shared-factory-failed-load",
+    ],
+)
+def test_reused_channel_id_cannot_join_stale_owner_to_pending_adapter(
+    monkeypatch: pytest.MonkeyPatch,
+    reuse_factory: bool,
+    replacement_fails: bool,
+) -> None:
+    original_handles: list[RegistrationHandle] = []
+    original_calls: list[NotificationRequest] = []
+    replacement_calls: list[NotificationRequest] = []
+    dispatch_results: list[object] = []
+    load_results: list[object] = []
+    stable_snapshot_read = threading.Event()
+    release_snapshot = threading.Event()
+    replacement_registered = threading.Event()
+    release_load = threading.Event()
+    original_factory = _adapter_factory("reused_sink", original_calls)
+    replacement_factory = (
+        original_factory
+        if reuse_factory
+        else _adapter_factory("reused_sink", replacement_calls)
+    )
+
+    class OriginalPlugin(Plugin):
+        def onload(self, context: PluginContext) -> None:
+            original_handles.append(
+                context.register(
+                    "notification_channel",
+                    "reused_sink",
+                    original_factory,
+                )
+            )
+
+    class ReplacementPlugin(Plugin):
+        def onload(self, context: PluginContext) -> None:
+            context.register(
+                "notification_channel",
+                "reused_sink",
+                replacement_factory,
+            )
+            replacement_registered.set()
+            assert release_load.wait(timeout=5)
+            if replacement_fails:
+                raise RuntimeError("replacement load failed")
+
+    config = _config(notification_report_channels=["reused_sink"])
+    services = _install(
+        monkeypatch,
+        config,
+        OriginalPlugin(_manifest("test.original-owner")),
+    )
+    service = NotificationService()
+    manager = services.plugin_manager
+    real_enabled_snapshot = (
+        manager.enabled_native_owner_registrations_snapshot
+    )
+
+    def paused_enabled_snapshot(extension_point=None):
+        snapshot = real_enabled_snapshot(extension_point)
+        stable_snapshot_read.set()
+        assert release_snapshot.wait(timeout=5)
+        return snapshot
+
+    monkeypatch.setattr(
+        manager,
+        "enabled_native_owner_registrations_snapshot",
+        paused_enabled_snapshot,
+    )
+    sender = threading.Thread(
+        target=lambda: dispatch_results.append(
+            service.send_with_results("stale owner", route_type="report")
+        )
+    )
+    sender.start()
+    assert stable_snapshot_read.wait(timeout=5)
+    original_handles[0].unregister()
+
+    replacement = ReplacementPlugin(_manifest("test.replacement-owner"))
+    assert manager.register(replacement, source="builtin").success is True
+    loader = threading.Thread(
+        target=lambda: load_results.append(
+            manager.load("test.replacement-owner")
+        )
+    )
+    loader.start()
+    assert replacement_registered.wait(timeout=5)
+
+    try:
+        release_snapshot.set()
+        sender.join(timeout=5)
+        assert sender.is_alive() is False
+        assert dispatch_results[0].status == "no_channel"
+        assert original_calls == []
+        assert replacement_calls == []
+    finally:
+        release_snapshot.set()
+        release_load.set()
+        sender.join(timeout=5)
+        loader.join(timeout=5)
+
+    assert loader.is_alive() is False
+    assert load_results[0].success is not replacement_fails
+    monkeypatch.setattr(
+        manager,
+        "enabled_native_owner_registrations_snapshot",
+        real_enabled_snapshot,
+    )
+
+    committed_result = service.send_with_results(
+        "replacement committed",
+        route_type="report",
+    )
+    if replacement_fails:
+        assert committed_result.status == "no_channel"
+        assert original_calls == []
+        assert replacement_calls == []
+        return
+    assert committed_result.success is True
+    if reuse_factory:
+        assert len(original_calls) == 1
+        assert replacement_calls == []
+    else:
+        assert original_calls == []
+        assert len(replacement_calls) == 1
 
 
 def test_disable_and_unload_remove_adapter_from_later_snapshots(

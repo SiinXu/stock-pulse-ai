@@ -9,7 +9,7 @@ import logging
 import threading
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Callable, Literal, Mapping, Protocol
+from typing import TYPE_CHECKING, Callable, Literal, Mapping, Protocol, TypeAlias
 
 from src.notification_routing import ROUTABLE_NOTIFICATION_CHANNEL_SET
 from src.utils.sanitize import log_safe_exception
@@ -98,16 +98,10 @@ class NotificationChannelAdapter(Protocol):
         ...
 
 
-class NotificationChannelFactory(Protocol):
-    """Callable registration shape with pre-construction canonical identity."""
-
-    channel_id: str
-    display_name: str
-
-    def __call__(self, config: "Config") -> NotificationChannelAdapter:
-        """Create one adapter for an enabled lifecycle transition."""
-
-        ...
+NotificationChannelFactory: TypeAlias = Callable[
+    ["Config"],
+    NotificationChannelAdapter,
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,12 +124,17 @@ class NotificationChannelLifecycleSnapshot:
 
 @dataclass(frozen=True, slots=True)
 class _OwnedNotificationChannel:
+    """Retain one registration-owned adapter with deterministic ordering metadata."""
+
     factory: object
+    owner_token: object
     snapshot: NotificationChannelSnapshot
     registration_order: int
 
 
 def _valid_channel_identity(value: object) -> bool:
+    """Return whether a value is a canonical notification channel ID."""
+
     return (
         type(value) is str
         and len(value) <= 128
@@ -144,25 +143,21 @@ def _valid_channel_identity(value: object) -> bool:
 
 
 def _valid_display_name(value: object) -> bool:
+    """Return whether a value is a bounded non-empty display name."""
+
     return type(value) is str and 0 < len(value.strip()) <= 200
 
 
-def _has_exact_positional_signature(
+def _accepts_positional_call(
     implementation: object,
     argument_count: int,
 ) -> bool:
+    """Return whether a callable accepts the core positional call shape."""
+
     signature = inspect.signature(implementation)
     arguments = (object(),) * argument_count
     signature.bind(*arguments)
-    parameters = tuple(signature.parameters.values())
-    return len(parameters) == argument_count and all(
-        parameter.kind
-        in {
-            inspect.Parameter.POSITIONAL_ONLY,
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-        }
-        for parameter in parameters
-    )
+    return True
 
 
 def validate_notification_channel_factory(implementation: object) -> bool:
@@ -171,13 +166,7 @@ def validate_notification_channel_factory(implementation: object) -> bool:
     if not callable(implementation):
         return False
     try:
-        channel_id = getattr(implementation, "channel_id")
-        display_name = getattr(implementation, "display_name")
-        if not _valid_channel_identity(channel_id):
-            return False
-        if not _valid_display_name(display_name):
-            return False
-        if not _has_exact_positional_signature(implementation, 1):
+        if not _accepts_positional_call(implementation, 1):
             return False
     except Exception as exc:  # broad-exception: fallback_recorded - hostile factory descriptors and signatures are safely recorded before plugin code executes
         log_safe_exception(
@@ -194,7 +183,6 @@ def validate_notification_channel_factory(implementation: object) -> bool:
 def _build_adapter_snapshot(
     adapter: object,
     channel_id: str,
-    display_name: str,
 ) -> NotificationChannelSnapshot | None:
     try:
         adapter_channel_id = getattr(adapter, "channel_id")
@@ -204,15 +192,14 @@ def _build_adapter_snapshot(
         if not (
             adapter_channel_id == channel_id
             and _valid_channel_identity(adapter_channel_id)
-            and adapter_display_name == display_name
             and _valid_display_name(adapter_display_name)
             and callable(availability_probe)
             and callable(sender)
         ):
             return None
         if not (
-            _has_exact_positional_signature(availability_probe, 0)
-            and _has_exact_positional_signature(sender, 1)
+            _accepts_positional_call(availability_probe, 0)
+            and _accepts_positional_call(sender, 1)
         ):
             return None
         return NotificationChannelSnapshot(
@@ -230,6 +217,24 @@ def _build_adapter_snapshot(
             exception_redaction_values=(),
         )
         return None
+
+
+def _safe_display_name(implementation: object, fallback: str) -> str:
+    """Read an optional display name without making it part of v1 factory shape."""
+
+    try:
+        display_name = getattr(implementation, "display_name", fallback)
+    except Exception as exc:  # broad-exception: fallback_recorded - optional diagnostic identity cannot affect publication validation
+        log_safe_exception(
+            logger,
+            "Notification channel display name could not be read",
+            exc,
+            error_code="notification_channel_display_name_invalid",
+            context={"channel": fallback},
+            exception_redaction_values=(),
+        )
+        return fallback
+    return display_name if _valid_display_name(display_name) else fallback
 
 
 class NotificationChannelRegistry:
@@ -271,52 +276,24 @@ class NotificationChannelRegistry:
         return self._config_provider()
 
     def validate_factory(self, implementation: object) -> bool:
-        """Validate and retain safe failed identity for CLI diagnostics."""
+        """Validate the accepted v1 ``Callable[[Config], Adapter]`` shape."""
 
-        valid = validate_notification_channel_factory(implementation)
-        try:
-            channel_id = getattr(implementation, "channel_id")
-            display_name = getattr(implementation, "display_name")
-        except Exception as exc:  # broad-exception: fallback_recorded - hostile identity descriptors are safely recorded and cannot enter diagnostics
-            log_safe_exception(
-                logger,
-                "Notification channel factory identity failed",
-                exc,
-                error_code="notification_channel_factory_identity_invalid",
-                exception_redaction_values=(),
-            )
-            return False
-        if _valid_channel_identity(channel_id) and _valid_display_name(display_name):
-            if not valid:
-                with self._lock:
-                    self._lifecycle[channel_id] = (
-                        NotificationChannelLifecycleSnapshot(
-                            channel_id=channel_id,
-                            display_name=display_name,
-                            state="failed",
-                        )
-                    )
-        return valid
+        return validate_notification_channel_factory(implementation)
 
-    def register(self, registration_id: str, implementation: object) -> None:
-        """Construct and publish one validated adapter factory atomically."""
+    def register(
+        self,
+        registration_id: str,
+        implementation: object,
+    ) -> object:
+        """Construct an adapter and return its opaque publication owner token."""
 
         if not self.validate_factory(implementation):
             raise TypeError("notification channel factory is invalid")
-        try:
-            factory_channel_id = getattr(implementation, "channel_id")
-            factory_display_name = getattr(implementation, "display_name")
-        except Exception as exc:  # broad-exception: fallback_recorded - mutable or hostile identity descriptors are safely recorded at the publication boundary
-            log_safe_exception(
-                logger,
-                "Notification channel factory identity changed",
-                exc,
-                error_code="notification_channel_factory_identity_invalid",
-                exception_redaction_values=(),
-            )
-            raise TypeError("notification channel factory is invalid") from None
-        if factory_channel_id != registration_id:
-            raise TypeError("notification channel factory is invalid")
+        owner_token = object()
+        factory_display_name = _safe_display_name(
+            implementation,
+            registration_id,
+        )
         with self._lock:
             if (
                 registration_id in self._reserved_channel_ids
@@ -347,14 +324,17 @@ class NotificationChannelRegistry:
         snapshot = _build_adapter_snapshot(
             adapter,
             registration_id,
-            factory_display_name,
         )
         if snapshot is None:
+            failed_display_name = _safe_display_name(
+                adapter,
+                factory_display_name,
+            )
             with self._lock:
                 self._lifecycle[registration_id] = (
                     NotificationChannelLifecycleSnapshot(
                         channel_id=registration_id,
-                        display_name=factory_display_name,
+                        display_name=failed_display_name,
                         state="failed",
                     )
                 )
@@ -368,6 +348,7 @@ class NotificationChannelRegistry:
                 raise ValueError("notification channel ID is already registered")
             self._entries[registration_id] = _OwnedNotificationChannel(
                 factory=implementation,
+                owner_token=owner_token,
                 snapshot=snapshot,
                 registration_order=self._next_order,
             )
@@ -379,6 +360,7 @@ class NotificationChannelRegistry:
                 )
             )
             self._next_order += 1
+        return owner_token
 
     def unregister(self, registration_id: str, implementation: object) -> None:
         """Remove only the adapter created by the exact registered factory."""
@@ -400,6 +382,24 @@ class NotificationChannelRegistry:
 
         with self._lock:
             entries = tuple(self._entries.values())
+        return tuple(
+            entry.snapshot
+            for entry in sorted(entries, key=lambda item: item.registration_order)
+        )
+
+    def snapshot_for_exact_owners(
+        self,
+        owners: Mapping[str, object],
+    ) -> tuple[NotificationChannelSnapshot, ...]:
+        """Return adapters paired to exact opaque native registration owners."""
+
+        owner_snapshot = dict(owners)
+        with self._lock:
+            entries = tuple(
+                entry
+                for channel_id, entry in self._entries.items()
+                if owner_snapshot.get(channel_id) is entry.owner_token
+            )
         return tuple(
             entry.snapshot
             for entry in sorted(entries, key=lambda item: item.registration_order)
@@ -467,7 +467,7 @@ def build_notification_channel_extension_contract(
     if not isinstance(registry, NotificationChannelRegistry):
         raise TypeError("notification channel registry is invalid")
     return ExtensionContract(
-        identity_resolver=lambda implementation: implementation.channel_id,
+        identity_resolver=None,
         validator=registry.validate_factory,
         backend=registry,
     )

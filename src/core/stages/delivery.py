@@ -18,13 +18,19 @@ from src.core.pipeline_stage_results import (
     PipelineStageStatus,
 )
 from src.enums import ReportType
-from src.notification import NotificationChannel
+from src.notification import (
+    ChannelAttemptResult as _ChannelAttemptResult,
+    NotificationChannel,
+)
 from src.services.run_diagnostics import (
     PipelineStageObservation,
     observe_pipeline_stage,
     record_notification_run as _record_notification_run_impl,
 )
-from src.utils.sanitize import log_safe_exception
+from src.utils.sanitize import (
+    log_safe_exception,
+    sanitize_exception_chain as _sanitize_exception_chain,
+)
 
 
 logger = logging.getLogger("src.core.pipeline")
@@ -49,6 +55,44 @@ def record_notification_run(*args, **kwargs):
         _record_notification_run_impl,
     )
     return recorder(*args, **kwargs)
+
+
+def _run_plugin_delivery_attempt(
+    pipeline: Any,
+    *,
+    side_effect_key: Tuple[Any, ...],
+    send: Callable[[], _ChannelAttemptResult],
+) -> PipelineStageResult[_ChannelAttemptResult]:
+    """Fence one structured adapter attempt with its retry decision."""
+
+    def _dispatch() -> PipelineStageResult[_ChannelAttemptResult]:
+        attempt = send()
+        if not isinstance(attempt, _ChannelAttemptResult):
+            raise TypeError("plugin notification attempt is invalid")
+        if attempt.success:
+            return PipelineStageResult.success(
+                PipelineStageName.DISPATCH,
+                attempt,
+                side_effect_committed=True,
+            )
+        return PipelineStageResult.failed(
+            PipelineStageName.DISPATCH,
+            value=attempt,
+            retryable=attempt.retryable,
+            side_effect_committed=not attempt.retryable,
+            reason=(
+                attempt.diagnostics
+                or attempt.error_code
+                or "Notification delivery was not confirmed."
+            ),
+        )
+
+    return pipeline._get_pipeline_stage_runner().run(
+        PipelineStageName.DISPATCH,
+        _dispatch,
+        retryable=True,
+        side_effect_key=side_effect_key,
+    )
 
 
 class _DeliveryStageMixin:
@@ -630,6 +674,7 @@ class _DeliveryStageMixin:
         delivery_failure_count = 0
         delivery_reused_count = 0
         delivery_reused_channels: set[str] = set()
+        delivery_failure_retryability: list[bool] = []
         static_delivery_scope: Optional[Tuple[Any, ...]] = None
         static_delivery_confirmed = False
         static_delivery_scope_owned = False
@@ -699,26 +744,50 @@ class _DeliveryStageMixin:
                 )
                 return
 
-            # Send notifications
-            if self.notifier.is_available():
-                delivery_snapshot = getattr(
-                    self.notifier,
-                    "_notification_delivery_snapshot",
-                    None,
-                )
-                if callable(delivery_snapshot):
-                    channels = list(
-                        static_scope_guards.enter_context(
-                            delivery_snapshot("report")
-                        )
+            context_route_available = False
+            has_context_channel = getattr(
+                self.notifier,
+                "_has_context_channel",
+                None,
+            )
+            if callable(has_context_channel):
+                try:
+                    context_route_available = bool(has_context_channel())
+                except Exception as e:  # broad-exception: optional_metadata - Context-route availability only refines diagnostics and cannot block delivery.
+                    log_safe_exception(
+                        logger,
+                        "Context notification availability check failed",
+                        e,
+                        error_code="pipeline_context_notification_availability_failed",
+                        level=logging.WARNING,
                     )
-                else:
+
+            # Resolve availability and aggregate targets from one retained
+            # plugin snapshot. The compatibility fallback is only for test or
+            # third-party notifiers that predate the snapshot API.
+            delivery_snapshot = getattr(
+                self.notifier,
+                "_notification_delivery_snapshot",
+                None,
+            )
+            if callable(delivery_snapshot):
+                channels = list(
+                    static_scope_guards.enter_context(
+                        delivery_snapshot("report")
+                    )
+                )
+                notification_available = bool(channels) or context_route_available
+            else:
+                notification_available = self.notifier.is_available()
+                if notification_available:
                     channels = self.notifier.get_available_channels()
                     channels = self.notifier.get_channels_for_route(
                         "report",
                         channels=channels,
                     )
 
+            # Send notifications
+            if notification_available:
                 def _channel_id(channel: Any) -> str:
                     return (
                         channel.value
@@ -756,17 +825,64 @@ class _DeliveryStageMixin:
                         else None
                     )
 
+                def _send_plugin_channel_safely(
+                    channel_label: str,
+                    send_func: Callable[[], _ChannelAttemptResult],
+                ) -> _ChannelAttemptResult:
+                    delivery_result = _run_plugin_delivery_attempt(
+                        self,
+                        side_effect_key=self._delivery_stage_key(
+                            route="aggregate",
+                            results=results,
+                            report_type=report_type,
+                            channel=channel_label,
+                        ),
+                        send=send_func,
+                    )
+                    if delivery_result.reused:
+                        delivery_reused_channels.add(channel_label)
+                    if isinstance(delivery_result.value, _ChannelAttemptResult):
+                        return delivery_result.value
+                    delivery_error = delivery_result.error
+                    if isinstance(delivery_error, Exception):
+                        log_safe_exception(
+                            logger,
+                            "Plugin notification delivery failed; continuing "
+                            "with remaining channels",
+                            delivery_error,
+                            error_code="pipeline_notification_channel_failed",
+                            context={"channel": channel_label},
+                            exception_redaction_values=(),
+                        )
+                        diagnostics = _sanitize_exception_chain(
+                            delivery_error,
+                            redact_diagnostics=True,
+                        )
+                    else:
+                        diagnostics = "Plugin notification attempt was unavailable."
+                    return _ChannelAttemptResult(
+                        channel=channel_label,
+                        success=False,
+                        error_code="exception",
+                        retryable=True,
+                        diagnostics=diagnostics,
+                    )
+
                 def _record_channel_result(
                     channel_label: str,
                     success: bool,
-                    error_message: Optional[Exception] = None,
+                    error_message: Optional[Any] = None,
                     target_results: Optional[List[AnalysisResult]] = None,
+                    *,
+                    retryable: bool = True,
                 ) -> None:
                     nonlocal delivery_attempt_count, delivery_failure_count
                     nonlocal delivery_reused_count
                     nonlocal static_delivery_confirmed
                     if channel_label != "__context__" and success:
                         static_delivery_confirmed = True
+                    if not success:
+                        delivery_failure_retryability.append(retryable)
                     if channel_label in delivery_reused_channels:
                         delivery_reused_count += 1
                         delivery_reused_channels.discard(channel_label)
@@ -790,24 +906,6 @@ class _DeliveryStageMixin:
                         results=results if target_results is None else target_results,
                         notification_run=notification_run,
                     )
-
-                context_route_available = False
-                has_context_channel = getattr(
-                    self.notifier,
-                    "_has_context_channel",
-                    None,
-                )
-                if callable(has_context_channel):
-                    try:
-                        context_route_available = bool(has_context_channel())
-                    except Exception as e:  # broad-exception: optional_metadata - Context-route availability only refines diagnostics and cannot block delivery.
-                        log_safe_exception(
-                            logger,
-                            "Context notification availability check failed",
-                            e,
-                            error_code="pipeline_context_notification_availability_failed",
-                            level=logging.WARNING,
-                        )
 
                 context_delivery = self._run_delivery_attempt(
                     side_effect_key=self._delivery_stage_key(
@@ -1099,8 +1197,8 @@ class _DeliveryStageMixin:
                         def _send_plugin_report(
                             channel=channel,
                             channel_id=channel_id,
-                        ) -> bool:
-                            adapter_result = self.notifier._send_to_plugin_channel(
+                        ) -> _ChannelAttemptResult:
+                            return self.notifier._send_to_plugin_channel(
                                 channel,
                                 report,
                                 image_bytes=(
@@ -1115,19 +1213,28 @@ class _DeliveryStageMixin:
                                 route_type="report",
                                 severity="info",
                             )
-                            return bool(adapter_result.success)
 
-                        channel_success, channel_error = _send_channel_safely(
+                        plugin_attempt = _send_plugin_channel_safely(
                             channel_id,
                             _send_plugin_report,
                         )
+                        channel_success = plugin_attempt.success
                         non_wechat_success = (
                             channel_success or non_wechat_success
                         )
+                        plugin_error = " | ".join(
+                            value
+                            for value in (
+                                plugin_attempt.error_code,
+                                plugin_attempt.diagnostics,
+                            )
+                            if value
+                        ) or None
                         _record_channel_result(
                             channel_id,
                             channel_success,
-                            channel_error,
+                            plugin_error,
+                            retryable=plugin_attempt.retryable,
                         )
                     elif channel == NotificationChannel.FEISHU:
                         def _send_feishu_report() -> bool:
@@ -1412,7 +1519,7 @@ class _DeliveryStageMixin:
                     )
                 dispatch_status = (
                     "degraded"
-                    if success and delivery_failure_count
+                    if success and delivery_failure_retryability
                     else ("success" if success else "failed")
                 )
                 if dispatch_status == "degraded":
@@ -1420,6 +1527,7 @@ class _DeliveryStageMixin:
                         PipelineStageName.DISPATCH,
                         success,
                         reason="Some notification deliveries failed.",
+                        retryable=any(delivery_failure_retryability),
                         side_effect_committed=True,
                     )
                 elif dispatch_status == "success":
@@ -1433,7 +1541,11 @@ class _DeliveryStageMixin:
                         PipelineStageName.DISPATCH,
                         value=False,
                         reason="All configured notification deliveries failed.",
-                        retryable=True,
+                        retryable=(
+                            any(delivery_failure_retryability)
+                            if delivery_failure_retryability
+                            else True
+                        ),
                     )
                 self._finish_pipeline_stage(
                     dispatch_stage,

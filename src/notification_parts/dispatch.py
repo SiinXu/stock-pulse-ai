@@ -124,30 +124,65 @@ class _DispatchMethods:
         email_stock_codes: Optional[List[str]],
         route_type: Optional[str],
         severity: Optional[str],
-    ) -> _NotificationAdapterResult:
-        """Invoke one adapter with the immutable core-owned request shape."""
+    ) -> ChannelAttemptResult:
+        """Invoke and map one adapter into the core attempt contract."""
 
-        adapter_result = channel.adapter.send(
-            _NotificationRequest(
-                content=content,
-                route_type=route_type,
-                severity=severity,
-                image_bytes=image_bytes,
-                stock_codes=tuple(email_stock_codes or ()),
-                metadata={},
+        started_at = time.monotonic()
+        try:
+            adapter_result = channel.adapter.send(
+                _NotificationRequest(
+                    content=content,
+                    route_type=route_type,
+                    severity=severity,
+                    image_bytes=image_bytes,
+                    stock_codes=tuple(email_stock_codes or ()),
+                    metadata={},
+                )
             )
-        )
-        if type(adapter_result) is not _NotificationAdapterResult:
-            logger.warning(
-                "Notification channel adapter returned an invalid result "
-                "error_code=notification_adapter_result_invalid channel=%s",
-                channel.channel_id,
+            if type(adapter_result) is not _NotificationAdapterResult:
+                logger.warning(
+                    "Notification channel adapter returned an invalid result "
+                    "error_code=notification_adapter_result_invalid channel=%s",
+                    channel.channel_id,
+                )
+                adapter_result = _NotificationAdapterResult(
+                    success=False,
+                    error_code="notification_adapter_result_invalid",
+                )
+            success = adapter_result.success
+            return ChannelAttemptResult(
+                channel=channel.channel_id,
+                success=success,
+                error_code=_normalize_notification_adapter_error_code(
+                    adapter_result.error_code,
+                    success=success,
+                ),
+                retryable=adapter_result.retryable if not success else False,
+                latency_ms=int((time.monotonic() - started_at) * 1000),
+                diagnostics=(
+                    sanitize_diagnostic_text(adapter_result.diagnostics) or None
+                ),
             )
-            return _NotificationAdapterResult(
+        except Exception as exc:  # broad-exception: fallback_recorded - one plugin adapter failure cannot stop later channels
+            log_safe_exception(
+                logger,
+                "Notification channel delivery failed",
+                exc,
+                error_code="notification_channel_delivery_failed",
+                context={"channel": channel.channel_id},
+                exception_redaction_values=(),
+            )
+            return ChannelAttemptResult(
+                channel=channel.channel_id,
                 success=False,
-                error_code="notification_adapter_result_invalid",
+                error_code="exception",
+                retryable=True,
+                latency_ms=int((time.monotonic() - started_at) * 1000),
+                diagnostics=sanitize_exception_chain(
+                    exc,
+                    redact_diagnostics=True,
+                ),
             )
-        return adapter_result
 
     def send_with_results(
         self,
@@ -232,7 +267,9 @@ class _DispatchMethods:
                 message="interactive context delivery failed; static channels skipped",
             )
 
-        plugin_channel_snapshot = self._notification_channel_registry.snapshot()
+        plugin_channel_snapshot = (
+            self._application_services.notification_channel_snapshot()
+        )
         available_plugin_channels = _available_notification_channel_snapshot(
             plugin_channel_snapshot
         )
@@ -370,6 +407,7 @@ class _DispatchMethods:
                 else channel.channel_id
             )
             started_at = time.monotonic()
+            plugin_attempt = None
             try:
                 if isinstance(channel, NotificationChannel):
                     result = self._send_to_static_channel(
@@ -385,7 +423,7 @@ class _DispatchMethods:
                     retryable = not attempt_success
                     diagnostics = None
                 else:
-                    adapter_result = self._send_to_plugin_channel(
+                    plugin_attempt = self._send_to_plugin_channel(
                         channel,
                         content,
                         image_bytes=(
@@ -397,30 +435,23 @@ class _DispatchMethods:
                         route_type=route_type,
                         severity=severity,
                     )
-                    attempt_success = adapter_result.success
-                    error_code = _normalize_notification_adapter_error_code(
-                        adapter_result.error_code,
-                        success=attempt_success,
-                    )
-                    retryable = (
-                        adapter_result.retryable
-                        if not attempt_success
-                        else False
-                    )
-                    diagnostics = (
-                        sanitize_diagnostic_text(
-                            adapter_result.diagnostics
-                        )
-                        or None
-                    )
-                latency_ms = int((time.monotonic() - started_at) * 1000)
+                    attempt_success = plugin_attempt.success
+                    error_code = plugin_attempt.error_code
+                    retryable = plugin_attempt.retryable
+                    diagnostics = plugin_attempt.diagnostics
+                latency_ms = (
+                    plugin_attempt.latency_ms
+                    if plugin_attempt is not None
+                    else int((time.monotonic() - started_at) * 1000)
+                )
 
                 if attempt_success:
                     success_count += 1
                 else:
                     fail_count += 1
                 channel_results.append(
-                    ChannelAttemptResult(
+                    plugin_attempt
+                    or ChannelAttemptResult(
                         channel=channel_id,
                         success=attempt_success,
                         error_code=error_code,

@@ -437,8 +437,8 @@ class NotificationService(
         # Detect all configured channels
         self._available_channels = self._detect_all_channels()
         plugin_channels = (
-            self._notification_channel_registry.snapshot()
-            if self._notification_channel_registry is not None
+            application_services.notification_channel_snapshot()
+            if application_services is not None
             else ()
         )
         if self._extract_dingtalk_session_webhook() is not None:

@@ -56,8 +56,12 @@ class NativeRegistrationBackend(Protocol):
     def contains(self, registration_id: str) -> bool:
         """Return whether the canonical native key is already occupied."""
 
-    def register(self, registration_id: str, implementation: object) -> None:
-        """Register one implementation under its canonical native key."""
+    def register(
+        self,
+        registration_id: str,
+        implementation: object,
+    ) -> object | None:
+        """Register one implementation and optionally return its native owner token."""
 
     def unregister(self, registration_id: str, implementation: object) -> None:
         """Remove exactly the supplied implementation when it is still owned."""
@@ -79,15 +83,23 @@ def _attribute_identity(attribute: str) -> IdentityResolver:
 class ExtensionContract:
     """Validation and optional native delegation for one extension point."""
 
-    identity_resolver: IdentityResolver
+    identity_resolver: IdentityResolver | None
     validator: ImplementationValidator = _reject_unconfigured_implementation
     supported_versions: frozenset[str] = field(default_factory=lambda: frozenset({"1"}))
     backend: NativeRegistrationBackend | None = None
 
     def __post_init__(self) -> None:
         versions = frozenset(self.supported_versions)
-        if not callable(self.identity_resolver) or not callable(self.validator):
+        if (
+            self.identity_resolver is not None
+            and not callable(self.identity_resolver)
+        ) or not callable(self.validator):
             raise TypeError("extension contract callbacks must be callable")
+        if self.identity_resolver is None and self.backend is None:
+            raise ValueError(
+                "a native backend is required when registration identity "
+                "cannot be read before construction"
+            )
         if not versions or any(
             type(version) is not str or API_MAJOR_PATTERN.fullmatch(version) is None
             for version in versions
@@ -189,6 +201,7 @@ class ExtensionRegistration:
 class _RegistryEntry:
     registration: ExtensionRegistration
     token: object
+    native_owner_token: object | None = None
     recovery_only: bool = False
 
 
@@ -258,6 +271,23 @@ class ExtensionRegistry:
                 configured[extension_point] = contract
         self._contracts = MappingProxyType(configured)
         self._entries: dict[tuple[ExtensionPoint, str], _RegistryEntry] = {}
+        self._registrations_snapshot: tuple[ExtensionRegistration, ...] = ()
+        self._native_owner_registrations_snapshot: tuple[
+            tuple[ExtensionRegistration, object],
+            ...,
+        ] = ()
+        self._registration_generations: Mapping[ExtensionPoint, int] = (
+            MappingProxyType(
+                {
+                    extension_point: 0
+                    for extension_point in EXTENSION_POINTS
+                }
+            )
+        )
+        self._registration_mutation_depths: dict[ExtensionPoint, int] = {
+            extension_point: 0
+            for extension_point in EXTENSION_POINTS
+        }
         self._next_order = 0
         self._lock = threading.RLock()
 
@@ -290,19 +320,20 @@ class ExtensionRegistry:
         if type(priority) is not int:
             raise PluginRegistryError("registration_priority_invalid")
 
-        try:
-            canonical_id = contract.identity_resolver(implementation)
-        except Exception as exc:  # broad-exception: fallback_recorded - Plugin identity failures are safely logged and mapped to a stable registry error.
-            log_safe_exception(
-                logger,
-                "Plugin extension identity resolution failed",
-                exc,
-                error_code="extension_identity_invalid",
-                context={"extension_point": extension_point, "plugin_id": plugin_id},
-            )
-            raise PluginRegistryError("extension_identity_invalid") from None
-        if type(canonical_id) is not str or canonical_id != registration_id:
-            raise PluginRegistryError("extension_identity_mismatch")
+        if contract.identity_resolver is not None:
+            try:
+                canonical_id = contract.identity_resolver(implementation)
+            except Exception as exc:  # broad-exception: fallback_recorded - Plugin identity failures are safely logged and mapped to a stable registry error.
+                log_safe_exception(
+                    logger,
+                    "Plugin extension identity resolution failed",
+                    exc,
+                    error_code="extension_identity_invalid",
+                    context={"extension_point": extension_point, "plugin_id": plugin_id},
+                )
+                raise PluginRegistryError("extension_identity_invalid") from None
+            if type(canonical_id) is not str or canonical_id != registration_id:
+                raise PluginRegistryError("extension_identity_mismatch")
 
         try:
             implementation_valid = contract.validator(implementation)
@@ -362,55 +393,179 @@ class ExtensionRegistry:
                 registration_order=self._next_order,
                 metadata=frozen_metadata,
             )
+            self._begin_registration_mutation(extension_point)
             try:
-                if contract.backend is not None:
-                    contract.backend.register(registration_id, implementation)
-                self._entries[key] = _RegistryEntry(registration=registration, token=token)
-            except Exception as exc:  # broad-exception: fallback_recorded - Partial native registration is rolled back and recorded before a typed failure is returned.
-                rollback_failed = False
-                recovery_handle: RegistrationHandle | None = None
-                if contract.backend is not None:
-                    try:
-                        contract.backend.unregister(registration_id, implementation)
-                    except Exception as rollback_exc:  # broad-exception: fallback_recorded - A failed exact-owner rollback is safely recorded for operators.
-                        rollback_failed = True
-                        log_safe_exception(
-                            logger,
-                            "Native extension registration rollback failed",
-                            rollback_exc,
-                            error_code="native_registry_rollback_failed",
-                            context={"extension_point": extension_point, "plugin_id": plugin_id},
+                try:
+                    native_owner_token: object | None = None
+                    if contract.backend is not None:
+                        native_owner_token = contract.backend.register(
+                            registration_id,
+                            implementation,
                         )
-                if rollback_failed:
-                    error_code = "native_registry_rollback_failed"
                     self._entries[key] = _RegistryEntry(
                         registration=registration,
                         token=token,
-                        recovery_only=True,
+                        native_owner_token=native_owner_token,
                     )
-                    recovery_handle = RegistrationHandle(
-                        self,
-                        extension_point,
-                        registration_id,
-                        token,
+                except Exception as exc:  # broad-exception: fallback_recorded - Partial native registration is rolled back and recorded before a typed failure is returned.
+                    rollback_failed = False
+                    recovery_handle: RegistrationHandle | None = None
+                    if contract.backend is not None:
+                        try:
+                            contract.backend.unregister(
+                                registration_id,
+                                implementation,
+                            )
+                        except Exception as rollback_exc:  # broad-exception: fallback_recorded - A failed exact-owner rollback is safely recorded for operators.
+                            rollback_failed = True
+                            log_safe_exception(
+                                logger,
+                                "Native extension registration rollback failed",
+                                rollback_exc,
+                                error_code="native_registry_rollback_failed",
+                                context={
+                                    "extension_point": extension_point,
+                                    "plugin_id": plugin_id,
+                                },
+                            )
+                    if rollback_failed:
+                        error_code = "native_registry_rollback_failed"
+                        self._entries[key] = _RegistryEntry(
+                            registration=registration,
+                            token=token,
+                            recovery_only=True,
+                        )
+                        recovery_handle = RegistrationHandle(
+                            self,
+                            extension_point,
+                            registration_id,
+                            token,
+                        )
+                    elif contract.backend is not None:
+                        error_code = "native_registry_registration_failed"
+                    else:
+                        error_code = "extension_registry_registration_failed"
+                    log_safe_exception(
+                        logger,
+                        "Plugin extension registration failed",
+                        exc,
+                        error_code=error_code,
+                        context={
+                            "extension_point": extension_point,
+                            "plugin_id": plugin_id,
+                        },
                     )
-                elif contract.backend is not None:
-                    error_code = "native_registry_registration_failed"
-                else:
-                    error_code = "extension_registry_registration_failed"
-                log_safe_exception(
-                    logger,
-                    "Plugin extension registration failed",
-                    exc,
-                    error_code=error_code,
-                    context={"extension_point": extension_point, "plugin_id": plugin_id},
+                    raise PluginRegistryError(
+                        error_code,
+                        recovery_handle=recovery_handle,
+                    ) from None
+                self._next_order += 1
+                return RegistrationHandle(
+                    self,
+                    extension_point,
+                    registration_id,
+                    token,
                 )
-                raise PluginRegistryError(
-                    error_code,
-                    recovery_handle=recovery_handle,
-                ) from None
-            self._next_order += 1
-            return RegistrationHandle(self, extension_point, registration_id, token)
+            finally:
+                self._finish_registration_mutation(extension_point)
+
+    def _begin_registration_mutation(
+        self,
+        extension_point: ExtensionPoint,
+    ) -> None:
+        """Mark the outermost point mutation unstable while holding ``_lock``."""
+
+        depth = self._registration_mutation_depths[extension_point]
+        if depth == 0:
+            self._advance_registration_generation(extension_point)
+        self._registration_mutation_depths[extension_point] = depth + 1
+
+    def _finish_registration_mutation(
+        self,
+        extension_point: ExtensionPoint,
+    ) -> None:
+        """Publish the point after its outermost mutation while holding ``_lock``."""
+
+        depth = self._registration_mutation_depths[extension_point] - 1
+        self._registration_mutation_depths[extension_point] = depth
+        if depth == 0:
+            self._publish_registrations_snapshot()
+            self._advance_registration_generation(extension_point)
+
+    def _advance_registration_generation(
+        self,
+        extension_point: ExtensionPoint,
+    ) -> None:
+        """Publish the next odd/even point generation while holding ``_lock``."""
+
+        generations = dict(self._registration_generations)
+        generations[extension_point] += 1
+        self._registration_generations = MappingProxyType(generations)
+
+    def _publish_registrations_snapshot(self) -> None:
+        """Publish active registrations after a write while holding ``_lock``."""
+
+        entries = tuple(
+            sorted(
+                (
+                    entry
+                    for entry in self._entries.values()
+                    if not entry.recovery_only
+                ),
+                key=lambda item: (
+                    item.registration.priority,
+                    item.registration.registration_order,
+                ),
+            )
+        )
+        self._registrations_snapshot = tuple(
+            entry.registration for entry in entries
+        )
+        self._native_owner_registrations_snapshot = tuple(
+            (entry.registration, entry.native_owner_token)
+            for entry in entries
+            if entry.native_owner_token is not None
+        )
+
+    def registrations_snapshot(
+        self,
+        extension_point: ExtensionPoint | None = None,
+    ) -> tuple[ExtensionRegistration, ...]:
+        """Return the lock-free immutable active-registration snapshot."""
+
+        snapshot = self._registrations_snapshot
+        if extension_point is None:
+            return snapshot
+        return tuple(
+            registration
+            for registration in snapshot
+            if registration.extension_point == extension_point
+        )
+
+    def native_owner_registrations_snapshot(
+        self,
+        extension_point: ExtensionPoint | None = None,
+    ) -> tuple[tuple[ExtensionRegistration, object], ...]:
+        """Return immutable registrations paired to opaque native owner tokens."""
+
+        snapshot = self._native_owner_registrations_snapshot
+        if extension_point is None:
+            return snapshot
+        return tuple(
+            (registration, owner_token)
+            for registration, owner_token in snapshot
+            if registration.extension_point == extension_point
+        )
+
+    def registration_snapshot_generation(
+        self,
+        extension_point: ExtensionPoint,
+    ) -> int:
+        """Return the lock-free point generation; odd means mutation in progress."""
+
+        if extension_point not in EXTENSION_POINTS:
+            raise ValueError("unsupported extension point")
+        return self._registration_generations[extension_point]
 
     def registrations(
         self,
@@ -471,27 +626,33 @@ class ExtensionRegistry:
             if entry is None or entry.token is not token:
                 return
             contract = self._contracts[extension_point]
-            if contract.backend is not None:
-                try:
-                    contract.backend.unregister(
-                        registration_id,
-                        entry.registration.implementation,
-                    )
-                except Exception as exc:  # broad-exception: fallback_recorded - Native cleanup failure is recorded while ownership remains retryable.
-                    log_safe_exception(
-                        logger,
-                        "Native plugin extension cleanup failed",
-                        exc,
-                        error_code="native_registry_unregistration_failed",
-                        context={
-                            "extension_point": extension_point,
-                            "plugin_id": entry.registration.plugin_id,
-                        },
-                    )
-                    raise PluginRegistryError("native_registry_unregistration_failed") from None
-            current = self._entries.get(key)
-            if current is not None and current.token is token:
-                del self._entries[key]
+            self._begin_registration_mutation(extension_point)
+            try:
+                if contract.backend is not None:
+                    try:
+                        contract.backend.unregister(
+                            registration_id,
+                            entry.registration.implementation,
+                        )
+                    except Exception as exc:  # broad-exception: fallback_recorded - Native cleanup failure is recorded while ownership remains retryable.
+                        log_safe_exception(
+                            logger,
+                            "Native plugin extension cleanup failed",
+                            exc,
+                            error_code="native_registry_unregistration_failed",
+                            context={
+                                "extension_point": extension_point,
+                                "plugin_id": entry.registration.plugin_id,
+                            },
+                        )
+                        raise PluginRegistryError(
+                            "native_registry_unregistration_failed"
+                        ) from None
+                current = self._entries.get(key)
+                if current is not None and current.token is token:
+                    del self._entries[key]
+            finally:
+                self._finish_registration_mutation(extension_point)
 
 
 class PluginContext:
