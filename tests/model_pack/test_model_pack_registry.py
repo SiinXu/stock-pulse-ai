@@ -79,6 +79,17 @@ def test_registry_preserves_portable_non_ascii_display_boundaries(
     ] == display_name
 
 
+def test_registry_preserves_the_maximum_valid_model_pack_identity(
+    tmp_path: Path,
+) -> None:
+    registry = ModelPackRegistry(tmp_path / "model-packs.json")
+    model_id = f"{'n' * 80}/{'m' * 80}:{'t' * 80}"
+
+    _register(registry, model_id=model_id)
+
+    assert registry.list_for_runtime(RUNTIME_A)[0]["model_id"] == model_id
+
+
 def test_registry_rejects_unvalidated_fields_without_replacing_existing_data(
     tmp_path: Path,
 ) -> None:

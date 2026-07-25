@@ -161,6 +161,8 @@ class _FakeRuntimeClient:
 class LocalModelRuntimeClientTestCase(_SystemConfigServiceTestCaseBase):
     def test_model_identifiers_accept_namespaces_but_reject_command_input(self) -> None:
         self.assertEqual(normalize_local_model_id("stockpulse/finance-q4:latest"), "stockpulse/finance-q4:latest")
+        maximum_model_id = f"{'n' * 80}/{'m' * 80}:{'t' * 80}"
+        self.assertEqual(normalize_local_model_id(maximum_model_id), maximum_model_id)
         for candidate in ("", "../model", "qwen3:8b;rm", "model$(whoami)", "model name"):
             with self.subTest(candidate=candidate):
                 with self.assertRaises(LocalModelValidationError):

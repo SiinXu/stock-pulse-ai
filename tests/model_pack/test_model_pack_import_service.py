@@ -3,12 +3,14 @@ from __future__ import annotations
 import hashlib
 import json
 import threading
+from contextlib import contextmanager
 from concurrent.futures import Future
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 import pytest
 
+import src.services.model_pack_import_service as model_pack_import_service_module
 from src.model_pack.registry import ModelPackRegistry
 from src.services.local_model_service import (
     LocalModelService,
@@ -118,7 +120,8 @@ class _RecordingExecutor:
     def __init__(self, events: list[tuple[str, str]]) -> None:
         self.events = events
 
-    def create(self, inspected, *, on_progress=None):
+    def create(self, inspected, *, on_progress=None, is_cancel_requested=None):
+        del is_cancel_requested
         self.events.append(("create", inspected.manifest.model_id))
         if on_progress is not None:
             on_progress(75, "Creating the Ollama model")
@@ -272,6 +275,58 @@ def test_prestart_terminalization_cleans_staged_upload(
 
     assert not staging.exists()
     assert executor.calls[0][3].cancelled()
+
+
+@pytest.mark.parametrize(
+    ("terminalizer", "expected_status"),
+    [
+        ("cancel", TaskStatusEnum.CANCELLED),
+        ("shutdown", TaskStatusEnum.INTERRUPTED),
+    ],
+)
+def test_validation_terminalization_never_crosses_the_create_boundary(
+    tmp_path: Path,
+    task_queue: AnalysisTaskQueue,
+    monkeypatch,
+    terminalizer: str,
+    expected_status: TaskStatusEnum,
+) -> None:
+    pack = _write_pack(tmp_path / "pack")
+    events: list[tuple[str, str]] = []
+    service, config, registry = _services(tmp_path, task_queue, events=events)
+    validation_started = threading.Event()
+    release_validation = threading.Event()
+    original_inspect = model_pack_import_service_module.inspect_model_pack
+
+    @contextmanager
+    def blocked_inspection(source):
+        validation_started.set()
+        assert release_validation.wait(timeout=5)
+        with original_inspect(source) as inspected:
+            yield inspected
+
+    monkeypatch.setattr(
+        model_pack_import_service_module,
+        "inspect_model_pack",
+        blocked_inspection,
+    )
+
+    task = service.start_import(pack)
+    future = task_queue._futures[task.task_id]
+    assert validation_started.wait(timeout=5)
+    if terminalizer == "cancel":
+        assert task_queue.cancel(task.task_id).status == TaskStatusEnum.CANCEL_REQUESTED
+    else:
+        task_queue.shutdown()
+    release_validation.set()
+    future.result(timeout=5)
+
+    assert task_queue.get(task.task_id).status == expected_status
+    assert events == [("base_url", "http://127.0.0.1:11434")]
+    assert config.updates == []
+    assert registry.list_for_runtime(
+        get_ollama_runtime_identity("http://127.0.0.1:11434")
+    ) == ()
 
 
 def test_queue_submission_failure_cleans_staged_upload(

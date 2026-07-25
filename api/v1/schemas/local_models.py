@@ -6,6 +6,7 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.model_pack.manifest import MAX_MODEL_ID_LENGTH
 from src.task_execution import TaskStatusEnum
 
 
@@ -20,7 +21,12 @@ class LocalModelRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    model_id: str = Field(..., min_length=1, max_length=128, pattern=LOCAL_MODEL_ID_PATTERN)
+    model_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=MAX_MODEL_ID_LENGTH,
+        pattern=LOCAL_MODEL_ID_PATTERN,
+    )
 
 
 class LocalModelAssignmentRequest(LocalModelRequest):
@@ -68,7 +74,12 @@ class ImportedLocalModelMetadata(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    model_id: str = Field(..., min_length=1, max_length=128, pattern=LOCAL_MODEL_ID_PATTERN)
+    model_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=MAX_MODEL_ID_LENGTH,
+        pattern=LOCAL_MODEL_ID_PATTERN,
+    )
     display_name: str = Field(..., min_length=1, max_length=160)
     minimum_memory_gb: int = Field(..., ge=1, le=2048)
     license_id: str = Field(..., min_length=1, max_length=128)

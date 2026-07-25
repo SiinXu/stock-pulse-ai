@@ -14,10 +14,12 @@ MANIFEST_FILENAME = "manifest.json"
 MAX_MANIFEST_BYTES = 1024 * 1024
 MAX_MODEL_PACK_BYTES = 64 * 1024 * 1024 * 1024
 MAX_METADATA_TEXT_LENGTH = 160
+MAX_MODEL_ID_LENGTH = 242
 MODEL_ID_PATTERN = re.compile(
-    r"^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:/[a-z0-9]+(?:[._-][a-z0-9]+)*)?"
-    r"(?::[a-z0-9]+(?:[._-][a-z0-9]+)*)?$",
-    re.ASCII | re.IGNORECASE,
+    r"^(?:[A-Za-z0-9_][A-Za-z0-9_-]{0,79}/)?"
+    r"[A-Za-z0-9_][A-Za-z0-9._-]{0,79}:"
+    r"[A-Za-z0-9_][A-Za-z0-9._-]{0,79}$",
+    re.ASCII,
 )
 SAFE_FILENAME_PATTERN = re.compile(
     r"^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9_-])?$"
@@ -180,10 +182,12 @@ def parse_manifest(raw: Mapping[str, Any]) -> ModelPackManifest:
     model_id = normalize_manifest_text(
         raw.get("model_id"),
         field_name="model_id",
-        max_length=96,
+        max_length=MAX_MODEL_ID_LENGTH,
     )
     if not MODEL_ID_PATTERN.fullmatch(model_id):
-        raise _invalid_manifest("model_id is not a valid Ollama model name")
+        raise _invalid_manifest(
+            "model_id must be an explicit Ollama model:tag with valid components"
+        )
 
     display_name = normalize_manifest_text(
         raw.get("display_name"),
@@ -301,6 +305,7 @@ def parse_manifest(raw: Mapping[str, Any]) -> ModelPackManifest:
 __all__ = [
     "MANIFEST_FILENAME",
     "MAX_MANIFEST_BYTES",
+    "MAX_MODEL_ID_LENGTH",
     "MAX_MODEL_PACK_BYTES",
     "MODEL_PACK_FORMAT_VERSION",
     "MODEL_ID_PATTERN",

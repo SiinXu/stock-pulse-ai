@@ -36,6 +36,7 @@ def _desktop_attestation(
     *,
     nonce: str,
     display_name: str = "Licensed Finance Q4",
+    model_id: str = "licensed/finance:q4",
 ) -> str:
     monkeypatch.setenv("DSA_DESKTOP_MODE", "true")
     monkeypatch.setenv(
@@ -48,7 +49,7 @@ def _desktop_attestation(
         "issuedAt": issued_at,
         "expiresAt": issued_at + DESKTOP_MODEL_PACK_ATTESTATION_TTL_MS,
         "nonce": nonce,
-        "modelId": "licensed/finance:q4",
+        "modelId": model_id,
         "displayName": display_name,
         "minimumMemoryGb": 16,
         "licenseId": "LicenseRef-Finance",
@@ -559,6 +560,35 @@ def test_desktop_activation_preserves_portable_non_ascii_display_boundaries(
 
     assert response.status_code == 200
     assert service.desktop_activations[0][1]["display_name"] == display_name
+
+
+def test_desktop_activation_preserves_the_maximum_valid_model_pack_identity(
+    monkeypatch,
+) -> None:
+    service = _ModelPackService()
+    client = _client(service)
+    model_id = f"{'n' * 80}/{'m' * 80}:{'t' * 80}"
+    attestation = _desktop_attestation(
+        monkeypatch,
+        nonce="7" * 32,
+        model_id=model_id,
+    )
+
+    response = client.post(
+        "/model-packs/desktop-activations",
+        json={
+            "model_id": model_id,
+            "display_name": "Licensed Finance Q4",
+            "minimum_memory_gb": 16,
+            "license_id": "LicenseRef-Finance",
+            "expected_config_version": "config-1",
+            "expected_runtime_identity": "a" * 64,
+            "desktop_attestation": attestation,
+        },
+    )
+
+    assert response.status_code == 200
+    assert service.desktop_activations[0][1]["model_id"] == model_id
 
 
 def test_desktop_activation_returns_a_stable_registration_failure(monkeypatch) -> None:

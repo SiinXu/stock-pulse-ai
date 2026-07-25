@@ -22,6 +22,10 @@ supported model-import entry point.
   counts chunked request bytes. The complete multipart envelope is limited to
   64 GiB plus 1 MiB of bounded form overhead; the file itself remains limited
   to exactly 64 GiB.
+- Once the server accepts a Web import, the panel observes the server-owned task
+  until it reaches a terminal state. Closing the panel or cancelling the
+  browser request may stop observation, but the client does not invent a
+  timeout while the accepted background task is still running.
 - The Web request cannot provide an Ollama URL. StockPulse reads
   `LLM_OLLAMA_BASE_URL` from saved server configuration.
 - A private or loopback Web Ollama target must also be allowed by the existing
@@ -144,7 +148,7 @@ Field rules:
 | Field | Contract |
 | --- | --- |
 | `format_version` | Integer `1` |
-| `model_id` | ASCII Ollama id, optionally `namespace/model:tag` |
+| `model_id` | Explicit ASCII `model:tag` or `namespace/model:tag`; each component is 1-80 characters. Namespace starts with an alphanumeric or `_` and then uses alphanumerics, `_`, or `-`; model and tag additionally allow `.` after the first character |
 | `display_name` | Non-empty user-visible name, at most 160 Unicode scalar values |
 | `gguf_file` | Root-level `.gguf` filename matching role `gguf` |
 | `modelfile` | Root-level filename matching role `modelfile` |
@@ -222,6 +226,12 @@ and StockPulse registry metadata; neither transport adds it as an Ollama
 license layer. See the official
 [Ollama create API](https://docs.ollama.com/api/create) for the downstream
 runtime contract.
+
+Cancellation is checked after validation, before any Web blob work, and again
+after a blob check or upload before StockPulse issues the irreversible
+`/api/create` request. If cancellation arrives while that request is already in
+flight, StockPulse prevents activation and registration, but Ollama may retain
+the model created by the request.
 
 ## Publisher Workflow
 

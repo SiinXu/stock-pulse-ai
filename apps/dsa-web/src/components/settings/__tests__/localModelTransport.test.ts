@@ -131,6 +131,50 @@ describe('localModelTransport', () => {
     }
   });
 
+  it('observes an accepted Model Pack task beyond the former client deadline', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-25T00:00:00Z'));
+    try {
+      packApi.startImport.mockResolvedValue({ taskId: 'pack-long', status: 'accepted' });
+      packApi.getImport
+        .mockImplementationOnce(async () => {
+          vi.setSystemTime(new Date(Date.now() + (32 * 60 * 1000)));
+          return {
+            taskId: 'pack-long',
+            status: 'processing',
+            progress: 80,
+            message: 'Creating model',
+          };
+        })
+        .mockResolvedValueOnce({
+          taskId: 'pack-long',
+          status: 'completed',
+          progress: 100,
+          result: {
+            modelId: 'licensed/finance:q4',
+            displayName: 'Licensed Finance Q4',
+            minimumMemoryGb: 16,
+            licenseId: 'LicenseRef-Finance',
+            warnings: [],
+            activated: true,
+            selectedPrimary: false,
+          },
+        });
+
+      const resultPromise = __localModelTransportTest.createWebTransport()
+        .importPack(new File(['pack'], 'finance.modelpack'), vi.fn());
+      await vi.advanceTimersByTimeAsync(750);
+
+      await expect(resultPromise).resolves.toMatchObject({
+        modelId: 'licensed/finance:q4',
+        activated: true,
+      });
+      expect(packApi.getImport).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('uses the backend task contract and emits polled progress in Web mode', async () => {
     vi.useFakeTimers();
     try {

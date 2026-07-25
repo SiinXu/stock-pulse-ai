@@ -119,8 +119,8 @@ const DESKTOP_LOCAL_MODEL_PULL_TIMEOUT_MS = 30 * 60 * 1000;
 const DESKTOP_LOCAL_MODEL_MAX_JSON_BYTES = 4 * 1024 * 1024;
 const DESKTOP_LOCAL_MODEL_MAX_EVENT_BYTES = 64 * 1024;
 const DESKTOP_LOCAL_MODEL_NAME_PATTERN =
-  /^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)?(?::[a-z0-9]+(?:[._-][a-z0-9]+)*)?$/i;
-const DESKTOP_LOCAL_MODEL_MAX_NAME_LENGTH = 96;
+  /^(?:[A-Za-z0-9_][A-Za-z0-9_-]{0,79}\/)?[A-Za-z0-9_][A-Za-z0-9._-]{0,79}:[A-Za-z0-9_][A-Za-z0-9._-]{0,79}$/;
+const DESKTOP_LOCAL_MODEL_MAX_NAME_LENGTH = 242;
 const DESKTOP_LOCAL_MODEL_INSTALL_GUIDE_URL = 'https://ollama.com/download';
 const DESKTOP_LOCAL_MODEL_RUNTIME_SOURCE = Object.freeze({
   SYSTEM: 'system',

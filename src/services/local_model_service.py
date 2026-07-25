@@ -18,7 +18,7 @@ import requests
 from src.llm.model_ref import decode_model_ref
 from src.llm.provider_catalog import get_provider
 from src.model_pack.errors import ModelPackError
-from src.model_pack.manifest import normalize_manifest_text
+from src.model_pack.manifest import MAX_MODEL_ID_LENGTH, normalize_manifest_text
 from src.services.system_config_service import (
     ConfigConflictError,
     ConfigValidationError,
@@ -44,7 +44,7 @@ LOCAL_MODEL_ID_PATTERN = re.compile(
     r"(?::[A-Za-z0-9][A-Za-z0-9._-]*)?$"
 )
 LOCAL_MODEL_RUNTIME_IDENTITY_PATTERN = re.compile(r"^[0-9a-f]{64}$")
-LOCAL_MODEL_MAX_ID_LENGTH = 128
+LOCAL_MODEL_MAX_ID_LENGTH = MAX_MODEL_ID_LENGTH
 LOCAL_MODEL_REGISTRATION_RECOVERY_TTL_SECONDS = 5.0 * 60.0
 LocalModelAssignment = Literal["auto", "primary", "agent"]
 ImportedModelMetadataProvider = Callable[[str], Iterable[Mapping[str, Any]]]

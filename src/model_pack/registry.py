@@ -12,6 +12,7 @@ from typing import Any, Dict, Iterable, Mapping, Tuple
 from src.model_pack.errors import ModelPackError
 from src.model_pack.manifest import (
     LICENSE_ID_PATTERN,
+    MAX_MODEL_ID_LENGTH,
     MODEL_ID_PATTERN,
     normalize_manifest_text,
     strip_portable_whitespace,
@@ -49,7 +50,7 @@ def _validated_entry(raw: Any) -> Dict[str, Any] | None:
         model_id = normalize_manifest_text(
             raw.get("model_id"),
             field_name="model_id",
-            max_length=96,
+            max_length=MAX_MODEL_ID_LENGTH,
         )
         display_name = normalize_manifest_text(
             raw.get("display_name"),

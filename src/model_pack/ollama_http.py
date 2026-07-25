@@ -230,8 +230,12 @@ class OllamaHttpModelPackExecutor:
         inspected: InspectedModelPack,
         *,
         on_progress: Optional[Callable[[int, str], None]] = None,
-    ) -> None:
-        """Upload the verified blob and create one Ollama model."""
+        is_cancel_requested: Optional[Callable[[], bool]] = None,
+    ) -> bool:
+        """Upload the verified blob and create unless cancellation wins first."""
+        cancel_requested = is_cancel_requested or (lambda: False)
+        if cancel_requested():
+            return False
         base_url = normalize_ollama_native_base_url(self._base_url_provider())
         digest = inspected.manifest.file_for_role("gguf").sha256
         if on_progress is not None:
@@ -241,6 +245,8 @@ class OllamaHttpModelPackExecutor:
             gguf_path=inspected.gguf_path,
             digest=digest,
         )
+        if cancel_requested():
+            return False
         if on_progress is not None:
             on_progress(75, "Creating the Ollama model")
         response = self._request(
@@ -273,6 +279,7 @@ class OllamaHttpModelPackExecutor:
             )
         if on_progress is not None:
             on_progress(90, "Activating the imported model")
+        return True
 
 
 __all__ = [

@@ -3037,6 +3037,7 @@ test('local model names accept curated tags and reject injection payloads', (t) 
     'deepseek-r1:8b',
     'qwen2.5-coder:7b',
     'stockpulse/fin-r1-7b:q4_k_m',
+    `${'n'.repeat(80)}/${'m'.repeat(80)}:${'t'.repeat(80)}`,
   ]) {
     assert.equal(mainModule.normalizeLocalModelName(valid), valid);
   }

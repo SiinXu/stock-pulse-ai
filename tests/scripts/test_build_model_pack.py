@@ -355,6 +355,37 @@ def test_builder_uses_portable_manifest_text_contract(tmp_path: Path) -> None:
     assert not invalid_output.exists()
 
 
+@pytest.mark.parametrize(
+    "model_id",
+    [
+        "finance",
+        "acme.finance/model:q4",
+        f"{'n' * 81}/model:q4",
+    ],
+)
+def test_builder_rejects_model_ids_without_a_stable_ollama_identity(
+    tmp_path: Path,
+    model_id: str,
+) -> None:
+    gguf, modelfile, license_file = _sources(tmp_path)
+    output = tmp_path / "invalid-model-id.modelpack"
+
+    with pytest.raises(ModelPackError) as error:
+        build_model_pack(
+            gguf_path=gguf,
+            modelfile_path=modelfile,
+            license_file_path=license_file,
+            model_id=model_id,
+            display_name="Portable",
+            license_id="Apache-2.0",
+            minimum_memory_gb=8,
+            output_path=output,
+        )
+
+    assert error.value.code == "invalid_manifest"
+    assert not output.exists()
+
+
 @pytest.mark.skipif(os.name == "nt", reason="symbolic-link replacement requires POSIX")
 @pytest.mark.parametrize("source_role", ["modelfile", "license"])
 def test_builder_rejects_text_source_replacement_between_lstat_and_open(

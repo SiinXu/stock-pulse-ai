@@ -21,7 +21,8 @@ const MODEL_PACK_CREATE_TIMEOUT_MS = 30 * 60 * 1000;
 const MODEL_PACK_TERMINATION_GRACE_MS = 5000;
 const MODEL_PACK_OLLAMA_BINARY = 'ollama';
 const MODEL_PACK_MODEL_ID_PATTERN =
-  /^[A-Za-z0-9]+(?:[._-][A-Za-z0-9]+)*(?:\/[A-Za-z0-9]+(?:[._-][A-Za-z0-9]+)*)?(?::[A-Za-z0-9]+(?:[._-][A-Za-z0-9]+)*)?$/;
+  /^(?:[A-Za-z0-9_][A-Za-z0-9_-]{0,79}\/)?[A-Za-z0-9_][A-Za-z0-9._-]{0,79}:[A-Za-z0-9_][A-Za-z0-9._-]{0,79}$/;
+const MODEL_PACK_MAX_MODEL_ID_LENGTH = 242;
 const MODEL_PACK_SAFE_FILENAME_PATTERN =
   /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9_-])?$/;
 const MODEL_PACK_SHA256_PATTERN = /^[0-9a-f]{64}$/;
@@ -191,9 +192,15 @@ function parseModelPackManifest(payload) {
         `Update StockPulse or use a version ${MODEL_PACK_FORMAT_VERSION} pack.`
     );
   }
-  const modelId = requireText(raw.model_id, 'model_id', 96);
+  const modelId = requireText(
+    raw.model_id,
+    'model_id',
+    MODEL_PACK_MAX_MODEL_ID_LENGTH
+  );
   if (!MODEL_PACK_MODEL_ID_PATTERN.test(modelId)) {
-    throw invalidManifest('model_id is not a valid Ollama model name');
+    throw invalidManifest(
+      'model_id must be an explicit Ollama model:tag with valid components'
+    );
   }
   const displayName = requireText(raw.display_name, 'display_name');
   const ggufFile = requireFilename(raw.gguf_file, 'gguf_file');
@@ -1090,6 +1097,9 @@ function isZipSymlink(entry) {
 function normalizeArchiveError(error, fallbackMessage) {
   if (error instanceof ModelPackError) {
     return error;
+  }
+  if (error && error.code === 'ENOSPC') {
+    return insufficientDiskSpaceError();
   }
   const diagnostic = error instanceof Error ? error.message : String(error || '');
   if (/invalid relative path|absolute path|backslash/i.test(diagnostic)) {

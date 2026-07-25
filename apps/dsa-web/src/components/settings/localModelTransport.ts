@@ -14,7 +14,6 @@ import type {
 const WEB_PULL_POLL_INTERVAL_MS = 750;
 const WEB_PULL_TIMEOUT_MS = 31 * 60 * 1000;
 const WEB_MODEL_PACK_POLL_INTERVAL_MS = 750;
-const WEB_MODEL_PACK_TIMEOUT_MS = 31 * 60 * 1000;
 const OLLAMA_INSTALL_GUIDE_URL = 'https://ollama.com/download';
 
 interface DesktopLocalModelState {
@@ -195,8 +194,7 @@ async function pollWebModelPackImport(
   onProgress: (progress: LocalModelProgress) => void,
   signal?: AbortSignal,
 ): Promise<ModelPackImportResult> {
-  const deadline = Date.now() + WEB_MODEL_PACK_TIMEOUT_MS;
-  while (Date.now() < deadline) {
+  while (true) {
     const task = await modelPacksApi.getImport(taskId);
     onProgress({
       modelId: task.result?.modelId ?? '',
@@ -220,10 +218,6 @@ async function pollWebModelPackImport(
     }
     await waitForPoll(WEB_MODEL_PACK_POLL_INTERVAL_MS, signal);
   }
-  throw new LocalModelTransportError(
-    'ollama_create_timeout',
-    'Model Pack import timed out',
-  );
 }
 
 function createWebTransport(): LocalModelTransport {

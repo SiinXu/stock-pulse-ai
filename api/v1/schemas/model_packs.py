@@ -5,9 +5,13 @@ from __future__ import annotations
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from api.v1.schemas.local_models import LOCAL_MODEL_ID_PATTERN
 from src.model_pack import MAX_DESKTOP_MODEL_PACK_ATTESTATION_BYTES, ModelPackError
-from src.model_pack.manifest import LICENSE_ID_PATTERN, normalize_manifest_text
+from src.model_pack.manifest import (
+    LICENSE_ID_PATTERN,
+    MAX_MODEL_ID_LENGTH,
+    MODEL_ID_PATTERN,
+    normalize_manifest_text,
+)
 from src.task_execution import TaskStatusEnum
 
 
@@ -37,7 +41,12 @@ class ModelPackDesktopActivationRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    model_id: str = Field(..., min_length=1, max_length=96, pattern=LOCAL_MODEL_ID_PATTERN)
+    model_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=MAX_MODEL_ID_LENGTH,
+        pattern=MODEL_ID_PATTERN.pattern,
+    )
     display_name: str = Field(..., min_length=1, max_length=160)
     minimum_memory_gb: int = Field(..., ge=1, le=2048)
     license_id: str = Field(

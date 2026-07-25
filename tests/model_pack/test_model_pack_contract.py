@@ -215,6 +215,40 @@ def test_manifest_uses_ascii_model_ids_and_unicode_scalar_display_lengths(
     _assert_error(error, "invalid_manifest", "160 characters")
 
 
+@pytest.mark.parametrize(
+    "model_id",
+    [
+        "finance",
+        "acme.finance/model:q4",
+        f"{'n' * 81}/model:q4",
+        f"namespace/{'m' * 81}:q4",
+        f"namespace/model:{'t' * 81}",
+    ],
+)
+def test_manifest_rejects_model_ids_ollama_cannot_preserve_exactly(
+    tmp_path: Path,
+    model_id: str,
+) -> None:
+    pack_path = _write_pack(tmp_path / "invalid-model-id")
+    manifest = json.loads((pack_path / "manifest.json").read_text(encoding="utf-8"))
+    manifest["model_id"] = model_id
+
+    with pytest.raises(ModelPackError) as error:
+        parse_manifest(manifest)
+
+    _assert_error(error, "invalid_manifest", "model_id")
+
+
+def test_manifest_accepts_the_pinned_ollama_component_limits(tmp_path: Path) -> None:
+    pack_path = _write_pack(tmp_path / "max-model-id")
+    manifest = json.loads((pack_path / "manifest.json").read_text(encoding="utf-8"))
+    manifest["model_id"] = f"{'n' * 80}/{'m' * 80}:{'t' * 80}"
+
+    parsed = parse_manifest(manifest)
+
+    assert parsed.model_id == manifest["model_id"]
+
+
 def test_manifest_rejects_unpaired_unicode_surrogates() -> None:
     payload = (
         '{"format_version":1,"model_id":"stockpulse/surrogate:q4",'

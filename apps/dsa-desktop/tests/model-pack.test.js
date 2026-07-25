@@ -6,6 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { Writable } = require('node:stream');
 const test = require('node:test');
+const yauzl = require('yauzl');
 
 const {
   ModelPackError,
@@ -319,6 +320,34 @@ test('manifest uses ASCII model ids and Unicode scalar display lengths', () => {
         && error.code === 'invalid_manifest'
         && /invalid Unicode/.test(error.userMessage)
     );
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('manifest preserves only pinned Ollama model identities with explicit tags', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-model-pack-model-id-'));
+  const { manifest } = writePack(tempRoot);
+  try {
+    for (const modelId of [
+      'finance',
+      'acme.finance/model:q4',
+      `${'n'.repeat(81)}/model:q4`,
+      `namespace/${'m'.repeat(81)}:q4`,
+      `namespace/model:${'t'.repeat(81)}`,
+    ]) {
+      manifest.model_id = modelId;
+      assert.throws(
+        () => parseModelPackManifest(Buffer.from(JSON.stringify(manifest))),
+        (error) => error instanceof ModelPackError
+          && error.code === 'invalid_manifest'
+          && /model_id/.test(error.userMessage)
+      );
+    }
+
+    manifest.model_id = `${'n'.repeat(80)}/${'m'.repeat(80)}:${'t'.repeat(80)}`;
+    const parsed = parseModelPackManifest(Buffer.from(JSON.stringify(manifest)));
+    assert.equal(parsed.modelId, manifest.model_id);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
@@ -900,6 +929,61 @@ test('archive output errors close extraction streams before typed cleanup', asyn
       (error) => error instanceof ModelPackError && error.code === 'invalid_archive'
     );
     assert.equal(outputClosed, true);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('archive ENOSPC closes extraction streams before actionable cleanup', async (t) => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-model-pack-zip-enospc-'));
+  const source = path.join(tempRoot, 'source');
+  writePack(source);
+  const archive = archiveFromDirectory(source, path.join(tempRoot, 'test.modelpack'));
+  const openedInputs = [];
+  let outputClosed = false;
+  const originalOpen = yauzl.open;
+
+  t.mock.method(yauzl, 'open', (archivePath, options, callback) => {
+    originalOpen(archivePath, options, (error, zipFile) => {
+      if (zipFile) {
+        const originalOpenReadStream = zipFile.openReadStream.bind(zipFile);
+        zipFile.openReadStream = (entry, done) => {
+          originalOpenReadStream(entry, (streamError, input) => {
+            if (input) {
+              openedInputs.push(input);
+            }
+            done(streamError, input);
+          });
+        };
+      }
+      callback(error, zipFile);
+    });
+  });
+
+  class DiskFullOutput extends Writable {
+    _write(_chunk, _encoding, callback) {
+      callback(Object.assign(new Error('disk full'), { code: 'ENOSPC' }));
+    }
+  }
+
+  t.mock.method(fs, 'createWriteStream', () => {
+    const output = new DiskFullOutput({ emitClose: true });
+    output.once('close', () => {
+      outputClosed = true;
+    });
+    return output;
+  });
+
+  try {
+    await assert.rejects(
+      inspectModelPack(archive, { diskFreeProvider: enoughDisk }),
+      (error) => error instanceof ModelPackError
+        && error.code === 'insufficient_disk_space'
+        && /Free disk space/.test(error.userMessage)
+    );
+    assert.equal(outputClosed, true);
+    assert.ok(openedInputs.length > 0);
+    assert.equal(openedInputs.every((input) => input.destroyed), true);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

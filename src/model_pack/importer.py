@@ -20,8 +20,9 @@ class ModelPackExecutor(Protocol):
         inspected: InspectedModelPack,
         *,
         on_progress: Optional[Callable[[int, str], None]] = None,
-    ) -> None:
-        """Create the validated model and optionally report bounded progress."""
+        is_cancel_requested: Optional[Callable[[], bool]] = None,
+    ) -> Optional[bool]:
+        """Create the validated model unless cancellation wins first."""
         ...
 
 

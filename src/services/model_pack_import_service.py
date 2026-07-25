@@ -146,10 +146,24 @@ class ModelPackImportService:
             try:
                 with inspect_model_pack(source_path) as inspected:
                     context.update_progress(20, "Validated Model Pack")
+                    metadata = {
+                        "model_id": inspected.manifest.model_id,
+                        "display_name": inspected.manifest.display_name,
+                        "minimum_memory_gb": inspected.manifest.minimum_memory_gb,
+                        "license_id": inspected.manifest.license.id,
+                        "warnings": list(inspected.warnings),
+                    }
+                    if context.is_cancel_requested():
+                        return {
+                            **metadata,
+                            "activated": False,
+                            "selected_primary": False,
+                        }
                     try:
-                        executor.create(
+                        created = executor.create(
                             inspected,
                             on_progress=context.update_progress,
+                            is_cancel_requested=context.is_cancel_requested,
                         )
                     except ModelPackError:
                         raise
@@ -170,14 +184,7 @@ class ModelPackImportService:
                             ),
                         ) from exc
 
-                    metadata = {
-                        "model_id": inspected.manifest.model_id,
-                        "display_name": inspected.manifest.display_name,
-                        "minimum_memory_gb": inspected.manifest.minimum_memory_gb,
-                        "license_id": inspected.manifest.license.id,
-                        "warnings": list(inspected.warnings),
-                    }
-                    if context.is_cancel_requested():
+                    if created is False or context.is_cancel_requested():
                         return {
                             **metadata,
                             "activated": False,

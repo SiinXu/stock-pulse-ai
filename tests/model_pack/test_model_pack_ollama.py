@@ -159,6 +159,58 @@ def test_http_executor_uploads_verified_blob_then_creates_from_controlled_fields
     ]
 
 
+def test_http_executor_cancellation_before_blob_work_issues_no_request(
+    tmp_path: Path,
+) -> None:
+    pack_path = _write_pack(tmp_path / "cancel-before-blob")
+    requests_seen = []
+    executor = OllamaHttpModelPackExecutor(
+        base_url_provider=lambda: "http://127.0.0.1:11434",
+        requester=lambda *args, **kwargs: requests_seen.append((args, kwargs)),
+    )
+
+    with inspect_model_pack(pack_path) as inspected:
+        created = executor.create(
+            inspected,
+            is_cancel_requested=lambda: True,
+        )
+
+    assert created is False
+    assert requests_seen == []
+
+
+def test_http_executor_cancellation_after_blob_upload_skips_create(
+    tmp_path: Path,
+) -> None:
+    pack_path = _write_pack(tmp_path / "cancel-after-blob")
+    requests_seen = []
+    cancelled = False
+
+    def requester(method: str, url: str, **kwargs):
+        nonlocal cancelled
+        requests_seen.append((method, url))
+        if method == "HEAD":
+            return _Response(404)
+        assert url.endswith("/api/blobs/sha256:" + _sha256(pack_path / "finance.gguf"))
+        assert kwargs["data"].read() == b"GGUF-finance-test"
+        cancelled = True
+        return _Response(201)
+
+    executor = OllamaHttpModelPackExecutor(
+        base_url_provider=lambda: "http://127.0.0.1:11434",
+        requester=requester,
+    )
+    with inspect_model_pack(pack_path) as inspected:
+        created = executor.create(
+            inspected,
+            is_cancel_requested=lambda: cancelled,
+        )
+
+    assert created is False
+    assert [method for method, _url in requests_seen] == ["HEAD", "POST"]
+    assert all(not url.endswith("/api/create") for _method, url in requests_seen)
+
+
 def test_web_pack_inspection_uses_the_portable_manifest_text_contract(
     tmp_path: Path,
 ) -> None:
