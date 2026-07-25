@@ -1,6 +1,13 @@
 # 03 Analysis workbench
 
-Path: **Research → Analysis** (or search “analysis” in the command palette).
+Paths:
+
+| Method | Path |
+| --- | --- |
+| Primary nav | **Research** → **Analysis Workbench** |
+| Command palette | “analysis”, “workbench” |
+| Route | `/research/analysis` |
+| Segments | `?segment=launch` (default) / `tasks` / `history`; history may include `recordId` |
 
 This is where **single-stock research reports** are produced. A task targets one ticker (or a batch you submit).
 

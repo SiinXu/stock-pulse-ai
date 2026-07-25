@@ -22,9 +22,10 @@ flowchart LR
 
 | 你现在的阶段 | 先读 | 然后 |
 | --- | --- | --- |
-| 还没装好 / 还没有模型 Key | [小白客户端安装](../beginner-client-setup.md) | 本手册 01 → 02 |
+| 还没装好 / 还没有模型 Key | [小白客户端安装](../beginner-client-setup.md)（[EN](../beginner-client-setup_EN.md)） | 本手册 01 → 02 |
 | 已经能打开界面 | [01 壳层](01-shell.md)、[02 首页](02-home.md) | [03 分析工作台](03-analysis-workbench.md) |
 | 已经跑出报告 | [08 阅读报告](08-reading-reports.md) | [11 日常工作流](11-daily-workflows.md) |
+| 想找候选标的 | [12 发现](12-discover.md) | [03 分析工作台](03-analysis-workbench.md) |
 | 想盯盘或记账 | [06 信号中心](06-signals.md)、[07 持仓](07-portfolio.md) | [09 回测](09-backtest.md) |
 
 不必一次读完。多数人第一周只需要 **01 + 02 + 03 + 08 + 11**。
@@ -37,9 +38,10 @@ flowchart LR
 | [02 首页](02-home.md) | 今日焦点、待办、配置缺口提示 |
 | [03 分析工作台](03-analysis-workbench.md) | 发起分析、任务进度、历史与对比 |
 | [04 大盘复盘](04-market-review.md) | 触发复盘、阅读复盘历史 |
+| [12 发现](12-discover.md) | AlphaSift 选股、热点题材、候选转分析（实验能力） |
 | [05 问股对话](05-agent-chat.md) | Agent 多轮追问与策略选择 |
-| [06 信号中心](06-signals.md) | AI 建议池、告警规则、推送历史与再评估 |
-| [07 持仓](07-portfolio.md) | 账户、记账、导入、风险与一键分析 |
+| [06 信号中心](06-signals.md) | AI 建议池、告警规则、推送历史与再评估（**不在一级侧栏**；铃铛 / 命令面板 / `/signals`） |
+| [07 持仓](07-portfolio.md) | 侧栏「组合」；账户、记账、导入、风险与一键分析 |
 | [08 阅读报告](08-reading-reports.md) | 个股报告阅读顺序与字段含义 |
 | [09 回测](09-backtest.md) | 历史建议事后验证 |
 | [10 设置](10-settings.md) | 模型、自选、通知、数据源等界面操作 |
@@ -57,18 +59,28 @@ flowchart LR
 | **支撑 / 压力** | 价格下方可能被买盘托住的区域叫支撑；上方可能遇卖压的区域叫压力 |
 | **止损** | 预先想好的「错了就认错离场」的价格或条件，用于控制亏损 |
 | **界面语言 vs 报告语言** | 前者改按钮和菜单；后者改报告正文语言，二者**互不影响** |
+| **组合 vs 持仓** | 侧栏导航名多为「组合」；页面标题多为「持仓」——同一模块 |
+| **Agent vs 问股** | 侧栏多为「Agent」；页面标题多为「问股」——同一模块 |
 
 更完整的金融用词治理见 [多语言金融术语指导](../financial-terminology-guide.md)。
 
 ## 语言版本
 
-- 简体中文（本目录默认文件）
-- [English](README_EN.md)
+| 手册语言 | 文件 |
+| --- | --- |
+| 简体中文（源） | `NN-topic.md`、`README.md` |
+| English | `NN-topic_EN.md`、`README_EN.md` |
 
-界面文案的中英切换在产品内完成；本手册的翻译与产品 `locales` 分开维护。约定见 [TRANSLATION.md](TRANSLATION.md)。
+- 产品界面另支持 zh-TW / ja / ko / de / es / fr / id / ms 等；**操作手册**当前以简中 + English 维护，与产品 `locales` 分开。
+- 界面语言在壳层切换；读手册时请对照你当前 UI 语言下的标签。约定见 [TRANSLATION.md](TRANSLATION.md)。
+- 安装上手（桌面客户端）：[小白客户端安装](../beginner-client-setup.md) · [English](../beginner-client-setup_EN.md)
+- 截图 figure pack 规范与命名：[assets/README.md](assets/README.md)
 
 ## 文档维护说明（给贡献者）
 
 - 本手册只写「怎么点界面」，不写部署与密钥运维。
 - 发现界面标签与手册不一致时，以**线上界面**为准，并开文档 PR 修正。
-- 分阶段扩写路线：Phase 1（首页 / 分析 / 读报告 / 工作流）→ Phase 2（信号 / 持仓 / 设置）→ Phase 3（复盘 / 问股 / 回测深讲）。
+- **每个模块应写清**：入口路径（导航 + 路由 + 深链参数）、术语表、逐步操作、使用案例、与相邻模块关系。
+- **有 UI / 路由 / 文案变更的 PR**：同一变更列车内检查并更新对应 `docs/ui-manual/*` 分册与本 README 导航表；中英成对修改。
+- 对照源码时优先核对：`apps/dsa-web/src/routing/routes.ts`、`components/layout/navigation.ts`、`i18n/uiText.ts`、设置 IA `settingsInformationArchitecture.ts`、选股文案 `locales/screening.ts`。
+- 扩写进度：01–12 分册（含发现）均已按初学者标准写入口 / 术语 / 案例；截图二进制仍待按 [assets/README.md](assets/README.md) 补齐（#599）。

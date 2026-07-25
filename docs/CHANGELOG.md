@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Docs] Completed sequential UI-manual expansion: deepened Home and report-reading chapters; added Discover/AlphaSift chapter (12); documented figure-pack naming under `docs/ui-manual/assets/`; added English beginner client setup guide pairing the Chinese install path.
+- [Docs] Deepened the bilingual UI operation manual (modules 01, 03–07, 09–10): accurate nav/routes/deep links, glossaries, step paths, and use cases; documented Signal Center entry outside the primary sidebar and Portfolio/Agent label aliases.
 - [Added] Added five opt-in investment committee Persona Skills with bounded built-in discovery, desktop packaging coverage, explicit existing-tool lists, differentiated evidence and risk lenses, and mandatory research-only, non-affiliation, and investment-risk disclosures.
 - [Fixed] Required valid security-audit dependencies on privileged API and ToolSession paths, prevented tool completion-audit retries from duplicating side effects, and bounded arbitrary-size configuration key evidence without limiting updates.
 - [Fixed] Prevented local-model pull workers retained by the process task queue from activating through a retired FastAPI lifespan and bypassing the current configuration mutation lease.

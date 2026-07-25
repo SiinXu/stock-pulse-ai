@@ -16,35 +16,36 @@ flowchart LR
   P --> Q[One open question: report or chat]
 ```
 
-1. **Home** — focus and todos.  
-2. **Signal Center** — `active` signals only.  
-3. **Portfolio** — risk if you track holdings.  
-4. One doubtful name — latest report or a single Agent question about invalidation.
+1. **Home** (`/`) — focus and todos.  
+2. **Signal Center** (bell → View all, command palette “signal”, or `/signals` — **not** in the primary sidebar) — `active` signals only.  
+3. **Portfolio** sidebar (`/portfolio`; page title may say Holdings) — risk if you track holdings.  
+4. One doubtful name — latest report or **Agent** chat (`/chat`) about invalidation.
 
 **Config tip**: start with reliable delivery on one channel; add more channels later ([10 Settings](10-settings_EN.md)).
 
 ### B. Deep dive (30–60 minutes)
 
-1. Submit the symbol on the **Analysis workbench** (optional Skill).  
+0. (Optional) No symbol yet? Use **Research → Discover** ([12](12-discover_EN.md)) hotspots/strategies, then **Analyze**.  
+1. Submit the symbol under **Research → Analysis Workbench** (`/research/analysis`; optional Skill).  
 2. Read with [08 Reading reports](08-reading-reports_EN.md).  
 3. Compare **history trend**.  
 4. **Agent chat** for observation / invalidation conditions (write codes clearly).  
-5. Optional simple **alert rules** in Signal Center.
+5. Optional simple **alert rules** at `/signals?tab=rules`.
 
 ### C. Weekly process review
 
-1. Run **Backtest** on historical advice.  
-2. Review outcomes and useful / not-useful feedback.  
+1. Run **Research → Backtest** (`/research/backtest`) on historical advice.  
+2. Open Signal Center **Review & stats** (`/signals?tab=review`) for outcomes and useful / not-useful feedback.  
 3. Tune model or default strategy in Settings — avoid noisy watchlist thrashing.
 
 ## Scenario cheat sheet
 
 | I want to… | Go to | Note |
 | --- | --- | --- |
-| Get a first report fast | Analysis workbench | One ticker + Beginner |
-| Market mood | Market review | Separate from single-name advice |
-| Price alerts | Signal Center → Rules | Start simple |
-| Track holdings | Portfolio | Create account first |
+| Get a first report fast | Research → Analysis Workbench | One ticker + Beginner |
+| Market mood | Research → Market review | Separate from single-name advice |
+| Price alerts | Signal Center → Rules (`/signals?tab=rules`) | Start simple |
+| Track holdings | Portfolio / Holdings page | Create account first |
 | Change model / key | Settings → AI | Save, then test |
 | Report language | Settings report language | Independent of UI language |
 

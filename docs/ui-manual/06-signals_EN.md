@@ -1,38 +1,175 @@
-# 06 Signal center
+# 06 Signal Center
 
-Path: **Signals** (often `/signals`).
+## Entry points and paths
 
-Typical tabs:
+Signal Center is **not** one of the five primary sidebar items (Home / Research / Portfolio / Agent / Settings). Use:
 
-| Tab | Purpose |
+| Method | Path |
 | --- | --- |
-| Stream | Browse structured AI suggestions |
-| Rules | Manage price, percent, indicator, and related alerts |
-| Delivery history | Notification attempts after triggers |
-| Review / stats | Outcome evaluation and summaries |
+| Notification bell | Bell → item or “View all” → `/signals` |
+| Command palette | Search “signal” / “Signal Center” |
+| Direct URL | `/signals` |
+| Portfolio links | Often `scope=holdings` or stock context |
+| Legacy bookmarks | `/decision-signals`, `/alerts` map into tabs |
 
-## Signal stream
+### Useful query params
 
-1. Focus on **active** signals by default.
-2. Filter by market, symbol, action, phase, source, and related fields.
-3. Scope controls (when present) switch all / holdings / watchlist; delivery history and some stats may stay global.
-4. Open a detail view for confidence, horizon, price plan, watch conditions, risk, and source report.
-5. Mark closed, invalidated, or archived; terminal states usually cannot return to active directly.
-6. Optionally mark useful / not useful.
+| Example | Meaning |
+| --- | --- |
+| `/signals` | Default |
+| `/signals?tab=feed` | **Feed** |
+| `/signals?tab=rules` | **Rules** |
+| `/signals?tab=rules&createRule=1` | Rules + open create |
+| `/signals?tab=history` | **Delivery history** (triggers) |
+| `/signals?tab=history&history=notifications` | Notification delivery view |
+| `/signals?tab=history&trigger=9` | Trigger detail |
+| `/signals?tab=review` | **Review & stats** |
+| `/signals?scope=all` / `holdings` / `watchlist` | Scope filter |
+| `/signals?stock=600519` | Stock context (latest / timeline) |
 
-**Interpretation**: signals are trackable advice records, not automated orders.
+A **Decision Signal** is a structured, filterable suggestion derived mainly from reports. It is **not** an order router.
 
-## Alert rules
+> ⚠️ Not investment advice. The product **does not** place trades for you.
 
-1. Create a rule under **Rules**.
-2. Choose a type (price cross, percent move, volume, indicators, portfolio risk, market status, and others as listed).
-3. Set the target scope, save, and enable.
-4. Prefer dry-run when available before long-running enablement.
-5. Respect cooldown indicators to avoid notification spam.
+## When to use
 
-## Delivery history and review
+| Scenario | Path |
+| --- | --- |
+| After first analyses | `tab=feed`, status **active** |
+| Price alerts | `tab=rules&createRule=1` |
+| “Did notify fire?” | `tab=history` |
+| Scorecard | `tab=review` (enough samples) |
+| From the bell | Read detail → close / feedback |
+| Holdings only | `scope=holdings` |
 
-- Delivery history shows whether notifications were attempted and channel results.
-- Outcome review is explicitly triggered from the UI when you want historical performance context.
+## Four tabs
 
-Previous: [05 Agent chat](05-agent-chat_EN.md) · Next: [07 Portfolio](07-portfolio_EN.md)
+```mermaid
+flowchart LR
+  subgraph signals ["/signals"]
+    F[feed]
+    R[rules]
+    D[history]
+    O[review]
+  end
+  A[Reports / Agent] --> F
+  R --> D
+  F --> O
+```
+
+| Tab (UI) | `tab=` | Role |
+| --- | --- | --- |
+| **Feed** | `feed` | Structured suggestions |
+| **Rules** | `rules` | Price / change / indicator / portfolio risk alerts |
+| **History** | `history` | Triggers and channel delivery |
+| **Review & stats** | `review` | Outcome engine and stats |
+
+Feed may offer sub-views (list / latest / timeline / stats). Beginners can stay on the default list.
+
+## Feed workflow
+
+| Setting | Beginner default |
+| --- | --- |
+| Status | **active** first |
+| Scope | **holdings** if you bookkeep; else all / watchlist |
+| Actions | Read detail before close / feedback |
+| Stock context | Select a symbol for latest + timeline blocks |
+
+### Steps
+
+1. Open `/signals`.  
+2. Tab **Feed**.  
+3. Filter market, symbol, **action**, phase, source, status.  
+4. Scope: all / holdings / watchlist.  
+5. Open **details**: action, confidence (0–1), horizon, plan prices, invalidation, risks, source report, profile.  
+6. Status: close / invalidate / archive — **terminal states usually cannot return to active**.  
+7. Feedback: useful / not useful.  
+8. Optional: **manual create** (source fixed as manual).  
+9. Optional: **create rule from signal**.
+
+### Empty states
+
+| Message | Typical cause | Next |
+| --- | --- | --- |
+| No signals | No successful stock analysis yet | [03 Workbench](03-analysis-workbench_EN.md) |
+| No latest active | None for this symbol | Re-analyze or widen status |
+| Empty bell | No new signals/alerts | Normal until you run analysis or rules |
+
+## Rules
+
+1. Tab **Rules**.  
+2. Create rule (or `createRule=1`).  
+3. Choose type (price break, % move, volume, MA/RSI/MACD, portfolio risk, market state, … as listed).  
+4. Scope symbols.  
+5. Save and **enable**.  
+6. Prefer **dry-run** when offered.  
+7. Respect **cooldown**.
+
+Empty rule lists are normal — the product does not invent alerts for you.
+
+## Delivery history
+
+| View | Meaning |
+| --- | --- |
+| Triggers (default) | Whether rules fired |
+| Notifications | Per-channel success/failure |
+
+On failure, fix channels in [10 Settings](10-settings_EN.md) with a test push before retuning rules endlessly.
+
+## Review & stats
+
+| Capability | Note |
+| --- | --- |
+| **Run outcomes** | Safe defaults: active only, fill missing/retryable, no mass force-overwrite |
+| **Stats** | Hit / miss / n/a; often **global reviewed** scope — not “rows currently visible in feed” |
+| **Style reassess** | Preview/save needs source report; may be risk-blocked |
+
+Few samples → ignore flashy percentages.
+
+## Glossary
+
+| Term | Meaning |
+| --- | --- |
+| **Decision Signal** | Queryable structured suggestion |
+| **action** | buy / add / hold / reduce / sell / watch / avoid / alert … |
+| **active** | Still live |
+| **expired / invalidated / closed / archived** | Terminal-ish states |
+| **horizon** | Time scale of the suggestion |
+| **confidence** | 0–1 model boldness |
+| **invalidation** | When the thesis breaks |
+| **source_type** | analysis / agent / alert / manual / market_review … |
+| **decision_profile** | conservative / balanced / aggressive … |
+| **scope** | all / holdings / watchlist |
+| **outcome** | Post-hoc evaluation |
+| **dry-run** | Trial without full side effects (per control) |
+
+## Use cases
+
+**A — First look after analysis**  
+Analyze `600519` → feed active → read action + risk + invalidation → feedback if wrong for you.
+
+**B — Price alert**  
+Create rule → dry-run → enable → history on fire → re-read report before acting.
+
+**C — Empty bell**  
+No analysis, no rules → empty is expected.
+
+**D — Global stats**  
+Feed filtered to holdings but review stats stay global — by design when labeled so.
+
+**E — Manual signal**  
+Create signal → source manual → fill code/market/action → submit.
+
+## Related modules
+
+Reports extract most signals; Portfolio shows async latest active; Agent may create agent-sourced rows; Settings owns channels; Backtest is a sibling scorecard ([09](09-backtest_EN.md)).
+
+## Related
+
+- [08 Reading reports](08-reading-reports_EN.md)
+- [07 Portfolio](07-portfolio_EN.md)
+- [09 Backtest](09-backtest_EN.md)
+- [10 Settings](10-settings_EN.md)
+- [DecisionSignal docs](../decision-signals.md), [Alerts](../alerts.md)
+
+Prev: [05 Agent chat](05-agent-chat_EN.md) · Next: [07 Portfolio](07-portfolio_EN.md)

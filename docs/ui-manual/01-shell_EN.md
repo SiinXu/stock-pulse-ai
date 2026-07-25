@@ -35,9 +35,9 @@ flowchart TB
 
 | Area | Typical location | Purpose | Plain meaning |
 | --- | --- | --- | --- |
-| **Primary nav** | Left on wide screens; top or drawer on narrow | Home, Research, Signals, Portfolio, Settings | The “table of contents” |
+| **Primary nav** | Left on wide screens; top or drawer on narrow | Five domains: Home, Research, Portfolio, Agent, Settings | The “table of contents” |
 | **Main content** | Center | Active feature page | The “body” |
-| **Notification bell** | Top or upper sidebar | Latest **signals** and **alerts** | “Anything new?” |
+| **Notification bell** | Top or upper sidebar | Latest **signals** / **alerts**; also a main path into **Signal Center** | “Anything new?” |
 | **Search / command** | Sidebar search or shortcut | Jump pages, find tickers, some global actions | “Universal search” |
 
 Desktop and Web share the same **information architecture** (how features are grouped). Desktop-only windows follow the shipped client.
@@ -45,18 +45,39 @@ Desktop and Web share the same **information architecture** (how features are gr
 > ⚠️ **Narrow screens**  
 > The left nav may collapse into a menu icon. If you cannot find Settings, open that menu or use the command palette.
 
-## Common nav groups
+## Primary navigation (matches current product IA)
 
-| Nav label (follow live UI) | Rough contents | Manual chapter |
+Five top-level domains; secondary tools live under **Research**.
+
+| Nav label (live UI) | Route | Contents | Manual |
+| --- | --- | --- | --- |
+| **Home** | `/` | Focus, todos, config gaps | [02 Home](02-home_EN.md) |
+| **Research** | Group often opens `/research/market` | Children below | 03 / 04 / 09 |
+| **Portfolio** | `/portfolio` | Holdings bookkeeping & risk (page title may say Holdings) | [07 Portfolio](07-portfolio_EN.md) |
+| **Agent** | `/chat` | Multi-turn chat (page title may say Ask stock) | [05 Agent chat](05-agent-chat_EN.md) |
+| **Settings** | `/settings` | Models, data, notifications, security | [10 Settings](10-settings_EN.md) |
+
+### Research children
+
+| Child label | Route | Manual |
 | --- | --- | --- |
-| Home | Focus and todos | [02 Home](02-home_EN.md) |
-| Research | Analysis workbench, market review | [03](03-analysis-workbench_EN.md), [04](04-market-review_EN.md) |
-| Agent chat | Multi-turn Q&A | [05 Agent chat](05-agent-chat_EN.md) |
-| Signals | Advice pool, rules, delivery history | [06 Signal center](06-signals_EN.md) |
-| Portfolio | Accounts and risk | [07 Portfolio](07-portfolio_EN.md) |
-| Settings | Models, watchlist, notifications | [10 Settings](10-settings_EN.md) |
+| Market review | `/research/market` | [04](04-market-review_EN.md) |
+| Discover | `/research/discover` | [12 Discover / AlphaSift](12-discover_EN.md) |
+| Analysis Workbench | `/research/analysis` | [03](03-analysis-workbench_EN.md) |
+| Backtest | `/research/backtest` | [09](09-backtest_EN.md) |
 
-Labels may shift slightly by version; trust the live UI.
+### How to open Signal Center (not in primary sidebar)
+
+| Method | Note |
+| --- | --- |
+| Notification bell | “View all” or open an item |
+| Command palette | Search “signal” / “Signal Center” |
+| Direct URL | `/signals` (see [06](06-signals_EN.md) for `tab` / `scope`) |
+| Portfolio | AI suggestion links on holdings rows |
+
+Legacy paths such as `/decision-signals`, `/alerts`, `/backtest`, `/screening` redirect to canonical routes.
+
+Labels may shift by version; **trust the live UI**. When product PRs change nav or routes, update this manual in the same release train.
 
 ## Command palette (worth learning)
 
