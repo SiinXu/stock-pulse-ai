@@ -9,6 +9,7 @@ import pytest
 import scripts.build_model_pack as model_pack_builder
 from scripts.build_model_pack import build_model_pack, main
 from src.model_pack import MAX_LICENSE_BYTES, ModelPackError, inspect_model_pack
+from src.model_pack.modelfile import MAX_MODELFILE_BYTES
 
 
 def _sources(root: Path):
@@ -134,9 +135,51 @@ def test_builder_rejects_symbolic_link_sources(tmp_path: Path) -> None:
     assert error.value.code == "invalid_source_file"
 
 
-def test_builder_rejects_license_text_above_the_import_limit(tmp_path: Path) -> None:
+def test_builder_rejects_oversized_modelfile_before_full_read(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    gguf, modelfile, license_file = _sources(tmp_path)
+    modelfile.write_bytes(b"x" * (MAX_MODELFILE_BYTES + 1))
+    original_read_bytes = Path.read_bytes
+
+    def reject_full_read(path: Path) -> bytes:
+        if path.resolve() == modelfile.resolve():
+            raise AssertionError("oversized Modelfile must not be read in full")
+        return original_read_bytes(path)
+
+    monkeypatch.setattr(Path, "read_bytes", reject_full_read)
+
+    with pytest.raises(ModelPackError) as error:
+        build_model_pack(
+            gguf_path=gguf,
+            modelfile_path=modelfile,
+            license_file_path=license_file,
+            model_id="stockpulse/test:q4",
+            display_name="StockPulse Test",
+            license_id="Apache-2.0",
+            minimum_memory_gb=8,
+            output_path=tmp_path / "oversized-modelfile.modelpack",
+        )
+
+    assert error.value.code == "unsafe_modelfile"
+    assert str(MAX_MODELFILE_BYTES) in error.value.user_message
+
+
+def test_builder_rejects_license_text_above_the_import_limit(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
     gguf, modelfile, license_file = _sources(tmp_path)
     license_file.write_bytes(b"x" * (MAX_LICENSE_BYTES + 1))
+    original_read_text = Path.read_text
+
+    def reject_full_read(path: Path, *args, **kwargs) -> str:
+        if path.resolve() == license_file.resolve():
+            raise AssertionError("oversized license must not be read in full")
+        return original_read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", reject_full_read)
 
     with pytest.raises(ModelPackError) as error:
         build_model_pack(

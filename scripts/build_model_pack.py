@@ -28,6 +28,7 @@ from src.model_pack import (  # noqa: E402
     parse_manifest,
     parse_modelfile,
 )
+from src.model_pack.modelfile import MAX_MODELFILE_BYTES  # noqa: E402
 
 
 _COPY_CHUNK_SIZE = 1024 * 1024
@@ -107,8 +108,22 @@ def build_manifest(
             "invalid_gguf",
             "The selected weight file is not GGUF. Select the correct file and try again.",
         )
+    if modelfile.stat().st_size > MAX_MODELFILE_BYTES:
+        raise ModelPackError(
+            "unsafe_modelfile",
+            f"Modelfile must not exceed {MAX_MODELFILE_BYTES} bytes. "
+            "Reduce it and rebuild the pack.",
+        )
+    with modelfile.open("rb") as modelfile_source:
+        modelfile_bytes = modelfile_source.read(MAX_MODELFILE_BYTES + 1)
+    if len(modelfile_bytes) > MAX_MODELFILE_BYTES:
+        raise ModelPackError(
+            "unsafe_modelfile",
+            f"Modelfile must not exceed {MAX_MODELFILE_BYTES} bytes. "
+            "Reduce it and rebuild the pack.",
+        )
     parsed_modelfile = parse_modelfile(
-        modelfile.read_bytes(),
+        modelfile_bytes,
         expected_gguf_file=gguf.name,
     )
     if parsed_modelfile.from_file != gguf.name:
@@ -116,18 +131,25 @@ def build_manifest(
             "unsafe_modelfile",
             f"Modelfile FROM must reference ./{gguf.name}.",
         )
-    try:
-        license_file.read_text(encoding="utf-8")
-    except UnicodeDecodeError as exc:
-        raise ModelPackError(
-            "invalid_license_file",
-            "The license file must contain UTF-8 text.",
-        ) from exc
     if license_file.stat().st_size > MAX_LICENSE_BYTES:
         raise ModelPackError(
             "invalid_license_file",
             f"The license file must not exceed {MAX_LICENSE_BYTES} bytes.",
         )
+    with license_file.open("rb") as license_source:
+        license_bytes = license_source.read(MAX_LICENSE_BYTES + 1)
+    if len(license_bytes) > MAX_LICENSE_BYTES:
+        raise ModelPackError(
+            "invalid_license_file",
+            f"The license file must not exceed {MAX_LICENSE_BYTES} bytes.",
+        )
+    try:
+        license_bytes.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ModelPackError(
+            "invalid_license_file",
+            "The license file must contain UTF-8 text.",
+        ) from exc
 
     manifest: Dict[str, object] = {
         "format_version": MODEL_PACK_FORMAT_VERSION,
