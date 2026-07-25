@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Restored backend CI compatibility after the Agent Soul, Persona catalog, and AlphaSift DTO contract merges without extending those features' runtime scope.
 - [Added] Added a loadable, network-free reference Data Provider plugin and author guide covering opt-in discovery, lifecycle diagnostics, compatibility, trust, and manager-owned routing boundaries.
 - [Fixed] Rejected all non-global and IANA special-purpose IPv4 and IPv6 results when resolving pinned embedded Ollama download hosts, including mixed DNS responses and IPv4-mapped forms.
 - [Added] Added a unified Settings local model center for Web and Desktop with catalog-backed recommendations, canonical cancellable Ollama pull tasks with bounded streaming and absolute deadlines, zero-config activation, explicit primary and Agent assignment, protected catalog-only deletion, exact-version offline recovery, and a shared first-run flow.

@@ -33,9 +33,24 @@ from src.agent.tools.registry import (
 from src.agent.skills.base import Skill, SkillManager
 
 
-def _builtin_strategy_names() -> set[str]:
+def _yaml_skill_names(directory: Path) -> set[str]:
+    return {
+        path.stem
+        for pattern in ("*.yaml", "*.yml")
+        for path in directory.glob(pattern)
+    }
+
+
+def _builtin_skill_names() -> set[str]:
     strategies_dir = Path(__file__).resolve().parent.parent / "strategies"
-    return {path.stem for path in strategies_dir.glob("*.yaml")}
+    return _yaml_skill_names(strategies_dir) | _yaml_skill_names(
+        strategies_dir / "personas"
+    )
+
+
+def _builtin_persona_names() -> set[str]:
+    strategies_dir = Path(__file__).resolve().parent.parent / "strategies"
+    return _yaml_skill_names(strategies_dir / "personas")
 
 
 # ============================================================
@@ -404,9 +419,9 @@ class TestBuiltinSkills(unittest.TestCase):
         from src.agent.skills.base import SkillManager
 
         manager = SkillManager()
-        expected = _builtin_strategy_names()
+        expected = _builtin_skill_names()
         count = manager.load_builtin_strategies()
-        self.assertEqual(count, len(expected), "Should load all built-in strategies from YAML")
+        self.assertEqual(count, len(expected), "Should load all built-in skills from YAML")
 
         skills = manager.list_skills()
         names = set()
@@ -424,6 +439,13 @@ class TestBuiltinSkills(unittest.TestCase):
 
         # Verify all strategy names from YAML are loaded
         self.assertEqual(names, expected)
+
+        personas = [
+            skill for skill in skills if skill.name in _builtin_persona_names()
+        ]
+        self.assertEqual({skill.name for skill in personas}, _builtin_persona_names())
+        self.assertTrue(all(not skill.default_active for skill in personas))
+        self.assertTrue(all(not skill.default_router for skill in personas))
 
 
 # ============================================================

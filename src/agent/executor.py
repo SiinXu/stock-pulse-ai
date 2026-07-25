@@ -39,6 +39,7 @@ from src.agent.runner import parse_dashboard_json_result, run_agent_loop
 from src.agent.runtime.contract import ExecutionState
 from src.agent.runtime.lifecycle import classify_result_terminal_state
 from src.agent.runtime_facts import AgentRuntimeFacts
+from src.agent.soul import compose_agent_soul_prompt as _compose_agent_soul_prompt
 from src.agent.stock_scope import StockScope, resolve_stock_scope
 from src.storage import get_db
 from src.agent.tools.registry import ToolRegistry
@@ -66,6 +67,7 @@ _EXECUTOR_COMPAT_EXPORTS = (
     build_agent_chat_tool_registry,
     Callable,
     classify_result_terminal_state,
+    _compose_agent_soul_prompt,
     ExecutionState,
     extract_provider_trace_turns,
     format_daily_market_context_prompt_section,

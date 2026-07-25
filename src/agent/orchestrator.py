@@ -75,6 +75,7 @@ from src.agent.runtime_facts import (
     build_agent_runtime_facts,
 )
 from src.agent.runtime.lifecycle import classify_result_terminal_state
+from src.agent.soul import compose_agent_soul_prompt as _compose_agent_soul_prompt
 from src.agent.runtime.guards import (
     RuntimeGuardPolicy,
     StageFailurePolicy,
@@ -114,6 +115,7 @@ _ORCHESTRATOR_COMPAT_EXPORTS = (
     build_risk_override_plan,
     build_visible_chat_history,
     classify_result_terminal_state,
+    _compose_agent_soul_prompt,
     contextvars,
     copy,
     dataclass_fields,
