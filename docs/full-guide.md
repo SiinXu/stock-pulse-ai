@@ -671,8 +671,10 @@ docker run -d \
 
 ### 安装依赖
 
+**权威安装路径**：本地源码环境必须通过 `constraints.txt`（运行时 pin）与 `build-constraints.txt`（PEP 517 构建 pin）解析依赖。`requirements.txt` 是应用默认安装入口；`pyproject.toml` 的 `[project]` / optional extras 仅提供元数据与可选组发现，**不能**替代 constraints 锁，也不应在无 `-c constraints.txt` 的情况下随意 `pip install .` 或升级包版本。锁文件仅允许通过 `python scripts/check_dependency_locks.py --update` 再生。
+
 ```bash
-# Python 3.10+ 推荐
+# Python 3.10+ 推荐（默认应用依赖）
 python -m pip install --upgrade --constraint constraints.txt pip
 python -m pip install --build-constraint build-constraints.txt -r requirements.txt
 python -m pip check
@@ -684,6 +686,37 @@ python -m pip install --upgrade --constraint constraints.txt pip
 python -m pip install --build-constraint build-constraints.txt -r requirements.txt
 python -m pip check
 ```
+
+#### 可选 extras（在默认安装之后）
+
+以下文件**不**包含在默认 `requirements.txt` 中；安装时仍须带上同一套 constraints / build-constraints：
+
+```bash
+# Kronos 本地推理 Agent Tool（见 docs/kronos-agent-tool.md）
+python -m pip install --build-constraint build-constraints.txt -r requirements-kronos.txt
+
+# 桌面端打包工具链（含 pyinstaller；仍基于默认 requirements）
+python -m pip install --build-constraint build-constraints.txt -r requirements-desktop.txt
+
+# 后端 CI / 本地开发工具（flake8、pytest、pip-audit、uv 等）
+python -m pip install --build-constraint build-constraints.txt -r .github/requirements-ci.txt
+
+# 实验性 PydanticAI 运行时 POC（默认 Native 零依赖；勿并入默认安装）
+python -m pip install --build-constraint build-constraints.txt -r requirements-pydanticai.txt
+
+python -m pip check
+```
+
+`pyproject.toml` 中的 optional-dependencies 组名与上述 extras 对齐（`kronos` / `desktop` / `dev` / `pydanticai`）。可复现安装仍优先使用对应的 `requirements-*.txt`（或 CI 文件）+ constraints；`pydanticai` 组在 metadata 中为哨兵占位，实际包集合只在 `requirements-pydanticai.txt`。
+
+#### Docker / CI 与本地差异
+
+| 表面 | 安装输入 | 说明 |
+| --- | --- | --- |
+| 本地源码 | `requirements.txt` + `constraints.txt` + `build-constraints.txt` | 上表权威命令 |
+| Docker 镜像 | Dockerfile 内同样使用 `constraints.txt` / `build-constraints.txt` + `requirements.txt` | 镜像构建即冻结该提交的锁 |
+| GitHub Actions `backend-gate` 等 | `.github/requirements-ci.txt`（`-r` 包含 `requirements.txt`）+ 同一 constraints | CI 额外装测试/审计工具，不是另一套 pin 权威 |
+| 桌面打包 | `requirements-desktop.txt` | 在默认依赖上增加打包工具 |
 
 Windows PowerShell 若仍使用系统默认代码页，首次安装依赖或运行环境检查前建议先启用 UTF-8，避免第三方工具或终端输出在中文字符上失败：
 

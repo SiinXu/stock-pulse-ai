@@ -610,8 +610,16 @@ docker run -d \
 
 ### Install Dependencies
 
+**Canonical install path**: local source installs must resolve packages through
+`constraints.txt` (runtime pins) and `build-constraints.txt` (PEP 517 build
+pins). `requirements.txt` is the default application entrypoint.
+`pyproject.toml` `[project]` metadata and optional extras are for discovery
+only—they do **not** replace the lock, and unconstrained `pip install .` or
+casual version upgrades are not supported. Regenerate locks only with
+`python scripts/check_dependency_locks.py --update`.
+
 ```bash
-# Python 3.10+ recommended
+# Python 3.10+ recommended (default application dependencies)
 python -m pip install --upgrade --constraint constraints.txt pip
 python -m pip install --build-constraint build-constraints.txt -r requirements.txt
 python -m pip check
@@ -623,6 +631,42 @@ python -m pip install --upgrade --constraint constraints.txt pip
 python -m pip install --build-constraint build-constraints.txt -r requirements.txt
 python -m pip check
 ```
+
+#### Optional extras (after the default install)
+
+These files are **not** pulled in by default `requirements.txt`. Always keep the
+same constraints / build-constraints:
+
+```bash
+# Kronos local-inference Agent Tool (see docs/kronos-agent-tool.md)
+python -m pip install --build-constraint build-constraints.txt -r requirements-kronos.txt
+
+# Desktop packaging toolchain (adds pyinstaller on top of the default set)
+python -m pip install --build-constraint build-constraints.txt -r requirements-desktop.txt
+
+# Backend CI / local dev tooling (flake8, pytest, pip-audit, uv, …)
+python -m pip install --build-constraint build-constraints.txt -r .github/requirements-ci.txt
+
+# Experimental PydanticAI runtime POC (Native stays the default zero-dep path)
+python -m pip install --build-constraint build-constraints.txt -r requirements-pydanticai.txt
+
+python -m pip check
+```
+
+Optional-dependency group names in `pyproject.toml` align with those extras
+(`kronos` / `desktop` / `dev` / `pydanticai`). Prefer the corresponding
+`requirements-*.txt` (or CI file) plus constraints for reproducible installs.
+The `pydanticai` metadata group is a sentinel; the exact package set lives only
+in `requirements-pydanticai.txt`.
+
+#### Docker / CI vs local
+
+| Surface | Install inputs | Notes |
+| --- | --- | --- |
+| Local source | `requirements.txt` + `constraints.txt` + `build-constraints.txt` | Canonical commands above |
+| Docker image | Same trio inside the Dockerfile | Image build freezes the lock at that commit |
+| GitHub Actions `backend-gate` and similar | `.github/requirements-ci.txt` (includes `requirements.txt`) + the same constraints | Adds test/audit tools; does not invent a second pin authority |
+| Desktop packaging | `requirements-desktop.txt` | Default deps plus packaging tools |
 
 On Windows PowerShell, if Python or pip still uses the system default code page, enable UTF-8 before the first dependency install or environment check. This keeps terminal output and third-party tooling from failing on non-ASCII text:
 
