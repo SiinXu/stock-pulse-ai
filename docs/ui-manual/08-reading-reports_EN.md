@@ -1,26 +1,77 @@
 # 08 Reading reports
 
-When opening a **stock** history report, use this reading order.
+When you open any **single-stock** history report, read in a fixed order so you are not buried by length and do not skip risk.
+
+> 💡 **Goal**  
+> Answer three questions first: (1) lean bullish, bearish, or neutral? (2) main risks? (3) what invalidates the idea?  
+> Do not start by memorizing every indicator name.
 
 ## Suggested order
 
-1. Core conclusion and action advice (buy / add / hold / watch / reduce / sell, and related labels)
-2. Score and trend view
-3. Key levels: support, resistance, reference entries, stop thinking
-4. Risk alerts and positive catalysts
-5. Sentiment, fundamentals, and news summary
-6. Market position (theme and role; more common for A-shares)
-7. Phase label and data quality (pre-market / intraday / post-market, degradation)
-8. Optional signal attribution weights (technical, news, fundamentals, market)
+```mermaid
+flowchart TD
+  A[1 Conclusion and action] --> B[2 Score and trend]
+  B --> C[3 Key levels]
+  C --> D[4 Risk and catalysts]
+  D --> E[5 News / fundamentals]
+  E --> F[6 Market position]
+  F --> G[7 Phase and data quality]
+  G --> H[8 Optional attribution]
+```
+
+| Step | What | Concepts | Plain meaning |
+| --- | --- | --- | --- |
+| 1 | Conclusion / action | `operation_advice`, structured `action` | Buy / add / hold / watch / reduce / sell / avoid |
+| 2 | Score and trend | sentiment-like scores, trend labels | Directional lean, not a guarantee |
+| 3 | Key levels | support, resistance, reference entries, stop ideas | Support ≈ demand zone below; resistance ≈ supply above |
+| 4 | Risk and catalysts | risk alerts, positive catalysts | Must be cross-checked |
+| 5 | News / fundamentals | headlines, basic financials | May be noisy or delayed |
+| 6 | Market position | theme / role (more common on A-shares) | Leader vs fringe; do not invent missing evidence |
+| 7 | Phase and quality | pre/in/post session, degradation | Intraday partial bar → lower confidence |
+| 8 | Optional attribution | technical / news / fundamental / market weights | Explains lean; not an order |
+
+## Action labels (intuition)
+
+| Label family | Intuition | Caution |
+| --- | --- | --- |
+| Buy / add | Constructive | Still read risk and invalidation |
+| Hold / hold-and-watch | Stay with existing risk | Not a blank check to add |
+| Watch / wait | Stay light or flat | Common when evidence is thin |
+| Reduce / sell | Defensive | Match to your own position |
+| Avoid | Do not engage | Not automatic shorting advice |
+
+> ⚠️ **Not investment advice**  
+> Even if the UI shows “buy”, it is research labeling. Position size and whether to trade are yours.
+
+## Level vocabulary
+
+| Term | Meaning |
+| --- | --- |
+| **Support** | A lower area where demand has often appeared |
+| **Resistance** | An upper area where supply has often appeared |
+| **Stop-loss** | Pre-planned exit when the thesis fails |
+| **Target / take-profit idea** | Upside area **if** the thesis holds; not a promise |
+
+## Phase and data quality
+
+| Situation | Why tone may be cautious |
+| --- | --- |
+| Pre-market | Today’s path has not happened yet |
+| Intraday / lunch / closing window | Daily bar may be **partial** |
+| Degraded / missing data | Sources failed; system should not invent |
+| Non-trading day | Reuses last session; stay conservative |
 
 ## Reading discipline
 
-- In range-bound conditions with unclear flows, reports often prefer hold/watch over rapid flip-flops.
-- When the UI marks an incomplete daily bar or degraded data, lower confidence in intraday conclusions.
-- All output is for research only and is not investment advice.
+- Range-bound markets with unclear flow often yield hold/watch — often a **feature**.  
+- Respect “partial bar” and quality limitations.  
+- Treat catalysts as leads to primary sources.  
+- Research only; not investment advice.
 
-## Market review reports
+## Example
 
-See [04 Market review](04-market-review_EN.md). Do not read market-review narrative as a single-stock order ticket.
+Report says “watch” while price spikes: check phase and data quality, whether resistance was broken on volume, risk section, history trend consistency, then ask Agent chat about **observation conditions** — not for guaranteed returns.
+
+Market-review reports: [04 Market review](04-market-review_EN.md).
 
 Previous: [07 Portfolio](07-portfolio_EN.md) · Next: [09 Backtest](09-backtest_EN.md)
