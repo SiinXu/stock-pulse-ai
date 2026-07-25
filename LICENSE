@@ -23,6 +23,11 @@ the AGPL-3.0 apply to the combined work.
 
 You must retain all copyright notices and license texts from both licenses.
 
+For the maintainer process that classifies upstream MIT vs StockPulse
+AGPL-3.0 file ownership, default SPDX conventions, and progressive SPDX
+coverage reporting (not a completed full-repository legal audit), see
+docs/license-ownership-inventory.md.
+
 ----------------------------------------------------------------------
 MIT License (for upstream code)
 

@@ -17,6 +17,9 @@ license notice and obtain their own counsel where required.
 Related architectural provenance rules:
 [Foundation Pipeline And Product Layer](foundation-product-architecture.md#license-and-provenance-boundary).
 
+Redistributors: the dual-license notice in the root [LICENSE](../LICENSE)
+links to this process document.
+
 ---
 
 ## Why this process exists
