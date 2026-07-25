@@ -9,8 +9,8 @@ This is the entry point for project documentation. The README covers the project
 | I want to | Start with | Then read |
 | --- | --- | --- |
 | Understand what the project does | [README (EN)](README_EN.md) | [Full Guide (EN)](full-guide_EN.md) |
-| **See how StockPulse differs from upstream** | [README EN · Why StockPulse](README_EN.md#why-stockpulse-vs-upstream) | [Root README · 为什么选择 StockPulse](../README.md#为什么选择-stockpulse相对上游), [Architecture overview](architecture-overview.md) |
-| Run the project for the first time | [Beginner client setup (EN)](beginner-client-setup_EN.md) | [Why StockPulse](README_EN.md#why-stockpulse-vs-upstream), [Security baseline — operator boundaries](security-baseline.md#operator-security-boundaries), [Full Guide (EN)](full-guide_EN.md), [UI User Manual](ui-manual/README_EN.md) |
+| **See how StockPulse differs from upstream** | [README EN · Why StockPulse](README_EN.md#why-stockpulse) | [Root README · 为什么选择 StockPulse](../README.md#why-stockpulse), [Architecture overview](architecture-overview.md) |
+| Run the project for the first time | [Beginner client setup (EN)](beginner-client-setup_EN.md) | [Why StockPulse](README_EN.md#why-stockpulse), [Security baseline — operator boundaries](security-baseline.md#operator-security-boundaries), [Full Guide (EN)](full-guide_EN.md), [UI User Manual](ui-manual/README_EN.md) |
 | **Learn the Web / desktop UI** | [UI User Manual](ui-manual/README_EN.md) | Per-module chapters (analysis, signals, portfolio, …) |
 | Configure model providers | [LLM Config Guide (EN)](LLM_CONFIG_GUIDE_EN.md) | [Local Model Catalog](local-model-catalog.md), [Provider Configuration Guide](llm-providers.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) |
 | Import or publish a local GGUF model | [StockPulse Model Packs](model-packs.md) | [LLM Config Guide (EN)](LLM_CONFIG_GUIDE_EN.md) |
