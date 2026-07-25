@@ -13,12 +13,15 @@ from src.model_pack.validation import inspect_model_pack
 
 
 class ModelPackExecutor(Protocol):
+    """Execution port for creating one already inspected Model Pack."""
+
     def create(
         self,
         inspected: InspectedModelPack,
         *,
         on_progress: Optional[Callable[[int, str], None]] = None,
     ) -> None:
+        """Create the validated model and optionally report bounded progress."""
         ...
 
 
@@ -32,6 +35,7 @@ class ModelPackImporter:
         register_model: Callable[[str], Any],
         disk_usage: Callable[[Path], object] = shutil.disk_usage,
     ) -> None:
+        """Bind the create executor, registration callback, and disk probe."""
         self._executor = executor
         self._register_model = register_model
         self._disk_usage = disk_usage
@@ -42,6 +46,7 @@ class ModelPackImporter:
         *,
         on_progress: Optional[Callable[[int, str], None]] = None,
     ) -> ModelPackImportResult:
+        """Validate, create, register, and return detached manifest metadata."""
         with inspect_model_pack(source, disk_usage=self._disk_usage) as inspected:
             try:
                 self._executor.create(inspected, on_progress=on_progress)

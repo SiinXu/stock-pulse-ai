@@ -22,6 +22,7 @@ if str(REPOSITORY_ROOT) not in sys.path:
 
 from src.model_pack import (  # noqa: E402
     MAX_LICENSE_BYTES,
+    MAX_MODEL_PACK_BYTES,
     MODEL_PACK_FORMAT_VERSION,
     ModelPackError,
     parse_manifest,
@@ -35,6 +36,7 @@ _OUTPUT_NAME_PATTERN = re.compile(r"[^a-z0-9._-]+")
 
 
 def sha256_file(path: Path) -> str:
+    """Return the SHA-256 digest for one file without loading it into memory."""
     digest = hashlib.sha256()
     with path.open("rb") as file_obj:
         for chunk in iter(lambda: file_obj.read(_COPY_CHUNK_SIZE), b""):
@@ -43,6 +45,7 @@ def sha256_file(path: Path) -> str:
 
 
 def _require_regular_file(path: Path, *, label: str) -> Path:
+    """Resolve one required source while rejecting links and non-files."""
     candidate = path.expanduser()
     try:
         source_stat = candidate.lstat()
@@ -65,11 +68,13 @@ def _require_regular_file(path: Path, *, label: str) -> Path:
 
 
 def _default_output_name(model_id: str) -> str:
+    """Derive a filesystem-safe default artifact name from a model id."""
     slug = _OUTPUT_NAME_PATTERN.sub("-", model_id.lower()).strip("-._")
     return f"{slug or 'model'}-v{MODEL_PACK_FORMAT_VERSION}.modelpack"
 
 
 def _file_entry(path: Path, role: str) -> Dict[str, object]:
+    """Build one manifest file entry from a validated source."""
     return {
         "path": path.name,
         "role": role,
@@ -88,6 +93,7 @@ def build_manifest(
     license_id: str,
     minimum_memory_gb: int,
 ) -> Dict[str, object]:
+    """Build and validate the canonical manifest for three source files."""
     names = (gguf.name, modelfile.name, license_file.name)
     if len({name.casefold() for name in names}) != len(names):
         raise ModelPackError(
@@ -142,6 +148,7 @@ def build_manifest(
 
 
 def _zip_info(filename: str, *, compression: int) -> ZipInfo:
+    """Return deterministic ZIP metadata for one regular file."""
     info = ZipInfo(filename=filename, date_time=_ARCHIVE_TIMESTAMP)
     info.compress_type = compression
     info.create_system = 3
@@ -150,6 +157,7 @@ def _zip_info(filename: str, *, compression: int) -> ZipInfo:
 
 
 def _write_bytes(archive: ZipFile, filename: str, payload: bytes) -> None:
+    """Write deterministic compressed bytes to an archive."""
     archive.writestr(
         _zip_info(filename, compression=ZIP_DEFLATED),
         payload,
@@ -164,6 +172,7 @@ def _write_file(
     *,
     compression: int,
 ) -> None:
+    """Stream one source file into the archive with fixed metadata."""
     info = _zip_info(source.name, compression=compression)
     info.file_size = source.stat().st_size
     with source.open("rb") as input_file, archive.open(
@@ -185,6 +194,7 @@ def build_model_pack(
     minimum_memory_gb: int,
     output_path: Optional[Path] = None,
 ) -> Tuple[Path, Path]:
+    """Build one validated archive and its release checksum atomically."""
     gguf = _require_regular_file(gguf_path, label="GGUF file")
     modelfile = _require_regular_file(modelfile_path, label="Modelfile")
     license_file = _require_regular_file(license_file_path, label="License file")
@@ -243,6 +253,12 @@ def build_model_pack(
             _write_file(archive, gguf, compression=ZIP_STORED)
             _write_file(archive, modelfile, compression=ZIP_DEFLATED)
             _write_file(archive, license_file, compression=ZIP_DEFLATED)
+        if temporary.stat().st_size > MAX_MODEL_PACK_BYTES:
+            raise ModelPackError(
+                "model_pack_too_large",
+                "The completed Model Pack exceeds the 64 GiB limit. "
+                "Use smaller source files and build it again.",
+            )
         artifact_digest = sha256_file(temporary)
         checksum_temporary.write_text(
             f"{artifact_digest}  {destination.name}\n",
@@ -262,6 +278,7 @@ def build_model_pack(
 
 
 def _parser() -> argparse.ArgumentParser:
+    """Create the release-builder command-line parser."""
     parser = argparse.ArgumentParser(
         description="Build a deterministic StockPulse Model Pack.",
     )
@@ -286,6 +303,7 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    """Run the release builder and return a stable process exit code."""
     args = _parser().parse_args(argv)
     try:
         artifact, checksum = build_model_pack(

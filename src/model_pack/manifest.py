@@ -40,6 +40,7 @@ _FILE_KEYS = frozenset({"path", "role", "sha256", "size_bytes"})
 
 
 def _invalid_manifest(message: str) -> ModelPackError:
+    """Return one actionable strict-manifest validation error."""
     return ModelPackError(
         "invalid_manifest",
         f"manifest.json is invalid: {message}. Build the pack again with the current tool.",
@@ -52,6 +53,7 @@ def _require_exact_keys(
     *,
     location: str,
 ) -> None:
+    """Require an object to contain exactly the allowed keys."""
     expected_keys = set(expected)
     actual_keys = set(value)
     missing = sorted(expected_keys - actual_keys)
@@ -68,6 +70,7 @@ def _require_text(
     field_name: str,
     max_length: int = MAX_METADATA_TEXT_LENGTH,
 ) -> str:
+    """Normalize one bounded visible metadata string."""
     if not isinstance(value, str):
         raise _invalid_manifest(f"{field_name} must be text")
     normalized = value.strip()
@@ -81,6 +84,7 @@ def _require_text(
 
 
 def validate_pack_filename(value: Any, *, field_name: str) -> str:
+    """Validate one root-level portable payload filename."""
     filename = _require_text(value, field_name=field_name, max_length=128)
     if not SAFE_FILENAME_PATTERN.fullmatch(filename) or filename in {".", ".."}:
         raise _invalid_manifest(f"{field_name} must be a root-level safe filename")
@@ -88,6 +92,7 @@ def validate_pack_filename(value: Any, *, field_name: str) -> str:
 
 
 def parse_manifest_bytes(payload: bytes) -> ModelPackManifest:
+    """Decode and parse one bounded UTF-8 JSON manifest."""
     if not payload or len(payload) > MAX_MANIFEST_BYTES:
         raise _invalid_manifest(
             f"manifest.json must contain between 1 and {MAX_MANIFEST_BYTES} bytes"
@@ -106,6 +111,7 @@ def parse_manifest_bytes(payload: bytes) -> ModelPackManifest:
 
 
 def parse_manifest(raw: Mapping[str, Any]) -> ModelPackManifest:
+    """Parse one strict format-v1 manifest without accepting extra fields."""
     _require_exact_keys(raw, _MANIFEST_KEYS, location="the manifest")
 
     format_version = raw.get("format_version")

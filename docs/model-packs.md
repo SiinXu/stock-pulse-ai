@@ -286,3 +286,8 @@ model. Reassign active routes, remove its id from the normal Ollama channel
 configuration, and run `ollama rm <model-id>` if the catalog-only deletion
 control does not list it. Restore saved configuration through the existing
 `.env` backup/import workflow if needed.
+
+The Local Models delete action remains limited to catalog entries that support
+the normal direct-pull lifecycle. A planned catalog model installed through a
+Model Pack can still be assigned normally, but it does not show that delete
+action; use the explicit reassignment and `ollama rm` rollback path above.

@@ -704,7 +704,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
                   {text.setAgent}
                 </Button>
               ) : null}
-              {installed && modelId ? (
+              {installed && modelId && directPull ? (
                 <IconButton
                   variant="danger"
                   size="default"

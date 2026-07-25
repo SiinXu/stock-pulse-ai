@@ -29,10 +29,12 @@ DiskUsage = Callable[[Path], object]
 
 
 def _error(code: str, message: str) -> ModelPackError:
+    """Return one stable actionable validation error."""
     return ModelPackError(code, message)
 
 
 def _sha256(path: Path) -> str:
+    """Hash one payload file with bounded memory."""
     digest = hashlib.sha256()
     try:
         with path.open("rb") as file_obj:
@@ -47,6 +49,7 @@ def _sha256(path: Path) -> str:
 
 
 def _disk_required_bytes(payload_size: int, *, archive: bool) -> int:
+    """Return staging, extraction, and reserve bytes for preflight."""
     reserve = min(
         _DISK_RESERVE_MAX_BYTES,
         max(_DISK_RESERVE_MIN_BYTES, payload_size // 20),
@@ -62,6 +65,7 @@ def _check_disk(
     archive: bool,
     disk_usage: DiskUsage,
 ) -> None:
+    """Reject an import when the staging disk lacks bounded free space."""
     required = _disk_required_bytes(payload_size, archive=archive)
     try:
         free = int(getattr(disk_usage(location), "free"))
@@ -83,10 +87,12 @@ def _check_disk(
 
 
 def _unexpected_file_warning(path: str) -> str:
+    """Return the stable warning for one undeclared regular file."""
     return f"Unexpected file is not part of the manifest: {path}"
 
 
 def _safe_archive_name(name: str) -> bool:
+    """Return whether one archive member is a safe root-level filename."""
     path = Path(name)
     return bool(
         name
@@ -102,6 +108,7 @@ def _validate_payload_files(
     root: Path,
     manifest: ModelPackManifest,
 ) -> None:
+    """Verify declared sizes, hashes, file types, GGUF magic, and limits."""
     for file_entry in manifest.files:
         path = root / file_entry.path
         if not path.exists():
@@ -183,6 +190,7 @@ def _build_inspection(
     manifest: ModelPackManifest,
     warnings: Tuple[str, ...],
 ) -> InspectedModelPack:
+    """Build an executor-ready inspection after all payload checks."""
     _validate_payload_files(root, manifest)
     modelfile_path = root / manifest.modelfile
     try:
@@ -221,6 +229,7 @@ def _build_inspection(
 
 
 def _read_directory_manifest(root: Path) -> Tuple[ModelPackManifest, bytes]:
+    """Read and parse the regular root manifest from a directory."""
     manifest_path = root / MANIFEST_FILENAME
     if not manifest_path.exists():
         raise _error(
@@ -250,6 +259,7 @@ def _read_directory_manifest(root: Path) -> Tuple[ModelPackManifest, bytes]:
 
 
 def _directory_inventory(root: Path) -> Tuple[str, ...]:
+    """Enumerate a bounded directory tree and return regular filenames."""
     names: List[str] = []
     paths: List[Path] = []
     entry_count = 0
@@ -293,6 +303,7 @@ def _copy_directory_payload(
     manifest: ModelPackManifest,
     manifest_payload: bytes,
 ) -> None:
+    """Copy only declared regular payload data into a private snapshot."""
     current_name = MANIFEST_FILENAME
     try:
         (destination / MANIFEST_FILENAME).write_bytes(manifest_payload)
@@ -329,6 +340,7 @@ def _inspect_directory(
     *,
     disk_usage: DiskUsage,
 ) -> Iterator[InspectedModelPack]:
+    """Inspect a directory through a private immutable snapshot."""
     manifest, manifest_payload = _read_directory_manifest(root)
     expected = {MANIFEST_FILENAME, *(entry.path for entry in manifest.files)}
     inventory = _directory_inventory(root)
@@ -357,6 +369,7 @@ def _inspect_directory(
 
 
 def _zip_inventory(archive: ZipFile) -> Dict[str, object]:
+    """Build a bounded safe inventory for one ZIP-compatible archive."""
     inventory: Dict[str, object] = {}
     casefold_names = set()
     for entry in archive.infolist():
@@ -391,6 +404,7 @@ def _zip_inventory(archive: ZipFile) -> Dict[str, object]:
 
 
 def _read_zip_manifest(archive: ZipFile, inventory: Dict[str, object]) -> ModelPackManifest:
+    """Read the bounded manifest from an already validated ZIP inventory."""
     manifest_info = inventory.get(MANIFEST_FILENAME)
     if manifest_info is None:
         raise _error(
@@ -419,6 +433,7 @@ def _extract_declared_files(
     manifest: ModelPackManifest,
     destination: Path,
 ) -> None:
+    """Extract only declared files after size and inventory validation."""
     declared_names = [MANIFEST_FILENAME, *(entry.path for entry in manifest.files)]
     for name in declared_names:
         info = inventory.get(name)
@@ -456,6 +471,7 @@ def _inspect_archive(
     *,
     disk_usage: DiskUsage,
 ) -> Iterator[InspectedModelPack]:
+    """Inspect one archive through a private extraction directory."""
     try:
         archive = ZipFile(archive_path, "r")
     except (BadZipFile, OSError) as exc:

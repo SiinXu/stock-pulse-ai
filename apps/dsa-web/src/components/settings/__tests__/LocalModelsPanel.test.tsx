@@ -579,6 +579,36 @@ describe('LocalModelsPanel', () => {
     expect(screen.queryByText('Imported models')).not.toBeInTheDocument();
   });
 
+  it('does not offer pullable-only deletion for a planned catalog import', async () => {
+    const plannedModelId = FINANCE_MODEL.install.plannedOllamaTag as string;
+    const remove = vi.fn();
+    createTransport.mockReturnValue(transport({
+      getRuntime: vi.fn().mockResolvedValue({
+        ...AVAILABLE_RUNTIME,
+        installedModels: [plannedModelId],
+        configuration: {
+          ...AVAILABLE_RUNTIME.configuration,
+          registeredModels: [plannedModelId],
+          importedModels: [{
+            modelId: plannedModelId,
+            displayName: 'Untrusted replacement name',
+            minimumMemoryGb: 99,
+            licenseId: 'LicenseRef-Other',
+          }],
+        },
+      }),
+      remove,
+    }));
+
+    renderPanel();
+
+    const finance = await screen.findByTestId('local-model-fin-r1-7b');
+    expect(within(finance).getByText('Fin-R1 7B')).toBeInTheDocument();
+    expect(within(finance).getByText('Installed')).toBeInTheDocument();
+    expect(within(finance).queryByRole('button', { name: 'Delete model' })).not.toBeInTheDocument();
+    expect(remove).not.toHaveBeenCalled();
+  });
+
   it('maps Model Pack integrity failures to localized actionable copy', async () => {
     createTransport.mockReturnValue(transport({
       importPack: vi.fn().mockRejectedValue(new LocalModelTransportError(

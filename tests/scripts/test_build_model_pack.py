@@ -6,6 +6,7 @@ from zipfile import ZIP_STORED, ZipFile
 
 import pytest
 
+import scripts.build_model_pack as model_pack_builder
 from scripts.build_model_pack import build_model_pack, main
 from src.model_pack import MAX_LICENSE_BYTES, ModelPackError, inspect_model_pack
 
@@ -151,6 +152,40 @@ def test_builder_rejects_license_text_above_the_import_limit(tmp_path: Path) -> 
 
     assert error.value.code == "invalid_license_file"
     assert str(MAX_LICENSE_BYTES) in error.value.user_message
+
+
+def test_builder_rejects_a_final_archive_above_the_import_limit(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    gguf, modelfile, license_file = _sources(tmp_path)
+    payload_bytes = sum(
+        path.stat().st_size for path in (gguf, modelfile, license_file)
+    )
+    monkeypatch.setattr(
+        model_pack_builder,
+        "MAX_MODEL_PACK_BYTES",
+        payload_bytes,
+    )
+    output = tmp_path / "oversized-artifact.modelpack"
+
+    with pytest.raises(ModelPackError) as error:
+        build_model_pack(
+            gguf_path=gguf,
+            modelfile_path=modelfile,
+            license_file_path=license_file,
+            model_id="stockpulse/test:q4",
+            display_name="StockPulse Test",
+            license_id="Apache-2.0",
+            minimum_memory_gb=8,
+            output_path=output,
+        )
+
+    assert error.value.code == "model_pack_too_large"
+    assert "completed Model Pack" in error.value.user_message
+    assert not output.exists()
+    assert not output.with_name(f"{output.name}.sha256").exists()
+    assert list(tmp_path.glob(f".{output.name}.*.tmp")) == []
 
 
 def test_builder_does_not_overwrite_a_source_with_the_checksum(tmp_path: Path) -> None:

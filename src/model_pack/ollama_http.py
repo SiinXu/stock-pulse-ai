@@ -69,6 +69,7 @@ def normalize_ollama_native_base_url(raw_url: str) -> str:
 
 
 def _actionable_request_error(exc: BaseException) -> ModelPackError:
+    """Translate outbound failures into safe actionable import errors."""
     if isinstance(exc, OutboundPolicyError):
         return ModelPackError(
             "ollama_access_blocked",
@@ -98,12 +99,14 @@ class OllamaHttpModelPackExecutor:
         allowlist_provider: Optional[Callable[[], Optional[Iterable[str]]]] = None,
         timeout_seconds: float = DEFAULT_OLLAMA_IMPORT_TIMEOUT_SECONDS,
     ) -> None:
+        """Bind the server-owned Ollama target and guarded requester."""
         self._base_url_provider = base_url_provider
         self._requester = requester
         self._allowlist_provider = allowlist_provider
         self._timeout_seconds = max(1.0, float(timeout_seconds))
 
     def _request(self, method: str, url: str, **kwargs: Any) -> Any:
+        """Issue one bounded request through the existing outbound policy."""
         if self._allowlist_provider is not None:
             allowlist = self._allowlist_provider()
             if allowlist is not None:
@@ -120,6 +123,7 @@ class OllamaHttpModelPackExecutor:
 
     @staticmethod
     def _close_response(response: Any) -> None:
+        """Close a response when the requester exposes a close hook."""
         close = getattr(response, "close", None)
         if callable(close):
             close()
@@ -131,6 +135,7 @@ class OllamaHttpModelPackExecutor:
         accepted: Iterable[int],
         operation: str,
     ) -> None:
+        """Require an accepted status or raise a stable Ollama error."""
         try:
             status_code = int(response.status_code)
         except (AttributeError, TypeError, ValueError):
@@ -161,6 +166,7 @@ class OllamaHttpModelPackExecutor:
         gguf_path: Path,
         digest: str,
     ) -> None:
+        """Ensure Ollama stores the verified GGUF content-addressed blob."""
         blob_url = f"{base_url}/api/blobs/sha256:{digest}"
         head_response = self._request("HEAD", blob_url)
         try:
@@ -203,6 +209,7 @@ class OllamaHttpModelPackExecutor:
 
     @staticmethod
     def _create_payload(inspected: InspectedModelPack) -> Dict[str, Any]:
+        """Project only validated data fields into Ollama's create payload."""
         manifest = inspected.manifest
         digest = manifest.file_for_role("gguf").sha256
         try:
@@ -232,6 +239,7 @@ class OllamaHttpModelPackExecutor:
         *,
         on_progress: Optional[Callable[[int, str], None]] = None,
     ) -> None:
+        """Upload the verified blob and create one Ollama model."""
         base_url = normalize_ollama_native_base_url(self._base_url_provider())
         digest = inspected.manifest.file_for_role("gguf").sha256
         if on_progress is not None:

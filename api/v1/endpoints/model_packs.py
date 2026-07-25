@@ -40,10 +40,12 @@ _SUPPORTED_ARCHIVE_SUFFIXES = frozenset({".modelpack", ".zip"})
 
 
 def _remove_staging(staging_root: Path) -> None:
+    """Remove one private upload staging directory idempotently."""
     shutil.rmtree(staging_root, ignore_errors=True)
 
 
 def _stage_upload(upload: UploadFile) -> tuple[Path, Path]:
+    """Copy one bounded upload into a private staging directory."""
     original_suffix = Path(upload.filename or "").suffix.lower()
     if original_suffix not in _SUPPORTED_ARCHIVE_SUFFIXES:
         raise HTTPException(
@@ -118,6 +120,7 @@ def import_model_pack(
     file: UploadFile = File(..., description="A .modelpack or ZIP archive"),
     service: ModelPackImportService = Depends(get_model_pack_import_service),
 ) -> ModelPackImportAccepted:
+    """Stage one archive and submit the canonical background import task."""
     staging_root = None
     try:
         staged_path, staging_root = _stage_upload(file)
@@ -160,6 +163,7 @@ def activate_desktop_model_pack(
     service: ModelPackImportService = Depends(get_model_pack_import_service),
     local_model_service: LocalModelService = Depends(get_local_model_service),
 ) -> LocalModelMutationResponse:
+    """Activate one Desktop-created model after attestation verification."""
     try:
         consume_desktop_model_pack_attestation(
             request.desktop_attestation,
@@ -211,6 +215,7 @@ def get_model_pack_import(
     task_id: str,
     service: ModelPackImportService = Depends(get_model_pack_import_service),
 ) -> ModelPackImportStatus:
+    """Return one Model Pack import projected through the shared task contract."""
     payload = service.get_import(task_id)
     if payload is None:
         raise HTTPException(

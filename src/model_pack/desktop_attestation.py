@@ -43,6 +43,7 @@ _USED_ATTESTATIONS_LOCK = threading.RLock()
 
 
 def _attestation_error(code: str = "desktop_attestation_invalid") -> ModelPackError:
+    """Return one stable Desktop attestation failure."""
     return ModelPackError(
         code,
         (
@@ -53,6 +54,7 @@ def _attestation_error(code: str = "desktop_attestation_invalid") -> ModelPackEr
 
 
 def _desktop_mode_enabled() -> bool:
+    """Return whether the managed backend is running under Desktop."""
     return os.getenv("DSA_DESKTOP_MODE", "").strip().lower() in {
         "1",
         "true",

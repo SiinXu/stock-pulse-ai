@@ -60,6 +60,7 @@ class ModelPackUploadLimitMiddleware:
         import_path: str = MODEL_PACK_IMPORT_PATH,
         max_request_bytes: int = MAX_MODEL_PACK_UPLOAD_REQUEST_BYTES,
     ) -> None:
+        """Configure the exact route and bounded multipart envelope size."""
         if not import_path.startswith("/"):
             raise ValueError("Model Pack import path must be absolute")
         if max_request_bytes < 1:
@@ -69,6 +70,7 @@ class ModelPackUploadLimitMiddleware:
         self.max_request_bytes = max_request_bytes
 
     async def _send_too_large(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """Send the stable 413 response without reflecting request data."""
         trace_id = uuid.uuid4().hex
         detail = model_pack_too_large_detail()
         response = JSONResponse(
@@ -83,6 +85,7 @@ class ModelPackUploadLimitMiddleware:
         await response(scope, receive, send)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """Limit declared or streamed request bytes before downstream parsing."""
         if (
             scope["type"] != "http"
             or scope.get("method") != "POST"
@@ -100,6 +103,7 @@ class ModelPackUploadLimitMiddleware:
         limit_exceeded = False
 
         async def limited_receive() -> Message:
+            """Clip the first over-limit chunk and terminate downstream input."""
             nonlocal limit_exceeded, received_bytes
             message = await receive()
             if message["type"] != "http.request":
@@ -118,6 +122,7 @@ class ModelPackUploadLimitMiddleware:
             return limited_message
 
         async def limited_send(message: Message) -> None:
+            """Suppress the downstream response after an ingress violation."""
             if not limit_exceeded:
                 await send(message)
 

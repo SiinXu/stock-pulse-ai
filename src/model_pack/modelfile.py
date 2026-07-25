@@ -14,10 +14,12 @@ PARAMETER_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
 
 def _unsafe(message: str) -> ModelPackError:
+    """Return one actionable constrained-Modelfile error."""
     return ModelPackError("unsafe_modelfile", message)
 
 
 def _parse_data_value(raw_value: str) -> Any:
+    """Parse one scalar PARAMETER value without accepting containers."""
     value = raw_value.strip()
     if not value:
         raise _unsafe("PARAMETER requires a name and value. Fix the Modelfile and rebuild the pack.")
@@ -37,6 +39,7 @@ def _parse_text_value(
     *,
     instruction: str,
 ) -> Tuple[str, int]:
+    """Parse one single-line or triple-quoted text instruction."""
     value = initial.strip()
     if not value:
         raise _unsafe(
@@ -79,6 +82,7 @@ def _parse_text_value(
 
 
 def parse_modelfile(payload: bytes, *, expected_gguf_file: str) -> ParsedModelfile:
+    """Parse the data-only Modelfile subset bound to one GGUF filename."""
     if not payload or len(payload) > MAX_MODELFILE_BYTES:
         raise _unsafe(
             f"Modelfile must contain between 1 and {MAX_MODELFILE_BYTES} bytes. "

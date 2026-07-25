@@ -12,6 +12,8 @@ from src.task_execution import TaskStatusEnum
 
 
 class ModelPackImportAccepted(BaseModel):
+    """Accepted background Model Pack task."""
+
     status: str = "accepted"
     task_id: str
     message: str
@@ -19,6 +21,8 @@ class ModelPackImportAccepted(BaseModel):
 
 
 class ModelPackImportResult(BaseModel):
+    """Completed Model Pack import result."""
+
     model_id: str
     display_name: str
     minimum_memory_gb: int
@@ -50,6 +54,7 @@ class ModelPackDesktopActivationRequest(BaseModel):
     @field_validator("display_name")
     @classmethod
     def validate_display_name(cls, value: str) -> str:
+        """Normalize visible Desktop metadata before attestation binding."""
         normalized = value.strip()
         if not normalized or any(ord(character) < 32 for character in normalized):
             raise ValueError("display_name must be visible text")
@@ -57,6 +62,8 @@ class ModelPackDesktopActivationRequest(BaseModel):
 
 
 class ModelPackImportStatus(BaseModel):
+    """Canonical task status and optional completed import result."""
+
     task_id: str
     status: TaskStatusEnum
     progress: int = Field(ge=0, le=100)

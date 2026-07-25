@@ -13,6 +13,7 @@ class ModelPackError(Exception):
         *,
         details: Optional[Mapping[str, Any]] = None,
     ) -> None:
+        """Store a stable code, public message, and detached details."""
         super().__init__(user_message)
         self.code = code
         self.user_message = user_message

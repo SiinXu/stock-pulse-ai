@@ -81,6 +81,17 @@ A pending command cancelled before execution never invokes its runner. Runners c
 poll `TaskRunContext.is_cancel_requested()`; it also returns true after
 `cancelled` or `interrupted` so a late-running callable observes the stop fence.
 
+`TaskCommand.on_done` is an optional executor-finalization cleanup hook. The
+queue attaches it only after executor admission and invokes it once when the
+command Future finishes, including pre-start cancellation and shutdown
+terminalization. It is not a lifecycle event or final-result commit boundary:
+callbacks must be idempotent, must only release process-local resources, and
+must never commit configuration or other business state. Runners retain their
+own `finally` cleanup for normal execution. Callback failures are sanitized and
+logged without changing the command's already-owned terminal state. A submitter
+that allocates resources before queue admission must clean them itself if
+admission fails before a Future exists.
+
 ## Results And Errors
 
 Generic `TaskCommand` runners may return `None` successfully. Existing stock

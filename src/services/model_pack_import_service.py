@@ -35,6 +35,8 @@ logger = logging.getLogger(__name__)
 
 
 class _ModelPackActivationHandler(Protocol):
+    """Activate one validated Model Pack through the shared local-model authority."""
+
     def __call__(
         self,
         normalized: str,
@@ -48,7 +50,9 @@ class _ModelPackActivationHandler(Protocol):
             [Callable[[], Any]], tuple[bool, Any]
         ],
         persist_metadata: Callable[[], Any],
-    ) -> Optional[Dict[str, Any]]: ...
+    ) -> Optional[Dict[str, Any]]:
+        """Return activation metadata after the guarded final commit."""
+        ...
 
 
 class ModelPackImportService:
@@ -63,6 +67,7 @@ class ModelPackImportService:
         registry: Optional[ModelPackRegistry] = None,
         executor_factory: Optional[Callable[[Callable[[], str]], Any]] = None,
     ) -> None:
+        """Bind import orchestration to the current config and task authorities."""
         self._system_config_service = system_config_service
         self._task_queue = task_queue
         self._activation_handler = activation_handler
@@ -76,6 +81,7 @@ class ModelPackImportService:
         self._failure_lock = _PROCESS_IMPORT_FAILURE_LOCK
 
     def _config_snapshot(self) -> tuple[str, Dict[str, str], str]:
+        """Return the immutable config version, values, and normalized runtime URL."""
         payload = self._system_config_service.get_config(include_schema=False)
         values = {
             str(item.get("key") or "").upper(): str(item.get("value") or "")
@@ -88,6 +94,7 @@ class ModelPackImportService:
         return str(payload.get("config_version") or ""), values, base_url
 
     def _record_failure(self, task_id: str, error: ModelPackError) -> None:
+        """Retain one bounded public failure projection for import polling."""
         with self._failure_lock:
             while len(self._failures) >= _MAX_RETAINED_IMPORT_FAILURES:
                 self._failures.pop(next(iter(self._failures)))
@@ -97,6 +104,7 @@ class ModelPackImportService:
             }
 
     def _clear_failure(self, task_id: str) -> None:
+        """Remove a retained failure after the same task succeeds."""
         with self._failure_lock:
             self._failures.pop(task_id, None)
 
@@ -106,6 +114,7 @@ class ModelPackImportService:
         runtime_identity: str,
         metadata: Mapping[str, Any],
     ) -> Dict[str, Any]:
+        """Register validated metadata under the selected Ollama runtime identity."""
         return self._registry.register(
             runtime_identity=runtime_identity,
             model_id=str(metadata["model_id"]),
@@ -128,10 +137,12 @@ class ModelPackImportService:
         executor = self._executor_factory(lambda: base_url)
 
         def cleanup_import_source() -> None:
+            """Remove the endpoint-owned staging directory idempotently."""
             if cleanup_path is not None:
                 shutil.rmtree(cleanup_path, ignore_errors=True)
 
         def run_import(context: TaskRunContext) -> Dict[str, Any]:
+            """Validate, create, and activate one staged pack in the worker."""
             try:
                 with inspect_model_pack(source_path) as inspected:
                     context.update_progress(20, "Validated Model Pack")
@@ -285,6 +296,7 @@ class ModelPackImportService:
             ) from exc
 
     def get_import(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """Return the public polling projection for one Model Pack import."""
         task = self._task_queue.get_task(str(task_id or ""))
         if task is None or task.report_type != MODEL_PACK_IMPORT_TASK_KIND:
             return None

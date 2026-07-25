@@ -555,6 +555,7 @@ class LocalModelService:
             )
 
             def commit_activation() -> Dict[str, Any]:
+                """Persist metadata and configuration in the bounded final commit."""
                 persist_metadata()
                 self._persist_model_configuration(
                     config_version=config_version,

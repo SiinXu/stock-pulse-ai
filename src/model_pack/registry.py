@@ -27,6 +27,7 @@ def default_model_pack_registry_path() -> Path:
 
 
 def _validated_entry(raw: Any) -> Dict[str, Any] | None:
+    """Return one bounded registry entry or reject it without partial data."""
     if not isinstance(raw, dict) or set(raw) != {
         "runtime_identity",
         "model_id",
@@ -65,17 +66,20 @@ class ModelPackRegistry:
     """Store bounded manifest presentation fields per configured Ollama runtime."""
 
     def __init__(self, path: Path | None = None) -> None:
+        """Bind one atomic owner-only registry path."""
         self._path = Path(path) if path is not None else default_model_pack_registry_path()
         self._lock = threading.RLock()
 
     @staticmethod
     def _key(entry: Mapping[str, Any]) -> tuple[str, str]:
+        """Return the case-insensitive runtime/model registry key."""
         return (
             str(entry["runtime_identity"]).lower(),
             str(entry["model_id"]).lower(),
         )
 
     def _read_locked(self) -> Tuple[Dict[str, Any], ...]:
+        """Read valid bounded entries while failing closed on corruption."""
         try:
             size = self._path.stat().st_size
         except FileNotFoundError:
@@ -102,6 +106,7 @@ class ModelPackRegistry:
         return tuple(entries[key] for key in sorted(entries))
 
     def _write_locked(self, entries: Iterable[Mapping[str, Any]]) -> None:
+        """Atomically write deterministically ordered registry entries."""
         ordered = sorted(
             (dict(entry) for entry in entries),
             key=lambda entry: self._key(entry),
