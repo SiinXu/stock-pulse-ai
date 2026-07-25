@@ -855,6 +855,17 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects the maximum wait time for Agent analysis.'],
     notes: ['Timeout does not affect other stocks in the analysis pipeline.'],
   },
+  'settings.agent.AGENT_CRITIC_ENABLED': {
+    title: 'Bounded Multi-Agent Critic',
+    summary: 'Adds one read-only Critic call before the Native Multi Decision stage.',
+    usage: 'Enable only when the extra Critic call and a possible single whitelist-stage retry fit the run budget.',
+    valueNotes: [
+      'Disabled by default; Single and Chat behavior is unchanged.',
+      'A retry can target only an already-entered intelligence or catalog-backed skill stage.',
+    ],
+    impact: ['Adds one Critic LLM call and, only after a retry verdict, at most one stage rerun.'],
+    notes: ['Invalid output and unavailable retry targets fail closed to fail_soft without spending retry budget.'],
+  },
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: 'Risk Agent Veto',
     summary: 'Allows the risk agent to veto buy signals when critical risk flags are detected.',

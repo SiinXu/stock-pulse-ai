@@ -70,9 +70,11 @@ and `StrategyEngine` remains the only structured multi-strategy partition and
 synthesis authority. Those two authorities are enforced by runtime code rather
 than trusting the model to follow prompt text.
 
-Future system-prompt stages, including a bounded Critic, must import
-`compose_agent_soul_prompt()` rather than copy the charter or create another
-precedence rule.
+The optional bounded Critic uses the same `BaseAgent._build_messages()` path and
+therefore imports `compose_agent_soul_prompt()` instead of copying the charter
+or creating another precedence rule. It is tool-free and read-only: Critic
+output can identify evidence limitations or request one whitelisted stage retry,
+but cannot author `strategy_synthesis`, expand ToolSurface, or replace Decision.
 
 ## Run Metadata
 

@@ -51,7 +51,7 @@ describe('placementForKey', () => {
   });
 
   it('keeps ordinary agent behavior fields under Agent Behavior', () => {
-    for (const key of ['AGENT_MODE', 'AGENT_MAX_STEPS', 'AGENT_MEMORY_ENABLED', 'AGENT_ORCHESTRATOR_MODE']) {
+    for (const key of ['AGENT_MODE', 'AGENT_MAX_STEPS', 'AGENT_MEMORY_ENABLED', 'AGENT_ORCHESTRATOR_MODE', 'AGENT_CRITIC_ENABLED']) {
       expect(placementForKey('agent', key)).toEqual({ section: 'agent_behavior', view: 'execution' });
     }
   });

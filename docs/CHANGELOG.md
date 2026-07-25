@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Added] Added five opt-in investment committee Persona Skills with bounded built-in discovery, desktop packaging coverage, explicit existing-tool lists, differentiated evidence and risk lenses, and mandatory research-only, non-affiliation, and investment-risk disclosures.
+- [Added] Added a default-off, tool-free bounded Critic before Native Multi decisions with strict pass/retry/fail-soft output, one catalog-backed whitelist retry budget, atomic evidence replacement, and internal trace/stream metadata while preserving StrategyEngine authority.
 - [Fixed] Required valid security-audit dependencies on privileged API and ToolSession paths, prevented tool completion-audit retries from duplicating side effects, and bounded arbitrary-size configuration key evidence without limiting updates.
 - [Fixed] Prevented local-model pull workers retained by the process task queue from activating through a retired FastAPI lifespan and bypassing the current configuration mutation lease.
 - [Fixed] Linearized late local-model pull activation with FastAPI lifespan retirement, task cancellation, queue shutdown, and the current configuration mutation lease.

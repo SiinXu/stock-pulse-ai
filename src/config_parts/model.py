@@ -205,6 +205,7 @@ class Config:
     agent_arch: str = "single"     # Agent architecture: 'single' (legacy) or 'multi' (orchestrator)
     agent_orchestrator_mode: str = "standard"  # Orchestrator mode: quick/standard/full/specialist
     agent_orchestrator_timeout_s: int = 600  # Cooperative timeout budget for the whole multi-agent pipeline
+    agent_critic_enabled: bool = False  # Enable the bounded pre-Decision Critic in Native Multi runs
     agent_technical_agent_timeout_s: float = 0
     agent_intel_agent_timeout_s: float = 0
     agent_risk_agent_timeout_s: float = 0
