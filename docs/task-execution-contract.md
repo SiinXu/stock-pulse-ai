@@ -174,6 +174,12 @@ Their bounded Ollama stream checks cancellation before the request, between
 response chunks/events, and immediately before configuration activation. The
 absolute pull deadline remains independent of progress frequency, so a runtime
 cannot keep a task alive indefinitely by continuously emitting partial data.
+Because the process-local queue can outlive one FastAPI lifespan, a completed
+pull resolves the current lifespan-owned `LocalModelService` before activating
+configuration. A retired service cannot activate a late worker, and an inactive
+application lifespan is never revived solely to finish activation. This keeps
+configuration mutation leases and local-model recovery reservations under the
+current application authority while preserving canonical task polling.
 
 This task does not add HTTP cancel/retry routes, an external broker, cross-process
 task sharing, or durable recovery after an ungraceful process loss.

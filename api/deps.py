@@ -11,7 +11,7 @@ API 依赖注入模块
 """
 
 import threading
-from typing import Any, Generator, Protocol, cast
+from typing import Any, Generator, Optional, Protocol, cast
 
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy.orm import Session
@@ -32,7 +32,7 @@ from src.services.task_queue import get_task_queue
 
 
 _SYSTEM_CONFIG_SERVICE_INIT_LOCK = threading.Lock()
-_LOCAL_MODEL_SERVICE_INIT_LOCK = threading.Lock()
+_LOCAL_MODEL_SERVICE_INIT_LOCK = threading.RLock()
 
 
 class SecurityAuditQueryService(SecurityAuditRecorder, Protocol):
@@ -116,6 +116,9 @@ def get_local_model_service(request: Request) -> LocalModelService:
                     system_config_service=get_system_config_service(request),
                     task_queue=get_task_queue(),
                     pullable_model_ids=get_pullable_local_model_ids,
+                    activation_service_provider=lambda: _get_active_local_model_service(
+                        request
+                    ),
                 )
                 request.app.state.local_model_service = service
     return service
@@ -156,3 +159,37 @@ def require_security_audit_query_service(
             },
         )
     return cast(SecurityAuditQueryService, recorder)
+
+
+def _get_active_local_model_service(request: Request) -> Optional[LocalModelService]:
+    """Resolve the current lifespan authority without reviving a stopped app."""
+    with _LOCAL_MODEL_SERVICE_INIT_LOCK:
+        if getattr(request.app.state, "local_model_services_active", True) is False:
+            return None
+        return get_local_model_service(request)
+
+
+def begin_local_model_service_lifespan(
+    app: object,
+    system_config_service: SystemConfigService,
+) -> None:
+    """Atomically publish a new configuration authority for local-model requests."""
+    with _LOCAL_MODEL_SERVICE_INIT_LOCK:
+        previous = getattr(app.state, "local_model_service", None)
+        if previous is not None:
+            previous.retire_pull_activation()
+            delattr(app.state, "local_model_service")
+        app.state.system_config_service = system_config_service
+        app.state.local_model_services_active = True
+
+
+def end_local_model_service_lifespan(app: object) -> None:
+    """Retire local-model activation before removing lifespan-owned services."""
+    with _LOCAL_MODEL_SERVICE_INIT_LOCK:
+        app.state.local_model_services_active = False
+        service = getattr(app.state, "local_model_service", None)
+        if service is not None:
+            service.retire_pull_activation()
+            delattr(app.state, "local_model_service")
+        if hasattr(app.state, "system_config_service"):
+            delattr(app.state, "system_config_service")

@@ -1457,7 +1457,7 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
         service, queue, client = self._local_service()
 
         service.start_pull("qwen3:4b")
-        service._configure_model_from_snapshot = Mock(
+        service._activate_completed_pull = Mock(
             side_effect=RuntimeError("unexpected activation failure")
         )
         result = queue.run_task()

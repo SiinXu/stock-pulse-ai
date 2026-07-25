@@ -416,11 +416,16 @@ class LocalModelService:
         task_queue: AnalysisTaskQueue,
         pullable_model_ids: Callable[[], Iterable[str]],
         client_factory: Callable[[str], OllamaRuntimeClient] = OllamaRuntimeClient,
+        activation_service_provider: Optional[
+            Callable[[], Optional["LocalModelService"]]
+        ] = None,
     ) -> None:
         self._system_config_service = system_config_service
         self._task_queue = task_queue
         self._pullable_model_ids = pullable_model_ids
         self._client_factory = client_factory
+        self._activation_service_provider = activation_service_provider
+        self._accepts_pull_activation = True
         self._task_lock = threading.RLock()
         self._operation_lock = threading.RLock()
         self._registration_recoveries: Dict[str, _LocalModelRegistrationRecovery] = {}
@@ -464,6 +469,31 @@ class LocalModelService:
             if isinstance(item, dict)
         }
         return str(payload.get("config_version") or ""), values
+
+    def retire_pull_activation(self) -> None:
+        """Fence this lifecycle instance against late pull activation."""
+        with self._operation_lock:
+            self._accepts_pull_activation = False
+
+    def _activate_completed_pull(
+        self,
+        normalized: str,
+        *,
+        config_version: str,
+        values: Mapping[str, str],
+        base_url: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Activate through the current live service or decline after retirement."""
+        with self._operation_lock:
+            if not self._accepts_pull_activation:
+                return None
+            return self._configure_model_from_snapshot_locked(
+                normalized,
+                assignment="auto",
+                config_version=config_version,
+                values=values,
+                base_url=base_url,
+            )
 
     @classmethod
     def _has_existing_primary(cls, values: Mapping[str, str]) -> bool:
@@ -1105,13 +1135,27 @@ class LocalModelService:
                         "selected_primary": False,
                     }
                 try:
-                    activation = self._configure_model_from_snapshot(
-                        normalized,
-                        assignment="auto",
-                        config_version=config_version,
-                        values=values,
-                        base_url=base_url,
+                    activation_service = (
+                        self._activation_service_provider()
+                        if self._activation_service_provider is not None
+                        else self
                     )
+                    activation = (
+                        activation_service._activate_completed_pull(
+                            normalized,
+                            config_version=config_version,
+                            values=values,
+                            base_url=base_url,
+                        )
+                        if activation_service is not None
+                        else None
+                    )
+                    if activation is None:
+                        return {
+                            "model_id": normalized,
+                            "activated": False,
+                            "selected_primary": False,
+                        }
                 except Exception as exc:  # broad-exception: fallback_recorded - download already succeeded
                     log_safe_exception(
                         logger,

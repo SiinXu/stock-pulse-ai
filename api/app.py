@@ -188,6 +188,10 @@ def _warn_if_open_cors_without_auth() -> None:
     )
 
 from api.v1 import api_v1_router
+from api.deps import (
+    begin_local_model_service_lifespan,
+    end_local_model_service_lifespan,
+)
 from api.middlewares.auth import add_auth_middleware
 from api.middlewares.error_handler import add_error_handlers
 from api.v1.schemas.common import HealthResponse
@@ -316,10 +320,11 @@ async def app_lifespan(app: FastAPI):
         app.state.runtime_scheduler_service.reconcile_from_config(
             run_immediately=runtime_run_immediately,
         )
-    if hasattr(app.state, "local_model_service"):
-        delattr(app.state, "local_model_service")
-    app.state.system_config_service = SystemConfigService(
-        runtime_scheduler=app.state.runtime_scheduler_service,
+    begin_local_model_service_lifespan(
+        app,
+        SystemConfigService(
+            runtime_scheduler=app.state.runtime_scheduler_service,
+        ),
     )
     _schedule_stock_index_background_refresh(app, "startup")
     try:
@@ -330,10 +335,7 @@ async def app_lifespan(app: FastAPI):
             refresh_task.cancel()
             with suppress(asyncio.CancelledError):
                 await refresh_task
-        if hasattr(app.state, "local_model_service"):
-            delattr(app.state, "local_model_service")
-        if hasattr(app.state, "system_config_service"):
-            delattr(app.state, "system_config_service")
+        end_local_model_service_lifespan(app)
         runtime_scheduler = getattr(app.state, "runtime_scheduler_service", None)
         if runtime_scheduler is not None:
             runtime_scheduler.stop()
