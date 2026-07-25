@@ -33,6 +33,20 @@ _METADATA_HOSTS = frozenset(
         "metadata.google.internal",
     }
 )
+_NON_PUBLIC_REFERENCE_NAMESPACES = frozenset(
+    {
+        "alt",
+        "example",
+        "home.arpa",
+        "internal",
+        "invalid",
+        "local",
+        "localdomain",
+        "localhost",
+        "onion",
+        "test",
+    }
+)
 _METADATA_IPS = frozenset(
     {
         ipaddress.ip_address("100.100.100.200"),
@@ -360,6 +374,45 @@ def validate_outbound_url(
     except OSError:
         _reject_target("dns_resolution_failed", target)
     _validate_addrinfos(addr_infos, target)
+    return target
+
+
+def _has_public_reference_hostname_syntax(hostname: str) -> bool:
+    if len(hostname) > 253 or "." not in hostname:
+        return False
+    labels = hostname.split(".")
+    return all(
+        label
+        and len(label) <= 63
+        and label[0].isalnum()
+        and label[-1].isalnum()
+        and all(char.isascii() and (char.isalnum() or char == "-") for char in label)
+        for label in labels
+    )
+
+
+def _uses_non_public_reference_namespace(hostname: str) -> bool:
+    return any(
+        hostname == namespace or hostname.endswith(f".{namespace}")
+        for namespace in _NON_PUBLIC_REFERENCE_NAMESPACES
+    )
+
+
+def validate_public_reference_url(raw_url: str) -> OutboundTarget:
+    """Validate a network-free HTTP(S) reference against public namespaces.
+
+    This helper deliberately ignores the operator allowlist and does not resolve
+    DNS. It establishes static reference eligibility, not current reachability.
+    """
+
+    target = _inspect_target(raw_url, allowlist=())
+    if target.literal_ip is not None:
+        return target
+    if (
+        not _has_public_reference_hostname_syntax(target.hostname)
+        or _uses_non_public_reference_namespace(target.hostname)
+    ):
+        _reject_target("non_public_hostname", target)
     return target
 
 

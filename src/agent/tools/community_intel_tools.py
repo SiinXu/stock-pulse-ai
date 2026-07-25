@@ -13,7 +13,10 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 
 from src.agent.tools.execution import _normalize_tool_stock_code
 from src.agent.tools.registry import ToolDefinition, ToolParameter, ToolPolicy
-from src.security.outbound_policy import OutboundPolicyError, validate_outbound_url
+from src.security.outbound_policy import (
+    OutboundPolicyError,
+    validate_public_reference_url,
+)
 from src.utils.sanitize import (
     exception_chain_redaction_values,
     log_safe_exception,
@@ -63,6 +66,7 @@ class _StrictCommunityIntelModel(BaseModel):
         allow_inf_nan=False,
         extra="forbid",
         frozen=True,
+        revalidate_instances="always",
         str_strip_whitespace=True,
         strict=True,
     )
@@ -107,7 +111,7 @@ class CommunityIntelCitation(_StrictCommunityIntelModel):
         if value is None:
             return None
         try:
-            validate_outbound_url(value, allowlist=(), resolve_dns=False)
+            validate_public_reference_url(value)
         except OutboundPolicyError as exc:
             raise ValueError(
                 "citation URL must reference a public HTTP(S) target"
@@ -492,13 +496,22 @@ class _CommunityIntelToolHandler:
                 status="degraded",
             )
         try:
+            if any(
+                not isinstance(item, CommunityIntelCoverage)
+                for item in observation.coverage
+            ) or any(
+                not isinstance(item, CommunityIntelCitation)
+                for item in observation.citations
+            ):
+                raise TypeError("provider observation contains untyped evidence")
+            observation = CommunityIntelObservation.model_validate(observation)
             payload = _project_observation(
                 observation,
                 stock_code=canonical_code,
                 language=language_hint,
                 window_days=window_days,
             )
-        except (TypeError, ValueError, ValidationError):
+        except (AttributeError, TypeError, ValueError, ValidationError):
             return _degraded_result(
                 stock_code=canonical_code,
                 language=language_hint,

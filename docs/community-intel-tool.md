@@ -62,13 +62,19 @@ same strict shape:
 Provider observations use immutable Pydantic v2 models with strict types,
 forbidden extra fields, finite confidence bounds, timezone-aware ordered
 timestamps, unique source coverage, and citations tied to a covered source.
+The handler revalidates the complete observation and every nested evidence
+model before projection, including instances created through unchecked model
+construction helpers.
 The tool rejects a mapping, free-form text, raw post list, mismatched stock,
 mismatched window, or mismatched language as invalid provider output.
 
 Prompt-facing strings pass through the central sensitive-data sanitizer.
-Citation URLs must also pass the central outbound public-target checks without
-using an operator allowlist or DNS lookup, so local, private-literal, metadata,
-and other restricted targets cannot become prompt evidence. Counts and field
+Citation URLs must also pass the central deterministic public-reference check
+without using an operator allowlist or DNS lookup. The check rejects private or
+restricted literal addresses, single-label hostnames, invalid hostname syntax,
+and known non-public namespaces such as `.internal`, `.home.arpa`, `.local`,
+`.invalid`, `.test`, `.example`, `.onion`, and `.alt`. It establishes static
+namespace eligibility rather than current DNS reachability. Counts and field
 lengths are capped, and the complete serialized result has an 8 KiB hard limit.
 A citation URL replaced by the sanitizer is omitted while its safe
 source/reference id is retained. The capped gap list always reserves its final

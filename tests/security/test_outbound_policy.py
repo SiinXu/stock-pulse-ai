@@ -11,7 +11,9 @@ from urllib.parse import urlsplit
 import pytest
 import requests
 
-from src.security import outbound_policy
+from src.notification_sender.custom_webhook_sender import CustomWebhookSender
+from src.patches.eastmoney_patch import _is_eastmoney_request_url
+from src.security import outbound_policy, validate_public_reference_url
 from src.security.outbound_policy import (
     OutboundPolicyError,
     guard_outbound_urls,
@@ -19,9 +21,6 @@ from src.security.outbound_policy import (
     safe_post,
     validate_outbound_url,
 )
-from src.notification_sender.custom_webhook_sender import CustomWebhookSender
-from src.patches.eastmoney_patch import _is_eastmoney_request_url
-
 
 PUBLIC_ADDRINFO = [
     (socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("93.184.216.34", 443))
@@ -92,6 +91,60 @@ def test_rejects_private_metadata_and_ip_obfuscation(url: str) -> None:
 def test_rejects_local_and_metadata_hostnames_without_dns(hostname: str) -> None:
     with pytest.raises(OutboundPolicyError):
         validate_outbound_url(f"http://{hostname}/", resolve_dns=False)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://intranet/admin",
+        "http://service.internal/private",
+        "http://router.home.arpa/status",
+        "https://fixture.invalid/reference",
+        "https://fixture.test/reference",
+        "https://fixture.example/reference",
+        "https://hidden.onion/reference",
+        "https://service.alt/reference",
+        "https://bad_host.example.com/reference",
+    ],
+)
+def test_public_reference_validator_rejects_non_public_namespaces_without_dns(
+    url: str,
+) -> None:
+    with patch("src.security.outbound_policy.socket.getaddrinfo") as resolver:
+        with pytest.raises(OutboundPolicyError):
+            validate_public_reference_url(url)
+    resolver.assert_not_called()
+
+
+def test_public_reference_validator_accepts_public_targets_without_dns() -> None:
+    with patch("src.security.outbound_policy.socket.getaddrinfo") as resolver:
+        hostname_target = validate_public_reference_url(
+            "https://community.example.com/reference"
+        )
+        literal_target = validate_public_reference_url("https://8.8.8.8/reference")
+
+    assert hostname_target.hostname == "community.example.com"
+    assert str(literal_target.literal_ip) == "8.8.8.8"
+    resolver.assert_not_called()
+
+
+def test_public_reference_policy_does_not_change_general_outbound_validation() -> None:
+    assert (
+        validate_outbound_url(
+            "http://intranet/status",
+            allowlist=(),
+            resolve_dns=False,
+        ).hostname
+        == "intranet"
+    )
+    assert (
+        validate_outbound_url(
+            "http://service.internal/status",
+            allowlist=(),
+            resolve_dns=False,
+        ).hostname
+        == "service.internal"
+    )
 
 
 def test_rejects_any_private_answer_from_mixed_dns_results() -> None:
