@@ -14,6 +14,8 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from src.schemas.report_strata import ReportStrata
+
 
 REPORT_SCHEMA_VERSION = "report-v1"
 
@@ -228,6 +230,8 @@ class Dashboard(BaseModel):
     battle_plan: Optional[BattlePlan] = None
     phase_decision: Optional[PhaseDecision] = None
     signal_attribution: Optional[SignalAttribution] = None
+    # Issue #616: additive evidence strata; historical payloads omit this field.
+    report_strata: Optional[ReportStrata] = None
 
 
 class AnalysisReportSchema(BaseModel):
@@ -249,6 +253,8 @@ class AnalysisReportSchema(BaseModel):
     confidence_level: Optional[str] = None
 
     dashboard: Optional[Dashboard] = None
+    # Top-level strata mirror (Issue #616). Prefer dashboard.report_strata when both set.
+    report_strata: Optional[ReportStrata] = None
 
     analysis_summary: Optional[str] = None
     key_points: Optional[str] = None

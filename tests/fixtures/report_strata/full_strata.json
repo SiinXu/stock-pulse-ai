@@ -1,0 +1,38 @@
+{
+  "schema_version": "report-strata-v1",
+  "verified_facts": [
+    {
+      "statement": "Close price was 1680.00 CNY on the last daily bar.",
+      "source_id": "ohlcv:daily:600519",
+      "as_of": "2026-07-25T15:00:00+08:00"
+    },
+    {
+      "statement": "Trailing PE from latest financials is 28.4.",
+      "source_id": "fundamentals:pe_ttm",
+      "as_of": "2026-07-20T00:00:00+08:00"
+    }
+  ],
+  "missing_or_conflicts": [
+    {
+      "kind": "conflict",
+      "description": "Provider A and Provider B disagree on volume for the last bar by more than 5%.",
+      "source_ids": ["ohlcv:provider_a", "ohlcv:provider_b"]
+    }
+  ],
+  "model_inference": [
+    "Near-term momentum is constructive if volume confirms the breakout.",
+    "Sector rotation may continue to favor consumer staples for 1-2 weeks."
+  ],
+  "risks_counter_evidence": [
+    "Valuation remains elevated relative to 5-year median.",
+    "A failed breakout below 1650 would invalidate the constructive case."
+  ],
+  "framework_alignment": {
+    "status": "partial",
+    "summary": "Matches quality filter; position size exceeds conservative rule.",
+    "framework_title": "Local conservative framework",
+    "framework_version": 2,
+    "framework_id": "local"
+  },
+  "disclaimer": "AI-generated content for reference only. Not investment advice."
+}

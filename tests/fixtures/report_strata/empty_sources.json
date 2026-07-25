@@ -1,0 +1,32 @@
+{
+  "schema_version": "report-strata-v1",
+  "verified_facts": [
+    {
+      "statement": "Last close was observed in the analysis window.",
+      "source_id": null,
+      "as_of": "2026-07-25T15:00:00+08:00"
+    },
+    {
+      "statement": "No provider source id was attached to this fact.",
+      "as_of": "2026-07-25T15:00:00+08:00"
+    }
+  ],
+  "missing_or_conflicts": [
+    {
+      "kind": "missing",
+      "description": "Institutional flow series unavailable for this market.",
+      "source_ids": []
+    }
+  ],
+  "model_inference": [
+    "Inference remains provisional when source ids are empty."
+  ],
+  "risks_counter_evidence": [
+    "Empty source ids reduce auditability of fact lines."
+  ],
+  "framework_alignment": {
+    "status": "not_configured",
+    "summary": "Personal investment framework not configured"
+  },
+  "disclaimer": "AI-generated content for reference only. Not investment advice."
+}

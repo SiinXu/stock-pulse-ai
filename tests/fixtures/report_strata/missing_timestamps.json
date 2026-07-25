@@ -1,0 +1,32 @@
+{
+  "schema_version": "report-strata-v1",
+  "verified_facts": [
+    {
+      "statement": "Company reported quarterly revenue growth.",
+      "source_id": "filing:earnings",
+      "as_of": null
+    },
+    {
+      "statement": "Analyst consensus target exists in cache.",
+      "source_id": "consensus:target"
+    }
+  ],
+  "missing_or_conflicts": [
+    {
+      "kind": "missing",
+      "description": "as-of timestamp missing for one or more verified facts.",
+      "source_ids": ["filing:earnings", "consensus:target"]
+    }
+  ],
+  "model_inference": [
+    "Without as-of stamps, freshness of facts cannot be proven."
+  ],
+  "risks_counter_evidence": [
+    "Stale or undated facts may overstate current conditions."
+  ],
+  "framework_alignment": {
+    "status": "not_configured",
+    "summary": "Personal investment framework not configured"
+  },
+  "disclaimer": "AI-generated content for reference only. Not investment advice."
+}

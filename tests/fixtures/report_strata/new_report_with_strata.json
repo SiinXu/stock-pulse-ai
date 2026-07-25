@@ -1,0 +1,37 @@
+{
+  "schema_version": "report-v1",
+  "stock_name": "贵州茅台",
+  "sentiment_score": 68,
+  "trend_prediction": "震荡",
+  "operation_advice": "观望",
+  "decision_type": "hold",
+  "confidence_level": "中",
+  "analysis_summary": "New artifact with six strata under dashboard.",
+  "dashboard": {
+    "core_conclusion": {
+      "one_sentence": "等待量能确认"
+    },
+    "report_strata": {
+      "schema_version": "report-strata-v1",
+      "verified_facts": [
+        {
+          "statement": "Daily close available for the analysis session date.",
+          "source_id": "ohlcv:daily",
+          "as_of": "2026-07-25T15:00:00+08:00"
+        }
+      ],
+      "missing_or_conflicts": [],
+      "model_inference": [
+        "Range-bound regime until volume expands."
+      ],
+      "risks_counter_evidence": [
+        "Macro risk-off could compress multiples further."
+      ],
+      "framework_alignment": {
+        "status": "not_configured",
+        "summary": "Personal investment framework not configured"
+      },
+      "disclaimer": "AI-generated content for reference only. Not investment advice."
+    }
+  }
+}
