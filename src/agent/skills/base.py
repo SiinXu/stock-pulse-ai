@@ -28,7 +28,37 @@ _BUILTIN_YAML_SUBDIRECTORIES = ("personas",)
 
 @dataclass
 class Skill:
-    """A trading skill that can be injected into the agent prompt."""
+    """A trading skill that can be injected into the agent prompt.
+
+    Each skill represents a common or custom trading pattern used
+    for stock analysis and push notifications. Strategies are typically
+    loaded from YAML files written in natural language.
+
+    Attributes:
+        name: Unique strategy identifier (e.g., "dragon_head").
+        display_name: Human-readable name (e.g., "龙头策略").
+        description: Brief description of when to apply this strategy.
+        instructions: Detailed natural language instructions injected into the system prompt.
+        category: Skill category: "trend", "pattern", "reversal", "framework",
+            or "persona".
+        core_rules: List of core trading rule numbers this strategy relates to (1-7).
+        required_tools: List of tool names this skill depends on.
+        allowed_tools: Optional allowlist metadata from SKILL.md frontmatter.
+        aliases: Optional alias phrases used by NL selectors / bot commands.
+        enabled: Whether this skill is currently active.
+        source: Origin of this skill: "builtin" or file path of a custom definition.
+        entrypoint: Definition file path (YAML or SKILL.md).
+        bundle_dir: Skill bundle directory when loaded from SKILL.md.
+        disable_model_invocation: Whether the model should avoid auto-invoking this skill.
+        user_invocable: Whether this skill should be exposed in user-facing selectors.
+        default_active: Whether this skill participates in the default activation set.
+        default_router: Whether this skill participates in router fallback selection.
+        default_priority: Ordering hint for defaults / selectors (lower comes first).
+        market_regimes: Optional market regime tags used by the skill router.
+        execution_context: Inline/fork execution hint from frontmatter.
+        subagent_type: Optional subagent type hint from frontmatter.
+        preferred_model: Optional model hint from frontmatter.
+    """
     name: str
     display_name: str
     description: str
@@ -365,7 +395,13 @@ class SkillManager:
         if not active:
             return ""
 
-        categories = {"trend": "趋势", "pattern": "形态", "reversal": "反转", "framework": "框架"}
+        categories = {
+            "trend": "趋势",
+            "pattern": "形态",
+            "reversal": "反转",
+            "framework": "框架",
+            "persona": "投资视角",
+        }
         grouped: Dict[str, List[Skill]] = {}
         for skill in active:
             cat = skill.category or "trend"
@@ -373,7 +409,7 @@ class SkillManager:
 
         parts = []
         idx = 1
-        ordered_keys = ["trend", "pattern", "reversal", "framework"]
+        ordered_keys = ["trend", "pattern", "reversal", "framework", "persona"]
         for cat_key in ordered_keys + [k for k in grouped if k not in ordered_keys]:
             skills_in_cat = grouped.get(cat_key, [])
             if not skills_in_cat:

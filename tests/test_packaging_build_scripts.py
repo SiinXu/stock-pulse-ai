@@ -81,6 +81,28 @@ def test_macos_backend_build_script_collects_and_probes_migration_registry() -> 
     assert "target={target_version}" in main_py
 
 
+def test_macos_backend_build_script_verifies_packaged_persona_asset() -> None:
+    script = _read_text(REPO_ROOT / "scripts" / "build-backend-macos.sh")
+
+    assert (
+        'packaged_persona="${packaged_strategies}/personas/persona_value_moat.yaml"'
+        in script
+    )
+    assert '[[ ! -f "${packaged_persona}" ]]' in script
+    assert "packaged Persona skill not found" in script
+
+
+def test_windows_backend_build_script_verifies_packaged_persona_asset() -> None:
+    script = _read_text(REPO_ROOT / "scripts" / "build-backend.ps1")
+
+    assert (
+        "$packagedPersona = Join-Path $packagedStrategies "
+        "'personas\\persona_value_moat.yaml'" in script
+    )
+    assert "Test-Path $packagedPersona -PathType Leaf" in script
+    assert "Packaged Persona skill not found" in script
+
+
 def test_docker_smoke_imports_and_validates_migration_registry() -> None:
     workflow = _read_text(REPO_ROOT / ".github" / "workflows" / "ci.yml")
 

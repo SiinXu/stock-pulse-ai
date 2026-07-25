@@ -213,6 +213,11 @@ if [[ ! -d "${packaged_strategies}" ]]; then
   echo "ERROR: packaged strategies directory not found under dist/backend/stock_analysis."
   exit 1
 fi
+packaged_persona="${packaged_strategies}/personas/persona_value_moat.yaml"
+if [[ ! -f "${packaged_persona}" ]]; then
+  echo "ERROR: packaged Persona skill not found: ${packaged_persona}."
+  exit 1
+fi
 packaged_strategy_count="$(find "${packaged_strategies}" -maxdepth 1 -type f -name '*.yaml' | wc -l | tr -d '[:space:]')"
 if [[ "${packaged_strategy_count}" != "${source_strategy_count}" ]]; then
   echo "ERROR: packaged strategies count mismatch: expected ${source_strategy_count}, got ${packaged_strategy_count}."

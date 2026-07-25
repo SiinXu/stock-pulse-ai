@@ -245,6 +245,10 @@ if (-not (Test-Path $packagedStrategies)) {
 if (-not (Test-Path $packagedStrategies)) {
   throw 'Packaged strategies directory not found under dist\backend\stock_analysis.'
 }
+$packagedPersona = Join-Path $packagedStrategies 'personas\persona_value_moat.yaml'
+if (-not (Test-Path $packagedPersona -PathType Leaf)) {
+  throw "Packaged Persona skill not found: $packagedPersona."
+}
 $packagedStrategyCount = @(Get-ChildItem -Path $packagedStrategies -Filter '*.yaml' -File).Count
 if ($packagedStrategyCount -ne $sourceStrategyCount) {
   throw "Packaged strategies count mismatch: expected $sourceStrategyCount, got $packagedStrategyCount."

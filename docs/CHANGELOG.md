@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Added] Added five opt-in investment committee Persona Skills with bounded built-in discovery, desktop packaging coverage, explicit existing-tool lists, differentiated evidence and risk lenses, and mandatory research-only, non-affiliation, and investment-risk disclosures.
 - [Fixed] Required valid security-audit dependencies on privileged API and ToolSession paths, prevented tool completion-audit retries from duplicating side effects, and bounded arbitrary-size configuration key evidence without limiting updates.
 - [Fixed] Prevented local-model pull workers retained by the process task queue from activating through a retired FastAPI lifespan and bypassing the current configuration mutation lease.
 - [Fixed] Linearized late local-model pull activation with FastAPI lifespan retirement, task cancellation, queue shutdown, and the current configuration mutation lease.
