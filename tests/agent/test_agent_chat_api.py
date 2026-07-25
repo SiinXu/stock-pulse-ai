@@ -18,6 +18,11 @@ from src.agent.public_contract import (
     AGENT_CHAT_FAILURE_MESSAGE,
 )
 from src.agent.runtime.guards import RuntimeGuardPolicy
+from src.agent.runtime_facts import (
+    AgentRuntimeFacts,
+    build_agent_soul_runtime_facts,
+)
+from src.agent.soul import compose_agent_soul_prompt, get_agent_soul_metadata
 from src.agent.stock_scope import resolve_stock_scope
 from src.agent.tools.registry import ToolRegistry
 from src.config import Config
@@ -179,6 +184,66 @@ def test_agent_chat_forwards_stock_context_to_executor(tmp_path: Path) -> None:
     assert kwargs["session_id"] == "s1"
     assert kwargs["context"]["stock_code"] == "600519"
     assert kwargs["context"]["stock_name"] == "匿名标的"
+    assert "agent_runtime" not in response.json()
+
+
+def test_agent_chat_returns_truthful_soul_runtime_identity(tmp_path: Path) -> None:
+    executor = MagicMock()
+    executor.chat.return_value = SimpleNamespace(
+        success=True,
+        content="ok",
+        error=None,
+        runtime_facts=build_agent_soul_runtime_facts(
+            compose_agent_soul_prompt("Chat API verified prompt")
+        ),
+    )
+    config = SimpleNamespace(is_agent_available=lambda: True)
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+                client = TestClient(create_app(static_dir=tmp_path / "static"))
+                response = client.post(
+                    "/api/v1/agent/chat",
+                    json={"message": "Analyze AAPL", "session_id": "soul-runtime"},
+                )
+
+    assert response.status_code == 200
+    assert response.json()["agent_runtime"] == get_agent_soul_metadata()
+
+
+def test_agent_chat_omits_direct_unverified_runtime_facts(tmp_path: Path) -> None:
+    executor = MagicMock()
+    executor.chat.return_value = SimpleNamespace(
+        success=True,
+        content="ok",
+        error=None,
+        runtime_facts=AgentRuntimeFacts(),
+    )
+    config = SimpleNamespace(is_agent_available=lambda: True)
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+                client = TestClient(create_app(static_dir=tmp_path / "static"))
+                response = client.post(
+                    "/api/v1/agent/chat",
+                    json={"message": "Analyze AAPL", "session_id": "direct-facts"},
+                )
+
+    assert response.status_code == 200
+    assert "agent_runtime" not in response.json()
+
+
+def test_agent_chat_openapi_exposes_optional_soul_runtime_identity(tmp_path: Path) -> None:
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        schema = create_app(static_dir=tmp_path / "static").openapi()
+
+    chat_response = schema["components"]["schemas"]["ChatResponse"]
+    assert "agent_runtime" in chat_response["properties"]
+    assert "agent_runtime" not in chat_response.get("required", [])
+    runtime_schema = schema["components"]["schemas"]["AgentRuntimeMetadata"]
+    assert set(runtime_schema["required"]) == {"soul_version", "soul_hash"}
 
 
 def test_agent_chat_failure_does_not_expose_executor_details(tmp_path: Path, caplog) -> None:
@@ -239,6 +304,7 @@ def test_agent_chat_keeps_all_unavailable_comparison_failure_content_empty(
         "content": "",
         "session_id": "all-unavailable-rest",
         "error": AGENT_CHAT_FAILED,
+        "agent_runtime": get_agent_soul_metadata(),
     }
 
 

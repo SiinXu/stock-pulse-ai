@@ -38,7 +38,10 @@ from src.agent.public_contract import (
 from src.agent.runner import parse_dashboard_json_result, run_agent_loop
 from src.agent.runtime.contract import ExecutionState
 from src.agent.runtime.lifecycle import classify_result_terminal_state
-from src.agent.runtime_facts import AgentRuntimeFacts
+from src.agent.runtime_facts import (
+    AgentRuntimeFacts,
+    build_agent_soul_runtime_facts as _build_agent_soul_runtime_facts,
+)
 from src.agent.soul import compose_agent_soul_prompt as _compose_agent_soul_prompt
 from src.agent.stock_scope import StockScope, resolve_stock_scope
 from src.storage import get_db
@@ -79,6 +82,7 @@ _EXECUTOR_COMPAT_EXPORTS = (
     get_market_role,
     json,
     log_safe_exception,
+    _build_agent_soul_runtime_facts,
     parse_dashboard_json_result,
     resolve_stock_scope,
     run_agent_loop,

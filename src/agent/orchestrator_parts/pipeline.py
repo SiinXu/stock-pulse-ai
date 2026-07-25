@@ -28,6 +28,9 @@ from src.agent.runtime_facts import (
     PipelineTerminationFact,
     build_agent_runtime_facts,
 )
+from src.agent.soul import (
+    propagate_agent_soul_composition as _propagate_agent_soul_composition,
+)
 from src.agent.skills.engine import StrategyResultStatus
 from src.agent.stream_events import stream_event
 from src.agent.tools.registry import ToolRegistry
@@ -265,6 +268,7 @@ class _PipelineMethods:
                     timeout_seconds=effective_stage_timeout_s,
                     cancelled_check=cancelled_check,
                 )
+                _propagate_agent_soul_composition(staged_ctx, ctx)
                 if not isinstance(result, StageResult):
                     raise TypeError("Stage agent returned an invalid result")
                 if result.status == StageStatus.COMPLETED:

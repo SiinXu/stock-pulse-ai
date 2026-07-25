@@ -73,9 +73,14 @@ from src.agent.runtime_facts import (
     DegradedEvent,
     PipelineTerminationFact,
     build_agent_runtime_facts,
+    build_agent_soul_runtime_facts as _build_agent_soul_runtime_facts,
+    inherit_agent_soul_runtime_facts as _inherit_agent_soul_runtime_facts,
 )
 from src.agent.runtime.lifecycle import classify_result_terminal_state
-from src.agent.soul import compose_agent_soul_prompt as _compose_agent_soul_prompt
+from src.agent.soul import (
+    compose_agent_soul_prompt as _compose_agent_soul_prompt,
+    propagate_agent_soul_composition as _propagate_agent_soul_composition,
+)
 from src.agent.runtime.guards import (
     RuntimeGuardPolicy,
     StageFailurePolicy,
@@ -128,6 +133,9 @@ _ORCHESTRATOR_COMPAT_EXPORTS = (
     json,
     log_runtime_guard_event,
     log_safe_exception,
+    _build_agent_soul_runtime_facts,
+    _inherit_agent_soul_runtime_facts,
+    _propagate_agent_soul_composition,
     normalize_decision_signal,
     normalize_report_language,
     normalize_stage_failure_reason,

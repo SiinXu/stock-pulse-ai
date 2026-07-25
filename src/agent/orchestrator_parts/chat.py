@@ -21,6 +21,10 @@ from src.agent.public_contract import (
 from src.agent.runner import run_agent_loop
 from src.agent.runtime.contract import ExecutionState
 from src.agent.runtime.lifecycle import classify_result_terminal_state
+from src.agent.runtime_facts import (
+    build_agent_soul_runtime_facts as _build_agent_soul_runtime_facts,
+    inherit_agent_soul_runtime_facts as _inherit_agent_soul_runtime_facts,
+)
 from src.agent.soul import compose_agent_soul_prompt as _compose_agent_soul_prompt
 from src.agent.stock_scope import StockScope, resolve_stock_scope
 from src.agent.tools.registry import ToolRegistry
@@ -237,9 +241,26 @@ class _ChatMethods:
         per_symbol_results: List[tuple[str, OrchestratorResult]],
         *,
         error: Optional[str] = None,
+        soul_system_prompt: Optional[str] = None,
     ) -> OrchestratorResult:
         """Discard partial comparison content while retaining audit metadata."""
         models = [result.model for _, result in per_symbol_results if result.model]
+        if soul_system_prompt is not None:
+            runtime_facts = _build_agent_soul_runtime_facts(soul_system_prompt)
+        else:
+            runtime_facts = next(
+                (
+                    inherited
+                    for _, result in per_symbol_results
+                    if (
+                        inherited := _inherit_agent_soul_runtime_facts(
+                            result.runtime_facts
+                        )
+                    )
+                    is not None
+                ),
+                None,
+            )
         return OrchestratorResult(
             success=False,
             content="",
@@ -260,6 +281,7 @@ class _ChatMethods:
             ),
             model=", ".join(dict.fromkeys(models)),
             error=error or "Pipeline cancelled",
+            runtime_facts=runtime_facts,
             cancelled=True,
         )
 
@@ -406,6 +428,7 @@ class _ChatMethods:
                 "保留币种与时区差异，并明确说明所有数据缺口。"
             )
         system_prompt = _compose_agent_soul_prompt(system_prompt)
+        soul_runtime_facts = _build_agent_soul_runtime_facts(system_prompt)
 
         evidence = []
         for stock_code, result in per_symbol_results:
@@ -467,10 +490,12 @@ class _ChatMethods:
             return self._build_multi_symbol_cancelled_result(
                 per_symbol_results,
                 error=loop_result.error,
+                soul_system_prompt=system_prompt,
             )
         if cancelled_check is not None and cancelled_check():
             return self._build_multi_symbol_cancelled_result(
-                per_symbol_results
+                per_symbol_results,
+                soul_system_prompt=system_prompt,
             )
 
         synthesis_succeeded = bool(
@@ -540,6 +565,7 @@ class _ChatMethods:
                 if content and has_usable_evidence
                 else AGENT_CHAT_FAILURE_MESSAGE
             ),
+            runtime_facts=soul_runtime_facts,
             timed_out=(
                 any(result.timed_out for _, result in per_symbol_results)
                 or bool(

@@ -22,6 +22,9 @@ from src.agent.public_contract import (
 )
 from src.agent.runtime.contract import ExecutionState
 from src.agent.runtime.lifecycle import classify_result_terminal_state
+from src.agent.runtime_facts import (
+    build_agent_soul_runtime_facts as _build_agent_soul_runtime_facts,
+)
 from src.agent.soul import compose_agent_soul_prompt as _compose_agent_soul_prompt
 from src.agent.stock_scope import resolve_stock_scope
 from src.config import get_config
@@ -96,6 +99,7 @@ class _ChatMethods:
             language_section=_build_language_section(report_language, chat_mode=True),
         )
         system_prompt = _compose_agent_soul_prompt(system_prompt)
+        soul_runtime_facts = _build_agent_soul_runtime_facts(system_prompt)
 
         chat_tool_registry = build_agent_chat_tool_registry(
             self.tool_registry,
@@ -190,6 +194,7 @@ class _ChatMethods:
                     stock_scope=scope_resolution.stock_scope,
                     cancelled_check=cancelled_check,
                 )
+                result.runtime_facts = soul_runtime_facts
             finally:
                 _CHAT_TOOL_REGISTRY.reset(registry_token)
         except Exception as exc:  # broad-exception: fallback_recorded - Safe logging and the failure sentinel preserve the Chat boundary.
@@ -209,6 +214,7 @@ class _ChatMethods:
                 success=False,
                 content="",
                 error=AGENT_CHAT_FAILURE_MESSAGE,
+                runtime_facts=soul_runtime_facts,
             )
 
         # Persist assistant reply (or error note) for context continuity.

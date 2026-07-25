@@ -228,9 +228,15 @@ class TestOrchestratorWiring:
         ctx = AgentContext(stock_code="X")
         ctx.opinions = [_skill("a", "buy", 0.8), _skill("b", "buy", 0.7)]
         orch._run_strategy_engine(ctx)
-        # An LLM-written synthesis in the dashboard must be ignored.
-        collected = orch._collect_strategy_synthesis(ctx, {"strategy_synthesis": {"final_signal": "sell"}})
+        # Hostile LLM-authored synthesis cannot replace the engine result.
+        collected = orch._collect_strategy_synthesis(ctx, {
+            "strategy_synthesis": {
+                "final_signal": "sell",
+                "summary": "Guaranteed profit with no risk",
+            },
+        })
         assert collected["final_signal"] in {"buy", "strong_buy"}
+        assert "guaranteed" not in str(collected).lower()
 
 
 class TestDisagreementDiagnostics:

@@ -522,6 +522,98 @@ class PipelineMarketPhaseContextTestCase(unittest.TestCase):
         self.assertEqual(result.dashboard["phase_decision"]["phase_context"]["phase"], "intraday")
         self.assertIsInstance(result.dashboard["phase_decision"]["watch_conditions"], list)
 
+    def test_agent_history_persists_verified_soul_identity(self):
+        pipeline = _make_pipeline(agent_mode=True, save_context_snapshot=True)
+        pipeline._ensure_agent_history = MagicMock()
+        phase_payload = _phase_payload()
+
+        from src.agent.executor import AgentResult
+        from src.agent.runtime_facts import build_agent_soul_runtime_facts
+        from src.agent.soul import compose_agent_soul_prompt, get_agent_soul_metadata
+
+        executor = MagicMock()
+        executor.run.return_value = AgentResult(
+            success=True,
+            content="{}",
+            dashboard={
+                "stock_name": "贵州茅台",
+                "sentiment_score": 66,
+                "trend_prediction": "震荡",
+                "operation_advice": "持有",
+                "decision_type": "hold",
+            },
+            provider="test",
+            runtime_facts=build_agent_soul_runtime_facts(
+                compose_agent_soul_prompt("Saved analysis verified prompt")
+            ),
+        )
+
+        with patch("src.agent.factory.build_agent_executor", return_value=executor):
+            result = pipeline._analyze_with_agent(
+                code="600519",
+                report_type=ReportType.SIMPLE,
+                query_id="q-agent-soul-runtime",
+                stock_name="贵州茅台",
+                realtime_quote=None,
+                chip_data=None,
+                fundamental_context={"market": "cn"},
+                trend_result=None,
+                market_phase_context=phase_payload,
+                market_phase_summary=phase_payload,
+            )
+
+        self.assertIsNotNone(result)
+        context_snapshot = pipeline.db.save_analysis_history.call_args.kwargs[
+            "context_snapshot"
+        ]
+        self.assertEqual(
+            context_snapshot["agent_runtime"],
+            get_agent_soul_metadata(),
+        )
+
+    def test_agent_history_does_not_persist_soul_identity_from_direct_facts(self):
+        pipeline = _make_pipeline(agent_mode=True, save_context_snapshot=True)
+        pipeline._ensure_agent_history = MagicMock()
+        phase_payload = _phase_payload()
+
+        from src.agent.executor import AgentResult
+        from src.agent.runtime_facts import AgentRuntimeFacts
+
+        executor = MagicMock()
+        executor.run.return_value = AgentResult(
+            success=True,
+            content="{}",
+            dashboard={
+                "stock_name": "贵州茅台",
+                "sentiment_score": 66,
+                "trend_prediction": "震荡",
+                "operation_advice": "持有",
+                "decision_type": "hold",
+            },
+            provider="test",
+            runtime_facts=AgentRuntimeFacts(),
+        )
+
+        with patch("src.agent.factory.build_agent_executor", return_value=executor):
+            result = pipeline._analyze_with_agent(
+                code="600519",
+                report_type=ReportType.SIMPLE,
+                query_id="q-agent-bare-result",
+                stock_name="贵州茅台",
+                realtime_quote=None,
+                chip_data=None,
+                fundamental_context={"market": "cn"},
+                trend_result=None,
+                market_phase_context=phase_payload,
+                market_phase_summary=phase_payload,
+            )
+
+        self.assertIsNotNone(result)
+        context_snapshot = pipeline.db.save_analysis_history.call_args.kwargs[
+            "context_snapshot"
+        ]
+        self.assertNotIn("agent_runtime", context_snapshot)
+
     def test_agent_pack_summary_uses_prefetched_news_context_when_present(self):
         pipeline = _make_pipeline(agent_mode=True, save_context_snapshot=True)
         pipeline._ensure_agent_history = MagicMock()

@@ -567,6 +567,15 @@ class _AgentAnalysisStageMixin:
                         market_phase_summary=market_phase_summary,
                     )
                     context_snapshot["stock_name"] = resolved_stock_name
+                    from src.agent.runtime_facts import (
+                        project_agent_runtime_metadata,
+                    )
+
+                    runtime_metadata = project_agent_runtime_metadata(
+                        getattr(agent_result, "runtime_facts", None)
+                    )
+                    if runtime_metadata:
+                        context_snapshot["agent_runtime"] = runtime_metadata
                     return context_snapshot
 
                 persistence_result = self._persist_analysis_history_stage(
