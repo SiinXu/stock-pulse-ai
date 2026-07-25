@@ -15,6 +15,7 @@ from unittest.mock import patch
 import httpx
 from fastapi import FastAPI
 
+from api import app as api_app
 from api.app import create_app
 from api import deps as api_deps
 from api.middlewares.error_handler import add_error_handlers
@@ -188,6 +189,58 @@ def test_local_model_dependency_shares_concurrent_system_config_service() -> Non
     assert request.app.state.local_model_service is expected_local_service
     system_factory.assert_called_once()
     local_factory.assert_called_once()
+
+
+def test_app_lifespan_rebinds_local_model_configuration_authority() -> None:
+    app = FastAPI()
+    request = SimpleNamespace(app=app)
+    system_services = [object(), object()]
+    scheduler_services = [Mock(), Mock()]
+
+    def construct_local_service(**kwargs):
+        return SimpleNamespace(
+            system_config_service=kwargs["system_config_service"],
+        )
+
+    async def exercise_two_lifespans():
+        resolved = []
+        for _index in range(2):
+            async with api_app.app_lifespan(app):
+                system_service = app.state.system_config_service
+                local_service = api_deps.get_local_model_service(request)
+                assert local_service.system_config_service is system_service
+                resolved.append((system_service, local_service))
+            assert not hasattr(app.state, "local_model_service")
+            assert not hasattr(app.state, "system_config_service")
+        return resolved
+
+    with (
+        patch.object(
+            api_app,
+            "RuntimeSchedulerService",
+            side_effect=scheduler_services,
+        ),
+        patch.object(
+            api_app,
+            "SystemConfigService",
+            side_effect=system_services,
+        ),
+        patch.object(api_app, "_schedule_stock_index_background_refresh"),
+        patch.object(
+            api_deps,
+            "LocalModelService",
+            side_effect=construct_local_service,
+        ),
+        patch.object(api_deps, "get_task_queue", return_value=Mock()),
+        patch("src.config.get_config", return_value=SimpleNamespace(schedule_run_immediately=False)),
+    ):
+        first, second = asyncio.run(exercise_two_lifespans())
+
+    assert first[0] is system_services[0]
+    assert second[0] is system_services[1]
+    assert first[1] is not second[1]
+    scheduler_services[0].stop.assert_called_once()
+    scheduler_services[1].stop.assert_called_once()
 
 
 class LocalModelApiIntegrationTestCase(_SystemConfigServiceTestCaseBase):
