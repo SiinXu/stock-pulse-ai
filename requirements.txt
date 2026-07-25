@@ -55,6 +55,7 @@ google-search-results>=2.4.0  # SerpAPI
 
 # Network requests
 requests>=2.31.0            # HTTP requests
+tldextract>=5.3,<6          # Bundled offline Public Suffix List for public reference validation
 markdown2>=2.4.0            # Markdown to HTML
 imgkit>=1.2.0              # Markdown to image; requires wkhtmltopdf
 fake-useragent>=1.4.0       # Random User-Agent support

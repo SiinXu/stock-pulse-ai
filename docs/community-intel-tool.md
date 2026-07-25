@@ -72,10 +72,15 @@ Prompt-facing strings pass through the central sensitive-data sanitizer.
 Citation URLs must also pass the central deterministic public-reference check
 without using an operator allowlist or DNS lookup. The check rejects private or
 restricted literal addresses, single-label hostnames, invalid hostname syntax,
-and known non-public namespaces such as `.internal`, `.home.arpa`, `.local`,
-`.invalid`, `.test`, `.example`, `.onion`, and `.alt`. It establishes static
-namespace eligibility rather than current DNS reachability. Counts and field
-lengths are capped, and the complete serialized result has an 8 KiB hard limit.
+A hostname must have a suffix recognized by the pinned `tldextract` bundled
+Public Suffix List snapshot; unknown and private-use suffixes such as `.corp`,
+`.home`, `.mail`, `.internal`, `.local`, `.invalid`, `.test`, `.example`, and
+`.alt` fail closed. The `.arpa` infrastructure/reverse tree and `.onion` remain
+explicitly ineligible even though the snapshot recognizes them. This validation
+does not refresh the snapshot, write a cache, resolve DNS, or make an HTTP
+request. It establishes static namespace eligibility rather than current DNS
+reachability. Counts and field lengths are capped, and the complete serialized
+result has an 8 KiB hard limit.
 A citation URL replaced by the sanitizer is omitted while its safe
 source/reference id is retained. The capped gap list always reserves its final
 slot for `citation_url_redacted`, dropping the last provider-supplied gap when

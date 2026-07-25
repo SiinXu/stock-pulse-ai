@@ -275,6 +275,14 @@ def test_result_redacts_secrets_from_text_and_citation_url() -> None:
         "https://fixture.example/reference",
         "https://hidden.onion/reference",
         "https://service.alt/reference",
+        "https://service.corp/reference",
+        "https://router.home/reference",
+        "https://gateway.mail/reference",
+        "https://resolver.arpa/reference",
+        "https://ipv4only.arpa/reference",
+        "https://1.10.in-addr.arpa/reference",
+        "https://1.168.192.in-addr.arpa/reference",
+        "https://d.f.ip6.arpa/reference",
     ],
 )
 def test_bound_session_rejects_non_public_citation_targets_even_if_allowlisted(
@@ -285,7 +293,8 @@ def test_bound_session_rejects_non_public_citation_targets_even_if_allowlisted(
         "OUTBOUND_HTTP_ALLOWLIST",
         "127.0.0.1:8000,169.254.169.254,metadata.google.internal,service.local,::1,"
         "intranet,service.internal,router.home.arpa,fixture.invalid,fixture.test,"
-        "fixture.example,hidden.onion,service.alt",
+        "fixture.example,hidden.onion,service.alt,service.corp,router.home,gateway.mail,"
+        "resolver.arpa,ipv4only.arpa,1.10.in-addr.arpa,1.168.192.in-addr.arpa,d.f.ip6.arpa",
     )
     unsafe_citation = CommunityIntelCitation.model_construct(
         source_id="fixture_forum",

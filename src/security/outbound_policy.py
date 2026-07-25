@@ -16,6 +16,7 @@ from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Tuple
 from urllib.parse import urljoin, urlsplit
 
 import requests
+import tldextract
 
 from src.utils.sanitize import sanitize_diagnostic_text
 
@@ -33,19 +34,11 @@ _METADATA_HOSTS = frozenset(
         "metadata.google.internal",
     }
 )
-_NON_PUBLIC_REFERENCE_NAMESPACES = frozenset(
-    {
-        "alt",
-        "example",
-        "home.arpa",
-        "internal",
-        "invalid",
-        "local",
-        "localdomain",
-        "localhost",
-        "onion",
-        "test",
-    }
+# Reference validation uses only the dependency's bundled PSL snapshot and has
+# no cache directory, remote refresh, DNS lookup, or request side effect.
+_PUBLIC_SUFFIX_EXTRACTOR = tldextract.TLDExtract(
+    cache_dir=None,
+    suffix_list_urls=(),
 )
 _METADATA_IPS = frozenset(
     {
@@ -391,11 +384,15 @@ def _has_public_reference_hostname_syntax(hostname: str) -> bool:
     )
 
 
-def _uses_non_public_reference_namespace(hostname: str) -> bool:
-    return any(
-        hostname == namespace or hostname.endswith(f".{namespace}")
-        for namespace in _NON_PUBLIC_REFERENCE_NAMESPACES
-    )
+def _has_public_reference_suffix(hostname: str) -> bool:
+    if (
+        hostname == "arpa"
+        or hostname.endswith(".arpa")
+        or hostname == "onion"
+        or hostname.endswith(".onion")
+    ):
+        return False
+    return bool(_PUBLIC_SUFFIX_EXTRACTOR(hostname).suffix)
 
 
 def validate_public_reference_url(raw_url: str) -> OutboundTarget:
@@ -410,7 +407,7 @@ def validate_public_reference_url(raw_url: str) -> OutboundTarget:
         return target
     if (
         not _has_public_reference_hostname_syntax(target.hostname)
-        or _uses_non_public_reference_namespace(target.hostname)
+        or not _has_public_reference_suffix(target.hostname)
     ):
         _reject_target("non_public_hostname", target)
     return target
