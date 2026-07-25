@@ -1,4 +1,71 @@
 {# Shared macros for report templates #}
+
+{% macro report_strata_section(strata, compact=false) -%}
+{% if strata %}
+{% if not compact %}
+### 🧾 {{ labels.report_strata_heading }}
+
+#### 1. {{ labels.verified_facts_heading }}
+{% if strata.verified_facts %}
+{% for fact in strata.verified_facts %}
+- {{ fact.statement }}{% if fact.source_id %} （{{ labels.fact_source_label }}: `{{ fact.source_id }}`）{% else %} （{{ labels.fact_source_unknown_label }}）{% endif %}{% if fact.as_of %} · {{ labels.fact_as_of_label }}: {{ fact.as_of }}{% else %} · {{ labels.fact_as_of_unknown_label }}{% endif %}
+{% endfor %}
+{% else %}
+- —
+{% endif %}
+
+#### 2. {{ labels.missing_or_conflicts_heading }}
+{% if strata.missing_or_conflicts %}
+{% for gap in strata.missing_or_conflicts %}
+- [{% if gap.kind == 'conflict' %}{{ labels.gap_kind_conflict_label }}{% else %}{{ labels.gap_kind_missing_label }}{% endif %}] {{ gap.description }}{% if gap.source_ids %}（{{ gap.source_ids|join(', ') }}）{% endif %}
+{% endfor %}
+{% else %}
+- —
+{% endif %}
+
+#### 3. {{ labels.model_inference_heading }}
+{% if strata.model_inference %}
+{% for item in strata.model_inference %}
+- {{ item }}
+{% endfor %}
+{% else %}
+- —
+{% endif %}
+
+#### 4. {{ labels.risks_counter_evidence_heading }}
+{% if strata.risks_counter_evidence %}
+{% for item in strata.risks_counter_evidence %}
+- {{ item }}
+{% endfor %}
+{% else %}
+- —
+{% endif %}
+
+#### 5. {{ labels.framework_alignment_heading }}
+{% set fa = strata.framework_alignment or {} %}
+- {{ fa.summary or labels.framework_not_configured_label }}{% if fa.status %}（{{ fa.status }}）{% endif %}
+
+#### 6. {{ labels.disclaimer_heading }}
+{{ strata.disclaimer or labels.not_investment_advice }}
+
+{% else %}
+**🧾 {{ labels.report_strata_heading }}**
+{% if strata.verified_facts %}
+· {{ labels.verified_facts_heading }}: {% for fact in strata.verified_facts[:2] %}{{ fact.statement[:40] }}{{ '…' if fact.statement|length > 40 else '' }}{{ '; ' if not loop.last else '' }}{% endfor %}
+{% endif %}
+{% if strata.model_inference %}
+· {{ labels.model_inference_heading }}: {{ strata.model_inference[0][:50] }}{{ '…' if strata.model_inference[0]|length > 50 else '' }}
+{% endif %}
+{% set fa = strata.framework_alignment or {} %}
+· {{ labels.framework_alignment_heading }}: {{ fa.summary or labels.framework_not_configured_label }}
+{% endif %}
+{% endif %}
+{%- endmacro %}
+
+{% macro report_disclaimer_line() -%}
+*{{ labels.not_investment_advice }}*
+{%- endmacro %}
+
 {% macro market_snapshot(result) %}
 {% set snapshot = result.market_snapshot if result.market_snapshot else {} %}
 {% if snapshot %}

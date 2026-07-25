@@ -1,3 +1,4 @@
+{% from '_macros.j2' import report_strata_section, report_disclaimer_line with context %}
 ## 🎯 {{ report_date }} {{ labels.dashboard_title }}
 
 > {{ results|length }} {{ labels.stock_unit }} | 🟢{{ labels.buy_label }}:{{ buy_count }} 🟡{{ labels.watch_label }}:{{ hold_count }} 🔴{{ labels.sell_label }}:{{ sell_count }}
@@ -86,9 +87,16 @@
 {% endfor %}
 {% endif %}
 
+{% set strata = e.report_strata or (dashboard.get('report_strata') if dashboard else none) %}
+{% if strata %}
+{{ report_strata_section(strata, compact=true) }}
+{% endif %}
+
 ---
 {% endfor %}
 {% endif %}
+
+{{ report_disclaimer_line() }}
 
 *{{ labels.report_time_label }}: {{ report_timestamp[11:16] }}*
 {% if show_llm_model and models_used %}
