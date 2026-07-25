@@ -472,20 +472,68 @@ class _ChatMethods:
             result.success and bool(result.content)
             for _, result in per_symbol_results
         )
+        per_symbol_tool_calls_log = [
+            call
+            for _, result in per_symbol_results
+            for call in result.tool_calls_log
+        ]
+        per_symbol_total_steps = sum(
+            result.total_steps for _, result in per_symbol_results
+        )
+        per_symbol_total_tokens = sum(
+            result.total_tokens for _, result in per_symbol_results
+        )
+        per_symbol_provider = next(
+            (result.provider for _, result in per_symbol_results if result.provider),
+            "",
+        )
+        models = [
+            result.model
+            for _, result in per_symbol_results
+            if result.model
+        ]
         loop_result = None
         if has_usable_evidence and (
             timeout_seconds is None or timeout_seconds > 0
         ):
-            loop_result = run_agent_loop(
-                messages=synthesis_messages,
-                tool_registry=ToolRegistry(),
-                llm_adapter=self.llm_adapter,
-                max_steps=1,
-                max_wall_clock_seconds=timeout_seconds,
-                emit_stage_events=False,
-                cancelled_check=cancelled_check,
-                runtime_guard_policy=self.runtime_guard_policy,
-            )
+            try:
+                loop_result = run_agent_loop(
+                    messages=synthesis_messages,
+                    tool_registry=ToolRegistry(),
+                    llm_adapter=self.llm_adapter,
+                    max_steps=1,
+                    max_wall_clock_seconds=timeout_seconds,
+                    emit_stage_events=False,
+                    cancelled_check=cancelled_check,
+                    runtime_guard_policy=self.runtime_guard_policy,
+                )
+            except Exception as exc:  # broad-exception: fallback_recorded - Preserve verified Soul identity at the synthesis boundary.
+                cancellation_requested = (
+                    cancelled_check is not None and cancelled_check()
+                )
+                log_safe_exception(
+                    logger,
+                    "Multi-symbol Chat synthesis raised",
+                    exc,
+                    error_code="agent_chat_synthesis_failed",
+                )
+                if cancellation_requested:
+                    return self._build_multi_symbol_cancelled_result(
+                        per_symbol_results,
+                        soul_system_prompt=system_prompt,
+                    )
+                return OrchestratorResult(
+                    success=False,
+                    content="",
+                    tool_calls_log=per_symbol_tool_calls_log,
+                    total_steps=per_symbol_total_steps,
+                    total_tokens=per_symbol_total_tokens,
+                    provider=per_symbol_provider,
+                    model=", ".join(dict.fromkeys(models)),
+                    error=AGENT_CHAT_FAILURE_MESSAGE,
+                    runtime_facts=soul_runtime_facts,
+                    timed_out=isinstance(exc, TimeoutError),
+                )
         if loop_result is not None and loop_result.cancelled:
             return self._build_multi_symbol_cancelled_result(
                 per_symbol_results,
@@ -529,35 +577,23 @@ class _ChatMethods:
                 diagnostic,
             )
 
-        models = [
-            result.model
-            for _, result in per_symbol_results
-            if result.model
-        ]
         if loop_result is not None and loop_result.model:
             models.append(loop_result.model)
         return OrchestratorResult(
             success=bool(content) and has_usable_evidence,
             content=content,
-            tool_calls_log=[
-                call
-                for _, result in per_symbol_results
-                for call in result.tool_calls_log
-            ],
+            tool_calls_log=per_symbol_tool_calls_log,
             total_steps=(
-                sum(result.total_steps for _, result in per_symbol_results)
+                per_symbol_total_steps
                 + (loop_result.total_steps if loop_result is not None else 0)
             ),
             total_tokens=(
-                sum(result.total_tokens for _, result in per_symbol_results)
+                per_symbol_total_tokens
                 + (loop_result.total_tokens if loop_result is not None else 0)
             ),
             provider=(
                 (loop_result.provider if loop_result is not None else "")
-                or next(
-                    (result.provider for _, result in per_symbol_results if result.provider),
-                    "",
-                )
+                or per_symbol_provider
             ),
             model=", ".join(dict.fromkeys(models)),
             error=(
