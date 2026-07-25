@@ -190,7 +190,7 @@ CI Docker smoke 除了导入 `src.migrations.registry`、调用 `get_migrations(
 | `RunFlowSnapshot` | `RUN_FLOW_SCHEMA_VERSION` | `run-flow-v1` | `schema_version` | 任务 / 历史 run-flow API 响应（按需构建，无专用列） |
 | `DecisionSignalPresentation` | `DECISION_SIGNAL_PRESENTATION_SCHEMA_VERSION` | `decision-signal-presentation-v1` | `schema_version` | DecisionSignal 展示对象（由 DB 行按需构建，无专用列） |
 | Security audit event | `SECURITY_AUDIT_SCHEMA_VERSION` | `security-audit-v1` | `schema_version` | `security_audit_events.schema_version` |
-| Scheduled task definition | `SCHEDULED_TASK_SCHEMA_VERSION` | `1` | `schema_version` | `scheduled_tasks` 定义及 `/api/v1/scheduled-tasks` payload |
+| Scheduled task definition | `SCHEDULED_TASK_SCHEMA_VERSION` | `2`（仍支持 v1） | `schema_version` | `scheduled_tasks` 定义及 `/api/v1/scheduled-tasks` payload |
 
 清单与实际常量由守护测试 `tests/test_data_model_versioning_guard.py` 绑定，任何常量漂移或序列化时丢弃版本字段都会被捕获。
 

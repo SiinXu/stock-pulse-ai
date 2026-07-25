@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """Batch task queue contracts for the analysis API."""
 
+import inspect
+from dataclasses import fields
+
 from tests.analysis_api_contract_support import (
     AnalysisTaskQueue,
     Future,
@@ -34,6 +37,164 @@ class BatchTaskQueueContractTestCase(unittest.TestCase):
             if executor is not None and hasattr(executor, "shutdown"):
                 executor.shutdown(wait=False, cancel_futures=True)
         AnalysisTaskQueue._instance = self._original_instance
+
+    def test_strict_skill_selection_preserves_legacy_positional_contracts(
+        self,
+    ) -> None:
+        from src.agent.runtime_assembly import (
+            _resolve_selected_skill_ids,
+            build_agent_executor,
+            resolve_skill_prompt_state,
+        )
+        from src.analyzer import GeminiAnalyzer
+        from src.core.pipeline import StockAnalysisPipeline
+        from src.services.analysis_service import AnalysisService
+
+        legacy_positional_names = (
+            (
+                AnalysisService.analyze_stock,
+                [
+                    "self",
+                    "stock_code",
+                    "report_type",
+                    "force_refresh",
+                    "query_id",
+                    "trace_id",
+                    "send_notification",
+                    "progress_callback",
+                    "skills",
+                    "analysis_phase",
+                    "query_source",
+                    "portfolio_context",
+                    "report_language",
+                    "use_memory",
+                    "request_context",
+                ],
+            ),
+            (
+                StockAnalysisPipeline.__init__,
+                [
+                    "self",
+                    "config",
+                    "max_workers",
+                    "request_context",
+                    "query_id",
+                    "trace_id",
+                    "query_source",
+                    "save_context_snapshot",
+                    "progress_callback",
+                    "analysis_skills",
+                    "analysis_phase",
+                    "portfolio_context",
+                    "daily_market_context_enabled",
+                    "daily_market_context_allow_generate",
+                ],
+            ),
+            (
+                AnalysisTaskQueue.submit_task,
+                [
+                    "self",
+                    "stock_code",
+                    "stock_name",
+                    "original_query",
+                    "selection_source",
+                    "query_source",
+                    "portfolio_context",
+                    "report_type",
+                    "analysis_phase",
+                    "force_refresh",
+                    "skills",
+                    "report_language",
+                    "use_memory",
+                    "request_context",
+                ],
+            ),
+            (
+                AnalysisTaskQueue.submit_tasks_batch,
+                [
+                    "self",
+                    "stock_codes",
+                    "stock_name",
+                    "original_query",
+                    "selection_source",
+                    "query_source",
+                    "portfolio_context",
+                    "report_type",
+                    "analysis_phase",
+                    "force_refresh",
+                    "notify",
+                    "skills",
+                    "report_language",
+                    "use_memory",
+                    "request_context",
+                ],
+            ),
+            (GeminiAnalyzer.__init__, ["self", "api_key"]),
+            (resolve_skill_prompt_state, ["config", "skills"]),
+            (build_agent_executor, ["config", "skills"]),
+            (_resolve_selected_skill_ids, []),
+            (AnalysisTaskQueue._build_analysis_command, ["self"]),
+        )
+
+        for callable_value, expected_names in legacy_positional_names:
+            with self.subTest(callable=callable_value.__qualname__):
+                signature = inspect.signature(callable_value)
+                positional_names = [
+                    parameter.name
+                    for parameter in signature.parameters.values()
+                    if parameter.kind
+                    in (
+                        inspect.Parameter.POSITIONAL_ONLY,
+                        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    )
+                ]
+                self.assertEqual(positional_names, expected_names)
+                bound = signature.bind_partial(
+                    *[object() for _ in expected_names]
+                )
+                self.assertEqual(list(bound.arguments), expected_names)
+                self.assertEqual(
+                    signature.parameters["strict_skill_selection"].kind,
+                    inspect.Parameter.KEYWORD_ONLY,
+                )
+
+    def test_coalescing_contract_keeps_legacy_positional_field_order(
+        self,
+    ) -> None:
+        legacy_field_names = [
+            "stock_code",
+            "report_type",
+            "analysis_phase",
+            "force_refresh",
+            "notify",
+            "skills",
+            "report_language",
+            "use_memory",
+            "portfolio_context",
+            "query_source",
+            "context_bound",
+        ]
+        self.assertEqual(
+            [field.name for field in fields(AnalysisTaskCoalescingContract)],
+            [*legacy_field_names, "strict_skill_selection"],
+        )
+
+        legacy_values = [
+            "600519",
+            "detailed",
+            "auto",
+            False,
+            True,
+            ("growth_quality",),
+            "en",
+            None,
+            None,
+            "api",
+            False,
+        ]
+        contract = AnalysisTaskCoalescingContract(*legacy_values)
+
+        self.assertFalse(contract.strict_skill_selection)
 
     def test_batch_submit_rolls_back_when_executor_submit_fails(self) -> None:
         class FailingExecutor:
@@ -95,6 +256,7 @@ class BatchTaskQueueContractTestCase(unittest.TestCase):
             query_source="portfolio",
             portfolio_context=portfolio_context,
             skills=request_skills,
+            strict_skill_selection=True,
         )
         request_skills.append("mutated_after_submit")
         portfolio_context["quantity"] = 999
@@ -114,6 +276,7 @@ class BatchTaskQueueContractTestCase(unittest.TestCase):
         submitted_command = queue._commands[accepted[0].task_id]
         submitted_metadata = deep_thaw(submitted_command.metadata)
         self.assertEqual(submitted_metadata["skills"], ["growth_quality"])
+        self.assertTrue(submitted_metadata["strict_skill_selection"])
         self.assertEqual(submitted_metadata["portfolio_context"]["quantity"], 100)
 
         service_instance = MagicMock()
@@ -122,6 +285,11 @@ class BatchTaskQueueContractTestCase(unittest.TestCase):
             executor.calls[0][0](*executor.calls[0][1])
 
         self.assertEqual(service_instance.analyze_stock.call_args.kwargs["skills"], ["growth_quality"])
+        self.assertTrue(
+            service_instance.analyze_stock.call_args.kwargs[
+                "strict_skill_selection"
+            ]
+        )
         self.assertIsNot(service_instance.analyze_stock.call_args.kwargs["skills"], request_skills)
         self.assertEqual(service_instance.analyze_stock.call_args.kwargs["analysis_phase"], "intraday")
         self.assertEqual(service_instance.analyze_stock.call_args.kwargs["query_source"], "portfolio")
@@ -171,6 +339,7 @@ class BatchTaskQueueContractTestCase(unittest.TestCase):
             {"notify": False},
             {"skills": []},
             {"skills": ["growth_quality"]},
+            {"strict_skill_selection": True},
             {"report_language": "EN"},
             {"use_memory": False},
             {"portfolio_context": {"account_id": 7, "quantity": 100}},

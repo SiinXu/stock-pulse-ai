@@ -14,7 +14,10 @@ from src.config import Config
 from src.core.trading_calendar import MarketSessionStatus
 from src.migrations.registry import SCHEDULED_TASK_SCHEMA_MIGRATION, TARGET_VERSION
 from src.repositories.scheduled_task_repo import ScheduledTaskRepository
-from src.schemas.scheduled_task import next_daily_run_at
+from src.schemas.scheduled_task import (
+    MAX_SCHEDULED_TASK_EXECUTION_GENERATION,
+    next_daily_run_at,
+)
 from src.services.scheduled_task_service import (
     ScheduledTaskContractError,
     ScheduledTaskService,
@@ -222,6 +225,34 @@ def task_contract(
     }
 
 
+def research_contract(
+    task_type: str,
+    *,
+    enabled: bool = True,
+    policy: str = "skip",
+    max_attempts: int = 1,
+    notify: bool = True,
+):
+    return {
+        "schema_version": 2,
+        "name": f"Morning {task_type}",
+        "task_type": task_type,
+        "schedule": {
+            "kind": "daily",
+            "time": "09:30",
+            "timezone": "Asia/Shanghai",
+            "calendar_market": "cn",
+            "non_trading_day_policy": policy,
+        },
+        "payload": {
+            "stock_code": "600519",
+            "notify": notify,
+        },
+        "enabled": enabled,
+        "max_attempts": max_attempts,
+    }
+
+
 def analysis_contract(**overrides) -> AnalysisTaskCoalescingContract:
     metadata = {
         "stock_code": "600519",
@@ -269,6 +300,7 @@ def build_service(
     *,
     market_status=MarketSessionStatus.OPEN,
     market_session_provider=None,
+    agent_skill_ids_provider=None,
 ):
     return ScheduledTaskService(
         repository=ScheduledTaskRepository(database),
@@ -277,6 +309,10 @@ def build_service(
         market_session_provider=(
             market_session_provider
             or (lambda _market, _date: market_status)
+        ),
+        agent_skill_ids_provider=(
+            agent_skill_ids_provider
+            or (lambda: {"persona_tail_risk"})
         ),
     )
 
@@ -326,6 +362,340 @@ def test_create_list_disable_and_enable_preserve_versioned_contract(database) ->
     enabled = service.set_enabled(created["id"], True, now=NOW)
     assert enabled["enabled"] is True
     assert enabled["next_run_at"].replace(tzinfo=None) == DUE
+
+
+@pytest.mark.parametrize("task_type", ["research_brief", "risk_check"])
+def test_create_list_disable_and_enable_preserve_research_contract(
+    database,
+    task_type,
+) -> None:
+    service = build_service(database)
+
+    created = service.create_task(research_contract(task_type), now=NOW)
+
+    assert created["schema_version"] == 2
+    assert created["task_type"] == task_type
+    assert created["payload"] == {
+        "stock_code": "600519",
+        "notify": True,
+    }
+    assert created["next_run_at"].replace(tzinfo=None) == DUE
+    assert service.list_tasks()["items"] == [created]
+
+    assert service.set_enabled(created["id"], False, now=NOW)["enabled"] is False
+    reenabled = service.set_enabled(created["id"], True, now=NOW)
+    assert reenabled["enabled"] is True
+    assert reenabled["next_run_at"].replace(tzinfo=None) == DUE
+
+
+@pytest.mark.parametrize(
+    ("task_type", "expected_report_type", "expected_skills"),
+    [
+        ("research_brief", "brief", None),
+        ("risk_check", "detailed", ["persona_tail_risk"]),
+    ],
+)
+def test_research_task_types_execute_end_to_end_with_notification_isolation(
+    database,
+    task_type,
+    expected_report_type,
+    expected_skills,
+) -> None:
+    queue = FakeTaskQueue()
+    service = build_service(database, queue)
+    task = service.create_task(research_contract(task_type), now=NOW)
+
+    assert service.tick(now=DUE) == {
+        "reconciled": 0,
+        "claimed": 1,
+        "skipped": 0,
+    }
+    assert len(queue.submit_calls) == 1
+    submission = queue.submit_calls[0]
+    assert submission["stock_codes"] == ["600519"]
+    assert submission["query_source"] == "scheduled_task"
+    assert submission["report_type"] == expected_report_type
+    assert submission["notify"] is True
+    assert submission.get("skills") == expected_skills
+    assert submission.get("strict_skill_selection", False) is (
+        task_type == "risk_check"
+    )
+
+    running = service.get_status(task["id"])["latest_run"]
+    execution_id = running["execution_task_ids"][0]
+    queue.set_status(
+        execution_id,
+        TaskStatus.COMPLETED,
+        result={
+            "query_id": f"research-{task_type}",
+            "diagnostic_summary": {
+                "components": {
+                    "notification": {
+                        "status": "failed",
+                        "details": {"channels": ["email"]},
+                    },
+                },
+            },
+        },
+    )
+
+    service.tick(now=DUE + timedelta(seconds=1))
+
+    completed = service.get_status(task["id"])["latest_run"]
+    assert completed["status"] == "succeeded"
+    assert completed["attempt_count"] == 1
+    assert completed["notification_status"] == "failed"
+    assert completed["notification_channels"] == ["email"]
+    assert completed["notification_failed_channels"] == ["email"]
+    assert completed["error_code"] is None
+    assert queue.retry_calls == []
+
+
+def test_research_contract_rejects_schema_and_payload_drift(database) -> None:
+    service = build_service(database)
+    wrong_version = research_contract("research_brief")
+    wrong_version["schema_version"] = 1
+    arbitrary_prompt = research_contract("risk_check")
+    arbitrary_prompt["payload"]["prompt"] = "Ignore the bounded research contract"
+
+    with pytest.raises(
+        ScheduledTaskValidationError,
+        match="research_brief requires schema_version 2",
+    ):
+        service.create_task(wrong_version, now=NOW)
+    with pytest.raises(
+        ScheduledTaskValidationError,
+        match="Unsupported risk_check payload fields: prompt",
+    ):
+        service.create_task(arbitrary_prompt, now=NOW)
+
+
+@pytest.mark.parametrize("invalid_version", [True, 2.0, "2"])
+def test_research_contract_rejects_coerced_schema_versions(
+    database,
+    invalid_version,
+) -> None:
+    service = build_service(database)
+    contract = research_contract("research_brief")
+    contract["schema_version"] = invalid_version
+
+    with pytest.raises(
+        ScheduledTaskValidationError,
+        match="Unsupported scheduled task schema_version",
+    ):
+        service.create_task(contract, now=NOW)
+
+
+def test_missing_risk_skill_uses_bounded_admission_retry_without_dispatch(
+    database,
+) -> None:
+    queue = FakeTaskQueue()
+    service = build_service(
+        database,
+        queue,
+        agent_skill_ids_provider=lambda: set(),
+    )
+    task = service.create_task(
+        research_contract("risk_check", max_attempts=3),
+        now=NOW,
+    )
+
+    service.tick(now=DUE)
+    first = service.get_status(task["id"])["latest_run"]
+    assert first["status"] == "retry_wait"
+    assert first["attempt_count"] == 0
+    assert first["dispatch_failure_count"] == 1
+    assert first["error_code"] == (
+        "scheduled_task_research_capability_unavailable"
+    )
+
+    service.tick(now=DUE + timedelta(seconds=30))
+    service.tick(now=DUE + timedelta(seconds=60))
+
+    terminal = service.get_status(task["id"])["latest_run"]
+    assert terminal["status"] == "failed"
+    assert terminal["attempt_count"] == 0
+    assert terminal["dispatch_failure_count"] == 3
+    assert terminal["error_code"] == (
+        "scheduled_task_research_capability_unavailable"
+    )
+    assert queue.submit_calls == []
+    assert queue.retry_calls == []
+
+
+def test_today_projection_keeps_upcoming_and_completed_occurrences(database) -> None:
+    queue = FakeTaskQueue()
+    service = build_service(database, queue)
+    brief = service.create_task(
+        research_contract("research_brief"),
+        now=NOW,
+    )
+    disabled = service.create_task(
+        research_contract("risk_check", enabled=False),
+        now=NOW,
+    )
+
+    upcoming = service.list_today(timezone_name="Asia/Shanghai", now=NOW)
+
+    assert upcoming["date"] == date(2026, 7, 24)
+    assert upcoming["timezone"] == "Asia/Shanghai"
+    assert upcoming["total"] == 1
+    assert upcoming["items"][0]["task"]["id"] == brief["id"]
+    assert upcoming["items"][0]["status"] == "scheduled"
+    assert upcoming["items"][0]["run"] is None
+    assert disabled["id"] not in {
+        item["task"]["id"] for item in upcoming["items"]
+    }
+
+    service.tick(now=DUE)
+    running = service.get_status(brief["id"])["latest_run"]
+    queue.set_status(running["execution_task_ids"][0], TaskStatus.COMPLETED)
+    service.tick(now=DUE + timedelta(seconds=1))
+
+    completed = service.list_today(
+        timezone_name="Asia/Shanghai",
+        now=DUE + timedelta(seconds=1),
+    )
+    assert completed["total"] == 1
+    assert completed["items"][0]["task"]["id"] == brief["id"]
+    assert completed["items"][0]["status"] == "succeeded"
+    assert completed["items"][0]["run"]["status"] == "succeeded"
+
+
+@pytest.mark.parametrize(
+    ("now", "expected_hours"),
+    [
+        (datetime(2026, 3, 8, 12, 0), 23),
+        (datetime(2026, 11, 1, 12, 0), 25),
+    ],
+)
+def test_today_projection_uses_local_dst_day_boundaries(
+    database,
+    monkeypatch,
+    now,
+    expected_hours,
+) -> None:
+    service = build_service(database)
+    captured_ranges = []
+
+    def capture_range(*, start, end, **_kwargs):
+        captured_ranges.append((start, end))
+        return []
+
+    monkeypatch.setattr(service.repository, "list_runs_between", capture_range)
+    monkeypatch.setattr(
+        service.repository,
+        "list_next_occurrences_between",
+        capture_range,
+    )
+
+    result = service.list_today(
+        timezone_name="America/New_York",
+        now=now,
+    )
+
+    assert result["items"] == []
+    assert len(captured_ranges) == 2
+    for start, end in captured_ranges:
+        assert end - start == timedelta(hours=expected_hours)
+
+
+def test_today_projection_keeps_future_schema_opaque(database) -> None:
+    service = build_service(database)
+    task = service.create_task(
+        research_contract("research_brief"),
+        now=NOW,
+    )
+    with database.get_session() as session:
+        row = session.get(ScheduledTaskRecord, task["id"])
+        row.schema_version = 3
+        row.task_type = "future_research"
+        row.payload_json = "not-understood"
+        session.commit()
+
+    today = service.list_today(timezone_name="Asia/Shanghai", now=NOW)
+
+    assert today["total"] == 1
+    item = today["items"][0]
+    assert item["status"] == "scheduled"
+    assert item["run"] is None
+    assert item["task"]["compatibility"] == "unsupported_schema"
+    assert item["task"]["schema_version"] == 3
+    assert "task_type" not in item["task"]
+    assert "payload" not in item["task"]
+
+
+def test_today_projection_rejects_invalid_display_timezone(database) -> None:
+    service = build_service(database)
+
+    with pytest.raises(
+        ScheduledTaskValidationError,
+        match="valid IANA timezone",
+    ):
+        service.list_today(timezone_name="Mars/Olympus", now=NOW)
+
+
+def test_today_projection_skips_run_deleted_between_projection_reads(
+    database,
+    monkeypatch,
+) -> None:
+    queue = FakeTaskQueue()
+    service = build_service(database, queue)
+    task = service.create_task(
+        research_contract("research_brief"),
+        now=NOW,
+    )
+    service.tick(now=DUE)
+    monkeypatch.setattr(
+        service.repository,
+        "list_tasks_by_ids",
+        lambda _task_ids: [],
+    )
+
+    today = service.list_today(
+        timezone_name="Asia/Shanghai",
+        now=DUE,
+    )
+
+    assert today["items"] == []
+    assert today["total"] == 0
+    assert service.repository.count_runs(task["id"]) == 1
+
+
+def test_today_projection_skips_corrupt_scheduled_definition(database) -> None:
+    service = build_service(database)
+    task = service.create_task(
+        research_contract("research_brief"),
+        now=NOW,
+    )
+    with database.get_session() as session:
+        row = session.get(ScheduledTaskRecord, task["id"])
+        row.task_type = "corrupt-v2"
+        session.commit()
+
+    today = service.list_today(timezone_name="Asia/Shanghai", now=NOW)
+
+    assert today["items"] == []
+    assert today["total"] == 0
+
+
+def test_today_projection_skips_run_backed_corrupt_definition(database) -> None:
+    queue = FakeTaskQueue()
+    service = build_service(database, queue)
+    task = service.create_task(
+        research_contract("research_brief", policy="run"),
+        now=NOW,
+    )
+    service.tick(now=DUE)
+    with database.get_session() as session:
+        row = session.get(ScheduledTaskRecord, task["id"])
+        row.schema_version = 2.5
+        session.commit()
+
+    today = service.list_today(timezone_name="Asia/Shanghai", now=DUE)
+
+    assert today["items"] == []
+    assert today["total"] == 0
 
 
 def test_stock_market_must_match_trading_calendar(database) -> None:
@@ -761,7 +1131,7 @@ def test_future_schema_reads_as_opaque_and_mutations_preserve_definition(databas
     task = service.create_task(task_contract(), now=NOW)
     with database.get_session() as session:
         row = session.get(ScheduledTaskRecord, task["id"])
-        row.schema_version = 2
+        row.schema_version = 3
         row.payload_json = "not-v1-json"
         session.commit()
         expected = definition_values(row)
@@ -772,7 +1142,7 @@ def test_future_schema_reads_as_opaque_and_mutations_preserve_definition(databas
     assert opaque == {
         "compatibility": "unsupported_schema",
         "id": task["id"],
-        "schema_version": 2,
+        "schema_version": 3,
         "name": "Morning analysis",
         "enabled": True,
         "next_run_at": expected["next_run_at"].replace(tzinfo=timezone.utc),
@@ -797,7 +1167,7 @@ def test_enablement_cas_never_rewrites_concurrently_upgraded_schema(
     def upgrade_then_set_enabled(task_id, **kwargs):
         with database.get_session() as session:
             row = session.get(ScheduledTaskRecord, task_id)
-            row.schema_version = 2
+            row.schema_version = 3
             session.commit()
         return original_set_enabled(task_id, **kwargs)
 
@@ -812,7 +1182,7 @@ def test_enablement_cas_never_rewrites_concurrently_upgraded_schema(
 
     with database.get_session() as session:
         persisted = session.get(ScheduledTaskRecord, task["id"])
-        assert persisted.schema_version == 2
+        assert persisted.schema_version == 3
         assert persisted.enabled is True
         assert persisted.next_run_at == DUE
 
@@ -829,7 +1199,7 @@ def test_claim_cas_never_dispatches_concurrently_upgraded_schema(
     def upgrade_then_claim(**kwargs):
         with database.get_session() as session:
             row = session.get(ScheduledTaskRecord, task["id"])
-            row.schema_version = 2
+            row.schema_version = 3
             row.payload_json = "not-v1-json"
             session.commit()
         return original_claim(**kwargs)
@@ -848,7 +1218,7 @@ def test_claim_cas_never_dispatches_concurrently_upgraded_schema(
     assert queue.submit_calls == []
     with database.get_session() as session:
         persisted = session.get(ScheduledTaskRecord, task["id"])
-        assert persisted.schema_version == 2
+        assert persisted.schema_version == 3
         assert persisted.enabled is True
         assert persisted.next_run_at == DUE
     run = service.list_runs(task["id"])["items"][0]
@@ -904,7 +1274,7 @@ def test_future_schema_due_slot_is_fenced_once_without_definition_rewrite(
     task = service_a.create_task(task_contract(), now=NOW)
     with database.get_session() as session:
         row = session.get(ScheduledTaskRecord, task["id"])
-        row.schema_version = 2
+        row.schema_version = 3
         row.payload_json = "not-v1-json"
         session.commit()
         expected = definition_values(row)
@@ -925,6 +1295,351 @@ def test_future_schema_due_slot_is_fenced_once_without_definition_rewrite(
     assert runs["items"][0]["error_code"] == "scheduled_task_schema_unsupported"
 
 
+def test_new_schema_runtime_advances_old_unsupported_fence_without_replay(
+    database,
+) -> None:
+    queue = FakeTaskQueue()
+    old_runtime = build_service(database, queue)
+    task = old_runtime.create_task(
+        research_contract("risk_check", policy="run"),
+        now=NOW,
+    )
+    persisted = old_runtime.repository.get_task(task["id"])
+    assert persisted is not None
+    assert old_runtime._record_unsupported_due_task(persisted, DUE) is True
+
+    restarted_runtime = build_service(database, queue)
+    first = restarted_runtime.tick(now=DUE)
+    second = restarted_runtime.tick(now=DUE)
+    second_restart = build_service(database, queue).tick(now=DUE)
+
+    assert first == {"reconciled": 0, "claimed": 0, "skipped": 1}
+    assert second == {"reconciled": 0, "claimed": 0, "skipped": 0}
+    assert second_restart == {"reconciled": 0, "claimed": 0, "skipped": 0}
+    assert queue.submit_calls == []
+    recovered = restarted_runtime.repository.get_task(task["id"])
+    assert recovered is not None
+    assert recovered.next_run_at == DUE + timedelta(days=1)
+    assert restarted_runtime.repository.count_runs(task["id"]) == 1
+
+    next_runtime = build_service(database, queue)
+    assert next_runtime.tick(now=DUE + timedelta(days=1))["claimed"] == 1
+    assert len(queue.submit_calls) == 1
+    assert queue.submit_calls[0]["strict_skill_selection"] is True
+    runs = next_runtime.list_runs(task["id"])["items"]
+    assert len(runs) == 2
+    assert runs[1]["status"] == "interrupted"
+    assert runs[1]["error_code"] == "scheduled_task_schema_unsupported"
+
+
+def test_supported_schema_fence_recovery_is_cross_process_idempotent(
+    database,
+) -> None:
+    queue = FakeTaskQueue()
+    service = build_service(database, queue)
+    task = service.create_task(
+        research_contract("research_brief", policy="run"),
+        now=NOW,
+    )
+    persisted = service.repository.get_task(task["id"])
+    assert persisted is not None
+    assert service._record_unsupported_due_task(persisted, DUE) is True
+    services = [build_service(database, queue), build_service(database, queue)]
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(
+            executor.map(lambda item: item.tick(now=DUE), services)
+        )
+
+    assert sum(result["skipped"] for result in results) == 1
+    assert queue.submit_calls == []
+    recovered = service.repository.get_task(task["id"])
+    assert recovered is not None
+    assert recovered.next_run_at == DUE + timedelta(days=1)
+    assert service.repository.count_runs(task["id"]) == 1
+
+
+@pytest.mark.parametrize(
+    "invalid_schema_version",
+    [0, -1, True, 2.5, "2"],
+)
+def test_persisted_schema_classifier_rejects_non_future_values(
+    database,
+    invalid_schema_version,
+) -> None:
+    service = build_service(database)
+    task = service.create_task(task_contract(), now=NOW)
+    row = service.repository.get_task(task["id"])
+    assert row is not None
+    row.schema_version = invalid_schema_version
+
+    with pytest.raises(
+        ScheduledTaskContractError,
+        match="schema version",
+    ):
+        service._task_item(row)
+    with pytest.raises(
+        ScheduledTaskContractError,
+        match="schema version",
+    ):
+        service._validate_persisted_task(row)
+
+
+def test_due_invalid_schema_is_disabled_without_invalid_run_snapshot(
+    database,
+) -> None:
+    queue = FakeTaskQueue()
+    service = build_service(database, queue)
+    task = service.create_task(task_contract(policy="run"), now=NOW)
+    with database.get_session() as session:
+        row = session.get(ScheduledTaskRecord, task["id"])
+        row.schema_version = -1
+        session.commit()
+
+    result = service.tick(now=DUE)
+
+    assert result == {"reconciled": 0, "claimed": 0, "skipped": 1}
+    assert queue.submit_calls == []
+    persisted = service.repository.get_task(task["id"])
+    assert persisted is not None
+    assert persisted.enabled is False
+    assert persisted.execution_generation == 2
+    assert persisted.next_run_at is None
+    assert service.repository.count_runs(task["id"]) == 0
+
+
+def test_due_invalid_execution_generation_is_disabled_before_claim(
+    database,
+) -> None:
+    queue = FakeTaskQueue()
+    service = build_service(database, queue)
+    task = service.create_task(task_contract(policy="run"), now=NOW)
+    with database.get_session() as session:
+        row = session.get(ScheduledTaskRecord, task["id"])
+        row.execution_generation = 1.9
+        session.commit()
+
+    result = service.tick(now=DUE)
+
+    assert result == {"reconciled": 0, "claimed": 0, "skipped": 1}
+    assert queue.submit_calls == []
+    persisted = service.repository.get_task(task["id"])
+    assert persisted is not None
+    assert persisted.enabled is False
+    assert persisted.execution_generation == 1
+    assert persisted.next_run_at is None
+    assert service.repository.count_runs(task["id"]) == 0
+
+
+def test_invalid_generation_quarantine_never_reuses_stale_run_generation(
+    database,
+    monkeypatch,
+) -> None:
+    queue = FakeTaskQueue(initial_status=TaskStatus.FAILED)
+    service = build_service(database, queue)
+    task = service.create_task(
+        task_contract(
+            enabled=False,
+            policy="run",
+            max_attempts=3,
+        ),
+        now=NOW,
+    )
+    enabled = service.set_enabled(task["id"], True, now=NOW)
+    assert service.repository.get_task(task["id"]).execution_generation == 2
+    service.tick(now=DUE)
+    stale = service.get_status(task["id"])["latest_run"]
+    assert stale["status"] == "retry_wait"
+    stale_run_id = stale["id"]
+
+    next_due = DUE + timedelta(days=1)
+    with database.get_session() as session:
+        row = session.get(ScheduledTaskRecord, task["id"])
+        row.execution_generation = 2.9
+        row.next_run_at = next_due
+        session.commit()
+
+    original_list_active_runs = service.repository.list_active_runs
+    monkeypatch.setattr(service.repository, "list_active_runs", lambda: [])
+    quarantined = service.tick(now=next_due)
+    monkeypatch.setattr(
+        service.repository,
+        "list_active_runs",
+        original_list_active_runs,
+    )
+
+    assert quarantined["skipped"] == 1
+    persisted = service.repository.get_task(task["id"])
+    assert persisted is not None
+    assert persisted.enabled is False
+    assert persisted.execution_generation == 3
+    reenabled = service.set_enabled(
+        enabled["id"],
+        True,
+        now=next_due,
+    )
+    assert reenabled["enabled"] is True
+    assert service.repository.get_task(task["id"]).execution_generation == 4
+
+    service.tick(now=next_due + timedelta(seconds=1))
+
+    assert queue.retry_calls == []
+    with database.get_session() as session:
+        stale_run = session.get(ScheduledTaskRunRecord, stale_run_id)
+        assert stale_run.definition_generation == 2
+        assert stale_run.status == "interrupted"
+        assert (
+            stale_run.error_code
+            == "scheduled_task_definition_changed_before_retry"
+        )
+
+
+def test_generation_ceiling_still_allows_fail_closed_disable(database) -> None:
+    queue = FakeTaskQueue()
+    service = build_service(database, queue)
+    task = service.create_task(task_contract(policy="run"), now=NOW)
+    with database.get_session() as session:
+        row = session.get(ScheduledTaskRecord, task["id"])
+        row.execution_generation = MAX_SCHEDULED_TASK_EXECUTION_GENERATION
+        session.commit()
+
+    disabled = service.set_enabled(task["id"], False, now=NOW)
+
+    assert disabled["enabled"] is False
+    persisted = service.repository.get_task(task["id"])
+    assert persisted is not None
+    assert (
+        persisted.execution_generation
+        == MAX_SCHEDULED_TASK_EXECUTION_GENERATION
+    )
+    assert service.tick(now=DUE)["claimed"] == 0
+    assert queue.submit_calls == []
+    with pytest.raises(
+        ScheduledTaskContractError,
+        match="generation cannot advance",
+    ):
+        service.set_enabled(task["id"], True, now=NOW)
+
+
+def test_generation_ceiling_quarantine_interrupts_same_generation_retry(
+    database,
+) -> None:
+    queue = FakeTaskQueue(initial_status=TaskStatus.FAILED)
+    service = build_service(database, queue)
+    task = service.create_task(
+        task_contract(policy="run", max_attempts=3),
+        now=NOW,
+    )
+    with database.get_session() as session:
+        row = session.get(ScheduledTaskRecord, task["id"])
+        row.execution_generation = MAX_SCHEDULED_TASK_EXECUTION_GENERATION
+        session.commit()
+    service.tick(now=DUE)
+    waiting = service.get_status(task["id"])["latest_run"]
+    assert waiting["status"] == "retry_wait"
+    with database.get_session() as session:
+        row = session.get(ScheduledTaskRecord, task["id"])
+        row.task_type = "corrupt-v1"
+        session.commit()
+
+    service.tick(now=DUE + timedelta(seconds=1))
+
+    persisted = service.repository.get_task(task["id"])
+    assert persisted is not None
+    assert persisted.enabled is False
+    assert (
+        persisted.execution_generation
+        == MAX_SCHEDULED_TASK_EXECUTION_GENERATION
+    )
+    run_row = service.repository.get_run(waiting["id"])
+    assert run_row is not None
+    run = service._run_item(run_row)
+    assert run["status"] == "interrupted"
+    assert run["error_code"] == "scheduled_task_definition_invalid"
+    assert queue.retry_calls == []
+    with database.get_session() as session:
+        row = session.get(ScheduledTaskRecord, task["id"])
+        row.task_type = "stock_analysis"
+        session.commit()
+    with pytest.raises(
+        ScheduledTaskContractError,
+        match="generation cannot advance",
+    ):
+        service.set_enabled(task["id"], True, now=DUE)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "invalid_value"),
+    [
+        ("attempt_count", 1.9),
+        ("attempt_count", "0"),
+        ("attempt_count", True),
+        ("dispatch_failure_count", 0.5),
+        ("definition_schema_version", 1.5),
+        ("definition_generation", "1"),
+    ],
+)
+def test_run_projection_rejects_lossy_integer_coercions(
+    database,
+    field_name,
+    invalid_value,
+) -> None:
+    queue = FakeTaskQueue()
+    service = build_service(database, queue)
+    task = service.create_task(task_contract(policy="run"), now=NOW)
+    service.tick(now=DUE)
+    row = service.repository.list_runs(task["id"], limit=1)[0]
+    setattr(row, field_name, invalid_value)
+
+    with pytest.raises(ScheduledTaskContractError, match="is invalid"):
+        service._run_item(row)
+
+
+def test_active_run_with_invalid_counter_is_interrupted_without_retry(
+    database,
+) -> None:
+    queue = FakeTaskQueue()
+    service = build_service(database, queue)
+    task = service.create_task(
+        task_contract(policy="run", max_attempts=3),
+        now=NOW,
+    )
+    service.tick(now=DUE)
+    run_id = service.get_status(task["id"])["latest_run"]["id"]
+    with database.get_session() as session:
+        run = session.get(ScheduledTaskRunRecord, run_id)
+        run.attempt_count = 1.9
+        session.commit()
+
+    result = service.tick(now=DUE + timedelta(seconds=1))
+
+    assert result["reconciled"] == 1
+    assert queue.retry_calls == []
+    with database.get_session() as session:
+        persisted = session.get(ScheduledTaskRunRecord, run_id)
+        assert persisted.status == "interrupted"
+        assert persisted.error_code == "scheduled_task_run_invalid"
+
+
+def test_today_projection_skips_corrupt_run_instead_of_failing_card(
+    database,
+) -> None:
+    queue = FakeTaskQueue()
+    service = build_service(database, queue)
+    task = service.create_task(task_contract(policy="run"), now=NOW)
+    service.tick(now=DUE)
+    run_id = service.get_status(task["id"])["latest_run"]["id"]
+    with database.get_session() as session:
+        run = session.get(ScheduledTaskRunRecord, run_id)
+        run.dispatch_failure_count = 0.5
+        session.commit()
+
+    today = service.list_today(timezone_name="Asia/Shanghai", now=DUE)
+
+    assert today["items"] == []
+    assert today["total"] == 0
+
+
 def test_quarantine_cas_never_disables_concurrently_upgraded_schema(
     database,
     monkeypatch,
@@ -941,7 +1656,7 @@ def test_quarantine_cas_never_disables_concurrently_upgraded_schema(
     def upgrade_then_quarantine(**kwargs):
         with database.get_session() as session:
             row = session.get(ScheduledTaskRecord, task["id"])
-            row.schema_version = 2
+            row.schema_version = 3
             session.commit()
         return original_quarantine(**kwargs)
 
@@ -959,7 +1674,7 @@ def test_quarantine_cas_never_disables_concurrently_upgraded_schema(
     assert queue.submit_calls == []
     with database.get_session() as session:
         persisted = session.get(ScheduledTaskRecord, task["id"])
-        assert persisted.schema_version == 2
+        assert persisted.schema_version == 3
         assert persisted.enabled is True
         assert persisted.next_run_at == DUE
 
@@ -976,7 +1691,7 @@ def test_future_schema_interrupts_active_projection_without_rewriting_definition
 
     with database.get_session() as session:
         row = session.get(ScheduledTaskRecord, task["id"])
-        row.schema_version = 2
+        row.schema_version = 3
         session.commit()
         expected = definition_values(row)
 
@@ -1012,7 +1727,7 @@ def test_active_quarantine_cas_reclassifies_concurrently_upgraded_schema(
     def upgrade_then_set_enabled(task_id, **kwargs):
         with database.get_session() as session:
             row = session.get(ScheduledTaskRecord, task_id)
-            row.schema_version = 2
+            row.schema_version = 3
             session.commit()
         return original_set_enabled(task_id, **kwargs)
 
@@ -1026,7 +1741,7 @@ def test_active_quarantine_cas_reclassifies_concurrently_upgraded_schema(
 
     with database.get_session() as session:
         persisted = session.get(ScheduledTaskRecord, task["id"])
-        assert persisted.schema_version == 2
+        assert persisted.schema_version == 3
         assert persisted.enabled is True
         assert persisted.next_run_at > DUE
     interrupted = service.list_runs(task["id"])["items"][0]
@@ -1276,7 +1991,7 @@ def test_schema_change_before_writer_fence_prevents_queue_admission(
     assert fence_ready.wait(timeout=5)
     with database.get_session() as session:
         row = session.get(ScheduledTaskRecord, task["id"])
-        row.schema_version = 2
+        row.schema_version = 3
         row.payload_json = "not-v1-json"
         session.commit()
     release_fence.set()

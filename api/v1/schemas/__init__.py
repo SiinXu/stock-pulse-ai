@@ -112,6 +112,7 @@ from api.v1.schemas.alerts import (
 )
 from api.v1.schemas.scheduled_tasks import (
     DailyScheduleRequest,
+    ResearchScheduledPayload,
     ScheduledTaskCreateRequest,
     ScheduledTaskDefinitionItem,
     ScheduledTaskItem,
@@ -119,6 +120,8 @@ from api.v1.schemas.scheduled_tasks import (
     ScheduledTaskRunItem,
     ScheduledTaskRunListResponse,
     ScheduledTaskStatusResponse,
+    ScheduledTaskTodayItem,
+    ScheduledTaskTodayResponse,
     StockAnalysisScheduledPayload,
     UnsupportedScheduledTaskItem,
 )
@@ -238,6 +241,7 @@ __all__ = [
     "AlertTriggerListResponse",
     # scheduled tasks
     "DailyScheduleRequest",
+    "ResearchScheduledPayload",
     "ScheduledTaskCreateRequest",
     "ScheduledTaskDefinitionItem",
     "ScheduledTaskItem",
@@ -245,6 +249,8 @@ __all__ = [
     "ScheduledTaskRunItem",
     "ScheduledTaskRunListResponse",
     "ScheduledTaskStatusResponse",
+    "ScheduledTaskTodayItem",
+    "ScheduledTaskTodayResponse",
     "StockAnalysisScheduledPayload",
     "UnsupportedScheduledTaskItem",
     # decision signals

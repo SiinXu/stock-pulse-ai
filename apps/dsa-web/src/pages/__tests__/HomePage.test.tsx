@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { alertsApi } from '../../api/alerts';
 import { decisionSignalsApi } from '../../api/decisionSignals';
 import { historyApi } from '../../api/history';
+import { scheduledTasksApi } from '../../api/scheduledTasks';
 import { systemConfigApi } from '../../api/systemConfig';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import {
@@ -39,6 +40,12 @@ vi.mock('../../api/alerts', () => ({
 vi.mock('../../api/history', () => ({
   historyApi: {
     getList: vi.fn(),
+  },
+}));
+
+vi.mock('../../api/scheduledTasks', () => ({
+  scheduledTasksApi: {
+    getToday: vi.fn(),
   },
 }));
 
@@ -85,6 +92,23 @@ const marketHistory = {
   stockName: 'Market review',
   reportType: 'market_review' as const,
   createdAt: '2026-07-23T12:00:00Z',
+};
+
+const scheduledRiskCheck = {
+  task: {
+    compatibility: 'supported' as const,
+    id: 'scheduled-risk-1',
+    schemaVersion: 2,
+    name: 'AAPL downside review',
+    taskType: 'risk_check',
+    enabled: true,
+    nextRunAt: '2026-07-25T10:00:00Z',
+    createdAt: '2026-07-24T20:00:00Z',
+    updatedAt: '2026-07-24T20:00:00Z',
+  },
+  scheduledFor: '2026-07-25T10:00:00Z',
+  status: 'retry_wait' as const,
+  run: null,
 };
 
 function LocationProbe() {
@@ -149,6 +173,13 @@ describe('HomePage attention hub', () => {
       requiredMissingKeys: [],
       nextStepKey: null,
       checks: [],
+    });
+    vi.mocked(scheduledTasksApi.getToday).mockResolvedValue({
+      date: '2026-07-25',
+      timezone: 'UTC',
+      generatedAt: '2026-07-25T12:00:00Z',
+      items: [scheduledRiskCheck],
+      total: 1,
     });
   });
 
@@ -219,10 +250,38 @@ describe('HomePage attention hub', () => {
       .getByText('Market review')).toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: 'Recent analyses' }))
       .getByText('Apple')).toBeInTheDocument();
+    const scheduled = screen.getByRole('region', { name: 'Scheduled tasks today' });
+    expect(within(scheduled).getByText('AAPL downside review')).toBeInTheDocument();
+    expect(within(scheduled).getByText('Risk check', { exact: false })).toBeInTheDocument();
+    expect(within(scheduled).getByText('Waiting to retry')).toBeInTheDocument();
+    const taskList = within(scheduled).getByRole('region', {
+      name: "Today's scheduled task list",
+    });
+    expect(taskList).toHaveAttribute('tabindex', '0');
+    expect(within(taskList).getByRole('list')).toBeInTheDocument();
+    expect(within(taskList).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(scheduled).queryByRole('button')).not.toBeInTheDocument();
 
     for (const reportType of ['market_review', 'simple', 'detailed', 'full', 'brief']) {
       expect(historyApi.getList).toHaveBeenCalledWith(expect.objectContaining({ reportType }));
     }
+    expect(scheduledTasksApi.getToday).toHaveBeenCalledWith({
+      timezone: expect.any(String),
+    });
+  });
+
+  it('isolates an unavailable scheduled-task projection from other Home data', async () => {
+    window.localStorage.setItem(HOME_CONFIGURABLE_STORAGE_KEY, '1');
+    vi.mocked(scheduledTasksApi.getToday).mockRejectedValue(
+      new Error('scheduled tasks unavailable'),
+    );
+
+    renderHome();
+
+    const scheduled = await screen.findByRole('region', { name: 'Scheduled tasks today' });
+    expect(within(scheduled).getByText('Home data is incomplete')).toBeInTheDocument();
+    expect(screen.getAllByText('Apple')).not.toHaveLength(0);
+    expect(screen.queryByText('No scheduled tasks today')).not.toBeInTheDocument();
   });
 
   it('shows loading rather than false empty history states when configuration starts expanded', async () => {

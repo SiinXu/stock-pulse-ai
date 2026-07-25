@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from datetime import datetime
 import json
 from pathlib import Path
 
@@ -14,12 +15,15 @@ import pytest
 from api.v1.endpoints import scheduled_tasks
 from api.v1.schemas.scheduled_tasks import (
     DailyScheduleRequest,
+    ResearchScheduledPayload,
     ScheduledTaskCreateRequest,
     ScheduledTaskItem,
     ScheduledTaskListResponse,
     ScheduledTaskRunItem,
     ScheduledTaskRunListResponse,
     ScheduledTaskStatusResponse,
+    ScheduledTaskTodayItem,
+    ScheduledTaskTodayResponse,
     StockAnalysisScheduledPayload,
     UnsupportedScheduledTaskItem,
 )
@@ -47,6 +51,7 @@ def client(tmp_path):
     database = DatabaseManager(db_url=f"sqlite:///{tmp_path / 'api.sqlite'}")
     service = ScheduledTaskService(
         repository=ScheduledTaskRepository(database),
+        clock=lambda: datetime(2026, 7, 25, 12, 0),
     )
     runtime_scheduler = FakeRuntimeScheduler()
     app = FastAPI()
@@ -84,6 +89,20 @@ def create_payload():
         "enabled": True,
         "max_attempts": 2,
     }
+
+
+def research_payload(task_type: str):
+    payload = create_payload()
+    payload.update({
+        "schema_version": 2,
+        "name": f"US {task_type}",
+        "task_type": task_type,
+        "payload": {
+            "stock_code": "AAPL",
+            "notify": True,
+        },
+    })
+    return payload
 
 
 def test_create_list_status_toggle_and_run_history(client) -> None:
@@ -168,6 +187,112 @@ def test_create_request_applies_declared_defaults(client) -> None:
     assert created["payload"]["notify"] is True
     assert created["enabled"] is True
     assert created["max_attempts"] == 1
+    assert set(created) == {
+        "compatibility",
+        "id",
+        "schema_version",
+        "name",
+        "task_type",
+        "schedule",
+        "payload",
+        "enabled",
+        "max_attempts",
+        "next_run_at",
+        "created_at",
+        "updated_at",
+    }
+    assert set(created["payload"]) == {
+        "stock_code",
+        "report_type",
+        "notify",
+    }
+
+
+@pytest.mark.parametrize("task_type", ["research_brief", "risk_check"])
+def test_create_research_task_preserves_versioned_payload(
+    client,
+    task_type: str,
+) -> None:
+    test_client, runtime_scheduler, _service = client
+
+    response = test_client.post(
+        "/api/v1/scheduled-tasks",
+        json=research_payload(task_type),
+    )
+
+    assert response.status_code == 201, response.text
+    created = response.json()
+    assert created["schema_version"] == 2
+    assert created["task_type"] == task_type
+    assert created["payload"] == {
+        "stock_code": "AAPL",
+        "notify": True,
+    }
+    assert runtime_scheduler.reconcile_calls == 1
+
+
+@pytest.mark.parametrize(
+    ("task_type", "schema_version"),
+    [
+        ("stock_analysis", 2),
+        ("research_brief", 1),
+        ("risk_check", 1),
+    ],
+)
+def test_create_rejects_task_type_schema_mismatch(
+    client,
+    task_type: str,
+    schema_version: int,
+) -> None:
+    test_client, runtime_scheduler, _service = client
+    payload = (
+        create_payload()
+        if task_type == "stock_analysis"
+        else research_payload(task_type)
+    )
+    payload["schema_version"] = schema_version
+
+    response = test_client.post("/api/v1/scheduled-tasks", json=payload)
+
+    assert response.status_code == 422
+    assert test_client.get("/api/v1/scheduled-tasks").json()["total"] == 0
+    assert runtime_scheduler.reconcile_calls == 0
+
+
+def test_today_endpoint_returns_timezone_aware_upcoming_occurrence(client) -> None:
+    test_client, _runtime_scheduler, _service = client
+    created = test_client.post(
+        "/api/v1/scheduled-tasks",
+        json=research_payload("research_brief"),
+    ).json()
+
+    response = test_client.get(
+        "/api/v1/scheduled-tasks/today",
+        params={"timezone": "America/New_York"},
+    )
+
+    assert response.status_code == 200, response.text
+    today = response.json()
+    assert today["date"] == "2026-07-25"
+    assert today["timezone"] == "America/New_York"
+    assert today["total"] == 1
+    assert today["items"][0]["task"]["id"] == created["id"]
+    assert today["items"][0]["status"] == "scheduled"
+    assert today["items"][0]["run"] is None
+
+
+def test_today_endpoint_rejects_invalid_timezone(client) -> None:
+    test_client, _runtime_scheduler, _service = client
+
+    response = test_client.get(
+        "/api/v1/scheduled-tasks/today",
+        params={"timezone": "Mars/Olympus"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["error"] == (
+        "scheduled_task_validation_error"
+    )
 
 
 @pytest.mark.parametrize("section", ["task", "schedule", "payload"])
@@ -218,6 +343,7 @@ def test_create_request_rejects_scalar_coercion(
 def test_scheduled_task_dtos_publish_explicit_strict_extra_policy() -> None:
     models = (
         DailyScheduleRequest,
+        ResearchScheduledPayload,
         StockAnalysisScheduledPayload,
         ScheduledTaskCreateRequest,
         ScheduledTaskItem,
@@ -226,6 +352,8 @@ def test_scheduled_task_dtos_publish_explicit_strict_extra_policy() -> None:
         ScheduledTaskRunItem,
         ScheduledTaskRunListResponse,
         ScheduledTaskStatusResponse,
+        ScheduledTaskTodayItem,
+        ScheduledTaskTodayResponse,
     )
 
     for model in models:
@@ -286,7 +414,7 @@ def test_future_schema_is_opaque_and_mutation_returns_conflict(client) -> None:
     ).json()
     with service.repository.db.get_session() as session:
         row = session.get(ScheduledTaskRecord, created["id"])
-        row.schema_version = 2
+        row.schema_version = 3
         row.payload_json = "not-v1-json"
         session.commit()
 
@@ -301,7 +429,7 @@ def test_future_schema_is_opaque_and_mutation_returns_conflict(client) -> None:
     assert response.status_code == 200
     opaque = response.json()["items"][0]
     assert opaque["compatibility"] == "unsupported_schema"
-    assert opaque["schema_version"] == 2
+    assert opaque["schema_version"] == 3
     assert "payload" not in opaque
     assert "schedule" not in opaque
     assert status_response.status_code == 200
@@ -313,7 +441,7 @@ def test_future_schema_is_opaque_and_mutation_returns_conflict(client) -> None:
     assert runtime_scheduler.reconcile_calls == 1
     with service.repository.db.get_session() as session:
         persisted = session.get(ScheduledTaskRecord, created["id"])
-        assert persisted.schema_version == 2
+        assert persisted.schema_version == 3
         assert persisted.payload_json == "not-v1-json"
         assert persisted.enabled is True
 
@@ -332,6 +460,7 @@ def test_static_openapi_contains_exact_scheduled_task_contract() -> None:
     )
     paths = [
         "/api/v1/scheduled-tasks",
+        "/api/v1/scheduled-tasks/today",
         "/api/v1/scheduled-tasks/{task_id}/status",
         "/api/v1/scheduled-tasks/{task_id}/enable",
         "/api/v1/scheduled-tasks/{task_id}/disable",
@@ -339,12 +468,15 @@ def test_static_openapi_contains_exact_scheduled_task_contract() -> None:
     ]
     schemas = [
         "DailyScheduleRequest",
+        "ResearchScheduledPayload",
         "ScheduledTaskCreateRequest",
         "ScheduledTaskItem",
         "ScheduledTaskListResponse",
         "ScheduledTaskRunItem",
         "ScheduledTaskRunListResponse",
         "ScheduledTaskStatusResponse",
+        "ScheduledTaskTodayItem",
+        "ScheduledTaskTodayResponse",
         "StockAnalysisScheduledPayload",
         "UnsupportedScheduledTaskItem",
     ]

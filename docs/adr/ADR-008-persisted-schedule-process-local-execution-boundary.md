@@ -38,18 +38,29 @@ The boundary has these rules:
   never parsed, executed, enabled, disabled, or rewritten by the older
   application. A due unknown slot receives one `interrupted` occurrence without
   changing any definition field, and subsequent polls exclude that fenced slot.
+  When a newer application understands that schema again, it advances an exact
+  schema/generation-matched unsupported fence to the next future occurrence; it
+  never replays the fenced slot.
   Every older-application definition write includes the expected schema version
   in its atomic database predicate and reclassifies a CAS miss.
 - A corrupt current-version definition is not forward-compatible data. It is
   disabled and quarantined with one interrupted occurrence so invalid financial
-  work cannot run.
+  work cannot run. Structurally invalid schema-version or execution-generation
+  values cannot be copied into a truthful occurrence snapshot, so that narrow
+  corruption path atomically disables the definition without a new run and
+  replaces the generation under the same writer lock with an exact value above
+  every valid persisted run snapshot for that task. Existing active runs are
+  interrupted before any later dispatch or retry; a definition at the SQLite
+  integer ceiling can still be disabled without incrementing, but remains
+  non-enableable until operator repair.
 - Daily wall times select the earliest valid instant on a fall-back date, so a
   definition runs at most once per schedule-local date. A local date is skipped
   when its wall time does not exist. Trading-session classification uses the
   exchange's IANA timezone, independently of the schedule timezone.
 - Every occurrence snapshots the understood schema and an internal execution
-  generation. Enable/disable transitions advance that generation, so an old
-  conflict or retry wait cannot resume after a disable/re-enable cycle.
+  generation. Normal enable/disable transitions advance that generation, and
+  structural-corruption quarantine installs a new exact generation fence, so an
+  old conflict or retry wait cannot resume after either transition.
 - Initial submission and retry first persist a tokenized `dispatching`
   reservation. Queue admission then runs inside a SQLite `BEGIN IMMEDIATE`
   writer window that rechecks schema, generation, enablement, reservation, and

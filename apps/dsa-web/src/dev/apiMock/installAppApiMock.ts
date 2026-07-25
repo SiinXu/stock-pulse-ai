@@ -101,6 +101,57 @@ function registerPriorityHandlers(mock: AxiosMockAdapter, profile: PlaygroundFix
     return [200, { total: tasks.length, pending, processing, tasks }];
   });
 
+  mock.onGet('/api/v1/scheduled-tasks/today').reply(() => reply(profile, {
+    date: '2026-07-25',
+    timezone: 'UTC',
+    generated_at: FIXTURE_TIMESTAMP,
+    total: 2,
+    items: [
+      {
+        task: {
+          compatibility: 'supported',
+          id: 'scheduled-brief-aapl',
+          schema_version: 2,
+          name: 'AAPL morning brief',
+          task_type: 'research_brief',
+          enabled: true,
+          next_run_at: '2026-07-25T14:30:00Z',
+          created_at: FIXTURE_TIMESTAMP,
+          updated_at: FIXTURE_TIMESTAMP,
+        },
+        scheduled_for: '2026-07-25T14:30:00Z',
+        status: 'succeeded',
+        run: {
+          id: 'scheduled-run-brief-aapl',
+          status: 'succeeded',
+          error_code: null,
+        },
+      },
+      {
+        task: {
+          compatibility: 'supported',
+          id: 'scheduled-risk-msft',
+          schema_version: 2,
+          name: 'MSFT downside review',
+          task_type: 'risk_check',
+          enabled: true,
+          next_run_at: '2026-07-25T10:00:00Z',
+          created_at: FIXTURE_TIMESTAMP,
+          updated_at: FIXTURE_TIMESTAMP,
+        },
+        scheduled_for: '2026-07-25T10:00:00Z',
+        status: 'scheduled',
+        run: null,
+      },
+    ],
+  }, {
+    date: '2026-07-25',
+    timezone: 'UTC',
+    generated_at: FIXTURE_TIMESTAMP,
+    total: 0,
+    items: [],
+  }));
+
   mock.onGet('/api/v1/agent/skills').reply(() => reply(profile, {
     skills: [
       { id: 'analysis', name: 'Equity analysis', description: 'End-to-end single-stock analysis pipeline.' },

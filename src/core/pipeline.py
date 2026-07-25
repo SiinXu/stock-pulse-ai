@@ -226,6 +226,8 @@ class StockAnalysisPipeline(_DeliveryStageMixin):
         portfolio_context: Optional[Dict[str, Any]] = None,
         daily_market_context_enabled: Optional[bool] = None,
         daily_market_context_allow_generate: bool = True,
+        *,
+        strict_skill_selection: bool = False,
     ):
         """Initialize the analysis pipeline and its request-scoped services.
 
@@ -245,6 +247,7 @@ class StockAnalysisPipeline(_DeliveryStageMixin):
         )
         self.progress_callback = progress_callback
         self.analysis_skills = list(analysis_skills) if analysis_skills is not None else None
+        self.strict_skill_selection = bool(strict_skill_selection)
         self.analysis_phase = analysis_phase or "auto"
         self.portfolio_context = dict(portfolio_context) if isinstance(portfolio_context, dict) else None
         self.daily_market_context_enabled = (
@@ -259,7 +262,11 @@ class StockAnalysisPipeline(_DeliveryStageMixin):
         self.fetcher_manager = DataFetcherManager()
         # No longer create akshare_fetcher separately, use fetcher_manager to get enhanced data
         self.trend_analyzer = StockTrendAnalyzer()  # Technical analyzer
-        self.analyzer = GeminiAnalyzer(config=self.config, skills=self.analysis_skills)
+        self.analyzer = GeminiAnalyzer(
+            config=self.config,
+            skills=self.analysis_skills,
+            strict_skill_selection=self.strict_skill_selection,
+        )
         self.notifier = NotificationService(request_context=request_context)
         self.market_structure_service = MarketStructureService(fetcher_manager=self.fetcher_manager)
         self.market_hotspot_service: Optional[MarketHotspotService] = None
