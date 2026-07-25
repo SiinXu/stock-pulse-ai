@@ -252,6 +252,32 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "AGENT_CRITIC_ENABLED": {
+        "title": "Bounded Multi-Agent Critic",
+        "description": "Run one tool-free evidence Critic before Decision in Native Multi analysis. The Critic may request at most one retry of an already-entered intelligence or catalog-backed skill stage.",
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 63,
+        "help_key": "settings.agent.AGENT_CRITIC_ENABLED",
+        "examples": [
+            "AGENT_CRITIC_ENABLED=false",
+            "AGENT_CRITIC_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：Agent 配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
+            },
+        ],
+        "warning_codes": [],
+    },
     "AGENT_RISK_OVERRIDE": {
         "title": "Risk Agent Override",
         "description": "Allow the risk agent to veto buy signals when critical risk flags are detected.",

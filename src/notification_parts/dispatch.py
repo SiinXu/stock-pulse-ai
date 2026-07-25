@@ -13,6 +13,13 @@ if TYPE_CHECKING:
         NotificationChannel,
         NotificationDispatchResult,
         WECHAT_IMAGE_MAX_BYTES,
+        _NotificationAdapterResult,
+        _NotificationChannelSnapshot,
+        _NotificationRequest,
+        _ROUTABLE_NOTIFICATION_CHANNELS,
+        _available_notification_channel_snapshot,
+        _ensure_notification_runtime,
+        _normalize_notification_adapter_error_code,
         log_safe_exception,
         logger,
         sanitize_diagnostic_text,
@@ -108,7 +115,100 @@ class _DispatchMethods:
         logger.warning(f"不支持的通知渠道: {channel}")
         return False
 
+    def _send_to_plugin_channel(
+        self,
+        channel: _NotificationChannelSnapshot,
+        content: str,
+        *,
+        image_bytes: Optional[bytes],
+        email_stock_codes: Optional[List[str]],
+        route_type: Optional[str],
+        severity: Optional[str],
+    ) -> ChannelAttemptResult:
+        """Invoke and map one adapter into the core attempt contract."""
+
+        started_at = time.monotonic()
+        try:
+            adapter_result = channel.adapter.send(
+                _NotificationRequest(
+                    content=content,
+                    route_type=route_type,
+                    severity=severity,
+                    image_bytes=image_bytes,
+                    stock_codes=tuple(email_stock_codes or ()),
+                    metadata={},
+                )
+            )
+            if type(adapter_result) is not _NotificationAdapterResult:
+                logger.warning(
+                    "Notification channel adapter returned an invalid result "
+                    "error_code=notification_adapter_result_invalid channel=%s",
+                    channel.channel_id,
+                )
+                adapter_result = _NotificationAdapterResult(
+                    success=False,
+                    error_code="notification_adapter_result_invalid",
+                )
+            success = adapter_result.success
+            return ChannelAttemptResult(
+                channel=channel.channel_id,
+                success=success,
+                error_code=_normalize_notification_adapter_error_code(
+                    adapter_result.error_code,
+                    success=success,
+                ),
+                retryable=adapter_result.retryable if not success else False,
+                latency_ms=int((time.monotonic() - started_at) * 1000),
+                diagnostics=(
+                    sanitize_diagnostic_text(adapter_result.diagnostics) or None
+                ),
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - one plugin adapter failure cannot stop later channels
+            log_safe_exception(
+                logger,
+                "Notification channel delivery failed",
+                exc,
+                error_code="notification_channel_delivery_failed",
+                context={"channel": channel.channel_id},
+                exception_redaction_values=(),
+            )
+            return ChannelAttemptResult(
+                channel=channel.channel_id,
+                success=False,
+                error_code="exception",
+                retryable=True,
+                latency_ms=int((time.monotonic() - started_at) * 1000),
+                diagnostics=sanitize_exception_chain(
+                    exc,
+                    redact_diagnostics=True,
+                ),
+            )
+
     def send_with_results(
+        self,
+        content: str,
+        email_stock_codes: Optional[List[str]] = None,
+        email_send_to_all: bool = False,
+        route_type: Optional[str] = None,
+        severity: Optional[str] = None,
+        dedup_key: Optional[str] = None,
+        cooldown_key: Optional[str] = None,
+    ) -> NotificationDispatchResult:
+        """Send once while retaining every adapter in the routed snapshot."""
+
+        application_services, _registry = _ensure_notification_runtime(self)
+        with application_services.notification_dispatch():
+            return self._send_with_results_under_lease(
+                content,
+                email_stock_codes=email_stock_codes,
+                email_send_to_all=email_send_to_all,
+                route_type=route_type,
+                severity=severity,
+                dedup_key=dedup_key,
+                cooldown_key=cooldown_key,
+            )
+
+    def _send_with_results_under_lease(
         self,
         content: str,
         email_stock_codes: Optional[List[str]] = None,
@@ -167,7 +267,34 @@ class _DispatchMethods:
                 message="interactive context delivery failed; static channels skipped",
             )
 
-        if not self._available_channels:
+        plugin_channel_snapshot = (
+            self._application_services.notification_channel_snapshot()
+        )
+        available_plugin_channels = _available_notification_channel_snapshot(
+            plugin_channel_snapshot
+        )
+        available_channels = [
+            *self._available_channels,
+            *available_plugin_channels,
+        ]
+        allowed_channel_ids = tuple(
+            dict.fromkeys(
+                (
+                    *_ROUTABLE_NOTIFICATION_CHANNELS,
+                    *(
+                        channel.channel_id
+                        for channel in plugin_channel_snapshot
+                    ),
+                )
+            )
+        )
+        target_channels = self.get_channels_for_route(
+            route_type,
+            available_channels,
+            allowed_channel_ids=allowed_channel_ids,
+        )
+
+        if not available_channels:
             if context_success:
                 logger.info("已通过消息上下文渠道完成推送（无其他通知渠道）")
                 return NotificationDispatchResult(
@@ -184,7 +311,6 @@ class _DispatchMethods:
                 message="notification service unavailable",
             )
 
-        target_channels = self.get_channels_for_route(route_type)
         if not target_channels:
             if context_success:
                 logger.info("已通过消息上下文渠道完成推送（路由后无其他通知渠道）")
@@ -224,11 +350,21 @@ class _DispatchMethods:
         # Markdown to image (Issue #289): convert once if any channel needs it.
         # Per-channel decision via _should_use_image_for_channel (see send() docstring for fallback rules).
         image_bytes = None
-        channels_needing_image = {
-            ch for ch in target_channels
-            if ch.value in self._markdown_to_image_channels
-            and ch not in {NotificationChannel.NTFY, NotificationChannel.GOTIFY}
-        }
+        target_channel_ids = tuple(
+            channel.value
+            if isinstance(channel, NotificationChannel)
+            else channel.channel_id
+            for channel in target_channels
+        )
+        channels_needing_image = tuple(
+            channel_id
+            for channel_id in target_channel_ids
+            if channel_id in self._markdown_to_image_channels
+            and channel_id not in {
+                NotificationChannel.NTFY.value,
+                NotificationChannel.GOTIFY.value,
+            }
+        )
         if channels_needing_image:
             from src.md2img import markdown_to_image
             image_bytes = markdown_to_image(
@@ -236,13 +372,13 @@ class _DispatchMethods:
             )
             if image_bytes:
                 logger.info("Markdown 已转换为图片，将向 %s 发送图片",
-                            [ch.value for ch in channels_needing_image])
+                            list(channels_needing_image))
             elif channels_needing_image:
-                try:
-                    from src.config import get_config
-                    engine = getattr(get_config(), "md2img_engine", "wkhtmltoimage")
-                except Exception:  # broad-exception: optional_metadata - use the established renderer hint default
-                    engine = "wkhtmltoimage"
+                engine = getattr(
+                    self._config,
+                    "md2img_engine",
+                    "wkhtmltoimage",
+                )
                 hint = (
                     "npm i -g markdown-to-file" if engine == "markdown-to-file"
                     else "wkhtmltopdf (apt install wkhtmltopdf / brew install wkhtmltopdf)"
@@ -252,7 +388,12 @@ class _DispatchMethods:
                     hint,
                 )
 
-        channel_names = ', '.join(ChannelDetector.get_channel_name(ch) for ch in target_channels)
+        channel_names = ', '.join(
+            ChannelDetector.get_channel_name(channel)
+            if isinstance(channel, NotificationChannel)
+            else channel.display_name
+            for channel in target_channels
+        )
         logger.info(f"正在向 {len(target_channels)} 个渠道发送通知：{channel_names}")
 
         success_count = 0
@@ -260,30 +401,63 @@ class _DispatchMethods:
         channel_results: List[ChannelAttemptResult] = []
 
         for channel in target_channels:
-            channel_name = ChannelDetector.get_channel_name(channel)
+            channel_id = (
+                channel.value
+                if isinstance(channel, NotificationChannel)
+                else channel.channel_id
+            )
             started_at = time.monotonic()
+            plugin_attempt = None
             try:
-                result = self._send_to_static_channel(
-                    channel,
-                    content,
-                    image_bytes=image_bytes,
-                    email_stock_codes=email_stock_codes,
-                    email_send_to_all=email_send_to_all,
-                    route_type=route_type,
+                if isinstance(channel, NotificationChannel):
+                    result = self._send_to_static_channel(
+                        channel,
+                        content,
+                        image_bytes=image_bytes,
+                        email_stock_codes=email_stock_codes,
+                        email_send_to_all=email_send_to_all,
+                        route_type=route_type,
+                    )
+                    attempt_success = bool(result)
+                    error_code = None if attempt_success else "send_failed"
+                    retryable = not attempt_success
+                    diagnostics = None
+                else:
+                    plugin_attempt = self._send_to_plugin_channel(
+                        channel,
+                        content,
+                        image_bytes=(
+                            image_bytes
+                            if channel_id in self._markdown_to_image_channels
+                            else None
+                        ),
+                        email_stock_codes=email_stock_codes,
+                        route_type=route_type,
+                        severity=severity,
+                    )
+                    attempt_success = plugin_attempt.success
+                    error_code = plugin_attempt.error_code
+                    retryable = plugin_attempt.retryable
+                    diagnostics = plugin_attempt.diagnostics
+                latency_ms = (
+                    plugin_attempt.latency_ms
+                    if plugin_attempt is not None
+                    else int((time.monotonic() - started_at) * 1000)
                 )
-                latency_ms = int((time.monotonic() - started_at) * 1000)
 
-                if result:
+                if attempt_success:
                     success_count += 1
                 else:
                     fail_count += 1
                 channel_results.append(
-                    ChannelAttemptResult(
-                        channel=channel.value,
-                        success=bool(result),
-                        error_code=None if result else "send_failed",
-                        retryable=not bool(result),
+                    plugin_attempt
+                    or ChannelAttemptResult(
+                        channel=channel_id,
+                        success=attempt_success,
+                        error_code=error_code,
+                        retryable=retryable,
                         latency_ms=latency_ms,
+                        diagnostics=diagnostics,
                     )
                 )
 
@@ -293,17 +467,28 @@ class _DispatchMethods:
                     "Notification channel delivery failed",
                     exc,
                     error_code="notification_channel_delivery_failed",
-                    context={"channel": channel.value},
+                    context={"channel": channel_id},
+                    exception_redaction_values=(
+                        ()
+                        if not isinstance(channel, NotificationChannel)
+                        else None
+                    ),
                 )
                 fail_count += 1
                 channel_results.append(
                     ChannelAttemptResult(
-                        channel=channel.value,
+                        channel=channel_id,
                         success=False,
                         error_code="exception",
                         retryable=True,
                         latency_ms=int((time.monotonic() - started_at) * 1000),
-                        diagnostics=sanitize_exception_chain(exc),
+                        diagnostics=sanitize_exception_chain(
+                            exc,
+                            redact_diagnostics=not isinstance(
+                                channel,
+                                NotificationChannel,
+                            ),
+                        ),
                     )
                 )
 

@@ -135,8 +135,10 @@ def test_reference_provider_remains_opt_in_when_plugins_dir_is_unset(
 
 def test_reference_provider_registers_loads_routes_and_disables(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
-    monkeypatch.setenv("PLUGINS_DIR", str(_EXAMPLE_PLUGIN.parent))
+    _copy_example(tmp_path, "example-provider")
+    monkeypatch.setenv("PLUGINS_DIR", str(tmp_path))
     services, providers, plugins = _build_services()
 
     try:

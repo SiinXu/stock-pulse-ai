@@ -32,6 +32,7 @@ class PluginOperationResult:
     success: bool
     state: PluginState
     error_code: str | None = None
+    deferred: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,27 +78,44 @@ class PluginManager:
         self._supported_api_versions = supported
         self._registry = registry or ExtensionRegistry()
         self._plugins: dict[str, _ManagedPlugin] = {}
+        self._stable_enabled_plugin_ids: frozenset[str] = frozenset()
         self._lock = threading.RLock()
         self._lifecycle_boundary: (
             Callable[[Callable[[], Any]], Any] | None
         ) = None
         self._activation_allowed: Callable[[], bool] | None = None
+        self._disable_boundary: (
+            Callable[
+                [str, Callable[[], PluginOperationResult]],
+                PluginOperationResult,
+            ]
+            | None
+        ) = None
         self._lifecycle_boundary_state = threading.local()
 
     def _bind_lifecycle_boundary(
         self,
         boundary: Callable[[Callable[[], Any]], Any],
         activation_allowed: Callable[[], bool],
+        disable_boundary: Callable[
+            [str, Callable[[], PluginOperationResult]],
+            PluginOperationResult,
+        ],
     ) -> None:
         """Bind the owning composition root's outer lifecycle authority."""
 
-        if not callable(boundary) or not callable(activation_allowed):
+        if (
+            not callable(boundary)
+            or not callable(activation_allowed)
+            or not callable(disable_boundary)
+        ):
             raise TypeError("plugin lifecycle boundary and guard must be callable")
         with self._lock:
             if self._lifecycle_boundary is not None:
                 if (
                     self._lifecycle_boundary == boundary
                     and self._activation_allowed == activation_allowed
+                    and self._disable_boundary == disable_boundary
                 ):
                     return
                 raise RuntimeError(
@@ -105,6 +123,7 @@ class PluginManager:
                 )
             self._lifecycle_boundary = boundary
             self._activation_allowed = activation_allowed
+            self._disable_boundary = disable_boundary
 
     def _run_lifecycle_boundary(self, operation: Callable[[], Any]) -> Any:
         """Run only the outermost lifecycle operation through the root hook."""
@@ -275,6 +294,55 @@ class PluginManager:
                 if registration.plugin_id in enabled_plugin_ids
             )
 
+    def enabled_registrations_snapshot(
+        self,
+        extension_point: ExtensionPoint | None = None,
+    ) -> tuple[ExtensionRegistration, ...]:
+        """Return active registrations for a lock-free stable-owner snapshot."""
+
+        enabled_plugin_ids = self._stable_enabled_plugin_ids
+        return tuple(
+            registration
+            for registration in self._registry.registrations_snapshot(
+                extension_point
+            )
+            if registration.plugin_id in enabled_plugin_ids
+        )
+
+    def enabled_native_owner_registrations_snapshot(
+        self,
+        extension_point: ExtensionPoint | None = None,
+    ) -> tuple[tuple[ExtensionRegistration, object], ...]:
+        """Return stable enabled registrations with exact native owner tokens."""
+
+        enabled_plugin_ids = self._stable_enabled_plugin_ids
+        return tuple(
+            (registration, owner_token)
+            for registration, owner_token in (
+                self._registry.native_owner_registrations_snapshot(
+                    extension_point
+                )
+            )
+            if registration.plugin_id in enabled_plugin_ids
+        )
+
+    def registration_snapshot_generation(
+        self,
+        extension_point: ExtensionPoint,
+    ) -> int:
+        """Return the lock-free unified-registry generation for one point."""
+
+        return self._registry.registration_snapshot_generation(extension_point)
+
+    def _publish_stable_enabled_plugin_ids(self) -> None:
+        """Publish enabled owners after a state write while holding ``_lock``."""
+
+        self._stable_enabled_plugin_ids = frozenset(
+            plugin_id
+            for plugin_id, record in self._plugins.items()
+            if record.state == "enabled" and record.transition is None
+        )
+
     def _shutdown_plugin_ids(self) -> tuple[str, ...]:
         """Return plugins whose owned lifecycle state still needs shutdown."""
 
@@ -354,6 +422,7 @@ class PluginManager:
                 )
 
             record.transition = operation
+            self._publish_stable_enabled_plugin_ids()
             context = PluginContext(plugin_id, self._registry)
             load_error_code: str | None = None
             try:
@@ -386,6 +455,7 @@ class PluginManager:
                 record.cleanup_pending = bool(remaining)
                 record.state = "failed"
                 record.transition = None
+                self._publish_stable_enabled_plugin_ids()
                 return PluginOperationResult(
                     plugin_id=plugin_id,
                     operation=operation,
@@ -402,6 +472,7 @@ class PluginManager:
             record.cleanup_pending = False
             record.state = "enabled"
             record.transition = None
+            self._publish_stable_enabled_plugin_ids()
             return PluginOperationResult(
                 plugin_id=plugin_id,
                 operation=operation,
@@ -412,7 +483,15 @@ class PluginManager:
     def disable(self, plugin_id: str) -> PluginOperationResult:
         """Unload an enabled plugin or converge a failed plugin after cleanup."""
 
-        return self._run_lifecycle_boundary(lambda: self._disable(plugin_id))
+        def run_disable() -> PluginOperationResult:
+            if self._disable_boundary is None:
+                return self._disable(plugin_id)
+            return self._disable_boundary(
+                plugin_id,
+                lambda: self._disable(plugin_id),
+            )
+
+        return self._run_lifecycle_boundary(run_disable)
 
     def _disable(self, plugin_id: str) -> PluginOperationResult:
         """Perform one disable transition inside the outer lifecycle boundary."""
@@ -438,6 +517,7 @@ class PluginManager:
                 )
             if record.state == "failed":
                 record.transition = "disable"
+                self._publish_stable_enabled_plugin_ids()
                 remaining, cleanup_errors = self._cleanup_handles(
                     plugin_id,
                     tuple(record.handles),
@@ -446,6 +526,7 @@ class PluginManager:
                 record.cleanup_pending = bool(remaining)
                 record.state = "failed" if remaining else "disabled"
                 record.transition = None
+                self._publish_stable_enabled_plugin_ids()
                 cleanup_error = cleanup_errors[0] if cleanup_errors else None
                 if cleanup_error is None and remaining:
                     cleanup_error = "plugin_registration_cleanup_failed"
@@ -466,6 +547,7 @@ class PluginManager:
                 )
 
             record.transition = "disable"
+            self._publish_stable_enabled_plugin_ids()
             unload_failed = False
             try:
                 record.plugin.onunload()
@@ -487,6 +569,7 @@ class PluginManager:
             record.cleanup_pending = bool(remaining)
             record.state = "failed" if remaining else "disabled"
             record.transition = None
+            self._publish_stable_enabled_plugin_ids()
             if cleanup_errors or remaining:
                 return PluginOperationResult(
                     plugin_id=plugin_id,

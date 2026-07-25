@@ -644,6 +644,46 @@ describe('SettingsField', () => {
     expect(onChange).toHaveBeenCalledWith('BOOLISH_FIELD', 'false');
   });
 
+  it('renders the bounded Critic default-off switch with explicit cost help', () => {
+    render(
+      <UiLanguageProvider initialLanguage="en">
+        <SettingsField
+          item={{
+            key: 'AGENT_CRITIC_ENABLED',
+            value: '',
+            rawValueExists: false,
+            isMasked: false,
+            schema: {
+              key: 'AGENT_CRITIC_ENABLED',
+              title: 'Bounded Multi-Agent Critic',
+              category: 'agent',
+              dataType: 'boolean',
+              uiControl: 'switch',
+              isSensitive: false,
+              isRequired: false,
+              isEditable: true,
+              defaultValue: 'false',
+              options: [],
+              validation: {},
+              displayOrder: 63,
+              helpKey: 'settings.agent.AGENT_CRITIC_ENABLED',
+            },
+          }}
+          value=""
+          onChange={vi.fn()}
+        />
+      </UiLanguageProvider>,
+    );
+
+    expect(
+      screen.getByRole('switch', { name: 'Bounded Multi-Agent Critic' }),
+    ).toHaveAttribute('aria-checked', 'false');
+    expect(
+      openHelpTooltip('View Bounded Multi-Agent Critic configuration help'),
+    ).toHaveTextContent(/one read-only Critic call/);
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/fail_soft/);
+  });
+
   it('shows the schema default for select fields when no explicit env value exists', () => {
     const onChange = vi.fn();
 

@@ -145,3 +145,35 @@ def test_factory_runtime_signature_keeps_eager_annotations():
         "config": Optional[Config],
         "skills": Optional[List[str]],
     }
+
+
+def test_strict_explicit_skill_selection_rejects_runtime_disappearance():
+    """Scheduled research must never replace a missing Persona with defaults."""
+    from src.agent.runtime_assembly import _resolve_selected_skill_ids
+
+    with pytest.raises(
+        ValueError,
+        match="Unknown explicitly selected Agent skill ids: persona_tail_risk",
+    ):
+        _resolve_selected_skill_ids(
+            requested_skills=["persona_tail_risk"],
+            configured_skills=None,
+            default_skills=["bull_trend"],
+            available_skill_ids={"bull_trend"},
+            strict_skill_selection=True,
+        )
+
+
+def test_non_strict_unknown_skill_selection_keeps_legacy_fallback():
+    """Existing callers retain the current permissive selection behavior."""
+    from src.agent.runtime_assembly import _resolve_selected_skill_ids
+
+    selected, explicit = _resolve_selected_skill_ids(
+        requested_skills=["persona_tail_risk"],
+        configured_skills=None,
+        default_skills=["bull_trend"],
+        available_skill_ids={"bull_trend"},
+    )
+
+    assert selected == ["bull_trend"]
+    assert explicit is False

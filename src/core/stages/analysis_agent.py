@@ -129,7 +129,17 @@ class _AgentAnalysisStageMixin:
                 else (getattr(self.config, 'agent_skills', None) or None)
             )
             # Build executor from shared factory (ToolRegistry and SkillManager prototype are cached)
-            executor = build_agent_executor(self.config, requested_skills)
+            if bool(getattr(self, "strict_skill_selection", False)):
+                executor = build_agent_executor(
+                    self.config,
+                    requested_skills,
+                    strict_skill_selection=True,
+                )
+            else:
+                executor = build_agent_executor(
+                    self.config,
+                    requested_skills,
+                )
 
             # Build initial context to avoid redundant tool calls
             initial_context = {

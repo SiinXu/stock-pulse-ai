@@ -66,15 +66,24 @@ def parse_notification_route_channels(raw_value: object) -> List[str]:
     return channels
 
 
-def split_notification_route_channels(channels: Iterable[object]) -> Tuple[List[str], List[str]]:
+def split_notification_route_channels(
+    channels: Iterable[object],
+    *,
+    allowed_channels: Optional[Iterable[str]] = None,
+) -> Tuple[List[str], List[str]]:
     """Return unique valid and invalid route channels while preserving input order."""
     valid: List[str] = []
     invalid: List[str] = []
     seen_valid = set()
     seen_invalid = set()
+    allowed = (
+        ROUTABLE_NOTIFICATION_CHANNEL_SET
+        if allowed_channels is None
+        else frozenset(allowed_channels)
+    )
 
     for channel in parse_notification_route_channels(channels):
-        if channel in ROUTABLE_NOTIFICATION_CHANNEL_SET:
+        if channel in allowed:
             if channel not in seen_valid:
                 valid.append(channel)
                 seen_valid.add(channel)

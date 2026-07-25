@@ -16,14 +16,16 @@ Design notes:
 - Plugin composition starts only after the root is installed. Built-ins supplied
   by the composition caller are registered first, then an explicitly configured
   external directory is scanned, and the resulting snapshot is loaded with
-  per-plugin fault isolation. The root-owned Analysis Strategy catalog is bound
-  into that same manager and consumed by the existing Skill runtime.
+  per-plugin fault isolation. The root-owned Analysis Strategy catalog and
+  Notification Channel adapter registry are bound into that same manager and
+  consumed by their existing runtimes.
 
 Only the singletons that actually exist in this codebase are held: Config,
 DatabaseManager, SearchService, AnalysisTaskQueue, the process plugin manager,
-and its Analysis Strategy catalog. There is no process-wide cache, auth rate
-limiter or shared thread pool singleton to own, so none is invented here (thread
-pools are owned per-pipeline / per-queue instance).
+its Analysis Strategy catalog, and its Notification Channel adapter registry.
+There is no process-wide cache, auth rate limiter or shared thread pool singleton
+to own, so none is invented here (thread pools are owned per-pipeline /
+per-queue instance).
 ``system_config_service`` is already composed in the FastAPI lifespan
 (``api/app.py``) and keeps its app-scoped lifecycle; this root does not modify
 or take over ``system_config_service.py``.
@@ -32,12 +34,18 @@ or take over ``system_config_service.py``.
 from __future__ import annotations
 
 import atexit
+import logging
 import os
 import threading
+from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator, Optional
 
 from src.plugins.constants import PLUGIN_APPLICATION_VERSION
+from src.utils.sanitize import log_safe_exception
+
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:  # import for typing only; avoids runtime import cycles
     from src.config import Config
@@ -45,6 +53,8 @@ if TYPE_CHECKING:  # import for typing only; avoids runtime import cycles
         AnalysisStrategyCatalogSnapshot,
         AnalysisStrategyRegistry,
         ExternalPluginResult,
+        NotificationChannelSnapshot,
+        NotificationChannelRegistry,
         Plugin,
         PluginManager,
         PluginOperationResult,
@@ -91,6 +101,9 @@ class ApplicationServices:
         analysis_strategy_registry: Optional[
             "AnalysisStrategyRegistry"
         ] = None,
+        notification_channel_registry: Optional[
+            "NotificationChannelRegistry"
+        ] = None,
         builtin_plugins: Optional[Iterable["Plugin"]] = None,
         plugins_dir: str | Path | None = None,
         plugin_application_version: str = PLUGIN_APPLICATION_VERSION,
@@ -99,24 +112,37 @@ class ApplicationServices:
         self._database = database
         self._search = search
         self._task_queue = task_queue
-        from src.plugins import AnalysisStrategyRegistry
+        from src.plugins import (
+            AnalysisStrategyRegistry,
+            NotificationChannelRegistry,
+        )
 
         if (
             analysis_strategy_registry is not None
             and not isinstance(analysis_strategy_registry, AnalysisStrategyRegistry)
         ):
             raise TypeError("analysis strategy registry is invalid")
+        if notification_channel_registry is not None and not isinstance(
+            notification_channel_registry,
+            NotificationChannelRegistry,
+        ):
+            raise TypeError("notification channel registry is invalid")
         plugin_manager_was_provided = plugin_manager is not None
         if plugin_manager is None:
             from src.plugins import (
                 PluginManager,
                 build_analysis_strategy_extension_contract,
                 build_application_extension_registry,
+                build_notification_channel_extension_contract,
             )
 
             if analysis_strategy_registry is None:
                 analysis_strategy_registry = AnalysisStrategyRegistry(
                     lambda: _get_declarative_analysis_strategy_names(self.config)
+                )
+            if notification_channel_registry is None:
+                notification_channel_registry = NotificationChannelRegistry(
+                    lambda: self.config
                 )
             plugin_manager = PluginManager(
                 application_version=plugin_application_version,
@@ -126,6 +152,11 @@ class ApplicationServices:
                         "analysis_strategy": (
                             build_analysis_strategy_extension_contract(
                                 analysis_strategy_registry
+                            )
+                        ),
+                        "notification_channel": (
+                            build_notification_channel_extension_contract(
+                                notification_channel_registry
                             )
                         ),
                     },
@@ -146,9 +177,36 @@ class ApplicationServices:
                 raise ValueError(
                     "plugin manager and analysis strategy registry must be paired"
                 )
+            configured_backend = plugin_manager.registry.native_backend(
+                "notification_channel"
+            )
+            if notification_channel_registry is None:
+                if isinstance(configured_backend, NotificationChannelRegistry):
+                    notification_channel_registry = configured_backend
+                elif configured_backend is not None:
+                    raise TypeError(
+                        "plugin manager uses an unsupported notification channel backend"
+                    )
+                else:
+                    notification_channel_registry = NotificationChannelRegistry(
+                        lambda: self.config
+                    )
+            elif configured_backend is not notification_channel_registry:
+                raise ValueError(
+                    "plugin manager and notification channel registry must be paired"
+                )
+        if (
+            notification_channel_registry is not None
+            and self._config is not None
+            and notification_channel_registry.config_snapshot() is not self._config
+        ):
+            raise ValueError(
+                "notification channel registry and application Config must be paired"
+            )
         self._plugin_manager = plugin_manager
         self._analysis_strategy_registry = analysis_strategy_registry
         self._analysis_strategy_catalog_token = object()
+        self._notification_channel_registry = notification_channel_registry
         if builtin_plugins is None and not plugin_manager_was_provided:
             from src.plugins.builtin import get_configured_builtin_plugins
 
@@ -166,9 +224,19 @@ class ApplicationServices:
         self._plugins_started = False
         self._plugin_close_requested = False
         self._plugins_closed = False
+        self._notification_dispatch_condition = threading.Condition(
+            threading.RLock()
+        )
+        self._notification_dispatch_count = 0
+        self._notification_dispatch_state = threading.local()
+        self._notification_writer_owner: int | None = None
+        self._notification_writer_reservations = 0
+        self._notification_transition_reservations = 0
+        self._deferred_notification_lifecycle: list[Callable[[], Any]] = []
         self._plugin_manager._bind_lifecycle_boundary(
             self._run_plugin_manager_lifecycle,
             self._plugin_activation_allowed,
+            self._run_plugin_disable_lifecycle,
         )
 
     @property
@@ -239,6 +307,185 @@ class ApplicationServices:
                 return snapshot
 
     @property
+    def notification_channel_registry(
+        self,
+    ) -> Optional["NotificationChannelRegistry"]:
+        """Return the paired notification adapter authority when configured."""
+
+        return self._notification_channel_registry
+
+    def notification_channel_snapshot(
+        self,
+    ) -> tuple["NotificationChannelSnapshot", ...]:
+        """Return adapters owned by lifecycle-stable enabled plugins only."""
+
+        registry = self._notification_channel_registry
+        if registry is None or not self._plugin_activation_allowed():
+            return ()
+        enabled_channel_owners = {
+            registration.registration_id: owner_token
+            for registration, owner_token in (
+                self._plugin_manager.enabled_native_owner_registrations_snapshot(
+                    "notification_channel"
+                )
+            )
+        }
+        return registry.snapshot_for_exact_owners(enabled_channel_owners)
+
+    @contextmanager
+    def notification_dispatch(self) -> Iterator[None]:
+        """Protect one complete notification adapter snapshot from unload."""
+
+        thread_id = threading.get_ident()
+        condition = self._notification_dispatch_condition
+        with condition:
+            depth = getattr(self._notification_dispatch_state, "depth", 0)
+            if self._notification_writer_owner == thread_id:
+                raise RuntimeError(
+                    "notification dispatch is unavailable during plugin unload"
+                )
+            if depth == 0:
+                while (
+                    self._notification_writer_owner is not None
+                    or self._notification_writer_reservations
+                ):
+                    condition.wait()
+            self._notification_dispatch_count += 1
+            self._notification_dispatch_state.depth = depth + 1
+
+        try:
+            yield
+        finally:
+            callbacks: tuple[Callable[[], Any], ...] = ()
+            with condition:
+                depth = getattr(self._notification_dispatch_state, "depth", 1)
+                self._notification_dispatch_state.depth = max(0, depth - 1)
+                self._notification_dispatch_count -= 1
+                if self._notification_dispatch_count == 0:
+                    if (
+                        self._notification_writer_owner is None
+                        and self._notification_transition_reservations == 0
+                    ):
+                        callbacks = tuple(
+                            self._deferred_notification_lifecycle
+                        )
+                        self._deferred_notification_lifecycle.clear()
+                    condition.notify_all()
+            self._run_deferred_notification_lifecycle(callbacks)
+
+    def _run_deferred_notification_lifecycle(
+        self,
+        callbacks: tuple[Callable[[], Any], ...],
+    ) -> None:
+        """Run accepted same-thread requests and release their writer claims."""
+
+        for callback in callbacks:
+            try:
+                callback()
+            except Exception as exc:  # broad-exception: fallback_recorded - deferred lifecycle failures are recorded without replacing the completed delivery result
+                log_safe_exception(
+                    logger,
+                    "Deferred plugin lifecycle operation failed",
+                    exc,
+                    error_code="deferred_plugin_lifecycle_failed",
+                )
+            finally:
+                with self._notification_dispatch_condition:
+                    self._notification_writer_reservations -= 1
+                    self._notification_dispatch_condition.notify_all()
+
+    def _defer_notification_lifecycle_if_dispatching(
+        self,
+        operation: Callable[[], Any],
+    ) -> bool:
+        """Queue a same-thread read-to-write request without deadlocking."""
+
+        if getattr(self._notification_dispatch_state, "depth", 0) <= 0:
+            return False
+        with self._notification_dispatch_condition:
+            self._deferred_notification_lifecycle.append(operation)
+            self._notification_writer_reservations += 1
+        return True
+
+    def _reserve_notification_transition_writer(self) -> None:
+        """Prevent the last reader from taking over a root transition."""
+
+        with self._notification_dispatch_condition:
+            self._notification_transition_reservations += 1
+            self._notification_writer_reservations += 1
+
+    def _release_notification_transition_writer(self) -> None:
+        """Release a transition claim and drain any otherwise orphaned work."""
+
+        callbacks: tuple[Callable[[], Any], ...] = ()
+        with self._notification_dispatch_condition:
+            self._notification_transition_reservations -= 1
+            self._notification_writer_reservations -= 1
+            if (
+                self._notification_transition_reservations == 0
+                and self._notification_writer_owner is None
+                and self._notification_dispatch_count == 0
+            ):
+                callbacks = tuple(self._deferred_notification_lifecycle)
+                self._deferred_notification_lifecycle.clear()
+            self._notification_dispatch_condition.notify_all()
+        self._run_deferred_notification_lifecycle(callbacks)
+
+    def _run_after_notification_dispatches(
+        self,
+        operation: Callable[[], Any],
+    ) -> Any:
+        """Run destructive lifecycle work with writer preference."""
+
+        thread_id = threading.get_ident()
+        condition = self._notification_dispatch_condition
+        with condition:
+            if self._notification_writer_owner == thread_id:
+                return operation()
+            self._notification_writer_reservations += 1
+            while self._notification_writer_owner is not None:
+                condition.wait()
+            self._notification_writer_owner = thread_id
+            while self._notification_dispatch_count:
+                condition.wait()
+        try:
+            return operation()
+        finally:
+            callbacks: tuple[Callable[[], Any], ...] = ()
+            with condition:
+                if self._notification_dispatch_count == 0:
+                    callbacks = tuple(self._deferred_notification_lifecycle)
+                    self._deferred_notification_lifecycle.clear()
+            self._run_deferred_notification_lifecycle(callbacks)
+            with condition:
+                self._notification_writer_owner = None
+                self._notification_writer_reservations -= 1
+                condition.notify_all()
+
+    def _run_plugin_disable_lifecycle(
+        self,
+        plugin_id: str,
+        operation: Callable[[], "PluginOperationResult"],
+    ) -> "PluginOperationResult":
+        """Delay ``onunload`` until every active notification snapshot exits."""
+
+        if self._defer_notification_lifecycle_if_dispatching(
+            lambda: self._plugin_manager.disable(plugin_id)
+        ):
+            from src.plugins import PluginOperationResult
+
+            snapshot = self._plugin_manager.snapshot(plugin_id)
+            return PluginOperationResult(
+                plugin_id=plugin_id,
+                operation="disable",
+                success=False,
+                state=snapshot.state if snapshot is not None else "failed",
+                error_code="plugin_lifecycle_deferred",
+                deferred=True,
+            )
+        return self._run_after_notification_dispatches(operation)
+
+    @property
     def builtin_plugin_results(self) -> tuple["PluginOperationResult", ...]:
         """Return startup registration results for caller-supplied built-ins."""
 
@@ -286,6 +533,15 @@ class ApplicationServices:
             with _services_lock:
                 self._plugins_starting = True
             try:
+                if (
+                    self._notification_channel_registry is not None
+                    and self._notification_channel_registry.config_snapshot()
+                    is not self.config
+                ):
+                    raise ValueError(
+                        "notification channel registry and application Config "
+                        "must be paired"
+                    )
                 self._builtin_plugin_results = tuple(
                     self._plugin_manager.register(plugin, source="builtin")
                     for plugin in self._builtin_plugins
@@ -350,6 +606,9 @@ class ApplicationServices:
         lifecycle boundary around the unload re-checks installation and rescues
         the race with a concurrent install of this root.
         """
+
+        if self._defer_notification_lifecycle_if_dispatching(self.close):
+            return self._plugin_shutdown_results
 
         with _services_lock:
             self._plugin_close_requested = True
@@ -475,6 +734,15 @@ class ApplicationServices:
     def _close_plugins(self) -> tuple["PluginOperationResult", ...]:
         """Perform root-local shutdown for the global transition owner."""
 
+        return self._run_after_notification_dispatches(
+            self._close_plugins_after_dispatches
+        )
+
+    def _close_plugins_after_dispatches(
+        self,
+    ) -> tuple["PluginOperationResult", ...]:
+        """Close plugins while holding the notification lifecycle writer."""
+
         self._plugin_close_requested = True
         with self._plugin_lifecycle_lock:
             if self._plugins_closed:
@@ -486,6 +754,8 @@ class ApplicationServices:
                     self._plugin_shutdown_results = self._plugin_manager.disable_all(
                         shutdown_ids,
                     )
+                if self._notification_channel_registry is not None:
+                    self._notification_channel_registry.mark_unloaded()
             return self._plugin_shutdown_results
 
 
@@ -619,6 +889,20 @@ def _set_application_services(
 
     global _services, _services_transition_active, _services_transition_target
 
+    deferred_cleanup_targets = tuple(superseded_services)
+    with _services_lock:
+        visible_services = _services
+    if visible_services is not None and (
+        visible_services._defer_notification_lifecycle_if_dispatching(
+            lambda: _set_application_services(
+                services,
+                validate_direct_target=validate_direct_target,
+                superseded_services=deferred_cleanup_targets,
+            )
+        )
+    ):
+        return
+
     with _services_lock:
         if _services_shutdown and services is not None:
             raise RuntimeError("Application services are shutting down")
@@ -629,6 +913,7 @@ def _set_application_services(
             _validate_direct_install_target(services)
 
     with _services_transition_lock:
+        transition_writer: Optional[ApplicationServices] = None
         with _services_lock:
             if _services_shutdown and services is not None:
                 raise RuntimeError("Application services are shutting down")
@@ -640,9 +925,12 @@ def _set_application_services(
             _services_transition_target = services
             _services_transition_active = True
             _services_transition_pending.clear()
+            if _services is not None and _services is not services:
+                transition_writer = _services
+                transition_writer._reserve_notification_transition_writer()
 
         target = services
-        cleanup_targets = tuple(superseded_services)
+        cleanup_targets = deferred_cleanup_targets
         try:
             while True:
                 restart_transition = False
@@ -746,6 +1034,8 @@ def _set_application_services(
                 _services_transition_active = False
                 _services_transition_target = None
                 _services_transition_pending.clear()
+            if transition_writer is not None:
+                transition_writer._release_notification_transition_writer()
 
 
 def reset_application_services() -> None:

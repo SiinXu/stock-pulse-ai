@@ -672,6 +672,10 @@ class _ConfigLoadingMethods:
                 field_name='AGENT_ORCHESTRATOR_TIMEOUT_S',
                 minimum=0,
             ),
+            agent_critic_enabled=parse_env_bool(
+                os.getenv('AGENT_CRITIC_ENABLED'),
+                False,
+            ),
             agent_technical_agent_timeout_s=parse_env_float(
                 os.getenv('AGENT_TECHNICAL_AGENT_TIMEOUT_S'), 0,
                 field_name='AGENT_TECHNICAL_AGENT_TIMEOUT_S', minimum=0,

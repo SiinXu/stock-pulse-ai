@@ -3,7 +3,7 @@
 AgentOrchestrator — multi-agent pipeline coordinator.
 
 Manages the lifecycle of specialised agents (Technical → Intel → Risk →
-Specialist → Decision) for a single stock analysis run.
+Specialist → optional Critic → Decision) for a single stock analysis run.
 
 Modes:
 - ``quick``   : Technical only → Decision (fastest, ~2 LLM calls)
@@ -36,6 +36,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 from dataclasses import dataclass, field, fields as dataclass_fields
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
+from src.agent import critic as _critic
 from src.agent.chat_context import (
     build_agent_chat_market_context,
     build_agent_chat_tool_registry,
@@ -111,6 +112,7 @@ _ORCHESTRATOR_COMPAT_EXPORTS = (
     AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
     AGENT_CHAT_FAILURE_MESSAGE,
     AGENT_EXECUTION_FAILURE_MESSAGE,
+    _critic,
     AgentContext,
     build_agent_chat_market_context,
     build_agent_chat_tool_registry,
@@ -159,7 +161,11 @@ _ORCHESTRATOR_COMPAT_EXPORTS = (
 
 # Valid orchestrator modes (ordered by cost/depth)
 VALID_MODES = ("quick", "standard", "full", "specialist")
-NON_CRITICAL_BASE_STAGES = frozenset({"intel", "risk"})
+NON_CRITICAL_BASE_STAGES = frozenset({
+    "intel",
+    "risk",
+    _critic.CRITIC_STAGE_NAME,
+})
 _PREPARED_DECISION_TYPE_INSERTED = "_prepared_dashboard_decision_type_inserted"
 
 

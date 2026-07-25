@@ -8,9 +8,16 @@ from enum import Enum
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
-SCHEDULED_TASK_SCHEMA_VERSION = 1
+STOCK_ANALYSIS_SCHEDULED_TASK_SCHEMA_VERSION = 1
+SCHEDULED_RESEARCH_TASK_SCHEMA_VERSION = 2
+SCHEDULED_TASK_SCHEMA_VERSION = SCHEDULED_RESEARCH_TASK_SCHEMA_VERSION
+SUPPORTED_SCHEDULED_TASK_SCHEMA_VERSIONS = frozenset({
+    STOCK_ANALYSIS_SCHEDULED_TASK_SCHEMA_VERSION,
+    SCHEDULED_RESEARCH_TASK_SCHEMA_VERSION,
+})
 SCHEDULED_TASK_POLL_INTERVAL_SECONDS = 30
 SCHEDULED_TASK_RETRY_DELAY_SECONDS = 30
+MAX_SCHEDULED_TASK_EXECUTION_GENERATION = (2**63) - 1
 SCHEDULED_NOTIFICATION_STATUSES = frozenset({
     "not_requested",
     "ok",
@@ -24,13 +31,15 @@ _DAILY_TIME_PATTERN = re.compile(r"(?:[01]\d|2[0-3]):[0-5]\d")
 
 
 class ScheduledTaskType(str, Enum):
-    """Task kinds supported by the first scheduling contract."""
+    """Task kinds supported by the versioned scheduling contract."""
 
     STOCK_ANALYSIS = "stock_analysis"
+    RESEARCH_BRIEF = "research_brief"
+    RISK_CHECK = "risk_check"
 
 
 class ScheduleKind(str, Enum):
-    """Recurrence kinds supported by schema version 1."""
+    """Recurrence kinds supported by scheduled-task schemas."""
 
     DAILY = "daily"
 
@@ -160,10 +169,14 @@ def scheduled_local_date(
 __all__ = [
     "ACTIVE_SCHEDULED_RUN_STATUSES",
     "NonTradingDayPolicy",
+    "MAX_SCHEDULED_TASK_EXECUTION_GENERATION",
     "SCHEDULED_TASK_POLL_INTERVAL_SECONDS",
     "SCHEDULED_TASK_RETRY_DELAY_SECONDS",
     "SCHEDULED_TASK_SCHEMA_VERSION",
+    "SCHEDULED_RESEARCH_TASK_SCHEMA_VERSION",
     "SCHEDULED_NOTIFICATION_STATUSES",
+    "STOCK_ANALYSIS_SCHEDULED_TASK_SCHEMA_VERSION",
+    "SUPPORTED_SCHEDULED_TASK_SCHEMA_VERSIONS",
     "ScheduleKind",
     "ScheduledRunStatus",
     "ScheduledTaskType",

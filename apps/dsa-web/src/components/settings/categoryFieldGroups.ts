@@ -158,6 +158,7 @@ const AGENT_GROUPS: CategoryFieldGroup[] = [
       'AGENT_NL_ROUTING',
       'AGENT_ORCHESTRATOR_MODE',
       'AGENT_ORCHESTRATOR_TIMEOUT_S',
+      'AGENT_CRITIC_ENABLED',
       'AGENT_RISK_OVERRIDE',
     ],
   },
