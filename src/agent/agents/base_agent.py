@@ -28,7 +28,10 @@ from src.agent.public_contract import (
     AGENT_EXECUTION_FAILURE_MESSAGE,
 )
 from src.agent.runner import RunLoopResult, run_agent_loop
-from src.agent.soul import compose_agent_soul_prompt
+from src.agent.soul import (
+    compose_agent_soul_prompt,
+    record_agent_soul_composition,
+)
 from src.agent.skills.defaults import extract_skill_id
 from src.agent.tools.registry import ToolRegistry
 from src.market_phase_prompt import format_market_phase_prompt_section
@@ -196,13 +199,7 @@ class BaseAgent(ABC):
 
     def _build_messages(self, ctx: AgentContext) -> List[Dict[str, Any]]:
         """Assemble the initial messages list for the LLM."""
-        messages: List[Dict[str, Any]] = [
-            {
-                "role": "system",
-                "content": compose_agent_soul_prompt(self.system_prompt(ctx)),
-            },
-        ]
-
+        history_messages: List[Dict[str, Any]] = []
         history = ctx.meta.get("conversation_history")
         if isinstance(history, list):
             for message in history:
@@ -210,8 +207,19 @@ class BaseAgent(ABC):
                     continue
                 role = message.get("role")
                 content = message.get("content")
-                if role in {"user", "assistant", "system"} and isinstance(content, str) and content:
-                    messages.append({"role": role, "content": content})
+                if role == "system" and isinstance(content, str) and content:
+                    raise ValueError(
+                        "BaseAgent rejects system-role conversation history"
+                    )
+                if role in {"user", "assistant"} and isinstance(content, str) and content:
+                    history_messages.append({"role": role, "content": content})
+
+        system_prompt = compose_agent_soul_prompt(self.system_prompt(ctx))
+        record_agent_soul_composition(ctx, system_prompt)
+        messages: List[Dict[str, Any]] = [
+            {"role": "system", "content": system_prompt},
+            *history_messages,
+        ]
 
         report_language = normalize_report_language(ctx.meta.get("report_language", "zh"))
         market_phase_section = format_market_phase_prompt_section(

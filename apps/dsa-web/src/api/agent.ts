@@ -21,6 +21,10 @@ export interface ChatResponse {
   content: string;
   session_id: string;
   error?: string;
+  agent_runtime?: {
+    soul_version: string;
+    soul_hash: string;
+  };
 }
 
 export interface SkillInfo {

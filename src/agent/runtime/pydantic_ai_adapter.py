@@ -47,6 +47,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import threading
 import time
 from typing import Any, Callable, List, Optional, Tuple
@@ -62,9 +63,20 @@ from src.agent.runtime.contract import (
     deep_thaw,
 )
 from src.agent.runtime.lifecycle import classify_terminal_state, get_default_usage_recorder
-from src.agent.public_contract import sanitize_agent_diagnostic
+from src.agent.runtime_facts import (
+    AgentRuntimeFacts,
+    build_agent_soul_runtime_facts,
+    inherit_agent_soul_runtime_facts,
+)
+from src.agent.soul import has_canonical_agent_soul
+from src.agent.public_contract import (
+    AGENT_EXECUTION_FAILURE_MESSAGE,
+    sanitize_agent_diagnostic,
+)
+from src.utils.sanitize import log_safe_exception
 
 _PYDANTIC_AI_DIST = "pydantic-ai-slim"
+logger = logging.getLogger("src.agent.runtime.pydantic_ai_adapter")
 
 
 class PydanticAIRuntimeUnavailableError(RuntimeError):
@@ -507,8 +519,15 @@ class PydanticAIRuntimeAdapter:
                 except Exception as exc:
                     worker_exception = exc
 
-                cancelled_result = self._cancelled_result()
-                timed_out_result = self._timed_out_result()
+                result_runtime_facts = inherit_agent_soul_runtime_facts(
+                    getattr(result, "runtime_facts", None)
+                )
+                cancelled_result = self._cancelled_result(
+                    runtime_facts=result_runtime_facts
+                )
+                timed_out_result = self._timed_out_result(
+                    runtime_facts=result_runtime_facts
+                )
                 failure_error = (
                     sanitize_agent_diagnostic(
                         str(worker_exception) or worker_exception.__class__.__name__
@@ -613,6 +632,7 @@ class PydanticAIRuntimeAdapter:
     ) -> Any:
         from src.agent.executor import AgentResult
 
+        result = None
         try:
             self._check_execution_fence(execution, deadline_monotonic)
             result = self._dispatch(
@@ -623,9 +643,17 @@ class PydanticAIRuntimeAdapter:
             )
             self._check_execution_fence(execution, deadline_monotonic)
         except _ExecutionCancelled:
-            result = self._cancelled_result()
+            result = self._cancelled_result(
+                runtime_facts=inherit_agent_soul_runtime_facts(
+                    getattr(result, "runtime_facts", None)
+                )
+            )
         except _ExecutionTimedOut:
-            result = self._timed_out_result()
+            result = self._timed_out_result(
+                runtime_facts=inherit_agent_soul_runtime_facts(
+                    getattr(result, "runtime_facts", None)
+                )
+            )
         except _ProviderBridgeError as exc:
             result = AgentResult(
                 success=False, content="", dashboard=None, error=str(exc)
@@ -633,7 +661,9 @@ class PydanticAIRuntimeAdapter:
         return result
 
     @staticmethod
-    def _cancelled_result() -> Any:
+    def _cancelled_result(
+        runtime_facts: Optional[AgentRuntimeFacts] = None,
+    ) -> Any:
         from src.agent.executor import AgentResult
 
         return AgentResult(
@@ -641,11 +671,14 @@ class PydanticAIRuntimeAdapter:
             content="",
             dashboard=None,
             error="Agent execution cancelled",
+            runtime_facts=runtime_facts,
             cancelled=True,
         )
 
     @staticmethod
-    def _timed_out_result() -> Any:
+    def _timed_out_result(
+        runtime_facts: Optional[AgentRuntimeFacts] = None,
+    ) -> Any:
         from src.agent.executor import AgentResult
 
         return AgentResult(
@@ -653,6 +686,7 @@ class PydanticAIRuntimeAdapter:
             content="",
             dashboard=None,
             error="Agent execution timed out",
+            runtime_facts=runtime_facts,
             timed_out=True,
         )
 
@@ -734,32 +768,65 @@ class PydanticAIRuntimeAdapter:
                 )
             )
 
-        system_prompt, user_message = self._resolve_prompt(context)
+        system_prompt, user_message, runtime_facts = self._resolve_prompt(context)
         agent_kwargs: dict = {"model": model, "toolsets": toolsets}
         if system_prompt:
             agent_kwargs["system_prompt"] = system_prompt
-        agent = Agent(**agent_kwargs)
 
-        run_result = agent.run_sync(user_message)
-        content = str(run_result.output or "")
-        total_tokens = getattr(model, "total_tokens", 0) or int(
-            getattr(run_result.usage, "total_tokens", 0) or 0
-        )
-        model_str = self._model_string(model)
+        try:
+            agent = Agent(**agent_kwargs)
+            run_result = agent.run_sync(user_message)
+            content = str(run_result.output or "")
+            total_tokens = getattr(model, "total_tokens", 0) or int(
+                getattr(run_result.usage, "total_tokens", 0) or 0
+            )
+            model_str = self._model_string(model)
 
-        dashboard = parse_dashboard_json(content)
-        return AgentResult(
-            success=dashboard is not None,
-            content=content,
-            dashboard=dashboard,
-            total_tokens=total_tokens,
-            model=model_str,
-            error=None
-            if dashboard is not None
-            else "Failed to parse dashboard JSON from agent response",
-        )
+            dashboard = parse_dashboard_json(content)
+            return AgentResult(
+                success=dashboard is not None,
+                content=content,
+                dashboard=dashboard,
+                total_tokens=total_tokens,
+                model=model_str,
+                error=None
+                if dashboard is not None
+                else "Failed to parse dashboard JSON from agent response",
+                runtime_facts=runtime_facts,
+            )
+        except _ExecutionCancelled:
+            return self._cancelled_result(runtime_facts=runtime_facts)
+        except _ExecutionTimedOut:
+            return self._timed_out_result(runtime_facts=runtime_facts)
+        except _ProviderBridgeError as exc:
+            return AgentResult(
+                success=False,
+                content="",
+                dashboard=None,
+                error=str(exc),
+                runtime_facts=runtime_facts,
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - Safe failure retains verified provenance.
+            if runtime_facts is None:
+                raise
+            log_safe_exception(
+                logger,
+                "PydanticAI execution failed after Native prompt composition",
+                exc,
+                error_code="pydantic_ai_composed_execution_failed",
+            )
+            return AgentResult(
+                success=False,
+                content="",
+                dashboard=None,
+                error=AGENT_EXECUTION_FAILURE_MESSAGE,
+                runtime_facts=runtime_facts,
+            )
 
-    def _resolve_prompt(self, context: ExecutionContext) -> Tuple[Optional[str], str]:
+    def _resolve_prompt(
+        self,
+        context: ExecutionContext,
+    ) -> Tuple[Optional[str], str, Optional[AgentRuntimeFacts]]:
         """Reuse the native single-run prompt authority when an executor exists.
 
         StockPulse owns the resolved system/skill prompt, dashboard constraints
@@ -772,8 +839,13 @@ class PydanticAIRuntimeAdapter:
             system_prompt, user_message, _ = self._executor.build_run_messages(
                 context.prompt, request_context
             )
-            return system_prompt, user_message
-        return None, context.prompt
+            runtime_facts = (
+                build_agent_soul_runtime_facts(system_prompt)
+                if has_canonical_agent_soul(system_prompt)
+                else None
+            )
+            return system_prompt, user_message, runtime_facts
+        return None, context.prompt, None
 
     @staticmethod
     def _model_string(model: Any) -> str:

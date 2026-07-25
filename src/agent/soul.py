@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import hashlib
-from typing import Dict
+from typing import Any, Dict, Optional
 
 
 AGENT_SOUL_VERSION = "1.0.0"
@@ -76,11 +76,36 @@ def render_agent_soul_system_block() -> str:
 
 
 AGENT_SOUL_SYSTEM_BLOCK = render_agent_soul_system_block()
-_AGENT_SOUL_SYSTEM_PREFIX = f"{AGENT_SOUL_SYSTEM_BLOCK}\n\n"
+_AGENT_SOUL_SYSTEM_SUFFIX = f"\n\n{AGENT_SOUL_SYSTEM_BLOCK}"
+_AGENT_SOUL_CONTEXT_META_KEY = "_agent_soul_identity"
+
+
+class _AgentSoulCompositionProof:
+    """Opaque proof that survives isolated-stage context copies."""
+
+    __slots__ = ()
+
+    def __deepcopy__(self, memo: Any) -> "_AgentSoulCompositionProof":
+        return self
+
+
+_AGENT_SOUL_COMPOSITION_PROOF = _AgentSoulCompositionProof()
+
+
+def has_canonical_agent_soul(system_prompt: Any) -> bool:
+    """Return whether the exact Soul block is the final prompt section."""
+    if not isinstance(system_prompt, str) or not system_prompt.endswith(
+        _AGENT_SOUL_SYSTEM_SUFFIX
+    ):
+        return False
+    base_prompt = system_prompt[: -len(_AGENT_SOUL_SYSTEM_SUFFIX)]
+    return bool(base_prompt.strip()) and not (
+        AGENT_SOUL_MARKER in base_prompt or _AGENT_SOUL_END_MARKER in base_prompt
+    )
 
 
 def compose_agent_soul_prompt(system_prompt: str) -> str:
-    """Prepend the Soul exactly once to one non-empty system prompt.
+    """Append the Soul exactly once as the final authoritative prompt section.
 
     The function is idempotent so shared assembly layers can converge on it.
     Multiple existing markers indicate an invalid, already-duplicated prompt and
@@ -89,17 +114,43 @@ def compose_agent_soul_prompt(system_prompt: str) -> str:
     if not isinstance(system_prompt, str) or not system_prompt.strip():
         raise ValueError("Agent Soul requires a non-empty system prompt")
 
-    if system_prompt.startswith(_AGENT_SOUL_SYSTEM_PREFIX):
-        remaining_prompt = system_prompt[len(_AGENT_SOUL_SYSTEM_PREFIX) :]
-        if (
-            AGENT_SOUL_MARKER in remaining_prompt
-            or _AGENT_SOUL_END_MARKER in remaining_prompt
-        ):
-            raise ValueError("Agent Soul boundary marker appears outside its canonical block")
+    if has_canonical_agent_soul(system_prompt):
         return system_prompt
     if AGENT_SOUL_MARKER in system_prompt or _AGENT_SOUL_END_MARKER in system_prompt:
         raise ValueError("Agent Soul boundary marker appears outside its canonical block")
-    return f"{_AGENT_SOUL_SYSTEM_PREFIX}{system_prompt}"
+    return f"{system_prompt.rstrip()}{_AGENT_SOUL_SYSTEM_SUFFIX}"
+
+
+def record_agent_soul_composition(ctx: Any, system_prompt: str) -> None:
+    """Record canonical composition on one internal Agent context."""
+    if not has_canonical_agent_soul(system_prompt):
+        raise ValueError("Agent Soul provenance requires the canonical composed prompt")
+    meta = getattr(ctx, "meta", None)
+    if not isinstance(meta, dict):
+        raise TypeError("Agent Soul composition requires an AgentContext-like meta dict")
+    meta[_AGENT_SOUL_CONTEXT_META_KEY] = _AGENT_SOUL_COMPOSITION_PROOF
+
+
+def get_context_agent_soul_metadata(ctx: Any) -> Optional[Dict[str, str]]:
+    """Return validated Soul identity only after that context was composed."""
+    meta = getattr(ctx, "meta", None)
+    if not isinstance(meta, dict):
+        return None
+    recorded = meta.get(_AGENT_SOUL_CONTEXT_META_KEY)
+    if recorded is not _AGENT_SOUL_COMPOSITION_PROOF:
+        return None
+    return get_agent_soul_metadata()
+
+
+def propagate_agent_soul_composition(source: Any, target: Any) -> None:
+    """Propagate only validated composition provenance between Agent contexts."""
+    metadata = get_context_agent_soul_metadata(source)
+    if metadata is None:
+        return
+    target_meta = getattr(target, "meta", None)
+    if not isinstance(target_meta, dict):
+        raise TypeError("Agent Soul composition requires an AgentContext-like meta dict")
+    target_meta[_AGENT_SOUL_CONTEXT_META_KEY] = _AGENT_SOUL_COMPOSITION_PROOF
 
 
 __all__ = [
@@ -109,6 +160,10 @@ __all__ = [
     "AGENT_SOUL_SYSTEM_BLOCK",
     "AGENT_SOUL_VERSION",
     "compose_agent_soul_prompt",
+    "get_context_agent_soul_metadata",
     "get_agent_soul_metadata",
+    "has_canonical_agent_soul",
+    "propagate_agent_soul_composition",
+    "record_agent_soul_composition",
     "render_agent_soul_system_block",
 ]

@@ -18,7 +18,11 @@ from src.agent.protocols import (
     StageFailureReason,
     normalize_stage_failure_reason,
 )
-from src.agent.soul import AGENT_SOUL_HASH, AGENT_SOUL_VERSION
+from src.agent.soul import (
+    get_agent_soul_metadata,
+    get_context_agent_soul_metadata,
+    has_canonical_agent_soul,
+)
 
 if TYPE_CHECKING:
     from src.agent.risk_override import RiskOverrideApplication
@@ -83,24 +87,60 @@ class PipelineTerminationFact:
 class AgentRuntimeFacts:
     """Immutable internal snapshot carried by ``AgentResult``."""
 
-    soul_version: str = AGENT_SOUL_VERSION
-    soul_hash: str = AGENT_SOUL_HASH
     base_agent_opinions: Tuple[BaseAgentOpinionFact, ...] = ()
     degraded_events: Tuple[DegradedEvent, ...] = ()
     pipeline_termination: Optional[PipelineTerminationFact] = None
     risk_override_application: Optional[RiskOverrideApplication] = None
 
+    @property
+    def soul_version(self) -> Optional[str]:
+        """Return the module-owned Soul version after verified composition."""
+        return project_agent_runtime_metadata(self).get("soul_version")
+
+    @property
+    def soul_hash(self) -> Optional[str]:
+        """Return the module-owned Soul hash after verified composition."""
+        return project_agent_runtime_metadata(self).get("soul_hash")
+
     def to_metadata(self) -> dict[str, str]:
         """Project the stable run identity without exposing model reasoning."""
-        return {
-            "soul_version": self.soul_version,
-            "soul_hash": self.soul_hash,
-        }
+        return project_agent_runtime_metadata(self)
+
+
+@dataclass(frozen=True)
+class _VerifiedAgentRuntimeFacts(AgentRuntimeFacts):
+    """Module-owned facts type proving canonical Soul composition."""
+
+
+def project_agent_runtime_metadata(facts: Any) -> dict[str, str]:
+    """Project identity only from the exact module-owned verified facts type."""
+    if type(facts) is not _VerifiedAgentRuntimeFacts:
+        return {}
+    return get_agent_soul_metadata()
+
+
+def build_agent_soul_runtime_facts(system_prompt: str) -> AgentRuntimeFacts:
+    """Build identity facts after the canonical Soul composer ran."""
+    if not has_canonical_agent_soul(system_prompt):
+        raise ValueError("Agent Soul runtime facts require the canonical composed prompt")
+    return _VerifiedAgentRuntimeFacts()
+
+
+def inherit_agent_soul_runtime_facts(facts: Any) -> Optional[AgentRuntimeFacts]:
+    """Copy only a module-verified Soul identity into a new result snapshot."""
+    if type(facts) is not _VerifiedAgentRuntimeFacts:
+        return None
+    return _VerifiedAgentRuntimeFacts()
 
 
 def build_agent_runtime_facts(ctx: AgentContext) -> AgentRuntimeFacts:
     """Build a validated low-sensitivity snapshot from an Agent context."""
-    return AgentRuntimeFacts(
+    facts_type = (
+        _VerifiedAgentRuntimeFacts
+        if get_context_agent_soul_metadata(ctx) is not None
+        else AgentRuntimeFacts
+    )
+    return facts_type(
         base_agent_opinions=tuple(_iter_base_agent_opinions(ctx)),
         degraded_events=tuple(_iter_degraded_events(ctx)),
         pipeline_termination=_pipeline_termination(ctx),
@@ -219,4 +259,7 @@ __all__ = [
     "DegradedEvent",
     "PipelineTerminationFact",
     "build_agent_runtime_facts",
+    "build_agent_soul_runtime_facts",
+    "inherit_agent_soul_runtime_facts",
+    "project_agent_runtime_metadata",
 ]

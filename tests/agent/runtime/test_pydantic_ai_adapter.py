@@ -31,6 +31,7 @@ from tests.litellm_stub import ensure_litellm_stub
 ensure_litellm_stub()
 
 from src.agent.llm_adapter import LLMResponse, ToolCall
+from src.agent.executor import AgentResult
 from src.agent.runtime.contract import (
     AgentExecution,
     ExecutionContext,
@@ -42,6 +43,12 @@ from src.agent.runtime.pydantic_ai_adapter import (
     PydanticAIRuntimeUnavailableError,
     _to_stockpulse_messages,
     is_pydantic_ai_available,
+)
+from src.agent.public_contract import AGENT_EXECUTION_FAILURE_MESSAGE
+from src.agent.runtime_facts import build_agent_soul_runtime_facts
+from src.agent.soul import (
+    compose_agent_soul_prompt,
+    get_agent_soul_metadata,
 )
 from src.agent.runtime.tool_session import BoundToolSession
 from src.agent.tools.registry import (
@@ -145,6 +152,25 @@ def _blocking_model(started: threading.Event, release: threading.Event, output_t
             )
 
     return _BlockingModel()
+
+
+def _raising_model(exception: RuntimeError):
+    """Fake Model that raises one ordinary provider/runtime exception."""
+    from pydantic_ai.models import Model
+
+    class _RaisingModel(Model):
+        @property
+        def model_name(self) -> str:
+            return "raising-fake"
+
+        @property
+        def system(self) -> str:
+            return "stockpulse"
+
+        async def request(self, messages, model_settings, model_request_parameters):
+            raise exception
+
+    return _RaisingModel()
 
 
 def _blocking_tool_call_model(
@@ -262,6 +288,16 @@ def _run_context(prompt: str) -> ExecutionContext:
     return ExecutionContext(mode=ExecutionMode.RUN, prompt=prompt)
 
 
+def _composed_executor() -> MagicMock:
+    executor = MagicMock()
+    executor.build_run_messages.return_value = (
+        compose_agent_soul_prompt("StockPulse Native prompt"),
+        "Native user message",
+        [],
+    )
+    return executor
+
+
 # ---------------------------------------------------------------------------
 # Optional-dependency contract
 # ---------------------------------------------------------------------------
@@ -318,29 +354,84 @@ def test_run_without_dashboard_json_fails_closed():
     assert "dashboard" in (handle.result.error or "").lower()
 
 
+@pytest.mark.parametrize("terminal", ["cancelled", "timed_out"])
+def test_post_dispatch_fence_preserves_composed_runtime_identity(terminal):
+    context = _run_context("Analyze 600519")
+    execution = AgentExecution(context)
+    execution.start()
+    adapter = PydanticAIRuntimeAdapter(model=MagicMock())
+    composed_result = AgentResult(
+        success=True,
+        content='{"signal": "buy"}',
+        dashboard={"signal": "buy"},
+        runtime_facts=build_agent_soul_runtime_facts(
+            compose_agent_soul_prompt("Composed result prompt")
+        ),
+    )
+    deadline_monotonic = None
+
+    def _dispatch(*_args, **_kwargs):
+        if terminal == "cancelled":
+            assert execution.request_cancel() is True
+        else:
+            time.sleep(0.02)
+        return composed_result
+
+    if terminal == "timed_out":
+        deadline_monotonic = time.monotonic() + 0.01
+
+    with patch.object(adapter, "_dispatch", side_effect=_dispatch):
+        result = adapter._run_once(
+            context,
+            execution=execution,
+            deadline_monotonic=deadline_monotonic,
+            event_emitter=MagicMock(),
+        )
+
+    assert result.runtime_facts.to_metadata() == get_agent_soul_metadata()
+    assert result.cancelled is (terminal == "cancelled")
+    assert result.timed_out is (terminal == "timed_out")
+
+
 def test_execute_reraises_worker_exception():
-    from pydantic_ai.models import Model
-
     exception = RuntimeError("pydantic runtime boom")
-
-    class _RaisingModel(Model):
-        @property
-        def model_name(self) -> str:
-            return "raising-fake"
-
-        @property
-        def system(self) -> str:
-            return "stockpulse"
-
-        async def request(self, messages, model_settings, model_request_parameters):
-            raise exception
-
-    adapter = PydanticAIRuntimeAdapter(model=_RaisingModel())
+    adapter = PydanticAIRuntimeAdapter(model=_raising_model(exception))
 
     with pytest.raises(RuntimeError, match="pydantic runtime boom") as excinfo:
         adapter.execute(_run_context("Analyze 600519"))
 
     assert excinfo.value is exception
+
+
+def test_composed_agent_construction_failure_preserves_identity_without_details():
+    exception = RuntimeError("constructor secret api_key=must-not-leak")
+    adapter = PydanticAIRuntimeAdapter(
+        model=MagicMock(),
+        executor=_composed_executor(),
+    )
+
+    with patch.object(pydantic_ai, "Agent", side_effect=exception):
+        handle = adapter.execute(_run_context("Analyze 600519"))
+
+    assert handle.state is ExecutionState.FAILED
+    assert handle.result.error == AGENT_EXECUTION_FAILURE_MESSAGE
+    assert "must-not-leak" not in handle.result.error
+    assert handle.result.runtime_facts.to_metadata() == get_agent_soul_metadata()
+
+
+def test_composed_run_exception_preserves_identity_without_details():
+    exception = RuntimeError("provider secret token=must-not-leak")
+    adapter = PydanticAIRuntimeAdapter(
+        model=_raising_model(exception),
+        executor=_composed_executor(),
+    )
+
+    handle = adapter.execute(_run_context("Analyze 600519"))
+
+    assert handle.state is ExecutionState.FAILED
+    assert handle.result.error == AGENT_EXECUTION_FAILURE_MESSAGE
+    assert "must-not-leak" not in handle.result.error
+    assert handle.result.runtime_facts.to_metadata() == get_agent_soul_metadata()
 
 
 def test_start_returns_live_running_handle_then_completes():

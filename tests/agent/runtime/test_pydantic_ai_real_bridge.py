@@ -27,6 +27,7 @@ ensure_litellm_stub()
 from src.agent.llm_adapter import LLMResponse, ToolCall
 from src.agent.runtime.contract import ExecutionContext, ExecutionMode, ExecutionState
 from src.agent.runtime.tool_session import BoundToolSession
+from src.agent.soul import compose_agent_soul_prompt, get_agent_soul_metadata
 from src.agent.tools.registry import (
     ToolDefinition,
     ToolParameter,
@@ -106,6 +107,7 @@ def test_real_bridge_forwards_real_tool_schema_and_timeout():
 
     assert handle.state is ExecutionState.SUCCEEDED
     assert handle.result.dashboard == {"signal": "buy", "confidence": 0.9}
+    assert handle.result.runtime_facts is None
 
     first = fake.calls[0]
     # RF-05 #1: the real tool definition — never a fixed empty array — reaches
@@ -245,7 +247,7 @@ class _PromptExecutor:
     """Minimal stand-in for ``AgentExecutor.build_run_messages`` (RF-05 #5)."""
 
     def build_run_messages(self, task, context=None):
-        return ("SYSTEM-PROMPT-REUSED", f"USER::{task}", [])
+        return (compose_agent_soul_prompt("SYSTEM-PROMPT-REUSED"), f"USER::{task}", [])
 
 
 def test_real_bridge_reuses_executor_prompt_authority():
@@ -260,10 +262,12 @@ def test_real_bridge_reuses_executor_prompt_authority():
     # The resolved system prompt crosses the bridge as a system message and the
     # executor-built user message replaces the raw prompt: one prompt authority
     # rather than a second set of business rules inside the adapter.
-    assert {"role": "system", "content": "SYSTEM-PROMPT-REUSED"} in messages
+    expected_system_prompt = compose_agent_soul_prompt("SYSTEM-PROMPT-REUSED")
+    assert {"role": "system", "content": expected_system_prompt} in messages
     assert any(
         m["role"] == "user" and m["content"] == "USER::Analyze 600519" for m in messages
     )
+    assert handle.result.runtime_facts.to_metadata() == get_agent_soul_metadata()
 
 
 def test_real_bridge_cancellation_wins_and_records_usage_once():

@@ -32,6 +32,7 @@ from src.agent.runtime import (
     ExecutionMode,
     to_public_sse_event,
 )
+from src.agent.runtime_facts import project_agent_runtime_metadata
 from src.config import get_config
 from src.services.agent_model_service import list_agent_model_deployments
 from src.utils.sanitize import redact_sensitive_text
@@ -76,11 +77,32 @@ class ChatRequest(BaseModel):
         """Return skill ids from the unified request shape."""
         return self.skills
 
+
+class AgentRuntimeMetadata(BaseModel):
+    soul_version: str
+    soul_hash: str
+
+
 class ChatResponse(BaseModel):
     success: bool
     content: str
     session_id: str
     error: Optional[str] = None
+    agent_runtime: Optional[AgentRuntimeMetadata] = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+    )
+
+
+def _project_agent_runtime(result: Any) -> Optional[AgentRuntimeMetadata]:
+    """Return low-sensitivity Soul identity only when the run recorded it."""
+    metadata = project_agent_runtime_metadata(
+        getattr(result, "runtime_facts", None)
+    )
+    if not metadata:
+        return None
+    return AgentRuntimeMetadata(**metadata)
+
 
 class SkillInfo(BaseModel):
     id: str
@@ -195,6 +217,7 @@ async def agent_chat(request: ChatRequest):
             lambda: executor.chat(message=request.message, session_id=session_id,
                                   context=ctx),
         )
+        agent_runtime = _project_agent_runtime(result)
 
         if not result.success:
             logger.error(
@@ -207,6 +230,7 @@ async def agent_chat(request: ChatRequest):
                 content="",
                 session_id=session_id,
                 error=AGENT_CHAT_FAILED,
+                agent_runtime=agent_runtime,
             )
 
         return ChatResponse(
@@ -214,6 +238,7 @@ async def agent_chat(request: ChatRequest):
             content=result.content,
             session_id=session_id,
             error=None,
+            agent_runtime=agent_runtime,
         )
             
     except Exception as exc:

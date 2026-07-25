@@ -7,6 +7,8 @@ from dataclasses import asdict
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 sys.modules.setdefault("litellm", MagicMock())
 
 from src.agent.agents.base_agent import BaseAgent
@@ -27,12 +29,17 @@ from src.agent.runner import (
     run_agent_loop,
 )
 from src.agent.runtime_facts import (
+    AgentRuntimeFacts,
     BaseAgentOpinionFact,
     DegradationBoundary,
     DegradedEvent,
     PipelineTerminationFact,
     build_agent_runtime_facts,
+    build_agent_soul_runtime_facts,
+    inherit_agent_soul_runtime_facts,
+    project_agent_runtime_metadata,
 )
+from src.agent.soul import compose_agent_soul_prompt, get_agent_soul_metadata
 
 
 def _orchestrator(*, risk_override=True):
@@ -150,9 +157,47 @@ def test_runtime_facts_only_project_independent_low_sensitivity_opinions():
         BaseAgentOpinionFact(agent="technical", signal="strong_buy", confidence=0.88),
         BaseAgentOpinionFact(agent="risk", signal="hold", confidence=0.7),
     )
+    assert facts.to_metadata() == {}
     serialized = json.dumps(asdict(facts), ensure_ascii=False, default=str).lower()
     for forbidden in ("reasoning", "raw_data", "token", "secret"):
         assert forbidden not in serialized
+
+
+def test_public_runtime_facts_constructor_cannot_claim_soul_identity():
+    metadata = get_agent_soul_metadata()
+
+    with pytest.raises(TypeError):
+        AgentRuntimeFacts(**metadata)
+
+    direct_opinion = BaseAgentOpinionFact(
+        agent="technical",
+        signal="hold",
+        confidence=0.5,
+    )
+    direct_facts = AgentRuntimeFacts(base_agent_opinions=(direct_opinion,))
+    verified_facts = build_agent_soul_runtime_facts(
+        compose_agent_soul_prompt("Verified system prompt")
+    )
+
+    assert direct_facts.soul_version is None
+    assert direct_facts.soul_hash is None
+    assert direct_facts.to_metadata() == {}
+    assert direct_facts.base_agent_opinions == (direct_opinion,)
+    assert verified_facts.to_metadata() == metadata
+    assert "soul_version" not in asdict(verified_facts)
+    assert "soul_hash" not in asdict(verified_facts)
+
+
+def test_runtime_metadata_projector_rejects_lookalike_subclasses():
+    class LookalikeFacts(AgentRuntimeFacts):
+        def to_metadata(self):
+            return get_agent_soul_metadata()
+
+    lookalike = LookalikeFacts()
+
+    assert lookalike.to_metadata() == get_agent_soul_metadata()
+    assert project_agent_runtime_metadata(lookalike) == {}
+    assert inherit_agent_soul_runtime_facts(lookalike) is None
 
 
 def test_legacy_executor_content_canonicalizes_escaped_reserved_field():

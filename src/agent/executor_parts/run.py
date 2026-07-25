@@ -5,6 +5,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
+from src.agent.runtime_facts import (
+    build_agent_soul_runtime_facts as _build_agent_soul_runtime_facts,
+)
 from src.agent.stock_scope import resolve_stock_scope
 from src.agent.soul import compose_agent_soul_prompt as _compose_agent_soul_prompt
 from src.market_context import get_market_guidelines, get_market_role
@@ -51,13 +54,15 @@ class _RunMethods:
             {"role": "user", "content": user_message},
         ]
 
-        return self._run_loop(
+        result = self._run_loop(
             messages,
             tool_decls,
             parse_dashboard=True,
             stock_scope=scope_resolution.stock_scope,
             cancelled_check=cancelled_check,
         )
+        result.runtime_facts = _build_agent_soul_runtime_facts(system_prompt)
+        return result
 
     def build_run_messages(
         self, task: str, context: Optional[Dict[str, Any]] = None

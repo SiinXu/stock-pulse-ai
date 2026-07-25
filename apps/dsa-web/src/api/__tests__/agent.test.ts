@@ -33,3 +33,47 @@ describe('agentApi.research', () => {
     expect(result.error).toBe('timed out');
   });
 });
+
+describe('agentApi.chat', () => {
+  beforeEach(() => mockPost.mockReset());
+
+  it('preserves additive Agent Soul run metadata from the Chat response', async () => {
+    mockPost.mockResolvedValue({
+      data: {
+        success: true,
+        content: 'Evidence is limited.',
+        session_id: 'chat-1',
+        agent_runtime: {
+          soul_version: '1.0.0',
+          soul_hash: 'sha256:test',
+        },
+      },
+    });
+
+    const result = await agentApi.chat({ message: 'Analyze AAPL' });
+
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/v1/agent/chat',
+      { message: 'Analyze AAPL' },
+      { timeout: 120000 },
+    );
+    expect(result.agent_runtime).toEqual({
+      soul_version: '1.0.0',
+      soul_hash: 'sha256:test',
+    });
+  });
+
+  it('keeps agent_runtime absent when the Chat response omits it', async () => {
+    mockPost.mockResolvedValue({
+      data: {
+        success: true,
+        content: 'No verified runtime identity.',
+        session_id: 'chat-2',
+      },
+    });
+
+    const result = await agentApi.chat({ message: 'Analyze MSFT' });
+
+    expect(result).not.toHaveProperty('agent_runtime');
+  });
+});
