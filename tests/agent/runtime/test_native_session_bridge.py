@@ -38,6 +38,7 @@ from src.agent.tools.registry import (
     ToolRegistry,
 )
 from src.plugins import build_agent_tool_extension_registry
+from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 
 class _TC:
@@ -54,6 +55,7 @@ def _native_session(registry: ToolRegistry, **overrides) -> BoundToolSession:
         "execution_id": "native-bridge-test",
         "allowed_tools": registry.list_names(),
         "enforce_access_policy": False,
+        "security_audit": SecurityAuditRecorderStub(),
     }
     params.update(overrides)
     return BoundToolSession(registry, **params)

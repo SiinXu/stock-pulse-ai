@@ -29,7 +29,10 @@ from typing import Optional, Union, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from api.deps import get_config_dep, get_security_audit_service
+from api.deps import (
+    get_config_dep,
+    require_security_audit_service,
+)
 from api.v1.errors import api_error, error_body
 from api.v1.schemas.analysis import (
     AnalyzeRequest,
@@ -88,8 +91,10 @@ from src.task_execution import TaskEventType, TaskStatusEnum, deep_thaw
 from src.services.run_diagnostics import build_run_diagnostic_summary
 from src.services.run_flow import build_task_run_flow_snapshot
 from src.services.security_audit_service import (
+    SecurityAuditRecorder,
     SecurityAuditService,
     SecurityAuditUnavailable,
+    require_security_audit_recorder,
 )
 from src.utils.data_processing import (
     normalize_model_used,
@@ -108,16 +113,19 @@ router = APIRouter()
 _SUPPORTED_FREE_TEXT_RE = re.compile(r"^[A-Za-z0-9.*\-+\u3400-\u9fff\s]+$")
 
 
-def _resolved_security_audit_service(value) -> SecurityAuditService | None:
-    if callable(getattr(value, "record_attempt", None)) and callable(
-        getattr(value, "record_completion", None)
-    ):
-        return value
-    return None
+def _require_analysis_audit_service(value: object) -> SecurityAuditRecorder:
+    try:
+        return require_security_audit_recorder(value)
+    except SecurityAuditUnavailable:
+        raise api_error(
+            503,
+            "security_audit_unavailable",
+            "Security audit storage is unavailable",
+        ) from None
 
 
 def _record_analysis_submission_audit(
-    service: SecurityAuditService | None,
+    service: SecurityAuditRecorder,
     *,
     phase: str,
     correlation_id: str,
@@ -126,8 +134,6 @@ def _record_analysis_submission_audit(
     reason_code: str = "attempt_started",
     metadata: dict[str, Any] | None = None,
 ) -> None:
-    if service is None:
-        return
     common = dict(
         event_type="analysis.submit",
         actor_type="api_client",
@@ -342,7 +348,7 @@ def _resolve_and_normalize_input(raw_value: str) -> str:
 def trigger_analysis(
         request: AnalyzeRequest,
         config: Config = Depends(get_config_dep),
-        security_audit: SecurityAuditService = Depends(get_security_audit_service),
+        security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
 ) -> Union[AnalysisResultResponse, JSONResponse]:
     """
     触发股票分析
@@ -415,7 +421,7 @@ def trigger_analysis(
     return _handle_async_analysis_batch(
         stock_codes,
         request,
-        security_audit=_resolved_security_audit_service(security_audit),
+        security_audit=_require_analysis_audit_service(security_audit),
     )
 
 
@@ -423,7 +429,7 @@ def _handle_async_analysis_batch(
     stock_codes: list,
     request: AnalyzeRequest,
     *,
-    security_audit: SecurityAuditService | None = None,
+    security_audit: SecurityAuditRecorder,
 ) -> JSONResponse:
     """
     Handle asynchronous analysis requests, including batch submission.

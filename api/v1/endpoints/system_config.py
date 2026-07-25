@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import os
 from typing import Any, Mapping
@@ -10,8 +12,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from api.deps import (
     get_runtime_scheduler_service,
-    get_security_audit_service,
     get_system_config_service,
+    require_security_audit_service,
 )
 from api.v1.errors import api_error
 from api.v1.schemas.common import ErrorResponse
@@ -52,8 +54,14 @@ from src.services.system_config_service import (
 )
 from src.services.runtime_scheduler import RuntimeSchedulerService
 from src.services.security_audit_service import (
+    SecurityAuditRecorder,
     SecurityAuditService,
     SecurityAuditUnavailable,
+    require_security_audit_recorder,
+)
+from src.schemas.security_audit import (
+    SECURITY_AUDIT_MAX_METADATA_LIST_ITEMS,
+    SECURITY_AUDIT_MAX_METADATA_STRING_LENGTH,
 )
 from src.utils.sanitize import log_safe_exception
 
@@ -62,16 +70,47 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _resolved_security_audit_service(value) -> SecurityAuditService | None:
-    if callable(getattr(value, "record_attempt", None)) and callable(
-        getattr(value, "record_completion", None)
-    ):
-        return value
-    return None
+def _require_config_audit_service(value: object) -> SecurityAuditRecorder:
+    try:
+        return require_security_audit_recorder(value)
+    except SecurityAuditUnavailable:
+        raise api_error(
+            503,
+            "security_audit_unavailable",
+            "Security audit storage is unavailable",
+        ) from None
+
+
+def _config_audit_metadata(request: UpdateSystemConfigRequest) -> dict[str, Any]:
+    """Build bounded, reproducible evidence for an arbitrary-size config update."""
+    canonical_keys = sorted({item.key for item in request.items})
+    canonical_payload = json.dumps(
+        canonical_keys,
+        ensure_ascii=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+    def _bounded_identity(value: str) -> str:
+        if len(value) <= SECURITY_AUDIT_MAX_METADATA_STRING_LENGTH:
+            return value
+        return f"sha256:{hashlib.sha256(value.encode('utf-8')).hexdigest()}"
+
+    return {
+        "key_sample": [
+            _bounded_identity(key)
+            for key in canonical_keys[:SECURITY_AUDIT_MAX_METADATA_LIST_ITEMS]
+        ],
+        "key_count": len(canonical_keys),
+        "item_count": len(request.items),
+        "keys_sha256": hashlib.sha256(canonical_payload).hexdigest(),
+        "keys_truncated": len(canonical_keys) > SECURITY_AUDIT_MAX_METADATA_LIST_ITEMS,
+        "config_version": _bounded_identity(request.config_version),
+        "reload_now": request.reload_now,
+    }
 
 
 def _record_config_audit(
-    service: SecurityAuditService | None,
+    service: SecurityAuditRecorder,
     *,
     phase: str,
     correlation_id: str,
@@ -79,8 +118,6 @@ def _record_config_audit(
     reason_code: str = "attempt_started",
     metadata: dict[str, Any],
 ) -> None:
-    if service is None:
-        return
     common = dict(
         event_type="system_config.write",
         actor_type="administrator",
@@ -599,16 +636,12 @@ def test_generation_backend(
 def update_system_config(
     request: UpdateSystemConfigRequest,
     service: SystemConfigService = Depends(get_system_config_service),
-    security_audit: SecurityAuditService = Depends(get_security_audit_service),
+    security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
 ) -> UpdateSystemConfigResponse:
     """Validate and persist system configuration updates."""
-    audit_service = _resolved_security_audit_service(security_audit)
+    audit_service = _require_config_audit_service(security_audit)
     correlation_id = SecurityAuditService.new_correlation_id()
-    audit_metadata = {
-        "keys": sorted({item.key for item in request.items}),
-        "config_version": request.config_version,
-        "reload_now": request.reload_now,
-    }
+    audit_metadata = _config_audit_metadata(request)
     _record_config_audit(
         audit_service,
         phase="attempt",

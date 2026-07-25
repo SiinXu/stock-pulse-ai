@@ -11,9 +11,9 @@ API 依赖注入模块
 """
 
 import threading
-from typing import Generator
+from typing import Any, Generator, Protocol, cast
 
-from fastapi import Request
+from fastapi import Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from src.storage import DatabaseManager
@@ -22,14 +22,24 @@ from src.services.system_config_service import SystemConfigService
 from src.services.runtime_scheduler import RuntimeSchedulerService
 from src.services.local_model_service import LocalModelService, get_pullable_local_model_ids
 from src.services.security_audit_service import (
+    SecurityAuditRecorder,
     SecurityAuditService,
+    SecurityAuditUnavailable,
     get_security_audit_service as _build_security_audit_service,
+    require_security_audit_recorder,
 )
 from src.services.task_queue import get_task_queue
 
 
 _SYSTEM_CONFIG_SERVICE_INIT_LOCK = threading.Lock()
 _LOCAL_MODEL_SERVICE_INIT_LOCK = threading.Lock()
+
+
+class SecurityAuditQueryService(SecurityAuditRecorder, Protocol):
+    """Audit service contract required by the administrator query endpoint."""
+
+    def list_events(self, **filters: Any) -> Any:
+        """Return one bounded page of persisted audit events."""
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -114,3 +124,35 @@ def get_local_model_service(request: Request) -> LocalModelService:
 def get_security_audit_service() -> SecurityAuditService:
     """Return a request-scoped lazy security-audit service."""
     return _build_security_audit_service()
+
+
+def require_security_audit_service(
+    service: object = Depends(get_security_audit_service),
+) -> SecurityAuditRecorder:
+    """Validate an overrideable audit dependency before endpoint code can run."""
+    try:
+        return require_security_audit_recorder(service)
+    except SecurityAuditUnavailable:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "security_audit_unavailable",
+                "message": "Security audit storage is unavailable",
+            },
+        ) from None
+
+
+def require_security_audit_query_service(
+    service: object = Depends(get_security_audit_service),
+) -> SecurityAuditQueryService:
+    """Validate the recorder and query surface before endpoint code can run."""
+    recorder = require_security_audit_service(service)
+    if not callable(getattr(recorder, "list_events", None)):
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "security_audit_unavailable",
+                "message": "Security audit storage is unavailable",
+            },
+        )
+    return cast(SecurityAuditQueryService, recorder)

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 import logging
-from typing import Any, Optional
+from typing import Any, Optional, Protocol, cast
 import uuid
 
 from src.repositories.security_audit_repo import SecurityAuditRepository
@@ -32,6 +32,25 @@ class SecurityAuditUnavailable(RuntimeError):
 
     def __init__(self) -> None:
         super().__init__(SECURITY_AUDIT_UNAVAILABLE)
+
+
+class SecurityAuditRecorder(Protocol):
+    """Minimum fail-closed recorder contract required by privileged paths."""
+
+    def record_attempt(self, **fields: Any) -> Any:
+        """Persist an attempt event before a privileged operation."""
+
+    def record_completion(self, **fields: Any) -> Any:
+        """Persist a completion event after a privileged operation."""
+
+
+def require_security_audit_recorder(value: object) -> SecurityAuditRecorder:
+    """Return a structurally valid recorder or fail with the stable audit error."""
+    if not callable(getattr(value, "record_attempt", None)) or not callable(
+        getattr(value, "record_completion", None)
+    ):
+        raise SecurityAuditUnavailable()
+    return cast(SecurityAuditRecorder, value)
 
 
 class SecurityAuditService:

@@ -17,6 +17,7 @@ from src.schemas.security_audit import (
 from src.services.security_audit_service import (
     SecurityAuditService,
     SecurityAuditUnavailable,
+    require_security_audit_recorder,
 )
 from src.storage import DatabaseManager
 
@@ -132,6 +133,17 @@ def test_append_failure_is_normalized_to_stable_unavailable(caplog) -> None:
 
     assert str(exc_info.value) == "security_audit_unavailable"
     assert "do-not-log" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    "recorder",
+    [None, object(), {"record_attempt": lambda: None}],
+)
+def test_required_recorder_rejects_missing_or_malformed_dependencies(recorder) -> None:
+    with pytest.raises(SecurityAuditUnavailable) as exc_info:
+        require_security_audit_recorder(recorder)
+
+    assert str(exc_info.value) == "security_audit_unavailable"
 
 
 def test_metadata_contract_rejects_unbounded_or_non_json_values() -> None:

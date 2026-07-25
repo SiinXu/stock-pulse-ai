@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from api import deps as api_deps
 from api.middlewares.error_handler import add_error_handlers
 from api.v1.endpoints import security_audit as endpoint
 from src.schemas.security_audit import SecurityAuditEventPage
@@ -20,7 +21,7 @@ from src.services.security_audit_service import SecurityAuditUnavailable
 def _client(service) -> TestClient:
     app = FastAPI()
     app.include_router(endpoint.router, prefix="/api/v1/security")
-    app.dependency_overrides[endpoint.get_security_audit_service] = lambda: service
+    app.dependency_overrides[api_deps.get_security_audit_service] = lambda: service
     add_error_handlers(app)
     return TestClient(app)
 
@@ -92,6 +93,13 @@ def test_query_surfaces_storage_failure() -> None:
             "/api/v1/security/audit-events",
             cookies={"dsa_session": "valid"},
         )
+
+    assert response.status_code == 503
+    assert response.json()["error"] == "security_audit_unavailable"
+
+
+def test_query_rejects_malformed_dependency_with_stable_503() -> None:
+    response = _client(None).get("/api/v1/security/audit-events")
 
     assert response.status_code == 503
     assert response.json()["error"] == "security_audit_unavailable"

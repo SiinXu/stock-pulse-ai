@@ -49,6 +49,7 @@ from src.services.analysis_context_builder import (
     PipelineAnalysisArtifacts,
 )
 from src.storage import DatabaseManager
+from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 
 # ============================================================
@@ -1427,6 +1428,9 @@ class TestAgentExecutor(unittest.TestCase):
             with patch(
                 "src.agent.tools.data_tools._get_fetcher_manager",
                 return_value=_FailingCapitalFlowManager(),
+            ), patch(
+                "src.agent.runner._get_security_audit_service",
+                return_value=SecurityAuditRecorderStub(),
             ), self.assertLogs("src.agent.tools.data_tools", level="WARNING") as logs:
                 result = executor.chat(
                     "Analyze capital flow",
@@ -1676,6 +1680,7 @@ class TestAgentExecutor(unittest.TestCase):
             execution_id="malformed-test",
             allowed_tools=registry.list_names(),
             enforce_access_policy=False,
+            security_audit=SecurityAuditRecorderStub(),
         )
 
         for malformed_name in (None, 7, ["echo"]):

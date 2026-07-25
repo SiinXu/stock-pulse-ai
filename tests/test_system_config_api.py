@@ -41,6 +41,7 @@ import src.auth as auth
 from src.config import Config
 from src.core.config_manager import ConfigManager
 from src.services.system_config_service import ConfigConflictError, SystemConfigService
+from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 
 class SystemConfigApiTestCase(unittest.TestCase):
@@ -87,6 +88,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
 
         self.manager = ConfigManager(env_path=self.env_path)
         self.service = SystemConfigService(manager=self.manager)
+        self.security_audit = SecurityAuditRecorderStub()
         self._verify_session_patch = patch.object(system_config, "verify_session", return_value=True)
         self._verify_session_patch.start()
 
@@ -127,6 +129,15 @@ class SystemConfigApiTestCase(unittest.TestCase):
         Config.reset_instance()
         self.manager = ConfigManager(env_path=self.env_path)
         self.service = SystemConfigService(manager=self.manager)
+
+    def _update_system_config(self, *, request, service):
+        """Call the endpoint with its mandatory audit dependency explicitly."""
+        self.assertIs(service, self.service)
+        return system_config.update_system_config(
+            request=request,
+            service=service,
+            security_audit=self.security_audit,
+        )
 
     def _build_client_app(self) -> FastAPI:
         app = FastAPI()
@@ -296,7 +307,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
             service=self.service,
         ).model_dump(by_alias=True)
 
-        response = system_config.update_system_config(
+        response = self._update_system_config(
             request=UpdateSystemConfigRequest(
                 config_version=config["config_version"],
                 mask_token=config["mask_token"],
@@ -353,7 +364,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
                 before = self.manager.read_config_map()
 
                 with self.assertRaises(HTTPException) as context:
-                    system_config.update_system_config(
+                    self._update_system_config(
                         request=UpdateSystemConfigRequest(
                             config_version=self.manager.get_config_version(),
                             mask_token="******",
@@ -387,7 +398,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         before = self.manager.read_config_map()
 
         with self.assertRaises(HTTPException) as context:
-            system_config.update_system_config(
+            self._update_system_config(
                 request=UpdateSystemConfigRequest(
                     config_version=self.manager.get_config_version(),
                     mask_token="******",
@@ -772,7 +783,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
 
     def test_put_config_updates_secret_and_plain_field(self) -> None:
         current = system_config.get_system_config(include_schema=False, service=self.service).model_dump()
-        payload = system_config.update_system_config(
+        payload = self._update_system_config(
             request=UpdateSystemConfigRequest(
                 config_version=current["config_version"],
                 mask_token="******",
@@ -796,7 +807,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         current = system_config.get_system_config(include_schema=False, service=self.service).model_dump()
 
         with self.assertRaises(HTTPException) as context:
-            system_config.update_system_config(
+            self._update_system_config(
                 request=UpdateSystemConfigRequest(
                     config_version=current["config_version"],
                     reload_now=False,
@@ -822,7 +833,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
                 ).model_dump()
 
                 with self.assertRaises(HTTPException) as context:
-                    system_config.update_system_config(
+                    self._update_system_config(
                         request=UpdateSystemConfigRequest(
                             config_version=current["config_version"],
                             reload_now=False,
@@ -843,7 +854,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
             service=self.service,
         ).model_dump()
 
-        payload = system_config.update_system_config(
+        payload = self._update_system_config(
             request=UpdateSystemConfigRequest(
                 config_version=current["config_version"],
                 mask_token="******",
@@ -874,7 +885,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
 
     def test_put_config_returns_conflict_when_version_is_stale(self) -> None:
         with self.assertRaises(HTTPException) as context:
-            system_config.update_system_config(
+            self._update_system_config(
                 request=UpdateSystemConfigRequest(
                     config_version="stale-version",
                     items=[{"key": "STOCK_LIST", "value": "600519"}],
@@ -933,7 +944,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         )
 
         current = system_config.get_system_config(include_schema=False, service=self.service).model_dump()
-        payload = system_config.update_system_config(
+        payload = self._update_system_config(
             request=UpdateSystemConfigRequest(
                 config_version=current["config_version"],
                 mask_token="******",
@@ -951,7 +962,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
 
     def test_put_config_returns_startup_only_schedule_warning(self) -> None:
         current = system_config.get_system_config(include_schema=False, service=self.service).model_dump()
-        payload = system_config.update_system_config(
+        payload = self._update_system_config(
             request=UpdateSystemConfigRequest(
                 config_version=current["config_version"],
                 reload_now=True,
@@ -983,7 +994,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
 
     def test_put_config_returns_schedule_time_runtime_rebind_warning(self) -> None:
         current = system_config.get_system_config(include_schema=False, service=self.service).model_dump()
-        payload = system_config.update_system_config(
+        payload = self._update_system_config(
             request=UpdateSystemConfigRequest(
                 config_version=current["config_version"],
                 reload_now=True,
@@ -1530,7 +1541,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         before = self.env_path.read_bytes()
 
         with self.assertRaises(HTTPException) as context:
-            system_config.update_system_config(
+            self._update_system_config(
                 request=UpdateSystemConfigRequest(
                     config_version=self.manager.get_config_version(),
                     items=[
@@ -1621,7 +1632,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.assertEqual(issue["code"], "field_required")
 
         with self.assertRaises(HTTPException) as context:
-            system_config.update_system_config(
+            self._update_system_config(
                 request=UpdateSystemConfigRequest(
                     config_version=self.manager.get_config_version(),
                     items=items,
@@ -1671,7 +1682,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
             self.assertEqual(issue["key"], "LLM_CUSTOM_TEAM_BASE_URL")
 
             with self.assertRaises(HTTPException) as context:
-                system_config.update_system_config(
+                self._update_system_config(
                     request=UpdateSystemConfigRequest(
                         config_version=self.manager.get_config_version(),
                         items=items,
@@ -1718,7 +1729,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
             self.assertEqual(issue["key"], "LLM_CUSTOM_DRAFT_BASE_URL")
 
             with self.assertRaises(HTTPException) as context:
-                system_config.update_system_config(
+                self._update_system_config(
                     request=UpdateSystemConfigRequest(
                         config_version=self.manager.get_config_version(),
                         items=items,
@@ -1731,7 +1742,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.assertEqual(self.env_path.read_bytes(), before)
 
     def test_provider_identity_round_trips_through_config_and_available_models_api(self) -> None:
-        response = system_config.update_system_config(
+        response = self._update_system_config(
             request=UpdateSystemConfigRequest(
                 config_version=self.manager.get_config_version(),
                 reload_now=False,

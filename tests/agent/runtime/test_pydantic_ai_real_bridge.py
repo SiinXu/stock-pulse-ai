@@ -36,6 +36,7 @@ from src.agent.tools.registry import (
 )
 
 from tests.agent.runtime._pydantic_ai_dependency import require_pydantic_ai
+from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 require_pydantic_ai()
 
@@ -90,6 +91,7 @@ def _bound_session() -> BoundToolSession:
         execution_id="ex-real-bridge",
         allowed_tools=["echo"],
         granted_permissions=["test:read"],
+        security_audit=SecurityAuditRecorderStub(),
     )
 
 

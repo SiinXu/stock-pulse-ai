@@ -9,7 +9,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, Request
 
-from api.deps import get_security_audit_service
+from api.deps import SecurityAuditQueryService, require_security_audit_query_service
 from api.v1.errors import api_error
 from api.v1.schemas.common import ErrorResponse
 from src.auth import COOKIE_NAME, is_auth_enabled, verify_session
@@ -17,10 +17,7 @@ from src.schemas.security_audit import (
     SECURITY_AUDIT_MAX_PAGE_SIZE,
     SecurityAuditEventPage,
 )
-from src.services.security_audit_service import (
-    SecurityAuditService,
-    SecurityAuditUnavailable,
-)
+from src.services.security_audit_service import SecurityAuditUnavailable
 
 
 router = APIRouter()
@@ -54,9 +51,10 @@ def list_security_audit_events(
     correlation_id: str | None = Query(None, min_length=16, max_length=64),
     occurred_from: datetime | None = Query(None),
     occurred_to: datetime | None = Query(None),
-    service: SecurityAuditService = Depends(get_security_audit_service),
+    service: SecurityAuditQueryService = Depends(require_security_audit_query_service),
 ) -> SecurityAuditEventPage:
     """Return a bounded page only to an authenticated administrator session."""
+    service = require_security_audit_query_service(service)
     if not is_auth_enabled():
         raise api_error(
             403,

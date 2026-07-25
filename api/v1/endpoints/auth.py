@@ -11,7 +11,10 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
-from api.deps import get_security_audit_service, get_system_config_service
+from api.deps import (
+    get_system_config_service,
+    require_security_audit_service,
+)
 from api.v1.errors import error_json_response
 from src.auth import (
     COOKIE_NAME,
@@ -36,8 +39,10 @@ from src.auth import (
 from src.config import Config, setup_env
 from src.core.config_manager import ConfigManager
 from src.services.security_audit_service import (
+    SecurityAuditRecorder,
     SecurityAuditService,
     SecurityAuditUnavailable,
+    require_security_audit_recorder,
 )
 from src.services.system_config_service import ConfigConflictError
 from src.utils.sanitize import log_safe_exception
@@ -53,15 +58,6 @@ def _auth_error(status_code: int, error: str, message: str) -> JSONResponse:
     return error_json_response(status_code, error, safe_message)
 
 
-def _resolved_security_audit_service(value) -> SecurityAuditService | None:
-    """Return only a dependency-resolved or explicitly injected audit service."""
-    if callable(getattr(value, "record_attempt", None)) and callable(
-        getattr(value, "record_completion", None)
-    ):
-        return value
-    return None
-
-
 def _security_audit_error() -> JSONResponse:
     return _auth_error(
         503,
@@ -71,15 +67,13 @@ def _security_audit_error() -> JSONResponse:
 
 
 def _record_login_completion(
-    service: SecurityAuditService | None,
+    service: SecurityAuditRecorder,
     *,
     correlation_id: str,
     actor_id: str,
     outcome: str,
     reason_code: str,
 ) -> JSONResponse | None:
-    if service is None:
-        return None
     try:
         service.record_completion(
             event_type="auth.login",
@@ -390,27 +384,29 @@ async def auth_update_settings(request: Request, body: AuthSettingsRequest):
 async def auth_login(
     request: Request,
     body: LoginRequest,
-    security_audit: SecurityAuditService = Depends(get_security_audit_service),
+    security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
 ):
     """Verify password or set initial password, set cookie on success. Returns 401 or 429 on failure."""
-    audit_service = _resolved_security_audit_service(security_audit)
+    try:
+        audit_service = require_security_audit_recorder(security_audit)
+    except SecurityAuditUnavailable:
+        return _security_audit_error()
     correlation_id = SecurityAuditService.new_correlation_id()
     ip = get_client_ip(request)
     actor_id = f"client:{hashlib.sha256(ip.encode('utf-8')).hexdigest()[:16]}"
-    if audit_service is not None:
-        try:
-            audit_service.record_attempt(
-                event_type="auth.login",
-                actor_type="remote_client",
-                actor_id=actor_id,
-                execution_id=correlation_id,
-                action="auth.login",
-                target_type="admin_session",
-                target_id="primary",
-                correlation_id=correlation_id,
-            )
-        except SecurityAuditUnavailable:
-            return _security_audit_error()
+    try:
+        audit_service.record_attempt(
+            event_type="auth.login",
+            actor_type="remote_client",
+            actor_id=actor_id,
+            execution_id=correlation_id,
+            action="auth.login",
+            target_type="admin_session",
+            target_id="primary",
+            correlation_id=correlation_id,
+        )
+    except SecurityAuditUnavailable:
+        return _security_audit_error()
 
     if not is_auth_enabled():
         audit_error = _record_login_completion(

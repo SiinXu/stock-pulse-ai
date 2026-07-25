@@ -41,8 +41,9 @@ from src.agent.tools.execution import (
 )
 from src.agent.tools.registry import ToolRegistry
 from src.services.security_audit_service import (
-    SecurityAuditService,
+    SecurityAuditRecorder,
     SecurityAuditUnavailable,
+    require_security_audit_recorder,
 )
 
 logger = logging.getLogger(__name__)
@@ -102,7 +103,7 @@ class BoundToolSession:
         audit_context: Optional[Mapping[str, Any]] = None,
         surface: Optional[ToolSurface] = None,
         enforce_access_policy: bool = True,
-        security_audit: Optional[SecurityAuditService] = None,
+        security_audit: SecurityAuditRecorder,
     ) -> None:
         if not isinstance(execution_id, str) or not execution_id.strip():
             raise ValueError("BoundToolSession requires a non-empty execution_id")
@@ -135,7 +136,7 @@ class BoundToolSession:
         # its replay-frozen behaviour while still dispatching through one
         # authority. Lifecycle gates below stay active regardless.
         self._enforce_access_policy = bool(enforce_access_policy)
-        self._security_audit = security_audit
+        self._security_audit = require_security_audit_recorder(security_audit)
         base_audit_context: Dict[str, Any] = {"execution_id": execution_id}
         if stage is not None:
             base_audit_context["stage"] = stage
@@ -237,15 +238,6 @@ class BoundToolSession:
         on_dispatched: Optional[Callable[[], None]] = None,
     ) -> Dict[str, Any]:
         """Audit one attempt/completion around the real session permission layer."""
-        if self._security_audit is None:
-            return self._execute_tool_call(
-                name,
-                arguments,
-                dispatch_guard=dispatch_guard,
-                completion_guard=completion_guard,
-                on_dispatched=on_dispatched,
-            )
-
         correlation_id = uuid.uuid4().hex
         target_id = _bounded_audit_identity(name, fallback="invalid")
         common = dict(
@@ -453,17 +445,33 @@ class BoundToolSession:
     ) -> Dict[str, Any]:
         started_at = time.time()
         tool_name = name if isinstance(name, str) else ""
+        completion_failed = phase == "completion"
         result = build_tool_error_result(
             tool_name=tool_name,
             code="security_audit_unavailable",
-            message="Security audit storage is unavailable; tool execution was rejected.",
+            message=(
+                "Security audit completion could not be persisted; tool execution "
+                "may already have occurred and must not be retried."
+                if completion_failed
+                else "Security audit storage is unavailable; tool execution was rejected."
+            ),
             started_at=started_at,
             context=self._build_call_context(tool_name),
-            retriable=True,
-            details={"phase": phase},
+            retriable=not completion_failed,
+            details={
+                "phase": phase,
+                "execution_may_have_occurred": completion_failed,
+            },
             arguments=arguments,
         )
+        cache_key = (
+            _build_tool_cache_key(tool_name, arguments)
+            if completion_failed and isinstance(arguments, dict)
+            else None
+        )
         with self._lock:
+            if cache_key is not None:
+                self._non_retriable_results[cache_key] = result
             self._audit_trail.append(result["audit"])
         return result
 

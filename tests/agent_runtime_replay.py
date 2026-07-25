@@ -51,6 +51,7 @@ from src.agent import factory as factory_module
 from src.agent import llm_adapter as llm_adapter_module
 from src.agent.llm_adapter import LLMResponse, ToolCall
 from src.agent.tools.registry import ToolDefinition, ToolParameter, ToolRegistry
+from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures" / "agent_runtime"
 MANIFEST_PATH = FIXTURES_DIR / "manifest.json"
@@ -431,7 +432,14 @@ def run_case(case: Dict[str, Any]):
     try:
         with patch.object(
             llm_adapter_module, "LLMToolAdapter", new=lambda cfg: adapter
-        ), patch.object(factory_module, "get_tool_registry", new=lambda: registry):
+        ), patch.object(
+            factory_module,
+            "get_tool_registry",
+            new=lambda: registry,
+        ), patch(
+            "src.agent.runner._get_security_audit_service",
+            return_value=SecurityAuditRecorderStub(),
+        ):
             executor = factory_module.build_agent_executor(config)
             payload = case["input"]
             if chat:

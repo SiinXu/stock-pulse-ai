@@ -27,6 +27,8 @@ from src.agent.tools.registry import (
     ToolPolicy,
     ToolRegistry,
 )
+from src.services.security_audit_service import SecurityAuditUnavailable
+from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 
 def _echo_registry(calls=None, permissions=("test:read",)) -> ToolRegistry:
@@ -56,6 +58,7 @@ def _session(registry, **overrides) -> BoundToolSession:
         "execution_id": "exec-1",
         "allowed_tools": ["echo"],
         "granted_permissions": ["test:read"],
+        "security_audit": SecurityAuditRecorderStub(),
     }
     params.update(overrides)
     return BoundToolSession(registry, **params)
@@ -65,9 +68,52 @@ def _session(registry, **overrides) -> BoundToolSession:
 # Construction and identity
 # ---------------------------------------------------------------------------
 
+def test_session_requires_explicit_security_audit_recorder():
+    calls = []
+    registry = ToolRegistry()
+    registry.register(
+        ToolDefinition(
+            name="mutate",
+            description="Append one test side effect.",
+            parameters=[
+                ToolParameter(name="message", type="string", description="Message"),
+            ],
+            handler=lambda message: calls.append(message),
+            policy=ToolPolicy.declared(
+                read_only=False,
+                side_effects=["test_state"],
+                permissions=["test:write"],
+            ),
+        )
+    )
+
+    with pytest.raises(TypeError, match="security_audit"):
+        BoundToolSession(
+            registry,
+            execution_id="missing-audit",
+            allowed_tools=["mutate"],
+        )
+    for invalid_recorder in (None, object()):
+        with pytest.raises(SecurityAuditUnavailable) as exc_info:
+            BoundToolSession(
+                registry,
+                execution_id="invalid-audit",
+                allowed_tools=["mutate"],
+                security_audit=invalid_recorder,
+            )
+        assert str(exc_info.value) == "security_audit_unavailable"
+
+    assert calls == []
+
+
 def test_session_requires_execution_id():
     with pytest.raises(ValueError):
-        BoundToolSession(_echo_registry(), execution_id="  ", allowed_tools=["echo"])
+        BoundToolSession(
+            _echo_registry(),
+            execution_id="  ",
+            allowed_tools=["echo"],
+            security_audit=SecurityAuditRecorderStub(),
+        )
 
 
 def test_session_freezes_identity_and_allowlist():

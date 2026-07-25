@@ -33,11 +33,13 @@ The canonical markers are `[REDACTED]` and `[REDACTED_URL]`. Existing Run Diagno
 
 Durable security-audit events use the same recursive redactor before schema
 validation and repository dispatch. Audit metadata is additionally bounded to
-two nested collection levels, 16 object keys, 256 items per list, and 256
-characters per string. If sanitization or validation cannot produce the strict
-contract, the privileged operation fails closed with
-`security_audit_unavailable`; it never truncates identity evidence or persists
-the original payload as a fallback. See
+two nested collection levels, 16 object keys, 64 items per list, and 256
+characters per string. Arbitrary-size System Configuration writes use a
+bounded key sample plus complete-set count and SHA-256 evidence; submitted
+values are not included. If sanitization or validation cannot produce the
+strict contract, the privileged operation fails closed with
+`security_audit_unavailable`; it never persists the original payload as a
+fallback. See
 [Durable Security Audit Phase 1](security-audit.md).
 
 ## Agent Trace Behavior
