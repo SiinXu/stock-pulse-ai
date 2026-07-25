@@ -1,165 +1,60 @@
-# 07 Portfolio (Holdings)
+# 07 Portfolio (Holdings): clear books before clever signals
 
-## Entry points and paths
+Hi. This module answers a plain question: **what do you hold, roughly at what cost, and is risk bunched in too few names?**
 
-| Method | Path |
+- Portfolio rows are **your facts** (trades, cash, dividends).  
+- AI signals are **research hints** that may appear beside rows.  
+- The app **does not** auto-trade from those hints.
+
+> 💡 Sidebar often says **Portfolio**; the page title may say **Holdings / portfolio management**. Same place.  
+> ⚠️ Research/record-keeping only — **not investment advice**. Keep paper accounts (if any) separate from live cash stories.
+
+## Open it
+
+Sidebar **Portfolio**, URL `/portfolio`, palette “portfolio/holdings”.
+
+## When you need it
+
+Trying AI reports only? Skip for now. Want advice vs real size? Create one account and a few trades. Have a broker CSV? Import with preview. Want practice? Use paper/sim if the UI offers it.
+
+## Layout in plain words
+
+Pick **all accounts** (overview; writes may be blocked) or **one ledger** (where you bookkeep). Switch **cost method** (FIFO / average—as labeled); it changes presentation, not historical trade rows. Read KPIs and risk as **direction**, especially when limitation tags say quotes or FX are partial. The positions table shows qty/cost/last/P&L, **Analyze** (sends a Workbench job), and an async AI column that may stay empty without active signals.
+
+## From zero in five gentle steps
+
+1. Create an account (name required).  
+2. Select that account—not “all”.  
+3. Enter one buy.  
+4. Check qty/cost.  
+5. Try an oversell on purpose; a block means safeguards work.
+
+## Three event types
+
+| Type | What you record |
 | --- | --- |
-| Primary nav | Sidebar **Portfolio** (Chinese UI nav label is often **组合**) |
-| Page title | Often **Holdings** / **持仓** inside the page |
-| Command palette | “portfolio”, “holdings” |
-| Route | `/portfolio` |
-| Signal Center | Links such as `/signals?scope=holdings` |
+| **trade** | Buys/sells with price, qty, fees |
+| **cash** | Deposits/withdrawals |
+| **corporate** | Dividends, splits, …
 
-Bookkeeping and risk — **not** auto rebalancing from AI signals.
+Filters, paging, delete confirms. Wrong account = wrong ledger—double-check.
 
-> 💡 Nav may say **Portfolio** while the page title says **Holdings**. Same module.
+## CSV import, kindly
 
-> ⚠️ Research / record-keeping only — **not investment advice**. Treat paper accounts separately from live cash.
+Select account → choose file → broker/generic template → **parse/dry-run** → sample-check three symbols → **commit** → reconcile with the broker app. Fix headers/encoding/duplicates in preview, not after regret.
 
-## When to use
+## With AI signals
 
-| Scenario | Approach |
-| --- | --- |
-| First time | One account; enter 1–2 trades |
-| Broker export | CSV parse/preview then commit |
-| Pre-open | MV, P&L, concentration, risk summary |
-| Research a holding | Row action → Analysis Workbench |
-| Multi-account | Select the right ledger first |
-| Practice | Paper / simulated account if offered |
-
-## Layout
-
-```mermaid
-flowchart TB
-  A[Account: all / one] --> B[KPI + risk]
-  A --> C[Positions + optional AI column]
-  A --> D[Events: trades / cash / corp actions]
-  A --> E[CSV import]
-  C --> F[Analyze → Workbench]
-  C --> G[Signal Center]
-```
-
-| Area | Role |
-| --- | --- |
-| **Account switcher** | Which ledger |
-| **KPIs** | Value, P&L, cash |
-| **Risk summary** | Concentration, drawdown, stop proximity |
-| **Positions table** | Qty, cost, floating P&L, optional AI |
-| **Events** | Trade / cash / corporate action ledger |
-| **Import** | Broker or generic CSV |
-
-## Viewing and cost method
-
-1. Open `/portfolio`; pick account or **all**.  
-2. Switch **cost method** (FIFO / average — **as labeled in UI**).  
-3. Read KPIs and risk.  
-4. AI column may load **asynchronously**; empty placeholder is normal.  
-5. **Stale** prices → read P&L conservatively.
-
-### Glossary
-
-| Term | Meaning |
-| --- | --- |
-| **Account** | Independent ledger |
-| **Paper** | Simulated account with virtual cash (if available) |
-| **Cost method** | How cost basis is computed |
-| **FIFO** | First-in, first-out |
-| **Average cost** | Blended unit cost |
-| **Realized / unrealized** | Closed vs open P&L |
-| **Concentration** | Large weights as % of assets |
-| **Drawdown** | Fall from a peak |
-| **Price stale** | Old or missing quote |
-| **Corporate action** | Dividend, split, etc. |
-| **Cash ledger** | Deposits/withdrawals |
-
-> ⚠️ Cost method changes **presentation**, not historical trade rows. Pick one method for long-term comparison.
-
-## Manual bookkeeping
-
-| Action | Note |
-| --- | --- |
-| Create / archive account | Archive noise accounts |
-| Trades | Side, qty, price, date, fees as form allows |
-| Cash | Affects cash and total assets |
-| Corporate actions | Types as supported |
-| Edit events | Filter and correct rows |
-| Over-sell guard | Selling more than available is **blocked** on purpose |
-
-## CSV import
-
-1. Pick broker template or generic.  
-2. **Preview / parse** first.  
-3. **Commit** only when codes, sides, qty, prices, dates look right.  
-4. Idempotent retry helps; still trust the preview.
-
-Common failures: headers, encoding, duplicates, over-sell, bad symbol formats ([03](03-analysis-workbench_EN.md)).
-
-## Analyze from a row
-
-1. Start analysis on the position.  
-2. If multi-account same symbol, pick account when prompted.  
-3. Track job under **Research → Analysis Workbench → Tasks**.  
-4. Read via [08](08-reading-reports_EN.md).  
-5. New active signals may appear; portfolio AI column refreshes async.
-
-## AI signal column
-
-| Observation | Meaning |
-| --- | --- |
-| Summary present | Latest displayable active signal |
-| Empty | None or still loading |
-| Degraded warning | Incomplete presentation — open full report/signal |
-| Jump to Signal Center | Often holdings scope |
+Empty AI cells are normal without active signals—run Workbench on holdings or open `/signals?scope=holdings`. Degraded badges mean open the full signal/report. Pre-open habit: concentration + drawdown → analyze the one name that worries you.
 
 ## Use cases
 
-**A — First ledger**  
-Create account → buy → check qty/cost → intentional over-sell should fail → valid sell.
-
-**B — Import reconcile**  
-Preview counts → spot-check three symbols → commit → match broker app quantities.
-
-**C — Positions without AI**  
-Run Workbench on holdings → refresh `/portfolio` or open `/signals?scope=holdings`.
-
-**D — Paper (if available)**  
-Separate paper account → simulate → do not mix into live decision narrative.
-
-**E — Pre-open 3 minutes**  
-Concentration + drawdown → analyze or open Signal Center on the riskiest name.
+Three manual trades only; large CSV with dry-run; holdings without AI until analysis runs; multi-account same symbol—pick the right ledger when prompted.
 
 ## Related
 
-- [06 Signal Center](06-signals_EN.md)
-- [03 Analysis Workbench](03-analysis-workbench_EN.md)
-- [11 Daily workflows](11-daily-workflows_EN.md)
-
-
-## Deep dive: accounts
-
-Create (name required, broker, base currency, market), edit, delete with confirm, all-accounts vs single-account. Writes often **blocked** on all-accounts view — select one ledger. Paper accounts if offered: separate narrative from live.
-
-## Deep dive: snapshot & risk
-
-Total equity / market value / cash; FX refresh (stale/latest); sector & position concentration; drawdown monitor; stop-loss proximity; AI risk signal rollup (sell/reduce/alert). Limitation tags (best-effort quotes, partial FX/cost, limited sector metrics) mean lower precision.
-
-## Deep dive: positions table
-
-Account, code, qty, cost, last, MV, unrealized P&L, return %, analyze action, async AI column. Empty → enter/import trades.
-
-## Deep dive: event ledger
-
-| Type | Fields | Effect |
-| --- | --- | --- |
-| trade | code, date, buy/sell, price, qty, fee/tax | Positions |
-| cash | date, in/out, amount, ccy | Cash |
-| corporate | effective date, dividend/split, DPS or ratio | Cost/qty |
-
-Filters, paging, delete with guards. Over-sell blocked. Account required for writes.
-
-## Deep dive: CSV import
-
-Select account → choose file → broker template → **parse/dry-run** → sample-check → **commit** → refresh vs broker app. Respect dry vs actual-write summaries; idempotent retry still needs human preview.
-
+- [06 Signal Center](06-signals_EN.md)  
+- [03 Analysis Workbench](03-analysis-workbench_EN.md)  
+- [11 Daily workflows](11-daily-workflows_EN.md)  
 
 Prev: [06 Signal Center](06-signals_EN.md) · Next: [08 Reading reports](08-reading-reports_EN.md)

@@ -1,155 +1,70 @@
-# 05 Agent chat (Ask stock)
+# 05 Agent chat: after the report, ask what still feels fuzzy
 
-## Entry points and paths
+Hi. Chat is a **multi-turn research assistant**. Its best use is not “promise me returns from zero”, but:
 
-| Method | Path |
-| --- | --- |
-| Primary nav | Sidebar **Agent** (page title often **Ask stock** / chat) |
-| Command palette | Search “chat”, “agent”, “ask” |
-| Canonical route | `/chat` |
-| From a report | **Continue in chat** (carries symbol context) |
-| Nav badge | Optional completion / onboarding badge on Agent |
+> I already have a report—this section confuses me / I want invalidation / I want a careful compare—let’s talk it through.
 
-Agent chat is **multi-turn**. It is best **after** a full Workbench report — not a substitute for the first structured report.
+Sidebar may say **Agent**; the page title often says **Ask stock**. Same door.
 
-> 💡 **Division of labor**  
-> - **Workbench** (`/research/analysis`): structured report + history + extractable signals  
-> - **Chat** (`/chat`): follow-ups on a name or report  
+> 💡 **vs Workbench** — Workbench builds the structured report; chat follows up. Prefer **report first, then questions**.
 
 > ⚠️ Research only — **not investment advice**.
 
-## When to use
+---
 
-| Scenario | Suggested approach |
-| --- | --- |
-| Report says “watch” | From report → ask observation / invalidation conditions |
-| Support / resistance jargon | Ask for plain language + invalidation |
-| Compare two names | Explicit “compare CODE1 vs CODE2 …” |
-| Wrong symbol context | State the new code before the question |
-| Long session cost | Context compression (if available) or new session |
+## Open chat
 
-## Layout
+Sidebar **Agent**, URL `/chat`, report **Continue in chat** (best—keeps symbol context), or the command palette.
 
-```mermaid
-flowchart LR
-  S[Session list] --> M[Message pane]
-  M --> I[Composer]
-  M --> O[Optional: Skill / export / compression]
-```
+---
 
-| Area | Role |
-| --- | --- |
-| **History** | Past sessions; delete clutter |
-| **Empty state** | Example prompts |
-| **Messages** | Multi-turn thread |
-| **Composer** | One focus per turn |
-| **Context compression** | Save tokens on long threads (watch unsaved hints) |
+## First conversation, gently
 
-## Steps
+1. Confirm the **symbol** (type the code if unsure).  
+2. One focus per turn—start with invalidation, not “full analysis + max leverage”.  
+3. Wait for the reply before the next question.  
+4. Changing symbols: **new conversation** or explicit “switch to 300750 only”.  
+5. Export useful bits, or turn levels into Signal Center rules.
 
-1. Open **Agent** (`/chat`) or **Continue in chat** from a report.  
-2. Confirm the **symbol** (type codes if unsure: `600519`, `hk00700`, `AAPL`).  
-3. Ask in natural language (risks, levels, invalidation).  
-4. One focus per turn.  
-5. On symbol switch, **name the new code** explicitly.  
-6. Export / notify if offered.  
-7. Delete useless sessions.
+Rewrite empty-state examples into research-friendly prompts (“list invalidation conditions…”, “no position sizes…”).
 
-Prefer research-style questions (risks + invalidation) over “guarantee me returns”.
+---
 
-## Strategy Skills (optional)
+## What else is on the page
 
-| Item | Note |
-| --- | --- |
-| What | Style packs (trend, quality, event, … as listed) |
-| Default | System default if none selected |
-| Beginners | Skip first; reduce variables |
+Session list, new chat, send/stop, delete, export, notify (needs channels), watchlist add/remove, strategy panel, heavier **generate analysis**, thinking block (reference, not scripture), context compression (save it).
 
-> ⚠️ Skills change emphasis — they do not remove market risk.
+---
 
-## Habits
+## Skills
 
-| Habit | Why |
-| --- | --- |
-| One stock per thread focus | Less mix-ups |
-| Write “compare / vs” + codes | Clearer model targeting |
-| Invalidation before “can I buy” | Research discipline |
-| Watch usage | Chat can cost more than one brief report |
-| Configure models first | Missing keys fail chat |
-| Local CLI backends | Often **no** tool-calling for Agent; UI backend status warns |
+Optional. First follow-up: skip. They change emphasis, not outcomes.
 
-### Prompt templates
+---
 
-| Goal | Example |
-| --- | --- |
-| Risks | “List the top 3 risks and each invalidation signal.” |
-| Levels | “Where are support/resistance and is the basis technical or event-driven?” |
-| Phase | “If the daily bar is incomplete, restate the conclusion conservatively.” |
-| Compare | “Compare AAPL vs MSFT trend differences; no position sizes.” |
-| Holdings | “I already hold 600519; discuss only observation conditions for add/reduce.” |
+## When send fails
 
-## Glossary
+1. Model saved + test connection?  
+2. Backend that cannot tool-call (local CLI limits)? Check task routing.  
+3. Network/backend up?  
+4. Notify failure ≠ chat failure—test channels separately.
 
-| Term | Meaning |
-| --- | --- |
-| **Agent / Ask stock** | Multi-turn chat entry |
-| **Session** | One continuous thread |
-| **Context** | Prior turns the model can see |
-| **Context compression** | Shrink history to save tokens |
-| **Skill** | Optional analysis style pack |
-| **Tool calling** | Live data tools; needs capable backend |
-| **Agent-sourced signal** | Some chats may create Decision Signals (not guaranteed per message) |
+---
+
+## Saving quota kindly
+
+Brief report first → chat only on 1–2 unclear points → compression on long threads → new session with a three-line summary if the model “forgets”.
+
+---
 
 ## Use cases
 
-**A — Invalidation after a report**  
-Open report → Continue in chat → list invalidation prices → optional rule in Signal Center.
+Invalidation after a report; avoid symbol mix-ups with explicit codes; compare AAPL vs MSFT without position sizes; holdings: observation conditions only, no sizing orders.
 
-**B — Avoid symbol mix-ups**  
-Bad: “What about the other one?”  
-Better: “Switch to 300750 only; do not mix 600519.”
-
-**C — Tight quota**  
-Brief/beginner Workbench report → chat only on 1–2 unclear sections.
-
-**D — Failure**  
-Check model keys, tool-capable backend, network → Settings AI / task routing → short retry.
-
-## Related modules
-
-Workbench is primary; Signal Center may show `agent` sources; Portfolio “analyze” still uses Workbench; Settings for models and usage.
+---
 
 ## Related
 
-- [03 Analysis Workbench](03-analysis-workbench_EN.md)
-- [08 Reading reports](08-reading-reports_EN.md)
-- [06 Signal Center](06-signals_EN.md)
-- [10 Settings](10-settings_EN.md)
-
-
-## Deep dive: session & message actions
-
-| Action | Notes |
-| --- | --- |
-| New conversation | Switch topics cleanly |
-| History list | Delete whole sessions |
-| Send / Stop | Watch generating state |
-| Delete message | Irreversible |
-| Export message/session | Research archive |
-| Notify | Needs notification channels |
-| Watchlist add/remove | Syncs with settings list |
-| Strategies panel | Expand/collapse Skills |
-| Generate analysis | Heavier path; costs quota |
-| Thinking block | Not an order ticket |
-| Context compression | Save; watch unsaved badge |
-
-## Deep dive: error states
-
-Connecting, sendFailure, notifyFailed, follow-up loading, compression save failure — map to model/network/notify settings retries.
-
-## Deep workflow
-
-Report first → continue in chat → invalidation question → levels question → export or create rule → new session when changing symbols.
-
+- [03](03-analysis-workbench_EN.md) · [08](08-reading-reports_EN.md) · [06](06-signals_EN.md) · [10](10-settings_EN.md)
 
 Prev: [04 Market review](04-market-review_EN.md) · Next: [06 Signal Center](06-signals_EN.md)

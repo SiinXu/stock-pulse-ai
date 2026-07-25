@@ -1,165 +1,132 @@
-# 03 Analysis workbench
+# 03 Analysis Workbench: where reports are born
 
-Paths:
+Hi. If Home is the front door, the Analysis Workbench is the room where work actually happens.
+
+You enter symbols, optionally pick a strategy Skill, click start, and the system fetches market/news context then asks a large model to write a research report. You can watch task progress live, then reopen history later to compare older calls.
+
+> 💡 **vs Market review**  
+> - **Workbench**: one stock (or a batch you chose)  
+> - **Market review**: whole-market temperature  
+> A strong index does not automatically bless your single name.
+
+> ⚠️ Research only — **not investment advice**. Each run usually costs model quota; start small.
+
+---
+
+## How to open it
 
 | Method | Path |
 | --- | --- |
-| Primary nav | **Research** → **Analysis Workbench** |
-| Command palette | “analysis”, “workbench” |
-| Route | `/research/analysis` |
-| Segments | `?segment=launch` (default) / `tasks` / `history`; history may include `recordId` |
+| Nav | **Research** → **Analysis Workbench** |
+| Palette | “analysis” / “workbench” |
+| URL | `/research/analysis` |
+| From Home | **Start analysis** |
+| From stock page | **Analyze** on `/stocks/{code}` |
 
-This is where **single-stock research reports** are produced. A task targets one ticker (or a batch you submit).
+Useful query params: `segment=launch|tasks|history`, `recordId`, `stock`.
 
-> 💡 **Vs Market review**  
-> - **Workbench**: one symbol  
-> - **Market review**: whole-market session summary  
-> Do not treat market review as a single-name order ticket.
+---
 
-## Three segments
+## Three segments (three conveyor belts)
 
-| Segment | Purpose | When |
+| Segment | You are… | When |
 | --- | --- | --- |
-| **Launch & batch** | Enter tickers, optional skill, submit | Every new report |
-| **Running tasks** | Progress and errors | Right after submit |
-| **History & compare** | Open reports, trends, delete | Reading and comparison |
+| **Launch** | Entering codes, choosing style, submitting | New work |
+| **Tasks** | Watching queue/running/fail | Right after submit |
+| **History** | Reading, comparing, deleting | After results exist |
 
-URL params such as `segment` and `recordId` restore context (useful bookmarks).
+Daily habit: **launch → tasks → history**.
 
-```mermaid
-sequenceDiagram
-  participant U as You
-  participant L as Launch
-  participant T as Tasks
-  participant H as History
-  U->>L: Enter ticker and start
-  L->>T: Create task
-  T-->>U: queued / running / done or failed
-  U->>H: Open report
-```
+---
 
-## Scenarios
+## Launch: first report, step by step
 
-| Scenario | Suggestion |
+1. Open Launch.  
+2. Type one code (`600519`, `hk00700`, `AAPL`…).  
+3. Leave **Skill** empty the first time.  
+4. Prefer **Beginner** and/or **brief** if offered.  
+5. **Start analysis**—then wait; do not spam the button.  
+6. When complete, **View report** or open History.
+
+### Symbol tips
+
+| Market | Example | Common mistake |
+| --- | --- | --- |
+| A-shares | `600519` | Company name only |
+| HK | `hk00700` | Missing `hk` |
+| US | `AAPL` | Chaotic casing |
+
+### Batch without tears
+
+Use after setup works. Submit 3–10 names, watch Tasks for partial failures, re-run only the failed ones. Huge batches get expensive and unreadable.
+
+### Smart import
+
+Image/CSV/clipboard → **human review** of detected codes → then submit. Blurry shots, bad encoding, or missing “code” headers are the usual failure causes.
+
+---
+
+## Tasks: what the states mean
+
+| State | Plain meaning | You |
+| --- | --- | --- |
+| Queued | Waiting its turn | Patience |
+| Running | Fetch + model | Optional run-flow |
+| Completed | Ready | Open report |
+| Failed | Error mid-flight | Read message → Settings |
+| Empty | Nothing running | Back to Launch |
+
+**Run flow** breaks a job into stages for debugging. Skip it until something spins forever.
+
+---
+
+## History: where reports live
+
+Select a row → read summary → open full markdown if needed → use **history trend** to see flip-flops on the same symbol → multi-delete only when you are sure (irreversible).
+
+Bookmark with `segment=history&recordId=…`. Reading order: [08](08-reading-reports_EN.md).
+
+---
+
+## Skills
+
+Optional style packs. First run: none. They change emphasis, not destiny.
+
+---
+
+## Cost & mindset
+
+Detailed + huge batch + spam re-runs burns quota and pollutes Signal Center. Prefer: one clear question → one run → careful read → optional chat follow-up.
+
+---
+
+## Use cases
+
+**A — First report ever** — one symbol, beginner/brief, read action + top risks.  
+**B — Weekend watchlist of 8** — batch brief → re-run fails → deep-read top 3 holdings → one price rule.  
+**C — Failure** — 401/balance → test connection; timeout → backend/network; data → data-source keys.  
+**D — From chart page** — Analyze on `/stocks/AAPL` carries the code for you.
+
+---
+
+## Glossary
+
+| Term | Plain meaning |
 | --- | --- |
-| First trial | One liquid name; Beginner mode or brief report |
-| Daily watchlist | Batch 3–10 names; watch the task list |
-| Deep dive | Pick a Skill; compare history trends |
-| Import from image/CSV | Confirm parsed tickers before submit |
+| Workbench | Main single-stock report factory |
+| Segment | Launch / tasks / history |
+| Skill | Optional analysis style |
+| Run flow | Stage diagnostics |
+| recordId | History id in the URL |
+| brief/detailed | Report density |
 
-## Start an analysis
+---
 
-1. Enter a code (`600519`, `hk00700`, `AAPL`, …).  
-2. Optionally pick from the watchlist.  
-3. Optionally choose a **Skill** (style pack); omit for default.  
-4. Optionally set **Beginner / Professional** or brief/detailed.  
-5. Start.  
-6. Watch **Running tasks**.  
-7. Open History when complete.
+## Related
 
-### Recommended UI settings
+- [08 Reading reports](08-reading-reports_EN.md)  
+- [05 Agent chat](05-agent-chat_EN.md)  
+- [06 Signal Center](06-signals_EN.md)  
+- [13 Stock workspace](13-stock-details_EN.md)  
 
-| Item | Beginner pick | Why |
-| --- | --- | --- |
-| Mode | Beginner | Shorter conclusion, conservative risk tone |
-| Detail | brief if available | Learn the skeleton first |
-| Skill | none | Fewer variables |
-| Batch size | 1–3 | Cost and rate limits |
-
-> ⚠️ **Cost & time**  
-> Each run calls an LLM (large language model) and may call news APIs. Larger batches cost more.
-
-### Ticker formats
-
-| Market | Examples | Common mistake |
-| --- | --- | --- |
-| A-share | `600519` | Company name without code |
-| Hong Kong | `hk00700` | Missing `hk` |
-| US | `AAPL`, `BRK.B` | Odd casing |
-| JP / KR | `7203.T`, `005930.KS` | Missing suffix |
-
-## Task states
-
-| State | Meaning | Action |
-| --- | --- | --- |
-| Queued | Waiting | Wait; avoid spam clicks |
-| Running | Fetching / generating | Read stage text |
-| Completed | Report ready | Open History |
-| Failed | Error | Read the reason, then retry |
-
-“Automatic phase” means session inference; the **report page** is authoritative for the final phase label.
-
-## History & compare
-
-1. Open a record for full Markdown/report UI.  
-2. Use history trend for the **same** symbol.  
-3. Multi-delete requires confirmation.  
-4. Market-review history is separate from single-stock history.
-
-## Beginner vs Professional
-
-| Mode | Experience |
-| --- | --- |
-| Beginner | Compact conclusion, conservative risk, clear research disclaimer |
-| Professional | Full fields and deeper evidence |
-
-Preference is usually local to the browser/client.
-
-## Examples
-
-- **Smoke test**: `600519`, no skill, Beginner → read conclusion + risk only.  
-- **Compare views**: run again later → history trend for suggestion changes.  
-- **From Portfolio**: one-click analysis still lands in this task flow.
-
-Continue in chat from a report when the entry exists — see [05 Agent chat](05-agent-chat_EN.md).
-
-Previous: [02 Home](02-home_EN.md) · Next: [04 Market review](04-market-review_EN.md)
-
-
-## Deep dive: segment controls
-
-### Launch (`segment=launch` or default)
-
-| Control | Role | Beginner tip |
-| --- | --- | --- |
-| Symbol input / autocomplete | Codes or search | One symbol first |
-| Fill from watchlist | Batch codes | Trim huge lists |
-| Strategy Skills | Style packs | Optional first run |
-| Beginner / pro, brief / detailed | Report density | Beginner + brief |
-| Start analysis | Submit | UI leans to tasks after |
-| Batch | Multi-symbol | 3–10 per wave |
-| Smart import | Image/CSV/clipboard | **Review codes** before submit |
-
-### Tasks (`segment=tasks`)
-
-| State | Meaning | Action |
-| --- | --- | --- |
-| Queued | Waiting | Do not spam submit |
-| Running | Fetch + LLM | Optional run-flow |
-| Completed | Report ready | **View report** |
-| Failed | Model/network/data | Read error → Settings → retry |
-| Empty | No jobs | Back to launch |
-
-Run-flow URL example: `segment=tasks&runFlow=task&runFlowTaskId=…`
-
-### History (`segment=history`)
-
-List + selection + `recordId` bookmark + multi-delete + history-trend drawer + optional history run-flow. Empty state: pick a row or launch new work.
-
-## Deep dive: batch & Skills
-
-Batch inherits density/strategy/notification settings; partial failure is possible. Skills come from the catalog (including plugins). Report language is independent of UI language. Local CLI backends may block Agent tools but still generate reports.
-
-## Deep dive: failures & cost
-
-| Symptom | Check |
-| --- | --- |
-| Instant fail | Key, test connection, quota |
-| Long queue | Backlog / backend down |
-| Job without report | Error text; filters on history |
-| Bill shock | Large batch + detailed + re-runs |
-
-## Deep use case
-
-Weekend 10-name watchlist: brief + default skill → batch → tasks → re-run failures → read top 3 in history → one price rule in Signal Center.
-
+Prev: [02 Home](02-home_EN.md) · Next: [04 Market review](04-market-review_EN.md)

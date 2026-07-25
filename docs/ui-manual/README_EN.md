@@ -2,9 +2,11 @@
 
 > **Scope**: How to use the **Web workbench and desktop client UI**.  
 > **Out of scope**: Deployment, Docker, GitHub Actions, full environment-variable lists, server ops.  
-> For install and first API key setup, see [Beginner client setup](../beginner-client-setup.md) (Chinese). For deployment, see the [Full guide (EN)](../full-guide_EN.md).
+> Install and first API key: [Beginner client setup (EN)](../beginner-client-setup_EN.md) · [中文](../beginner-client-setup.md). Deploy: [Full guide (EN)](../full-guide_EN.md).
 
-Welcome. This manual assumes you are opening StockPulse **for the first time**. You may not yet know A-share / Hong Kong / US ticker formats, or what “Analysis”, “Signals”, and “Portfolio” each mean. We will walk through them step by step.
+Hi — welcome.
+
+This manual is written for a **first-time** reader. Chapters use a friendly, explicit tutorial voice: what to click, why it matters, and what to do next. Tables are for quick lookup; prose walks you through calmly. If live UI labels differ, **trust the screen** and send a docs fix.
 
 > 💡 **Friendly reminder**  
 > Output is for **learning and research only** and is **not investment advice**. Make your own risk and compliance decisions before any real trade.
