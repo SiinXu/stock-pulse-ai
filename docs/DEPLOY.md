@@ -21,7 +21,7 @@ StockPulse 是**单管理员 / 本地优先**产品，不是多租户 SaaS：
 - `PLUGINS_DIR` 加载的是与进程同权的**可信 Python 代码**，不是应用商店沙箱。
 - 非本机 HTTP 监听在关闭认证时默认**拒绝启动**；`ALLOW_INSECURE_PUBLIC_BIND=true` 仅紧急逃生。
 
-完整清单与条款见 [安全基线 · 运维安全边界](security-baseline.md#operator-security-boundaries-deployers)。
+完整清单与条款见 [安全基线 · 运维安全边界](security-baseline.md#operator-security-boundaries)。
 
 ---
 

@@ -26,7 +26,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Docs] Published the data_provider ownership map after the first ADR-006 symbol-normalization extraction.
 - [Docs] Surface StockPulse differentiators vs upstream on the homepage README (shipped vs planned, non-claims, dual license and security links).
 - [Docs] Document single-admin, trusted-plugin, and public-bind security boundaries for deployers (baseline section, deploy pointers, index rows).
-- [Chore] Inventoried ADR-006 legacy market and analysis-context-pack facade importers, banned new production facade imports via a CI allowlist guard, and published the phased retirement policy.
 - [Changed] Enforced a deny-by-default Agent ToolSurface with bounded executable capabilities, mandatory execution-owned grants, strict schema and stock-scope checks, recursive outbound URL policy validation, redacted denial audits, and no direct ToolRegistry execution bypass.
 - [Added] Added five opt-in investment committee Persona Skills with bounded built-in discovery, desktop packaging coverage, explicit existing-tool lists, differentiated evidence and risk lenses, and mandatory research-only, non-affiliation, and investment-risk disclosures.
 - [Added] Added a default-off, tool-free bounded Critic before Native Multi decisions with strict pass/retry/fail-soft output, one catalog-backed whitelist retry budget, atomic evidence replacement, and internal trace/stream metadata while preserving StrategyEngine authority.

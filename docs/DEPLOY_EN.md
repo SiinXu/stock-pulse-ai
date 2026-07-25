@@ -21,7 +21,7 @@ StockPulse is a **single-administrator / local-first** product, not multi-tenant
 - `PLUGINS_DIR` loads **trusted in-process Python** with the same OS privileges as the app—not a marketplace sandbox.
 - Non-local HTTP binds **fail closed** when auth is disabled; `ALLOW_INSECURE_PUBLIC_BIND=true` is emergency-only.
 
-Full checklist: [Security baseline — operator boundaries](security-baseline.md#operator-security-boundaries-deployers).
+Full checklist: [Security baseline — operator boundaries](security-baseline.md#operator-security-boundaries).
 
 ---
 

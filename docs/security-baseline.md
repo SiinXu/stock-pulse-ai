@@ -1,7 +1,7 @@
 # Security and Compliance Baseline
 
 Status: Maintainer baseline
-Last reviewed: 2026-07-23
+Last reviewed: 2026-07-26
 Applies to: StockPulse backend, API, Web and desktop clients, Agent and Bot integrations, data providers, notifications, reports, automation, and release workflows
 
 The optional Agent risk-control exception is defined in
@@ -28,6 +28,7 @@ The baseline covers:
 
 It does not make StockPulse suitable for regulated use by itself. Operators remain responsible for their deployment, network exposure, data processing, retention, licensing, and jurisdiction-specific obligations.
 
+<a id="operator-security-boundaries"></a>
 ## Operator security boundaries (deployers)
 
 This section is the operator-facing summary of boundaries that are easy to misread from marketing copy or from enabling a single configuration switch. Normative requirement IDs remain in [Baseline Requirements](#baseline-requirements). Implementation details live in the linked contracts and code anchors.
