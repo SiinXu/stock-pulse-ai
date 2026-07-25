@@ -134,6 +134,21 @@ async def _async_generator_callback(event: PluginEvent):
     yield event
 
 
+class _GeneratorCallable:
+    def __call__(self, event: PluginEvent):
+        yield event
+
+
+class _AsyncCallable:
+    async def __call__(self, event: PluginEvent) -> None:
+        del event
+
+
+class _AsyncGeneratorCallable:
+    async def __call__(self, event: PluginEvent):
+        yield event
+
+
 def test_contract_accepts_exactly_the_six_initial_event_names() -> None:
     assert EVENT_HOOK_NAMES == {
         "analysis.started",
@@ -167,6 +182,9 @@ def test_contract_accepts_exactly_the_six_initial_event_names() -> None:
         _generator_callback,
         _async_callback,
         _async_generator_callback,
+        _GeneratorCallable(),
+        _AsyncCallable(),
+        _AsyncGeneratorCallable(),
     ],
     ids=[
         "zero-argument",
@@ -174,6 +192,9 @@ def test_contract_accepts_exactly_the_six_initial_event_names() -> None:
         "generator",
         "coroutine",
         "async-generator",
+        "generator-callable",
+        "coroutine-callable",
+        "async-generator-callable",
     ],
 )
 def test_contract_rejects_incompatible_callback_shapes(callback) -> None:
