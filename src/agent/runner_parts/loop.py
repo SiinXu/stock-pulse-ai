@@ -22,6 +22,9 @@ from src.agent.stock_scope import StockScope
 from src.agent.stream_events import stream_event
 from src.agent.tools.execution import _build_tool_cache_key
 from src.agent.tools.registry import ToolRegistry
+from src.services.security_audit_service import (
+    get_security_audit_service as _get_security_audit_service,
+)
 
 if TYPE_CHECKING:
     from src.agent.runner import (
@@ -116,6 +119,7 @@ def run_agent_loop(
         backend="native",
         principal="native-runtime",
         enforce_access_policy=False,
+        security_audit=_get_security_audit_service(),
     )
     total_tokens = 0
     provider_used = ""

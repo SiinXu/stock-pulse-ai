@@ -40,6 +40,7 @@ EXPECTED_PUBLIC_EXPORTS = frozenset(
     log_safe_exception logger logging match_legacy_schema_profile or_
     parse_sniper_value pd persist_llm_usage preflight_existing
     sanitize_agent_history_content select sessionmaker sqlite_insert
+    SecurityAuditEventRecord
     sqlite_type_affinity threading time timedelta timezone
     to_utc_naive_datetime utc_naive_now
     """.split()
@@ -82,9 +83,10 @@ EXPECTED_SCHEMA_DEFINITIONS = (
     "DecisionSignalRecord",
     "DecisionSignalOutcomeRecord",
     "DecisionSignalFeedbackRecord",
+    "SecurityAuditEventRecord",
 )
 EXPECTED_SCHEMA_AST_HASH = (
-    "fed25c613b0de7f606f56ad353e5c83bc400d972a899d2f31c2bd587ced17754"
+    "1aa41dec1d85e09ae6e09fd7867fec8345456648a4b77881b4bb8d7e9f5d549d"
 )
 EXPECTED_SCHEMA_MODELS = (
     "DatabaseSchemaMigration",
@@ -118,6 +120,7 @@ EXPECTED_SCHEMA_MODELS = (
     "DecisionSignalFeedbackRecord",
     "DecisionSignalMemoryFlagRecord",
     "PortfolioAccountKind",
+    "SecurityAuditEventRecord",
 )
 EXPECTED_SCHEMA_TABLES = (
     "schema_migrations",
@@ -151,6 +154,7 @@ EXPECTED_SCHEMA_TABLES = (
     "decision_signal_feedback",
     "decision_signal_memory_flags",
     "portfolio_account_kinds",
+    "security_audit_events",
 )
 EXPECTED_SCHEMA_METHODS = {
     "StockDaily": ("__repr__", "to_dict"),

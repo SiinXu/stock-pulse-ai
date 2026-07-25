@@ -25,6 +25,7 @@ from api.v1.endpoints import (
     local_models,
     portfolio,
     scorecard,
+    security_audit,
     stocks,
     system_config,
     usage,
@@ -122,6 +123,12 @@ router.include_router(
     scorecard.router,
     prefix="/scorecard",
     tags=["Scorecard"]
+)
+
+router.include_router(
+    security_audit.router,
+    prefix="/security",
+    tags=["SecurityAudit"],
 )
 
 router.include_router(

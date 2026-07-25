@@ -15,7 +15,7 @@
 | 使用 Bot / IM 接入 | [Bot 命令与接入](bot-command.md) | [Bot 平台配置](bot/) |
 | 排查运行问题 | [FAQ](FAQ.md) | [更新日志](CHANGELOG.md) |
 | 处理数据源失败或降级 | [数据源稳定性与故障处理图示](data-source-stability.md) | [英文版](data-source-stability_EN.md)、[FAQ](FAQ.md) |
-| 查看日志、错误与 trace 的敏感数据边界 | [敏感数据脱敏（英文）](security-sensitive-data-redaction.md) | [出站 HTTP 安全策略（英文）](security-outbound-policy.md) |
+| 查看日志、错误、审计与 trace 的敏感数据边界 | [敏感数据脱敏（英文）](security-sensitive-data-redaction.md) | [持久安全审计 Phase 1（英文）](security-audit.md)、[出站 HTTP 安全策略（英文）](security-outbound-policy.md) |
 | 参与开发或提交 PR | [贡献指南](CONTRIBUTING.md) | [业务架构](business-architecture.md)、[技术架构总览](architecture-overview.md)、[ADR 注册表](adr/README.md)、[API 规格](architecture/api_spec.json) |
 
 ## 快速开始
@@ -27,6 +27,7 @@
 | [界面操作手册](ui-manual/README.md) | Web / 桌面分模块界面用法（不含部署）；[English](ui-manual/README_EN.md) |
 | [完整配置与部署指南](full-guide.md) | 环境准备、运行方式、配置说明、部署路径和常见问题 |
 | [FAQ](FAQ.md) | 常见配置、模型、通知、部署和运行问题 |
+| [持久安全审计 Phase 1（英文）](security-audit.md) | 事件合同、代表性特权路径、管理员查询、保留、失败语义与回滚 |
 | [数据源稳定性与故障处理图示](data-source-stability.md) | Tushare、TickFlow、AkShare、Efinance、YFinance、Longbridge 等已接入源的使用场景、fallback 链路和推荐配置 |
 | [更新日志](CHANGELOG.md) | 版本变化、能力调整和迁移说明 |
 

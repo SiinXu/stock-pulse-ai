@@ -21,6 +21,10 @@ from src.config import get_config, Config
 from src.services.system_config_service import SystemConfigService
 from src.services.runtime_scheduler import RuntimeSchedulerService
 from src.services.local_model_service import LocalModelService, get_pullable_local_model_ids
+from src.services.security_audit_service import (
+    SecurityAuditService,
+    get_security_audit_service as _build_security_audit_service,
+)
 from src.services.task_queue import get_task_queue
 
 
@@ -105,3 +109,8 @@ def get_local_model_service(request: Request) -> LocalModelService:
                 )
                 request.app.state.local_model_service = service
     return service
+
+
+def get_security_audit_service() -> SecurityAuditService:
+    """Return a request-scoped lazy security-audit service."""
+    return _build_security_audit_service()

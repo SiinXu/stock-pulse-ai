@@ -3,14 +3,15 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
-from api.deps import get_system_config_service
+from api.deps import get_security_audit_service, get_system_config_service
 from api.v1.errors import error_json_response
 from src.auth import (
     COOKIE_NAME,
@@ -34,6 +35,10 @@ from src.auth import (
 )
 from src.config import Config, setup_env
 from src.core.config_manager import ConfigManager
+from src.services.security_audit_service import (
+    SecurityAuditService,
+    SecurityAuditUnavailable,
+)
 from src.services.system_config_service import ConfigConflictError
 from src.utils.sanitize import log_safe_exception
 
@@ -46,6 +51,51 @@ def _auth_error(status_code: int, error: str, message: str) -> JSONResponse:
     """Return one stable envelope for every auth failure path."""
     safe_message = "Internal server error" if status_code >= 500 else message
     return error_json_response(status_code, error, safe_message)
+
+
+def _resolved_security_audit_service(value) -> SecurityAuditService | None:
+    """Return only a dependency-resolved or explicitly injected audit service."""
+    if callable(getattr(value, "record_attempt", None)) and callable(
+        getattr(value, "record_completion", None)
+    ):
+        return value
+    return None
+
+
+def _security_audit_error() -> JSONResponse:
+    return _auth_error(
+        503,
+        "security_audit_unavailable",
+        "Security audit storage is unavailable",
+    )
+
+
+def _record_login_completion(
+    service: SecurityAuditService | None,
+    *,
+    correlation_id: str,
+    actor_id: str,
+    outcome: str,
+    reason_code: str,
+) -> JSONResponse | None:
+    if service is None:
+        return None
+    try:
+        service.record_completion(
+            event_type="auth.login",
+            actor_type="remote_client",
+            actor_id=actor_id,
+            execution_id=correlation_id,
+            action="auth.login",
+            target_type="admin_session",
+            target_id="primary",
+            outcome=outcome,
+            reason_code=reason_code,
+            correlation_id=correlation_id,
+        )
+    except SecurityAuditUnavailable:
+        return _security_audit_error()
+    return None
 
 
 class LoginRequest(BaseModel):
@@ -337,17 +387,66 @@ async def auth_update_settings(request: Request, body: AuthSettingsRequest):
     summary="Login or set initial password",
     description="Verify password and set session cookie. If password not set yet, accepts password+passwordConfirm.",
 )
-async def auth_login(request: Request, body: LoginRequest):
+async def auth_login(
+    request: Request,
+    body: LoginRequest,
+    security_audit: SecurityAuditService = Depends(get_security_audit_service),
+):
     """Verify password or set initial password, set cookie on success. Returns 401 or 429 on failure."""
+    audit_service = _resolved_security_audit_service(security_audit)
+    correlation_id = SecurityAuditService.new_correlation_id()
+    ip = get_client_ip(request)
+    actor_id = f"client:{hashlib.sha256(ip.encode('utf-8')).hexdigest()[:16]}"
+    if audit_service is not None:
+        try:
+            audit_service.record_attempt(
+                event_type="auth.login",
+                actor_type="remote_client",
+                actor_id=actor_id,
+                execution_id=correlation_id,
+                action="auth.login",
+                target_type="admin_session",
+                target_id="primary",
+                correlation_id=correlation_id,
+            )
+        except SecurityAuditUnavailable:
+            return _security_audit_error()
+
     if not is_auth_enabled():
+        audit_error = _record_login_completion(
+            audit_service,
+            correlation_id=correlation_id,
+            actor_id=actor_id,
+            outcome="denied",
+            reason_code="auth_disabled",
+        )
+        if audit_error is not None:
+            return audit_error
         return _auth_error(400, "auth_disabled", "Authentication is not configured")
 
     password = (body.password or "").strip()
     if not password:
+        audit_error = _record_login_completion(
+            audit_service,
+            correlation_id=correlation_id,
+            actor_id=actor_id,
+            outcome="denied",
+            reason_code="password_required",
+        )
+        if audit_error is not None:
+            return audit_error
         return _auth_error(400, "password_required", "请输入密码")
 
-    ip = get_client_ip(request)
     if not check_rate_limit(ip):
+        audit_error = _record_login_completion(
+            audit_service,
+            correlation_id=correlation_id,
+            actor_id=actor_id,
+            outcome="denied",
+            reason_code="rate_limited",
+        )
+        if audit_error is not None:
+            return audit_error
         return _auth_error(429, "rate_limited", "Too many failed attempts. Please try again later.")
 
     password_set = is_password_set()
@@ -357,21 +456,66 @@ async def auth_login(request: Request, body: LoginRequest):
         confirm = (body.password_confirm or "").strip()
         if password != confirm:
             record_login_failure(ip)
+            audit_error = _record_login_completion(
+                audit_service,
+                correlation_id=correlation_id,
+                actor_id=actor_id,
+                outcome="denied",
+                reason_code="password_mismatch",
+            )
+            if audit_error is not None:
+                return audit_error
             return _auth_error(400, "password_mismatch", "Passwords do not match")
         err = set_initial_password(password)
         if err:
             record_login_failure(ip)
+            audit_error = _record_login_completion(
+                audit_service,
+                correlation_id=correlation_id,
+                actor_id=actor_id,
+                outcome="denied",
+                reason_code="invalid_password",
+            )
+            if audit_error is not None:
+                return audit_error
             return _auth_error(400, "invalid_password", err)
     else:
         if not verify_password(password):
             record_login_failure(ip)
+            audit_error = _record_login_completion(
+                audit_service,
+                correlation_id=correlation_id,
+                actor_id=actor_id,
+                outcome="denied",
+                reason_code="invalid_password",
+            )
+            if audit_error is not None:
+                return audit_error
             return _auth_error(401, "invalid_password", "密码错误")
 
     clear_rate_limit(ip)
     session_val = create_session()
     if not session_val:
+        audit_error = _record_login_completion(
+            audit_service,
+            correlation_id=correlation_id,
+            actor_id=actor_id,
+            outcome="failure",
+            reason_code="session_creation_failed",
+        )
+        if audit_error is not None:
+            return audit_error
         return _auth_error(500, "internal_error", "Failed to create session")
 
+    audit_error = _record_login_completion(
+        audit_service,
+        correlation_id=correlation_id,
+        actor_id=actor_id,
+        outcome="success",
+        reason_code="login_succeeded",
+    )
+    if audit_error is not None:
+        return audit_error
     resp = JSONResponse(content={"ok": True})
     _set_session_cookie(resp, session_val, request)
     return resp

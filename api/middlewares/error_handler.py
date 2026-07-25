@@ -177,6 +177,15 @@ def add_error_handlers(app) -> None:
         """处理 HTTP 异常"""
         trace_id = _request_trace_id(request)
         if exc.status_code >= 500:
+            detail_error = (
+                exc.detail.get("error")
+                if isinstance(exc.detail, dict)
+                else None
+            )
+            security_audit_unavailable = (
+                exc.status_code == 503
+                and detail_error == "security_audit_unavailable"
+            )
             safe_log_exception = HTTPException(
                 status_code=exc.status_code,
                 detail="Server error detail redacted",
@@ -185,17 +194,28 @@ def add_error_handlers(app) -> None:
                 logger,
                 "HTTP exception returned a server error",
                 safe_log_exception,
-                error_code="internal_error",
+                error_code=(
+                    "security_audit_unavailable"
+                    if security_audit_unavailable
+                    else "internal_error"
+                ),
                 trace_id=trace_id,
                 method=request.method,
                 path=_normalized_request_path(request),
                 context={"status_code": exc.status_code},
             )
-            content = error_body(
-                "internal_error",
-                "Internal server error",
-                trace_id=trace_id,
-            )
+            if security_audit_unavailable:
+                content = error_body(
+                    "security_audit_unavailable",
+                    "Security audit storage is unavailable",
+                    trace_id=trace_id,
+                )
+            else:
+                content = error_body(
+                    "internal_error",
+                    "Internal server error",
+                    trace_id=trace_id,
+                )
             response_headers = {"X-Trace-ID": trace_id}
         else:
             content = normalize_error_body(

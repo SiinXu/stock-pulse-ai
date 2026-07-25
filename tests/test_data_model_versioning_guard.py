@@ -50,6 +50,10 @@ from src.schemas.run_flow import (
     RunFlowSnapshot,
     RunFlowSummary,
 )
+from src.schemas.security_audit import (
+    SECURITY_AUDIT_SCHEMA_VERSION,
+    SecurityAuditEventCreate,
+)
 
 
 def test_serialized_artifact_version_constants_match_documented_inventory() -> None:
@@ -63,6 +67,7 @@ def test_serialized_artifact_version_constants_match_documented_inventory() -> N
     assert PROVIDER_USAGE_SCHEMA_VERSION == "2026-06-10"
     assert REPORT_SCHEMA_VERSION == "report-v1"
     assert RUN_FLOW_SCHEMA_VERSION == "run-flow-v1"
+    assert SECURITY_AUDIT_SCHEMA_VERSION == "security-audit-v1"
     assert (
         DECISION_SIGNAL_PRESENTATION_SCHEMA_VERSION
         == "decision-signal-presentation-v1"
@@ -162,3 +167,18 @@ def test_decision_signal_presentation_emits_version() -> None:
         presentation["schema_version"]
         == DECISION_SIGNAL_PRESENTATION_SCHEMA_VERSION
     )
+
+
+def test_security_audit_event_serialization_emits_version() -> None:
+    event = SecurityAuditEventCreate(
+        event_type="auth.login",
+        phase="attempt",
+        actor={"type": "remote_client", "id": "client:fixture"},
+        execution_id="execution-fixture",
+        action="auth.login",
+        target={"type": "admin_session", "id": "primary"},
+        outcome="pending",
+        reason_code="attempt_started",
+        correlation_id="0123456789abcdef0123456789abcdef",
+    )
+    assert event.model_dump()["schema_version"] == SECURITY_AUDIT_SCHEMA_VERSION

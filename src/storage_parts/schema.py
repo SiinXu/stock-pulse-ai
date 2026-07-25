@@ -1149,3 +1149,30 @@ class PortfolioAccountKind(Base):
     account_type = Column(String(16), nullable=False, default='paper', index=True)
     created_at = Column(DateTime, default=utc_naive_now, index=True)
     updated_at = Column(DateTime, default=utc_naive_now, onupdate=utc_naive_now, index=True)
+
+
+class SecurityAuditEventRecord(Base):
+    """Append-only privileged-operation security event."""
+
+    __tablename__ = 'security_audit_events'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    schema_version = Column(String(32), nullable=False)
+    occurred_at = Column(DateTime, nullable=False, index=True)
+    event_type = Column(String(64), nullable=False, index=True)
+    phase = Column(String(16), nullable=False, index=True)
+    actor_type = Column(String(64), nullable=False)
+    actor_id = Column(String(128), nullable=False)
+    execution_id = Column(String(128), nullable=False, index=True)
+    action = Column(String(64), nullable=False, index=True)
+    target_type = Column(String(64), nullable=False)
+    target_id = Column(String(128), nullable=False)
+    outcome = Column(String(16), nullable=False, index=True)
+    reason_code = Column(String(64), nullable=False)
+    correlation_id = Column(String(64), nullable=False, index=True)
+    metadata_json = Column(Text, nullable=False, default='{}')
+
+    __table_args__ = (
+        Index('ix_security_audit_event_time_id', 'occurred_at', 'id'),
+        Index('ix_security_audit_correlation_phase', 'correlation_id', 'phase'),
+    )

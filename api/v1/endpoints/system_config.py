@@ -8,7 +8,12 @@ from typing import Any, Mapping
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from api.deps import get_runtime_scheduler_service, get_system_config_service
+from api.deps import (
+    get_runtime_scheduler_service,
+    get_security_audit_service,
+    get_system_config_service,
+)
+from api.v1.errors import api_error
 from api.v1.schemas.common import ErrorResponse
 from api.v1.schemas.system_config import (
     DiscoverLLMChannelModelsRequest,
@@ -46,11 +51,62 @@ from src.services.system_config_service import (
     SystemConfigService,
 )
 from src.services.runtime_scheduler import RuntimeSchedulerService
+from src.services.security_audit_service import (
+    SecurityAuditService,
+    SecurityAuditUnavailable,
+)
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _resolved_security_audit_service(value) -> SecurityAuditService | None:
+    if callable(getattr(value, "record_attempt", None)) and callable(
+        getattr(value, "record_completion", None)
+    ):
+        return value
+    return None
+
+
+def _record_config_audit(
+    service: SecurityAuditService | None,
+    *,
+    phase: str,
+    correlation_id: str,
+    outcome: str = "pending",
+    reason_code: str = "attempt_started",
+    metadata: dict[str, Any],
+) -> None:
+    if service is None:
+        return
+    common = dict(
+        event_type="system_config.write",
+        actor_type="administrator",
+        actor_id=_config_audit_actor(),
+        execution_id=correlation_id,
+        action="system_config.write",
+        target_type="system_config",
+        target_id="runtime",
+        correlation_id=correlation_id,
+        metadata=metadata,
+    )
+    try:
+        if phase == "attempt":
+            service.record_attempt(**common)
+        else:
+            service.record_completion(
+                **common,
+                outcome=outcome,
+                reason_code=reason_code,
+            )
+    except SecurityAuditUnavailable:
+        raise api_error(
+            503,
+            "security_audit_unavailable",
+            "Security audit storage is unavailable",
+        )
 
 
 def _config_audit_actor() -> str:
@@ -535,6 +591,7 @@ def test_generation_backend(
         400: {"description": "Validation failed", "model": SystemConfigValidationErrorResponse},
         409: {"description": "Version conflict", "model": SystemConfigConflictResponse},
         500: {"description": "Internal server error", "model": ErrorResponse},
+        503: {"description": "Security audit unavailable", "model": ErrorResponse},
     },
     summary="Update system configuration",
     description="Update key-value pairs in .env. Mask token preserves existing secret values.",
@@ -542,8 +599,22 @@ def test_generation_backend(
 def update_system_config(
     request: UpdateSystemConfigRequest,
     service: SystemConfigService = Depends(get_system_config_service),
+    security_audit: SecurityAuditService = Depends(get_security_audit_service),
 ) -> UpdateSystemConfigResponse:
     """Validate and persist system configuration updates."""
+    audit_service = _resolved_security_audit_service(security_audit)
+    correlation_id = SecurityAuditService.new_correlation_id()
+    audit_metadata = {
+        "keys": sorted({item.key for item in request.items}),
+        "config_version": request.config_version,
+        "reload_now": request.reload_now,
+    }
+    _record_config_audit(
+        audit_service,
+        phase="attempt",
+        correlation_id=correlation_id,
+        metadata=audit_metadata,
+    )
     try:
         payload = service.update(
             config_version=request.config_version,
@@ -554,8 +625,15 @@ def update_system_config(
             connectivity_timeout_seconds=request.connectivity_timeout_seconds,
             actor=_config_audit_actor(),
         )
-        return UpdateSystemConfigResponse.model_validate(payload)
     except ConfigValidationError as exc:
+        _record_config_audit(
+            audit_service,
+            phase="completion",
+            correlation_id=correlation_id,
+            outcome="rejected",
+            reason_code="validation_failed",
+            metadata=audit_metadata,
+        )
         raise HTTPException(
             status_code=400,
             detail={
@@ -565,6 +643,14 @@ def update_system_config(
             },
         )
     except ConfigConflictError as exc:
+        _record_config_audit(
+            audit_service,
+            phase="completion",
+            correlation_id=correlation_id,
+            outcome="rejected",
+            reason_code="config_version_conflict",
+            metadata=audit_metadata,
+        )
         raise HTTPException(
             status_code=409,
             detail={
@@ -574,6 +660,14 @@ def update_system_config(
             },
         )
     except Exception as exc:  # broad-exception: fallback_recorded - map update failures to a sanitized API error
+        _record_config_audit(
+            audit_service,
+            phase="completion",
+            correlation_id=correlation_id,
+            outcome="failure",
+            reason_code="config_update_failed",
+            metadata=audit_metadata,
+        )
         log_safe_exception(
             logger,
             "System configuration update failed",
@@ -587,6 +681,15 @@ def update_system_config(
                 "message": "Failed to update system configuration",
             },
         )
+    _record_config_audit(
+        audit_service,
+        phase="completion",
+        correlation_id=correlation_id,
+        outcome="success",
+        reason_code="config_updated",
+        metadata=audit_metadata,
+    )
+    return UpdateSystemConfigResponse.model_validate(payload)
 
 
 @router.post(
