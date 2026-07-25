@@ -639,25 +639,32 @@ same constraints / build-constraints:
 
 ```bash
 # Kronos local-inference Agent Tool (see docs/kronos-agent-tool.md)
-python -m pip install --build-constraint build-constraints.txt -r requirements-kronos.txt
+# (requirements-kronos.txt also embeds -c constraints.txt)
+python -m pip install --constraint constraints.txt \
+  --build-constraint build-constraints.txt -r requirements-kronos.txt
 
 # Desktop packaging toolchain (adds pyinstaller on top of the default set)
-python -m pip install --build-constraint build-constraints.txt -r requirements-desktop.txt
+python -m pip install --constraint constraints.txt \
+  --build-constraint build-constraints.txt -r requirements-desktop.txt
 
 # Backend CI / local dev tooling (flake8, pytest, pip-audit, uv, …)
-python -m pip install --build-constraint build-constraints.txt -r .github/requirements-ci.txt
+python -m pip install --constraint constraints.txt \
+  --build-constraint build-constraints.txt -r .github/requirements-ci.txt
 
 # Experimental PydanticAI runtime POC (Native stays the default zero-dep path)
-python -m pip install --build-constraint build-constraints.txt -r requirements-pydanticai.txt
+# Exact pins live in requirements-pydanticai.txt; still pass constraints.
+python -m pip install --constraint constraints.txt \
+  --build-constraint build-constraints.txt -r requirements-pydanticai.txt
 
 python -m pip check
 ```
 
 Optional-dependency group names in `pyproject.toml` align with those extras
-(`kronos` / `desktop` / `dev` / `pydanticai`). Prefer the corresponding
-`requirements-*.txt` (or CI file) plus constraints for reproducible installs.
-The `pydanticai` metadata group is a sentinel; the exact package set lives only
-in `requirements-pydanticai.txt`.
+(`kronos` / `desktop` / `dev` / `pydanticai`) once that packaging PR is present.
+Prefer the corresponding `requirements-*.txt` (or CI file) plus constraints for
+reproducible installs. Do not use unconstrained `pip install '.[extra]'` as the
+pin path. The `pydanticai` metadata group is an empty sentinel; the exact package
+set lives only in `requirements-pydanticai.txt`.
 
 #### Docker / CI vs local
 
