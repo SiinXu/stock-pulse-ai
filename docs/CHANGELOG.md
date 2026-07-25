@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Docs] Expanded the bilingual UI manual for market review, Agent chat, signals, portfolios, backtesting, and settings with beginner workflows, terminology, examples, and risk guidance.
 - [Fixed] Restored backend CI compatibility after the Agent Soul, Persona catalog, and AlphaSift DTO contract merges without extending those features' runtime scope.
 - [Added] Wired trusted `analysis_strategy` plugins into the root-owned Skill catalog with detached definitions, fail-closed conflicts, lifecycle-aware cache invalidation, and unchanged declarative precedence and StrategyEngine authority.
 - [Added] Added a versioned Agent Soul charter with one fail-closed composer across Native Single, Multi, and Chat prompts, truthful analysis-history metadata, and additive Chat API run identity.
