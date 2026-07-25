@@ -21,6 +21,7 @@ from api.v1.endpoints import (
     decision_signals,
     health,
     history,
+    investment_framework,
     intelligence,
     local_models,
     portfolio,
@@ -118,6 +119,12 @@ router.include_router(
     local_models.router,
     prefix="/local-models",
     tags=["LocalModels"],
+)
+
+router.include_router(
+    investment_framework.router,
+    prefix="/investment-framework",
+    tags=["InvestmentFramework"]
 )
 
 router.include_router(

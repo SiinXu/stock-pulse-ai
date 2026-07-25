@@ -24,6 +24,7 @@ from src.migrations.registry import (
     DECISION_SIGNAL_PROFILE_MIGRATION,
     INTELLIGENCE_ITEM_SCOPE_MIGRATION,
     INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION,
+    INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION,
     LEGACY_BASELINE_MIGRATION,
     LLM_USAGE_TELEMETRY_MIGRATION,
     PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION,
@@ -195,6 +196,7 @@ def test_pending_cli_subprocess_is_read_only(
         INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION.id,
         SECURITY_AUDIT_EVENTS_MIGRATION.id,
         SCHEDULED_TASK_SCHEMA_MIGRATION.id,
+        INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION.id,
     ]
     assert payload["target_version"] == TARGET_VERSION
     assert str(db_path) not in completed.stdout
@@ -259,6 +261,7 @@ def test_legacy_registry_without_checksum_is_reported_without_alter(
         INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION.id,
         SECURITY_AUDIT_EVENTS_MIGRATION.id,
         SCHEDULED_TASK_SCHEMA_MIGRATION.id,
+        INVESTMENT_FRAMEWORK_SCHEMA_MIGRATION.id,
     ]
     assert _database_snapshot(db_path) == before
     assert "checksum" not in {row[1] for row in before["registry_columns"]}
