@@ -163,6 +163,85 @@ def assert_numeric_consistency(
             )
 
 
+# Report dotted paths that must match frozen market_data when that field is numeric.
+FROZEN_MARKET_NUMERIC_BINDINGS = {
+    "dashboard.data_perspective.price_position.current_price": ("market_data", "current_price"),
+    "dashboard.data_perspective.price_position.ma5": ("market_data", "ma5"),
+    "dashboard.data_perspective.price_position.ma10": ("market_data", "ma10"),
+    "dashboard.data_perspective.price_position.ma20": ("market_data", "ma20"),
+    "dashboard.data_perspective.volume_analysis.volume_ratio": ("market_data", "volume_ratio"),
+    "dashboard.data_perspective.volume_analysis.turnover_rate": ("market_data", "turnover_rate"),
+}
+
+
+def resolve_frozen_numeric(frozen: Mapping[str, Any], report_path: str) -> Optional[float]:
+    """Resolve a report numeric path against frozen_inputs when a binding exists.
+
+    Returns:
+      - float when frozen provides a finite numeric value for the bound field
+      - None when there is no binding, the frozen section is missing, or the
+        frozen field is null/non-numeric (limited-field scenarios)
+    """
+    binding = FROZEN_MARKET_NUMERIC_BINDINGS.get(report_path)
+    if binding is None:
+        # Fallback: leaf name under market_data (e.g. current_price)
+        leaf = report_path.rsplit(".", 1)[-1]
+        market = frozen.get("market_data")
+        if isinstance(market, Mapping) and leaf in market:
+            return _as_float(market.get(leaf))
+        return None
+    section_name, key = binding
+    section = frozen.get(section_name)
+    if not isinstance(section, Mapping):
+        return None
+    if key not in section:
+        return None
+    return _as_float(section.get(key))
+
+
+def assert_numeric_paths_bound_to_frozen(
+    report: Mapping[str, Any],
+    numeric_paths: Mapping[str, Any],
+    frozen: Mapping[str, Any],
+    *,
+    case_id: str,
+    abs_tol: float = 1e-6,
+    rel_tol: float = 1e-9,
+) -> None:
+    """Fail when declared numeric paths or report values contradict frozen inputs.
+
+    This closes the loophole where report and expectations.numeric_paths stay
+    synchronized while both invent numbers that disagree with frozen_inputs.
+    """
+    for path, expected_raw in numeric_paths.items():
+        frozen_val = resolve_frozen_numeric(frozen, path)
+        if frozen_val is None:
+            continue
+        expected = _as_float(expected_raw)
+        if expected is None:
+            raise AssertionError(
+                f"[{case_id}] expectations.numeric_paths[{path!r}] is not numeric "
+                f"but frozen_inputs binds a numeric value {frozen_val!r}"
+            )
+        if not math.isclose(expected, frozen_val, rel_tol=rel_tol, abs_tol=abs_tol):
+            raise AssertionError(
+                f"[{case_id}] expectations.numeric_paths contradict frozen_inputs at {path}: "
+                f"expectation={expected!r} frozen={frozen_val!r}"
+            )
+        actual_raw = dig(report, path)
+        actual = _as_float(actual_raw)
+        if actual is None:
+            raise AssertionError(
+                f"[{case_id}] report missing/non-numeric at {path} while frozen_inputs "
+                f"requires {frozen_val!r}: {actual_raw!r}"
+            )
+        if not math.isclose(actual, frozen_val, rel_tol=rel_tol, abs_tol=abs_tol):
+            raise AssertionError(
+                f"[{case_id}] report invents number contradicting frozen_inputs at {path}: "
+                f"report={actual!r} frozen={frozen_val!r}"
+            )
+
+
 def _joined_text(report: Mapping[str, Any]) -> str:
     return "\n".join(collect_string_values(report)).lower()
 
@@ -255,6 +334,12 @@ def evaluate_case(case: Mapping[str, Any]) -> None:
     if not isinstance(numeric_paths, Mapping):
         raise AssertionError(f"[{case_id}] expectations.numeric_paths must be an object")
     assert_numeric_consistency(report, numeric_paths, case_id=case_id)
+    assert_numeric_paths_bound_to_frozen(
+        report,
+        numeric_paths,
+        frozen,
+        case_id=case_id,
+    )
 
     sources = frozen.get("sources") or {}
     if not isinstance(sources, Mapping):

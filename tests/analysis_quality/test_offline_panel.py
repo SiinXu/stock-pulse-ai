@@ -106,3 +106,16 @@ def test_assert_numeric_consistency_direct() -> None:
             {"dashboard.data_perspective.price_position.current_price": 11.0},
             case_id="direct",
         )
+
+def test_report_and_expectations_cannot_diverge_from_frozen_inputs() -> None:
+    """Regression: report+expectations agreement must not hide frozen contradictions."""
+    case = next(iter_panel_cases())
+    mutated = copy.deepcopy(case)
+    path = "dashboard.data_perspective.price_position.current_price"
+    bogus = 1.0
+    mutated["report"]["dashboard"]["data_perspective"]["price_position"]["current_price"] = bogus
+    mutated["expectations"]["numeric_paths"][path] = bogus
+    # frozen_inputs still holds the real price; both report and expectations lie together.
+    with pytest.raises(AssertionError, match="frozen_inputs"):
+        evaluate_case(mutated)
+
