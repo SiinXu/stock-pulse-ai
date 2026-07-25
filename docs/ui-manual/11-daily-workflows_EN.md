@@ -1,52 +1,83 @@
 # 11 Daily workflows and UI FAQ
 
+This chapter chains earlier modules into “how I use StockPulse every day”. If you keep only one chapter, keep this one.
+
+> 💡 **Principle**  
+> Few stable entry points. Read conclusion and risk first. Do not re-run the same symbol dozens of times without a reason.
+
 ## Recommended workflows
 
-### About five minutes daily
+### A. About five minutes (maintenance)
 
-1. Open Home for focus and todos.
-2. Skim active signals in Signal center.
-3. Check portfolio risk and unusual signals.
-4. Open the latest report or ask one chat question on symbols that need attention.
+```mermaid
+flowchart LR
+  H[Home focus] --> S[Signal Center scan]
+  S --> P[Portfolio risk]
+  P --> Q[One open question: report or chat]
+```
 
-### Deep dive on one stock
+1. **Home** — focus and todos.  
+2. **Signal Center** — `active` signals only.  
+3. **Portfolio** — risk if you track holdings.  
+4. One doubtful name — latest report or a single Agent question about invalidation.
 
-1. Submit the symbol in the analysis workbench (optional strategy).
-2. Read the report using [08 Reading reports](08-reading-reports_EN.md).
-3. Compare prior runs via history trend.
-4. Use chat for invalidation and watch conditions.
-5. Add Signal center rules when you need monitoring.
+**Config tip**: start with reliable delivery on one channel; add more channels later ([10 Settings](10-settings_EN.md)).
 
-### Review your own process
+### B. Deep dive (30–60 minutes)
 
-1. Run backtest on historical advice.
-2. Inspect outcomes and useful/not-useful feedback in Signal center.
-3. Adjust models or default strategy in Settings instead of constantly churning the watchlist.
+1. Submit the symbol on the **Analysis workbench** (optional Skill).  
+2. Read with [08 Reading reports](08-reading-reports_EN.md).  
+3. Compare **history trend**.  
+4. **Agent chat** for observation / invalidation conditions (write codes clearly).  
+5. Optional simple **alert rules** in Signal Center.
+
+### C. Weekly process review
+
+1. Run **Backtest** on historical advice.  
+2. Review outcomes and useful / not-useful feedback.  
+3. Tune model or default strategy in Settings — avoid noisy watchlist thrashing.
+
+## Scenario cheat sheet
+
+| I want to… | Go to | Note |
+| --- | --- | --- |
+| Get a first report fast | Analysis workbench | One ticker + Beginner |
+| Market mood | Market review | Separate from single-name advice |
+| Price alerts | Signal Center → Rules | Start simple |
+| Track holdings | Portfolio | Create account first |
+| Change model / key | Settings → AI | Save, then test |
+| Report language | Settings report language | Independent of UI language |
 
 ## UI FAQ
 
-**Analysis spins forever?**  
-Check Running tasks for failure reasons; fix model or connectivity, then retry.
+**Analysis spins forever?** Check Running tasks for failures (key, quota, network, ticker format). Fix, then retry.
 
-**Report language does not match UI language?**  
-They are independent: UI language covers chrome; report language is set under Settings.
+**UI language ≠ report language?** Expected. They are configured separately.
 
-**Signal center is empty?**  
-Successful stock analyses must extract signals first; very old history may not backfill. Run analysis on the watchlist once.
+**Signal Center empty?** Need successful single-stock analyses with extracted signals. Very old history may not backfill.
 
-**Holdings exist but no AI suggestion?**  
-Signals load asynchronously; empty placeholder means no active signal.
+**Portfolio has no AI suggestion?** Signals load asynchronously; empty placeholder means no active signal yet.
 
-**CSV import fails?**  
-Use dry-run preview; fix headers, oversell, or duplicates before commit.
+**CSV import fails?** Use preview; fix headers, oversolds, duplicates.
 
-**Chat mixes symbols or misses the point?**  
-State the active code; for comparisons write “compare A and B”.
+**Chat mixes tickers?** State the code; for comparison write “compare AAPL and MSFT”.
 
-## Related docs
+**Home always incomplete?** Confirm Save succeeded, model test passed, watchlist non-empty.
+
+## Habits
+
+| Habit | Why |
+| --- | --- |
+| Never paste API keys into chat screenshots | Quota theft |
+| Always Save settings | Unsaved = not configured |
+| Treat output as research input | You own risk |
+| Small batches | Cost and cognitive load |
+
+## Related
 
 - [Manual home](README_EN.md)
-- [Beginner client setup](../beginner-client-setup.md) (install and first keys; Chinese)
-- [FAQ (EN)](../FAQ_EN.md)
+- [Beginner client setup](../beginner-client-setup.md) (CN)
+- [FAQ](../FAQ_EN.md)
+- [Full guide](../full-guide_EN.md)
 
 Previous: [10 Settings](10-settings_EN.md) · Back: [Manual home](README_EN.md)
