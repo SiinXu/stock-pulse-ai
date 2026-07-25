@@ -2,14 +2,24 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from sqlalchemy import desc, func, insert, literal, select, update
 from sqlalchemy.exc import IntegrityError
 
 from src.schemas.scheduled_task import ACTIVE_SCHEDULED_RUN_STATUSES
 from src.storage import DatabaseManager, ScheduledTaskRecord, ScheduledTaskRunRecord
+
+
+@dataclass(frozen=True)
+class ScheduledRunFenceResult:
+    """Outcome of one queue admission guarded by the definition writer lock."""
+
+    outcome: str
+    task: Optional[ScheduledTaskRecord] = None
+    run: Optional[ScheduledTaskRunRecord] = None
 
 
 class ScheduledTaskRepository:
@@ -87,6 +97,7 @@ class ScheduledTaskRepository:
         task_id: str,
         *,
         expected_schema_version: int,
+        expected_execution_generation: int,
         enabled: bool,
         next_run_at: Optional[datetime],
         updated_at: datetime,
@@ -99,9 +110,12 @@ class ScheduledTaskRepository:
                     ScheduledTaskRecord.id == task_id,
                     ScheduledTaskRecord.schema_version
                     == expected_schema_version,
+                    ScheduledTaskRecord.execution_generation
+                    == expected_execution_generation,
                 )
                 .values(
                     enabled=enabled,
+                    execution_generation=expected_execution_generation + 1,
                     next_run_at=next_run_at,
                     updated_at=updated_at,
                 )
@@ -150,6 +164,7 @@ class ScheduledTaskRepository:
         *,
         task_id: str,
         expected_schema_version: int,
+        expected_execution_generation: int,
         expected_next_run_at: datetime,
         next_run_at: datetime,
         run_fields: Dict[str, Any],
@@ -163,6 +178,8 @@ class ScheduledTaskRepository:
                     ScheduledTaskRecord.id == task_id,
                     ScheduledTaskRecord.schema_version
                     == expected_schema_version,
+                    ScheduledTaskRecord.execution_generation
+                    == expected_execution_generation,
                     ScheduledTaskRecord.enabled.is_(True),
                     ScheduledTaskRecord.next_run_at == expected_next_run_at,
                 )
@@ -196,6 +213,7 @@ class ScheduledTaskRepository:
         *,
         task_id: str,
         expected_schema_version: int,
+        expected_execution_generation: int,
         expected_next_run_at: datetime,
         run_fields: Dict[str, Any],
     ) -> Optional[ScheduledTaskRunRecord]:
@@ -216,6 +234,8 @@ class ScheduledTaskRepository:
         source = select(*projected_values).where(
             ScheduledTaskRecord.id == task_id,
             ScheduledTaskRecord.schema_version == expected_schema_version,
+            ScheduledTaskRecord.execution_generation
+            == expected_execution_generation,
             ScheduledTaskRecord.enabled.is_(True),
             ScheduledTaskRecord.next_run_at == expected_next_run_at,
         )
@@ -247,6 +267,7 @@ class ScheduledTaskRepository:
         *,
         task_id: str,
         expected_schema_version: int,
+        expected_execution_generation: int,
         expected_next_run_at: datetime,
         run_fields: Dict[str, Any],
         updated_at: datetime,
@@ -259,11 +280,14 @@ class ScheduledTaskRepository:
                     ScheduledTaskRecord.id == task_id,
                     ScheduledTaskRecord.schema_version
                     == expected_schema_version,
+                    ScheduledTaskRecord.execution_generation
+                    == expected_execution_generation,
                     ScheduledTaskRecord.enabled.is_(True),
                     ScheduledTaskRecord.next_run_at == expected_next_run_at,
                 )
                 .values(
                     enabled=False,
+                    execution_generation=expected_execution_generation + 1,
                     next_run_at=None,
                     updated_at=updated_at,
                 )
@@ -290,6 +314,139 @@ class ScheduledTaskRepository:
                 raise
             session.refresh(run)
             return self._detach(session, run)
+
+    def reserve_run_admission(
+        self,
+        *,
+        run_id: str,
+        dispatch_token: str,
+        now: datetime,
+    ) -> Optional[ScheduledTaskRunRecord]:
+        """Reserve one due retry before any process-local queue side effect."""
+        with self.db.get_session() as session:
+            result = session.execute(
+                update(ScheduledTaskRunRecord)
+                .where(
+                    ScheduledTaskRunRecord.id == run_id,
+                    ScheduledTaskRunRecord.status == "retry_wait",
+                    ScheduledTaskRunRecord.dispatch_token.is_(None),
+                    ScheduledTaskRunRecord.next_attempt_at.is_not(None),
+                    ScheduledTaskRunRecord.next_attempt_at <= now,
+                )
+                .values(
+                    status="dispatching",
+                    dispatch_token=dispatch_token,
+                    updated_at=now,
+                )
+            )
+            if result.rowcount != 1:
+                session.rollback()
+                return None
+            session.commit()
+            row = session.get(ScheduledTaskRunRecord, run_id)
+            return self._detach(session, row)
+
+    def update_run_under_definition_fence(
+        self,
+        *,
+        run_id: str,
+        expected_schema_version: int,
+        expected_dispatch_token: str,
+        allowed_run_statuses: Sequence[str],
+        now: datetime,
+        update_factory: Callable[
+            [ScheduledTaskRecord, ScheduledTaskRunRecord],
+            Dict[str, Any],
+        ],
+    ) -> ScheduledRunFenceResult:
+        """Apply a queue admission and its run update in one writer window.
+
+        SQLite's writer lock is acquired before the definition and run are read.
+        The callback may submit to the process-local queue; concurrent definition
+        mutations therefore linearize either before that side effect or after its
+        durable execution identity has been recorded.
+        """
+        session = self.db.get_session()
+        try:
+            session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+            run = session.get(ScheduledTaskRunRecord, run_id)
+            task = (
+                session.get(ScheduledTaskRecord, run.task_id)
+                if run is not None
+                else None
+            )
+
+            def finish(outcome: str) -> ScheduledRunFenceResult:
+                if task is not None:
+                    session.expunge(task)
+                if run is not None:
+                    session.expunge(run)
+                session.commit()
+                return ScheduledRunFenceResult(outcome, task=task, run=run)
+
+            if run is None:
+                return finish("run_missing")
+            if task is None:
+                return finish("task_missing")
+            if task.schema_version != expected_schema_version:
+                return finish("schema_changed")
+            if task.schema_version != run.definition_schema_version:
+                return finish("schema_changed")
+            if run.dispatch_token != expected_dispatch_token:
+                return finish("reservation_changed")
+            if (
+                int(task.execution_generation)
+                != int(run.definition_generation)
+            ):
+                return finish("generation_changed")
+            if not bool(task.enabled):
+                return finish("disabled")
+            if run.status not in set(allowed_run_statuses):
+                return finish("run_changed")
+            if (
+                run.status == "retry_wait"
+                and run.next_attempt_at is not None
+                and run.next_attempt_at > now
+            ):
+                return finish("not_due")
+
+            fields = update_factory(task, run)
+            for key, value in fields.items():
+                setattr(run, key, value)
+            session.flush()
+            session.refresh(task)
+            session.refresh(run)
+            return finish("applied")
+        except Exception:  # broad-exception: cleanup - Roll back the fenced writer transaction before preserving the original failure.
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    def finalize_dispatch_reservation(
+        self,
+        *,
+        run_id: str,
+        dispatch_token: str,
+        fields: Dict[str, Any],
+    ) -> Optional[ScheduledTaskRunRecord]:
+        """Conditionally finalize one admission reservation after a fence miss."""
+        with self.db.get_session() as session:
+            result = session.execute(
+                update(ScheduledTaskRunRecord)
+                .where(
+                    ScheduledTaskRunRecord.id == run_id,
+                    ScheduledTaskRunRecord.status == "dispatching",
+                    ScheduledTaskRunRecord.dispatch_token == dispatch_token,
+                )
+                .values(**fields)
+            )
+            if result.rowcount != 1:
+                session.rollback()
+                return None
+            session.commit()
+            row = session.get(ScheduledTaskRunRecord, run_id)
+            return self._detach(session, row)
 
     def get_run(self, run_id: str) -> Optional[ScheduledTaskRunRecord]:
         """Return one occurrence record by identifier, if present."""

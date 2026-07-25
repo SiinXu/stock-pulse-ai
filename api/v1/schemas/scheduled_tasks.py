@@ -107,8 +107,22 @@ class ScheduledTaskRunItem(BaseModel):
         "interrupted",
     ]
     attempt_count: int
+    dispatch_failure_count: int
     execution_task_ids: List[str] = Field(default_factory=list)
     result_refs: List[str] = Field(default_factory=list)
+    notification_status: Optional[
+        Literal[
+            "not_requested",
+            "ok",
+            "degraded",
+            "failed",
+            "skipped",
+            "not_configured",
+            "unknown",
+        ]
+    ] = None
+    notification_channels: List[str] = Field(default_factory=list)
+    notification_failed_channels: List[str] = Field(default_factory=list)
     error_code: Optional[str] = None
     next_attempt_at: Optional[datetime] = None
     started_at: Optional[datetime] = None

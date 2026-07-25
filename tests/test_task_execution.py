@@ -25,6 +25,7 @@ from src.task_execution import (
     TaskIdempotencyConflictError,
     TaskNotFoundError,
     TaskQueueShutdownError,
+    TaskRetryInProgressError,
     TaskRetryNotAllowedError,
     TaskRetryUnsupportedError,
     TaskStatusEnum,
@@ -689,6 +690,32 @@ def test_concurrent_retry_callers_share_child_under_synchronous_cleanup_pressure
     assert child_id in task_queue._tasks
     assert task_queue._retry_children == {}
     assert task_queue._task_lifecycle_pins == {}
+
+
+def test_retry_nowait_rejects_an_in_progress_reservation(task_queue) -> None:
+    task_queue._executor = SynchronousExecutor()
+    factory_entered = threading.Event()
+    release_factory = threading.Event()
+
+    def retry_factory() -> TaskCommand:
+        factory_entered.set()
+        assert release_factory.wait(timeout=2)
+        return make_command(lambda _context: {"ok": True})
+
+    parent_id = task_queue.submit(make_command(
+        lambda _context: (_ for _ in ()).throw(RuntimeError("failed")),
+        retry_factory=retry_factory,
+    ))
+    owner = threading.Thread(target=lambda: task_queue.retry(parent_id))
+    owner.start()
+    assert factory_entered.wait(timeout=2)
+
+    with pytest.raises(TaskRetryInProgressError):
+        task_queue.retry_nowait(parent_id)
+
+    release_factory.set()
+    owner.join(timeout=2)
+    assert not owner.is_alive()
 
 
 def test_retry_executor_failure_rolls_back_reserved_child_and_pin(task_queue) -> None:

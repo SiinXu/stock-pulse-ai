@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import date, datetime, timedelta, timezone
+import threading
 from types import SimpleNamespace
 
 import pytest
-from sqlalchemy import inspect, select
+from sqlalchemy import event, inspect, select
 
 from src.config import Config
 from src.core.trading_calendar import MarketSessionStatus
@@ -28,12 +29,14 @@ from src.storage import (
     DatabaseManager,
     DatabaseSchemaMigration,
     ScheduledTaskRecord,
+    ScheduledTaskRunRecord,
 )
 from src.task_execution import TaskNotFoundError, TaskSnapshot, TaskStatus
 
 
 NOW = datetime(2026, 7, 24, 1, 29)
 DUE = datetime(2026, 7, 24, 1, 30)
+_UNSET = object()
 
 
 class FakeTaskQueue:
@@ -48,6 +51,7 @@ class FakeTaskQueue:
         self.submit_calls = []
         self.retry_calls = []
         self.snapshots = {}
+        self.results = {}
         self._sequence = 0
 
     def _snapshot(self, task_id: str, status: TaskStatus) -> TaskSnapshot:
@@ -73,6 +77,11 @@ class FakeTaskQueue:
     def get(self, task_id: str) -> TaskSnapshot:
         return self.snapshots[task_id]
 
+    def get_task(self, task_id: str):
+        if task_id not in self.snapshots:
+            return None
+        return SimpleNamespace(result=self.results.get(task_id))
+
     def retry(self, task_id: str) -> str:
         self.retry_calls.append(task_id)
         self._sequence += 1
@@ -80,14 +89,46 @@ class FakeTaskQueue:
         self.snapshots[child_id] = self._snapshot(child_id, self.retry_status)
         return child_id
 
-    def set_status(self, task_id: str, status: TaskStatus) -> None:
+    def set_status(
+        self,
+        task_id: str,
+        status: TaskStatus,
+        *,
+        result=_UNSET,
+    ) -> None:
         self.snapshots[task_id] = self._snapshot(task_id, status)
+        if result is not _UNSET:
+            self.results[task_id] = result
 
 
 class MissingRetrySourceQueue(FakeTaskQueue):
     def retry(self, task_id: str) -> str:
         self.retry_calls.append(task_id)
         raise TaskNotFoundError(task_id)
+
+
+class RejectingSubmitQueue(FakeTaskQueue):
+    def submit_tasks_batch(self, **kwargs):
+        self.submit_calls.append(kwargs)
+        raise RuntimeError("queue rejected submission")
+
+
+class RejectingRetryQueue(FakeTaskQueue):
+    def retry(self, task_id: str) -> str:
+        self.retry_calls.append(task_id)
+        raise RuntimeError("queue rejected retry")
+
+
+class BlockingSubmitQueue(FakeTaskQueue):
+    def __init__(self) -> None:
+        super().__init__()
+        self.entered = threading.Event()
+        self.release = threading.Event()
+
+    def submit_tasks_batch(self, **kwargs):
+        self.entered.set()
+        assert self.release.wait(timeout=5)
+        return super().submit_tasks_batch(**kwargs)
 
 
 class CoalescingTaskQueue(FakeTaskQueue):
@@ -205,6 +246,7 @@ def definition_values(row) -> dict:
     return {
         "id": row.id,
         "schema_version": row.schema_version,
+        "execution_generation": row.execution_generation,
         "name": row.name,
         "task_type": row.task_type,
         "schedule_kind": row.schedule_kind,
@@ -240,8 +282,23 @@ def build_service(
 
 
 def test_schema_migration_and_models_create_both_tables(database) -> None:
-    table_names = set(inspect(database._engine).get_table_names())
+    inspector = inspect(database._engine)
+    table_names = set(inspector.get_table_names())
     assert {"scheduled_tasks", "scheduled_task_runs"}.issubset(table_names)
+    assert "execution_generation" in {
+        column["name"] for column in inspector.get_columns("scheduled_tasks")
+    }
+    assert {
+        "definition_schema_version",
+        "definition_generation",
+        "dispatch_token",
+        "dispatch_failure_count",
+        "notification_status",
+        "notification_channels_json",
+        "notification_failed_channels_json",
+    }.issubset({
+        column["name"] for column in inspector.get_columns("scheduled_task_runs")
+    })
     assert TARGET_VERSION == SCHEDULED_TASK_SCHEMA_MIGRATION.id
     with database.get_session() as session:
         applied = session.execute(
@@ -283,14 +340,34 @@ def test_stock_market_must_match_trading_calendar(database) -> None:
         service.create_task(contract, now=NOW)
 
 
-def test_daily_schedule_selects_second_fall_back_fold_after_first_passed() -> None:
+@pytest.mark.parametrize(
+    ("after", "expected"),
+    [
+        (
+            datetime(2026, 11, 1, 5, 29, tzinfo=timezone.utc),
+            datetime(2026, 11, 1, 5, 30),
+        ),
+        (
+            datetime(2026, 11, 1, 5, 30, tzinfo=timezone.utc),
+            datetime(2026, 11, 2, 6, 30),
+        ),
+        (
+            datetime(2026, 11, 1, 6, 15, tzinfo=timezone.utc),
+            datetime(2026, 11, 2, 6, 30),
+        ),
+    ],
+)
+def test_daily_schedule_uses_only_first_fall_back_fold_per_local_date(
+    after,
+    expected,
+) -> None:
     result = next_daily_run_at(
         schedule_time="01:30",
         timezone_name="America/New_York",
-        after=datetime(2026, 11, 1, 6, 15, tzinfo=timezone.utc),
+        after=after,
     )
 
-    assert result == datetime(2026, 11, 1, 6, 30)
+    assert result == expected
 
 
 def test_daily_schedule_skips_nonexistent_spring_forward_wall_time() -> None:
@@ -353,6 +430,10 @@ def test_due_occurrence_dispatches_once_and_persists_success(database) -> None:
     completed = service.get_status(task["id"])["latest_run"]
     assert completed["status"] == "succeeded"
     assert completed["attempt_count"] == 1
+    assert completed["dispatch_failure_count"] == 0
+    assert completed["notification_status"] == "not_requested"
+    assert completed["notification_channels"] == []
+    assert completed["notification_failed_channels"] == []
     assert completed["result_refs"] == [
         f"result-{completed['execution_task_ids'][0]}"
     ]
@@ -1044,3 +1125,357 @@ def test_retry_wait_is_interrupted_when_process_local_execution_is_lost(
     assert interrupted["attempt_count"] == 1
     assert interrupted["error_code"] == "scheduled_task_execution_state_lost"
     assert restarted_queue.retry_calls == waiting["execution_task_ids"]
+
+
+def test_fall_back_schedule_claims_only_one_run_for_local_date(database) -> None:
+    queue = FakeTaskQueue()
+    service = build_service(database, queue)
+    contract = task_contract(policy="run")
+    contract["schedule"].update({
+        "time": "01:30",
+        "timezone": "America/New_York",
+        "calendar_market": "us",
+    })
+    contract["payload"]["stock_code"] = "AAPL"
+    task = service.create_task(
+        contract,
+        now=datetime(2026, 11, 1, 5, 29),
+    )
+
+    service.tick(now=datetime(2026, 11, 1, 5, 30))
+    running = service.get_status(task["id"])["latest_run"]
+    queue.set_status(running["execution_task_ids"][0], TaskStatus.COMPLETED)
+    service.tick(now=datetime(2026, 11, 1, 6, 30))
+
+    status = service.get_status(task["id"])
+    assert status["latest_run"]["status"] == "succeeded"
+    assert service.list_runs(task["id"])["total"] == 1
+    assert status["task"]["next_run_at"] == datetime(
+        2026,
+        11,
+        2,
+        6,
+        30,
+        tzinfo=timezone.utc,
+    )
+
+
+def test_disable_and_reenable_does_not_revive_old_retry_wait(database) -> None:
+    queue = FakeTaskQueue(initial_status=TaskStatus.FAILED)
+    service = build_service(database, queue)
+    task = service.create_task(task_contract(max_attempts=2), now=NOW)
+    service.tick(now=DUE)
+    waiting = service.get_status(task["id"])["latest_run"]
+    assert waiting["status"] == "retry_wait"
+
+    service.set_enabled(task["id"], False, now=DUE + timedelta(seconds=1))
+    service.set_enabled(task["id"], True, now=DUE + timedelta(seconds=2))
+    service.tick(now=DUE + timedelta(seconds=30))
+
+    interrupted = service.get_status(task["id"])["latest_run"]
+    assert interrupted["status"] == "interrupted"
+    assert interrupted["attempt_count"] == 1
+    assert interrupted["error_code"] == (
+        "scheduled_task_definition_changed_before_retry"
+    )
+    assert queue.retry_calls == []
+
+
+def test_disable_serializes_after_queue_admission_writer_fence(database) -> None:
+    queue = BlockingSubmitQueue()
+    service = build_service(database, queue)
+    task = service.create_task(task_contract(max_attempts=2), now=NOW)
+    errors = []
+    disable_done = threading.Event()
+    disable_sql_started = threading.Event()
+
+    def run_tick() -> None:
+        try:
+            service.tick(now=DUE)
+        except BaseException as exc:  # pragma: no cover - asserted below
+            errors.append(exc)
+
+    def disable() -> None:
+        try:
+            service.set_enabled(task["id"], False, now=DUE)
+        except BaseException as exc:  # pragma: no cover - asserted below
+            errors.append(exc)
+        finally:
+            disable_done.set()
+
+    tick_thread = threading.Thread(target=run_tick)
+    disable_thread = threading.Thread(target=disable)
+    tick_thread.start()
+    assert queue.entered.wait(timeout=5)
+
+    def observe_disable_sql(
+        _connection,
+        _cursor,
+        statement,
+        _parameters,
+        _context,
+        _executemany,
+    ) -> None:
+        normalized = statement.lower()
+        if (
+            normalized.lstrip().startswith("update scheduled_tasks set")
+            and "execution_generation" in normalized
+            and "enabled" in normalized
+        ):
+            disable_sql_started.set()
+
+    event.listen(database._engine, "before_cursor_execute", observe_disable_sql)
+    try:
+        disable_thread.start()
+        assert disable_sql_started.wait(timeout=5)
+        assert not disable_done.wait(timeout=0.2)
+        queue.release.set()
+        tick_thread.join(timeout=5)
+        disable_thread.join(timeout=5)
+    finally:
+        event.remove(database._engine, "before_cursor_execute", observe_disable_sql)
+
+    assert errors == []
+    assert not tick_thread.is_alive()
+    assert not disable_thread.is_alive()
+    assert len(queue.submit_calls) == 1
+    running = service.get_status(task["id"])["latest_run"]
+    assert running["status"] == "running"
+    assert service.get_task(task["id"])["enabled"] is False
+
+    queue.set_status(running["execution_task_ids"][0], TaskStatus.FAILED)
+    service.tick(now=DUE + timedelta(seconds=1))
+    interrupted = service.get_status(task["id"])["latest_run"]
+    assert interrupted["status"] == "interrupted"
+    assert queue.retry_calls == []
+
+
+def test_schema_change_before_writer_fence_prevents_queue_admission(
+    database,
+    monkeypatch,
+) -> None:
+    queue = FakeTaskQueue()
+    service = build_service(database, queue)
+    task = service.create_task(task_contract(), now=NOW)
+    fence_ready = threading.Event()
+    release_fence = threading.Event()
+    original_fence = service.repository.update_run_under_definition_fence
+
+    def delayed_fence(**kwargs):
+        fence_ready.set()
+        assert release_fence.wait(timeout=5)
+        return original_fence(**kwargs)
+
+    monkeypatch.setattr(
+        service.repository,
+        "update_run_under_definition_fence",
+        delayed_fence,
+    )
+    tick_thread = threading.Thread(target=lambda: service.tick(now=DUE))
+    tick_thread.start()
+    assert fence_ready.wait(timeout=5)
+    with database.get_session() as session:
+        row = session.get(ScheduledTaskRecord, task["id"])
+        row.schema_version = 2
+        row.payload_json = "not-v1-json"
+        session.commit()
+    release_fence.set()
+    tick_thread.join(timeout=5)
+
+    assert not tick_thread.is_alive()
+    assert queue.submit_calls == []
+    run = service.list_runs(task["id"])["items"][0]
+    assert run["status"] == "interrupted"
+    assert run["attempt_count"] == 0
+    assert run["error_code"] == "scheduled_task_schema_unsupported"
+
+
+def test_submit_rejection_is_bounded_without_consuming_attempts(database) -> None:
+    queue = RejectingSubmitQueue()
+    service = build_service(database, queue)
+    task = service.create_task(task_contract(max_attempts=1), now=NOW)
+
+    for seconds in (0, 30, 60):
+        service.tick(now=DUE + timedelta(seconds=seconds))
+
+    failed = service.get_status(task["id"])["latest_run"]
+    assert failed["status"] == "failed"
+    assert failed["attempt_count"] == 0
+    assert failed["dispatch_failure_count"] == 3
+    assert failed["execution_task_ids"] == []
+    assert failed["error_code"] == "scheduled_task_dispatch_failed"
+    assert len(queue.submit_calls) == 3
+
+
+def test_retry_rejection_is_bounded_without_consuming_new_attempts(database) -> None:
+    queue = RejectingRetryQueue(initial_status=TaskStatus.FAILED)
+    service = build_service(database, queue)
+    task = service.create_task(task_contract(max_attempts=3), now=NOW)
+
+    service.tick(now=DUE)
+    for seconds in (30, 60, 90):
+        service.tick(now=DUE + timedelta(seconds=seconds))
+
+    failed = service.get_status(task["id"])["latest_run"]
+    assert failed["status"] == "failed"
+    assert failed["attempt_count"] == 1
+    assert failed["dispatch_failure_count"] == 3
+    assert failed["execution_task_ids"] == ["execution-1"]
+    assert failed["error_code"] == "scheduled_task_retry_failed"
+    assert queue.retry_calls == ["execution-1"] * 3
+
+
+def test_retry_wait_without_due_time_is_not_admitted(database) -> None:
+    queue = FakeTaskQueue(initial_status=TaskStatus.FAILED)
+    service = build_service(database, queue)
+    task = service.create_task(task_contract(max_attempts=2), now=NOW)
+    service.tick(now=DUE)
+    with database.get_session() as session:
+        run = session.get(
+            ScheduledTaskRunRecord,
+            service.get_status(task["id"])["latest_run"]["id"],
+        )
+        run.next_attempt_at = None
+        session.commit()
+
+    service.tick(now=DUE + timedelta(seconds=30))
+
+    waiting = service.get_status(task["id"])["latest_run"]
+    assert waiting["status"] == "retry_wait"
+    assert waiting["attempt_count"] == 1
+    assert queue.retry_calls == []
+
+
+def test_uncertain_post_accept_transaction_never_replays_submission(
+    database,
+    monkeypatch,
+) -> None:
+    queue = FakeTaskQueue()
+    service = build_service(database, queue)
+    task = service.create_task(task_contract(), now=NOW)
+    original_fence = service.repository.update_run_under_definition_fence
+
+    def fail_after_acceptance(**kwargs):
+        update_factory = kwargs["update_factory"]
+
+        def uncertain_factory(task_row, run_row):
+            fields = update_factory(task_row, run_row)
+            assert fields["status"] == "running"
+            raise RuntimeError("database commit unavailable")
+
+        return original_fence(
+            **{**kwargs, "update_factory": uncertain_factory}
+        )
+
+    monkeypatch.setattr(
+        service.repository,
+        "update_run_under_definition_fence",
+        fail_after_acceptance,
+    )
+    service.tick(now=DUE)
+    reserved = service.get_status(task["id"])["latest_run"]
+    assert reserved["status"] == "dispatching"
+    assert reserved["attempt_count"] == 0
+    assert reserved["execution_task_ids"] == []
+    assert len(queue.submit_calls) == 1
+
+    service.tick(now=DUE + timedelta(seconds=1))
+
+    interrupted = service.get_status(task["id"])["latest_run"]
+    assert interrupted["status"] == "interrupted"
+    assert interrupted["error_code"] == "scheduled_task_dispatch_interrupted"
+    assert len(queue.submit_calls) == 1
+
+
+@pytest.mark.parametrize(
+    ("component", "expected"),
+    [
+        (
+            {"status": "ok", "details": {"channels": ["telegram"]}},
+            ("ok", ["telegram"], []),
+        ),
+        (
+            {
+                "status": "degraded",
+                "details": {
+                    "channels": ["telegram", "email"],
+                    "failed": ["email"],
+                },
+            },
+            ("degraded", ["telegram", "email"], ["email"]),
+        ),
+        (
+            {"status": "failed", "details": {"channels": ["wechat"]}},
+            ("failed", ["wechat"], ["wechat"]),
+        ),
+        (
+            {"status": "not_configured", "details": {"channels": ["report"]}},
+            ("not_configured", ["report"], []),
+        ),
+        (
+            {"status": "skipped", "details": {"channels": ["report"]}},
+            ("skipped", ["report"], []),
+        ),
+        (
+            {"status": "future", "details": {"channels": ["secret"]}},
+            ("unknown", [], []),
+        ),
+    ],
+)
+def test_success_persists_sanitized_notification_outcome(
+    database,
+    component,
+    expected,
+) -> None:
+    queue = FakeTaskQueue()
+    service = build_service(database, queue)
+    contract = task_contract()
+    contract["payload"]["notify"] = True
+    task = service.create_task(contract, now=NOW)
+    service.tick(now=DUE)
+    running = service.get_status(task["id"])["latest_run"]
+    queue.set_status(
+        running["execution_task_ids"][0],
+        TaskStatus.COMPLETED,
+        result={
+            "diagnostic_summary": {
+                "components": {"notification": component},
+            },
+        },
+    )
+
+    service.tick(now=DUE + timedelta(seconds=1))
+
+    succeeded = service.get_status(task["id"])["latest_run"]
+    assert succeeded["status"] == "succeeded"
+    assert succeeded["error_code"] is None
+    assert (
+        succeeded["notification_status"],
+        succeeded["notification_channels"],
+        succeeded["notification_failed_channels"],
+    ) == expected
+    assert queue.retry_calls == []
+
+
+def test_notification_channel_projection_is_bounded_and_keeps_failed_subset() -> None:
+    status, channels, failed = ScheduledTaskService._notification_outcome(
+        requested=True,
+        result={
+            "diagnostic_summary": {
+                "components": {
+                    "notification": {
+                        "status": "degraded",
+                        "details": {
+                            "channels": [f"channel-{index}" for index in range(20)],
+                            "failed": ["channel-19", "channel-1"],
+                        },
+                    },
+                },
+            },
+        },
+    )
+
+    assert status == "degraded"
+    assert len(channels) == 16
+    assert failed == ["channel-1"]
+    assert set(failed).issubset(channels)

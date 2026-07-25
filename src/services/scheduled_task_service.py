@@ -19,6 +19,7 @@ from src.core.trading_calendar import (
 from src.repositories.scheduled_task_repo import ScheduledTaskRepository
 from src.schemas.scheduled_task import (
     NonTradingDayPolicy,
+    SCHEDULED_NOTIFICATION_STATUSES,
     SCHEDULED_TASK_RETRY_DELAY_SECONDS,
     SCHEDULED_TASK_SCHEMA_VERSION,
     ScheduleKind,
@@ -31,15 +32,18 @@ from src.schemas.scheduled_task import (
     validate_daily_time,
     validate_timezone,
 )
+from src.services.run_diagnostics import sanitize_diagnostic_text
 from src.services.task_queue import DuplicateTaskError
 from src.services.stock_code_utils import resolve_index_stock_code_for_analysis
-from src.task_execution import TaskNotFoundError, TaskStatus
+from src.task_execution import TaskNotFoundError, TaskRetryInProgressError, TaskStatus
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
 _REPORT_TYPES = frozenset({"brief", "simple", "detailed", "full"})
 _MAX_ATTEMPTS = 3
+_MAX_DISPATCH_FAILURES = 3
+_MAX_NOTIFICATION_CHANNELS = 16
 
 
 class ScheduledTaskError(Exception):
@@ -102,6 +106,25 @@ def _json_list(raw_value: str, *, field_name: str) -> list[str]:
             f"Persisted {field_name} must be a list of non-empty strings"
         )
     return list(value)
+
+
+def _sanitized_channels(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    channels = []
+    seen = set()
+    for item in value:
+        if type(item) is not str:
+            continue
+        channel = sanitize_diagnostic_text(item, max_length=64)
+        channel = str(channel or "").strip()
+        if not channel or channel in seen:
+            continue
+        seen.add(channel)
+        channels.append(channel)
+        if len(channels) >= _MAX_NOTIFICATION_CHANNELS:
+            break
+    return channels
 
 
 class ScheduledTaskService:
@@ -222,6 +245,16 @@ class ScheduledTaskService:
             raise ScheduledTaskContractError(
                 "Persisted scheduled task enablement is inconsistent"
             )
+        try:
+            execution_generation = int(row.execution_generation)
+        except (TypeError, ValueError) as exc:
+            raise ScheduledTaskContractError(
+                "Persisted scheduled task execution generation is invalid"
+            ) from exc
+        if execution_generation < 1:
+            raise ScheduledTaskContractError(
+                "Persisted scheduled task execution generation is invalid"
+            )
         return normalized
 
     @classmethod
@@ -284,17 +317,67 @@ class ScheduledTaskService:
             raise ScheduledTaskContractError(
                 "Persisted scheduled task run attempt count is invalid"
             )
+        dispatch_failure_count = int(row.dispatch_failure_count)
+        if not 0 <= dispatch_failure_count <= _MAX_DISPATCH_FAILURES:
+            raise ScheduledTaskContractError(
+                "Persisted scheduled task run dispatch failure count is invalid"
+            )
+        try:
+            definition_schema_version = int(row.definition_schema_version)
+            definition_generation = int(row.definition_generation)
+        except (TypeError, ValueError) as exc:
+            raise ScheduledTaskContractError(
+                "Persisted scheduled task run definition snapshot is invalid"
+            ) from exc
+        if definition_schema_version < 1 or definition_generation < 1:
+            raise ScheduledTaskContractError(
+                "Persisted scheduled task run definition snapshot is invalid"
+            )
+        dispatch_token = row.dispatch_token
+        if status == ScheduledRunStatus.DISPATCHING:
+            if not isinstance(dispatch_token, str) or not dispatch_token:
+                raise ScheduledTaskContractError(
+                    "Persisted scheduled task dispatch reservation is invalid"
+                )
+        elif dispatch_token is not None:
+            raise ScheduledTaskContractError(
+                "Persisted scheduled task dispatch reservation is stale"
+            )
+        notification_status = row.notification_status
+        if (
+            notification_status is not None
+            and notification_status not in SCHEDULED_NOTIFICATION_STATUSES
+        ):
+            raise ScheduledTaskContractError(
+                "Persisted scheduled task notification status is invalid"
+            )
+        notification_channels = _json_list(
+            row.notification_channels_json,
+            field_name="notification_channels",
+        )
+        failed_notification_channels = _json_list(
+            row.notification_failed_channels_json,
+            field_name="notification_failed_channels",
+        )
+        if not set(failed_notification_channels).issubset(notification_channels):
+            raise ScheduledTaskContractError(
+                "Persisted scheduled task notification channels are invalid"
+            )
         return {
             "id": row.id,
             "task_id": row.task_id,
             "scheduled_for": cls._aware_or_none(row.scheduled_for),
             "status": status.value,
             "attempt_count": attempt_count,
+            "dispatch_failure_count": dispatch_failure_count,
             "execution_task_ids": execution_task_ids,
             "result_refs": _json_list(
                 row.result_refs_json,
                 field_name="result_refs",
             ),
+            "notification_status": notification_status,
+            "notification_channels": notification_channels,
+            "notification_failed_channels": failed_notification_channels,
             "error_code": row.error_code,
             "next_attempt_at": cls._aware_or_none(row.next_attempt_at),
             "started_at": cls._aware_or_none(row.started_at),
@@ -451,6 +534,7 @@ class ScheduledTaskService:
             {
                 "id": uuid.uuid4().hex,
                 "schema_version": normalized["schema_version"],
+                "execution_generation": 1,
                 "name": normalized["name"],
                 "task_type": normalized["task_type"],
                 "schedule_kind": normalized["schedule_kind"],
@@ -527,6 +611,7 @@ class ScheduledTaskService:
         row = self.repository.set_enabled(
             task_id,
             expected_schema_version=existing.schema_version,
+            expected_execution_generation=existing.execution_generation,
             enabled=bool(enabled),
             next_run_at=next_run,
             updated_at=now_value,
@@ -685,6 +770,9 @@ class ScheduledTaskService:
                         disabled = self.repository.set_enabled(
                             task.id,
                             expected_schema_version=task.schema_version,
+                            expected_execution_generation=(
+                                task.execution_generation
+                            ),
                             enabled=False,
                             next_run_at=None,
                             updated_at=now,
@@ -762,16 +850,24 @@ class ScheduledTaskService:
         run = self.repository.record_unmodified_interrupted_occurrence(
             task_id=task.id,
             expected_schema_version=task.schema_version,
+            expected_execution_generation=task.execution_generation,
             expected_next_run_at=scheduled_for,
             run_fields={
                 "id": uuid.uuid4().hex,
                 "task_id": task.id,
                 "scheduled_for": scheduled_for,
+                "definition_schema_version": task.schema_version,
+                "definition_generation": task.execution_generation,
+                "dispatch_token": None,
                 "status": ScheduledRunStatus.INTERRUPTED.value,
                 "attempt_count": 0,
+                "dispatch_failure_count": 0,
                 "execution_task_ids_json": "[]",
                 "owned_execution_task_ids_json": "[]",
                 "result_refs_json": "[]",
+                "notification_status": None,
+                "notification_channels_json": "[]",
+                "notification_failed_channels_json": "[]",
                 "error_code": "scheduled_task_schema_unsupported",
                 "next_attempt_at": None,
                 "started_at": None,
@@ -829,16 +925,24 @@ class ScheduledTaskService:
         run = self.repository.quarantine_due_task(
             task_id=task.id,
             expected_schema_version=task.schema_version,
+            expected_execution_generation=task.execution_generation,
             expected_next_run_at=scheduled_for,
             run_fields={
                 "id": uuid.uuid4().hex,
                 "task_id": task.id,
                 "scheduled_for": scheduled_for,
+                "definition_schema_version": task.schema_version,
+                "definition_generation": task.execution_generation,
+                "dispatch_token": None,
                 "status": ScheduledRunStatus.INTERRUPTED.value,
                 "attempt_count": 0,
+                "dispatch_failure_count": 0,
                 "execution_task_ids_json": "[]",
                 "owned_execution_task_ids_json": "[]",
                 "result_refs_json": "[]",
+                "notification_status": None,
+                "notification_channels_json": "[]",
+                "notification_failed_channels_json": "[]",
                 "error_code": "scheduled_task_definition_invalid",
                 "next_attempt_at": None,
                 "started_at": None,
@@ -899,20 +1003,29 @@ class ScheduledTaskService:
                 terminal_error = "scheduled_task_calendar_unavailable"
         run_id = uuid.uuid4().hex
         run_status = terminal_status or ScheduledRunStatus.DISPATCHING
+        dispatch_token = uuid.uuid4().hex if terminal_status is None else None
         run = self.repository.claim_due_occurrence(
             task_id=task.id,
             expected_schema_version=task.schema_version,
+            expected_execution_generation=task.execution_generation,
             expected_next_run_at=scheduled_for,
             next_run_at=next_run,
             run_fields={
                 "id": run_id,
                 "task_id": task.id,
                 "scheduled_for": scheduled_for,
+                "definition_schema_version": task.schema_version,
+                "definition_generation": task.execution_generation,
+                "dispatch_token": dispatch_token,
                 "status": run_status.value,
                 "attempt_count": 0,
+                "dispatch_failure_count": 0,
                 "execution_task_ids_json": "[]",
                 "owned_execution_task_ids_json": "[]",
                 "result_refs_json": "[]",
+                "notification_status": None,
+                "notification_channels_json": "[]",
+                "notification_failed_channels_json": "[]",
                 "error_code": terminal_error,
                 "next_attempt_at": None,
                 "started_at": None if terminal_status is not None else now,
@@ -926,19 +1039,71 @@ class ScheduledTaskService:
             return self._reclassify_due_after_cas_miss(task.id, now)
         if terminal_status is not None:
             return "skipped"
-        self._dispatch_run(run, task, now, contract=contract)
+        self._admit_run(run, now)
         return "claimed"
 
-    def _dispatch_run(
-        self,
-        run,
-        task,
+    @staticmethod
+    def _conflict_wait_fields(now: datetime) -> Dict[str, Any]:
+        return {
+            "status": ScheduledRunStatus.RETRY_WAIT.value,
+            "dispatch_token": None,
+            "error_code": "scheduled_task_execution_conflict",
+            "next_attempt_at": now
+            + timedelta(seconds=SCHEDULED_TASK_RETRY_DELAY_SECONDS),
+            "finished_at": None,
+            "updated_at": now,
+        }
+
+    @staticmethod
+    def _interrupted_admission_fields(
         now: datetime,
         *,
-        contract: Optional[Dict[str, Any]] = None,
-    ) -> None:
-        contract = contract or self._validate_persisted_task(task)
-        attempt_count = int(run.attempt_count) + 1
+        error_code: str,
+    ) -> Dict[str, Any]:
+        return {
+            "status": ScheduledRunStatus.INTERRUPTED.value,
+            "dispatch_token": None,
+            "error_code": error_code,
+            "next_attempt_at": None,
+            "finished_at": now,
+            "updated_at": now,
+        }
+
+    @staticmethod
+    def _dispatch_failure_fields(
+        run,
+        now: datetime,
+        *,
+        error_code: str,
+    ) -> Dict[str, Any]:
+        failure_count = int(run.dispatch_failure_count) + 1
+        terminal = failure_count >= _MAX_DISPATCH_FAILURES
+        return {
+            "status": (
+                ScheduledRunStatus.FAILED.value
+                if terminal
+                else ScheduledRunStatus.RETRY_WAIT.value
+            ),
+            "dispatch_token": None,
+            "dispatch_failure_count": failure_count,
+            "error_code": error_code,
+            "next_attempt_at": (
+                None
+                if terminal
+                else now + timedelta(seconds=SCHEDULED_TASK_RETRY_DELAY_SECONDS)
+            ),
+            "finished_at": now if terminal else None,
+            "updated_at": now,
+        }
+
+    @staticmethod
+    def _running_admission_fields(
+        run,
+        now: datetime,
+        *,
+        execution_id: str,
+        owned: bool,
+    ) -> Dict[str, Any]:
         execution_history = _json_list(
             run.execution_task_ids_json,
             field_name="execution_task_ids",
@@ -947,137 +1112,379 @@ class ScheduledTaskService:
             run.owned_execution_task_ids_json,
             field_name="owned_execution_task_ids",
         )
-        dispatched_ids: list[str] = []
-        try:
-            payload = contract["payload"]
-            accepted, duplicates = self._queue().submit_tasks_batch(
-                stock_codes=[str(payload["stock_code"])],
-                query_source="scheduled_task",
-                report_type=str(payload.get("report_type") or "detailed"),
-                notify=bool(payload.get("notify", True)),
-            )
-            if len(accepted) + len(duplicates) != 1:
-                raise ScheduledTaskContractError(
-                    "Scheduled stock analysis did not resolve one execution task"
-                )
-            owned_ids = [accepted_task.task_id for accepted_task in accepted]
-            coalesced_ids: list[str] = []
-            if duplicates:
-                duplicate = duplicates[0]
-                if duplicate.existing_contract != duplicate.requested_contract:
-                    self.repository.update_run(
-                        run.id,
-                        {
-                            "status": ScheduledRunStatus.RETRY_WAIT.value,
-                            "error_code": "scheduled_task_execution_conflict",
-                            "next_attempt_at": now
-                            + timedelta(
-                                seconds=SCHEDULED_TASK_RETRY_DELAY_SECONDS
-                            ),
-                            "updated_at": now,
-                        },
-                    )
-                    return
-                coalesced_ids = [duplicate.existing_task_id]
-            dispatched_ids = owned_ids + coalesced_ids
-            execution_ids = execution_history + dispatched_ids
-            all_owned_ids = owned_history + owned_ids
-            updated = self.repository.update_run(
-                run.id,
-                {
-                    "status": ScheduledRunStatus.RUNNING.value,
-                    "attempt_count": attempt_count,
-                    "execution_task_ids_json": json.dumps(execution_ids),
-                    "owned_execution_task_ids_json": json.dumps(all_owned_ids),
-                    "error_code": None,
-                    "next_attempt_at": None,
-                    "started_at": run.started_at or now,
-                    "updated_at": now,
-                },
-            )
-            if updated is None:
-                raise ScheduledTaskContractError(
-                    "Scheduled task run disappeared during dispatch"
-                )
-            self._reconcile_run(updated, task, now)
-        except Exception as exc:  # broad-exception: fallback_recorded - dispatch failure is persisted with bounded retry state.
-            log_safe_exception(
-                logger,
-                "Scheduled task dispatch failed",
-                exc,
-                error_code="scheduled_task_dispatch_failed",
-                context={"run_id": run.id, "task_id": run.task_id},
-            )
-            if dispatched_ids:
-                self._finish_run(
-                    run.id,
-                    status=ScheduledRunStatus.INTERRUPTED,
-                    now=now,
-                    error_code="scheduled_task_dispatch_state_lost",
-                    attempt_count=attempt_count,
-                )
-            elif attempt_count < int(task.max_attempts):
-                self.repository.update_run(
-                    run.id,
-                    {
-                        "status": ScheduledRunStatus.RETRY_WAIT.value,
-                        "attempt_count": attempt_count,
-                        "execution_task_ids_json": json.dumps(execution_history),
-                        "owned_execution_task_ids_json": json.dumps(owned_history),
-                        "error_code": "scheduled_task_dispatch_failed",
-                        "next_attempt_at": now
-                        + timedelta(seconds=SCHEDULED_TASK_RETRY_DELAY_SECONDS),
-                        "updated_at": now,
-                    },
-                )
-            else:
-                self._finish_run(
-                    run.id,
-                    status=ScheduledRunStatus.FAILED,
-                    now=now,
-                    error_code="scheduled_task_dispatch_failed",
-                    attempt_count=attempt_count,
-                )
+        return {
+            "status": ScheduledRunStatus.RUNNING.value,
+            "dispatch_token": None,
+            "attempt_count": int(run.attempt_count) + 1,
+            "execution_task_ids_json": json.dumps(
+                execution_history + [execution_id]
+            ),
+            "owned_execution_task_ids_json": json.dumps(
+                owned_history + ([execution_id] if owned else [])
+            ),
+            "error_code": None,
+            "next_attempt_at": None,
+            "started_at": run.started_at or now,
+            "finished_at": None,
+            "updated_at": now,
+        }
 
-    def _reconcile_run(self, run, task, now: datetime) -> None:
-        status = ScheduledRunStatus(run.status)
-        if status == ScheduledRunStatus.DISPATCHING:
+    def _admit_run(self, run, now: datetime) -> None:
+        """Resolve one reserved occurrence to a durable queue execution identity."""
+        dispatch_token = str(run.dispatch_token or "")
+        if not dispatch_token:
             self._finish_run(
                 run.id,
                 status=ScheduledRunStatus.INTERRUPTED,
                 now=now,
-                error_code="scheduled_task_dispatch_interrupted",
+                error_code="scheduled_task_dispatch_reservation_invalid",
             )
+            return
+        queue = self._queue()
+
+        def update_factory(task, current_run) -> Dict[str, Any]:
+            try:
+                contract = self._validate_persisted_task(task)
+            except ScheduledTaskContractError as exc:
+                task.enabled = False
+                task.execution_generation = int(task.execution_generation) + 1
+                task.next_run_at = None
+                task.updated_at = now
+                log_safe_exception(
+                    logger,
+                    "Scheduled task definition disabled before queue admission",
+                    exc,
+                    error_code="scheduled_task_definition_quarantined",
+                    context={"task_id": task.id, "run_id": current_run.id},
+                    level=logging.WARNING,
+                )
+                return self._interrupted_admission_fields(
+                    now,
+                    error_code="scheduled_task_definition_invalid",
+                )
+
+            if int(current_run.attempt_count) >= int(task.max_attempts):
+                return {
+                    **self._interrupted_admission_fields(
+                        now,
+                        error_code="scheduled_task_execution_attempts_exhausted",
+                    ),
+                    "status": ScheduledRunStatus.FAILED.value,
+                }
+
+            execution_history = _json_list(
+                current_run.execution_task_ids_json,
+                field_name="execution_task_ids",
+            )
+            owned_history = set(_json_list(
+                current_run.owned_execution_task_ids_json,
+                field_name="owned_execution_task_ids",
+            ))
+            retry_owned_execution = bool(
+                execution_history and execution_history[-1] in owned_history
+            )
+
+            if retry_owned_execution:
+                try:
+                    retry_nowait = getattr(queue, "retry_nowait", None)
+                    execution_id = (
+                        retry_nowait(execution_history[-1])
+                        if callable(retry_nowait)
+                        else queue.retry(execution_history[-1])
+                    )
+                except TaskRetryInProgressError:
+                    return self._conflict_wait_fields(now)
+                except DuplicateTaskError as exc:
+                    if exc.existing_contract != exc.requested_contract:
+                        return self._conflict_wait_fields(now)
+                    execution_id = exc.existing_task_id
+                    owned = False
+                except TaskNotFoundError:
+                    return self._interrupted_admission_fields(
+                        now,
+                        error_code="scheduled_task_execution_state_lost",
+                    )
+                except Exception as exc:  # broad-exception: fallback_recorded - canonical retry rejection is persisted and retried independently from execution attempts.
+                    log_safe_exception(
+                        logger,
+                        "Scheduled task retry admission failed",
+                        exc,
+                        error_code="scheduled_task_retry_failed",
+                        context={
+                            "run_id": current_run.id,
+                            "task_id": current_run.task_id,
+                        },
+                    )
+                    return self._dispatch_failure_fields(
+                        current_run,
+                        now,
+                        error_code="scheduled_task_retry_failed",
+                    )
+                else:
+                    owned = True
+                if not isinstance(execution_id, str) or not execution_id:
+                    return self._interrupted_admission_fields(
+                        now,
+                        error_code="scheduled_task_retry_state_lost",
+                    )
+                return self._running_admission_fields(
+                    current_run,
+                    now,
+                    execution_id=execution_id,
+                    owned=owned,
+                )
+
+            payload = contract["payload"]
+            try:
+                accepted, duplicates = queue.submit_tasks_batch(
+                    stock_codes=[str(payload["stock_code"])],
+                    query_source="scheduled_task",
+                    report_type=str(payload.get("report_type") or "detailed"),
+                    notify=bool(payload.get("notify", True)),
+                )
+            except Exception as exc:  # broad-exception: fallback_recorded - canonical batch submission rolls back rejected queue state.
+                log_safe_exception(
+                    logger,
+                    "Scheduled task dispatch admission failed",
+                    exc,
+                    error_code="scheduled_task_dispatch_failed",
+                    context={
+                        "run_id": current_run.id,
+                        "task_id": current_run.task_id,
+                    },
+                )
+                return self._dispatch_failure_fields(
+                    current_run,
+                    now,
+                    error_code="scheduled_task_dispatch_failed",
+                )
+
+            accepted = list(accepted or [])
+            duplicates = list(duplicates or [])
+            if len(accepted) + len(duplicates) != 1:
+                if accepted:
+                    return self._interrupted_admission_fields(
+                        now,
+                        error_code="scheduled_task_dispatch_state_lost",
+                    )
+                return self._dispatch_failure_fields(
+                    current_run,
+                    now,
+                    error_code="scheduled_task_dispatch_failed",
+                )
+            if duplicates:
+                duplicate = duplicates[0]
+                if duplicate.existing_contract != duplicate.requested_contract:
+                    return self._conflict_wait_fields(now)
+                execution_id = duplicate.existing_task_id
+                owned = False
+            else:
+                execution_id = accepted[0].task_id
+                owned = True
+            if not isinstance(execution_id, str) or not execution_id:
+                return self._interrupted_admission_fields(
+                    now,
+                    error_code="scheduled_task_dispatch_state_lost",
+                )
+            return self._running_admission_fields(
+                current_run,
+                now,
+                execution_id=execution_id,
+                owned=owned,
+            )
+
+        try:
+            result = self.repository.update_run_under_definition_fence(
+                run_id=run.id,
+                expected_schema_version=SCHEDULED_TASK_SCHEMA_VERSION,
+                expected_dispatch_token=dispatch_token,
+                allowed_run_statuses=[ScheduledRunStatus.DISPATCHING.value],
+                now=now,
+                update_factory=update_factory,
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - a durable dispatch reservation prevents blind replay after an uncertain commit.
+            log_safe_exception(
+                logger,
+                "Scheduled task admission transaction failed closed",
+                exc,
+                error_code="scheduled_task_admission_state_uncertain",
+                context={"run_id": run.id, "task_id": run.task_id},
+            )
+            return
+
+        if result.outcome == "applied":
+            if (
+                result.run is not None
+                and result.task is not None
+                and result.run.status == ScheduledRunStatus.RUNNING.value
+            ):
+                self._reconcile_run(result.run, result.task, now)
+            return
+        self._finalize_admission_fence_miss(
+            run,
+            dispatch_token=dispatch_token,
+            outcome=result.outcome,
+            now=now,
+        )
+
+    def _finalize_admission_fence_miss(
+        self,
+        run,
+        *,
+        dispatch_token: str,
+        outcome: str,
+        now: datetime,
+    ) -> None:
+        execution_ids = _json_list(
+            run.execution_task_ids_json,
+            field_name="execution_task_ids",
+        )
+        phase = "retry" if execution_ids else "dispatch"
+        error_codes = {
+            "task_missing": "scheduled_task_definition_missing",
+            "schema_changed": "scheduled_task_schema_unsupported",
+            "generation_changed": f"scheduled_task_definition_changed_before_{phase}",
+            "disabled": f"scheduled_task_disabled_before_{phase}",
+        }
+        error_code = error_codes.get(outcome)
+        if error_code is None:
+            return
+        self.repository.finalize_dispatch_reservation(
+            run_id=run.id,
+            dispatch_token=dispatch_token,
+            fields=self._interrupted_admission_fields(
+                now,
+                error_code=error_code,
+            ),
+        )
+
+    @staticmethod
+    def _notification_outcome(
+        *,
+        requested: bool,
+        result: Any,
+    ) -> tuple[str, list[str], list[str]]:
+        if not requested:
+            return "not_requested", [], []
+        if not isinstance(result, Mapping):
+            return "unknown", [], []
+        diagnostic_summary = result.get("diagnostic_summary")
+        if not isinstance(diagnostic_summary, Mapping):
+            return "unknown", [], []
+        components = diagnostic_summary.get("components")
+        if not isinstance(components, Mapping):
+            return "unknown", [], []
+        notification = components.get("notification")
+        if not isinstance(notification, Mapping):
+            return "unknown", [], []
+        status = notification.get("status")
+        if status not in SCHEDULED_NOTIFICATION_STATUSES - {"not_requested"}:
+            return "unknown", [], []
+        details = notification.get("details")
+        details = details if isinstance(details, Mapping) else {}
+        channels = _sanitized_channels(details.get("channels"))
+        failed_channels = _sanitized_channels(details.get("failed"))
+        if status == "failed" and not failed_channels:
+            failed_channels = list(channels)
+        elif status != "degraded":
+            failed_channels = []
+        for channel in failed_channels:
+            if (
+                channel not in channels
+                and len(channels) < _MAX_NOTIFICATION_CHANNELS
+            ):
+                channels.append(channel)
+        failed_channels = [
+            channel for channel in failed_channels if channel in channels
+        ]
+        return str(status), channels, failed_channels
+
+    def _completed_notification_fields(
+        self,
+        *,
+        queue: Any,
+        execution_id: str,
+        requested: bool,
+    ) -> Dict[str, Any]:
+        result = None
+        if requested:
+            accessor = getattr(queue, "get_task", None)
+            if callable(accessor):
+                try:
+                    task_info = accessor(execution_id)
+                    result = getattr(task_info, "result", None)
+                except Exception as exc:  # broad-exception: fallback_recorded - malformed or evicted full results degrade only the notification projection.
+                    log_safe_exception(
+                        logger,
+                        "Scheduled task notification result projection unavailable",
+                        exc,
+                        error_code="scheduled_task_notification_projection_failed",
+                        context={"execution_id": execution_id},
+                        level=logging.WARNING,
+                    )
+        status, channels, failed_channels = self._notification_outcome(
+            requested=requested,
+            result=result,
+        )
+        return {
+            "notification_status": status,
+            "notification_channels_json": json.dumps(channels),
+            "notification_failed_channels_json": json.dumps(failed_channels),
+        }
+
+    def _reconcile_run(self, run, task, now: datetime) -> None:
+        status = ScheduledRunStatus(run.status)
+        if status == ScheduledRunStatus.DISPATCHING:
+            dispatch_token = str(run.dispatch_token or "")
+            if dispatch_token:
+                self.repository.finalize_dispatch_reservation(
+                    run_id=run.id,
+                    dispatch_token=dispatch_token,
+                    fields=self._interrupted_admission_fields(
+                        now,
+                        error_code="scheduled_task_dispatch_interrupted",
+                    ),
+                )
+            else:
+                self._finish_run(
+                    run.id,
+                    status=ScheduledRunStatus.INTERRUPTED,
+                    now=now,
+                    error_code="scheduled_task_dispatch_interrupted",
+                )
             return
         if status == ScheduledRunStatus.RETRY_WAIT:
             execution_ids = _json_list(
                 run.execution_task_ids_json,
                 field_name="execution_task_ids",
             )
-            owned_ids = set(
-                _json_list(
-                    run.owned_execution_task_ids_json,
-                    field_name="owned_execution_task_ids",
-                )
-            )
+            phase = "retry" if execution_ids else "dispatch"
             if not bool(task.enabled):
                 self._finish_run(
                     run.id,
                     status=ScheduledRunStatus.INTERRUPTED,
                     now=now,
-                    error_code=(
-                        "scheduled_task_disabled_before_retry"
-                        if execution_ids
-                        else "scheduled_task_disabled_before_dispatch"
-                    ),
+                    error_code=f"scheduled_task_disabled_before_{phase}",
+                )
+                return
+            if int(task.execution_generation) != int(run.definition_generation):
+                self._finish_run(
+                    run.id,
+                    status=ScheduledRunStatus.INTERRUPTED,
+                    now=now,
+                    error_code=f"scheduled_task_definition_changed_before_{phase}",
                 )
                 return
             if run.next_attempt_at is not None and run.next_attempt_at > now:
                 return
-            if execution_ids and execution_ids[-1] in owned_ids:
-                self._retry_execution(run, task, now)
-            else:
-                self._dispatch_run(run, task, now)
+            dispatch_token = uuid.uuid4().hex
+            reserved = self.repository.reserve_run_admission(
+                run_id=run.id,
+                dispatch_token=dispatch_token,
+                now=now,
+            )
+            if reserved is not None:
+                self._admit_run(reserved, now)
             return
         if status != ScheduledRunStatus.RUNNING:
             return
@@ -1094,9 +1501,10 @@ class ScheduledTaskService:
                 error_code="scheduled_task_execution_contract_invalid",
             )
             return
+        queue = self._queue()
         try:
             current_execution_id = execution_ids[-1]
-            snapshot = self._queue().get(current_execution_id)
+            snapshot = queue.get(current_execution_id)
         except TaskNotFoundError:
             self._finish_run(
                 run.id,
@@ -1109,12 +1517,20 @@ class ScheduledTaskService:
         if not snapshot.status.terminal:
             return
         if snapshot.status == TaskStatus.COMPLETED:
+            contract = self._validate_persisted_task(task)
             result_refs = [snapshot.result_ref] if snapshot.result_ref else []
+            notification_fields = self._completed_notification_fields(
+                queue=queue,
+                execution_id=current_execution_id,
+                requested=bool(contract["payload"].get("notify", True)),
+            )
             self.repository.update_run(
                 run.id,
                 {
                     "status": ScheduledRunStatus.SUCCEEDED.value,
+                    "dispatch_token": None,
                     "result_refs_json": json.dumps(result_refs),
+                    **notification_fields,
                     "error_code": None,
                     "next_attempt_at": None,
                     "finished_at": now,
@@ -1131,6 +1547,14 @@ class ScheduledTaskService:
                 error_code="scheduled_task_disabled_before_retry",
             )
             return
+        if int(task.execution_generation) != int(run.definition_generation):
+            self._finish_run(
+                run.id,
+                status=ScheduledRunStatus.INTERRUPTED,
+                now=now,
+                error_code="scheduled_task_definition_changed_before_retry",
+            )
+            return
 
         owned_ids = set(
             _json_list(
@@ -1145,9 +1569,11 @@ class ScheduledTaskService:
                     run.id,
                     {
                         "status": ScheduledRunStatus.RETRY_WAIT.value,
+                        "dispatch_token": None,
                         "error_code": "scheduled_task_coalesced_execution_failed",
                         "next_attempt_at": now
                         + timedelta(seconds=SCHEDULED_TASK_RETRY_DELAY_SECONDS),
+                        "finished_at": None,
                         "updated_at": now,
                     },
                 )
@@ -1163,9 +1589,11 @@ class ScheduledTaskService:
                 run.id,
                 {
                     "status": ScheduledRunStatus.RETRY_WAIT.value,
+                    "dispatch_token": None,
                     "error_code": error_code,
                     "next_attempt_at": now
                     + timedelta(seconds=SCHEDULED_TASK_RETRY_DELAY_SECONDS),
+                    "finished_at": None,
                     "updated_at": now,
                 },
             )
@@ -1175,109 +1603,6 @@ class ScheduledTaskService:
                 status=ScheduledRunStatus.FAILED,
                 now=now,
                 error_code=error_code,
-            )
-
-    def _retry_execution(self, run, task, now: datetime) -> None:
-        execution_ids = _json_list(
-            run.execution_task_ids_json,
-            field_name="execution_task_ids",
-        )
-        owned_history = _json_list(
-            run.owned_execution_task_ids_json,
-            field_name="owned_execution_task_ids",
-        )
-        if not execution_ids or execution_ids[-1] not in set(owned_history):
-            self._finish_run(
-                run.id,
-                status=ScheduledRunStatus.FAILED,
-                now=now,
-                error_code="scheduled_task_retry_not_owned",
-            )
-            return
-        attempt_count = int(run.attempt_count) + 1
-        child_id: Optional[str] = None
-        try:
-            child_id = self._queue().retry(execution_ids[-1])
-            updated = self.repository.update_run(
-                run.id,
-                {
-                    "status": ScheduledRunStatus.RUNNING.value,
-                    "attempt_count": attempt_count,
-                    "execution_task_ids_json": json.dumps(execution_ids + [child_id]),
-                    "owned_execution_task_ids_json": json.dumps(
-                        owned_history + [child_id]
-                    ),
-                    "error_code": None,
-                    "next_attempt_at": None,
-                    "updated_at": now,
-                },
-            )
-            if updated is None:
-                raise ScheduledTaskContractError(
-                    "Scheduled task run disappeared during retry"
-                )
-            self._reconcile_run(updated, task, now)
-        except DuplicateTaskError as exc:
-            if exc.existing_contract != exc.requested_contract:
-                self.repository.update_run(
-                    run.id,
-                    {
-                        "status": ScheduledRunStatus.RETRY_WAIT.value,
-                        "error_code": "scheduled_task_execution_conflict",
-                        "next_attempt_at": now
-                        + timedelta(seconds=SCHEDULED_TASK_RETRY_DELAY_SECONDS),
-                        "updated_at": now,
-                    },
-                )
-                return
-            updated = self.repository.update_run(
-                run.id,
-                {
-                    "status": ScheduledRunStatus.RUNNING.value,
-                    "attempt_count": attempt_count,
-                    "execution_task_ids_json": json.dumps(
-                        execution_ids + [exc.existing_task_id]
-                    ),
-                    "owned_execution_task_ids_json": json.dumps(owned_history),
-                    "error_code": None,
-                    "next_attempt_at": None,
-                    "updated_at": now,
-                },
-            )
-            if updated is None:
-                raise ScheduledTaskContractError(
-                    "Scheduled task run disappeared during retry coalescing"
-                )
-            self._reconcile_run(updated, task, now)
-        except TaskNotFoundError:
-            self._finish_run(
-                run.id,
-                status=ScheduledRunStatus.INTERRUPTED,
-                now=now,
-                error_code="scheduled_task_execution_state_lost",
-            )
-        except Exception as exc:  # broad-exception: fallback_recorded - retry failure is terminal at the bounded attempt count.
-            log_safe_exception(
-                logger,
-                "Scheduled task retry failed",
-                exc,
-                error_code="scheduled_task_retry_failed",
-                context={"run_id": run.id, "task_id": run.task_id},
-            )
-            self._finish_run(
-                run.id,
-                status=(
-                    ScheduledRunStatus.INTERRUPTED
-                    if child_id is not None
-                    else ScheduledRunStatus.FAILED
-                ),
-                now=now,
-                error_code=(
-                    "scheduled_task_retry_state_lost"
-                    if child_id is not None
-                    else "scheduled_task_retry_failed"
-                ),
-                attempt_count=attempt_count,
             )
 
     def _finish_run(
@@ -1291,6 +1616,7 @@ class ScheduledTaskService:
     ) -> None:
         fields: Dict[str, Any] = {
             "status": status.value,
+            "dispatch_token": None,
             "error_code": error_code,
             "next_attempt_at": None,
             "finished_at": now,

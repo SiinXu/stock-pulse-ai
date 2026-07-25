@@ -161,9 +161,13 @@ RuntimeSchedulerService or standalone Scheduler -> ScheduledTaskService.tick()
 ```
 
 The persisted `ScheduledRun` status and execution-ID history describe one due
-occurrence; they do not own canonical task lifecycle. Exact coalescing, retry,
-and completion are observed through the process-local queue defined by ADR-004
-and the persisted boundary in
+occurrence; they do not own canonical task lifecycle. Definition generations
+prevent disable/re-enable ABA, and tokenized dispatch reservations place queue
+admission and durable execution identity inside one SQLite writer window.
+Accepted executions, admission failures, and sanitized notification outcomes
+remain separate audit dimensions. Exact coalescing, retry, and completion are
+observed through the process-local queue defined by ADR-004 and the persisted
+boundary in
 [ADR-008](adr/ADR-008-persisted-schedule-process-local-execution-boundary.md).
 Normal API and Desktop backends own one polling callback, while Docker's
 `--serve-only` server defers persisted execution to the analyzer process. See

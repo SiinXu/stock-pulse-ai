@@ -43,9 +43,20 @@ The boundary has these rules:
 - A corrupt current-version definition is not forward-compatible data. It is
   disabled and quarantined with one interrupted occurrence so invalid financial
   work cannot run.
-- Daily wall times enumerate both valid DST folds and skip a local date when the
-  wall time does not exist. Trading-session classification uses the exchange's
-  IANA timezone, independently of the schedule timezone.
+- Daily wall times select the earliest valid instant on a fall-back date, so a
+  definition runs at most once per schedule-local date. A local date is skipped
+  when its wall time does not exist. Trading-session classification uses the
+  exchange's IANA timezone, independently of the schedule timezone.
+- Every occurrence snapshots the understood schema and an internal execution
+  generation. Enable/disable transitions advance that generation, so an old
+  conflict or retry wait cannot resume after a disable/re-enable cycle.
+- Initial submission and retry first persist a tokenized `dispatching`
+  reservation. Queue admission then runs inside a SQLite `BEGIN IMMEDIATE`
+  writer window that rechecks schema, generation, enablement, reservation, and
+  run state before storing the accepted execution identity. Concurrent
+  definition writers therefore commit either before admission or after the
+  identity is durable. An uncertain database finalization leaves the reservation
+  fail-closed for interruption instead of replaying a possible side effect.
 - Queue coalescing requires equality of every result or side-effect input passed
   to `AnalysisService`, including request-context binding. An incompatible
   active stock task causes conflict waiting without consuming an execution
@@ -55,7 +66,12 @@ The boundary has these rules:
   that execution fails the occurrence is interrupted and cannot create another
   submission or retry side effect.
 - `max_attempts` bounds accepted or compatible execution attempts. It does not
-  count conflict probes that submit no work.
+  count conflict probes or queue admission failures that submit no work. Queue
+  admission failures use a separate bounded counter.
+- A completed canonical analysis remains a successful occurrence even when
+  notification delivery is failed or degraded. The run stores only a bounded,
+  sanitized notification status and channel projection; durable channel replay
+  requires a separate outbox design and never replays the whole analysis.
 
 Natural-language planning, general workflow orchestration, a distributed lease,
 multi-process execution recovery, and a second analysis pipeline remain out of
@@ -70,8 +86,9 @@ scope and require a separate decision.
 - Same-stock schedules serialize through the canonical queue; identical
   schedules share one compatible execution, while materially different analyses
   wait for their own execution instead of being reported as false successes.
-- DST and cross-timezone behavior is deterministic but can produce two runs on a
-  fall-back date and no run on a spring-forward date whose wall time is absent.
+- DST and cross-timezone behavior is deterministic: a fall-back date produces
+  at most one run at its earliest valid instant, while a spring-forward date has
+  no run when its wall time is absent.
 - Operators must run one scheduled-task owner for a database. Multi-owner or
   distributed execution would need leases, durable execution state, and another
   ADR.

@@ -191,6 +191,14 @@ class TaskRetryUnsupportedError(TaskExecutionError):
         super().__init__(f"Task has no retry factory: {task_id}")
 
 
+class TaskRetryInProgressError(TaskExecutionError):
+    error_code = "task_retry_in_progress"
+
+    def __init__(self, task_id: str):
+        self.task_id = task_id
+        super().__init__(f"Task retry admission is already in progress: {task_id}")
+
+
 class TaskQueueShutdownError(TaskExecutionError):
     error_code = "task_queue_shutdown"
 
@@ -384,6 +392,7 @@ __all__ = [
     "TaskIdempotencyConflictError",
     "TaskNotFoundError",
     "TaskQueueShutdownError",
+    "TaskRetryInProgressError",
     "TaskRetryNotAllowedError",
     "TaskRetryUnsupportedError",
     "TaskRunContext",

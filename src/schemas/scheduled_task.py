@@ -11,6 +11,15 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 SCHEDULED_TASK_SCHEMA_VERSION = 1
 SCHEDULED_TASK_POLL_INTERVAL_SECONDS = 30
 SCHEDULED_TASK_RETRY_DELAY_SECONDS = 30
+SCHEDULED_NOTIFICATION_STATUSES = frozenset({
+    "not_requested",
+    "ok",
+    "degraded",
+    "failed",
+    "skipped",
+    "not_configured",
+    "unknown",
+})
 _DAILY_TIME_PATTERN = re.compile(r"(?:[01]\d|2[0-3]):[0-5]\d")
 
 
@@ -111,8 +120,8 @@ def next_daily_run_at(
     wall_time = time(hour=hour, minute=minute)
 
     # A local wall time can map to two UTC instants during a fall-back fold, or
-    # to no instant during a spring-forward gap. Round-tripping each fold makes
-    # both cases explicit and keeps the returned occurrence strictly monotonic.
+    # to no instant during a spring-forward gap. A daily definition runs at most
+    # once per local date, so the earliest valid instant is canonical.
     for day_offset in range(4):
         wall_datetime = datetime.combine(
             local_after.date() + timedelta(days=day_offset),
@@ -128,7 +137,8 @@ def next_daily_run_at(
             round_trip = candidate_utc.astimezone(schedule_timezone)
             if round_trip.replace(tzinfo=None) == wall_datetime:
                 valid_instants.add(candidate_utc)
-        for candidate_utc in sorted(valid_instants):
+        if valid_instants:
+            candidate_utc = min(valid_instants)
             if candidate_utc > after_utc:
                 return candidate_utc.replace(tzinfo=None)
 
@@ -153,6 +163,7 @@ __all__ = [
     "SCHEDULED_TASK_POLL_INTERVAL_SECONDS",
     "SCHEDULED_TASK_RETRY_DELAY_SECONDS",
     "SCHEDULED_TASK_SCHEMA_VERSION",
+    "SCHEDULED_NOTIFICATION_STATUSES",
     "ScheduleKind",
     "ScheduledRunStatus",
     "ScheduledTaskType",

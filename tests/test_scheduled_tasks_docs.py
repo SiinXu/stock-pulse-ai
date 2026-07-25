@@ -45,11 +45,20 @@ def test_scheduled_task_topic_is_indexed_and_documents_runtime_boundaries() -> N
         "expected schema version",
         "after disable is interrupted",
         "SCHEDULE_ENABLED` settings may still start or rebuild",
+        "earliest valid UTC instant",
+        "execution generation",
+        "BEGIN IMMEDIATE",
+        "dispatch_failure_count",
+        "notification_failed_channels",
+        "does not change the occurrence from `succeeded`",
     ):
         assert required in topic
+    assert "both valid UTC instants are eligible" not in topic
     assert "amended by [ADR-008]" in adr
     assert "occurrence/audit projection" in schedule_adr
     assert "Amends: [ADR-004]" in schedule_adr
+    assert "at most once per schedule-local date" in schedule_adr
+    assert "never replays the whole analysis" in schedule_adr
     assert "ScheduledTaskService.tick()" in architecture
 
 

@@ -89,7 +89,7 @@ EXPECTED_SCHEMA_DEFINITIONS = (
     "ScheduledTaskRunRecord",
 )
 EXPECTED_SCHEMA_AST_HASH = (
-    "01ee2ba7403a278c66957f533b17a0447357ad34d7e9ce012ce037ba599d8ef3"
+    "0b983eec1e9de49dbadd68f92317d481b4f08bf00fa00db578341f74bea43921"
 )
 EXPECTED_SCHEMA_MODELS = (
     "DatabaseSchemaMigration",

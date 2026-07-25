@@ -53,9 +53,11 @@ ownership contracts below rather than introducing another scheduler.
 Times are stored as UTC-naive values under the repository's SQLite convention
 and returned by the API as UTC timestamps. The IANA timezone remains part of
 the definition, so daylight-saving changes are applied when calculating each
-next occurrence. During a fall-back fold, both valid UTC instants are eligible
-in chronological order. If the configured wall time does not exist during a
-spring-forward gap, that local date is skipped rather than silently shifted.
+next occurrence. During a fall-back fold, the earliest valid UTC instant is the
+only occurrence for that schedule-local date. If it has passed, the next local
+date is selected rather than running the second fold. If the configured wall
+time does not exist during a spring-forward gap, that local date is skipped
+rather than silently shifted.
 
 ## API
 
@@ -76,6 +78,9 @@ queue. A conflict-waiting occurrence that has not submitted or adopted a
 compatible execution is interrupted instead of dispatching after disable. An
 already submitted execution may finish and still record success, but a failure
 after disable is interrupted instead of creating a retry or resubmission.
+Each enable/disable transition advances an internal execution generation. A
+disable followed by re-enable therefore cannot revive an occurrence that was
+already waiting to dispatch or retry under the older definition state.
 
 Responses use a `compatibility` discriminator. Schema-v1 definitions return
 `supported` and the complete definition. An unknown future schema returns
@@ -105,15 +110,26 @@ quarantine occurrence. Enablement, supported claims, and v1 quarantine writes
 all compare the expected schema version in the same database statement; a CAS
 miss is re-read and reclassified before any later action.
 
+Each occurrence snapshots both the understood schema version and execution
+generation. Initial submission and every retry first persist a tokenized
+`dispatching` reservation. The service then acquires SQLite's writer lock with
+`BEGIN IMMEDIATE`, reloads the definition and run, rechecks schema, generation,
+enablement, token, and status, and admits queue work before storing the accepted
+execution identity in that same writer window. A concurrent disable or schema
+writer therefore commits either before queue admission, which prevents the
+side effect, or after the execution ID is durable. If database finalization is
+uncertain after queue acceptance, the reservation is interrupted on recovery
+and is not blindly replayed.
+
 The run statuses are:
 
 | Status | Meaning |
 | --- | --- |
-| `dispatching` | The occurrence is claimed but its canonical task ID is not yet durable. |
+| `dispatching` | A tokenized queue-admission reservation exists but its canonical task ID is not yet durable. |
 | `running` | The canonical analysis task is pending or processing. |
 | `retry_wait` | A failed compatible execution is waiting for retry, or an incompatible active stock task is waiting for a new submission probe after 30 seconds. |
 | `succeeded` | The canonical analysis completed; available result references are stored. |
-| `failed` | The bounded compatible execution attempts ended. |
+| `failed` | The compatible execution-attempt bound or separate queue-admission failure bound ended. |
 | `skipped` | The selected market was closed and policy was `skip`. |
 | `interrupted` | Execution identity, definition validity, or required calendar classification was unavailable; no blind dispatch occurs. |
 
@@ -137,15 +153,34 @@ else's task. Only a task ID created by the occurrence can use the queue's retry
 operation. `execution_task_ids` remains append-only audit history, with the last
 ID representing the execution currently being observed.
 
+`attempt_count` increases only when a newly accepted or exactly compatible
+coalesced execution ID is durable. Queue shutdown, executor rejection, and
+other admission failures do not consume analysis attempts; they increment the
+separate `dispatch_failure_count` and retry after 30 seconds, stopping after
+three admission failures. Incompatible duplicate probes consume neither
+counter. A missing process-local retry source is interrupted immediately
+because repeating that lookup cannot recover its execution state.
+
+Successful runs expose `notification_status`, `notification_channels`, and
+`notification_failed_channels`. `notify=false` records `not_requested`.
+Requested delivery records `ok`, `degraded`, `failed`, `skipped`,
+`not_configured`, or `unknown` from the canonical analysis diagnostic result.
+Only bounded sanitized status/channel evidence is stored; diagnostic messages
+and arbitrary result details are not copied into the schedule record. Delivery
+failure does not change the occurrence from `succeeded`, consume another
+analysis attempt, or replay the analysis. Durable per-channel replay is outside
+this phase and requires an outbox contract.
+
 The execution authority is process-local, as documented in
 [`task-execution-contract.md`](task-execution-contract.md) and
 [ADR-008](adr/ADR-008-persisted-schedule-process-local-execution-boundary.md).
 The durable
 occurrence claim prevents duplicate polling, but it does not claim distributed
 exactly-once execution. If a process exits after queue submission and before
-the task ID is stored, the run becomes `interrupted` and fails closed instead
-of blindly repeating a possibly completed side effect. Multi-worker scheduling
-requires a separate architecture decision and is out of scope.
+the task ID is stored, the durable dispatch reservation becomes `interrupted`
+and fails closed instead of blindly repeating a possibly completed side effect.
+The same rule applies to retry admission. Multi-worker scheduling requires a
+separate architecture decision and is out of scope.
 
 ## Trading Calendar Behavior
 
@@ -193,8 +228,10 @@ retry ownership remain process-local.
 ## Persistence And Rollback
 
 Migration `202607240002_scheduled_task_schema` adds `scheduled_tasks` and
-`scheduled_task_runs`. It is additive and preserves existing configuration,
-global schedule behavior, analysis history, and task-queue API fields.
+`scheduled_task_runs`, including internal definition snapshots, execution
+generation, dispatch reservations, admission-failure counts, and notification
+outcomes. It is additive and preserves existing configuration, global schedule
+behavior, analysis history, and task-queue API fields.
 
 The normal code rollback is to revert the feature PR. An older application will
 fail closed when it sees the unknown higher migration, so production rollback

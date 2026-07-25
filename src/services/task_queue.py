@@ -43,6 +43,7 @@ from src.task_execution import (
     TaskIdempotencyConflictError,
     TaskNotFoundError,
     TaskQueueShutdownError,
+    TaskRetryInProgressError,
     TaskRetryNotAllowedError,
     TaskRetryUnsupportedError,
     TaskRunContext,
@@ -1064,7 +1065,12 @@ class AnalysisTaskQueue:
             self._cleanup_old_tasks()
         return child_task_id
 
-    def retry(self, task_id: str) -> str:
+    def retry(
+        self,
+        task_id: str,
+        *,
+        wait_for_in_progress: bool = True,
+    ) -> str:
         """Retry a terminal task while coordinating concurrent callers."""
         waiter = False
         with self._data_lock:
@@ -1091,6 +1097,8 @@ class AnalysisTaskQueue:
                 reservation = _RetryReservation(child_task_id=uuid.uuid4().hex)
                 self._retry_reservations[task_id] = reservation
             else:
+                if not wait_for_in_progress:
+                    raise TaskRetryInProgressError(task_id)
                 waiter = True
 
         if waiter:
@@ -1137,6 +1145,10 @@ class AnalysisTaskQueue:
             raise
 
         return child_task_id
+
+    def retry_nowait(self, task_id: str) -> str:
+        """Retry without waiting behind another process-local admission owner."""
+        return self.retry(task_id, wait_for_in_progress=False)
     
     def _build_analysis_command(
         self,
