@@ -26,6 +26,10 @@ logger = logging.getLogger(__name__)
 class SkillRouter:
     """Select applicable skills for a given analysis context."""
 
+    def __init__(self, *, skill_manager=None, config=None) -> None:
+        self._skill_manager = skill_manager
+        self._config = config
+
     def select_skills(
         self,
         ctx: AgentContext,
@@ -36,13 +40,17 @@ class SkillRouter:
             logger.info("[SkillRouter] user-requested skills: %s", requested_skills)
             return requested_skills[:max_count]
 
-        routing_mode = self._get_routing_mode()
+        routing_mode = self._get_routing_mode(self._config)
         if routing_mode == "manual":
-            selected = self._get_manual_skills(max_count=max_count)
+            selected = self._get_manual_skills(
+                max_count=max_count,
+                config=self._config,
+                skill_manager=self._skill_manager,
+            )
             logger.info("[SkillRouter] manual mode — using skills: %s", selected)
             return selected
 
-        available_skills = self._get_available_skills()
+        available_skills = self._get_available_skills(self._skill_manager)
         skill_catalog = available_skills or None
         available_ids = {skill.name for skill in available_skills}
         regime = self._detect_regime(ctx)
@@ -100,11 +108,12 @@ class SkillRouter:
         return None
 
     @staticmethod
-    def _get_routing_mode() -> str:
+    def _get_routing_mode(config=None) -> str:
         try:
-            from src.config import get_config
+            if config is None:
+                from src.application_services import get_application_services
 
-            config = get_config()
+                config = get_application_services().config
             return getattr(config, "agent_skill_routing", "auto")
         except Exception as exc:
             log_safe_exception(
@@ -117,17 +126,17 @@ class SkillRouter:
             return "auto"
 
     @staticmethod
-    def _get_available_ids() -> set:
-        return {skill.name for skill in SkillRouter._get_available_skills()}
+    def _get_available_ids(skill_manager=None) -> set:
+        return {
+            skill.name
+            for skill in SkillRouter._get_available_skills(skill_manager)
+        }
 
     @staticmethod
-    def _get_available_skills() -> list:
+    def _get_available_skills(skill_manager=None) -> list:
         try:
-            from src.agent.factory import _SKILL_MANAGER_PROTOTYPE
-
-            if _SKILL_MANAGER_PROTOTYPE is not None:
-                return list(_SKILL_MANAGER_PROTOTYPE.list_skills())
-
+            if skill_manager is not None:
+                return list(skill_manager.list_skills())
             from src.agent.factory import get_skill_manager
 
             sm = get_skill_manager()
@@ -143,12 +152,19 @@ class SkillRouter:
             return []
 
     @classmethod
-    def _get_manual_skills(cls, max_count: int) -> List[str]:
+    def _get_manual_skills(
+        cls,
+        max_count: int,
+        *,
+        config=None,
+        skill_manager=None,
+    ) -> List[str]:
         configured: List[str] = []
         try:
-            from src.config import get_config
+            if config is None:
+                from src.application_services import get_application_services
 
-            config = get_config()
+                config = get_application_services().config
             configured = [
                 skill_id
                 for skill_id in getattr(config, "agent_skills", []) or []
@@ -164,7 +180,7 @@ class SkillRouter:
             )
             configured = []
 
-        available_skills = cls._get_available_skills()
+        available_skills = cls._get_available_skills(skill_manager)
         skill_catalog = available_skills or None
         available = {skill.name for skill in available_skills}
         selected = [skill_id for skill_id in configured if skill_id in available][:max_count]

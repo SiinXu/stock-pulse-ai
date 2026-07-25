@@ -25,6 +25,7 @@ Usage::
 
 import copy
 import logging
+import threading
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -46,6 +47,9 @@ _SENTINEL = object()
 # Track which custom_dir the prototype was built with so we can invalidate
 # the cache if AGENT_SKILL_DIR changes at runtime (e.g. via config reload).
 _SKILL_MANAGER_CUSTOM_DIR: object = _SENTINEL
+_SKILL_MANAGER_CATALOG_TOKEN: object = _SENTINEL
+_SKILL_MANAGER_CATALOG_GENERATION = -1
+_SKILL_MANAGER_CACHE_LOCK = threading.RLock()
 
 
 @dataclass
@@ -196,6 +200,29 @@ def get_tool_registry():
     return _TOOL_REGISTRY
 
 
+def build_declarative_skill_manager(config: Config):
+    """Build the existing built-in plus custom declarative Skill catalog."""
+
+    from src.agent.skills.base import SkillManager
+
+    skill_manager = SkillManager()
+    skill_manager.load_builtin_skills()
+
+    custom_dir = getattr(config, "agent_skill_dir", None)
+    if custom_dir:
+        try:
+            skill_manager.load_custom_skills(custom_dir)
+        except Exception as exc:  # broad-exception: fallback_recorded - built-in skills remain available.
+            log_safe_exception(
+                logger,
+                "Agent factory custom skill loading failed",
+                exc,
+                error_code="agent_factory_custom_skill_load_failed",
+                level=logging.WARNING,
+            )
+    return skill_manager
+
+
 def get_skill_manager(config: Optional[Config] = None):
     """Return a deepcopy-clone of the cached SkillManager prototype.
 
@@ -208,40 +235,52 @@ def get_skill_manager(config: Optional[Config] = None):
     (e.g. via the web settings reload), the prototype is rebuilt automatically.
     """
     global _SKILL_MANAGER_PROTOTYPE, _SKILL_MANAGER_CUSTOM_DIR
+    global _SKILL_MANAGER_CATALOG_TOKEN, _SKILL_MANAGER_CATALOG_GENERATION
 
+    from src.application_services import get_application_services
+
+    services = get_application_services()
     if config is None:
-        from src.config import get_config
-        config = get_config()
+        config = services.config
 
     current_custom_dir = getattr(config, "agent_skill_dir", None)
-    if _SKILL_MANAGER_PROTOTYPE is not None and current_custom_dir == _SKILL_MANAGER_CUSTOM_DIR:
-        return copy.deepcopy(_SKILL_MANAGER_PROTOTYPE)
+    plugin_snapshot = services.analysis_strategy_snapshot()
+    with _SKILL_MANAGER_CACHE_LOCK:
+        if (
+            _SKILL_MANAGER_PROTOTYPE is not None
+            and current_custom_dir == _SKILL_MANAGER_CUSTOM_DIR
+            and plugin_snapshot.catalog_token is _SKILL_MANAGER_CATALOG_TOKEN
+            and plugin_snapshot.generation == _SKILL_MANAGER_CATALOG_GENERATION
+        ):
+            return copy.deepcopy(_SKILL_MANAGER_PROTOTYPE)
 
-    from src.agent.skills.base import SkillManager
-
-    if _SKILL_MANAGER_PROTOTYPE is not None:
-        logger.info("[AgentFactory] SkillManager prototype invalidated (agent_skill_dir changed: %r -> %r)",
-                    _SKILL_MANAGER_CUSTOM_DIR, current_custom_dir)
-
-    skill_manager = SkillManager()
-    skill_manager.load_builtin_skills()
-
-    if current_custom_dir:
-        try:
-            skill_manager.load_custom_skills(current_custom_dir)
-        except Exception as exc:  # broad-exception: fallback_recorded - built-in skills remain available.
-            log_safe_exception(
-                logger,
-                "Agent factory custom skill loading failed",
-                exc,
-                error_code="agent_factory_custom_skill_load_failed",
-                level=logging.WARNING,
+        if _SKILL_MANAGER_PROTOTYPE is not None:
+            logger.info(
+                "[AgentFactory] SkillManager prototype invalidated by directory, root, or plugin generation"
             )
 
-    _SKILL_MANAGER_PROTOTYPE = skill_manager
-    _SKILL_MANAGER_CUSTOM_DIR = current_custom_dir
-    logger.info("[AgentFactory] SkillManager prototype cached (%d skills)", len(skill_manager._skills))
-    return copy.deepcopy(_SKILL_MANAGER_PROTOTYPE)
+        skill_manager = build_declarative_skill_manager(config)
+        for registration in plugin_snapshot.registrations:
+            definition = registration.definition
+            if skill_manager.get(definition.name) is not None:
+                logger.warning(
+                    "[AgentFactory] Plugin skill '%s' conflicts with the declarative catalog and was excluded",
+                    definition.name,
+                )
+                continue
+            skill_manager.register(
+                definition.to_skill(plugin_id=registration.plugin_id)
+            )
+
+        _SKILL_MANAGER_PROTOTYPE = skill_manager
+        _SKILL_MANAGER_CUSTOM_DIR = current_custom_dir
+        _SKILL_MANAGER_CATALOG_TOKEN = plugin_snapshot.catalog_token
+        _SKILL_MANAGER_CATALOG_GENERATION = plugin_snapshot.generation
+        logger.info(
+            "[AgentFactory] SkillManager prototype cached (%d skills)",
+            len(skill_manager._skills),
+        )
+        return copy.deepcopy(_SKILL_MANAGER_PROTOTYPE)
 
 
 def resolve_skill_prompt_state(
@@ -250,8 +289,9 @@ def resolve_skill_prompt_state(
 ) -> SkillPromptState:
     """Resolve active skills and prompt fragments for analyzer / agent entrypoints."""
     if config is None:
-        from src.config import get_config
-        config = get_config()
+        from src.application_services import get_application_services
+
+        config = get_application_services().config
 
     from src.agent.skills.defaults import (
         get_default_active_skill_ids,
@@ -325,8 +365,9 @@ def build_agent_executor(
         A ready-to-call :class:`src.agent.executor.AgentExecutor` instance.
     """
     if config is None:
-        from src.config import get_config
-        config = get_config()
+        from src.application_services import get_application_services
+
+        config = get_application_services().config
 
     arch = getattr(config, "agent_arch", "single")
 

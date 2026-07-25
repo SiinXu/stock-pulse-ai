@@ -15,8 +15,8 @@ right boundary.
 
 | Need | Choose | Current path | Boundary |
 | --- | --- | --- | --- |
-| Add investment criteria, prompt instructions, activation metadata, or declare existing tools required by a specialist without executing code | Skill / strategy package | Built-ins use `strategies/*.yaml`; custom definitions use top-level YAML or nested `SKILL.md` under `AGENT_SKILL_DIR` | Declarative input to the existing Skill runtime; `required_tools` narrows only an optional `SkillAgent` specialist, while imported `allowed_tools` is metadata rather than runtime access control |
-| Add reviewed Python behavior for one of the six official extension points below | System plugin | `PLUGINS_DIR` provides package discovery and lifecycle only; an application composition path must also bind `PluginManager` to the exact native registry described by the implementation-status table | Trusted in-process code; the default process binds Agent Tools, while every unbound or contract-only point remains unavailable at runtime |
+| Add investment criteria, prompt instructions, activation metadata, or declare existing tools required by a specialist without executing code | Skill / strategy package | Built-ins use the `strategies/` catalog; custom definitions use top-level YAML or nested `SKILL.md` under `AGENT_SKILL_DIR` | Declarative input to the existing Skill runtime; `required_tools` narrows only an optional `SkillAgent` specialist, while imported `allowed_tools` is metadata rather than runtime access control |
+| Add reviewed Python behavior for one of the six official extension points below | System plugin | `PLUGINS_DIR` provides package discovery and lifecycle only; an application composition path must also bind `PluginManager` to the exact native registry described by the implementation-status table | Trusted in-process code; the default process binds Agent Tools and Analysis Strategies, while every unbound or contract-only point remains unavailable at runtime |
 | Add UI components, Settings panels, custom commands, a remote marketplace, dependency installation, hot reload, a connector/MCP boundary, or another extension point | New design and ADR | Propose the authority, trust, compatibility, and lifecycle contract before implementation | Outside the version 1 plugin surface; do not route it through a nearby registration API |
 
 Skill packages are appropriate when an author only needs natural-language
@@ -30,7 +30,8 @@ behavior and an application composition path has bound the extension point's
 exact native registry. `PLUGINS_DIR` alone discovers and manages package
 lifecycle; it can activate only implementations whose point is bound by that
 composition root. The default process root binds Agent Tools to its cached
-`ToolRegistry`. Data Provider plugin execution still requires programmatic
+`ToolRegistry` and Analysis Strategies to its root-owned declarative catalog
+adapter. Data Provider plugin execution still requires programmatic
 composition with `PluginManager(registry=manager.plugin_registry)`. A listed
 but unbound point needs explicit wiring under the accepted contract, while a
 new surface requires an ADR instead of an implicit registry expansion.
@@ -47,7 +48,7 @@ new surface requires an ADR instead of an implicit registry expansion.
 | Plugin lifecycle, manifest, registry | `src/plugins/` core; Data Provider and Agent Tool native adapters wired, other points fail closed | #273 X2a core implemented |
 | Built-in/external startup wiring | `src/application_services.py` composition root | #273 X2b implemented |
 | Data Providers | `DataProvider`, `BaseFetcher`, and `DataFetcherManager` | #276 X3 native adapter implemented; caller must inject the target manager registry |
-| Analysis Strategies | `Skill`, `SkillManager`, `StrategyEngine` | Contract only in this batch |
+| Analysis Strategies | `Skill`, `SkillManager`, `StrategyEngine` | Default process definition adapter wired; `SkillManager` and `StrategyEngine` remain authoritative |
 | Agent Tools | `ToolDefinition`, `ToolRegistry`, Tool Surface | Default process adapter wired; strict registration validation remains fail-closed |
 | Notification Channels | `NotificationChannel`, sender mixins, `NotificationService` | Contract only in this batch |
 | Report Templates | `src/services/report_renderer.py`, `templates/report_*.j2` | Contract only in this batch |
@@ -164,8 +165,10 @@ including every `onunload()` callback, before a successor may start.
 
 The default lifecycle-style built-in catalog is configuration-gated. Existing
 Data Provider built-ins remain owned by each `DataFetcherManager`; the optional
-Kronos Agent Tool is added only when its explicit enable flag is true, while the
-other four extension points remain contract-only. `ApplicationServices`
+Kronos Agent Tool is added only when its explicit enable flag is true. Analysis
+Strategy registration is available without a built-in lifecycle plugin, while
+Notification Channels, Report Templates, and Event Hooks remain contract-only.
+`ApplicationServices`
 continues to accept an explicit built-in iterable for tests and composition
 callers. New built-ins must use that seam rather than a parallel startup hook.
 
@@ -183,12 +186,12 @@ Manifest `minAppVersion` is checked against the current released StockPulse
 compatibility line (`3.26.3` for this delivery). That value is maintained with
 the release line; it is not an operator override that can bypass compatibility.
 
-Default extension-point contracts enforce canonical identity but reject every
+Default extension-point contracts enforce canonical identity but reject an
 implementation until composition supplies that point's concrete validator.
 Identity alone is never treated as proof that an implementation satisfies its
-full protocol. The native adapters delivered by X2b, X3, or a later integration
-must inject the validator and optional native backend before registrations for
-that point can succeed.
+full protocol. The Analysis Strategy and Agent Tool bindings supply their
+validators in the default root; every remaining integration must inject its
+validator and optional native backend before registrations can succeed.
 
 ## Package And Manifest
 
@@ -544,9 +547,33 @@ gain a per-Skill tool allowlist, so a general tool-permission request cannot be
 implemented by authoring Skill YAML or `SKILL.md` alone.
 
 A plugin registers a definition. It does not replace `StrategyEngine`, write a
-consensus result directly, or bypass required-tool and policy checks. Existing
-custom skill directory loading remains a separate compatibility path until a
-later implementation intentionally routes it through the plugin registry.
+consensus result directly, or bypass required-tool and policy checks. The native
+adapter validates and detaches the mutable `Skill`, pins plugin provenance, and
+publishes it through the same generation-aware catalog used by Single-Agent
+prompt assembly, Multi-Agent routing, and `SkillAgent` construction.
+
+Built-ins still load through `SkillManager.load_builtin_skills()`. A configured
+`AGENT_SKILL_DIR` preserves top-level YAML/YML plus nested `SKILL.md` discovery,
+and a custom definition may still replace a built-in with the same name. A
+plugin may not replace a built-in, custom definition, or another plugin: initial
+collisions reject registration, while a later custom-directory collision keeps
+the custom definition and excludes the enabled plugin definition until the
+conflict is removed. Load, disable, enable, custom-directory changes, and root
+replacement invalidate the next catalog clone by root identity and generation.
+An in-flight clone remains stable.
+
+The default `ApplicationServices` root owns the paired native adapter and unified
+`PluginManager`. A caller supplying a custom manager must bind the exact
+`AnalysisStrategyRegistry` backend consumed by that manager. The root derives
+that backend or rejects an explicit mismatch instead of silently splitting
+lifecycle and catalog authority. No-argument catalog and router calls resolve
+the installed root's `config`. Explicit-config assembly passes its resolved
+manager and config into Multi-Agent routing and specialist construction, so the
+Single and Multi paths cannot silently switch catalogs.
+
+See the [Analysis Strategy Plugin Authoring Guide](analysis-strategy-plugin-authoring.md)
+for definition fields, load commands, precedence, diagnostics, tests, and the
+trust boundary.
 
 ### Agent Tools
 
