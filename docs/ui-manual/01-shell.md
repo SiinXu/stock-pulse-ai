@@ -61,7 +61,7 @@ flowchart TB
 | 导航名 | 路由 | 里面有什么 | 手册 |
 | --- | --- | --- | --- |
 | **首页** | `/` | 今日焦点、待办、配置缺口 | [02](02-home.md) |
-| **研究** | 组入口常到 `/research/market` | 见下表子菜单 | 03 / 04 / 09 / 12 |
+| **研究** | 组入口常到 `/research/market` | 见下表子菜单 | [03](03-analysis-workbench.md) / [04](04-market-review.md) / [09](09-backtest.md) |
 | **组合** | `/portfolio` | 持仓记账（页面标题常写「持仓」） | [07](07-portfolio.md) |
 | **Agent** | `/chat` | 问股多轮对话（页面标题常写「问股」） | [05](05-agent-chat.md) |
 | **设置** | `/settings` | 模型、数据源、通知、安全 | [10](10-settings.md) |
@@ -71,7 +71,7 @@ flowchart TB
 | 子项 | 路由 | 手册 |
 | --- | --- | --- |
 | 大盘复盘 | `/research/market` | [04](04-market-review.md) |
-| 发现 | `/research/discover` | `/research/discover` |
+| 发现 | `/research/discover` | 暂无分册；侧栏 **研究 → 发现**（旧 `/screening` 会重定向） |
 | 分析工作台 | `/research/analysis` | [03](03-analysis-workbench.md) |
 | 回测 | `/research/backtest` | [09](09-backtest.md) |
 
@@ -80,7 +80,7 @@ flowchart TB
 | 去哪 | 怎么进 |
 | --- | --- |
 | **信号中心** `/signals` | 通知铃、命令面板、首页焦点行；见 [06](06-signals.md) |
-| **个股工作区** `/stocks/代码` | 命令面板或外链；见 `/stocks/:code` |
+| **个股工作区** | 命令面板输入代码，或打开 `/stocks/<code>`（例如 `/stocks/600519`） |
 | **登录** `/login` | 开启管理员认证后；受保护页会带 `?redirect=` |
 
 旧路径如 `/decision-signals`、`/alerts`、`/backtest`、`/screening` 一般会重定向到新地址。

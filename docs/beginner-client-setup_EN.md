@@ -131,5 +131,5 @@ Export a config backup from Settings. On failure, import the backup, or reconfig
 | Goal | Doc |
 | --- | --- |
 | Learn the shell and daily path | [UI manual](ui-manual/README_EN.md) |
-| Deeper deploy / env (advanced) | [Full guide](full-guide.md) / [Full guide (EN)](full-guide_EN.md) if present |
+| Deeper deploy / env (advanced) | [Full guide (EN)](full-guide_EN.md) · [Full guide (ZH)](full-guide.md) |
 | LLM provider details | [LLM config guide (EN)](LLM_CONFIG_GUIDE_EN.md) |
