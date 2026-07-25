@@ -1,0 +1,22 @@
+{
+  "title": "StockPulse 界面操作手册",
+  "description": "Web / 桌面客户端界面操作说明（学习研究用途，不构成投资建议）",
+  "author": "StockPulse contributors",
+  "language": "zh-hans",
+  "root": ".",
+  "structure": {
+    "readme": "README.md",
+    "summary": "SUMMARY.md"
+  },
+  "plugins": [],
+  "pluginsConfig": {},
+  "variables": {
+    "product": "StockPulse"
+  },
+  "links": {
+    "sidebar": {
+      "GitHub 仓库": "https://github.com/SiinXu/stock-pulse-ai",
+      "文档中心": "../INDEX.md"
+    }
+  }
+}

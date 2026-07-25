@@ -24,7 +24,7 @@
 | --- | --- |
 | [README](../README.md) | 项目定位、核心能力、快速开始、推送效果 |
 | [小白客户端安装与配置](beginner-client-setup.md) | 面向不会代码用户的客户端下载、Anspire Open / AIHubMix 模型配置、新闻源配置和常见问题；[English](beginner-client-setup_EN.md) |
-| [界面操作手册](ui-manual/README.md) | Web / 桌面分模块界面用法（不含部署）；[English](ui-manual/README_EN.md)；截图规范 [assets](ui-manual/assets/README.md) |
+| [界面操作手册](ui-manual/README.md) | Web / 桌面分模块界面用法（不含部署）；[English](ui-manual/README_EN.md)；GitBook/Honkit 预览见 [GITBOOK.md](ui-manual/GITBOOK.md)；截图规范 [assets](ui-manual/assets/README.md) |
 | [完整配置与部署指南](full-guide.md) | 环境准备、运行方式、配置说明、部署路径和常见问题 |
 | [FAQ](FAQ.md) | 常见配置、模型、通知、部署和运行问题 |
 | [持久安全审计 Phase 1（英文）](security-audit.md) | 事件合同、代表性特权路径、管理员查询、保留、失败语义与回滚 |

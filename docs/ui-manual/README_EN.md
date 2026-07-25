@@ -42,6 +42,7 @@ Most people only need **01 + 02 + 03 + 08 + 11** in the first week.
 | [04 Market review](04-market-review_EN.md) | Trigger review, read review history |
 | [12 Discover](12-discover_EN.md) | AlphaSift screening, hotspots, candidates → analysis (experimental) |
 | [13 Stock workspace](13-stock-details_EN.md) | `/stocks/:code` quotes & K-lines; jump to analyze / watchlist / rules |
+| [14 Settings fields](14-settings-fields_EN.md) | Field help quick reference (see Chinese tables for full wording) |
 | [05 Agent chat](05-agent-chat_EN.md) | Multi-turn Q&A and strategy selection |
 | [06 Signal center](06-signals_EN.md) | Suggestion pool, rules, delivery, review (**not** in primary sidebar; bell / palette / `/signals`) |
 | [07 Portfolio](07-portfolio_EN.md) | Sidebar Portfolio; accounts, bookkeeping, import, risk, one-click analysis |
@@ -86,3 +87,7 @@ Most people only need **01 + 02 + 03 + 08 + 11** in the first week.
 - Modules 01–13 cover all primary business routes; 03/05/06/07/10 include deep operational maps against large page implementations. Field-level detail continues as product PRs land; binary screenshots pending [assets/README.md](assets/README.md) (#599).
 
 **Disclaimer**: Output is for learning and research only and is not investment advice.
+
+## Preview (GitBook-compatible)
+
+Local Honkit preview: see [GITBOOK.md](GITBOOK.md).

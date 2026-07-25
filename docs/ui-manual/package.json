@@ -1,0 +1,13 @@
+{
+  "name": "stockpulse-ui-manual-book",
+  "private": true,
+  "description": "GitBook/Honkit build for the StockPulse UI operation manual",
+  "scripts": {
+    "build": "honkit build . ../../.gitbook-ui-manual-site",
+    "serve": "honkit serve . --port 4000",
+    "pdf": "honkit pdf . ../../.gitbook-ui-manual.pdf"
+  },
+  "devDependencies": {
+    "honkit": "^6.0.0"
+  }
+}

@@ -26,7 +26,7 @@ This is the entry point for project documentation. The README covers the project
 | --- | --- |
 | [README (EN)](README_EN.md) | Project overview, key features, quick start, sample output |
 | [Beginner client setup (EN)](beginner-client-setup_EN.md) | Download desktop client, Anspire/AIHubMix keys, watchlist, first analysis; [中文](beginner-client-setup.md) |
-| [UI User Manual](ui-manual/README_EN.md) | Modular Web/desktop UI usage (no deployment); [简体中文](ui-manual/README.md); figure pack [assets](ui-manual/assets/README.md) |
+| [UI User Manual](ui-manual/README_EN.md) | Modular Web/desktop UI usage (no deployment); [简体中文](ui-manual/README.md); Honkit/GitBook preview [GITBOOK.md](ui-manual/GITBOOK.md); figure pack [assets](ui-manual/assets/README.md) |
 | [Full Guide (EN)](full-guide_EN.md) | Environment setup, run modes, configuration, deployment paths, and common issues |
 | [FAQ (EN)](FAQ_EN.md) | Common configuration, model, notification, deployment, and runtime issues |
 | [Data-source Priority, Health, and Degradation](data-source-stability_EN.md) | Static/realtime priority, health scoring, adaptive ordering, fallback chains, deployment profiles, and troubleshooting |

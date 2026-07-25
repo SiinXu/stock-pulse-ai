@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Docs] Completed the UI operation manual set (modules 01–14, bilingual), added a settings field quick-reference generated from in-app help, and added Honkit/GitBook-compatible preview scaffolding under `docs/ui-manual/`.
 - [Docs] Rewrote core UI-manual chapters in a friendlier, more detailed tutorial voice (Home, Workbench, Agent chat, Signal Center, Portfolio, Reading reports, Settings), keeping concrete routes and step-by-step guidance.
 - [Docs] Continued UI-manual depth pass: stock workspace chapter (13), login/shell paths, and deep operational maps for workbench, Agent chat, Signal Center, portfolio, and settings aligned to live page controls.
 - [Docs] Completed sequential UI-manual expansion: deepened Home and report-reading chapters; added Discover/AlphaSift chapter (12); documented figure-pack naming under `docs/ui-manual/assets/`; added English beginner client setup guide pairing the Chinese install path.

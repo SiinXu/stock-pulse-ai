@@ -100,3 +100,9 @@ docs/specs/
 
 # ignore local screenshots / one-off visual evidence
 /*.png
+
+# UI manual Honkit/GitBook local build
+.gitbook-ui-manual-site/
+.gitbook-ui-manual.pdf
+docs/ui-manual/node_modules/
+docs/ui-manual/_book/

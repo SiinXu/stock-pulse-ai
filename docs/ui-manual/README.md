@@ -48,6 +48,7 @@ flowchart LR
 | [04 大盘复盘](04-market-review.md) | 触发复盘、阅读复盘历史 |
 | [12 发现](12-discover.md) | AlphaSift 选股、热点题材、候选转分析（实验能力） |
 | [13 个股工作区](13-stock-details.md) | `/stocks/:code` 报价与 K 线、转分析/自选/规则 |
+| [14 设置字段速查](14-settings-fields.md) | 设置页字段帮助汇总表（查字典） |
 | [05 问股对话](05-agent-chat.md) | Agent 多轮追问与策略选择 |
 | [06 信号中心](06-signals.md) | AI 建议池、告警规则、推送历史与再评估（**不在一级侧栏**；铃铛 / 命令面板 / `/signals`） |
 | [07 持仓](07-portfolio.md) | 侧栏「组合」；账户、记账、导入、风险与一键分析 |
@@ -93,3 +94,7 @@ flowchart LR
 - **有 UI / 路由 / 文案变更的 PR**：同一变更列车内检查并更新对应 `docs/ui-manual/*` 分册与本 README 导航表；中英成对修改。
 - 对照源码时优先核对：`apps/dsa-web/src/routing/routes.ts`、`components/layout/navigation.ts`、`i18n/uiText.ts`、设置 IA `settingsInformationArchitecture.ts`、选股文案 `locales/screening.ts`。
 - 扩写进度：01–13 分册已覆盖全部主业务路由；03/05/06/07/10 含「深度操作」对照上千行页面实现。仍持续按 PR 增量补字段级细节；截图二进制待 [assets/README.md](assets/README.md)（#599）。
+
+## 在线 / 本地预览（GitBook 兼容）
+
+本目录可用 Honkit（GitBook 兼容）本地预览，说明见 [GITBOOK.md](GITBOOK.md)。
