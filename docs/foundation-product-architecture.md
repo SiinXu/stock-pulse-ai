@@ -141,6 +141,10 @@ is authoritative:
 
 Do not infer a file's license from whether it is called foundation or product,
 or from its directory. When provenance is uncertain, resolve it before merging.
+For classification rules, default SPDX headers, inventory triggers, and the
+progressive coverage checklist, follow
+[license-ownership-inventory.md](license-ownership-inventory.md). That document
+is a maintainer process, not a claim that every path has been audited.
 
 ## Keeping This Policy Current
 

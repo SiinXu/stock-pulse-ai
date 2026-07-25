@@ -82,6 +82,7 @@ This is the entry point for project documentation. The README covers the project
 | [Business Architecture](business-architecture.md) | Stakeholders, business capabilities, outcomes, and the value flow from evidence acquisition to notification |
 | [Technical Architecture](architecture-overview.md) | Current components, entrypoints, ownership boundaries, process modes, cache/fallback branches, and the eight-stage analysis data flow |
 | [Foundation Pipeline And Product Layer](foundation-product-architecture.md) | Responsibility tracks, interaction boundaries, contribution placement, upstream porting, and license provenance |
+| [MIT / AGPL File Ownership Inventory Process](license-ownership-inventory.md) | Classification rules, SPDX defaults, inventory template, and progressive coverage reporting (not a completed full-repo audit) |
 | [ADR Registry And Process](adr/README.md) | Decision numbering, statuses, template, significant-PR consideration, and historical records |
 | [API Spec](architecture/api_spec.json) | FastAPI OpenAPI artifact |
 | [Contributing Guide (EN)](CONTRIBUTING_EN.md) | Issues, pull requests, tests, documentation sync, and collaboration expectations |
