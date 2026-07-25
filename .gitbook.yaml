@@ -1,0 +1,13 @@
+# GitBook.com Git Sync configuration
+# Target site (organization editor):
+#   https://app.gitbook.com/o/JMiVv6cqssblgINpUvgv/sites/site_gPScy
+#
+# When connecting GitHub → Git Sync for this repository, point the Space/site
+# content root at the UI operation manual folder below.
+
+root: ./docs/ui-manual/
+
+# Optional: keep GitBook from treating unrelated paths as docs
+structure:
+  readme: README.md
+  summary: SUMMARY.md
