@@ -1,6 +1,6 @@
 # 通知能力基线
 
-本文档记录通知能力 P0-P7 终态：渠道、配置 key、GitHub Actions 映射、Web 设置元数据、CLI 诊断口径、Web 一键测试、自定义 Webhook Body 模板语义、通知路由策略、降噪机制、聚合报告失败隔离、ntfy / Gotify 一等渠道、WebPush / Apprise 评估，以及本地 / Docker / GitHub Actions / Desktop 场景化配置说明。P0 只做基线与只读诊断；P1 增加 Web 单渠道真实测试；P2 产品化现有 Body 模板；P3 增加 report / alert / system_error 路由；P4 增加进程内降噪；P5 强化测试诊断和聚合报告逐渠道失败隔离；P6-A 新增 ntfy；P6-C 新增 Gotify；P6-D 只评估 WebPush / Apprise；P7 收口文档与 Actions env 对照表自动化，不新增运行时依赖、配置入口、per-URL 模板、跨进程持久化、真实每日摘要或重试循环。
+本文档记录通知能力 P0-P7 终态及可信通知插件接线：渠道、配置 key、GitHub Actions 映射、Web 设置元数据、CLI 诊断口径、Web 一键测试、自定义 Webhook Body 模板语义、通知路由策略、降噪机制、聚合报告失败隔离、ntfy / Gotify 一等渠道、WebPush / Apprise 评估，以及本地 / Docker / GitHub Actions / Desktop 场景化配置说明。P0 只做基线与只读诊断；P1 增加 Web 单渠道真实测试；P2 产品化现有 Body 模板；P3 增加 report / alert / system_error 路由；P4 增加进程内降噪；P5 强化测试诊断和聚合报告逐渠道失败隔离；P6-A 新增 ntfy；P6-C 新增 Gotify；P6-D 只评估 WebPush / Apprise；P7 收口文档与 Actions env 对照表自动化，不新增运行时依赖、配置入口、per-URL 模板、跨进程持久化、真实每日摘要或重试循环。
 
 ## 渠道基线
 
@@ -20,6 +20,7 @@
 | Discord | 静态配置 | `DISCORD_WEBHOOK_URL` 或 `DISCORD_BOT_TOKEN` + `DISCORD_MAIN_CHANNEL_ID` | `DISCORD_INTERACTIONS_PUBLIC_KEY` | Webhook 与 Bot 均可启用发送 |
 | Slack | 静态配置 | `SLACK_WEBHOOK_URL` 或 `SLACK_BOT_TOKEN` + `SLACK_CHANNEL_ID` | - | Bot 优先用于文本与图片同频道发送 |
 | AstrBot | 静态配置 | `ASTRBOT_URL` | `ASTRBOT_TOKEN`, `WEBHOOK_VERIFY_SSL` | `ASTRBOT_TOKEN` 可选 |
+| 可信插件 adapter | 系统插件 | `PLUGINS_DIR` 指向插件父目录 | 现有 `NOTIFICATION_*_CHANNELS` 可引用其 canonical ID | 默认进程只加载显式 opt-in 的同进程 Python 插件；不提供 sandbox、依赖安装、远程 marketplace 或设置 UI |
 | `UNKNOWN` | 兜底枚举 | - | - | 仅为未知渠道兜底，不由静态环境变量启用 |
 | 钉钉会话 | 运行时上下文 | - | - | 从来源消息上下文提取，无法仅由 `.env` 静态判断 |
 | 飞书会话 | 运行时上下文 | - | - | 从来源消息上下文提取，交互式命令结果仅回到来源会话 |
@@ -216,17 +217,29 @@ P3 新增三类通知路由配置：
 | `alert` | `NOTIFICATION_ALERT_CHANNELS` | EventMonitor 触发通知 |
 | `system_error` | `NOTIFICATION_SYSTEM_ERROR_CHANNELS` | 预留能力；当前不新增自动系统错误生产者 |
 
-配置值为逗号分隔渠道枚举：`wechat,feishu,telegram,email,pushover,ntfy,gotify,pushplus,serverchan3,custom,discord,slack,astrbot`。
+配置值为逗号分隔渠道 ID。内置 ID 为 `wechat,feishu,dingtalk,telegram,email,pushover,ntfy,gotify,pushplus,serverchan3,custom,discord,slack,astrbot`；运行时还接受当前 enabled 插件注册的 canonical ID。
 
 - 留空或未配置：保持旧行为，发送到所有已配置静态渠道。
 - 非空：只发送到路由列表与已配置渠道的交集；交集为空时不会 fallback 到全渠道。
 - `send_to_context()` 不受路由限制，机器人会话上下文仍会收到触发任务的回复。
-- Web 设置页的路由下拉只列出已配置成功的渠道（存量已保存但对应渠道未配置的值仍会显示并可取消勾选）；未配置任何渠道时展示引导入口，可跳转到「通知渠道」页完成配置。
+- Web 设置页的路由下拉只列出已配置成功的内置渠道（存量已保存但对应渠道未配置的值仍会显示并可取消勾选）；本轮不新增插件设置 UI，插件 ID 由运维通过现有环境配置维护。未配置任何内置渠道时展示引导入口，可跳转到「通知渠道」页完成配置。
 - `GET /api/v1/system/config` 使用通知运行时的唯一权威 `NotificationService.detect_configured_channels`，从当前 live `Config` 快照计算 `configured_notification_channels`，不会从已保存值、展示值或 `******` 掩码重建第二份通知配置。因此 `reload_now=false` 只写入 `.env` 时，该状态会保持旧运行时值，直到显式重载；进程环境、`.env` 优先级和 `DISCORD_CHANNEL_ID` 等兼容别名也与实际运行时完全一致。Web 只消费该只读状态，不再重复推断凭据组或解析 ntfy / Gotify URL。旧后端未返回该字段时，Web 为兼容滚动升级将状态标为未知：暂不按已配置渠道过滤，继续展示完整渠道目录并保留已有选择；后端明确返回空列表时仍按“没有已配置渠道”处理。畸形 ntfy / Gotify authority、userinfo、端口或 NFKC 字符会关闭式判为未配置，不会令配置读取失败，也不会在响应或日志中回显原始 URL。
 - 交互式命令（钉钉会话、飞书会话、Telegram）带有来源上下文时，会跳过 `FEISHU_WEBHOOK_URL` 等静态通知渠道；`SCHEDULE`、CLI、API 或无来源上下文的任务仍按 report 路由发送。
 - 路由过滤发生在 Markdown 转图片前，`MARKDOWN_TO_IMAGE_CHANNELS` 只对路由后的渠道子集生效。
 - `MERGE_EMAIL_NOTIFICATION` 不需要额外配置；只要 `email` 仍在 report 路由后的渠道中，现有合并邮件行为保持不变。
-- `--check-notify` 会把未知渠道值报为 error，把合法但未启用的路由目标报为 warning。
+- `--check-notify` 使用当前插件生命周期快照并直接显示 canonical ID、display name 与状态：未知、disabled、failed 或 unloaded 插件 ID 报 error；enabled 但 unavailable 的插件目标报 warning；enabled 且 available 的插件 ID 计入已配置渠道。内置与插件 ID 混用时不会把插件 ID 强制转换为内置枚举。
+
+## 可信插件通知渠道
+
+`notification_channel` 系统插件复用 `PluginManager` 生命周期和唯一的 `NotificationService` 分发链，不建立第二套路由或 sender authority。插件用 `context.register("notification_channel", canonical_id, factory)` 注册 factory；factory 接收当前 `Config`，返回带有同一 `channel_id`、`display_name`、`is_available()` 和 `send(request)` 的 adapter。可直接运行的最小包见 [`examples/plugins/example-notification-channel/`](../examples/plugins/example-notification-channel/README.md)。
+
+每次发送先取得 root-owned dispatch lease，冻结 enabled adapter tuple，再分别判断 availability，并用“内置 routable ID + 本次 enabled 插件 ID”冻结 route allowlist。aggregate 路径直接用同一 retained snapshot 同时决定本路由是否存在可投递目标和实际目标，不会先通过独立的 `is_available()` 预检释放一次 lease。空路由仍发送到全部 available 渠道；非空路由只保留 configured、enabled、available 的交集，交集为空不会 fallback 到 broadcast。并发 disable、replace、reset 或 close 会等待所有已进入的发送快照结束后才执行 `onunload()`。adapter 在本次发送线程中请求 disable 时，`PluginOperationResult` 返回 `success=False, deferred=True` 与当前 state；同线程 root 替换请求返回时只表示已入队，尚未切换 root。deferred 请求会在所有已进入的 lease（包括同线程嵌套发送）退出后执行，并在此前阻止任何新快照进入。当同时存在其他已进入的发送时，发起请求的发送可以先返回，所以 `deferred=True` 不表示卸载已完成。因此已冻结目标不漏发、不重复，下一个快照不再包含已移除 adapter。
+
+route、降噪、Markdown 图片准备、计时、错误映射和 attempt 聚合仍由 core 负责。adapter 只接收这些决策之后构造的 immutable `NotificationRequest`；返回的 `NotificationAdapterResult` 会映射到既有 `ChannelAttemptResult`，aggregate 路径也会保留 error code、retryable 与脱敏 diagnostics，并对成功或不可重试的 attempt 做物理发送防重。availability 异常或非法返回只记录脱敏日志并从本次 target snapshot 排除，不生成发送 attempt；send 异常、非法结果或失败返回才生成脱敏 attempt，并继续后续渠道，不改变分析成功标准。canonical ID 与内置或其他插件重名会在 factory 执行前关闭式拒绝；v1 factory 可以是接收一个 `Config` 的普通函数或 adapter class，额外参数可以是 optional/variadic，但 core 的既定调用不得要求更多参数。返回 adapter 的 `channel_id` 必须与 registration ID 相同，display name 及 `is_available()`/`send(request)` 签名会在 publication 前校验。native adapter 还必须以 canonical ID 和每次 native publication 独有的不透明 owner token，与 PluginManager 中 lifecycle-stable 的 enabled registration 精确配对后才会进入发送快照；因此即使替代注册复用同一 ID 和同一个 factory/class，旧 owner 也不能误接入尚在 `onload()` 或最终加载失败的新 adapter。`--check-notify` 在 manager 提交前同样不会把 pending adapter 报告为 enabled；disable/unload 会通过既有 owner handle 清理 adapter。
+
+`NotificationService` 的 Config 与 notification registry 来自同一个已安装 `ApplicationServices` 快照。仅用于报告渲染的 service 构造保持惰性，不会为了检查插件而安装或启动默认 root；首次 availability、route 或 send 操作才绑定投递 runtime，并关闭式拒绝与 service Config 不同的并发安装 root。adapter 在每次 enable 时取得该 root 当时的 Config。默认 root 的 `Config.reset_instance()` 会影响之后构造的 service，但不会暗中替换已经发布的 adapter；先 disable 再 enable 会用重载后的 Config 重建 adapter。显式注入 Config 的 root 始终保留该对象，进程全局 Config reset 不会改写它。
+
+外部插件是与 StockPulse 进程等价权限的受信任 Python 代码。配置 `PLUGINS_DIR` 即表示显式信任目录中的代码；当前没有 sandbox、远程安装或 marketplace。adapter 若使用用户可影响的网络 endpoint，必须复用中央 outbound policy/安全 HTTP helper，不得自行绕过 allowlist。示例 `example_log` 只记录 route、长度、股票数量和图片存在性，不记录正文、不访问网络，也不需要 secret。
 
 ## 聚合报告失败隔离
 

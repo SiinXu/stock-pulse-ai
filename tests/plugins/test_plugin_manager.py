@@ -273,10 +273,15 @@ def test_enabled_registrations_wait_for_disable_and_exclude_unloading_plugin() -
     plugin = BlockingUnloadPlugin(_manifest("blocking-unload"), ("daily",))
     assert manager.register(plugin, source="builtin").success is True
     assert manager.load("blocking-unload").success is True
+    assert [
+        registration.registration_id
+        for registration in manager.enabled_registrations_snapshot()
+    ] == ["daily"]
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         disable_future = executor.submit(manager.disable, "blocking-unload")
         assert unload_started.wait(timeout=2)
+        assert manager.enabled_registrations_snapshot() == ()
         snapshot_future = executor.submit(
             manager.enabled_registrations,
             "report_template",

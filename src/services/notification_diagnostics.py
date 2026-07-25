@@ -27,6 +27,14 @@ from src.notification_sender.ntfy_sender import resolve_ntfy_endpoint
 KeyTier = Literal["minimal", "advanced"]
 IssueSeverity = Literal["error", "warning", "info"]
 ChannelKind = Literal["configured", "fallback", "context"]
+PluginChannelState = Literal[
+    "available",
+    "enabled_unavailable",
+    "disabled",
+    "failed",
+    "unloaded",
+    "unknown",
+]
 
 
 @dataclass(frozen=True)
@@ -63,6 +71,15 @@ class NotificationDiagnosticIssue:
 
 
 @dataclass(frozen=True)
+class NotificationPluginChannelStatus:
+    """Safe canonical identity and lifecycle state for CLI output."""
+
+    channel_id: str
+    display_name: str
+    state: PluginChannelState
+
+
+@dataclass(frozen=True)
 class NotificationDiagnosticResult:
     """Structured notification diagnostic result."""
 
@@ -70,6 +87,7 @@ class NotificationDiagnosticResult:
     errors: Tuple[NotificationDiagnosticIssue, ...]
     warnings: Tuple[NotificationDiagnosticIssue, ...]
     info: Tuple[NotificationDiagnosticIssue, ...]
+    plugin_channels: Tuple[NotificationPluginChannelStatus, ...] = ()
 
     @property
     def ok(self) -> bool:
@@ -311,10 +329,77 @@ def _require_pair(
         )
 
 
-def run_notification_diagnostics(config: Config) -> NotificationDiagnosticResult:
+def run_notification_diagnostics(
+    config: Config,
+    *,
+    enabled_plugin_channels: Sequence[str] = (),
+    available_plugin_channels: Sequence[str] = (),
+    plugin_channel_states: Sequence[NotificationPluginChannelStatus] = (),
+) -> NotificationDiagnosticResult:
     """Run read-only diagnostics for notification configuration."""
 
-    configured = tuple(channel.value for channel in NotificationService.detect_configured_channels(config))
+    enabled_plugins = tuple(dict.fromkeys(enabled_plugin_channels))
+    available_plugins = tuple(
+        dict.fromkeys(
+            channel
+            for channel in available_plugin_channels
+            if channel in enabled_plugins
+        )
+    )
+    plugin_states = list(plugin_channel_states)
+    known_state_ids = {entry.channel_id for entry in plugin_states}
+    for channel_id in enabled_plugins:
+        if channel_id in known_state_ids:
+            continue
+        plugin_states.append(
+            NotificationPluginChannelStatus(
+                channel_id=channel_id,
+                display_name=channel_id,
+                state=(
+                    "available"
+                    if channel_id in available_plugins
+                    else "enabled_unavailable"
+                ),
+            )
+        )
+        known_state_ids.add(channel_id)
+
+    configured_route_tokens = tuple(
+        dict.fromkeys(
+            channel
+            for route_config in NOTIFICATION_ROUTE_CONFIGS.values()
+            for channel in (
+                getattr(config, route_config["config_attr"], []) or []
+            )
+        )
+    )
+    for channel_id in configured_route_tokens:
+        if (
+            channel_id in ROUTABLE_NOTIFICATION_CHANNELS
+            or channel_id in known_state_ids
+        ):
+            continue
+        plugin_states.append(
+            NotificationPluginChannelStatus(
+                channel_id=channel_id,
+                display_name=channel_id,
+                state="unknown",
+            )
+        )
+        known_state_ids.add(channel_id)
+    configured = tuple(
+        dict.fromkeys(
+            (
+                *(
+                    channel.value
+                    for channel in NotificationService.detect_configured_channels(
+                        config
+                    )
+                ),
+                *available_plugins,
+            )
+        )
+    )
     errors: List[NotificationDiagnosticIssue] = []
     warnings: List[NotificationDiagnosticIssue] = []
     info: List[NotificationDiagnosticIssue] = [
@@ -329,6 +414,19 @@ def run_notification_diagnostics(config: Config) -> NotificationDiagnosticResult
             "通知诊断会检查渠道基线、只读诊断、Web 测试、P3 路由配置、P4 降噪配置和 P6 ntfy/Gotify 渠道。",
         ),
     ]
+
+    for plugin_state in plugin_states:
+        if plugin_state.state == "enabled_unavailable":
+            warnings.append(
+                _issue(
+                    "warning",
+                    "plugin_channel_unavailable",
+                    (
+                        f"插件通知渠道 {plugin_state.channel_id} 已启用但当前不可用；"
+                        "本次诊断不会将其计入可发送渠道。"
+                    ),
+                )
+            )
 
     if not configured:
         errors.append(
@@ -477,7 +575,15 @@ def run_notification_diagnostics(config: Config) -> NotificationDiagnosticResult
         if not route_channels:
             continue
 
-        valid_channels, invalid_channels = split_notification_route_channels(route_channels)
+        allowed_channels = tuple(
+            dict.fromkeys(
+                (*ROUTABLE_NOTIFICATION_CHANNELS, *enabled_plugins)
+            )
+        )
+        valid_channels, invalid_channels = split_notification_route_channels(
+            route_channels,
+            allowed_channels=allowed_channels,
+        )
         if invalid_channels:
             errors.append(
                 _issue(
@@ -485,7 +591,7 @@ def run_notification_diagnostics(config: Config) -> NotificationDiagnosticResult
                     "invalid_route_channel",
                     (
                         f"{route_config['env_key']} 包含未知通知渠道: {', '.join(invalid_channels)}；"
-                        f"允许值: {', '.join(ROUTABLE_NOTIFICATION_CHANNELS)}。"
+                        f"允许值: {', '.join(allowed_channels)}。"
                     ),
                     key=route_config["env_key"],
                 )
@@ -563,6 +669,7 @@ def run_notification_diagnostics(config: Config) -> NotificationDiagnosticResult
         errors=tuple(errors),
         warnings=tuple(warnings),
         info=tuple(info),
+        plugin_channels=tuple(plugin_states),
     )
 
 
@@ -584,13 +691,31 @@ def format_notification_diagnostics(result: NotificationDiagnosticResult) -> str
         f"已配置渠道: {len(result.configured_channels)} 个",
     ]
     if result.configured_channels:
+        plugin_names = {
+            channel.channel_id: channel.display_name
+            for channel in result.plugin_channels
+        }
         channel_names = [
-            ChannelDetector.get_channel_name(NotificationChannel(channel))
+            (
+                ChannelDetector.get_channel_name(NotificationChannel(channel))
+                if channel in NotificationChannel._value2member_map_
+                else plugin_names.get(channel, channel)
+            )
             for channel in result.configured_channels
         ]
         lines.append("渠道列表: " + ", ".join(channel_names))
     else:
         lines.append("渠道列表: (无)")
+
+    if result.plugin_channels:
+        lines.append("插件渠道状态:")
+        lines.extend(
+            (
+                f"- {channel.display_name} ({channel.channel_id}): "
+                f"{channel.state}"
+            )
+            for channel in result.plugin_channels
+        )
 
     lines.append("")
     lines.extend(_format_issues("Errors", result.errors))
