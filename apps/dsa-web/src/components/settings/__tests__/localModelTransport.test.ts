@@ -19,8 +19,14 @@ const api = vi.hoisted(() => ({
   restoreRegistration: vi.fn(),
   finalizeUnregistration: vi.fn(),
 }));
+const packApi = vi.hoisted(() => ({
+  startImport: vi.fn(),
+  getImport: vi.fn(),
+  activateDesktop: vi.fn(),
+}));
 
 vi.mock('../../../api/localModels', () => ({ localModelsApi: api }));
+vi.mock('../../../api/modelPacks', () => ({ modelPacksApi: packApi }));
 
 const RUNTIME_IDENTITY = 'b26993598dffd1f14aed97def57ef67f753518a9b773d8a12033c82b4fa545ca';
 
@@ -52,6 +58,16 @@ function createDesktopBridge(): DesktopLocalModelBridge {
       modelId: 'qwen3:4b',
       weightsMutationAttempted: true,
     }),
+    importPack: vi.fn().mockResolvedValue({
+      ok: true,
+      modelId: 'licensed/finance:q4',
+      displayName: 'Licensed Finance Q4',
+      minimumMemoryGb: 16,
+      licenseId: 'LicenseRef-Finance',
+      warnings: [],
+      runtimeIdentity: RUNTIME_IDENTITY,
+      desktopAttestation: 'desktop-attestation',
+    }),
     openInstallGuide: vi.fn().mockResolvedValue(true),
     onStateChange: vi.fn().mockReturnValue(() => undefined),
   };
@@ -62,6 +78,101 @@ describe('localModelTransport', () => {
     vi.clearAllMocks();
     delete window.stockPulseLocalModels;
     api.getConfiguration.mockResolvedValue(CONFIGURATION);
+    packApi.activateDesktop.mockResolvedValue({ selectedPrimary: false });
+  });
+
+  it('uploads and polls a Model Pack through the Web task contract', async () => {
+    vi.useFakeTimers();
+    try {
+      packApi.startImport.mockImplementation(async (_file, options) => {
+        options.onUploadProgress({ loaded: 5, total: 10 });
+        return { taskId: 'pack-1', status: 'accepted' };
+      });
+      packApi.getImport
+        .mockResolvedValueOnce({
+          taskId: 'pack-1',
+          status: 'processing',
+          progress: 50,
+          message: 'Creating model',
+        })
+        .mockResolvedValueOnce({
+          taskId: 'pack-1',
+          status: 'completed',
+          progress: 100,
+          result: {
+            modelId: 'licensed/finance:q4',
+            displayName: 'Licensed Finance Q4',
+            minimumMemoryGb: 16,
+            licenseId: 'LicenseRef-Finance',
+            warnings: [],
+            activated: true,
+            selectedPrimary: false,
+          },
+        });
+      const progress = vi.fn();
+      const file = new File(['pack'], 'finance.modelpack');
+
+      const resultPromise = __localModelTransportTest.createWebTransport()
+        .importPack(file, progress);
+      await vi.advanceTimersByTimeAsync(750);
+
+      await expect(resultPromise).resolves.toMatchObject({
+        modelId: 'licensed/finance:q4',
+        activated: true,
+      });
+      expect(packApi.startImport).toHaveBeenCalledWith(file, expect.any(Object));
+      expect(progress).toHaveBeenCalledWith({
+        modelId: '',
+        percent: 60,
+        status: 'Creating model',
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('observes an accepted Model Pack task beyond the former client deadline', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-25T00:00:00Z'));
+    try {
+      packApi.startImport.mockResolvedValue({ taskId: 'pack-long', status: 'accepted' });
+      packApi.getImport
+        .mockImplementationOnce(async () => {
+          vi.setSystemTime(new Date(Date.now() + (32 * 60 * 1000)));
+          return {
+            taskId: 'pack-long',
+            status: 'processing',
+            progress: 80,
+            message: 'Creating model',
+          };
+        })
+        .mockResolvedValueOnce({
+          taskId: 'pack-long',
+          status: 'completed',
+          progress: 100,
+          result: {
+            modelId: 'licensed/finance:q4',
+            displayName: 'Licensed Finance Q4',
+            minimumMemoryGb: 16,
+            licenseId: 'LicenseRef-Finance',
+            warnings: [],
+            activated: true,
+            selectedPrimary: false,
+          },
+        });
+
+      const resultPromise = __localModelTransportTest.createWebTransport()
+        .importPack(new File(['pack'], 'finance.modelpack'), vi.fn());
+      await vi.advanceTimersByTimeAsync(750);
+
+      await expect(resultPromise).resolves.toMatchObject({
+        modelId: 'licensed/finance:q4',
+        activated: true,
+      });
+      expect(packApi.getImport).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('uses the backend task contract and emits polled progress in Web mode', async () => {
@@ -189,6 +300,43 @@ describe('localModelTransport', () => {
       'config-1',
       RUNTIME_IDENTITY,
     );
+  });
+
+  it('activates Desktop-imported manifest metadata against the pre-import snapshot', async () => {
+    const bridge = createDesktopBridge();
+    const transport = __localModelTransportTest.createDesktopTransport(bridge);
+
+    await expect(transport.importPack(null, () => undefined)).resolves.toMatchObject({
+      modelId: 'licensed/finance:q4',
+      displayName: 'Licensed Finance Q4',
+      activated: true,
+    });
+    expect(bridge.importPack).toHaveBeenCalledWith('config-1');
+    expect(packApi.activateDesktop).toHaveBeenCalledWith(
+      {
+        modelId: 'licensed/finance:q4',
+        displayName: 'Licensed Finance Q4',
+        minimumMemoryGb: 16,
+        licenseId: 'LicenseRef-Finance',
+      },
+      'config-1',
+      RUNTIME_IDENTITY,
+      'desktop-attestation',
+    );
+    expect(api.getConfiguration.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(bridge.importPack).mock.invocationCallOrder[0],
+    );
+  });
+
+  it('does not activate when the Desktop native picker is cancelled', async () => {
+    const bridge = createDesktopBridge();
+    vi.mocked(bridge.importPack).mockResolvedValue({ ok: false, canceled: true });
+
+    await expect(
+      __localModelTransportTest.createDesktopTransport(bridge)
+        .importPack(null, () => undefined),
+    ).resolves.toBeNull();
+    expect(packApi.activateDesktop).not.toHaveBeenCalled();
   });
 
   it('does not recommend another pull when desktop activation fails after download', async () => {

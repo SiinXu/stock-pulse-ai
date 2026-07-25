@@ -72,6 +72,8 @@ describe('representative playground scenarios', () => {
     expect(await screen.findByRole('heading', { name: 'Local Models' })).toBeInTheDocument();
     expect(screen.getByText('Qwen 2.5 7B Instruct')).toBeInTheDocument();
     expect(screen.getByText('Finance Qwen 7B')).toBeInTheDocument();
+    expect(screen.getByText('Offline Finance Q4')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Import Model Pack' })).toBeEnabled();
     expect(screen.queryByText('playground_mock_not_registered')).not.toBeInTheDocument();
   });
 

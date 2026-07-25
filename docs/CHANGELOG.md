@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Added] Added a default-off Human-in-the-Loop risk-control bypass with owner-scoped durable proposals, versioned CAS decisions, one-shot consumption, mandatory security auditing, authenticated additive APIs, and a Home-linked approvals page.
+- [Chore] Declared PEP 621 project metadata and optional extras in `pyproject.toml` while keeping `constraints.txt` / `build-constraints.txt` and `scripts/check_dependency_locks.py` as the pin authority.
+- [Docs] Aligned install documentation with constraints, build-constraints, optional requirements extras, and Docker/CI install surfaces.
 - [Changed] Enforced a deny-by-default Agent ToolSurface with bounded executable capabilities, mandatory execution-owned grants, strict schema and stock-scope checks, recursive outbound URL policy validation, redacted denial audits, and no direct ToolRegistry execution bypass.
 - [Added] Added five opt-in investment committee Persona Skills with bounded built-in discovery, desktop packaging coverage, explicit existing-tool lists, differentiated evidence and risk lenses, and mandatory research-only, non-affiliation, and investment-risk disclosures.
 - [Added] Added a default-off, tool-free bounded Critic before Native Multi decisions with strict pass/retry/fail-soft output, one catalog-backed whitelist retry budget, atomic evidence replacement, and internal trace/stream metadata while preserving StrategyEngine authority.
@@ -38,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Docs] Added verified local-model sizes, RAM tiers, upstream repositories, license conclusions, GGUF conversion guidance, distribution boundaries, and Ollama configuration.
 - [Added] An optional, default-off Kronos K-line forecasting Agent Tool with isolated dependencies, eagerly validated local-only weights, strict scoped input/default bounds, probabilistic direction and volatility output, and mandatory investment-risk disclosure.
 - [Fixed] Enforced strict Kronos state-dict loading and lossless, provider-portable Agent Tool plugin definitions before registration.
+- [Added] Added a versioned data-only Model Pack format, integrity-checked offline GGUF import through Web and Desktop Ollama transports, deterministic release packaging, and actionable validation/runtime failure guidance.
 - [Fixed] Bundled `constraints.txt` / `build-constraints.txt` into the packaged desktop backend and resolved them from `sys._MEIPASS`, so the AlphaSift repair install pins runtime and PEP 517 build dependencies on the desktop artifact too instead of degrading to `--no-deps` only.
 - [Added] Bundled a pinned, checksum-verified Ollama runtime with Windows x64 and macOS desktop packages, preserving system Ollama precedence while isolating embedded model data and retaining it across managed Windows updates.
 - [Fixed] Prevented Windows API and desktop startup from hanging on a cold MIME database by initializing built-in mappings without scanning the registry before registering frontend asset types.

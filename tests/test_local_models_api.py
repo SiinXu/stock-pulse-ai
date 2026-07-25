@@ -733,6 +733,7 @@ def test_runtime_response_combines_transport_and_configuration_state() -> None:
             "registered_models": ["qwen3:4b"],
             "primary_model": "ollama/qwen3:4b",
             "agent_model": "",
+            "imported_models": [],
         },
     }
 

@@ -128,12 +128,26 @@ source /opt/stock-analyzer/venv/bin/activate
 
 ### 2. Install Dependencies
 
+Default application installs must use both `constraints.txt` and
+`build-constraints.txt`. Do not omit either constraint file. Optional
+capabilities (Kronos, desktop packaging, CI/dev tooling, experimental
+PydanticAI) install **after** the default set via the matching
+`requirements-*.txt` or `.github/requirements-ci.txt`, still under the same
+constraints—see [Full Guide · Install Dependencies](full-guide_EN.md#install-dependencies).
+`pyproject.toml` extras only expose group names; the lock remains authoritative.
+
 ```bash
 cd /opt/stock-analyzer
 python -m pip install --upgrade --constraint constraints.txt pip -i https://pypi.tuna.tsinghua.edu.cn/simple
 python -m pip install --build-constraint build-constraints.txt -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 python -m pip check
 ```
+
+Docker image builds use the same `constraints.txt` / `build-constraints.txt` +
+`requirements.txt` trio inside the Dockerfile, frozen at the image commit.
+GitHub Actions backend gates install `.github/requirements-ci.txt` (which
+includes `requirements.txt`) for extra test/audit tools without creating a
+second pin authority.
 
 ### 3. Configure Environment Variables
 

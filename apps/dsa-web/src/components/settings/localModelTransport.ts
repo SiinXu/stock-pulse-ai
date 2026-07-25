@@ -1,4 +1,5 @@
 import { localModelsApi } from '../../api/localModels';
+import { modelPacksApi } from '../../api/modelPacks';
 import { getParsedApiError } from '../../api/error';
 import type {
   LocalModelAssignment,
@@ -6,11 +7,13 @@ import type {
   LocalModelProgress,
   LocalModelPullResult,
   LocalModelRuntimeState,
+  ModelPackImportResult,
 } from '../../types/localModels';
 
 
 const WEB_PULL_POLL_INTERVAL_MS = 750;
 const WEB_PULL_TIMEOUT_MS = 31 * 60 * 1000;
+const WEB_MODEL_PACK_POLL_INTERVAL_MS = 750;
 const OLLAMA_INSTALL_GUIDE_URL = 'https://ollama.com/download';
 
 interface DesktopLocalModelState {
@@ -30,6 +33,13 @@ interface DesktopOperationResult {
   error?: unknown;
   runtimeIdentity?: unknown;
   weightsMutationAttempted?: unknown;
+  canceled?: unknown;
+  message?: unknown;
+  displayName?: unknown;
+  minimumMemoryGb?: unknown;
+  licenseId?: unknown;
+  warnings?: unknown;
+  desktopAttestation?: unknown;
 }
 
 export interface DesktopLocalModelBridge {
@@ -39,6 +49,7 @@ export interface DesktopLocalModelBridge {
   stop: () => Promise<DesktopLocalModelState>;
   pull: (modelId: string) => Promise<DesktopOperationResult>;
   remove: (modelId: string, expectedRuntimeIdentity: string) => Promise<DesktopOperationResult>;
+  importPack: (expectedConfigVersion: string) => Promise<DesktopOperationResult>;
   openInstallGuide: () => Promise<boolean>;
   onStateChange: (listener: (state: DesktopLocalModelState) => void) => (() => void) | void;
 }
@@ -71,6 +82,11 @@ export interface LocalModelTransport {
     signal?: AbortSignal,
   ): Promise<LocalModelPullResult>;
   remove(modelId: string): Promise<LocalModelMutationResponse>;
+  importPack(
+    file: File | null,
+    onProgress: (progress: LocalModelProgress) => void,
+    signal?: AbortSignal,
+  ): Promise<ModelPackImportResult | null>;
   assign(modelId: string, assignment: LocalModelAssignment): Promise<LocalModelMutationResponse>;
   start?(): Promise<LocalModelRuntimeState>;
   stop?(): Promise<LocalModelRuntimeState>;
@@ -173,6 +189,37 @@ async function pollWebPull(
   throw new LocalModelTransportError('local_model_pull_timeout', 'Local model download timed out');
 }
 
+async function pollWebModelPackImport(
+  taskId: string,
+  onProgress: (progress: LocalModelProgress) => void,
+  signal?: AbortSignal,
+): Promise<ModelPackImportResult> {
+  while (true) {
+    const task = await modelPacksApi.getImport(taskId);
+    onProgress({
+      modelId: task.result?.modelId ?? '',
+      percent: Math.min(100, 20 + Math.round(task.progress * 0.8)),
+      status: task.message || task.status,
+    });
+    if (task.status === 'completed' && task.result) {
+      if (!task.result.activated) {
+        throw new LocalModelTransportError(
+          'registration_failed',
+          'The model was created but could not be registered',
+        );
+      }
+      return task.result;
+    }
+    if (['failed', 'cancelled', 'interrupted'].includes(task.status)) {
+      throw new LocalModelTransportError(
+        task.error || 'model_pack_import_failed',
+        task.message || 'Model Pack import failed',
+      );
+    }
+    await waitForPoll(WEB_MODEL_PACK_POLL_INTERVAL_MS, signal);
+  }
+}
+
 function createWebTransport(): LocalModelTransport {
   return {
     kind: 'web',
@@ -198,6 +245,37 @@ function createWebTransport(): LocalModelTransport {
       }
     },
     remove: (modelId) => localModelsApi.deleteModel(modelId),
+    async importPack(file, onProgress, signal) {
+      if (!(file instanceof File)) {
+        throw new LocalModelTransportError(
+          'model_pack_source_required',
+          'Select a Model Pack file',
+        );
+      }
+      try {
+        const accepted = await modelPacksApi.startImport(file, {
+          signal,
+          onUploadProgress: ({ loaded, total }) => {
+            const percent = total && total > 0
+              ? Math.min(20, Math.round((loaded / total) * 20))
+              : null;
+            onProgress({ modelId: '', percent, status: 'uploading' });
+          },
+        });
+        onProgress({ modelId: '', percent: 20, status: accepted.status });
+        return await pollWebModelPackImport(accepted.taskId, onProgress, signal);
+      } catch (error) {
+        if (error instanceof LocalModelTransportError
+          || (error instanceof DOMException && error.name === 'AbortError')) {
+          throw error;
+        }
+        const parsed = getParsedApiError(error, 'en');
+        throw new LocalModelTransportError(
+          parsed.code || 'model_pack_import_failed',
+          'Model Pack import failed',
+        );
+      }
+    },
     assign: (modelId, assignment) => localModelsApi.assign(modelId, assignment),
     async openInstallGuide() {
       window.open(OLLAMA_INSTALL_GUIDE_URL, '_blank', 'noopener,noreferrer');
@@ -402,6 +480,68 @@ function createDesktopTransport(bridge: DesktopLocalModelBridge): LocalModelTran
         configuration,
       );
     },
+    async importPack(_file, onProgress) {
+      const configuration = await localModelsApi.getConfiguration();
+      const unsubscribe = bridge.onStateChange((state) => {
+        const nextProgress = normalizeProgress(state.progress);
+        if (nextProgress && state.operation === 'import') onProgress(nextProgress);
+      });
+      try {
+        const result = await bridge.importPack(configuration.configVersion);
+        if (result.canceled === true) return null;
+        if (result.ok !== true) {
+          throw new LocalModelTransportError(
+            typeof result.error === 'string' ? result.error : 'model_pack_import_failed',
+            typeof result.message === 'string' ? result.message : 'Model Pack import failed',
+          );
+        }
+        const modelId = typeof result.modelId === 'string' ? result.modelId : '';
+        const displayName = typeof result.displayName === 'string' ? result.displayName : '';
+        const minimumMemoryGb = typeof result.minimumMemoryGb === 'number'
+          ? result.minimumMemoryGb
+          : 0;
+        const licenseId = typeof result.licenseId === 'string' ? result.licenseId : '';
+        const runtimeIdentity = typeof result.runtimeIdentity === 'string'
+          ? result.runtimeIdentity
+          : '';
+        const desktopAttestation = typeof result.desktopAttestation === 'string'
+          ? result.desktopAttestation
+          : '';
+        if (!modelId || !displayName || !minimumMemoryGb || !licenseId
+          || !runtimeIdentity || !desktopAttestation) {
+          throw new LocalModelTransportError(
+            'local_model_runtime_snapshot_missing',
+            'Desktop did not return a complete validated Model Pack snapshot',
+          );
+        }
+        const manifest = { modelId, displayName, minimumMemoryGb, licenseId };
+        let activation: LocalModelMutationResponse;
+        try {
+          activation = await modelPacksApi.activateDesktop(
+            manifest,
+            configuration.configVersion,
+            runtimeIdentity,
+            desktopAttestation,
+          );
+        } catch (error) {
+          const parsed = getParsedApiError(error, 'en');
+          throw new LocalModelTransportError(
+            parsed.code || 'registration_failed',
+            'The model was created but could not be registered',
+          );
+        }
+        return {
+          ...manifest,
+          warnings: Array.isArray(result.warnings)
+            ? result.warnings.filter((warning): warning is string => typeof warning === 'string')
+            : [],
+          activated: true,
+          selectedPrimary: activation.selectedPrimary,
+        };
+      } finally {
+        if (typeof unsubscribe === 'function') unsubscribe();
+      }
+    },
     assign: (modelId, assignment) => localModelsApi.assign(modelId, assignment),
     start: () => loadState(bridge.start),
     stop: () => loadState(bridge.stop),
@@ -433,4 +573,5 @@ export const __localModelTransportTest = {
   createWebTransport,
   normalizeDesktopState,
   pollWebPull,
+  pollWebModelPackImport,
 };

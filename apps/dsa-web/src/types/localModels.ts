@@ -65,6 +65,14 @@ export interface LocalModelConfiguration {
   registeredModels: string[];
   primaryModel: string;
   agentModel: string;
+  importedModels?: ImportedLocalModelMetadata[];
+}
+
+export interface ImportedLocalModelMetadata {
+  modelId: string;
+  displayName: string;
+  minimumMemoryGb: number;
+  licenseId: string;
 }
 
 export type LocalModelRuntimeStatus =
@@ -133,4 +141,26 @@ export interface LocalModelMutationResponse extends LocalModelConfiguration {
 
 export interface LocalModelUnregistrationResponse extends LocalModelMutationResponse {
   recoveryToken: string;
+}
+
+export interface ModelPackImportAccepted {
+  status: 'accepted';
+  taskId: string;
+  message: string;
+  messageCode: string;
+}
+
+export interface ModelPackImportResult extends ImportedLocalModelMetadata {
+  warnings: string[];
+  activated: boolean;
+  selectedPrimary: boolean;
+}
+
+export interface ModelPackImportStatus {
+  taskId: string;
+  status: TaskLifecycleStatus;
+  progress: number;
+  error?: string | null;
+  message?: string | null;
+  result?: ModelPackImportResult | null;
 }

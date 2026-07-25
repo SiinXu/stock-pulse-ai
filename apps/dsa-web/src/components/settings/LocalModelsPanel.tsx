@@ -11,6 +11,7 @@ import {
   Square,
   Star,
   Trash2,
+  Upload,
 } from 'lucide-react';
 import {
   Badge,
@@ -55,7 +56,7 @@ interface LocalModelsPanelProps {
   onModelReady?: (modelId: string) => void;
 }
 
-type OperationKind = 'pull' | 'assign-primary' | 'assign-agent' | 'select' | 'delete' | 'runtime';
+type OperationKind = 'pull' | 'import' | 'assign-primary' | 'assign-agent' | 'select' | 'delete' | 'runtime';
 
 interface ActiveOperation {
   kind: OperationKind;
@@ -67,7 +68,49 @@ const EMPTY_CONFIGURATION: LocalModelConfiguration = {
   registeredModels: [],
   primaryModel: '',
   agentModel: '',
+  importedModels: [],
 };
+
+const MODEL_PACK_ERROR_TEXT_KEYS = {
+  unsupported_format_version: 'importUnsupportedVersion',
+  missing_manifest: 'importMissing',
+  missing_file: 'importMissing',
+  pack_not_found: 'importMissing',
+  size_mismatch: 'importIntegrity',
+  hash_mismatch: 'importIntegrity',
+  unsafe_archive_entry: 'importUnsafe',
+  unsafe_package_entry: 'importUnsafe',
+  unsafe_modelfile: 'importUnsafe',
+  invalid_gguf: 'importInvalidGguf',
+  insufficient_disk_space: 'importDisk',
+  disk_check_failed: 'importDisk',
+  ollama_access_blocked: 'importOllama',
+  ollama_unavailable: 'importOllama',
+  ollama_create_failed: 'importCreate',
+  ollama_create_timeout: 'importCreate',
+  registration_failed: 'importRegistration',
+  local_model_activation_failed: 'importRegistration',
+  desktop_attestation_invalid: 'importRegistration',
+  desktop_attestation_expired: 'importConflict',
+  desktop_attestation_replayed: 'importConflict',
+  desktop_attestation_capacity: 'importBusy',
+  model_pack_too_large: 'importTooLarge',
+  unsupported_archive: 'importUnsupportedArchive',
+  empty_model_pack: 'importUnsupportedArchive',
+  model_pack_source_required: 'importUnsupportedArchive',
+  invalid_archive: 'importInvalid',
+  invalid_manifest: 'importInvalid',
+  invalid_license_file: 'importInvalid',
+  file_read_failed: 'importInvalid',
+  busy: 'importBusy',
+  config_version_conflict: 'importConflict',
+  runtime_changed: 'importConflict',
+  'runtime-changed': 'importConflict',
+  local_model_runtime_snapshot_missing: 'importConflict',
+  local_model_runtime_unavailable: 'importOllama',
+  invalid_ollama_configuration: 'importConflict',
+  model_pack_import_submission_failed: 'importFailed',
+} as const;
 
 const CAPABILITY_TEXT_KEYS = {
   general: 'capabilityGeneral',
@@ -123,7 +166,17 @@ function configurationFromMutation(
     registeredModels: mutation.registeredModels,
     primaryModel: mutation.primaryModel,
     agentModel: mutation.agentModel,
+    importedModels: mutation.importedModels ?? [],
   };
+}
+
+function catalogRuntimeModelId(
+  model: LocalModelCatalogEntry,
+  importedIds: ReadonlySet<string>,
+): string | null {
+  if (model.install.ollamaTag) return model.install.ollamaTag;
+  const planned = model.install.plannedOllamaTag;
+  return planned && importedIds.has(planned.toLowerCase()) ? planned : null;
 }
 
 export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
@@ -150,8 +203,10 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
   const [copiedModel, setCopiedModel] = useState('');
   const [readyModel, setReadyModel] = useState('');
   const [primaryPromptModel, setPrimaryPromptModel] = useState('');
+  const [readyKind, setReadyKind] = useState<'download' | 'import'>('download');
   const [deleteModel, setDeleteModel] = useState<LocalModelCatalogEntry | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -208,6 +263,22 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
     [runtime?.installedModels],
   );
   const configuration = runtime?.configuration ?? EMPTY_CONFIGURATION;
+  const importedModels = useMemo(
+    () => configuration.importedModels ?? [],
+    [configuration.importedModels],
+  );
+  const importedIds = useMemo(
+    () => new Set(importedModels.map((model) => model.modelId.toLowerCase())),
+    [importedModels],
+  );
+  const catalogModelIds = useMemo(() => new Set(models.flatMap((model) => [
+    model.install.ollamaTag,
+    model.install.plannedOllamaTag,
+  ]).filter((modelId): modelId is string => Boolean(modelId)).map((modelId) => modelId.toLowerCase())), [models]);
+  const unknownImportedModels = useMemo(
+    () => importedModels.filter((model) => !catalogModelIds.has(model.modelId.toLowerCase())),
+    [catalogModelIds, importedModels],
+  );
   const registeredModels = useMemo(
     () => new Set(configuration.registeredModels.map((model) => model.toLowerCase())),
     [configuration.registeredModels],
@@ -222,7 +293,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
     const selected = selectedModelId.trim();
     if (isLoading || runtime === null || !selected || activeOperation !== null) return;
     const selectedReady = models.some((model) => {
-      const tag = model.install.ollamaTag;
+      const tag = catalogRuntimeModelId(model, importedIds);
       return Boolean(
         tag
         && tag.toLowerCase() === selected.toLowerCase()
@@ -233,19 +304,29 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
           || modelIsAssigned(configuration.agentModel, tag)
         ),
       );
-    });
+    }) || unknownImportedModels.some((model) => (
+      model.modelId.toLowerCase() === selected.toLowerCase()
+      && installedModels.has(model.modelId.toLowerCase())
+      && (
+        registeredModels.has(model.modelId.toLowerCase())
+        || modelIsAssigned(configuration.primaryModel, model.modelId)
+        || modelIsAssigned(configuration.agentModel, model.modelId)
+      )
+    ));
     if (!selectedReady) onModelReady?.('');
   }, [
     activeOperation,
     configuration.agentModel,
     configuration.primaryModel,
     installedModels,
+    importedIds,
     isLoading,
     models,
     onModelReady,
     registeredModels,
     runtime,
     selectedModelId,
+    unknownImportedModels,
   ]);
 
   const updateConfiguration = useCallback(async (next: LocalModelConfiguration) => {
@@ -273,6 +354,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
       const nextRuntime = await refreshRuntime();
       await onConfigurationChanged?.();
       setReadyModel(modelId);
+      setReadyKind('download');
       onModelReady?.(modelId);
       if (
         result.selectedPrimary
@@ -298,6 +380,61 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
       if (abortRef.current === controller) abortRef.current = null;
       setActiveOperation(null);
     }
+  };
+
+  const handleImport = async (file: File | null) => {
+    const controller = new AbortController();
+    abortRef.current?.abort();
+    abortRef.current = controller;
+    setActiveOperation({ kind: 'import' });
+    setProgress({ modelId: '', percent: 0, status: 'pending' });
+    setActionError('');
+    setActionWarning('');
+    setManualCommand('');
+    setReadyModel('');
+    setPrimaryPromptModel('');
+    try {
+      const result = await transport.importPack(file, setProgress, controller.signal);
+      if (result === null) return;
+      const nextRuntime = await refreshRuntime();
+      await onConfigurationChanged?.();
+      setReadyModel(result.modelId);
+      setReadyKind('import');
+      onModelReady?.(result.modelId);
+      if (result.warnings.length > 0) {
+        setActionWarning(formatUiText(text.importWarnings, { count: result.warnings.length }));
+      }
+      if (
+        result.selectedPrimary
+        || Boolean(nextRuntime && modelIsAssigned(nextRuntime.configuration.primaryModel, result.modelId))
+      ) {
+        setPrimaryPromptModel('');
+      } else {
+        setPrimaryPromptModel(result.modelId);
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      const code = error instanceof LocalModelTransportError ? error.code : '';
+      const key = MODEL_PACK_ERROR_TEXT_KEYS[code as keyof typeof MODEL_PACK_ERROR_TEXT_KEYS];
+      setActionError(key ? text[key] : text.importFailed);
+    } finally {
+      if (abortRef.current === controller) abortRef.current = null;
+      setActiveOperation(null);
+    }
+  };
+
+  const openModelPackPicker = () => {
+    if (transport.kind === 'desktop') {
+      void handleImport(null);
+      return;
+    }
+    fileInputRef.current?.click();
+  };
+
+  const handleModelPackFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0] ?? null;
+    event.currentTarget.value = '';
+    if (file) void handleImport(file);
   };
 
   const handleAssignment = async (modelId: string, assignment: 'primary' | 'agent') => {
@@ -418,7 +555,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
     const sectionModels = models.filter((model) => model.section === section);
     if (sectionModels.length === 0) return <EmptyState title={text.noModels} compact />;
     return sectionModels.map((model) => {
-      const modelId = model.install.ollamaTag;
+      const modelId = catalogRuntimeModelId(model, importedIds);
       const installed = Boolean(modelId && installedModels.has(modelId.toLowerCase()));
       const registered = Boolean(modelId && registeredModels.has(modelId.toLowerCase()));
       const primary = Boolean(modelId && modelIsAssigned(configuration.primaryModel, modelId));
@@ -503,7 +640,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
               </div>
             ) : null}
 
-            {!directPull ? (
+            {!directPull && !installed ? (
               <InlineAlert
                 variant={model.install.status === 'license_review_required' ? 'warning' : 'info'}
                 size="compact"
@@ -539,7 +676,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
                   {text.download}
                 </Button>
               ) : null}
-              {!directPull ? (
+              {!directPull && !installed ? (
                 <Button variant="secondary" size="default" onClick={() => openDownloadGuide(model)}>
                   <ExternalLink aria-hidden="true" />
                   {text.downloadGuide}
@@ -567,7 +704,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
                   {text.setAgent}
                 </Button>
               ) : null}
-              {installed && modelId ? (
+              {installed && modelId && directPull ? (
                 <IconButton
                   variant="danger"
                   size="default"
@@ -585,25 +722,111 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
     });
   };
 
+  const importedCards = unknownImportedModels.map((model) => {
+    const modelId = model.modelId;
+    const installed = installedModels.has(modelId.toLowerCase());
+    const registered = registeredModels.has(modelId.toLowerCase());
+    const primary = modelIsAssigned(configuration.primaryModel, modelId);
+    const agent = modelIsAssigned(configuration.agentModel, modelId);
+    const ready = installed && (registered || primary || agent);
+    const selected = selectedModelId.trim().toLowerCase() === modelId.toLowerCase();
+    const busy = activeOperation !== null;
+    return (
+      <Card
+        key={modelId}
+        variant="bordered"
+        padding="sm"
+        title={model.displayName}
+        headerRight={<Badge variant="history">{text.imported}</Badge>}
+        data-testid={`local-model-imported-${modelId}`}
+      >
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-1.5">
+            <Badge>{formatUiText(text.memory, { ram: model.minimumMemoryGb })}</Badge>
+            <Badge>{model.licenseId}</Badge>
+            {installed ? <Badge variant="success"><Check aria-hidden="true" />{text.installed}</Badge> : null}
+            {registered && !primary && !agent ? <Badge variant="info">{text.registered}</Badge> : null}
+            {primary ? <Badge variant="success">{text.primary}</Badge> : null}
+            {agent ? <Badge variant="info"><Bot aria-hidden="true" />{text.agent}</Badge> : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+            {installed && onModelReady && selectModelLabel && selectedModelLabel ? (
+              <Button
+                variant={selected ? 'secondary' : 'primary'}
+                size="default"
+                disabled={busy || selected}
+                aria-pressed={selected}
+                onClick={() => void handleModelSelection(modelId, ready)}
+              >
+                {selected ? <Check aria-hidden="true" /> : null}
+                {selected ? selectedModelLabel : selectModelLabel}
+              </Button>
+            ) : null}
+            {installed && !primary ? (
+              <Button
+                variant="secondary"
+                size="default"
+                disabled={busy}
+                onClick={() => void handleAssignment(modelId, 'primary')}
+              >
+                <Star aria-hidden="true" />{text.setPrimary}
+              </Button>
+            ) : null}
+            {installed && !agent ? (
+              <Button
+                variant="secondary"
+                size="default"
+                disabled={busy}
+                onClick={() => void handleAssignment(modelId, 'agent')}
+              >
+                <Bot aria-hidden="true" />{text.setAgent}
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      </Card>
+    );
+  });
+
   return (
     <Section
       title={text.title}
       headingAs={headingAs}
       actions={(
-        <IconButton
-          variant="outline"
-          size="default"
-          aria-label={text.refresh}
-          isLoading={activeOperation?.kind === 'runtime'}
-          disabled={activeOperation !== null}
-          onClick={() => void refreshRuntime()}
-        >
-          <RefreshCw aria-hidden="true" />
-        </IconButton>
+        <>
+          <Button
+            variant="secondary"
+            size="default"
+            isLoading={activeOperation?.kind === 'import'}
+            loadingText={text.importing}
+            disabled={activeOperation !== null || runtime?.status !== 'running'}
+            onClick={openModelPackPicker}
+          >
+            <Upload aria-hidden="true" />{text.importPack}
+          </Button>
+          <IconButton
+            variant="outline"
+            size="default"
+            aria-label={text.refresh}
+            isLoading={activeOperation?.kind === 'runtime'}
+            disabled={activeOperation !== null}
+            onClick={() => void refreshRuntime()}
+          >
+            <RefreshCw aria-hidden="true" />
+          </IconButton>
+        </>
       )}
       data-testid="local-models-panel"
     >
       <div className="space-y-4">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".modelpack,.zip,application/zip"
+          className="hidden"
+          tabIndex={-1}
+          onChange={handleModelPackFile}
+        />
         <div className="flex flex-wrap items-center justify-between gap-3 border-y border-border py-3">
           <div className="flex items-center gap-2 text-sm text-foreground">
             <StatusDot tone={runtimeCopy.tone} pulse={runtime?.status === 'starting'} />
@@ -646,6 +869,27 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
           </div>
         </div>
 
+        {activeOperation?.kind === 'import' ? (
+          <div className="space-y-1.5" data-testid="model-pack-import-progress">
+            <div
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progress?.percent ?? undefined}
+              aria-label={text.importing}
+              className="h-1.5 overflow-hidden rounded-full bg-hover"
+            >
+              <div
+                className="h-full rounded-full bg-primary transition-[width] duration-200"
+                style={{ width: `${progress?.percent ?? 4}%` }}
+              />
+            </div>
+            <p className="text-xs text-muted-text">
+              {progress?.percent === null ? text.importing : `${progress?.percent ?? 0}%`}
+            </p>
+          </div>
+        ) : null}
+
         {runtime?.status === 'unavailable' || runtime?.status === 'not-installed' || runtime?.status === 'error' ? (
           <InlineAlert
             variant="warning"
@@ -656,8 +900,11 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
         {readyModel ? (
           <InlineAlert
             variant="success"
-            title={text.readyTitle}
-            message={formatUiText(text.readyMessage, { model: readyModel })}
+            title={readyKind === 'import' ? text.importReadyTitle : text.readyTitle}
+            message={formatUiText(
+              readyKind === 'import' ? text.importReadyMessage : text.readyMessage,
+              { model: readyModel },
+            )}
           />
         ) : null}
         {primaryPromptModel ? (
@@ -700,6 +947,14 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
             </section>
           ))}
         </div>
+        {importedCards.length > 0 ? (
+          <section aria-labelledby="local-models-imported">
+            <h3 id="local-models-imported" className="mb-3 text-sm font-semibold text-foreground">
+              {text.importedModels}
+            </h3>
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">{importedCards}</div>
+          </section>
+        ) : null}
       </div>
 
       <ConfirmDialog
