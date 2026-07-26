@@ -566,7 +566,7 @@ class TestReportStrataRendering(unittest.TestCase):
                 ],
                 "framework_alignment": {
                     "status": "not_configured",
-                    "summary": "Personal investment framework not configured",
+                    "summary": "Personal investment framework not configured or inactive",
                 },
                 "disclaimer": "AI-generated content for reference only. Not investment advice.",
             },

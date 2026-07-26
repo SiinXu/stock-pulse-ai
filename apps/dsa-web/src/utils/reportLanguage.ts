@@ -59,7 +59,7 @@ const REPORT_TEXT = {
     modelInference: '模型推断',
     risksCounterEvidence: '风险与反证',
     frameworkAlignment: '与个人框架对齐',
-    frameworkNotConfigured: '个人投资框架未配置',
+    frameworkNotConfigured: '个人投资框架未配置或已停用',
     disclaimerHeading: '非投资建议声明',
     defaultDisclaimer: 'AI生成，仅供参考，不构成投资建议',
     factSource: '来源',
@@ -120,7 +120,8 @@ const REPORT_TEXT = {
     modelInference: 'Model Inference',
     risksCounterEvidence: 'Risks / Counter-Evidence',
     frameworkAlignment: 'Alignment with User Framework',
-    frameworkNotConfigured: 'Personal investment framework not configured',
+    frameworkNotConfigured:
+      'Personal investment framework not configured or inactive',
     disclaimerHeading: 'Non-Investment-Advice Disclaimer',
     defaultDisclaimer: 'AI-generated content for reference only. Not investment advice.',
     factSource: 'Source',
@@ -181,7 +182,8 @@ const REPORT_TEXT = {
     modelInference: '모델 추론',
     risksCounterEvidence: '리스크 / 반증',
     frameworkAlignment: '개인 프레임워크 정합',
-    frameworkNotConfigured: '개인 투자 프레임워크가 구성되지 않음',
+    frameworkNotConfigured:
+      '개인 투자 프레임워크가 구성되지 않았거나 비활성 상태임',
     disclaimerHeading: '투자 권유 아님 고지',
     defaultDisclaimer: 'AI 생성 참고용이며 투자 권유가 아닙니다.',
     factSource: '출처',
