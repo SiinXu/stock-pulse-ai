@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Docs] Froze the personal investment framework product narrative to match `main`: versioned API/storage, stock-analysis read-only inject, no Web editor, and honest report-strata `framework_alignment` empty-state copy.
 - [Docs] Documented the minimal scheduled-task Settings list, Home today projection, and process-local research-only defaults.
 - [Added] Linked Home today scheduled tasks to Settings management with a clear empty-state path.
 - [Added] Added a minimal Settings list for persisted scheduled-task definitions with enable/disable controls and process-local research-only framing.
@@ -18,8 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Docs] Documented HITL default-off defaults, proposal lifetime, and independent Agent pipeline deadline fail-closed behavior for risk-control bypass approvals.
 - [Docs] Documented HITL `/approvals`, report evidence strata, and the offline analysis-quality panel as shipped-on-main surfaces in the UI manual (no primary-nav inventing).
 - [Added] Injected the active personal investment framework as read-only research context into the stock analysis path and report strata alignment slot.
-- [Added] Added a minimal Settings editor for the local personal investment framework with create, versioned save, deactivate, and delete against the existing API.
-- [Docs] Aligned UI-manual feature-status tables with main: scheduled tasks, notification plugins, and local model packs as shipped; investment framework as backend-only.
+- [Docs] Aligned UI-manual feature-status tables with main: scheduled tasks, notification plugins, and local model packs as shipped; investment framework storage plus stock-analysis inject without a Web editor.
 - [Docs] Documented UI manual figure-pack naming, P0 capture checklist, and PR evidence rules under `docs/ui-manual/assets/` (#599 docs side).
 - [Added] Added a default-off Human-in-the-Loop risk-control bypass with owner-scoped durable proposals, versioned CAS decisions, one-shot consumption, mandatory security auditing, authenticated additive APIs, and a Home-linked approvals page.
 - [Chore] Declared PEP 621 project metadata and optional extras in `pyproject.toml` while keeping `constraints.txt` / `build-constraints.txt` and `scripts/check_dependency_locks.py` as the pin authority.

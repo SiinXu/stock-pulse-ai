@@ -44,7 +44,9 @@ class TestReportStrataSchema(unittest.TestCase):
         self.assertEqual(data["model_inference"], [])
         self.assertEqual(data["risks_counter_evidence"], [])
         self.assertEqual(data["framework_alignment"]["status"], "not_configured")
-        self.assertIn("not configured", data["framework_alignment"]["summary"].lower())
+        summary = data["framework_alignment"]["summary"].lower()
+        self.assertIn("not configured", summary)
+        self.assertIn("inactive", summary)
         self.assertTrue(data["disclaimer"])
         self.assertIn("Not investment advice", data["disclaimer"])
 
@@ -65,6 +67,7 @@ class TestReportStrataSchema(unittest.TestCase):
         strata = ensure_report_strata(None, language="zh")
         self.assertEqual(strata.framework_alignment.status, "not_configured")
         self.assertIn("未配置", strata.framework_alignment.summary)
+        self.assertIn("已停用", strata.framework_alignment.summary)
 
     def test_inference_not_merged_into_facts(self) -> None:
         strata = ReportStrata(

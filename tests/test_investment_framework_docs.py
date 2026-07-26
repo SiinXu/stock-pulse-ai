@@ -33,6 +33,18 @@ def test_framework_topic_documents_api_scope_context_and_rollback() -> None:
         assert "2N-1" in document
         assert "trigger" in document.lower()
         assert "TEMP" in document
+        # Product narrative freeze: honest ship state after stock-analysis inject.
+        assert (
+            "no web editor" in document.lower()
+            or "无 web 编辑器" in document.lower()
+            or "无 Web 编辑器" in document
+        )
+        assert (
+            "stock analysis" in document.lower()
+            or "个股分析" in document
+            or "inject_framework_into_analysis_context" in document
+        )
+        assert "personal_investment_framework_prompt" in document or "只读研究" in document
 
 
 def test_framework_docs_are_discoverable_without_expanding_readmes() -> None:

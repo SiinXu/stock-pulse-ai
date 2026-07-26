@@ -2,9 +2,25 @@
 
 [中文](personal-investment-framework.md) | [English](personal-investment-framework_EN.md)
 
-## 当前范围
+## 当前范围（产品叙事冻结）
 
-本阶段只交付 Issue #465 的后端切片：单机账户的版本化存储、CRUD/历史 API、乐观并发控制，以及供后续分析装配读取的稳定 adapter。当前版本**不包含**完整 Web 页面、导入/导出、自动交易，也没有把框架真实注入 Single / Multi / Research prompt 或报告。调用 `InvestmentFrameworkContextReader` 只代表读取边界稳定，不能据此宣称 Agent 已遵循个人框架。
+Issue #465 以**后端**切片起步。当前 `main` 已有**部分**分析注入。对外叙事必须与代码树一致：
+
+**已交付：**
+
+- 本地版本化存储、CRUD/历史 API、乐观并发
+- 稳定的 `InvestmentFrameworkContextReader` 只读 adapter
+- **个股分析路径**注入：active 框架经 `inject_framework_into_analysis_context`（`src/core/stages/analysis_stock.py` → analyzer 的 `personal_investment_framework_prompt`）作为**只读研究上下文**
+- 报告分层 **对齐槽位填充**：有 active 框架时由 `enrich_dashboard_framework_alignment` 写入；否则 `framework_alignment.status=not_configured` 与本地化空槽摘要
+
+**未交付 / 非完整产品：**
+
+- **`main` 上无 Web 编辑器**（设置页/报告 UI 无编辑入口；仅 API 管理；勿声称 Settings 编辑器已上线，也勿写“Web 编辑器仍为最小范围”）
+- 无导入/导出、无自动交易
+- 未作为通用字段接入 Multi-agent / Research / Chat 或 `AnalysisContextPack`
+- 注入仅为研究上下文——**不是**实盘交易权限，也**不保证**模型逐条遵守规则
+
+`framework_alignment.status=not_configured` 表示**没有 active 框架**（未创建或已停用）。这是预期空槽，不是分析失败或 bug。
 
 ## 账户与权限边界
 
@@ -63,7 +79,7 @@ Create、update 或 deactivate flush 后，repository 会使 ORM identity state 
 - 未创建或已停用时：`None`，现有分析路径不做任何变化。
 - 持久化内容损坏时：fail closed 抛出 data error，不把损坏误报成“未配置”。
 
-该 reader 目前没有接入 `AnalysisContextPack` 或 Agent prompt。后续真实接线必须在 Single / Multi / Research 各装配入口统一处理优先级、上下文大小、报告披露和回归测试。
+个股分析管线经 `src/services/investment_framework_prompt.py` 软失败地加载该 reader。它**不是**通用 `AnalysisContextPack` 字段，也**未**以同样方式接入 Multi-agent / Research / Chat。后续扩展须在其余路径统一优先级、上下文大小、报告披露与回归测试。有 active 框架时，不得描述为实盘交易权限或“模型已保证遵守全部规则”。
 
 ## 迁移与回滚
 
@@ -72,7 +88,7 @@ Fresh 数据库由 SQLAlchemy metadata 建表，registered migration 验证 shap
 生产 migration 是 forward-only：
 
 1. 升级前停止写入并备份数据库。
-2. 若只需停止框架影响，先调用 deactivate；当前分析本来就没有 prompt 注入。
+2. 若只需停止框架影响，先调用 deactivate，使个股分析注入变为 no-op，分层槽位回到 `not_configured`。
 3. 若必须回滚应用与 schema，停止新客户端写入，恢复 migration 前数据库备份，并同时部署匹配的旧代码。
 4. 不要手工删除 `schema_migrations` 记录或直接删表伪造降级；旧代码看到未知更高 migration 会按现有合同 fail closed。
 

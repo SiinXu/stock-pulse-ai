@@ -530,7 +530,7 @@ _REPORT_LABELS: Dict[str, Dict[str, str]] = {
         "model_inference_heading": "模型推断",
         "risks_counter_evidence_heading": "风险与反证",
         "framework_alignment_heading": "与个人框架对齐",
-        "framework_not_configured_label": "个人投资框架未配置",
+        "framework_not_configured_label": "个人投资框架未配置或已停用",
         "fact_source_label": "来源",
         "fact_as_of_label": "截至",
         "fact_source_unknown_label": "来源未标注",
@@ -678,7 +678,9 @@ _REPORT_LABELS: Dict[str, Dict[str, str]] = {
         "model_inference_heading": "Model Inference",
         "risks_counter_evidence_heading": "Risks / Counter-Evidence",
         "framework_alignment_heading": "Alignment with User Framework",
-        "framework_not_configured_label": "Personal investment framework not configured",
+        "framework_not_configured_label": (
+            "Personal investment framework not configured or inactive"
+        ),
         "fact_source_label": "Source",
         "fact_as_of_label": "As of",
         "fact_source_unknown_label": "source not labeled",
@@ -826,7 +828,9 @@ _REPORT_LABELS: Dict[str, Dict[str, str]] = {
         "model_inference_heading": "모델 추론",
         "risks_counter_evidence_heading": "리스크 / 반증",
         "framework_alignment_heading": "개인 프레임워크 정합",
-        "framework_not_configured_label": "개인 투자 프레임워크가 구성되지 않음",
+        "framework_not_configured_label": (
+            "개인 투자 프레임워크가 구성되지 않았거나 비활성 상태임"
+        ),
         "fact_source_label": "출처",
         "fact_as_of_label": "기준 시각",
         "fact_source_unknown_label": "출처 미표기",

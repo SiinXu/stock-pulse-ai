@@ -32,9 +32,13 @@ DEFAULT_DISCLAIMER_EN = (
 )
 DEFAULT_DISCLAIMER_KO = "AI 생성 참고용이며 투자 권유가 아닙니다."
 
-FRAMEWORK_NOT_CONFIGURED_SUMMARY_ZH = "个人投资框架未配置"
-FRAMEWORK_NOT_CONFIGURED_SUMMARY_EN = "Personal investment framework not configured"
-FRAMEWORK_NOT_CONFIGURED_SUMMARY_KO = "개인 투자 프레임워크가 구성되지 않음"
+FRAMEWORK_NOT_CONFIGURED_SUMMARY_ZH = "个人投资框架未配置或已停用"
+FRAMEWORK_NOT_CONFIGURED_SUMMARY_EN = (
+    "Personal investment framework not configured or inactive"
+)
+FRAMEWORK_NOT_CONFIGURED_SUMMARY_KO = (
+    "개인 투자 프레임워크가 구성되지 않았거나 비활성 상태임"
+)
 
 
 def default_disclaimer(language: Optional[str] = None) -> str:
@@ -48,7 +52,7 @@ def default_disclaimer(language: Optional[str] = None) -> str:
 
 
 def default_framework_not_configured_summary(language: Optional[str] = None) -> str:
-    """Return the default framework slot copy when no framework is active."""
+    """Return empty-slot copy when no active personal investment framework exists."""
     key = (language or "zh").strip().lower()
     if key.startswith("en"):
         return FRAMEWORK_NOT_CONFIGURED_SUMMARY_EN

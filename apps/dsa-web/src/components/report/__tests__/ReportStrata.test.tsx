@@ -24,7 +24,7 @@ const strataPayload = {
   risksCounterEvidence: ['Break below support invalidates the constructive case.'],
   frameworkAlignment: {
     status: 'not_configured' as const,
-    summary: 'Personal investment framework not configured',
+    summary: 'Personal investment framework not configured or inactive',
   },
   disclaimer: 'AI-generated content for reference only. Not investment advice.',
 };
@@ -107,7 +107,7 @@ describe('ReportStrata', () => {
             risks_counter_evidence: ['Break below support invalidates the constructive case.'],
             framework_alignment: {
               status: 'not_configured',
-              summary: 'Personal investment framework not configured',
+              summary: 'Personal investment framework not configured or inactive',
             },
             disclaimer: 'AI-generated content for reference only. Not investment advice.',
           },

@@ -75,7 +75,7 @@ def test_enrich_dashboard_framework_alignment_fills_slot() -> None:
             "risks_counter_evidence": [],
             "framework_alignment": {
                 "status": "not_configured",
-                "summary": "个人投资框架未配置",
+                "summary": "个人投资框架未配置或已停用",
             },
             "disclaimer": "AI生成，仅供参考，不构成投资建议",
         }

@@ -2,9 +2,25 @@
 
 [Chinese](personal-investment-framework.md) | [English](personal-investment-framework_EN.md)
 
-## Current Scope
+## Current Scope (Product Narrative Freeze)
 
-This phase delivers only the Issue #465 backend slice: versioned storage for the local account, CRUD/history APIs, optimistic concurrency, and a stable adapter for future analysis assembly. It does **not** include the complete Web page, import/export, automated trading, or real injection into Single, Multi, or Research prompts and reports. The existence of `InvestmentFrameworkContextReader` proves only a read boundary; it does not mean an Agent already follows the framework.
+Issue #465 started as a **backend** slice. Current `main` also wires a **partial** analysis inject. Keep marketing and docs aligned with the tree:
+
+**Shipped:**
+
+- Versioned local storage, CRUD/history APIs, optimistic concurrency
+- Stable `InvestmentFrameworkContextReader` read adapter
+- **Stock analysis path** inject: active framework is attached as **read-only research context** via `inject_framework_into_analysis_context` (`src/core/stages/analysis_stock.py` → analyzer prompt key `personal_investment_framework_prompt`)
+- Report-strata **alignment slot enrichment** when a framework is active (`enrich_dashboard_framework_alignment`); otherwise `framework_alignment.status=not_configured` with a localized empty-slot summary
+
+**Not shipped / not full product:**
+
+- **No Web editor** on `main` Settings or report UI (manage via API only; do **not** claim a Settings editor is live, and do **not** use “Web editor still minimal”)
+- No import/export and no automated trading
+- Not a general inject into Multi-agent, Research/Chat, or `AnalysisContextPack` as a pack field
+- Inject is research context only—not live trading authority, and not a guarantee the model follows every rule
+
+`framework_alignment.status=not_configured` means **no active framework** (missing or deactivated). It is an expected empty slot, not an analysis failure or bug.
 
 ## Account And Authorization Boundary
 
@@ -63,7 +79,7 @@ The history endpoint currently returns the complete history in one unpaginated r
 - `None` when no framework exists or it is inactive, leaving every existing analysis path unchanged.
 - A fail-closed data error for corrupt persisted content instead of misreporting corruption as "not configured."
 
-The reader is not wired into `AnalysisContextPack` or Agent prompts yet. Future real integration must converge Single, Multi, and Research assembly, precedence, context-size limits, report disclosure, and regression coverage.
+The stock analysis pipeline loads the reader through `src/services/investment_framework_prompt.py` (soft-fail on load errors). The reader is **not** a general `AnalysisContextPack` field and is **not** wired into Multi-agent / Research / Chat assembly the same way. Future expansion must converge remaining paths, precedence, context-size limits, report disclosure, and regression coverage. Presence of an active framework must not be described as live trading authority or guaranteed rule compliance.
 
 ## Migration And Rollback
 
@@ -72,7 +88,7 @@ Fresh databases receive the tables from SQLAlchemy metadata and the registered m
 Production migrations are forward-only:
 
 1. Stop writes and back up the database before upgrading.
-2. To remove framework influence without reverting schema, deactivate it; this slice does not inject it into prompts in the first place.
+2. To remove framework influence without reverting schema, deactivate it so the stock-analysis inject becomes a no-op and strata return `not_configured`.
 3. To roll back both application and schema, stop new clients, restore the pre-migration database backup, and deploy the matching older code.
 4. Never delete a `schema_migrations` row or drop tables manually to simulate a downgrade. Older code fails closed on an unknown higher migration by design.
 

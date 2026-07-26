@@ -12,7 +12,7 @@ Issue #616 requires analysis reports to present **fixed evidence strata** so flu
 2. **Missing data or source conflicts** — gaps that must not be folded into facts  
 3. **Model inference** — judgment, forecasts, and narrative conclusions  
 4. **Risks / counter-evidence**  
-5. **Alignment with user framework** — uses the local personal framework slot from #465; when none is active, status is `not_configured` with an explicit summary  
+5. **Alignment with user framework** — uses the local personal framework slot from #465; when none is active, status is `not_configured` with an explicit empty-slot summary (not an analysis failure); when active, the stock-analysis path may enrich the slot with read-only research context metadata  
 6. **Non-investment-advice disclaimer** — always visible on user-facing formats
 
 ## Schema
@@ -24,7 +24,7 @@ Issue #616 requires analysis reports to present **fixed evidence strata** so flu
 
 ## New analysis artifacts
 
-Successful JSON parse paths call `attach_report_strata_to_dashboard`: existing LLM strata are normalized; otherwise an empty six-slot structure is written (framework not configured + disclaimer). New runs therefore always persist the six-slot payload; filled fact lines still depend on model/upstream data quality.
+Successful JSON parse paths call `attach_report_strata_to_dashboard`: existing LLM strata are normalized; otherwise an empty six-slot structure is written (`not_configured` when no active framework + disclaimer). `enrich_dashboard_framework_alignment` then fills the alignment slot when a framework is active. New runs therefore always persist the six-slot payload; filled fact lines still depend on model/upstream data quality. Presence of the slot or inject does not mean the model guarantees full rule compliance.
 
 ## Rendering
 
@@ -36,7 +36,7 @@ Successful JSON parse paths call `attach_report_strata_to_dashboard`: existing L
 
 ## Defaults
 
-- Empty or missing framework → `framework_alignment.status = not_configured` plus localized “framework not configured” summary  
+- Empty, missing, or inactive framework → `framework_alignment.status = not_configured` plus localized “not configured or inactive” summary  
 - Blank disclaimer on a present strata payload is filled with the language default  
 - `ensure_report_strata()` builds a complete empty structure for **new** artifacts that need the slot filled deterministically  
 
