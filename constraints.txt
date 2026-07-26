@@ -56,7 +56,7 @@ flake8==7.3.0
 frozenlist==1.8.0
 fsspec==2026.6.0
 futu-api==10.8.6808
-genai-prices==0.0.71
+genai-prices==0.0.72
 google-auth==2.56.2
 google-genai==2.13.0
 google-search-results==2.4.2
