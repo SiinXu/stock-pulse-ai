@@ -180,11 +180,8 @@ The product surface is intentionally small:
 | Surface | Behavior |
 | --- | --- |
 | Settings → System & Security → Scheduling → Legacy day-batch | Configures `SCHEDULE_*` + shows legacy status only. Copy labels it as legacy and warns when both tracks appear enabled. |
-| Settings → System & Security → Scheduling → Saved definitions | Lists versioned definitions, shows next run when known, and enable/disable supported definitions. Unsupported future schemas are visible but not mutable. |
+| Settings → System & Security → Scheduling → Saved definitions | Create supported definitions (`stock_analysis` / `research_brief` / `risk_check`), list persisted definitions, show next run and latest run status when the status API returns them, and enable/disable supported definitions. Unsupported future schemas are visible but not mutable. |
 | Home → Configurable area → Versioned scheduled tasks today | Read-only today projection from `GET /scheduled-tasks/today` (versioned track only). Empty state links to Settings management. |
-
-| Settings → System & Security → Scheduling | Create supported definitions (`stock_analysis` / `research_brief` / `risk_check`), list persisted definitions, show next run and latest run status when the status API returns them, and enable/disable supported definitions. Unsupported future schemas are visible but not mutable. |
-| Home → Configurable area → Scheduled tasks today | Read-only today projection from `GET /scheduled-tasks/today`. Empty state links to Settings management. |
 
 Defaults and framing:
 
