@@ -1,0 +1,315 @@
+<div align="center">
+
+# 📈 StockPulse · 智能股票分析系统
+
+[![GitHub stars](https://img.shields.io/github/stars/SiinXu/stock-pulse-ai?style=social)](https://github.com/SiinXu/stock-pulse-ai/stargazers)
+[![CI](https://github.com/SiinXu/stock-pulse-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/SiinXu/stock-pulse-ai/actions/workflows/ci.yml)
+[![License: MIT + AGPL-3.0](https://img.shields.io/badge/License-MIT%20%2B%20AGPL--3.0-blue.svg)](../LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Ready-2088FF?logo=github-actions&logoColor=white)](https://github.com/features/actions)
+
+> 🤖 基于 AI 大模型的 A股/港股/美股/日股/韩股/台股自选股智能分析系统，每日自动分析并推送「决策仪表盘」到企业微信/飞书/Telegram/Discord/Slack/邮箱
+
+[**功能特性**](#-功能特性) · [**为什么选 StockPulse**](#为什么选择-stockpulse相对上游) · [**快速开始**](#-快速开始) · [**推送效果**](#-推送效果) · [**文档中心**](INDEX.md) · [**完整指南**](full-guide.md) · [**English README**](../README.md)
+
+**简体中文** | [English](../README.md) | [繁體中文](README_CHT.md)
+
+</div>
+
+> [!NOTE]
+> **StockPulse** 是 [ZhuLinsen/daily_stock_analysis](https://github.com/ZhuLinsen/daily_stock_analysis) 的独立维护 fork。上游原始代码遵循 MIT License，StockPulse 新增与大幅修改的代码遵循 AGPL-3.0。StockPulse 不是上游团队发布的官方版本。感谢原作者和贡献者；完整授权条款见 [LICENSE](../LICENSE)。
+
+<a id="why-stockpulse"></a>
+## 为什么选择 StockPulse（相对上游）
+
+StockPulse 定位为**本地优先的投资研究工作台**：把数据、证据、策略与 Agent 能力收敛在你可控的环境里，而不是“一键荐股神器”。上游 `daily_stock_analysis` 仍是优秀的每日分析与推送基础；StockPulse 在 fork 上持续投入**可扩展契约、安全边界与研究工作流**。
+
+### 已交付差异（`main` 上可验证）
+
+| 差异 | 说明 | 深入阅读 |
+| --- | --- | --- |
+| 报告分层（信任 UX） | 事实 / 缺口 / 推断 / 风险 / 框架对齐 / 免责声明（Markdown / 简报 / 企微 / Web） | [更新日志](CHANGELOG.md) |
+| HITL 风险门控 | 默认关闭；高风险控制路径可审批；`/approvals` 页面 | [人工审批](human-approvals.md) |
+| 严格 ToolSurface | 工具默认拒绝、授权、schema / 股票范围、出站 URL 策略 | [安全基线](security-baseline.md) |
+| Model Pack | 版本化离线 GGUF 导入（Web + 桌面 Ollama） | [Model Packs](model-packs.md) |
+| 定时研究任务 | 日更分析 / 研究简报 / 风险检查；首页今日视图 | [定时任务](scheduled-tasks.md) |
+| 可信插件 | 策略、报告模板、通知渠道、事件钩子、数据源等 | [插件契约](plugin-extension-contract.md) |
+| Agent Soul / Persona / Critic | 宪章装配；可选委员会 Persona；多 Agent 前有界 Critic | [Agent Soul](agent-soul.md) |
+| 个人投资框架（后端） | 版本化存储与 API；Web 编辑器仍为最小范围 | [投资框架](personal-investment-framework.md) |
+| 安全审计 Phase 1 | 特权路径持久审计 | [安全审计](security-audit.md) |
+| 离线质量面板 | 固定样例 + 本地 runner（不绑 live LLM） | [贡献指南](CONTRIBUTING.md) |
+| 双许可证 | 上游 MIT + StockPulse AGPL-3.0 | [LICENSE](../LICENSE) |
+
+### 明确非承诺（请勿误解）
+
+- **不是**多租户 SaaS，也**不是**启用管理员登录后的用户隔离 / RBAC（见 [安全基线 AUTH-05](security-baseline.md) 与议题 [#230](https://github.com/SiinXu/stock-pulse-ai/issues/230)）。
+- **插件 = 与进程同权的可信代码**：可读写环境变量、密钥、数据库与文件；不要加载不可信第三方包。
+- **免费行情源可零配置运行**，但受上游限流与接口变动影响，稳定性不保证。
+- **输出仅供学习与研究**，不构成投资建议，亦非受监管投顾服务。
+
+### 规划中（勿与已交付混淆）
+
+| 方向 | 状态 | 跟踪 |
+| --- | --- | --- |
+| 投资框架完整 Web 编辑与全路径注入 | 进行中 | [#465](https://github.com/SiinXu/stock-pulse-ai/issues/465) |
+| 多用户 / 工作区隔离 | 规划 | [#230](https://github.com/SiinXu/stock-pulse-ai/issues/230) |
+
+更完整的场景入口见 [文档中心](INDEX.md)。架构边界见 [技术架构总览](architecture-overview.md)。
+
+## 🗂️ 目录导览
+
+| 区域 | 位置与职责 |
+| --- | --- |
+| 核心后端 | `src/` 承载业务与编排，`data_provider/` 适配数据源，`api/` 提供 FastAPI 路由，`bot/` 集成机器人。 |
+| 客户端 | `apps/dsa-web/` 是 Web 工作台，`apps/dsa-desktop/` 是 Electron 桌面客户端。 |
+| 产品资源 | `strategies/` 保存内置 YAML 策略，`templates/` 保存 Jinja 报告模板。 |
+| 文档与测试 | `docs/` 保存指南与架构说明，`tests/` 按后端领域组织测试。 |
+| 自动化 | `scripts/`、`docker/`、`.github/workflows/` 与 `.claude/` 分别承载脚本、容器、CI 和 AI 协作资产。 |
+| 运行入口 | `main.py` 启动分析、CLI 与调度，`server.py` 启动 FastAPI，`webui.py` 保留兼容 Web 启动方式。 |
+| 依赖策略 | `requirements*.txt` 声明运行时与可选依赖；`constraints.txt` 和 `build-constraints.txt` 约束运行时与构建解析。 |
+
+详细边界与数据流见 [架构总览](architecture-overview.md)。
+
+## ✨ 功能特性
+
+| 能力 | 覆盖内容 |
+|------|------|
+| AI 研究报告 | 评分、趋势、点位、风险、催化与清单；**报告分层**（事实 / 缺口 / 推断 / 风险 / 框架对齐 / 免责声明） |
+| 多市场数据 | A股 / 港股 / 美股 / 日股 / 韩股 / 台股与 ETF；行情、K 线、指标、新闻、公告、基本面；见 [市场支持边界](market-support.md) |
+| Web / 桌面工作台 | 分析、历史、完整 Markdown、回测、持仓（含纸面账户类型）、设置、浅色 / 深色主题 |
+| 风险与治理 | **默认关闭的 HITL 审批**、持久安全审计、出站 HTTP 策略、公网绑定防护 |
+| Agent 与 ToolSurface | 策略问股、工具**默认拒绝**的 ToolSurface、Agent Soul、可选 Persona、有界 Critic |
+| 本地模型 | Ollama 目录拉取、**Model Pack** 离线 GGUF 导入（Web / 桌面） |
+| 定时研究任务 | 日更分析 / 研究简报 / 风险检查；首页「今日任务」只读视图 |
+| 插件扩展 | 分析策略、报告模板、通知渠道、事件钩子、数据源等可信插件点 |
+| 智能导入与补全 | 图片、CSV/Excel、剪贴板；代码 / 名称 / 拼音补全 |
+| 自动化与推送 | GitHub Actions、Docker、进程内调度、FastAPI；企微 / 飞书 / Telegram / Discord / Slack / 邮件 + 渠道插件 |
+
+> 功能细节、字段契约、基本面 P0 超时语义、交易纪律、数据源优先级、Web/API 行为请看 [完整配置与部署指南](full-guide.md)。
+
+### 技术栈与数据来源
+
+| 类型 | 支持 |
+|------|------|
+| AI 模型 | [Anspire](https://open.anspire.cn/)、[AIHubMix](https://aihubmix.com/)、Gemini、OpenAI 兼容、DeepSeek、通义千问、Claude、Ollama 本地模型等 |
+| 行情数据 | [TickFlow](https://tickflow.org/)、AkShare、Tushare、Pytdx、Baostock、YFinance、Longbridge |
+| 新闻搜索 | [Anspire](https://open.anspire.cn/)、[SerpAPI](https://serpapi.com/baidu-search-api)、[Tavily](https://tavily.com/)、[Bocha](https://open.bocha.cn/)、[Brave](https://brave.com/search/api/)、[MiniMax](https://platform.minimaxi.com/)、SearXNG |
+| 社交舆情 | [Stock Sentiment API](https://api.adanos.org/docs)（Reddit / X / Polymarket，仅美股，可选） |
+
+> 项目默认内置 AkShare、Baostock、YFinance 等免费行情源，可零配置运行；免费源受上游限流、接口变动和网络波动影响，稳定性不保证。长期定时、批量分析或更稳定行情建议配置 TickFlow、Tushare、Longbridge 等 token 型数据源，适用市场、Actions 映射和 fallback 规则见 [数据源配置](full-guide.md#数据源配置)。
+
+## 🚀 快速开始
+
+### 方式一：[GitHub Actions（推荐）](https://www.bilibili.com/video/BV11FEb66EXG/)
+
+> 5 分钟完成部署，零成本，无需服务器。
+
+
+#### 1. Fork 本仓库
+
+点击右上角 `Fork` 按钮（顺便点个 Star⭐ 支持一下）
+
+#### 2. 配置 Secrets
+
+`Settings` → `Secrets and variables` → `Actions` → `New repository secret`
+
+**AI 模型配置（至少配置一个）**
+
+默认先选一个模型服务商并填写 API Key；需要多模型、图片识别、本地模型或高级路由时，再参考 [LLM 配置指南](LLM_CONFIG_GUIDE.md)。
+
+| Secret 名称 | 说明 | 必填 |
+|------------|------|:----:|
+| `ANSPIRE_API_KEYS` | [Anspire](https://open.anspire.cn/) API Key，可用于大模型和联网搜索 | **推荐** |
+| `AIHUBMIX_KEY` | [AIHubMix](https://aihubmix.com/) API Key，可切换使用多种模型 | **推荐** |
+| `GEMINI_API_KEY` | Google Gemini API Key | 可选 |
+| `ANTHROPIC_API_KEY` | Anthropic Claude API Key | 可选 |
+| `OPENAI_API_KEY` | OpenAI 兼容 API Key（支持 DeepSeek、通义千问等） | 可选 |
+| `OPENAI_BASE_URL` / `OPENAI_MODEL` | 使用 OpenAI 兼容服务时填写 | 可选 |
+
+> Ollama 更适合本地 / Docker 部署，GitHub Actions 推荐使用云端 API。
+
+**通知渠道配置（至少配置一个）**
+
+| Secret 名称 | 说明 |
+|------------|------|
+| `WECHAT_WEBHOOK_URL` | 企业微信机器人 |
+| `FEISHU_WEBHOOK_URL` | 飞书机器人 |
+| `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` | Telegram |
+| `DISCORD_WEBHOOK_URL` | Discord Webhook |
+| `SLACK_BOT_TOKEN` + `SLACK_CHANNEL_ID` | Slack Bot |
+| `EMAIL_SENDER` + `EMAIL_PASSWORD` | 邮件推送 |
+
+更多渠道、签名校验、分组邮件、Markdown 转图片等配置见 [通知渠道详细配置](full-guide.md#通知渠道详细配置)。
+
+**自选股配置（必填）**
+
+| Secret 名称 | 说明 | 必填 |
+|------------|------|:----:|
+| `STOCK_LIST` | 自选股代码，如 `600519,hk00700,AAPL,7203.T,005930.KS,2330.TW` | ✅ |
+
+**新闻源配置（推荐）**
+
+新闻源会显著影响舆情、公告、事件和催化因素质量，建议至少配置一个搜索服务。
+
+| Secret 名称 | 说明 | 必填 |
+|------------|------|:----:|
+| `ANSPIRE_API_KEYS` | [Anspire AI Search](https://open.anspire.cn/)：汇聚全球舆情信息，适配 A 股、美股、港股等新闻和舆情检索；同一 Key 可复用大模型服务 | **推荐** |
+| `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/baidu-search-api)：搜索引擎结果补强，适合实时金融新闻 | **推荐** |
+| `TAVILY_API_KEYS` | [Tavily](https://tavily.com/)：通用新闻搜索 API | 可选 |
+| `BOCHA_API_KEYS` | [博查搜索](https://open.bocha.cn/)：中文搜索优化，支持 AI 摘要 | 可选 |
+| `BRAVE_API_KEYS` | [Brave Search](https://brave.com/search/api/)：隐私优先，美股资讯补强 | 可选 |
+| `MINIMAX_API_KEYS` | [MiniMax](https://platform.minimaxi.com/)：结构化搜索结果 | 可选 |
+| `SEARXNG_BASE_URLS` | SearXNG 自建实例：无配额兜底，适合私有部署 | 可选 |
+
+更多搜索源、社交舆情和降级规则见 [搜索服务配置](full-guide.md#搜索服务配置)。
+
+**行情数据源配置（可选）**
+
+> 默认使用 AkShare、Baostock、YFinance 等免费数据源，日志中"未配置"的提示不影响运行。
+> 如需更稳定的行情，可按市场配置以下 Secret：
+
+| Secret 名称 | 适用市场 | 说明 |
+|------------|:--------:|------|
+| `TUSHARE_TOKEN` | A 股 | 提升历史行情稳定性 |
+| `LONGBRIDGE_OAUTH_CLIENT_ID` + `LONGBRIDGE_OAUTH_TOKEN_CACHE_B64` | 港股/美股 | 补齐量比、换手率、PE 等字段 |
+
+> 详见 [数据源配置](full-guide.md#数据源配置)。
+
+#### 3. 启用 Actions
+
+`Actions` 标签 → `I understand my workflows, go ahead and enable them`
+
+#### 4. 手动测试
+
+`Actions` → `StockPulse Daily Analysis` → `Run workflow` → `Run workflow`
+
+#### 完成
+
+默认每个**工作日 18:00（北京时间）**自动执行，也可手动触发。默认非交易日（含 A/H/US 节假日）不执行；强制运行、交易日检查、断点续传等规则见 [完整指南](full-guide.md#定时任务配置)。
+
+### 方式二：[客户端配置教程](https://www.bilibili.com/video/BV11FEb66Eyr/) / 本地运行 / Docker 部署
+
+```bash
+# 克隆项目
+git clone https://github.com/SiinXu/stock-pulse-ai.git && cd stock-pulse-ai
+
+# 安装依赖
+python -m pip install --upgrade --constraint constraints.txt pip
+python -m pip install --build-constraint build-constraints.txt -r requirements.txt
+python -m pip check
+
+# 配置环境变量
+cp .env.example .env && vim .env
+
+# 运行分析
+python main.py
+```
+
+常用命令：
+
+```bash
+python main.py --debug
+python main.py --dry-run
+python main.py --stocks 600519,hk00700,AAPL,2330.TW
+python main.py --market-review
+python main.py --schedule
+python main.py --serve-only
+```
+
+> Docker 部署、定时任务、云服务器访问请参考 [完整指南](full-guide.md)；桌面客户端打包请参考 [桌面端打包说明](desktop-package.md)。
+
+## 📱 推送效果
+
+### 决策仪表盘
+```
+🎯 2026-02-08 决策仪表盘
+共分析3只股票 | 🟢买入:0 🟡观望:2 🔴卖出:1
+
+📊 分析结果摘要
+⚪ 中钨高新(000657): 观望 | 评分 65 | 看多
+⚪ 永鼎股份(600105): 观望 | 评分 48 | 震荡
+🟡 新莱应材(300260): 卖出 | 评分 35 | 看空
+
+⚪ 中钨高新 (000657)
+📰 重要信息速览
+💭 舆情情绪: 市场关注其AI属性与业绩高增长，情绪偏积极，但需消化短期获利盘和主力流出压力。
+📊 业绩预期: 基于舆情信息，公司2025年前三季度业绩同比大幅增长，基本面强劲，为股价提供支撑。
+
+🚨 风险警报:
+
+风险点1：2月5日主力资金大幅净卖出3.63亿元，需警惕短期抛压。
+风险点2：筹码集中度高达35.15%，表明筹码分散，拉升阻力可能较大。
+风险点3：舆情中提及公司历史违规记录及重组相关风险提示，需保持关注。
+✨ 利好催化:
+
+利好1：公司被市场定位为AI服务器HDI核心供应商，受益于AI产业发展。
+利好2：2025年前三季度扣非净利润同比暴涨407.52%，业绩表现强劲。
+📢 最新动态: 【最新消息】舆情显示公司是AI PCB微钻领域龙头，深度绑定全球头部PCB/载板厂。2月5日主力资金净卖出3.63亿元，需关注后续资金流向。
+
+---
+生成时间: 18:00
+```
+
+### 大盘复盘
+```
+🎯 2026-01-10 大盘复盘
+
+📊 主要指数
+- 上证指数: 3250.12 (🟢+0.85%)
+- 深证成指: 10521.36 (🟢+1.02%)
+- 创业板指: 2156.78 (🟢+1.35%)
+
+📈 市场概况
+上涨: 3920 | 下跌: 1349 | 涨停: 155 | 跌停: 3
+
+🔥 板块表现
+领涨: 互联网服务、文化传媒、小金属
+领跌: 保险、航空机场、光伏设备
+```
+
+## ⚙️ 配置说明
+
+完整环境变量、模型渠道、通知渠道、数据源优先级、交易纪律、基本面 P0 语义和部署说明请参考 [完整配置指南](full-guide.md)。
+
+## 🖥️ Web 界面
+
+Web 工作台提供配置管理、任务监控、手动分析、历史报告、完整 Markdown 报告、Agent 问股、回测、持仓管理、智能导入和浅色 / 深色主题。启动方式：
+
+```bash
+python main.py --webui
+python main.py --webui-only
+```
+
+访问 `http://127.0.0.1:8000` 即可使用。认证、智能导入、搜索补全、历史报告复制、云服务器访问等细节见 [本地 WebUI 管理界面](full-guide.md#本地-webui-管理界面)。
+
+## 🤖 Agent 策略问股
+
+配置任意可用 AI API Key 后，Web `/chat` 页面即可使用策略问股；如需显式关闭可设置 `AGENT_MODE=false`。
+
+- 支持均线金叉、缠论、波浪理论、多头趋势、热点题材、事件驱动、成长质量、预期重估等内置策略
+- 支持实时行情、K 线、技术指标、新闻和风险信息调用
+- 支持多轮追问、会话导出、发送到通知渠道和后台执行
+- 支持自定义策略文件与多 Agent 编排（实验性）
+
+> Agent 具体参数、`skill` 命名兼容、多 Agent 模式和预算护栏见 [完整指南](full-guide.md#本地-webui-管理界面) 与 [LLM 配置指南](LLM_CONFIG_GUIDE.md)。
+
+## 📬 项目链接
+
+[GitHub 仓库](https://github.com/SiinXu/stock-pulse-ai) · [问题反馈](https://github.com/SiinXu/stock-pulse-ai/issues) · [文档中心](INDEX.md) · [English README](../README.md) · [文档中心](INDEX.md) · [部署安全边界](security-baseline.md#operator-security-boundaries)
+
+## 📄 License
+
+本项目采用双许可证：
+
+- **上游原始代码**：MIT License（Copyright © 2026 ZhuLinsen）
+- **StockPulse 新增与大幅修改的代码**：GNU Affero General Public License v3.0（AGPL-3.0）
+
+完整说明见 [LICENSE](../LICENSE) 文件。通过网络提供本软件服务（包括 Web 界面、API 或 Agent 平台）时，必须遵守 AGPL-3.0 的相应要求。StockPulse 保留上游项目的版权与许可声明，并作为独立项目持续维护。
+
+欢迎在二次开发或引用时注明 StockPulse 与上游项目的代码来源。
+
+## ⚠️ 免责声明
+
+本项目仅供学习和研究使用，不构成任何投资建议。股市有风险，投资需谨慎。作者不对使用本项目产生的任何损失负责。
+
+---

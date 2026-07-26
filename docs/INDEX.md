@@ -7,7 +7,7 @@
 | 我想要 | 先看 | 继续看 |
 | --- | --- | --- |
 | 快速了解项目能做什么 | [README](../README.md) | [完整配置与部署指南](full-guide.md) |
-| **了解 StockPulse 相对上游的差异** | [README · 为什么选择 StockPulse](../README.md#why-stockpulse) | [英文 README · Why StockPulse](README_EN.md#why-stockpulse)、[技术架构总览](architecture-overview.md) |
+| **了解 StockPulse 相对上游的差异** | [English README · Why StockPulse](../README.md#why-stockpulse) | [简体 README · 为什么选 StockPulse](README_CN.md#why-stockpulse)、[技术架构总览](architecture-overview.md) |
 | 第一次把项目跑起来 | [小白客户端安装与配置](beginner-client-setup.md)（[English](beginner-client-setup_EN.md)） | [README · 差异说明](../README.md#why-stockpulse)、[安全基线 · 运维边界](security-baseline.md#operator-security-boundaries)、[完整配置与部署指南](full-guide.md) |
 | **学习 Web / 桌面界面怎么用** | [界面操作手册](ui-manual/README.md) | 各模块分册（分析、信号、持仓等） |
 | 配置大模型渠道 | [LLM 配置指南](LLM_CONFIG_GUIDE.md) | [LLM 服务商配置指南](llm-providers.md) |
@@ -25,7 +25,8 @@
 
 | 文档 | 内容 |
 | --- | --- |
-| [README](../README.md) | 项目定位、相对上游差异、核心能力、快速开始、推送效果 |
+| [README（英文默认）](../README.md) | 项目定位、差异化、核心能力、快速开始（GitHub 首页） |
+| [README（简体中文）](README_CN.md) | 同上中文版 |
 | [小白客户端安装与配置](beginner-client-setup.md) | 面向不会代码用户的客户端下载、Anspire Open / AIHubMix 模型配置、新闻源配置和常见问题；[English](beginner-client-setup_EN.md) |
 | [界面操作手册](ui-manual/README.md) | Web / 桌面分模块界面用法（不含部署）；[English](ui-manual/README_EN.md) |
 | [完整配置与部署指南](full-guide.md) | 环境准备、运行方式、配置说明、部署路径和常见问题 |
@@ -98,6 +99,7 @@
 | 文档 | 内容 |
 | --- | --- |
 | [英文文档索引](INDEX_EN.md) | English documentation index |
-| [英文 README](README_EN.md) | English project overview and quick start |
+| [English README](../README.md) | English project homepage (repository root) |
+| [简体中文 README](README_CN.md) | Chinese project overview |
 | [繁中 README](README_CHT.md) | 繁體中文項目概覽與快速開始 |
 | [UI manual (English)](ui-manual/README_EN.md) | Modular Web/desktop UI guide |
