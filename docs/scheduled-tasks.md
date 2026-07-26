@@ -6,8 +6,8 @@ The scheduled-task model stores deterministic daily stock-analysis and bounded
 research tasks and runs them through the existing process-local
 `AnalysisTaskQueue ->
 AnalysisService` boundary. It does not add a natural-language scheduler,
-workflow engine, worker service, second analysis pipeline, or scheduling
-management UI. Home exposes only a read-only projection of today's occurrences.
+workflow engine, worker service, second analysis pipeline, or natural-language planning UI. Settings exposes a minimal list with enable/disable for
+persisted definitions. Home exposes a read-only projection of today's occurrences.
 
 Schema version 1 supports one configurable stock analysis per definition.
 Schema version 2 adds the predefined `research_brief` and `risk_check` types.
@@ -146,6 +146,23 @@ The database mutation is authoritative. If the immediate best-effort runtime
 reconciliation fails after a create, enable, or disable commit, the API still
 returns the committed result and logs `scheduled_task_runtime_reconcile_deferred`;
 the owner loop retries discovery on its next polling interval.
+
+
+## Web UI (minimal)
+
+The product surface is intentionally small:
+
+| Surface | Behavior |
+| --- | --- |
+| Settings → System & Security → Scheduling | Lists persisted definitions, shows next run when known, and enable/disable supported definitions. Unsupported future schemas are visible but not mutable. |
+| Home → Configurable area → Scheduled tasks today | Read-only today projection from `GET /scheduled-tasks/today`. Empty state links to Settings management. |
+
+Defaults and framing:
+
+- No create/edit form, natural-language planner, multi-tenant ownership, or distributed scheduler in this UI.
+- Execution remains process-local through `AnalysisTaskQueue` / ADR-008.
+- Research brief and risk-check schedules are research-only aids, not investment advice.
+- Daily stock-list scheduler env (`SCHEDULE_*`) remains the separate system-config card on the same Settings view.
 
 ## Occurrence And Execution Semantics
 

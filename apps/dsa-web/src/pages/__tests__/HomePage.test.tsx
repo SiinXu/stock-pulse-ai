@@ -261,7 +261,7 @@ describe('HomePage attention hub', () => {
     expect(taskList).toHaveAttribute('tabindex', '0');
     expect(within(taskList).getByRole('list')).toBeInTheDocument();
     expect(within(taskList).getAllByRole('listitem')).toHaveLength(1);
-    expect(within(scheduled).queryByRole('button')).not.toBeInTheDocument();
+    expect(within(scheduled).getByRole('button', { name: 'Manage schedules' })).toBeInTheDocument();
 
     for (const reportType of ['market_review', 'simple', 'detailed', 'full', 'brief']) {
       expect(historyApi.getList).toHaveBeenCalledWith(expect.objectContaining({ reportType }));
@@ -412,4 +412,16 @@ describe('HomePage attention hub', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(window.localStorage.getItem(ONBOARDING_DISMISSED_STORAGE_KEY)).toBe('true');
   });
+
+  it('links the today scheduled-tasks card to Settings management', async () => {
+    renderHome();
+    const configurable = await screen.findByRole('button', { name: /Configurable area/ });
+    fireEvent.click(configurable);
+    expect(await screen.findByRole('button', { name: 'Manage schedules' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Manage schedules' }));
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      `${APP_ROUTE_PATHS.settings}?section=system_security&view=runtime`,
+    );
+  });
+
 });

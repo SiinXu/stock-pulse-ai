@@ -713,7 +713,18 @@ const HomePage: React.FC = () => {
             description={t('home.scheduledTasksTodayDescription')}
             level="section"
             padding="md"
-            actions={<CalendarClock className="h-5 w-5 text-primary" aria-hidden="true" />}
+            actions={(
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => navigate(buildSettingsHref({ section: 'system_security', view: 'runtime' }))}
+                >
+                  {t('home.manageScheduledTasks')}
+                </Button>
+                <CalendarClock className="h-5 w-5 text-primary" aria-hidden="true" />
+              </div>
+            )}
           >
             {isLoading ? (
               <StatePanel state="loading" title={t('common.loading')} size="compact" titleAs="p" />
@@ -765,6 +776,15 @@ const HomePage: React.FC = () => {
                 compact
                 title={t('home.noScheduledTasksTodayTitle')}
                 description={t('home.noScheduledTasksTodayDescription')}
+                action={(
+                  <Button
+                    variant="secondary"
+                    size="default"
+                    onClick={() => navigate(buildSettingsHref({ section: 'system_security', view: 'runtime' }))}
+                  >
+                    {t('home.manageScheduledTasks')}
+                  </Button>
+                )}
               />
             )}
           </Section>

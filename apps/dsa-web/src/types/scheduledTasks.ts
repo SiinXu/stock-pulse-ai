@@ -14,8 +14,10 @@ export type ScheduledTaskOccurrenceStatus =
   | 'skipped'
   | 'interrupted';
 
+export type ScheduledTaskCompatibility = 'supported' | 'unsupported_schema';
+
 export interface ScheduledTaskDefinitionSummary {
-  compatibility: 'supported' | 'unsupported_schema';
+  compatibility: ScheduledTaskCompatibility;
   id: string;
   schemaVersion: number;
   name: string;
@@ -24,6 +26,16 @@ export interface ScheduledTaskDefinitionSummary {
   nextRunAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ScheduledTaskListResponse {
+  items: ScheduledTaskDefinitionSummary[];
+  total: number;
+}
+
+export interface ScheduledTaskListQuery {
+  enabled?: boolean;
+  limit?: number;
 }
 
 export interface ScheduledTaskRunSummary {
