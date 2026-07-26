@@ -4,18 +4,18 @@
 
 ## Current Scope (Product Narrative Freeze)
 
-Issue #465 started as a **backend** slice. Current `main` also wires a **partial** analysis inject. Keep marketing and docs aligned with the tree:
+Issue #465 started as a **backend** slice. Current `main` also wires a **partial** analysis inject and a **minimal Settings editor**. Keep marketing and docs aligned with the tree:
 
 **Shipped:**
 
 - Versioned local storage, CRUD/history APIs, optimistic concurrency
 - Stable `InvestmentFrameworkContextReader` read adapter
+- **Settings → Agent Behavior** minimal editor: create, versioned save, deactivate, delete (title/description/free-form rules/line-based risk and tracking; full decision-tree and dimension-matrix UI can come later)
 - **Stock analysis path** inject: active framework is attached as **read-only research context** via `inject_framework_into_analysis_context` (`src/core/stages/analysis_stock.py` → analyzer prompt key `personal_investment_framework_prompt`)
 - Report-strata **alignment slot enrichment** when a framework is active (`enrich_dashboard_framework_alignment`); otherwise `framework_alignment.status=not_configured` with a localized empty-slot summary
 
 **Not shipped / not full product:**
 
-- **No Web editor** on `main` Settings or report UI (manage via API only; do **not** claim a Settings editor is live, and do **not** use “Web editor still minimal”)
 - No import/export and no automated trading
 - Not a general inject into Multi-agent, Research/Chat, or `AnalysisContextPack` as a pack field
 - Inject is research context only—not live trading authority, and not a guarantee the model follows every rule
@@ -70,6 +70,30 @@ After create, update, or deactivation flushes, the repository expires its ORM id
 Every mutation's `expected_revision` protects aggregate state, not just the content version. Only confirmed revision drift returns `409 investment_framework_revision_conflict` and exposes `params.current_revision` so the client can refresh before retrying. A version-history constraint inconsistency fails closed as a server-side data error instead of masquerading as a retryable revision conflict. Absence returns `404 investment_framework_not_found`; invalid request schemas use the existing stable `422 validation_error` envelope.
 
 The history endpoint currently returns the complete history in one unpaginated response. That keeps this backend slice's contract simple, but frequent long-term updates make read cost and payload size grow with the version count. Any future pagination must separately define compatible ordering, cursor, and total semantics.
+
+## Web editor
+
+Settings → **Agent Behavior** hosts the minimal editor:
+
+- Create the single local framework (`POST /api/v1/investment-framework`)
+- Save with `expected_revision` to create and activate a new version (`PUT`)
+- Deactivate (`POST .../deactivate`) so analysis no longer injects the framework
+- Delete (`DELETE`) removes the aggregate and all history
+
+The editor supports title, description, free-form rules, and line-based risk/tracking criteria. Full decision-tree UI can be added later; richer content already stored via API remains readable. Saving free-form fields preserves server-owned `decision_tree` / `evaluation_dimensions` so the minimal editor does not wipe structured content. On HTTP 409 revision conflicts, the UI reloads server state.
+
+The page always shows a research-only disclaimer: not investment advice.
+
+## Analysis injection path
+
+The stock analysis pipeline (`src/core/stages/analysis_stock.py`, decision-dashboard Single path):
+
+1. Calls `inject_framework_into_analysis_context` for the active framework.
+2. **Fails soft** when none is configured or deactivated (same analysis behavior as before).
+3. When active, writes `personal_investment_framework_prompt` plus a JSON snapshot; prompt formatting appends the read-only section.
+4. After successful JSON parse, `enrich_dashboard_framework_alignment` fills report strata `framework_alignment` (default `partial` with title/version; preserves model `aligned`/`conflict` when already present).
+
+Implementation: `src/services/investment_framework_prompt.py` and `InvestmentFrameworkContextReader`.
 
 ## Analysis-Context Read Boundary
 

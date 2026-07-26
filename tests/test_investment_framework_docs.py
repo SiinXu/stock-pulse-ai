@@ -33,11 +33,14 @@ def test_framework_topic_documents_api_scope_context_and_rollback() -> None:
         assert "2N-1" in document
         assert "trigger" in document.lower()
         assert "TEMP" in document
-        # Product narrative freeze: honest ship state after stock-analysis inject.
+        # Product narrative freeze: Settings editor + stock-analysis inject are shipped;
+        # Multi/Chat still out of scope.
         assert (
-            "no web editor" in document.lower()
-            or "无 web 编辑器" in document.lower()
-            or "无 Web 编辑器" in document
+            "Settings" in document
+            or "Agent Behavior" in document
+            or "Agent 行为" in document
+            or "minimal editor" in document.lower()
+            or "最小编辑器" in document
         )
         assert (
             "stock analysis" in document.lower()
@@ -45,6 +48,12 @@ def test_framework_topic_documents_api_scope_context_and_rollback() -> None:
             or "inject_framework_into_analysis_context" in document
         )
         assert "personal_investment_framework_prompt" in document or "只读研究" in document
+        assert (
+            "Multi-agent" in document
+            or "Multi/Chat" in document
+            or "Multi-agent / Research / Chat" in document
+            or "Multi / Chat / Research" in document
+        )
 
 
 def test_framework_docs_are_discoverable_without_expanding_readmes() -> None:
@@ -52,9 +61,16 @@ def test_framework_docs_are_discoverable_without_expanding_readmes() -> None:
     index_en = _read("docs/INDEX_EN.md")
     changelog = _read("docs/CHANGELOG.md")
 
-    assert "[个人投资框架后端合同](personal-investment-framework.md)" in index
+    assert "[个人投资框架](personal-investment-framework.md)" in index
     assert (
-        "[Personal Investment Framework Backend Contract]"
+        "[Personal Investment Framework]"
         "(personal-investment-framework_EN.md)"
     ) in index_en
     assert "versioned local personal investment framework backend" in changelog
+    # Living docs cover Settings editor + single-path analysis injection.
+    chinese = _read("docs/personal-investment-framework.md")
+    english = _read("docs/personal-investment-framework_EN.md")
+    for document in (chinese, english):
+        assert "Agent Behavior" in document or "Agent 行为" in document
+        assert "framework_alignment" in document
+        assert "investment_framework_prompt" in document

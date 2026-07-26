@@ -4,18 +4,18 @@
 
 ## 当前范围（产品叙事冻结）
 
-Issue #465 以**后端**切片起步。当前 `main` 已有**部分**分析注入。对外叙事必须与代码树一致：
+Issue #465 以**后端**切片起步。当前 `main` 已有**部分**分析注入与 Settings 最小编辑器。对外叙事必须与代码树一致：
 
 **已交付：**
 
 - 本地版本化存储、CRUD/历史 API、乐观并发
 - 稳定的 `InvestmentFrameworkContextReader` 只读 adapter
+- **Settings → Agent 行为** 最小编辑器：创建、版本化保存、停用、删除（标题/说明/自由规则/按行风险与跟踪条件；决策树与完整维度矩阵 UI 仍可后续扩展）
 - **个股分析路径**注入：active 框架经 `inject_framework_into_analysis_context`（`src/core/stages/analysis_stock.py` → analyzer 的 `personal_investment_framework_prompt`）作为**只读研究上下文**
 - 报告分层 **对齐槽位填充**：有 active 框架时由 `enrich_dashboard_framework_alignment` 写入；否则 `framework_alignment.status=not_configured` 与本地化空槽摘要
 
 **未交付 / 非完整产品：**
 
-- **`main` 上无 Web 编辑器**（设置页/报告 UI 无编辑入口；仅 API 管理；勿声称 Settings 编辑器已上线，也勿写“Web 编辑器仍为最小范围”）
 - 无导入/导出、无自动交易
 - 未作为通用字段接入 Multi-agent / Research / Chat 或 `AnalysisContextPack`
 - 注入仅为研究上下文——**不是**实盘交易权限，也**不保证**模型逐条遵守规则
@@ -70,6 +70,30 @@ Create、update 或 deactivate flush 后，repository 会使 ORM identity state 
 所有 mutation 的 `expected_revision` 都针对 aggregate state，而不是 content version。只有确证的 revision 漂移返回稳定 `409 investment_framework_revision_conflict`，`params.current_revision` 告知客户端刷新后重试；version-history constraint 不一致会 fail closed 为服务端 data error，不能伪装成可重试的 revision conflict。不存在返回 `404 investment_framework_not_found`，请求 schema 错误返回现有稳定 `422 validation_error` envelope。
 
 历史端点当前一次返回完整历史，不提供分页。该行为保持本切片的简单合同，但长期频繁更新会使读取成本和响应体随版本数增长；引入分页时必须另行定义兼容的顺序、游标和 total 语义。
+
+## Web 编辑入口
+
+Settings → **Agent 行为** 提供最小编辑器：
+
+- 创建本机唯一框架（`POST /api/v1/investment-framework`）
+- 保存时携带 `expected_revision` 创建新版本并激活（`PUT`）
+- 停用（`POST .../deactivate`）后分析不再注入框架
+- 删除（`DELETE`）会移除 aggregate 与全部历史
+
+编辑器当前支持标题、说明、自由规则，以及按行填写的风险规则/跟踪条件。决策树与完整维度矩阵 UI 仍可在后续扩展；若 API 收到更完整 content，历史与 GET 仍会返回。保存自由文本字段时会保留服务端已有的 `decision_tree` / `evaluation_dimensions`，避免最小编辑器覆盖结构化内容。修订冲突（HTTP 409）时界面会重新加载服务端状态。
+
+页面固定展示研究用途免责声明：不构成投资建议。
+
+## 分析注入路径
+
+股票分析 pipeline（`src/core/stages/analysis_stock.py`，Single 决策仪表盘路径）在增强上下文中：
+
+1. 调用 `inject_framework_into_analysis_context` 读取 active framework。
+2. 未配置或停用时 **fail soft**，分析行为与后端切片前一致。
+3. 已激活时写入 `personal_investment_framework_prompt` 与序列化 snapshot；`GeminiAnalyzer` prompt 格式化会追加该只读章节。
+4. 解析成功后的 dashboard 会通过 `enrich_dashboard_framework_alignment` 填充报告 strata 的 `framework_alignment`（默认 `partial` + 框架标题/版本；若模型已给出 `aligned`/`conflict` 则保留）。
+
+实现入口：`src/services/investment_framework_prompt.py` 与既有 `InvestmentFrameworkContextReader`。
 
 ## 分析上下文读取边界
 
