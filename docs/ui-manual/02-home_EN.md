@@ -1,149 +1,187 @@
-# 02 Home: start here after you open the app
+# 02 Home
 
-If this is your first time in StockPulse, Home can feel oddly empty—no giant report wall, just a few cards and tips. That is intentional.
+## What you will learn
 
-Home is an **attention hub**: it helps you decide **what to look at today**, not dump every historical report on the screen. Think of it as the front door. Glance first, then walk into analysis, signals, or portfolio.
+1. Treat Home as an **attention hub**, not a report dump  
+2. Read the setup banner, focus, todos, signal summary, scheduled tasks, morning entry, recent analyses  
+3. Complete “setup → first analysis” end-to-end  
+4. Run a 3-minute pre-open habit  
+5. Fix empty Home, sticky yellow banners, odd redirects  
 
-> 💡 **First visit checklist**  
-> 1. Configure at least one **AI model**, save it, and pass **test connection**.  
-> 2. Put **1–3** familiar symbols on the watchlist (e.g. `600519`).  
-> If either is missing, Home may keep saying setup is incomplete. That is protection, not a bug—running analysis without basics usually fails and burns quota.
+> 📘 **One-liner**  
+> Home answers **what to look at today**, then you drill into analysis, signals, or portfolio.
 
-> ⚠️ Home summaries are for learning and research only — **not investment advice**.
+> 💡 **Before you rely on Home**  
+> 1. At least one AI model that **tests green** and was **Saved**.  
+> 2. Watchlist with **1–3** familiar codes (e.g. `600519`).  
+
+> ⚠️ **Research only** — summaries and signals are **not investment advice**.
 
 ---
 
-## How to open Home
+## 1. Information architecture
 
-| Method | What to do |
+```mermaid
+flowchart TD
+  A[Open /] --> B{Setup gap?}
+  B -->|yes| C[Guided setup → Settings]
+  B -->|no| D[Focus · Todos · Summary]
+  A --> H[Today's scheduled tasks RO]
+  A --> I[Expandable: morning / recent]
+  D --> J[Signal Center]
+```
+
+| Block | Question it answers | Not for |
+| --- | --- | --- |
+| Setup banner | What’s missing for a minimal run? | Full field help (Settings) |
+| Today’s focus | Which active signals deserve a glance? | Full report narrative |
+| Todos | Research re-check reminders? | Life todos |
+| Signal summary | Open Signal Center or not? | Per-signal invalidation detail |
+| Scheduled tasks | Did today’s automation run? | Editing schedules (Settings) |
+| Morning entry | Latest market review shortcut | Single-name orders |
+| Recent analyses | Last few reports | Full history (Workbench) |
+
+---
+
+## 2. How to open Home
+
+| Method | Action |
 | --- | --- |
-| Nav | Click **Home** |
+| Nav | **Home** |
 | URL | `/` |
-| Command palette | `Cmd/Ctrl + K` → “home” |
-| After setup | Save settings, return here, check whether the gap banner cleared |
+| Palette | `Cmd/Ctrl+K` → home |
+| After setup | Save → return → check banner |
 
 ---
 
-## When Home helps
-
-| Situation | What to do on Home |
-| --- | --- |
-| Fresh install | Follow **Start guided setup** on the warning banner |
-| Few minutes before the open | Scan **Today’s focus** and **Todos**; open only 1–2 names you care about |
-| You already ran analyses | Jump from focus into Signal Center, or expand recent reports |
-| Partial load | Use **Retry** on the incomplete-data warning |
-| Just want to analyze | Empty focus → **Start analysis** opens the Workbench |
-
----
-
-## What you will see (in plain language)
-
-1. **(Maybe) setup-incomplete banner** — fix this first.  
-2. **Three core blocks**: Today’s focus, Todos, Signal summary.  
-3. **Expandable area**: morning/market review entry and recent analyses—often collapsed so the page stays calm.
+## 3. Block details
 
 ### Setup-incomplete banner
 
-Lists what is still missing (model, watchlist, …).
+> 🖼️ **Figure placeholder** · `assets/home-config-gap-en.png`  
+> **Capture**：Home setup-incomplete banner + Start guided setup CTA.  
+> **Notes**：Reproduce with missing model/watchlist; crop banner.  
+> **Status**：pending — see [assets/PLACEHOLDERS.md](assets/PLACEHOLDERS.md)
 
-- **Start guided setup** jumps into Settings readiness.  
-- You can dismiss and look around, but fill the gaps before relying on analysis.  
-- Always **Save** after edits; unsaved keys will not clear the banner.
+Lists gaps (model, watchlist, …). **Start guided setup** → fix → **Save** → test connection → return.
+
+> ❌ **Avoid**  
+> Paste a key, never Save, refresh Home forever.
 
 ### Today’s focus
 
-Latest **active** signals worth a glance, usually time-ordered.
+Active signals, usually time-ordered. Click a row → Signal Center with context.
 
-| State | Meaning | Next step |
-| --- | --- | --- |
-| Rows listed | Active signals exist | Click a row → Signal Center with that symbol |
-| **No focus signals** | Nothing active yet | **Start analysis** |
-| Load error | Feed failed | Retry; check network/backend |
+> ⚠️ **Note**  
+> Focus is **not** a must-buy list. Prefer: holdings → real watchlist → ignore noise.
 
 ### Todos
 
-Not a life todo app—research reminders such as signals nearing expiry that deserve a human re-check. **Todos clear** means nothing urgent in that sense.
+Research reminders (e.g. near-expiry signals), not a life planner.
 
 ### Signal summary
 
-A small dashboard (counts for active signals, alerts, review due). Use it to decide whether to open Signal Center—not as a substitute for reading details.
+KPI strip: whether Signal Center is worth opening—not a substitute for reading items.
 
-### Expandable: morning report & recent analyses
+### Today’s scheduled tasks (read-only)
 
-- No morning block data → run a [market review](04-market-review_EN.md).  
-- Recent analyses → open a report quickly.  
-- Full history lives under **Research → Analysis Workbench → History**.
+> 🖼️ **Figure placeholder** · `assets/home-scheduled-tasks-en.png`  
+> **Capture**：Today’s scheduled tasks block: read-only copy + rows or empty state.  
+> **Notes**：Show status labels; English UI.  
+> **Status**：pending — see [assets/PLACEHOLDERS.md](assets/PLACEHOLDERS.md)
 
----
+| Item | Detail |
+| --- | --- |
+| Role | Today’s runs only |
+| Types | Stock analysis, research brief, risk check, … |
+| Edit rules | **Settings → System & Security → Scheduling** |
+| Empty list | Usually “none planned”, not a crash |
 
-## First success path (follow along)
+```mermaid
+flowchart LR
+  S[Settings · Scheduling] --> R[Long-running process]
+  R --> H[Home · read-only list]
+```
 
-1. Home shows a gap → **Start guided setup**.  
-2. Add a model provider, **Save**, **Test connection** until green.  
-3. Watchlist e.g. `600519` → **Save**.  
-4. Back to Home; banner should ease.  
-5. **Start analysis** → run one symbol.  
-6. Read with [08 Reading reports](08-reading-reports_EN.md).
+### Expandable: morning & recent
 
-If something fails, stop multi-clicking. Read the error; fix keys/quota/network in [10 Settings](10-settings_EN.md).
-
----
-
-## Three-minute pre-open habit
-
-1. Check todos for near-expiry signals.  
-2. Open at most 1–2 focus rows you actually hold or watch.  
-3. Expand recent analyses for continuity.  
-4. Open market review only if you need market context.
+Collapsed by default. Full market review → [04](04-market-review_EN.md). Full history → Workbench history.
 
 ---
 
-## Links & redirects
+## 4. Tutorial: zero → first report
 
-Clean `/` stays on Home. Legacy `recordId` links may redirect into Workbench history on purpose. Invalid links show a clear error—pick another history row.
+| Step | Action | Success |
+| --- | --- | --- |
+| 1 | Guided setup | Settings readiness |
+| 2 | Model + Save + test | Connection OK |
+| 3 | Watchlist + Save | Codes stored |
+| 4 | Back to Home | Banner eases |
+| 5 | Start analysis | Task runs |
+| 6 | Read report | [08](08-reading-reports_EN.md) order |
+
+Stop multi-clicking on errors—fix key, quota, network, backend.
 
 ---
 
-## Friendly FAQ
+## 5. Tutorial: 3-minute pre-open
 
-**Empty Home—broken?** Usually no successful analysis or no active signals yet.  
-**I typed a key but setup still incomplete?** Did you **Save** and pass test connection?  
-**Where is Signal Center in the sidebar?** It is not a top-level item—use focus rows, the bell, or `/signals`. See [06](06-signals_EN.md).
+1. Todos for near-expiry  
+2. At most 1–2 focus rows you truly care about  
+3. Scheduled tasks status  
+4. Optional: recent analyses or market review  
 
 ---
 
+## 6. Links & redirects
 
+Clean `/` stays on Home. Links with `recordId` may redirect into Workbench history on purpose. Invalid links show a clear error.
 
-## Today’s scheduled tasks (if your build has them)
+---
 
-Newer / unmerged builds may show a **Today’s scheduled tasks** read-only block on Home:
+## 7. Use cases
 
-- Lists tasks that already ran or will run today (analysis, research brief, risk check, …).  
-- Statuses may include running, waiting retry, skipped.  
-- **Not** the place to edit schedules — use Settings → System & Security → Scheduling.  
-- Empty list for today is normal when nothing is planned.
+**Sticky yellow banner:** Save + test connection + non-empty watchlist.  
+**Two minutes at work:** todos + one focus + scheduled status.  
+**Too many focus rows:** holdings first.  
+**Focus → rule:** Signal Center → Rules → price condition.  
+**Waiting retry on schedule:** confirm schedule enabled + long-running process; don’t thrash watchlist first.  
+**Empty Home:** run one analysis first.
 
-See `docs/scheduled-tasks.md` for implementation detail.
+More recipes: [11](11-daily-workflows_EN.md).
+
+---
+
+## 8. FAQ
+
+| Q | A |
+| --- | --- |
+| Broken empty Home? | Usually no reports/active signals yet |
+| Key typed, still incomplete? | Save + test |
+| No Signals in sidebar? | Not primary; bell / focus / `/signals` |
+
+---
+
+## 9. Self-check
+
+- [ ] Explain why Home can look empty  
+- [ ] Clear a setup banner properly  
+- [ ] Distinguish focus / todos / summary / scheduled tasks  
+- [ ] Know schedules are edited in Settings  
+
+---
 
 ## Glossary
 
-| Term | Plain meaning |
+| Term | Meaning |
 | --- | --- |
-| Attention hub | Home’s job: prioritize today |
-| Today’s focus | Priority active signals |
-| Todos | Research re-check reminders |
+| Attention hub | Home’s job |
 | Active signal | Still-live Decision Signal |
 | Guided setup | Jump into Settings readiness |
-| Morning report | Home entry toward latest market review |
-
----
+| Today’s scheduled tasks | Read-only projection of today’s runs |
 
 ## Related
 
-- [01 Shell](01-shell_EN.md)  
-- [03 Analysis Workbench](03-analysis-workbench_EN.md)  
-- [06 Signal Center](06-signals_EN.md)  
-- [10 Settings](10-settings_EN.md)  
-- [Beginner client setup](../beginner-client-setup_EN.md)  
+[01](01-shell_EN.md) · [03](03-analysis-workbench_EN.md) · [06](06-signals_EN.md) · [10](10-settings_EN.md) · [11](11-daily-workflows_EN.md)
 
-Prev: [01 Shell](01-shell_EN.md) · Next: [03 Analysis Workbench](03-analysis-workbench_EN.md)
+Prev: [01](01-shell_EN.md) · Next: [03](03-analysis-workbench_EN.md)

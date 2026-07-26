@@ -1,34 +1,37 @@
 # 02 Beranda
 
-Halo. Beranda memprioritaskan apa yang dilihat hari ini.
+Beranda adalah **pusat perhatian**: apa yang perlu dilihat hari ini, bukan seluruh riwayat laporan.
 
-> 💡 First: working model + 1–3 watchlist codes, then Save.  
-> ⚠️ Hanya riset — **bukan saran investasi**.
+> Pertama: model yang terhubung + 1–3 kode watchlist → **Simpan**.  
+> Hanya untuk penelitian/belajar — **bukan nasihat investasi**.
 
-## Jalur
+## Cara buka
 
-| How | Where |
+| Cara | Di mana |
 | --- | --- |
-| Navigation | **Home** |
+| Navigasi | **Beranda** |
 | URL | `/` |
-| Guided setup | Settings readiness |
+| Perintah | `Cmd/Ctrl + K` → home |
+| Setup terpandu | Kesiapan di Pengaturan |
 
-## Blocks
+## Blok
 
-1. **Setup incomplete banner** → Start guided setup  
-2. **Today's focus** → active signals  
-3. **Todos** → re-check reminders  
-4. **Signal summary** → KPIs  
-5. **Expandable area** → market review / recent analyses  
-6. **Today's scheduled tasks** (if your build has it) → read-only scheduled tasks  
+1. **Banner setup belum lengkap** → setup terpandu  
+2. **Fokus hari ini** → sinyal aktif  
+3. **Todos** → pengingat cek ulang  
+4. **Ringkasan sinyal** → angka  
+5. **Tugas terjadwal hari ini** (hanya baca)  
+6. **Area lipat** → ulasan pasar / analisis terbaru  
 
-## First success path
+Buat/ubah jadwal di **Pengaturan → Sistem & keamanan → Penjadwalan**. “Tidak ada tugas hari ini” biasanya normal.
 
-1. Add model + Save + test connection  
-2. Fill watchlist (`600519`)  
-3. Confirm Home gap clears  
-4. Start analysis  
-5. Read the report → [08](08-reading-reports.md)  
+## Jalur sukses pertama
+
+1. Model + Simpan + uji koneksi  
+2. Watchlist (`600519`)  
+3. Banner beranda mereda  
+4. Mulai analisis  
+5. Baca laporan → [08](08-reading-reports.md)  
 
 ## Terkait
 

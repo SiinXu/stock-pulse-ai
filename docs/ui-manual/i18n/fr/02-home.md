@@ -1,34 +1,37 @@
 # 02 Accueil
 
-Bonjour. L'accueil priorise ce qu'il faut regarder aujourd'hui.
+L’accueil est un **hub d’attention** : quoi regarder aujourd’hui, pas tout l’historique des rapports.
 
-> 💡 First: working model + 1–3 watchlist codes, then Save.  
-> ⚠️ Recherche uniquement — **pas un conseil d'investissement**.
+> D’abord : un modèle qui connecte + 1–3 codes en liste → **Enregistrer**.  
+> Recherche / apprentissage uniquement — **pas un conseil en investissement**.
 
-## Chemins
+## Ouvrir
 
-| How | Where |
+| Comment | Où |
 | --- | --- |
-| Navigation | **Home** |
+| Navigation | **Accueil** |
 | URL | `/` |
-| Guided setup | Settings readiness |
+| Commande | `Cmd/Ctrl + K` → home |
+| Config guidée | Préparation dans Réglages |
 
-## Blocks
+## Blocs
 
-1. **Setup incomplete banner** → Start guided setup  
-2. **Today's focus** → active signals  
-3. **Todos** → re-check reminders  
-4. **Signal summary** → KPIs  
-5. **Expandable area** → market review / recent analyses  
-6. **Today's scheduled tasks** (if your build has it) → read-only scheduled tasks  
+1. **Bannière config incomplète** → config guidée  
+2. **Focus du jour** → signaux actifs  
+3. **Todos** → rappels de relecture  
+4. **Résumé des signaux** → compteurs  
+5. **Tâches planifiées du jour** (lecture seule)  
+6. **Zone repliable** → revue de marché / analyses récentes  
 
-## First success path
+Créer/éditer les horaires : **Réglages → Système et sécurité → Planification**. « Aucune tâche aujourd’hui » est souvent normal.
 
-1. Add model + Save + test connection  
-2. Fill watchlist (`600519`)  
-3. Confirm Home gap clears  
-4. Start analysis  
-5. Read the report → [08](08-reading-reports.md)  
+## Premier parcours réussi
+
+1. Modèle + Enregistrer + test de connexion  
+2. Liste (`600519`)  
+3. La bannière d’accueil s’apaise  
+4. Lancer une analyse  
+5. Lire le rapport → [08](08-reading-reports.md)  
 
 ## Lié
 

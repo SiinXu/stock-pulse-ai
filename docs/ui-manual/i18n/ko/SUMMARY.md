@@ -1,7 +1,7 @@
 # Summary
 
 * [StockPulse UI 사용 설명서](README.md)
-* [셸](01-shell.md)
+* [메뉴와 상단 바](01-shell.md)
 * [홈](02-home.md)
 * [분석 워크벤치](03-analysis-workbench.md)
 * [시장 리뷰](04-market-review.md)

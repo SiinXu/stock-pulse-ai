@@ -1,34 +1,37 @@
 # 02 ホーム
 
-こんにちは。 ホームは「今日何を見るか」を整理する場所です。
+ホームは「今日何を見るか」を整理する場所です。全部の履歴を並べる壁ではありません。
 
-> 💡 First: working model + 1–3 watchlist codes, then Save.  
-> ⚠️ 学習・研究用途であり、**投資助言ではありません**。
+> 最初に：動くモデル + 自選 1〜3 銘柄 → **保存**。  
+> 学習・研究用途であり、**投資助言ではありません**。
 
 ## 入り方
 
-| How | Where |
+| 方法 | 場所 |
 | --- | --- |
-| Navigation | **Home** |
+| ナビ | **ホーム** |
 | URL | `/` |
-| Guided setup | Settings readiness |
+| コマンド | `Cmd/Ctrl + K` → home |
+| 案内設定 | 設定の準備状況へ |
 
-## Blocks
+## 画面のブロック
 
-1. **Setup incomplete banner** → Start guided setup  
-2. **Today's focus** → active signals  
-3. **Todos** → re-check reminders  
-4. **Signal summary** → KPIs  
-5. **Expandable area** → market review / recent analyses  
-6. **Today's scheduled tasks** (if your build has it) → read-only scheduled tasks  
+1. **設定未完了バナー** → 案内設定を開始  
+2. **今日のフォーカス** → 有効なシグナル  
+3. **ToDo** → 再確認リマインダー  
+4. **シグナル要約** → 件数などの指標  
+5. **今日の定時タスク**（読み取り専用）→ 当日のスケジュール実行  
+6. **折りたたみ** → 大盤レビュー / 最近の分析  
 
-## First success path
+定時ルールの作成・編集は **設定 → システムとセキュリティ → スケジュール**。ホームでは変更できません。空のリストは「今日は予定なし」のことが多く、故障とは限りません。
 
-1. Add model + Save + test connection  
-2. Fill watchlist (`600519`)  
-3. Confirm Home gap clears  
-4. Start analysis  
-5. Read the report → [08](08-reading-reports.md)  
+## 最初の成功ルート
+
+1. モデル追加 → 保存 → 接続テスト  
+2. 自選（例 `600519`）  
+3. ホームの不足表示が消えることを確認  
+4. 分析を開始  
+5. レポートを読む → [08](08-reading-reports.md)  
 
 ## 関連
 

@@ -1,28 +1,36 @@
-# 10 Paramètres
+# 10 Réglages
 
-Bonjour. Make the minimum path work.
+Beaucoup de champs. Trois gains d’abord :
 
-## Three first wins
+1. **Un modèle qui connecte**  
+2. **Une liste avec des codes**  
+3. **(Optionnel) un canal avec test d’envoi**  
 
-1. Model connects  
-2. Watchlist has codes  
-3. One notify channel (optional)  
+> Uniquement les clics UI. Déploiement ailleurs.  
+> **Enregistrer → tester → quitter**.
 
-## Chemins
+## Ouvrir
 
-`/settings` · `section=ai_models&view=connections`  
+`/settings` · config guidée sur l’accueil · `section=ai_models&view=connections`
 
-## Save discipline
+## Notifications
 
-Edit → Save → test connection/push → leave  
+Canaux souvent en **cartes**. Ouvrir un canal, token → **test** → **Enregistrer**.  
+Des **plugins de canal** côté déploiement peuvent en ajouter (`docs/notifications.md`).
 
-## Upcoming / unmerged surfaces
+## Planification
 
-- Local model packs (if build has them)  
-- Notification plugins  
-- Investment framework surfaces  
-- Scheduling details in System & Security  
+**Système et sécurité → Planification** : auto on/off, heure, prochaine exécution, « lancer maintenant » si autorisé.  
+Sur l’accueil, **tâches planifiées du jour** = lecture seule. Détail : `docs/scheduled-tasks.md`.
+
+## Cadre d’investissement
+
+Cadre personnel versionné : **API/backend d’abord**. Souvent pas encore d’éditeur Web complet. Contrat : `docs/personal-investment-framework.md`.
+
+## Model packs (certains builds / en cours)
+
+Si **Import pack** existe : importer une archive locale versionnée → lier un snapshot → activer. Sans bouton, n’inventez pas. Entrée : **AI & Models → Local models**.
 
 ## Lié
 
-[02](02-home.md) · [14](14-settings-fields.md) · [06](06-signals.md)
+[02](02-home.md) · [01](01-shell.md) · [06](06-signals.md) · [14](14-settings-fields.md)

@@ -1,34 +1,37 @@
 # 02 홈
 
-안녕하세요. 홈은 오늘 무엇을 볼지 정리하는 곳입니다.
+홈은 **오늘 무엇을 볼지** 정리하는 곳입니다. 모든 과거 보고서를 쏟아 놓지 않습니다.
 
-> 💡 First: working model + 1–3 watchlist codes, then Save.  
-> ⚠️ 학습·연구 용도이며 **투자 자문이 아닙니다**.
+> 먼저: 동작하는 모델 + 관심 종목 1–3개 → **저장**.  
+> 학습·연구 용도이며 **투자 자문이 아닙니다**.
 
-## 경로
+## 들어가는 법
 
-| How | Where |
+| 방법 | 위치 |
 | --- | --- |
-| Navigation | **Home** |
+| 메뉴 | **홈** |
 | URL | `/` |
-| Guided setup | Settings readiness |
+| 명령 | `Cmd/Ctrl + K` → home |
+| 안내 설정 | 설정 준비 상태로 |
 
-## Blocks
+## 화면 블록
 
-1. **Setup incomplete banner** → Start guided setup  
-2. **Today's focus** → active signals  
-3. **Todos** → re-check reminders  
-4. **Signal summary** → KPIs  
-5. **Expandable area** → market review / recent analyses  
-6. **Today's scheduled tasks** (if your build has it) → read-only scheduled tasks  
+1. **설정 미완료 배너** → 안내 설정 시작  
+2. **오늘의 포커스** → 유효 시그널  
+3. **할 일** → 재확인 알림  
+4. **시그널 요약** → 건수 등  
+5. **오늘의 예약 작업**(읽기 전용) → 당일 스케줄 실행  
+6. **접기 영역** → 시장 복기 / 최근 분석  
 
-## First success path
+예약 규칙 생성·수정은 **설정 → 시스템 및 보안 → 스케줄**. 홈에서는 바꿀 수 없습니다. “오늘 예약 없음”은 대개 정상입니다.
 
-1. Add model + Save + test connection  
-2. Fill watchlist (`600519`)  
-3. Confirm Home gap clears  
-4. Start analysis  
-5. Read the report → [08](08-reading-reports.md)  
+## 첫 성공 경로
+
+1. 모델 추가 → 저장 → 연결 테스트  
+2. 관심 종목(예: `600519`)  
+3. 홈 배너 완화 확인  
+4. 분석 시작  
+5. 보고서 읽기 → [08](08-reading-reports.md)  
 
 ## 관련
 

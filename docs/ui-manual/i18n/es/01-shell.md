@@ -1,39 +1,34 @@
-# 01 Shell
+# 01 Navegación y barra superior
 
-Hola. Aprende la navegación, campana, paleta de comandos e idioma/tema.
+Al abrir StockPulse, el centro cambia, pero el menú (izq./arriba), la campana, la búsqueda/comando, el idioma y el tema suelen seguir ahí.
 
-> 💡 This chapter is navigation only, not .env editing.  
-> ⚠️ Solo investigación — **no es asesoramiento de inversión**.
+Aprenda primero estas entradas globales. Este capítulo es solo navegación de UI—no despliegue ni `.env`.
 
-## Rutas
+> Solo investigación/aprendizaje — **no es asesoramiento de inversión**.
 
-| How | Where |
+## Cuándo usarlo
+
+| Objetivo | Dónde |
 | --- | --- |
-| Navigation | Five primary domains |
-| Command palette | `Cmd/Ctrl + K` |
-| Notification bell | Top bar |
-| Login | `/login` |
-| Signals | `/signals` (not in primary sidebar) |
-| Stock page | `/stocks/:code` |
+| No sé dónde está una función | Menú principal |
+| Saltar desde cualquier página | Paleta `Cmd/Ctrl + K` |
+| Ver avisos nuevos | Campana |
+| Menús EN, informes ZH | Idioma UI vs idioma del informe (Ajustes) |
+| Tema oscuro | Tema |
+| Login activado | `/login` |
 
-## Five primary domains
+## Cinco menús de primer nivel
 
-| Navigation | Route | Manual |
+| Menú | Ruta | Manual |
 | --- | --- | --- |
-| Home | `/` | [02](02-home.md) |
-| Research | `/research/*` | 03/04/09/12 |
+| Inicio | `/` | [02](02-home.md) |
+| Research | a menudo `/research/market` | 03/04/09/12 |
 | Portfolio | `/portfolio` | [07](07-portfolio.md) |
 | Agent | `/chat` | [05](05-agent-chat.md) |
-| Settings | `/settings` | [10](10-settings.md) |
+| Ajustes | `/settings` | [10](10-settings.md) |
 
-## UI language vs report language
-
-| Control | Changes | Does not change |
-| --- | --- | --- |
-| UI language | Menus/buttons | Report body text |
-| Report language | Report body text | Menus/buttons |
-| Theme | light/dark | logic |
+**No están en el menú principal:** Centro de señales `/signals` (campana/paleta/inicio), cotización `/stocks/:code`, login.
 
 ## Relacionado
 
-[02](02-home.md) · [10](10-settings.md) · [06](06-signals.md)
+[02](02-home.md) · [06](06-signals.md) · [10](10-settings.md)

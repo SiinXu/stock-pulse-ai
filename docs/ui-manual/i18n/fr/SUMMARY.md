@@ -1,7 +1,7 @@
 # Summary
 
 * [Manuel d'interface StockPulse](README.md)
-* [Shell](01-shell.md)
+* [Navigation et barre supérieure](01-shell.md)
 * [Accueil](02-home.md)
 * [Banc d'analyse](03-analysis-workbench.md)
 * [Revue de marché](04-market-review.md)

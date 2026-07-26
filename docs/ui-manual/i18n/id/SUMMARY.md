@@ -1,7 +1,7 @@
 # Summary
 
 * [Manual operasi UI StockPulse](README.md)
-* [Shell](01-shell.md)
+* [Navigasi dan bilah atas](01-shell.md)
 * [Beranda](02-home.md)
 * [Workbench analisis](03-analysis-workbench.md)
 * [Tinjauan pasar](04-market-review.md)

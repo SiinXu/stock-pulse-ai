@@ -94,7 +94,19 @@ English chapters point at `-en` or language-neutral files:
 | Item | Status |
 | --- | --- |
 | Naming + location documented | Done (this file + [TRANSLATION.md](../TRANSLATION.md)) |
-| P0/P1 binary assets | Pending maintainer capture against live UI |
-| Chapter embeds | Add when corresponding files exist |
+| Full scene list + capture brief | Done — [PLACEHOLDERS.md](PLACEHOLDERS.md) |
+| P0/P1 binary assets | **Pending** maintainer capture against live UI |
+| Chapter embeds | **Placeholder blocks in** modules 01–13 (no broken image links until files exist) |
 
-When adding the first real PNG/WebP files, update this status table and embed them in the P0 chapters in the same docs PR.
+### Placeholder convention in chapters
+
+Until a PNG/WebP exists, chapters use a blockquote—not `![](…)`—so GitBook/Honkit never show a broken image:
+
+```markdown
+> 🖼️ **配图占位** · `assets/<stem>-zh.png`
+> **应配内容**：……
+> **拍摄要点**：……
+> **状态**：待补图（清单：assets/PLACEHOLDERS.md）
+```
+
+When the file is ready: replace the blockquote with a real image + one-line caption (see rules above), and tick the stem in [PLACEHOLDERS.md](PLACEHOLDERS.md).

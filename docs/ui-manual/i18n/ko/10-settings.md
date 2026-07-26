@@ -1,28 +1,36 @@
 # 10 설정
 
-안녕하세요. Make the minimum path work.
+항목은 많지만 처음에는 세 가지만 맞추면 됩니다.
 
-## Three first wins
+1. **모델 연결**  
+2. **관심 종목 코드**  
+3. **(선택) 알림 채널 테스트 성공**  
 
-1. Model connects  
-2. Watchlist has codes  
-3. One notify channel (optional)  
+> UI 조작만 다룹니다. 배포는 별도 가이드.  
+> **저장 → 테스트 → 나가기**.
 
-## 경로
+## 들어가는 법
 
-`/settings` · `section=ai_models&view=connections`  
+`/settings` · 홈 안내 설정 · `section=ai_models&view=connections`
 
-## Save discipline
+## 알림
 
-Edit → Save → test connection/push → leave  
+채널은 카드로 나오는 경우가 많습니다. 하나부터 열고 토큰 입력 → **테스트 푸시** → **저장**.  
+배포 측 **알림 플러그인**으로 채널이 추가될 수 있습니다(`docs/notifications.md`).
 
-## Upcoming / unmerged surfaces
+## 스케줄
 
-- Local model packs (if build has them)  
-- Notification plugins  
-- Investment framework surfaces  
-- Scheduling details in System & Security  
+**시스템 및 보안 → 스케줄**에서 자동 분석 on/off·시각·다음 실행·(권한 시) 즉시 실행.  
+홈 **오늘의 예약 작업**은 읽기 전용. 자세한 내용은 `docs/scheduled-tasks.md`.
+
+## 투자 프레임워크
+
+버전 관리되는 개인 투자 프레임워크는 **API/백엔드 우선**. 완전한 전용 웹 편집 화면은 아직 없을 수 있습니다. 계약: `docs/personal-investment-framework.md`.
+
+## 모델 팩(일부 빌드 / 진행 중)
+
+UI에 Import pack이 있으면 버전 로컬 팩 가져오기 → 스냅샷 연결 → 활성화. 버튼이 없으면 억지로 찾지 마세요. 위치는 **AI 및 모델 → 로컬 모델** 근처.
 
 ## 관련
 
-[02](02-home.md) · [14](14-settings-fields.md) · [06](06-signals.md)
+[02](02-home.md) · [01](01-shell.md) · [06](06-signals.md) · [14](14-settings-fields.md)

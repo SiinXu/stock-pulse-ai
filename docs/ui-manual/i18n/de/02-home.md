@@ -1,34 +1,37 @@
-# 02 Startseite
+# 02 Home
 
-Hallo. Die Startseite priorisiert, was Sie heute ansehen sollten.
+Home ist ein **Aufmerksamkeits-Hub**: Was lohnt sich heute—nicht die volle Report-Historie.
 
-> 💡 First: working model + 1–3 watchlist codes, then Save.  
-> ⚠️ Nur Forschung/Lernen — **keine Anlageberatung**.
+> Zuerst: funktionierendes Modell + 1–3 Watchlist-Codes → **Speichern**.  
+> Nur Forschung/Lernen — **keine Anlageberatung**.
 
-## Pfade
+## Öffnen
 
-| How | Where |
+| Wie | Wo |
 | --- | --- |
 | Navigation | **Home** |
 | URL | `/` |
-| Guided setup | Settings readiness |
+| Befehl | `Cmd/Ctrl + K` → home |
+| Guided setup | Settings-Readiness |
 
-## Blocks
+## Blöcke
 
-1. **Setup incomplete banner** → Start guided setup  
-2. **Today's focus** → active signals  
-3. **Todos** → re-check reminders  
-4. **Signal summary** → KPIs  
-5. **Expandable area** → market review / recent analyses  
-6. **Today's scheduled tasks** (if your build has it) → read-only scheduled tasks  
+1. **Setup unvollständig** → Guided setup  
+2. **Today’s focus** → aktive Signale  
+3. **Todos** → erneute Prüfung  
+4. **Signal summary** → Kennzahlen  
+5. **Today’s scheduled tasks** (nur lesen) → heutige Läufe  
+6. **Einklappbar** → Market review / letzte Analysen  
 
-## First success path
+Zeitpläne anlegen/ändern: **Settings → System & Security → Scheduling**. „Keine Tasks heute“ ist meist normal.
 
-1. Add model + Save + test connection  
-2. Fill watchlist (`600519`)  
-3. Confirm Home gap clears  
-4. Start analysis  
-5. Read the report → [08](08-reading-reports.md)  
+## Erster Erfolg
+
+1. Modell + Speichern + Verbindungstest  
+2. Watchlist (`600519`)  
+3. Home-Banner beruhigt sich  
+4. Analyse starten  
+5. Report lesen → [08](08-reading-reports.md)  
 
 ## Verwandt
 

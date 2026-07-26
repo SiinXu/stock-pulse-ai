@@ -27,13 +27,13 @@
 | id | Bahasa Indonesia |
 | ms | Bahasa Melayu |
 
-Switch UI language: Shell language control or Settings
+Switch UI language: UI language control or Settings
 
 ## モジュール
 
 | # | Module | About |
 | --- | --- | --- |
-| [01](01-shell.md) | シェル | Nav, palette, bell, language |
+| [01](01-shell.md) | ナビとトップバー | メニュー・パレット・ベル・言語 |
 | [02](02-home.md) | ホーム | Focus, todos, setup gaps |
 | [03](03-analysis-workbench.md) | 分析ワークベンチ | Run reports |
 | [04](04-market-review.md) | マーケットレビュー | Market-wide summary |
@@ -51,7 +51,7 @@ Switch UI language: Shell language control or Settings
 ## おすすめの読み方
 
 1. Install + model key  
-2. Shell + Home  
+2. Navigation + Home  
 3. First Workbench report  
 4. Read report + daily 5 minutes  
 

@@ -1,7 +1,7 @@
 # Summary
 
 * [StockPulse 画面操作マニュアル](README.md)
-* [シェル](01-shell.md)
+* [ナビとトップバー](01-shell.md)
 * [ホーム](02-home.md)
 * [分析ワークベンチ](03-analysis-workbench.md)
 * [マーケットレビュー](04-market-review.md)

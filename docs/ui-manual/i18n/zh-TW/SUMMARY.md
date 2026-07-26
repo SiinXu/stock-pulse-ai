@@ -1,7 +1,7 @@
 # Summary
 
 * [手冊首頁](README.md)
-* [01-shell](01-shell.md)
+* [01 導航與頂欄](01-shell.md)
 * [02-home](02-home.md)
 * [03-analysis-workbench](03-analysis-workbench.md)
 * [04-market-review](04-market-review.md)

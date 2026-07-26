@@ -1,34 +1,37 @@
 # 02 Inicio
 
-Hola. Inicio prioriza qué mirar hoy.
+Inicio es un **centro de atención**: qué mirar hoy, no todo el historial de informes.
 
-> 💡 First: working model + 1–3 watchlist codes, then Save.  
-> ⚠️ Solo investigación — **no es asesoramiento de inversión**.
+> Primero: un modelo que conecte + 1–3 códigos en la lista → **Guardar**.  
+> Solo investigación/aprendizaje — **no es asesoramiento de inversión**.
 
-## Rutas
+## Cómo abrir
 
-| How | Where |
+| Cómo | Dónde |
 | --- | --- |
-| Navigation | **Home** |
+| Navegación | **Inicio** |
 | URL | `/` |
-| Guided setup | Settings readiness |
+| Comando | `Cmd/Ctrl + K` → home |
+| Configuración guiada | Preparación en Ajustes |
 
-## Blocks
+## Bloques
 
-1. **Setup incomplete banner** → Start guided setup  
-2. **Today's focus** → active signals  
-3. **Todos** → re-check reminders  
-4. **Signal summary** → KPIs  
-5. **Expandable area** → market review / recent analyses  
-6. **Today's scheduled tasks** (if your build has it) → read-only scheduled tasks  
+1. **Banner de configuración incompleta** → configuración guiada  
+2. **Enfoque de hoy** → señales activas  
+3. **Todos** → recordatorios de revisión  
+4. **Resumen de señales** → contadores  
+5. **Tareas programadas de hoy** (solo lectura)  
+6. **Expandible** → repaso de mercado / análisis recientes  
 
-## First success path
+Crear o editar horarios: **Ajustes → Sistema y seguridad → Programación**. “Sin tareas hoy” suele ser normal.
 
-1. Add model + Save + test connection  
-2. Fill watchlist (`600519`)  
-3. Confirm Home gap clears  
-4. Start analysis  
-5. Read the report → [08](08-reading-reports.md)  
+## Primera ruta de éxito
+
+1. Modelo + Guardar + prueba de conexión  
+2. Lista (`600519`)  
+3. El banner de Inicio se suaviza  
+4. Iniciar análisis  
+5. Leer informe → [08](08-reading-reports.md)  
 
 ## Relacionado
 

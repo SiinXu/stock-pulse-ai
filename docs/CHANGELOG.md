@@ -8,7 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [Docs] Added multi-language UI manual packs (zh-TW/ja/ko/de/es/fr/id/ms) aligned with product UI languages, plus unmerged-feature notes for scheduled tasks and local model packs.
+- [Docs] UI manual figure placeholders: modules 01–13 use explicit capture briefs (`assets/PLACEHOLDERS.md`); no broken image links until PNGs exist.
+- [Docs] UI-manual tone pass toward product-doc standard: less slang/metaphor, softer absolutes, engineering terms demoted to advanced notes.
+- [Docs] Deepened UI operation manual structure: learning goals, callouts (tip/warning/recommend/avoid/concept/entry), mermaid maps, step tutorials, use cases, FAQ, and self-check lists across modules 01–13 (Chinese source detailed; EN 01/02/11 expanded).
+- [Docs] Expanded UI-manual chapter 11 into workflows plus scenario recipes (roles, combo techniques, Agent prompts, automation, anti-patterns), and added more use cases across Home/Workbench/Agent/Signals/Portfolio/Settings/Discover.
+- [Docs] Replaced UI-manual “shell/外壳” jargon with everyday “navigation and top bar” (all locales), and documented main-branch scheduled tasks, notification channel plugins, scheduling UI, investment-framework API scope, and model-pack import notes (open PR).
+- [Docs] Added multi-language UI manual packs (zh-TW/ja/ko/de/es/fr/id/ms) aligned with product UI languages.
 - [Docs] Completed the UI operation manual set (modules 01–14, bilingual), added a settings field quick-reference generated from in-app help, and added Honkit/GitBook-compatible preview scaffolding under `docs/ui-manual/`.
 - [Docs] Rewrote core UI-manual chapters in a friendlier, more detailed tutorial voice (Home, Workbench, Agent chat, Signal Center, Portfolio, Reading reports, Settings), keeping concrete routes and step-by-step guidance.
 - [Docs] Continued UI-manual depth pass: stock workspace chapter (13), login/shell paths, and deep operational maps for workbench, Agent chat, Signal Center, portfolio, and settings aligned to live page controls.

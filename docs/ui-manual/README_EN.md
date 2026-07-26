@@ -6,13 +6,39 @@
 
 If you are opening StockPulse for the first time, the chapters below follow product usage order: where to click, what you will see, and what to do next. If live UI labels differ from this manual, trust the screen.
 
-> > Output is for **learning and research only** and is **not investment advice**. Make your own risk and compliance decisions before any real trade.
+> Output is for **learning and research only** and is **not investment advice**. Make your own risk and compliance decisions before any real trade.
+
+## How chapters are organized
+
+| Block | Purpose |
+| --- | --- |
+| Learning goals | 3–5 outcomes |
+| Mental map / diagrams | Mermaid or structure tables |
+| Entry & routes | Where to click / which URL |
+| Detailed sections | Match the live UI |
+| Tutorials | Numbered steps |
+| Use cases | Situational “I want…” |
+| FAQ / self-check | Troubleshoot and verify |
+| Glossary + related | Close the loop |
+
+### Callouts
+
+| Mark | Meaning |
+| --- | --- |
+| 💡 **Tip** | Shortcuts and extras |
+| ⚠️ **Note** | Easy mistakes, quota, boundaries |
+| ✅ **Recommended** | Default good path |
+| ❌ **Avoid** | Anti-patterns |
+| 📘 **Concept** | Definitions |
+| 🧭 **Entry** | How to open the page |
+
+The **Simplified Chinese** chapters are the fullest source; English tracks the same structure (depth may lag on some modules—use the Chinese pair or i18n packs when needed).
 
 ## Suggested reading order
 
 ```mermaid
 flowchart LR
-  A[Install and API key] --> B[Shell and Home]
+  A[Install and API key] --> B[Navigation and Home]
   B --> C[First analysis]
   C --> D[How to read a report]
   D --> E[Daily 5-minute workflow]
@@ -22,7 +48,7 @@ flowchart LR
 | Your stage | Start with | Then |
 | --- | --- | --- |
 | Not installed / no model key yet | [Beginner client setup (EN)](../beginner-client-setup_EN.md) | Modules 01 → 02 |
-| UI already opens | [01 Shell](01-shell_EN.md), [02 Home](02-home_EN.md) | [03 Analysis workbench](03-analysis-workbench_EN.md) |
+| UI already opens | [01 Navigation and top bar](01-shell_EN.md), [02 Home](02-home_EN.md) | [03 Analysis workbench](03-analysis-workbench_EN.md) |
 | You already have a report | [08 Reading reports](08-reading-reports_EN.md) | [11 Daily workflows](11-daily-workflows_EN.md) |
 | Looking for candidates | [12 Discover](12-discover_EN.md) | [03 Analysis workbench](03-analysis-workbench_EN.md) |
 | Alerts or bookkeeping | [06 Signals](06-signals_EN.md), [07 Portfolio](07-portfolio_EN.md) | [09 Backtest](09-backtest_EN.md) |
@@ -33,7 +59,7 @@ Most people only need **01 + 02 + 03 + 08 + 11** in the first week.
 
 | Module | Description |
 | --- | --- |
-| [01 Shell and global actions](01-shell_EN.md) | Navigation, command palette, notification bell, language and theme |
+| [01 Navigation and top bar](01-shell_EN.md) | Menus, command palette, notification bell, language and theme |
 | [02 Home](02-home_EN.md) | Today focus, todos, configuration gap prompts |
 | [03 Analysis workbench](03-analysis-workbench_EN.md) | Start analysis, task progress, history and compare |
 | [04 Market review](04-market-review_EN.md) | Trigger review, read review history |
@@ -45,8 +71,8 @@ Most people only need **01 + 02 + 03 + 08 + 11** in the first week.
 | [07 Portfolio](07-portfolio_EN.md) | Sidebar Portfolio; accounts, bookkeeping, import, risk, one-click analysis |
 | [08 Reading reports](08-reading-reports_EN.md) | How to read a stock report |
 | [09 Backtest](09-backtest_EN.md) | Post-hoc checks on historical AI advice |
-| [10 Settings](10-settings_EN.md) | Models, watchlist, notifications, data sources in the UI |
-| [11 Daily workflows](11-daily-workflows_EN.md) | Recommended flows and common UI questions |
+| [10 Settings](10-settings_EN.md) | Models, watchlist, notifications, scheduling, data sources in the UI |
+| [11 Daily workflows and scenarios](11-daily-workflows_EN.md) | Rhythms, roles, recipes, combos, Agent prompts, anti-patterns |
 
 ## Quick glossary
 

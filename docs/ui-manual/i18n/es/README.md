@@ -27,13 +27,13 @@ The app can switch among these UI languages. This folder is one locale pack of t
 | id | Bahasa Indonesia |
 | ms | Bahasa Melayu |
 
-Switch UI language: Shell language control or Settings
+Switch UI language: UI language control or Settings
 
 ## Módulos
 
 | # | Module | About |
 | --- | --- | --- |
-| [01](01-shell.md) | Shell | Nav, palette, bell, language |
+| [01](01-shell.md) | Navegación y barra superior | Menú, paleta, campana, idioma |
 | [02](02-home.md) | Inicio | Focus, todos, setup gaps |
 | [03](03-analysis-workbench.md) | Mesa de análisis | Run reports |
 | [04](04-market-review.md) | Revisión de mercado | Market-wide summary |
@@ -51,7 +51,7 @@ Switch UI language: Shell language control or Settings
 ## Inicio recomendado
 
 1. Install + model key  
-2. Shell + Home  
+2. Navigation + Home  
 3. First Workbench report  
 4. Read report + daily 5 minutes  
 

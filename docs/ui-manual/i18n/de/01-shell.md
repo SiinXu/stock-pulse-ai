@@ -1,39 +1,34 @@
-# 01 Shell
+# 01 Navigation und obere Leiste
 
-Hallo. Lernen Sie Navigation, Glocke, Befehlspalette, Sprache/Theme.
+Nach dem Öffnen wechselt der Mittelbereich, aber Menü (links/oben), Glocke, Suche/Befehlspalette, Sprache und Theme bleiben meist sichtbar.
 
-> 💡 This chapter is navigation only, not .env editing.  
-> ⚠️ Nur Forschung/Lernen — **keine Anlageberatung**.
+Lernen Sie diese globalen Eingänge zuerst. Dieses Kapitel behandelt nur die UI-Navigation—kein Deployment und keine .env-Dateien.
 
-## Pfade
+> Nur Forschung/Lernen — **keine Anlageberatung**.
 
-| How | Where |
+## Wann Sie sie brauchen
+
+| Ziel | Wo |
 | --- | --- |
-| Navigation | Five primary domains |
-| Command palette | `Cmd/Ctrl + K` |
-| Notification bell | Top bar |
-| Login | `/login` |
-| Signals | `/signals` (not in primary sidebar) |
-| Stock page | `/stocks/:code` |
+| Funktion finden | Hauptnavigation |
+| Von überall springen | Befehlspalette `Cmd/Ctrl + K` |
+| Neue Hinweise | Benachrichtigungsglocke |
+| Menü EN, Report ZH | UI-Sprache vs. Report-Sprache (Einstellungen) |
+| Dunkles UI | Theme |
+| Login aktiv | `/login` |
 
-## Five primary domains
+## Fünf Hauptmenüs
 
-| Navigation | Route | Manual |
+| Menü | Route | Handbuch |
 | --- | --- | --- |
 | Home | `/` | [02](02-home.md) |
-| Research | `/research/*` | 03/04/09/12 |
+| Research | oft `/research/market` | 03/04/09/12 |
 | Portfolio | `/portfolio` | [07](07-portfolio.md) |
 | Agent | `/chat` | [05](05-agent-chat.md) |
 | Settings | `/settings` | [10](10-settings.md) |
 
-## UI language vs report language
-
-| Control | Changes | Does not change |
-| --- | --- | --- |
-| UI language | Menus/buttons | Report body text |
-| Report language | Report body text | Menus/buttons |
-| Theme | light/dark | logic |
+**Nicht in der Hauptnav:** Signal Center `/signals` (Glocke/Palette/Home), Aktie `/stocks/:code`, Login.
 
 ## Verwandt
 
-[02](02-home.md) · [10](10-settings.md) · [06](06-signals.md)
+[02](02-home.md) · [06](06-signals.md) · [10](10-settings.md)

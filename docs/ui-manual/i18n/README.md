@@ -15,6 +15,6 @@ Product UI languages (from `apps/dsa-web/src/i18n/uiLanguages.ts`):
 | id | [id/README.md](id/README.md) |
 | ms | [ms/README.md](ms/README.md) |
 
-Switch the **product UI language** in the shell/settings; open the matching manual pack above.
+Switch the **product UI language** in Settings or the language control; open the matching manual pack above.
 
 Full long-form prose is maintained in **zh + en** at the parent folder. Other locales provide complete tutorial coverage aligned to the same module map; field-level Settings tables remain richest in [../14-settings-fields.md](../14-settings-fields.md).

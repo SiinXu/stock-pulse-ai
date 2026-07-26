@@ -1,39 +1,34 @@
-# 01 Shell
+# 01 Navigation et barre supérieure
 
-Bonjour. Apprenez la navigation, la cloche, la palette et la langue/thème.
+Après l’ouverture, le centre change, mais le menu (gauche/haut), la cloche, la recherche/commande, la langue et le thème restent en général.
 
-> 💡 This chapter is navigation only, not .env editing.  
-> ⚠️ Recherche uniquement — **pas un conseil d'investissement**.
+Apprenez d’abord ces entrées globales. Ce chapitre ne couvre que la navigation UI—pas le déploiement ni les `.env`.
 
-## Chemins
+> Recherche / apprentissage uniquement — **pas un conseil en investissement**.
 
-| How | Where |
+## Quand s’en servir
+
+| Objectif | Où |
 | --- | --- |
-| Navigation | Five primary domains |
-| Command palette | `Cmd/Ctrl + K` |
-| Notification bell | Top bar |
-| Login | `/login` |
-| Signals | `/signals` (not in primary sidebar) |
-| Stock page | `/stocks/:code` |
+| Trouver une fonction | Menu principal |
+| Aller n’importe où | Palette `Cmd/Ctrl + K` |
+| Voir les alertes | Cloche |
+| Menus EN, rapports ZH | Langue UI vs langue des rapports (Réglages) |
+| Mode sombre | Thème |
+| Login activé | `/login` |
 
-## Five primary domains
+## Cinq menus de premier niveau
 
-| Navigation | Route | Manual |
+| Menu | Route | Manuel |
 | --- | --- | --- |
-| Home | `/` | [02](02-home.md) |
-| Research | `/research/*` | 03/04/09/12 |
+| Accueil | `/` | [02](02-home.md) |
+| Research | souvent `/research/market` | 03/04/09/12 |
 | Portfolio | `/portfolio` | [07](07-portfolio.md) |
 | Agent | `/chat` | [05](05-agent-chat.md) |
-| Settings | `/settings` | [10](10-settings.md) |
+| Réglages | `/settings` | [10](10-settings.md) |
 
-## UI language vs report language
-
-| Control | Changes | Does not change |
-| --- | --- | --- |
-| UI language | Menus/buttons | Report body text |
-| Report language | Report body text | Menus/buttons |
-| Theme | light/dark | logic |
+**Hors menu principal :** Centre de signaux `/signals` (cloche/palette/accueil), cotation `/stocks/:code`, login.
 
 ## Lié
 
-[02](02-home.md) · [10](10-settings.md) · [06](06-signals.md)
+[02](02-home.md) · [06](06-signals.md) · [10](10-settings.md)

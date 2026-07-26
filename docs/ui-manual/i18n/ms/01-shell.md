@@ -1,39 +1,34 @@
-# 01 Shell
+# 01 Navigasi dan bar atas
 
-Hai. Pelajari navigasi, loceng, palet perintah, bahasa/tema.
+Selepas buka StockPulse, kandungan tengah bertukar, tetapi menu (kiri/atas), loceng, carian/perintah, bahasa dan tema biasanya kekal.
 
-> 💡 This chapter is navigation only, not .env editing.  
-> ⚠️ Untuk penyelidikan sahaja — **bukan nasihat pelaburan**.
+Kenali pintu masuk global ini dahulu. Bab ini hanya navigasi UI—bukan deployment atau `.env`.
 
-## Laluan
+> Untuk penyelidikan/belajar sahaja — **bukan nasihat pelaburan**.
 
-| How | Where |
+## Bila digunakan
+
+| Matlamat | Di mana |
 | --- | --- |
-| Navigation | Five primary domains |
-| Command palette | `Cmd/Ctrl + K` |
-| Notification bell | Top bar |
-| Login | `/login` |
-| Signals | `/signals` (not in primary sidebar) |
-| Stock page | `/stocks/:code` |
+| Tak jumpa fungsi | Menu utama |
+| Loncat dari mana-mana | Palette `Cmd/Ctrl + K` |
+| Semak amaran | Loceng |
+| Menu EN, laporan ZH | Bahasa UI vs bahasa laporan (Tetapan) |
+| Tema gelap | Tema |
+| Login aktif | `/login` |
 
-## Five primary domains
+## Lima menu tahap satu
 
-| Navigation | Route | Manual |
+| Menu | Laluan | Manual |
 | --- | --- | --- |
-| Home | `/` | [02](02-home.md) |
-| Research | `/research/*` | 03/04/09/12 |
+| Laman utama | `/` | [02](02-home.md) |
+| Research | sering `/research/market` | 03/04/09/12 |
 | Portfolio | `/portfolio` | [07](07-portfolio.md) |
 | Agent | `/chat` | [05](05-agent-chat.md) |
-| Settings | `/settings` | [10](10-settings.md) |
+| Tetapan | `/settings` | [10](10-settings.md) |
 
-## UI language vs report language
-
-| Control | Changes | Does not change |
-| --- | --- | --- |
-| UI language | Menus/buttons | Report body text |
-| Report language | Report body text | Menus/buttons |
-| Theme | light/dark | logic |
+**Bukan dalam menu utama:** Signal Center `/signals` (loceng/palette/utama), saham `/stocks/:code`, login.
 
 ## Berkaitan
 
-[02](02-home.md) · [10](10-settings.md) · [06](06-signals.md)
+[02](02-home.md) · [06](06-signals.md) · [10](10-settings.md)

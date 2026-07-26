@@ -1,39 +1,34 @@
-# 01 シェル
+# 01 ナビとトップバー
 
-こんにちは。 ナビ・ベル・コマンドパレット・言語/テーマの外枠を覚えましょう。
+StockPulse を開くと、中央の画面は変わりますが、左（または上）のメニュー、通知ベル、検索/コマンド、言語とテーマはだいたい残ります。
 
-> 💡 This chapter is navigation only, not .env editing.  
-> ⚠️ 学習・研究用途であり、**投資助言ではありません**。
+まずはこれらの入口を覚えると、分析・保有・設定に戻りやすくなります。本章は UI の移動だけを扱います（デプロイや .env は対象外）。
 
-## 入り方
+> 学習・研究用途であり、**投資助言ではありません**。
 
-| How | Where |
+## いつ使うか
+
+| 目的 | どこ |
 | --- | --- |
-| Navigation | Five primary domains |
-| Command palette | `Cmd/Ctrl + K` |
-| Notification bell | Top bar |
-| Login | `/login` |
-| Signals | `/signals` (not in primary sidebar) |
-| Stock page | `/stocks/:code` |
+| 機能の場所が分からない | 左/上のメニュー |
+| どこからでも分析へ | コマンドパレット `Cmd/Ctrl + K` |
+| 新しい通知を見る | 通知ベル |
+| メニュー英語・レポート中国語 | UI 言語 vs レポート言語（設定） |
+| ダーク表示 | テーマ |
+| ログイン有効時 | `/login` |
 
-## Five primary domains
+## 五つの一級メニュー
 
-| Navigation | Route | Manual |
+| メニュー | ルート | 手冊 |
 | --- | --- | --- |
-| Home | `/` | [02](02-home.md) |
-| Research | `/research/*` | 03/04/09/12 |
-| Portfolio | `/portfolio` | [07](07-portfolio.md) |
+| ホーム | `/` | [02](02-home.md) |
+| リサーチ | 多くは `/research/market` から | 03/04/09/12 |
+| ポートフォリオ | `/portfolio` | [07](07-portfolio.md) |
 | Agent | `/chat` | [05](05-agent-chat.md) |
-| Settings | `/settings` | [10](10-settings.md) |
+| 設定 | `/settings` | [10](10-settings.md) |
 
-## UI language vs report language
-
-| Control | Changes | Does not change |
-| --- | --- | --- |
-| UI language | Menus/buttons | Report body text |
-| Report language | Report body text | Menus/buttons |
-| Theme | light/dark | logic |
+**一級に無いがよく使う**: シグナルセンター `/signals`（ベル / パレット / ホーム）、個別株 `/stocks/コード`、ログイン。
 
 ## 関連
 
-[02](02-home.md) · [10](10-settings.md) · [06](06-signals.md)
+[02](02-home.md) · [06](06-signals.md) · [10](10-settings.md)

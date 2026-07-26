@@ -1,28 +1,36 @@
 # 10 設定
 
-こんにちは。 Make the minimum path work.
+設定項目は多いですが、最初は次の3つだけで十分です。
 
-## Three first wins
+1. **モデルがつながる**  
+2. **自選にコードがある**  
+3. **（任意）通知チャネルがテスト成功**  
 
-1. Model connects  
-2. Watchlist has codes  
-3. One notify channel (optional)  
+> UI の操作だけを扱います。デプロイは別ガイド。  
+> **保存 → テスト → 離れる** を習慣に。
 
 ## 入り方
 
-`/settings` · `section=ai_models&view=connections`  
+`/settings` · ホームの案内設定 · `section=ai_models&view=connections`
 
-## Save discipline
+## 通知
 
-Edit → Save → test connection/push → leave  
+チャネルはカード表示が多いです。まずは1つだけ開き、Webhook/Token を入れて **テスト送信** → **保存**。  
+デプロイ側の **通知プラグイン** で追加チャネルが出ることがあります（`docs/notifications.md`）。
 
-## Upcoming / unmerged surfaces
+## スケジュール
 
-- Local model packs (if build has them)  
-- Notification plugins  
-- Investment framework surfaces  
-- Scheduling details in System & Security  
+**システムとセキュリティ → スケジュール** で自動分析の ON/OFF・時刻・次回実行・（権限があれば）即時実行。  
+ホームの **今日の定時タスク** は読み取り専用。詳細は `docs/scheduled-tasks.md`。
+
+## 投資フレームワーク
+
+バージョン付き個人投資フレームワークは **API/バックエンドが先**。完全な専用 Web 編集画面はまだ無いことが多いです。契約は `docs/personal-investment-framework.md`。
+
+## モデルパック（一部ビルド / 進行中）
+
+UI に「Import pack / モデルパック取り込み」があれば、ローカルのバージョン付きパックを取り込み→スナップショット紐付け→有効化。ボタンが無いビルドでは無理に操作しない。入口は **AI とモデル → ローカルモデル** 付近。
 
 ## 関連
 
-[02](02-home.md) · [14](14-settings-fields.md) · [06](06-signals.md)
+[02](02-home.md) · [01](01-shell.md) · [06](06-signals.md) · [14](14-settings-fields.md)

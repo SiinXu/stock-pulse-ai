@@ -1,34 +1,37 @@
 # 02 Laman utama
 
-Hai. Laman utama mengutamakan apa yang perlu dilihat hari ini.
+Laman utama ialah **hab perhatian**: apa yang perlu dilihat hari ini, bukan seluruh sejarah laporan.
 
-> 💡 First: working model + 1–3 watchlist codes, then Save.  
-> ⚠️ Untuk penyelidikan sahaja — **bukan nasihat pelaburan**.
+> Mula-mula: model yang sambung + 1–3 kod senarai pantau → **Simpan**.  
+> Untuk penyelidikan/belajar sahaja — **bukan nasihat pelaburan**.
 
-## Laluan
+## Cara buka
 
-| How | Where |
+| Cara | Di mana |
 | --- | --- |
-| Navigation | **Home** |
+| Navigasi | **Laman utama** |
 | URL | `/` |
-| Guided setup | Settings readiness |
+| Perintah | `Cmd/Ctrl + K` → home |
+| Setup berpandu | Kesediaan dalam Tetapan |
 
-## Blocks
+## Blok
 
-1. **Setup incomplete banner** → Start guided setup  
-2. **Today's focus** → active signals  
-3. **Todos** → re-check reminders  
-4. **Signal summary** → KPIs  
-5. **Expandable area** → market review / recent analyses  
-6. **Today's scheduled tasks** (if your build has it) → read-only scheduled tasks  
+1. **Banner setup belum lengkap** → setup berpandu  
+2. **Fokus hari ini** → isyarat aktif  
+3. **Todos** → peringatan semakan  
+4. **Ringkasan isyarat** → kiraan  
+5. **Tugas berjadual hari ini** (baca sahaja)  
+6. **Kawasan lipat** → ulasan pasaran / analisis terkini  
 
-## First success path
+Cipta/edit jadual di **Tetapan → Sistem & keselamatan → Penjadualan**. “Tiada tugas hari ini” biasanya normal.
 
-1. Add model + Save + test connection  
-2. Fill watchlist (`600519`)  
-3. Confirm Home gap clears  
-4. Start analysis  
-5. Read the report → [08](08-reading-reports.md)  
+## Laluan kejayaan pertama
+
+1. Model + Simpan + ujian sambungan  
+2. Senarai pantau (`600519`)  
+3. Banner utama mereda  
+4. Mula analisis  
+5. Baca laporan → [08](08-reading-reports.md)  
 
 ## Berkaitan
 

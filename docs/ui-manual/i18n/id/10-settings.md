@@ -1,28 +1,36 @@
 # 10 Pengaturan
 
-Halo. Make the minimum path work.
+Banyak field. Tiga kemenangan dulu:
 
-## Three first wins
+1. **Model terhubung**  
+2. **Watchlist berisi kode**  
+3. **(Opsional) satu saluran lolos uji push**  
 
-1. Model connects  
-2. Watchlist has codes  
-3. One notify channel (optional)  
+> Hanya klik UI. Deployment di panduan lain.  
+> **Simpan → uji → keluar**.
 
-## Jalur
+## Buka
 
-`/settings` · `section=ai_models&view=connections`  
+`/settings` · setup terpandu di beranda · `section=ai_models&view=connections`
 
-## Save discipline
+## Notifikasi
 
-Edit → Save → test connection/push → leave  
+Saluran sering berupa **kartu**. Buka satu, isi token → **uji push** → **Simpan**.  
+**Plugin saluran** di deploy bisa menambah jenis (`docs/notifications.md`).
 
-## Upcoming / unmerged surfaces
+## Penjadwalan
 
-- Local model packs (if build has them)  
-- Notification plugins  
-- Investment framework surfaces  
-- Scheduling details in System & Security  
+**Sistem & keamanan → Penjadwalan**: auto on/off, jam, run berikutnya, “jalankan sekarang” jika diizinkan.  
+Di beranda, **tugas terjadwal hari ini** hanya baca. Detail: `docs/scheduled-tasks.md`.
+
+## Kerangka investasi
+
+Kerangka pribadi berversi: **API/backend dulu**. Sering belum ada editor Web penuh. Kontrak: `docs/personal-investment-framework.md`.
+
+## Model packs (sebagian build / berjalan)
+
+Jika ada **Import pack**: impor arsip lokal berversi → ikat snapshot → aktifkan. Tanpa tombol, jangan memaksa. Masuk lewat **AI & Models → Local models**.
 
 ## Terkait
 
-[02](02-home.md) · [14](14-settings-fields.md) · [06](06-signals.md)
+[02](02-home.md) · [01](01-shell.md) · [06](06-signals.md) · [14](14-settings-fields.md)

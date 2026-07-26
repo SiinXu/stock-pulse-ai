@@ -1,7 +1,7 @@
 # Summary
 
 * [StockPulse UI-Bedienungsanleitung](README.md)
-* [Shell](01-shell.md)
+* [Navigation und obere Leiste](01-shell.md)
 * [Startseite](02-home.md)
 * [Analyse-Workbench](03-analysis-workbench.md)
 * [Marktüberblick](04-market-review.md)
