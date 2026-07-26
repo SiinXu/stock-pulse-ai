@@ -7,8 +7,8 @@
 | 我想要 | 先看 | 继续看 |
 | --- | --- | --- |
 | 快速了解项目能做什么 | [README](../README.md) | [完整配置与部署指南](full-guide.md) |
-| **了解 StockPulse 相对上游的差异** | [English README · Why StockPulse](../README.md#why-stockpulse) | [简体 README · 为什么选 StockPulse](README_CN.md#why-stockpulse)、[技术架构总览](architecture-overview.md) |
-| 第一次把项目跑起来 | [小白客户端安装与配置](beginner-client-setup.md)（[English](beginner-client-setup_EN.md)） | [README · 差异说明](../README.md#why-stockpulse)、[安全基线 · 运维边界](security-baseline.md#operator-security-boundaries)、[完整配置与部署指南](full-guide.md) |
+| **了解 StockPulse 的定位与能力** | [English README · Why StockPulse](../README.md#why-stockpulse) | [简体 README · 为什么选 StockPulse](README_CN.md#why-stockpulse)、[技术架构总览](architecture-overview.md) |
+| 第一次把项目跑起来 | [小白客户端安装与配置](beginner-client-setup.md)（[English](beginner-client-setup_EN.md)） | [README · 定位与亮点](../README.md#why-stockpulse)、[安全基线 · 运维边界](security-baseline.md#operator-security-boundaries)、[完整配置与部署指南](full-guide.md) |
 | **学习 Web / 桌面界面怎么用** | [界面操作手册](ui-manual/README.md) | 各模块分册（分析、信号、持仓等） |
 | 配置大模型渠道 | [LLM 配置指南](LLM_CONFIG_GUIDE.md) | [LLM 服务商配置指南](llm-providers.md) |
 | 配置推送通知 | [通知能力基线](notifications.md) | [完整配置与部署指南](full-guide.md) |

@@ -19,14 +19,14 @@ Local-first research workbench: multi-market data → technical & news context �
 </div>
 
 > [!NOTE]
-> **StockPulse** is an independently maintained fork of [ZhuLinsen/daily_stock_analysis](https://github.com/ZhuLinsen/daily_stock_analysis). Upstream original code is MIT; StockPulse new and substantially modified code is **AGPL-3.0**. Not an official upstream release. See [LICENSE](LICENSE).
+> StockPulse builds on [ZhuLinsen/daily_stock_analysis](https://github.com/ZhuLinsen/daily_stock_analysis) with thanks to the original authors. Project licensing: original portions under MIT; StockPulse additions under **AGPL-3.0**. See [LICENSE](LICENSE).
 
 <a id="why-stockpulse"></a>
 ## Why StockPulse
 
-StockPulse is a **local-first investment research workbench**—data, evidence, strategies, and agents under your control—not a “stock-picking oracle.” Upstream `daily_stock_analysis` remains a strong daily-analysis and push foundation; StockPulse adds **extension contracts, security boundaries, auditable risk gates, and research workflows**.
+StockPulse is a **local-first investment research workbench**: multi-market data, evidence-aware analysis, optional agents, and notifications under **your** control—not a black-box stock tip service. It emphasizes **auditable risk controls**, **plugin-friendly extension**, and **honest report structure** so research stays inspectable.
 
-| Differentiator | On `main` | Docs |
+| Highlight | On `main` | Docs |
 | --- | --- | --- |
 | **Report strata (trust UX)** | Facts / gaps / inference / risks / framework alignment / disclaimer in Markdown, brief, WeChat, and Web full report | [CHANGELOG](docs/CHANGELOG.md) |
 | **Human-in-the-loop risk gate** | Default-off approvals for high-risk control paths; durable proposals + `/approvals` UI | [Human approvals](docs/human-approvals_EN.md) |
@@ -39,7 +39,7 @@ StockPulse is a **local-first investment research workbench**—data, evidence, 
 | **Investment framework (backend)** | Versioned personal framework API/storage; Web editor still minimal | [Framework](docs/personal-investment-framework_EN.md) |
 | **Security audit Phase 1** | Durable privileged-path audit trail | [Security audit](docs/security-audit.md) |
 | **Offline quality panel** | Deterministic fixtures + local runner (no live LLM scoring) | [CONTRIBUTING](docs/CONTRIBUTING_EN.md) |
-| **Dual license** | Upstream MIT + StockPulse AGPL-3.0 | [LICENSE](LICENSE) |
+| **Open source licensing** | MIT (original portions) + AGPL-3.0 (StockPulse additions) | [LICENSE](LICENSE) |
 
 ### Explicit non-claims
 

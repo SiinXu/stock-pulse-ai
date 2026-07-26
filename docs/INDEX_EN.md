@@ -9,7 +9,7 @@ This is the entry point for project documentation. The README covers the project
 | I want to | Start with | Then read |
 | --- | --- | --- |
 | Understand what the project does | [README (EN, root)](../README.md) | [Full Guide (EN)](full-guide_EN.md) |
-| **See how StockPulse differs from upstream** | [README · Why StockPulse](../README.md#why-stockpulse) | [简体 README](README_CN.md#why-stockpulse), [Architecture overview](architecture-overview.md) |
+| **Understand StockPulse positioning and highlights** | [README · Why StockPulse](../README.md#why-stockpulse) | [简体 README](README_CN.md#why-stockpulse), [Architecture overview](architecture-overview.md) |
 | Run the project for the first time | [Beginner client setup (EN)](beginner-client-setup_EN.md) | [Why StockPulse](../README.md#why-stockpulse), [Security baseline — operator boundaries](security-baseline.md#operator-security-boundaries), [Full Guide (EN)](full-guide_EN.md), [UI User Manual](ui-manual/README_EN.md) |
 | **Learn the Web / desktop UI** | [UI User Manual](ui-manual/README_EN.md) | Per-module chapters (analysis, signals, portfolio, …) |
 | Configure model providers | [LLM Config Guide (EN)](LLM_CONFIG_GUIDE_EN.md) | [Local Model Catalog](local-model-catalog.md), [Provider Configuration Guide](llm-providers.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) |

@@ -19,7 +19,7 @@
 </div>
 
 > [!NOTE]
-> **StockPulse** 是 [ZhuLinsen/daily_stock_analysis](https://github.com/ZhuLinsen/daily_stock_analysis) 的獨立維護 fork。上游原始程式碼遵循 MIT License，StockPulse 新增與大幅修改的程式碼遵循 AGPL-3.0。StockPulse 不是上游團隊發布的官方版本。感謝原作者和貢獻者；完整授權條款見 [LICENSE](../LICENSE)。
+> StockPulse 在 [ZhuLinsen/daily_stock_analysis](https://github.com/ZhuLinsen/daily_stock_analysis) 基礎上持續演進，感謝原作者與貢獻者。授權：原始部分 MIT；StockPulse 新增與大幅修改部分 **AGPL-3.0**。詳見 [LICENSE](../LICENSE)。
 
 ## 🗂️ 目錄導覽
 
