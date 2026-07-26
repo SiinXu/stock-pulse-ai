@@ -171,7 +171,7 @@ describe('ScheduledTasksPanel', () => {
     expect(await screen.findByTestId('settings-scheduled-tasks-create-form')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Daily AAPL' } });
-    fireEvent.change(screen.getByLabelText('Stock code'), { target: { value: 'AAPL' } });
+    fireEvent.change(screen.getByLabelText('Symbol code'), { target: { value: 'AAPL' } });
     fireEvent.click(screen.getByTestId('settings-scheduled-tasks-create-submit'));
 
     await waitFor(() => {
@@ -264,7 +264,7 @@ describe('ScheduledTasksPanel', () => {
 
     fireEvent.click(await screen.findByTestId('settings-scheduled-tasks-create'));
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Daily AAPL' } });
-    fireEvent.change(screen.getByLabelText('Stock code'), { target: { value: 'AAPL' } });
+    fireEvent.change(screen.getByLabelText('Symbol code'), { target: { value: 'AAPL' } });
     fireEvent.change(screen.getByLabelText('Max attempts'), { target: { value: '9' } });
     fireEvent.click(screen.getByTestId('settings-scheduled-tasks-create-submit'));
 

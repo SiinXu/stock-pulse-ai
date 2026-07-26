@@ -1177,7 +1177,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.schedulerTimes": "Horaires prévus",
   "i18n.uiText.UI_TEXT.settings.schedulerTitle": "Legacy day-batch schedule",
   "i18n.uiText.UI_TEXT.settings.scheduledTasksTitle": "Saved schedule definitions (versioned)",
-  "i18n.uiText.UI_TEXT.settings.scheduledTasksDescription": "Process-local versioned analysis and research schedules (separate from the legacy SCHEDULE_* day-batch above). Enable or disable definitions; no natural-language planner or distributed scheduler.",
+  "i18n.uiText.UI_TEXT.settings.scheduledTasksDescription": "Create and review process-local versioned analysis and research schedules (separate from the legacy SCHEDULE_* day-batch above). Enable or disable definitions; no natural-language planner or distributed scheduler.",
   "i18n.uiText.UI_TEXT.settings.scheduledTasksProcessLocalNote": "Execution still uses this process analysis queue (ADR-008). Research schedules are research-only and not investment advice.",
   "i18n.uiText.UI_TEXT.settings.scheduledTasksListLabel": "Saved schedule definitions",
   "i18n.uiText.UI_TEXT.settings.scheduledTasksRefresh": "Refresh schedule definitions",
