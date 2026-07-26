@@ -678,6 +678,25 @@ class _StockAnalysisStageMixin:
                     )
                     decision_reflection = None
 
+            try:
+                from src.services.investment_framework_prompt import (
+                    inject_framework_into_analysis_context,
+                )
+
+                inject_framework_into_analysis_context(
+                    enhanced_context,
+                    report_language=report_language,
+                )
+            except Exception as exc:  # broad-exception: fallback_recorded - Framework inject is optional research context.
+                log_safe_exception(
+                    logger,
+                    "Personal investment framework inject failed",
+                    exc,
+                    error_code="pipeline_investment_framework_inject_failed",
+                    level=logging.WARNING,
+                    context={"stock_code": code},
+                )
+
             # Step 7: Call AI Analysis (Pass in Enhanced Context and News)
             (
                 analysis_context_pack_summary,

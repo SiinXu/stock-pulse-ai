@@ -222,6 +222,24 @@ class GeminiAnalyzer:
                     language=report_language,
                     top_level_strata=data.get("report_strata"),
                 )
+                try:
+                    from src.services.investment_framework_prompt import (
+                        enrich_dashboard_framework_alignment,
+                    )
+
+                    dashboard = enrich_dashboard_framework_alignment(
+                        dashboard,
+                        report_language=report_language,
+                    )
+                except Exception as framework_exc:  # broad-exception: fallback_recorded - framework strata fill is optional
+                    log_safe_exception(
+                        logger,
+                        "Failed to enrich framework alignment strata",
+                        framework_exc,
+                        error_code="report_strata_framework_enrich_failed",
+                        level=logging.WARNING,
+                        context={"symbol": code},
+                    )
             except Exception as strata_exc:  # broad-exception: fallback_recorded - strata attach must not block parse
                 log_safe_exception(
                     logger,
