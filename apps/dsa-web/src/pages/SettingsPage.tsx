@@ -81,6 +81,7 @@ import {
 import { IntelligenceSourcesPanel } from '../components/settings/IntelligenceSourcesPanel';
 import FirstRunSetupCard from '../components/settings/FirstRunSetupCard';
 import SchedulerSettingsCard from '../components/settings/SchedulerSettingsCard';
+import ScheduledTasksPanel from '../components/settings/ScheduledTasksPanel';
 import { getConfigItem } from '../components/settings/settingsConfigItems';
 import { WEB_BUILD_INFO } from '../utils/constants';
 import { decodeModelRef } from '../utils/modelRef';
@@ -2336,16 +2337,23 @@ const SettingsPage: React.FC = () => {
             ) : null}
             {activeCategory === 'system' && activeView === 'security' ? <AuthSettingsCard /> : null}
             {activeCategory === 'system' && activeView === 'runtime' ? (
-              <SchedulerSettingsCard
-                items={rawActiveItems}
-                disabled={isSaving || isLoading}
-                issueByKey={issueByKey}
-                statusRefreshToken={schedulerStatusRefreshToken}
-                onSchedulerStateChange={handleSchedulerRuntimeStateChange}
-                onChange={setDraftValue}
-                t={t}
-                language={uiLanguage}
-              />
+              <>
+                <SchedulerSettingsCard
+                  items={rawActiveItems}
+                  disabled={isSaving || isLoading}
+                  issueByKey={issueByKey}
+                  statusRefreshToken={schedulerStatusRefreshToken}
+                  onSchedulerStateChange={handleSchedulerRuntimeStateChange}
+                  onChange={setDraftValue}
+                  t={t}
+                  language={uiLanguage}
+                />
+                <ScheduledTasksPanel
+                  disabled={isSaving || isLoading}
+                  t={t}
+                  language={uiLanguage}
+                />
+              </>
             ) : null}
             {activeCategory === 'system' && activeView === 'about' ? (
               <SettingsSectionCard
