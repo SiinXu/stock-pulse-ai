@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Added] Registered `SIGNAL_SCORECARD_PUBLIC_ENABLED` and `SIGNAL_SCORECARD_MIN_SAMPLES` in the config registry/Settings pipeline (default off) and added a read-only Settings scorecard preview that uses the public route and documents enable-for-preview behavior.
 - [Docs] Aligned homepage README framework differentiators with the shipped Settings minimal editor and stock-analysis inject (removed residual “no Web editor” soft-claim).
 - [Changed] Clarified dual-schedule honesty in Settings/Home: legacy `SCHEDULE_*` day-batch vs versioned scheduled tasks, process-owner note, and a non-blocking dual-track warning when both appear enabled.
 - [Docs] Froze the personal investment framework product narrative to match `main`: versioned API/storage, Settings minimal editor, stock-analysis read-only inject, and honest report-strata `framework_alignment` empty-state copy.

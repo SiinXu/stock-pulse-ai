@@ -84,6 +84,7 @@ import FirstRunSetupCard from '../components/settings/FirstRunSetupCard';
 import SchedulerSettingsCard from '../components/settings/SchedulerSettingsCard';
 import ScheduledTasksPanel from '../components/settings/ScheduledTasksPanel';
 import SecurityAuditPanel from '../components/settings/SecurityAuditPanel';
+import SignalScorecardPanel from '../components/settings/SignalScorecardPanel';
 import { getConfigItem } from '../components/settings/settingsConfigItems';
 import { WEB_BUILD_INFO } from '../utils/constants';
 import { decodeModelRef } from '../utils/modelRef';
@@ -2366,6 +2367,22 @@ const SettingsPage: React.FC = () => {
                   language={uiLanguage}
                 />
               </>
+            ) : null}
+            {activeCategory === 'system' && activeView === 'general' ? (
+              <SignalScorecardPanel
+                publicEnabled={['1', 'true', 'yes', 'on'].includes(
+                  String(allValuesByKey.SIGNAL_SCORECARD_PUBLIC_ENABLED ?? '').trim().toLowerCase(),
+                )}
+                minSamples={(() => {
+                  const raw = String(allValuesByKey.SIGNAL_SCORECARD_MIN_SAMPLES ?? '').trim();
+                  if (!raw) return 10;
+                  const parsed = Number.parseInt(raw, 10);
+                  return Number.isFinite(parsed) ? parsed : 10;
+                })()}
+                disabled={isSaving || isLoading}
+                t={t}
+                language={uiLanguage}
+              />
             ) : null}
             {activeCategory === 'system' && activeView === 'about' ? (
               <SettingsSectionCard
