@@ -255,11 +255,12 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
         <form className="space-y-4" onSubmit={handleSave}>
           {framework ? (
             <div className="grid grid-cols-1 gap-2 text-xs text-secondary-text sm:grid-cols-3">
-              <span>{t('settings.frameworkVersionLabel')}: v{framework.version}</span>
-              <span>{t('settings.frameworkRevisionLabel')}: {framework.revision}</span>
+              <span>{t('settings.frameworkVersionValue', { version: framework.version })}</span>
+              <span>{t('settings.frameworkRevisionValue', { revision: framework.revision })}</span>
               <span>
-                {t('settings.frameworkActiveVersionLabel')}:{' '}
-                {framework.activeVersion == null ? '—' : `v${framework.activeVersion}`}
+                {framework.activeVersion == null
+                  ? t('settings.frameworkActiveVersionNone')
+                  : t('settings.frameworkActiveVersionValue', { version: framework.activeVersion })}
               </span>
             </div>
           ) : null}
