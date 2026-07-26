@@ -450,16 +450,14 @@ def project_report_strata_for_api(
     log_context: Optional[Dict[str, Any]] = None,
 ) -> Optional[Dict[str, Any]]:
     """Project strata for API ReportDetails; log and return None on failure."""
+    from src.utils.sanitize import log_safe_exception
+
     try:
         model = resolve_report_strata(source, language=language, ensure=False)
         if model is None:
             return None
         return model.to_public_dict()
     except Exception as exc:  # broad-exception: fallback_recorded - projection failure must not break report delivery
-        try:
-            from src.utils.sanitize import log_safe_exception
-        except Exception:
-            return None
         log_safe_exception(
             logging.getLogger(__name__),
             "Report strata projection failed",
