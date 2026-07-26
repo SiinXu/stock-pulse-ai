@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Docs] Froze the personal investment framework product narrative to match `main`: versioned API/storage, Settings minimal editor, stock-analysis read-only inject, and honest report-strata `framework_alignment` empty-state copy.
 - [Changed] Explained HITL `/approvals` default-off preconditions (admin auth, rule disabled, `AGENT_RISK_OVERRIDE`) with banners, disabled actions, and Agent settings help cross-links instead of a silent empty success state.
 - [Added] Added Settings create flow and latest-run status for versioned scheduled tasks on top of list/enable/disable.
+- [Added] Added a read-only Settings Security audit panel over GET /api/v1/security/audit-events with pagination, optional filters, and honest 403 when administrator authentication is disabled.
 - [Docs] Documented the minimal scheduled-task Settings list, Home today projection, and process-local research-only defaults.
 - [Added] Linked Home today scheduled tasks to Settings management with a clear empty-state path.
 - [Added] Added a minimal Settings list for persisted scheduled-task definitions with enable/disable controls and process-local research-only framing.
