@@ -168,6 +168,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('settings', 'generation-backend-status-panel', 'GenerationBackendStatusPanel', 'components/settings/GenerationBackendStatusPanel.tsx', ['default', 'loading', 'error']),
   entry('settings', 'intelligent-import', 'IntelligentImport', 'components/settings/IntelligentImport.tsx', ['interactive', 'error']),
   entry('settings', 'intelligence-sources-panel', 'IntelligenceSourcesPanel', 'components/settings/IntelligenceSourcesPanel.tsx', ['default', 'loading', 'empty', 'error']),
+  entry('settings', 'investment-framework-settings-card', 'InvestmentFrameworkSettingsCard', 'components/settings/InvestmentFrameworkSettingsCard.tsx', ['default', 'empty', 'error']),
   entry('settings', 'llm-channel-editor', 'LLMChannelEditor', 'components/settings/LLMChannelEditor.tsx', ['interactive', 'empty', 'error']),
   entry('settings', 'llm-config-mode-banner', 'LLMConfigModeBanner', 'components/settings/LLMConfigModeBanner.tsx', ['default', 'loading', 'error']),
   entry('settings', 'local-models-panel', 'LocalModelsPanel', 'components/settings/LocalModelsPanel.tsx', ['default', 'interactive', 'empty', 'error']),

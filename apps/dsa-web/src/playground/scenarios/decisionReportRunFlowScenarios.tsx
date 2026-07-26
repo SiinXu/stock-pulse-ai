@@ -326,6 +326,44 @@ const ReportStrataStory = () => {
 
 const ReportSummaryStory = () => <ReportSummary data={fixtureReport} isHistory onOpenRunFlow={() => undefined} />;
 
+const ReportStrataStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  if (scenario === 'empty') {
+    return <ReportStrata details={{}} language="en" alwaysShowDisclaimer />;
+  }
+  return (
+    <ReportStrata
+      details={{
+        reportStrata: {
+          schemaVersion: 'report-strata-v1',
+          verifiedFacts: [
+            {
+              statement: 'Close was 1680 on the last daily bar.',
+              sourceId: 'ohlcv:daily',
+              asOf: '2026-07-25T15:00:00+08:00',
+            },
+          ],
+          missingOrConflicts: [
+            {
+              kind: 'conflict',
+              description: 'Volume sources disagree.',
+              sourceIds: ['a', 'b'],
+            },
+          ],
+          modelInference: ['Momentum may improve if volume confirms.'],
+          risksCounterEvidence: ['Break below support invalidates the constructive case.'],
+          frameworkAlignment: {
+            status: 'not_configured',
+            summary: 'Personal investment framework not configured',
+          },
+          disclaimer: 'AI-generated content for reference only. Not investment advice.',
+        },
+      }}
+      language="en"
+    />
+  );
+};
+
 const RunFlowEventListStory = () => {
   const { scenario } = usePlaygroundScenario();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);

@@ -351,7 +351,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
           ) : null}
 
           <div className="flex flex-wrap gap-2">
-            <Button type="submit" disabled={isSubmitting || isLoading}>
+            <Button type="submit" variant="primary" disabled={isSubmitting || isLoading}>
               {exists ? t('settings.frameworkSave') : t('settings.frameworkCreate')}
             </Button>
             {exists && framework?.isActive ? (
