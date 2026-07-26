@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Docs] Documented UI manual figure-pack naming, P0 capture checklist, and PR evidence rules under `docs/ui-manual/assets/` (#599 docs side).
 - [Added] Added a default-off Human-in-the-Loop risk-control bypass with owner-scoped durable proposals, versioned CAS decisions, one-shot consumption, mandatory security auditing, authenticated additive APIs, and a Home-linked approvals page.
 - [Chore] Declared PEP 621 project metadata and optional extras in `pyproject.toml` while keeping `constraints.txt` / `build-constraints.txt` and `scripts/check_dependency_locks.py` as the pin authority.
 - [Docs] Aligned install documentation with constraints, build-constraints, optional requirements extras, and Docker/CI install surfaces.
