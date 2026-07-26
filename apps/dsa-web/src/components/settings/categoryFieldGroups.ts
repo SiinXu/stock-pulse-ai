@@ -144,6 +144,14 @@ const SYSTEM_GROUPS: CategoryFieldGroup[] = [
       'SAVE_CONTEXT_SNAPSHOT',
     ],
   },
+  {
+    id: 'scorecard',
+    titleKey: 'settings.sysGroupScorecard',
+    keys: [
+      'SIGNAL_SCORECARD_PUBLIC_ENABLED',
+      'SIGNAL_SCORECARD_MIN_SAMPLES',
+    ],
+  },
 ];
 
 const AGENT_GROUPS: CategoryFieldGroup[] = [

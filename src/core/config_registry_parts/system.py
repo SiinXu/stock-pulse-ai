@@ -637,4 +637,65 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "SIGNAL_SCORECARD_PUBLIC_ENABLED": {
+        "title": "Public Signal Scorecard",
+        "description": (
+            "Opt-in unauthenticated exposure of the aggregated signal scorecard at "
+            "GET /api/v1/scorecard. Off by default so self-hosted deployments stay private; "
+            "when enabled, only aggregate non-sensitive stats are returned (no per-symbol identity)."
+        ),
+        "category": "system",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 56,
+        "help_key": "settings.system.scorecard",
+        "examples": [
+            "SIGNAL_SCORECARD_PUBLIC_ENABLED=false",
+            "SIGNAL_SCORECARD_PUBLIC_ENABLED=true",
+            "SIGNAL_SCORECARD_MIN_SAMPLES=10",
+        ],
+        "docs": [
+            {
+                "label": "Full guide: environment variables",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "SIGNAL_SCORECARD_MIN_SAMPLES": {
+        "title": "Scorecard Min Samples",
+        "description": (
+            "Minimum decided samples (hit + miss) before a scorecard bucket shows a hit rate. "
+            "Buckets below this threshold render as insufficient_data."
+        ),
+        "category": "system",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "10",
+        "options": [],
+        "validation": {"min": 1, "max": 10000},
+        "display_order": 57,
+        "help_key": "settings.system.scorecard",
+        "examples": [
+            "SIGNAL_SCORECARD_MIN_SAMPLES=10",
+            "SIGNAL_SCORECARD_MIN_SAMPLES=20",
+        ],
+        "docs": [
+            {
+                "label": "Full guide: environment variables",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
+            },
+        ],
+        "warning_codes": [],
+    },
+
 }

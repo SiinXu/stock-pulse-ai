@@ -651,6 +651,29 @@ const settingsHelpEnUS: SettingsHelpMap = {
     impact: ['Affects scheduled jobs, CLI runs, and GitHub Actions manual runs on holidays; the Web/API market-review button submits directly.'],
     notes: ['Disabling it can produce reports with missing realtime quotes on closed markets.'],
   },
+  'settings.system.scorecard': {
+    title: 'Public signal scorecard',
+    summary: 'Controls the opt-in aggregated signal scorecard at GET /api/v1/scorecard.',
+    usage: 'Keep SIGNAL_SCORECARD_PUBLIC_ENABLED off unless you intentionally want an unauthenticated transparency endpoint. SIGNAL_SCORECARD_MIN_SAMPLES sets the decided-sample floor before a bucket shows a hit rate.',
+    valueNotes: [
+      'Default is off so self-hosted deployments stay private.',
+      'When enabled, the route returns only aggregate, non-sensitive stats (no per-symbol identity).',
+      'Operator preview in Settings uses the same public route; with the flag off the API returns 404.',
+      'Buckets below the min-sample threshold render as insufficient_data instead of a rate.',
+    ],
+    impact: [
+      'Affects whether /api/v1/scorecard is reachable without a session.',
+      'Does not change decision-signal outcome calculation or report scoring formulas.',
+    ],
+    notes: [
+      'There is no separate admin-only scorecard API in this release; enable the public flag to preview live aggregation.',
+    ],
+    examples: [
+      'SIGNAL_SCORECARD_PUBLIC_ENABLED=false',
+      'SIGNAL_SCORECARD_PUBLIC_ENABLED=true',
+      'SIGNAL_SCORECARD_MIN_SAMPLES=10',
+    ],
+  },
   'settings.system.HTTP_PROXY': {
     title: 'Network Proxy',
     summary: 'Sets a proxy for external API, model, or search requests.',
