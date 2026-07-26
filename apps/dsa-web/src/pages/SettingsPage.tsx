@@ -21,6 +21,7 @@ import { ApiErrorAlert, AppPage, Button, ConfirmDialog, EmptyState, PageHeader, 
 import { SETTINGS_MISC_TEXT } from '../locales/settingsMisc';
 import {
   AuthSettingsCard,
+  InvestmentFrameworkSettingsCard,
   ChangePasswordCard,
   GenerationBackendStatusPanel,
   IntelligentImport,
@@ -2336,6 +2337,7 @@ const SettingsPage: React.FC = () => {
               </SettingsSectionCard>
             ) : null}
             {activeCategory === 'system' && activeView === 'security' ? <AuthSettingsCard /> : null}
+            {activeSection === 'agent_behavior' ? <InvestmentFrameworkSettingsCard /> : null}
             {activeCategory === 'system' && activeView === 'runtime' ? (
               <>
                 <SchedulerSettingsCard
