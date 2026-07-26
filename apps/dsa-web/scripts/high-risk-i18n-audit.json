@@ -14,9 +14,9 @@
   },
   "decisionEvidence": {
     "count": 93,
-    "sha256": "9184e96f9468bf9478e16a7257228bfefb46acaaf0db327a1d96f4a14534d064",
+    "sha256": "7c2e24a79a5f4403fd19eb652b071e1b2e8b6625e5a761fa0a903e3bd8429f5d",
     "localeValueCount": 501,
-    "revisionSha256": "9ed8682934cd9f7c865d662af7a7a75b04c22a2818a9a6a500bee0e67cede780"
+    "revisionSha256": "843d0e18fa8087f9a4b32446ad107712268703e62c88ab33ea31e75aecb6cf86"
   },
   "languageReview": {
     "zh": {
@@ -254,19 +254,19 @@
         }
       ],
       "snapshot": {
-        "keyCount": 73,
-        "keySetSha256": "f8f3bfe20e1a597361ebd75e72e33cc57ddc561256c19d8ddd825276b2f21182",
+        "keyCount": 75,
+        "keySetSha256": "fb6fdab4339afd794be39224f7643ee44bb60b158e21690297212bafa6664ce7",
         "bundleSha256": {
-          "zh": "fb1efe0edc4f8eb5ed62409c92ebc2159dc54d6ecd637adbf6f8331c48ce1942",
-          "zh-TW": "013ae134cf1707a8d57c0ddbdb1fbb2fe3b2349d357d4d789858c30b3e742549",
-          "en": "ac500405f7af2a5983280ea4d644887ba8e4ccd7c9272b036b1e7709e389afa4",
-          "ja": "d06cb516f303ecf5c1becef28512087be4216fc39705af8c124ef22d39b86df2",
-          "ko": "49f1ad0d8d74b64c3355ab978e0762c9d49da32ff7daa0b827e2c8c5072c7fcd",
-          "de": "b5767457045d7f446210d55bb4acc29cd22fb1821aaffda76ede354113abfaf2",
-          "es": "54c97b819fc1b8999e36a63c16e21975a60af99cc2481da907067fbe3f3a4a25",
-          "ms": "db2a8be3903750cdbe17fd5abe6cb5de269ce940acfd662046918ac36ff0084a",
-          "fr": "e2e2f5c34e3efa6f589d0273251dbd4dc7e0d45971a413d3b4c74b067e983ff1",
-          "id": "806193e4d3cae82a164175f5d95e075248db21b532f15f2107dddb2b77d12b2b"
+          "zh": "b279e80767790f29046f00c6025e40372ec91c0bc72bed23e4beea9f5c406e3e",
+          "zh-TW": "2cea7e03ce8c610a3127d2ed8f957b6cad645e2e7f8155fc180ff7f261d917d8",
+          "en": "7bc155fae0ad636cce152da53c3d2211384b48291b198f69b0ca8fd21a9bc464",
+          "ja": "0989bc5bcf72f790afe02142e88ed14091035c5c1b54cb222ee5f0f8b99202d5",
+          "ko": "8defc554bd496934f47f34b871843bfad800fda6de50394f351ff838c16594b6",
+          "de": "d830ae0120cee11dc5861d33f9b1b98036de1df37e5d7eca497dedf902e58063",
+          "es": "7f1c4a592cb0e305a07e6924e51a86078b31167316eb16718dead1aa1be61060",
+          "ms": "7ece545ca43ddd97fd02cdd5c646ab1ad91db791c60234356e40ceae57cc0f6e",
+          "fr": "bf79b0c65e6b4f88eeb0d772259799671e7b9ac153b66a2e4b0a356f214b6a1b",
+          "id": "5bd2ab43e1908c728d16baf775e2133e6bdb5b6308b5a167e0df4a11d47aa68b"
         }
       }
     },
@@ -290,23 +290,23 @@
           "pattern": "^i18n\\.uiText\\.UI_TEXT\\.settings\\.(?:auth|changePassword)"
         },
         {
-          "pattern": "^api\\.error\\.STABLE_ERROR_TEXT\\.(?:unauthorized|auth_disabled|password_required|current_required|password_mismatch|password_already_set|invalid_password|not_changeable|rate_limited)\\."
+          "pattern": "^api\\.error\\.STABLE_ERROR_TEXT\\.(?:unauthorized|auth_disabled|approval_auth_required|password_required|current_required|password_mismatch|password_already_set|invalid_password|not_changeable|rate_limited)\\."
         }
       ],
       "snapshot": {
-        "keyCount": 87,
-        "keySetSha256": "8d85e892027c06f15181d70b18f28d259f4537f4bd0e57544c2845f7ae1fb28c",
+        "keyCount": 89,
+        "keySetSha256": "fe9b4c645201e2e6fb71bd91c8d68b2ff61c0ce284f4a2d4d878345bdac52d49",
         "bundleSha256": {
-          "zh": "c6265221a5df29f92c7df0ddea6472264457bf4cd9ff61ae1e77502db959653b",
-          "zh-TW": "2c00574e0c5001bd350405714476479c28478b7df4453a68fd687fb3b7429cd7",
-          "en": "57657c8a1482429e1924cfb4ce07514847eaed4b25244c489be3aaf01cc6b2da",
-          "ja": "09bbaf0167a6a3075a0eafe531ea43e9b1c96af1042ee32f0adbaecb9063ac49",
-          "ko": "a29c3c8d5b7a2a97cc160a4fe91922656bd199755f479004b48c12f916051282",
-          "de": "6938fbaac7836439d5fac33ef84cf0a2666c08862322c77e2c6a51f7fa77c4ac",
-          "es": "20e2b4d82ff04e646a43519b384885e38d89431210c5613353f2ba1937dce444",
-          "ms": "196b34618fb29c44f92370f5984fb5631c39d9051203ec41fd63d58f5dda1e7a",
-          "fr": "dbd4a0876a6ba50c39c0a6776a9d4a7c7d9519c22a90a7a79e92c17c9e644789",
-          "id": "00cc8c720ade85b0b68e0e01aba81c396ad0f18dc70e1897fd5dd286a2d81279"
+          "zh": "3e11c5a20f9fb29fa6fd047f7d9b42765a555922912c407f5d3ac050a3de3100",
+          "zh-TW": "f35ff5e3704347b07ffa8eaf331fed9bdba61267d20a95e39a3297a1fae85d99",
+          "en": "73ec39cc17026c4d4b0a38d3b65d8e6eed12bef05e7d7003f9453358ee37ac15",
+          "ja": "419ef91f8c8c63847cb77cdb90785c5375113c4e53ffa90d980b37ee69d6d374",
+          "ko": "cb68c20831c85af04a8f0722f4cc0104bbd3ef192a2080ad468f46edc4b43075",
+          "de": "9af09a18fcd6c3a83dc39bd52b90a52327917ec34c5e43ea695daa5136dd705c",
+          "es": "30033f2a22f91f42d281cc50b2ce90c1cdba05229170bf640a945f70134c822a",
+          "ms": "ad99362517b7108fbd321d2905806f1bb930981e2fe19ef8fb0383e26fcf6ffa",
+          "fr": "b1c9a31904b0195a2bb0441dab01c04595db8fff6e6584b03f0bb7ba7d9216db",
+          "id": "96e3a70828338ddf02c521bc2f650a8b83659c6b72a62aa21829508b7219d7b3"
         }
       }
     },
@@ -394,19 +394,19 @@
         }
       ],
       "snapshot": {
-        "keyCount": 102,
-        "keySetSha256": "4287240a10ec17357042d36e3ee87f20c7b737ff5ceb21b49e9efcb8637c7dfb",
+        "keyCount": 104,
+        "keySetSha256": "99162a61d57b62d2c3089bc730e16384090bf8a592ded977e7e6b4e30cb0779a",
         "bundleSha256": {
-          "zh": "8bedc69089c9ace2ca4352e1ca288c0d605235bd7c1dd5936ca9ff37e2e24cf7",
-          "zh-TW": "d13d3b6525574d27cddbead82eb83d165f7fcb6249ac4a6e7cbe77ab76e2e597",
-          "en": "a66b9a4d6f8476059bdd85794734aab84707fd1b0417a26a22a386cc2b3f7879",
-          "ja": "6b33f93df60ad5fc762f07b55caed5acd8fb9f96189a126049af3f345ea5ca06",
-          "ko": "35427c5eb7f9650cf39c3abf567f7fd6172fbbf244b1848623a9d23a01e424d0",
-          "de": "cde7d44cb8a39025567814c358936f0d498ceeb19f1217c4601ddc7f553dbefd",
-          "es": "2269c0117368e41d2f0c02468829f815a8c9aa45e7d585e9293cb78c1ed4591b",
-          "ms": "3666f618891a8d1f54a73479be6cec1e2d574a33b03d6ff26c49fb71bdc71acd",
-          "fr": "d4ac3b18668e7d9fe7ca96a9a70b153d4888095d747fce469d8853a79a6b282c",
-          "id": "6621d232b7f72e26f1012ce13c91e386c1364fb48ff3a12ccbddb93277be089e"
+          "zh": "cb84c71af183170fb987186cfd2098545af5cb632955be6e28a91aec33f86b17",
+          "zh-TW": "d6c9cc3729222b0f18ff574f7780bc278ca9949ddf2e10b809e9675858164f45",
+          "en": "875950bb73dba011ef0457ca5286c1e4319eff6e2cd75f7aa0e44a2cb6ec82fd",
+          "ja": "2cdeb407ef80aa0936cae38eb2dae1c685924026b249f9bbd7c494f4064b6f42",
+          "ko": "a82166a89e74bebabf3d910f1fcb2f4ddb5f73418a9c609d455d2eac7fa5888d",
+          "de": "b825c0401277cf9646ec6cff3b25881b88d0588a74687c61193608893df90134",
+          "es": "215669f1f87ac1618dde1efe05663a8e9db1b202540bc90a4a12deab56aa3d99",
+          "ms": "e2ae95ec25a306762c5fb34cc882e256faba01e7fe8e270b9f6002efc339f6d8",
+          "fr": "6a5b8e5156835b558a85d7f8f0327217b4e7d025ca88a30991e09e4b5ef413c4",
+          "id": "0d302cb8da385e6f862427cb06cb550a7c3ea87350c38aa0b225a6679da1e3c0"
         }
       }
     },
@@ -527,6 +527,7 @@
         "alphasift_screen_task_not_found",
         "alphasift_unavailable",
         "analysis_failed",
+        "approval_auth_required",
         "auth_disabled",
         "config_conflict",
         "config_version_conflict",
@@ -596,6 +597,10 @@
         "analysis_failed": [
           "api.error.STABLE_ERROR_TEXT.analysis_failed.title",
           "api.error.STABLE_ERROR_TEXT.analysis_failed.message"
+        ],
+        "approval_auth_required": [
+          "api.error.STABLE_ERROR_TEXT.approval_auth_required.title",
+          "api.error.STABLE_ERROR_TEXT.approval_auth_required.message"
         ],
         "auth_disabled": [
           "api.error.STABLE_ERROR_TEXT.auth_disabled.title",
@@ -1321,16 +1326,6 @@
       ],
       "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_RISK_OVERRIDE.usage",
       "before": {
-        "zh-TW": "開啟後，full/specialist 模式中的風險 Agent 可將買入建議降級為觀望或賣出。",
-        "ja": "有効化すると、フル/スペシャリストモードのリスクエージェントは買い推奨を保有または売却に下げることができます。",
-        "ko": "활성화되면 전면/전문가 모드의 리스크 에이전트가 매수 추천을 보유 또는 매도로 강등할 수 있습니다.",
-        "de": "Wenn aktiviert, kann der Risikoagent im Voll-/Spezialistenmodus Kaufempfehlungen auf Halten oder Verkauf herunterstufen.",
-        "es": "Cuando está activado, el agente de riesgo en modo completo/especialista puede degradar las recomendaciones de compra para mantenerlas o venderlas.",
-        "ms": "Apabila didayakan, ejen risiko dalam mod penuh/pakar boleh menurunkan taraf cadangan beli untuk dipegang atau dijual.",
-        "fr": "Une fois activé, l’agent de risque en mode « full / spécialiste » peut rétrograder les recommandations d’achat pour les conserver ou les vendre.",
-        "id": "Saat diaktifkan, agen risiko dalam mode penuh/spesialis dapat menurunkan rekomendasi pembelian untuk ditahan atau dijual."
-      },
-      "recommended": {
         "zh-TW": "開啟後，full/specialist 模式中的風險 Agent 可將買入建議降級為持有或賣出。",
         "ja": "有効にすると、full/specialist モードのリスクエージェントは、買い推奨を保有または売却へ引き下げることができます。",
         "ko": "활성화하면 full/specialist 모드의 리스크 에이전트가 매수 추천을 보유 또는 매도로 하향 조정할 수 있습니다.",
@@ -1339,6 +1334,16 @@
         "ms": "Apabila didayakan, ejen risiko dalam mod full/specialist boleh menurunkan taraf cadangan beli kepada pegang atau jual.",
         "fr": "Une fois activé, l’agent de risque en mode full/specialist peut abaisser une recommandation d’achat à conserver ou vendre.",
         "id": "Saat diaktifkan, agen risiko dalam mode full/specialist dapat menurunkan rekomendasi beli menjadi tahan atau jual."
+      },
+      "recommended": {
+        "zh-TW": "開啟後，full/specialist 模式中的風險 Agent 可將買入建議降級為持有或賣出。該保守覆寫仍會自動生效，除非人工審批（/approvals）捕獲了對應路徑。",
+        "ja": "有効にすると、full/specialist モードのリスクエージェントは、買い推奨を保有または売却へ引き下げることができます。その保守的な上書きは、Human approvals（/approvals）が該当パスを捕捉しない限り、自動で適用されたままです。",
+        "ko": "활성화하면 full/specialist 모드의 리스크 에이전트가 매수 추천을 보유 또는 매도로 하향 조정할 수 있습니다. 해당 보수적 재정의는 Human approvals(/approvals)가 해당 경로를 포착하지 않는 한 계속 자동 적용됩니다.",
+        "de": "Wenn aktiviert, kann der Risikoagent im Modus full/specialist Kaufempfehlungen auf Halten oder Verkaufen herabstufen. Diese konservative Überschreibung gilt weiterhin automatisch, sofern Human approvals (/approvals) den Pfad nicht übernimmt.",
+        "es": "Cuando está activado, el agente de riesgo en modo full/specialist puede rebajar una recomendación de compra a mantener o vender. Esa anulación conservadora sigue aplicándose automáticamente a menos que Human approvals (/approvals) capture la ruta.",
+        "ms": "Apabila didayakan, ejen risiko dalam mod full/specialist boleh menurunkan taraf cadangan beli kepada pegang atau jual. Overide konservatif itu masih diguna secara automatik melainkan Human approvals (/approvals) menangkap laluan tersebut.",
+        "fr": "Une fois activé, l’agent de risque en mode full/specialist peut abaisser une recommandation d’achat à conserver ou vendre. Cette surcharge conservatrice s’applique toujours automatiquement, sauf si Human approvals (/approvals) capture le chemin.",
+        "id": "Saat diaktifkan, agen risiko dalam mode full/specialist dapat menurunkan rekomendasi beli menjadi tahan atau jual. Override konservatif itu tetap diterapkan secara otomatis kecuali Human approvals (/approvals) menangkap jalur tersebut."
       }
     },
     {

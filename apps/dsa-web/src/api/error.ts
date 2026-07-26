@@ -54,6 +54,16 @@ const STABLE_ERROR_TEXT: Record<string, StableErrorText> = {
     zh: { title: '需要登录', message: '登录状态已失效，请重新登录。' },
     en: { title: 'Sign-in required', message: 'Your session has expired. Sign in again.' },
   }),
+  approval_auth_required: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.approval_auth_required", {
+    zh: {
+      title: '需要启用管理员认证',
+      message: '人工审批要求 ADMIN_AUTH_ENABLED=true 且持有有效管理员会话；认证关闭时返回 403。',
+    },
+    en: {
+      title: 'Administrator authentication required',
+      message: 'Human approvals require ADMIN_AUTH_ENABLED=true and a valid administrator session; disabled authentication returns 403.',
+    },
+  }),
   auth_disabled: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.auth_disabled", {
     zh: { title: '密码登录未启用', message: '当前服务尚未启用密码登录。' },
     en: { title: 'Password login is disabled', message: 'Password login is not enabled for this service.' },

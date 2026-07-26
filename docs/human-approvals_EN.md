@@ -64,6 +64,12 @@ Proposal responses expose only `id`, owner, status, version, expiry, consumption
 
 The Web page is `/approvals`, reached from the Home To-dos card without adding a primary navigation domain. It shows pending and terminal states, countdowns, original and conservative signals, approve/reject controls, and minimal rule settings. Local controls suppress duplicate clicks, and a `409` refreshes server state.
 
+The page states default preconditions honestly instead of looking “broken”:
+
+- Disabled authentication (`403` / `approval_auth_required`) or a missing session (`401`) shows a warning banner, disables rule edits and decision actions, and deep-links to Auth & Security settings or the sign-in page.
+- When the rule is off by default, the page explains that no pending approvals are created and the existing `AGENT_RISK_OVERRIDE` conservative override still applies automatically.
+- When the rule can load, the page explains the relationship to `AGENT_RISK_OVERRIDE`: with override on and `will_apply`, the conservative path still runs first; only a matched rule plus successful approval and consumption preserves the original recommendation.
+
 ## Execution semantics
 
 The single gate is `AgentOrchestrator._apply_risk_override`. The rule is consulted only when the existing risk plan actually `will_apply`. An off rule or unselected risk category preserves historical behavior. When matched, the worker creates or reuses a proposal and polls while Web/API decisions complete asynchronously:

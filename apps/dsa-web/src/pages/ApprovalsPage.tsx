@@ -1,5 +1,6 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, Clock3, RefreshCw, ShieldAlert, XCircle } from 'lucide-react';
 import { approvalsApi } from '../api/approvals';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
@@ -19,6 +20,10 @@ import {
 } from '../components/common';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { APPROVALS_TEXT } from '../locales/approvals';
+import {
+  APP_ROUTE_PATHS,
+  buildSettingsHref,
+} from '../routing/routes';
 import type {
   ApprovalDecision,
   ApprovalProposal,
@@ -30,6 +35,11 @@ import type {
 const RULE_MIN_SECONDS = 30;
 const RULE_MAX_SECONDS = 3600;
 
+type ApprovalPrecondition =
+  | 'auth_disabled'
+  | 'session_required'
+  | null;
+
 function statusVariant(status: ApprovalStatus) {
   if (status === 'approved') return 'success' as const;
   if (status === 'pending') return 'warning' as const;
@@ -37,8 +47,25 @@ function statusVariant(status: ApprovalStatus) {
   return 'history' as const;
 }
 
+function resolveApprovalPrecondition(error: ParsedApiError | null): ApprovalPrecondition {
+  if (!error) return null;
+  if (
+    error.status === 403
+    || error.code === 'approval_auth_required'
+    || error.code === 'auth_disabled'
+    || error.code === 'forbidden'
+  ) {
+    return 'auth_disabled';
+  }
+  if (error.status === 401 || error.code === 'unauthorized') {
+    return 'session_required';
+  }
+  return null;
+}
+
 const ApprovalsPage: React.FC = () => {
   const { language } = useUiLanguage();
+  const navigate = useNavigate();
   const text = APPROVALS_TEXT[language];
   const [rule, setRule] = useState<ApprovalRule | null>(null);
   const [proposals, setProposals] = useState<ApprovalProposal[]>([]);
@@ -74,7 +101,14 @@ const ApprovalsPage: React.FC = () => {
       setProposals(page.items);
       setError(null);
     } catch (cause) {
-      if (mountedRef.current) setError(getParsedApiError(cause, language));
+      if (mountedRef.current) {
+        setError(getParsedApiError(cause, language));
+        // Keep rule/proposals from a previous successful load when background refresh fails.
+        if (!background) {
+          setRule(null);
+          setProposals([]);
+        }
+      }
     } finally {
       if (mountedRef.current) {
         setLoading(false);
@@ -89,6 +123,10 @@ const ApprovalsPage: React.FC = () => {
       const page = await approvalsApi.list({ page: 1, pageSize: 50 });
       if (!mountedRef.current) return;
       setProposals(page.items);
+      // A successful poll after a prior auth error clears the permanent precondition.
+      setError((current) => (
+        resolveApprovalPrecondition(current) !== null ? null : current
+      ));
     } catch (cause) {
       if (mountedRef.current) setError(getParsedApiError(cause, language));
     } finally {
@@ -100,17 +138,34 @@ const ApprovalsPage: React.FC = () => {
     document.title = text.documentTitle;
   }, [text.documentTitle]);
 
+  const precondition = useMemo(() => resolveApprovalPrecondition(error), [error]);
+  const actionsBlocked = precondition !== null;
+  const showGenericError = Boolean(error && precondition === null);
+
   useEffect(() => {
     mountedRef.current = true;
     void load();
-    const refreshTimer = window.setInterval(() => void pollProposals(), 5_000);
-    const countdownTimer = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => {
       mountedRef.current = false;
+    };
+  }, [load]);
+
+  useEffect(() => {
+    // Skip background polling while auth is permanently unavailable to avoid
+    // refresh-button flicker and repeated 401/403 noise.
+    if (actionsBlocked) return undefined;
+    const refreshTimer = window.setInterval(() => void pollProposals(), 5_000);
+    return () => {
       window.clearInterval(refreshTimer);
+    };
+  }, [actionsBlocked, pollProposals]);
+
+  useEffect(() => {
+    const countdownTimer = window.setInterval(() => setNow(Date.now()), 1_000);
+    return () => {
       window.clearInterval(countdownTimer);
     };
-  }, [load, pollProposals]);
+  }, []);
 
   const pending = useMemo(
     () => proposals.filter((proposal) => proposal.status === 'pending'),
@@ -122,6 +177,7 @@ const ApprovalsPage: React.FC = () => {
   );
 
   const toggleRiskSource = (source: ApprovalRiskSource, checked: boolean) => {
+    if (actionsBlocked) return;
     setRiskSources((current) => (
       checked
         ? [...new Set([...current, source])]
@@ -130,7 +186,7 @@ const ApprovalsPage: React.FC = () => {
   };
 
   const saveRule = async () => {
-    if (!rule || riskSources.length === 0) return;
+    if (!rule || riskSources.length === 0 || actionsBlocked) return;
     setSavingRule(true);
     setNotice(null);
     try {
@@ -157,7 +213,7 @@ const ApprovalsPage: React.FC = () => {
   };
 
   const decide = async (proposal: ApprovalProposal, decision: ApprovalDecision) => {
-    if (decidingId) return;
+    if (decidingId || actionsBlocked) return;
     setDecidingId(proposal.id);
     setNotice(null);
     try {
@@ -189,9 +245,9 @@ const ApprovalsPage: React.FC = () => {
 
   const renderProposal = (proposal: ApprovalProposal) => {
     const seconds = Math.max(0, Math.ceil((new Date(proposal.expiresAt).getTime() - now) / 1000));
-    const pendingActive = proposal.status === 'pending' && seconds > 0;
+    const pendingActive = proposal.status === 'pending' && seconds > 0 && !actionsBlocked;
     const timingLabel = proposal.status === 'pending'
-      ? (pendingActive ? text.expiresIn.replace('{seconds}', String(seconds)) : text.expired)
+      ? (seconds > 0 ? text.expiresIn.replace('{seconds}', String(seconds)) : text.expired)
       : (proposal.status === 'expired' ? text.expired : statusLabel(proposal.status));
     return (
       <article
@@ -262,6 +318,15 @@ const ApprovalsPage: React.FC = () => {
     );
   };
 
+  const authSettingsHref = buildSettingsHref({
+    section: 'system_security',
+    view: 'security',
+  });
+  const agentSettingsHref = buildSettingsHref({
+    section: 'agent_behavior',
+    view: 'execution',
+  });
+
   return (
     <WorkspacePage data-testid="approvals-page" contentClassName="space-y-6">
       <PageHeader
@@ -281,7 +346,70 @@ const ApprovalsPage: React.FC = () => {
         )}
       />
 
-      {error ? (
+      {precondition === 'auth_disabled' ? (
+        <InlineAlert
+          variant="warning"
+          title={text.authDisabledTitle}
+          message={text.authDisabledMessage}
+          data-testid="approvals-precondition-auth-disabled"
+          action={(
+            <Button
+              variant="secondary"
+              size="default"
+              onClick={() => navigate(authSettingsHref)}
+            >
+              {text.authDisabledAction}
+            </Button>
+          )}
+        />
+      ) : null}
+
+      {precondition === 'session_required' ? (
+        <InlineAlert
+          variant="warning"
+          title={text.sessionRequiredTitle}
+          message={text.sessionRequiredMessage}
+          data-testid="approvals-precondition-session-required"
+          action={(
+            <Button
+              variant="secondary"
+              size="default"
+              onClick={() => navigate(APP_ROUTE_PATHS.login)}
+            >
+              {text.sessionRequiredAction}
+            </Button>
+          )}
+        />
+      ) : null}
+
+      {rule && !rule.enabled && !actionsBlocked ? (
+        <InlineAlert
+          variant="info"
+          title={text.ruleDisabledTitle}
+          message={text.ruleDisabledMessage}
+          data-testid="approvals-precondition-rule-disabled"
+        />
+      ) : null}
+
+      {rule && !actionsBlocked ? (
+        <InlineAlert
+          variant="info"
+          title={text.riskOverrideTitle}
+          message={text.riskOverrideMessage}
+          data-testid="approvals-precondition-risk-override"
+          action={(
+            <Button
+              variant="secondary"
+              size="default"
+              onClick={() => navigate(agentSettingsHref)}
+            >
+              {text.riskOverrideAction}
+            </Button>
+          )}
+        />
+      ) : null}
+
+      {showGenericError && error ? (
         <ApiErrorAlert
           error={error}
           actionLabel={text.recover}
@@ -298,8 +426,10 @@ const ApprovalsPage: React.FC = () => {
         padding="md"
         actions={<ShieldAlert className="h-5 w-5 text-warning" aria-hidden="true" />}
       >
-        {loading || !rule ? (
+        {loading ? (
           <StatePanel state="loading" title={text.refresh} size="compact" />
+        ) : !rule ? (
+          <EmptyState compact title={text.unavailableRule} description={text.blockedPending} />
         ) : (
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
             <div className="space-y-4">
@@ -308,11 +438,12 @@ const ApprovalsPage: React.FC = () => {
                 <Switch
                   checked={enabled}
                   onCheckedChange={setEnabled}
+                  disabled={actionsBlocked}
                   aria-label={text.enabled}
                   testId="approval-rule-enabled"
                 />
               </label>
-              <fieldset>
+              <fieldset disabled={actionsBlocked}>
                 <legend className="mb-2 text-sm font-medium text-foreground">{text.riskSources}</legend>
                 <div className="flex flex-wrap gap-4">
                   <Checkbox
@@ -336,6 +467,7 @@ const ApprovalsPage: React.FC = () => {
                 label={text.expiry}
                 hint={text.expiryHint}
                 value={expiry}
+                disabled={actionsBlocked}
                 onChange={(event) => setExpiry(Number(event.currentTarget.value))}
               />
               <div className="grid">
@@ -345,7 +477,8 @@ const ApprovalsPage: React.FC = () => {
                   isLoading={savingRule}
                   loadingText={text.saving}
                   disabled={
-                    riskSources.length === 0
+                    actionsBlocked
+                    || riskSources.length === 0
                     || !Number.isInteger(expiry)
                     || expiry < RULE_MIN_SECONDS
                     || expiry > RULE_MAX_SECONDS
@@ -363,18 +496,25 @@ const ApprovalsPage: React.FC = () => {
       <Section title={text.pendingTitle} level="canvas" padding="md">
         {loading ? (
           <StatePanel state="loading" title={text.refresh} size="compact" />
-        ) : pending.length === 0 ? (
-          <EmptyState compact title={text.emptyPending} />
-        ) : (
+        ) : pending.length > 0 ? (
+          // Keep already-loaded proposals visible as read-only when auth fails mid-session.
           <div className="space-y-3">{pending.map(renderProposal)}</div>
+        ) : actionsBlocked ? (
+          <EmptyState compact title={text.blockedPending} />
+        ) : (
+          <EmptyState compact title={text.emptyPending} />
         )}
       </Section>
 
       <Section title={text.historyTitle} level="canvas" padding="md">
-        {terminal.length === 0 ? (
-          <EmptyState compact title={text.emptyHistory} />
-        ) : (
+        {loading ? (
+          <StatePanel state="loading" title={text.refresh} size="compact" />
+        ) : terminal.length > 0 ? (
           <div className="space-y-3">{terminal.map(renderProposal)}</div>
+        ) : actionsBlocked ? (
+          <EmptyState compact title={text.blockedHistory} />
+        ) : (
+          <EmptyState compact title={text.emptyHistory} />
         )}
       </Section>
     </WorkspacePage>
