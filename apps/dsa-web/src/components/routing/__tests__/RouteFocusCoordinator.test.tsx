@@ -107,6 +107,21 @@ function ReplacePage() {
   );
 }
 
+function DetailsWithBackPage() {
+  const navigate = useNavigate();
+  return (
+    <RegisteredPage routeId="details-back" title="Details with back">
+      <button
+        type="button"
+        data-route-focus-key="details:back"
+        onClick={() => void navigate(-1)}
+      >
+        Back
+      </button>
+    </RegisteredPage>
+  );
+}
+
 function PresentationSwapPage() {
   return (
     <RegisteredPage routeId="presentation" title="Presentation page">
@@ -217,6 +232,7 @@ function renderRouter(
         { path: '/presentation', element: <PresentationSwapPage /> },
         { path: '/previous', element: <RegisteredPage routeId="previous" title="Previous page" /> },
         { path: '/second', element: <RegisteredPage routeId="second" title="Second page" /> },
+        { path: '/details-back', element: <DetailsWithBackPage /> },
         { path: '/deferred', element: <DeferredPage /> },
         { path: '/same-path', element: <SamePathUrlStatePage /> },
       ],
@@ -302,6 +318,43 @@ describe('RouteFocusCoordinator', () => {
       await router.navigate(-1);
     });
     await waitFor(() => expect(screen.getByRole('link', { name: 'Open second page' })).toHaveFocus());
+  });
+
+  it('restores the details-page Back trigger on Forward after history POP', async () => {
+    const router = createMemoryRouter([
+      {
+        element: (
+          <RouteFocusCoordinator>
+            <Outlet />
+          </RouteFocusCoordinator>
+        ),
+        children: [
+          {
+            path: '/first',
+            element: (
+              <RegisteredPage routeId="first" title="First page">
+                <Link to="/details-back" data-route-focus-key="first:details">
+                  Open details
+                </Link>
+              </RegisteredPage>
+            ),
+          },
+          { path: '/details-back', element: <DetailsWithBackPage /> },
+        ],
+      },
+    ], { initialEntries: ['/first'] });
+    render(<RouterProvider router={router} />);
+
+    fireEvent.click(screen.getByRole('link', { name: 'Open details' }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Details with back' })).toHaveFocus());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Open details' })).toHaveFocus());
+
+    await act(async () => {
+      await router.navigate(1);
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Back' })).toHaveFocus());
   });
 
   it('discards a canceled trigger before a later POP transition', async () => {
