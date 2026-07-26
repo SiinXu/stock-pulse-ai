@@ -694,6 +694,29 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响定时任务、CLI 和 GitHub Actions 手动运行是否在休市日执行；Web/API 大盘复盘按钮会直接提交任务。'],
     notes: ['关闭后休市日可能生成缺少实时行情的报告。'],
   },
+  'settings.system.scorecard': {
+    title: '公开信号计分卡',
+    summary: '控制聚合信号计分卡（GET /api/v1/scorecard）的可选公开暴露。',
+    usage: '除非你明确需要免登录的透明度端点，否则保持 SIGNAL_SCORECARD_PUBLIC_ENABLED 关闭。SIGNAL_SCORECARD_MIN_SAMPLES 控制分桶达到多少“已判定”样本后才展示命中率。',
+    valueNotes: [
+      '默认关闭，保证自托管部署的私密性。',
+      '开启后该路由仅返回聚合、非敏感统计（不含个股身份）。',
+      '设置页中的运营预览使用同一公开路由；关闭时 API 返回 404。',
+      '低于最小样本阈值的分桶返回 insufficient_data，而不是比率。',
+    ],
+    impact: [
+      '影响 /api/v1/scorecard 是否可在无会话时访问。',
+      '不改变决策信号结果计算或报告评分公式。',
+    ],
+    notes: [
+      '本版本没有单独的管理端计分卡 API；如需预览实时聚合，需开启公开开关。',
+    ],
+    examples: [
+      'SIGNAL_SCORECARD_PUBLIC_ENABLED=false',
+      'SIGNAL_SCORECARD_PUBLIC_ENABLED=true',
+      'SIGNAL_SCORECARD_MIN_SAMPLES=10',
+    ],
+  },
   'settings.system.HTTP_PROXY': {
     title: '网络代理',
     summary: '为外部 API、模型服务或搜索请求配置代理地址。',
