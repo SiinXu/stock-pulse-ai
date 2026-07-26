@@ -1,9 +1,19 @@
 import type React from 'react';
 import { useCallback, useRef, useState } from 'react';
+import { X } from 'lucide-react';
 import { getParsedApiError } from '../../api/error';
 import { stocksApi, type ExtractItem } from '../../api/stocks';
 import { systemConfigApi, SystemConfigConflictError } from '../../api/systemConfig';
-import { Badge, Button, Checkbox, InlineAlert } from '../common';
+import {
+  Badge,
+  Button,
+  Checkbox,
+  FileInput,
+  IconButton,
+  InlineAlert,
+  StickyActionBar,
+  Textarea,
+} from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiLanguage } from '../../i18n/uiText';
 import { parseStockListValue } from '../../utils/stockList';
@@ -301,15 +311,21 @@ export const IntelligentImport: React.FC<IntelligentImportProps> = ({
         </p>
       </div>
 
-      <div
-        onDrop={onDrop}
-        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-        onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
-        className={`flex min-h-24 flex-col gap-4 rounded-xl border border-dashed  p-4 transition-colors ${
-          isDragging ? 'settings-drag-active' : 'settings-border-strong settings-surface-overlay-soft'
-        } ${disabled || isLoading ? 'cursor-not-allowed opacity-60' : ''}`}
-      >
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div
+          onDrop={onDrop}
+          onDragOver={(event) => {
+            event.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragLeave={(event) => {
+            event.preventDefault();
+            setIsDragging(false);
+          }}
+          className={`flex min-h-18 flex-wrap items-center justify-center gap-2 rounded-xl border border-dashed p-3 transition-colors ${
+            isDragging ? 'settings-drag-active' : 'settings-border-strong settings-surface-overlay-soft'
+          } ${disabled || isLoading ? 'cursor-not-allowed opacity-60' : ''}`}
+        >
           <Button
             type="button"
             variant="secondary"
@@ -318,11 +334,9 @@ export const IntelligentImport: React.FC<IntelligentImportProps> = ({
           >
             {t('settings.intelligentImportChooseImage')}
           </Button>
-          <input
+          <FileInput
             ref={imageInputRef}
-            type="file"
             accept=".jpg,.jpeg,.png,.webp,.gif"
-            className="hidden"
             onChange={onImageInput}
             disabled={disabled || isLoading}
           />
@@ -334,19 +348,19 @@ export const IntelligentImport: React.FC<IntelligentImportProps> = ({
           >
             {t('settings.intelligentImportChooseFile')}
           </Button>
-          <input
+          <FileInput
             ref={dataFileInputRef}
-            type="file"
             accept=".csv,.xlsx,.txt"
-            className="hidden"
             onChange={onDataFileInput}
             disabled={disabled || isLoading}
           />
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <textarea
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
+          <Textarea
             placeholder={t('settings.intelligentImportPastePlaceholder')}
-            className="settings-surface-strong settings-border-strong min-h-18 w-full rounded-lg border px-3 py-2 text-xs text-foreground shadow-none transition-colors placeholder:text-muted-text focus:outline-none focus:border-muted-text"
+            fieldClassName="min-w-0 flex-1"
+            size="default"
+            className="settings-surface-strong settings-border-strong resize-none text-xs shadow-none"
             value={pasteText}
             onChange={(e) => setPasteText(e.target.value)}
             disabled={disabled || isLoading}
@@ -354,7 +368,7 @@ export const IntelligentImport: React.FC<IntelligentImportProps> = ({
           <Button
             type="button"
             variant="secondary"
-            className="shrink-0 sm:self-start"
+            className="shrink-0 sm:self-end"
             onClick={handlePasteParse}
             disabled={disabled || isLoading || !pasteText.trim()}
           >
@@ -384,15 +398,15 @@ export const IntelligentImport: React.FC<IntelligentImportProps> = ({
               {t('settings.intelligentImportSelectionSummary', { valid: validCount, checked: checkedCount })}
             </span>
             <div className="flex flex-wrap gap-1">
-              <button type="button" className="inline-flex min-h-11 min-w-11 items-center justify-center px-2 text-xs text-secondary-text transition-colors hover:text-foreground" onClick={() => toggleAll(true)}>
+              <Button type="button" variant="ghost" size="compact" onClick={() => toggleAll(true)}>
                 {t('common.selectAllCurrent')}
-              </button>
-              <button type="button" className="inline-flex min-h-11 min-w-11 items-center justify-center px-2 text-xs text-secondary-text transition-colors hover:text-foreground" onClick={() => toggleAll(false)}>
+              </Button>
+              <Button type="button" variant="ghost" size="compact" onClick={() => toggleAll(false)}>
                 {t('common.cancel')}
-              </button>
-              <button type="button" className="inline-flex min-h-11 min-w-11 items-center justify-center px-2 text-xs text-secondary-text transition-colors hover:text-foreground" onClick={clearAll}>
+              </Button>
+              <Button type="button" variant="ghost" size="compact" onClick={clearAll}>
                 {t('settings.intelligentImportClear')}
-              </button>
+              </Button>
             </div>
           </div>
           <div className="max-h-56 space-y-1 overflow-y-auto rounded-xl border settings-border-strong settings-surface-overlay-soft p-2">
@@ -425,28 +439,31 @@ export const IntelligentImport: React.FC<IntelligentImportProps> = ({
                     <Badge variant={confidenceMeta.badge} size="sm">
                       {confidenceMeta.label}
                     </Badge>
-                    <button
-                      type="button"
-                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-secondary-text transition-colors hover:text-foreground"
+                    <IconButton
+                      size="compact"
+                      aria-label={t('common.delete')}
                       onClick={() => removeItem(it.id)}
                       disabled={disabled}
                     >
-                      ×
-                    </button>
+                      <X aria-hidden="true" />
+                    </IconButton>
                   </div>
                 </div>
               );
             })}
           </div>
-          <Button
-            type="button"
-            variant="primary"
-            className="mt-2"
-            onClick={() => void mergeToWatchlist()}
-            disabled={disabled || isMerging || checkedCount === 0}
-          >
-            {isMerging ? t('settings.saving') : t('settings.intelligentImportMergeToWatchlist')}
-          </Button>
+          <StickyActionBar>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => void mergeToWatchlist()}
+              disabled={disabled || isMerging || checkedCount === 0}
+              isLoading={isMerging}
+              loadingText={t('settings.saving')}
+            >
+              {t('settings.intelligentImportMergeToWatchlist')}
+            </Button>
+          </StickyActionBar>
         </div>
       )}
     </div>

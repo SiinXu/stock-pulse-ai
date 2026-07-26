@@ -7,7 +7,7 @@ import { decisionSignalsApi } from '../api/decisionSignals';
 import { portfolioApi } from '../api/portfolio';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
-import { ApiErrorAlert, AppPage, Badge, Button, Card, Checkbox, ConfirmDialog, DataTable, type DataTableColumn, DatePicker, EmptyState, IconButton, InlineAlert, Input, Loading, Modal, PageHeader, Select, Surface } from '../components/common';
+import { ApiErrorAlert, AppPage, Badge, Button, Card, Checkbox, ConfirmDialog, DataTable, type DataTableColumn, DatePicker, EmptyState, FileInput, IconButton, InlineAlert, Input, Loading, Modal, PageHeader, Select, Surface } from '../components/common';
 import { PortfolioSignalSummary } from '../components/decision-signals/DecisionSignalDisplay';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { getUiClauseSeparator } from '../utils/uiLocale';
@@ -126,9 +126,6 @@ function resolveOperationAttempt(
 
 const PORTFOLIO_DATE_TRIGGER_CLASS =
   'h-11 w-full rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
-const PORTFOLIO_FILE_PICKER_CLASS =
-  'flex h-11 w-full cursor-pointer items-center justify-center rounded-full border border-border bg-transparent px-3 text-xs text-foreground transition-colors duration-200 hover:bg-hover focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
-
 function getSignalTime(item: DecisionSignalItem): number {
   return parseDecisionSignalDate(getDecisionSignalPresentation(item).timestamp)?.getTime() ?? 0;
 }
@@ -1943,18 +1940,29 @@ const PortfolioPage: React.FC = () => {
                 disabled={csvParsing || csvCommitting || brokers.length === 0}
                 options={brokers.map((item) => ({ value: item.broker, label: formatBrokerLabel(item.broker, item.displayName, language) }))}
               />
-              <div className="space-y-1">
+              <div className="grid gap-1">
                 <span className="block text-xs text-muted-text">{text.csvFile}</span>
-                <label className={PORTFOLIO_FILE_PICKER_CLASS}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="primary"
+                  disabled={csvParsing || csvCommitting || brokers.length === 0}
+                  onClick={() => csvInputRef.current?.click()}
+                >
                   {text.chooseCsv}
-                  <input ref={csvInputRef} type="file" accept=".csv" className="hidden"
-                    onChange={(e) => {
-                      setCsvFile(e.target.files && e.target.files[0] ? e.target.files[0] : null);
-                      csvOperationRef.current = null;
-                      setCsvParseResult(null);
-                      setCsvCommitResult(null);
-                    }} />
-                </label>
+                </Button>
+                <FileInput
+                  ref={csvInputRef}
+                  accept=".csv"
+                  aria-label={text.chooseCsv}
+                  disabled={csvParsing || csvCommitting || brokers.length === 0}
+                  onChange={(e) => {
+                    setCsvFile(e.target.files && e.target.files[0] ? e.target.files[0] : null);
+                    csvOperationRef.current = null;
+                    setCsvParseResult(null);
+                    setCsvCommitResult(null);
+                  }}
+                />
                 {csvFile ? (
                   <div className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-subtle-soft px-2 py-1.5">
                     <span className="min-w-0 flex-1 truncate text-xs text-foreground">{csvFile.name}</span>

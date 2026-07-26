@@ -49,9 +49,14 @@ describe('ReportMarkdown', () => {
 
     const copyButton = await screen.findByRole('button', { name: '复制 Markdown 源码' });
     expect(copyButton).toBeDisabled();
-    expect(screen.getByRole('button', { name: '关闭' })).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByRole('button', { name: '关闭' })).toHaveAttribute('data-control', 'button');
+    expect(screen.getByRole('button', { name: '关闭' })).toHaveClass('control-hit-target');
     markdown.resolve('# 中文报告');
     expect(await screen.findByRole('heading', { name: '中文报告' })).toBeInTheDocument();
+    expect(document.querySelector('.report-markdown-prose')).toHaveClass(
+      'overflow-hidden',
+      'rounded-xl',
+    );
     expect(copyButton).toBeEnabled();
   });
 
@@ -76,8 +81,9 @@ describe('ReportMarkdown', () => {
 
     const copyButton = await screen.findByRole('button', { name: 'Copy Markdown Source' });
     expect(copyButton).toBeDisabled();
-    expect(copyButton).toHaveClass('h-11', 'w-11');
-    expect(screen.getByRole('button', { name: 'Copy Plain Text' })).toHaveClass('h-11', 'w-11');
+    expect(copyButton).toHaveAttribute('data-control', 'icon-button');
+    expect(copyButton).toHaveClass('control-hit-target');
+    expect(screen.getByRole('button', { name: 'Copy Plain Text' })).toHaveAttribute('data-control', 'icon-button');
     markdown.resolve('# 中文报告');
     expect(await screen.findByRole('heading', { name: '中文报告' })).toBeInTheDocument();
     expect(copyButton).toBeEnabled();

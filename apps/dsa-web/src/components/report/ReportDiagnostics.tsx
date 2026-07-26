@@ -10,7 +10,16 @@ import type {
   RunDiagnosticStatus,
   RunDiagnosticSummary,
 } from '../../types/analysis';
-import { Badge, Button, Card, InlineAlert, StatusDot, useClipboard } from '../common';
+import {
+  Badge,
+  Button,
+  Card,
+  InlineAlert,
+  Spinner,
+  StatusDot,
+  Surface,
+  useClipboard,
+} from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
 
@@ -222,20 +231,20 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
           </div>
           <span className="flex shrink-0 items-center gap-2">
             {isLoading ? (
-              <span className="home-spinner h-3.5 w-3.5 animate-spin border-2" aria-hidden="true" />
+              <Spinner size="sm" label={text.loading} className="h-3.5 w-3.5" />
             ) : null}
             <Badge variant={statusStyle.variant} className="gap-1.5 shadow-none">
               <StatusDot tone={statusStyle.tone} className="h-1.5 w-1.5" />
               {statusLabel}
             </Badge>
-            <span className="hidden home-accent-chip px-2 py-0.5 text-xs text-muted-text md:inline-flex">
+            <Badge variant="default" className="hidden md:inline-flex">
               {text.scope}
-            </span>
+            </Badge>
             <ChevronDown className="h-4 w-4 text-muted-text transition-transform group-open:rotate-180" aria-hidden="true" />
           </span>
         </summary>
 
-        <div className="home-divider space-y-4 border-t px-4 pb-4 pt-3">
+        <div className="space-y-4 border-t border-border px-4 pb-4 pt-3">
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div className="min-w-0 space-y-2">
               <p className="text-sm leading-6 text-foreground">
@@ -243,24 +252,24 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
               </p>
               <div className="flex flex-wrap items-center gap-2 text-xs text-muted-text">
                 {traceId ? (
-                  <span className="home-accent-chip px-2 py-0.5 font-mono">
+                  <Badge variant="default" className="font-mono">
                     {text.trace}: {traceId}
-                  </span>
+                  </Badge>
                 ) : null}
                 {taskId ? (
-                  <span className="home-accent-chip px-2 py-0.5 font-mono">
+                  <Badge variant="default" className="font-mono">
                     {text.task}: {taskId}
-                  </span>
+                  </Badge>
                 ) : null}
                 {queryId ? (
-                  <span className="home-accent-chip px-2 py-0.5 font-mono">
+                  <Badge variant="default" className="font-mono">
                     {text.query}: {queryId}
-                  </span>
+                  </Badge>
                 ) : null}
                 {visibleSummary.triggerSource ? (
-                  <span className="home-accent-chip px-2 py-0.5">
+                  <Badge variant="default">
                     {text.trigger}: {visibleSummary.triggerSource}
-                  </span>
+                  </Badge>
                 ) : null}
               </div>
             </div>
@@ -299,7 +308,12 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
                 const componentStyle = COMPONENT_STATUS_STYLE[component.status] || COMPONENT_STATUS_STYLE.unknown;
                 const componentLabel = text.component[component.status] || component.status;
                 return (
-                  <div key={component.key} className="home-subpanel p-3">
+                  <Surface
+                    key={component.key}
+                    level="interactive"
+                    padding="none"
+                    className="p-3"
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-foreground">
@@ -314,10 +328,10 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
                         {componentLabel}
                       </Badge>
                     </div>
-                  </div>
+                  </Surface>
                 );
               }) : (
-                <p className="home-subpanel p-3 text-sm text-secondary-text">
+                <p className="rounded-lg border border-border bg-card p-3 text-sm text-secondary-text">
                   {text.noComponents}
                 </p>
               )}
@@ -325,12 +339,12 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
           </div>
 
           {hasAdvancedPayload ? (
-            <details className="home-subpanel group/advanced p-3">
+            <details className="group/advanced rounded-lg border border-border bg-card p-3">
               <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3">
                 <span className="text-sm font-medium text-foreground">{text.advanced}</span>
                 <ChevronDown className="h-4 w-4 text-muted-text transition-transform group-open/advanced:rotate-180" aria-hidden="true" />
               </summary>
-              <pre className="home-trace-pre home-trace-pre-content mt-3 max-h-80 overflow-auto rounded-lg bg-base p-3 text-left font-mono text-xs text-foreground">
+              <pre className="report-trace-pre report-trace-pre-content mt-3 max-h-80 overflow-auto rounded-lg bg-base p-3 text-left font-mono text-xs text-foreground">
                 {JSON.stringify(advancedPayload, null, 2)}
               </pre>
             </details>

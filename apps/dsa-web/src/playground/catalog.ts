@@ -40,8 +40,12 @@ export const PLAYGROUND_CATEGORIES: readonly PlaygroundCategoryId[] = [
 
 export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   common('button', 'Button', ['variants', 'sizes', 'states']),
+  common('pressable', 'Pressable', ['interactive', 'states']),
   common('selection-chip', 'SelectionChip', ['interactive', 'states']),
   common('icon-button', 'IconButton', ['variants', 'sizes', 'states']),
+  common('spinner', 'Spinner', ['sizes', 'states']),
+  common('progress', 'Progress', ['variants', 'loading']),
+  common('file-input', 'FileInput', ['interactive', 'states']),
   common('field', 'Field', ['states']),
   common('textarea', 'Textarea', ['states']),
   common('segmented-control', 'SegmentedControl', ['interactive', 'states']),

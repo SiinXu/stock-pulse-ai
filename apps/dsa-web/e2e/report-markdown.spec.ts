@@ -24,7 +24,7 @@ async function openFirstHistoryReport(page: Page) {
     segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
   }));
   await expect(page.getByRole('heading', { name: '分析工作台' })).toBeVisible({ timeout: 10_000 });
-  const firstHistoryItem = page.locator('.home-history-item').first();
+  const firstHistoryItem = page.locator('.history-item[data-control="pressable"]').first();
   await expect(firstHistoryItem).toBeVisible({ timeout: 10_000 });
   await expect(firstHistoryItem).toContainText('E2E Fixture');
   await firstHistoryItem.click();

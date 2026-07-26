@@ -100,6 +100,7 @@ export const SidebarProfile: React.FC<SidebarProfileProps> = ({
         </div>
         <div className="mx-2 border-t border-border" />
         <ThemeToggle
+          menuLayout="select"
           wrapperClassName="w-full"
           triggerClassName={menuRowClass}
           iconClassName="h-4 w-4 shrink-0"

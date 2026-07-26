@@ -19,9 +19,11 @@ import {
   Card,
   ConfirmDialog,
   EmptyState,
+  FileInput,
   IconButton,
   InlineAlert,
   Loading,
+  Progress,
   Section,
   StatusDot,
   useClipboard,
@@ -609,19 +611,13 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
 
             {pulling ? (
               <div className="space-y-1.5" data-testid={`local-model-progress-${model.id}`}>
-                <div
-                  role="progressbar"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={progress?.percent ?? undefined}
-                  aria-label={`${localizedName} ${text.downloading}`}
-                  className="h-1.5 overflow-hidden rounded-full bg-hover"
-                >
-                  <div
-                    className="h-full rounded-full bg-primary transition-[width] duration-200"
-                    style={{ width: `${progress?.percent ?? 4}%` }}
-                  />
-                </div>
+                <Progress
+                  value={progress?.percent ?? undefined}
+                  label={`${localizedName} ${text.downloading}`}
+                  valueText={progress?.percent === null ? text.downloading : `${progress?.percent ?? 0}%`}
+                  tone="primary"
+                  className="h-1.5"
+                />
                 <p className="text-xs text-muted-text">
                   {progress?.percent === null ? text.downloading : `${progress?.percent ?? 0}%`}
                 </p>
@@ -819,11 +815,9 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
       data-testid="local-models-panel"
     >
       <div className="space-y-4">
-        <input
+        <FileInput
           ref={fileInputRef}
-          type="file"
           accept=".modelpack,.zip,application/zip"
-          className="hidden"
           tabIndex={-1}
           onChange={handleModelPackFile}
         />
@@ -871,19 +865,13 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
 
         {activeOperation?.kind === 'import' ? (
           <div className="space-y-1.5" data-testid="model-pack-import-progress">
-            <div
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={progress?.percent ?? undefined}
-              aria-label={text.importing}
-              className="h-1.5 overflow-hidden rounded-full bg-hover"
-            >
-              <div
-                className="h-full rounded-full bg-primary transition-[width] duration-200"
-                style={{ width: `${progress?.percent ?? 4}%` }}
-              />
-            </div>
+            <Progress
+              value={progress?.percent ?? undefined}
+              label={text.importing}
+              valueText={progress?.percent === null ? text.importing : `${progress?.percent ?? 0}%`}
+              tone="primary"
+              className="h-1.5"
+            />
             <p className="text-xs text-muted-text">
               {progress?.percent === null ? text.importing : `${progress?.percent ?? 0}%`}
             </p>

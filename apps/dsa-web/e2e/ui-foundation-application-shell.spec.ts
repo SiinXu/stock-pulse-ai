@@ -200,7 +200,7 @@ test.describe('application shell foundation', () => {
 
       const profileDialog = page.getByRole('dialog', { name: 'StockPulse' });
       await expect(profileDialog).toBeVisible();
-      const themeTrigger = profileDialog.getByRole('button', { name: 'Toggle theme' });
+      const themeTrigger = profileDialog.getByRole('combobox', { name: 'Toggle theme' });
       await expect(themeTrigger).toBeFocused();
       expect((await themeTrigger.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
       await page.keyboard.press('Escape');
@@ -215,7 +215,7 @@ test.describe('application shell foundation', () => {
     await mobileProfile.click();
     const profileDialog = page.getByRole('dialog', { name: 'StockPulse' });
     await expect(profileDialog).toBeVisible();
-    await expect(profileDialog.getByRole('button', { name: 'Toggle theme' })).toBeFocused();
+    await expect(profileDialog.getByRole('combobox', { name: 'Toggle theme' })).toBeFocused();
 
     await page.setViewportSize({ width: 1024, height: 768 });
     const desktopProfile = page.locator('[data-shell-profile-trigger="desktop"]');
@@ -256,9 +256,9 @@ test.describe('application shell foundation', () => {
     const lightBackground = await main.evaluate((element) => getComputedStyle(element).backgroundColor);
     await page.getByRole('button', { name: 'StockPulse' }).click();
     await page.getByRole('dialog', { name: 'StockPulse' })
-      .getByRole('button', { name: 'Toggle theme' })
+      .getByRole('combobox', { name: 'Toggle theme' })
       .click();
-    await page.getByRole('menuitemradio', { name: 'Dark' }).click();
+    await page.getByRole('option', { name: 'Dark' }).click();
     await expect(page.locator('html')).toHaveClass(/dark/);
 
     await expect.poll(
@@ -294,38 +294,46 @@ test.describe('application shell foundation', () => {
     await expect(homeMenu).toHaveCount(0);
     await expect(compactHome).toBeFocused();
 
-    const compactResearch = sidebar.getByRole('link', { name: 'Research' });
+    const compactResearch = sidebar.getByRole('button', { name: 'Research' });
     await compactResearch.hover();
     const researchMenu = page.getByRole('menu', { name: 'Research' });
+    await expect(researchMenu.getByRole('menuitem', { name: 'Research overview' })).toBeVisible();
     await expect(researchMenu.getByRole('menuitem', { name: 'Market review' })).toBeVisible();
     await expect(researchMenu.getByRole('menuitem', { name: 'Discover' })).toBeVisible();
     await expect(researchMenu.getByRole('menuitem', { name: 'Backtest' })).toBeVisible();
     await researchMenu.getByRole('menuitem', { name: 'Discover' }).click();
     await expect(page).toHaveURL(/\/research\/discover$/);
-    await expect(compactResearch).toHaveAttribute('aria-current', 'page');
+    await expect(compactResearch).not.toHaveAttribute('aria-current');
+    await expect(compactResearch).toHaveAttribute('data-navigation-active', 'true');
     const compactNavigation = sidebar.getByRole('navigation', { name: 'Main navigation' });
     const compactRoutes = await compactNavigation.getByRole('link').all();
-    expect(compactRoutes).toHaveLength(5);
+    expect(compactRoutes).toHaveLength(4);
     for (const route of compactRoutes) {
       expect((await route.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
     }
+    expect((await compactResearch.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
     await sidebar.getByRole('button', { name: 'Expand sidebar' }).click();
     await expectSidebarWidth(sidebar, 240);
     const navigation = sidebar.getByRole('navigation', { name: 'Main navigation' });
-    const researchToggle = navigation.getByRole('button', { name: 'Research' });
     const researchParent = navigation.getByRole('link', { name: 'Research' });
+    const researchToggle = navigation.locator('[data-sidebar-group-toggle="research"]');
     const discoverChild = navigation.getByRole('link', { name: 'Discover' });
+    await expect(researchToggle).toHaveAccessibleName('Collapse Research menu');
     await expect(researchToggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(researchParent).toHaveAttribute('href', '/research');
     await expect(researchParent).not.toHaveAttribute('aria-current');
+    await expect(researchParent).toHaveAttribute('data-navigation-active', 'true');
     await expect(discoverChild).toHaveAttribute('aria-current', 'page');
     await researchToggle.click();
     await expect(researchToggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(researchToggle).toHaveAccessibleName('Expand Research menu');
     await expect(navigation.getByRole('link', { name: 'Discover' })).toBeHidden();
-    await expect(researchParent).toHaveAttribute('aria-current', 'page');
+    await expect(page).toHaveURL(/\/research\/discover$/);
+    await expect(navigation.locator('a[aria-current="page"]')).toHaveCount(0);
     await researchToggle.click();
     await expect(researchToggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(researchToggle).toHaveAccessibleName('Collapse Research menu');
     await expect(navigation.getByRole('link', { name: 'Discover' })).toBeVisible();
-    await expect(researchParent).not.toHaveAttribute('aria-current');
     await expect(discoverChild).toHaveAttribute('aria-current', 'page');
     expect(await navigation.evaluate((element) => element.scrollHeight)).toBeGreaterThan(
       await navigation.evaluate((element) => element.clientHeight),
@@ -363,13 +371,18 @@ test.describe('application shell foundation', () => {
     await page.getByRole('button', { name: 'Open navigation' }).click();
     const drawer = page.getByRole('dialog', { name: 'Navigation' });
     const mobileNavigation = drawer.getByRole('navigation', { name: 'Main navigation' });
-    const mobileResearchToggle = mobileNavigation.getByRole('button', { name: 'Research' });
+    const mobileResearch = mobileNavigation.getByRole('link', { name: 'Research' });
+    const mobileResearchToggle = mobileNavigation.locator('[data-sidebar-group-toggle="research"]');
+    await expect(mobileResearch).toHaveAttribute('href', '/research');
+    await expect(mobileResearchToggle).toHaveAccessibleName('Collapse Research menu');
     await expect(mobileResearchToggle).toHaveAttribute('aria-expanded', 'true');
     await mobileResearchToggle.click();
     await expect(mobileResearchToggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(mobileResearchToggle).toHaveAccessibleName('Expand Research menu');
     await expect(mobileNavigation.getByRole('link', { name: 'Discover' })).toBeHidden();
     await mobileResearchToggle.click();
     await expect(mobileResearchToggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(mobileResearchToggle).toHaveAccessibleName('Collapse Research menu');
     await expect(mobileNavigation.getByRole('link', { name: 'Discover' })).toBeVisible();
     expect(await mobileNavigation.evaluate((element) => element.scrollHeight)).toBeGreaterThan(
       await mobileNavigation.evaluate((element) => element.clientHeight),

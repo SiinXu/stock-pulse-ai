@@ -70,7 +70,12 @@ describe('HistoryList', () => {
     expect(screen.getByText('已选 1')).toBeInTheDocument();
     expect(screen.getByText('买入 82')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /贵州茅台/i }));
+    const historyItem = screen.getByRole('button', { name: /贵州茅台/i });
+    expect(historyItem).toHaveAttribute('data-control', 'pressable');
+    expect(historyItem).toHaveClass('history-item', 'history-item-selected');
+    expect(historyItem).not.toHaveClass('home-history-item');
+    expect(historyItem.querySelector('.h-2.w-2.rounded-full')).toBeInTheDocument();
+    fireEvent.click(historyItem);
     expect(onItemClick).toHaveBeenCalledWith(1);
 
     const itemCheckbox = screen.getByRole('checkbox', { name: '选择 贵州茅台 历史记录' });

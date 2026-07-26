@@ -73,6 +73,10 @@ describe('RunFlowGraph', () => {
 
     expect(screen.getByText('入口')).toBeInTheDocument();
     expect(screen.getByText('数据来源')).toBeInTheDocument();
+    expect(screen.getByTestId('run-flow-lane-entry')).toHaveStyle({
+      left: '12px',
+      width: '204px',
+    });
     expect(screen.getAllByText('降级回退').length).toBeGreaterThan(0);
     expect(screen.getByText('降级输入')).toBeInTheDocument();
     expect(screen.getByTestId('run-flow-node-news')).toHaveTextContent('开始');
@@ -505,7 +509,7 @@ describe('RunFlowGraph', () => {
     expect(onSelectNode).not.toHaveBeenCalled();
   });
 
-  it('uses clearer default and selected card states without changing border width', () => {
+  it('uses flat default and selected card states with a single border', () => {
     render(
       <RunFlowGraph
         lanes={lanes}
@@ -516,18 +520,17 @@ describe('RunFlowGraph', () => {
     );
 
     expect(screen.getByTestId('run-flow-node-request')).toHaveClass(
-      'border-2',
+      'border',
       'border-subtle/80',
-      'ring-1',
-      'ring-subtle',
+      'shadow-none',
     );
     expect(screen.getByTestId('run-flow-node-news')).toHaveClass(
-      'border-2',
-      'border-primary/85',
+      'border',
+      'border-primary/60',
       'bg-primary/8',
-      'ring-2',
-      'ring-primary/25',
+      'shadow-none',
     );
+    expect(screen.getByTestId('run-flow-node-request')).not.toHaveClass('hover:-translate-y-0.5');
   });
 
   it('emphasizes selected provider group paths including internal fallback attempts', () => {

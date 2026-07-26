@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { StrictMode } from 'react';
 import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -38,6 +38,17 @@ const LanguageSwitchButton = () => {
     </button>
   );
 };
+
+const defaultMatchMedia = (query: string) => ({
+  matches: query === '(prefers-color-scheme: dark)',
+  media: query,
+  onchange: null,
+  addListener: vi.fn(),
+  removeListener: vi.fn(),
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+  dispatchEvent: vi.fn(),
+});
 
 const {
   mockGetSkills,
@@ -144,16 +155,7 @@ vi.mock('../../stores/agentChatStore', () => {
 beforeAll(() => {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
-    value: vi.fn().mockImplementation((query: string) => ({
-      matches: query === '(prefers-color-scheme: dark)',
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })),
+    value: vi.fn().mockImplementation(defaultMatchMedia),
   });
 
   Object.defineProperty(window, 'requestAnimationFrame', {
@@ -174,6 +176,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(window.matchMedia).mockImplementation(defaultMatchMedia);
   mockStoreState.messages = [];
   mockStoreState.loading = false;
   mockStoreState.progressSteps = [];
@@ -270,8 +273,46 @@ describe('ChatPage', () => {
     expect(await screen.findByTestId('chat-workspace')).toBeInTheDocument();
     expect(screen.getByTestId('chat-session-list-scroll')).toBeInTheDocument();
     expect(screen.getByTestId('chat-message-scroll')).toBeInTheDocument();
+    expect(screen.getByTestId('chat-session-rail')).toHaveClass('hidden', 'xl:flex');
+    expect(screen.getByTestId('chat-session-rail')).not.toHaveClass('md:flex');
+    expect(screen.getByTestId('chat-session-trigger')).toHaveClass('xl:hidden');
+    expect(screen.getByTestId('chat-session-trigger')).not.toHaveClass('md:hidden');
     expect(mockLoadInitialSession).toHaveBeenCalled();
     expect(mockClearCompletionBadge).toHaveBeenCalled();
+  });
+
+  it('closes the compact session drawer when the wide rail becomes available', async () => {
+    let railChangeListener: ((event: MediaQueryListEvent) => void) | null = null;
+    vi.mocked(window.matchMedia).mockImplementation((query: string) => ({
+      ...defaultMatchMedia(query),
+      matches: false,
+      addEventListener: vi.fn((type: string, listener: EventListenerOrEventListenerObject) => {
+        if (query === '(min-width: 1280px)' && type === 'change') {
+          railChangeListener = listener as (event: MediaQueryListEvent) => void;
+        }
+      }),
+    }));
+
+    render(
+      <MemoryRouter initialEntries={['/chat']}>
+        <ChatPage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByTestId('chat-session-trigger'));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(railChangeListener).not.toBeNull();
+
+    act(() => {
+      railChangeListener?.({ matches: true } as MediaQueryListEvent);
+    });
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    const activeSession = within(screen.getByTestId('chat-session-rail'))
+      .getByRole('button', { name: /切换到对话/u });
+    expect(activeSession).toHaveAttribute('aria-current', 'page');
+    await waitFor(() => expect(activeSession).toHaveFocus());
+    expect(document.body.style.overflow).toBe('');
   });
 
   it('keeps the chat mode legible in dark mode and removes the research panel border', async () => {
@@ -472,6 +513,9 @@ describe('ChatPage', () => {
     fireEvent.click(sessionCard);
     expect(mockSwitchSession).not.toHaveBeenCalled();
     expect(sessionCard).toHaveAttribute('aria-current', 'page');
+    expect(sessionCard).toHaveAttribute('data-control', 'pressable');
+    expect(sessionCard).toHaveClass('session-item');
+    expect(sessionCard.querySelector('.indicator')).not.toBeInTheDocument();
   });
 
   it('renders a separate delete button for each session and opens confirmation without switching', async () => {
@@ -485,6 +529,9 @@ describe('ChatPage', () => {
       name: /删除对话 请简要分析 600519/,
     });
 
+    expect(deleteButton).toHaveAttribute('data-control', 'icon-button');
+    expect(deleteButton).toHaveAttribute('data-size', 'navigation');
+    expect(deleteButton).toHaveClass('h-11', 'w-11');
     fireEvent.click(deleteButton);
 
     expect(mockSwitchSession).not.toHaveBeenCalled();
@@ -937,10 +984,17 @@ describe('ChatPage', () => {
     );
 
     const exportButton = await screen.findByRole('button', { name: '导出此条消息为 Markdown' });
-    const actionGroup = exportButton.parentElement;
+    const actionGroup = exportButton.closest('.chat-message-actions');
+    const prose = screen.getByText('趋势偏强').closest('.chat-prose');
 
     expect(actionGroup).toHaveClass('chat-message-actions');
     expect(actionGroup?.className).not.toMatch(/pointer-events-none|opacity-0/);
+    expect(actionGroup?.querySelectorAll('[data-control="icon-button"]')).toHaveLength(2);
+    const actionSlots = actionGroup?.querySelectorAll('[data-slot="chat-message-action"]') ?? [];
+    expect(actionSlots).toHaveLength(2);
+    actionSlots.forEach((slot) => expect(slot).toHaveClass('h-11', 'w-11'));
+    expect(prose).not.toHaveClass('pr-20', 'sm:pr-24');
+    expect(prose?.nextElementSibling).toBe(actionGroup);
   });
 
   it('sends exported markdown to notification channel and shows success feedback', async () => {

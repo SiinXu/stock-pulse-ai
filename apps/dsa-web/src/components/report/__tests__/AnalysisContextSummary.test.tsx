@@ -490,6 +490,12 @@ describe('ReportSummary analysis context placement', () => {
     expect(screen.getAllByText('质量分 82/100 可用')[0]).toBeInTheDocument();
 
     const strategy = screen.getByText('狙击点位');
+    const strategySurface = screen.getByText('120').closest('[data-surface-level]');
+    expect(strategySurface).toHaveAttribute(
+      'data-surface-level',
+      'interactive',
+    );
+    expect(strategySurface?.querySelector('[style*="linear-gradient"]')).toBeNull();
     const news = screen.getByText('相关资讯');
     const diagnostics = screen.getByTestId('run-diagnostics');
     const contextSummary = screen.getByTestId('analysis-context-summary');

@@ -17,7 +17,7 @@ import { createParsedApiError, getParsedApiError, type ParsedApiError } from '..
 import { analysisApi } from '../api/analysis';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, AppPage, Button, ConfirmDialog, EmptyState, PageHeader, SearchableSelect, Surface, Switch, ToastViewport, type SearchableSelectOption } from '../components/common';
+import { ApiErrorAlert, AppPage, Button, ConfirmDialog, EmptyState, FileInput, PageHeader, SearchableSelect, Surface, Switch, ToastViewport, type SearchableSelectOption } from '../components/common';
 import { SETTINGS_MISC_TEXT } from '../locales/settingsMisc';
 import {
   AuthSettingsCard,
@@ -2511,11 +2511,9 @@ const SettingsPage: React.FC = () => {
                     >
                       {t('settings.importEnv')}
                     </Button>
-                    <input
+                    <FileInput
                       ref={envBackupImportRef}
-                      type="file"
                       accept=".env,.txt"
-                      className="hidden"
                       onChange={(event) => {
                         void handleEnvBackupImportFile(event);
                       }}

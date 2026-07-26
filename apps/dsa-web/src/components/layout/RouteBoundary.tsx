@@ -4,6 +4,7 @@ import type { ErrorInfo } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { Button } from '../common/Button';
+import { Spinner } from '../common/Spinner';
 
 type PageLoadingFallbackProps = {
   fullPage?: boolean;
@@ -21,7 +22,7 @@ export const PageLoadingFallback: React.FC<PageLoadingFallbackProps> = ({ fullPa
           : 'flex min-h-[60vh] items-center justify-center'
       }
     >
-      <div aria-hidden="true" className="h-8 w-8 animate-spin rounded-full border-2 border-primary/20 border-t-primary" />
+      <Spinner size="lg" />
       <span className="sr-only">{t('common.loading')}</span>
     </div>
   );

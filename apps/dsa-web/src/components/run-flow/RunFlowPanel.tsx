@@ -2,6 +2,7 @@ import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, RefreshCw, Workflow } from 'lucide-react';
 import { Button, EmptyState, InlineAlert } from '../common';
+import { Spinner } from '../common/Spinner';
 import {
   isPermanentlyUnavailableResourceError,
   type ParsedApiError,
@@ -116,7 +117,7 @@ export const RunFlowPanel: React.FC<RunFlowPanelProps> = ({ source, title, onUna
   if (isLoading && !snapshot) {
     return (
       <div className="flex min-h-[22rem] flex-col items-center justify-center text-center" data-testid="run-flow-panel-loading">
-        <div className="home-spinner h-10 w-10 animate-spin border-[3px]" aria-hidden="true" />
+        <Spinner size="lg" label={t('runFlow.loadingTitle')} />
         <h3 className="mt-4 text-base font-semibold text-foreground">{t('runFlow.loadingTitle')}</h3>
         <p className="mt-2 max-w-sm text-sm text-secondary-text">{t('runFlow.loadingDescription')}</p>
       </div>
@@ -204,7 +205,10 @@ export const RunFlowPanel: React.FC<RunFlowPanelProps> = ({ source, title, onUna
               }}
             />
           </div>
-          <div className="min-h-[20rem] xl:max-h-[calc(100dvh-18rem)]" data-testid="run-flow-events-column">
+          <div
+            className="h-[32rem] min-h-80 max-h-[calc(100dvh-18rem)]"
+            data-testid="run-flow-events-column"
+          >
             <RunFlowEventList
               events={topology?.events || snapshot.events}
               selectedNodeId={graphSelectedNodeId}

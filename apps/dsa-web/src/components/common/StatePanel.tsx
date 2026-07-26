@@ -1,7 +1,8 @@
 import type React from 'react';
 import { forwardRef } from 'react';
-import { AlertCircle, CircleCheck, LoaderCircle, ShieldAlert, TriangleAlert } from 'lucide-react';
+import { AlertCircle, CircleCheck, ShieldAlert, TriangleAlert } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { Spinner } from './Spinner';
 import { Surface } from './Surface';
 
 export type StatePanelState = 'loading' | 'blocked' | 'partial' | 'empty' | 'error' | 'retrying' | 'success';
@@ -34,7 +35,7 @@ const STATE_ICON_STYLES: Record<StatePanelState, string> = {
 
 function defaultStateIcon(state: StatePanelState): React.ReactNode {
   if (state === 'loading' || state === 'retrying') {
-    return <LoaderCircle className="animate-spin motion-reduce:animate-none" aria-hidden="true" />;
+    return <Spinner size="md" />;
   }
   if (state === 'error') return <AlertCircle aria-hidden="true" />;
   if (state === 'blocked') return <ShieldAlert aria-hidden="true" />;

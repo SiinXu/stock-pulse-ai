@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components -- Scenario modules intentionally export renderer registries. */
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Bell, Check, Copy, Info, Save, Search, Trash2 } from 'lucide-react';
 import { createParsedApiError } from '../../api/error';
 import {
@@ -21,6 +21,7 @@ import {
   EmptyState,
   EyeToggleIcon,
   Field,
+  FileInput,
   FilterBar,
   FilterChip,
   FilterSheet,
@@ -34,6 +35,8 @@ import {
   PageHeader,
   Pagination,
   Popover,
+  Pressable,
+  Progress,
   ResponsiveFilterPanel,
   ResponsiveRail,
   ScoreGauge,
@@ -50,6 +53,7 @@ import {
   StatePanel,
   StatusDot,
   StickyActionBar,
+  Spinner,
   SummaryStrip,
   Surface as CommonSurface,
   Switch,
@@ -80,6 +84,85 @@ const Surface = ({ children, className = '' }: { children: ReactNode; className?
     {children}
   </div>
 );
+
+const PressableStory = () => {
+  const text = useSampleText();
+  const { scenario } = usePlaygroundScenario();
+  const [pressed, setPressed] = useState(false);
+  return (
+    <Surface>
+      <Pressable
+        aria-pressed={pressed}
+        disabled={scenario === 'states'}
+        onClick={() => setPressed((current) => !current)}
+        className="w-full rounded-xl border border-border bg-card p-4 text-left hover:bg-hover aria-pressed:border-foreground"
+      >
+        <span className="block text-sm font-semibold text-foreground">{text.optionOne}</span>
+        <span className="mt-1 block text-sm text-secondary-text">{text.fieldHint}</span>
+      </Pressable>
+    </Surface>
+  );
+};
+
+const SpinnerStory = () => {
+  const text = useSampleText();
+  const { scenario } = usePlaygroundScenario();
+  return (
+    <Surface className="flex flex-wrap items-center gap-6 text-foreground">
+      {scenario === 'sizes' ? (
+        <>
+          <Spinner size="sm" />
+          <Spinner size="md" />
+          <Spinner size="lg" />
+        </>
+      ) : (
+        <Spinner label={text.loadingAction} />
+      )}
+    </Surface>
+  );
+};
+
+const ProgressStory = () => {
+  const text = useSampleText();
+  const { scenario } = usePlaygroundScenario();
+  return (
+    <Surface className="space-y-4">
+      {scenario === 'loading' ? (
+        <Progress label={text.loadingDescription} />
+      ) : (
+        <>
+          <Progress value={32} label={`${text.score}: 32%`} valueText="32%" />
+          <Progress value={76} label={`${text.score}: 76%`} valueText="76%" />
+        </>
+      )}
+    </Surface>
+  );
+};
+
+const FileInputStory = () => {
+  const text = useSampleText();
+  const { scenario } = usePlaygroundScenario();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [filename, setFilename] = useState('');
+  return (
+    <Surface className="flex flex-wrap items-center gap-3">
+      <FileInput
+        ref={inputRef}
+        disabled={scenario === 'states'}
+        aria-label={text.fieldLabel}
+        onChange={(event) => setFilename(event.target.files?.[0]?.name ?? '')}
+      />
+      <Button
+        variant="secondary"
+        disabled={scenario === 'states'}
+        onClick={() => inputRef.current?.click()}
+      >
+        {text.primaryAction}
+      </Button>
+      <span className="text-sm text-secondary-text">{filename || text.emptyTitle}</span>
+    </Surface>
+  );
+};
 
 const useSampleText = () => {
   const { language } = useUiLanguage();
@@ -945,8 +1028,12 @@ const ModalStory = () => {
 
 export const COMMON_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   button: ButtonStory,
+  pressable: PressableStory,
   'selection-chip': SelectionChipStory,
   'icon-button': IconButtonStory,
+  spinner: SpinnerStory,
+  progress: ProgressStory,
+  'file-input': FileInputStory,
   field: FieldStory,
   textarea: TextareaStory,
   'segmented-control': SegmentedControlStory,

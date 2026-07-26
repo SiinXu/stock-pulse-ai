@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useMemo, useState } from 'react';
 import { AlertTriangle, Filter, GitBranch, ListFilter, OctagonAlert, XCircle } from 'lucide-react';
-import { Badge, Button, StatusDot } from '../common';
+import { Badge, Button, Pressable, StatusDot, Surface } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiTextKey } from '../../i18n/uiText';
 import type { RunFlowEvent } from '../../types/runFlow';
@@ -72,7 +72,12 @@ export const RunFlowEventList: React.FC<RunFlowEventListProps> = ({
   const filters: EventFilter[] = ['all', 'important', 'problems', 'fallback', 'cancelled'];
 
   return (
-    <div className="home-subpanel flex min-h-0 flex-col overflow-hidden p-3" data-testid="run-flow-events">
+    <Surface
+      level="interactive"
+      padding="none"
+      className="flex h-full min-h-0 flex-col overflow-hidden p-3"
+      data-testid="run-flow-events"
+    >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="label-uppercase">{t('runFlow.events.title')}</p>
@@ -131,9 +136,9 @@ export const RunFlowEventList: React.FC<RunFlowEventListProps> = ({
               {metadata.length > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {metadata.map(([key, value]) => (
-                    <span key={key} className="home-accent-chip px-2 py-0.5 text-xs text-muted-text">
+                    <Badge key={key} variant="default" className="text-muted-text">
                       {key}: {formatMetadataValue(value)}
-                    </span>
+                    </Badge>
                   ))}
                 </div>
               ) : null}
@@ -145,15 +150,14 @@ export const RunFlowEventList: React.FC<RunFlowEventListProps> = ({
           }
 
           return (
-            <button
+            <Pressable
               key={event.id}
-              type="button"
               className="block w-full"
               onClick={() => onSelectNode(event.nodeId || '')}
               aria-label={t('runFlow.events.openNode', { title: event.title })}
             >
               {content}
-            </button>
+            </Pressable>
           );
         }) : (
           <div className="flex min-h-32 flex-col items-center justify-center rounded-lg border border-dashed border-subtle px-4 py-8 text-center text-sm text-secondary-text">
@@ -162,6 +166,6 @@ export const RunFlowEventList: React.FC<RunFlowEventListProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </Surface>
   );
 };

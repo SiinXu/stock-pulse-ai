@@ -1,8 +1,9 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { Check, LoaderCircle } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { cn } from '../../utils/cn';
+import { Spinner } from './Spinner';
 
 export interface SelectionChipProps extends Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,
@@ -64,10 +65,7 @@ export const SelectionChip = forwardRef<HTMLButtonElement, SelectionChipProps>((
     {selected === undefined && !isLoading ? null : (
       <span className="flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden="true">
         {isLoading ? (
-          <LoaderCircle
-            className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none"
-            data-indicator="loading"
-          />
+          <Spinner size="sm" className="h-3.5 w-3.5" data-indicator="loading" />
         ) : (
           <Check
             className={cn('h-3.5 w-3.5', selected ? 'opacity-100' : 'opacity-0')}

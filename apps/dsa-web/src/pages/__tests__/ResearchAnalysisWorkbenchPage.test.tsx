@@ -4,7 +4,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { agentApi } from '../../api/agent';
-import { analysisApi } from '../../api/analysis';
+import { analysisApi, DuplicateTaskError } from '../../api/analysis';
 import { historyApi } from '../../api/history';
 import { stocksApi } from '../../api/stocks';
 import { systemConfigApi } from '../../api/systemConfig';
@@ -272,6 +272,8 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     expect(screen.getByRole('combobox', { name: '股票搜索' })).toBeInTheDocument();
     expect(document.title).toBe('分析工作台 - StockPulse');
     const workbenchTabs = screen.getByRole('tablist', { name: '分析工作台分段' });
+    expect(workbenchTabs).toHaveClass('segmented-control');
+    expect(workbenchTabs).not.toHaveClass('border-b', 'border-border');
     expect(within(workbenchTabs).getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       '发起与批量',
       '运行中任务',
@@ -322,15 +324,14 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     fireEvent.click(runFlowTrigger);
 
     expect(await screen.findByTestId('run-flow-panel')).toHaveTextContent('task');
-    const runFlowDrawer = screen.getByRole('dialog', { name: '运行流' });
-    expect(runFlowDrawer).toHaveAttribute('data-drawer-variant', 'detail');
-    expect(runFlowDrawer).toHaveAttribute('data-drawer-size', 'wide');
+    const runFlowModal = screen.getByRole('dialog', { name: '运行流' });
+    expect(runFlowModal).toHaveAttribute('data-modal-size', 'fullscreen');
     const search = new URLSearchParams(screen.getByTestId('location').textContent?.split('?')[1]);
     expect(search.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow))
       .toBe(RUN_FLOW_ROUTE_QUERY_VALUES.task);
     expect(search.get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlowTaskId)).toBe('task-7');
 
-    fireEvent.keyDown(runFlowDrawer, { key: 'Escape' });
+    fireEvent.keyDown(runFlowModal, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '运行流' })).not.toBeInTheDocument());
     expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.runFlow)).toBeNull();
     expect(runFlowTrigger).toHaveFocus();
@@ -372,6 +373,88 @@ describe('ResearchAnalysisWorkbenchPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '返回当前报告' }));
     expect(await screen.findByTestId('report-summary')).toHaveTextContent('Apple');
+  });
+
+  it('reanalyzes the selected report with a forced refresh and opens running tasks', async () => {
+    vi.mocked(agentApi.getSkills).mockResolvedValue({
+      skills: [{ id: 'owner-strategy', name: 'Owner strategy', description: 'Owner strategy' }],
+      default_skill_id: '',
+    });
+    useStockPoolStore.setState({ historyItems: [historyItem] });
+    renderWorkbench();
+
+    const strategySelect = await screen.findByRole('combobox', { name: '策略' });
+    fireEvent.click(strategySelect);
+    fireEvent.click(await screen.findByRole('option', { name: 'Owner strategy' }));
+    fireEvent.click(screen.getByRole('tab', { name: '历史与对比' }));
+
+    expect(await screen.findByTestId('report-summary')).toHaveTextContent('Apple');
+    fireEvent.click(screen.getByRole('button', { name: '重新分析' }));
+
+    await waitFor(() => expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stockCode: 'AAPL',
+        stockName: 'Apple',
+        originalQuery: 'AAPL',
+        selectionSource: 'manual',
+        forceRefresh: true,
+        skills: ['owner-strategy'],
+      }),
+    ));
+    await waitFor(() => {
+      expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment))
+        .toBe(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
+    });
+  });
+
+  it('opens running tasks when a forced reanalysis finds a duplicate task', async () => {
+    vi.mocked(analysisApi.analyzeAsync).mockRejectedValueOnce(
+      new DuplicateTaskError('AAPL', 'task-existing'),
+    );
+    useStockPoolStore.setState({ historyItems: [historyItem] });
+    renderWorkbench(buildAnalysisWorkbenchHref({ recordId: 12 }));
+
+    expect(await screen.findByTestId('report-summary')).toHaveTextContent('Apple');
+    fireEvent.click(screen.getByRole('button', { name: '重新分析' }));
+
+    await waitFor(() => {
+      expect(renderedSearch().get(ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment))
+        .toBe(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
+    });
+    expect(await screen.findByText('AAPL 已有分析任务，请等待当前任务完成。')).toBeInTheDocument();
+  });
+
+  it('does not navigate back to tasks when a reanalysis finishes after leaving the workbench', async () => {
+    const pendingAnalysis = deferredPromise<{ taskId: string; status: 'pending' }>();
+    vi.mocked(analysisApi.analyzeAsync).mockReturnValueOnce(pendingAnalysis.promise);
+    useStockPoolStore.setState({ historyItems: [historyItem] });
+    renderWorkbench(buildAnalysisWorkbenchHref({ recordId: 12 }));
+
+    expect(await screen.findByTestId('report-summary')).toHaveTextContent('Apple');
+    fireEvent.click(screen.getByRole('button', { name: '重新分析' }));
+    await waitFor(() => expect(analysisApi.analyzeAsync).toHaveBeenCalledOnce());
+
+    fireEvent.click(screen.getByRole('button', { name: '追问 AI' }));
+    expect(screen.getByTestId('location')).toHaveTextContent('/chat?stock=AAPL&name=Apple&recordId=12');
+
+    await act(async () => {
+      pendingAnalysis.resolve({ taskId: 'task-late', status: 'pending' });
+      await pendingAnalysis.promise;
+    });
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/chat?stock=AAPL&name=Apple&recordId=12');
+  });
+
+  it('opens Chat with the selected report as a prepared follow-up', async () => {
+    useStockPoolStore.setState({ historyItems: [historyItem] });
+    renderWorkbench(buildAnalysisWorkbenchHref({ recordId: 12 }));
+
+    expect(await screen.findByTestId('report-summary')).toHaveTextContent('Apple');
+    fireEvent.click(screen.getByRole('button', { name: '追问 AI' }));
+
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/chat?stock=AAPL&name=Apple&recordId=12',
+    );
   });
 
   it('selects the newest report when the history segment has no recordId', async () => {

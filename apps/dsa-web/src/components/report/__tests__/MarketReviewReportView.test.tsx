@@ -411,9 +411,10 @@ describe('MarketReviewReportView', () => {
     );
 
     const runFlowButton = screen.getByRole('button', { name: '查看历史记录 7 运行流' });
-    expect(runFlowButton).toHaveClass('h-11', 'w-11');
-    expect(screen.getByRole('button', { name: '复制 Markdown 源码' })).toHaveClass('h-11', 'w-11');
-    expect(screen.getByRole('button', { name: '复制纯文本' })).toHaveClass('h-11', 'w-11');
+    expect(runFlowButton).toHaveAttribute('data-control', 'icon-button');
+    expect(runFlowButton).toHaveClass('control-hit-target');
+    expect(screen.getByRole('button', { name: '复制 Markdown 源码' })).toHaveAttribute('data-control', 'icon-button');
+    expect(screen.getByRole('button', { name: '复制纯文本' })).toHaveAttribute('data-control', 'icon-button');
 
     fireEvent.click(runFlowButton);
 

@@ -64,16 +64,16 @@ const MODEL_KEYS_TO_RESET = [
 ];
 
 async function selectTheme(page: Page, theme: '浅色' | '深色') {
-  let themeTrigger = page.getByRole('button', { name: '切换主题' }).first();
+  let themeTrigger = page.getByRole('combobox', { name: '切换主题' }).first();
   if (!await themeTrigger.isVisible().catch(() => false)) {
     const profileTrigger = page.getByRole('button', { name: 'StockPulse', exact: true }).last();
     if (await profileTrigger.getAttribute('aria-expanded') !== 'true') {
       await profileTrigger.click();
     }
-    themeTrigger = page.getByRole('button', { name: '切换主题' }).first();
+    themeTrigger = page.getByRole('combobox', { name: '切换主题' }).first();
   }
   await themeTrigger.click();
-  await page.getByRole('menuitemradio', { name: theme, exact: true }).click();
+  await page.getByRole('option', { name: theme, exact: true }).click();
   if (theme === '深色') {
     await expect(page.locator('html')).toHaveClass(/dark/);
   } else {

@@ -1,6 +1,6 @@
 import type React from 'react';
 import { ChevronDown, ChevronRight, Info, X } from 'lucide-react';
-import { Badge, Button, DataTable, type DataTableColumn, IconButton, StatusDot } from '../common';
+import { Badge, Button, DataTable, type DataTableColumn, IconButton, StatusDot, Surface } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { RunFlowNode, RunFlowStatus } from '../../types/runFlow';
 import {
@@ -118,12 +118,18 @@ export const RunFlowNodeDetails: React.FC<RunFlowNodeDetailsProps> = ({
 
   if (!node) {
     return (
-      <aside className="home-subpanel p-4 text-sm text-secondary-text" data-testid="run-flow-node-details-empty">
+      <Surface
+        as="aside"
+        level="interactive"
+        padding="none"
+        className="p-4 text-sm text-secondary-text"
+        data-testid="run-flow-node-details-empty"
+      >
         <div className="flex items-center gap-2">
           <Info className="h-4 w-4 text-primary" aria-hidden="true" />
           {t('runFlow.nodeDetails.empty')}
         </div>
-      </aside>
+      </Surface>
     );
   }
 
@@ -241,7 +247,13 @@ export const RunFlowNodeDetails: React.FC<RunFlowNodeDetailsProps> = ({
   }
 
   return (
-    <aside className="home-subpanel p-4" data-testid="run-flow-node-details">
+    <Surface
+      as="aside"
+      level="interactive"
+      padding="none"
+      className="p-4"
+      data-testid="run-flow-node-details"
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="label-uppercase">{t('runFlow.nodeDetails.title')}</p>
@@ -397,6 +409,6 @@ export const RunFlowNodeDetails: React.FC<RunFlowNodeDetailsProps> = ({
           </dl>
         </div>
       ) : null}
-    </aside>
+    </Surface>
   );
 };

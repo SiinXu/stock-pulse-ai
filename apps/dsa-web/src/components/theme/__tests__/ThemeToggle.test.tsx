@@ -64,4 +64,23 @@ describe('ThemeToggle', () => {
     fireEvent.keyDown(menu, { key: 'ArrowRight' });
     expect(options[(currentIndex + 1) % options.length]).toHaveFocus();
   });
+
+  it('uses the compact neutral Select presentation when requested', () => {
+    render(
+      <ThemeProvider>
+        <ThemeToggle menuLayout="select" />
+      </ThemeProvider>,
+    );
+
+    const trigger = screen.getByRole('combobox', { name: '切换主题' });
+    fireEvent.click(trigger);
+
+    expect(screen.queryByRole('menu', { name: '主题模式' })).not.toBeInTheDocument();
+    const options = screen.getAllByRole('option');
+    expect(options).toHaveLength(3);
+    options.forEach((option) => {
+      expect(option).toHaveClass('text-xs');
+      expect(option).not.toHaveClass('bg-primary/10', 'text-primary');
+    });
+  });
 });

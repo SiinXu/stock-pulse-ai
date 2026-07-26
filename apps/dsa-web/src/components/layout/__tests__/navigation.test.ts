@@ -26,13 +26,20 @@ import {
 
 describe('application navigation descriptor', () => {
   it('converges to five primary domains with approved secondary routes', () => {
-    expect(APPLICATION_NAVIGATION_ITEMS.map(({ key, to }) => [key, to])).toEqual([
-      ['home', APP_ROUTE_PATHS.home],
-      ['research', APP_ROUTE_PATHS.researchMarket],
-      ['portfolio', APP_ROUTE_PATHS.portfolio],
-      ['agent', APP_ROUTE_PATHS.agent],
-      ['settings', APP_ROUTE_PATHS.settings],
+    expect(APPLICATION_NAVIGATION_ITEMS.map((item) => [
+      item.key,
+      item.kind,
+      item.to,
+    ])).toEqual([
+      ['home', 'link', APP_ROUTE_PATHS.home],
+      ['research', 'group', APP_ROUTE_PATHS.research],
+      ['portfolio', 'link', APP_ROUTE_PATHS.portfolio],
+      ['agent', 'link', APP_ROUTE_PATHS.agent],
+      ['settings', 'link', APP_ROUTE_PATHS.settings],
     ]);
+    expect(APPLICATION_NAVIGATION_ITEMS[1]).toEqual(expect.objectContaining({
+      exact: true,
+    }));
     expect(APPLICATION_NAVIGATION_ITEMS[0]?.children?.map(({ key, to }) => [key, to]) ?? []).toEqual([]);
     expect(APPLICATION_NAVIGATION_ITEMS[1]?.children?.map(({ key, to }) => [key, to])).toEqual([
       ['research-market', APP_ROUTE_PATHS.researchMarket],
@@ -48,6 +55,7 @@ describe('application navigation descriptor', () => {
     const targets = entries.map(({ to }) => to);
 
     expect(new Set(keys).size).toBe(keys.length);
+    expect(new Set(targets).size).toBe(targets.length);
     expect(keys).not.toContain('more');
     expect(keys).not.toContain('usage');
     expect(targets).not.toContain(LEGACY_ROUTE_PATHS.usage);
