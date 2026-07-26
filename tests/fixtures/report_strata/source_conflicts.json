@@ -1,0 +1,41 @@
+{
+  "schema_version": "report-strata-v1",
+  "verified_facts": [
+    {
+      "statement": "Symbol trades on the Shanghai main board.",
+      "source_id": "registry:exchange",
+      "as_of": "2026-07-25T09:30:00+08:00"
+    }
+  ],
+  "missing_or_conflicts": [
+    {
+      "kind": "conflict",
+      "description": "News headline timestamps disagree across providers for the same event id.",
+      "source_ids": ["news:provider_x", "news:provider_y"]
+    },
+    {
+      "kind": "conflict",
+      "description": "Chip structure concentration differs by more than the configured threshold.",
+      "source_ids": ["chip:primary", "chip:secondary"]
+    },
+    {
+      "kind": "missing",
+      "description": "Real-time quote snapshot was not available at analysis start.",
+      "source_ids": ["quote:realtime"]
+    }
+  ],
+  "model_inference": [
+    "Conflict flags prevent treating either conflicting series as a single verified fact."
+  ],
+  "risks_counter_evidence": [
+    "Acting on unresolved source conflicts increases false-certainty risk."
+  ],
+  "framework_alignment": {
+    "status": "conflict",
+    "summary": "Framework risk rule rejects adding when source conflicts remain open.",
+    "framework_title": "Risk-first framework",
+    "framework_version": 1,
+    "framework_id": "local"
+  },
+  "disclaimer": "AI生成，仅供参考，不构成投资建议"
+}

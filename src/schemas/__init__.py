@@ -19,6 +19,17 @@ from src.schemas.analysis_context_pack import (
     DataQuality,
 )
 from src.schemas.report_schema import AnalysisReportSchema
+from src.schemas.report_strata import (
+    REPORT_STRATA_SCHEMA_VERSION,
+    DataGapOrConflict,
+    FrameworkAlignment,
+    ReportStrata,
+    VerifiedFact,
+    empty_report_strata,
+    ensure_report_strata,
+    normalize_report_strata,
+    resolve_report_strata,
+)
 from src.schemas.request_context import (
     AnalysisRequestContext,
     NotificationReplyTarget,
@@ -28,6 +39,15 @@ from src.schemas.run_flow import RunFlowSnapshot
 
 __all__ = [
     "AnalysisReportSchema",
+    "REPORT_STRATA_SCHEMA_VERSION",
+    "DataGapOrConflict",
+    "FrameworkAlignment",
+    "ReportStrata",
+    "VerifiedFact",
+    "empty_report_strata",
+    "ensure_report_strata",
+    "normalize_report_strata",
+    "resolve_report_strata",
     "PACK_VERSION",
     "AnalysisContextBlock",
     "AnalysisContextItem",

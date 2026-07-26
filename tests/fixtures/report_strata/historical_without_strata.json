@@ -1,0 +1,18 @@
+{
+  "schema_version": "report-v1",
+  "stock_name": "贵州茅台",
+  "sentiment_score": 72,
+  "trend_prediction": "看多",
+  "operation_advice": "持有",
+  "decision_type": "hold",
+  "confidence_level": "中",
+  "analysis_summary": "Historical payload without report strata.",
+  "dashboard": {
+    "core_conclusion": {
+      "one_sentence": "持有观望"
+    },
+    "intelligence": {
+      "risk_alerts": ["波动风险"]
+    }
+  }
+}
