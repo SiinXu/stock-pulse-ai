@@ -57,6 +57,23 @@ flowchart TD
 3. Home gaps clear → Analysis workbench → run `600519`.  
 4. Open the history report and read it with [08 Reading reports](08-reading-reports_EN.md).
 
+
+## Today's scheduled tasks (shipped on current main)
+
+Home includes a read-only **Today's scheduled tasks** block for today's ran and upcoming items:
+
+| You see | Meaning |
+| --- | --- |
+| Task type | Stock analysis / research brief / risk check (labels as in UI) |
+| Status | Pending, running, completed, failed, skipped, retry wait, … |
+| Empty list | No ran/upcoming items for today — normal |
+
+Home is **read-only** for today's occurrences. Edit schedules under **Settings → System & security / Scheduling** (enable, daily times, next run, run once). A **long-running** Web / API / Desktop process must stay up for on-time execution.
+
+If your UI lacks this region, upgrade to a build that includes scheduled tasks.
+
+Engineering contract: `docs/scheduled-tasks.md`.
+
 ## Notes
 
 - Legacy links with `recordId` may redirect into the workbench segments on purpose.  
