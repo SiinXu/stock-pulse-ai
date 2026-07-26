@@ -9,6 +9,7 @@ import { FirstRunWizard } from '../../components/settings/FirstRunWizard';
 import { GenerationBackendStatusPanel } from '../../components/settings/GenerationBackendStatusPanel';
 import { IntelligentImport } from '../../components/settings/IntelligentImport';
 import { IntelligenceSourcesPanel } from '../../components/settings/IntelligenceSourcesPanel';
+import { InvestmentFrameworkSettingsCard } from '../../components/settings/InvestmentFrameworkSettingsCard';
 import { LLMChannelEditor } from '../../components/settings/LLMChannelEditor';
 import { LLMConfigModeBanner } from '../../components/settings/LLMConfigModeBanner';
 import { LocalModelsPanel } from '../../components/settings/LocalModelsPanel';
@@ -466,6 +467,7 @@ export const SETTINGS_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'first-run-wizard': FirstRunWizardStory,
   'generation-backend-status-panel': GenerationBackendStatusPanelStory,
   'intelligent-import': IntelligentImportStory,
+  'investment-framework-settings-card': InvestmentFrameworkSettingsCard,
   'intelligence-sources-panel': IntelligenceSourcesPanel,
   'llm-channel-editor': LLMChannelEditorStory,
   'llm-config-mode-banner': LLMConfigModeBannerStory,

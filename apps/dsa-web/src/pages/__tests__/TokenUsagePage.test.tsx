@@ -277,7 +277,7 @@ describe('TokenUsagePage', () => {
     expect(await screen.findByRole('heading', { name: 'Token usage' })).toBeInTheDocument();
     expect(document.title).toBe('Token usage - StockPulse');
     expect(screen.getByRole('tab', { name: 'Today' })).toHaveClass('min-h-6');
-    expect(await screen.findAllByText('Stock analysis')).toHaveLength(2);
+    expect(await screen.findAllByText('Equity analysis')).toHaveLength(2);
     expect(screen.getByText('Latest 50 LLM token audit records.')).toBeInTheDocument();
     expect(screen.queryByText('Token 用量监控')).not.toBeInTheDocument();
   });

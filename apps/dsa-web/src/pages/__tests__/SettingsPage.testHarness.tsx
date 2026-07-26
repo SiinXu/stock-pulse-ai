@@ -228,6 +228,7 @@ vi.mock('../../components/settings', async () => {
     </div>
   ),
   AuthSettingsCard: () => <div>认证与登录保护</div>,
+  InvestmentFrameworkSettingsCard: () => <div data-testid="investment-framework-settings-card">个人投资框架</div>,
   ChangePasswordCard: () => <div>修改密码</div>,
   IntelligentImport: ({ onMerged }: { onMerged: (value: string) => void }) => (
     <button type="button" onClick={() => onMerged('SZ000001,SZ000002')}>
