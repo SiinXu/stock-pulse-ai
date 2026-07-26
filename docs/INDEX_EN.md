@@ -32,7 +32,6 @@ This is the entry point for project documentation. The README covers the project
 | [Data-source Priority, Health, and Degradation](data-source-stability_EN.md) | Static/realtime priority, health scoring, adaptive ordering, fallback chains, deployment profiles, and troubleshooting |
 | [Sensitive-Data Redaction](security-sensitive-data-redaction.md) | Redaction coverage, Agent trace behavior, debug guarantees, limits, incident response, and rollback |
 | [Durable Security Audit Phase 1](security-audit.md) | Event schema, representative privileged paths, administrator query access, retention, failure semantics, and rollback |
-| [Human-in-the-Loop Approval Safety Gate](human-approvals_EN.md) | Default-off risk-bypass approval, CAS state machine, authenticated APIs, Home to-do entry, and migration rollback |
 | [Changelog](CHANGELOG.md) | Release notes, capability changes, and migration notes |
 
 ## Configuration
@@ -82,10 +81,10 @@ This is the entry point for project documentation. The README covers the project
 | [Business Architecture](business-architecture.md) | Stakeholders, business capabilities, outcomes, and the value flow from evidence acquisition to notification |
 | [Technical Architecture](architecture-overview.md) | Current components, entrypoints, ownership boundaries, process modes, cache/fallback branches, and the eight-stage analysis data flow |
 | [Foundation Pipeline And Product Layer](foundation-product-architecture.md) | Responsibility tracks, interaction boundaries, contribution placement, upstream porting, and license provenance |
-| [MIT / AGPL File Ownership Inventory Process](license-ownership-inventory.md) | Classification rules, SPDX defaults, inventory template, and progressive coverage reporting (not a completed full-repo audit) |
 | [ADR Registry And Process](adr/README.md) | Decision numbering, statuses, template, significant-PR consideration, and historical records |
 | [API Spec](architecture/api_spec.json) | FastAPI OpenAPI artifact |
 | [Contributing Guide (EN)](CONTRIBUTING_EN.md) | Issues, pull requests, tests, documentation sync, and collaboration expectations |
+| [Offline Analysis Quality Panel](analysis-quality-panel.md) | Fixed-panel offline trust fixtures, extension guide, and non-claims (#617 Phase A) |
 | [Data Provider Plugin Authoring Guide](data-provider-plugin-authoring.md) | Loadable example, manifest, `PLUGINS_DIR`, lifecycle diagnostics, compatibility, trust, and routing boundaries |
 | [Analysis Strategy Plugin Authoring Guide](analysis-strategy-plugin-authoring.md) | Declarative-first boundary, `Skill` registration fields, catalog precedence, lifecycle, diagnostics, tests, and trust |
 | [Supply-Chain Maintenance](supply-chain-maintenance.md) | Dependency and GitHub Actions pinning, permissions, updates, exceptions, validation, and rollback policy |
