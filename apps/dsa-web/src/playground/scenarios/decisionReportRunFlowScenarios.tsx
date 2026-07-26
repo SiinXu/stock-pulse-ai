@@ -28,6 +28,7 @@ import { ReportMarkdownDrawer } from '../../components/report/ReportMarkdownDraw
 import { ReportMarkdownPanel } from '../../components/report/ReportMarkdownPanel';
 import { ReportNews } from '../../components/report/ReportNews';
 import { ReportOverview } from '../../components/report/ReportOverview';
+import { ReportStrata } from '../../components/report/ReportStrata';
 import { ReportStrategy } from '../../components/report/ReportStrategy';
 import { ReportSummary } from '../../components/report/ReportSummary';
 import { RunFlowEventList } from '../../components/run-flow/RunFlowEventList';
@@ -285,6 +286,44 @@ const ReportStrategyStory = () => {
   return <ReportStrategy strategy={scenario === 'empty' ? undefined : fixtureReport.strategy} language="en" />;
 };
 
+const ReportStrataStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  if (scenario === 'empty') {
+    return <ReportStrata details={{}} language="en" alwaysShowDisclaimer />;
+  }
+  return (
+    <ReportStrata
+      details={{
+        reportStrata: {
+          schemaVersion: 'report-strata-v1',
+          verifiedFacts: [
+            {
+              statement: 'Close was 1680 on the last daily bar.',
+              sourceId: 'ohlcv:daily',
+              asOf: '2026-07-25T15:00:00+08:00',
+            },
+          ],
+          missingOrConflicts: [
+            {
+              kind: 'conflict',
+              description: 'Volume sources disagree.',
+              sourceIds: ['a', 'b'],
+            },
+          ],
+          modelInference: ['Momentum may improve if volume confirms.'],
+          risksCounterEvidence: ['Break below support invalidates the constructive case.'],
+          frameworkAlignment: {
+            status: 'not_configured',
+            summary: 'Personal investment framework not configured',
+          },
+          disclaimer: 'AI-generated content for reference only. Not investment advice.',
+        },
+      }}
+      language="en"
+    />
+  );
+};
+
 const ReportSummaryStory = () => <ReportSummary data={fixtureReport} isHistory onOpenRunFlow={() => undefined} />;
 
 const RunFlowEventListStory = () => {
@@ -362,6 +401,7 @@ export const DECISION_REPORT_RUN_FLOW_SCENARIOS: Record<string, PlaygroundScenar
   'report-markdown-panel': ReportMarkdownPanelStory,
   'report-news': ReportNewsStory,
   'report-overview': ReportOverviewStory,
+  'report-strata': ReportStrataStory,
   'report-strategy': ReportStrategyStory,
   'report-summary': ReportSummaryStory,
   'deep-research-panel': DeepResearchPanelStory,

@@ -82,8 +82,6 @@ describe('ReportStrata', () => {
     render(<ReportStrata details={details} language="en" />);
     expect(screen.getByTestId('report-strata-facts')).toHaveTextContent('Close was 1680');
   });
-});
-
 
   it('renders strata from snake_case rawResult.dashboard.report_strata body fields', () => {
     const details: ReportDetails = {
@@ -121,4 +119,5 @@ describe('ReportStrata', () => {
     expect(screen.getByTestId('report-strata-inference')).toHaveTextContent('Momentum may improve');
     expect(screen.getByTestId('report-strata-disclaimer')).toHaveTextContent('Not investment advice');
   });
+});
 

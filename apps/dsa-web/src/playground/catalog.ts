@@ -149,6 +149,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('reports', 'report-markdown-panel', 'ReportMarkdownPanel', 'components/report/ReportMarkdownPanel.tsx', ['default', 'loading', 'error']),
   entry('reports', 'report-news', 'ReportNews', 'components/report/ReportNews.tsx', ['default', 'loading', 'empty', 'error']),
   entry('reports', 'report-overview', 'ReportOverview', 'components/report/ReportOverview.tsx', ['default', 'states']),
+  entry('reports', 'report-strata', 'ReportStrata', 'components/report/ReportStrata.tsx', ['default', 'empty']),
   entry('reports', 'report-strategy', 'ReportStrategy', 'components/report/ReportStrategy.tsx', ['default', 'empty']),
   entry('reports', 'report-summary', 'ReportSummary', 'components/report/ReportSummary.tsx', ['default', 'loading', 'error']),
   entry('reports', 'deep-research-panel', 'DeepResearchPanel', 'components/chat/DeepResearchPanel.tsx', ['interactive', 'empty', 'error']),
