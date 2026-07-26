@@ -13,6 +13,16 @@ This document explains how to deploy StockPulse to a server.
 
 **Conclusion: Docker Compose is recommended for the fastest and most convenient migration!**
 
+### Read first: security boundaries
+
+StockPulse is a **single-administrator / local-first** product, not multi-tenant SaaS:
+
+- Enabling `ADMIN_AUTH_ENABLED` protects an administrator session; it is **not** per-user isolation or RBAC.
+- `PLUGINS_DIR` loads **trusted in-process Python** with the same OS privileges as the app—not a marketplace sandbox.
+- Non-local HTTP binds **fail closed** when auth is disabled; `ALLOW_INSECURE_PUBLIC_BIND=true` is emergency-only.
+
+Full checklist: [Security baseline — operator boundaries](security-baseline.md#operator-security-boundaries).
+
 ---
 
 ## Option 1: Docker Compose Deployment (Recommended)

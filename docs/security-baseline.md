@@ -1,7 +1,7 @@
 # Security and Compliance Baseline
 
 Status: Maintainer baseline
-Last reviewed: 2026-07-23
+Last reviewed: 2026-07-26
 Applies to: StockPulse backend, API, Web and desktop clients, Agent and Bot integrations, data providers, notifications, reports, automation, and release workflows
 
 The optional Agent risk-control exception is defined in
@@ -27,6 +27,63 @@ The baseline covers:
 - investment-analysis disclosures and privacy obligations.
 
 It does not make StockPulse suitable for regulated use by itself. Operators remain responsible for their deployment, network exposure, data processing, retention, licensing, and jurisdiction-specific obligations.
+
+<a id="operator-security-boundaries"></a>
+## Operator security boundaries (deployers)
+
+This section is the operator-facing summary of boundaries that are easy to misread from marketing copy or from enabling a single configuration switch. Normative requirement IDs remain in [Baseline Requirements](#baseline-requirements). Implementation details live in the linked contracts and code anchors.
+
+### 1. Single-administrator session (not multi-tenant)
+
+| Fact | Meaning |
+| --- | --- |
+| Default product model | One optional **administrator** identity for the whole process/deployment |
+| `ADMIN_AUTH_ENABLED=true` | Requires a valid admin session cookie on non-exempt `/api/v1/*` routes; protects the deployment from anonymous control |
+| What auth is **not** | Per-user accounts, workspaces, tenant isolation, or RBAC (`AUTH-05`) |
+| Shared browser / shared admin password | Anyone who can log in as the administrator has full admin power |
+
+Until a multi-user model ships ([#230](https://github.com/SiinXu/stock-pulse-ai/issues/230)), do not describe StockPulse as multi-tenant SaaS. Config, reports, portfolios, and frameworks under the current `local` scope are process/deployment-scoped, not "your personal tenant among many."
+
+### 2. Trusted plugins (process-local code)
+
+| Fact | Meaning |
+| --- | --- |
+| Safe default | Leave `PLUGINS_DIR` unset or blank — no external plugin packages load |
+| Setting `PLUGINS_DIR` | Opts into **arbitrary Python** discovered under that directory, running with the **same OS privileges** as the StockPulse process |
+| Not claimed | Marketplace download, dependency install sandbox, browser-extension isolation, or separate-process permission sandbox |
+
+Plugins can reach environment variables, secrets, databases, filesystem paths, and outbound network paths that the process itself can use. Only load packages you trust as if you installed them into the application tree. Full contract: [Plugin extension contract](plugin-extension-contract.md) (operator trust boundary and six extension points). Skill/strategy YAML packages are declarative analysis input; they are not a substitute for reviewing system plugins.
+
+### 3. Public bind, reverse proxy, and auth-disabled behavior
+
+| Situation | Expected behavior |
+| --- | --- |
+| Local development bind (`127.0.0.1` / loopback) | Auth may remain disabled for convenience; treat as a trusted local network only |
+| Non-local HTTP bind (`0.0.0.0`, LAN, public interface) without auth | Startup **fails closed** unless an emergency override is set (`AUTH-01`, bind policy in `src/security/http_bind.py`) |
+| Docker Compose / cloud published ports | Set `ADMIN_AUTH_ENABLED=true` before starting a service that listens beyond loopback (see [Deploy guide](DEPLOY.md) / [Deploy guide EN](DEPLOY_EN.md)) |
+| `ALLOW_INSECURE_PUBLIC_BIND=true` | Emergency escape hatch only: unauthenticated public listen with a persistent security warning — **not** a normal production mode |
+| Open CORS without auth | Development/demo convenience only; do not treat it as a hardened public API |
+
+### 4. Checklist before public or multi-client exposure
+
+1. Enable `ADMIN_AUTH_ENABLED=true`, set a strong admin password, and use **HTTPS** at the reverse proxy or edge.
+2. Prefer reverse proxy TLS termination; do not rely on "auth enabled" alone if cookies or tokens can be stolen on cleartext links.
+3. Keep `ALLOW_INSECURE_PUBLIC_BIND` unset/`false`.
+4. Leave `PLUGINS_DIR` empty unless every package is reviewed and trusted.
+5. Review outbound policy for user-influenced URLs: [Outbound HTTP security policy](security-outbound-policy.md).
+6. Confirm CORS and cookie `Secure` / `SameSite` settings match your real browser origins.
+7. Assume a single shared admin: anyone with the password or a stolen session cookie is the administrator.
+
+### 5. Related documents
+
+| Topic | Document |
+| --- | --- |
+| Full baseline requirements and gaps | This file (sections below) |
+| Plugin trust and extension points | [Plugin extension contract](plugin-extension-contract.md) |
+| Outbound SSRF / egress defaults | [Outbound HTTP security policy](security-outbound-policy.md) |
+| Durable audit Phase 1 | [Security audit](security-audit.md) |
+| Sensitive log/export redaction | [Sensitive-data redaction](security-sensitive-data-redaction.md) |
+| Deploy bind notes | [DEPLOY.md](DEPLOY.md), [DEPLOY_EN.md](DEPLOY_EN.md) |
 
 ## Threat Model
 
