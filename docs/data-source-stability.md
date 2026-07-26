@@ -8,6 +8,11 @@
 
 架构决策见 [ADR-005：保留优先级 fallback 与按市场隔离的熔断控制](adr/ADR-005-provider-fallback-and-circuit-control.md)。
 
+
+## 模块所有权
+
+ADR-006 拆分后，规范化 / 路由辅助 / 共享类型的文件归属见 [Data provider module ownership](data-provider-ownership.md)。
+
 ## 一句话答复用户
 
 如果遇到“数据源失败”，通常不是系统只能用一个源，而是免费源被限流、上游接口临时变更、网络抖动或当前市场/标的不支持。DSA 已经内置多数据源 fallback，会按场景自动尝试下一个源；如果你希望更稳定，建议至少配置一个 token 型稳定源：

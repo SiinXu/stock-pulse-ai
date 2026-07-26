@@ -74,7 +74,7 @@ resolve -> fetch -> intelligence -> context -> analyze -> persist -> render -> d
 | `src/` | Primary application package for orchestration, services, schemas, persistence, report rendering, and shared runtime logic. |
 | `src/market/` | Canonical market-analysis, market-context, phase-prompt, phase-summary, and structure-prompt implementations. The top-level `src/market_analyzer.py`, `src/market_context.py`, `src/market_phase_prompt.py`, `src/market_phase_summary.py`, and `src/market_structure_prompt.py` modules remain compatibility facades. **New production code must import the canonical package**; see [legacy facade import policy](legacy-facade-import-policy.md). |
 | `src/analysis_context_pack/` | Canonical context projection and prompt-rendering implementations. `src/analysis_context_pack_overview.py` and `src/analysis_context_pack_prompt.py` remain compatibility facades. **New production code must import the canonical package**; see [legacy facade import policy](legacy-facade-import-policy.md). |
-| `data_provider/` | Provider adapters, capability routing, normalization, caching, fallback, and health control. |
+| `data_provider/` | Provider adapters, capability routing, normalization, caching, fallback, and health control. Ownership after ADR-006 extractions: [data provider ownership map](data-provider-ownership.md). |
 | `api/` | FastAPI transport, middleware, lifecycle, and public HTTP schemas. |
 | `bot/` | Messaging-platform adapters, dispatch, commands, and stream integrations. |
 | `strategies/` | Built-in natural-language trading Skill definitions loaded from root YAML files plus the reserved `strategies/personas/` YAML collection; other nested YAML directories are not discovered. |
@@ -386,6 +386,7 @@ separately owned contract.
 - [Scheduled tasks](scheduled-tasks.md)
 - [Persisted schedule boundary](adr/ADR-008-persisted-schedule-process-local-execution-boundary.md)
 - [Data-source stability and fallback](data-source-stability.md)
+- [Data provider module ownership](data-provider-ownership.md)
 - [Analysis Context Pack](analysis-context-pack.md)
 - [Agent stream events](agent-stream-events.md)
 - [Database migrations](database-migrations.md)

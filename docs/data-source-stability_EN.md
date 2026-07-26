@@ -6,6 +6,11 @@ This guide explains how StockPulse chooses market-data providers, changes order 
 
 For model routing and LLM failures, see [LLM routing and degradation order](LLM_CONFIG_GUIDE_EN.md#routing-and-degradation-order). Configuration changes use the [transactional hot-reload and one-step rollback contract](LLM_CONFIG_GUIDE_EN.md#transactional-hot-reload-and-one-step-rollback).
 
+
+## Module ownership
+
+For which file owns normalization, routing helpers, and shared types after ADR-006 extractions, see [Data provider module ownership](data-provider-ownership.md).
+
 ## The Three Priority Systems
 
 StockPulse has separate priority systems. Changing one does not silently rewrite the others.
