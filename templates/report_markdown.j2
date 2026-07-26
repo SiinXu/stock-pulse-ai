@@ -1,4 +1,4 @@
-{% from '_macros.j2' import market_snapshot with context %}
+{% from '_macros.j2' import market_snapshot, report_strata_section, report_disclaimer_line with context %}
 # 🎯 {{ report_date }} {{ labels.dashboard_title }}
 
 > {{ labels.analyzed_prefix }} **{{ results|length }}** {{ labels.stock_unit }} | 🟢{{ labels.buy_label }}:{{ buy_count }} 🟡{{ labels.watch_label }}:{{ hold_count }} 🔴{{ labels.sell_label }}:{{ sell_count }}
@@ -232,9 +232,14 @@
 {% endfor %}
 {% endif %}
 
+{% set strata = e.report_strata or (dashboard.get('report_strata') if dashboard else none) %}
+{{ report_strata_section(strata, compact=false) }}
+
 ---
 {% endfor %}
 {% endif %}
+
+{{ report_disclaimer_line() }}
 
 *{{ labels.generated_at_label }}：{{ report_timestamp }}*
 {% if show_llm_model and models_used %}

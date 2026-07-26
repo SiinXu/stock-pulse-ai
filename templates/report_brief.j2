@@ -1,3 +1,4 @@
+{% from '_macros.j2' import report_strata_section, report_disclaimer_line with context %}
 # 🎯 {{ report_date }} {{ labels.brief_title }}
 
 > {{ results|length }} {{ labels.stock_unit_compact }} | 🟢{{ buy_count }} 🟡{{ hold_count }} 🔴{{ sell_count }}
@@ -10,7 +11,13 @@
 {% set core = (dash.get('core_conclusion') or {}) if dash else {} %}
 {% set one = (core.get('one_sentence') or e.result.analysis_summary or '')[:60] %}
 **{{ e.stock_name }}({{ e.result.code }})** {{ e.signal_emoji }} {{ e.signal_text }} | {{ labels.score_label }} {{ e.result.sentiment_score }} | {{ one }}
+{% set strata = e.report_strata or (dash.get('report_strata') if dash else none) %}
+{% if strata %}
+{{ report_strata_section(strata, compact=true) }}
+{% endif %}
 {% endfor %}
+
+{{ report_disclaimer_line() }}
 
 *{{ report_timestamp }}*
 {% if show_llm_model and models_used %}

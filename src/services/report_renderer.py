@@ -44,6 +44,7 @@ from src.schemas.decision_action import (
     display_operation_advice_for_result,
     localize_action_label,
 )
+from src.schemas.report_strata import resolve_report_strata
 from src.utils.data_processing import (
     normalize_model_used,
     signal_attribution_has_content,
@@ -301,6 +302,7 @@ def render(
         }.get(display_action, display_action)
         _, se, _ = get_signal_level(signal_action or display_advice, r.sentiment_score, report_language)
         rn = get_localized_stock_name(r.name, r.code, report_language)
+        strata_model = resolve_report_strata(r, language=report_language)
         sorted_enriched.append({
             "result": r,
             "signal_text": display_advice,
@@ -308,6 +310,8 @@ def render(
             "stock_name": _escape_md(rn),
             "localized_operation_advice": display_advice,
             "localized_trend_prediction": localize_trend_prediction(r.trend_prediction, report_language),
+            # Issue #616: optional strata dict for templates; None keeps historical path quiet.
+            "report_strata": strata_model.to_public_dict() if strata_model else None,
         })
 
     display_buckets = [

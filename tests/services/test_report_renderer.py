@@ -532,3 +532,86 @@ class TestReportRenderer(unittest.TestCase):
         out = render("markdown", [], summary_only=True)
         self.assertIsNotNone(out)
         self.assertIn("0", out)
+
+
+class TestReportStrataRendering(unittest.TestCase):
+    """Issue #616: strata sections and always-on disclaimer."""
+
+    def _strata_dashboard(self) -> dict:
+        return {
+            "core_conclusion": {"one_sentence": "等待确认"},
+            "intelligence": {"risk_alerts": []},
+            "battle_plan": {"sniper_points": {"stop_loss": "110"}},
+            "report_strata": {
+                "schema_version": "report-strata-v1",
+                "verified_facts": [
+                    {
+                        "statement": "Close was 1680 on the last daily bar.",
+                        "source_id": "ohlcv:daily",
+                        "as_of": "2026-07-25T15:00:00+08:00",
+                    }
+                ],
+                "missing_or_conflicts": [
+                    {
+                        "kind": "conflict",
+                        "description": "Volume sources disagree.",
+                        "source_ids": ["a", "b"],
+                    }
+                ],
+                "model_inference": [
+                    "Momentum may improve if volume confirms."
+                ],
+                "risks_counter_evidence": [
+                    "Break below support invalidates the constructive case."
+                ],
+                "framework_alignment": {
+                    "status": "not_configured",
+                    "summary": "Personal investment framework not configured",
+                },
+                "disclaimer": "AI-generated content for reference only. Not investment advice.",
+            },
+        }
+
+    def test_markdown_renders_six_strata_and_keeps_inference_out_of_facts(self) -> None:
+        r = _make_result(dashboard=self._strata_dashboard(), report_language="en")
+        out = render("markdown", [r], summary_only=False)
+        self.assertIsNotNone(out)
+        assert out is not None
+        self.assertIn("Evidence Strata", out)
+        self.assertIn("Verified Facts", out)
+        self.assertIn("Close was 1680", out)
+        self.assertIn("Missing Data or Source Conflicts", out)
+        self.assertIn("Volume sources disagree", out)
+        self.assertIn("Model Inference", out)
+        self.assertIn("Momentum may improve", out)
+        self.assertIn("Risks / Counter-Evidence", out)
+        self.assertIn("Alignment with User Framework", out)
+        self.assertIn("Not investment advice", out)
+        # Inference text must not appear inside the facts bullet for the close price line only once as fact.
+        facts_idx = out.index("Verified Facts")
+        inference_idx = out.index("Model Inference")
+        self.assertLess(facts_idx, inference_idx)
+        facts_block = out[facts_idx:inference_idx]
+        self.assertNotIn("Momentum may improve", facts_block)
+
+    def test_historical_without_strata_still_renders_with_disclaimer(self) -> None:
+        r = _make_result()
+        md = render("markdown", [r], summary_only=False)
+        brief = render("brief", [r])
+        wechat = render("wechat", [r])
+        for out, name in ((md, "markdown"), (brief, "brief"), (wechat, "wechat")):
+            self.assertIsNotNone(out, name)
+            assert out is not None
+            self.assertIn("不构成投资建议", out)
+            self.assertNotIn("证据分层", out)
+
+    def test_brief_and_wechat_render_compact_strata(self) -> None:
+        r = _make_result(dashboard=self._strata_dashboard(), report_language="en")
+        brief = render("brief", [r])
+        wechat = render("wechat", [r])
+        for out in (brief, wechat):
+            self.assertIsNotNone(out)
+            assert out is not None
+            self.assertIn("Evidence Strata", out)
+            self.assertIn("Not investment advice", out)
+
