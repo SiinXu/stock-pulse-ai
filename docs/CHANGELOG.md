@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Docs] Made the root README English-first for SEO/GEO: removed the demo GIF placeholder, documented shipped capabilities (report strata, HITL, ToolSurface, Model Packs, scheduled tasks, plugins, Critic, security audit, offline quality panel), moved Simplified Chinese to `docs/README_CN.md`, and pointed `docs/README_EN.md` at the root README.
 - [Docs] Wired the offline analysis quality panel runner into CONTRIBUTING with non-alpha scope and local commands.
 - [Docs] Documented HITL default-off defaults, proposal lifetime, and independent Agent pipeline deadline fail-closed behavior for risk-control bypass approvals.
+- [Docs] Documented HITL `/approvals`, report evidence strata, and the offline analysis-quality panel as shipped-on-main surfaces in the UI manual (no primary-nav inventing).
 - [Docs] Aligned UI-manual feature-status tables with main: scheduled tasks, notification plugins, and local model packs as shipped; investment framework as backend-only.
 - [Docs] Documented UI manual figure-pack naming, P0 capture checklist, and PR evidence rules under `docs/ui-manual/assets/` (#599 docs side).
 - [Added] Added a default-off Human-in-the-Loop risk-control bypass with owner-scoped durable proposals, versioned CAS decisions, one-shot consumption, mandatory security auditing, authenticated additive APIs, and a Home-linked approvals page.

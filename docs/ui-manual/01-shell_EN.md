@@ -80,6 +80,7 @@ These five top-level items match the product navigation:
 | Surface | How to open |
 | --- | --- |
 | **Signal Center** `/signals` | Notification bell, command palette, Home focus rows; see [06](06-signals_EN.md) |
+| **Human approvals** `/approvals` | **Not** in the primary sidebar; open via the Home **Review human approvals** control when administrator sign-in is enabled (labels as in UI); contract: `docs/human-approvals_EN.md` |
 | **Stock workspace** | Type a code in the palette, or open `/stocks/<code>` (example: `/stocks/600519`) |
 | **Login** `/login` | When admin auth is on; protected pages use `?redirect=` |
 

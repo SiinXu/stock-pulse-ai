@@ -80,6 +80,7 @@ flowchart TB
 | 去哪 | 怎么进 |
 | --- | --- |
 | **信号中心** `/signals` | 通知铃、命令面板、首页焦点行；见 [06](06-signals.md) |
+| **人工审批** `/approvals` | **不在一级侧栏**；首页 **查看人工审批** / **Review human approvals** 按钮进入（需已开启管理员登录；文案以界面为准）；工程说明见 `docs/human-approvals.md` |
 | **个股工作区** | 命令面板输入代码，或打开 `/stocks/<code>`（例如 `/stocks/600519`） |
 | **登录** `/login` | 开启管理员认证后；受保护页会带 `?redirect=` |
 
