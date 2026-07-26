@@ -151,7 +151,27 @@ DSA_PLAYWRIGHT_ARTIFACT_CANARY=stockpulse-local-canary-change-me \
 
 # 真实登录后故意失败的安全诊断验收；临时 spec 与默认结果会自动清理
 python scripts/check_playwright_failure_diagnostics.py
+
+# 离线分析质量面板（无网络、无 live LLM；结构/信任夹具，不衡量 market alpha）
+./scripts/run_analysis_quality_panel.sh
+# 等价：
+# python -m pytest -m "not network and quality_benchmark" tests/analysis_quality -q
 ```
+
+### 离线分析质量面板（贡献者如何跑）
+
+报告格式、证据分层或分析输出结构相关改动时，除 `./scripts/ci_gate.sh` 外建议本地跑固定面板：
+
+```bash
+./scripts/run_analysis_quality_panel.sh
+```
+
+- **是什么**：`tests/fixtures/analysis_quality/` 中的冻结合成用例 + `tests/analysis_quality/` 的确定性断言（schema、数值与 frozen inputs 一致、缺口标记、风险面、泄漏模式）。
+- **不是什么**：不是 market alpha / 策略收益评测，不是 live 数据源 SLA，不是主观 LLM 打分门禁。面板只回答工程信任问题。
+- **专题文档**：[离线分析质量面板](analysis-quality-panel.md)（扩展用例、非主张范围、与 #617 边界）。
+- **CI**：该面板默认离线；不要把它改成依赖 live LLM 或外网供应商的阻断门禁。
+
+HITL 人工审批的默认关闭、提案有效期与 pipeline 截止语义见 [人工审批安全门禁](human-approvals.md)。
 
 Web 界面文案、语言边界、领域字典和错误码约定见 [Web 国际化开发约定](web-i18n.md)。新增页面或语言时必须按领域扩展 `src/locales/`，不得在 JSX 中硬编码可见文案。
 
