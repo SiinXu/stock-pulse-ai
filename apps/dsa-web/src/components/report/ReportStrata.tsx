@@ -98,12 +98,12 @@ export const normalizeReportStrataPayload = (value: unknown): ReportStrataType |
           ? record.schema_version
           : undefined,
     verifiedFacts: Array.isArray(pickList(record, 'verifiedFacts', 'verified_facts'))
-      ? (pickList(record, 'verifiedFacts', 'verified_facts') as unknown[])
+      ? (pickList(record, 'verifiedFacts', 'verified_facts') as ReportStrataVerifiedFact[])
       : [],
     missingOrConflicts: Array.isArray(
       pickList(record, 'missingOrConflicts', 'missing_or_conflicts'),
     )
-      ? (pickList(record, 'missingOrConflicts', 'missing_or_conflicts') as unknown[])
+      ? (pickList(record, 'missingOrConflicts', 'missing_or_conflicts') as ReportStrataGapOrConflict[])
       : [],
     modelInference: asStringList(pickList(record, 'modelInference', 'model_inference')),
     risksCounterEvidence: asStringList(
