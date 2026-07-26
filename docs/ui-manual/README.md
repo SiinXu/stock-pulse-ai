@@ -74,6 +74,8 @@ flowchart LR
 - 界面语言在壳层切换；读手册时请对照你当前 UI 语言下的标签。约定见 [TRANSLATION.md](TRANSLATION.md)。
 - 安装上手（桌面客户端）：[客户端安装](../beginner-client-setup.md) · [English](../beginner-client-setup_EN.md)
 
+- 截图 figure pack 规范与命名：[assets/README.md](assets/README.md)（#599；二进制截图可后补）
+
 ## 文档维护说明（给贡献者）
 
 - 本手册只写「怎么点界面」，不写部署与密钥运维。

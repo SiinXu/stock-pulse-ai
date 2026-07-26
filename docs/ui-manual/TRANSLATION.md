@@ -25,3 +25,8 @@ If the live UI string differs from the manual, prefer the **live UI** and update
 1. Copy each `*_EN.md` (or Chinese source) to a new suffix agreed by maintainers (for example `_CHT.md`).
 2. Add links in `README.md` / `README_EN.md` and in `docs/INDEX.md` / `docs/INDEX_EN.md`.
 3. Keep module boundaries identical; do not merge or split modules per language.
+
+## Figure pack (screenshots)
+
+Annotated UI screenshots live under [`assets/`](assets/README.md). Naming: `<module>-<scene>[-<lang>].png|webp`. P0 capture checklist and PR evidence rules are documented there. Do not commit one-off process screenshots outside that convention.
+

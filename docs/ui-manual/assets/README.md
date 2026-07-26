@@ -1,0 +1,116 @@
+# UI manual figure pack
+
+Annotated screenshots (or language-neutral chrome crops) for the operation manual live here when maintainers add them.
+
+This directory implements the storage side of issue **#599** (annotated screenshot / figure pack). Until images exist, chapters remain text + mermaid first.
+
+## Goals
+
+- Help zero-basis users answer “where is the button?”
+- Stay in sync with product IA and i18n without committing one-off PR review screenshots into random paths
+- Prefer **one pack per major release** over ad-hoc images in every docs PR
+
+## Naming convention
+
+```
+docs/ui-manual/assets/
+  <module>-<scene>[-<lang>].<ext>
+```
+
+| Part | Rules | Examples |
+| --- | --- | --- |
+| `module` | Manual module slug without number, lowercase kebab | `home`, `shell`, `analysis-workbench`, `signals`, `settings`, `discover` |
+| `scene` | Short scene id, kebab-case | `config-gap`, `three-segments`, `task-running`, `report-header`, `tabs-empty`, `save-control` |
+| `lang` | Optional. Omit when chrome is language-neutral or bilingual in product | `zh`, `en` |
+| `ext` | `png` or `webp` preferred | `home-config-gap-zh.png` |
+
+Examples:
+
+| File | Meaning |
+| --- | --- |
+| `home-config-gap-zh.png` | Home setup-incomplete banner (Simplified Chinese UI) |
+| `analysis-workbench-three-segments-en.png` | Workbench launch / tasks / history segments (English UI) |
+| `signals-tabs-empty.png` | Signal Center tabs + empty feed (shared chrome) |
+| `settings-save-control-zh.png` | Settings save control location |
+| `report-header-action-phase.png` | Report header: action + phase + data-quality affordance |
+
+## Required starter set (priority)
+
+| Priority | Scene | Suggested filename stem | Used by chapter |
+| --- | --- | --- | --- |
+| P0 | Home configuration gap + primary CTA | `home-config-gap` | [02](../02-home.md) |
+| P0 | Analysis Workbench three segments | `analysis-workbench-three-segments` | [03](../03-analysis-workbench.md) |
+| P0 | Running task progress states | `analysis-workbench-task-running` | [03](../03-analysis-workbench.md) |
+| P0 | Report header: action, phase, quality | `report-header-action-phase` | [08](../08-reading-reports.md) |
+| P0 | Signal Center tabs + empty state | `signals-tabs-empty` | [06](../06-signals.md) |
+| P0 | Settings save control | `settings-save-control` | [10](../10-settings.md) |
+
+## Caption and alt text rules
+
+1. Every figure in a manual chapter needs:
+   - Markdown image with meaningful **alt text** (describe the UI region, not “screenshot”).
+   - A one-line **caption** under the image in the chapter language.
+2. Captions must use **live product labels** for that language. Do not invent parallel names.
+3. If zh and en UI differ only by strings, prefer two crops (`-zh` / `-en`) or one neutral chrome crop plus caption text in each language chapter.
+4. Do not embed secrets, API keys, personal portfolio sizes, or real account identifiers. Use demo symbols (`600519`, `AAPL`) and redaction.
+
+## When to refresh figures
+
+Refresh the pack (or the affected stems) when any of these ship:
+
+- Primary nav / Research children change
+- Signal Center tab rename or route change
+- Report header layout change (action / phase / quality)
+- Settings save control or section IA change
+- Home core blocks restructure
+
+Link the refresh to the product PR or a dedicated docs PR; mention the stem list in the PR body.
+
+## How to embed in a chapter
+
+```markdown
+`assets/home-config-gap-zh.png` (embed when file exists)
+
+*Caption: Home warning when readiness checks fail — use **Start guided setup**.*
+```
+
+English chapters point at `-en` or language-neutral files:
+
+```markdown
+`assets/home-config-gap-en.png` (embed when file exists)
+
+*Caption: Home warning when readiness checks fail — use **Start guided setup**.*
+```
+
+## What not to commit here
+
+- Issue/PR review screenshots tied to a single ticket number as the only filename context
+- Marketing hero art
+- Full video tours (link externally if needed)
+- Unredacted production data
+
+## Status
+
+| Item | Status |
+| --- | --- |
+| Naming + location documented | Done (this file + [TRANSLATION.md](../TRANSLATION.md)) |
+| P0/P1 binary assets | Pending maintainer capture against live UI |
+| Chapter embeds | Add when corresponding files exist |
+
+When adding the first real PNG/WebP files, update this status table and embed them in the P0 chapters in the same docs PR.
+
+## How to attach evidence in PRs (without committing process screenshots)
+
+AGENTS.md forbids committing one-off issue/PR process screenshots into the repository. Prefer:
+
+1. **PR body / comment attachments** or GitHub-hosted images on the PR description.
+2. **Actions artifacts** for Playwright/smoke captures when they prove a UI change.
+3. **This figure pack** only for **maintained product screenshots** that document the UI manual long-term (stable stems in the P0/P1 table above).
+
+Do **not**:
+
+- Commit review screenshots named after a single issue/PR number as the only context.
+- Drop temporary acceptance PNGs under random paths outside this naming convention.
+- Embed secrets, API keys, personal portfolio sizes, or real account identifiers.
+
+When a product PR changes nav, report header, Signal Center tabs, or Settings save controls, either refresh the matching stem in this pack in a docs PR, or attach temporary evidence only on the product PR body until the pack is refreshed.

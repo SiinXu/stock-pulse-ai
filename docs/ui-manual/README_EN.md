@@ -70,6 +70,8 @@ Most people only need **01 + 02 + 03 + 08 + 11** in the first week.
 - Conventions: [TRANSLATION.md](TRANSLATION.md).
 - Desktop first-run: [Beginner client setup (EN)](../beginner-client-setup_EN.md) · [中文](../beginner-client-setup.md)
 
+- Figure pack naming and P0 capture checklist: [assets/README.md](assets/README.md) (#599; binary screenshots may follow later)
+
 ## Maintainer notes
 
 - UI procedures only — no deploy/secrets runbooks here.
