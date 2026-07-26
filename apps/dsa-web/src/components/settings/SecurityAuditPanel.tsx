@@ -353,10 +353,10 @@ const SecurityAuditPanel: React.FC<SecurityAuditPanelProps> = ({
                     <p className="font-mono text-sm font-semibold text-foreground">
                       {event.eventType}
                     </p>
-                    <Badge variant={outcomeVariant(event.outcome)} size="compact">
+                    <Badge variant={outcomeVariant(event.outcome)} size="sm">
                       {event.outcome}
                     </Badge>
-                    <Badge variant="history" size="compact">
+                    <Badge variant="history" size="sm">
                       {event.phase}
                     </Badge>
                   </div>
