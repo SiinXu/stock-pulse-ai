@@ -206,6 +206,7 @@ export const SettingsViewTabs: React.FC<SettingsViewTabsProps> = ({
       }))}
       onChange={onSelectView}
       ariaLabel={tabsLabel}
+      semantics="single-select"
     />
   );
 };

@@ -3,7 +3,9 @@ import { Component, lazy, Suspense, useCallback, useMemo, useState } from 'react
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
 import type { ReportLanguage } from '../../types/analysis';
+import { Button } from '../common/Button';
 import { Drawer } from '../common/Drawer';
+import { Spinner } from '../common/Spinner';
 
 interface ReportMarkdownDrawerProps {
   recordId: number;
@@ -56,7 +58,7 @@ class ReportMarkdownDrawerErrorBoundary extends Component<
 
 const ReportMarkdownLoadingState: React.FC<{ message: string }> = ({ message }) => (
   <div className="flex h-64 flex-col items-center justify-center">
-    <div className="home-spinner h-10 w-10 animate-spin border-[3px]" />
+    <Spinner size="lg" label={message} />
     <p className="mt-4 text-sm text-secondary-text">{message}</p>
   </div>
 );
@@ -73,13 +75,15 @@ const ReportMarkdownChunkErrorState: React.FC<{
       </svg>
     </div>
     <p className="text-sm text-danger">{message}</p>
-    <button
+    <Button
       type="button"
+      variant="secondary"
+      size="default"
       onClick={onRequestClose}
-      className="home-surface-button mt-4 min-h-11 min-w-11 rounded-lg px-4 py-2 text-sm text-secondary-text"
+      className="mt-4"
     >
       {dismissText}
-    </button>
+    </Button>
   </div>
 );
 

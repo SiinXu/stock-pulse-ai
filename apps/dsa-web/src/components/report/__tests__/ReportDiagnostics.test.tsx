@@ -58,7 +58,7 @@ describe('ReportDiagnostics', () => {
   it('loads historical diagnostics in a collapsed panel and copies sanitized text', async () => {
     vi.mocked(historyApi.getDiagnostics).mockResolvedValue(diagnosticSummary);
 
-    render(<ReportDiagnostics recordId={1} />);
+    const { container } = render(<ReportDiagnostics recordId={1} />);
 
     expect(historyApi.getDiagnostics).toHaveBeenCalledWith(1);
     expect(await screen.findByText('运行状态')).toBeInTheDocument();
@@ -73,6 +73,9 @@ describe('ReportDiagnostics', () => {
     expect(screen.getByText('最近失败后已降级')).toBeInTheDocument();
     expect(screen.getByText('未配置')).toBeInTheDocument();
     expect(screen.getByText('高级字段').closest('summary')).toHaveClass('min-h-11');
+    expect(container.querySelector('.home-subpanel')).toBeNull();
+    expect(container.querySelector('.home-accent-chip')).toBeNull();
+    expect(container.querySelector('.report-trace-pre')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '复制排障信息' }));
 

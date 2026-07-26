@@ -331,6 +331,7 @@ const ComponentPlaygroundPage = () => {
               }))}
               onChange={(value) => setSelection({ scenario: value })}
               ariaLabel={text.scenario}
+              semantics="single-select"
               className="max-w-full justify-self-start xl:justify-self-end"
             />
             <div className="flex min-w-0 flex-wrap items-center gap-2 xl:justify-end">

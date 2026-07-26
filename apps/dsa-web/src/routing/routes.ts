@@ -11,6 +11,7 @@ export const APP_ROUTE_PATHS = {
   signals: '/signals',
   approvals: '/approvals',
   stockDetails: '/stocks/:stockCode',
+  research: '/research',
   researchAnalysis: '/research/analysis',
   researchMarket: '/research/market',
   researchDiscover: '/research/discover',

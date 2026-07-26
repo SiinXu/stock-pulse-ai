@@ -69,7 +69,14 @@ describe('TaskPanel', () => {
     expect(screen.getAllByText('trace-task-1')).toHaveLength(2);
     expect(screen.queryByText(/请求阶段:/)).not.toBeInTheDocument();
     expect(container.querySelector('[data-surface-level="interactive"]')).toBeTruthy();
-    expect(container.querySelector('.home-subpanel')).toBeTruthy();
+    expect(container.querySelector('[data-testid="task-panel-item"]')).toHaveAttribute(
+      'data-surface-level',
+      'interactive',
+    );
+    expect(screen.getByRole('progressbar', { name: '分析中 40%' })).toHaveAttribute(
+      'aria-valuenow',
+      '40',
+    );
   });
 
   it('keeps narrow sidebar task metadata in rows instead of squeezing diagnostics vertically', () => {
@@ -115,7 +122,7 @@ describe('TaskPanel', () => {
     );
 
     const runFlowButton = screen.getByRole('button', { name: '查看 贵州茅台 运行流' });
-    expect(runFlowButton).toHaveAttribute('data-size', 'default');
+    expect(runFlowButton).toHaveAttribute('data-size', 'compact');
     fireEvent.click(runFlowButton);
 
     expect(onOpenRunFlow).toHaveBeenCalledWith(baseTask);
@@ -157,7 +164,7 @@ describe('TaskPanel', () => {
     expect(screen.getByLabelText('任务状态：已完成')).toBeInTheDocument();
 
     const dismissButton = screen.getByRole('button', { name: '关闭 贵州茅台 任务' });
-    expect(dismissButton).toHaveAttribute('data-size', 'default');
+    expect(dismissButton).toHaveAttribute('data-size', 'compact');
     fireEvent.click(dismissButton);
     expect(onDismiss).toHaveBeenCalledWith('task-1');
   });

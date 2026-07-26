@@ -7,7 +7,6 @@ import {
   CircleAlert,
   Clock3,
   Funnel,
-  Loader2,
   Play,
   Plus,
   Star,
@@ -25,6 +24,7 @@ import { truncateStockName } from '../../utils/stockName';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiTextKey, UiTextParams } from '../../i18n/uiText';
 import { HOME_WORKSPACE_VALUES, type HomeWorkspaceValue } from '../../routing/routes';
+import { Spinner } from '../common/Spinner';
 
 export type HomeWorkspaceTab = HomeWorkspaceValue;
 export type WatchlistAnalyzeMode = 'all' | 'pending';
@@ -124,7 +124,13 @@ const WatchlistRowItem: React.FC<{
               {truncateStockName(stockName)}
             </span>
             {row.isTodayStatusLoading ? (
-              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-text" aria-label={t('watchlist.todayStatusLoading')} />
+              <>
+                <Spinner
+                  size="sm"
+                  className="h-3.5 w-3.5 shrink-0 text-muted-text"
+                />
+                <span className="sr-only">{t('watchlist.todayStatusLoading')}</span>
+              </>
             ) : row.isTodayStatusUnknown ? (
               <CircleAlert className="h-3.5 w-3.5 shrink-0 text-warning" aria-label={t('watchlist.todayStatusUnavailable')} />
             ) : row.analyzedToday ? (

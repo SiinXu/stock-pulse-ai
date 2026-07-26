@@ -1,6 +1,6 @@
 import type React from 'react';
 import { ChevronDown, RefreshCw, Workflow, X } from 'lucide-react';
-import { Badge, Card, IconButton, StatusDot } from '../common';
+import { Badge, Card, IconButton, Progress, StatusDot, Surface } from '../common';
 import { DashboardPanelHeader } from '../dashboard';
 import type { TaskInfo } from '../../types/analysis';
 import { getRequestedPhaseLabel } from '../../utils/marketPhase';
@@ -53,7 +53,12 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
   const taskMessage = formatTaskMessage(task, language);
 
   return (
-    <div className="home-subpanel grid min-w-0 gap-2.5 px-3 py-2.5" data-testid="task-panel-item">
+    <Surface
+      level="interactive"
+      padding="none"
+      className="grid min-w-0 gap-1.5 px-2.5 py-2"
+      data-testid="task-panel-item"
+    >
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
         <div className="flex min-w-0 items-start gap-2">
           <div className="shrink-0 pt-1.5">
@@ -83,7 +88,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
             <IconButton
               type="button"
               variant="ghost"
-              size="default"
+              size="compact"
               tooltip={t('taskPanel.openRunFlow')}
               onClick={(event) => {
                 event.stopPropagation();
@@ -108,7 +113,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
             <IconButton
               type="button"
               variant="ghost"
-              size="default"
+              size="compact"
               onClick={(event) => {
                 event.stopPropagation();
                 onDismiss(task.taskId);
@@ -137,12 +142,13 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
 
       {!isTerminal ? (
         <div className="flex min-w-0 items-center gap-2">
-          <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-subtle">
-            <div
-              className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
+          <Progress
+            value={progress}
+            label={`${statusLabel} ${progress}%`}
+            valueText={`${progress}%`}
+            tone="primary"
+            className="h-1.5 min-w-0 flex-1"
+          />
           <span className="shrink-0 text-xs text-muted-text tabular-nums">
             {progress}%
           </span>
@@ -169,7 +175,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
           </div>
         </details>
       ) : null}
-    </div>
+    </Surface>
   );
 };
 

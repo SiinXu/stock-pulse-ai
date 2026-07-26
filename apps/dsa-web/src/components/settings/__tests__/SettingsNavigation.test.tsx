@@ -168,7 +168,7 @@ describe('SettingsSectionNav', () => {
 });
 
 describe('SettingsViewTabs', () => {
-  it('renders the five AI & Models views and marks the active tab', () => {
+  it('renders the five AI & Models views and marks the active option', () => {
     render(
       <SettingsViewTabs
         section="ai_models"
@@ -178,17 +178,18 @@ describe('SettingsViewTabs', () => {
         tabsLabel="AI & Models views"
       />,
     );
-    const tabs = screen.getAllByRole('tab');
-    expect(tabs.map((tab) => tab.textContent)).toEqual([
+    const options = screen.getAllByRole('radio');
+    expect(options.map((option) => option.textContent)).toEqual([
       'Overview',
       'Model Access',
       'Local Models',
       'Task Routing',
       'Reliability',
     ]);
-    expect(screen.getByRole('tab', { name: 'Task Routing' })).toHaveAttribute('aria-selected', 'true');
-    for (const tab of tabs) {
-      expect(tab).toHaveClass('min-h-6', 'segmented-control-tab');
+    expect(screen.getByRole('radiogroup', { name: 'AI & Models views' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Task Routing' })).toHaveAttribute('aria-checked', 'true');
+    for (const option of options) {
+      expect(option).toHaveClass('min-h-6', 'segmented-control-tab');
     }
   });
 
@@ -203,7 +204,7 @@ describe('SettingsViewTabs', () => {
         tabsLabel="AI 视图"
       />,
     );
-    fireEvent.click(screen.getByRole('tab', { name: '可靠性' }));
+    fireEvent.click(screen.getByRole('radio', { name: '可靠性' }));
     expect(onSelect).toHaveBeenCalledWith('reliability');
   });
 

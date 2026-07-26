@@ -82,9 +82,9 @@ function setMediaMatch(query: string, matches: boolean): void {
   mediaListeners.get(query)?.forEach((listener) => listener(event));
 }
 
-function renderShell() {
+function renderShell(initialEntry = '/chat') {
   return render(
-    <MemoryRouter initialEntries={['/chat']}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <ThemeProvider>
         <Shell>
           <button type="button">page content</button>
@@ -163,9 +163,11 @@ describe('Shell', () => {
   });
 
   it('retains the owner-selected framed main without clipping horizontal content', () => {
-    renderShell();
+    const { container } = renderShell();
 
     const main = screen.getByRole('main');
+    const sidebar = container.querySelector('[data-shell-sidebar]');
+    expect(sidebar).not.toHaveClass('border-r', 'border-border');
     expect(main).toHaveAttribute('data-shell-main', 'true');
     expect(main).toHaveClass('rounded-xl', 'border', 'border-border', 'bg-card', 'shadow-soft-card');
     expect(main).toHaveClass('overflow-y-auto');
@@ -189,7 +191,7 @@ describe('Shell', () => {
     expect(profile).toHaveClass('h-11', 'w-11');
     fireEvent.click(profile);
     const profileDialog = screen.getByRole('dialog', { name: 'StockPulse' });
-    await waitFor(() => expect(within(profileDialog).getByRole('button', { name: '切换主题' })).toHaveFocus());
+    await waitFor(() => expect(within(profileDialog).getByRole('combobox', { name: '切换主题' })).toHaveFocus());
     fireEvent.keyDown(profileDialog, { key: 'Escape' });
     await waitFor(() => expect(profile).toHaveFocus());
 
@@ -238,6 +240,21 @@ describe('Shell', () => {
 
     expect(screen.queryByRole('dialog', { name: '导航菜单' })).not.toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole('link', { name: 'Agent' })).toHaveFocus());
+  });
+
+  it('moves focus to the active compact group when its current child is inside the flyout', async () => {
+    setMediaMatch(COMPACT_SIDEBAR_QUERY, true);
+    const { container } = renderShell('/research/market');
+    fireEvent.click(screen.getByRole('button', { name: '打开导航菜单' }));
+    expect(screen.getByRole('dialog', { name: '导航菜单' })).toBeInTheDocument();
+
+    act(() => setMediaMatch(DESKTOP_SIDEBAR_QUERY, true));
+
+    expect(screen.queryByRole('dialog', { name: '导航菜单' })).not.toBeInTheDocument();
+    const sidebar = container.querySelector('[data-shell-sidebar]');
+    const researchGroup = within(sidebar as HTMLElement).getByRole('button', { name: '研究' });
+    expect(researchGroup).toHaveAttribute('data-navigation-active', 'true');
+    await waitFor(() => expect(researchGroup).toHaveFocus());
   });
 
   it('does not move content focus when the desktop breakpoint changes with navigation closed', async () => {

@@ -1,6 +1,7 @@
 import type React from 'react';
 import { useId } from 'react';
 import { cn } from '../../utils/cn';
+import { getTabId } from './tabIds';
 
 export interface SegmentedControlOption<T extends string> {
   value: T;
@@ -10,41 +11,61 @@ export interface SegmentedControlOption<T extends string> {
 }
 
 interface SegmentedControlProps<T extends string> {
+  id?: string;
   value: T;
   options: Array<SegmentedControlOption<T>>;
   onChange: (value: T) => void;
   ariaLabel: string;
   className?: string;
   getPanelId?: (value: T) => string | undefined;
+  semantics?: 'tabs' | 'single-select';
 }
 
 export function SegmentedControl<T extends string>({
+  id,
   value,
   options,
   onChange,
   ariaLabel,
   className,
   getPanelId,
+  semantics = 'tabs',
 }: SegmentedControlProps<T>) {
   const generatedId = useId();
+  const usesTabSemantics = semantics === 'tabs';
+
+  const selectOption = (index: number) => {
+    const option = options[index];
+    if (!option || option.disabled) return;
+    onChange(option.value);
+    requestAnimationFrame(() => {
+      document.getElementById(
+        id ? getTabId(id, option.value) : `${generatedId}-${option.value}`,
+      )?.focus();
+    });
+  };
 
   const moveSelection = (currentIndex: number, direction: 1 | -1) => {
     for (let offset = 1; offset <= options.length; offset += 1) {
       const nextIndex = (currentIndex + direction * offset + options.length) % options.length;
-      const nextOption = options[nextIndex];
-      if (!nextOption.disabled) {
-        onChange(nextOption.value);
-        requestAnimationFrame(() => {
-          document.getElementById(`${generatedId}-${nextOption.value}`)?.focus();
-        });
+      if (!options[nextIndex].disabled) {
+        selectOption(nextIndex);
         return;
       }
     }
   };
 
+  const selectBoundaryOption = (fromStart: boolean) => {
+    const indexes = options.map((_, index) => index);
+    if (!fromStart) indexes.reverse();
+    const nextIndex = indexes.find((index) => !options[index].disabled);
+    if (nextIndex !== undefined) selectOption(nextIndex);
+  };
+
   return (
     <div
-      role="tablist"
+      id={id}
+      role={usesTabSemantics ? 'tablist' : 'radiogroup'}
       aria-label={ariaLabel}
       className={cn(
         'segmented-control inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full p-1',
@@ -56,11 +77,12 @@ export function SegmentedControl<T extends string>({
         return (
           <button
             key={option.value}
-            id={`${generatedId}-${option.value}`}
+            id={id ? getTabId(id, option.value) : `${generatedId}-${option.value}`}
             type="button"
-            role="tab"
-            aria-selected={selected}
-            aria-controls={getPanelId?.(option.value)}
+            role={usesTabSemantics ? 'tab' : 'radio'}
+            aria-selected={usesTabSemantics ? selected : undefined}
+            aria-checked={usesTabSemantics ? undefined : selected}
+            aria-controls={usesTabSemantics ? getPanelId?.(option.value) : undefined}
             tabIndex={selected ? 0 : -1}
             disabled={option.disabled}
             className={cn(
@@ -79,6 +101,12 @@ export function SegmentedControl<T extends string>({
               } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
                 event.preventDefault();
                 moveSelection(index, -1);
+              } else if (event.key === 'Home') {
+                event.preventDefault();
+                selectBoundaryOption(true);
+              } else if (event.key === 'End') {
+                event.preventDefault();
+                selectBoundaryOption(false);
               }
             }}
           >

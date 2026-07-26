@@ -52,6 +52,10 @@ vi.mock('./pages/MarketReviewPage', () => ({
   default: () => <div data-testid="market-review-page">Market review</div>,
 }));
 
+vi.mock('./pages/ResearchOverviewPage', () => ({
+  default: () => <div data-testid="research-overview-page">Research overview</div>,
+}));
+
 vi.mock('./pages/ResearchAnalysisWorkbenchPage', () => ({
   default: () => <div data-testid="analysis-workbench-page">Analysis Workbench</div>,
 }));
@@ -134,7 +138,7 @@ describe('App routing behavior', () => {
 
     const { container } = render(<App />);
 
-    expect(container.querySelector('.border-t-primary')).toBeInTheDocument();
+    expect(container.querySelector('[data-control="spinner"]')).toBeInTheDocument();
   });
 
   it('redirects protected routes to login when auth is enabled but user is not logged in', async () => {
@@ -298,6 +302,15 @@ describe('App routing behavior', () => {
 
     expect(await screen.findByTestId('market-review-page')).toBeInTheDocument();
     expect(setCurrentRoute).toHaveBeenLastCalledWith(APP_ROUTE_PATHS.researchMarket);
+  });
+
+  it('routes the canonical Research overview path after auth is ready', async () => {
+    window.history.pushState({}, '', APP_ROUTE_PATHS.research);
+
+    render(<App />);
+
+    expect(await screen.findByTestId('research-overview-page')).toBeInTheDocument();
+    expect(setCurrentRoute).toHaveBeenLastCalledWith(APP_ROUTE_PATHS.research);
   });
 
   it('routes the canonical Analysis Workbench path after auth is ready', async () => {

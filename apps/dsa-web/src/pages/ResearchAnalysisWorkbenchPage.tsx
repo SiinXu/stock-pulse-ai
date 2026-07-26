@@ -10,6 +10,8 @@ import {
   FlaskConical,
   History,
   ListChecks,
+  MessageCircle,
+  RefreshCw,
   Upload,
   Workflow,
 } from 'lucide-react';
@@ -31,16 +33,17 @@ import {
   Button,
   Checkbox,
   ConfirmDialog,
-  Drawer,
   EmptyState,
+  FileInput,
   InlineAlert,
+  Modal,
   PageHeader,
   SegmentedControl,
   Select,
   Surface,
   TabPanel,
-  Tabs,
   WorkspaceLayout,
+  getTabPanelId,
 } from '../components/common';
 import { useToast } from '../components/common/toastContext';
 import { DashboardStateBlock } from '../components/dashboard';
@@ -74,9 +77,11 @@ import {
 import { useStockPoolStore } from '../stores/stockPoolStore';
 import type { TaskInfo } from '../types/analysis';
 import type { RunFlowSnapshotSource } from '../types/runFlow';
-import { getStrategyDisplay } from '../utils/strategyDisplay';
 import { normalizeBatchAnalysisCodes, submitBatchAnalysis } from '../utils/batchAnalysis';
+import { buildDeepLink } from '../utils/deepLink';
 import { normalizeReportLanguage } from '../utils/reportLanguage';
+import { areStockCodesEquivalent } from '../utils/stockCode';
+import { getStrategyDisplay } from '../utils/strategyDisplay';
 import {
   readExperienceMode,
   writeExperienceMode,
@@ -133,6 +138,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
   const { language, t } = useUiLanguage();
   const { showToast } = useToast();
   const pageHeadingRef = useRef<HTMLHeadingElement>(null);
+  const isMountedRef = useRef(false);
   useRouteFocusTarget({
     routeId: APP_ROUTE_PATHS.researchAnalysis,
     headingRef: pageHeadingRef,
@@ -166,6 +172,13 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
   const [isBatchSubmitting, setIsBatchSubmitting] = useState(false);
   const [batchNotice, setBatchNotice] = useState<WorkbenchNotice>(null);
   const [markdownRecordId, setMarkdownRecordId] = useState<number | null>(null);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const {
     query,
@@ -525,6 +538,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
       reportType: experienceMode === 'beginner' ? 'brief' : 'detailed',
       skills: selectedAnalysisSkills,
     });
+    if (!isMountedRef.current) return;
     const latest = useStockPoolStore.getState();
     const taskAccepted = latest.activeTasks.some((task) => (
       task.reportType !== 'market_review' && !beforeTaskIds.has(task.taskId)
@@ -823,6 +837,47 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
     && selectedReport?.meta.id === routeState.recordId
     ? selectedReport
     : null;
+  const handleReanalyze = useCallback(async () => {
+    if (!selectedAnalysisReport) return;
+
+    const beforeTaskIds = new Set(analysisTasks.map((task) => task.taskId));
+    await submitAnalysis({
+      stockCode: selectedAnalysisReport.meta.stockCode,
+      stockName: selectedAnalysisReport.meta.stockName,
+      originalQuery: selectedAnalysisReport.meta.stockCode,
+      selectionSource: 'manual',
+      forceRefresh: true,
+      skills: selectedAnalysisSkills,
+    });
+    if (!isMountedRef.current) return;
+    const latest = useStockPoolStore.getState();
+    const taskAccepted = latest.activeTasks.some((task) => (
+      task.reportType !== 'market_review'
+      && !beforeTaskIds.has(task.taskId)
+      && areStockCodesEquivalent(task.stockCode, selectedAnalysisReport.meta.stockCode)
+    ));
+    if (taskAccepted || latest.duplicateTask) {
+      selectSegment(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
+    }
+  }, [
+    analysisTasks,
+    selectSegment,
+    selectedAnalysisReport,
+    selectedAnalysisSkills,
+    submitAnalysis,
+  ]);
+  const handleAskFollowUp = useCallback(() => {
+    const recordId = selectedAnalysisReport?.meta.id;
+    const stockCode = selectedAnalysisReport?.meta.stockCode;
+    if (recordId === undefined || !stockCode) return;
+
+    navigate(buildDeepLink({
+      page: 'chat',
+      stockCode,
+      stockName: selectedAnalysisReport.meta.stockName || undefined,
+      recordId,
+    }));
+  }, [navigate, selectedAnalysisReport]);
   const isHistoryTrendUnavailable = !selectedReport?.meta.stockCode;
   useEffect(() => {
     if (
@@ -859,13 +914,17 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
         )}
       />
 
-      <Tabs
+      <SegmentedControl
         id={WORKBENCH_TABS_ID}
         className="mt-5"
-        aria-label={t('analysisWorkbench.tabsLabel')}
+        ariaLabel={t('analysisWorkbench.tabsLabel')}
         value={routeState.segment}
-        items={tabItems}
-        onValueChange={(value) => {
+        options={tabItems.map((item) => ({
+          value: item.id as AnalysisWorkbenchSegment,
+          label: item.label,
+        }))}
+        getPanelId={(value) => getTabPanelId(WORKBENCH_TABS_ID, value)}
+        onChange={(value) => {
           if (Object.values(ANALYSIS_WORKBENCH_SEGMENT_VALUES).includes(
             value as AnalysisWorkbenchSegment,
           )) {
@@ -941,6 +1000,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                 value={experienceMode}
                 onChange={handleExperienceModeChange}
                 ariaLabel={t('home.experienceModeLabel')}
+                semantics="single-select"
                 options={[
                   { value: 'beginner', label: t('home.beginnerMode') },
                   { value: 'professional', label: t('home.professionalMode') },
@@ -1028,10 +1088,8 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                     {t('watchlist.pendingStatusUnavailable')}
                   </p>
                 ) : null}
-                <input
+                <FileInput
                   ref={fileInputRef}
-                  type="file"
-                  className="hidden"
                   accept="image/jpeg,image/png,image/webp,image/gif,.csv,.xlsx,.xls,.txt"
                   onChange={(event) => {
                     const file = event.target.files?.[0];
@@ -1131,6 +1189,29 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                       <Button
                         type="button"
                         variant="secondary"
+                        size="default"
+                        disabled={isAnalyzing || selectedAnalysisReport.meta.id === undefined}
+                        isLoading={isAnalyzing}
+                        loadingText={t('home.reanalyze')}
+                        onClick={() => void handleReanalyze()}
+                      >
+                        <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                        {t('home.reanalyze')}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="default"
+                        disabled={selectedAnalysisReport.meta.id === undefined}
+                        onClick={handleAskFollowUp}
+                      >
+                        <MessageCircle className="h-4 w-4" aria-hidden="true" />
+                        {t('home.askAi')}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="default"
                         disabled={isHistoryTrendUnavailable}
                         onClick={() => void openHistoryTrend()}
                       >
@@ -1140,6 +1221,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                       <Button
                         type="button"
                         variant="secondary"
+                        size="default"
                         onClick={() => setMarkdownRecordId(selectedAnalysisReport.meta.id ?? null)}
                       >
                         <FileText className="h-4 w-4" aria-hidden="true" />
@@ -1234,12 +1316,11 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
       ) : null}
 
       {runFlowDialog.open ? (
-        <Drawer
+        <Modal
           isOpen
           onClose={closeRunFlow}
           title={t('runFlow.drawerTitle')}
-          variant="detail"
-          size="wide"
+          size="fullscreen"
         >
           <RunFlowPanel
             key={`${runFlowDialog.source.type}-${runFlowDialog.source.type === 'task' ? runFlowDialog.source.taskId : runFlowDialog.source.recordId}`}
@@ -1247,7 +1328,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
             title={runFlowDialog.title}
             onUnavailable={handleUnavailableRunFlow}
           />
-        </Drawer>
+        </Modal>
       ) : null}
     </AppPage>
   );

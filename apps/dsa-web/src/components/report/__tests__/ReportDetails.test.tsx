@@ -45,14 +45,19 @@ describe('ReportDetails', () => {
 
     const rawToggle = screen.getByRole('button', { name: '原始分析结果' });
     const snapshotToggle = screen.getByRole('button', { name: '分析快照' });
-    expect(rawToggle).toHaveClass('min-h-11');
-    expect(snapshotToggle).toHaveClass('min-h-11');
+    expect(rawToggle).toHaveAttribute('data-control', 'button');
+    expect(rawToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(snapshotToggle).toHaveAttribute('data-control', 'button');
+    expect(snapshotToggle).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(rawToggle);
     fireEvent.click(snapshotToggle);
+    expect(rawToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(snapshotToggle).toHaveAttribute('aria-expanded', 'true');
 
     const [rawCopyButton, snapshotCopyButton] = screen.getAllByRole('button', { name: '复制' });
-    expect(rawCopyButton).toHaveClass('min-h-11', 'min-w-11');
-    expect(snapshotCopyButton).toHaveClass('min-h-11', 'min-w-11');
+    expect(rawCopyButton).toHaveAttribute('data-control', 'button');
+    expect(rawCopyButton).toHaveClass('control-hit-target');
+    expect(snapshotCopyButton).toHaveAttribute('data-control', 'button');
 
     await act(async () => {
       fireEvent.click(rawCopyButton);

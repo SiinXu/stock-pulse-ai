@@ -18,8 +18,12 @@ field-description, hit-target, boundary, empty-state, or alert behavior.
 | Primitive | Contract |
 | --- | --- |
 | `Button` | Requires an explicit intent, forwards the native button ref, and exposes semantic variant and size state. |
+| `Pressable` | Provides native button semantics, focus, disabled state, and a coarse-pointer hit target for compound rows or cards whose visual treatment remains caller-owned. |
 | `SelectionChip` | Provides a compact text-led selection command that grows for multi-line content without caller-owned geometry. |
 | `IconButton` | Requires an accessible name, provides an optional tooltip, separates its visible icon surface from its coarse-pointer hit target, and owns the 44px `navigation` size used by shell and rail controls. |
+| `Spinner` | Provides one reduced-motion-safe loading glyph; it stays decorative inside an already labelled busy control and becomes a labelled status only when it owns the announcement. |
+| `Progress` | Requires an accessible label, normalizes determinate values, exposes an indeterminate state, and limits indicator styling to semantic tones without page-owned width or animation markup. |
+| `FileInput` | Provides the hidden native file control used with a visible shared `Button` or `IconButton` trigger; file validation and product copy remain caller-owned. |
 | `Input` | Forwards the native input ref, owns label/hint/error wiring, and uses a focusable coarse-pointer frame around the visible input. |
 | `Field` | Associates a label with one control, renders either an error or hint, and forwards its wrapper ref. |
 | `Textarea` | Reuses `Field`, forwards the native textarea ref, and owns invalid/description semantics. |
@@ -162,7 +166,7 @@ instead of becoming bare, preserving the same precedence across refresh.
 
 Research Analysis continuity includes the validated task/history Run Flow
 identity owned by the Workbench URL. A same-stock return restores its active
-detail Drawer; carrying a different stock drops report and Run Flow identities
+detail overlay; carrying a different stock drops report and Run Flow identities
 whose affinity cannot be proven. Home never receives that destination snapshot,
 so its Sidebar link cannot loop back into Workbench. The current explicit route
 also wins immediately over a stale snapshot, so clearing a destination filter
@@ -315,11 +319,17 @@ semantic state tones; it does not create a row of nested cards.
 
 `Tabs` and `TabPanel` are reserved for mutually exclusive content under one
 page H1. They own tablist/tab/tabpanel association, disabled-item skipping,
-Left/Right/Home/End movement, and native Enter/Space activation. Sibling page
-routes use `WorkspaceNavigation` instead: desktop renders real Router Links
-with one `aria-current="page"`, while compact layouts render a labelled native
-select that hands the selected item back to the caller. Route item IDs, not
-translated labels or array indexes, provide stable focus markers.
+Left/Right/Home/End movement, and native Enter/Space activation.
+`SegmentedControl` defaults to the same tab semantics when it switches panels;
+when it chooses one value without controlling a panel, callers select its
+`single-select` contract, which exposes a radiogroup/radio relationship and
+the same disabled-item and boundary-key navigation. Panel-controlling callers
+may provide a stable ID so its triggers share the `TabPanel` ID contract.
+Sibling page routes use
+`WorkspaceNavigation` instead: desktop renders real Router Links with one
+`aria-current="page"`, while compact layouts render a labelled native select
+that hands the selected item back to the caller. Route item IDs, not translated
+labels or array indexes, provide stable focus markers.
 
 The owner-selected PR #35 page restoration keeps Settings, Portfolio, Signal
 Center, and Backtest on the full-width `AppPage` canvas. Each exposes the shared
@@ -342,7 +352,11 @@ This applies to Agent Behavior, Conversation, Reports, Alerts, Backtesting,
 System & Security, task routing, reliability, raw advanced configuration,
 scheduler, and event monitor settings. Their field groups use the shared
 `Input`, `Select`, `Textarea`, and `TimePicker` controls directly in the active
-section, alongside operational status and related page actions.
+section, alongside operational status and related page actions. Intelligent
+Import keeps file/image selection and pasted text in a compact two-column
+layout at large widths; its review commands, row removal, and sticky merge
+action use the shared command primitives while preserving coarse-pointer
+targets.
 
 The shared `Modal` is reserved for discrete submission flows: adding or editing
 one intelligence source, provider, or notification channel; authentication or
@@ -357,8 +371,9 @@ page flow. Sensitive directory state exposes only configured or not configured,
 never a credential or masked value. Settings field rows reserve one 240px
 desktop control column, and every shared field control fills that same column;
 `Input` and `Select` use the same control height. The sidebar profile consumes
-`ThemeToggle`'s default vertical menu; it must not override the shared menu into
-a horizontal segmented row.
+`ThemeToggle`'s opt-in compact `Select` presentation so theme and language
+choices use the same neutral option geometry. Standalone ThemeToggle consumers
+retain the default vertical menu.
 
 `RouteFocusCoordinator` is mounted once inside the data Router. A page may
 only call `useRouteFocusTarget({ routeId, headingRef, ready })`; it cannot pass
@@ -397,22 +412,33 @@ replace or reinterpret the separately owned UI4 L-09 target. The typed
 application navigation descriptor exposes five stable primary domains: Home,
 Research, Portfolio, Agent, and Settings. Home temporarily owns one Signal
 Center child until the global notification entry replaces it, while Research
-owns Market Review, Discover, Analysis Workbench, and Backtest. Expanded desktop navigation and the mobile
-drawer expose a separate 44px disclosure button for each secondary group, keep
-the groups open by default, and allow users to collapse or reopen their child
-routes without turning the parent route link into a false toggle. Compact
-navigation opens the same children in a right-side hover or keyboard flyout;
-Right Arrow enters the flyout and Left Arrow or Escape restores its parent
-trigger. While a secondary subtree is visible, its active child is the sole
-`aria-current="page"` link. When that subtree is collapsed or its compact flyout
-is closed, the visible parent link becomes the sole `aria-current="page"` owner
-for either its own destination or an active descendant.
+owns a dedicated overview plus Market Review, Discover, Analysis Workbench, and
+Backtest. In expanded desktop navigation and the mobile drawer, the Research
+label navigates to `/research`; a separately labelled chevron expands or
+collapses the child navigation without changing the route. Compact navigation
+keeps Research as a menu trigger and presents Research Overview as the first
+item in the right-side hover or keyboard flyout, followed by the four tools;
+Right Arrow enters the flyout and Left Arrow or Escape restores its trigger.
+On `/research`, the expanded Research label or compact Research Overview item
+is the current page. On a child route, the visible active child is the sole
+`aria-current="page"` link, while the Research branch retains visual
+active-section treatment. Market Review remains a distinct page at
+`/research/market`.
 
-Canonical Research paths are `/research/market`, `/research/discover`,
-`/research/analysis`, and `/research/backtest`. Analysis Workbench owns the
-`launch`, `tasks`, and `history` segments as URL state on that single route, and
-its history segment owns report comparison, full Markdown, and Run Flow detail
-Drawers. Home renders exactly Today's Focus, To-dos, and Signal summary before a
+Canonical Research paths are `/research`, `/research/market`,
+`/research/discover`, `/research/analysis`, and `/research/backtest`. Analysis
+Workbench owns the `launch`, `tasks`, and `history` segments as URL state on
+that single route, and its history segment owns report comparison, full
+Markdown, and Run Flow detail.
+Run Flow uses the shared fullscreen `Modal` so graph inspection has a centered
+workspace while retaining the URL-owned source identity, focus restoration,
+and unavailable-state fallback. Its lane headers span their complete lanes,
+nodes use the flat `Pressable` treatment, and the fixed-height event rail owns
+its internal scroll without compressing the graph. A selected report exposes direct reanalysis
+with the current Skill selection and a typed Chat handoff carrying the selected
+stock/report identity as an unconsumed follow-up; accepted or duplicate
+reanalysis switches to the task
+segment. Home renders exactly Today's Focus, To-dos, and Signal summary before a
 collapsed configurable area. Legacy Home analysis URLs with `recordId`, Run Flow,
 stock, or analysis-workspace state use replace navigation into the corresponding
 Workbench segment while preserving safe unrelated query and hash state. The

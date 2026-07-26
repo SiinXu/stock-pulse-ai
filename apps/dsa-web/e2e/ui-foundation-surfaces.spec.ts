@@ -184,7 +184,7 @@ test.describe('surface and task-state foundation', () => {
     await page.goto(LEGACY_ROUTE_PATHS.usage);
     await expect(page.getByText('400', { exact: true })).toBeVisible();
     await expect(page.getByRole('table')).toBeVisible();
-    await page.getByRole('tab', { name: '今日' }).click();
+    await page.getByRole('radio', { name: '今日' }).click();
 
     await expect(page.locator('[data-state-panel="error"]')).toHaveCount(1);
     await expect(page.getByText('400', { exact: true })).toHaveCount(0);

@@ -13,15 +13,31 @@ import {
 import type { UiTextKey } from '../../i18n/uiText';
 import { APP_ROUTE_PATHS } from '../../routing/routes';
 
-export type ApplicationNavigationItem = {
+type ApplicationNavigationBaseItem = {
   key: string;
   labelKey: UiTextKey;
-  to: string;
   icon: LucideIcon;
-  exact?: boolean;
   badge?: 'completion';
-  children?: readonly ApplicationNavigationItem[];
 };
+
+export type ApplicationNavigationLink = ApplicationNavigationBaseItem & {
+  kind: 'link';
+  to: string;
+  exact?: boolean;
+  children?: never;
+};
+
+export type ApplicationNavigationGroup = ApplicationNavigationBaseItem & {
+  kind: 'group';
+  to: string;
+  exact?: boolean;
+  overviewLabelKey: UiTextKey;
+  children: readonly ApplicationNavigationLink[];
+};
+
+export type ApplicationNavigationItem =
+  | ApplicationNavigationLink
+  | ApplicationNavigationGroup;
 
 export function shouldDelegateCurrentDocumentNavigation(
   event: ReactMouseEvent<HTMLAnchorElement>,
@@ -43,6 +59,7 @@ export function shouldDelegateCurrentDocumentNavigation(
 // in collapsible expanded groups and the compact flyout.
 export const APPLICATION_NAVIGATION_ITEMS: readonly ApplicationNavigationItem[] = [
   {
+    kind: 'link',
     key: 'home',
     labelKey: 'layout.nav.home',
     to: APP_ROUTE_PATHS.home,
@@ -50,18 +67,21 @@ export const APPLICATION_NAVIGATION_ITEMS: readonly ApplicationNavigationItem[] 
     exact: true,
   },
   {
+    kind: 'group',
     key: 'research',
     labelKey: 'layout.nav.research',
-    to: APP_ROUTE_PATHS.researchMarket,
+    to: APP_ROUTE_PATHS.research,
+    exact: true,
+    overviewLabelKey: 'researchOverview.overviewLabel',
     icon: Search,
     children: [
-      { key: 'research-market', labelKey: 'home.marketReview', to: APP_ROUTE_PATHS.researchMarket, icon: BarChart3 },
-      { key: 'research-discover', labelKey: 'layout.nav.discover', to: APP_ROUTE_PATHS.researchDiscover, icon: Search },
-      { key: 'research-analysis', labelKey: 'analysisWorkbench.title', to: APP_ROUTE_PATHS.researchAnalysis, icon: FlaskConical },
-      { key: 'research-backtest', labelKey: 'layout.nav.backtest', to: APP_ROUTE_PATHS.researchBacktest, icon: Activity },
+      { kind: 'link', key: 'research-market', labelKey: 'home.marketReview', to: APP_ROUTE_PATHS.researchMarket, icon: BarChart3 },
+      { kind: 'link', key: 'research-discover', labelKey: 'layout.nav.discover', to: APP_ROUTE_PATHS.researchDiscover, icon: Search },
+      { kind: 'link', key: 'research-analysis', labelKey: 'analysisWorkbench.title', to: APP_ROUTE_PATHS.researchAnalysis, icon: FlaskConical },
+      { kind: 'link', key: 'research-backtest', labelKey: 'layout.nav.backtest', to: APP_ROUTE_PATHS.researchBacktest, icon: Activity },
     ],
   },
-  { key: 'portfolio', labelKey: 'layout.nav.portfolio', to: APP_ROUTE_PATHS.portfolio, icon: BriefcaseBusiness },
-  { key: 'agent', labelKey: 'layout.nav.agent', to: APP_ROUTE_PATHS.agent, icon: MessageSquareQuote, badge: 'completion' },
-  { key: 'settings', labelKey: 'layout.nav.settings', to: APP_ROUTE_PATHS.settings, icon: Settings2 },
+  { kind: 'link', key: 'portfolio', labelKey: 'layout.nav.portfolio', to: APP_ROUTE_PATHS.portfolio, icon: BriefcaseBusiness },
+  { kind: 'link', key: 'agent', labelKey: 'layout.nav.agent', to: APP_ROUTE_PATHS.agent, icon: MessageSquareQuote, badge: 'completion' },
+  { kind: 'link', key: 'settings', labelKey: 'layout.nav.settings', to: APP_ROUTE_PATHS.settings, icon: Settings2 },
 ];

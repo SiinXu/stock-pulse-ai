@@ -1,7 +1,7 @@
 import type React from 'react';
 import { forwardRef } from 'react';
-import { LoaderCircle } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { Spinner } from './Spinner';
 import { Tooltip } from './Tooltip';
 
 export type IconButtonSize = 'compact' | 'default' | 'comfortable' | 'navigation';
@@ -68,7 +68,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(({
         className,
       )}
     >
-      {isLoading ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : children}
+      {isLoading ? <Spinner size="sm" /> : children}
     </button>
   );
 
