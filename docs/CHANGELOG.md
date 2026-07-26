@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Added] Rendered analysis report strata (facts, gaps, inference, risks, framework alignment) in Markdown, brief, and WeChat templates with a mandatory non-investment-advice disclaimer while keeping historical reports without strata compatible.
 - [Chore] Inventoried ADR-006 legacy market and analysis-context-pack facade importers, banned new production facade imports via a CI allowlist guard, and published the phased retirement policy.
 - [Docs] Added English beginner client setup and Phase-2 UI manual depth (signals, portfolio, settings, agent, market review, backtest) with accurate Signal Center entry paths outside the primary sidebar.
+- [Chore] Extracted data_provider symbol/market normalization helpers into a focused module re-exported from the base facade with no intentional behavior change.
 - [Docs] Published the data_provider ownership map after the first ADR-006 symbol-normalization extraction.
 - [Docs] Surface StockPulse differentiators vs upstream on the homepage README (shipped vs planned, non-claims, dual license and security links).
 - [Docs] Document single-admin, trusted-plugin, and public-bind security boundaries for deployers (baseline section, deploy pointers, index rows).

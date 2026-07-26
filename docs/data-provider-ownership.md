@@ -21,9 +21,12 @@ priority, circuit, or fallback policy (ADR-005).
 | `data_provider` package (`__init__.py`) | Stable package exports for plugins and callers. |
 
 Until a later retirement PR says otherwise, production and test code may keep
-importing public names from `data_provider.base`. New **implementations** of
-extracted responsibilities belong in the owner module below, then re-exported
-from the facade when a public name must remain stable.
+importing public names from `data_provider.base`. Prefer patching
+`data_provider.base.<name>` in tests that target the public surface (facade
+attribute binds preserve object identity with the owner module at import time).
+New **implementations** of extracted responsibilities belong in the owner
+module below, then re-exported from the facade when a public name must remain
+stable.
 
 ## Ownership Map (after first extraction)
 

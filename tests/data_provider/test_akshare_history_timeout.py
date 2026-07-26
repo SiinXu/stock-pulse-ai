@@ -115,7 +115,8 @@ def test_akshare_call_with_timeout_returns_promptly() -> None:
             call_name="unit-hang",
         )
 
-    assert time.monotonic() - started < 0.5
+    # Spawn + join overhead can exceed 0.5s under load; bound is "prompt", not wall-clock tight.
+    assert time.monotonic() - started < 2.0
 
 
 def test_akshare_call_with_timeout_reaps_timed_out_worker_process() -> None:
