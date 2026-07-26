@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Tests] Added offline HITL regression anchors for create/approve/consume audit trail, reject fail-closed await, and pipeline-deadline stop-waiting without authorization.
 - [Docs] Documented HITL default-off defaults, proposal lifetime, and independent Agent pipeline deadline fail-closed behavior for risk-control bypass approvals.
 - [Docs] Documented HITL `/approvals`, report evidence strata, and the offline analysis-quality panel as shipped-on-main surfaces in the UI manual (no primary-nav inventing).
+- [Docs] Documented the investment framework Settings editor, single-path analysis injection, and research-only disclaimer.
 - [Added] Injected the active personal investment framework as read-only research context into the stock analysis path and report strata alignment slot.
 - [Docs] Aligned UI-manual feature-status tables with main: scheduled tasks, notification plugins, and local model packs as shipped; investment framework storage plus stock-analysis inject without a Web editor.
 - [Docs] Documented UI manual figure-pack naming, P0 capture checklist, and PR evidence rules under `docs/ui-manual/assets/` (#599 docs side).
