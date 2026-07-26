@@ -1141,7 +1141,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.scheduledTasksRefresh": "Refresh schedule definitions",
   "i18n.uiText.UI_TEXT.settings.scheduledTasksEmptyTitle": "No schedule definitions yet",
   "i18n.uiText.UI_TEXT.settings.scheduledTasksEmptyDescription": "After definitions exist, enable or disable them here. Home shows a read-only today projection.",
-  "i18n.uiText.UI_TEXT.settings.scheduledTasksTypeAnalysis": "Stock analysis",
+  "i18n.uiText.UI_TEXT.settings.scheduledTasksTypeAnalysis": "株式分析",
   "i18n.uiText.UI_TEXT.settings.scheduledTasksTypeResearchBrief": "Research brief",
   "i18n.uiText.UI_TEXT.settings.scheduledTasksTypeRiskCheck": "Risk check",
   "i18n.uiText.UI_TEXT.settings.scheduledTasksTypeUnknown": "Unknown type",

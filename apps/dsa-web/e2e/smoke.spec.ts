@@ -222,7 +222,9 @@ test.describe('web smoke', () => {
     await expect(scheduledTaskList.getByRole('listitem')).toHaveCount(1);
     await scheduledTaskList.focus();
     await expect(scheduledTaskList).toBeFocused();
-    await expect(scheduledTasks.getByRole('button')).toHaveCount(0);
+    // List rows stay non-interactive; manage action lives in the section header only.
+    await expect(scheduledTaskList.getByRole('button')).toHaveCount(0);
+    await expect(scheduledTasks.getByRole('button', { name: /管理定时定义|Manage schedules/i })).toHaveCount(1);
   });
 
   test('chat page allows entering a question and starts a request', async ({ page }) => {
