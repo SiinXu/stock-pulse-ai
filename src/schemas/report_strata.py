@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Optional, Sequence, Union
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 
 REPORT_STRATA_SCHEMA_VERSION = "report-strata-v1"
@@ -249,7 +249,7 @@ def normalize_report_strata(
             return None
         try:
             strata = ReportStrata.model_validate(payload)
-        except Exception as exc:
+        except ValidationError as exc:
             strata = _coerce_partial_dict(payload, language=language)
             if strata is None:
                 raise exc
@@ -411,7 +411,7 @@ def _coerce_partial_dict(
             framework_alignment=framework,
             disclaimer=str(disclaimer).strip() or default_disclaimer(lang),
         )
-    except Exception:
+    except (TypeError, ValueError, KeyError, AttributeError):
         return None
 
 
