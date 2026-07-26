@@ -394,19 +394,19 @@
         }
       ],
       "snapshot": {
-        "keyCount": 104,
-        "keySetSha256": "99162a61d57b62d2c3089bc730e16384090bf8a592ded977e7e6b4e30cb0779a",
+        "keyCount": 108,
+        "keySetSha256": "c6a5ff9c1a4c37dfe3b2b3149a780517b31753dd41cab426d4c8494d54226ea8",
         "bundleSha256": {
-          "zh": "cb84c71af183170fb987186cfd2098545af5cb632955be6e28a91aec33f86b17",
-          "zh-TW": "d6c9cc3729222b0f18ff574f7780bc278ca9949ddf2e10b809e9675858164f45",
-          "en": "875950bb73dba011ef0457ca5286c1e4319eff6e2cd75f7aa0e44a2cb6ec82fd",
-          "ja": "2cdeb407ef80aa0936cae38eb2dae1c685924026b249f9bbd7c494f4064b6f42",
-          "ko": "a82166a89e74bebabf3d910f1fcb2f4ddb5f73418a9c609d455d2eac7fa5888d",
-          "de": "b825c0401277cf9646ec6cff3b25881b88d0588a74687c61193608893df90134",
-          "es": "215669f1f87ac1618dde1efe05663a8e9db1b202540bc90a4a12deab56aa3d99",
-          "ms": "e2ae95ec25a306762c5fb34cc882e256faba01e7fe8e270b9f6002efc339f6d8",
-          "fr": "6a5b8e5156835b558a85d7f8f0327217b4e7d025ca88a30991e09e4b5ef413c4",
-          "id": "0d302cb8da385e6f862427cb06cb550a7c3ea87350c38aa0b225a6679da1e3c0"
+          "zh": "97f105f3ccd290c4d84d5acf1e8543bdf8ee99406787fa5f55a150789816d752",
+          "zh-TW": "7683762c7435aaed8cca949b40344e67ee0b075d5b8d377609c166e885819fdc",
+          "en": "d7a69bcd47ee305a50a37db08998025f2ef35d17009df07e79ae9342fe207a19",
+          "ja": "4f5e3092427054d9168fee81262c6f9500e382140d84dbf973339853808f2473",
+          "ko": "1b4cf6b58d3c9bbe7fd01ea8bd157cfae2c6e8474cf234a34b6a4921dc64ca36",
+          "de": "07778893fe3aeb2603950c1996cfe0a7f440223bc2229f2b5491364e7ab79ba6",
+          "es": "c2a6f9e7ad9b4b8be02e7aee4f68a196862f79ff31cb1f19c02309dbbf5e407f",
+          "ms": "b983fddcaa6a0755613f324295eda4a725573afa8751cbd55a55c0294085fc97",
+          "fr": "75c3cbaca2040d4b7c48323999064309083d88fc76af12e7108555205402fbf4",
+          "id": "def13667ca1f7aa7893001018ac5d1eba9f356daefaf592e9f67a169de31b441"
         }
       }
     },
@@ -552,6 +552,8 @@
         "portfolio_oversell",
         "rate_limited",
         "scheduler_busy",
+        "security_audit_auth_required",
+        "security_audit_unavailable",
         "unauthorized",
         "unsupported_alert_type",
         "validation_error",
@@ -697,6 +699,14 @@
         "scheduler_busy": [
           "api.error.STABLE_ERROR_TEXT.scheduler_busy.title",
           "api.error.STABLE_ERROR_TEXT.scheduler_busy.message"
+        ],
+        "security_audit_auth_required": [
+          "api.error.STABLE_ERROR_TEXT.security_audit_auth_required.title",
+          "api.error.STABLE_ERROR_TEXT.security_audit_auth_required.message"
+        ],
+        "security_audit_unavailable": [
+          "api.error.STABLE_ERROR_TEXT.security_audit_unavailable.title",
+          "api.error.STABLE_ERROR_TEXT.security_audit_unavailable.message"
         ],
         "unauthorized": [
           "api.error.STABLE_ERROR_TEXT.unauthorized.title",

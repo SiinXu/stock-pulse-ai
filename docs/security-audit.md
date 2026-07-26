@@ -64,7 +64,11 @@ query. This deliberately adds no new deployment configuration surface.
 event-type, outcome, correlation, and UTC time filters. It requires a valid
 single-administrator session. The endpoint explicitly returns `403` when
 administrator authentication is disabled and `401` for a missing or invalid
-session. Phase 1 has no Web UI, multi-tenant RBAC, export, or SIEM integration.
+session. Phase 1 also exposes a **read-only Web UI** under Settings → System &
+Security → Auth & Security (Security audit panel) that consumes the same GET
+API, trusts server-side redaction, and surfaces an honest blocked state when
+auth is disabled. Phase 1 still has no multi-tenant RBAC, export, or SIEM
+integration.
 
 ## Failure Semantics
 

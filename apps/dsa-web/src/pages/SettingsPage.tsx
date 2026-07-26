@@ -83,6 +83,7 @@ import { IntelligenceSourcesPanel } from '../components/settings/IntelligenceSou
 import FirstRunSetupCard from '../components/settings/FirstRunSetupCard';
 import SchedulerSettingsCard from '../components/settings/SchedulerSettingsCard';
 import ScheduledTasksPanel from '../components/settings/ScheduledTasksPanel';
+import SecurityAuditPanel from '../components/settings/SecurityAuditPanel';
 import SignalScorecardPanel from '../components/settings/SignalScorecardPanel';
 import { getConfigItem } from '../components/settings/settingsConfigItems';
 import { WEB_BUILD_INFO } from '../utils/constants';
@@ -2337,7 +2338,16 @@ const SettingsPage: React.FC = () => {
                 ) : null}
               </SettingsSectionCard>
             ) : null}
-            {activeCategory === 'system' && activeView === 'security' ? <AuthSettingsCard /> : null}
+            {activeCategory === 'system' && activeView === 'security' ? (
+              <>
+                <AuthSettingsCard />
+                <SecurityAuditPanel
+                  disabled={isSaving || isLoading}
+                  t={t}
+                  language={uiLanguage}
+                />
+              </>
+            ) : null}
             {activeSection === 'agent_behavior' ? <InvestmentFrameworkSettingsCard /> : null}
             {activeCategory === 'system' && activeView === 'runtime' ? (
               <>
