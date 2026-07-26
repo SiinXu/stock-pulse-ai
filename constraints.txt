@@ -33,7 +33,7 @@ cryptography==49.0.0
 cssselect==1.4.0
 cuda-bindings==13.3.1 ; python_full_version < '3.15' and sys_platform == 'linux'
 cuda-pathfinder==1.6.0 ; python_full_version < '3.15' and sys_platform == 'linux'
-cuda-toolkit==13.0.3.0 ; sys_platform == 'linux'
+cuda-toolkit==13.3.1 ; sys_platform == 'linux'
 curl-cffi==0.15.0
 cyclonedx-python-lib==11.11.0
 decorator==5.3.1
