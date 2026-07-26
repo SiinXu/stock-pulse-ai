@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { ReportStrata, resolveReportStrataFromDetails } from '../ReportStrata';
+import { ReportStrata } from '../ReportStrata';
+import { resolveReportStrataFromDetails } from '../reportStrataUtils';
 import type { ReportDetails } from '../../../types/analysis';
 
 const strataPayload = {
