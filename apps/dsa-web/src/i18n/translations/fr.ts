@@ -588,6 +588,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.noRecentAnalysesTitle": "Aucune analyse récente",
   "i18n.uiText.UI_TEXT.home.noScheduledTasksTodayDescription": "Aucune tâche planifiée n'a été exécutée ou n'est prévue plus tard aujourd'hui.",
   "i18n.uiText.UI_TEXT.home.noScheduledTasksTodayTitle": "Aucune tâche planifiée aujourd'hui",
+  "i18n.uiText.UI_TEXT.home.manageScheduledTasks": "Manage schedules",
+
   "i18n.uiText.UI_TEXT.home.noTodosDescription": "Aucun signal actif n'est expiré ou bientôt à réévaluer.",
   "i18n.uiText.UI_TEXT.home.noTodosTitle": "Aucune tâche en attente",
   "i18n.uiText.UI_TEXT.home.partialDataMessage": "Certaines données d'accueil sont temporairement indisponibles. Le reste du contenu est affiché.",
