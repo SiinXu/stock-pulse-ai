@@ -60,12 +60,37 @@ The panel answers engineering trust questions. It does **not** claim market alph
 5. Run:
 
 ```bash
-python -m pytest -m "not network" tests/analysis_quality -q
-# or, after the local runner lands:
 ./scripts/run_analysis_quality_panel.sh
+# equivalent:
+python -m pytest -m "not network and quality_benchmark" tests/analysis_quality -q
 ```
 
 6. Prefer multi-market coverage (A / HK / US) and offline scenarios such as normal session, missing provider fields, conflicting headlines, and limited fields.
+
+
+
+## Local runner
+
+Use the thin wrapper for a deterministic local run:
+
+```bash
+./scripts/run_analysis_quality_panel.sh
+```
+
+Equivalent direct invocation:
+
+```bash
+python -m pytest -m "not network and quality_benchmark" tests/analysis_quality -q
+```
+
+The runner:
+
+- selects only `quality_benchmark` tests that are also offline (`not network`)
+- uses a temporary `DATABASE_PATH` so local state is not touched
+- never performs live LLM or network calls
+- is suitable for maintainer laptops and optional non-blocking automation
+
+It is **not** a required live-scoring CI gate.
 
 ## pytest markers
 
