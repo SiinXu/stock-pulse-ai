@@ -4,6 +4,17 @@ export type ScheduledTaskType =
   | 'risk_check'
   | string;
 
+export type ScheduledTaskSupportedType =
+  | 'stock_analysis'
+  | 'research_brief'
+  | 'risk_check';
+
+export type ScheduledTaskReportType = 'brief' | 'simple' | 'detailed' | 'full';
+
+export type ScheduledTaskCalendarMarket = 'cn' | 'hk' | 'us' | 'jp' | 'kr' | 'tw';
+
+export type ScheduledTaskNonTradingDayPolicy = 'skip' | 'run';
+
 export type ScheduledTaskOccurrenceStatus =
   | 'scheduled'
   | 'dispatching'
@@ -13,6 +24,8 @@ export type ScheduledTaskOccurrenceStatus =
   | 'failed'
   | 'skipped'
   | 'interrupted';
+
+export type ScheduledTaskRunStatus = Exclude<ScheduledTaskOccurrenceStatus, 'scheduled'>;
 
 export type ScheduledTaskCompatibility = 'supported' | 'unsupported_schema';
 
@@ -40,7 +53,7 @@ export interface ScheduledTaskListQuery {
 
 export interface ScheduledTaskRunSummary {
   id: string;
-  status: Exclude<ScheduledTaskOccurrenceStatus, 'scheduled'>;
+  status: ScheduledTaskRunStatus;
   errorCode: string | null;
 }
 
@@ -61,4 +74,67 @@ export interface ScheduledTaskTodayResponse {
 
 export interface ScheduledTaskTodayQuery {
   timezone?: string;
+}
+
+export interface ScheduledTaskDailySchedule {
+  kind: 'daily';
+  time: string;
+  timezone: string;
+  calendarMarket: ScheduledTaskCalendarMarket;
+  nonTradingDayPolicy: ScheduledTaskNonTradingDayPolicy;
+}
+
+export interface ScheduledTaskStockAnalysisPayload {
+  stockCode: string;
+  reportType?: ScheduledTaskReportType;
+  notify?: boolean;
+}
+
+export interface ScheduledTaskResearchPayload {
+  stockCode: string;
+  notify?: boolean;
+}
+
+export interface ScheduledTaskCreateRequest {
+  schemaVersion: 1 | 2;
+  name: string;
+  taskType: ScheduledTaskSupportedType;
+  schedule: ScheduledTaskDailySchedule;
+  payload: ScheduledTaskStockAnalysisPayload | ScheduledTaskResearchPayload;
+  enabled?: boolean;
+  maxAttempts?: number;
+}
+
+export interface ScheduledTaskRunItem {
+  id: string;
+  taskId: string;
+  scheduledFor: string;
+  status: ScheduledTaskRunStatus;
+  attemptCount: number;
+  dispatchFailureCount: number;
+  executionTaskIds: string[];
+  resultRefs: string[];
+  notificationStatus?: string | null;
+  notificationChannels?: string[];
+  notificationFailedChannels?: string[];
+  errorCode: string | null;
+  nextAttemptAt: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ScheduledTaskRunListResponse {
+  items: ScheduledTaskRunItem[];
+  total: number;
+}
+
+export interface ScheduledTaskRunListQuery {
+  limit?: number;
+}
+
+export interface ScheduledTaskStatusResponse {
+  task: ScheduledTaskDefinitionSummary;
+  latestRun: ScheduledTaskRunItem | null;
 }

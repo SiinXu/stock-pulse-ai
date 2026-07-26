@@ -274,28 +274,49 @@ export const RouteFocusCoordinator: React.FC<RouteFocusCoordinatorProps> = ({ ch
       return undefined;
     }
 
-    let secondFrame = 0;
-    const firstFrame = window.requestAnimationFrame(() => {
-      secondFrame = window.requestAnimationFrame(() => {
-        if (pendingTransitionRef.current !== transition) return;
-        const entry = entriesRef.current.get(location.key);
-        const restoreTarget = transition.navigationType === 'POP' && entry?.focusKey
-          ? uniqueFocusableMarker(entry.focusKey)
-          : null;
-        if (restoreTarget) restoreTarget.focus({ preventScroll: true });
-        if (
-          transition.shouldFocusHeading
-          && (!restoreTarget || document.activeElement !== restoreTarget)
-        ) {
-          heading.focus({ preventScroll: true });
-        }
+    // Double-rAF + cancelled flag: StrictMode remounts and registrationVersion
+    // bumps cancel in-flight frames. A bare cancelAnimationFrame chain can leave
+    // a stale second frame that fails closed to H1 before the Back marker exists,
+    // clearing the transition so Forward never restores the trigger.
+    let cancelled = false;
+    let attempts = 0;
+    const maxRestoreAttempts = 8;
+    let frameId = 0;
+
+    const applyFocus = () => {
+      if (cancelled || pendingTransitionRef.current !== transition) return;
+
+      const entry = entriesRef.current.get(location.key);
+      const restoreKey = transition.navigationType === 'POP' ? entry?.focusKey : undefined;
+      const restoreTarget = restoreKey ? uniqueFocusableMarker(restoreKey) : null;
+
+      // POP stored a marker that is not mounted yet — retry instead of H1 fallback.
+      if (restoreKey && !restoreTarget && attempts < maxRestoreAttempts) {
+        attempts += 1;
+        frameId = window.requestAnimationFrame(applyFocus);
+        return;
+      }
+
+      if (restoreTarget) restoreTarget.focus({ preventScroll: true });
+      if (
+        transition.shouldFocusHeading
+        && (!restoreTarget || document.activeElement !== restoreTarget)
+      ) {
+        heading.focus({ preventScroll: true });
+      }
+      if (pendingTransitionRef.current === transition) {
         pendingTransitionRef.current = null;
-      });
+      }
+    };
+
+    frameId = window.requestAnimationFrame(() => {
+      if (cancelled) return;
+      frameId = window.requestAnimationFrame(applyFocus);
     });
 
     return () => {
-      window.cancelAnimationFrame(firstFrame);
-      if (secondFrame) window.cancelAnimationFrame(secondFrame);
+      cancelled = true;
+      if (frameId) window.cancelAnimationFrame(frameId);
     };
   }, [location.key, registrationVersion]);
 

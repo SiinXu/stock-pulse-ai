@@ -180,12 +180,13 @@ The product surface is intentionally small:
 | Surface | Behavior |
 | --- | --- |
 | Settings → System & Security → Scheduling → Legacy day-batch | Configures `SCHEDULE_*` + shows legacy status only. Copy labels it as legacy and warns when both tracks appear enabled. |
-| Settings → System & Security → Scheduling → Saved definitions | Lists versioned definitions, shows next run when known, and enable/disable supported definitions. Unsupported future schemas are visible but not mutable. |
+| Settings → System & Security → Scheduling → Saved definitions | Create supported definitions (`stock_analysis` / `research_brief` / `risk_check`), list persisted definitions, show next run and latest run status when the status API returns them, and enable/disable supported definitions. Unsupported future schemas are visible but not mutable. |
 | Home → Configurable area → Versioned scheduled tasks today | Read-only today projection from `GET /scheduled-tasks/today` (versioned track only). Empty state links to Settings management. |
 
 Defaults and framing:
 
-- No create/edit form, natural-language planner, multi-tenant ownership, or distributed scheduler in this UI.
+- Create uses the existing `POST /scheduled-tasks` contract only. There is still no edit/delete definition form, natural-language planner, multi-tenant ownership, or distributed scheduler in this UI.
+- Latest status is loaded via `GET /scheduled-tasks/{id}/status` after list refresh (fail-soft per item). Full run-history browsing stays API-only for now.
 - Execution remains process-local through `AnalysisTaskQueue` / ADR-008.
 - Research brief and risk-check schedules are research-only aids, not investment advice.
 - Daily stock-list scheduler env (`SCHEDULE_*`) remains the separate **legacy** system-config card on the same Settings view; it is not the versioned definitions list.

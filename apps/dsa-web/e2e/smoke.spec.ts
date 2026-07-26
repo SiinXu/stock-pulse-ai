@@ -206,7 +206,7 @@ test.describe('web smoke', () => {
     await expect(page.locator('#home-configurable-content')).toBeHidden();
 
     await configurable.click();
-    // Match current home.scheduledTasksToday copy (versioned-task honesty, not legacy SCHEDULE_*).
+    // Dual-track honesty (#665): Home card is the versioned schedule projection only.
     const scheduledTasks = page.getByRole('region', {
       name: '今日版本化定时任务',
       exact: true,
@@ -216,7 +216,7 @@ test.describe('web smoke', () => {
     await expect(scheduledTasks.getByText(/风险检查/)).toBeVisible();
     await expect(scheduledTasks.getByText('等待重试')).toBeVisible();
     const scheduledTaskList = scheduledTasks.getByRole('region', {
-      name: /今日.*定时任务列表|Today.*scheduled task list/i,
+      name: '今日版本化定时任务列表',
     });
     await expect(scheduledTaskList).toHaveAttribute('tabindex', '0');
     await expect(scheduledTaskList.getByRole('list')).toBeVisible();
@@ -349,3 +349,4 @@ test.describe('web smoke', () => {
 
   });
 });
+
