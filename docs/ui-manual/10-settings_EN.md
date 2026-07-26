@@ -167,8 +167,11 @@ Trust **current `origin/main`**. Older running builds may still lack entries—b
 | **Notification channel plugins** | **Shipped** | Settings → notifications / plugin surfaces when discovery is enabled | Prove one built-in channel with **test push** first; plugin channels follow the UI list |
 | **Personal investment framework** | **Backend shipped**; **no full Web editor yet** | API / engineering docs primarily | See `docs/personal-investment-framework.md` (backend slice); expand UI chapters only after a real editor ships |
 | **Local model pack import** | **Shipped** | Settings → **AI & Models → Local Models** → Import Model Pack (labels as in UI) | Catalog pull/activate still apply; import path: `docs/model-packs.md` and in-product help |
+| **HITL human approvals** | **Shipped** (default off) | **Not** in primary sidebar; route `/approvals`; Home to-dos / approval cards; needs admin auth | See [01 Shell](01-shell_EN.md); contract `docs/human-approvals_EN.md`. One-shot risk-bypass approval — **not** broker trade approval |
+| **Report evidence strata** | **Shipped** | Full-report Web view strata panel (labels as in UI) | See [08 Reading reports](08-reading-reports_EN.md); contract `docs/report-strata-contract_EN.md` |
+| **Analysis quality offline panel** | **Shipped** (engineering / CI fixtures) | **No Web operations page**; `tests/fixtures/analysis_quality/` + local runner | Contributors: `docs/analysis-quality-panel.md`; do not document as a product sidebar feature |
 
-For shipped capabilities, write “available on current main”. Use a single “if your UI lacks this entry, upgrade” note only when the install is older.
+For shipped capabilities, write “available on current main”. Use a single “if your UI lacks this entry, upgrade” note only when the install is older. Do **not** list shipped surfaces as “unmerged” or “coming soon”.
 
 
 ## Related

@@ -61,6 +61,18 @@ flowchart TD
 | Degraded / missing data | Sources failed; system should not invent |
 | Non-trading day | Reuses last session; stay conservative |
 
+## Report evidence strata (shipped on main)
+
+On current main, the **full report** Web view can show fixed evidence strata (verified facts / gaps & conflicts / model inference / risks & counter-evidence / framework alignment / non-investment-advice disclaimer) so fluent prose is not misread as verified fact.
+
+| What you see | How to read it |
+| --- | --- |
+| Strata sections present | Read by block; do **not** treat model inference as verified fact |
+| Older reports without strata | Expected; disclaimer should still be visible |
+| Engineering contract | `docs/report-strata-contract_EN.md` |
+
+UI labels win over this manual when wording differs.
+
 ## Reading discipline
 
 - Range-bound markets with unclear flow often yield hold/watch — often a **feature**.  
