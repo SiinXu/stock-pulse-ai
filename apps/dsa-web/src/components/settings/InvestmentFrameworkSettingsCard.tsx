@@ -39,16 +39,21 @@ function emptyDraft(): {
   };
 }
 
-function contentFromDraft(draft: ReturnType<typeof emptyDraft>): InvestmentFrameworkContent {
+function contentFromDraft(
+  draft: ReturnType<typeof emptyDraft>,
+  existing?: InvestmentFrameworkContent | null,
+): InvestmentFrameworkContent {
   const riskRules = linesToList(draft.riskRules);
   const trackingCriteria = linesToList(draft.trackingCriteria);
   const freeFormRules = draft.freeFormRules.trim() || null;
+  // Preserve structured fields the minimal editor does not own so save cannot wipe them.
   return {
     schemaVersion: 'investment-framework-content-v1',
     title: draft.title.trim(),
     description: draft.description.trim() || null,
-    decisionTree: [],
-    evaluationDimensions: [],
+    rootNodeId: existing?.rootNodeId ?? null,
+    decisionTree: existing?.decisionTree ?? [],
+    evaluationDimensions: existing?.evaluationDimensions ?? [],
     riskRules,
     trackingCriteria,
     freeFormRules,
@@ -115,11 +120,16 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
     if (!draft.title.trim()) {
       return t('settings.frameworkTitleRequired');
     }
-    const content = contentFromDraft(draft);
+    const content = contentFromDraft(draft, framework?.content);
+    const hasStructured = Boolean(
+      (content.decisionTree && content.decisionTree.length)
+      || (content.evaluationDimensions && content.evaluationDimensions.length),
+    );
     if (
       !content.freeFormRules
       && !(content.riskRules && content.riskRules.length)
       && !(content.trackingCriteria && content.trackingCriteria.length)
+      && !hasStructured
     ) {
       return t('settings.frameworkCriteriaRequired');
     }
@@ -135,7 +145,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
       setError(validationError);
       return;
     }
-    const content = contentFromDraft(draft);
+    const content = contentFromDraft(draft, framework?.content);
     setIsSubmitting(true);
     try {
       if (!exists || !framework) {
@@ -158,7 +168,15 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
         setSuccessMessage(t('settings.frameworkSaved'));
       }
     } catch (err) {
-      setError(getParsedApiError(err));
+      const parsed = getParsedApiError(err);
+      setError(parsed);
+      if (
+        parsed.status === 409
+        || parsed.code === 'investment_framework_revision_conflict'
+      ) {
+        // Refresh server state so the next save uses the current revision.
+        await load();
+      }
     } finally {
       setIsSubmitting(false);
     }

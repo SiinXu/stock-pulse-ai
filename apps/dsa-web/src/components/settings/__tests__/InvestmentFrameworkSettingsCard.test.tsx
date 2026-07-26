@@ -138,4 +138,67 @@ describe('InvestmentFrameworkSettingsCard', () => {
     });
     expect(await screen.findByText('已保存为新版本并激活')).toBeInTheDocument();
   });
+
+  it('preserves evaluation dimensions the minimal editor does not own', async () => {
+    getFramework.mockResolvedValue({
+      frameworkId: 1,
+      scope: 'local',
+      version: 1,
+      activeVersion: 1,
+      revision: 1,
+      isActive: true,
+      content: {
+        title: 'Structured',
+        freeFormRules: 'Keep free form',
+        riskRules: [],
+        trackingCriteria: [],
+        evaluationDimensions: [
+          { name: 'Moat', weight: 50, criteria: ['Durable pricing power'] },
+        ],
+      },
+      createdAt: '2026-07-26T00:00:00Z',
+      updatedAt: '2026-07-26T00:00:00Z',
+      versionCreatedAt: '2026-07-26T00:00:00Z',
+    });
+    updateFramework.mockResolvedValue({
+      frameworkId: 1,
+      scope: 'local',
+      version: 2,
+      activeVersion: 2,
+      revision: 2,
+      isActive: true,
+      content: {
+        title: 'Structured',
+        freeFormRules: 'Keep free form updated',
+        riskRules: [],
+        trackingCriteria: [],
+        evaluationDimensions: [
+          { name: 'Moat', weight: 50, criteria: ['Durable pricing power'] },
+        ],
+      },
+      createdAt: '2026-07-26T00:00:00Z',
+      updatedAt: '2026-07-26T01:00:00Z',
+      versionCreatedAt: '2026-07-26T01:00:00Z',
+    });
+
+    render(<InvestmentFrameworkSettingsCard />);
+    await screen.findByDisplayValue('Structured');
+    fireEvent.change(screen.getByLabelText('自由规则'), {
+      target: { value: 'Keep free form updated' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
+
+    await waitFor(() => {
+      expect(updateFramework).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: expect.objectContaining({
+            freeFormRules: 'Keep free form updated',
+            evaluationDimensions: [
+              { name: 'Moat', weight: 50, criteria: ['Durable pricing power'] },
+            ],
+          }),
+        }),
+      );
+    });
+  });
 });
