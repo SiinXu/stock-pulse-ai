@@ -10,23 +10,23 @@
 
 > 🤖 基于 AI 大模型的 A股/港股/美股/日股/韩股/台股自选股智能分析系统，每日自动分析并推送「决策仪表盘」到企业微信/飞书/Telegram/Discord/Slack/邮箱
 
-[**功能特性**](#-功能特性) · [**为什么选 StockPulse**](#为什么选择-stockpulse相对上游) · [**快速开始**](#-快速开始) · [**推送效果**](#-推送效果) · [**文档中心**](INDEX.md) · [**完整指南**](full-guide.md) · [**English README**](../README.md)
+[**功能特性**](#-功能特性) · [**为什么选 StockPulse**](#why-stockpulse) · [**快速开始**](#-快速开始) · [**推送效果**](#-推送效果) · [**文档中心**](INDEX.md) · [**完整指南**](full-guide.md) · [**English README**](../README.md)
 
 **简体中文** | [English](../README.md) | [繁體中文](README_CHT.md)
 
 </div>
 
 > [!NOTE]
-> **StockPulse** 是 [ZhuLinsen/daily_stock_analysis](https://github.com/ZhuLinsen/daily_stock_analysis) 的独立维护 fork。上游原始代码遵循 MIT License，StockPulse 新增与大幅修改的代码遵循 AGPL-3.0。StockPulse 不是上游团队发布的官方版本。感谢原作者和贡献者；完整授权条款见 [LICENSE](../LICENSE)。
+> StockPulse 在 [ZhuLinsen/daily_stock_analysis](https://github.com/ZhuLinsen/daily_stock_analysis) 基础上持续演进，感谢原作者与贡献者。许可：原始部分 MIT；StockPulse 新增与大幅修改部分 **AGPL-3.0**。详见 [LICENSE](../LICENSE)。
 
 <a id="why-stockpulse"></a>
-## 为什么选择 StockPulse（相对上游）
+## 为什么选择 StockPulse
 
-StockPulse 定位为**本地优先的投资研究工作台**：把数据、证据、策略与 Agent 能力收敛在你可控的环境里，而不是“一键荐股神器”。上游 `daily_stock_analysis` 仍是优秀的每日分析与推送基础；StockPulse 在 fork 上持续投入**可扩展契约、安全边界与研究工作流**。
+StockPulse 是**本地优先的投资研究工作台**：多市场数据、可核对的分析结构、可选 Agent 与通知推送，都在你可控的环境里运行——不是黑盒荐股服务。项目侧重**可审计的风险控制**、**可扩展插件契约**，以及**事实与推断分层呈现**的报告形态。
 
-### 已交付差异（`main` 上可验证）
+### 核心能力亮点（`main` 上可验证）
 
-| 差异 | 说明 | 深入阅读 |
+| 亮点 | 说明 | 深入阅读 |
 | --- | --- | --- |
 | 报告分层（信任 UX） | 事实 / 缺口 / 推断 / 风险 / 框架对齐 / 免责声明（Markdown / 简报 / 企微 / Web） | [更新日志](CHANGELOG.md) |
 | HITL 风险门控 | 默认关闭；高风险控制路径可审批；`/approvals` 页面 | [人工审批](human-approvals.md) |
@@ -38,13 +38,13 @@ StockPulse 定位为**本地优先的投资研究工作台**：把数据、证�
 | 个人投资框架（后端） | 版本化存储与 API；Web 编辑器仍为最小范围 | [投资框架](personal-investment-framework.md) |
 | 安全审计 Phase 1 | 特权路径持久审计 | [安全审计](security-audit.md) |
 | 离线质量面板 | 固定样例 + 本地 runner（不绑 live LLM） | [贡献指南](CONTRIBUTING.md) |
-| 双许可证 | 上游 MIT + StockPulse AGPL-3.0 | [LICENSE](../LICENSE) |
+| 开源许可 | 原始部分 MIT + StockPulse 新增部分 AGPL-3.0 | [LICENSE](../LICENSE) |
 
 ### 明确非承诺（请勿误解）
 
 - **不是**多租户 SaaS，也**不是**启用管理员登录后的用户隔离 / RBAC（见 [安全基线 AUTH-05](security-baseline.md) 与议题 [#230](https://github.com/SiinXu/stock-pulse-ai/issues/230)）。
 - **插件 = 与进程同权的可信代码**：可读写环境变量、密钥、数据库与文件；不要加载不可信第三方包。
-- **免费行情源可零配置运行**，但受上游限流与接口变动影响，稳定性不保证。
+- **免费行情源可零配置运行**，但受数据源限流与接口变动影响，稳定性不保证。
 - **输出仅供学习与研究**，不构成投资建议，亦非受监管投顾服务。
 
 ### 规划中（勿与已交付混淆）
@@ -96,7 +96,7 @@ StockPulse 定位为**本地优先的投资研究工作台**：把数据、证�
 | 新闻搜索 | [Anspire](https://open.anspire.cn/)、[SerpAPI](https://serpapi.com/baidu-search-api)、[Tavily](https://tavily.com/)、[Bocha](https://open.bocha.cn/)、[Brave](https://brave.com/search/api/)、[MiniMax](https://platform.minimaxi.com/)、SearXNG |
 | 社交舆情 | [Stock Sentiment API](https://api.adanos.org/docs)（Reddit / X / Polymarket，仅美股，可选） |
 
-> 项目默认内置 AkShare、Baostock、YFinance 等免费行情源，可零配置运行；免费源受上游限流、接口变动和网络波动影响，稳定性不保证。长期定时、批量分析或更稳定行情建议配置 TickFlow、Tushare、Longbridge 等 token 型数据源，适用市场、Actions 映射和 fallback 规则见 [数据源配置](full-guide.md#数据源配置)。
+> 项目默认内置 AkShare、Baostock、YFinance 等免费行情源，可零配置运行；免费源受数据源限流、接口变动和网络波动影响，稳定性不保证。长期定时、批量分析或更稳定行情建议配置 TickFlow、Tushare、Longbridge 等 token 型数据源，适用市场、Actions 映射和 fallback 规则见 [数据源配置](full-guide.md#数据源配置)。
 
 ## 🚀 快速开始
 
@@ -301,12 +301,10 @@ python main.py --webui-only
 
 本项目采用双许可证：
 
-- **上游原始代码**：MIT License（Copyright © 2026 ZhuLinsen）
+- **部分原始代码**：MIT License（Copyright © ZhuLinsen 等）
 - **StockPulse 新增与大幅修改的代码**：GNU Affero General Public License v3.0（AGPL-3.0）
 
-完整说明见 [LICENSE](../LICENSE) 文件。通过网络提供本软件服务（包括 Web 界面、API 或 Agent 平台）时，必须遵守 AGPL-3.0 的相应要求。StockPulse 保留上游项目的版权与许可声明，并作为独立项目持续维护。
-
-欢迎在二次开发或引用时注明 StockPulse 与上游项目的代码来源。
+完整说明见 [LICENSE](../LICENSE)。通过网络提供本软件服务（包括 Web 界面、API 或 Agent 平台）时，须遵守 AGPL-3.0 的相应要求。欢迎在二次开发或引用时注明代码来源与许可证。
 
 ## ⚠️ 免责声明
 
