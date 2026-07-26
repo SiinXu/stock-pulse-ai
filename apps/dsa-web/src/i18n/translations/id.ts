@@ -588,6 +588,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.noRecentAnalysesTitle": "Belum ada analisis terbaru",
   "i18n.uiText.UI_TEXT.home.noScheduledTasksTodayDescription": "Tidak ada tugas terjadwal yang telah berjalan atau akan dijalankan hari ini.",
   "i18n.uiText.UI_TEXT.home.noScheduledTasksTodayTitle": "Tidak ada tugas terjadwal hari ini",
+  "i18n.uiText.UI_TEXT.home.manageScheduledTasks": "Manage schedules",
+
   "i18n.uiText.UI_TEXT.home.noTodosDescription": "Tidak ada sinyal aktif yang kedaluwarsa atau segera perlu dinilai ulang.",
   "i18n.uiText.UI_TEXT.home.noTodosTitle": "Tidak ada tugas tertunda",
   "i18n.uiText.UI_TEXT.home.partialDataMessage": "Sebagian data Beranda sementara tidak tersedia. Konten lainnya tetap ditampilkan.",

@@ -588,6 +588,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.noRecentAnalysesTitle": "暫無最近分析",
   "i18n.uiText.UI_TEXT.home.noScheduledTasksTodayDescription": "今天沒有已執行或稍後即將執行的定時任務。",
   "i18n.uiText.UI_TEXT.home.noScheduledTasksTodayTitle": "今日暫無定時任務",
+  "i18n.uiText.UI_TEXT.home.manageScheduledTasks": "Manage schedules",
+
   "i18n.uiText.UI_TEXT.home.noTodosDescription": "目前沒有即將到期、需要重新評估的有效訊號。",
   "i18n.uiText.UI_TEXT.home.noTodosTitle": "待辦已清空",
   "i18n.uiText.UI_TEXT.home.partialDataMessage": "部分首頁資料暫時無法使用，已顯示其餘可用內容。",

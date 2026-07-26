@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Added] Linked Home today scheduled tasks to Settings management with a clear empty-state path.
 - [Added] Added a minimal Settings list for persisted scheduled-task definitions with enable/disable controls and process-local research-only framing.
 - [Docs] Softened README positioning copy to describe StockPulse capabilities without competitive “vs upstream” framing; kept factual license and attribution notes.
 - [Docs] Made the root README English-first for SEO/GEO: removed the demo GIF placeholder, documented shipped capabilities (report strata, HITL, ToolSurface, Model Packs, scheduled tasks, plugins, Critic, security audit, offline quality panel), moved Simplified Chinese to `docs/README_CN.md`, and pointed `docs/README_EN.md` at the root README.

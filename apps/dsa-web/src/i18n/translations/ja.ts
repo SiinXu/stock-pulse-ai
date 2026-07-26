@@ -588,6 +588,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.noRecentAnalysesTitle": "最近の分析はありません",
   "i18n.uiText.UI_TEXT.home.noScheduledTasksTodayDescription": "今日実行済み、またはこの後実行予定の定期タスクはありません。",
   "i18n.uiText.UI_TEXT.home.noScheduledTasksTodayTitle": "今日の定期タスクはありません",
+  "i18n.uiText.UI_TEXT.home.manageScheduledTasks": "Manage schedules",
+
   "i18n.uiText.UI_TEXT.home.noTodosDescription": "期限切れまたは間もなく再評価が必要な有効シグナルはありません。",
   "i18n.uiText.UI_TEXT.home.noTodosTitle": "保留中のタスクはありません",
   "i18n.uiText.UI_TEXT.home.partialDataMessage": "一部のホームデータを一時的に利用できません。利用可能な内容は表示しています。",

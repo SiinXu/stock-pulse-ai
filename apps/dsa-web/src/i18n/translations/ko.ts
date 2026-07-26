@@ -588,6 +588,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.home.noRecentAnalysesTitle": "최근 분석이 없습니다",
   "i18n.uiText.UI_TEXT.home.noScheduledTasksTodayDescription": "오늘 실행되었거나 이후 실행 예정인 예약 작업이 없습니다.",
   "i18n.uiText.UI_TEXT.home.noScheduledTasksTodayTitle": "오늘 예약 작업 없음",
+  "i18n.uiText.UI_TEXT.home.manageScheduledTasks": "Manage schedules",
+
   "i18n.uiText.UI_TEXT.home.noTodosDescription": "만료되었거나 곧 재평가가 필요한 활성 신호가 없습니다.",
   "i18n.uiText.UI_TEXT.home.noTodosTitle": "대기 중인 할 일이 없습니다",
   "i18n.uiText.UI_TEXT.home.partialDataMessage": "일부 홈 데이터를 일시적으로 사용할 수 없습니다. 나머지 콘텐츠는 계속 표시됩니다.",
