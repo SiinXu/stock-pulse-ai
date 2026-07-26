@@ -394,6 +394,7 @@
         }
       ],
       "snapshot": {
+<<<<<<< HEAD
         "keyCount": 104,
         "keySetSha256": "99162a61d57b62d2c3089bc730e16384090bf8a592ded977e7e6b4e30cb0779a",
         "bundleSha256": {
@@ -407,6 +408,21 @@
           "ms": "e2ae95ec25a306762c5fb34cc882e256faba01e7fe8e270b9f6002efc339f6d8",
           "fr": "6a5b8e5156835b558a85d7f8f0327217b4e7d025ca88a30991e09e4b5ef413c4",
           "id": "0d302cb8da385e6f862427cb06cb550a7c3ea87350c38aa0b225a6679da1e3c0"
+=======
+        "keyCount": 106,
+        "keySetSha256": "9be8b9b82f94bcfcd678b29a3f61d3beafd816f14db1dca3c08d44841f0046da",
+        "bundleSha256": {
+          "zh": "c95a65b20b79e1bd122456875b237fb98a276e71991e4b16e6a6880d28840ccb",
+          "zh-TW": "bf538b57038b0a842963d036743c0f20b217fae19d4a66f05ea2c43d617c9e67",
+          "en": "f1786c2314433e95e864990ef4d21da0dfae9b8a2a3b66ee71958c36aa48e73b",
+          "ja": "21df41bc5ee05a65261c4b54e0fff7a7425c58f0c8064f6603fe5b09a5d68477",
+          "ko": "cd6be1287e08bd7352fc1827cf81cc1119b28872e1b5592f1f00360fd06c73c2",
+          "de": "1fb898c0745ed310ec5b3ad0946f996a56a7c312e4bbcc2883ffec607139303d",
+          "es": "a3a14cb9c6f0f6da51d77846152ec828d5e9f90802158111892f50af80da3ddb",
+          "ms": "38615f58c47bac6f7e96d6b25289cc4f3c5a6d32a41b3df5dcadb53cb2141208",
+          "fr": "19e6b233dea5e281809de1bd842bd1f4c4ca246d02b6f4dc8a664b425237bfe2",
+          "id": "03bf438e10cdc1b38522f970eefa38174c54064fe0c84d9c24f08dca978b3d2d"
+>>>>>>> 878c1552 (feat: add read-only Security audit panel in Settings)
         }
       }
     },
@@ -552,6 +568,8 @@
         "portfolio_oversell",
         "rate_limited",
         "scheduler_busy",
+        "security_audit_auth_required",
+        "security_audit_unavailable",
         "unauthorized",
         "unsupported_alert_type",
         "validation_error",
@@ -697,6 +715,14 @@
         "scheduler_busy": [
           "api.error.STABLE_ERROR_TEXT.scheduler_busy.title",
           "api.error.STABLE_ERROR_TEXT.scheduler_busy.message"
+        ],
+        "security_audit_auth_required": [
+          "api.error.STABLE_ERROR_TEXT.security_audit_auth_required.title",
+          "api.error.STABLE_ERROR_TEXT.security_audit_auth_required.message"
+        ],
+        "security_audit_unavailable": [
+          "api.error.STABLE_ERROR_TEXT.security_audit_unavailable.title",
+          "api.error.STABLE_ERROR_TEXT.security_audit_unavailable.message"
         ],
         "unauthorized": [
           "api.error.STABLE_ERROR_TEXT.unauthorized.title",
