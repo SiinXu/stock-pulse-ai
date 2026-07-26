@@ -5248,7 +5248,7 @@ export const SOURCE_UI_TRANSLATIONS: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.schedulerTimeInputAria": "Scheduled time {index}",
   "i18n.uiText.UI_TEXT.settings.schedulerTimePlaceholder": "e.g. 18:00",
   "i18n.uiText.UI_TEXT.settings.schedulerTimes": "Scheduled times",
-  "i18n.uiText.UI_TEXT.settings.schedulerTitle": "Scheduled task",
+  "i18n.uiText.UI_TEXT.settings.schedulerTitle": "Legacy day-batch schedule",
   "i18n.uiText.UI_TEXT.settings.securityAuditActor": "Actor",
   "i18n.uiText.UI_TEXT.settings.securityAuditApplyFilters": "Apply filters",
   "i18n.uiText.UI_TEXT.settings.securityAuditAuthRequiredDescription": "Security audit access returns HTTP 403 when administrator authentication is disabled. Enable authentication above, sign in, then reload this panel.",
