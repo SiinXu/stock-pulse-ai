@@ -72,8 +72,8 @@ resolve -> fetch -> intelligence -> context -> analyze -> persist -> render -> d
 | Path | Responsibility |
 | --- | --- |
 | `src/` | Primary application package for orchestration, services, schemas, persistence, report rendering, and shared runtime logic. |
-| `src/market/` | Canonical market-analysis, market-context, phase-prompt, phase-summary, and structure-prompt implementations. The top-level `src/market_analyzer.py`, `src/market_context.py`, `src/market_phase_prompt.py`, `src/market_phase_summary.py`, and `src/market_structure_prompt.py` modules remain compatibility facades. |
-| `src/analysis_context_pack/` | Canonical context projection and prompt-rendering implementations. `src/analysis_context_pack_overview.py` and `src/analysis_context_pack_prompt.py` remain compatibility facades. |
+| `src/market/` | Canonical market-analysis, market-context, phase-prompt, phase-summary, and structure-prompt implementations. The top-level `src/market_analyzer.py`, `src/market_context.py`, `src/market_phase_prompt.py`, `src/market_phase_summary.py`, and `src/market_structure_prompt.py` modules remain compatibility facades. **New production code must import the canonical package**; see [legacy facade import policy](legacy-facade-import-policy.md). |
+| `src/analysis_context_pack/` | Canonical context projection and prompt-rendering implementations. `src/analysis_context_pack_overview.py` and `src/analysis_context_pack_prompt.py` remain compatibility facades. **New production code must import the canonical package**; see [legacy facade import policy](legacy-facade-import-policy.md). |
 | `data_provider/` | Provider adapters, capability routing, normalization, caching, fallback, and health control. |
 | `api/` | FastAPI transport, middleware, lifecycle, and public HTTP schemas. |
 | `bot/` | Messaging-platform adapters, dispatch, commands, and stream integrations. |
@@ -395,6 +395,7 @@ separately owned contract.
 - [Web UI foundation](web-ui-foundation.md)
 - [API specification artifact](architecture/api_spec.json)
 - [Behavior-preserving decomposition method](adr/ADR-006-behavior-preserving-module-decomposition.md)
+- [Legacy facade import policy and inventory](legacy-facade-import-policy.md)
 
 ## Keeping This Overview Current
 

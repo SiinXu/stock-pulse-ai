@@ -1,0 +1,164 @@
+{
+  "version": 1,
+  "description": "Allowlisted production importers of ADR-006 legacy facade modules. New production imports must use the canonical package and must not expand this list without an explicit migration plan.",
+  "facades": {
+    "src.analysis_context_pack_overview": [
+      "api/v1/endpoints/analysis.py",
+      "api/v1/endpoints/history.py",
+      "src/core/pipeline.py",
+      "src/core/stages/persistence.py",
+      "src/services/alert_service.py",
+      "src/services/alert_worker.py",
+      "src/services/run_flow.py"
+    ],
+    "src.analysis_context_pack_prompt": [
+      "src/core/pipeline.py",
+      "src/core/stages/persistence.py",
+      "src/phase_decision_guardrail.py"
+    ],
+    "src.market_analyzer": [
+      "src/core/market_review.py",
+      "src/services/market_light_service.py"
+    ],
+    "src.market_context": [
+      "bot/stock_symbols.py",
+      "src/agent/chat_context.py",
+      "src/agent/executor.py",
+      "src/agent/executor_parts/run.py",
+      "src/analyzer.py",
+      "src/services/stock_code_utils.py"
+    ],
+    "src.market_phase_prompt": [
+      "src/agent/agents/base_agent.py",
+      "src/agent/executor.py",
+      "src/agent/executor_parts/loop.py",
+      "src/analyzer.py"
+    ],
+    "src.market_phase_summary": [
+      "api/v1/endpoints/analysis.py",
+      "api/v1/endpoints/history.py",
+      "src/analysis_context_pack/overview.py",
+      "src/core/pipeline.py",
+      "src/core/stages/analysis.py",
+      "src/core/stages/analysis_agent.py",
+      "src/core/stages/analysis_context.py",
+      "src/core/stages/analysis_results.py",
+      "src/core/stages/analysis_stock.py",
+      "src/core/stages/persistence.py",
+      "src/notification.py",
+      "src/phase_decision_guardrail.py",
+      "src/services/alert_service.py",
+      "src/services/alert_worker.py",
+      "src/services/analysis_service.py",
+      "src/services/backtest_service.py",
+      "src/services/history_service.py",
+      "src/services/report_renderer.py"
+    ],
+    "src.market_sector_analysis": [
+      "src/market/analyzer.py"
+    ],
+    "src.market_structure_prompt": [
+      "src/agent/agents/base_agent.py",
+      "src/agent/executor.py",
+      "src/agent/executor_parts/chat.py",
+      "src/agent/executor_parts/loop.py",
+      "src/analyzer.py"
+    ]
+  },
+  "catalog": {
+    "src.analysis_context_pack_overview": {
+      "canonical": "src.analysis_context_pack.overview",
+      "definition": "src/analysis_context_pack_overview.py",
+      "importers": [
+        "api/v1/endpoints/analysis.py",
+        "api/v1/endpoints/history.py",
+        "src/core/pipeline.py",
+        "src/core/stages/persistence.py",
+        "src/services/alert_service.py",
+        "src/services/alert_worker.py",
+        "src/services/run_flow.py"
+      ]
+    },
+    "src.analysis_context_pack_prompt": {
+      "canonical": "src.analysis_context_pack.prompt",
+      "definition": "src/analysis_context_pack_prompt.py",
+      "importers": [
+        "src/core/pipeline.py",
+        "src/core/stages/persistence.py",
+        "src/phase_decision_guardrail.py"
+      ]
+    },
+    "src.market_analyzer": {
+      "canonical": "src.market.analyzer",
+      "definition": "src/market_analyzer.py",
+      "importers": [
+        "src/core/market_review.py",
+        "src/services/market_light_service.py"
+      ]
+    },
+    "src.market_context": {
+      "canonical": "src.market.context",
+      "definition": "src/market_context.py",
+      "importers": [
+        "bot/stock_symbols.py",
+        "src/agent/chat_context.py",
+        "src/agent/executor.py",
+        "src/agent/executor_parts/run.py",
+        "src/analyzer.py",
+        "src/services/stock_code_utils.py"
+      ]
+    },
+    "src.market_phase_prompt": {
+      "canonical": "src.market.phase_prompt",
+      "definition": "src/market_phase_prompt.py",
+      "importers": [
+        "src/agent/agents/base_agent.py",
+        "src/agent/executor.py",
+        "src/agent/executor_parts/loop.py",
+        "src/analyzer.py"
+      ]
+    },
+    "src.market_phase_summary": {
+      "canonical": "src.market.phase_summary",
+      "definition": "src/market_phase_summary.py",
+      "importers": [
+        "api/v1/endpoints/analysis.py",
+        "api/v1/endpoints/history.py",
+        "src/analysis_context_pack/overview.py",
+        "src/core/pipeline.py",
+        "src/core/stages/analysis.py",
+        "src/core/stages/analysis_agent.py",
+        "src/core/stages/analysis_context.py",
+        "src/core/stages/analysis_results.py",
+        "src/core/stages/analysis_stock.py",
+        "src/core/stages/persistence.py",
+        "src/notification.py",
+        "src/phase_decision_guardrail.py",
+        "src/services/alert_service.py",
+        "src/services/alert_worker.py",
+        "src/services/analysis_service.py",
+        "src/services/backtest_service.py",
+        "src/services/history_service.py",
+        "src/services/report_renderer.py"
+      ]
+    },
+    "src.market_sector_analysis": {
+      "canonical": "src.market.sector_analysis",
+      "definition": "src/market_sector_analysis.py",
+      "importers": [
+        "src/market/analyzer.py"
+      ]
+    },
+    "src.market_structure_prompt": {
+      "canonical": "src.market.structure_prompt",
+      "definition": "src/market_structure_prompt.py",
+      "importers": [
+        "src/agent/agents/base_agent.py",
+        "src/agent/executor.py",
+        "src/agent/executor_parts/chat.py",
+        "src/agent/executor_parts/loop.py",
+        "src/analyzer.py"
+      ]
+    }
+  }
+}

@@ -28,6 +28,8 @@ deterministic_checks() {
   python scripts/check_install_guidance.py
   python scripts/check_local_model_catalog.py
   python scripts/check_dependency_vulnerabilities.py --self-test
+  python scripts/check_legacy_facade_imports.py --self-test
+  python scripts/check_legacy_facade_imports.py
   ./scripts/test.sh code
   ./scripts/test.sh yfinance
 }
