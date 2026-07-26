@@ -33,11 +33,14 @@ def test_framework_topic_documents_api_scope_context_and_rollback() -> None:
         assert "2N-1" in document
         assert "trigger" in document.lower()
         assert "TEMP" in document
-        # Product narrative freeze: honest ship state after stock-analysis inject.
+        # Product narrative freeze: Settings editor + stock-analysis inject are shipped;
+        # Multi/Chat still out of scope.
         assert (
-            "no web editor" in document.lower()
-            or "无 web 编辑器" in document.lower()
-            or "无 Web 编辑器" in document
+            "Settings" in document
+            or "Agent Behavior" in document
+            or "Agent 行为" in document
+            or "minimal editor" in document.lower()
+            or "最小编辑器" in document
         )
         assert (
             "stock analysis" in document.lower()
@@ -45,6 +48,12 @@ def test_framework_topic_documents_api_scope_context_and_rollback() -> None:
             or "inject_framework_into_analysis_context" in document
         )
         assert "personal_investment_framework_prompt" in document or "只读研究" in document
+        assert (
+            "Multi-agent" in document
+            or "Multi/Chat" in document
+            or "Multi-agent / Research / Chat" in document
+            or "Multi / Chat / Research" in document
+        )
 
 
 def test_framework_docs_are_discoverable_without_expanding_readmes() -> None:
