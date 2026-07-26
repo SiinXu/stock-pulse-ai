@@ -279,6 +279,9 @@ describe('ResearchAnalysisWorkbenchPage', () => {
       '运行中任务',
       '历史与对比',
     ]);
+    const informationDensity = screen.getByRole('radiogroup', { name: '信息密度' });
+    expect(within(informationDensity).getByRole('radio', { name: '专业' }))
+      .toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('button', { name: '导入图表/文档到分析' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '分析全部' })).toBeInTheDocument();
   });

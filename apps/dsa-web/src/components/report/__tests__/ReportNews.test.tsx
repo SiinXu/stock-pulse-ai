@@ -1,9 +1,13 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+// @ts-expect-error Node types are intentionally excluded from the browser tsconfig.
+import fs from 'node:fs';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { historyApi } from '../../../api/history';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../../utils/uiLanguage';
 import { ReportNews } from '../ReportNews';
+
+const indexCss = fs.readFileSync('src/index.css', 'utf8');
 
 vi.mock('../../../api/history', () => ({
   historyApi: {
@@ -38,6 +42,10 @@ describe('ReportNews', () => {
     expect(screen.getByText('来源：报告页补充资讯；是否用于分析以输入数据块为准。')).toBeVisible();
     expect(container.querySelector('[data-surface-level="interactive"]')).toBeTruthy();
     expect(container.querySelector('.report-news-item')).toBeTruthy();
+    expect(indexCss).toMatch(/\.report-news-item\s*\{/);
+    expect(indexCss).toMatch(/\.report-news-title\s*\{/);
+    expect(indexCss).toMatch(/\.report-news-snippet\s*\{/);
+    expect(indexCss).toMatch(/\.dark\s+\.report-news-item\s*\{/);
 
     const refreshButton = screen.getByRole('button', { name: '刷新' });
     expect(refreshButton).toHaveAttribute('data-control', 'button');
@@ -59,6 +67,32 @@ describe('ReportNews', () => {
 
     expect(await screen.findByText('暂无相关资讯')).toBeInTheDocument();
     expect(screen.getByText('可稍后刷新以获取最新资讯。')).toBeInTheDocument();
+  });
+
+  it('uses one live status while the header spinner remains decorative', async () => {
+    let resolveRequest!: (
+      value: Awaited<ReturnType<typeof historyApi.getNews>>,
+    ) => void;
+    const pendingRequest = new Promise<Awaited<ReturnType<typeof historyApi.getNews>>>(
+      (resolve) => {
+        resolveRequest = resolve;
+      },
+    );
+    vi.mocked(historyApi.getNews).mockReturnValue(pendingRequest);
+
+    const { container } = render(<ReportNews recordId={1} />);
+
+    expect(screen.getAllByRole('status')).toHaveLength(1);
+    expect(screen.getByRole('status')).toHaveTextContent('加载资讯中...');
+    expect(container.querySelector('[data-control="spinner"]')).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    );
+
+    await act(async () => {
+      resolveRequest({ total: 0, items: [] });
+      await pendingRequest;
+    });
   });
 
   it('keeps UI-owned empty state Chinese around an English report section', async () => {

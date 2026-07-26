@@ -65,7 +65,7 @@ export const ReportNews: React.FC<ReportNewsProps> = ({ recordId, limit = 8, lan
         actions={(
           <div className="flex items-center gap-2">
             {isLoading ? (
-              <Spinner size="sm" label={chromeText.loadingNews} />
+              <Spinner size="sm" />
             ) : null}
             <Badge variant="default" size="sm">
               {sourceText.sourceLabel}

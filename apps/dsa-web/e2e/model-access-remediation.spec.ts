@@ -267,9 +267,9 @@ test.describe('model access product convergence', () => {
   test('01 AI & Models exposes exactly four product views', async ({ page }) => {
     await openConnections(page);
     for (const label of ['总览', '模型接入', '任务路由', '可靠性']) {
-      await expect(page.getByRole('tab', { name: label })).toBeVisible();
+      await expect(page.getByRole('radio', { name: label })).toBeVisible();
     }
-    await expect(page.getByRole('tab', { name: '高级' })).toHaveCount(0);
+    await expect(page.getByRole('radio', { name: '高级' })).toHaveCount(0);
   });
 
   test('02 legacy provider URLs replace-redirect to Model Access', async ({ page }) => {
@@ -306,7 +306,7 @@ test.describe('model access product convergence', () => {
   test('06 normal AI views contain no raw config keys or legacy terminology', async ({ page }) => {
     await openConnections(page);
     for (const label of ['总览', '模型接入', '任务路由', '可靠性']) {
-      await page.getByRole('tab', { name: label }).click();
+      await page.getByRole('radio', { name: label }).click();
       const text = await page.locator('main').innerText();
       expect(text).not.toMatch(/LLM_|LITELLM_|GENERATION_BACKEND|模型供应商|快速添加渠道|渠道管理|Legacy Provider/);
     }
@@ -635,7 +635,7 @@ test.describe('model access product convergence', () => {
 
   test('21b deleting a referenced Connection is blocked by both the API and the page workflow', async ({ page }) => {
     await createSavedConnection(page, ['fake-report-model', 'fake-agent-model']);
-    await page.getByRole('tab', { name: '任务路由' }).click();
+    await page.getByRole('radio', { name: '任务路由' }).click();
     const reportModelRef = modelRef('custom', 'fake-report-model');
     await waitForAiAutosave(page, () => selectStrictModel(page, '主要模型', reportModelRef));
 
@@ -669,7 +669,7 @@ test.describe('model access product convergence', () => {
       }),
     ]));
 
-    await page.getByRole('tab', { name: '模型接入' }).click();
+    await page.getByRole('radio', { name: '模型接入' }).click();
     await page.getByRole('button', { name: '更多操作 e2e' }).click();
     await page.getByRole('menuitem', { name: '删除连接' }).click();
     const dialog = page.getByRole('dialog', { name: '无法直接删除连接' });
@@ -685,7 +685,7 @@ test.describe('model access product convergence', () => {
 
   test('22 task routing empty state links to model access', async ({ page }) => {
     await openConnections(page);
-    await page.getByRole('tab', { name: '任务路由' }).click();
+    await page.getByRole('radio', { name: '任务路由' }).click();
     await expect(page.getByText('还没有可用模型')).toBeVisible();
     await page.getByRole('button', { name: '前往模型接入' }).click();
     await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible();
@@ -693,7 +693,7 @@ test.describe('model access product convergence', () => {
 
   test('22b task routing round-trip preserves source, Back/Forward, and refreshes models after save', async ({ page }) => {
     await openConnections(page);
-    await page.getByRole('tab', { name: '任务路由' }).click();
+    await page.getByRole('radio', { name: '任务路由' }).click();
     await expect(page.getByText('还没有可用模型')).toBeVisible();
     await page.getByRole('button', { name: '前往模型接入' }).click();
     await expect(page).toHaveURL(/section=ai_models&view=connections&from=task_routing/);
@@ -726,7 +726,7 @@ test.describe('model access product convergence', () => {
 
   test('24 task models use strict SearchableSelect controls', async ({ page }) => {
     await createSavedConnection(page);
-    await page.getByRole('tab', { name: '任务路由' }).click();
+    await page.getByRole('radio', { name: '任务路由' }).click();
     const reportModelRef = modelRef('custom', 'fake-report-model');
     for (const label of ['主要模型', 'Agent 主要模型', 'Vision 模型']) {
       const trigger = page.getByRole('button', { name: label, exact: true });
@@ -740,7 +740,7 @@ test.describe('model access product convergence', () => {
 
   test('24b Report, Agent, and Vision selections persist exact Connection model refs in one autosave', async ({ page }) => {
     await createSavedConnection(page);
-    await page.getByRole('tab', { name: '任务路由' }).click();
+    await page.getByRole('radio', { name: '任务路由' }).click();
     const reportModelRef = modelRef('custom', 'fake-report-model');
     const agentModelRef = modelRef('custom', 'fake-agent-model');
     const visionModelRef = modelRef('custom', 'fake-vision-model');
@@ -767,7 +767,7 @@ test.describe('model access product convergence', () => {
 
   test('25 selected task routes survive Available Models becoming stale', async ({ page }) => {
     await createSavedConnection(page);
-    await page.getByRole('tab', { name: '任务路由' }).click();
+    await page.getByRole('radio', { name: '任务路由' }).click();
     const reportModelRef = modelRef('custom', 'fake-report-model');
     await waitForAiAutosave(page, () => selectStrictModel(page, '主要模型', reportModelRef));
     await page.route('**/api/v1/system/config/llm/available-models', (route) => route.fulfill({
@@ -781,7 +781,7 @@ test.describe('model access product convergence', () => {
 
   test('26 fallback models are searchable, deduplicated, and reorderable', async ({ page }) => {
     await createSavedConnection(page);
-    await page.getByRole('tab', { name: '可靠性' }).click();
+    await page.getByRole('radio', { name: '可靠性' }).click();
     await page.getByRole('button', { name: '选择备用模型' }).click();
     await page.getByLabel('搜索模型').fill('agent');
     await expect(page.getByRole('checkbox', { name: 'fake-agent-model' })).toBeVisible();
@@ -804,17 +804,17 @@ test.describe('model access product convergence', () => {
     const reportModelRef = modelRef('custom', 'fake-report-model');
     const agentModelRef = modelRef('custom', 'fake-agent-model');
     await waitForAiAutosave(page, async () => {
-      await page.getByRole('tab', { name: '可靠性' }).click();
+      await page.getByRole('radio', { name: '可靠性' }).click();
       await page.getByRole('button', { name: '选择备用模型' }).click();
       await page.getByRole('checkbox', { name: 'fake-report-model' }).check();
       await page.getByLabel('搜索模型').press('Escape');
-      await page.getByRole('tab', { name: '任务路由' }).click();
+      await page.getByRole('radio', { name: '任务路由' }).click();
       await selectStrictModel(page, '主要模型', reportModelRef);
       await selectStrictModel(page, 'Agent 主要模型', reportModelRef);
       await selectStrictModel(page, 'Vision 模型', reportModelRef);
     });
 
-    await page.getByRole('tab', { name: '模型接入' }).click();
+    await page.getByRole('radio', { name: '模型接入' }).click();
     await page.getByRole('button', { name: '管理模型 e2e' }).click();
     const dialog = page.getByRole('dialog', { name: '编辑模型服务' });
     await dialog.getByRole('button', { name: '移除模型 fake-report-model' }).click();
@@ -849,7 +849,7 @@ test.describe('model access product convergence', () => {
     page.on('request', (request) => {
       if (request.url().endsWith('/api/v1/system/config') && request.method() === 'PUT') putCount += 1;
     });
-    await page.getByRole('tab', { name: '任务路由' }).click();
+    await page.getByRole('radio', { name: '任务路由' }).click();
     await selectStrictModel(page, '主要模型', modelRef('custom', 'fake-report-model'));
     await expect(page.getByText(/AI 模型: 等待自动保存/)).toBeVisible();
     await page.getByRole('button', { name: '重置当前分组' }).click();
@@ -876,13 +876,13 @@ test.describe('model access product convergence', () => {
     await expect(page.getByRole('button', { name: '重试' })).toBeVisible();
   });
 
-  test('28 developer diagnostics is a dedicated uncollapsed Advanced tab', async ({ page }) => {
+  test('28 developer diagnostics is a dedicated uncollapsed Advanced view', async ({ page }) => {
     await openSettings(page);
     // Backend Status keeps the banner/status panels on the default tab.
     await page.goto(buildSettingsHref({ section: 'advanced', view: 'raw_config' }));
     await expect(page.getByTestId('generation-backend-status-panel')).toBeVisible();
-    // Developer fields moved to their own tab and render without a collapsible.
-    await page.getByRole('tab', { name: '开发者诊断' }).click();
+    // Developer fields moved to their own view option and render without a collapsible.
+    await page.getByRole('radio', { name: '开发者诊断' }).click();
     await expect(page.getByRole('heading', { name: '开发者诊断' })).toBeVisible();
     await expect(page.locator('details').filter({ hasText: '开发者诊断' })).toHaveCount(0);
   });

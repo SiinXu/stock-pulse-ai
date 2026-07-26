@@ -558,10 +558,10 @@ export function registerSettingsPageLlmTests(): void {
 
     render(<SettingsPage />);
 
-    // The AI & Models section is active and its second-level view tabs render.
+    // The AI & Models section is active and its second-level view options render.
     expect(screen.getByRole('button', { name: /AI 与模型/ })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('tab', { name: '模型接入' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: '任务路由' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: '模型接入' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: '任务路由' })).toBeInTheDocument();
 
     // Clicking a first-level section pushes the canonical section/view URL
     // (section is the single source of truth; no legacy params leak).
@@ -610,7 +610,7 @@ export function registerSettingsPageLlmTests(): void {
 
     render(<SettingsPage />);
 
-    expect(screen.getByRole('tab', { name: '总览' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('radio', { name: '总览' })).toHaveAttribute('aria-checked', 'true');
     await waitFor(() => expect(getLlmAvailableModels).toHaveBeenCalledTimes(1));
     await expect(getLlmAvailableModels.mock.results[0]?.value).rejects.toThrow('catalog unavailable');
     expect(await screen.findByText('可用模型加载失败')).toBeInTheDocument();

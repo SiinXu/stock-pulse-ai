@@ -1320,7 +1320,8 @@ const ChatPage: React.FC = () => {
               value={chatMode}
               onChange={(value) => setChatMode(value)}
               ariaLabel={t('research.modeLabel')}
-              className="dark:!bg-foreground/10 dark:[&_.segmented-control-tab[aria-selected=true]]:!bg-foreground dark:[&_.segmented-control-tab[aria-selected=true]]:text-background dark:[&_.segmented-control-tab[aria-selected=false]]:text-foreground/70"
+              semantics="single-select"
+              className="dark:!bg-foreground/10 dark:[&_.segmented-control-tab[aria-checked=true]]:!bg-foreground dark:[&_.segmented-control-tab[aria-checked=true]]:text-background dark:[&_.segmented-control-tab[aria-checked=false]]:text-foreground/70"
               options={[
                 { value: 'chat', label: t('research.chatMode') },
                 { value: 'research', label: t('research.mode') },

@@ -292,6 +292,7 @@ const SegmentedControlStory = () => {
         value={value}
         onChange={setValue}
         ariaLabel={text.preview}
+        semantics="single-select"
         options={[
           { value: 'one', label: text.optionOne },
           { value: 'two', label: text.optionTwo },

@@ -1000,6 +1000,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                 value={experienceMode}
                 onChange={handleExperienceModeChange}
                 ariaLabel={t('home.experienceModeLabel')}
+                semantics="single-select"
                 options={[
                   { value: 'beginner', label: t('home.beginnerMode') },
                   { value: 'professional', label: t('home.professionalMode') },

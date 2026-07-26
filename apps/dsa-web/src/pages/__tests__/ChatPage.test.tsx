@@ -322,13 +322,13 @@ describe('ChatPage', () => {
       </MemoryRouter>,
     );
 
-    const modeControl = await screen.findByRole('tablist', { name: '对话模式' });
+    const modeControl = await screen.findByRole('radiogroup', { name: '对话模式' });
     expect(modeControl).toHaveClass(
-      'dark:[&_.segmented-control-tab[aria-selected=true]]:!bg-foreground',
-      'dark:[&_.segmented-control-tab[aria-selected=true]]:text-background',
+      'dark:[&_.segmented-control-tab[aria-checked=true]]:!bg-foreground',
+      'dark:[&_.segmented-control-tab[aria-checked=true]]:text-background',
     );
 
-    fireEvent.click(screen.getByRole('tab', { name: '深度研究' }));
+    fireEvent.click(screen.getByRole('radio', { name: '深度研究' }));
     const researchSurface = screen.getByRole('heading', { name: '深度研究' }).closest('[data-surface-level="section"]');
     expect(researchSurface).not.toHaveClass('border');
   });

@@ -239,6 +239,7 @@ const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => 
         options={PERIOD_OPTIONS.map((option) => ({ value: option, label: t(PERIOD_LABEL_KEYS[option]) }))}
         onChange={handlePeriodChange}
         ariaLabel={t('usage.title')}
+        semantics="single-select"
       />
       <Button
         type="button"
