@@ -156,6 +156,21 @@ Advanced → export backup → reinstall → import → test connection → shor
 | Readiness / config gap | What still blocks minimal analysis |
 | Test push | Synthetic notification to verify a channel |
 
+
+## Feature status aligned with main (2026-07)
+
+Trust **current `origin/main`**. Older running builds may still lack entries—believe the screen.
+
+| Capability | Status on main | UI entry | How to use this manual |
+| --- | --- | --- | --- |
+| **Scheduled tasks** | **Shipped** | Settings → **Scheduling** (enable, daily times, next run, run once); Home **Today's scheduled tasks** (read-only) | See Scheduling above and [02 Home](02-home_EN.md); contract: `docs/scheduled-tasks.md` |
+| **Notification channel plugins** | **Shipped** | Settings → notifications / plugin surfaces when discovery is enabled | Prove one built-in channel with **test push** first; plugin channels follow the UI list |
+| **Personal investment framework** | **Backend shipped**; **no full Web editor yet** | API / engineering docs primarily | See `docs/personal-investment-framework.md` (backend slice); expand UI chapters only after a real editor ships |
+| **Local model pack import** | **Shipped** | Settings → **AI & Models → Local Models** → Import Model Pack (labels as in UI) | Catalog pull/activate still apply; import path: `docs/model-packs.md` and in-product help |
+
+For shipped capabilities, write “available on current main”. Use a single “if your UI lacks this entry, upgrade” note only when the install is older.
+
+
 ## Related
 
 - [02 Home](02-home_EN.md)  
