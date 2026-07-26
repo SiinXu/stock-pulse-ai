@@ -29,6 +29,8 @@ from src.schemas.report_strata import (
     ensure_report_strata,
     normalize_report_strata,
     resolve_report_strata,
+    attach_report_strata_to_dashboard,
+    project_report_strata_for_api,
 )
 from src.schemas.request_context import (
     AnalysisRequestContext,
@@ -48,6 +50,8 @@ __all__ = [
     "ensure_report_strata",
     "normalize_report_strata",
     "resolve_report_strata",
+    "attach_report_strata_to_dashboard",
+    "project_report_strata_for_api",
     "PACK_VERSION",
     "AnalysisContextBlock",
     "AnalysisContextItem",

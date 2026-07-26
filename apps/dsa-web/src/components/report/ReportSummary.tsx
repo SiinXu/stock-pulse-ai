@@ -2,6 +2,7 @@ import React from 'react';
 import type { AnalysisResult, AnalysisReport } from '../../types/analysis';
 import { ReportOverview } from './ReportOverview';
 import { ReportStrategy } from './ReportStrategy';
+import { ReportStrata } from './ReportStrata';
 import { ReportNews } from './ReportNews';
 import { ReportDetails } from './ReportDetails';
 import { ReportDiagnostics } from './ReportDiagnostics';
@@ -70,6 +71,9 @@ export const ReportSummary: React.FC<ReportSummaryProps> = ({
 
       {/* Strategy target zone. */}
       <ReportStrategy strategy={strategy} language={reportLanguage} />
+
+      {/* Issue #616: evidence strata (facts / gaps / inference / risks / framework / disclaimer) */}
+      <ReportStrata details={details} language={reportLanguage} alwaysShowDisclaimer />
 
       {/* News section */}
       <ReportNews recordId={recordId} limit={8} language={reportLanguage} />

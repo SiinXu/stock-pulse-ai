@@ -615,3 +615,23 @@ class TestReportStrataRendering(unittest.TestCase):
             self.assertIn("Evidence Strata", out)
             self.assertIn("Not investment advice", out)
 
+
+    def test_markdown_disclaimer_once_with_strata(self) -> None:
+        r = _make_result(dashboard=self._strata_dashboard(), report_language="en")
+        out = render("markdown", [r], summary_only=False)
+        self.assertIsNotNone(out)
+        assert out is not None
+        self.assertIn("Evidence Strata", out)
+        self.assertIn("Verified Facts", out)
+        # Section 6 is report-level only (footer); body must not re-title disclaimer.
+        self.assertNotIn("Non-Investment-Advice Disclaimer", out)
+        count = out.count("Not investment advice")
+        self.assertEqual(count, 1, out)
+
+    def test_markdown_disclaimer_once_without_strata(self) -> None:
+        r = _make_result()
+        out = render("markdown", [r], summary_only=False)
+        self.assertIsNotNone(out)
+        assert out is not None
+        self.assertEqual(out.count("不构成投资建议"), 1)
+

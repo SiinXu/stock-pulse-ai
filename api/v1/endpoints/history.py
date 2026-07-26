@@ -574,6 +574,13 @@ def get_history_detail(
             result.get("context_snapshot"),
             result.get("raw_result"),
         )
+        from src.schemas.report_strata import project_report_strata_for_api
+
+        report_strata = project_report_strata_for_api(
+            result.get("raw_result"),
+            language=report_language,
+            log_context={"record_id": record_id, "path": "history_detail"},
+        )
 
         details = ReportDetails(
             news_content=result.get("news_content"),
@@ -586,6 +593,7 @@ def get_history_detail(
             sector_rankings=extracted_boards.get("sector_rankings"),
             concept_rankings=extracted_boards.get("concept_rankings"),
             market_structure=market_structure,
+            report_strata=report_strata,
         )
         
         return AnalysisReport(

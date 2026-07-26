@@ -20,6 +20,8 @@ from src.schemas.report_strata import (
     extract_report_strata_payload,
     normalize_report_strata,
     resolve_report_strata,
+    attach_report_strata_to_dashboard,
+    project_report_strata_for_api,
 )
 
 
@@ -188,6 +190,41 @@ class TestReportStrataSchema(unittest.TestCase):
         self.assertEqual(gap.kind, "conflict")
         with self.assertRaises(Exception):
             DataGapOrConflict(kind="unknown", description="x")  # type: ignore[arg-type]
+
+    def test_attach_report_strata_seeds_empty_structure(self) -> None:
+        dash = attach_report_strata_to_dashboard(None, language="en")
+        self.assertIn("report_strata", dash)
+        strata = dash["report_strata"]
+        self.assertEqual(strata["schema_version"], REPORT_STRATA_SCHEMA_VERSION)
+        self.assertEqual(strata["framework_alignment"]["status"], "not_configured")
+        self.assertIn("Not investment advice", strata["disclaimer"])
+
+    def test_attach_preserves_existing_facts(self) -> None:
+        dash = attach_report_strata_to_dashboard(
+            {
+                "core_conclusion": {"one_sentence": "hold"},
+                "report_strata": {
+                    "verified_facts": [{"statement": "Close was 1", "source_id": "ohlcv"}],
+                    "model_inference": ["Maybe up"],
+                },
+            },
+            language="en",
+        )
+        facts = dash["report_strata"]["verified_facts"]
+        self.assertEqual(facts[0]["statement"], "Close was 1")
+        self.assertIn("Maybe up", dash["report_strata"]["model_inference"])
+        self.assertTrue(dash["report_strata"]["disclaimer"])
+
+    def test_project_report_strata_for_api_returns_none_on_missing(self) -> None:
+        self.assertIsNone(project_report_strata_for_api({"dashboard": {}}))
+        payload = project_report_strata_for_api(
+            {"dashboard": {"report_strata": empty_report_strata("zh").to_public_dict()}},
+            language="zh",
+        )
+        self.assertIsNotNone(payload)
+        assert payload is not None
+        self.assertEqual(payload["schema_version"], REPORT_STRATA_SCHEMA_VERSION)
+
 
 
 if __name__ == "__main__":

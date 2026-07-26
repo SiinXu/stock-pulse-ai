@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Tests] Added offline fixed-panel analysis quality fixtures with deterministic structural trust assertions and no live LLM scoring (#617).
 - [Docs] Documented the offline analysis quality panel harness, extension steps, and explicit non-claims (#617).
 - [Chore] Added a deterministic local runner for offline analysis quality panel fixtures (#617).
+- [Fixed] Projected report strata on history and analysis status paths, attached six-slot strata on new JSON analysis parses, logged projection failures, and emitted a single Markdown disclaimer footer.
+- [Docs] Documented the Issue #616 report strata presentation contract for analysis reports.
+- [Added] Showed report strata (facts, gaps, inference, risks, framework alignment, disclaimer) in the Web full-report view with the same section order as Markdown templates and historical fallbacks without strata.
 - [Added] Rendered analysis report strata (facts, gaps, inference, risks, framework alignment) in Markdown, brief, and WeChat templates with a mandatory non-investment-advice disclaimer while keeping historical reports without strata compatible.
 - [Changed] Enforced a deny-by-default Agent ToolSurface with bounded executable capabilities, mandatory execution-owned grants, strict schema and stock-scope checks, recursive outbound URL policy validation, redacted denial audits, and no direct ToolRegistry execution bypass.
 - [Added] Added five opt-in investment committee Persona Skills with bounded built-in discovery, desktop packaging coverage, explicit existing-tool lists, differentiated evidence and risk lenses, and mandatory research-only, non-affiliation, and investment-risk disclosures.

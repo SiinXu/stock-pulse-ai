@@ -360,6 +360,44 @@ export interface AnalysisContextPackOverview {
   metadata: AnalysisContextPackOverviewMetadata;
 }
 
+
+export type ReportStrataFrameworkStatus =
+  | 'aligned'
+  | 'partial'
+  | 'conflict'
+  | 'not_configured';
+
+export interface ReportStrataVerifiedFact {
+  statement: string;
+  sourceId?: string | null;
+  asOf?: string | null;
+}
+
+export interface ReportStrataGapOrConflict {
+  kind: 'missing' | 'conflict';
+  description: string;
+  sourceIds?: string[];
+}
+
+export interface ReportStrataFrameworkAlignment {
+  status: ReportStrataFrameworkStatus;
+  summary?: string;
+  frameworkTitle?: string | null;
+  frameworkVersion?: number | null;
+  frameworkId?: string | null;
+}
+
+/** Issue #616 evidence strata for full-report presentation. */
+export interface ReportStrata {
+  schemaVersion?: string;
+  verifiedFacts?: ReportStrataVerifiedFact[];
+  missingOrConflicts?: ReportStrataGapOrConflict[];
+  modelInference?: string[];
+  risksCounterEvidence?: string[];
+  frameworkAlignment?: ReportStrataFrameworkAlignment;
+  disclaimer?: string;
+}
+
 /** Details section */
 export interface ReportDetails {
   newsContent?: string;
@@ -372,6 +410,7 @@ export interface ReportDetails {
   sectorRankings?: SectorRankings;
   conceptRankings?: SectorRankings;
   marketStructure?: MarketStructureContext | null;
+  reportStrata?: ReportStrata | null;
 }
 
 /** Full analysis report */
