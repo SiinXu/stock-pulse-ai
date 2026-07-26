@@ -52,9 +52,16 @@ def test_framework_docs_are_discoverable_without_expanding_readmes() -> None:
     index_en = _read("docs/INDEX_EN.md")
     changelog = _read("docs/CHANGELOG.md")
 
-    assert "[个人投资框架后端合同](personal-investment-framework.md)" in index
+    assert "[个人投资框架](personal-investment-framework.md)" in index
     assert (
-        "[Personal Investment Framework Backend Contract]"
+        "[Personal Investment Framework]"
         "(personal-investment-framework_EN.md)"
     ) in index_en
     assert "versioned local personal investment framework backend" in changelog
+    # Living docs cover Settings editor + single-path analysis injection.
+    chinese = _read("docs/personal-investment-framework.md")
+    english = _read("docs/personal-investment-framework_EN.md")
+    for document in (chinese, english):
+        assert "Agent Behavior" in document or "Agent 行为" in document
+        assert "framework_alignment" in document
+        assert "investment_framework_prompt" in document
