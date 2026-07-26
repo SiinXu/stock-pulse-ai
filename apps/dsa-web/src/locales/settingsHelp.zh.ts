@@ -912,10 +912,16 @@ const settingsHelpZhCN: SettingsHelpMap = {
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: '风险 Agent 否决权',
     summary: '允许风险 Agent 在检测到关键风险信号时否决买入信号。',
-    usage: '开启后，full/specialist 模式中的风险 Agent 可将买入建议降级为观望或卖出。',
-    valueNotes: ['仅在 AGENT_ORCHESTRATOR_MODE 包含风险阶段时生效。'],
+    usage: '开启后，full/specialist 模式中的风险 Agent 可将买入建议降级为观望或卖出。该保守覆写仍会自动生效，除非人工审批（/approvals）捕获了对应路径。',
+    valueNotes: [
+      '仅在 AGENT_ORCHESTRATOR_MODE 包含风险阶段时生效。',
+      'HITL 风控绕过在 /approvals 默认关闭；在该页启用后，才可在限时窗口内一次性申请保留原始信号。',
+    ],
     impact: ['影响最终投资建议的风险保守程度。'],
-    notes: ['关闭后风险 Agent 的意见仅作参考，不会否决决策。'],
+    notes: [
+      '关闭后风险 Agent 的意见仅作参考，不会否决决策。',
+      '打开人工审批（/approvals）可配置默认关闭的 HITL 门禁。这不是券商或交易下单审批，也不会扩大 Agent 工具权限。',
+    ],
   },
   'settings.agent.DEEP_RESEARCH': {
     title: 'Deep Research',

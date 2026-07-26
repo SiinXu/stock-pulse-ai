@@ -869,10 +869,16 @@ const settingsHelpEnUS: SettingsHelpMap = {
   'settings.agent.AGENT_RISK_OVERRIDE': {
     title: 'Risk Agent Veto',
     summary: 'Allows the risk agent to veto buy signals when critical risk flags are detected.',
-    usage: 'When enabled, the risk agent in full/specialist mode can downgrade buy recommendations to hold or sell.',
-    valueNotes: ['Only effective when AGENT_ORCHESTRATOR_MODE includes the risk stage.'],
+    usage: 'When enabled, the risk agent in full/specialist mode can downgrade buy recommendations to hold or sell. That conservative override still applies automatically unless Human approvals captures the path.',
+    valueNotes: [
+      'Only effective when AGENT_ORCHESTRATOR_MODE includes the risk stage.',
+      'HITL risk-control bypass is off by default on /approvals; enable it there for a one-shot, time-limited chance to preserve the original signal.',
+    ],
     impact: ['Affects the risk conservatism of final investment recommendations.'],
-    notes: ['When disabled, the risk agent opinion is advisory only and cannot override decisions.'],
+    notes: [
+      'When disabled, the risk agent opinion is advisory only and cannot override decisions.',
+      'Open Human approvals (/approvals) to configure the default-off HITL gate. This is not broker or trade-order approval and does not expand Agent tool authority.',
+    ],
   },
   'settings.agent.DEEP_RESEARCH': {
     title: 'Deep Research',
