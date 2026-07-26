@@ -468,6 +468,9 @@ class GeminiAnalyzer:
         decision_memory_prompt = context.get("decision_memory_reflection_prompt")
         if isinstance(decision_memory_prompt, str) and decision_memory_prompt:
             prompt += decision_memory_prompt
+        framework_prompt = context.get("personal_investment_framework_prompt")
+        if isinstance(framework_prompt, str) and framework_prompt:
+            prompt += framework_prompt
         prompt += f"""
 
 ## 📈 技术面数据
