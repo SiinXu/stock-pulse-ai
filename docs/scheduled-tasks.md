@@ -1,5 +1,30 @@
 # Scheduled Tasks
 
+## Two schedulers (read this first)
+
+StockPulse currently has **two independent schedule tracks**. They share the
+process-local analysis queue when work is admitted, but they are **not** one
+unified scheduler UI or migration wizard.
+
+| Track | Config / API | What it runs | Settings surface | Home surface |
+| --- | --- | --- | --- | --- |
+| **Legacy day-batch** | `SCHEDULE_ENABLED`, `SCHEDULE_TIME` / `SCHEDULE_TIMES`, plus `STOCK_LIST` | Whole watchlist analysis at fixed daily times | **Legacy day-batch schedule** card (`SchedulerSettingsCard`) | Not listed as versioned “today” rows |
+| **Versioned scheduled tasks** | `POST/GET /api/v1/scheduled-tasks`, SQLite definitions | Per-definition stock analysis or research (`schema_version` 1/2) | **Saved schedule definitions** panel | **Versioned scheduled tasks today** card |
+
+Both tracks may be enabled at once. That can produce overlapping analysis load
+(the queue may coalesce identical execution contracts, but it does not merge
+unrelated jobs). Prefer enabling only the track you intend to use.
+
+**Process ownership** is deployment-role based (`--serve`, `--schedule`, Compose
+`analyzer` vs `server`, Desktop `--serve-only`). The internal
+`DSA_SCHEDULED_TASK_OWNER` handoff makes those roles explicit; it is **not** a
+second operator-facing switch. The legacy status card reports only legacy
+day-batch next/last times — it does not expose a live “this process owns
+versioned tasks” indicator.
+
+There is no English twin of this document yet (`docs/scheduled-tasks_EN.md`);
+this file is the single source for both tracks.
+
 ## Scope
 
 The scheduled-task model stores deterministic daily stock-analysis and bounded
@@ -154,15 +179,16 @@ The product surface is intentionally small:
 
 | Surface | Behavior |
 | --- | --- |
-| Settings → System & Security → Scheduling | Lists persisted definitions, shows next run when known, and enable/disable supported definitions. Unsupported future schemas are visible but not mutable. |
-| Home → Configurable area → Scheduled tasks today | Read-only today projection from `GET /scheduled-tasks/today`. Empty state links to Settings management. |
+| Settings → System & Security → Scheduling → Legacy day-batch | Configures `SCHEDULE_*` + shows legacy status only. Copy labels it as legacy and warns when both tracks appear enabled. |
+| Settings → System & Security → Scheduling → Saved definitions | Lists versioned definitions, shows next run when known, and enable/disable supported definitions. Unsupported future schemas are visible but not mutable. |
+| Home → Configurable area → Versioned scheduled tasks today | Read-only today projection from `GET /scheduled-tasks/today` (versioned track only). Empty state links to Settings management. |
 
 Defaults and framing:
 
 - No create/edit form, natural-language planner, multi-tenant ownership, or distributed scheduler in this UI.
 - Execution remains process-local through `AnalysisTaskQueue` / ADR-008.
 - Research brief and risk-check schedules are research-only aids, not investment advice.
-- Daily stock-list scheduler env (`SCHEDULE_*`) remains the separate system-config card on the same Settings view.
+- Daily stock-list scheduler env (`SCHEDULE_*`) remains the separate **legacy** system-config card on the same Settings view; it is not the versioned definitions list.
 
 ## Occurrence And Execution Semantics
 
