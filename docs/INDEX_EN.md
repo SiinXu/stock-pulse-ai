@@ -9,7 +9,8 @@ This is the entry point for project documentation. The README covers the project
 | I want to | Start with | Then read |
 | --- | --- | --- |
 | Understand what the project does | [README (EN)](README_EN.md) | [Full Guide (EN)](full-guide_EN.md) |
-| Run the project for the first time | [Beginner client setup (EN)](beginner-client-setup_EN.md) | [Full Guide (EN)](full-guide_EN.md), [UI User Manual](ui-manual/README_EN.md) |
+| **See how StockPulse differs from upstream** | [README EN · Why StockPulse](README_EN.md#why-stockpulse) | [Root README · 为什么选择 StockPulse](../README.md#why-stockpulse), [Architecture overview](architecture-overview.md) |
+| Run the project for the first time | [Beginner client setup (EN)](beginner-client-setup_EN.md) | [Why StockPulse](README_EN.md#why-stockpulse), [Security baseline — operator boundaries](security-baseline.md#operator-security-boundaries), [Full Guide (EN)](full-guide_EN.md), [UI User Manual](ui-manual/README_EN.md) |
 | **Learn the Web / desktop UI** | [UI User Manual](ui-manual/README_EN.md) | Per-module chapters (analysis, signals, portfolio, …) |
 | Configure model providers | [LLM Config Guide (EN)](LLM_CONFIG_GUIDE_EN.md) | [Local Model Catalog](local-model-catalog.md), [Provider Configuration Guide](llm-providers.md) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) |
 | Import or publish a local GGUF model | [StockPulse Model Packs](model-packs.md) | [LLM Config Guide (EN)](LLM_CONFIG_GUIDE_EN.md) |
@@ -27,7 +28,7 @@ This is the entry point for project documentation. The README covers the project
 
 | Document | Contents |
 | --- | --- |
-| [README (EN)](README_EN.md) | Project overview, key features, quick start, sample output |
+| [README (EN)](README_EN.md) | Project overview, differentiators vs upstream, key features, quick start, sample output |
 | [Beginner client setup (EN)](beginner-client-setup_EN.md) | Download desktop client, Anspire/AIHubMix keys, watchlist, first analysis; [中文](beginner-client-setup.md) |
 | [UI User Manual](ui-manual/README_EN.md) | Modular Web/desktop UI usage (no deployment); [简体中文](ui-manual/README.md) |
 | [Full Guide (EN)](full-guide_EN.md) | Environment setup, run modes, configuration, deployment paths, and common issues |

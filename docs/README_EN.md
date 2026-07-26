@@ -280,7 +280,7 @@ After configuring any available AI API key, the Web `/chat` page can use strateg
 
 ## 📞 Project Links
 
-[GitHub Repository](https://github.com/SiinXu/stock-pulse-ai) · [GitHub Issues](https://github.com/SiinXu/stock-pulse-ai/issues) · [Documentation](https://github.com/SiinXu/stock-pulse-ai/tree/main/docs)
+[GitHub Repository](https://github.com/SiinXu/stock-pulse-ai) · [GitHub Issues](https://github.com/SiinXu/stock-pulse-ai/issues) · [Documentation index](INDEX_EN.md) · [Differentiators entry](INDEX_EN.md) · [Deploy security boundaries](security-baseline.md#operator-security-boundaries)
 
 ## 📄 License
 
