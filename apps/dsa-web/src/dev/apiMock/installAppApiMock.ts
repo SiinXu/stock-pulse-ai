@@ -143,11 +143,31 @@ function registerPriorityHandlers(mock: AxiosMockAdapter, profile: PlaygroundFix
       next_run_at: FIXTURE_TIMESTAMP,
       created_at: FIXTURE_TIMESTAMP,
       updated_at: FIXTURE_TIMESTAMP,
+    }, {
+      compatibility: 'supported',
+      id,
+      schema_version: 2,
+      name: id,
+      task_type: 'research_brief',
+      enabled: false,
+      next_run_at: null,
+      created_at: FIXTURE_TIMESTAMP,
+      updated_at: FIXTURE_TIMESTAMP,
     });
   });
   mock.onPost(/\/api\/v1\/scheduled-tasks\/[^/]+\/disable$/).reply((config) => {
     const id = String(config.url || '').split('/').slice(-2, -1)[0] || 'task';
     return reply(profile, {
+      compatibility: 'supported',
+      id,
+      schema_version: 2,
+      name: id,
+      task_type: 'research_brief',
+      enabled: false,
+      next_run_at: null,
+      created_at: FIXTURE_TIMESTAMP,
+      updated_at: FIXTURE_TIMESTAMP,
+    }, {
       compatibility: 'supported',
       id,
       schema_version: 2,

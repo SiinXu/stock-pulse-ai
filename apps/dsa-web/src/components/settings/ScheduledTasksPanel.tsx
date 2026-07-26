@@ -132,8 +132,8 @@ const ScheduledTasksPanel: React.FC<ScheduledTasksPanelProps> = ({
       actions={(
         <IconButton
           type="button"
-          variant="secondary"
-          size="sm"
+          variant="outline"
+          size="compact"
           onClick={() => void loadTasks('refresh')}
           disabled={disabled || isLoading || isRefreshing}
           isLoading={isRefreshing}

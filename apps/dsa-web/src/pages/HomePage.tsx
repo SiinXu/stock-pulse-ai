@@ -717,7 +717,7 @@ const HomePage: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Button
                   variant="secondary"
-                  size="sm"
+                  size="compact"
                   onClick={() => navigate(buildSettingsHref({ section: 'system_security', view: 'runtime' }))}
                 >
                   {t('home.manageScheduledTasks')}
