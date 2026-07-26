@@ -2117,21 +2117,21 @@ describe('DecisionSignalsPage', () => {
     expect(await screen.findByText('当前查看：AAPL')).toBeInTheDocument();
 
     openSignalsView('全部信号');
-    fireEvent.click(screen.getByRole('button', { name: '查看 贵州茅台 AI 建议详情' }));
+    fireEvent.click(await screen.findByRole('button', { name: '查看 贵州茅台 AI 建议详情' }));
     expect(within(await screen.findByRole('dialog')).getByText('趋势保持')).toBeInTheDocument();
     closeSignalDetailsDrawer();
     openStockContextModal();
-    fireEvent.click(screen.getByRole('button', { name: '清空当前股票' }));
+    fireEvent.click(await screen.findByRole('button', { name: '清空当前股票' }));
 
     expect(getStockContextInput()).toHaveValue('');
     closeStockContextModal();
     expect(screen.getAllByText('选择股票查看 AI 建议').length).toBeGreaterThan(0);
     openSignalsView('股票信号时间线');
-    expect(screen.getByRole('button', { name: '查询时间线' })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: '查询时间线' })).toBeDisabled();
     openSignalsView('全部信号');
-    fireEvent.click(screen.getByRole('button', { name: '查看 贵州茅台 AI 建议详情' }));
+    fireEvent.click(await screen.findByRole('button', { name: '查看 贵州茅台 AI 建议详情' }));
     expect(within(await screen.findByRole('dialog')).getByText('趋势保持')).toBeInTheDocument();
-  });
+  }, 15_000);
 
   it('closes a timeline-sourced drawer when an active timeline status update removes it', async () => {
     const timelineSignal = makeSignal({

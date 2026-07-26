@@ -1134,8 +1134,13 @@ test.describe('Analysis Workbench interaction contract', () => {
       }, 202);
     });
 
-    await page.locator('#analysis-workbench-stock-search').fill('AAPL');
-    await page.getByRole('button', { name: 'Analyze', exact: true }).last().click();
+    // Wait for setup/experience readiness before typing; Analyze stays disabled until then.
+    const stockSearch = page.locator('#analysis-workbench-stock-search');
+    await expect(stockSearch).toBeEnabled();
+    await stockSearch.fill('AAPL');
+    const analyze = page.getByRole('button', { name: 'Analyze', exact: true }).last();
+    await expect(analyze).toBeEnabled();
+    await analyze.click();
 
     await expectSearchParams(page, {
       [ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS.segment]: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
