@@ -154,7 +154,27 @@ DSA_PLAYWRIGHT_ARTIFACT_CANARY=stockpulse-local-canary-change-me \
 
 # Real authenticated intentional-failure diagnostics acceptance; temporary files are cleaned
 python scripts/check_playwright_failure_diagnostics.py
+
+# Offline analysis quality panel (no network, no live LLM; structural trust fixtures, not market alpha)
+./scripts/run_analysis_quality_panel.sh
+# equivalent:
+# python -m pytest -m "not network and quality_benchmark" tests/analysis_quality -q
 ```
+
+### Offline analysis quality panel (how contributors run it)
+
+When changing report formats, evidence strata, or analysis output structure, also run the fixed offline panel locally (in addition to `./scripts/ci_gate.sh`):
+
+```bash
+./scripts/run_analysis_quality_panel.sh
+```
+
+- **What it is**: Frozen synthetic cases under `tests/fixtures/analysis_quality/` plus deterministic assertions in `tests/analysis_quality/` (schema parse, numeric consistency with frozen inputs, gap markers, risk surface, leakage patterns).
+- **What it is not**: Not market alpha or strategy PnL scoring, not live vendor SLA checks, not a subjective LLM quality merge gate. The panel answers engineering trust questions only.
+- **Topic doc**: [Offline Analysis Quality Panel](analysis-quality-panel.md) (how to extend cases, non-claims, #617 boundary).
+- **CI**: Keep the panel offline; do not turn it into a live-LLM or internet-vendor blocking gate.
+
+HITL human approval defaults (off by default), proposal lifetime, and pipeline deadline semantics: [Human-in-the-Loop Approval Safety Gate](human-approvals_EN.md).
 
 See [Web Internationalization Conventions](web-i18n_EN.md) for UI/report-language boundaries, domain registries, and error-code handling. New pages and languages must extend the relevant `src/locales/` domain instead of hardcoding visible JSX copy.
 
