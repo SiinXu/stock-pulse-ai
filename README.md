@@ -36,7 +36,7 @@ StockPulse is a **local-first investment research workbench**: multi-market data
 | **Trusted plugins** | Strategies, report templates, notification channels, event hooks, data providers | [Plugin contract](docs/plugin-extension-contract.md) |
 | **Agent Soul + Personas** | Charter across Single/Multi/Chat; optional committee Personas (default off) | [Agent Soul](docs/agent-soul.md) |
 | **Bounded Critic loop** | Default-off critic before multi-agent decisions (pass / retry / fail-soft) | [CHANGELOG](docs/CHANGELOG.md) |
-| **Investment framework** | Versioned API/storage; stock-analysis inject as read-only research context; no Web editor on main | [Framework](docs/personal-investment-framework_EN.md) |
+| **Investment framework** | Versioned API/storage; Settings minimal editor; stock-analysis inject as read-only research context | [Framework](docs/personal-investment-framework_EN.md) |
 | **Security audit Phase 1** | Durable privileged-path audit trail | [Security audit](docs/security-audit.md) |
 | **Offline quality panel** | Deterministic fixtures + local runner (no live LLM scoring) | [CONTRIBUTING](docs/CONTRIBUTING_EN.md) |
 | **Open source licensing** | MIT (original portions) + AGPL-3.0 (StockPulse additions) | [LICENSE](LICENSE) |

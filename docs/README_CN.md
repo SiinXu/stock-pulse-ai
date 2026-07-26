@@ -35,7 +35,7 @@ StockPulse 是**本地优先的投资研究工作台**：多市场数据、可�
 | 定时研究任务 | 日更分析 / 研究简报 / 风险检查；首页今日视图 | [定时任务](scheduled-tasks.md) |
 | 可信插件 | 策略、报告模板、通知渠道、事件钩子、数据源等 | [插件契约](plugin-extension-contract.md) |
 | Agent Soul / Persona / Critic | 宪章装配；可选委员会 Persona；多 Agent 前有界 Critic | [Agent Soul](agent-soul.md) |
-| 个人投资框架 | 版本化 API/存储；个股分析路径只读研究注入；`main` 无 Web 编辑器 | [投资框架](personal-investment-framework.md) |
+| 个人投资框架 | 版本化 API/存储；Settings 最小编辑器；个股分析路径只读研究注入 | [投资框架](personal-investment-framework.md) |
 | 安全审计 Phase 1 | 特权路径持久审计 | [安全审计](security-audit.md) |
 | 离线质量面板 | 固定样例 + 本地 runner（不绑 live LLM） | [贡献指南](CONTRIBUTING.md) |
 | 开源许可 | 原始部分 MIT + StockPulse 新增部分 AGPL-3.0 | [LICENSE](../LICENSE) |
@@ -51,7 +51,7 @@ StockPulse 是**本地优先的投资研究工作台**：多市场数据、可�
 
 | 方向 | 状态 | 跟踪 |
 | --- | --- | --- |
-| 投资框架 Web 编辑器与 Multi/Research 全路径注入 | 规划 / 进行中 | [#465](https://github.com/SiinXu/stock-pulse-ai/issues/465) |
+| 投资框架完整决策树/维度矩阵编辑与 Multi/Research 全路径注入 | 规划 / 进行中 | [#465](https://github.com/SiinXu/stock-pulse-ai/issues/465) |
 | 多用户 / 工作区隔离 | 规划 | [#230](https://github.com/SiinXu/stock-pulse-ai/issues/230) |
 
 更完整的场景入口见 [文档中心](INDEX.md)。架构边界见 [技术架构总览](architecture-overview.md)。
