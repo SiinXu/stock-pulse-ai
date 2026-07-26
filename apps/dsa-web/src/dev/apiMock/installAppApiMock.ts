@@ -101,6 +101,64 @@ function registerPriorityHandlers(mock: AxiosMockAdapter, profile: PlaygroundFix
     return [200, { total: tasks.length, pending, processing, tasks }];
   });
 
+  mock.onGet('/api/v1/scheduled-tasks').reply(() => reply(profile, {
+    total: 2,
+    items: [
+      {
+        compatibility: 'supported',
+        id: 'scheduled-brief-aapl',
+        schema_version: 2,
+        name: 'AAPL morning brief',
+        task_type: 'research_brief',
+        enabled: true,
+        next_run_at: '2026-07-25T14:30:00Z',
+        created_at: FIXTURE_TIMESTAMP,
+        updated_at: FIXTURE_TIMESTAMP,
+      },
+      {
+        compatibility: 'supported',
+        id: 'scheduled-risk-msft',
+        schema_version: 2,
+        name: 'MSFT downside review',
+        task_type: 'risk_check',
+        enabled: false,
+        next_run_at: null,
+        created_at: FIXTURE_TIMESTAMP,
+        updated_at: FIXTURE_TIMESTAMP,
+      },
+    ],
+  }, {
+    total: 0,
+    items: [],
+  }));
+  mock.onPost(/\/api\/v1\/scheduled-tasks\/[^/]+\/enable$/).reply((config) => {
+    const id = String(config.url || '').split('/').slice(-2, -1)[0] || 'task';
+    return reply(profile, {
+      compatibility: 'supported',
+      id,
+      schema_version: 2,
+      name: id,
+      task_type: 'research_brief',
+      enabled: true,
+      next_run_at: FIXTURE_TIMESTAMP,
+      created_at: FIXTURE_TIMESTAMP,
+      updated_at: FIXTURE_TIMESTAMP,
+    });
+  });
+  mock.onPost(/\/api\/v1\/scheduled-tasks\/[^/]+\/disable$/).reply((config) => {
+    const id = String(config.url || '').split('/').slice(-2, -1)[0] || 'task';
+    return reply(profile, {
+      compatibility: 'supported',
+      id,
+      schema_version: 2,
+      name: id,
+      task_type: 'research_brief',
+      enabled: false,
+      next_run_at: null,
+      created_at: FIXTURE_TIMESTAMP,
+      updated_at: FIXTURE_TIMESTAMP,
+    });
+  });
   mock.onGet('/api/v1/scheduled-tasks/today').reply(() => reply(profile, {
     date: '2026-07-25',
     timezone: 'UTC',
