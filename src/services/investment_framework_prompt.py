@@ -21,6 +21,28 @@ logger = logging.getLogger(__name__)
 PERSONAL_INVESTMENT_FRAMEWORK_PROMPT_KEY = "personal_investment_framework_prompt"
 PERSONAL_INVESTMENT_FRAMEWORK_CONTEXT_KEY = "personal_investment_framework"
 
+# Prompt-only budgets so a max-size framework cannot dominate the analysis prompt.
+_PROMPT_FREE_FORM_MAX_CHARS = 2500
+_PROMPT_LIST_MAX_ITEMS = 20
+_PROMPT_LIST_ITEM_MAX_CHARS = 400
+_PROMPT_DIMENSION_MAX_ITEMS = 15
+
+
+def _clip_text(value: str, limit: int) -> str:
+    text = (value or "").strip()
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 1)].rstrip() + "…"
+
+
+def _clip_rule_list(values: list[str]) -> list[str]:
+    clipped: list[str] = []
+    for item in values[:_PROMPT_LIST_MAX_ITEMS]:
+        cleaned = _clip_text(str(item), _PROMPT_LIST_ITEM_MAX_CHARS)
+        if cleaned:
+            clipped.append(cleaned)
+    return clipped
+
 
 def format_investment_framework_prompt_section(
     context: Optional[InvestmentFrameworkAnalysisContext],
@@ -35,6 +57,11 @@ def format_investment_framework_prompt_section(
     title = content.title
     version = context.framework_version
     framework_id = context.framework_id
+    description = _clip_text(content.description or "", 800)
+    free_form = _clip_text(content.free_form_rules or "", _PROMPT_FREE_FORM_MAX_CHARS)
+    risk_rules = _clip_rule_list(list(content.risk_rules or []))
+    tracking_criteria = _clip_rule_list(list(content.tracking_criteria or []))
+    dimensions = list(content.evaluation_dimensions or [])[:_PROMPT_DIMENSION_MAX_ITEMS]
 
     if lang in {"en", "ko"}:
         lines = [
@@ -48,22 +75,24 @@ def format_investment_framework_prompt_section(
             "trading authority or investment advice.",
             "",
         ]
-        if content.description:
-            lines.extend(["### Description", content.description, ""])
-        if content.free_form_rules:
-            lines.extend(["### Free-form rules", content.free_form_rules, ""])
-        if content.risk_rules:
+        if description:
+            lines.extend(["### Description", description, ""])
+        if free_form:
+            lines.extend(["### Free-form rules", free_form, ""])
+        if risk_rules:
             lines.append("### Risk rules")
-            lines.extend(f"- {rule}" for rule in content.risk_rules)
+            lines.extend(f"- {rule}" for rule in risk_rules)
             lines.append("")
-        if content.tracking_criteria:
+        if tracking_criteria:
             lines.append("### Tracking criteria")
-            lines.extend(f"- {item}" for item in content.tracking_criteria)
+            lines.extend(f"- {item}" for item in tracking_criteria)
             lines.append("")
-        if content.evaluation_dimensions:
+        if dimensions:
             lines.append("### Evaluation dimensions")
-            for dimension in content.evaluation_dimensions:
-                criteria = "; ".join(dimension.criteria) if dimension.criteria else ""
+            for dimension in dimensions:
+                criteria = "; ".join(
+                    _clip_rule_list(list(dimension.criteria or []))
+                )
                 lines.append(
                     f"- {dimension.name} (weight {dimension.weight})"
                     + (f": {criteria}" if criteria else "")
@@ -81,22 +110,22 @@ def format_investment_framework_prompt_section(
         "以下内容仅作为研究上下文参考，不构成投资建议，也不授权自动交易。",
         "",
     ]
-    if content.description:
-        lines.extend(["### 说明", content.description, ""])
-    if content.free_form_rules:
-        lines.extend(["### 自由规则", content.free_form_rules, ""])
-    if content.risk_rules:
+    if description:
+        lines.extend(["### 说明", description, ""])
+    if free_form:
+        lines.extend(["### 自由规则", free_form, ""])
+    if risk_rules:
         lines.append("### 风险规则")
-        lines.extend(f"- {rule}" for rule in content.risk_rules)
+        lines.extend(f"- {rule}" for rule in risk_rules)
         lines.append("")
-    if content.tracking_criteria:
+    if tracking_criteria:
         lines.append("### 跟踪条件")
-        lines.extend(f"- {item}" for item in content.tracking_criteria)
+        lines.extend(f"- {item}" for item in tracking_criteria)
         lines.append("")
-    if content.evaluation_dimensions:
+    if dimensions:
         lines.append("### 评估维度")
-        for dimension in content.evaluation_dimensions:
-            criteria = "；".join(dimension.criteria) if dimension.criteria else ""
+        for dimension in dimensions:
+            criteria = "；".join(_clip_rule_list(list(dimension.criteria or [])))
             lines.append(
                 f"- {dimension.name}（权重 {dimension.weight}）"
                 + (f"：{criteria}" if criteria else "")

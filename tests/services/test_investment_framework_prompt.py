@@ -92,6 +92,26 @@ def test_enrich_dashboard_framework_alignment_fills_slot() -> None:
     assert alignment["framework_id"] == "7"
 
 
+def test_format_prompt_clips_oversized_free_form() -> None:
+    ctx = _context()
+    huge = "A" * 5000
+    oversized = InvestmentFrameworkAnalysisContext(
+        framework_id=ctx.framework_id,
+        framework_version=ctx.framework_version,
+        content=InvestmentFrameworkContent.model_validate(
+            {
+                "title": "Huge",
+                "free_form_rules": huge,
+            }
+        ),
+        updated_at=ctx.updated_at,
+    )
+    section = format_investment_framework_prompt_section(oversized, report_language="en")
+    assert huge not in section
+    assert "…" in section
+    assert len(section) < 4000
+
+
 def test_enrich_preserves_model_aligned_status() -> None:
     dashboard = {
         "report_strata": {
