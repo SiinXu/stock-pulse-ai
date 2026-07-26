@@ -73,6 +73,7 @@ describe('ThemeToggle', () => {
     );
 
     const trigger = screen.getByRole('combobox', { name: '切换主题' });
+    expect(trigger).toHaveClass('h-11', 'min-h-11', 'sm:h-11', 'sm:min-h-11');
     fireEvent.click(trigger);
 
     expect(screen.queryByRole('menu', { name: '主题模式' })).not.toBeInTheDocument();

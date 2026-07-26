@@ -2055,7 +2055,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     expect(statusCalls).toBeGreaterThan(0);
     const runFlowButton = task.getByRole('button', { name: /查看.*运行流/ });
     await expect(runFlowButton).toHaveAttribute('data-control', 'icon-button');
-    await expect(runFlowButton).toHaveAttribute('data-size', 'default');
+    await expect(runFlowButton).toHaveAttribute('data-size', 'compact');
     await runFlowButton.click();
     await expectMinimumTouchTarget(
       page.getByTestId('run-flow-node-topology_data_realtime_quote-toggle'),

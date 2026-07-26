@@ -23,7 +23,7 @@ describe('SettingsHelpButton tooltip contract', () => {
     const trigger = renderHelpButton();
 
     expect(trigger).toHaveAttribute('data-control', 'icon-button');
-    expect(trigger).toHaveAttribute('data-size', 'compact');
+    expect(trigger).toHaveAttribute('data-size', 'navigation');
     expect(trigger).toHaveClass('control-hit-target');
     fireEvent.mouseEnter(trigger.parentElement!);
 
