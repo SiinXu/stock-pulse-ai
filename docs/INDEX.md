@@ -28,7 +28,6 @@
 | [完整配置与部署指南](full-guide.md) | 环境准备、运行方式、配置说明、部署路径和常见问题 |
 | [FAQ](FAQ.md) | 常见配置、模型、通知、部署和运行问题 |
 | [持久安全审计 Phase 1（英文）](security-audit.md) | 事件合同、代表性特权路径、管理员查询、保留、失败语义与回滚 |
-| [人工审批安全门禁](human-approvals.md) | 默认关闭的风控绕过审批、CAS 状态机、认证 API、Web 待办入口与迁移回滚 |
 | [数据源稳定性与故障处理图示](data-source-stability.md) | Tushare、TickFlow、AkShare、Efinance、YFinance、Longbridge 等已接入源的使用场景、fallback 链路和推荐配置 |
 | [更新日志](CHANGELOG.md) | 版本变化、能力调整和迁移说明 |
 
@@ -79,10 +78,10 @@
 | [业务架构](business-architecture.md) | 利益相关者、业务能力、结果与从证据获取到通知的价值流 |
 | [技术架构总览](architecture-overview.md) | 当前组件、入口、所有权边界、进程模式、缓存/fallback 旁路与八阶段分析数据流 |
 | [Foundation Pipeline 与 Product Layer](foundation-product-architecture.md) | 双轨职责、交互边界、贡献归属、上游移植与许可证来源规则 |
-| [MIT / AGPL 文件归属清单流程（英文）](license-ownership-inventory.md) | 上游 MIT 与 StockPulse AGPL 分类规则、SPDX 约定、清单模板与渐进覆盖报告（非全库审计结论） |
 | [ADR 注册表与流程](adr/README.md) | 架构决策编号、状态、模板、重大 PR 考量规则与历史决策入口 |
 | [API 规格](architecture/api_spec.json) | FastAPI OpenAPI 规格产物 |
 | [贡献指南](CONTRIBUTING.md) | Issue、PR、测试、文档同步和协作要求 |
+| [离线分析质量面板（英文）](analysis-quality-panel.md) | 固定面板离线信任夹具、扩展方式与非主张范围（#617 Phase A） |
 | [Data Provider 插件作者指南（英文）](data-provider-plugin-authoring.md) | 可加载示例、manifest、`PLUGINS_DIR`、生命周期诊断、版本兼容、信任模型与路由边界 |
 | [Analysis Strategy 插件作者指南（英文）](analysis-strategy-plugin-authoring.md) | 声明式优先边界、`Skill` 注册字段、catalog 优先级、生命周期、诊断、测试与信任模型 |
 | [供应链维护策略](supply-chain-maintenance.md) | 依赖与 GitHub Actions 的固定、权限、更新、例外、验证和回滚契约（英文） |
