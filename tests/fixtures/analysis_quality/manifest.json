@@ -1,0 +1,49 @@
+{
+  "panel_id": "analysis-quality-phase-a",
+  "schema_version": "analysis-quality-panel-v1",
+  "description": "Offline fixed-panel analysis quality fixtures for structural trust checks. Synthetic only; does not measure market alpha or live vendor accuracy.",
+  "license": "synthetic-fixture",
+  "related_issues": [
+    617,
+    252
+  ],
+  "notes": {
+    "strata": "Report evidence strata (#616) are not asserted until that contract lands on main. Pre-strata public report fields only.",
+    "not_measured": [
+      "market alpha or strategy PnL",
+      "live provider SLA",
+      "LLM subjective quality scores",
+      "prediction-vs-actual tracking (#449/#466)"
+    ]
+  },
+  "cases": [
+    {
+      "id": "a-normal-complete",
+      "file": "cases/a-normal-complete.json",
+      "market": "A",
+      "scenario": "normal_session",
+      "license": "synthetic-fixture"
+    },
+    {
+      "id": "us-missing-fundamentals",
+      "file": "cases/us-missing-fundamentals.json",
+      "market": "US",
+      "scenario": "missing_provider_fields",
+      "license": "synthetic-fixture"
+    },
+    {
+      "id": "hk-conflicting-headlines",
+      "file": "cases/hk-conflicting-headlines.json",
+      "market": "HK",
+      "scenario": "conflicting_headlines",
+      "license": "synthetic-fixture"
+    },
+    {
+      "id": "a-limited-fields",
+      "file": "cases/a-limited-fields.json",
+      "market": "A",
+      "scenario": "limited_fields",
+      "license": "synthetic-fixture"
+    }
+  ]
+}

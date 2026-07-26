@@ -1,0 +1,134 @@
+{
+  "id": "a-normal-complete",
+  "scenario": "normal_session",
+  "market": "A",
+  "license": "synthetic-fixture",
+  "notes": "Complete A-share panel case: all primary sources present with as-of stamps; report numbers match frozen inputs.",
+  "frozen_inputs": {
+    "stock_code": "600519",
+    "stock_name": "Kweichow Moutai",
+    "as_of": "2026-07-01T15:00:00+08:00",
+    "market_data": {
+      "current_price": 1680.5,
+      "ma5": 1672.0,
+      "ma10": 1658.0,
+      "ma20": 1635.0,
+      "volume_ratio": 1.12,
+      "turnover_rate": 0.18
+    },
+    "news": [
+      {
+        "headline": "Company files routine quarterly update",
+        "as_of": "2026-07-01T09:00:00+08:00",
+        "source": "synthetic-wire"
+      }
+    ],
+    "fundamentals": {
+      "pe_ttm": 28.4,
+      "revenue_yoy": 0.12
+    },
+    "sources": {
+      "market_data": {
+        "present": true,
+        "as_of": "2026-07-01T15:00:00+08:00",
+        "provider": "synthetic-fixture"
+      },
+      "news": {
+        "present": true,
+        "as_of": "2026-07-01T09:00:00+08:00",
+        "provider": "synthetic-wire"
+      },
+      "fundamentals": {
+        "present": true,
+        "as_of": "2026-06-30T00:00:00+08:00",
+        "provider": "synthetic-fixture"
+      }
+    }
+  },
+  "report": {
+    "schema_version": "report-v1",
+    "stock_name": "Kweichow Moutai",
+    "sentiment_score": 62,
+    "trend_prediction": "mildly bullish",
+    "operation_advice": "Hold",
+    "decision_type": "hold",
+    "confidence_level": "medium",
+    "dashboard": {
+      "core_conclusion": {
+        "one_sentence": "Trend intact; hold with MA10 as risk line.",
+        "signal_type": "hold",
+        "time_sensitivity": "session"
+      },
+      "data_perspective": {
+        "trend_status": {
+          "ma_alignment": "bullish",
+          "is_bullish": true,
+          "trend_score": 68
+        },
+        "price_position": {
+          "current_price": 1680.5,
+          "ma5": 1672.0,
+          "ma10": 1658.0,
+          "ma20": 1635.0,
+          "support_level": 1658.0,
+          "resistance_level": 1720.0
+        },
+        "volume_analysis": {
+          "volume_ratio": 1.12,
+          "volume_status": "normal",
+          "turnover_rate": 0.18,
+          "volume_meaning": "Participation is steady relative to the 20-day average."
+        }
+      },
+      "intelligence": {
+        "latest_news": "Company files routine quarterly update",
+        "risk_alerts": [
+          "Valuation remains elevated; reduce only on confirmed MA10 break."
+        ],
+        "positive_catalysts": [
+          "Routine quarterly update without adverse surprise."
+        ],
+        "sentiment_summary": "Neutral-to-positive on steady demand narrative."
+      },
+      "battle_plan": {
+        "sniper_points": {
+          "ideal_buy": 1658.0,
+          "stop_loss": 1630.0,
+          "take_profit": 1720.0
+        },
+        "position_strategy": {
+          "suggested_position": "maintain",
+          "risk_control": "Exit or cut if close loses MA10 with volume expansion."
+        },
+        "action_checklist": [
+          "Confirm close vs MA10",
+          "Re-check volume_ratio vs 1.0"
+        ]
+      }
+    },
+    "analysis_summary": "MA stack is bullish and price sits above MA5/MA10 with normal volume.",
+    "key_points": "current_price 1680.5; MA10 1658.0; volume_ratio 1.12",
+    "risk_warning": "Not investment advice. Elevated PE and single-name concentration remain key risks.",
+    "data_sources": "market_data@2026-07-01T15:00:00+08:00; news@2026-07-01T09:00:00+08:00; fundamentals@2026-06-30T00:00:00+08:00",
+    "search_performed": true
+  },
+  "expectations": {
+    "require_schema_version": "report-v1",
+    "require_risk_warning": true,
+    "numeric_paths": {
+      "dashboard.data_perspective.price_position.current_price": 1680.5,
+      "dashboard.data_perspective.price_position.ma5": 1672.0,
+      "dashboard.data_perspective.price_position.ma10": 1658.0,
+      "dashboard.data_perspective.price_position.ma20": 1635.0,
+      "dashboard.data_perspective.volume_analysis.volume_ratio": 1.12,
+      "dashboard.data_perspective.volume_analysis.turnover_rate": 0.18
+    },
+    "required_source_keys_present": [
+      "market_data",
+      "news",
+      "fundamentals"
+    ],
+    "required_gaps": [],
+    "forbid_traceback_leakage": true
+  }
+}
