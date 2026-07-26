@@ -230,8 +230,8 @@ const SecurityAuditPanel: React.FC<SecurityAuditPanelProps> = ({
       actions={(
         <IconButton
           type="button"
-          variant="secondary"
-          size="sm"
+          variant="outline"
+          size="compact"
           onClick={() => void loadEvents('refresh')}
           // Keep refresh available after a 403 so operators can retry once auth
           // is enabled without leaving Settings.
@@ -288,7 +288,7 @@ const SecurityAuditPanel: React.FC<SecurityAuditPanelProps> = ({
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Button
           type="button"
-          variant="secondary"
+          variant="outline"
           size="comfortable"
           onClick={applyFilters}
           disabled={disabled || isLoading || isRefreshing}
@@ -353,10 +353,10 @@ const SecurityAuditPanel: React.FC<SecurityAuditPanelProps> = ({
                     <p className="font-mono text-sm font-semibold text-foreground">
                       {event.eventType}
                     </p>
-                    <Badge variant={outcomeVariant(event.outcome)} size="sm">
+                    <Badge variant={outcomeVariant(event.outcome)} size="compact">
                       {event.outcome}
                     </Badge>
-                    <Badge variant="history" size="sm">
+                    <Badge variant="history" size="compact">
                       {event.phase}
                     </Badge>
                   </div>
