@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Docs] Froze the personal investment framework product narrative to match `main`: versioned API/storage, stock-analysis read-only inject, no Web editor, and honest report-strata `framework_alignment` empty-state copy.
+- [Changed] Clarified dual-schedule honesty in Settings/Home: legacy `SCHEDULE_*` day-batch vs versioned scheduled tasks, process-owner note, and a non-blocking dual-track warning when both appear enabled.
 - [Docs] Documented the minimal scheduled-task Settings list, Home today projection, and process-local research-only defaults.
 - [Added] Linked Home today scheduled tasks to Settings management with a clear empty-state path.
 - [Added] Added a minimal Settings list for persisted scheduled-task definitions with enable/disable controls and process-local research-only framing.

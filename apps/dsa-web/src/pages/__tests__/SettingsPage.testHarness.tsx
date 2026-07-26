@@ -164,6 +164,15 @@ vi.mock('react-router-dom', async (importOriginal) => ({
   useNavigate: () => usageNavigate,
 }));
 
+vi.mock('../../api/scheduledTasks', () => ({
+  scheduledTasksApi: {
+    list: vi.fn(async () => ({ total: 0, items: [] })),
+    getToday: vi.fn(async () => ({ date: '', timezone: 'UTC', generatedAt: '', items: [], total: 0 })),
+    enable: vi.fn(),
+    disable: vi.fn(),
+  },
+}));
+
 vi.mock('../../api/systemConfig', () => ({
   systemConfigApi: {
     exportEnv: (...args: unknown[]) => exportEnv(...args),

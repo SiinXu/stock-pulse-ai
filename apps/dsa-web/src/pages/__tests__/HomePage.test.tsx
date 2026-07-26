@@ -251,12 +251,12 @@ describe('HomePage attention hub', () => {
       .getByText('Market review')).toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: 'Recent analyses' }))
       .getByText('Apple')).toBeInTheDocument();
-    const scheduled = screen.getByRole('region', { name: 'Scheduled tasks today' });
+    const scheduled = screen.getByRole('region', { name: 'Versioned scheduled tasks today' });
     expect(within(scheduled).getByText('AAPL downside review')).toBeInTheDocument();
     expect(within(scheduled).getByText('Risk check', { exact: false })).toBeInTheDocument();
     expect(within(scheduled).getByText('Waiting to retry')).toBeInTheDocument();
     const taskList = within(scheduled).getByRole('region', {
-      name: "Today's scheduled task list",
+      name: "Today's versioned scheduled task list",
     });
     expect(taskList).toHaveAttribute('tabindex', '0');
     expect(within(taskList).getByRole('list')).toBeInTheDocument();
@@ -279,10 +279,10 @@ describe('HomePage attention hub', () => {
 
     renderHome();
 
-    const scheduled = await screen.findByRole('region', { name: 'Scheduled tasks today' });
+    const scheduled = await screen.findByRole('region', { name: 'Versioned scheduled tasks today' });
     expect(within(scheduled).getByText('Home data is incomplete')).toBeInTheDocument();
     expect(screen.getAllByText('Apple')).not.toHaveLength(0);
-    expect(screen.queryByText('No scheduled tasks today')).not.toBeInTheDocument();
+    expect(screen.queryByText('No versioned scheduled tasks today')).not.toBeInTheDocument();
   });
 
   it('shows loading rather than false empty history states when configuration starts expanded', async () => {

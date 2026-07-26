@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type React from 'react';
 import { Clock, Play, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
+import { scheduledTasksApi } from '../../api/scheduledTasks';
 import { systemConfigApi } from '../../api/systemConfig';
 import type {
   ConfigValidationIssue,
@@ -107,19 +108,37 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
   const [runNowSuccess, setRunNowSuccess] = useState('');
   const [scheduleEnabledOverride, setScheduleEnabledOverride] = useState<boolean | null>(null);
   const [isAddingTime, setIsAddingTime] = useState(false);
+  // Live dual-track probe: true only when list(enabled=true) succeeds with ≥1 item.
+  // null = not yet known / probe failed — never invent a dual-track state.
+  const [hasEnabledVersionedTasks, setHasEnabledVersionedTasks] = useState<boolean | null>(null);
+
+  const refreshVersionedTaskOverlap = useCallback(async () => {
+    try {
+      const response = await scheduledTasksApi.list({ enabled: true, limit: 1 });
+      const hasItems = (response.items?.length ?? 0) > 0;
+      const hasTotal = (response.total ?? 0) > 0;
+      setHasEnabledVersionedTasks(hasItems || hasTotal);
+    } catch {
+      // Fail soft: missing dual-track data must not block legacy controls.
+      setHasEnabledVersionedTasks(null);
+    }
+  }, []);
 
   const refreshSchedulerStatus = useCallback(async () => {
     setStatusError(null);
     setIsRefreshingStatus(true);
     try {
-      const payload = await systemConfigApi.getSchedulerStatus();
+      const [payload] = await Promise.all([
+        systemConfigApi.getSchedulerStatus(),
+        refreshVersionedTaskOverlap(),
+      ]);
       setStatus(payload);
     } catch (error: unknown) {
       setStatusError(getParsedApiError(error));
     } finally {
       setIsRefreshingStatus(false);
     }
-  }, []);
+  }, [refreshVersionedTaskOverlap]);
 
   useEffect(() => {
     if (!hasSchedulerSettings) {
@@ -153,6 +172,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
   const timeTargetKey = scheduleTimesItem ? 'SCHEDULE_TIMES' : 'SCHEDULE_TIME';
   const statusEnabled = status?.enabled ?? scheduleEnabled;
   const displayedScheduleEnabled = scheduleEnabledOverride ?? statusEnabled;
+  const showDualTrackWarning = displayedScheduleEnabled && hasEnabledVersionedTasks === true;
   const effectiveStatusTimes = status?.scheduleTimes?.length ? status.scheduleTimes : scheduleTimes.filter(Boolean);
   const validationIssues = [
     ...(issueByKey.SCHEDULE_ENABLED || []),
@@ -189,6 +209,27 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
       description={t('settings.schedulerDescription')}
     >
       <div data-testid="scheduler-settings-card" className="space-y-4">
+        <InlineAlert
+          variant="info"
+          data-testid="scheduler-legacy-track-note"
+          title={t('settings.schedulerLegacyTrackTitle')}
+          message={(
+            <>
+              <span className="block">{t('settings.schedulerLegacyTrackNote')}</span>
+              <span className="mt-2 block" data-testid="scheduler-owner-note">
+                {t('settings.schedulerOwnerNote')}
+              </span>
+            </>
+          )}
+        />
+        {showDualTrackWarning ? (
+          <InlineAlert
+            variant="warning"
+            data-testid="scheduler-dual-track-warning"
+            title={t('settings.schedulerDualTrackTitle')}
+            message={t('settings.schedulerDualTrackWarning')}
+          />
+        ) : null}
         <div className="grid grid-cols-1 gap-3">
           <Surface level="interactive" className="space-y-4 px-4 py-4">
             <div className="flex min-h-11 items-center justify-between gap-3">
@@ -300,6 +341,9 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                   : statusEnabled
                     ? t('settings.schedulerEnabled')
                     : t('settings.schedulerDisabled')}
+              </p>
+              <p className="mt-1 text-xs leading-6 text-muted-text">
+                {t('settings.schedulerStatusScopeNote')}
               </p>
             </div>
             <dl className="grid grid-cols-1 gap-2 text-xs">
