@@ -20,6 +20,7 @@ StockPulse is a **single-administrator / local-first** product, not multi-tenant
 - Enabling `ADMIN_AUTH_ENABLED` protects an administrator session; it is **not** per-user isolation or RBAC.
 - `PLUGINS_DIR` loads **trusted in-process Python** with the same OS privileges as the app—not a marketplace sandbox.
 - Non-local HTTP binds **fail closed** when auth is disabled; `ALLOW_INSECURE_PUBLIC_BIND=true` is emergency-only.
+- Optional **HITL risk-control bypass approval** is default-off; enable only with administrator auth and an operator who can decide within the proposal window. Proposal lifetime and the Agent pipeline deadline are separate clocks—see [Human-in-the-Loop Approval Safety Gate](human-approvals_EN.md).
 
 Full checklist: [Security baseline — operator boundaries](security-baseline.md#operator-security-boundaries).
 

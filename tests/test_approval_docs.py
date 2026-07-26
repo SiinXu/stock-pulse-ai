@@ -19,6 +19,11 @@ def test_approval_docs_cover_security_api_migration_and_rollback() -> None:
             "SecurityAuditService",
             "202607250001_approval_gate_schema",
             "rollback" if filename.endswith("_EN.md") else "回滚",
+            "300",
+            "AGENT_ORCHESTRATOR_TIMEOUT_S",
+            "local_admin",
+            "pipeline",
+            "expires_in_seconds",
         ):
             assert required in content
 

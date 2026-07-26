@@ -2,9 +2,45 @@
 
 Human-in-the-Loop (HITL) approval provides a default-off, one-shot, auditable exception to the existing Agent risk override. It handles only `risk_control_bypass`: when an existing `risk_veto` or `risk_downgrade` would make the final recommendation more conservative, the administrator may approve preserving the original recommendation for a short window. This is not trade approval; it neither connects to a broker nor expands Agent tool authority.
 
+## When to enable
+
+The rule is **off by default** (`enabled=false`). Consider enabling `risk_control_bypass` only when all of the following hold:
+
+1. Administrator authentication is on (`ADMIN_AUTH_ENABLED=true`) and an operator can reach Web `/approvals` or the approval API within the proposal lifetime.
+2. You understand Agent risk override: `risk_veto` / `risk_downgrade` rewrite a more aggressive original recommendation to a more conservative result; HITL only allows a **one-shot**, short-window administrator exception to keep the original recommendation.
+3. You accept fail-closed behavior: timeout, rejection, expiry, audit failure, or pipeline deadline always applies the conservative override and never silently relaxes risk control.
+
+Do not enable this for unattended batch jobs, auth-disabled public deployments, or multi-level IAM / broker order-approval workflows—those are outside the current contract.
+
+## Defaults and timeouts (operations)
+
+| Item | Default / range | Notes |
+| --- | --- | --- |
+| Rule switch | **Off** | With no persisted rule, behavior matches the pre-HITL path and no proposal is created |
+| Proposal lifetime `expires_in_seconds` | **300** seconds (allowed **30–3600**) | Measured from proposal creation; becomes `expired` at the deadline |
+| Poll interval | about 1 second | Worker sleep granularity while waiting for a decision—not a separate “analysis timeout” knob |
+| Owner | fixed `local_admin` | Single administrator; no multi-tenant owners and no multi-level approval chains |
+
+Web countdowns and API `expires_at` both use that lifetime. Shorter lifetimes reduce how long a pipeline may block on a pending proposal; longer values must not exceed 3600 seconds.
+
+## Proposal timeout vs analysis pipeline deadline
+
+These clocks are **independent**:
+
+1. **Proposal lifetime**  
+   Controlled by rule `expires_in_seconds`. After expiry the status is `expired` and every worker must apply the conservative override. An `approved` proposal that is not successfully CAS-consumed before expiry also cannot authorize a bypass.
+
+2. **Analysis pipeline deadline (orchestrator budget)**  
+   Driven by the Agent orchestrator timeout (`AGENT_ORCHESTRATOR_TIMEOUT_S`; commonly 600 seconds by default, `0` disables). Pipeline entry sets `_approval_deadline_epoch` to `start + timeout` (or empty when the budget is disabled). While polling, `await_risk_control_bypass` calls `stop_waiting_check`; when the deadline has passed it **stops waiting immediately and returns `None`** (fail closed → conservative override), **even if the proposal is still `pending` and has not reached `expires_at`**.
+
+3. **Cancellation**  
+   If `cancelled_check` becomes true while the proposal is still `pending`, the worker cancels the proposal and returns `None` (conservative override).
+
+**Operational implication:** when HITL is enabled, the administrator must decide within **min(proposal lifetime, remaining pipeline budget)**. If the pipeline budget is shorter than the proposal lifetime, waiting ends at the pipeline deadline; the proposal may remain listed until natural expiry, but that execution will not obtain a bypass from overtime waiting. After restart, workers never treat leftover `pending` state as authorization.
+
 ## Security boundary
 
-- The identity model remains the local single administrator, with owner fixed to `local_admin`. Approval APIs require `ADMIN_AUTH_ENABLED=true` and a valid administrator session. Disabled authentication returns `403`; a missing or invalid session returns `401`.
+- The identity model remains the local **single administrator**, with owner fixed to `local_admin`. Approval APIs require `ADMIN_AUTH_ENABLED=true` and a valid administrator session. Disabled authentication returns `403`; a missing or invalid session returns `401`. There is no multi-level approval, layered RBAC, or SSO identity switch.
 - The rule is off by default. When enabled, its default lifetime is 300 seconds and its allowed range is 30–3600 seconds. Risk sources are limited to the existing `risk_veto` and `risk_downgrade` categories.
 - Proposals only transition `pending → approved | rejected | expired | cancelled`. Terminal states are irreversible and versions increase monotonically. Decisions use `expected_version` CAS; replaying the same completed decision is an idempotent read and does not mutate state again.
 - A unique SHA-256 idempotency key is derived from execution input. The same execution and bounded context reuse the original proposal. A persisted proposal survives process restart and eventually expires.
