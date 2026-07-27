@@ -1,16 +1,16 @@
 # StockPulse universal Python dependency constraints
 # Generated file; do not edit by hand.
 # Resolver: uv==0.11.31
-# Source-SHA256: 0b9ee190bd59ea83199a022d42493fced6f1cbcacc216be9d7a62bba86ca26f9
+# Source-SHA256: 98c9b59f9c16c62598d0fca47d12dea66320416e1487cc27db89cd3d662fdafc
 # Python-Minimum: 3.10
-# Exclude-Newer: 2026-07-22T03:00:00Z
+# Exclude-Newer: 2026-07-27T04:06:13Z
 # Platforms: universal (Linux, macOS, Windows)
 # Regenerate: python scripts/check_dependency_locks.py --update
 aiohappyeyeballs==2.7.1
-aiohttp==3.14.2
+aiohttp==3.14.3
 aiosignal==1.4.0
 akracer==0.0.14 ; sys_platform == 'linux'
-akshare==1.18.72
+akshare==1.18.79
 alphasift @ git+https://github.com/ZhuLinsen/alphasift.git@9f522747caafd3c0b1ddb7e14d5cf44c8580b6cf#egg=alphasift
 altgraph==0.17.5
 annotated-doc==0.0.4
@@ -47,7 +47,7 @@ et-xmlfile==2.0.0
 exceptiongroup==1.3.1 ; python_full_version < '3.11'
 exchange-calendars==4.13.2
 fake-useragent==2.2.0
-fastapi==0.139.2
+fastapi==0.140.0
 fastuuid==0.14.0
 feedfinder2==0.0.4
 feedparser==6.0.12
@@ -56,11 +56,11 @@ flake8==7.3.0
 frozenlist==1.8.0
 fsspec==2026.6.0
 futu-api==10.8.6808
-genai-prices==0.0.71
+genai-prices==0.0.72
 google-auth==2.56.2
-google-genai==2.13.0
+google-genai==2.14.0
 google-search-results==2.4.2
-greenlet==3.5.3 ; platform_machine == 'AMD64' or platform_machine == 'WIN32' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'ppc64le' or platform_machine == 'win32' or platform_machine == 'x86_64'
+greenlet==3.5.4 ; platform_machine == 'AMD64' or platform_machine == 'WIN32' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'ppc64le' or platform_machine == 'win32' or platform_machine == 'x86_64'
 griffelib==2.1.0
 h11==0.16.0
 hf-xet==1.5.2 ; platform_machine == 'AMD64' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or platform_machine == 'x86_64'
@@ -89,7 +89,7 @@ license-expression==30.4.4
 litellm==1.93.0
 logfire-api==4.37.0
 longbridge==0.2.74 ; python_full_version < '3.12' and sys_platform == 'linux'
-longbridge==4.3.3 ; python_full_version >= '3.12' or sys_platform != 'linux'
+longbridge==4.4.1 ; python_full_version >= '3.12' or sys_platform != 'linux'
 lxml==6.1.1
 lxml-html-clean==0.4.5
 macholib==1.16.4 ; sys_platform == 'darwin'
@@ -124,14 +124,14 @@ nvidia-nccl-cu13==2.29.7 ; sys_platform == 'linux'
 nvidia-nvjitlink==13.3.33 ; (platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')
 nvidia-nvshmem-cu13==3.4.5 ; sys_platform == 'linux'
 nvidia-nvtx==13.0.85 ; (platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux')
-openai==2.46.0
+openai==2.48.0
 openpyxl==3.1.5
 opentelemetry-api==1.44.0
 orjson==3.11.9
 packageurl-python==0.17.6
 packaging==26.2
 pandas==2.3.3 ; python_full_version < '3.11'
-pandas==3.0.3 ; python_full_version >= '3.11'
+pandas==3.0.5 ; python_full_version >= '3.11'
 peewee==4.2.6
 pefile==2024.8.26 ; sys_platform == 'win32'
 pillow==12.3.0
@@ -168,7 +168,7 @@ pytest==9.1.1
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.2
 python-multipart==0.0.32
-pytz==2026.2
+pytz==2026.3.post1
 pywin32-ctypes==0.2.3 ; sys_platform == 'win32'
 pyyaml==6.0.3
 referencing==0.37.0
@@ -222,5 +222,5 @@ websocket-client==1.9.0
 websockets==15.0.1
 xlrd==2.0.2
 yarl==1.24.5
-yfinance==1.5.1
+yfinance==1.5.2
 zipp==4.1.0

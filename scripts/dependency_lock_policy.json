@@ -13,7 +13,7 @@
       "3.13",
       "3.14"
     ],
-    "exclude_newer": "2026-07-22T03:00:00Z",
+    "exclude_newer": "2026-07-27T04:06:13Z",
     "universal": true
   },
   "source_files": [
@@ -94,5 +94,5 @@
       ]
     }
   },
-  "lock_sha256": "fa0dec919f9e5b5ab28b2d17e2db309daf6a1ec3c8e36d6d2a27c8b7fe57859e"
+  "lock_sha256": "2ac5109c226a5d0a8d36f7baa4721bb5c6b4f8ec85d675da27cac6c52ef4bbad"
 }
