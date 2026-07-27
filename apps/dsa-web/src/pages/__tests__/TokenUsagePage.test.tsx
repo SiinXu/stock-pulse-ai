@@ -219,7 +219,7 @@ describe('TokenUsagePage', () => {
 
     expect(await screen.findByText('400')).toBeInTheDocument();
     expect(screen.getByRole('table')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('tab', { name: '今日' }));
+    fireEvent.click(screen.getByRole('radio', { name: '今日' }));
 
     expect(screen.getByRole('status')).toHaveAttribute('data-state-panel', 'loading');
     expect(screen.queryByText('400')).not.toBeInTheDocument();
@@ -276,7 +276,8 @@ describe('TokenUsagePage', () => {
 
     expect(await screen.findByRole('heading', { name: 'Token usage' })).toBeInTheDocument();
     expect(document.title).toBe('Token usage - StockPulse');
-    expect(screen.getByRole('tab', { name: 'Today' })).toHaveClass('min-h-6');
+    expect(screen.getByRole('radiogroup', { name: 'Token usage' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Today' })).toHaveClass('min-h-6');
     expect(await screen.findAllByText('Equity analysis')).toHaveLength(2);
     expect(screen.getByText('Latest 50 LLM token audit records.')).toBeInTheDocument();
     expect(screen.queryByText('Token 用量监控')).not.toBeInTheDocument();
@@ -334,7 +335,7 @@ describe('TokenUsagePage', () => {
       });
     });
 
-    fireEvent.click(screen.getByRole('tab', { name: '今日' }));
+    fireEvent.click(screen.getByRole('radio', { name: '今日' }));
 
     await waitFor(() => {
       expect(get).toHaveBeenLastCalledWith('/api/v1/usage/dashboard', {
@@ -362,7 +363,7 @@ describe('TokenUsagePage', () => {
     renderPage();
 
     await screen.findByRole('heading', { name: 'Token 用量监控' });
-    fireEvent.click(screen.getByRole('tab', { name: '今日' }));
+    fireEvent.click(screen.getByRole('radio', { name: '今日' }));
 
     await waitFor(() => {
       expect(get).toHaveBeenLastCalledWith('/api/v1/usage/dashboard', {

@@ -1514,7 +1514,8 @@ describe('PortfolioPage FX refresh', () => {
     await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 1, costMethod: 'fifo', includeRealtime: false }));
     fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
     expect(screen.getByLabelText('仅预演（不写入）').closest('label')).toHaveClass('min-h-11');
-    expect(screen.getByLabelText('选择 CSV').closest('label')).toHaveClass('h-11');
+    expect(screen.getByLabelText('选择 CSV')).toHaveAttribute('data-control', 'file-input');
+    expect(screen.getByRole('button', { name: '选择 CSV' })).toHaveAttribute('data-control', 'button');
     const file = new File(['header\nrow'], 'trades.csv', { type: 'text/csv' });
     fireEvent.change(screen.getByLabelText('选择 CSV'), { target: { files: [file] } });
     fireEvent.click(screen.getByLabelText('仅预演（不写入）'));

@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useMemo, useId } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { Badge, StatusDot } from '../common';
+import { Badge, Pressable, StatusDot, Surface } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { RunFlowEdge, RunFlowLane, RunFlowNode, RunFlowStatus } from '../../types/runFlow';
 import {
@@ -621,7 +621,12 @@ export const RunFlowGraph: React.FC<RunFlowGraphProps> = ({
   }, []).sort((left, right) => getEdgeFocusRank(left.focusLevel) - getEdgeFocusRank(right.focusLevel));
 
   return (
-    <div className="home-subpanel overflow-hidden p-3" data-testid="run-flow-graph">
+    <Surface
+      level="interactive"
+      padding="none"
+      className="overflow-hidden p-3"
+      data-testid="run-flow-graph"
+    >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="label-uppercase">{t('runFlow.graph.title')}</p>
@@ -727,8 +732,9 @@ export const RunFlowGraph: React.FC<RunFlowGraphProps> = ({
             return (
             <div
               key={lane.id}
+              data-testid={`run-flow-lane-${lane.id}`}
               className="absolute top-0 z-20 rounded-lg border border-subtle bg-base/75 px-3 py-2 text-xs font-medium text-secondary-text backdrop-blur-sm"
-              style={{ left, width: metrics.nodeWidth }}
+              style={{ left: left - 8, width: metrics.laneWidth - 16 }}
             >
               {lane.label}
             </div>
@@ -743,13 +749,13 @@ export const RunFlowGraph: React.FC<RunFlowGraphProps> = ({
             const expanded = Boolean(expandedNodeIds?.has(node.id));
             const compact = Boolean(node.compact);
             const nodeStateClass = selected
-              ? 'border-primary/85 bg-primary/8 shadow-lg ring-2 ring-primary/25'
+              ? 'border-primary/60 bg-primary/8 shadow-none'
               : compact
-                ? 'border-subtle/70 bg-base/70 ring-1 ring-subtle'
-                : 'border-subtle/80 bg-elevated/92 ring-1 ring-subtle';
+                ? 'border-subtle/70 bg-base/70 shadow-none'
+                : 'border-subtle/80 bg-elevated/92 shadow-none';
             const nodeDensityClass = compact
-              ? 'px-2.5 py-2 shadow-none hover:shadow-soft-card'
-              : 'px-3 py-2 shadow-soft-card hover:shadow-lg';
+              ? 'px-2.5 py-2'
+              : 'px-3 py-2';
             return (
               <div
                 key={node.id}
@@ -757,15 +763,14 @@ export const RunFlowGraph: React.FC<RunFlowGraphProps> = ({
                 className="absolute z-30"
                 style={{ left: node.x, top: node.y, width: node.width, height: node.height }}
               >
-                <button
-                  type="button"
+                <Pressable
                   data-testid={`run-flow-node-${node.id}`}
                   onClick={() => onSelectNode?.(node)}
                   aria-pressed={selected}
                   aria-label={t('runFlow.graph.nodeAria', { label: node.label, status: statusLabel })}
                   data-layout-lane={node.laneIndex}
                   data-layout-row={node.row}
-                  className={`box-border flex max-w-full min-w-0 flex-col items-start overflow-hidden rounded-lg border-2 text-left backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-primary/60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15 ${nodeDensityClass} ${nodeStateClass} ${
+                  className={`box-border flex max-w-full min-w-0 flex-col items-start overflow-hidden rounded-lg border text-left backdrop-blur-sm transition-colors hover:border-primary/40 hover:bg-hover/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/15 ${nodeDensityClass} ${nodeStateClass} ${
                     expandable ? 'pb-8' : ''
                   }`}
                   style={{ width: node.width, height: node.height }}
@@ -792,10 +797,9 @@ export const RunFlowGraph: React.FC<RunFlowGraphProps> = ({
                       {t('runFlow.graph.startedAt')}: {formatDateTime(node.startedAt, language, t)}
                     </span>
                   ) : null}
-                </button>
+                </Pressable>
                 {expandable ? (
-                  <button
-                    type="button"
+                  <Pressable
                     data-testid={`run-flow-node-${node.id}-toggle`}
                     aria-label={expanded ? t('runFlow.graph.collapseNode', { label: node.label }) : t('runFlow.graph.expandNode', { label: node.label })}
                     aria-expanded={expanded}
@@ -816,13 +820,13 @@ export const RunFlowGraph: React.FC<RunFlowGraphProps> = ({
                       )}
                       {expanded ? t('runFlow.graph.collapse') : t('runFlow.graph.expand')}
                     </span>
-                  </button>
+                  </Pressable>
                 ) : null}
               </div>
             );
           })}
         </div>
       </div>
-    </div>
+    </Surface>
   );
 };

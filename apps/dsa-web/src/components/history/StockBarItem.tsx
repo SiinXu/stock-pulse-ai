@@ -1,5 +1,6 @@
 import type React from 'react';
 import { Badge, IconButton } from '../common';
+import { Pressable } from '../common/Pressable';
 import type { StockBarItem as StockBarItemType } from '../../types/analysis';
 import { getSentimentColor } from '../../types/analysis';
 import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../../utils/decisionAction';
@@ -43,17 +44,16 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
 
   return (
     <div
-      className={`home-history-item relative flex items-stretch group/item ${
-        isViewing ? 'home-history-item-selected' : ''
+      className={`history-item group/item relative flex w-full min-w-0 flex-1 items-stretch ${
+        isViewing ? 'history-item-selected' : ''
       }`}
     >
-      <button
-        type="button"
+      <Pressable
         onClick={() => onClick(item.id)}
         aria-label={t('history.itemAria', { name: stockName, code: item.stockCode })}
         className="min-w-0 flex-1 text-left p-1.5"
       >
-        <div className="relative z-10 flex items-center gap-2">
+        <div className="relative z-10 flex w-full items-center gap-2">
           {isMarketReview ? (
             <div className="h-2 w-2 flex-shrink-0 rounded-full bg-warning" />
           ) : sentimentColor ? (
@@ -86,7 +86,7 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
                   <Badge
                     variant="default"
                     size="sm"
-                    className="home-history-sentiment-badge shrink-0 text-xs font-semibold leading-none shadow-none transition-opacity duration-200"
+                    className="history-sentiment-badge shrink-0 text-xs font-semibold leading-none shadow-none transition-opacity duration-200"
                     style={{
                       color: sentimentColor,
                       borderColor: `${sentimentColor}30`,
@@ -98,14 +98,14 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
                 ) : null}
               </div>
             </div>
-            <div className="mt-0.5 flex items-center gap-1" data-testid="history-card-meta">
+            <div className="mt-0.5 flex min-w-0 items-center gap-1" data-testid="history-card-meta">
               {item.lastAnalysisTime && (
-                <span className="text-[0.6875rem] text-muted-text">
+                <span className="min-w-0 truncate text-[0.6875rem] text-muted-text">
                   {formatDateTime(item.lastAnalysisTime, language)}
                 </span>
               )}
               {item.analysisCount > 1 && (
-                <span className="text-[0.6875rem] text-muted-text">
+                <span className="shrink-0 whitespace-nowrap text-[0.6875rem] text-muted-text">
                   {t('history.analysisCount', { count: item.analysisCount })}
                 </span>
               )}
@@ -117,7 +117,7 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
             </div>
           </div>
         </div>
-      </button>
+      </Pressable>
       {onDelete && (
         <div
           className="relative z-10 flex h-11 w-11 shrink-0 self-center items-center justify-center"

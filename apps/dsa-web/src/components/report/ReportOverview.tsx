@@ -212,9 +212,9 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
       key={board.key}
       className="inline-flex shrink-0 items-center gap-2 text-sm"
     >
-      <span className="home-accent-chip px-2 py-0.5 text-xs font-medium">
+      <Badge variant="default" size="sm">
         {board.name}
-      </span>
+      </Badge>
       {board.signal && (
         <Badge
           variant={getBoardStatusVariant(board.signal.status)}
@@ -237,7 +237,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
   return (
     <div className="space-y-5">
       {/* Main Info Area - Two-Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
+      <div className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-3">
         {/* Left side: Stock information and conclusions */}
         <div className="lg:col-span-2 space-y-5">
           {/* Stock Header */}
@@ -261,9 +261,9 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
                   )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                  <span className="home-accent-chip px-2 py-0.5 font-mono text-xs">
+                  <Badge variant="default" size="sm" className="font-mono">
                     {meta.stockCode}
-                  </span>
+                  </Badge>
                   {marketPhaseLabel ? (
                     <Badge variant="info" className="shrink-0 gap-1.5 shadow-none" aria-label={marketPhaseLabel}>
                       {marketPhaseLabel}
@@ -285,7 +285,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
             </div>
 
             {/* Key conclusion */}
-            <div className="home-divider border-t pt-5">
+            <div className="border-t border-border pt-5">
               <span className="label-uppercase">{text.keyInsights}</span>
               <p className="mt-2 max-w-[62ch] whitespace-pre-wrap text-left text-base leading-7 text-foreground">
                 {summary.analysisSummary || text.noAnalysisSummary}
@@ -300,7 +300,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
               padding="sm"
               hoverable
               className="home-insight-card"
-              style={{ ['--home-insight-tone' as string]: 'var(--home-strategy-buy)' }}
+              style={{ ['--home-insight-tone' as string]: 'var(--report-strategy-buy)' }}
             >
               <div className="flex items-start gap-3">
                 <div className="home-insight-icon w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center flex-shrink-0">
@@ -323,7 +323,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
               padding="sm"
               hoverable
               className="home-insight-card"
-              style={{ ['--home-insight-tone' as string]: 'var(--home-strategy-take)' }}
+              style={{ ['--home-insight-tone' as string]: 'var(--report-strategy-take)' }}
             >
               <div className="flex items-start gap-3">
                 <div className="home-insight-icon w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center flex-shrink-0">
@@ -358,7 +358,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
         </div>
 
         {/* Right side: Sentiment indicators / Watchlist actions */}
-        <div className="flex flex-col space-y-4">
+        <div className="flex h-full flex-col space-y-4">
           {watchlist && meta.reportType !== 'market_review' && (
             <Card variant="bordered" padding="sm">
               <div className="text-center space-y-3">
@@ -379,7 +379,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
               </div>
             </Card>
           )}
-          <Card variant="bordered" padding="md" className="home-rail-card !overflow-visible">
+          <Card variant="bordered" padding="md" className="home-rail-card flex-1 !overflow-visible">
             <div className="text-center">
               <h3 className="mb-5 text-sm font-medium tracking-wide text-foreground">{text.marketSentiment}</h3>
               <ScoreGauge score={summary.sentimentScore} size="lg" language={reportLanguage} />

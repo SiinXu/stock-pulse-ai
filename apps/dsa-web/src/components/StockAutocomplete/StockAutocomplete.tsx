@@ -16,6 +16,7 @@ import { cn } from '../../utils/cn';
 import type { Market } from '../../types/stockIndex';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { STOCK_SEARCH_TEXT } from '../../locales/stockSearch';
+import { Spinner } from '../common/Spinner';
 
 const AUTOCOMPLETE_INPUT_CLASS =
   'h-11 min-h-11 min-w-11 w-full rounded-lg border border-border bg-transparent px-3 text-base text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60 sm:h-9 sm:min-h-9 sm:min-w-9 sm:text-xs';
@@ -121,7 +122,7 @@ function StockAutocompleteInner({
   ariaLabel,
   className,
 }: StockAutocompleteProps) {
-  const { language } = useUiLanguage();
+  const { language, t } = useUiLanguage();
   const resolvedPlaceholder = placeholder ?? STOCK_SEARCH_TEXT[language].placeholder;
   const resolvedAriaLabel = ariaLabel ?? STOCK_SEARCH_TEXT[language].inputLabel;
   const { index, loading, fallback } = useStockIndex();
@@ -300,7 +301,7 @@ function StockAutocompleteInner({
       {/* Loading indicator */}
       {loading && (
         <div className="absolute right-3 top-1/2 -translate-y-1/2">
-          <div className="w-4 h-4 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+          <Spinner size="sm" label={t('common.loading')} />
         </div>
       )}
 

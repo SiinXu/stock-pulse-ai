@@ -41,7 +41,8 @@ describe('ReportMarkdownDrawer', () => {
       expect(await screen.findByText('加载报告失败')).toBeInTheDocument();
 
       const closeButton = screen.getByRole('button', { name: '关闭' });
-      expect(closeButton).toHaveClass('min-h-11', 'min-w-11');
+      expect(closeButton).toHaveAttribute('data-control', 'button');
+      expect(closeButton).toHaveClass('control-hit-target');
       fireEvent.click(closeButton);
 
       await waitFor(() => {

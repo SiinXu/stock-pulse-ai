@@ -22,6 +22,9 @@ describe('SettingsHelpButton tooltip contract', () => {
   it('shows only the field purpose and recommendation in the shared tooltip', () => {
     const trigger = renderHelpButton();
 
+    expect(trigger).toHaveAttribute('data-control', 'icon-button');
+    expect(trigger).toHaveAttribute('data-size', 'navigation');
+    expect(trigger).toHaveClass('control-hit-target');
     fireEvent.mouseEnter(trigger.parentElement!);
 
     const tooltip = screen.getByRole('tooltip');

@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BarChart3, Clipboard, FileText, Gauge, Layers, ShieldAlert, TrendingUp, WalletCards, Workflow } from 'lucide-react';
+import { BarChart3, Check, Clipboard, FileText, Gauge, Layers, ShieldAlert, TrendingUp, WalletCards, Workflow } from 'lucide-react';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { historyApi } from '../../api/history';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -22,8 +22,7 @@ import {
 } from '../../utils/marketReview';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { getUiLocale } from '../../utils/uiLocale';
-import { ApiErrorAlert, Card, DataTable, type DataTableColumn, InlineAlert, useClipboard } from '../common';
-import { Tooltip } from '../common/Tooltip';
+import { ApiErrorAlert, Badge, Card, DataTable, IconButton, type DataTableColumn, InlineAlert, Spinner, useClipboard } from '../common';
 import { MarketStructureCard } from './MarketStructureCard';
 import { ReportMarkdownBody } from './ReportMarkdownBody';
 
@@ -430,65 +429,55 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
             </h2>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-text">
               {meta?.stockCode ? (
-                <span className="home-accent-chip px-2 py-0.5 font-mono">{meta.stockCode}</span>
+                <Badge variant="default" size="sm" className="font-mono">
+                  {meta.stockCode}
+                </Badge>
               ) : null}
               {meta?.createdAt ? <span>{new Date(meta.createdAt).toLocaleString(getUiLocale(uiLanguage))}</span> : null}
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-3">
             {canOpenRunFlow ? (
-              <Tooltip content={runFlowText['runFlow.open']}>
-                <span className="inline-flex">
-                  <button
-                    type="button"
-                    onClick={() => onOpenRunFlow(recordId)}
-                    className="home-surface-button flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-foreground"
-                    aria-label={formatUiText(runFlowText['runFlow.openHistoryAria'], { recordId })}
-                  >
-                    <Workflow className="h-5 w-5" aria-hidden="true" />
-                  </button>
-                </span>
-              </Tooltip>
+              <IconButton
+                type="button"
+                variant="outline"
+                size="default"
+                onClick={() => onOpenRunFlow(recordId)}
+                aria-label={formatUiText(runFlowText['runFlow.openHistoryAria'], { recordId })}
+                tooltip={runFlowText['runFlow.open']}
+              >
+                <Workflow aria-hidden="true" />
+              </IconButton>
             ) : null}
-            <Tooltip content={chromeText.copyMarkdownSource}>
-              <span className="inline-flex">
-                <button
-                  type="button"
-                  onClick={() => void handleCopy('markdown')}
-                  disabled={isLoading || !content || copiedType !== null}
-                  className="home-surface-button flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-50"
-                  aria-label={chromeText.copyMarkdownSource}
-                >
-                  {copiedType === 'markdown' ? (
-                    <svg className="h-5 w-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : (
-                    <Clipboard className="h-5 w-5" aria-hidden="true" />
-                  )}
-                </button>
-              </span>
-            </Tooltip>
-            <Tooltip content={chromeText.copyPlainText}>
-              <span className="inline-flex">
-                <button
-                  type="button"
-                  onClick={() => void handleCopy('text')}
-                  disabled={isLoading || !content || copiedType !== null}
-                  className="home-surface-button flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-50"
-                  aria-label={chromeText.copyPlainText}
-                >
-                  {copiedType === 'text' ? (
-                    <svg className="h-5 w-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : (
-                    <FileText className="h-5 w-5" aria-hidden="true" />
-                  )}
-                </button>
-              </span>
-            </Tooltip>
+            <IconButton
+              type="button"
+              variant="outline"
+              size="default"
+              onClick={() => void handleCopy('markdown')}
+              disabled={isLoading || !content || copiedType !== null}
+              aria-label={chromeText.copyMarkdownSource}
+            >
+              {copiedType === 'markdown' ? (
+                <Check className="text-success" aria-hidden="true" />
+              ) : (
+                <Clipboard aria-hidden="true" />
+              )}
+            </IconButton>
+            <IconButton
+              type="button"
+              variant="outline"
+              size="default"
+              onClick={() => void handleCopy('text')}
+              disabled={isLoading || !content || copiedType !== null}
+              aria-label={chromeText.copyPlainText}
+            >
+              {copiedType === 'text' ? (
+                <Check className="text-success" aria-hidden="true" />
+              ) : (
+                <FileText aria-hidden="true" />
+              )}
+            </IconButton>
           </div>
         </div>
       </Card>
@@ -650,7 +639,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
       {isLoading ? (
         <Card variant="bordered" padding="md" className="text-left">
           <div className="flex h-64 flex-col items-center justify-center">
-            <div className="home-spinner h-10 w-10 animate-spin border-[3px]" />
+            <Spinner size="lg" label={chromeText.loadingReport} />
             <p className="mt-4 text-sm text-secondary-text">{chromeText.loadingReport}</p>
           </div>
         </Card>

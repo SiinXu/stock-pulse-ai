@@ -123,7 +123,8 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
         }
         const sidebar = document.querySelector<HTMLElement>('[data-shell-sidebar]');
         const activeRoute = sidebar?.querySelector<HTMLElement>('a[aria-current="page"]');
-        (activeRoute ?? sidebar)?.focus();
+        const activeGroup = sidebar?.querySelector<HTMLElement>('[data-navigation-active="true"]');
+        (activeRoute ?? activeGroup ?? sidebar)?.focus();
       });
     };
     mediaQuery.addEventListener('change', handlePresentationChange);
@@ -178,7 +179,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
           data-shell-sidebar-mode={sidebarCollapsed ? 'compact' : 'expanded'}
           tabIndex={-1}
           className={cn(
-            'sticky top-0 z-40 hidden h-dvh shrink-0 self-start overflow-visible border-r border-border bg-background px-2 py-4 transition-[width] duration-300 ease-out motion-reduce:transition-none lg:flex lg:flex-col',
+            'sticky top-0 z-40 hidden h-dvh shrink-0 self-start overflow-visible bg-background px-2 py-4 transition-[width] duration-300 ease-out motion-reduce:transition-none lg:flex lg:flex-col',
             sidebarCollapsed ? 'w-20' : 'w-60'
           )}
           aria-label={t('layout.desktopSidebar')}

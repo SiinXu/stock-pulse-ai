@@ -13,7 +13,7 @@ import { encodeModelRef } from '../src/utils/modelRef';
 import { BACKTEST_TEXT } from '../src/locales/backtest';
 import { PORTFOLIO_TEXT } from '../src/locales/portfolio';
 import { SCREENING_TEXT } from '../src/locales/screening';
-import { UI_TEXT } from '../src/i18n/uiText';
+import { formatUiText, UI_TEXT } from '../src/i18n/uiText';
 import {
   ANALYSIS_WORKBENCH_SEGMENT_VALUES,
   APP_ROUTE_PATHS,
@@ -197,12 +197,12 @@ async function selectUiLanguage(page: Page, language: 'zh' | 'en') {
 }
 
 async function selectTheme(page: Page, optionName: '浅色' | '深色') {
-  const toggle = page.getByRole('button', { name: '切换主题' }).first();
+  const toggle = page.getByRole('combobox', { name: '切换主题' }).first();
   if (!await toggle.isVisible().catch(() => false)) {
     await page.getByRole('button', { name: 'StockPulse', exact: true }).last().click();
   }
   await toggle.click();
-  await page.getByRole('menuitemradio', { name: optionName, exact: true }).click();
+  await page.getByRole('option', { name: optionName, exact: true }).click();
 }
 
 async function installMockAuth(page: Page, options: {
@@ -293,7 +293,10 @@ async function openSeededReport(page: Page, uiLanguage: 'zh' | 'en', reportLangu
   await page.goto(buildAnalysisWorkbenchHref({
     segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
   }));
-  const historyItem = page.locator('.home-history-item').filter({ hasText: 'E2E Fixture' }).first();
+  const historyItem = page
+    .locator('.history-item[data-control="pressable"]')
+    .filter({ hasText: 'E2E Fixture' })
+    .first();
   await expect(historyItem).toBeVisible({ timeout: 15_000 });
   await historyItem.click();
   await expect(page.getByText('E2E Fixture', { exact: true }).first()).toBeVisible({ timeout: 15_000 });
@@ -841,20 +844,38 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await login(page, 'en');
     await assertRouteChrome(page, APP_ROUTE_PATHS.home, UI_TEXT.en['home.todayFocus'], UI_TEXT.en['home.pageTitle']);
     await assertRouteChrome(page, APP_ROUTE_PATHS.agent, UI_TEXT.en['chat.title'], UI_TEXT.en['chat.pageTitle']);
+    await assertRouteChrome(page, APP_ROUTE_PATHS.research, UI_TEXT.en['layout.nav.research'], UI_TEXT.en['researchOverview.documentTitle']);
+    const researchOverviewNavigation = page.getByRole('navigation', {
+      name: UI_TEXT.en['layout.mainNav'],
+    });
+    const researchOverviewParent = researchOverviewNavigation.getByRole('link', {
+      name: UI_TEXT.en['layout.nav.research'],
+    });
+    await expect(researchOverviewParent).toHaveAttribute('aria-current', 'page');
+    await expect(researchOverviewNavigation.locator('a[aria-current="page"]')).toHaveCount(1);
     await assertRouteChrome(page, APP_ROUTE_PATHS.researchMarket, UI_TEXT.en['home.marketReview'], UI_TEXT.en['home.marketReviewPageTitle']);
     const navigation = page.getByRole('navigation', { name: UI_TEXT.en['layout.mainNav'] });
     const researchParent = navigation.getByRole('link', { name: UI_TEXT.en['layout.nav.research'] });
+    const researchToggle = navigation.getByRole('button', {
+      name: formatUiText(UI_TEXT.en['layout.collapseNavGroup'], {
+        label: UI_TEXT.en['layout.nav.research'],
+      }),
+    });
     const marketChild = navigation.getByRole('link', { name: UI_TEXT.en['home.marketReview'] });
-    await expect(researchParent).not.toHaveAttribute('aria-current', 'page');
+    await expect(researchParent).toHaveAttribute('href', APP_ROUTE_PATHS.research);
+    await expect(researchParent).not.toHaveAttribute('aria-current');
+    await expect(researchParent).toHaveAttribute('data-navigation-active', 'true');
     await expect(marketChild).toHaveAttribute('aria-current', 'page');
     await expect(navigation.locator('a[aria-current="page"]')).toHaveCount(1);
-    const researchToggle = navigation.getByRole('button', { name: UI_TEXT.en['layout.nav.research'] });
     await researchToggle.click();
-    await expect(researchParent).toHaveAttribute('aria-current', 'page');
     await expect(marketChild).toBeHidden();
-    await expect(navigation.locator('a[aria-current="page"]')).toHaveCount(1);
-    await researchToggle.click();
-    await expect(researchParent).not.toHaveAttribute('aria-current', 'page');
+    await expect(page).toHaveURL(/\/research\/market$/);
+    await expect(navigation.locator('a[aria-current="page"]')).toHaveCount(0);
+    await navigation.getByRole('button', {
+      name: formatUiText(UI_TEXT.en['layout.expandNavGroup'], {
+        label: UI_TEXT.en['layout.nav.research'],
+      }),
+    }).click();
     await expect(marketChild).toHaveAttribute('aria-current', 'page');
     await assertRouteChrome(page, APP_ROUTE_PATHS.researchAnalysis, UI_TEXT.en['analysisWorkbench.title'], UI_TEXT.en['analysisWorkbench.documentTitle']);
     await assertRouteChrome(page, APP_ROUTE_PATHS.researchDiscover, SCREENING_TEXT.en.title, SCREENING_TEXT.en.documentTitle);
@@ -2034,7 +2055,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     expect(statusCalls).toBeGreaterThan(0);
     const runFlowButton = task.getByRole('button', { name: /查看.*运行流/ });
     await expect(runFlowButton).toHaveAttribute('data-control', 'icon-button');
-    await expect(runFlowButton).toHaveAttribute('data-size', 'default');
+    await expect(runFlowButton).toHaveAttribute('data-size', 'compact');
     await runFlowButton.click();
     await expectMinimumTouchTarget(
       page.getByTestId('run-flow-node-topology_data_realtime_quote-toggle'),
@@ -2075,8 +2096,14 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
     }));
     await expect(page.getByText('New Report semantic report', { exact: true })).toBeVisible();
-    const oldItem = page.locator('.home-history-item').filter({ hasText: 'Old Report' }).first();
-    const newItem = page.locator('.home-history-item').filter({ hasText: 'New Report' }).first();
+    const oldItem = page
+      .locator('.history-item[data-control="pressable"]')
+      .filter({ hasText: 'Old Report' })
+      .first();
+    const newItem = page
+      .locator('.history-item[data-control="pressable"]')
+      .filter({ hasText: 'New Report' })
+      .first();
     await oldItem.click();
     await oldRequestStarted.promise;
     await expect(newItem).toBeVisible();
@@ -2585,6 +2612,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect.poll(async () => (await getElementContrast(reportHeading)).ratio).toBeGreaterThanOrEqual(3);
     await expect.poll(async () => (await getElementContrast(reportBody)).ratio).toBeGreaterThanOrEqual(4.5);
     await assertNoDocumentOverflow(page, APP_ROUTE_PATHS.agent);
+    await assertNoDocumentOverflow(page, APP_ROUTE_PATHS.research);
     await assertNoDocumentOverflow(page, APP_ROUTE_PATHS.researchMarket);
     await assertNoDocumentOverflow(page, APP_ROUTE_PATHS.researchDiscover);
     await assertNoDocumentOverflow(page, APP_ROUTE_PATHS.portfolio);

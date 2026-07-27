@@ -154,7 +154,7 @@ const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactBu
     tokens: ['dynamic:toneStyles[tone]', 'dynamic:className'],
   }]],
   ['../common/StatePanel.tsx', [{
-    line: 67,
+    line: 68,
     owner: 'UIUX-HARNESS',
     removeWhen: 'StatePanel callers no longer need layout className or native style pass-through after wrapper migration.',
     tokens: ['dynamic:className', 'style:dynamic:style spread:props'],
@@ -186,7 +186,7 @@ const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactBu
     },
   ]],
   ['../tasks/TaskPanel.tsx', [{
-    line: 224,
+    line: 230,
     owner: 'UIUX-HARNESS',
     removeWhen: 'TaskPanel migrates from Card to Surface after every caller moves layout sizing to an external wrapper.',
     tokens: ['dynamic:className'],

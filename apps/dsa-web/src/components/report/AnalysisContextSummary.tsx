@@ -161,18 +161,18 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
               );
             })}
             {triggerSource ? (
-              <span className="home-accent-chip px-2 py-0.5 text-xs text-muted-text">
+              <Badge variant="default" size="sm">
                 {text.triggerSource}: {triggerSource}
-              </span>
+              </Badge>
             ) : null}
-            <span className="home-accent-chip px-2 py-0.5 text-xs text-muted-text">
+            <Badge variant="default" size="sm">
               {text.inputScope}
-            </span>
+            </Badge>
             <ChevronDown className="h-4 w-4 shrink-0 text-muted-text transition-transform group-open:rotate-180" aria-hidden="true" />
           </span>
         </summary>
 
-        <div className="home-divider border-t px-4 pb-4 pt-3">
+        <div className="border-t border-border px-4 pb-4 pt-3">
           <DashboardPanelHeader
             eyebrow={text.eyebrow}
             title={text.title}
@@ -184,18 +184,18 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
             actions={metadataItems.length > 0 || typeof quality?.overallScore === 'number' ? (
               <div className="hidden flex-wrap justify-end gap-2 text-xs text-muted-text md:flex">
                 {typeof quality?.overallScore === 'number' ? (
-                  <span className="home-accent-chip px-2 py-0.5">
+                  <Badge variant="default" size="sm">
                     {text.qualityScore}: {quality.overallScore}/100{qualityLabel ? ` ${qualityLabel}` : ''}
-                  </span>
+                  </Badge>
                 ) : null}
                 {metadataItems.map((item) => (
-                  <span key={item} className="home-accent-chip px-2 py-0.5">
+                  <Badge key={item} variant="default" size="sm">
                     {item}
-                  </span>
+                  </Badge>
                 ))}
-                <span className="home-accent-chip px-2 py-0.5">
+                <Badge variant="default" size="sm">
                   {text.inputScope}
-                </span>
+                </Badge>
               </div>
             ) : undefined}
           />
@@ -284,18 +284,18 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
           {metadataItems.length > 0 || typeof quality?.overallScore === 'number' ? (
             <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-text md:hidden">
               {typeof quality?.overallScore === 'number' ? (
-                <span className="home-accent-chip px-2 py-0.5">
+                <Badge variant="default" size="sm">
                   {text.qualityScore}: {quality.overallScore}/100{qualityLabel ? ` ${qualityLabel}` : ''}
-                </span>
+                </Badge>
               ) : null}
               {metadataItems.map((item) => (
-                <span key={item} className="home-accent-chip px-2 py-0.5">
+                <Badge key={item} variant="default" size="sm">
                   {item}
-                </span>
+                </Badge>
               ))}
-              <span className="home-accent-chip px-2 py-0.5">
+              <Badge variant="default" size="sm">
                 {text.inputScope}
-              </span>
+              </Badge>
             </div>
           ) : null}
         </div>

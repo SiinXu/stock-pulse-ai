@@ -61,15 +61,21 @@ These five top-level items match the product navigation:
 | Nav label | Route(s) | What is inside | Manual |
 | --- | --- | --- | --- |
 | **Home** | `/` | Today focus, todos, configuration gaps | [02](02-home_EN.md) |
-| **Research** | group often opens `/research/market` | Children in the table below | [03](03-analysis-workbench_EN.md) / [04](04-market-review_EN.md) / [09](09-backtest_EN.md) |
+| **Research** | `/research` | Overview and the tools in the table below | [03](03-analysis-workbench_EN.md) / [04](04-market-review_EN.md) / [09](09-backtest_EN.md) |
 | **Portfolio** | `/portfolio` | Holdings bookkeeping (page title often **Holdings**) | [07](07-portfolio_EN.md) |
 | **Agent** | `/chat` | Multi-turn chat (page title often **Ask stock**) | [05](05-agent-chat_EN.md) |
 | **Settings** | `/settings` | Models, data sources, notifications, security | [10](10-settings_EN.md) |
 
-### Research children
+On expanded desktop navigation and in the mobile drawer, select the **Research**
+label to open `/research`; the separately labelled chevron only expands or
+collapses the child links. On the compact rail, **Research** opens a flyout whose
+first item is **Research overview**.
 
-| Child | Route | Manual |
+### Research pages
+
+| Page | Route | Manual |
 | --- | --- | --- |
+| Research overview | `/research` | Entry cards for the four Research tools |
 | Market review | `/research/market` | [04](04-market-review_EN.md) |
 | Discover | `/research/discover` | No dedicated chapter yet; sidebar **Research → Discover** (legacy `/screening` redirects) |
 | Analysis workbench | `/research/analysis` | [03](03-analysis-workbench_EN.md) |
@@ -114,6 +120,8 @@ Opens recent signals and alerts and deep-links into Signal Center. An empty bell
 | **Theme** | Light / dark chrome | Business logic |
 
 They are independent: English menus + Chinese reports is a valid combination.
+
+Theme and UI language use the same compact dropdown treatment in the Profile menu, with a neutral selected state.
 
 ---
 

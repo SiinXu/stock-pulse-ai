@@ -196,6 +196,7 @@ describe('deepLink', () => {
 
   it('accepts canonical and legacy Research routes without rewriting their state', () => {
     for (const pathname of [
+      APP_ROUTE_PATHS.research,
       APP_ROUTE_PATHS.researchMarket,
       APP_ROUTE_PATHS.researchDiscover,
       APP_ROUTE_PATHS.researchBacktest,

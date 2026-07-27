@@ -5,7 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { backtestApi } from '../api/backtest';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
-import { ApiErrorAlert, AppPage, Badge, Button, Card, DataTable, type DataTableColumn, DatePicker, EmptyState, Input, Loading, PageHeader, Pagination, SegmentedControl, Select, StatusDot, Switch, Tooltip } from '../components/common';
+import { ApiErrorAlert, AppPage, Badge, Button, Card, ConfirmDialog, DataTable, type DataTableColumn, DatePicker, EmptyState, Input, Loading, PageHeader, Pagination, SegmentedControl, Select, StatePanel, StatusDot, Switch, Toolbar, Tooltip } from '../components/common';
+import { Progress } from '../components/common/Progress';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import {
@@ -304,6 +305,7 @@ const BacktestPage: React.FC = () => {
   const [dateToError, setDateToError] = useState('');
   const [appliedFilters, setAppliedFilters] = useState<BacktestFilterSnapshot>(initialFilters);
   const [forceRerun, setForceRerun] = useState(false);
+  const [pendingForceRun, setPendingForceRun] = useState<BacktestFilterSnapshot | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [runResult, setRunResult] = useState<BacktestRunResponse | null>(null);
   const [runError, setRunError] = useState<ParsedApiError | null>(null);
@@ -470,9 +472,7 @@ const BacktestPage: React.FC = () => {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Run backtest
-  const handleRun = async () => {
-    const validatedFilters = validateDraftFilters();
-    if (!validatedFilters) return;
+  const runBacktest = async (validatedFilters: BacktestFilterSnapshot, force: boolean) => {
     setAppliedFilters(validatedFilters);
     const requestGeneration = runRequestGenerationRef.current + 1;
     runRequestGenerationRef.current = requestGeneration;
@@ -487,8 +487,8 @@ const BacktestPage: React.FC = () => {
       const dateTo = validatedFilters.endDate || undefined;
       const response = await backtestApi.run({
         code,
-        force: forceRerun || undefined,
-        minAgeDays: forceRerun ? 0 : undefined,
+        force: force || undefined,
+        minAgeDays: force ? 0 : undefined,
         evalWindowDays: requestedEvalWindowDays,
         analysisDateFrom: dateFrom,
         analysisDateTo: dateTo,
@@ -522,6 +522,16 @@ const BacktestPage: React.FC = () => {
     } finally {
       if (isLatestRequest()) setIsRunning(false);
     }
+  };
+
+  const handleRun = () => {
+    const validatedFilters = validateDraftFilters();
+    if (!validatedFilters) return;
+    if (forceRerun) {
+      setPendingForceRun(validatedFilters);
+      return;
+    }
+    void runBacktest(validatedFilters, false);
   };
 
   // Phase is a result-only filter (backtestApi.run never receives it), so apply
@@ -696,7 +706,7 @@ const BacktestPage: React.FC = () => {
           <Button
             type="button"
             onClick={handleFilter}
-            disabled={isLoadingResults}
+            disabled={isRunning || isLoadingResults}
             variant="secondary"
             size="primary"
             isLoading={isLoadingResults}
@@ -761,20 +771,23 @@ const BacktestPage: React.FC = () => {
           <SegmentedControl
             value={isNextDayValidation ? 'oneDay' : 'window'}
             options={[
-              { value: 'window', label: text.evalWindow, disabled: isRunning || isLoadingResults || isLoadingPerf },
-              { value: 'oneDay', label: text.oneDayValidation, disabled: isRunning || isLoadingResults || isLoadingPerf },
+              { value: 'window', label: text.evalWindow, disabled: isRunning },
+              { value: 'oneDay', label: text.oneDayValidation, disabled: isRunning },
             ]}
             onChange={handleValidationModeChange}
             ariaLabel={text.evalWindow}
+            semantics="single-select"
           />
           <div className="flex h-8 items-center gap-1.5">
             <span className="whitespace-nowrap text-xs font-medium text-secondary-text">{text.forceRerun}</span>
-            <Switch
-              checked={forceRerun}
-              disabled={isRunning}
-              onCheckedChange={setForceRerun}
-              aria-label={text.forceRerun}
-            />
+            <Tooltip content={text.forceRerunDescription}>
+              <Switch
+                checked={forceRerun}
+                disabled={isRunning}
+                onCheckedChange={setForceRerun}
+                aria-label={text.forceRerun}
+              />
+            </Tooltip>
           </div>
           <Button
             type="button"
@@ -805,7 +818,17 @@ const BacktestPage: React.FC = () => {
 
       {/* Main content; div, not main: the app shell already renders the single <main> landmark. */}
       {isRunning ? (
-        <Loading label={text.running} className="h-64" />
+        <StatePanel
+          state="loading"
+          title={text.running}
+          description={(
+            <Progress
+              label={text.running}
+              className="mt-3 w-56 max-w-full"
+            />
+          )}
+          className="h-64"
+        />
       ) : !hasBacktestData && (isLoadingPerf || isLoadingResults) ? (
         <Loading label={text.loadingResults} className="h-64" />
       ) : !hasBacktestData && performanceError ? (
@@ -836,7 +859,7 @@ const BacktestPage: React.FC = () => {
         <div className="flex max-h-[38vh] flex-col gap-3 overflow-y-auto lg:max-h-none lg:w-60 lg:flex-shrink-0">
           {performanceError ? <ApiErrorAlert error={performanceError} /> : null}
           {isLoadingPerf ? (
-            <Loading />
+            <Loading label={text.loadingResults} />
           ) : overallPerf ? (
             <PerformanceCard metrics={overallPerf} title={text.overallPerformance} language={language} />
           ) : performanceError ? null : (
@@ -865,17 +888,23 @@ const BacktestPage: React.FC = () => {
 
         {/* Right content - Results table */}
         <section className="min-h-0 flex-1 overflow-y-auto">
-          <div className="mb-3 flex flex-wrap items-end gap-2">
-            <Select
-              label={`${text.resultFilters} · ${text.phase}`}
-              value={phaseFilter}
-              onChange={(value) => handlePhaseChange(value as BacktestPhaseFilter)}
-              disabled={isRunning}
-              className="w-40"
-              options={phaseFilterOptions.map((option) => ({ value: option.value, label: option.label }))}
-            />
-            <span className="pb-1.5 text-xs text-muted-text">{text.resultPhaseHint}</span>
-          </div>
+          <Toolbar
+            aria-label={text.resultToolbarLabel}
+            className="mb-3"
+            left={(
+              <>
+                <Select
+                  label={`${text.resultFilters} · ${text.phase}`}
+                  value={phaseFilter}
+                  onChange={(value) => handlePhaseChange(value as BacktestPhaseFilter)}
+                  disabled={isRunning}
+                  className="w-40"
+                  options={phaseFilterOptions.map((option) => ({ value: option.value, label: option.label }))}
+                />
+                <span className="pb-1.5 text-xs text-muted-text">{text.resultPhaseHint}</span>
+              </>
+            )}
+          />
           {resultsError ? (
             <ApiErrorAlert error={resultsError} className="mb-3" />
           ) : null}
@@ -946,6 +975,20 @@ const BacktestPage: React.FC = () => {
         </section>
       </div>
       )}
+
+      <ConfirmDialog
+        isOpen={pendingForceRun != null}
+        title={text.forceRerunConfirmTitle}
+        message={text.forceRerunConfirmMessage}
+        confirmText={text.runBacktest}
+        cancelText={t('common.cancel')}
+        onConfirm={() => {
+          const filters = pendingForceRun;
+          setPendingForceRun(null);
+          if (filters) void runBacktest(filters, true);
+        }}
+        onCancel={() => setPendingForceRun(null)}
+      />
     </AppPage>
   );
 };

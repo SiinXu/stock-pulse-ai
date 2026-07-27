@@ -681,8 +681,8 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
     await expect(page).toHaveURL(/#evidence$/);
     await expect(page.getByTestId('run-flow-panel')).toBeVisible();
     await expect(page.getByRole('dialog', { name: 'Run Flow' })).toHaveAttribute(
-      'data-drawer-variant',
-      'detail',
+      'data-modal-size',
+      'fullscreen',
     );
   });
 
@@ -954,15 +954,14 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
       `${APP_ROUTE_PATHS.researchAnalysis}?segment=tasks&keep=yes&runFlow=task&runFlowTaskId=task-2`,
     );
     await expect(page.getByTestId('run-flow-panel')).toBeVisible();
-    const runFlowDrawer = page.getByRole('dialog', { name: 'Run Flow' });
-    await expect(runFlowDrawer).toHaveAttribute('data-drawer-variant', 'detail');
-    await expect(runFlowDrawer).toHaveAttribute('data-drawer-size', 'wide');
+    const runFlowModal = page.getByRole('dialog', { name: 'Run Flow' });
+    await expect(runFlowModal).toHaveAttribute('data-modal-size', 'fullscreen');
     await expect.poll(() => fixture.taskFlowRequests.filter((taskId) => taskId === 'task-2').length).toBeGreaterThanOrEqual(1);
 
     await page.reload();
     await expect(page.getByTestId('run-flow-panel')).toBeVisible();
     await expect.poll(() => fixture.taskFlowRequests.filter((taskId) => taskId === 'task-2').length).toBeGreaterThanOrEqual(2);
-    await runFlowDrawer.getByRole('button', { name: 'Close drawer', exact: true }).click();
+    await runFlowModal.getByRole('button', { name: 'Close', exact: true }).click();
 
     await expect(page.getByTestId('run-flow-panel')).toHaveCount(0);
     await expectSearchParams(page, {
@@ -989,7 +988,7 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
     await expect(page.getByTestId('run-flow-panel')).toBeVisible();
     await expect.poll(() => fixture.historyFlowRequests.filter((recordId) => recordId === 2).length).toBeGreaterThanOrEqual(2);
     await page.getByRole('dialog', { name: 'Run Flow' })
-      .getByRole('button', { name: 'Close drawer', exact: true })
+      .getByRole('button', { name: 'Close', exact: true })
       .click();
 
     await expect(page.getByTestId('run-flow-panel')).toHaveCount(0);
@@ -1026,7 +1025,7 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
     await expect(page.getByTestId('run-flow-panel')).toBeVisible();
   });
 
-  test('320px history Run Flow Drawer traps focus and restores its trigger on close', async ({ page }) => {
+  test('320px history Run Flow Modal traps focus and restores its trigger on close', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 844 });
     await openFixtureHome(page, `${APP_ROUTE_PATHS.researchAnalysis}?segment=history&recordId=2`);
     await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
@@ -1034,30 +1033,30 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
     const trigger = page.getByRole('button', { name: 'View run flow for history record 2' });
     await trigger.click();
 
-    const drawer = page.getByRole('dialog', { name: 'Run Flow' });
-    await expect(drawer).toBeVisible();
-    await expect(drawer).toHaveAttribute('data-drawer-variant', 'detail');
-    await expectFocusWithin(drawer);
+    const modal = page.getByRole('dialog', { name: 'Run Flow' });
+    await expect(modal).toBeVisible();
+    await expect(modal).toHaveAttribute('data-modal-size', 'fullscreen');
+    await expectFocusWithin(modal);
     await expect(page.locator('#root')).toHaveAttribute('inert', '');
     await expectBodyOverflow(page, 'hidden');
-    await drawer.evaluate(async (element) => {
+    await modal.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });
-    const drawerBox = await drawer.boundingBox();
-    expect(drawerBox).not.toBeNull();
-    expect(drawerBox!.x).toBeGreaterThanOrEqual(0);
-    expect(drawerBox!.x + drawerBox!.width).toBeLessThanOrEqual(320);
-    expect(await drawer.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
-    await drawer.getByRole('button', { name: 'Close drawer', exact: true }).click();
+    const modalBox = await modal.boundingBox();
+    expect(modalBox).not.toBeNull();
+    expect(modalBox!.x).toBeGreaterThanOrEqual(0);
+    expect(modalBox!.x + modalBox!.width).toBeLessThanOrEqual(320);
+    expect(await modal.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await modal.getByRole('button', { name: 'Close', exact: true }).click();
 
-    await expect(drawer).toHaveCount(0);
+    await expect(modal).toHaveCount(0);
     await expect(trigger).toBeFocused();
     await expectSearchParams(page, { recordId: '2', runFlow: null, runFlowRecordId: null });
     await expect(page.locator('#root')).not.toHaveAttribute('inert', '');
     await expectBodyOverflow(page, '');
   });
 
-  test('390px history Run Flow Drawer closes with Escape and restores its trigger', async ({ page }) => {
+  test('390px history Run Flow Modal closes with Escape and restores its trigger', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openFixtureHome(page, `${APP_ROUTE_PATHS.researchAnalysis}?segment=history&recordId=2`);
     await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
@@ -1065,12 +1064,13 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
     const trigger = page.getByRole('button', { name: 'View run flow for history record 2' });
     await trigger.click();
 
-    const drawer = page.getByRole('dialog', { name: 'Run Flow' });
-    await expect(drawer).toBeVisible();
-    await expectFocusWithin(drawer);
+    const modal = page.getByRole('dialog', { name: 'Run Flow' });
+    await expect(modal).toBeVisible();
+    await expect(modal).toHaveAttribute('data-modal-size', 'fullscreen');
+    await expectFocusWithin(modal);
     await page.keyboard.press('Escape');
 
-    await expect(drawer).toHaveCount(0);
+    await expect(modal).toHaveCount(0);
     await expect(trigger).toBeFocused();
     await expectSearchParams(page, { recordId: '2', runFlow: null, runFlowRecordId: null });
     await expectBodyOverflow(page, '');

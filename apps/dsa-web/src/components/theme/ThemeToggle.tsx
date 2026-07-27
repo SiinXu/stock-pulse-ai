@@ -5,6 +5,7 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiTextKey } from '../../i18n/uiText';
 import { cn } from '../../utils/cn';
 import { Popover } from '../common/Popover';
+import { Select } from '../common/Select';
 
 type ThemeOption = 'light' | 'dark' | 'system';
 type ThemeToggleVariant = 'default' | 'nav' | 'rail';
@@ -33,7 +34,7 @@ function resolveThemeLabel(theme: string | undefined, t: (key: UiTextKey) => str
 interface ThemeToggleProps {
   variant?: ThemeToggleVariant;
   collapsed?: boolean;
-  menuLayout?: 'vertical' | 'horizontal';
+  menuLayout?: 'vertical' | 'horizontal' | 'select';
   wrapperClassName?: string;
   triggerClassName?: string;
   triggerActiveClassName?: string;
@@ -60,6 +61,33 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
   const isNavVariant = variant === 'nav';
   const isRailVariant = variant === 'rail';
   const isHorizontalMenu = menuLayout === 'horizontal';
+
+  if (menuLayout === 'select') {
+    return (
+      <div
+        className={cn(
+          triggerClassName ?? 'flex h-11 min-h-11 w-full items-center gap-2 rounded-lg px-3 text-sm text-secondary-text',
+          triggerActiveClassName,
+          wrapperClassName,
+        )}
+      >
+        <TriggerIcon className={iconClassName ?? 'h-4 w-4 shrink-0'} />
+        <Select
+          value={activeTheme}
+          onChange={(nextTheme) => setTheme(nextTheme as ThemeOption)}
+          options={THEME_OPTIONS.map(({ value, labelKey }) => ({
+            value,
+            label: t(labelKey),
+          }))}
+          ariaLabel={t('theme.toggle')}
+          className="min-w-0 flex-1 [&>div]:w-full"
+          triggerClassName="h-11 min-h-11 border-0 bg-transparent px-0 text-sm font-normal hover:bg-transparent sm:h-11 sm:min-h-11"
+          menuAlign="start"
+          menuPlacement="top"
+        />
+      </div>
+    );
+  }
 
   return (
     <Popover

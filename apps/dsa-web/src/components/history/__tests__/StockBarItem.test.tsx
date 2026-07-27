@@ -44,6 +44,9 @@ describe('StockBarItemComponent', () => {
       name: /^贵州茅台股票股份有限公司 600519 历史记录$/,
     });
     expect(openButton).toBeInTheDocument();
+    expect(openButton).toHaveAttribute('data-control', 'pressable');
+    expect(openButton.closest('.history-item')).toBeInTheDocument();
+    expect(openButton.closest('.home-history-item')).not.toBeInTheDocument();
     // No button nesting: the delete button must not be a descendant of the open button.
     expect(within(openButton).queryByRole('button')).not.toBeInTheDocument();
 

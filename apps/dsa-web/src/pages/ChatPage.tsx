@@ -2,11 +2,21 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ChevronDown, SlidersHorizontal, RefreshCw } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  Copy,
+  Download,
+  History,
+  RefreshCw,
+  SlidersHorizontal,
+  Trash2,
+} from 'lucide-react';
 import { cn } from '../utils/cn';
 import { agentApi } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
 import { ApiErrorAlert, Badge, Button, Checkbox, ConfirmDialog, Drawer, EmptyState, IconButton, InlineAlert, ScrollArea, SearchInput, SegmentedControl, Surface, Switch, Tooltip, useClipboard } from '../components/common';
+import { Pressable } from '../components/common/Pressable';
 import { DeepResearchPanel } from '../components/chat/DeepResearchPanel';
 import { getParsedApiError } from '../api/error';
 import type { SkillInfo } from '../api/agent';
@@ -51,6 +61,7 @@ const CONTEXT_COMPRESSION_CONFIG_KEY = 'AGENT_CONTEXT_COMPRESSION_ENABLED';
 const CHAT_SESSION_QUERY_KEY = 'session';
 const CHAT_CONTEXT_STATE_QUERY_KEY = 'context';
 const CHAT_ACTIVE_CONTEXT_STATE = 'active';
+const CHAT_DESKTOP_RAIL_QUERY = '(min-width: 1280px)';
 const STRONG_COMPARE_STOCK_MESSAGE_RE = /比较|对比|\bvs\b|和[^，。,.!?！？]{0,40}比/i;
 const WEAK_COMPARE_STOCK_MESSAGE_RE = /差异(?!化)|区别|不同|相比|对照|比一比/;
 const CHOICE_COMPARE_STOCK_MESSAGE_RE = /哪个|哪只|哪一个|谁更|更值得|更适合|怎么选|选哪|二选一/;
@@ -195,7 +206,13 @@ const ChatPage: React.FC = () => {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+  const sidebarOpenRef = useRef(false);
+  const desktopSessionRailRef = useRef<HTMLDivElement>(null);
+  const setSidebarPresentationOpen = useCallback((open: boolean) => {
+    sidebarOpenRef.current = open;
+    setSidebarOpen(open);
+  }, []);
+  const closeSidebar = useCallback(() => setSidebarPresentationOpen(false), [setSidebarPresentationOpen]);
   const [sending, setSending] = useState(false);
   const [isFollowUpContextLoading, setIsFollowUpContextLoading] = useState(false);
   const [sendToast, setSendToast] = useState<{
@@ -272,6 +289,32 @@ const ChatPage: React.FC = () => {
       isMountedRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') {
+      return undefined;
+    }
+    const mediaQuery = window.matchMedia(CHAT_DESKTOP_RAIL_QUERY);
+    let focusFrame: number | undefined;
+    const handleRailPresentationChange = (event: MediaQueryListEvent) => {
+      if (!event.matches || !sidebarOpenRef.current) {
+        return;
+      }
+      setSidebarPresentationOpen(false);
+      focusFrame = window.requestAnimationFrame(() => {
+        const rail = desktopSessionRailRef.current;
+        const activeSession = rail?.querySelector<HTMLElement>('[aria-current="page"]');
+        (activeSession ?? rail)?.focus();
+      });
+    };
+    mediaQuery.addEventListener('change', handleRailPresentationChange);
+    return () => {
+      mediaQuery.removeEventListener('change', handleRailPresentationChange);
+      if (focusFrame !== undefined) {
+        window.cancelAnimationFrame(focusFrame);
+      }
+    };
+  }, [setSidebarPresentationOpen]);
 
   const loadWatchlist = useCallback(async () => {
     try {
@@ -639,12 +682,12 @@ const ChatPage: React.FC = () => {
     requestScrollToBottom('auto');
     const newSessionId = useAgentChatStore.getState().startNewChat();
     setSessionInUrl(newSessionId, true);
-    setSidebarOpen(false);
-  }, [requestScrollToBottom, setSessionInUrl]);
+    setSidebarPresentationOpen(false);
+  }, [requestScrollToBottom, setSessionInUrl, setSidebarPresentationOpen]);
 
   const handleSwitchSession = useCallback(async (targetSessionId: string) => {
     if (targetSessionId === sessionId) {
-      setSidebarOpen(false);
+      setSidebarPresentationOpen(false);
       return;
     }
     const switched = await switchSession(targetSessionId);
@@ -655,9 +698,9 @@ const ChatPage: React.FC = () => {
       setActiveStockCode(null);
       requestScrollToBottom('auto');
       setSessionInUrl(targetSessionId, true);
-      setSidebarOpen(false);
+      setSidebarPresentationOpen(false);
     }
-  }, [requestScrollToBottom, sessionId, setSessionInUrl, switchSession]);
+  }, [requestScrollToBottom, sessionId, setSessionInUrl, setSidebarPresentationOpen, switchSession]);
 
   const confirmDelete = useCallback(async () => {
     if (!deleteConfirmId || deleteLoading) return;
@@ -973,17 +1016,17 @@ const ChatPage: React.FC = () => {
   const sidebarContent = (
     <>
       <div className="flex items-center justify-between border-b border-subtle bg-subtle-soft p-3.5">
-        <h2 className="hidden text-sm font-semibold text-primary uppercase tracking-[0.2em] md:flex items-center gap-2">
+        <h2 className="hidden items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-primary xl:flex">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           {t('chat.history')}
         </h2>
         <div className="flex items-center">
-          <button
-            type="button"
+          <IconButton
             onClick={handleStartNewChat}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted-text transition-all hover:bg-subtle-hover hover:text-foreground"
+            size="navigation"
+            tooltip={false}
             aria-label={t('chat.newConversation')}
           >
             <svg
@@ -999,7 +1042,7 @@ const ChatPage: React.FC = () => {
                 d="M12 4v16m8-8H4"
               />
             </svg>
-          </button>
+          </IconButton>
         </div>
       </div>
       <div className="px-3 pt-3">
@@ -1051,15 +1094,13 @@ const ChatPage: React.FC = () => {
           <div className="space-y-2">
             {filteredSessions.map((s) => (
               <div key={s.session_id} className="session-item-row">
-                <button
-                  type="button"
+                <Pressable
                   onClick={() => void handleSwitchSession(s.session_id)}
                   disabled={sessionLoading}
                   className={`session-item ${s.session_id === sessionId ? 'active' : ''}`}
                   aria-label={t('chat.switchSession', { title: s.title })}
                   aria-current={s.session_id === sessionId ? 'page' : undefined}
                 >
-                  <div className="indicator" />
                   <div className="content">
                     <span className="title">{s.title}</span>
                     <div className="mt-0.5 flex items-center gap-2">
@@ -1076,9 +1117,11 @@ const ChatPage: React.FC = () => {
                       )}
                     </div>
                   </div>
-                </button>
-                <button
-                  type="button"
+                </Pressable>
+                <IconButton
+                  variant="danger"
+                  size="navigation"
+                  tooltip={false}
                   className="delete-btn"
                   onClick={() => {
                     setDeleteConfirmId(s.session_id);
@@ -1087,20 +1130,8 @@ const ChatPage: React.FC = () => {
                   disabled={sessionLoading}
                   aria-label={t('chat.deleteSession', { title: s.title })}
                 >
-                  <svg
-                    className="w-3.5 h-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    />
-                  </svg>
-                </button>
+                  <Trash2 aria-hidden="true" />
+                </IconButton>
               </div>
             ))}
           </div>
@@ -1119,7 +1150,12 @@ const ChatPage: React.FC = () => {
       className="flex h-[calc(100dvh-5rem)] w-full min-w-0 gap-4 overflow-hidden p-3 sm:h-[calc(100dvh-5.5rem)] lg:h-[calc(100dvh-2rem)]"
     >
       {/* Desktop sidebar */}
-      <div className="hidden h-full w-64 flex-shrink-0 flex-col overflow-hidden rounded-3xl border border-subtle bg-card/82 shadow-soft-card md:flex">
+      <div
+        ref={desktopSessionRailRef}
+        tabIndex={-1}
+        className="hidden h-full w-64 flex-shrink-0 flex-col overflow-hidden rounded-3xl border border-subtle bg-card/82 shadow-soft-card xl:flex"
+        data-testid="chat-session-rail"
+      >
         {sidebarContent}
       </div>
 
@@ -1156,26 +1192,16 @@ const ChatPage: React.FC = () => {
         <header className="mb-4 flex-shrink-0 space-y-3">
           <div className="flex items-start justify-between gap-4">
             <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setSidebarOpen(true)}
-                className="-ml-1 inline-flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground md:hidden"
+              <IconButton
+                onClick={() => setSidebarPresentationOpen(true)}
+                size="navigation"
+                tooltip={false}
+                className="-ml-1 xl:hidden"
                 aria-label={t('chat.history')}
+                data-testid="chat-session-trigger"
               >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 6h16M4 12h16M4 18h16"
-                  />
-                </svg>
-              </button>
+                <History aria-hidden="true" />
+              </IconButton>
               <svg
                 className="w-6 h-6 text-primary"
                 fill="none"
@@ -1294,7 +1320,8 @@ const ChatPage: React.FC = () => {
               value={chatMode}
               onChange={(value) => setChatMode(value)}
               ariaLabel={t('research.modeLabel')}
-              className="dark:!bg-foreground/10 dark:[&_.segmented-control-tab[aria-selected=true]]:!bg-foreground dark:[&_.segmented-control-tab[aria-selected=true]]:text-background dark:[&_.segmented-control-tab[aria-selected=false]]:text-foreground/70"
+              semantics="single-select"
+              className="dark:!bg-foreground/10 dark:[&_.segmented-control-tab[aria-checked=true]]:!bg-foreground dark:[&_.segmented-control-tab[aria-checked=true]]:text-background dark:[&_.segmented-control-tab[aria-checked=false]]:text-foreground/70"
               options={[
                 { value: 'chat', label: t('research.chatMode') },
                 { value: 'research', label: t('research.mode') },
@@ -1413,29 +1440,43 @@ const ChatPage: React.FC = () => {
                       msg.thinkingSteps &&
                       renderThinkingDetails(msg.thinkingSteps)}
                     {msg.role === 'assistant' ? (
-                      <div className="relative">
-                        <div className="chat-message-actions">
-                          <button
-                            type="button"
-                            onClick={() => copyMessageToClipboard(msg.id, displayContent)}
-                            className="chat-copy-btn"
-                            aria-label={copiedMessages.has(msg.id) ? text.copied : text.copy}
-                          >
-                            {copiedMessages.has(msg.id) ? text.copied : text.copy}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => downloadMessageAsMarkdown(msg)}
-                            className="chat-copy-btn"
-                            aria-label={t('chat.exportMessage')}
-                          >
-                            {t('chat.export')}
-                          </button>
-                        </div>
-                        <div className="chat-prose pr-20 sm:pr-24">
+                      <div>
+                        <div className="chat-prose">
                           <Markdown remarkPlugins={[remarkGfm]}>
                             {displayContent}
                           </Markdown>
+                        </div>
+                        <div className="chat-message-actions">
+                          <span
+                            data-slot="chat-message-action"
+                            className="flex h-11 w-11 items-center justify-center"
+                          >
+                            <IconButton
+                              size="compact"
+                              tooltip={false}
+                              onClick={() => copyMessageToClipboard(msg.id, displayContent)}
+                              aria-label={copiedMessages.has(msg.id) ? text.copied : text.copy}
+                            >
+                              {copiedMessages.has(msg.id) ? (
+                                <Check className="text-success" aria-hidden="true" />
+                              ) : (
+                                <Copy aria-hidden="true" />
+                              )}
+                            </IconButton>
+                          </span>
+                          <span
+                            data-slot="chat-message-action"
+                            className="flex h-11 w-11 items-center justify-center"
+                          >
+                            <IconButton
+                              size="compact"
+                              tooltip={false}
+                              onClick={() => downloadMessageAsMarkdown(msg)}
+                              aria-label={t('chat.exportMessage')}
+                            >
+                              <Download aria-hidden="true" />
+                            </IconButton>
+                          </span>
                         </div>
                       </div>
                     ) : (

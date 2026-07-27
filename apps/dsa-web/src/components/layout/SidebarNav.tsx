@@ -88,7 +88,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
   );
   const itemActiveClass = 'border-[var(--nav-active-border)] bg-[var(--nav-active-bg)] font-medium text-foreground shadow-[0_1px_2px_var(--nav-active-shadow)]';
   const itemIconClass = cn('h-5 w-5', 'shrink-0');
-  const itemLabelClass = cn('truncate', isRail ? 'text-center' : '');
+  const itemLabelClass = cn('min-w-0 flex-1 truncate', isRail ? 'text-center' : '');
   const cancelGroupClose = useCallback(() => {
     if (groupCloseTimerRef.current !== null) {
       window.clearTimeout(groupCloseTimerRef.current);
@@ -251,23 +251,15 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
         aria-label={t('layout.mainNav')}
       >
         {navItems.map((item) => {
-          const { key, labelKey, to, icon: Icon, exact, badge, children } = item;
+          const { key, labelKey, icon: Icon, badge } = item;
           const label = t(labelKey);
-          const navigationTarget = resolveContextAwareNavigationTarget(to, currentHref);
+          const children = item.kind === 'group' ? item.children : undefined;
           const activeChild = children?.find((child) => isRouteActive(child.to, child.exact));
-          const parentActive = isRouteActive(to, exact);
-          const groupActive = parentActive
-            || Boolean(activeChild);
+          const groupSelfActive = item.kind === 'group'
+            ? isRouteActive(item.to, item.exact)
+            : false;
+          const groupActive = groupSelfActive || Boolean(activeChild);
           const childrenExpanded = children ? !closedGroupKeys.has(key) : false;
-          const groupParentAriaCurrent = children
-            ? activeChild
-              ? childrenExpanded
-                ? undefined
-                : 'page'
-              : parentActive
-                ? 'page'
-                : undefined
-            : undefined;
           const renderItemContent = (active: boolean) => (
             <>
               <Icon className={cn(itemIconClass, active ? 'text-[var(--nav-icon-active)]' : 'text-current')} />
@@ -285,47 +277,8 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               ) : null}
             </>
           );
-          const link = children ? (
-            <Link
-              to={navigationTarget}
-              aria-current={groupParentAriaCurrent}
-              onClick={(event) => {
-                if (shouldDelegateCurrentDocumentNavigation(event)) {
-                  onNavigate?.();
-                }
-              }}
-              aria-label={label}
-              data-route-focus-key={`${focusKeyPrefix}:${key}`}
-              data-route-focus-return-key={returnFocusKey}
-              className={cn(itemInteractiveClass, groupActive ? itemActiveClass : '')}
-            >
-              {renderItemContent(groupActive)}
-            </Link>
-          ) : (
-            <NavLink
-              to={navigationTarget}
-              end={exact}
-              aria-current="page"
-              onClick={(event) => {
-                if (shouldDelegateCurrentDocumentNavigation(event)) {
-                  onNavigate?.();
-                }
-              }}
-              aria-label={label}
-              data-route-focus-key={`${focusKeyPrefix}:${key}`}
-              data-route-focus-return-key={returnFocusKey}
-              className={({ isActive }) =>
-                cn(
-                  itemInteractiveClass,
-                  isActive || groupActive ? itemActiveClass : ''
-                )
-              }
-            >
-              {({ isActive }) => renderItemContent(isActive || groupActive)}
-            </NavLink>
-          );
 
-          if (children && collapsed) {
+          if (item.kind === 'group' && collapsed) {
             const contentId = `${focusKeyPrefix}-${key}-flyout`;
             const triggerFocusKey = `${focusKeyPrefix}:${key}`;
             return (
@@ -360,42 +313,37 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                   });
                 }}
                 trigger={({ open }) => (
-                  <Link
-                    to={navigationTarget}
+                  <button
+                    type="button"
                     aria-label={label}
-                    aria-current={activeChild
-                      ? open
-                        ? undefined
-                        : 'page'
-                      : parentActive
-                        ? 'page'
-                        : undefined}
                     aria-haspopup="menu"
                     aria-expanded={open}
                     aria-controls={open ? contentId : undefined}
+                    data-navigation-active={groupActive ? 'true' : undefined}
                     data-route-focus-key={triggerFocusKey}
                     data-route-focus-return-key={returnFocusKey}
                     onMouseEnter={() => openGroup(key, false)}
                     onMouseLeave={scheduleGroupClose}
                     onKeyDown={(event) => {
-                      if (event.key !== 'ArrowRight') return;
+                      if (event.key !== 'ArrowRight' && event.key !== 'ArrowDown') return;
                       event.preventDefault();
                       openGroup(key, true);
                     }}
-                    onClick={(event) => {
-                      if (shouldDelegateCurrentDocumentNavigation(event)) {
-                        closeGroup();
-                        onNavigate?.();
-                      }
+                    onClick={() => {
+                      if (open && focusFlyoutGroupKey === key) closeGroup();
+                      else openGroup(key, true);
                     }}
-                    className={cn(itemInteractiveClass, groupActive ? itemActiveClass : '')}
+                    className={cn(
+                      itemInteractiveClass,
+                      groupActive && !open ? itemActiveClass : groupActive ? 'text-foreground' : '',
+                    )}
                   >
                     {renderItemContent(groupActive)}
                     <ChevronRight
                       className="absolute bottom-1.5 right-1.5 h-3 w-3 text-muted-text"
                       aria-hidden="true"
                     />
-                  </Link>
+                  </button>
                 )}
               >
                 {() => (
@@ -403,7 +351,29 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                     <div className="px-2.5 pb-1.5 pt-1 text-xs font-medium text-muted-text">
                       {label}
                     </div>
-                    {children.map((child) => {
+                    <Link
+                      role="menuitem"
+                      tabIndex={-1}
+                      to={resolveContextAwareNavigationTarget(item.to, currentHref)}
+                      aria-label={t(item.overviewLabelKey)}
+                      aria-current={groupSelfActive ? 'page' : undefined}
+                      data-route-focus-key={`${focusKeyPrefix}:${key}-overview`}
+                      data-route-focus-return-key={triggerFocusKey}
+                      onClick={(event) => {
+                        if (shouldDelegateCurrentDocumentNavigation(event)) {
+                          closeGroup();
+                          onNavigate?.();
+                        }
+                      }}
+                      className={cn(
+                        'flex min-h-11 items-center gap-2.5 rounded-lg px-2.5 text-sm text-secondary-text transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-foreground motion-reduce:transition-none',
+                        groupSelfActive ? itemActiveClass : '',
+                      )}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      <span className="truncate">{t(item.overviewLabelKey)}</span>
+                    </Link>
+                    {item.children.map((child) => {
                       const ChildIcon = child.icon;
                       const childLabel = t(child.labelKey);
                       const childActive = isRouteActive(child.to, child.exact);
@@ -439,25 +409,57 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
             );
           }
 
-          if (children) {
+          if (item.kind === 'group') {
             const childrenId = `${focusKeyPrefix}-${key}-children`;
+            const navigationTarget = resolveContextAwareNavigationTarget(item.to, currentHref);
+            const toggleLabel = childrenExpanded
+              ? t('layout.collapseNavGroup', { label })
+              : t('layout.expandNavGroup', { label });
             return (
               <div key={key} className="flex shrink-0 flex-col gap-1">
                 <div className="flex items-center gap-1">
-                  <div className="min-w-0 flex-1">{link}</div>
-                  <IconButton
+                  <NavLink
+                    to={navigationTarget}
+                    end={item.exact}
+                    aria-current="page"
                     aria-label={label}
+                    data-navigation-active={groupActive ? 'true' : undefined}
+                    data-sidebar-group-link={key}
+                    data-route-focus-key={`${focusKeyPrefix}:${key}`}
+                    data-route-focus-return-key={returnFocusKey}
+                    onClick={(event) => {
+                      if (shouldDelegateCurrentDocumentNavigation(event)) {
+                        onNavigate?.();
+                      }
+                    }}
+                    className={({ isActive }) => cn(
+                      itemInteractiveClass,
+                      'min-w-0 flex-1',
+                      isActive
+                        ? itemActiveClass
+                        : groupActive
+                          ? 'font-medium text-foreground'
+                          : '',
+                    )}
+                  >
+                    {({ isActive }) => renderItemContent(isActive || groupActive)}
+                  </NavLink>
+                  <IconButton
+                    aria-label={toggleLabel}
+                    tooltip={toggleLabel}
                     size="navigation"
                     variant="ghost"
-                    tooltip={false}
                     aria-expanded={childrenExpanded}
                     aria-controls={childrenExpanded ? childrenId : undefined}
                     data-sidebar-group-toggle={key}
+                    data-route-focus-key={`${focusKeyPrefix}:${key}:toggle`}
+                    data-route-focus-return-key={returnFocusKey}
                     onClick={() => toggleGroupChildren(key)}
+                    className={cn(groupActive && 'text-foreground')}
                   >
                     <ChevronRight
                       className={cn(
-                        'h-4 w-4 transition-transform motion-reduce:transition-none',
+                        'transition-transform motion-reduce:transition-none',
                         childrenExpanded && 'rotate-90',
                       )}
                       aria-hidden="true"
@@ -465,7 +467,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                   </IconButton>
                 </div>
                 {childrenExpanded ? <div id={childrenId} className="ml-4 flex flex-col gap-1 border-l border-border pl-3">
-                  {children.map((child) => {
+                  {item.children.map((child) => {
                     const ChildIcon = child.icon;
                     const childLabel = t(child.labelKey);
                     return (
@@ -503,6 +505,31 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               </div>
             );
           }
+
+          const navigationTarget = resolveContextAwareNavigationTarget(item.to, currentHref);
+          const link = (
+            <NavLink
+              to={navigationTarget}
+              end={item.exact}
+              aria-current="page"
+              onClick={(event) => {
+                if (shouldDelegateCurrentDocumentNavigation(event)) {
+                  onNavigate?.();
+                }
+              }}
+              aria-label={label}
+              data-route-focus-key={`${focusKeyPrefix}:${key}`}
+              data-route-focus-return-key={returnFocusKey}
+              className={({ isActive }) =>
+                cn(
+                  itemInteractiveClass,
+                  isActive ? itemActiveClass : ''
+                )
+              }
+            >
+              {({ isActive }) => renderItemContent(isActive)}
+            </NavLink>
+          );
 
           return (
             <React.Fragment key={key}>

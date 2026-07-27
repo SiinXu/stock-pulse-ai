@@ -127,12 +127,12 @@ test.describe('complete UI i18n acceptance', () => {
     await expect(mobileBacktestLink).toBeVisible(); // 10
     await mobileBacktestLink.click();
 
-    const themeToggle = page.getByRole('button', { name: 'Toggle theme' }).first();
+    const themeToggle = page.getByRole('combobox', { name: 'Toggle theme' }).first();
     if (!await themeToggle.isVisible().catch(() => false)) {
       await openProfileMenu(page);
     }
     await themeToggle.click();
-    await page.getByRole('menuitemradio', { name: 'Dark', exact: true }).click();
+    await page.getByRole('option', { name: 'Dark', exact: true }).click();
     await expect(page.locator('html')).toHaveClass(/dark/); // 11
 
     await selectUiLanguage(page, 'zh');
@@ -201,6 +201,7 @@ test.describe('complete UI i18n acceptance', () => {
     const routes = [
       { path: APP_ROUTE_PATHS.home, text: UI_TEXT.en['home.todayFocus'], title: UI_TEXT.en['home.pageTitle'] },
       { path: APP_ROUTE_PATHS.agent, text: UI_TEXT.en['chat.title'], title: UI_TEXT.en['chat.pageTitle'] },
+      { path: APP_ROUTE_PATHS.research, text: UI_TEXT.en['layout.nav.research'], title: UI_TEXT.en['researchOverview.documentTitle'] },
       { path: APP_ROUTE_PATHS.researchMarket, text: UI_TEXT.en['home.marketReview'], title: UI_TEXT.en['home.marketReviewPageTitle'] },
       { path: APP_ROUTE_PATHS.researchDiscover, text: SCREENING_TEXT.en.title, title: SCREENING_TEXT.en.documentTitle },
       { path: APP_ROUTE_PATHS.researchAnalysis, text: UI_TEXT.en['analysisWorkbench.title'], title: UI_TEXT.en['analysisWorkbench.documentTitle'] },
@@ -217,7 +218,7 @@ test.describe('complete UI i18n acceptance', () => {
       await expect(page.getByText(route.text, { exact: true }).first()).toBeVisible({ timeout: 15_000 });
       await expect(page).toHaveTitle(new RegExp(route.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
     }
-    expect(routes).toHaveLength(11); // 16-26
+    expect(routes).toHaveLength(12); // 16-27
   });
 
   test('English Settings localizes model access, discovery success, and discovery failure', async ({ page }) => {

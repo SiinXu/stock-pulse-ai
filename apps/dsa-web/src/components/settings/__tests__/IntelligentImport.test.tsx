@@ -44,6 +44,11 @@ describe('IntelligentImport', () => {
 
     const inputs = container.querySelectorAll('input[type="file"]');
     expect(inputs).toHaveLength(2);
+    expect(inputs[0].parentElement?.parentElement).toHaveClass('grid', 'lg:grid-cols-2');
+    expect(screen.getByPlaceholderText('或粘贴 CSV/Excel 复制的文本...')).toHaveAttribute(
+      'data-control',
+      'textarea',
+    );
 
     const imageClick = vi.fn();
     const dataClick = vi.fn();
@@ -171,7 +176,7 @@ describe('IntelligentImport', () => {
     });
   });
 
-  it('keeps review actions and compact row controls on 44px touch targets', async () => {
+  it('uses shared compact review controls with coarse-pointer hit targets', async () => {
     parseImport.mockResolvedValue({
       items: [{ code: 'SZ000001', name: 'Ping An Bank', confidence: 'high' }],
       codes: [],
@@ -193,11 +198,17 @@ describe('IntelligentImport', () => {
 
     await screen.findByText('SZ000001');
     for (const actionName of ['全选当前', '取消', '清空']) {
-      expect(screen.getByRole('button', { name: actionName })).toHaveClass('min-h-11', 'min-w-11');
+      const action = screen.getByRole('button', { name: actionName });
+      expect(action).toHaveAttribute('data-control', 'button');
+      expect(action).toHaveAttribute('data-size', 'compact');
+      expect(action).toHaveClass('control-hit-target');
     }
     const checkbox = screen.getByRole('checkbox');
     expect(checkbox.closest('label')).toHaveClass('min-h-11');
     expect(checkbox).toHaveClass('h-6', 'w-6');
-    expect(screen.getByRole('button', { name: '×' })).toHaveClass('h-11', 'w-11');
+    const removeButton = screen.getByRole('button', { name: '删除' });
+    expect(removeButton).toHaveAttribute('data-control', 'icon-button');
+    expect(removeButton).toHaveAttribute('data-size', 'compact');
+    expect(removeButton).toHaveClass('control-hit-target');
   });
 });

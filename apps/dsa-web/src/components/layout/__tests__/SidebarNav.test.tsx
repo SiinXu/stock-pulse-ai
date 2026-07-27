@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, useNavigate } from 'react-router-dom';
+import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTE_PATHS, LEGACY_ROUTE_PATHS } from '../../../routing/routes';
 import { recordSessionLocation } from '../../../utils/sessionContinuity';
@@ -11,7 +11,7 @@ if (!HTMLElement.prototype.scrollIntoView) {
 
 const mockLogout = vi.fn().mockResolvedValue(undefined);
 const mockGetAlphaSiftStatus = vi.fn().mockResolvedValue({ enabled: false, available: false, installSpecIsDefault: false });
-const mockThemeToggle = vi.fn(({ collapsed }: { collapsed?: boolean }) => (
+const mockThemeToggle = vi.fn(({ collapsed }: { collapsed?: boolean; menuLayout?: 'vertical' | 'horizontal' | 'select' }) => (
   <button type="button">{collapsed ? '切换主题(折叠)' : '切换主题'}</button>
 ));
 
@@ -25,6 +25,11 @@ function ClearPortfolioStateHarness() {
       <button type="button" onClick={() => navigate(APP_ROUTE_PATHS.portfolio)}>All accounts</button>
     </>
   );
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output aria-label="current location">{`${location.pathname}${location.search}`}</output>;
 }
 
 vi.mock('../../../contexts/AuthContext', () => ({
@@ -48,7 +53,7 @@ vi.mock('../../../api/alphasift', () => ({
 }));
 
 vi.mock('../../theme/ThemeToggle', () => ({
-  ThemeToggle: (props: { collapsed?: boolean }) => mockThemeToggle(props),
+  ThemeToggle: (props: { collapsed?: boolean; menuLayout?: 'vertical' | 'horizontal' | 'select' }) => mockThemeToggle(props),
 }));
 
 describe('SidebarNav', () => {
@@ -191,7 +196,7 @@ describe('SidebarNav', () => {
     const hrefs = screen.getAllByRole('link').map((link) => link.getAttribute('href'));
     expect(hrefs.slice(0, 9)).toEqual([
       APP_ROUTE_PATHS.home,
-      APP_ROUTE_PATHS.researchMarket,
+      APP_ROUTE_PATHS.research,
       APP_ROUTE_PATHS.researchMarket,
       APP_ROUTE_PATHS.researchDiscover,
       APP_ROUTE_PATHS.researchAnalysis,
@@ -206,23 +211,31 @@ describe('SidebarNav', () => {
     render(
       <MemoryRouter initialEntries={[APP_ROUTE_PATHS.home]}>
         <SidebarNav />
+        <LocationProbe />
       </MemoryRouter>,
     );
 
-    const groupLink = screen.getByRole('link', { name: '研究' });
-    expect(groupLink).not.toHaveAttribute('aria-expanded');
-    expect(groupLink.querySelectorAll('svg')).toHaveLength(1);
-    expect(screen.getByRole('button', { name: '研究' })).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('button', { name: '研究' })).toHaveAttribute('data-control', 'icon-button');
-    expect(screen.getByRole('button', { name: '研究' })).toHaveAttribute('data-size', 'navigation');
+    const researchLink = screen.getByRole('link', { name: '研究' });
+    const researchToggle = screen.getByRole('button', { name: '收起研究菜单' });
+    expect(researchLink).toHaveAttribute('href', APP_ROUTE_PATHS.research);
+    expect(researchToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(researchToggle).toHaveAttribute('data-control', 'icon-button');
+    expect(researchToggle).toHaveAttribute('data-size', 'navigation');
+    expect(researchToggle.querySelectorAll('svg')).toHaveLength(1);
+    expect(screen.getByRole('status', { name: 'current location' })).toHaveTextContent(
+      APP_ROUTE_PATHS.home,
+    );
     expect(screen.queryByRole('button', { name: '首页' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: '大盘复盘' })).toBeVisible();
     expect(screen.getByRole('link', { name: '发现' })).toBeVisible();
     expect(screen.getByRole('link', { name: '分析工作台' })).toBeVisible();
 
-    const researchToggle = screen.getByRole('button', { name: '研究' });
     fireEvent.click(researchToggle);
     expect(researchToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(researchToggle).toHaveAccessibleName('展开研究菜单');
+    expect(screen.getByRole('status', { name: 'current location' })).toHaveTextContent(
+      APP_ROUTE_PATHS.home,
+    );
     expect(researchToggle).not.toHaveAttribute('aria-controls');
     expect(screen.queryByRole('link', { name: '大盘复盘' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '发现' })).not.toBeInTheDocument();
@@ -231,10 +244,34 @@ describe('SidebarNav', () => {
 
     fireEvent.click(researchToggle);
     expect(researchToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(researchToggle).toHaveAccessibleName('收起研究菜单');
     expect(researchToggle).toHaveAttribute('aria-controls', 'shell-nav-research-children');
     expect(screen.getByRole('link', { name: '大盘复盘' })).toBeVisible();
     expect(screen.getByRole('link', { name: '发现' })).toBeVisible();
     expect(screen.getByRole('link', { name: '分析工作台' })).toBeVisible();
+  });
+
+  it('navigates from the Research label while its disclosure only changes visibility', async () => {
+    const onNavigate = vi.fn();
+    render(
+      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.home]}>
+        <SidebarNav onNavigate={onNavigate} />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '收起研究菜单' }));
+    expect(screen.getByRole('status', { name: 'current location' }))
+      .toHaveTextContent(APP_ROUTE_PATHS.home);
+    expect(onNavigate).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('link', { name: '研究' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('status', { name: 'current location' }))
+        .toHaveTextContent(APP_ROUTE_PATHS.research);
+    });
+    expect(onNavigate).toHaveBeenCalledOnce();
   });
 
   it('keeps the Discover navigation item stable after config save events', () => {
@@ -294,7 +331,7 @@ describe('SidebarNav', () => {
         triggerClassName: expect.stringContaining('h-11'),
       }),
     );
-    expect(mockThemeToggle.mock.calls.at(-1)?.[0]).not.toHaveProperty('menuLayout');
+    expect(mockThemeToggle.mock.calls.at(-1)?.[0]).toHaveProperty('menuLayout', 'select');
     expect(within(profileDialog).getByRole('button', { name: '切换主题' })).toBeInTheDocument();
     const languageControl = within(profileDialog).getByTestId('ui-language-selector');
     expect(within(languageControl).getByRole('combobox', { name: '切换界面语言' })).toBeInTheDocument();
@@ -351,11 +388,13 @@ describe('SidebarNav', () => {
     search.blur();
     await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
 
-    const research = screen.getByRole('link', { name: '研究' });
+    const research = screen.getByRole('button', { name: '研究' });
     const beforeNavigation = screen.getByRole('button', { name: 'Before navigation' });
     beforeNavigation.focus();
     fireEvent.mouseEnter(research);
     const menu = await screen.findByRole('menu', { name: '研究' });
+    expect(within(menu).getByRole('menuitem', { name: '研究概览' }))
+      .toHaveAttribute('href', APP_ROUTE_PATHS.research);
     expect(within(menu).getByRole('menuitem', { name: '大盘复盘' }))
       .toHaveAttribute('href', APP_ROUTE_PATHS.researchMarket);
     expect(within(menu).getByRole('menuitem', { name: '发现' }))
@@ -364,6 +403,35 @@ describe('SidebarNav', () => {
       .toHaveAttribute('href', APP_ROUTE_PATHS.researchAnalysis);
     expect(research).toHaveAttribute('aria-expanded', 'true');
     expect(beforeNavigation).toHaveFocus();
+  });
+
+  it('opens compact groups without navigating and delegates navigation to child links', async () => {
+    const onNavigate = vi.fn();
+    render(
+      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.home]}>
+        <SidebarNav collapsed onNavigate={onNavigate} />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    const research = screen.getByRole('button', { name: '研究' });
+    fireEvent.click(research);
+
+    const menu = await screen.findByRole('menu', { name: '研究' });
+    expect(screen.getByRole('status', { name: 'current location' })).toHaveTextContent(
+      APP_ROUTE_PATHS.home,
+    );
+    expect(onNavigate).not.toHaveBeenCalled();
+
+    fireEvent.click(within(menu).getByRole('menuitem', { name: '研究概览' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('status', { name: 'current location' })).toHaveTextContent(
+        APP_ROUTE_PATHS.research,
+      );
+    });
+    expect(onNavigate).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('menu', { name: '研究' })).not.toBeInTheDocument();
   });
 
   it('keeps a compact group open across the hover bridge and closes after leaving it', async () => {
@@ -375,7 +443,7 @@ describe('SidebarNav', () => {
         </MemoryRouter>,
       );
 
-      const research = screen.getByRole('link', { name: '研究' });
+      const research = screen.getByRole('button', { name: '研究' });
       fireEvent.mouseEnter(research);
       const menu = screen.getByRole('menu', { name: '研究' });
       fireEvent.mouseLeave(research);
@@ -396,7 +464,22 @@ describe('SidebarNav', () => {
     }
   });
 
-  it('exposes the visible Research child as the only current-page link in expanded and compact navigation', async () => {
+  it('exposes the Research overview or visible child as the only current-page link', async () => {
+    const overviewRender = render(
+      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.research]}>
+        <SidebarNav />
+      </MemoryRouter>,
+    );
+
+    const overviewParent = screen.getByRole('link', { name: '研究' });
+    expect(overviewParent).toHaveAttribute('aria-current', 'page');
+    expect(overviewParent).toHaveAttribute('data-navigation-active', 'true');
+    expect(screen.getByRole('link', { name: '大盘复盘' })).not.toHaveAttribute('aria-current');
+    let currentLinks = overviewRender.container.querySelectorAll('a[aria-current="page"]');
+    expect(currentLinks).toHaveLength(1);
+    expect(currentLinks[0]).toBe(overviewParent);
+    overviewRender.unmount();
+
     const marketRender = render(
       <MemoryRouter initialEntries={[APP_ROUTE_PATHS.researchMarket]}>
         <SidebarNav />
@@ -406,18 +489,18 @@ describe('SidebarNav', () => {
     const researchParent = screen.getByRole('link', { name: '研究' });
     const expandedMarketChild = screen.getByRole('link', { name: '大盘复盘' });
     expect(researchParent).not.toHaveAttribute('aria-current', 'page');
+    expect(researchParent).toHaveAttribute('data-navigation-active', 'true');
     expect(expandedMarketChild).toHaveAttribute('aria-current', 'page');
-    let currentLinks = marketRender.container.querySelectorAll('a[aria-current="page"]');
+    currentLinks = marketRender.container.querySelectorAll('a[aria-current="page"]');
     expect(currentLinks).toHaveLength(1);
     expect(currentLinks[0]).toBe(expandedMarketChild);
 
-    const researchToggle = screen.getByRole('button', { name: '研究' });
+    const researchToggle = screen.getByRole('button', { name: '收起研究菜单' });
     fireEvent.click(researchToggle);
-    expect(researchParent).toHaveAttribute('aria-current', 'page');
+    expect(researchParent).not.toHaveAttribute('aria-current');
     expect(screen.queryByRole('link', { name: '大盘复盘' })).not.toBeInTheDocument();
     currentLinks = marketRender.container.querySelectorAll('a[aria-current="page"]');
-    expect(currentLinks).toHaveLength(1);
-    expect(currentLinks[0]).toBe(researchParent);
+    expect(currentLinks).toHaveLength(0);
 
     fireEvent.click(researchToggle);
     expect(researchParent).not.toHaveAttribute('aria-current', 'page');
@@ -449,20 +532,40 @@ describe('SidebarNav', () => {
         <SidebarNav collapsed />
       </MemoryRouter>,
     );
-    const research = screen.getByRole('link', { name: '研究' });
-    expect(research).toHaveAttribute('aria-current', 'page');
+    const research = screen.getByRole('button', { name: '研究' });
+    expect(research).not.toHaveAttribute('aria-current');
+    expect(research).toHaveAttribute('data-navigation-active', 'true');
     currentLinks = compactRender.container.querySelectorAll('a[aria-current="page"]');
-    expect(currentLinks).toHaveLength(1);
-    expect(currentLinks[0]).toBe(research);
+    expect(currentLinks).toHaveLength(0);
     fireEvent.mouseEnter(research);
     const menu = await screen.findByRole('menu', { name: '研究' });
     const compactMarketChild = within(menu).getByRole('menuitem', { name: '大盘复盘' });
+    const compactOverview = within(menu).getByRole('menuitem', { name: '研究概览' });
     expect(research).not.toHaveAttribute('aria-current', 'page');
+    expect(compactOverview).not.toHaveAttribute('aria-current');
     expect(compactMarketChild).toHaveAttribute('aria-current', 'page');
     currentLinks = document.querySelectorAll('a[aria-current="page"]');
     expect(currentLinks).toHaveLength(1);
     expect(currentLinks[0]).toBe(compactMarketChild);
     compactRender.unmount();
+
+    const compactOverviewRender = render(
+      <MemoryRouter initialEntries={[APP_ROUTE_PATHS.research]}>
+        <SidebarNav collapsed />
+      </MemoryRouter>,
+    );
+    const compactResearch = screen.getByRole('button', { name: '研究' });
+    expect(compactResearch).not.toHaveAttribute('aria-current');
+    expect(compactResearch).toHaveAttribute('data-navigation-active', 'true');
+    fireEvent.click(compactResearch);
+    const overviewMenu = await screen.findByRole('menu', { name: '研究' });
+    const compactOverviewCurrent = within(overviewMenu)
+      .getByRole('menuitem', { name: '研究概览' });
+    expect(compactOverviewCurrent).toHaveAttribute('aria-current', 'page');
+    currentLinks = document.querySelectorAll('a[aria-current="page"]');
+    expect(currentLinks).toHaveLength(1);
+    expect(currentLinks[0]).toBe(compactOverviewCurrent);
+    compactOverviewRender.unmount();
   });
 
   it('opens compact groups with ArrowRight and restores the trigger with ArrowLeft or Escape', async () => {
@@ -472,12 +575,12 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    const research = screen.getByRole('link', { name: '研究' });
+    const research = screen.getByRole('button', { name: '研究' });
     research.focus();
     fireEvent.keyDown(research, { key: 'ArrowRight' });
 
     let menu = await screen.findByRole('menu', { name: '研究' });
-    const firstItem = within(menu).getByRole('menuitem', { name: '大盘复盘' });
+    const firstItem = within(menu).getByRole('menuitem', { name: '研究概览' });
     await waitFor(() => expect(firstItem).toHaveFocus());
     fireEvent.keyDown(firstItem, { key: 'ArrowLeft' });
     await waitFor(() => expect(screen.queryByRole('menu', { name: '研究' })).not.toBeInTheDocument());
@@ -485,7 +588,7 @@ describe('SidebarNav', () => {
 
     fireEvent.keyDown(research, { key: 'ArrowRight' });
     menu = await screen.findByRole('menu', { name: '研究' });
-    await waitFor(() => expect(within(menu).getByRole('menuitem', { name: '大盘复盘' })).toHaveFocus());
+    await waitFor(() => expect(within(menu).getByRole('menuitem', { name: '研究概览' })).toHaveFocus());
     fireEvent.keyDown(menu, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('menu', { name: '研究' })).not.toBeInTheDocument());
     await waitFor(() => expect(research).toHaveFocus());
@@ -510,7 +613,15 @@ describe('SidebarNav', () => {
       'data-route-focus-key',
       'shell-nav-desktop:research-analysis',
     );
-    screen.getAllByRole('link').forEach((link) => expect(link).toHaveClass('shrink-0'));
+    const researchLink = screen.getByRole('link', { name: '研究' });
+    expect(researchLink).toHaveAttribute(
+      'data-route-focus-key',
+      'shell-nav-desktop:research',
+    );
+    expect(researchLink).toHaveClass('min-w-0', 'flex-1');
+    screen.getAllByRole('link')
+      .filter((link) => link !== researchLink)
+      .forEach((link) => expect(link).toHaveClass('shrink-0'));
 
     const markers = Array.from(document.querySelectorAll('[data-route-focus-key]'))
       .map((element) => element.getAttribute('data-route-focus-key'));

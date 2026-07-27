@@ -2,6 +2,7 @@ import type React from 'react';
 import { useRef, useCallback, useEffect, useId } from 'react';
 import type { HistoryItem } from '../../types/analysis';
 import { Badge, Button, Checkbox, ScrollArea, Surface } from '../common';
+import { Spinner } from '../common/Spinner';
 import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
 import { HistoryListItem } from './HistoryListItem';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -177,7 +178,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
             
             {isLoadingMore && (
               <div className="flex justify-center py-4">
-                <div className="home-spinner h-5 w-5 animate-spin border-2" />
+                <Spinner size="md" label={t('history.loading')} />
               </div>
             )}
 
