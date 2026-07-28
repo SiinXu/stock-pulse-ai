@@ -45,6 +45,19 @@ describe('IconButton', () => {
     expect(button).toHaveClass('h-11', 'w-11');
   });
 
+  it('provides a bare variant for compact icon-only affordances', () => {
+    render(
+      <IconButton aria-label="View help" size="compact" variant="bare" tooltip={false}>
+        <RefreshCw aria-hidden="true" />
+      </IconButton>,
+    );
+
+    const button = screen.getByRole('button', { name: 'View help' });
+    expect(button).toHaveAttribute('data-variant', 'bare');
+    expect(button).toHaveClass('rounded-md');
+    expect(button).not.toHaveClass('hover:bg-hover');
+  });
+
   it('associates its visible tooltip with the focused button', async () => {
     render(
       <IconButton aria-label="Refresh analysis">

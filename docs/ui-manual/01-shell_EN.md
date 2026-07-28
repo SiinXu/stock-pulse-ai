@@ -66,10 +66,10 @@ These five top-level items match the product navigation:
 | **Agent** | `/chat` | Multi-turn chat (page title often **Ask stock**) | [05](05-agent-chat_EN.md) |
 | **Settings** | `/settings` | Models, data sources, notifications, security | [10](10-settings_EN.md) |
 
-On expanded desktop navigation and in the mobile drawer, select the **Research**
-label to open `/research`; the separately labelled chevron only expands or
-collapses the child links. On the compact rail, **Research** opens a flyout whose
-first item is **Research overview**.
+On expanded desktop navigation and in the mobile drawer, the full **Research**
+row expands or collapses its children; the first child, **Research overview**,
+opens `/research`. On the compact rail, **Research** opens a flyout whose first
+item is also **Research overview**.
 
 ### Research pages
 

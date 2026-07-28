@@ -73,7 +73,7 @@ The history endpoint currently returns the complete history in one unpaginated r
 
 ## Web editor
 
-Settings → **Agent Behavior** hosts the minimal editor:
+Settings → **Agent Behavior** shows framework status; **View fields** opens the minimal editor in a configuration dialog:
 
 - Create the single local framework (`POST /api/v1/investment-framework`)
 - Save with `expected_revision` to create and activate a new version (`PUT`)

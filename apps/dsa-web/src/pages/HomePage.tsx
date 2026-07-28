@@ -352,7 +352,10 @@ const HomePage: React.FC = () => {
   const approvalsHref = APP_ROUTE_PATHS.approvals;
 
   return (
-    <WorkspacePage data-testid="home-attention-hub" contentClassName="space-y-6">
+    <WorkspacePage
+      data-testid="home-attention-hub"
+      contentClassName="space-y-6 rounded-xl border border-border p-5"
+    >
       <PageHeader
         ref={pageHeadingRef}
         title={t('layout.route.home.title')}
@@ -487,11 +490,12 @@ const HomePage: React.FC = () => {
         <Section
           title={t('home.todos')}
           description={t('home.todosDescription')}
-          level="canvas"
+          level="interactive"
           padding="md"
+          contentClassName="flex flex-col gap-3"
           actions={<ClipboardCheck className="h-5 w-5 text-warning" aria-hidden="true" />}
         >
-          <div className="mb-3 grid">
+          <div className="flex justify-end">
             <Button
               variant="outline"
               size="default"
@@ -547,7 +551,7 @@ const HomePage: React.FC = () => {
         <Section
           title={t('home.signalSummary')}
           description={t('home.signalSummaryDescription')}
-          level="canvas"
+          level="interactive"
           padding="md"
           actions={<BellRing className="h-5 w-5 text-danger" aria-hidden="true" />}
         >
@@ -584,7 +588,7 @@ const HomePage: React.FC = () => {
         </Section>
       </div>
 
-      <section className="border-t border-border pt-4" aria-labelledby="home-configurable-heading">
+      <section className="rounded-xl border border-border p-4" aria-labelledby="home-configurable-heading">
         <button
           type="button"
           className="flex min-h-11 w-full items-center justify-between gap-4 text-left"
@@ -609,7 +613,7 @@ const HomePage: React.FC = () => {
         <div id="home-configurable-content" className="mt-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-3" hidden={!configurableExpanded}>
           <Section
             title={t('home.morningReport')}
-            level="section"
+            level="interactive"
             padding="md"
             actions={<CalendarClock className="h-5 w-5 text-primary" aria-hidden="true" />}
           >
@@ -661,7 +665,11 @@ const HomePage: React.FC = () => {
             )}
           </Section>
 
-          <Section title={t('home.recentAnalyses')} level="section" padding="md">
+          <Section
+            title={t('home.recentAnalyses')}
+            level="interactive"
+            padding="md"
+          >
             {isLoading ? (
               <StatePanel state="loading" title={t('common.loading')} size="compact" titleAs="p" />
             ) : data.recentAnalyses.length > 0 ? (

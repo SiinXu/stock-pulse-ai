@@ -73,7 +73,7 @@ Create、update 或 deactivate flush 后，repository 会使 ORM identity state 
 
 ## Web 编辑入口
 
-Settings → **Agent 行为** 提供最小编辑器：
+Settings → **Agent 行为** 显示框架状态；点击 **查看配置项** 后在配置弹框中提供最小编辑器：
 
 - 创建本机唯一框架（`POST /api/v1/investment-framework`）
 - 保存时携带 `expected_revision` 创建新版本并激活（`PUT`）

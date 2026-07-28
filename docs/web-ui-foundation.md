@@ -413,14 +413,14 @@ application navigation descriptor exposes five stable primary domains: Home,
 Research, Portfolio, Agent, and Settings. Home temporarily owns one Signal
 Center child until the global notification entry replaces it, while Research
 owns a dedicated overview plus Market Review, Discover, Analysis Workbench, and
-Backtest. In expanded desktop navigation and the mobile drawer, the Research
-label navigates to `/research`; a separately labelled chevron expands or
-collapses the child navigation without changing the route. Compact navigation
-keeps Research as a menu trigger and presents Research Overview as the first
-item in the right-side hover or keyboard flyout, followed by the four tools;
+Backtest. In expanded desktop navigation and the mobile drawer, the full
+Research row expands or collapses the child navigation without changing the
+route; Research Overview is the first child and navigates to `/research`.
+Compact navigation keeps Research as a menu trigger and presents Research
+Overview as the first item in the right-side hover or keyboard flyout, followed by the four tools;
 Right Arrow enters the flyout and Left Arrow or Escape restores its trigger.
-On `/research`, the expanded Research label or compact Research Overview item
-is the current page. On a child route, the visible active child is the sole
+On `/research`, the expanded or compact Research Overview item is the current
+page. On a child route, the visible active child is the sole
 `aria-current="page"` link, while the Research branch retains visual
 active-section treatment. Market Review remains a distinct page at
 `/research/market`.

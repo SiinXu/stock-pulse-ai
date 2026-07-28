@@ -8,12 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Changed] Refined Web Home and Settings with bordered attention panels, a modal investment-framework editor, compact shared help and local-model icons, a unified Research disclosure row, and a cleaner embedded Usage header.
 - [Changed] Made native, platform-matched loopback Web/API/Ollama setup download the official macOS or Windows installer directly, re-detect the runtime when users return, retain server-side guidance for detected remote, proxy, container, and Linux environments, and document loopback-preserving tunnel limits.
 - [Fixed] Retried route-focus restoration when a POP target marker is not mounted yet, so browser Forward restores the details Back control instead of racing to the H1 fallback.
 - [Added] Registered `SIGNAL_SCORECARD_PUBLIC_ENABLED` and `SIGNAL_SCORECARD_MIN_SAMPLES` in the config registry/Settings pipeline (default off) and added a read-only Settings scorecard preview that uses the public route and documents enable-for-preview behavior.
 - [Docs] Aligned homepage README framework differentiators with the shipped Settings minimal editor and stock-analysis inject (removed residual “no Web editor” soft-claim).
 - [Fixed] Refined Web research history markers, desktop sidebar separation, Profile theme selection, and Analysis Workbench segment controls.
-- [Added] Added a dedicated Web Research overview at `/research`; expanded desktop and mobile labels navigate to it while separate controls manage the child menu, and the compact menu exposes the overview before the existing Research tools.
+- [Added] Added a dedicated Web Research overview at `/research`; expanded desktop and mobile Research rows disclose an overview-first child menu, and the compact menu exposes the overview before the existing Research tools.
 - [Changed] Restored compact Web report actions, fullscreen and flat-lane Run Flow inspection, flat history/session rows, wide-screen Chat history placement, below-message response tools, and confirmation before forced Backtest reruns while preserving current URL and task contracts.
 - [Changed] Added shared `Pressable`, `Spinner`, `Progress`, and `FileInput` primitives and migrated repeated Web row, loading, progress, and upload controls to them.
 - [Changed] Restored the compact two-column intelligent import, non-overlapping hotspot metrics, rounded report Markdown, equal-height report rails, flat strategy cards, and compact Settings help controls.

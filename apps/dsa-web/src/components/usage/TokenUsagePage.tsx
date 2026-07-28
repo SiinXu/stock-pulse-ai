@@ -392,7 +392,6 @@ const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => 
     <Section
       title={t('usage.title')}
       description={t('usage.description')}
-      eyebrow={t('usage.eyebrow')}
       actions={actions}
       headingAs="h2"
       contentClassName="space-y-5"
