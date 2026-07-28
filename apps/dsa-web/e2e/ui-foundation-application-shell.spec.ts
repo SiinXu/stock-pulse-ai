@@ -315,14 +315,14 @@ test.describe('application shell foundation', () => {
     await sidebar.getByRole('button', { name: 'Expand sidebar' }).click();
     await expectSidebarWidth(sidebar, 240);
     const navigation = sidebar.getByRole('navigation', { name: 'Main navigation' });
-    const researchParent = navigation.getByRole('link', { name: 'Research' });
     const researchToggle = navigation.locator('[data-sidebar-group-toggle="research"]');
+    const researchOverview = navigation.getByRole('link', { name: 'Research overview' });
     const discoverChild = navigation.getByRole('link', { name: 'Discover' });
     await expect(researchToggle).toHaveAccessibleName('Collapse Research menu');
     await expect(researchToggle).toHaveAttribute('aria-expanded', 'true');
-    await expect(researchParent).toHaveAttribute('href', '/research');
-    await expect(researchParent).not.toHaveAttribute('aria-current');
-    await expect(researchParent).toHaveAttribute('data-navigation-active', 'true');
+    await expect(researchOverview).toHaveAttribute('href', '/research');
+    await expect(researchOverview).not.toHaveAttribute('aria-current');
+    await expect(researchToggle).toHaveAttribute('data-navigation-active', 'true');
     await expect(discoverChild).toHaveAttribute('aria-current', 'page');
     await researchToggle.click();
     await expect(researchToggle).toHaveAttribute('aria-expanded', 'false');
@@ -371,7 +371,7 @@ test.describe('application shell foundation', () => {
     await page.getByRole('button', { name: 'Open navigation' }).click();
     const drawer = page.getByRole('dialog', { name: 'Navigation' });
     const mobileNavigation = drawer.getByRole('navigation', { name: 'Main navigation' });
-    const mobileResearch = mobileNavigation.getByRole('link', { name: 'Research' });
+    const mobileResearch = mobileNavigation.getByRole('link', { name: 'Research overview' });
     const mobileResearchToggle = mobileNavigation.locator('[data-sidebar-group-toggle="research"]');
     await expect(mobileResearch).toHaveAttribute('href', '/research');
     await expect(mobileResearchToggle).toHaveAccessibleName('Collapse Research menu');
@@ -394,6 +394,9 @@ test.describe('application shell foundation', () => {
     await mobileSettings.scrollIntoViewIfNeeded();
     await expect(mobileSettings).toBeVisible();
     await expectNoDocumentOverflow(page);
+    await mobileResearch.click();
+    await expect(page).toHaveURL(/\/research$/);
+    await expect(drawer).toBeHidden();
   });
 });
 

@@ -38,7 +38,8 @@ export const SettingsHelpButton: React.FC<SettingsHelpButtonProps> = ({
 
   return (
     <IconButton
-      size="navigation"
+      size="compact"
+      variant="bare"
       aria-label={helpButtonLabel}
       tooltip={(
         <span className="block w-64 space-y-2 py-1 text-left">

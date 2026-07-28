@@ -8,7 +8,6 @@ import { cn } from '../../utils/cn';
 import { resolveContextAwareNavigationTarget } from '../../utils/sessionContinuity';
 import { APP_ROUTE_PATHS } from '../../routing/routes';
 import { ConfirmDialog } from '../common/ConfirmDialog';
-import { IconButton } from '../common/IconButton';
 import { Popover } from '../common/Popover';
 import { StatusDot } from '../common/StatusDot';
 import { Tooltip } from '../common/Tooltip';
@@ -417,56 +416,57 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               : t('layout.expandNavGroup', { label });
             return (
               <div key={key} className="flex shrink-0 flex-col gap-1">
-                <div className="flex items-center gap-1">
-                  <NavLink
+                <button
+                  type="button"
+                  aria-label={toggleLabel}
+                  aria-expanded={childrenExpanded}
+                  aria-controls={childrenExpanded ? childrenId : undefined}
+                  data-navigation-active={groupActive ? 'true' : undefined}
+                  data-sidebar-group-toggle={key}
+                  data-route-focus-key={`${focusKeyPrefix}:${key}`}
+                  data-route-focus-return-key={returnFocusKey}
+                  onClick={() => toggleGroupChildren(key)}
+                  className={cn(
+                    itemInteractiveClass,
+                    groupActive && 'font-medium text-foreground',
+                  )}
+                >
+                  {renderItemContent(groupActive)}
+                  <ChevronRight
+                    className={cn(
+                      'h-4 w-4 shrink-0 transition-transform motion-reduce:transition-none',
+                      childrenExpanded && 'rotate-90',
+                    )}
+                    aria-hidden="true"
+                  />
+                </button>
+                {childrenExpanded ? <div id={childrenId} className="ml-4 flex flex-col gap-1 border-l border-border pl-3">
+                  <Link
                     to={navigationTarget}
-                    end={item.exact}
-                    aria-current="page"
-                    aria-label={label}
-                    data-navigation-active={groupActive ? 'true' : undefined}
-                    data-sidebar-group-link={key}
-                    data-route-focus-key={`${focusKeyPrefix}:${key}`}
-                    data-route-focus-return-key={returnFocusKey}
                     onClick={(event) => {
                       if (shouldDelegateCurrentDocumentNavigation(event)) {
                         onNavigate?.();
                       }
                     }}
-                    className={({ isActive }) => cn(
+                    aria-label={t(item.overviewLabelKey)}
+                    aria-current={groupSelfActive ? 'page' : undefined}
+                    data-sidebar-group-link={key}
+                    data-route-focus-key={`${focusKeyPrefix}:${key}-overview`}
+                    data-route-focus-return-key={returnFocusKey}
+                    className={cn(
                       itemInteractiveClass,
-                      'min-w-0 flex-1',
-                      isActive
-                        ? itemActiveClass
-                        : groupActive
-                          ? 'font-medium text-foreground'
-                          : '',
+                      'min-h-10 gap-2.5 px-2.5 text-xs',
+                      groupSelfActive ? itemActiveClass : '',
                     )}
                   >
-                    {({ isActive }) => renderItemContent(isActive || groupActive)}
-                  </NavLink>
-                  <IconButton
-                    aria-label={toggleLabel}
-                    tooltip={toggleLabel}
-                    size="navigation"
-                    variant="ghost"
-                    aria-expanded={childrenExpanded}
-                    aria-controls={childrenExpanded ? childrenId : undefined}
-                    data-sidebar-group-toggle={key}
-                    data-route-focus-key={`${focusKeyPrefix}:${key}:toggle`}
-                    data-route-focus-return-key={returnFocusKey}
-                    onClick={() => toggleGroupChildren(key)}
-                    className={cn(groupActive && 'text-foreground')}
-                  >
-                    <ChevronRight
-                      className={cn(
-                        'transition-transform motion-reduce:transition-none',
-                        childrenExpanded && 'rotate-90',
-                      )}
-                      aria-hidden="true"
-                    />
-                  </IconButton>
-                </div>
-                {childrenExpanded ? <div id={childrenId} className="ml-4 flex flex-col gap-1 border-l border-border pl-3">
+                    <Icon className={cn(
+                      'h-4 w-4 shrink-0',
+                      groupSelfActive
+                        ? 'text-[var(--nav-icon-active)]'
+                        : 'text-current',
+                    )} />
+                    <span className="truncate">{t(item.overviewLabelKey)}</span>
+                  </Link>
                   {item.children.map((child) => {
                     const ChildIcon = child.icon;
                     const childLabel = t(child.labelKey);

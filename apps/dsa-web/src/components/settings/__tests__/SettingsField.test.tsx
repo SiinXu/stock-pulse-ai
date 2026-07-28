@@ -1358,7 +1358,7 @@ describe('SettingsField', () => {
 
     const helpTrigger = screen.getByRole('button', { name: '查看 自选股列表 配置说明' });
     expect(helpTrigger).toHaveAttribute('data-control', 'icon-button');
-    expect(helpTrigger).toHaveAttribute('data-size', 'navigation');
+    expect(helpTrigger).toHaveAttribute('data-size', 'compact');
     expect(helpTrigger).toHaveClass('control-hit-target');
     fireEvent.mouseEnter(helpTrigger.parentElement!);
 

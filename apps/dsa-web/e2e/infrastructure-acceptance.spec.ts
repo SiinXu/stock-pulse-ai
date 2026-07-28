@@ -848,23 +848,32 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     const researchOverviewNavigation = page.getByRole('navigation', {
       name: UI_TEXT.en['layout.mainNav'],
     });
-    const researchOverviewParent = researchOverviewNavigation.getByRole('link', {
-      name: UI_TEXT.en['layout.nav.research'],
+    const researchOverviewGroup = researchOverviewNavigation.getByRole('button', {
+      name: formatUiText(UI_TEXT.en['layout.collapseNavGroup'], {
+        label: UI_TEXT.en['layout.nav.research'],
+      }),
     });
-    await expect(researchOverviewParent).toHaveAttribute('aria-current', 'page');
+    const researchOverviewLink = researchOverviewNavigation.getByRole('link', {
+      name: UI_TEXT.en['researchOverview.overviewLabel'],
+    });
+    await expect(researchOverviewGroup).toHaveAttribute('data-navigation-active', 'true');
+    await expect(researchOverviewLink).toHaveAttribute('href', APP_ROUTE_PATHS.research);
+    await expect(researchOverviewLink).toHaveAttribute('aria-current', 'page');
     await expect(researchOverviewNavigation.locator('a[aria-current="page"]')).toHaveCount(1);
     await assertRouteChrome(page, APP_ROUTE_PATHS.researchMarket, UI_TEXT.en['home.marketReview'], UI_TEXT.en['home.marketReviewPageTitle']);
     const navigation = page.getByRole('navigation', { name: UI_TEXT.en['layout.mainNav'] });
-    const researchParent = navigation.getByRole('link', { name: UI_TEXT.en['layout.nav.research'] });
     const researchToggle = navigation.getByRole('button', {
       name: formatUiText(UI_TEXT.en['layout.collapseNavGroup'], {
         label: UI_TEXT.en['layout.nav.research'],
       }),
     });
+    const researchOverview = navigation.getByRole('link', {
+      name: UI_TEXT.en['researchOverview.overviewLabel'],
+    });
     const marketChild = navigation.getByRole('link', { name: UI_TEXT.en['home.marketReview'] });
-    await expect(researchParent).toHaveAttribute('href', APP_ROUTE_PATHS.research);
-    await expect(researchParent).not.toHaveAttribute('aria-current');
-    await expect(researchParent).toHaveAttribute('data-navigation-active', 'true');
+    await expect(researchOverview).toHaveAttribute('href', APP_ROUTE_PATHS.research);
+    await expect(researchOverview).not.toHaveAttribute('aria-current');
+    await expect(researchToggle).toHaveAttribute('data-navigation-active', 'true');
     await expect(marketChild).toHaveAttribute('aria-current', 'page');
     await expect(navigation.locator('a[aria-current="page"]')).toHaveCount(1);
     await researchToggle.click();

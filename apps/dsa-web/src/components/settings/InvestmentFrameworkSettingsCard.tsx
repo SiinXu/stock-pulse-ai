@@ -6,7 +6,7 @@ import { investmentFrameworkApi } from '../../api/investmentFramework';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { InvestmentFrameworkContent, InvestmentFrameworkResponse } from '../../types/investmentFramework';
-import { Badge, Button } from '../common';
+import { Badge, Button, Modal } from '../common';
 import { SettingsAlert } from './SettingsAlert';
 import { SettingsSectionCard } from './SettingsSectionCard';
 
@@ -78,11 +78,14 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
   const [draft, setDraft] = useState(emptyDraft);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [loadError, setLoadError] = useState<ParsedApiError | null>(null);
   const [error, setError] = useState<string | ParsedApiError | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setIsLoading(true);
+    setLoadError(null);
     setError(null);
     try {
       const current = await investmentFrameworkApi.get();
@@ -96,7 +99,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
         setExists(false);
         setDraft(emptyDraft());
       } else {
-        setError(parsed);
+        setLoadError(parsed);
       }
     } finally {
       setIsLoading(false);
@@ -108,13 +111,19 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
   }, [load]);
 
   const statusLabel = useMemo(() => {
+    if (isLoading) {
+      return t('common.loading');
+    }
+    if (loadError) {
+      return loadError.title;
+    }
     if (!exists || !framework) {
       return t('settings.frameworkStatusMissing');
     }
     return framework.isActive
       ? t('settings.frameworkStatusActive')
       : t('settings.frameworkStatusInactive');
-  }, [exists, framework, t]);
+  }, [exists, framework, isLoading, loadError, t]);
 
   const validateDraft = (): string | null => {
     if (!draft.title.trim()) {
@@ -233,26 +242,62 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
     <SettingsSectionCard
       title={t('settings.frameworkTitle')}
       description={t('settings.frameworkDescription')}
-      contentBordered
       actions={
-        <Badge
-          variant={framework?.isActive ? 'success' : 'default'}
-          size="sm"
-          className={
-            framework?.isActive
-              ? ''
-              : 'border-[var(--settings-border)] bg-[var(--settings-surface-hover)] text-secondary-text'
-          }
-        >
-          {statusLabel}
-        </Badge>
+        <>
+          <Badge
+            variant={loadError ? 'danger' : framework?.isActive ? 'success' : 'default'}
+            size="sm"
+            className={
+              loadError || framework?.isActive
+                ? ''
+                : 'border-[var(--settings-border)] bg-[var(--settings-surface-hover)] text-secondary-text'
+            }
+          >
+            {statusLabel}
+          </Badge>
+          {!loadError ? (
+            <Button
+              variant="secondary"
+              size="default"
+              aria-haspopup="dialog"
+              disabled={isLoading}
+              onClick={() => setIsConfigOpen(true)}
+            >
+              {t('settings.openConfigItems')}
+            </Button>
+          ) : null}
+        </>
       }
     >
-      <p className="mb-4 text-xs leading-6 text-muted-text">{t('settings.frameworkDisclaimer')}</p>
-      {isLoading ? (
-        <p className="text-sm text-muted-text">{t('common.loading')}</p>
-      ) : (
-        <form className="space-y-4" onSubmit={handleSave}>
+      <p className="text-xs leading-6 text-muted-text">{t('settings.frameworkDisclaimer')}</p>
+      {loadError ? (
+        <SettingsAlert
+          title={loadError.title}
+          message={loadError.message}
+          actionLabel={t('common.retry')}
+          onAction={() => void load()}
+        />
+      ) : null}
+      <Modal
+        isOpen={isConfigOpen}
+        onClose={() => setIsConfigOpen(false)}
+        title={t('settings.frameworkTitle')}
+        description={t('settings.frameworkDescription')}
+        size="wide"
+        closeDisabled={isSubmitting}
+      >
+        <p className="mb-4 text-xs leading-6 text-muted-text">{t('settings.frameworkDisclaimer')}</p>
+        {isLoading ? (
+          <p className="text-sm text-muted-text">{t('common.loading')}</p>
+        ) : loadError ? (
+          <SettingsAlert
+            title={loadError.title}
+            message={loadError.message}
+            actionLabel={t('common.retry')}
+            onAction={() => void load()}
+          />
+        ) : (
+          <form className="space-y-4" aria-busy={isSubmitting} onSubmit={handleSave}>
           {framework ? (
             <div className="grid grid-cols-1 gap-2 text-xs text-secondary-text sm:grid-cols-3">
               <span>{t('settings.frameworkVersionValue', { version: framework.version })}</span>
@@ -374,9 +419,15 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                 {t('settings.frameworkDelete')}
               </Button>
             ) : null}
+            {isSubmitting ? (
+              <span role="status" className="self-center text-xs text-secondary-text">
+                {t('common.processing')}
+              </span>
+            ) : null}
           </div>
-        </form>
-      )}
+          </form>
+        )}
+      </Modal>
     </SettingsSectionCard>
   );
 };

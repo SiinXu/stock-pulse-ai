@@ -127,6 +127,7 @@ describe('TokenUsagePage', () => {
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(document.title).toBe('Settings host');
     expect(container.querySelector('[data-pattern="app-page"]')).toBeNull();
+    expect(screen.queryByText('Usage', { selector: '.label-uppercase' })).not.toBeInTheDocument();
   });
 
   it('renders one stable loading state instead of a zero-value dashboard shell', async () => {

@@ -192,12 +192,22 @@ describe('HomePage attention hub', () => {
     expect(within(core).getByRole('heading', { name: "Today's Focus" })).toBeInTheDocument();
     expect(within(core).getByRole('heading', { name: 'To-dos' })).toBeInTheDocument();
     expect(within(core).getByRole('heading', { name: 'Signal summary' })).toBeInTheDocument();
-    expect(within(core).getByRole('button', { name: 'Review human approvals' })).toBeInTheDocument();
-    for (const block of within(core).getAllByRole('region')) {
-      expect(block).toHaveAttribute('data-surface-level', 'canvas');
-    }
+    const todos = within(core).getByRole('region', { name: 'To-dos' });
+    const signalSummary = within(core).getByRole('region', { name: 'Signal summary' });
+    const approvals = within(core).getByRole('button', { name: 'Review human approvals' });
+    expect(approvals.parentElement).toHaveClass('flex', 'justify-end');
+    expect(todos).toHaveClass('rounded-xl', 'border', 'border-border');
+    expect(todos.querySelector(':scope > div.mt-4')).toHaveClass('flex', 'flex-col', 'gap-3');
+    expect(signalSummary).toHaveClass('rounded-xl', 'border', 'border-border');
+    expect(within(core).getByRole('region', { name: "Today's Focus" }))
+      .toHaveAttribute('data-surface-level', 'canvas');
+    expect(todos).toHaveAttribute('data-surface-level', 'interactive');
+    expect(signalSummary).toHaveAttribute('data-surface-level', 'interactive');
 
+    expect(screen.getByTestId('home-attention-hub').querySelector('[data-slot="workspace-content"]'))
+      .toHaveClass('rounded-xl', 'border', 'border-border', 'p-5');
     const configurable = screen.getByRole('button', { name: /Configurable area/ });
+    expect(configurable.closest('section')).toHaveClass('rounded-xl', 'border', 'border-border', 'p-4');
     expect(configurable).toHaveAttribute('aria-expanded', 'false');
     expect(document.getElementById('home-configurable-content')).not.toBeVisible();
     expect(window.localStorage.getItem(HOME_CONFIGURABLE_STORAGE_KEY)).toBeNull();
@@ -247,10 +257,12 @@ describe('HomePage attention hub', () => {
     renderHome();
 
     fireEvent.click(await screen.findByRole('button', { name: /Configurable area/ }));
-    expect(within(screen.getByRole('region', { name: 'Morning report / Market review' }))
-      .getByText('Market review')).toBeInTheDocument();
-    expect(within(screen.getByRole('region', { name: 'Recent analyses' }))
-      .getByText('Apple')).toBeInTheDocument();
+    const morningReport = screen.getByRole('region', { name: 'Morning report / Market review' });
+    const recentAnalyses = screen.getByRole('region', { name: 'Recent analyses' });
+    expect(morningReport).toHaveClass('border', 'border-border');
+    expect(recentAnalyses).toHaveClass('border', 'border-border');
+    expect(within(morningReport).getByText('Market review')).toBeInTheDocument();
+    expect(within(recentAnalyses).getByText('Apple')).toBeInTheDocument();
     const scheduled = screen.getByRole('region', { name: 'Versioned scheduled tasks today' });
     expect(within(scheduled).getByText('AAPL downside review')).toBeInTheDocument();
     expect(within(scheduled).getByText('Risk check', { exact: false })).toBeInTheDocument();

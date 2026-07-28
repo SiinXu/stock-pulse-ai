@@ -23,8 +23,11 @@ describe('SettingsHelpButton tooltip contract', () => {
     const trigger = renderHelpButton();
 
     expect(trigger).toHaveAttribute('data-control', 'icon-button');
-    expect(trigger).toHaveAttribute('data-size', 'navigation');
+    expect(trigger).toHaveAttribute('data-size', 'compact');
+    expect(trigger).toHaveAttribute('data-variant', 'bare');
     expect(trigger).toHaveClass('control-hit-target');
+    expect(trigger).toHaveClass('rounded-md');
+    expect(trigger).not.toHaveClass('hover:bg-hover');
     fireEvent.mouseEnter(trigger.parentElement!);
 
     const tooltip = screen.getByRole('tooltip');

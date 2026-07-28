@@ -5,7 +5,7 @@ import { Spinner } from './Spinner';
 import { Tooltip } from './Tooltip';
 
 export type IconButtonSize = 'compact' | 'default' | 'comfortable' | 'navigation';
-export type IconButtonVariant = 'ghost' | 'outline' | 'danger';
+export type IconButtonVariant = 'ghost' | 'bare' | 'outline' | 'danger';
 
 export interface IconButtonProps extends Omit<
   React.ButtonHTMLAttributes<HTMLButtonElement>,
@@ -29,6 +29,7 @@ const ICON_BUTTON_SIZE_STYLES: Record<IconButtonSize, string> = {
 
 const ICON_BUTTON_VARIANT_STYLES: Record<IconButtonVariant, string> = {
   ghost: 'border border-transparent bg-transparent text-secondary-text hover:bg-hover hover:text-foreground',
+  bare: 'rounded-md border border-transparent bg-transparent text-secondary-text hover:text-foreground',
   outline: 'border border-border bg-transparent text-secondary-text hover:bg-hover hover:text-foreground',
   danger: 'border border-transparent bg-transparent text-danger hover:bg-danger/10',
 };

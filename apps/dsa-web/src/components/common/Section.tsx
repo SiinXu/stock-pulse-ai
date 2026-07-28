@@ -13,7 +13,7 @@ export interface SectionProps extends Omit<React.HTMLAttributes<HTMLElement>, 't
   children: React.ReactNode;
   headingAs?: SectionHeading;
   headingId?: string;
-  level?: Extract<SurfaceLevel, 'canvas' | 'section'>;
+  level?: Extract<SurfaceLevel, 'canvas' | 'section' | 'interactive'>;
   padding?: SurfacePadding;
   contentClassName?: string;
 }
