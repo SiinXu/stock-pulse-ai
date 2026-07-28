@@ -432,9 +432,12 @@ test.describe('Settings Help shared tooltip contract', () => {
       document.body.style.overflow = 'clip';
     });
     const trigger = page.getByRole('button', { name: 'View Standalone help configuration help' });
+    await expect(trigger).toHaveAttribute('data-size', 'compact');
+    await expect(trigger).toHaveAttribute('data-variant', 'bare');
+    await expect(trigger).toHaveClass(/control-hit-target/);
     const triggerBox = await trigger.boundingBox();
-    expect(triggerBox?.width).toBeGreaterThanOrEqual(44);
-    expect(triggerBox?.height).toBeGreaterThanOrEqual(44);
+    expect(triggerBox?.width).toBe(28);
+    expect(triggerBox?.height).toBe(28);
 
     await trigger.click();
     const tooltip = page.getByRole('tooltip');
