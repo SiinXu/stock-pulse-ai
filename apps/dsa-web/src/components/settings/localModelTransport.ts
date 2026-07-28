@@ -178,8 +178,8 @@ function resolveWebOllamaInstallTarget(
     }
   }
 
-  const canInstallForThisMachine = isLoopbackPage && isLoopbackApi;
-  if (!canInstallForThisMachine) {
+  const passesLoopbackTopologyGate = isLoopbackPage && isLoopbackApi;
+  if (!passesLoopbackTopologyGate) {
     return { action: 'guide', platform: null, url: OLLAMA_INSTALL_URLS.fallback };
   }
   return resolveOllamaInstallTarget(platform, userAgent, maxTouchPoints);

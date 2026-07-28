@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [Changed] Made native, platform-matched loopback Web/API/Ollama setup download the official macOS or Windows installer directly, re-detect the runtime when users return, and retain server-side guidance for remote, proxy, container, and Linux environments.
+- [Changed] Made native, platform-matched loopback Web/API/Ollama setup download the official macOS or Windows installer directly, re-detect the runtime when users return, retain server-side guidance for detected remote, proxy, container, and Linux environments, and document loopback-preserving tunnel limits.
 - [Fixed] Retried route-focus restoration when a POP target marker is not mounted yet, so browser Forward restores the details Back control instead of racing to the H1 fallback.
 - [Added] Registered `SIGNAL_SCORECARD_PUBLIC_ENABLED` and `SIGNAL_SCORECARD_MIN_SAMPLES` in the config registry/Settings pipeline (default off) and added a read-only Settings scorecard preview that uses the public route and documents enable-for-preview behavior.
 - [Docs] Aligned homepage README framework differentiators with the shipped Settings minimal editor and stock-analysis inject (removed residual “no Web editor” soft-claim).
