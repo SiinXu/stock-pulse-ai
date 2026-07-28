@@ -202,7 +202,6 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
   const [actionError, setActionError] = useState('');
   const [actionWarning, setActionWarning] = useState('');
   const [manualCommand, setManualCommand] = useState('');
-  const [copiedModel, setCopiedModel] = useState('');
   const [readyModel, setReadyModel] = useState('');
   const [primaryPromptModel, setPrimaryPromptModel] = useState('');
   const [readyKind, setReadyKind] = useState<'download' | 'import'>('download');
@@ -260,10 +259,42 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
     };
   }, [transport]);
 
+  useEffect(() => {
+    const shouldDetectAfterInstall = runtime?.status === 'not-installed'
+      || runtime?.status === 'unavailable'
+      || runtime?.status === 'error';
+    if (!shouldDetectAfterInstall) return undefined;
+
+    let active = true;
+    let requestInFlight = false;
+    const detectAfterInstall = () => {
+      if (document.visibilityState === 'hidden' || requestInFlight) return;
+      requestInFlight = true;
+      void transport.getRuntime()
+        .then((nextRuntime) => {
+          if (active) setRuntime(nextRuntime);
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          requestInFlight = false;
+        });
+    };
+    window.addEventListener('focus', detectAfterInstall);
+    document.addEventListener('visibilitychange', detectAfterInstall);
+    return () => {
+      active = false;
+      window.removeEventListener('focus', detectAfterInstall);
+      document.removeEventListener('visibilitychange', detectAfterInstall);
+    };
+  }, [runtime?.status, transport]);
+
   const installedModels = useMemo(
     () => new Set(runtime?.installedModels.map((model) => model.toLowerCase()) ?? []),
     [runtime?.installedModels],
   );
+  const canDownloadRuntimeInstaller = transport.installAction === 'download'
+    && transport.installPlatform !== null
+    && runtime?.localInstallPlatform === transport.installPlatform;
   const configuration = runtime?.configuration ?? EMPTY_CONFIGURATION;
   const importedModels = useMemo(
     () => configuration.importedModels ?? [],
@@ -515,15 +546,17 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
     }
   };
 
-  const openDownloadGuide = (model: LocalModelCatalogEntry) => {
-    window.open(model.install.downloadUrl, '_blank', 'noopener,noreferrer');
+  const handleInstallRuntime = async () => {
+    setActionError('');
+    try {
+      await transport.openInstallTarget(canDownloadRuntimeInstaller ? 'download' : 'guide');
+    } catch {
+      setActionError(text.actionFailed);
+    }
   };
 
-  const copyCommand = async (modelId: string) => {
-    clearCopyError();
-    if (await copyText(formatUiText(text.manualPullCommand, { model: modelId }))) {
-      setCopiedModel(modelId);
-    }
+  const openDownloadGuide = (model: LocalModelCatalogEntry) => {
+    window.open(model.install.downloadUrl, '_blank', 'noopener,noreferrer');
   };
 
   const copyManualCommand = async () => {
@@ -587,7 +620,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
           variant="bordered"
           padding="sm"
           title={localizedName}
-          headerRight={recommended ? <Badge variant="info"><Star aria-hidden="true" />{text.recommended}</Badge> : null}
+          headerRight={recommended ? <Badge variant="info"><Star className="h-3 w-3" aria-hidden="true" />{text.recommended}</Badge> : null}
           data-testid={`local-model-${model.id}`}
         >
           <div className="space-y-3">
@@ -624,18 +657,6 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
               </div>
             ) : null}
 
-            {directPull && runtime?.status !== 'running' && !installed ? (
-              <div className="flex min-w-0 items-center gap-2 rounded-lg bg-hover px-3 py-2">
-                <code className="min-w-0 flex-1 truncate text-xs text-secondary-text">
-                  {formatUiText(text.manualPullCommand, { model: modelId ?? '' })}
-                </code>
-                <Button variant="ghost" size="compact" onClick={() => void copyCommand(modelId ?? '')}>
-                  {copiedModel === modelId ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
-                  {copiedModel === modelId ? text.copied : text.copyCommand}
-                </Button>
-              </div>
-            ) : null}
-
             {!directPull && !installed ? (
               <InlineAlert
                 variant={model.install.status === 'license_review_required' ? 'warning' : 'info'}
@@ -668,13 +689,13 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
                   loadingText={text.downloading}
                   onClick={() => void handlePull(model)}
                 >
-                  <Download aria-hidden="true" />
+                  <Download className="h-3.5 w-3.5" aria-hidden="true" />
                   {text.download}
                 </Button>
               ) : null}
               {!directPull && !installed ? (
                 <Button variant="secondary" size="default" onClick={() => openDownloadGuide(model)}>
-                  <ExternalLink aria-hidden="true" />
+                  <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
                   {text.downloadGuide}
                 </Button>
               ) : null}
@@ -798,7 +819,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
             disabled={activeOperation !== null || runtime?.status !== 'running'}
             onClick={openModelPackPicker}
           >
-            <Upload aria-hidden="true" />{text.importPack}
+            <Upload className="h-4 w-4" aria-hidden="true" />{text.importPack}
           </Button>
           <IconButton
             variant="outline"
@@ -853,11 +874,16 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
             ) : null}
             {runtime?.status === 'not-installed' || runtime?.status === 'unavailable' ? (
               <Button
-                variant="secondary"
+                variant="primary"
                 disabled={activeOperation !== null}
-                onClick={() => void transport.openInstallGuide()}
+                onClick={() => void handleInstallRuntime()}
               >
-                <ExternalLink aria-hidden="true" />{text.installRuntime}
+                {canDownloadRuntimeInstaller
+                  ? <Download className="h-4 w-4" aria-hidden="true" />
+                  : <ExternalLink className="h-4 w-4" aria-hidden="true" />}
+                {canDownloadRuntimeInstaller
+                  ? text.downloadRuntime
+                  : text.installRuntime}
               </Button>
             ) : null}
           </div>
@@ -882,7 +908,9 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
           <InlineAlert
             variant="warning"
             title={text.unavailableTitle}
-            message={text.unavailableMessage}
+            message={canDownloadRuntimeInstaller
+              ? text.unavailableMessage
+              : text.unavailableGuideMessage}
           />
         ) : null}
         {readyModel ? (

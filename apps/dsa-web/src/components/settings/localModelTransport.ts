@@ -1,6 +1,7 @@
 import { localModelsApi } from '../../api/localModels';
 import { modelPacksApi } from '../../api/modelPacks';
 import { getParsedApiError } from '../../api/error';
+import { API_BASE_URL } from '../../utils/constants';
 import type {
   LocalModelAssignment,
   LocalModelMutationResponse,
@@ -14,7 +15,21 @@ import type {
 const WEB_PULL_POLL_INTERVAL_MS = 750;
 const WEB_PULL_TIMEOUT_MS = 31 * 60 * 1000;
 const WEB_MODEL_PACK_POLL_INTERVAL_MS = 750;
-const OLLAMA_INSTALL_GUIDE_URL = 'https://ollama.com/download';
+const OLLAMA_INSTALL_URLS = {
+  macos: 'https://ollama.com/download/Ollama.dmg',
+  windows: 'https://ollama.com/download/OllamaSetup.exe',
+  linux: 'https://ollama.com/download/linux',
+  fallback: 'https://ollama.com/download',
+} as const;
+
+type OllamaInstallAction = 'download' | 'guide';
+type OllamaInstallPlatform = 'macos' | 'windows';
+
+interface OllamaInstallTarget {
+  action: OllamaInstallAction;
+  platform: OllamaInstallPlatform | null;
+  url: string;
+}
 
 interface DesktopLocalModelState {
   runtime?: unknown;
@@ -74,6 +89,8 @@ export class LocalModelTransportError extends Error {
 
 export interface LocalModelTransport {
   kind: 'desktop' | 'web';
+  installAction: OllamaInstallAction;
+  installPlatform: OllamaInstallPlatform | null;
   canControlRuntime: boolean;
   getRuntime(): Promise<LocalModelRuntimeState>;
   pull(
@@ -90,12 +107,82 @@ export interface LocalModelTransport {
   assign(modelId: string, assignment: LocalModelAssignment): Promise<LocalModelMutationResponse>;
   start?(): Promise<LocalModelRuntimeState>;
   stop?(): Promise<LocalModelRuntimeState>;
-  openInstallGuide(): Promise<void>;
+  openInstallTarget(action: OllamaInstallAction): Promise<void>;
   subscribe?(listener: (state: LocalModelRuntimeState) => void): () => void;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object';
+}
+
+function resolveOllamaInstallTarget(
+  platform = (
+    (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform
+    || navigator.platform
+    || ''
+  ),
+  userAgent = navigator.userAgent,
+  maxTouchPoints = navigator.maxTouchPoints,
+): OllamaInstallTarget {
+  const normalizedPlatform = platform.toLowerCase();
+  const normalizedUserAgent = userAgent.toLowerCase();
+  const isAppleMobile = /iphone|ipad|ipod/.test(normalizedUserAgent)
+    || (normalizedPlatform.includes('mac') && maxTouchPoints > 1);
+
+  if (!isAppleMobile
+    && (normalizedPlatform.includes('win') || normalizedUserAgent.includes('windows'))) {
+    return { action: 'download', platform: 'windows', url: OLLAMA_INSTALL_URLS.windows };
+  }
+  if (!isAppleMobile
+    && (normalizedPlatform.includes('mac') || normalizedUserAgent.includes('mac os'))) {
+    return { action: 'download', platform: 'macos', url: OLLAMA_INSTALL_URLS.macos };
+  }
+  if (!normalizedUserAgent.includes('android')
+    && (normalizedPlatform.includes('linux') || normalizedUserAgent.includes('linux'))) {
+    return { action: 'guide', platform: null, url: OLLAMA_INSTALL_URLS.linux };
+  }
+  return { action: 'guide', platform: null, url: OLLAMA_INSTALL_URLS.fallback };
+}
+
+function resolveWebOllamaInstallTarget(
+  hostname = window.location.hostname,
+  platform = (
+    (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform
+    || navigator.platform
+    || ''
+  ),
+  userAgent = navigator.userAgent,
+  maxTouchPoints = navigator.maxTouchPoints,
+  apiBaseUrl = API_BASE_URL,
+): OllamaInstallTarget {
+  const normalizedHostname = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  const isLoopbackHostname = (value: string) => value === 'localhost'
+    || value.endsWith('.localhost')
+    || value === '::1'
+    || /^127(?:\.\d{1,3}){3}$/.test(value);
+  const isLoopbackPage = isLoopbackHostname(normalizedHostname);
+  let isLoopbackApi = isLoopbackPage;
+
+  if (apiBaseUrl.trim()) {
+    try {
+      const pageHost = normalizedHostname.includes(':')
+        ? `[${normalizedHostname}]`
+        : normalizedHostname;
+      const apiHostname = new URL(apiBaseUrl, `http://${pageHost}/`)
+        .hostname
+        .toLowerCase()
+        .replace(/^\[|\]$/g, '');
+      isLoopbackApi = isLoopbackHostname(apiHostname);
+    } catch {
+      isLoopbackApi = false;
+    }
+  }
+
+  const passesLoopbackTopologyGate = isLoopbackPage && isLoopbackApi;
+  if (!passesLoopbackTopologyGate) {
+    return { action: 'guide', platform: null, url: OLLAMA_INSTALL_URLS.fallback };
+  }
+  return resolveOllamaInstallTarget(platform, userAgent, maxTouchPoints);
 }
 
 function normalizeProgress(value: unknown): LocalModelProgress | null {
@@ -132,6 +219,7 @@ function normalizeDesktopState(
     status,
     installedModels,
     manualPullSupported: status !== 'running',
+    localInstallPlatform: null,
     configuration,
     managed: value.managed === true,
     operation: typeof value.operation === 'string' ? value.operation : null,
@@ -221,8 +309,11 @@ async function pollWebModelPackImport(
 }
 
 function createWebTransport(): LocalModelTransport {
+  const installTarget = resolveWebOllamaInstallTarget();
   return {
     kind: 'web',
+    installAction: installTarget.action,
+    installPlatform: installTarget.platform,
     canControlRuntime: false,
     getRuntime: () => localModelsApi.getRuntime(),
     async pull(modelId, onProgress, signal) {
@@ -277,8 +368,13 @@ function createWebTransport(): LocalModelTransport {
       }
     },
     assign: (modelId, assignment) => localModelsApi.assign(modelId, assignment),
-    async openInstallGuide() {
-      window.open(OLLAMA_INSTALL_GUIDE_URL, '_blank', 'noopener,noreferrer');
+    async openInstallTarget(action) {
+      const url = action === 'download' && installTarget.action === 'download'
+        ? installTarget.url
+        : installTarget.action === 'guide'
+          ? installTarget.url
+          : OLLAMA_INSTALL_URLS.fallback;
+      window.open(url, '_blank', 'noopener,noreferrer');
     },
   };
 }
@@ -360,6 +456,8 @@ function createDesktopTransport(bridge: DesktopLocalModelBridge): LocalModelTran
   };
   return {
     kind: 'desktop',
+    installAction: 'guide',
+    installPlatform: null,
     canControlRuntime: true,
     getRuntime: () => loadState(bridge.detect),
     async pull(modelId, onProgress) {
@@ -545,7 +643,7 @@ function createDesktopTransport(bridge: DesktopLocalModelBridge): LocalModelTran
     assign: (modelId, assignment) => localModelsApi.assign(modelId, assignment),
     start: () => loadState(bridge.start),
     stop: () => loadState(bridge.stop),
-    async openInstallGuide() {
+    async openInstallTarget() {
       await bridge.openInstallGuide();
     },
     subscribe(listener) {
@@ -574,4 +672,6 @@ export const __localModelTransportTest = {
   normalizeDesktopState,
   pollWebPull,
   pollWebModelPackImport,
+  resolveOllamaInstallTarget,
+  resolveWebOllamaInstallTarget,
 };

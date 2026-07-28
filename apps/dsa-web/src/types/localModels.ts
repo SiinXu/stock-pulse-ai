@@ -89,6 +89,7 @@ export interface LocalModelRuntimeState {
   status: LocalModelRuntimeStatus;
   installedModels: string[];
   manualPullSupported: boolean;
+  localInstallPlatform: 'macos' | 'windows' | null;
   configuration: LocalModelConfiguration;
   managed?: boolean;
   operation?: string | null;

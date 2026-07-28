@@ -92,6 +92,7 @@ class LocalModelRuntimeResponse(BaseModel):
     status: Literal["running", "unavailable"]
     installed_models: List[str] = Field(default_factory=list)
     manual_pull_supported: bool = False
+    local_install_platform: Optional[Literal["macos", "windows"]] = None
     configuration: LocalModelConfigurationResponse
 
 

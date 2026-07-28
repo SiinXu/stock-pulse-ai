@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import logging
-from typing import NoReturn
+import sys
+from typing import NoReturn, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from api.deps import get_local_model_service
 from api.v1.schemas.local_models import (
@@ -31,6 +32,7 @@ from src.services.local_model_service import (
     LocalModelService,
     LocalModelValidationError,
 )
+from src.security.http_bind import is_local_only_bind
 from src.services.system_config_service import ConfigConflictError, ConfigValidationError
 from src.task_execution import TaskStatusEnum
 from src.utils.sanitize import log_safe_exception
@@ -38,6 +40,15 @@ from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _native_local_install_platform() -> Optional[str]:
+    """Return the installer platform only for a native macOS or Windows backend."""
+    if sys.platform == "darwin":
+        return "macos"
+    if sys.platform == "win32":
+        return "windows"
+    return None
 
 
 def _raise_local_model_error(exc: Exception, *, model_id: str = "") -> NoReturn:
@@ -75,11 +86,22 @@ def _raise_local_model_error(exc: Exception, *, model_id: str = "") -> NoReturn:
 
 @router.get("/runtime", response_model=LocalModelRuntimeResponse)
 def get_local_model_runtime(
+    request: Request,
     service: LocalModelService = Depends(get_local_model_service),
 ) -> LocalModelRuntimeResponse:
     """Return runtime availability and current saved assignments."""
     try:
         payload = service.get_runtime_status()
+        local_install_platform = _native_local_install_platform()
+        request_client_host = request.client.host if request.client is not None else ""
+        payload["local_install_platform"] = (
+            local_install_platform
+            if local_install_platform
+            and payload.pop("runtime_endpoint_is_loopback", False)
+            and is_local_only_bind(request.url.hostname)
+            and is_local_only_bind(request_client_host)
+            else None
+        )
         payload["configuration"] = service.get_configuration()
         return LocalModelRuntimeResponse.model_validate(payload)
     except Exception as exc:  # broad-exception: fallback_recorded - sanitized API boundary
