@@ -1670,5 +1670,25 @@ class LocalModelServiceTestCase(_SystemConfigServiceTestCaseBase):
                 "status": "unavailable",
                 "installed_models": [],
                 "manual_pull_supported": True,
+                "runtime_endpoint_is_loopback": True,
             },
         )
+
+    def test_runtime_status_marks_remote_ollama_endpoint_as_not_loopback(self) -> None:
+        self._rewrite_env(
+            "ADMIN_AUTH_ENABLED=true",
+            "LLM_OLLAMA_BASE_URL=https://ollama.example.com:11434",
+        )
+
+        class _UnavailableClient:
+            def list_installed_models(self):
+                raise LocalModelRuntimeUnavailableError("remote endpoint failed")
+
+        service = LocalModelService(
+            system_config_service=self.service,
+            task_queue=_FakeTaskQueue(),
+            pullable_model_ids=lambda: {"qwen3:4b"},
+            client_factory=lambda _base_url: _UnavailableClient(),
+        )
+
+        self.assertFalse(service.get_runtime_status()["runtime_endpoint_is_loopback"])

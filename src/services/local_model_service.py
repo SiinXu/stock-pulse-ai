@@ -19,6 +19,7 @@ from src.llm.model_ref import decode_model_ref
 from src.llm.provider_catalog import get_provider
 from src.model_pack.errors import ModelPackError
 from src.model_pack.manifest import MAX_MODEL_ID_LENGTH, normalize_manifest_text
+from src.security.http_bind import is_local_only_bind
 from src.services.system_config_service import (
     ConfigConflictError,
     ConfigValidationError,
@@ -155,6 +156,15 @@ def get_ollama_runtime_identity(value: Any) -> str:
     """Return an opaque identity for one normalized server-controlled runtime."""
     normalized = normalize_ollama_base_url(value)
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def is_ollama_runtime_endpoint_loopback(value: Any) -> bool:
+    """Return whether the configured server-owned Ollama endpoint is loopback."""
+    try:
+        hostname = urlsplit(normalize_ollama_base_url(value)).hostname or ""
+        return is_local_only_bind(hostname)
+    except LocalModelValidationError:
+        return False
 
 
 def get_pullable_local_model_ids() -> Set[str]:
@@ -1279,20 +1289,25 @@ class LocalModelService:
     def get_runtime_status(self) -> Dict[str, Any]:
         """Return installed models or a stable unavailable state without raw diagnostics."""
         _config_version, values = self._config_snapshot()
+        runtime_endpoint_is_loopback = False
         try:
-            installed = self._client_factory(self._base_url(values)).list_installed_models()
+            base_url = self._base_url(values)
+            runtime_endpoint_is_loopback = is_ollama_runtime_endpoint_loopback(base_url)
+            installed = self._client_factory(base_url).list_installed_models()
         except LocalModelError:
             return {
                 "runtime": "ollama",
                 "status": "unavailable",
                 "installed_models": [],
                 "manual_pull_supported": True,
+                "runtime_endpoint_is_loopback": runtime_endpoint_is_loopback,
             }
         return {
             "runtime": "ollama",
             "status": "running",
             "installed_models": installed,
             "manual_pull_supported": False,
+            "runtime_endpoint_is_loopback": runtime_endpoint_is_loopback,
         }
 
     def _pending_pull(self, model_id: str) -> Optional[TaskInfo]:

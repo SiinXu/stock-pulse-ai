@@ -107,6 +107,7 @@ const AVAILABLE_RUNTIME: LocalModelRuntimeState = {
   status: 'running',
   installedModels: [],
   manualPullSupported: false,
+  localInstallPlatform: 'macos',
   totalMemoryGb: 16,
   configuration: {
     configVersion: 'config-1',
@@ -127,13 +128,15 @@ function renderPanel(props: Partial<React.ComponentProps<typeof LocalModelsPanel
 function transport(overrides: Partial<LocalModelTransport> = {}): LocalModelTransport {
   return {
     kind: 'web',
+    installAction: 'download',
+    installPlatform: 'macos',
     canControlRuntime: false,
     getRuntime: vi.fn().mockResolvedValue(AVAILABLE_RUNTIME),
     pull: vi.fn(),
     importPack: vi.fn(),
     remove: vi.fn(),
     assign: vi.fn(),
-    openInstallGuide: vi.fn(),
+    openInstallTarget: vi.fn(),
     ...overrides,
   };
 }
@@ -160,10 +163,18 @@ describe('LocalModelsPanel', () => {
     expect(within(general).getByText('Light tier')).toBeInTheDocument();
     expect(within(general).getByText('Apache-2.0')).toBeInTheDocument();
     expect(within(general).getByText('Recommended tier')).toBeInTheDocument();
+    expect(within(general).getByText('Recommended tier').closest('span')?.querySelector('svg'))
+      .toHaveClass('h-3', 'w-3');
+    expect(within(general).getByRole('button', { name: 'Download' }).querySelector('svg'))
+      .toHaveClass('h-3.5', 'w-3.5');
     const finance = screen.getByTestId('local-model-fin-r1-7b');
     expect(within(finance).getByText('Standard tier')).toBeInTheDocument();
     expect(within(finance).getByText('Conversion pending')).toBeInTheDocument();
-    expect(within(finance).getByRole('button', { name: 'Open download guide' })).toBeEnabled();
+    const downloadGuide = within(finance).getByRole('button', { name: 'Open download guide' });
+    expect(downloadGuide).toBeEnabled();
+    expect(downloadGuide.querySelector('svg')).toHaveClass('h-3.5', 'w-3.5');
+    expect(screen.getByRole('button', { name: 'Import Model Pack' }).querySelector('svg'))
+      .toHaveClass('h-4', 'w-4');
   });
 
   it('does not auto-select an existing ready model in wizard mode', async () => {
@@ -487,20 +498,69 @@ describe('LocalModelsPanel', () => {
     expect(screen.queryByText('ollama pull qwen3:4b')).not.toBeInTheDocument();
   });
 
-  it('degrades to a copyable command when Ollama is unavailable', async () => {
+  it('offers the platform installer without requiring a terminal command', async () => {
+    const openInstallTarget = vi.fn().mockResolvedValue(undefined);
     createTransport.mockReturnValue(transport({
       getRuntime: vi.fn().mockResolvedValue({
         ...AVAILABLE_RUNTIME,
         status: 'unavailable',
         manualPullSupported: true,
       }),
+      openInstallTarget,
     }));
 
     renderPanel();
 
     expect(await screen.findByText('Ollama is unavailable')).toBeInTheDocument();
-    expect(screen.getByText('ollama pull qwen3:4b')).toBeInTheDocument();
+    expect(screen.queryByText('ollama pull qwen3:4b')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Download' })).toBeDisabled();
+    const installerButton = screen.getByRole('button', { name: 'Download Ollama installer' });
+    expect(installerButton.querySelector('svg')).toHaveClass('h-4', 'w-4');
+    fireEvent.click(installerButton);
+    expect(openInstallTarget).toHaveBeenCalledWith('download');
+  });
+
+  it('keeps server-side guidance when the backend runtime is not locally installable', async () => {
+    const openInstallTarget = vi.fn().mockResolvedValue(undefined);
+    createTransport.mockReturnValue(transport({
+      getRuntime: vi.fn().mockResolvedValue({
+        ...AVAILABLE_RUNTIME,
+        status: 'unavailable',
+        manualPullSupported: true,
+        localInstallPlatform: null,
+      }),
+      openInstallTarget,
+    }));
+
+    renderPanel();
+
+    expect(await screen.findByText(
+      'Follow the official instructions to install and start Ollama on the machine configured for the StockPulse backend, then refresh the status.',
+    )).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'View Ollama installation' }));
+    expect(openInstallTarget).toHaveBeenCalledWith('guide');
+  });
+
+  it('detects Ollama after the user returns from installing it', async () => {
+    const getRuntime = vi.fn()
+      .mockResolvedValueOnce({
+        ...AVAILABLE_RUNTIME,
+        status: 'unavailable',
+        manualPullSupported: true,
+      })
+      .mockResolvedValue(AVAILABLE_RUNTIME);
+    createTransport.mockReturnValue(transport({ getRuntime }));
+
+    renderPanel();
+
+    expect(await screen.findByText('Ollama is unavailable')).toBeInTheDocument();
+    window.dispatchEvent(new Event('focus'));
+
+    await vi.waitFor(() => {
+      expect(getRuntime).toHaveBeenCalledTimes(2);
+      expect(screen.getByRole('button', { name: 'Download' })).toBeEnabled();
+    });
+    expect(screen.queryByText('Ollama is unavailable')).not.toBeInTheDocument();
   });
 
   it('uploads a Model Pack from Web and renders unknown manifest metadata', async () => {

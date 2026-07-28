@@ -11178,6 +11178,21 @@
             "title": "Manual Pull Supported",
             "default": false
           },
+          "local_install_platform": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "macos",
+                  "windows"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Local Install Platform"
+          },
           "configuration": {
             "$ref": "#/components/schemas/LocalModelConfigurationResponse"
           }

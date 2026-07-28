@@ -81,6 +81,105 @@ describe('localModelTransport', () => {
     packApi.activateDesktop.mockResolvedValue({ selectedPrimary: false });
   });
 
+  it('resolves stable official installer targets by desktop platform', () => {
+    expect(__localModelTransportTest.resolveOllamaInstallTarget(
+      'MacIntel',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)',
+      0,
+    )).toEqual({
+      action: 'download',
+      platform: 'macos',
+      url: 'https://ollama.com/download/Ollama.dmg',
+    });
+    expect(__localModelTransportTest.resolveOllamaInstallTarget(
+      'Win32',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      0,
+    )).toEqual({
+      action: 'download',
+      platform: 'windows',
+      url: 'https://ollama.com/download/OllamaSetup.exe',
+    });
+    expect(__localModelTransportTest.resolveOllamaInstallTarget(
+      'Linux x86_64',
+      'Mozilla/5.0 (X11; Linux x86_64)',
+      0,
+    )).toEqual({
+      action: 'guide',
+      platform: null,
+      url: 'https://ollama.com/download/linux',
+    });
+    expect(__localModelTransportTest.resolveOllamaInstallTarget(
+      'MacIntel',
+      'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X)',
+      5,
+    )).toEqual({
+      action: 'guide',
+      platform: null,
+      url: 'https://ollama.com/download',
+    });
+  });
+
+  it('only offers direct installers from a loopback Web deployment', () => {
+    expect(__localModelTransportTest.resolveWebOllamaInstallTarget(
+      '127.0.0.1',
+      'MacIntel',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)',
+      0,
+    )).toEqual({
+      action: 'download',
+      platform: 'macos',
+      url: 'https://ollama.com/download/Ollama.dmg',
+    });
+    expect(__localModelTransportTest.resolveWebOllamaInstallTarget(
+      'stockpulse.example.com',
+      'MacIntel',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)',
+      0,
+    )).toEqual({
+      action: 'guide',
+      platform: null,
+      url: 'https://ollama.com/download',
+    });
+    expect(__localModelTransportTest.resolveWebOllamaInstallTarget(
+      'localhost',
+      'Win32',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      0,
+      'https://stockpulse.example.com/api',
+    )).toEqual({
+      action: 'guide',
+      platform: null,
+      url: 'https://ollama.com/download',
+    });
+  });
+
+  it('opens the resolved installer directly from the Web transport', async () => {
+    const platform = vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel');
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    try {
+      const transport = __localModelTransportTest.createWebTransport();
+
+      expect(transport.installAction).toBe('download');
+      await transport.openInstallTarget('download');
+      expect(open).toHaveBeenCalledWith(
+        'https://ollama.com/download/Ollama.dmg',
+        '_blank',
+        'noopener,noreferrer',
+      );
+      open.mockClear();
+      await transport.openInstallTarget('guide');
+      expect(open).toHaveBeenCalledWith(
+        'https://ollama.com/download',
+        '_blank',
+        'noopener,noreferrer',
+      );
+    } finally {
+      platform.mockRestore();
+      open.mockRestore();
+    }
+  });
+
   it('uploads and polls a Model Pack through the Web task contract', async () => {
     vi.useFakeTimers();
     try {

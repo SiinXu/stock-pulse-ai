@@ -94,6 +94,7 @@ class _FakeLocalModelService:
             "status": "running",
             "installed_models": ["qwen3:4b"],
             "manual_pull_supported": False,
+            "runtime_endpoint_is_loopback": True,
         }
 
     def get_configuration(self):
@@ -113,9 +114,21 @@ def _build_app(service: _FakeLocalModelService) -> FastAPI:
     return app
 
 
-async def _request(service: _FakeLocalModelService, method: str, path: str, **kwargs) -> httpx.Response:
-    transport = httpx.ASGITransport(app=_build_app(service), raise_app_exceptions=False)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+async def _request(
+    service: _FakeLocalModelService,
+    method: str,
+    path: str,
+    *,
+    request_base_url: str = "http://127.0.0.1",
+    request_client_host: str = "127.0.0.1",
+    **kwargs,
+) -> httpx.Response:
+    transport = httpx.ASGITransport(
+        app=_build_app(service),
+        raise_app_exceptions=False,
+        client=(request_client_host, 123),
+    )
+    async with httpx.AsyncClient(transport=transport, base_url=request_base_url) as client:
         return await client.request(method, path, **kwargs)
 
 
@@ -720,7 +733,14 @@ class LocalModelApiIntegrationTestCase(_SystemConfigServiceTestCaseBase):
 
 
 def test_runtime_response_combines_transport_and_configuration_state() -> None:
-    response = asyncio.run(_request(_FakeLocalModelService(), "GET", "/api/v1/local-models/runtime"))
+    with patch.object(
+        local_models,
+        "_native_local_install_platform",
+        return_value="macos",
+    ):
+        response = asyncio.run(
+            _request(_FakeLocalModelService(), "GET", "/api/v1/local-models/runtime")
+        )
 
     assert response.status_code == 200
     assert response.json() == {
@@ -728,6 +748,7 @@ def test_runtime_response_combines_transport_and_configuration_state() -> None:
         "status": "running",
         "installed_models": ["qwen3:4b"],
         "manual_pull_supported": False,
+        "local_install_platform": "macos",
         "configuration": {
             "config_version": "config-1",
             "registered_models": ["qwen3:4b"],
@@ -736,6 +757,58 @@ def test_runtime_response_combines_transport_and_configuration_state() -> None:
             "imported_models": [],
         },
     }
+
+
+def test_runtime_response_disables_local_install_for_a_remote_api_host() -> None:
+    with patch.object(
+        local_models,
+        "_native_local_install_platform",
+        return_value="macos",
+    ):
+        response = asyncio.run(
+            _request(
+                _FakeLocalModelService(),
+                "GET",
+                "/api/v1/local-models/runtime",
+                request_base_url="https://stockpulse.example.com",
+            )
+        )
+
+    assert response.status_code == 200
+    assert response.json()["local_install_platform"] is None
+
+
+def test_runtime_response_disables_local_install_for_a_non_loopback_client() -> None:
+    with patch.object(
+        local_models,
+        "_native_local_install_platform",
+        return_value="macos",
+    ):
+        response = asyncio.run(
+            _request(
+                _FakeLocalModelService(),
+                "GET",
+                "/api/v1/local-models/runtime",
+                request_client_host="172.17.0.1",
+            )
+        )
+
+    assert response.status_code == 200
+    assert response.json()["local_install_platform"] is None
+
+
+def test_runtime_response_disables_local_install_without_a_native_installer_platform() -> None:
+    with patch.object(
+        local_models,
+        "_native_local_install_platform",
+        return_value=None,
+    ):
+        response = asyncio.run(
+            _request(_FakeLocalModelService(), "GET", "/api/v1/local-models/runtime")
+        )
+
+    assert response.status_code == 200
+    assert response.json()["local_install_platform"] is None
 
 
 def test_pull_request_forbids_caller_controlled_base_url_before_service_invocation() -> None:
@@ -991,6 +1064,10 @@ def test_static_openapi_contains_the_local_model_contract() -> None:
         "/api/v1/local-models/runtime",
     ):
         assert static["paths"][path] == runtime["paths"][path]
+    assert (
+        static["components"]["schemas"]["LocalModelRuntimeResponse"]
+        == runtime["components"]["schemas"]["LocalModelRuntimeResponse"]
+    )
     for schema in (
         "LocalModelAssignmentRequest",
         "LocalModelConfigurationResponse",

@@ -43,6 +43,7 @@ describe('localModelsApi', () => {
           status: 'running',
           installed_models: ['qwen3:4b'],
           manual_pull_supported: false,
+          local_install_platform: 'macos',
           configuration: { config_version: 'v1', registered_models: ['qwen3:4b'] },
         },
       });
@@ -58,6 +59,7 @@ describe('localModelsApi', () => {
     });
     expect(runtime).toMatchObject({
       installedModels: ['qwen3:4b'],
+      localInstallPlatform: 'macos',
       configuration: { registeredModels: ['qwen3:4b'] },
     });
   });
