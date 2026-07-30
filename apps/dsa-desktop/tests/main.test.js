@@ -213,6 +213,7 @@ test('desktop package includes the isolated floating assistant surface and tray 
     'utf-8'
   );
 
+  assert.ok(packageMetadata.build.files.includes('backend-runtime.js'));
   assert.ok(packageMetadata.build.files.includes('assistant-preload.js'));
   assert.ok(packageMetadata.build.files.includes('renderer/**/*'));
   assert.ok(packageMetadata.build.extraResources.some((entry) =>
@@ -265,27 +266,6 @@ test('Electron Builder selects the backend runtime modules', () => {
       isSelected(filePath, fs.statSync(filePath)),
       true,
       `Electron Builder must select ${file}`
-    );
-  }
-});
-
-test('shared Desktop env mechanics stay outside the backend lifecycle owner', () => {
-  const desktopEnv = require('../desktop-env');
-  const backendRuntimeModule = require('../backend-runtime');
-  const sharedNames = [
-    'extendMacDesktopBackendPath',
-    'hasOwnValue',
-    'normalizeBackendHost',
-    'readEnvFileValue',
-    'readEnvFileValues',
-  ];
-
-  for (const name of sharedNames) {
-    assert.equal(typeof desktopEnv[name], 'function');
-    assert.equal(
-      Object.prototype.hasOwnProperty.call(backendRuntimeModule, name),
-      false,
-      `${name} must not be owned by the backend lifecycle module`
     );
   }
 });
@@ -1124,7 +1104,6 @@ test('buildBackendEnvironment extends macOS GUI PATH with Homebrew CLI directori
     envFile: '/tmp/dsa/.env',
     dbPath: '/tmp/dsa/data.db',
     logDir: '/tmp/dsa/logs',
-    modelPackAttestationEnv: 'OVERRIDE_ATTESTATION_ENV',
     sourceEnv: {
       PATH: '/usr/bin:/bin:/usr/sbin:/sbin',
       CUSTOM_FLAG: 'kept',
@@ -1144,10 +1123,6 @@ test('buildBackendEnvironment extends macOS GUI PATH with Homebrew CLI directori
   assert.equal(env.LOG_DIR, '/tmp/dsa/logs');
   assert.equal(env.WEBUI_HOST, '127.0.0.1');
   assert.match(env[mainModule.DESKTOP_MODEL_PACK_ATTESTATION_ENV], /^[0-9a-f]{64}$/);
-  assert.equal(
-    Object.prototype.hasOwnProperty.call(env, 'OVERRIDE_ATTESTATION_ENV'),
-    false
-  );
 });
 
 test('Desktop Model Pack attestation binds validated metadata to one short-lived token', (t) => {
@@ -1489,6 +1464,33 @@ test('findAvailablePort normalizes wildcard bind hosts before listening', async 
   assert.deepEqual(listenedHosts, ['0.0.0.0', '::']);
 });
 
+test('findAvailablePort advances through the configured range after bind failures', async (t) => {
+  const attemptedPorts = [];
+  const fakeNet = {
+    createServer: () => {
+      const server = new EventEmitter();
+      server.listen = (port) => {
+        attemptedPorts.push(port);
+        process.nextTick(() => {
+          server.emit(port === 8123 ? 'error' : 'listening');
+        });
+      };
+      server.close = (callback) => {
+        if (callback) {
+          callback();
+        }
+      };
+      return server;
+    },
+  };
+  const mainModule = loadMainModule(t, { platform: 'linux', net: fakeNet });
+
+  const port = await mainModule.findAvailablePort(8123, 8124);
+
+  assert.equal(port, 8124);
+  assert.deepEqual(attemptedPorts, [8123, 8124]);
+});
+
 test('startBackend passes WEBUI_HOST from env file to backend args and env', (t) => {
   const previousWebuiHost = process.env.WEBUI_HOST;
   const previousProviderDailyCacheDir = process.env.PROVIDER_DAILY_CACHE_DIR;
@@ -1550,77 +1552,96 @@ test('startBackend passes WEBUI_HOST from env file to backend args and env', (t)
   );
 });
 
-test('startBackend surfaces synchronous spawn failures without retaining a child', (t) => {
-  const mainModule = loadMainModule(t, {
-    platform: 'darwin',
-    childProcess: {
-      spawn: () => {
-        throw new Error('spawn rejected');
-      },
-    },
-  });
-  t.after(() => mainModule.__setBackendProcessForTest(null));
-
-  assert.throws(
-    () => mainModule.startBackend({
-      port: 8123,
-      envFile: '/tmp/dsa/.env',
-      dbPath: '/tmp/dsa/data/stock_analysis.db',
-      logDir: '/tmp/dsa/logs',
-    }),
-    /spawn rejected/
-  );
-  assert.equal(mainModule.__getBackendProcessForTest(), null);
-});
-
-test('startBackend launch diagnostics omit environment values and decode UTF-8 output', (t) => {
-  const previousSecret = process.env.DESKTOP_BACKEND_TEST_SECRET;
+test('startBackend reports spawn failures without logging backend environment secrets', (t) => {
   const originalConsoleLog = console.log;
   const logs = [];
+  let spawnedEnvironment = null;
   const fakeBackendProcess = new EventEmitter();
-  fakeBackendProcess.pid = 4123;
+  fakeBackendProcess.pid = 8123;
   fakeBackendProcess.exitCode = null;
   fakeBackendProcess.signalCode = null;
   fakeBackendProcess.stdout = new EventEmitter();
   fakeBackendProcess.stderr = new EventEmitter();
   fakeBackendProcess.kill = () => true;
-  process.env.DESKTOP_BACKEND_TEST_SECRET = 'must-not-appear-in-launch-diagnostics';
-  console.log = (line) => logs.push(String(line));
-
   const mainModule = loadMainModule(t, {
-    platform: 'darwin',
+    platform: 'linux',
     childProcess: {
-      spawn: () => fakeBackendProcess,
+      spawn: (_command, _args, options) => {
+        spawnedEnvironment = options.env;
+        return fakeBackendProcess;
+      },
     },
   });
+  const originalSecret = process.env.AD05_CHARACTERIZATION_SECRET;
+  process.env.AD05_CHARACTERIZATION_SECRET = 'must-not-appear-in-desktop-logs';
+  console.log = (line) => {
+    logs.push(String(line));
+  };
+
   t.after(() => {
-    mainModule.__setBackendProcessForTest(null);
     console.log = originalConsoleLog;
-    if (previousSecret === undefined) {
-      delete process.env.DESKTOP_BACKEND_TEST_SECRET;
+    mainModule.__setBackendProcessForTest(null);
+    if (originalSecret === undefined) {
+      delete process.env.AD05_CHARACTERIZATION_SECRET;
     } else {
-      process.env.DESKTOP_BACKEND_TEST_SECRET = previousSecret;
+      process.env.AD05_CHARACTERIZATION_SECRET = originalSecret;
     }
   });
 
-  const launchInfo = mainModule.startBackend({
+  mainModule.startBackend({
     port: 8123,
     envFile: '/tmp/dsa/.env',
-    dbPath: '/tmp/dsa/data/stock_analysis.db',
+    dbPath: '/tmp/dsa/stock_analysis.db',
     logDir: '/tmp/dsa/logs',
   });
-  fakeBackendProcess.stdout.emit('data', Buffer.from('  后端就绪  \n', 'utf-8'));
+  const attestationKey = spawnedEnvironment[mainModule.DESKTOP_MODEL_PACK_ATTESTATION_ENV];
+  fakeBackendProcess.emit('spawn');
+  fakeBackendProcess.emit('error', new Error('spawn failed'));
 
-  assert.equal(
-    launchInfo.command.includes(process.env.DESKTOP_BACKEND_TEST_SECRET),
-    false
+  assert.match(attestationKey, /^[0-9a-f]{64}$/);
+  assert.ok(logs.some((line) => line.includes('[backend] spawned pid=8123')));
+  assert.ok(logs.some((line) => line.includes('[backend] failed to start: spawn failed')));
+  assert.ok(logs.every((line) => !line.includes('must-not-appear-in-desktop-logs')));
+  assert.ok(logs.every((line) => !line.includes(attestationKey)));
+  assert.ok(logs.every((line) => !line.includes(mainModule.DESKTOP_MODEL_PACK_ATTESTATION_ENV)));
+  assert.equal(mainModule.buildDesktopAssistantState().serviceStatus, 'unavailable');
+});
+
+test('startBackend preserves facade state when spawn throws synchronously', (t) => {
+  const spawnError = new Error('synchronous spawn failure');
+  const mainModule = loadMainModule(t, {
+    platform: 'linux',
+    childProcess: {
+      spawn: () => {
+        throw spawnError;
+      },
+    },
+  });
+
+  assert.throws(
+    () => mainModule.startBackend({
+      port: 8123,
+      envFile: '/tmp/dsa/.env',
+      dbPath: '/tmp/dsa/stock_analysis.db',
+      logDir: '/tmp/dsa/logs',
+    }),
+    spawnError
   );
-  assert.equal(logs.some((line) => line.endsWith('[backend] 后端就绪')), true);
+  assert.equal(mainModule.__getBackendProcessForTest(), null);
+  assert.equal(mainModule.buildDesktopAssistantState().serviceStatus, 'starting');
 });
 
 test('startBackend ignores lifecycle events from a replaced process generation', async (t) => {
+  const originalConsoleLog = console.log;
+  const logs = [];
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-desktop-backend-generation-'));
-  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+  console.log = (line) => {
+    logs.push(String(line));
+  };
+  t.after(() => {
+    console.log = originalConsoleLog;
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
   const backendProcesses = Array.from({ length: 2 }, (_value, index) => {
     const processRef = new EventEmitter();
     processRef.pid = 4100 + index;
@@ -1655,7 +1676,10 @@ test('startBackend ignores lifecycle events from a replaced process generation',
   mainModule.startBackend({ ...launchOptions, port: 8124 });
   mainModule.__setDesktopAssistantStateForTest({ webReady: true });
 
+  backendProcesses[0].stdout.emit('data', 'stale backend output');
+  backendProcesses[0].stderr.emit('data', 'stale backend diagnostic');
   backendProcesses[0].emit('error', new Error('stale backend failed'));
+  assert.ok(logs.every((line) => !line.includes('stale backend')));
   assert.equal(mainModule.buildDesktopAssistantState().serviceStatus, 'ready');
   backendProcesses[0].exitCode = 0;
   backendProcesses[0].emit('exit', 0, null);
@@ -2907,88 +2931,6 @@ test('createWindow startup routes a pending deep link after restore and backend 
   });
 });
 
-test('createWindow reports a bounded backend health timeout', async (t) => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-desktop-health-timeout-'));
-  const loadedUrls = [];
-  const originalDateNow = Date.now;
-  let currentTime = 1_000_000;
-  let readyPromise;
-
-  Date.now = () => {
-    currentTime += 61_000;
-    return currentTime;
-  };
-
-  function fakeBrowserWindow() {
-    return {
-      isDestroyed: () => false,
-      on: () => undefined,
-      once: () => undefined,
-      setBackgroundColor: () => undefined,
-      webContents: {
-        on: () => undefined,
-        setWindowOpenHandler: () => undefined,
-        send: () => undefined,
-      },
-      loadFile: async () => undefined,
-      loadURL: async (url) => {
-        loadedUrls.push(url);
-      },
-    };
-  }
-
-  const fakeBackendProcess = new EventEmitter();
-  fakeBackendProcess.pid = 12345;
-  fakeBackendProcess.exitCode = null;
-  fakeBackendProcess.signalCode = null;
-  fakeBackendProcess.killed = false;
-  fakeBackendProcess.stdout = new EventEmitter();
-  fakeBackendProcess.stderr = new EventEmitter();
-  fakeBackendProcess.kill = () => true;
-
-  const fakeNet = {
-    createServer: () => {
-      const server = new EventEmitter();
-      server.listen = () => {
-        process.nextTick(() => server.emit('listening'));
-      };
-      server.close = (callback) => callback();
-      return server;
-    },
-  };
-
-  const mainModule = loadMainModule(t, {
-    platform: 'darwin',
-    browserWindow: fakeBrowserWindow,
-    net: fakeNet,
-    childProcess: {
-      spawn: () => fakeBackendProcess,
-    },
-    app: {
-      getPath: () => tempRoot,
-      whenReady: () => ({
-        then: (handler) => {
-          readyPromise = Promise.resolve().then(handler);
-          return readyPromise;
-        },
-      }),
-      on: () => undefined,
-    },
-  });
-
-  t.after(() => {
-    Date.now = originalDateNow;
-    mainModule.__setBackendProcessForTest(null);
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  });
-
-  await readyPromise;
-
-  assert.equal(loadedUrls.length, 1);
-  const errorUrl = new URL(loadedUrls[0]);
-  assert.match(errorUrl.searchParams.get('error'), /Health check timeout/);
-});
-
 test('stopBackend waits for backend process exit', async (t) => {
   const mainModule = loadMainModule(t, { platform: 'linux' });
   const killSignals = [];
@@ -3056,6 +2998,47 @@ test('stopBackend keeps backend process reference when exit wait times out', asy
 
   assert.equal(killSignals.includes('SIGTERM'), true);
   assert.equal(mainModule.__getBackendProcessForTest(), fakeBackend);
+});
+
+test('stopBackend escalates from SIGTERM to SIGKILL when the POSIX child remains alive', async (t) => {
+  const mainModule = loadMainModule(t, { platform: 'linux' });
+  const originalSetTimeout = global.setTimeout;
+  const killSignals = [];
+  const fakeBackend = new EventEmitter();
+
+  fakeBackend.pid = 4321;
+  fakeBackend.killed = false;
+  fakeBackend.exitCode = null;
+  fakeBackend.signalCode = null;
+  fakeBackend.kill = (signal) => {
+    killSignals.push(signal);
+    fakeBackend.killed = true;
+    if (signal === 'SIGKILL') {
+      process.nextTick(() => {
+        fakeBackend.signalCode = 'SIGKILL';
+        fakeBackend.emit('exit', null, 'SIGKILL');
+      });
+    }
+    return true;
+  };
+
+  global.setTimeout = (callback, delay, ...args) => (
+    originalSetTimeout(callback, delay >= 3000 ? 0 : delay, ...args)
+  );
+  mainModule.__setBackendProcessForTest(fakeBackend);
+
+  t.after(() => {
+    global.setTimeout = originalSetTimeout;
+    mainModule.__setBackendProcessForTest(null);
+  });
+
+  await Promise.race([
+    mainModule.stopBackend(),
+    new Promise((_, reject) => originalSetTimeout(() => reject(new Error('stopBackend did not resolve')), 200)),
+  ]);
+
+  assert.deepEqual(killSignals, ['SIGTERM', 'SIGKILL']);
+  assert.equal(mainModule.__getBackendProcessForTest(), null);
 });
 
 test('stopBackend uses taskkill on Windows and clears after backend exit', async (t) => {

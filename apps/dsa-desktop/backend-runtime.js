@@ -1,9 +1,10 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+
+'use strict';
+
 const fs = require('fs');
-const http = require('http');
-const net = require('net');
 const path = require('path');
-const { spawn } = require('child_process');
-const { TextDecoder } = require('util');
 const {
   extendMacDesktopBackendPath,
   hasOwnValue,
@@ -15,584 +16,416 @@ const DESKTOP_BACKEND_DEFAULT_HOST = '127.0.0.1';
 const PROVIDER_DAILY_CACHE_DIR_ENV_KEY = 'PROVIDER_DAILY_CACHE_DIR';
 const PUBLIC_BIND_HOSTS = Object.freeze(new Set(['0.0.0.0', '::', '[::]', '*']));
 
-function normalizeBackendBindHost(value, fallback = DESKTOP_BACKEND_DEFAULT_HOST) {
-  const host = normalizeBackendHost(value, fallback);
-  const lowerHost = host.toLowerCase();
-  if (lowerHost === '*') {
-    return '0.0.0.0';
-  }
-  if (lowerHost === '[::]') {
-    return '::';
-  }
-  return host;
-}
-
-function resolveDesktopProviderDailyCacheDir({
-  envFile,
-  dbPath,
-  sourceEnv = process.env,
-} = {}, dependencies = {}) {
-  const sourceValue = hasOwnValue(sourceEnv, PROVIDER_DAILY_CACHE_DIR_ENV_KEY)
-    ? String(sourceEnv[PROVIDER_DAILY_CACHE_DIR_ENV_KEY] || '').trim()
-    : '';
-  if (sourceValue) {
-    return sourceValue;
-  }
-
-  const envFileValue = String(
-    readEnvFileValue(
-      envFile,
-      PROVIDER_DAILY_CACHE_DIR_ENV_KEY,
-      sourceEnv,
-      dependencies
-    ) || ''
-  ).trim();
-  if (envFileValue) {
-    return envFileValue;
-  }
-
-  return path.join(path.dirname(dbPath), 'provider_cache', 'daily');
-}
-
-function resolveBackendBindHost({
-  envFile,
-  sourceEnv = process.env,
-  fallback = DESKTOP_BACKEND_DEFAULT_HOST,
-} = {}, dependencies = {}) {
-  const sourceHost = normalizeBackendHost(sourceEnv.WEBUI_HOST);
-  if (sourceHost) {
-    return normalizeBackendBindHost(sourceHost, fallback);
-  }
-
-  const envFileHost = normalizeBackendHost(
-    readEnvFileValue(envFile, 'WEBUI_HOST', sourceEnv, dependencies)
-  );
-  return normalizeBackendBindHost(envFileHost || fallback, fallback);
-}
-
-function resolveDesktopConnectHost(bindHost) {
-  const host = normalizeBackendBindHost(bindHost, DESKTOP_BACKEND_DEFAULT_HOST);
-  if (PUBLIC_BIND_HOSTS.has(host.toLowerCase())) {
-    return DESKTOP_BACKEND_DEFAULT_HOST;
-  }
-  return host;
-}
-
-function formatUrlHost(host) {
-  const normalized = normalizeBackendHost(host, DESKTOP_BACKEND_DEFAULT_HOST);
-  if (normalized.startsWith('[') && normalized.endsWith(']')) {
-    return normalized;
-  }
-  return normalized.includes(':') ? `[${normalized}]` : normalized;
-}
-
-function buildBackendUrl(host, port, pathname = '/') {
-  const url = new URL(`http://${formatUrlHost(host)}:${port}/`);
-  url.pathname = pathname;
-  return url.toString();
-}
-
-function buildBackendArgs({ host, port }) {
-  return [
-    '--serve-only',
-    '--host',
-    normalizeBackendBindHost(host, DESKTOP_BACKEND_DEFAULT_HOST),
-    '--port',
-    String(port),
-  ];
-}
-
-function buildBackendEnvironment({
-  envFile,
-  dbPath,
-  logDir,
-  port = null,
-  host = null,
-  sourceEnv = process.env,
-  modelPackAttestationEnv,
-  modelPackAttestationKey,
-}, {
-  fsImpl = fs,
-  platform = process.platform,
-} = {}) {
-  const selectedPort = Number(port);
-  const selectedHost = normalizeBackendBindHost(
-    normalizeBackendHost(host) || resolveBackendBindHost(
-      { envFile, sourceEnv },
-      { fsImpl }
-    ),
-    DESKTOP_BACKEND_DEFAULT_HOST
-  );
-  const env = {
-    ...sourceEnv,
-    DSA_DESKTOP_MODE: 'true',
-    ENV_FILE: envFile,
-    DATABASE_PATH: dbPath,
-    LOG_DIR: logDir,
-    PROVIDER_DAILY_CACHE_DIR: resolveDesktopProviderDailyCacheDir(
-      { envFile, dbPath, sourceEnv },
-      { fsImpl }
-    ),
-    PYTHONUTF8: '1',
-    PYTHONIOENCODING: 'utf-8',
-    WEBUI_HOST: selectedHost,
-    WEBUI_ENABLED: 'false',
-    BOT_ENABLED: 'false',
-    DINGTALK_STREAM_ENABLED: 'false',
-    FEISHU_STREAM_ENABLED: 'false',
-  };
-  if (!/^[0-9a-f]{64}$/.test(String(modelPackAttestationKey || ''))) {
-    throw new TypeError('Desktop Model Pack attestation key is invalid');
-  }
-  env[modelPackAttestationEnv] = modelPackAttestationKey;
-
-  if (Number.isInteger(selectedPort) && selectedPort >= 1 && selectedPort <= 65535) {
-    env.WEBUI_PORT = String(selectedPort);
-  }
-
-  if (platform === 'darwin') {
-    env.PATH = extendMacDesktopBackendPath(sourceEnv.PATH, platform);
-  }
-
-  return env;
-}
-
-function decodeBackendOutput(data, decoder, platform = process.platform) {
-  if (typeof data === 'string') {
-    return data.trim();
-  }
-  if (!Buffer.isBuffer(data)) {
-    return String(data).trim();
-  }
-
-  let decoded = decoder.decode(data, { stream: true });
-
-  // Windows subprocesses may emit local-code-page bytes; use GBK when UTF-8 replacement characters appear.
-  if (platform === 'win32' && decoded.includes('\uFFFD')) {
-    try {
-      decoded = new TextDecoder('gbk', { fatal: false }).decode(data, { stream: true });
-    } catch (_error) {
-    }
-  }
-
-  return decoded.trim();
-}
-
-function formatCommand(command, args = []) {
-  return [command, ...args]
-    .map((part) => {
-      const value = String(part);
-      return value.includes(' ') ? `"${value}"` : value;
-    })
-    .join(' ');
-}
-
-function findAvailablePort(
-  startPort = 8000,
-  endPort = 8100,
-  host = DESKTOP_BACKEND_DEFAULT_HOST,
-  {
-    netImpl = net,
-  } = {}
-) {
-  const bindHost = normalizeBackendBindHost(host, DESKTOP_BACKEND_DEFAULT_HOST);
-  return new Promise((resolve, reject) => {
-    const tryPort = (port) => {
-      if (port > endPort) {
-        reject(new Error('No available port'));
-        return;
-      }
-
-      const server = netImpl.createServer();
-      server.once('error', () => {
-        tryPort(port + 1);
-      });
-      server.once('listening', () => {
-        server.close(() => resolve(port));
-      });
-      server.listen(port, bindHost);
-    };
-
-    tryPort(startPort);
-  });
-}
-
-function waitForHealth(
-  url,
-  timeoutMs = 60000,
-  intervalMs = 250,
-  requestTimeoutMs = 1500,
-  shouldAbort = null,
-  onProgress = null,
-  {
-    httpImpl = http,
-  } = {}
-) {
-  const start = Date.now();
-  let attempts = 0;
-
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    let retryTimer = null;
-    let activeRequest = null;
-
-    const emitProgress = (payload) => {
-      if (typeof onProgress !== 'function') {
-        return;
-      }
-      try {
-        onProgress(payload);
-      } catch (_error) {
-      }
-    };
-
-    const finish = (error, result) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-
-      if (retryTimer) {
-        clearTimeout(retryTimer);
-        retryTimer = null;
-      }
-
-      if (activeRequest && !activeRequest.destroyed) {
-        activeRequest.destroy();
-      }
-
-      if (error) {
-        emitProgress({
-          type: 'final_error',
-          elapsedMs: Date.now() - start,
-          attempts,
-          message: error.message,
-        });
-      }
-
-      if (error) {
-        reject(error);
-      } else {
-        resolve(result);
-      }
-    };
-
-    const scheduleNext = () => {
-      if (settled) {
-        return;
-      }
-      retryTimer = setTimeout(attempt, intervalMs);
-    };
-
-    const attempt = () => {
-      if (settled) {
-        return;
-      }
-
-      if (typeof shouldAbort === 'function') {
-        const abortReason = shouldAbort();
-        if (abortReason) {
-          emitProgress({
-            type: 'aborted',
-            elapsedMs: Date.now() - start,
-            attempts,
-            reason: abortReason,
-          });
-          finish(new Error(`Health check aborted: ${abortReason}`));
-          return;
-        }
-      }
-
-      const elapsedMs = Date.now() - start;
-      if (elapsedMs > timeoutMs) {
-        emitProgress({
-          type: 'total_timeout',
-          elapsedMs,
-          attempts,
-          timeoutMs,
-        });
-        finish(new Error(`Health check timeout after ${elapsedMs}ms`));
-        return;
-      }
-
-      attempts += 1;
-      emitProgress({
-        type: 'probe_start',
-        elapsedMs,
-        attempts,
-      });
-
-      activeRequest = httpImpl.get(url, (res) => {
-        if (settled) {
-          return;
-        }
-
-        res.resume();
-        if (res.statusCode === 200) {
-          const readyElapsedMs = Date.now() - start;
-          emitProgress({
-            type: 'ready',
-            elapsedMs: readyElapsedMs,
-            attempts,
-          });
-          finish(null, { elapsedMs: readyElapsedMs, attempts });
-          return;
-        }
-
-        emitProgress({
-          type: 'probe_status',
-          elapsedMs: Date.now() - start,
-          attempts,
-          statusCode: res.statusCode,
-        });
-        scheduleNext();
-      });
-
-      activeRequest.setTimeout(requestTimeoutMs, () => {
-        emitProgress({
-          type: 'probe_timeout',
-          elapsedMs: Date.now() - start,
-          attempts,
-          requestTimeoutMs,
-        });
-        activeRequest.destroy(new Error(`Health probe request timeout after ${requestTimeoutMs}ms`));
-      });
-
-      activeRequest.on('error', (error) => {
-        if (settled) {
-          return;
-        }
-
-        emitProgress({
-          type: 'probe_error',
-          elapsedMs: Date.now() - start,
-          attempts,
-          errorCode: error.code || 'unknown',
-          errorMessage: error.message,
-        });
-        scheduleNext();
-      });
-    };
-
-    attempt();
-  });
-}
-
-function waitForBackendExit(processRef, timeoutMs = 5000) {
-  if (!processRef || processRef.exitCode !== null || processRef.signalCode) {
-    return Promise.resolve(true);
-  }
-
-  return new Promise((resolve) => {
-    let settled = false;
-    let timer = null;
-    let onExit = null;
-
-    const done = (exited) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      clearTimeout(timer);
-      if (onExit) {
-        processRef.removeListener('exit', onExit);
-      }
-      resolve(exited || processRef.exitCode !== null || Boolean(processRef.signalCode));
-    };
-
-    onExit = () => done(true);
-
-    timer = setTimeout(() => {
-      done(false);
-    }, timeoutMs);
-
-    processRef.once('exit', onExit);
-  });
-}
-
 function createBackendRuntime({
-  app,
   appRootDev,
-  fsImpl = fs,
-  httpImpl = http,
-  isQuitting = () => false,
-  log = () => undefined,
-  markUnavailable = () => undefined,
+  isWindows,
+  isMac,
+  spawnImpl,
+  netImpl,
+  httpImpl,
+  TextDecoderImpl,
   modelPackAttestationEnv,
   modelPackAttestationKey,
-  netImpl = net,
+  getIsPackaged,
+  getResourcesPath,
+  getSourceEnv = () => process.env,
+  getIsQuitting = () => false,
+  resolveEnvExamplePath,
+  logLine = () => undefined,
   onUnavailable = () => undefined,
-  platform = process.platform,
-  processRef = process,
-  spawnImpl = spawn,
 } = {}) {
-  if (!app || !appRootDev || !modelPackAttestationEnv) {
-    throw new TypeError(
-      'Backend runtime requires Electron app, development root, and attestation environment key'
-    );
+  if (typeof spawnImpl !== 'function') {
+    throw new TypeError('Backend runtime requires a spawn implementation');
+  }
+  if (!netImpl || typeof netImpl.createServer !== 'function') {
+    throw new TypeError('Backend runtime requires a net implementation');
+  }
+  if (!httpImpl || typeof httpImpl.get !== 'function') {
+    throw new TypeError('Backend runtime requires an HTTP implementation');
+  }
+  if (typeof TextDecoderImpl !== 'function') {
+    throw new TypeError('Backend runtime requires a TextDecoder implementation');
   }
 
   let backendProcess = null;
   let backendStartError = null;
 
-  const resolveBackendPath = () => {
-    if (processRef.env.DSA_BACKEND_PATH) {
-      return processRef.env.DSA_BACKEND_PATH;
+  function normalizeBackendBindHost(value, fallback = DESKTOP_BACKEND_DEFAULT_HOST) {
+    const host = normalizeBackendHost(value, fallback);
+    const lowerHost = host.toLowerCase();
+    if (lowerHost === '*') {
+      return '0.0.0.0';
+    }
+    if (lowerHost === '[::]') {
+      return '::';
+    }
+    return host;
+  }
+
+  function resolveDesktopProviderDailyCacheDir({
+    envFile,
+    dbPath,
+    sourceEnv = getSourceEnv(),
+  } = {}) {
+    const sourceValue = hasOwnValue(sourceEnv, PROVIDER_DAILY_CACHE_DIR_ENV_KEY)
+      ? String(sourceEnv[PROVIDER_DAILY_CACHE_DIR_ENV_KEY] || '').trim()
+      : '';
+    if (sourceValue) {
+      return sourceValue;
     }
 
-    if (app.isPackaged) {
-      const backendDir = path.join(processRef.resourcesPath, 'backend');
-      const exeName = platform === 'win32' ? 'stock_analysis.exe' : 'stock_analysis';
+    const envFileValue = String(
+      readEnvFileValue(envFile, PROVIDER_DAILY_CACHE_DIR_ENV_KEY, sourceEnv) || ''
+    ).trim();
+    if (envFileValue) {
+      return envFileValue;
+    }
+
+    return path.join(path.dirname(dbPath), 'provider_cache', 'daily');
+  }
+
+  function resolveBackendBindHost({
+    envFile,
+    sourceEnv = getSourceEnv(),
+    fallback = DESKTOP_BACKEND_DEFAULT_HOST,
+  } = {}) {
+    const sourceHost = normalizeBackendHost(sourceEnv.WEBUI_HOST);
+    if (sourceHost) {
+      return normalizeBackendBindHost(sourceHost, fallback);
+    }
+
+    const envFileHost = normalizeBackendHost(readEnvFileValue(envFile, 'WEBUI_HOST', sourceEnv));
+    return normalizeBackendBindHost(envFileHost || fallback, fallback);
+  }
+
+  function resolveDesktopConnectHost(bindHost) {
+    const host = normalizeBackendBindHost(bindHost, DESKTOP_BACKEND_DEFAULT_HOST);
+    if (PUBLIC_BIND_HOSTS.has(host.toLowerCase())) {
+      return DESKTOP_BACKEND_DEFAULT_HOST;
+    }
+    return host;
+  }
+
+  function formatUrlHost(host) {
+    const normalized = normalizeBackendHost(host, DESKTOP_BACKEND_DEFAULT_HOST);
+    if (normalized.startsWith('[') && normalized.endsWith(']')) {
+      return normalized;
+    }
+    return normalized.includes(':') ? `[${normalized}]` : normalized;
+  }
+
+  function buildBackendUrl(host, port, pathname = '/') {
+    const url = new URL(`http://${formatUrlHost(host)}:${port}/`);
+    url.pathname = pathname;
+    return url.toString();
+  }
+
+  function buildBackendArgs({ host, port }) {
+    return [
+      '--serve-only',
+      '--host',
+      normalizeBackendBindHost(host, DESKTOP_BACKEND_DEFAULT_HOST),
+      '--port',
+      String(port),
+    ];
+  }
+
+  function buildBackendEnvironment({
+    envFile,
+    dbPath,
+    logDir,
+    port = null,
+    host = null,
+    sourceEnv = getSourceEnv(),
+    modelPackAttestationKey: attestationKey = modelPackAttestationKey,
+  }) {
+    const selectedPort = Number(port);
+    const selectedHost = normalizeBackendBindHost(
+      normalizeBackendHost(host) || resolveBackendBindHost({ envFile, sourceEnv }),
+      DESKTOP_BACKEND_DEFAULT_HOST
+    );
+    const env = {
+      ...sourceEnv,
+      DSA_DESKTOP_MODE: 'true',
+      ENV_FILE: envFile,
+      DATABASE_PATH: dbPath,
+      LOG_DIR: logDir,
+      PROVIDER_DAILY_CACHE_DIR: resolveDesktopProviderDailyCacheDir({
+        envFile,
+        dbPath,
+        sourceEnv,
+      }),
+      PYTHONUTF8: '1',
+      PYTHONIOENCODING: 'utf-8',
+      WEBUI_HOST: selectedHost,
+      WEBUI_ENABLED: 'false',
+      BOT_ENABLED: 'false',
+      DINGTALK_STREAM_ENABLED: 'false',
+      FEISHU_STREAM_ENABLED: 'false',
+    };
+    if (!/^[0-9a-f]{64}$/.test(String(attestationKey || ''))) {
+      throw new TypeError('Desktop Model Pack attestation key is invalid');
+    }
+    env[modelPackAttestationEnv] = attestationKey;
+
+    if (Number.isInteger(selectedPort) && selectedPort >= 1 && selectedPort <= 65535) {
+      env.WEBUI_PORT = String(selectedPort);
+    }
+
+    if (isMac) {
+      env.PATH = extendMacDesktopBackendPath(sourceEnv.PATH, 'darwin');
+    }
+
+    return env;
+  }
+
+  function resolveBackendPath(sourceEnv = getSourceEnv()) {
+    if (sourceEnv.DSA_BACKEND_PATH) {
+      return sourceEnv.DSA_BACKEND_PATH;
+    }
+
+    if (getIsPackaged()) {
+      const backendDir = path.join(getResourcesPath(), 'backend');
+      const exeName = isWindows ? 'stock_analysis.exe' : 'stock_analysis';
       const oneDirPath = path.join(backendDir, 'stock_analysis', exeName);
-      if (fsImpl.existsSync(oneDirPath)) {
+      if (fs.existsSync(oneDirPath)) {
         return oneDirPath;
       }
       return path.join(backendDir, exeName);
     }
 
     return null;
-  };
+  }
 
-  const resolveBindHost = ({
-    envFile,
-    sourceEnv = processRef.env,
-    fallback = DESKTOP_BACKEND_DEFAULT_HOST,
-  } = {}) => resolveBackendBindHost(
-    { envFile, sourceEnv, fallback },
-    { fsImpl }
-  );
+  function resolvePythonPath(sourceEnv = getSourceEnv()) {
+    return sourceEnv.DSA_PYTHON || 'python';
+  }
 
-  const buildEnvironment = (options = {}) => buildBackendEnvironment(
-    {
-      ...options,
-      sourceEnv: options.sourceEnv === undefined ? processRef.env : options.sourceEnv,
-      modelPackAttestationEnv,
-      modelPackAttestationKey: options.modelPackAttestationKey === undefined
-        ? modelPackAttestationKey
-        : options.modelPackAttestationKey,
-    },
-    { fsImpl, platform }
-  );
+  function formatCommand(command, args = []) {
+    return [command, ...args]
+      .map((part) => {
+        const value = String(part);
+        return value.includes(' ') ? `"${value}"` : value;
+      })
+      .join(' ');
+  }
 
-  const clearStartError = () => {
-    backendStartError = null;
-  };
+  function ensureEnvFile(envPath) {
+    if (fs.existsSync(envPath)) {
+      return;
+    }
 
-  const setStartError = (error = null) => {
-    backendStartError = error;
-  };
+    const envExample = resolveEnvExamplePath();
+    if (fs.existsSync(envExample)) {
+      fs.copyFileSync(envExample, envPath);
+      return;
+    }
 
-  const isUnavailable = () => Boolean(
-    backendStartError
-    || (backendProcess && (backendProcess.exitCode !== null || backendProcess.signalCode))
-  );
+    fs.writeFileSync(envPath, '# Configure your API keys and stock list here.\n', 'utf-8');
+  }
 
-  const start = ({ port, envFile, dbPath, logDir, host = null }) => {
-    const backendPath = resolveBackendPath();
-    clearStartError();
-    const launchStartedAt = Date.now();
-    const bindHost = normalizeBackendBindHost(
-      normalizeBackendHost(host) || resolveBindHost({ envFile }),
-      DESKTOP_BACKEND_DEFAULT_HOST
-    );
+  function decodeBackendOutput(data, decoder) {
+    if (typeof data === 'string') {
+      return data.trim();
+    }
+    if (!Buffer.isBuffer(data)) {
+      return String(data).trim();
+    }
 
-    const env = buildEnvironment({ envFile, dbPath, logDir, port, host: bindHost });
-    const args = buildBackendArgs({ host: bindHost, port });
-    let launchMode = '';
-    let launchCommand = '';
-    let launchCwd = '';
-
-    if (backendPath) {
-      if (!fsImpl.existsSync(backendPath)) {
-        throw new Error(`Backend executable not found: ${backendPath}`);
+    let decoded = decoder.decode(data, { stream: true });
+    if (isWindows && decoded.includes('\uFFFD')) {
+      try {
+        decoded = new TextDecoderImpl('gbk', { fatal: false }).decode(data, { stream: true });
+      } catch (_error) {
       }
-      launchMode = 'packaged';
-      launchCommand = formatCommand(backendPath, args);
-      launchCwd = path.dirname(backendPath);
-      backendProcess = spawnImpl(backendPath, args, {
-        env,
-        cwd: launchCwd,
-        stdio: 'pipe',
-        windowsHide: true,
-      });
-    } else {
-      const pythonPath = processRef.env.DSA_PYTHON || 'python';
-      const scriptPath = path.join(appRootDev, 'main.py');
-      const pythonArgs = ['-X', 'utf8', scriptPath, ...args];
-      launchMode = 'development';
-      launchCommand = formatCommand(pythonPath, pythonArgs);
-      launchCwd = appRootDev;
-      backendProcess = spawnImpl(pythonPath, pythonArgs, {
-        env,
-        cwd: launchCwd,
-        stdio: 'pipe',
-        windowsHide: true,
-      });
     }
 
-    if (backendProcess) {
-      const launchedProcess = backendProcess;
-      let firstStdoutLogged = false;
-      let firstStderrLogged = false;
-      const stdoutDecoder = new TextDecoder('utf-8', { fatal: false });
-      const stderrDecoder = new TextDecoder('utf-8', { fatal: false });
+    return decoded.trim();
+  }
 
-      launchedProcess.once('spawn', () => {
-        if (backendProcess !== launchedProcess) {
+  function findAvailablePort(
+    startPort = 8000,
+    endPort = 8100,
+    host = DESKTOP_BACKEND_DEFAULT_HOST
+  ) {
+    const bindHost = normalizeBackendBindHost(host, DESKTOP_BACKEND_DEFAULT_HOST);
+    return new Promise((resolve, reject) => {
+      const tryPort = (port) => {
+        if (port > endPort) {
+          reject(new Error('No available port'));
           return;
         }
-        log(`[backend] spawned pid=${launchedProcess.pid} in ${Date.now() - launchStartedAt}ms`);
-      });
-      launchedProcess.on('error', (error) => {
-        if (backendProcess !== launchedProcess) {
-          return;
-        }
-        setStartError(error);
-        markUnavailable();
-        log(`[backend] failed to start: ${error.message}`);
-        onUnavailable();
-      });
-      launchedProcess.stdout.on('data', (data) => {
-        if (backendProcess !== launchedProcess) {
-          return;
-        }
-        if (!firstStdoutLogged) {
-          firstStdoutLogged = true;
-          log(`[backend] first stdout after ${Date.now() - launchStartedAt}ms`);
-        }
-        log(`[backend] ${decodeBackendOutput(data, stdoutDecoder, platform)}`);
-      });
-      launchedProcess.stderr.on('data', (data) => {
-        if (backendProcess !== launchedProcess) {
-          return;
-        }
-        if (!firstStderrLogged) {
-          firstStderrLogged = true;
-          log(`[backend] first stderr after ${Date.now() - launchStartedAt}ms`);
-        }
-        log(`[backend] ${decodeBackendOutput(data, stderrDecoder, platform)}`);
-      });
-      launchedProcess.on('exit', (code, signal) => {
-        if (backendProcess !== launchedProcess) {
-          return;
-        }
-        markUnavailable();
-        if (!isQuitting() && !backendStartError) {
-          setStartError(new Error('Backend process exited'));
-        }
-        log(`[backend] exited with code ${code}, signal ${signal || 'none'}`);
-        onUnavailable();
-      });
-    }
 
-    return {
-      mode: launchMode,
-      command: launchCommand,
-      cwd: launchCwd,
-    };
-  };
+        const server = netImpl.createServer();
+        server.once('error', () => {
+          tryPort(port + 1);
+        });
+        server.once('listening', () => {
+          server.close(() => resolve(port));
+        });
+        server.listen(port, bindHost);
+      };
 
-  const getHealthAbortReason = () => {
+      tryPort(startPort);
+    });
+  }
+
+  function waitForHealth(
+    url,
+    timeoutMs = 60000,
+    intervalMs = 250,
+    requestTimeoutMs = 1500,
+    shouldAbort = null,
+    onProgress = null
+  ) {
+    const start = Date.now();
+    let attempts = 0;
+
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      let retryTimer = null;
+      let activeRequest = null;
+
+      const emitProgress = (payload) => {
+        if (typeof onProgress !== 'function') {
+          return;
+        }
+        try {
+          onProgress(payload);
+        } catch (_error) {
+        }
+      };
+
+      const finish = (error, result) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+
+        if (retryTimer) {
+          clearTimeout(retryTimer);
+          retryTimer = null;
+        }
+
+        if (activeRequest && !activeRequest.destroyed) {
+          activeRequest.destroy();
+        }
+
+        if (error) {
+          emitProgress({
+            type: 'final_error',
+            elapsedMs: Date.now() - start,
+            attempts,
+            message: error.message,
+          });
+          reject(error);
+        } else {
+          resolve(result);
+        }
+      };
+
+      const scheduleNext = () => {
+        if (settled) {
+          return;
+        }
+        retryTimer = setTimeout(attempt, intervalMs);
+      };
+
+      const attempt = () => {
+        if (settled) {
+          return;
+        }
+
+        if (typeof shouldAbort === 'function') {
+          const abortReason = shouldAbort();
+          if (abortReason) {
+            emitProgress({
+              type: 'aborted',
+              elapsedMs: Date.now() - start,
+              attempts,
+              reason: abortReason,
+            });
+            finish(new Error(`Health check aborted: ${abortReason}`));
+            return;
+          }
+        }
+
+        const elapsedMs = Date.now() - start;
+        if (elapsedMs > timeoutMs) {
+          emitProgress({
+            type: 'total_timeout',
+            elapsedMs,
+            attempts,
+            timeoutMs,
+          });
+          finish(new Error(`Health check timeout after ${elapsedMs}ms`));
+          return;
+        }
+
+        attempts += 1;
+        emitProgress({
+          type: 'probe_start',
+          elapsedMs,
+          attempts,
+        });
+
+        activeRequest = httpImpl.get(url, (res) => {
+          if (settled) {
+            return;
+          }
+
+          res.resume();
+          if (res.statusCode === 200) {
+            const readyElapsedMs = Date.now() - start;
+            emitProgress({
+              type: 'ready',
+              elapsedMs: readyElapsedMs,
+              attempts,
+            });
+            finish(null, { elapsedMs: readyElapsedMs, attempts });
+            return;
+          }
+
+          emitProgress({
+            type: 'probe_status',
+            elapsedMs: Date.now() - start,
+            attempts,
+            statusCode: res.statusCode,
+          });
+          scheduleNext();
+        });
+
+        activeRequest.setTimeout(requestTimeoutMs, () => {
+          emitProgress({
+            type: 'probe_timeout',
+            elapsedMs: Date.now() - start,
+            attempts,
+            requestTimeoutMs,
+          });
+          activeRequest.destroy(new Error(`Health probe request timeout after ${requestTimeoutMs}ms`));
+        });
+
+        activeRequest.on('error', (error) => {
+          if (settled) {
+            return;
+          }
+
+          emitProgress({
+            type: 'probe_error',
+            elapsedMs: Date.now() - start,
+            attempts,
+            errorCode: error.code || 'unknown',
+            errorMessage: error.message,
+          });
+          scheduleNext();
+        });
+      };
+
+      attempt();
+    });
+  }
+
+  function getAbortReason() {
     if (backendStartError) {
       return `backend start error: ${backendStartError.message}`;
     }
@@ -606,39 +439,200 @@ function createBackendRuntime({
       return `backend exited by signal ${backendProcess.signalCode}`;
     }
     return null;
-  };
+  }
 
-  const waitUntilHealthy = (
-    url,
-    {
-      timeoutMs = 60000,
-      intervalMs = 250,
-      requestTimeoutMs = 1500,
-      onProgress = null,
-    } = {}
-  ) => waitForHealth(
-    url,
-    timeoutMs,
-    intervalMs,
-    requestTimeoutMs,
-    getHealthAbortReason,
-    onProgress,
-    { httpImpl }
-  );
+  function notifyUnavailable() {
+    onUnavailable(getSnapshot());
+  }
 
-  const clearProcessIfCurrent = (processRefToClear) => {
-    if (backendProcess === processRefToClear) {
+  function resetStartError() {
+    backendStartError = null;
+  }
+
+  function recordStartError(error) {
+    backendStartError = error instanceof Error ? error : new Error(String(error));
+    notifyUnavailable();
+    return backendStartError;
+  }
+
+  async function waitUntilHealthy({
+    url,
+    timeoutMs = 60000,
+    intervalMs = 250,
+    requestTimeoutMs = 1500,
+    onProgress = null,
+  }) {
+    try {
+      const result = await waitForHealth(
+        url,
+        timeoutMs,
+        intervalMs,
+        requestTimeoutMs,
+        getAbortReason,
+        onProgress
+      );
+      resetStartError();
+      return result;
+    } catch (error) {
+      recordStartError(error);
+      throw error;
+    }
+  }
+
+  function startBackend({ port, envFile, dbPath, logDir, host = null }) {
+    resetStartError();
+    const launchStartedAt = Date.now();
+    const sourceEnv = getSourceEnv();
+    const bindHost = normalizeBackendBindHost(
+      normalizeBackendHost(host) || resolveBackendBindHost({ envFile, sourceEnv }),
+      DESKTOP_BACKEND_DEFAULT_HOST
+    );
+    const env = buildBackendEnvironment({
+      envFile,
+      dbPath,
+      logDir,
+      port,
+      host: bindHost,
+      sourceEnv,
+    });
+    const args = buildBackendArgs({ host: bindHost, port });
+    const backendPath = resolveBackendPath(sourceEnv);
+    let launchMode = '';
+    let launchCommand = '';
+    let launchCwd = '';
+    let launchedProcess = null;
+
+    if (backendPath) {
+      if (!fs.existsSync(backendPath)) {
+        throw new Error(`Backend executable not found: ${backendPath}`);
+      }
+      launchMode = 'packaged';
+      launchCommand = formatCommand(backendPath, args);
+      launchCwd = path.dirname(backendPath);
+      launchedProcess = spawnImpl(backendPath, args, {
+        env,
+        cwd: launchCwd,
+        stdio: 'pipe',
+        windowsHide: true,
+      });
+    } else {
+      const pythonPath = resolvePythonPath(sourceEnv);
+      const scriptPath = path.join(appRootDev, 'main.py');
+      const pythonArgs = ['-X', 'utf8', scriptPath, ...args];
+      launchMode = 'development';
+      launchCommand = formatCommand(pythonPath, pythonArgs);
+      launchCwd = appRootDev;
+      launchedProcess = spawnImpl(pythonPath, pythonArgs, {
+        env,
+        cwd: launchCwd,
+        stdio: 'pipe',
+        windowsHide: true,
+      });
+    }
+
+    backendProcess = launchedProcess;
+    if (launchedProcess) {
+      let firstStdoutLogged = false;
+      let firstStderrLogged = false;
+      const stdoutDecoder = new TextDecoderImpl('utf-8', { fatal: false });
+      const stderrDecoder = new TextDecoderImpl('utf-8', { fatal: false });
+
+      launchedProcess.once('spawn', () => {
+        if (backendProcess !== launchedProcess) {
+          return;
+        }
+        logLine(`[backend] spawned pid=${launchedProcess.pid} in ${Date.now() - launchStartedAt}ms`);
+      });
+      launchedProcess.on('error', (error) => {
+        if (backendProcess !== launchedProcess) {
+          return;
+        }
+        backendStartError = error;
+        logLine(`[backend] failed to start: ${error.message}`);
+        notifyUnavailable();
+      });
+      launchedProcess.stdout.on('data', (data) => {
+        if (backendProcess !== launchedProcess) {
+          return;
+        }
+        if (!firstStdoutLogged) {
+          firstStdoutLogged = true;
+          logLine(`[backend] first stdout after ${Date.now() - launchStartedAt}ms`);
+        }
+        logLine(`[backend] ${decodeBackendOutput(data, stdoutDecoder)}`);
+      });
+      launchedProcess.stderr.on('data', (data) => {
+        if (backendProcess !== launchedProcess) {
+          return;
+        }
+        if (!firstStderrLogged) {
+          firstStderrLogged = true;
+          logLine(`[backend] first stderr after ${Date.now() - launchStartedAt}ms`);
+        }
+        logLine(`[backend] ${decodeBackendOutput(data, stderrDecoder)}`);
+      });
+      launchedProcess.on('exit', (code, signal) => {
+        if (backendProcess !== launchedProcess) {
+          return;
+        }
+        if (!getIsQuitting() && !backendStartError) {
+          backendStartError = new Error('Backend process exited');
+        }
+        logLine(`[backend] exited with code ${code}, signal ${signal || 'none'}`);
+        notifyUnavailable();
+      });
+    }
+
+    return {
+      mode: launchMode,
+      command: launchCommand,
+      cwd: launchCwd,
+    };
+  }
+
+  function waitForBackendExit(processRef, timeoutMs = 5000) {
+    if (!processRef || processRef.exitCode !== null || processRef.signalCode) {
+      return Promise.resolve(true);
+    }
+
+    return new Promise((resolve) => {
+      let settled = false;
+      let timer = null;
+      let onExit = null;
+
+      const done = (exited) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timer);
+        if (onExit) {
+          processRef.removeListener('exit', onExit);
+        }
+        resolve(exited || processRef.exitCode !== null || Boolean(processRef.signalCode));
+      };
+
+      onExit = () => done(true);
+      timer = setTimeout(() => {
+        done(false);
+      }, timeoutMs);
+      processRef.once('exit', onExit);
+    });
+  }
+
+  function clearBackendProcessIfCurrent(processRef) {
+    if (backendProcess === processRef) {
       backendProcess = null;
     }
-  };
+  }
 
-  const stop = () => {
+  function stopBackend() {
     if (!backendProcess) {
       return Promise.resolve();
     }
     const processToStop = backendProcess;
     if (processToStop.exitCode !== null || processToStop.signalCode) {
-      clearProcessIfCurrent(processToStop);
+      clearBackendProcessIfCurrent(processToStop);
       return Promise.resolve();
     }
 
@@ -647,10 +641,10 @@ function createBackendRuntime({
         if (!exited) {
           return;
         }
-        clearProcessIfCurrent(processToStop);
+        clearBackendProcessIfCurrent(processToStop);
       });
 
-    if (platform === 'win32') {
+    if (isWindows) {
       spawnImpl(
         'taskkill',
         ['/PID', String(processToStop.pid), '/T', '/F'],
@@ -664,8 +658,8 @@ function createBackendRuntime({
       processToStop.kill('SIGTERM');
     }
     setTimeout(() => {
-      if (processToStop.killed
-        || processToStop.exitCode !== null
+      // `killed` only records that a signal was sent; exit state confirms termination.
+      if (processToStop.exitCode !== null
         || processToStop.signalCode) {
         return;
       }
@@ -676,36 +670,47 @@ function createBackendRuntime({
     }, 3000);
 
     return waitAndClear();
-  };
+  }
 
-  return {
-    buildEnvironment,
-    clearStartError,
-    findAvailablePort: (startPort, endPort, host) => findAvailablePort(
-      startPort,
-      endPort,
-      host,
-      { netImpl }
-    ),
-    isUnavailable,
-    setStartError,
-    start,
-    stop,
+  function getSnapshot() {
+    return Object.freeze({
+      process: backendProcess,
+      startError: backendStartError,
+    });
+  }
+
+  function setProcessForTest(processRef = null) {
+    backendProcess = processRef;
+  }
+
+  function setStartErrorForTest(error = null) {
+    backendStartError = error;
+  }
+
+  return Object.freeze({
+    buildBackendArgs,
+    buildBackendEnvironment,
+    buildBackendUrl,
+    decodeBackendOutput,
+    ensureEnvFile,
+    findAvailablePort,
+    getSnapshot,
+    recordStartError,
+    resetStartError,
+    resolveBackendBindHost,
+    resolveDesktopConnectHost,
+    resolveDesktopProviderDailyCacheDir,
+    setProcessForTest,
+    setStartErrorForTest,
+    startBackend,
+    stopBackend,
+    waitForBackendExit,
+    waitForHealth,
     waitUntilHealthy,
-    __getProcessForTest: () => backendProcess,
-    __setProcessForTest: (processRefForTest = null) => {
-      backendProcess = processRefForTest;
-    },
-  };
+  });
 }
 
 module.exports = {
   DESKTOP_BACKEND_DEFAULT_HOST,
-  buildBackendArgs,
-  buildBackendUrl,
   createBackendRuntime,
-  resolveBackendBindHost,
-  resolveDesktopConnectHost,
-  resolveDesktopProviderDailyCacheDir,
-  waitForBackendExit,
 };

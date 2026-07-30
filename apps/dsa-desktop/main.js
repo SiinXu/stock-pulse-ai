@@ -20,22 +20,17 @@ const {
   readEnvFileValue,
   readEnvFileValues,
 } = require('./desktop-env');
-const {
-  DESKTOP_BACKEND_DEFAULT_HOST,
-  buildBackendArgs,
-  buildBackendUrl,
-  createBackendRuntime,
-  resolveBackendBindHost,
-  resolveDesktopConnectHost,
-  resolveDesktopProviderDailyCacheDir,
-  waitForBackendExit,
-} = require('./backend-runtime');
 const { loadDesktopLocalModelPresets } = require('./local-model-catalog');
 const { ModelPackError, importModelPack } = require('./model-pack');
+const {
+  DESKTOP_BACKEND_DEFAULT_HOST,
+  createBackendRuntime,
+} = require('./backend-runtime');
 const { spawn } = require('child_process');
 const net = require('net');
 const http = require('http');
 const https = require('https');
+const { TextDecoder } = require('util');
 
 let mainWindow = null;
 let assistantWindow = null;
@@ -168,25 +163,6 @@ const DESKTOP_LOCAL_MODEL_STATE_EVENT = 'desktop-local-model:state';
 const DESKTOP_MODEL_PACK_ATTESTATION_ENV = 'STOCKPULSE_DESKTOP_MODEL_PACK_ATTESTATION_KEY';
 const DESKTOP_MODEL_PACK_ATTESTATION_TTL_MS = 5 * 60 * 1000;
 const desktopModelPackAttestationKey = crypto.randomBytes(32).toString('hex');
-// The runtime owns the backend child lifecycle; this file remains the Electron composition root.
-const backendRuntime = createBackendRuntime({
-  app,
-  appRootDev,
-  fsImpl: fs,
-  httpImpl: http,
-  isQuitting: () => desktopIsQuitting,
-  log: logLine,
-  markUnavailable: () => {
-    desktopWebReady = false;
-  },
-  modelPackAttestationEnv: DESKTOP_MODEL_PACK_ATTESTATION_ENV,
-  modelPackAttestationKey: desktopModelPackAttestationKey,
-  netImpl: net,
-  onUnavailable: notifyDesktopAssistantState,
-  platform: process.platform,
-  processRef: process,
-  spawnImpl: spawn,
-});
 const DESKTOP_UPDATE_RUNTIME_RELATIVE_FILES = Object.freeze([
   '.env',
   path.join('data', 'stock_analysis.db'),
@@ -228,6 +204,27 @@ const UPDATE_STATUS = Object.freeze({
 const UPDATE_MODE = Object.freeze({
   AUTO: 'auto',
   MANUAL: 'manual',
+});
+
+const backendRuntime = createBackendRuntime({
+  appRootDev,
+  isWindows,
+  isMac,
+  spawnImpl: spawn,
+  netImpl: net,
+  httpImpl: http,
+  TextDecoderImpl: TextDecoder,
+  modelPackAttestationEnv: DESKTOP_MODEL_PACK_ATTESTATION_ENV,
+  modelPackAttestationKey: desktopModelPackAttestationKey,
+  getIsPackaged: () => app.isPackaged,
+  getResourcesPath: () => process.resourcesPath,
+  getIsQuitting: () => desktopIsQuitting,
+  resolveEnvExamplePath,
+  logLine,
+  onUnavailable: () => {
+    desktopWebReady = false;
+    notifyDesktopAssistantState();
+  },
 });
 
 function isAllowedDesktopDeepLinkPath(pathname) {
@@ -361,8 +358,11 @@ function isDesktopWindowVisible(windowRef) {
 }
 
 function buildDesktopAssistantState() {
+  const backendSnapshot = backendRuntime.getSnapshot();
   let serviceStatus = 'starting';
-  if (backendRuntime.isUnavailable()) {
+  if (backendSnapshot.startError
+    || (backendSnapshot.process
+      && (backendSnapshot.process.exitCode !== null || backendSnapshot.process.signalCode))) {
     serviceStatus = 'unavailable';
   } else if (desktopWebReady) {
     serviceStatus = 'ready';
@@ -1322,6 +1322,20 @@ function migrateMacPackagedRuntimeState() {
   return result;
 }
 
+const {
+  buildBackendArgs,
+  buildBackendEnvironment,
+  buildBackendUrl,
+  ensureEnvFile,
+  findAvailablePort,
+  resolveBackendBindHost,
+  resolveDesktopConnectHost,
+  resolveDesktopProviderDailyCacheDir,
+  startBackend,
+  stopBackend,
+  waitForBackendExit,
+} = backendRuntime;
+
 function sleep(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
@@ -1356,40 +1370,6 @@ function logLine(message) {
     console.error(error);
   }
   console.log(line.trim());
-}
-
-function ensureEnvFile(envPath) {
-  if (fs.existsSync(envPath)) {
-    return;
-  }
-
-  const envExample = resolveEnvExamplePath();
-  if (fs.existsSync(envExample)) {
-    fs.copyFileSync(envExample, envPath);
-    return;
-  }
-
-  fs.writeFileSync(envPath, '# Configure your API keys and stock list here.\n', 'utf-8');
-}
-
-function buildBackendEnvironment(options) {
-  return backendRuntime.buildEnvironment(options);
-}
-
-function findAvailablePort(startPort = 8000, endPort = 8100, host = DESKTOP_BACKEND_DEFAULT_HOST) {
-  return backendRuntime.findAvailablePort(startPort, endPort, host);
-}
-
-function startBackend({ port, envFile, dbPath, logDir, host = null }) {
-  return backendRuntime.start({ port, envFile, dbPath, logDir, host });
-}
-
-function __setBackendProcessForTest(processRef = null) {
-  backendRuntime.__setProcessForTest(processRef);
-}
-
-function stopBackend() {
-  return backendRuntime.stop();
 }
 
 function resolveDesktopVersion() {
@@ -3447,7 +3427,7 @@ async function createWindow(brandMigrationResult) {
   desktopMainPageUrl = '';
   desktopWebReady = false;
   desktopDeepLinkNavigationInFlight = false;
-  backendRuntime.clearStartError();
+  backendRuntime.resetStartError();
   notifyDesktopAssistantState();
   const restoreResult = isWindowsNsisInstalledApp() ? restorePackagedRuntimeStateFromBackup() : null;
   const macMigrationResult = migrateMacPackagedRuntimeState();
@@ -3591,9 +3571,10 @@ async function createWindow(brandMigrationResult) {
     logStartup(`Backend launch cwd=${launchInfo.cwd}`);
     logStartup('Waiting for backend health check');
   } catch (error) {
-    backendRuntime.setStartError(error instanceof Error ? error : new Error(String(error)));
     desktopWebReady = false;
-    notifyDesktopAssistantState();
+    if (!backendRuntime.getSnapshot().startError) {
+      backendRuntime.recordStartError(error);
+    }
     logStartup(`Backend launch failed: ${String(error)}`);
     const errorUrl = `file://${loadingPath}?error=${encodeURIComponent(String(error))}`;
     await mainWindow.loadURL(errorUrl);
@@ -3641,15 +3622,13 @@ async function createWindow(brandMigrationResult) {
   };
 
   try {
-    const healthInfo = await backendRuntime.waitUntilHealthy(
-      healthUrl,
-      {
-        timeoutMs: 60000,
-        intervalMs: 250,
-        requestTimeoutMs: 1500,
-        onProgress: onHealthProgress,
-      },
-    );
+    const healthInfo = await backendRuntime.waitUntilHealthy({
+      url: healthUrl,
+      timeoutMs: 60000,
+      intervalMs: 250,
+      requestTimeoutMs: 1500,
+      onProgress: onHealthProgress,
+    });
     logStartup(`Backend ready in ${healthInfo.elapsedMs}ms (${healthInfo.attempts} probes)`);
     const mainPageStartedAt = Date.now();
     const mainPageUrl = buildMainPageUrl(port, Date.now(), backendConnectHost);
@@ -3676,7 +3655,7 @@ async function createWindow(brandMigrationResult) {
       throw error;
     }
     desktopWebReady = true;
-    backendRuntime.clearStartError();
+    backendRuntime.resetStartError();
     desktopAssistantLastReadyAt = new Date().toISOString();
     notifyDesktopAssistantState();
     await flushPendingDesktopDeepLink();
@@ -3689,8 +3668,9 @@ async function createWindow(brandMigrationResult) {
     }
   } catch (error) {
     desktopWebReady = false;
-    backendRuntime.setStartError(error instanceof Error ? error : new Error(String(error)));
-    notifyDesktopAssistantState();
+    if (!backendRuntime.getSnapshot().startError) {
+      backendRuntime.recordStartError(error);
+    }
     logStartup(`Startup failed while waiting for health: ${String(error)}`);
     const errorUrl = `file://${loadingPath}?error=${encodeURIComponent(String(error))}`;
     await mainWindow.loadURL(errorUrl);
@@ -3891,9 +3871,11 @@ module.exports = {
   startBackend,
   stopBackend,
   __getBackendProcessForTest() {
-    return backendRuntime.__getProcessForTest();
+    return backendRuntime.getSnapshot().process;
   },
-  __setBackendProcessForTest,
+  __setBackendProcessForTest(processRef = null) {
+    backendRuntime.setProcessForTest(processRef);
+  },
   __setMainWindowForTest(mainWindowRef = null) {
     mainWindow = mainWindowRef;
   },
@@ -3913,7 +3895,7 @@ module.exports = {
     lastReadyAt = '',
   } = {}) {
     desktopWebReady = webReady;
-    backendRuntime.setStartError(startError);
+    backendRuntime.setStartErrorForTest(startError);
     desktopAssistantLastReadyAt = lastReadyAt;
   },
   __setDesktopDeepLinkStateForTest({

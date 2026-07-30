@@ -1,3 +1,8 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+
+'use strict';
+
 const fs = require('fs');
 
 const MAC_DESKTOP_CLI_PATH_ENTRIES = Object.freeze([
