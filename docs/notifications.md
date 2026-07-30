@@ -6,7 +6,7 @@
 
 | 渠道 | 类型 | Minimal key | Advanced key | 说明 |
 | --- | --- | --- | --- | --- |
-| 钉钉 Webhook | 静态配置 | `DINGTALK_WEBHOOK_URL` | `DINGTALK_SECRET` | 支持加签安全方式。当前仅限环境变量配置，暂未接入 Web UI 设置页。 |
+| 钉钉 Webhook | 静态配置 | `DINGTALK_WEBHOOK_URL` | `DINGTALK_SECRET` | 支持加签安全方式；Web 设置页可配置并真实测试。签名密钥仅在群机器人启用加签时需要。 |
 | 企业微信 | 静态配置 | `WECHAT_WEBHOOK_URL` | `WECHAT_MSG_TYPE` | 配置后参与批量通知发送 |
 | 飞书 Webhook / App Bot | 静态配置 | `FEISHU_WEBHOOK_URL` 或 `FEISHU_APP_ID` + `FEISHU_APP_SECRET` + `FEISHU_CHAT_ID` | `FEISHU_WEBHOOK_SECRET`, `FEISHU_WEBHOOK_KEYWORD`, `FEISHU_RECEIVE_ID_TYPE`, `FEISHU_DOMAIN` | Webhook URL 优先；未配置 Webhook 时，App Bot 三元组可主动向指定群/用户推送。`FEISHU_STREAM_ENABLED` 仅代表事件订阅 / Stream Bot，不参与主动通知配置完成判断 |
 | Telegram | 静态配置 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | `TELEGRAM_MESSAGE_THREAD_ID` | token 与 chat id 必须同时存在 |
@@ -39,6 +39,12 @@ Discord 长报告发送复用现有分片链路：单条 `content` 运行时不�
 - WebPush、Apprise、更细粒度路由、跨进程降噪和真实每日摘要暂不进入运行时实现；相关配置如未来引入，应先更新本文档、`.env.example`、Web 元数据与回归测试。
 - Bark 保持 custom webhook 基线，不新增 `BARK_*` 一等配置。
 - 飞书 App Bot 发送路径复用 `requirements.txt` 中已有的 `lark-oapi>=1.0.0`，不是新增依赖；标准源码安装、Docker、GitHub Actions daily workflow 和桌面构建链路均通过受 `constraints.txt` 约束的 requirements 输入安装。官方依据：[Feishu message create OpenAPI](https://open.feishu.cn/document/server-docs/im-v1/message/create)、[lark-oapi PyPI](https://pypi.org/project/lark-oapi/)、[SDK repo](https://github.com/larksuite/oapi-sdk-python)。App Bot 文件上传依赖同一 SDK 的 `im.v1.file.create` API，官方文档：[Feishu file create OpenAPI](https://open.feishu.cn/document/server-docs/im-v1/file/create)。
+
+### 钉钉群机器人 Web 配置
+
+设置 → 通知渠道 → 钉钉会把 `DINGTALK_WEBHOOK_URL` / `DINGTALK_SECRET` 的**群机器人 Webhook**与 `DINGTALK_APP_KEY` / `DINGTALK_APP_SECRET` / `DINGTALK_STREAM_ENABLED` 的**应用机器人 / Stream**分区展示；两者不是互相替代的开关。Webhook URL 和签名密钥均按敏感字段遮罩，遮罩值在保存和测试草稿中沿用服务器已保存值，不会写回字面量 `******`。
+
+通知测试的渠道列表包含 `dingtalk`，会把当前未保存草稿交给服务端的隔离配置进行真实发送，不持久化草稿。提供 `DINGTALK_SECRET` 时发送器附加 `timestamp` / `sign`；留空时保留既有的未加签群机器人兼容行为。URL 必须是 `http` / `https` URL；非空签名密钥必须符合 `SEC...` 格式。
 
 ## 报告渲染与分片
 

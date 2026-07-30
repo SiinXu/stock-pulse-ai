@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Added] Completed Settings lifecycle controls with last-good configuration rollback, durable scheduled-run history, structured investment-framework editing and immutable history copy-to-draft, plus masked DingTalk group webhook configuration and testing.
+- [Fixed] Aligned investment-framework history timestamps and latest markers, stable line and node-ID editing, Unicode 15 dimension uniqueness, collection/rule limits, and field-addressable backend validation with the authoritative schema.
 - [Changed] Refined Web Home and Settings with bordered attention panels, compact shared help and local-model icons, and a cleaner embedded Usage header.
 - [Changed] Refined Web Home, Research, Chat, and Settings layouts with modal intelligent import, a dedicated investment-framework tab with an inline editor and in-page history drawer, stock autocomplete in Deep Research, compact retry controls, a navigable Research parent row, right-opening Profile preferences, and adaptive history and scheduler panels.
 - [Added] Added Web decision-memory controls, bounded editable alert cooldown policies, and a global filtered decision-outcome explorer.

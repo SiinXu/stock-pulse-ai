@@ -254,6 +254,16 @@ function responseFor<T>(profile: PlaygroundFixtureProfile, ready: T, empty: T): 
   return [200, profile === 'empty' ? empty : ready];
 }
 
+function parseRequestBody(data: unknown): Record<string, unknown> {
+  if (typeof data === 'string') {
+    return JSON.parse(data) as Record<string, unknown>;
+  }
+  if (data && typeof data === 'object') {
+    return data as Record<string, unknown>;
+  }
+  return {};
+}
+
 function requestPath(config: InternalAxiosRequestConfig): string {
   const raw = config.url || '/api';
   try {
@@ -440,7 +450,7 @@ export function installPlaygroundApiMock(
     configVersion: `fixture-v${state.configVersion}`,
     maskToken: '******',
     items: state.configItems,
-    configuredNotificationChannels: ['email', 'custom'],
+    configuredNotificationChannels: ['email', 'custom', 'dingtalk'],
     updatedAt: FIXTURE_TIMESTAMP,
   }, {
     configVersion: `fixture-v${state.configVersion}`,
@@ -747,20 +757,38 @@ export function installPlaygroundApiMock(
     models: [],
     latencyMs: 38,
   }));
-  mock.onPost('/api/v1/system/config/notification/test-channel').reply(() => responseFor(profile, {
-    success: true,
-    message: 'Fixture notification delivered.',
-    retryable: false,
-    latencyMs: 32,
-    attempts: [{ channel: 'email', success: true, message: 'Delivered', stage: 'dispatch', retryable: false, latencyMs: 32, httpStatus: 200 }],
-  }, {
-    success: false,
-    message: 'No fixture channel configured.',
-    errorCode: 'empty_fixture',
-    stage: 'validation',
-    retryable: false,
-    attempts: [],
-  }));
+  mock.onPost('/api/v1/system/config/notification/test-channel').reply((config) => {
+    if (profile === 'error') {
+      return [503, errorPayload];
+    }
+    if (profile === 'empty') {
+      return [200, {
+        success: false,
+        message: 'No fixture channel configured.',
+        errorCode: 'empty_fixture',
+        stage: 'validation',
+        retryable: false,
+        attempts: [],
+      }];
+    }
+    const body = parseRequestBody(config.data);
+    const channel = typeof body.channel === 'string' ? body.channel : 'unknown';
+    return [200, {
+      success: true,
+      message: `Fixture ${channel} notification delivered.`,
+      retryable: false,
+      latencyMs: 32,
+      attempts: [{
+        channel,
+        success: true,
+        message: 'Delivered',
+        stage: 'dispatch',
+        retryable: false,
+        latencyMs: 32,
+        httpStatus: 200,
+      }],
+    }];
+  });
   mock.onPost('/api/v1/system/config/validate').reply(() => responseFor(profile, { valid: true, issues: [] }, { valid: true, issues: [] }));
   mock.onPut('/api/v1/system/config').reply((config) => {
     if (profile === 'error') return [503, errorPayload];

@@ -10,6 +10,7 @@ import type {
   GenerationBackendStatusPreviewRequest,
   GenerationBackendStatusResponse,
   ImportSystemConfigRequest,
+  RollbackSystemConfigRequest,
   LegacyChannelsMigrationPreview,
   LlmProviderCatalogResponse,
   LLMConfigModeStatus,
@@ -292,6 +293,37 @@ export const systemConfigApi = {
 
   async importDesktopEnv(payload: ImportSystemConfigRequest): Promise<UpdateSystemConfigResponse> {
     return this.importEnv(payload);
+  },
+
+  async rollback(payload: RollbackSystemConfigRequest): Promise<UpdateSystemConfigResponse> {
+    try {
+      const response = await apiClient.post<Record<string, unknown>>(
+        '/api/v1/system/config/rollback',
+        { config_version: payload.configVersion },
+      );
+      return toCamelCase<UpdateSystemConfigResponse>(response.data);
+    } catch (error: unknown) {
+      const parsed = getParsedApiError(error);
+      if (error && typeof error === 'object' && 'response' in error) {
+        const status = (error as { response?: { status?: number } }).response?.status;
+        const payloadData = (error as { response?: { data?: unknown } }).response?.data;
+        if (status === 409 && parsed.code === 'config_version_conflict') {
+          const conflict = toCamelCase<SystemConfigConflictResponse>(payloadData ?? {});
+          const parsedCurrentVersion = (
+            parsed.params?.currentConfigVersion
+            ?? parsed.params?.current_config_version
+          );
+          throw new SystemConfigConflictError(
+            parsed.message || conflict.message || '配置版本冲突',
+            conflict.params?.currentConfigVersion
+              || conflict.currentConfigVersion
+              || (typeof parsedCurrentVersion === 'string' ? parsedCurrentVersion : undefined),
+            parsed,
+          );
+        }
+      }
+      throw error;
+    }
   },
 
   async testLLMChannel(payload: TestLLMChannelRequest): Promise<TestLLMChannelResponse> {

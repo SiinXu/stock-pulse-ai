@@ -762,6 +762,11 @@ class SystemConfigApiTestCase(unittest.TestCase):
                 self.assertNotIn("super-secret", serialized)
                 self.assertNotIn("private.example", serialized)
 
+    def test_notification_test_request_accepts_dingtalk_channel(self) -> None:
+        request = TestNotificationChannelRequest(channel="dingtalk")
+
+        self.assertEqual(request.channel, "dingtalk")
+
     def test_preview_generation_backend_status_returns_validation_error_for_bad_draft(self) -> None:
         self._rewrite_env(
             "GENERATION_BACKEND=codex_cli",

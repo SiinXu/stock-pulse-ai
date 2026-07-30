@@ -10,7 +10,7 @@ Issue #465 started as a **backend** slice. Current `main` also wires a **partial
 
 - Versioned local storage, CRUD/history APIs, optimistic concurrency
 - Stable `InvestmentFrameworkContextReader` read adapter
-- **Settings → Agent Behavior** minimal editor: create, versioned save, deactivate, delete (title/description/free-form rules/line-based risk and tracking; full decision-tree and dimension-matrix UI can come later)
+- **Settings → Agent Behavior** structured editor: create, versioned save, deactivate, delete, decision-tree and evaluation-dimension editing, plus immutable history inspection
 - **Stock analysis path** inject: active framework is attached as **read-only research context** via `inject_framework_into_analysis_context` (`src/core/stages/analysis_stock.py` → analyzer prompt key `personal_investment_framework_prompt`)
 - Report-strata **alignment slot enrichment** when a framework is active (`enrich_dashboard_framework_alignment`); otherwise `framework_alignment.status=not_configured` with a localized empty-slot summary
 
@@ -39,7 +39,7 @@ Every immutable version stores a strict `InvestmentFrameworkContent`:
 - `tracking_criteria`: ongoing review conditions.
 - `free_form_rules`: optional rules that do not fit a structured field.
 
-Unknown fields and scalar coercion are rejected: for example, string `"1"` in a JSON body cannot stand in for an integer revision and string `"25"` cannot stand in for a numeric weight; response DTOs likewise cannot mask service-layer type drift. The `DELETE` revision continues to use the existing typed parsing contract for HTTP query parameters. The same strict boundary applies to persisted-content reads, so type drift or an unknown `schema_version` in old data fails closed instead of being silently converted. A framework must contain at least one substantive criterion; tree targets must reference declared nodes, every node must be reachable from the root, cycles are forbidden, and node IDs and dimension names must be unique. Weights are relative values in the `0..100` range; this phase does not require them to sum to 100.
+Unknown fields and scalar coercion are rejected: for example, string `"1"` in a JSON body cannot stand in for an integer revision and string `"25"` cannot stand in for a numeric weight; response DTOs likewise cannot mask service-layer type drift. The `DELETE` revision continues to use the existing typed parsing contract for HTTP query parameters. The same strict boundary applies to persisted-content reads, so type drift or an unknown `schema_version` in old data fails closed instead of being silently converted. A framework must contain at least one substantive criterion; tree targets must reference declared nodes, every node must be reachable from the root, cycles are forbidden, and node IDs and dimension names must be unique. Dimension-name uniqueness uses the pinned Unicode 15.0 default full case-folding (`C+F`, non-Turkic) contract. Backend and Web both use repository-pinned mappings rather than Python, browser, or Node Unicode/ICU data; duplicate issues are attached to every related dimension-name field. Weights are relative values in the `0..100` range; this phase does not require them to sum to 100.
 
 ## Storage And Version Semantics
 
@@ -73,16 +73,19 @@ The history endpoint currently returns the complete history in one unpaginated r
 
 ## Web editor
 
-Settings → **Agent Behavior → Investment Framework** exposes a dedicated horizontal tab with the inline minimal editor and framework status:
+Settings → **Agent Behavior → Investment Framework** exposes a dedicated horizontal tab with the inline structured editor and framework status:
 
 - Create the single local framework (`POST /api/v1/investment-framework`)
 - Save with `expected_revision` to create and activate a new version (`PUT`)
 - Deactivate (`POST .../deactivate`) so analysis no longer injects the framework
 - Delete (`DELETE`) removes the aggregate and all history
+- Read immutable newest-first history; inspect it read-only or copy content into a draft that saves against the current revision
 
 **Version history** opens a read-only drawer on the same page and lists immutable versions in descending order with the active state. A user can copy any historical version into the current draft, then save it as a new version using the aggregate's current `revision`; copying alone does not mutate history or activation.
 
-The editor supports title, description, free-form rules, and line-based risk/tracking criteria. Full decision-tree UI can be added later; richer content already stored via API remains readable. Saving free-form fields preserves `decision_tree` / `evaluation_dimensions` from the draft source (the current version or a copied historical version) so the minimal editor does not wipe structured content. On HTTP 409 revision conflicts, the UI reloads server state.
+The editor supports title, description, free-form rules, line-based risk/tracking criteria, decision-tree roots, node IDs, questions, conditional target/outcome branches, and evaluation-dimension names, weights, descriptions, and criteria. Before save it checks unique IDs/names, valid targets and root, reachability, cycles, and `0..100` weights. It also mirrors backend collection limits: 100 nodes, 20 branches per node, 50 dimensions, 30 criteria per dimension, 100 risk rules, and 100 tracking criteria. Node questions, branch conditions/outcomes, dimension criteria, risk rules, and tracking criteria each allow 1–1000 characters; titles, descriptions, dimension names, and free-form rules retain their separate schema limits. Line-based fields retain transient editing text such as a trailing newline, then canonicalize to trimmed non-empty entries on blur or save. Node renaming follows the identity captured when editing begins, so entering another existing ID temporarily cannot steal that node's root or inbound references. A root or inbound-referenced node cannot be deleted; the UI names its localized dependencies.
+
+Both the history list and read-only inspector display each version's `created_at`. The list marks latest and active versions independently, so the latest snapshot remains identifiable after deactivation. History is never restored or edited in place. “Copy into current draft” copies content only; the following save still uses the current aggregate revision and creates a new version. An HTTP 409 conflict preserves the draft and offers an explicit “Load latest server version” action instead of silently overwriting it. Backend 422 validation remains authoritative: duplicate nodes, unknown targets, cycles, unreachable nodes, and duplicate dimensions expose stable `investment_framework_*` types with field-addressable `details.issues[].loc` values. The Web maps those public sanitized locations to the related node or dimension while retaining a localized global error; unknown server diagnostics remain in error details instead of becoming primary product copy. Known-field edits use object merges, and the transport preserves unknown future fields so rolling upgrades do not silently drop server-owned content.
 
 The page always shows a research-only disclaimer: not investment advice.
 

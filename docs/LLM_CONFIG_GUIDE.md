@@ -184,6 +184,8 @@ LITELLM_MODEL=ollama/qwen3:8b
 
 调用 `POST /api/v1/system/config/rollback` 并提交当前 `config_version`，即可原子激活该快照。它复用普通配置写入的 optimistic conflict 和应用级认证中间件，且绝不会修改 `ADMIN_AUTH_ENABLED`；如果快照中的该字段不同，会返回 `auth_settings_endpoint_required`，仍必须通过 `/api/v1/auth/settings` 完成再认证。回退成功后，被替换的有效版本会成为下一份 last-known-good，因此再回退一次可以撤销本次操作。`reload_now=false` 继续作为只持久化兼容模式：不发布运行时状态，也不替换 last-known-good。
 
+Web 设置页在 **高级 → 配置备份** 提供同一回滚入口：显示并提交当前 `config_version`，执行前强确认，成功后刷新配置、版本与诊断。`409` 不会自动重试；用户可显式载入最新配置。服务器回执 `updated_keys` 中的字段会同步为回滚后的值；其他未保存草稿与当前登录状态保持不变。
+
 分析 worker 在 `AnalysisService` 启动任务时读取当前 singleton，随后 `StockAnalysisPipeline` 在整次运行中持有该对象。因此运行中的任务不会被后续热加载中途改写；尚未启动的排队任务会在 worker 启动时获得最新有效配置。运维审计日志只记录操作者类别、UTC 时间、操作、结果、变更键名和配置版本，不记录任何值。当前单管理员模型只能归因为 `authenticated_admin`、`desktop_operator` 或 `local_operator`，不声明逐用户身份或持久化安全审计存储。
 
 ### LLM 路由与降级顺序

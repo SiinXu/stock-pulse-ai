@@ -19,6 +19,7 @@ import { SETTINGS_CONTROL_WIDTH_CLASS } from './settingsControlLayout';
 function getChannelOptions(language: UiLanguage): Array<{ value: NotificationTestChannel; label: string }> {
   return [
     { value: 'wechat', label: getNotificationChannelLabel('wechat', language) },
+    { value: 'dingtalk', label: getNotificationChannelLabel('dingtalk', language) },
     { value: 'feishu', label: getNotificationChannelLabel('feishu', language) },
     { value: 'telegram', label: 'Telegram' },
     { value: 'email', label: getNotificationChannelLabel('email', language) },

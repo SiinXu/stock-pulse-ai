@@ -333,6 +333,74 @@ describe('systemConfigApi', () => {
     expect(result.attempts[0].httpStatus).toBe(200);
   });
 
+  it('rolls back against the current config version and maps the response', async () => {
+    post.mockResolvedValueOnce({
+      data: {
+        success: true,
+        config_version: 'v3',
+        applied_count: 4,
+        skipped_masked_count: 0,
+        reload_triggered: true,
+        updated_keys: ['SCHEDULE_TIME'],
+        warnings: [],
+      },
+    });
+
+    const result = await systemConfigApi.rollback({ configVersion: 'v4' });
+
+    expect(post).toHaveBeenCalledWith(
+      '/api/v1/system/config/rollback',
+      { config_version: 'v4' },
+    );
+    expect(result).toMatchObject({
+      configVersion: 'v3',
+      appliedCount: 4,
+      reloadTriggered: true,
+      updatedKeys: ['SCHEDULE_TIME'],
+    });
+  });
+
+  it('maps only rollback version conflicts to SystemConfigConflictError', async () => {
+    post.mockRejectedValueOnce({
+      response: {
+        status: 409,
+        data: {
+          detail: {
+            error: 'config_version_conflict',
+            message: 'Configuration has changed',
+            current_config_version: 'v5',
+          },
+        },
+      },
+    });
+
+    await expect(systemConfigApi.rollback({ configVersion: 'v4' })).rejects.toMatchObject({
+      name: 'SystemConfigConflictError',
+      currentConfigVersion: 'v5',
+      parsedError: {
+        code: 'config_version_conflict',
+        status: 409,
+      },
+    });
+  });
+
+  it('preserves rollback-unavailable errors instead of treating them as version conflicts', async () => {
+    const unavailable = {
+      response: {
+        status: 409,
+        data: {
+          detail: {
+            error: 'rollback_unavailable',
+            message: 'No last-known-good configuration is available',
+          },
+        },
+      },
+    };
+    post.mockRejectedValueOnce(unavailable);
+
+    await expect(systemConfigApi.rollback({ configVersion: 'v4' })).rejects.toBe(unavailable);
+  });
+
   it('loads first-run setup status with camelCase fields', async () => {
     get.mockResolvedValueOnce({
       data: {

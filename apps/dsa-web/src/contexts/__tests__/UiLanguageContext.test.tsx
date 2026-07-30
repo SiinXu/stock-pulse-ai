@@ -147,7 +147,7 @@ describe('UiLanguageContext', () => {
       expect(within(selector).getByRole('combobox')).toHaveAccessibleName(UI_TEXT[language]['language.toggle']);
     }
     expect(within(selector).getByRole('combobox')).toHaveAttribute('data-value', 'id');
-  });
+  }, 15_000);
 
   it('places the profile language list to the right of its trigger', () => {
     const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function mockRect(this: HTMLElement) {

@@ -155,6 +155,10 @@ const STABLE_ERROR_TEXT: Record<string, StableErrorText> = {
     zh: { title: '配置版本冲突', message: '服务器配置已更新，请刷新后重新应用本次修改。' },
     en: { title: 'Configuration conflict', message: 'The server configuration changed. Refresh and apply your changes again.' },
   }),
+  rollback_unavailable: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.rollback_unavailable", {
+    zh: { title: '没有可回滚的配置', message: '当前没有可用的上一份稳定配置，未执行任何更改。' },
+    en: { title: 'No configuration is available to roll back', message: 'There is no previous stable configuration available, so nothing was changed.' },
+  }),
   validation_failed: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.validation_failed", {
     zh: { title: '配置校验失败', message: '检查标记的配置项后再试。' },
     en: { title: 'Configuration validation failed', message: 'Check the marked settings and try again.' },

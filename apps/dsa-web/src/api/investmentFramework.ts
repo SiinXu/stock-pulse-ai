@@ -14,22 +14,65 @@ import type {
 
 const BASE_PATH = '/api/v1/investment-framework';
 
+function snakeKey(key: string): string {
+  return key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+}
+
+function toSnakeUnknown(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(toSnakeUnknown);
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .map(([key, nested]) => [snakeKey(key), toSnakeUnknown(nested)]),
+    );
+  }
+  return value;
+}
+
+function unknownFields(
+  value: Record<string, unknown>,
+  knownKeys: readonly string[],
+): Record<string, unknown> {
+  const known = new Set(knownKeys);
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => !known.has(key))
+      .map(([key, nested]) => [snakeKey(key), toSnakeUnknown(nested)]),
+  );
+}
+
 function toSnakeContent(content: InvestmentFrameworkCreateRequest['content']): Record<string, unknown> {
   return {
+    ...unknownFields(content, [
+      'schemaVersion',
+      'title',
+      'description',
+      'rootNodeId',
+      'decisionTree',
+      'evaluationDimensions',
+      'riskRules',
+      'trackingCriteria',
+      'freeFormRules',
+    ]),
     schema_version: content.schemaVersion ?? 'investment-framework-content-v1',
     title: content.title,
     description: content.description ?? null,
     root_node_id: content.rootNodeId ?? null,
     decision_tree: (content.decisionTree ?? []).map((node) => ({
+      ...unknownFields(node, ['nodeId', 'question', 'branches']),
       node_id: node.nodeId,
       question: node.question,
       branches: node.branches.map((branch) => ({
+        ...unknownFields(branch, ['condition', 'targetNodeId', 'outcome']),
         condition: branch.condition,
         target_node_id: branch.targetNodeId ?? null,
         outcome: branch.outcome ?? null,
       })),
     })),
     evaluation_dimensions: (content.evaluationDimensions ?? []).map((item) => ({
+      ...unknownFields(item, ['name', 'weight', 'criteria', 'description']),
       name: item.name,
       weight: item.weight,
       criteria: item.criteria ?? [],

@@ -128,11 +128,11 @@ English menus + Chinese reports is valid.
 
 ### Scheduling
 
-When enabled, a **long-running** Web/API/Desktop process must stay up. You may see next-run times and “run once” actions. Implementation notes: `docs/scheduled-tasks.md`.
+When enabled, a **long-running** Web/API/Desktop process must stay up. You may see next-run times and “run once” actions. Versioned definitions also expose lazy **Run history** with attempts, execution/result references, errors, and notification failures; **Load more** increases the real query limit. Implementation notes: `docs/scheduled-tasks.md`.
 
 ### Config backup
 
-Export a saved snapshot before desktop reinstall; import reloads keys and may warn about unsaved drafts.
+Export a saved snapshot before desktop reinstall; import reloads keys and may warn about unsaved drafts. **Roll back to the last good configuration** submits the current config version behind a danger confirmation and reloads atomically. A version conflict is never auto-retried: explicitly load the latest config first. Fields actually restored by the server synchronize to their rolled-back values; other unsaved drafts and the signed-in session remain intact.
 
 ## Use cases
 
@@ -169,9 +169,9 @@ Trust **current `origin/main`**. Older running builds may still lack entries—b
 
 | Capability | Status on main | UI entry | How to use this manual |
 | --- | --- | --- | --- |
-| **Scheduled tasks** | **Shipped** | Settings → **Scheduling** (enable, daily times, next run, run once); Home **Today's scheduled tasks** (read-only) | See Scheduling above and [02 Home](02-home_EN.md); contract: `docs/scheduled-tasks.md` |
+| **Scheduled tasks** | **Shipped, including run history** | Settings → **Scheduling** (enable, daily times, next run, run once, versioned-definition run history); Home **Today's scheduled tasks** (read-only) | See Scheduling above and [02 Home](02-home_EN.md); contract: `docs/scheduled-tasks.md` |
 | **Notification channel plugins** | **Shipped** | Settings → notifications / plugin surfaces when discovery is enabled | Prove one built-in channel with **test push** first; plugin channels follow the UI list |
-| **Personal investment framework** | **Minimal Web editor shipped** | Settings → **Agent behavior → Investment Framework**; the editor is inline on its own horizontal tab and history uses a read-only in-page drawer | Supports create, versioned save, history review, copying a historical version into the current draft, deactivate, and delete; see `docs/personal-investment-framework.md` for field boundaries |
+| **Personal investment framework** | **Structured Web editor and history shipped** | Settings → **Agent behavior → Investment Framework**; the editor is inline on its own horizontal tab and history uses a read-only in-page drawer | Supports decision trees, evaluation dimensions, immutable history inspection/copy-to-draft, versioned save, deactivate, and delete; see `docs/personal-investment-framework_EN.md` |
 | **Local model pack import** | **Shipped** | Settings → **AI & Models → Local Models** → Import Model Pack (labels as in UI) | Catalog pull/activate still apply; import path: `docs/model-packs.md` and in-product help |
 | **HITL human approvals** | **Shipped** (default off) | **Not** in primary sidebar; route `/approvals`; Home **Review human approvals** when administrator sign-in is enabled | See [01 Shell](01-shell_EN.md); contract `docs/human-approvals_EN.md`. One-shot risk-bypass approval — **not** broker trade approval |
 | **Report evidence strata** | **Shipped** | Full-report Web view strata panel (labels as in UI) | See [08 Reading reports](08-reading-reports_EN.md); contract `docs/report-strata-contract_EN.md` |

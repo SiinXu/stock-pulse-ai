@@ -15,6 +15,7 @@ const {
   getLlmProviderCatalog,
   getLlmAvailableModels,
   importEnv,
+  rollbackSystemConfig,
   runSchedulerNow,
   updateSystemConfig,
   alphasiftEnable,
@@ -52,6 +53,7 @@ const {
   getLlmProviderCatalog: vi.fn(),
   getLlmAvailableModels: vi.fn(),
   importEnv: vi.fn(),
+  rollbackSystemConfig: vi.fn(),
   runSchedulerNow: vi.fn(),
   updateSystemConfig: vi.fn(),
   alphasiftEnable: vi.fn(),
@@ -188,6 +190,7 @@ vi.mock('../../api/systemConfig', () => ({
     getLlmProviderCatalog: (...args: unknown[]) => getLlmProviderCatalog(...args),
     getLlmAvailableModels: (...args: unknown[]) => getLlmAvailableModels(...args),
     importEnv: (...args: unknown[]) => importEnv(...args),
+    rollback: (...args: unknown[]) => rollbackSystemConfig(...args),
     runSchedulerNow: (...args: unknown[]) => runSchedulerNow(...args),
     update: (...args: unknown[]) => updateSystemConfig(...args),
   },
@@ -914,6 +917,15 @@ function registerSettingsPageBeforeEach(): void {
       updatedKeys: ['STOCK_LIST'],
       warnings: [],
     });
+    rollbackSystemConfig.mockResolvedValue({
+      success: true,
+      configVersion: 'v0',
+      appliedCount: 2,
+      skippedMaskedCount: 0,
+      reloadTriggered: true,
+      updatedKeys: ['STOCK_LIST', 'DINGTALK_WEBHOOK_URL'],
+      warnings: [],
+    });
     updateSystemConfig.mockResolvedValue({
       success: true,
       configVersion: 'v2',
@@ -976,6 +988,7 @@ const SettingsPageTestHarness = {
   getLlmProviderCatalog,
   getLlmAvailableModels,
   importEnv,
+  rollbackSystemConfig,
   runSchedulerNow,
   updateSystemConfig,
   alphasiftEnable,
