@@ -1563,11 +1563,28 @@ const ChatPage: React.FC = () => {
                 />
               ) : null}
               {chatError ? (
-                <ApiErrorAlert
-                  error={chatError}
-                  actionLabel={lastFailedRequest ? t('common.retry') : undefined}
-                  onAction={lastFailedRequest ? () => void retryLastStream() : undefined}
-                />
+                <div className="relative">
+                  <ApiErrorAlert
+                    error={chatError}
+                    className={cn(
+                      '[&>div>div]:w-full [&_details]:w-full',
+                      lastFailedRequest && 'pr-12',
+                    )}
+                  />
+                  {lastFailedRequest ? (
+                    <Tooltip content={t('common.retry')} className="absolute right-2 top-2 z-10">
+                      <IconButton
+                        variant="danger"
+                        size="compact"
+                        tooltip={false}
+                        aria-label={t('common.retry')}
+                        onClick={() => void retryLastStream()}
+                      >
+                        <RefreshCw aria-hidden="true" />
+                      </IconButton>
+                    </Tooltip>
+                  ) : null}
+                </div>
               ) : null}
               {isFollowUpContextLoading ? (
                 <InlineAlert
@@ -1607,7 +1624,7 @@ const ChatPage: React.FC = () => {
                 <div className="relative space-y-2" ref={skillPickerRef}>
                   <button
                     type="button"
-                    className="home-surface-button flex h-9 w-full items-center justify-between gap-2 rounded-lg px-2 text-left text-xs text-foreground"
+                    className="home-surface-button flex h-9 w-full items-center justify-between gap-2 rounded-lg px-2 text-left text-xs text-foreground !shadow-none"
                     aria-label={mobileSkillPickerOpen ? t('chat.collapseStrategies') : t('chat.expandStrategies')}
                     aria-expanded={mobileSkillPickerOpen}
                     aria-controls="chat-skill-picker-panel"

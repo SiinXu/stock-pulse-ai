@@ -84,7 +84,9 @@ describe('SchedulerSettingsCard dual-schedule honesty', () => {
       />,
     );
 
-    expect(await screen.findByTestId('scheduler-settings-card')).toBeInTheDocument();
+    const card = await screen.findByTestId('scheduler-settings-card');
+    expect(card.querySelector(':scope > div.grid')).toHaveClass('xl:grid-cols-2', 'xl:items-start');
+    expect(card.querySelector('dl')).toHaveClass('sm:grid-cols-3');
     expect(screen.getByText('Legacy day-batch schedule')).toBeInTheDocument();
     expect(screen.getByTestId('scheduler-legacy-track-note')).toBeInTheDocument();
     expect(screen.getByTestId('scheduler-owner-note')).toBeInTheDocument();
@@ -166,4 +168,3 @@ describe('SchedulerSettingsCard dual-schedule honesty', () => {
     expect(await screen.findByTestId('scheduler-dual-track-warning')).toBeInTheDocument();
   });
 });
-

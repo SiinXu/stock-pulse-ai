@@ -83,6 +83,11 @@ describe('settingsInformationArchitecture', () => {
     expect(getDefaultView('alerts')).toBe('routing');
     expect(getSectionViews('data_sources').map((view) => view.id)).toEqual(['sources', 'intelligence', 'providers']);
     expect(getDefaultView('data_sources')).toBe('sources');
+    expect(getSectionViews('agent_behavior').map((view) => view.id)).toEqual([
+      'execution',
+      'investment_framework',
+    ]);
+    expect(getDefaultView('agent_behavior')).toBe('execution');
     expect(getSectionViews('system_security').map((view) => view.id)).toEqual(['runtime', 'general', 'service', 'security', 'about']);
     expect(getDefaultView('system_security')).toBe('runtime');
     expect(getSectionViews('advanced').map((view) => view.id)).toEqual(['raw_config', 'diagnostics', 'backup']);
@@ -98,6 +103,8 @@ describe('settingsInformationArchitecture', () => {
     expect(viewLabel('ai_models', SETTINGS_VIEW_IDS.aiModels.localModels, 'en')).toBe('Local Models');
     expect(viewLabel('ai_models', 'task_routing', 'zh')).toBe('任务路由');
     expect(viewLabel('ai_models', 'task_routing', 'en')).toBe('Task Routing');
+    expect(viewLabel('agent_behavior', 'investment_framework', 'zh')).toBe('投资框架');
+    expect(viewLabel('agent_behavior', 'investment_framework', 'en')).toBe('Investment Framework');
   });
 
   it('recognizes valid section ids', () => {

@@ -200,9 +200,11 @@ describe('HomePage attention hub', () => {
     expect(todos.querySelector(':scope > div.mt-4')).toHaveClass('flex', 'flex-col', 'gap-3');
     expect(signalSummary).toHaveClass('rounded-xl', 'border', 'border-border');
     expect(within(core).getByRole('region', { name: "Today's Focus" }))
-      .toHaveAttribute('data-surface-level', 'canvas');
+      .toHaveAttribute('data-surface-level', 'interactive');
     expect(todos).toHaveAttribute('data-surface-level', 'interactive');
     expect(signalSummary).toHaveAttribute('data-surface-level', 'interactive');
+    expect(screen.getByRole('button', { name: 'Start analysis' }))
+      .toHaveAttribute('data-size', 'primary');
 
     expect(screen.getByTestId('home-attention-hub').querySelector('[data-slot="workspace-content"]'))
       .toHaveClass('rounded-xl', 'border', 'border-border', 'p-5');

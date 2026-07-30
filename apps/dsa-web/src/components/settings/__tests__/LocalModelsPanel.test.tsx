@@ -664,7 +664,12 @@ describe('LocalModelsPanel', () => {
 
     const finance = await screen.findByTestId('local-model-fin-r1-7b');
     expect(within(finance).getByText('Fin-R1 7B')).toBeInTheDocument();
-    expect(within(finance).getByText('Installed')).toBeInTheDocument();
+    expect(within(finance).getByText('Installed').closest('span')?.querySelector('svg'))
+      .toHaveClass('h-3', 'w-3');
+    expect(within(finance).getByRole('button', { name: 'Set as primary' }).querySelector('svg'))
+      .toHaveClass('h-3.5', 'w-3.5');
+    expect(within(finance).getByRole('button', { name: 'Set as Agent model' }).querySelector('svg'))
+      .toHaveClass('h-3.5', 'w-3.5');
     expect(within(finance).queryByRole('button', { name: 'Delete model' })).not.toBeInTheDocument();
     expect(remove).not.toHaveBeenCalled();
   });

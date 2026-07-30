@@ -61,6 +61,7 @@ import { useAnalysisWorkbenchState } from '../hooks/useAnalysisWorkbenchState';
 import { useDashboardLifecycle } from '../hooks/useDashboardLifecycle';
 import { useWatchlist } from '../hooks/useWatchlist';
 import { useWatchlistAnalysisCoverage } from '../hooks/useWatchlistAnalysisCoverage';
+import { STOCK_SEARCH_TEXT } from '../locales/stockSearch';
 import {
   ANALYSIS_WORKBENCH_ROUTE_QUERY_KEYS,
   ANALYSIS_WORKBENCH_SEGMENT_VALUES,
@@ -968,8 +969,8 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
         activeValue={routeState.segment}
       >
         <Surface level="interactive" padding="lg">
-          <div className="max-w-4xl space-y-5">
-            <div>
+          <div className="mx-auto w-full max-w-5xl space-y-6">
+            <div className="max-w-2xl">
               <h2 className="text-lg font-semibold text-foreground">
                 {t('analysisWorkbench.launch')}
               </h2>
@@ -978,18 +979,26 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
               </p>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-3">
-              <StockAutocomplete
-                id="analysis-workbench-stock-search"
-                value={query}
-                onChange={setQuery}
-                onSubmit={(stockCode, stockName, selectionSource) => {
-                  void handleSubmitAnalysis(stockCode, stockName, selectionSource);
-                }}
-                placeholder={t('home.placeholder')}
-                disabled={isAnalyzing || !isExperienceModeReady}
-                className={inputError ? 'border-danger/50' : undefined}
-              />
+            <div className="grid gap-4 rounded-xl border border-border bg-background/20 p-4 lg:grid-cols-3 lg:items-end">
+              <div>
+                <label
+                  htmlFor="analysis-workbench-stock-search"
+                  className="mb-1.5 block text-xs font-medium text-secondary-text"
+                >
+                  {STOCK_SEARCH_TEXT[language].inputLabel}
+                </label>
+                <StockAutocomplete
+                  id="analysis-workbench-stock-search"
+                  value={query}
+                  onChange={setQuery}
+                  onSubmit={(stockCode, stockName, selectionSource) => {
+                    void handleSubmitAnalysis(stockCode, stockName, selectionSource);
+                  }}
+                  placeholder={t('home.placeholder')}
+                  disabled={isAnalyzing || !isExperienceModeReady}
+                  className={inputError ? 'border-danger/50' : undefined}
+                />
+              </div>
               <Select
                 value={selectedStrategyId}
                 onChange={setSelectedStrategyId}
@@ -1009,25 +1018,28 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
               />
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <SegmentedControl
-                value={experienceMode}
-                onChange={handleExperienceModeChange}
-                ariaLabel={t('home.experienceModeLabel')}
-                semantics="single-select"
-                options={[
-                  { value: 'beginner', label: t('home.beginnerMode') },
-                  { value: 'professional', label: t('home.professionalMode') },
-                ]}
-              />
-              <Checkbox
-                checked={notify}
-                onChange={(event) => setNotify(event.target.checked)}
-                label={t('home.notify')}
-              />
+            <div className="flex flex-col gap-3 rounded-xl border border-border bg-background/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-3">
+                <SegmentedControl
+                  value={experienceMode}
+                  onChange={handleExperienceModeChange}
+                  ariaLabel={t('home.experienceModeLabel')}
+                  semantics="single-select"
+                  options={[
+                    { value: 'beginner', label: t('home.beginnerMode') },
+                    { value: 'professional', label: t('home.professionalMode') },
+                  ]}
+                />
+                <Checkbox
+                  checked={notify}
+                  onChange={(event) => setNotify(event.target.checked)}
+                  label={t('home.notify')}
+                />
+              </div>
               <Button
                 type="button"
                 variant="primary"
+                className="shrink-0"
                 disabled={!query || isAnalyzing || !isExperienceModeReady}
                 isLoading={isAnalyzing}
                 loadingText={t('home.analyzing')}
@@ -1038,7 +1050,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
               </Button>
             </div>
 
-            <div className="border-t border-border pt-5">
+            <div className="rounded-xl border border-border bg-background/20 p-4">
               <p className="text-sm text-secondary-text">
                 {t('analysisWorkbench.batchDescription')}
               </p>

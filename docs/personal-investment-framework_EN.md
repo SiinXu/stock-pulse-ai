@@ -73,13 +73,15 @@ The history endpoint currently returns the complete history in one unpaginated r
 
 ## Web editor
 
-Settings → **Agent Behavior** shows framework status; **View fields** opens the structured editor in a fullscreen configuration dialog:
+Settings → **Agent Behavior → Investment Framework** exposes a dedicated horizontal tab with the inline structured editor and framework status:
 
 - Create the single local framework (`POST /api/v1/investment-framework`)
 - Save with `expected_revision` to create and activate a new version (`PUT`)
 - Deactivate (`POST .../deactivate`) so analysis no longer injects the framework
 - Delete (`DELETE`) removes the aggregate and all history
 - Read immutable newest-first history; inspect it read-only or copy content into a draft that saves against the current revision
+
+**Version history** opens a read-only drawer on the same page and lists immutable versions in descending order with the active state. A user can copy any historical version into the current draft, then save it as a new version using the aggregate's current `revision`; copying alone does not mutate history or activation.
 
 The editor supports title, description, free-form rules, line-based risk/tracking criteria, decision-tree roots, node IDs, questions, conditional target/outcome branches, and evaluation-dimension names, weights, descriptions, and criteria. Before save it checks unique IDs/names, valid targets and root, reachability, cycles, and `0..100` weights. It also mirrors backend collection limits: 100 nodes, 20 branches per node, 50 dimensions, 30 criteria per dimension, 100 risk rules, and 100 tracking criteria. Node questions, branch conditions/outcomes, dimension criteria, risk rules, and tracking criteria each allow 1–1000 characters; titles, descriptions, dimension names, and free-form rules retain their separate schema limits. Renaming a node updates current root and branch references. A root or inbound-referenced node cannot be deleted; the UI names its dependencies.
 

@@ -61,6 +61,34 @@ describe('Select', () => {
     rectSpy.mockRestore();
   });
 
+  it('can place the shared listbox to the right of its trigger', () => {
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function mockRect(this: HTMLElement) {
+      if (this.getAttribute('role') === 'combobox') {
+        return new DOMRect(100, 200, 160, 36);
+      }
+      return new DOMRect(0, 0, 180, 117);
+    });
+    render(
+      <Select
+        value="dark"
+        onChange={() => {}}
+        options={[
+          { value: 'light', label: 'Light' },
+          { value: 'dark', label: 'Dark' },
+        ]}
+        ariaLabel="Theme"
+        menuPlacement="right"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Theme' }));
+
+    const listbox = screen.getByRole('listbox');
+    expect(listbox).toHaveStyle({ left: '264px', top: '200px' });
+    expect(listbox.style.maxHeight).toMatch(/^min\(15rem, \d+px\)$/);
+    rectSpy.mockRestore();
+  });
+
   it('accepts shared trigger styling without styling the listbox wrapper', () => {
     render(
       <Select
