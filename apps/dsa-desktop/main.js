@@ -13,13 +13,27 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const os = require('os');
+const {
+  DESKTOP_BACKEND_DEFAULT_HOST,
+  buildBackendArgs,
+  buildBackendUrl,
+  createBackendRuntime,
+  extendMacDesktopBackendPath,
+  hasOwnValue,
+  normalizeBackendHost,
+  readEnvFileValue,
+  readEnvFileValues,
+  resolveBackendBindHost,
+  resolveDesktopConnectHost,
+  resolveDesktopProviderDailyCacheDir,
+  waitForBackendExit,
+} = require('./backend-runtime');
 const { loadDesktopLocalModelPresets } = require('./local-model-catalog');
 const { ModelPackError, importModelPack } = require('./model-pack');
 const { spawn } = require('child_process');
 const net = require('net');
 const http = require('http');
 const https = require('https');
-const { TextDecoder } = require('util');
 
 let mainWindow = null;
 let assistantWindow = null;
@@ -27,9 +41,7 @@ let assistantWindowLoadPromise = null;
 let desktopTray = null;
 let desktopIsQuitting = false;
 let desktopAssistantLastReadyAt = '';
-let backendProcess = null;
 let logFilePath = null;
-let backendStartError = null;
 let desktopUpdateState = null;
 let lastNotifiedUpdateVersion = '';
 let lastPromptedInstallVersion = '';
@@ -63,14 +75,12 @@ const DESKTOP_UPDATE_BACKUP_DIR = '.dsa-desktop-update-backup';
 const DESKTOP_UPDATE_BACKUP_MANIFEST_FILE = 'runtime-state.json';
 const DESKTOP_BRAND_MIGRATION_RECORD_FILE = '.stockpulse-brand-migration.json';
 const DESKTOP_BRAND_MIGRATION_TEMP_SUFFIX = '.stockpulse-migration.tmp';
-const PROVIDER_DAILY_CACHE_DIR_ENV_KEY = 'PROVIDER_DAILY_CACHE_DIR';
 const DESKTOP_PROVIDER_DAILY_CACHE_RELATIVE_PATH = path.join('data', 'provider_cache', 'daily');
 const LEGACY_DESKTOP_PRODUCT_NAMES = Object.freeze(['Daily Stock Analysis']);
 const WINDOWS_NSIS_UNINSTALLER_NAMES = Object.freeze([
   'Uninstall StockPulse.exe',
   'Uninstall Daily Stock Analysis.exe',
 ]);
-const DESKTOP_BACKEND_DEFAULT_HOST = '127.0.0.1';
 const DESKTOP_PROTOCOL = 'stockpulse';
 const DESKTOP_PROTOCOL_HOST = 'app';
 const DESKTOP_DEEP_LINK_MAX_LENGTH = 4096;
@@ -156,20 +166,25 @@ const DESKTOP_LOCAL_MODEL_STATE_EVENT = 'desktop-local-model:state';
 const DESKTOP_MODEL_PACK_ATTESTATION_ENV = 'STOCKPULSE_DESKTOP_MODEL_PACK_ATTESTATION_KEY';
 const DESKTOP_MODEL_PACK_ATTESTATION_TTL_MS = 5 * 60 * 1000;
 const desktopModelPackAttestationKey = crypto.randomBytes(32).toString('hex');
-const PUBLIC_BIND_HOSTS = Object.freeze(new Set(['0.0.0.0', '::', '[::]', '*']));
-const MAC_DESKTOP_CLI_PATH_ENTRIES = Object.freeze([
-  '/opt/homebrew/bin',
-  '/usr/local/bin',
-  '/opt/homebrew/sbin',
-  '/usr/local/sbin',
-]);
-const MAC_DESKTOP_SYSTEM_PATH_ENTRIES = Object.freeze([
-  '/usr/bin',
-  '/bin',
-  '/usr/sbin',
-  '/sbin',
-]);
-const DESKTOP_BACKEND_PATH_DELIMITER = isWindows ? ';' : ':';
+// The runtime owns the backend child lifecycle; this file remains the Electron composition root.
+const backendRuntime = createBackendRuntime({
+  app,
+  appRootDev,
+  fsImpl: fs,
+  httpImpl: http,
+  isQuitting: () => desktopIsQuitting,
+  log: logLine,
+  markUnavailable: () => {
+    desktopWebReady = false;
+  },
+  modelPackAttestationEnv: DESKTOP_MODEL_PACK_ATTESTATION_ENV,
+  modelPackAttestationKey: desktopModelPackAttestationKey,
+  netImpl: net,
+  onUnavailable: notifyDesktopAssistantState,
+  platform: process.platform,
+  processRef: process,
+  spawnImpl: spawn,
+});
 const DESKTOP_UPDATE_RUNTIME_RELATIVE_FILES = Object.freeze([
   '.env',
   path.join('data', 'stock_analysis.db'),
@@ -345,8 +360,7 @@ function isDesktopWindowVisible(windowRef) {
 
 function buildDesktopAssistantState() {
   let serviceStatus = 'starting';
-  if (backendStartError
-    || (backendProcess && (backendProcess.exitCode !== null || backendProcess.signalCode))) {
+  if (backendRuntime.isUnavailable()) {
     serviceStatus = 'unavailable';
   } else if (desktopWebReady) {
     serviceStatus = 'ready';
@@ -1306,285 +1320,6 @@ function migrateMacPackagedRuntimeState() {
   return result;
 }
 
-function resolveBackendPath() {
-  if (process.env.DSA_BACKEND_PATH) {
-    return process.env.DSA_BACKEND_PATH;
-  }
-
-  if (app.isPackaged) {
-    const backendDir = path.join(process.resourcesPath, 'backend');
-    const exeName = isWindows ? 'stock_analysis.exe' : 'stock_analysis';
-    const oneDirPath = path.join(backendDir, 'stock_analysis', exeName);
-    if (fs.existsSync(oneDirPath)) {
-      return oneDirPath;
-    }
-    return path.join(backendDir, exeName);
-  }
-
-  return null;
-}
-
-function extendMacDesktopBackendPath(rawPath) {
-  if (!isMac) {
-    return rawPath;
-  }
-
-  const seen = new Set();
-  const entries = String(rawPath || '')
-    .split(DESKTOP_BACKEND_PATH_DELIMITER)
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-    .filter((entry) => {
-      if (seen.has(entry)) {
-        return false;
-      }
-      seen.add(entry);
-      return true;
-    });
-
-  [...MAC_DESKTOP_CLI_PATH_ENTRIES, ...MAC_DESKTOP_SYSTEM_PATH_ENTRIES].forEach((entry) => {
-    if (!seen.has(entry)) {
-      entries.push(entry);
-      seen.add(entry);
-    }
-  });
-
-  return entries.join(DESKTOP_BACKEND_PATH_DELIMITER);
-}
-
-function normalizeBackendHost(value, fallback = '') {
-  const normalized = String(value || '').trim();
-  return normalized || fallback;
-}
-
-function normalizeBackendBindHost(value, fallback = DESKTOP_BACKEND_DEFAULT_HOST) {
-  const host = normalizeBackendHost(value, fallback);
-  const lowerHost = host.toLowerCase();
-  if (lowerHost === '*') {
-    return '0.0.0.0';
-  }
-  if (lowerHost === '[::]') {
-    return '::';
-  }
-  return host;
-}
-
-function hasOwnValue(object, key) {
-  return Object.prototype.hasOwnProperty.call(object || {}, key);
-}
-
-function parseQuotedEnvValue(value, quote) {
-  let result = '';
-  for (let index = 1; index < value.length; index += 1) {
-    const char = value[index];
-    if (char === quote) {
-      if (quote === '"') {
-        return result.replace(/\\([nrt"\\$])/g, (_match, escaped) => {
-          if (escaped === 'n') {
-            return '\n';
-          }
-          if (escaped === 'r') {
-            return '\r';
-          }
-          if (escaped === 't') {
-            return '\t';
-          }
-          return escaped;
-        });
-      }
-      return result.replace(/\\'/g, "'").replace(/\\\\/g, '\\');
-    }
-    result += char;
-  }
-
-  return value.trim();
-}
-
-function parseEnvScalarValue(rawValue) {
-  const value = String(rawValue || '').trimStart();
-  if (!value) {
-    return '';
-  }
-
-  const quote = value[0];
-  if (quote === '"' || quote === "'") {
-    return parseQuotedEnvValue(value, quote);
-  }
-
-  for (let index = 0; index < value.length; index += 1) {
-    if (value[index] === '#' && (index === 0 || /\s/.test(value[index - 1]))) {
-      return value.slice(0, index).trim();
-    }
-  }
-
-  return value.trim();
-}
-
-function expandEnvReferences(value, values = {}, sourceEnv = process.env) {
-  return String(value || '').replace(
-    /\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-(.*?))?\}/g,
-    (_match, name, defaultValue) => {
-      if (hasOwnValue(sourceEnv, name)) {
-        return String(sourceEnv[name]);
-      }
-      if (hasOwnValue(values, name)) {
-        return String(values[name]);
-      }
-      return defaultValue === undefined ? '' : defaultValue;
-    }
-  );
-}
-
-function readEnvFileValues(envFile, sourceEnv = process.env) {
-  if (!envFile || !fs.existsSync(envFile)) {
-    return {};
-  }
-
-  let content = '';
-  try {
-    content = fs.readFileSync(envFile, 'utf-8');
-  } catch (_error) {
-    return {};
-  }
-
-  const values = {};
-  for (const line of content.split(/\r?\n/)) {
-    const match = line.match(/^\uFEFF?\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
-    if (!match) {
-      continue;
-    }
-    values[match[1]] = expandEnvReferences(
-      parseEnvScalarValue(match[2]),
-      values,
-      sourceEnv
-    );
-  }
-
-  return values;
-}
-
-function readEnvFileValue(envFile, key, sourceEnv = process.env) {
-  const values = readEnvFileValues(envFile, sourceEnv);
-  return hasOwnValue(values, key) ? values[key] : null;
-}
-
-function resolveDesktopProviderDailyCacheDir({
-  envFile,
-  dbPath,
-  sourceEnv = process.env,
-} = {}) {
-  const sourceValue = hasOwnValue(sourceEnv, PROVIDER_DAILY_CACHE_DIR_ENV_KEY)
-    ? String(sourceEnv[PROVIDER_DAILY_CACHE_DIR_ENV_KEY] || '').trim()
-    : '';
-  if (sourceValue) {
-    return sourceValue;
-  }
-
-  const envFileValue = String(
-    readEnvFileValue(envFile, PROVIDER_DAILY_CACHE_DIR_ENV_KEY, sourceEnv) || ''
-  ).trim();
-  if (envFileValue) {
-    return envFileValue;
-  }
-
-  return path.join(path.dirname(dbPath), 'provider_cache', 'daily');
-}
-
-function resolveBackendBindHost({
-  envFile,
-  sourceEnv = process.env,
-  fallback = DESKTOP_BACKEND_DEFAULT_HOST,
-} = {}) {
-  const sourceHost = normalizeBackendHost(sourceEnv.WEBUI_HOST);
-  if (sourceHost) {
-    return normalizeBackendBindHost(sourceHost, fallback);
-  }
-
-  const envFileHost = normalizeBackendHost(readEnvFileValue(envFile, 'WEBUI_HOST', sourceEnv));
-  return normalizeBackendBindHost(envFileHost || fallback, fallback);
-}
-
-function resolveDesktopConnectHost(bindHost) {
-  const host = normalizeBackendBindHost(bindHost, DESKTOP_BACKEND_DEFAULT_HOST);
-  if (PUBLIC_BIND_HOSTS.has(host.toLowerCase())) {
-    return DESKTOP_BACKEND_DEFAULT_HOST;
-  }
-  return host;
-}
-
-function formatUrlHost(host) {
-  const normalized = normalizeBackendHost(host, DESKTOP_BACKEND_DEFAULT_HOST);
-  if (normalized.startsWith('[') && normalized.endsWith(']')) {
-    return normalized;
-  }
-  return normalized.includes(':') ? `[${normalized}]` : normalized;
-}
-
-function buildBackendUrl(host, port, pathname = '/') {
-  const url = new URL(`http://${formatUrlHost(host)}:${port}/`);
-  url.pathname = pathname;
-  return url.toString();
-}
-
-function buildBackendArgs({ host, port }) {
-  return [
-    '--serve-only',
-    '--host',
-    normalizeBackendBindHost(host, DESKTOP_BACKEND_DEFAULT_HOST),
-    '--port',
-    String(port),
-  ];
-}
-
-function buildBackendEnvironment({
-  envFile,
-  dbPath,
-  logDir,
-  port = null,
-  host = null,
-  sourceEnv = process.env,
-  modelPackAttestationKey = desktopModelPackAttestationKey,
-}) {
-  const selectedPort = Number(port);
-  const selectedHost = normalizeBackendBindHost(
-    normalizeBackendHost(host) || resolveBackendBindHost({ envFile, sourceEnv }),
-    DESKTOP_BACKEND_DEFAULT_HOST
-  );
-  const env = {
-    ...sourceEnv,
-    DSA_DESKTOP_MODE: 'true',
-    ENV_FILE: envFile,
-    DATABASE_PATH: dbPath,
-    LOG_DIR: logDir,
-    PROVIDER_DAILY_CACHE_DIR: resolveDesktopProviderDailyCacheDir({
-      envFile,
-      dbPath,
-      sourceEnv,
-    }),
-    PYTHONUTF8: '1',
-    PYTHONIOENCODING: 'utf-8',
-    WEBUI_HOST: selectedHost,
-    WEBUI_ENABLED: 'false',
-    BOT_ENABLED: 'false',
-    DINGTALK_STREAM_ENABLED: 'false',
-    FEISHU_STREAM_ENABLED: 'false',
-  };
-  if (!/^[0-9a-f]{64}$/.test(String(modelPackAttestationKey || ''))) {
-    throw new TypeError('Desktop Model Pack attestation key is invalid');
-  }
-  env[DESKTOP_MODEL_PACK_ATTESTATION_ENV] = modelPackAttestationKey;
-
-  if (Number.isInteger(selectedPort) && selectedPort >= 1 && selectedPort <= 65535) {
-    env.WEBUI_PORT = String(selectedPort);
-  }
-
-  if (isMac) {
-    env.PATH = extendMacDesktopBackendPath(sourceEnv.PATH);
-  }
-
-  return env;
-}
-
 function sleep(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
@@ -1621,40 +1356,6 @@ function logLine(message) {
   console.log(line.trim());
 }
 
-function decodeBackendOutput(data, decoder) {
-  if (typeof data === 'string') {
-    return data.trim();
-  }
-  if (!Buffer.isBuffer(data)) {
-    return String(data).trim();
-  }
-
-  let decoded = decoder.decode(data, { stream: true });
-
-  // Windows consoles and subprocesses may emit local-code-page bytes; fall back to GBK when replacement characters indicate a decode failure.
-  if (isWindows && decoded.includes('\uFFFD')) {
-    try {
-      decoded = new TextDecoder('gbk', { fatal: false }).decode(data, { stream: true });
-    } catch (_error) {
-    }
-  }
-
-  return decoded.trim();
-}
-
-function formatCommand(command, args = []) {
-  return [command, ...args]
-    .map((part) => {
-      const value = String(part);
-      return value.includes(' ') ? `"${value}"` : value;
-    })
-    .join(' ');
-}
-
-function resolvePythonPath() {
-  return process.env.DSA_PYTHON || 'python';
-}
-
 function ensureEnvFile(envPath) {
   if (fs.existsSync(envPath)) {
     return;
@@ -1669,373 +1370,24 @@ function ensureEnvFile(envPath) {
   fs.writeFileSync(envPath, '# Configure your API keys and stock list here.\n', 'utf-8');
 }
 
-function findAvailablePort(startPort = 8000, endPort = 8100, host = DESKTOP_BACKEND_DEFAULT_HOST) {
-  const bindHost = normalizeBackendBindHost(host, DESKTOP_BACKEND_DEFAULT_HOST);
-  return new Promise((resolve, reject) => {
-    const tryPort = (port) => {
-      if (port > endPort) {
-        reject(new Error('No available port'));
-        return;
-      }
-
-      const server = net.createServer();
-      server.once('error', () => {
-        tryPort(port + 1);
-      });
-      server.once('listening', () => {
-        server.close(() => resolve(port));
-      });
-      server.listen(port, bindHost);
-    };
-
-    tryPort(startPort);
-  });
+function buildBackendEnvironment(options) {
+  return backendRuntime.buildEnvironment(options);
 }
 
-function waitForHealth(
-  url,
-  timeoutMs = 60000,
-  intervalMs = 250,
-  requestTimeoutMs = 1500,
-  shouldAbort = null,
-  onProgress = null
-) {
-  const start = Date.now();
-  let attempts = 0;
-
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    let retryTimer = null;
-    let activeRequest = null;
-
-    const emitProgress = (payload) => {
-      if (typeof onProgress !== 'function') {
-        return;
-      }
-      try {
-        onProgress(payload);
-      } catch (_error) {
-      }
-    };
-
-    const finish = (error, result) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-
-      if (retryTimer) {
-        clearTimeout(retryTimer);
-        retryTimer = null;
-      }
-
-      if (activeRequest && !activeRequest.destroyed) {
-        activeRequest.destroy();
-      }
-
-      if (error) {
-        emitProgress({
-          type: 'final_error',
-          elapsedMs: Date.now() - start,
-          attempts,
-          message: error.message,
-        });
-      }
-
-      if (error) {
-        reject(error);
-      } else {
-        resolve(result);
-      }
-    };
-
-    const scheduleNext = () => {
-      if (settled) {
-        return;
-      }
-      retryTimer = setTimeout(attempt, intervalMs);
-    };
-
-    const attempt = () => {
-      if (settled) {
-        return;
-      }
-
-      if (typeof shouldAbort === 'function') {
-        const abortReason = shouldAbort();
-        if (abortReason) {
-          emitProgress({
-            type: 'aborted',
-            elapsedMs: Date.now() - start,
-            attempts,
-            reason: abortReason,
-          });
-          finish(new Error(`Health check aborted: ${abortReason}`));
-          return;
-        }
-      }
-
-      const elapsedMs = Date.now() - start;
-      if (elapsedMs > timeoutMs) {
-        emitProgress({
-          type: 'total_timeout',
-          elapsedMs,
-          attempts,
-          timeoutMs,
-        });
-        finish(new Error(`Health check timeout after ${elapsedMs}ms`));
-        return;
-      }
-
-      attempts += 1;
-      emitProgress({
-        type: 'probe_start',
-        elapsedMs,
-        attempts,
-      });
-
-      activeRequest = http.get(url, (res) => {
-        if (settled) {
-          return;
-        }
-
-        res.resume();
-        if (res.statusCode === 200) {
-          const readyElapsedMs = Date.now() - start;
-          emitProgress({
-            type: 'ready',
-            elapsedMs: readyElapsedMs,
-            attempts,
-          });
-          finish(null, { elapsedMs: readyElapsedMs, attempts });
-          return;
-        }
-
-        emitProgress({
-          type: 'probe_status',
-          elapsedMs: Date.now() - start,
-          attempts,
-          statusCode: res.statusCode,
-        });
-        scheduleNext();
-      });
-
-      activeRequest.setTimeout(requestTimeoutMs, () => {
-        emitProgress({
-          type: 'probe_timeout',
-          elapsedMs: Date.now() - start,
-          attempts,
-          requestTimeoutMs,
-        });
-        activeRequest.destroy(new Error(`Health probe request timeout after ${requestTimeoutMs}ms`));
-      });
-
-      activeRequest.on('error', (error) => {
-        if (settled) {
-          return;
-        }
-
-        emitProgress({
-          type: 'probe_error',
-          elapsedMs: Date.now() - start,
-          attempts,
-          errorCode: error.code || 'unknown',
-          errorMessage: error.message,
-        });
-        scheduleNext();
-      });
-    };
-
-    attempt();
-  });
+function findAvailablePort(startPort = 8000, endPort = 8100, host = DESKTOP_BACKEND_DEFAULT_HOST) {
+  return backendRuntime.findAvailablePort(startPort, endPort, host);
 }
 
 function startBackend({ port, envFile, dbPath, logDir, host = null }) {
-  const backendPath = resolveBackendPath();
-  backendStartError = null;
-  const launchStartedAt = Date.now();
-  const bindHost = normalizeBackendBindHost(
-    normalizeBackendHost(host) || resolveBackendBindHost({ envFile }),
-    DESKTOP_BACKEND_DEFAULT_HOST
-  );
-
-  const env = buildBackendEnvironment({ envFile, dbPath, logDir, port, host: bindHost });
-
-  const args = buildBackendArgs({ host: bindHost, port });
-  let launchMode = '';
-  let launchCommand = '';
-  let launchCwd = '';
-
-  if (backendPath) {
-    if (!fs.existsSync(backendPath)) {
-      throw new Error(`Backend executable not found: ${backendPath}`);
-    }
-    launchMode = 'packaged';
-    launchCommand = formatCommand(backendPath, args);
-    launchCwd = path.dirname(backendPath);
-    backendProcess = spawn(backendPath, args, {
-      env,
-      cwd: launchCwd,
-      stdio: 'pipe',
-      windowsHide: true,
-    });
-  } else {
-    const pythonPath = resolvePythonPath();
-    const scriptPath = path.join(appRootDev, 'main.py');
-    const pythonArgs = ['-X', 'utf8', scriptPath, ...args];
-    launchMode = 'development';
-    launchCommand = formatCommand(pythonPath, pythonArgs);
-    launchCwd = appRootDev;
-    backendProcess = spawn(pythonPath, pythonArgs, {
-      env,
-      cwd: launchCwd,
-      stdio: 'pipe',
-      windowsHide: true,
-    });
-  }
-
-  if (backendProcess) {
-    const launchedProcess = backendProcess;
-    let firstStdoutLogged = false;
-    let firstStderrLogged = false;
-    const stdoutDecoder = new TextDecoder('utf-8', { fatal: false });
-    const stderrDecoder = new TextDecoder('utf-8', { fatal: false });
-
-    launchedProcess.once('spawn', () => {
-      if (backendProcess !== launchedProcess) {
-        return;
-      }
-      logLine(`[backend] spawned pid=${launchedProcess.pid} in ${Date.now() - launchStartedAt}ms`);
-    });
-    launchedProcess.on('error', (error) => {
-      if (backendProcess !== launchedProcess) {
-        return;
-      }
-      backendStartError = error;
-      desktopWebReady = false;
-      logLine(`[backend] failed to start: ${error.message}`);
-      notifyDesktopAssistantState();
-    });
-    launchedProcess.stdout.on('data', (data) => {
-      if (backendProcess !== launchedProcess) {
-        return;
-      }
-      if (!firstStdoutLogged) {
-        firstStdoutLogged = true;
-        logLine(`[backend] first stdout after ${Date.now() - launchStartedAt}ms`);
-      }
-      logLine(`[backend] ${decodeBackendOutput(data, stdoutDecoder)}`);
-    });
-    launchedProcess.stderr.on('data', (data) => {
-      if (backendProcess !== launchedProcess) {
-        return;
-      }
-      if (!firstStderrLogged) {
-        firstStderrLogged = true;
-        logLine(`[backend] first stderr after ${Date.now() - launchStartedAt}ms`);
-      }
-      logLine(`[backend] ${decodeBackendOutput(data, stderrDecoder)}`);
-    });
-    launchedProcess.on('exit', (code, signal) => {
-      if (backendProcess !== launchedProcess) {
-        return;
-      }
-      desktopWebReady = false;
-      if (!desktopIsQuitting && !backendStartError) {
-        backendStartError = new Error('Backend process exited');
-      }
-      logLine(`[backend] exited with code ${code}, signal ${signal || 'none'}`);
-      notifyDesktopAssistantState();
-    });
-  }
-
-  return {
-    mode: launchMode,
-    command: launchCommand,
-    cwd: launchCwd,
-  };
-}
-
-function waitForBackendExit(processRef, timeoutMs = 5000) {
-  if (!processRef || processRef.exitCode !== null || processRef.signalCode) {
-    return Promise.resolve(true);
-  }
-
-  return new Promise((resolve) => {
-    let settled = false;
-    let timer = null;
-    let onExit = null;
-
-    const done = (exited) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      clearTimeout(timer);
-      if (onExit) {
-        processRef.removeListener('exit', onExit);
-      }
-      resolve(exited || processRef.exitCode !== null || Boolean(processRef.signalCode));
-    };
-
-    onExit = () => done(true);
-
-    timer = setTimeout(() => {
-      done(false);
-    }, timeoutMs);
-
-    processRef.once('exit', onExit);
-  });
+  return backendRuntime.start({ port, envFile, dbPath, logDir, host });
 }
 
 function __setBackendProcessForTest(processRef = null) {
-  backendProcess = processRef;
-}
-
-function clearBackendProcessIfCurrent(processRef) {
-  if (backendProcess === processRef) {
-    backendProcess = null;
-  }
+  backendRuntime.__setProcessForTest(processRef);
 }
 
 function stopBackend() {
-  if (!backendProcess) {
-    return Promise.resolve();
-  }
-  const processToStop = backendProcess;
-  if (processToStop.exitCode !== null || processToStop.signalCode) {
-    clearBackendProcessIfCurrent(processToStop);
-    return Promise.resolve();
-  }
-
-  const waitAndClear = () => waitForBackendExit(processToStop, 10000)
-    .then((exited) => {
-      if (!exited) {
-        return;
-      }
-      clearBackendProcessIfCurrent(processToStop);
-    });
-
-  if (isWindows) {
-    spawn('taskkill', ['/PID', String(processToStop.pid), '/T', '/F'], { windowsHide: true }).on('error', () => {
-    });
-    return waitAndClear();
-  }
-
-  if (!processToStop.killed) {
-    processToStop.kill('SIGTERM');
-  }
-  setTimeout(() => {
-    if (processToStop.killed || processToStop.exitCode !== null || processToStop.signalCode) {
-      return;
-    }
-    try {
-      processToStop.kill('SIGKILL');
-    } catch (_error) {
-    }
-  }, 3000);
-
-  return waitAndClear();
+  return backendRuntime.stop();
 }
 
 function resolveDesktopVersion() {
@@ -4093,7 +3445,7 @@ async function createWindow(brandMigrationResult) {
   desktopMainPageUrl = '';
   desktopWebReady = false;
   desktopDeepLinkNavigationInFlight = false;
-  backendStartError = null;
+  backendRuntime.clearStartError();
   notifyDesktopAssistantState();
   const restoreResult = isWindowsNsisInstalledApp() ? restorePackagedRuntimeStateFromBackup() : null;
   const macMigrationResult = migrateMacPackagedRuntimeState();
@@ -4237,7 +3589,7 @@ async function createWindow(brandMigrationResult) {
     logStartup(`Backend launch cwd=${launchInfo.cwd}`);
     logStartup('Waiting for backend health check');
   } catch (error) {
-    backendStartError = error instanceof Error ? error : new Error(String(error));
+    backendRuntime.setStartError(error instanceof Error ? error : new Error(String(error)));
     desktopWebReady = false;
     notifyDesktopAssistantState();
     logStartup(`Backend launch failed: ${String(error)}`);
@@ -4287,27 +3639,14 @@ async function createWindow(brandMigrationResult) {
   };
 
   try {
-    const healthInfo = await waitForHealth(
+    const healthInfo = await backendRuntime.waitUntilHealthy(
       healthUrl,
-      60000,
-      250,
-      1500,
-      () => {
-        if (backendStartError) {
-          return `backend start error: ${backendStartError.message}`;
-        }
-        if (!backendProcess) {
-          return 'backend process is unavailable';
-        }
-        if (backendProcess.exitCode !== null) {
-          return `backend exited with code ${backendProcess.exitCode}`;
-        }
-        if (backendProcess.signalCode) {
-          return `backend exited by signal ${backendProcess.signalCode}`;
-        }
-        return null;
+      {
+        timeoutMs: 60000,
+        intervalMs: 250,
+        requestTimeoutMs: 1500,
+        onProgress: onHealthProgress,
       },
-      onHealthProgress
     );
     logStartup(`Backend ready in ${healthInfo.elapsedMs}ms (${healthInfo.attempts} probes)`);
     const mainPageStartedAt = Date.now();
@@ -4335,7 +3674,7 @@ async function createWindow(brandMigrationResult) {
       throw error;
     }
     desktopWebReady = true;
-    backendStartError = null;
+    backendRuntime.clearStartError();
     desktopAssistantLastReadyAt = new Date().toISOString();
     notifyDesktopAssistantState();
     await flushPendingDesktopDeepLink();
@@ -4348,7 +3687,7 @@ async function createWindow(brandMigrationResult) {
     }
   } catch (error) {
     desktopWebReady = false;
-    backendStartError = error instanceof Error ? error : new Error(String(error));
+    backendRuntime.setStartError(error instanceof Error ? error : new Error(String(error)));
     notifyDesktopAssistantState();
     logStartup(`Startup failed while waiting for health: ${String(error)}`);
     const errorUrl = `file://${loadingPath}?error=${encodeURIComponent(String(error))}`;
@@ -4550,7 +3889,7 @@ module.exports = {
   startBackend,
   stopBackend,
   __getBackendProcessForTest() {
-    return backendProcess;
+    return backendRuntime.__getProcessForTest();
   },
   __setBackendProcessForTest,
   __setMainWindowForTest(mainWindowRef = null) {
@@ -4572,7 +3911,7 @@ module.exports = {
     lastReadyAt = '',
   } = {}) {
     desktopWebReady = webReady;
-    backendStartError = startError;
+    backendRuntime.setStartError(startError);
     desktopAssistantLastReadyAt = lastReadyAt;
   },
   __setDesktopDeepLinkStateForTest({

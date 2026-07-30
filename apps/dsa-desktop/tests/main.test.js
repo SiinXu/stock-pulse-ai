@@ -226,6 +226,15 @@ test('desktop package includes the isolated floating assistant surface and tray 
   assert.doesNotMatch(assistantScript, /innerHTML/);
 });
 
+test('desktop package includes the backend runtime module', () => {
+  const packageMetadata = JSON.parse(
+    fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf-8')
+  );
+
+  assert.ok(packageMetadata.build.files.includes('backend-runtime.js'));
+  assert.equal(fs.existsSync(path.join(__dirname, '..', 'backend-runtime.js')), true);
+});
+
 test('desktop assistant actions map only to allowlisted routes', (t) => {
   const mainModule = loadMainModule(t);
 
@@ -1455,6 +1464,74 @@ test('startBackend passes WEBUI_HOST from env file to backend args and env', (t)
     spawned[0].options.env.PROVIDER_DAILY_CACHE_DIR,
     path.join(tmpDir, 'provider_cache', 'daily')
   );
+});
+
+test('startBackend surfaces synchronous spawn failures without retaining a child', (t) => {
+  const mainModule = loadMainModule(t, {
+    platform: 'darwin',
+    childProcess: {
+      spawn: () => {
+        throw new Error('spawn rejected');
+      },
+    },
+  });
+  t.after(() => mainModule.__setBackendProcessForTest(null));
+
+  assert.throws(
+    () => mainModule.startBackend({
+      port: 8123,
+      envFile: '/tmp/dsa/.env',
+      dbPath: '/tmp/dsa/data/stock_analysis.db',
+      logDir: '/tmp/dsa/logs',
+    }),
+    /spawn rejected/
+  );
+  assert.equal(mainModule.__getBackendProcessForTest(), null);
+});
+
+test('startBackend launch diagnostics omit environment values and decode UTF-8 output', (t) => {
+  const previousSecret = process.env.DESKTOP_BACKEND_TEST_SECRET;
+  const originalConsoleLog = console.log;
+  const logs = [];
+  const fakeBackendProcess = new EventEmitter();
+  fakeBackendProcess.pid = 4123;
+  fakeBackendProcess.exitCode = null;
+  fakeBackendProcess.signalCode = null;
+  fakeBackendProcess.stdout = new EventEmitter();
+  fakeBackendProcess.stderr = new EventEmitter();
+  fakeBackendProcess.kill = () => true;
+  process.env.DESKTOP_BACKEND_TEST_SECRET = 'must-not-appear-in-launch-diagnostics';
+  console.log = (line) => logs.push(String(line));
+
+  const mainModule = loadMainModule(t, {
+    platform: 'darwin',
+    childProcess: {
+      spawn: () => fakeBackendProcess,
+    },
+  });
+  t.after(() => {
+    mainModule.__setBackendProcessForTest(null);
+    console.log = originalConsoleLog;
+    if (previousSecret === undefined) {
+      delete process.env.DESKTOP_BACKEND_TEST_SECRET;
+    } else {
+      process.env.DESKTOP_BACKEND_TEST_SECRET = previousSecret;
+    }
+  });
+
+  const launchInfo = mainModule.startBackend({
+    port: 8123,
+    envFile: '/tmp/dsa/.env',
+    dbPath: '/tmp/dsa/data/stock_analysis.db',
+    logDir: '/tmp/dsa/logs',
+  });
+  fakeBackendProcess.stdout.emit('data', Buffer.from('  后端就绪  \n', 'utf-8'));
+
+  assert.equal(
+    launchInfo.command.includes(process.env.DESKTOP_BACKEND_TEST_SECRET),
+    false
+  );
+  assert.equal(logs.some((line) => line.endsWith('[backend] 后端就绪')), true);
 });
 
 test('startBackend ignores lifecycle events from a replaced process generation', async (t) => {
@@ -2744,6 +2821,88 @@ test('createWindow startup routes a pending deep link after restore and backend 
     }
     fs.rmSync(tempRoot, { recursive: true, force: true });
   });
+});
+
+test('createWindow reports a bounded backend health timeout', async (t) => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-desktop-health-timeout-'));
+  const loadedUrls = [];
+  const originalDateNow = Date.now;
+  let currentTime = 1_000_000;
+  let readyPromise;
+
+  Date.now = () => {
+    currentTime += 61_000;
+    return currentTime;
+  };
+
+  function fakeBrowserWindow() {
+    return {
+      isDestroyed: () => false,
+      on: () => undefined,
+      once: () => undefined,
+      setBackgroundColor: () => undefined,
+      webContents: {
+        on: () => undefined,
+        setWindowOpenHandler: () => undefined,
+        send: () => undefined,
+      },
+      loadFile: async () => undefined,
+      loadURL: async (url) => {
+        loadedUrls.push(url);
+      },
+    };
+  }
+
+  const fakeBackendProcess = new EventEmitter();
+  fakeBackendProcess.pid = 12345;
+  fakeBackendProcess.exitCode = null;
+  fakeBackendProcess.signalCode = null;
+  fakeBackendProcess.killed = false;
+  fakeBackendProcess.stdout = new EventEmitter();
+  fakeBackendProcess.stderr = new EventEmitter();
+  fakeBackendProcess.kill = () => true;
+
+  const fakeNet = {
+    createServer: () => {
+      const server = new EventEmitter();
+      server.listen = () => {
+        process.nextTick(() => server.emit('listening'));
+      };
+      server.close = (callback) => callback();
+      return server;
+    },
+  };
+
+  const mainModule = loadMainModule(t, {
+    platform: 'darwin',
+    browserWindow: fakeBrowserWindow,
+    net: fakeNet,
+    childProcess: {
+      spawn: () => fakeBackendProcess,
+    },
+    app: {
+      getPath: () => tempRoot,
+      whenReady: () => ({
+        then: (handler) => {
+          readyPromise = Promise.resolve().then(handler);
+          return readyPromise;
+        },
+      }),
+      on: () => undefined,
+    },
+  });
+
+  t.after(() => {
+    Date.now = originalDateNow;
+    mainModule.__setBackendProcessForTest(null);
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  await readyPromise;
+
+  assert.equal(loadedUrls.length, 1);
+  const errorUrl = new URL(loadedUrls[0]);
+  assert.match(errorUrl.searchParams.get('error'), /Health check timeout/);
 });
 
 test('stopBackend waits for backend process exit', async (t) => {
