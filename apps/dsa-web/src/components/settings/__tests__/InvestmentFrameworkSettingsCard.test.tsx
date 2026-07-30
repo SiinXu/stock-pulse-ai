@@ -244,7 +244,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
     expect(await screen.findByText('已保存为新版本并激活')).toBeInTheDocument();
   });
 
-  it('preserves a stale draft on conflict until the user explicitly loads latest', async () => {
+  it('automatically replaces a stale draft with the latest server state after a conflict', async () => {
     const existingFramework = {
       frameworkId: 1,
       scope: 'local',
@@ -294,20 +294,13 @@ describe('InvestmentFrameworkSettingsCard', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
 
-    expect(await screen.findByText('配置已被其他操作更新。')).toBeInTheDocument();
-    expect(getFramework).toHaveBeenCalledTimes(1);
-    expect(screen.getByLabelText('自由规则')).toHaveValue('My pending conflict draft');
-    expect(screen.getByText(/当前草稿仍被保留/)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: '载入服务器最新版本' }));
     await waitFor(() => expect(getFramework).toHaveBeenCalledTimes(2));
     expect(await screen.findByLabelText('自由规则')).toHaveValue('Latest server rules');
     expect(screen.getByText('并发 revision：4')).toBeInTheDocument();
     expect(screen.queryByText('配置已被其他操作更新。')).not.toBeInTheDocument();
-    expect(screen.queryByText(/当前草稿仍被保留/)).not.toBeInTheDocument();
   });
 
-  it('does not expose a stale draft when an explicit conflict refresh fails', async () => {
+  it('does not expose a stale draft when conflict refresh fails', async () => {
     const existingFramework = {
       frameworkId: 1,
       scope: 'local',
@@ -359,11 +352,6 @@ describe('InvestmentFrameworkSettingsCard', () => {
       target: { value: 'My pending conflict draft' },
     });
     fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
-
-    expect(await screen.findByText('配置已被其他操作更新。')).toBeInTheDocument();
-    expect(getFramework).toHaveBeenCalledTimes(1);
-    expect(screen.getByLabelText('自由规则')).toHaveValue('My pending conflict draft');
-    fireEvent.click(screen.getByRole('button', { name: '载入服务器最新版本' }));
 
     await waitFor(() => expect(getFramework).toHaveBeenCalledTimes(2));
     expect(await screen.findByText('暂时无法读取个人投资框架。')).toBeInTheDocument();
