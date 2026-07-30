@@ -630,7 +630,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
               <Badge>{formatUiText(text.memory, { ram: model.recommendedRamGb })}</Badge>
               <Badge>{text[MEMORY_TIER_TEXT_KEYS[model.memoryTier]]}</Badge>
               <Badge>{model.license.identifier}</Badge>
-              {installed ? <Badge variant="success"><Check aria-hidden="true" />{text.installed}</Badge> : null}
+              {installed ? <Badge variant="success"><Check className="h-3 w-3" aria-hidden="true" />{text.installed}</Badge> : null}
               {registered && !primary && !agent ? <Badge variant="info">{text.registered}</Badge> : null}
               {primary ? <Badge variant="success">{text.primary}</Badge> : null}
               {agent ? <Badge variant="info"><Bot aria-hidden="true" />{text.agent}</Badge> : null}
@@ -706,7 +706,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
                   disabled={busy}
                   onClick={() => void handleAssignment(modelId, 'primary')}
                 >
-                  <Star aria-hidden="true" />
+                  <Star className="h-3.5 w-3.5" aria-hidden="true" />
                   {text.setPrimary}
                 </Button>
               ) : null}
@@ -717,7 +717,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
                   disabled={busy}
                   onClick={() => void handleAssignment(modelId, 'agent')}
                 >
-                  <Bot aria-hidden="true" />
+                  <Bot className="h-3.5 w-3.5" aria-hidden="true" />
                   {text.setAgent}
                 </Button>
               ) : null}
@@ -761,7 +761,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
           <div className="flex flex-wrap gap-1.5">
             <Badge>{formatUiText(text.memory, { ram: model.minimumMemoryGb })}</Badge>
             <Badge>{model.licenseId}</Badge>
-            {installed ? <Badge variant="success"><Check aria-hidden="true" />{text.installed}</Badge> : null}
+            {installed ? <Badge variant="success"><Check className="h-3 w-3" aria-hidden="true" />{text.installed}</Badge> : null}
             {registered && !primary && !agent ? <Badge variant="info">{text.registered}</Badge> : null}
             {primary ? <Badge variant="success">{text.primary}</Badge> : null}
             {agent ? <Badge variant="info"><Bot aria-hidden="true" />{text.agent}</Badge> : null}
@@ -786,7 +786,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
                 disabled={busy}
                 onClick={() => void handleAssignment(modelId, 'primary')}
               >
-                <Star aria-hidden="true" />{text.setPrimary}
+                <Star className="h-3.5 w-3.5" aria-hidden="true" />{text.setPrimary}
               </Button>
             ) : null}
             {installed && !agent ? (
@@ -796,7 +796,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
                 disabled={busy}
                 onClick={() => void handleAssignment(modelId, 'agent')}
               >
-                <Bot aria-hidden="true" />{text.setAgent}
+                <Bot className="h-3.5 w-3.5" aria-hidden="true" />{text.setAgent}
               </Button>
             ) : null}
           </div>
@@ -933,7 +933,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
                 size="compact"
                 onClick={() => void handleAssignment(primaryPromptModel, 'primary')}
               >
-                <Star aria-hidden="true" />{text.setPrimary}
+                <Star className="h-3.5 w-3.5" aria-hidden="true" />{text.setPrimary}
               </Button>
             )}
           />

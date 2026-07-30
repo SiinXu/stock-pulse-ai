@@ -17,7 +17,7 @@ import { createParsedApiError, getParsedApiError, type ParsedApiError } from '..
 import { analysisApi } from '../api/analysis';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, AppPage, Button, ConfirmDialog, EmptyState, FileInput, PageHeader, SearchableSelect, Surface, Switch, ToastViewport, type SearchableSelectOption } from '../components/common';
+import { ApiErrorAlert, AppPage, Button, ConfirmDialog, EmptyState, FileInput, Modal, PageHeader, SearchableSelect, Surface, Switch, ToastViewport, type SearchableSelectOption } from '../components/common';
 import { SETTINGS_MISC_TEXT } from '../locales/settingsMisc';
 import {
   AuthSettingsCard,
@@ -426,6 +426,7 @@ const SettingsPage: React.FC = () => {
   const [schedulerOverrideFromUi, setSchedulerOverrideFromUi] = useState<boolean | null>(null);
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [isIntelligentImportOpen, setIsIntelligentImportOpen] = useState(false);
   const { beginnerMode, setBeginnerMode } = useBeginnerMode();
   // Advanced sections stay hidden until the user reveals them; re-hiding on
   // enabling beginner mode keeps the simplified navigation predictable.
@@ -1134,6 +1135,8 @@ const SettingsPage: React.FC = () => {
     && activeView === SETTINGS_VIEW_IDS.aiModels.overview;
   const isAiLocalModels = activeSection === SETTINGS_SECTION_IDS.aiModels
     && activeView === SETTINGS_VIEW_IDS.aiModels.localModels;
+  const isInvestmentFrameworkView = activeSection === 'agent_behavior'
+    && activeView === 'investment_framework';
   // Task Routing view: the single place to edit which model each task uses.
   const isAiTaskRouting = activeSection === 'ai_models' && activeView === 'task_routing';
   const pickAiModelItems = useCallback(
@@ -1864,6 +1867,7 @@ const SettingsPage: React.FC = () => {
     && !isAiLocalModels
     && !isAiTaskRouting
     && !isAiReliability
+    && !isInvestmentFrameworkView
     && !isTopLevelAdvanced
     && !(isAlertsSection && activeView === 'events')
     && !(activeSection === 'system_security' && (activeView === 'security' || activeView === 'about'));
@@ -1999,6 +2003,7 @@ const SettingsPage: React.FC = () => {
   ) : activeSection === 'overview'
     || activeSection === 'ai_models'
     || activeSection === 'advanced'
+    || isInvestmentFrameworkView
     || activeCategory === 'system'
     || (isAlertsSection && activeView === 'events' && eventMonitorItems.length > 0)
     || (activeCategory === 'data_source' && activeSubCategory !== 'providers') ? null : (
@@ -2348,7 +2353,7 @@ const SettingsPage: React.FC = () => {
                 />
               </>
             ) : null}
-            {activeSection === 'agent_behavior' ? <InvestmentFrameworkSettingsCard /> : null}
+            {isInvestmentFrameworkView ? <InvestmentFrameworkSettingsCard /> : null}
             {activeCategory === 'system' && activeView === 'runtime' ? (
               <>
                 <SchedulerSettingsCard
@@ -2539,24 +2544,49 @@ const SettingsPage: React.FC = () => {
               </SettingsSectionCard>
             ) : null}
             {activeCategory === 'base' ? (
-              <SettingsSectionCard
-                title={t('settings.intelligentImport')}
-                description={t('settings.intelligentImportDescription')}
-                contentBordered
-              >
-                <IntelligentImport
-                  stockListValue={
-                    (activeItems.find((i) => i.key === 'STOCK_LIST')?.value as string) ?? ''
-                  }
-                  configVersion={configVersion}
-                  maskToken={maskToken}
-                  onMerged={async () => {
-                    await refreshAfterExternalSave(['STOCK_LIST']);
-                    applyPostSaveEffects();
-                  }}
-                  disabled={isSaving || isLoading}
-                />
-              </SettingsSectionCard>
+              <>
+                <SettingsSectionCard
+                  title={t('settings.intelligentImport')}
+                  description={t('settings.intelligentImportDescription')}
+                  actions={(
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="default"
+                      aria-haspopup="dialog"
+                      onClick={() => setIsIntelligentImportOpen(true)}
+                    >
+                      {t('settings.openConfigItems')}
+                    </Button>
+                  )}
+                >
+                  <p className="text-xs leading-6 text-muted-text">
+                    {t('settings.intelligentImportSupportedInputs')}
+                    {' · '}
+                    {t('settings.intelligentImportHint')}
+                  </p>
+                </SettingsSectionCard>
+                <Modal
+                  isOpen={isIntelligentImportOpen}
+                  onClose={() => setIsIntelligentImportOpen(false)}
+                  title={t('settings.intelligentImport')}
+                  description={t('settings.intelligentImportDescription')}
+                  size="wide"
+                >
+                  <IntelligentImport
+                    stockListValue={
+                      (activeItems.find((i) => i.key === 'STOCK_LIST')?.value as string) ?? ''
+                    }
+                    configVersion={configVersion}
+                    maskToken={maskToken}
+                    onMerged={async () => {
+                      await refreshAfterExternalSave(['STOCK_LIST']);
+                      applyPostSaveEffects();
+                    }}
+                    disabled={isSaving || isLoading}
+                  />
+                </Modal>
+              </>
             ) : null}
             {isAiOverview ? (
               <SettingsSectionCard

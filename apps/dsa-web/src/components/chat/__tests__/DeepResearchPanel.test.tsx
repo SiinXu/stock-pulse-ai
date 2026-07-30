@@ -9,6 +9,16 @@ vi.mock('../../../api/agent', () => ({
   agentApi: { research: vi.fn() },
 }));
 
+vi.mock('../../../hooks/useStockIndex', () => ({
+  useStockIndex: () => ({
+    index: [],
+    loading: false,
+    error: null,
+    fallback: false,
+    loaded: true,
+  }),
+}));
+
 vi.mock('react-markdown', () => ({
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
@@ -35,6 +45,10 @@ describe('DeepResearchPanel', () => {
   it('shows the empty hint before a run', () => {
     renderPanel();
     expect(screen.getByText('Enter a question to start deep research.')).toBeTruthy();
+    expect(screen.getByRole('combobox', { name: 'Related stock code' })).toHaveAttribute(
+      'aria-haspopup',
+      'listbox',
+    );
   });
 
   it('keeps the empty hint lightweight and the research configuration at the bottom', () => {
@@ -66,6 +80,30 @@ describe('DeepResearchPanel', () => {
     );
     expect(screen.getByText('Sub-questions and references')).toBeTruthy();
     expect(screen.getByText('What is the moat?')).toBeTruthy();
+  });
+
+  it('preserves Enter submission for a manually entered stock code', async () => {
+    researchMock.mockResolvedValue({
+      success: true,
+      content: 'Submitted with the keyboard.',
+      sources: [],
+      token_usage: 20,
+    });
+    renderPanel();
+
+    fireEvent.change(screen.getByLabelText('Research question'), {
+      target: { value: 'Keyboard submission?' },
+    });
+    const stockInput = screen.getByLabelText('Related stock code');
+    fireEvent.change(stockInput, { target: { value: 'AAPL' } });
+    fireEvent.keyDown(stockInput, { key: 'Enter' });
+
+    await waitFor(() => {
+      expect(researchMock).toHaveBeenCalledWith(
+        { question: 'Keyboard submission?', stockCode: 'AAPL' },
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
+    });
   });
 
   it('surfaces an error when the research response is unsuccessful', async () => {

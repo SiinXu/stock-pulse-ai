@@ -83,7 +83,7 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
           className="min-w-0 flex-1 [&>div]:w-full"
           triggerClassName="h-11 min-h-11 border-0 bg-transparent px-0 text-sm font-normal hover:bg-transparent sm:h-11 sm:min-h-11"
           menuAlign="start"
-          menuPlacement="top"
+          menuPlacement="right"
         />
       </div>
     );

@@ -73,14 +73,16 @@ The history endpoint currently returns the complete history in one unpaginated r
 
 ## Web editor
 
-Settings → **Agent Behavior** shows framework status; **View fields** opens the minimal editor in a configuration dialog:
+Settings → **Agent Behavior → Investment Framework** exposes a dedicated horizontal tab with the inline minimal editor and framework status:
 
 - Create the single local framework (`POST /api/v1/investment-framework`)
 - Save with `expected_revision` to create and activate a new version (`PUT`)
 - Deactivate (`POST .../deactivate`) so analysis no longer injects the framework
 - Delete (`DELETE`) removes the aggregate and all history
 
-The editor supports title, description, free-form rules, and line-based risk/tracking criteria. Full decision-tree UI can be added later; richer content already stored via API remains readable. Saving free-form fields preserves server-owned `decision_tree` / `evaluation_dimensions` so the minimal editor does not wipe structured content. On HTTP 409 revision conflicts, the UI reloads server state.
+**Version history** opens a read-only drawer on the same page and lists immutable versions in descending order with the active state. A user can copy any historical version into the current draft, then save it as a new version using the aggregate's current `revision`; copying alone does not mutate history or activation.
+
+The editor supports title, description, free-form rules, and line-based risk/tracking criteria. Full decision-tree UI can be added later; richer content already stored via API remains readable. Saving free-form fields preserves `decision_tree` / `evaluation_dimensions` from the draft source (the current version or a copied historical version) so the minimal editor does not wipe structured content. On HTTP 409 revision conflicts, the UI reloads server state.
 
 The page always shows a research-only disclaimer: not investment advice.
 

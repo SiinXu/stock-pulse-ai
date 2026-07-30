@@ -5,7 +5,8 @@ import remarkGfm from 'remark-gfm';
 import { Search, StopCircle } from 'lucide-react';
 import { agentApi } from '../../api/agent';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
-import { ApiErrorAlert, Button, Field, InlineAlert, Input, StatePanel, Surface, Textarea } from '../common';
+import { ApiErrorAlert, Button, Field, InlineAlert, StatePanel, Surface, Textarea } from '../common';
+import { StockAutocomplete } from '../StockAutocomplete';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import {
   DEEP_RESEARCH_SESSION_STORAGE_PREFIX,
@@ -76,6 +77,7 @@ export const DeepResearchPanel: React.FC<DeepResearchPanelProps> = ({ sessionId 
   const [question, setQuestion] = useState(initialRun?.question ?? '');
   const [stockCode, setStockCode] = useState(initialRun?.stockCode ?? '');
   const [error, setError] = useState<ParsedApiError | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const runSeqRef = useRef(0);
   const mountedRef = useRef(true);
@@ -175,7 +177,7 @@ export const DeepResearchPanel: React.FC<DeepResearchPanelProps> = ({ sessionId 
         <p className="text-sm text-muted-text">{t('research.emptyHint')}</p>
       ) : null}
 
-      <form className="mt-auto space-y-3" onSubmit={handleRun}>
+      <form ref={formRef} className="mt-auto space-y-3" onSubmit={handleRun}>
         <Textarea
           label={t('research.questionLabel')}
           value={question}
@@ -186,12 +188,19 @@ export const DeepResearchPanel: React.FC<DeepResearchPanelProps> = ({ sessionId 
         />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <Field controlId="deep-research-stock" label={t('research.stockCodeLabel')} hint={t('research.stockCodeHint')} className="sm:w-64">
-            <Input
+            <StockAutocomplete
               id="deep-research-stock"
               value={stockCode}
-              onChange={(event) => setStockCode(event.target.value)}
+              onChange={setStockCode}
+              onSubmit={(code, _name, source, metadata) => {
+                setStockCode(metadata?.displayCode ?? code);
+                if (source !== 'autocomplete') {
+                  formRef.current?.requestSubmit();
+                }
+              }}
               disabled={running}
-              autoComplete="off"
+              placeholder={t('research.stockCodeHint')}
+              ariaLabel={t('research.stockCodeLabel')}
             />
           </Field>
           {running ? (

@@ -850,7 +850,7 @@ describe('ChatPage', () => {
 
     const mobileToggle = await screen.findByRole('button', { name: '展开策略选择' });
     const skillPanel = screen.getByTestId('chat-skill-picker-panel');
-    expect(mobileToggle).toHaveClass('h-9');
+    expect(mobileToggle).toHaveClass('h-9', '!shadow-none');
     expect(screen.getByRole('textbox', { name: '消息输入框' })).toHaveClass('min-h-11');
     expect(mobileToggle).toHaveAttribute('aria-expanded', 'false');
     expect(skillPanel).toHaveClass('hidden');
@@ -1093,7 +1093,14 @@ describe('ChatPage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('button', { name: '重试' }));
+    const retry = await screen.findByRole('button', { name: '重试' });
+    const alert = screen.getByText('请求失败').closest('[role="alert"]');
+
+    expect(retry).toHaveAttribute('data-control', 'icon-button');
+    expect(retry).toHaveAttribute('data-variant', 'danger');
+    expect(retry.parentElement).toHaveClass('absolute', 'right-2', 'top-2');
+    expect(alert).toHaveClass('pr-12', '[&>div>div]:w-full', '[&_details]:w-full');
+    fireEvent.click(retry);
 
     expect(mockRetryLastStream).toHaveBeenCalledTimes(1);
   });

@@ -54,7 +54,7 @@ export const UiLanguageToggle: React.FC<UiLanguageToggleProps> = ({
           ariaLabel={t('language.toggle')}
           className="min-w-0 flex-1 [&>div]:w-full [&_button]:h-full [&_button]:min-h-0 [&_button]:border-0 [&_button]:bg-transparent [&_button]:px-0 [&_button]:text-sm [&_button]:font-normal [&_button:hover]:bg-transparent"
           menuAlign="start"
-          menuPlacement="top"
+          menuPlacement="right"
         />
       </div>
     );
