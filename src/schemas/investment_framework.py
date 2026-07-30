@@ -7,7 +7,15 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    ValidationError,
+    model_validator,
+)
+from pydantic_core import InitErrorDetails, PydanticCustomError
 
 
 INVESTMENT_FRAMEWORK_CONTENT_SCHEMA_VERSION = "investment-framework-content-v1"
@@ -337,6 +345,22 @@ class InvestmentFrameworkContent(BaseModel):
 
     @model_validator(mode="after")
     def _validate_structure(self) -> "InvestmentFrameworkContent":
+        structure_errors: list[InitErrorDetails] = []
+
+        def add_error(
+            error_type: str,
+            message: str,
+            location: tuple[str | int, ...],
+            input_value: object,
+        ) -> None:
+            structure_errors.append(
+                InitErrorDetails(
+                    type=PydanticCustomError(error_type, message),
+                    loc=location,
+                    input=input_value,
+                )
+            )
+
         if not any(
             (
                 self.decision_tree,
@@ -346,61 +370,156 @@ class InvestmentFrameworkContent(BaseModel):
                 self.free_form_rules,
             )
         ):
-            raise ValueError("Investment framework content must define at least one criterion")
+            add_error(
+                "investment_framework_empty_content",
+                "Investment framework content must define at least one criterion",
+                (),
+                self,
+            )
 
         node_ids = [node.node_id for node in self.decision_tree]
-        if len(node_ids) != len(set(node_ids)):
-            raise ValueError("Decision-tree node IDs must be unique")
+        node_id_indices: dict[str, list[int]] = {}
+        for node_index, node_id in enumerate(node_ids):
+            node_id_indices.setdefault(node_id, []).append(node_index)
+        duplicate_node_ids = {
+            node_id
+            for node_id, indices in node_id_indices.items()
+            if len(indices) > 1
+        }
+        for duplicate_node_id in duplicate_node_ids:
+            for node_index in node_id_indices[duplicate_node_id]:
+                add_error(
+                    "investment_framework_duplicate_node_id",
+                    "Decision-tree node IDs must be unique",
+                    ("decision_tree", node_index, "node_id"),
+                    duplicate_node_id,
+                )
+
         if self.decision_tree:
             known_node_ids = set(node_ids)
-            if self.root_node_id is None or self.root_node_id not in known_node_ids:
-                raise ValueError("root_node_id must identify a decision-tree node")
-            unknown_targets = sorted(
-                {
-                    branch.target_node_id
-                    for node in self.decision_tree
-                    for branch in node.branches
-                    if branch.target_node_id is not None
-                    and branch.target_node_id not in known_node_ids
-                }
+            root_is_valid = (
+                self.root_node_id is not None
+                and self.root_node_id in known_node_ids
             )
-            if unknown_targets:
-                raise ValueError("Decision-tree branches reference unknown target nodes")
-
-            adjacency = {
-                node.node_id: tuple(
-                    branch.target_node_id
-                    for branch in node.branches
-                    if branch.target_node_id is not None
+            if not root_is_valid:
+                add_error(
+                    "investment_framework_root_unknown",
+                    "root_node_id must identify a decision-tree node",
+                    ("root_node_id",),
+                    self.root_node_id,
                 )
-                for node in self.decision_tree
-            }
-            visited = set()
-            visiting = set()
 
-            def visit(node_id: str) -> None:
-                if node_id in visiting:
-                    raise ValueError("Decision tree must not contain cycles")
-                if node_id in visited:
-                    return
-                visiting.add(node_id)
-                for target_node_id in adjacency[node_id]:
-                    visit(target_node_id)
-                visiting.remove(node_id)
-                visited.add(node_id)
+            unknown_target_found = False
+            for node_index, node in enumerate(self.decision_tree):
+                for branch_index, branch in enumerate(node.branches):
+                    target_node_id = branch.target_node_id
+                    if (
+                        target_node_id is not None
+                        and target_node_id not in known_node_ids
+                    ):
+                        unknown_target_found = True
+                        add_error(
+                            "investment_framework_target_unknown",
+                            "Decision-tree branches reference unknown target nodes",
+                            (
+                                "decision_tree",
+                                node_index,
+                                "branches",
+                                branch_index,
+                                "target_node_id",
+                            ),
+                            target_node_id,
+                        )
 
-            visit(self.root_node_id)
-            if visited != known_node_ids:
-                raise ValueError("Every decision-tree node must be reachable from the root")
+            if (
+                root_is_valid
+                and not duplicate_node_ids
+                and not unknown_target_found
+            ):
+                adjacency = {
+                    node.node_id: tuple(
+                        (
+                            branch.target_node_id,
+                            node_index,
+                            branch_index,
+                        )
+                        for branch_index, branch in enumerate(node.branches)
+                        if branch.target_node_id is not None
+                    )
+                    for node_index, node in enumerate(self.decision_tree)
+                }
+                visited: set[str] = set()
+                visiting: set[str] = set()
+                cycle_locations: set[tuple[str | int, ...]] = set()
+
+                def visit(node_id: str) -> None:
+                    if node_id in visited:
+                        return
+                    visiting.add(node_id)
+                    for target_node_id, node_index, branch_index in adjacency[node_id]:
+                        target_location = (
+                            "decision_tree",
+                            node_index,
+                            "branches",
+                            branch_index,
+                            "target_node_id",
+                        )
+                        if target_node_id in visiting:
+                            if target_location not in cycle_locations:
+                                cycle_locations.add(target_location)
+                                add_error(
+                                    "investment_framework_cycle",
+                                    "Decision tree must not contain cycles",
+                                    target_location,
+                                    target_node_id,
+                                )
+                            continue
+                        visit(target_node_id)
+                    visiting.remove(node_id)
+                    visited.add(node_id)
+
+                visit(self.root_node_id)
+                for node_index, node in enumerate(self.decision_tree):
+                    if node.node_id not in visited:
+                        add_error(
+                            "investment_framework_unreachable",
+                            "Every decision-tree node must be reachable from the root",
+                            ("decision_tree", node_index, "node_id"),
+                            node.node_id,
+                        )
         elif self.root_node_id is not None:
-            raise ValueError("root_node_id requires a decision tree")
+            add_error(
+                "investment_framework_root_requires_tree",
+                "root_node_id requires a decision tree",
+                ("root_node_id",),
+                self.root_node_id,
+            )
 
         dimension_names = [
             casefold_investment_framework_dimension_name(item.name)
             for item in self.evaluation_dimensions
         ]
-        if len(dimension_names) != len(set(dimension_names)):
-            raise ValueError("Evaluation dimension names must be unique")
+        dimension_name_indices: dict[str, list[int]] = {}
+        for dimension_index, dimension_name in enumerate(dimension_names):
+            dimension_name_indices.setdefault(dimension_name, []).append(
+                dimension_index
+            )
+        for indices in dimension_name_indices.values():
+            if len(indices) < 2:
+                continue
+            for dimension_index in indices:
+                add_error(
+                    "investment_framework_duplicate_dimension_name",
+                    "Evaluation dimension names must be unique",
+                    ("evaluation_dimensions", dimension_index, "name"),
+                    self.evaluation_dimensions[dimension_index].name,
+                )
+
+        if structure_errors:
+            raise ValidationError.from_exception_data(
+                self.__class__.__name__,
+                structure_errors,
+            )
         return self
 
 

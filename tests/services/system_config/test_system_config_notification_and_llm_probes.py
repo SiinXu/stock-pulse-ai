@@ -181,6 +181,43 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
             "https://oapi.dingtalk.com/robot/send?access_token=saved-token",
         )
 
+    @patch("src.notification_sender.dingtalk_sender.safe_post")
+    def test_test_dingtalk_channel_classifies_api_rejection_without_leaking_secrets(
+        self,
+        mock_post,
+    ) -> None:
+        mock_post.return_value = self._mock_http_response(
+            200,
+            {"errcode": 310000, "errmsg": "keywords not in content"},
+        )
+
+        with self._notification_test_env():
+            payload = self.service.test_notification_channel(
+                channel="dingtalk",
+                items=[
+                    {
+                        "key": "DINGTALK_WEBHOOK_URL",
+                        "value": "https://oapi.dingtalk.com/robot/send?access_token=draft-token",
+                    },
+                    {"key": "DINGTALK_SECRET", "value": "SECdraft_signing_secret"},
+                ],
+                title="Test title",
+                content="hello",
+                timeout_seconds=3,
+            )
+
+        self.assertFalse(payload["success"])
+        self.assertEqual(payload["error_code"], "send_failed")
+        self.assertEqual(payload["stage"], "notification_send")
+        self.assertFalse(payload["retryable"])
+        self.assertEqual(len(payload["attempts"]), 1)
+        self.assertEqual(payload["attempts"][0]["error_code"], "send_failed")
+        self.assertEqual(payload["attempts"][0]["stage"], "notification_send")
+        self.assertFalse(payload["attempts"][0]["retryable"])
+        self.assertIn("access_token=***", payload["attempts"][0]["target"])
+        self.assertNotIn("draft-token", str(payload))
+        self.assertNotIn("SECdraft_signing_secret", str(payload))
+
     @patch("src.notification_sender.custom_webhook_sender.requests.post")
     def test_test_notification_channel_returns_custom_webhook_attempts(self, mock_post) -> None:
         mock_post.side_effect = [

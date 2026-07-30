@@ -25,6 +25,7 @@ import {
 import { SettingsAlert } from './SettingsAlert';
 import { SettingsSectionCard } from './SettingsSectionCard';
 import InvestmentFrameworkStructuredEditor from './InvestmentFrameworkStructuredEditor';
+import LineListTextarea from './LineListTextarea';
 import {
   cloneInvestmentFrameworkContent,
   emptyInvestmentFrameworkContent,
@@ -33,14 +34,6 @@ import {
   validateInvestmentFrameworkContent,
   type InvestmentFrameworkValidationIssue,
 } from './investmentFrameworkEditorModel';
-
-function linesToList(value: string): string[] {
-  return value.split('\n').map((line) => line.trim()).filter(Boolean);
-}
-
-function listToLines(values: string[] | undefined): string {
-  return (values ?? []).join('\n');
-}
 
 function editableContent(content: InvestmentFrameworkContent): InvestmentFrameworkContent {
   return {
@@ -67,16 +60,16 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
   const [changeSummary, setChangeSummary] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [loadError, setLoadError] = useState<ParsedApiError | null>(null);
   const [error, setError] = useState<ParsedApiError | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isConflict, setIsConflict] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
   const [serverValidationIssues, setServerValidationIssues] = useState<
     InvestmentFrameworkValidationIssue[]
   >([]);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [history, setHistory] = useState<InvestmentFrameworkHistoryResponse | null>(null);
   const [selectedHistoryVersion, setSelectedHistoryVersion] = useState<number | null>(null);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
@@ -95,6 +88,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
         setChangeSummary('');
         setShowValidation(false);
       }
+      setIsConflict(false);
       return true;
     } catch (err) {
       const parsed = getParsedApiError(err);
@@ -106,6 +100,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
           setChangeSummary('');
           setShowValidation(false);
         }
+        setIsConflict(false);
         return true;
       }
       setLoadError(parsed);
@@ -264,9 +259,8 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
         setSuccessMessage(t('settings.frameworkSaved'));
       }
       setShowValidation(false);
-      if (isHistoryOpen) {
-        await loadHistory(!exists);
-      }
+      setIsConflict(false);
+      await loadHistory(!exists);
     } catch (err) {
       const parsed = getParsedApiError(err);
       if (parsed.status === 422 || parsed.code === 'validation_error') {
@@ -276,12 +270,10 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
         setShowValidation(true);
       }
       setError(parsed);
-      if (
+      setIsConflict(
         parsed.status === 409
-        || parsed.code === 'investment_framework_revision_conflict'
-      ) {
-        await load(true);
-      }
+        || parsed.code === 'investment_framework_revision_conflict',
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -305,12 +297,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
     } catch (err) {
       const parsed = getParsedApiError(err);
       setError(parsed);
-      if (
-        parsed.status === 409
-        || parsed.code === 'investment_framework_revision_conflict'
-      ) {
-        await load(true);
-      }
+      setIsConflict(parsed.status === 409);
     } finally {
       setIsSubmitting(false);
     }
@@ -384,7 +371,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
             size="default"
             aria-controls="investment-framework-history-drawer"
             aria-expanded={isHistoryOpen}
-            disabled={!exists || isLoading}
+            disabled={!exists || isLoading || Boolean(loadError)}
             onClick={() => setIsHistoryOpen((current) => !current)}
           >
             <History className="h-3.5 w-3.5" aria-hidden="true" />
@@ -401,7 +388,9 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
         }
       >
         <div className="min-w-0 space-y-4">
-          <p className="text-xs leading-6 text-muted-text">{t('settings.frameworkDisclaimer')}</p>
+          <p className="text-xs leading-6 text-muted-text">
+            {t('settings.frameworkDisclaimer')}
+          </p>
           {isLoading ? (
             <StatePanel state="loading" title={t('common.loading')} size="compact" titleAs="p" />
           ) : loadError ? (
@@ -420,7 +409,9 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                   <span>
                     {framework.activeVersion == null
                       ? t('settings.frameworkActiveVersionNone')
-                      : t('settings.frameworkActiveVersionValue', { version: framework.activeVersion })}
+                      : t('settings.frameworkActiveVersionValue', {
+                        version: framework.activeVersion,
+                      })}
                   </span>
                 </div>
               ) : null}
@@ -494,15 +485,15 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                         limit: INVESTMENT_FRAMEWORK_LIMITS.ruleLength,
                       })}
                     </span>
-                    <textarea
+                    <LineListTextarea
                       id="investment-framework-risk-rules"
                       className={`${fieldClass} min-h-20`}
                       aria-label={t('settings.frameworkRiskRulesLabel')}
-                      value={listToLines(content.riskRules)}
+                      values={content.riskRules}
                       disabled={isSubmitting}
-                      onChange={(event) => setContent((current) => ({
+                      onValuesChange={(riskRules) => setContent((current) => ({
                         ...current,
-                        riskRules: linesToList(event.target.value),
+                        riskRules,
                       }))}
                       placeholder={t('settings.frameworkListPlaceholder')}
                     />
@@ -530,15 +521,15 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                         limit: INVESTMENT_FRAMEWORK_LIMITS.ruleLength,
                       })}
                     </span>
-                    <textarea
+                    <LineListTextarea
                       id="investment-framework-tracking"
                       className={`${fieldClass} min-h-20`}
                       aria-label={t('settings.frameworkTrackingLabel')}
-                      value={listToLines(content.trackingCriteria)}
+                      values={content.trackingCriteria}
                       disabled={isSubmitting}
-                      onChange={(event) => setContent((current) => ({
+                      onValuesChange={(trackingCriteria) => setContent((current) => ({
                         ...current,
-                        trackingCriteria: linesToList(event.target.value),
+                        trackingCriteria,
                       }))}
                       placeholder={t('settings.frameworkListPlaceholder')}
                     />
@@ -586,7 +577,16 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                 />
               ) : null}
               {error ? (
-                <ApiErrorAlert error={error} />
+                <ApiErrorAlert
+                  error={error}
+                  actionLabel={isConflict ? t('settings.frameworkLoadLatest') : undefined}
+                  onAction={isConflict ? () => void load(true) : undefined}
+                />
+              ) : null}
+              {isConflict ? (
+                <p className="text-xs leading-5 text-secondary-text">
+                  {t('settings.frameworkConflictDraftPreserved')}
+                </p>
               ) : null}
               {successMessage ? (
                 <SettingsAlert
@@ -633,43 +633,44 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
         {isHistoryOpen ? (
           <aside
             id="investment-framework-history-drawer"
-            className="min-w-0 space-y-3 rounded-xl border settings-border bg-background/20 p-4"
+            className="min-w-0 self-start rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4 shadow-soft-card"
             aria-label={t('settings.frameworkHistory')}
           >
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
-                    <History className="h-4 w-4" aria-hidden="true" />
-                    {t('settings.frameworkHistory')}
-                  </h3>
-                  <p className="mt-1 text-xs leading-5 text-secondary-text">
-                    {t('settings.frameworkHistoryDescription')}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1">
-                  <IconButton
-                    type="button"
-                    variant="outline"
-                    size="compact"
-                    disabled={isHistoryLoading || !exists}
-                    isLoading={isHistoryLoading}
-                    aria-label={t('settings.frameworkHistoryRefresh')}
-                    onClick={() => void loadHistory()}
-                  >
-                    <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                  </IconButton>
-                  <IconButton
-                    type="button"
-                    variant="outline"
-                    size="compact"
-                    aria-label={t('settings.frameworkHistoryClose')}
-                    onClick={() => setIsHistoryOpen(false)}
-                  >
-                    <X className="h-4 w-4" aria-hidden="true" />
-                  </IconButton>
-                </div>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <History className="h-4 w-4" aria-hidden="true" />
+                  {t('settings.frameworkHistory')}
+                </h3>
+                <p className="mt-1 text-xs leading-5 text-muted-text">
+                  {t('settings.frameworkHistoryDescription')}
+                </p>
               </div>
+              <div className="flex items-center gap-1">
+                <IconButton
+                  type="button"
+                  variant="ghost"
+                  size="compact"
+                  aria-label={t('settings.frameworkHistoryRefresh')}
+                  disabled={isHistoryLoading}
+                  isLoading={isHistoryLoading}
+                  onClick={() => void loadHistory()}
+                >
+                  <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                </IconButton>
+                <IconButton
+                  type="button"
+                  variant="ghost"
+                  size="compact"
+                  aria-label={t('settings.frameworkHistoryClose')}
+                  onClick={() => setIsHistoryOpen(false)}
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden="true" />
+                </IconButton>
+              </div>
+            </div>
 
+            <div className="mt-4 space-y-3">
               {isHistoryLoading && !history ? (
                 <StatePanel
                   state="loading"
@@ -694,7 +695,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
               ) : null}
               {history?.items.length ? (
                 <div
-                  className="max-h-52 space-y-2 overflow-y-auto pr-1"
+                  className="max-h-56 space-y-2 overflow-y-auto pr-1"
                   role="list"
                   aria-label={t('settings.frameworkHistoryList')}
                 >
@@ -702,9 +703,11 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                     <div key={item.version} role="listitem">
                       <button
                         type="button"
-                        aria-label={t('settings.frameworkHistoryVersion', { version: item.version })}
+                        aria-label={t('settings.frameworkHistoryVersion', {
+                          version: item.version,
+                        })}
                         aria-pressed={selectedHistoryVersion === item.version}
-                        className="flex w-full items-center justify-between gap-2 rounded-lg border settings-border px-3 py-2 text-left hover:bg-[var(--settings-surface-hover)]"
+                        className="flex w-full items-center justify-between gap-2 rounded-lg border border-[var(--settings-border)] px-3 py-2 text-left transition-colors hover:bg-[var(--settings-surface-hover)]"
                         onClick={() => setSelectedHistoryVersion(item.version)}
                       >
                         <span className="min-w-0">
@@ -722,11 +725,18 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                             </time>
                           </span>
                         </span>
-                        {item.isActive ? (
-                          <Badge variant="success" size="sm">
-                            {t('settings.frameworkHistoryActive')}
-                          </Badge>
-                        ) : null}
+                        <span className="flex flex-wrap justify-end gap-1">
+                          {item.version === history.latestVersion ? (
+                            <Badge variant="default" size="sm">
+                              {t('settings.frameworkHistoryLatest')}
+                            </Badge>
+                          ) : null}
+                          {item.isActive ? (
+                            <Badge variant="success" size="sm">
+                              {t('settings.frameworkHistoryActive')}
+                            </Badge>
+                          ) : null}
+                        </span>
                       </button>
                     </div>
                   ))}
@@ -735,7 +745,8 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
 
               {selectedHistory ? (
                 <section
-                  className="space-y-3 border-t border-border/60 pt-3"
+                  className="space-y-3 border-t border-[var(--settings-border)] pt-3"
+                  role="region"
                   aria-label={t('settings.frameworkHistoryDetails')}
                   data-testid={`framework-history-inspector-${selectedHistory.version}`}
                 >
@@ -765,7 +776,9 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                       </dd>
                     </div>
                     <div>
-                      <dt className="text-muted-text">{t('settings.frameworkHistoryDimensions')}</dt>
+                      <dt className="text-muted-text">
+                        {t('settings.frameworkHistoryDimensions')}
+                      </dt>
                       <dd className="text-secondary-text">
                         {selectedHistory.content.evaluationDimensions?.length ?? 0}
                       </dd>
@@ -786,6 +799,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                   </Button>
                 </section>
               ) : null}
+            </div>
           </aside>
         ) : null}
       </div>

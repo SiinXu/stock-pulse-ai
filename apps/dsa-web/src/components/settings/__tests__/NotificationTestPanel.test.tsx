@@ -142,6 +142,51 @@ describe('NotificationTestPanel', () => {
     expect(screen.getByText('https://oapi.dingtalk.com/robot/send?access_token=***')).toBeInTheDocument();
   });
 
+  it('renders a classified DingTalk API rejection without exposing secrets', async () => {
+    testNotificationChannel.mockResolvedValueOnce({
+      success: false,
+      message: 'dingtalk 通知测试失败',
+      errorCode: 'send_failed',
+      stage: 'notification_send',
+      retryable: false,
+      latencyMs: 8,
+      attempts: [
+        {
+          channel: 'dingtalk',
+          success: false,
+          message: '通知测试发送失败',
+          target: 'https://oapi.dingtalk.com/robot/send?access_token=***',
+          errorCode: 'send_failed',
+          stage: 'notification_send',
+          retryable: false,
+          latencyMs: 8,
+        },
+      ],
+    });
+
+    render(
+      <NotificationTestPanel
+        items={[
+          { key: 'DINGTALK_WEBHOOK_URL', value: '******' },
+          { key: 'DINGTALK_SECRET', value: '******' },
+        ]}
+        maskToken="******"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '配置' }));
+    chooseOption(screen.getByLabelText('渠道'), 'dingtalk');
+    fireEvent.click(screen.getByRole('button', { name: /发送测试/ }));
+
+    expect(await screen.findByText('测试失败')).toBeInTheDocument();
+    expect(screen.getAllByText('send_failed').length).toBeGreaterThan(0);
+    expect(
+      screen.getByText('https://oapi.dingtalk.com/robot/send?access_token=***'),
+    ).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent('draft-token');
+    expect(document.body).not.toHaveTextContent('SECdraft_signing_secret');
+  });
+
   it('uses translated defaults when UI language changes and user has not edited fields', async () => {
     localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'zh');
 

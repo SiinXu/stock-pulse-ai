@@ -9,14 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Fixed] Treated DingTalk signing secrets as opaque provider values and localized newly added Web settings and analysis copy across all translated bundles.
-- [Fixed] Aligned Web investment-framework dimension uniqueness with backend Unicode case folding and field-level duplicate errors.
 - [Fixed] Separated successful paper-trade submission from follow-up portfolio refresh failures, with a page-level refresh retry and accurate success copy.
 - [Added] Added shared structured phase, signal-attribution, and strategy-synthesis report sections across synchronous, task, and history results, and expanded Japan/Korea search seeds with explicit suffix and manual-entry guidance.
 - [Added] Added Web paper-account trading with explicit account labeling, optional latest-close pricing, actionable failures, and in-place portfolio refreshes.
 - [Added] Added per-request Web analysis-phase controls for single, batch, import, reanalysis, and portfolio analysis flows while keeping automatic inference as the default.
 - [Added] Completed Settings lifecycle controls with last-good configuration rollback, durable scheduled-run history, structured investment-framework editing and immutable history copy-to-draft, plus masked DingTalk group webhook configuration and testing.
-- [Fixed] Aligned investment-framework history timestamps, editor collection and rule limits, and backend validation placement with the authoritative schema.
-- [Added] Added Web decision-memory controls, editable alert cooldown policies, and a global filtered decision-outcome explorer.
+- [Fixed] Aligned investment-framework history timestamps and latest markers, stable line and node-ID editing, Unicode 15 dimension uniqueness, collection/rule limits, and field-addressable backend validation with the authoritative schema.
 - [Changed] Refined Web Home and Settings with bordered attention panels, compact shared help and local-model icons, and a cleaner embedded Usage header.
 - [Changed] Refined Web Home, Research, Chat, and Settings layouts with modal intelligent import, a dedicated investment-framework tab with an inline editor and in-page history drawer, stock autocomplete in Deep Research, compact retry controls, a navigable Research parent row, right-opening Profile preferences, and adaptive history and scheduler panels.
 - [Added] Added Web decision-memory controls, bounded editable alert cooldown policies, and a global filtered decision-outcome explorer.

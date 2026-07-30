@@ -506,4 +506,74 @@ describe('investmentFrameworkEditorModel', () => {
       },
     ]);
   });
+
+  it('maps real structural 422 types to editor-addressable node and dimension paths', () => {
+    const content = validContent();
+
+    expect(validationIssuesFromFrameworkApiDetails({
+      issues: [
+        {
+          type: 'investment_framework_duplicate_node_id',
+          loc: ['body', 'content', 'decision_tree', 1, 'node_id'],
+          msg: 'Decision-tree node IDs must be unique',
+        },
+        {
+          type: 'investment_framework_cycle',
+          loc: ['body', 'content', 'decision_tree', 0, 'branches', 0, 'target_node_id'],
+          msg: 'Decision tree must not contain cycles',
+        },
+        {
+          type: 'investment_framework_unreachable',
+          loc: ['body', 'content', 'decision_tree', 1, 'node_id'],
+          msg: 'Every decision-tree node must be reachable from the root',
+        },
+        {
+          type: 'investment_framework_duplicate_dimension_name',
+          loc: ['body', 'content', 'evaluation_dimensions', 0, 'name'],
+          msg: 'Evaluation dimension names must be unique',
+        },
+      ],
+    }, content)).toEqual([
+      {
+        code: 'duplicate_node_id',
+        path: 'decisionTree.1.nodeId',
+        value: 'valuation',
+      },
+      {
+        code: 'cycle',
+        path: 'decisionTree.0.branches.0.targetNodeId',
+        value: 'root',
+      },
+      {
+        code: 'unreachable',
+        path: 'decisionTree.1.nodeId',
+        value: 'valuation',
+      },
+      {
+        code: 'duplicate_dimension_name',
+        path: 'evaluationDimensions.0.name',
+        value: 'moat',
+      },
+    ]);
+  });
+
+  it('keeps unknown server diagnostics out of the localized primary error', () => {
+    const content = validContent();
+
+    expect(validationIssuesFromFrameworkApiDetails({
+      issues: [
+        {
+          type: 'future_validation_type',
+          loc: ['body', 'content', 'future_field'],
+          msg: 'Provider diagnostic must remain in error details',
+        },
+      ],
+    }, content)).toEqual([
+      {
+        code: 'server_validation',
+        path: 'future_field',
+        value: undefined,
+      },
+    ]);
+  });
 });

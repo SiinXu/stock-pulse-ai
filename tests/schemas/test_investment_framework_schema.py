@@ -324,6 +324,86 @@ def test_dimension_casefold_contract_rejects_duplicates_and_allows_newer_additio
     ]
 
 
+def test_structure_errors_expose_editor_addressable_locations() -> None:
+    duplicate_nodes = _structured_content()
+    duplicate_nodes["decision_tree"][1]["node_id"] = "quality"
+    with pytest.raises(ValidationError) as duplicate_node_error:
+        InvestmentFrameworkContent.model_validate(duplicate_nodes)
+    assert {
+        (error["type"], error["loc"])
+        for error in duplicate_node_error.value.errors(include_url=False)
+    } >= {
+        (
+            "investment_framework_duplicate_node_id",
+            ("decision_tree", 0, "node_id"),
+        ),
+        (
+            "investment_framework_duplicate_node_id",
+            ("decision_tree", 1, "node_id"),
+        ),
+    }
+
+    unknown_target = _structured_content()
+    unknown_target["decision_tree"][0]["branches"][0]["target_node_id"] = "missing"
+    with pytest.raises(ValidationError) as target_error:
+        InvestmentFrameworkContent.model_validate(unknown_target)
+    assert (
+        "investment_framework_target_unknown",
+        ("decision_tree", 0, "branches", 0, "target_node_id"),
+    ) in {
+        (error["type"], error["loc"])
+        for error in target_error.value.errors(include_url=False)
+    }
+
+    cyclic = _structured_content()
+    cyclic["decision_tree"][1]["branches"][0] = {
+        "condition": "Loop",
+        "target_node_id": "quality",
+    }
+    with pytest.raises(ValidationError) as cycle_error:
+        InvestmentFrameworkContent.model_validate(cyclic)
+    assert (
+        "investment_framework_cycle",
+        ("decision_tree", 1, "branches", 0, "target_node_id"),
+    ) in {
+        (error["type"], error["loc"])
+        for error in cycle_error.value.errors(include_url=False)
+    }
+
+    unreachable = _structured_content()
+    unreachable["decision_tree"][0]["branches"][0] = {
+        "condition": "Stop",
+        "outcome": "Terminal",
+    }
+    with pytest.raises(ValidationError) as unreachable_error:
+        InvestmentFrameworkContent.model_validate(unreachable)
+    assert (
+        "investment_framework_unreachable",
+        ("decision_tree", 1, "node_id"),
+    ) in {
+        (error["type"], error["loc"])
+        for error in unreachable_error.value.errors(include_url=False)
+    }
+
+    duplicate_dimensions = _structured_content()
+    duplicate_dimensions["evaluation_dimensions"][1]["name"] = "moat"
+    with pytest.raises(ValidationError) as dimension_error:
+        InvestmentFrameworkContent.model_validate(duplicate_dimensions)
+    assert {
+        (error["type"], error["loc"])
+        for error in dimension_error.value.errors(include_url=False)
+    } >= {
+        (
+            "investment_framework_duplicate_dimension_name",
+            ("evaluation_dimensions", 0, "name"),
+        ),
+        (
+            "investment_framework_duplicate_dimension_name",
+            ("evaluation_dimensions", 1, "name"),
+        ),
+    }
+
+
 def test_decision_tree_rejects_cycles_and_unreachable_nodes() -> None:
     cyclic = _structured_content()
     cyclic["decision_tree"][1]["branches"][0] = {

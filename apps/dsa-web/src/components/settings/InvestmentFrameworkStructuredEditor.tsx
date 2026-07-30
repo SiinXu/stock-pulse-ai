@@ -11,6 +11,7 @@ import type {
 } from '../../types/investmentFramework';
 import type { UiTextKey } from '../../i18n/uiText';
 import { Button, ConfirmDialog } from '../common';
+import LineListTextarea from './LineListTextarea';
 import { SettingsAlert } from './SettingsAlert';
 import {
   canCommitInvestmentFrameworkNodeRename,
@@ -46,10 +47,6 @@ function moveItem<T>(items: T[], from: number, to: number): T[] {
   const [item] = next.splice(from, 1);
   next.splice(to, 0, item);
   return next;
-}
-
-function linesToList(value: string): string[] {
-  return value.split('\n').map((line) => line.trim()).filter(Boolean);
 }
 
 const InvestmentFrameworkStructuredEditor: React.FC<
@@ -226,7 +223,7 @@ const InvestmentFrameworkStructuredEditor: React.FC<
       ...dimensions.slice(0, index + 1),
       {
         ...source,
-        name: `${source.name} copy`.trim(),
+        name: `${source.name} ${t('common.copy')}`.trim(),
         criteria: [...(source.criteria ?? [])],
       },
       ...dimensions.slice(index + 1),
@@ -694,15 +691,13 @@ const InvestmentFrameworkStructuredEditor: React.FC<
                     limit: INVESTMENT_FRAMEWORK_LIMITS.ruleLength,
                   })}
                 </span>
-                <textarea
+                <LineListTextarea
                   className={`${fieldClass} min-h-20`}
                   aria-label={t('settings.frameworkDimensionCriteria')}
-                  value={(dimension.criteria ?? []).join('\n')}
+                  values={dimension.criteria}
                   disabled={disabled}
                   placeholder={t('settings.frameworkListPlaceholder')}
-                  onChange={(event) => updateDimension(index, {
-                    criteria: linesToList(event.target.value),
-                  })}
+                  onValuesChange={(criteria) => updateDimension(index, { criteria })}
                 />
               </label>
               {currentDimensionIssues.length ? (

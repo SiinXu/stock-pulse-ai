@@ -248,6 +248,50 @@ def test_api_schema_is_strict_and_has_no_client_selected_account_identity(
     assert update_schema["properties"]["expected_revision"]["minimum"] == 1
 
 
+def test_api_exposes_editor_addressable_structure_validation_locations(
+    client: TestClient,
+) -> None:
+    content = {
+        "title": "Structured validation",
+        "root_node_id": "root",
+        "decision_tree": [
+            {
+                "node_id": "root",
+                "question": "Continue?",
+                "branches": [
+                    {
+                        "condition": "Yes",
+                        "target_node_id": "missing",
+                    }
+                ],
+            }
+        ],
+    }
+
+    response = client.post(
+        "/api/v1/investment-framework",
+        json={"content": content},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"] == "validation_error"
+    assert response.json()["details"]["issues"] == [
+        {
+            "type": "investment_framework_target_unknown",
+            "loc": [
+                "body",
+                "content",
+                "decision_tree",
+                0,
+                "branches",
+                0,
+                "target_node_id",
+            ],
+            "msg": "Decision-tree branches reference unknown target nodes",
+        }
+    ]
+
+
 @pytest.mark.parametrize(
     "changes",
     (
