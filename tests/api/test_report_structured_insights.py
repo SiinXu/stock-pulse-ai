@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """Contract tests for the optional structured report insight projection."""
 
-from src.schemas.report_structured_insights import (
+from api.v1.schemas.report_structured_insights import (
     REPORT_STRUCTURED_INSIGHTS_SCHEMA_VERSION,
     project_report_structured_insights_for_api,
 )

@@ -581,7 +581,7 @@ def get_history_detail(
             language=report_language,
             log_context={"record_id": record_id, "path": "history_detail"},
         )
-        from src.schemas.report_structured_insights import (
+        from api.v1.schemas.report_structured_insights import (
             project_report_structured_insights_for_api,
         )
 

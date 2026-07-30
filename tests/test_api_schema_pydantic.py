@@ -66,6 +66,16 @@ LOCAL_MODEL_CATALOG_SCHEMAS = (
     "LocalModelQ4Artifact",
     "LocalModelUpstream",
 )
+REPORT_STRUCTURED_INSIGHT_SCHEMAS = (
+    "ReportStructuredInsights",
+    "ReportStructuredPhaseContext",
+    "ReportStructuredPhaseDecision",
+    "ReportStructuredSignalAttribution",
+    "ReportStructuredStrategyConflict",
+    "ReportStructuredStrategySkill",
+    "ReportStructuredStrategySummary",
+    "ReportStructuredStrategySynthesis",
+)
 
 
 def _collect_component_schema_refs(node: Any) -> set[str]:
@@ -214,6 +224,19 @@ def test_structured_insights_static_api_spec_matches_runtime_contract() -> None:
     ]
 
     assert static_property == runtime_property
+    assert static_property["anyOf"][0] == {
+        "$ref": "#/components/schemas/ReportStructuredInsights",
+    }
+    for schema_name in REPORT_STRUCTURED_INSIGHT_SCHEMAS:
+        assert (
+            static_spec["components"]["schemas"][schema_name]
+            == runtime_spec["components"]["schemas"][schema_name]
+        )
+    root_schema = static_spec["components"]["schemas"]["ReportStructuredInsights"]
+    assert root_schema["required"] == ["schema_version"]
+    assert root_schema["properties"]["schema_version"]["const"] == (
+        "report-structured-insights-v1"
+    )
 
 
 def test_v1_prefix_is_applied_at_app_mount_level() -> None:

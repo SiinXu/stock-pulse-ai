@@ -13,10 +13,10 @@
     ]
   },
   "decisionEvidence": {
-    "count": 93,
-    "sha256": "7c2e24a79a5f4403fd19eb652b071e1b2e8b6625e5a761fa0a903e3bd8429f5d",
-    "localeValueCount": 501,
-    "revisionSha256": "843d0e18fa8087f9a4b32446ad107712268703e62c88ab33ea31e75aecb6cf86"
+    "count": 95,
+    "sha256": "2faa80b93b2962304e973f99d5a103233e2ddcb994bf718b95b76f4e970b27b8",
+    "localeValueCount": 517,
+    "revisionSha256": "803c7f7f32bc386382705c3d313090319bea14ad5647bf12a2759d3d74d411c8"
   },
   "languageReview": {
     "zh": {
@@ -398,15 +398,15 @@
         "keySetSha256": "287a7020f60361e05ae78a4d14012ac1d3b376466709d8136614b53a744d89fb",
         "bundleSha256": {
           "zh": "5e8249b53f304eac81d84d3c3aac7723f8cf4dc001de8ad22ff67d11d481b5d2",
-          "zh-TW": "e58a652b92088b646c4b943fe04c703070e5c3c79f5ace5d0a16120c64c97649",
+          "zh-TW": "d86f38f864074b17a04bd6977bee4544380a9710cef028499db4365f4079fe0d",
           "en": "b7436b4c78a430094721dc26e191b8048302d314b92b4ab3dbd863612344b14c",
-          "ja": "1adf8157b455e808cb22defa85b6c1aeb91db4782eaea3f5f382c1d95f6638d2",
-          "ko": "2d55ce12787859fca02a26fe06d9c2c67d771d9f34a736f973b6b700ae64a3ff",
-          "de": "90e5447cb34529070a1c00c608a494c6ca91a66d32ca1dab3165dfb4e9247c71",
-          "es": "7a8ac799d9fb1073f6bcac081fbf61ac6e26d20e6519e9436cd5b84f2fa9d123",
-          "ms": "3c2bede73e6d440be1f9df0596bfa2de1805b6d3e5d9541f4a8953ad95c9f245",
-          "fr": "3463828df020e111b12bddd3368e26a5de216b2af868aab072f5ca7196dfb831",
-          "id": "961f576f7b82ad49fc485fa90e2ea69cfabf9d603fabf29a285a7e3ceeec2c50"
+          "ja": "8232001e85541d0ef9bc5f7f631088b638ca1997b2e1188ff1aa6f8fbe824bac",
+          "ko": "c15a9717519706292fe0e48c81e415cc5031ba7b32bc97c9434a532b6ab9f6cc",
+          "de": "c654df6acb55b282f45ac7cda9bec2ab56cd1f00e1614ad361c43803e1259dbe",
+          "es": "242f71087751811d7c2b66803cc3a8e0d66d34740fa6156fc5505e9d279e1aa8",
+          "ms": "70f961ce03b543d7dcaa1714f27f2830ef1ca5245a9446c04e277071fb834995",
+          "fr": "621b682f4a1e3e0fd99ea23d3a2bd32354bcdf84f49319083cea5dec2f82d0ac",
+          "id": "af8fa53d626f0109e24d3df4ac7e6d74064f020c3cc415415b74e02afadf717f"
         }
       }
     },
@@ -3299,6 +3299,64 @@
         "ms": "Lonjakan volum dagangan berhampiran dasar",
         "fr": "Hausse du volume des transactions près d’un point bas",
         "id": "Lonjakan volume perdagangan di area bawah"
+      }
+    },
+    {
+      "id": "rollback_unavailable_message_locale_candidates",
+      "key": "api.error.STABLE_ERROR_TEXT.rollback_unavailable.message",
+      "category": "error",
+      "rationale": "Localizes the rollback-unavailable recovery message while preserving the contract that no stable snapshot exists and no configuration was changed.",
+      "sourceIds": [
+        "stockpulse_product_contract"
+      ],
+      "before": {
+        "zh-TW": "There is no previous stable configuration available, so nothing was changed.",
+        "ja": "There is no previous stable configuration available, so nothing was changed.",
+        "ko": "There is no previous stable configuration available, so nothing was changed.",
+        "de": "There is no previous stable configuration available, so nothing was changed.",
+        "es": "There is no previous stable configuration available, so nothing was changed.",
+        "ms": "There is no previous stable configuration available, so nothing was changed.",
+        "fr": "There is no previous stable configuration available, so nothing was changed.",
+        "id": "There is no previous stable configuration available, so nothing was changed."
+      },
+      "recommended": {
+        "zh-TW": "沒有可用的先前穩定設定，因此沒有任何變更。",
+        "ja": "利用可能な以前の安定した構成がないため、何も変更されませんでした。",
+        "ko": "이전에 사용 가능한 안정적인 구성이 없으므로 변경된 사항이 없습니다.",
+        "de": "Es ist keine vorherige stabile Konfiguration verfügbar, daher wurde nichts geändert.",
+        "es": "No hay ninguna configuración estable anterior disponible, por lo que no se cambió nada.",
+        "ms": "Tiada konfigurasi stabil sebelumnya tersedia, jadi tiada apa-apa yang diubah.",
+        "fr": "Aucune configuration stable précédente n'est disponible, donc rien n'a été modifié.",
+        "id": "Tidak ada konfigurasi stabil sebelumnya yang tersedia, jadi tidak ada yang diubah."
+      }
+    },
+    {
+      "id": "rollback_unavailable_title_locale_candidates",
+      "key": "api.error.STABLE_ERROR_TEXT.rollback_unavailable.title",
+      "category": "error",
+      "rationale": "Localizes the rollback-unavailable title without changing the stable error code or implying that a rollback can proceed.",
+      "sourceIds": [
+        "stockpulse_product_contract"
+      ],
+      "before": {
+        "zh-TW": "No configuration is available to roll back",
+        "ja": "No configuration is available to roll back",
+        "ko": "No configuration is available to roll back",
+        "de": "No configuration is available to roll back",
+        "es": "No configuration is available to roll back",
+        "ms": "No configuration is available to roll back",
+        "fr": "No configuration is available to roll back",
+        "id": "No configuration is available to roll back"
+      },
+      "recommended": {
+        "zh-TW": "沒有可回滾的設定",
+        "ja": "ロールバックできる構成がありません",
+        "ko": "롤백할 수 있는 구성이 없습니다.",
+        "de": "Es ist keine Konfiguration für ein Rollback verfügbar",
+        "es": "No hay ninguna configuración disponible para revertir",
+        "ms": "Tiada konfigurasi tersedia untuk dipulihkan",
+        "fr": "Aucune configuration n'est disponible pour restaurer",
+        "id": "Tidak ada konfigurasi yang tersedia untuk dipulihkan"
       }
     }
   ]

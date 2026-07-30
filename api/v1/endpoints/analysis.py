@@ -1357,7 +1357,7 @@ def get_analysis_status(task_id: str) -> TaskStatus:
                 language=report_language,
                 log_context={"task_id": task_id, "path": "get_analysis_status"},
             )
-            from src.schemas.report_structured_insights import (
+            from api.v1.schemas.report_structured_insights import (
                 project_report_structured_insights_for_api,
             )
 
@@ -1677,7 +1677,7 @@ def _build_analysis_report(
         language=report_language,
         log_context={"path": "_build_analysis_report"},
     )
-    from src.schemas.report_structured_insights import (
+    from api.v1.schemas.report_structured_insights import (
         project_report_structured_insights_for_api,
     )
 

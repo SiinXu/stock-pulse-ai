@@ -6003,12 +6003,13 @@
               },
               "structured_insights": {
                 "anyOf": [
-                  {},
+                  {
+                    "$ref": "#/components/schemas/ReportStructuredInsights"
+                  },
                   {
                     "type": "null"
                   }
                 ],
-                "title": "Structured Insights",
                 "description": "Optional report-structured-insights-v1 projection containing phase decision, signal attribution, and multi-strategy synthesis"
               }
             }
@@ -6018,6 +6019,413 @@
           "meta",
           "summary"
         ]
+      },
+      "ReportStructuredInsights": {
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "report-structured-insights-v1",
+            "title": "Schema Version"
+          },
+          "phase_decision": {
+            "$ref": "#/components/schemas/ReportStructuredPhaseDecision"
+          },
+          "signal_attribution": {
+            "$ref": "#/components/schemas/ReportStructuredSignalAttribution"
+          },
+          "strategy_synthesis": {
+            "$ref": "#/components/schemas/ReportStructuredStrategySynthesis"
+          }
+        },
+        "type": "object",
+        "required": [
+          "schema_version"
+        ],
+        "title": "ReportStructuredInsights",
+        "description": "Versioned structured-insight projection returned by report APIs."
+      },
+      "ReportStructuredPhaseContext": {
+        "properties": {
+          "phase": {
+            "type": "string",
+            "title": "Phase"
+          },
+          "market": {
+            "type": "string",
+            "title": "Market"
+          },
+          "market_local_time": {
+            "type": "string",
+            "title": "Market Local Time"
+          },
+          "session_date": {
+            "type": "string",
+            "title": "Session Date"
+          },
+          "effective_daily_bar_date": {
+            "type": "string",
+            "title": "Effective Daily Bar Date"
+          },
+          "trigger_source": {
+            "type": "string",
+            "title": "Trigger Source"
+          },
+          "analysis_intent": {
+            "type": "string",
+            "title": "Analysis Intent"
+          },
+          "is_trading_day": {
+            "type": "boolean",
+            "title": "Is Trading Day"
+          },
+          "is_market_open_now": {
+            "type": "boolean",
+            "title": "Is Market Open Now"
+          },
+          "is_partial_bar": {
+            "type": "boolean",
+            "title": "Is Partial Bar"
+          },
+          "minutes_to_open": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Minutes To Open"
+          },
+          "minutes_to_close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Minutes To Close"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "title": "ReportStructuredPhaseContext",
+        "description": "Bounded market-phase context exposed by the report API."
+      },
+      "ReportStructuredPhaseDecision": {
+        "properties": {
+          "phase_context": {
+            "$ref": "#/components/schemas/ReportStructuredPhaseContext"
+          },
+          "action_window": {
+            "type": "string",
+            "title": "Action Window"
+          },
+          "immediate_action": {
+            "type": "string",
+            "title": "Immediate Action"
+          },
+          "next_check_time": {
+            "type": "string",
+            "title": "Next Check Time"
+          },
+          "confidence_reason": {
+            "type": "string",
+            "title": "Confidence Reason"
+          },
+          "watch_conditions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Watch Conditions"
+          },
+          "data_limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Data Limitations"
+          }
+        },
+        "type": "object",
+        "title": "ReportStructuredPhaseDecision",
+        "description": "Bounded phase-decision fields exposed by the report API."
+      },
+      "ReportStructuredSignalAttribution": {
+        "properties": {
+          "technical_indicators": {
+            "type": "integer",
+            "title": "Technical Indicators"
+          },
+          "news_sentiment": {
+            "type": "integer",
+            "title": "News Sentiment"
+          },
+          "fundamentals": {
+            "type": "integer",
+            "title": "Fundamentals"
+          },
+          "market_conditions": {
+            "type": "integer",
+            "title": "Market Conditions"
+          },
+          "strongest_bullish_signal": {
+            "type": "string",
+            "title": "Strongest Bullish Signal"
+          },
+          "strongest_bearish_signal": {
+            "type": "string",
+            "title": "Strongest Bearish Signal"
+          }
+        },
+        "type": "object",
+        "title": "ReportStructuredSignalAttribution",
+        "description": "Normalized signal-attribution weights and strongest-signal labels."
+      },
+      "ReportStructuredStrategyConflict": {
+        "properties": {
+          "conflict_type": {
+            "type": "string",
+            "title": "Conflict Type"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "description_key": {
+            "type": "string",
+            "title": "Description Key"
+          },
+          "participants": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Participants"
+          }
+        },
+        "type": "object",
+        "title": "ReportStructuredStrategyConflict",
+        "description": "One bounded conflict between strategy opinions."
+      },
+      "ReportStructuredStrategySkill": {
+        "properties": {
+          "skill_id": {
+            "type": "string",
+            "title": "Skill Id"
+          },
+          "agent_name": {
+            "type": "string",
+            "title": "Agent Name"
+          },
+          "signal": {
+            "type": "string",
+            "title": "Signal"
+          },
+          "reasoning": {
+            "type": "string",
+            "title": "Reasoning"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "score_adjustment": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Score Adjustment"
+          },
+          "conditions_met": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Conditions Met"
+          },
+          "invalid_signal": {
+            "type": "boolean",
+            "title": "Invalid Signal"
+          }
+        },
+        "type": "object",
+        "title": "ReportStructuredStrategySkill",
+        "description": "One bounded supporting or opposing strategy opinion."
+      },
+      "ReportStructuredStrategySummary": {
+        "properties": {
+          "final_signal": {
+            "type": "string",
+            "title": "Final Signal"
+          },
+          "consensus_level": {
+            "type": "string",
+            "title": "Consensus Level"
+          },
+          "conflict_severity": {
+            "type": "string",
+            "title": "Conflict Severity"
+          },
+          "opinion_count": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Opinion Count"
+          },
+          "total_opinion_count": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Total Opinion Count"
+          },
+          "invalid_opinion_count": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Invalid Opinion Count"
+          },
+          "conflict_count": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Conflict Count"
+          }
+        },
+        "type": "object",
+        "title": "ReportStructuredStrategySummary",
+        "description": "Bounded summary parameters for a strategy synthesis."
+      },
+      "ReportStructuredStrategySynthesis": {
+        "properties": {
+          "final_signal": {
+            "type": "string",
+            "title": "Final Signal"
+          },
+          "conflict_severity": {
+            "type": "string",
+            "title": "Conflict Severity"
+          },
+          "consensus_level": {
+            "type": "string",
+            "title": "Consensus Level"
+          },
+          "summary_key": {
+            "type": "string",
+            "title": "Summary Key"
+          },
+          "weighted_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Weighted Score"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "original_confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Original Confidence"
+          },
+          "conflict_count": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Conflict Count"
+          },
+          "supporting_skills": {
+            "items": {
+              "$ref": "#/components/schemas/ReportStructuredStrategySkill"
+            },
+            "type": "array",
+            "title": "Supporting Skills"
+          },
+          "opposing_skills": {
+            "items": {
+              "$ref": "#/components/schemas/ReportStructuredStrategySkill"
+            },
+            "type": "array",
+            "title": "Opposing Skills"
+          },
+          "conflicts": {
+            "items": {
+              "$ref": "#/components/schemas/ReportStructuredStrategyConflict"
+            },
+            "type": "array",
+            "title": "Conflicts"
+          },
+          "summary_params": {
+            "$ref": "#/components/schemas/ReportStructuredStrategySummary"
+          }
+        },
+        "type": "object",
+        "title": "ReportStructuredStrategySynthesis",
+        "description": "Bounded multi-strategy synthesis exposed by the report API."
       },
       "StockQuote": {
         "type": "object",

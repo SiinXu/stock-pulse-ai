@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Treated DingTalk signing secrets as opaque provider values and localized newly added Web settings and analysis copy across all translated bundles.
 - [Fixed] Aligned Web investment-framework dimension uniqueness with backend Unicode case folding and field-level duplicate errors.
 - [Fixed] Separated successful paper-trade submission from follow-up portfolio refresh failures, with a page-level refresh retry and accurate success copy.
 - [Added] Added shared structured phase, signal-attribution, and strategy-synthesis report sections across synchronous, task, and history results, and expanded Japan/Korea search seeds with explicit suffix and manual-entry guidance.

@@ -14,6 +14,7 @@ from typing import Optional, List, Any, Dict, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from api.v1.schemas.market_phase import MarketPhaseSummary
+from api.v1.schemas.report_structured_insights import ReportStructuredInsights
 from src.schemas.decision_action import DecisionAction
 
 
@@ -266,7 +267,7 @@ class ReportDetails(BaseModel):
         None,
         description="Issue #616 evidence strata (facts/gaps/inference/risks/framework/disclaimer)",
     )
-    structured_insights: Optional[Any] = Field(
+    structured_insights: Optional[ReportStructuredInsights] = Field(
         None,
         description=(
             "Optional report-structured-insights-v1 projection containing phase decision, "
