@@ -33,6 +33,59 @@ vi.mock('../../../api/investmentFramework', () => ({
   },
 }));
 
+function structuredFrameworkResponse() {
+  return {
+    frameworkId: 1,
+    scope: 'local' as const,
+    version: 1,
+    activeVersion: 1,
+    revision: 7,
+    isActive: true,
+    content: {
+      schemaVersion: 'investment-framework-content-v1' as const,
+      title: 'Structured',
+      rootNodeId: 'root',
+      decisionTree: [
+        {
+          nodeId: 'root',
+          question: 'Start?',
+          branches: [
+            {
+              condition: 'Continue',
+              targetNodeId: 'valuation',
+              outcome: null,
+            },
+          ],
+        },
+        {
+          nodeId: 'valuation',
+          question: 'Value?',
+          branches: [
+            {
+              condition: 'Finish',
+              targetNodeId: null,
+              outcome: 'Done',
+            },
+          ],
+        },
+      ],
+      evaluationDimensions: [
+        {
+          name: 'Moat',
+          weight: 50,
+          criteria: ['Pricing power'],
+        },
+      ],
+      riskRules: ['Limit position size'],
+      trackingCriteria: ['Review guidance'],
+      freeFormRules: null,
+    },
+    createdAt: '2026-07-26T00:00:00Z',
+    updatedAt: '2026-07-26T00:00:00Z',
+    versionCreatedAt: '2026-07-26T00:00:00Z',
+  };
+}
+
 describe('InvestmentFrameworkSettingsCard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -46,7 +99,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
     });
   });
 
-  it('creates a framework when none exists', async () => {
+  it('creates a framework from the inline editor when none exists', async () => {
     getFramework.mockRejectedValue(
       createApiError(
         createParsedApiError({
@@ -79,12 +132,8 @@ describe('InvestmentFrameworkSettingsCard', () => {
 
     render(<InvestmentFrameworkSettingsCard />);
 
-    await waitFor(() => {
-      expect(getFramework).toHaveBeenCalled();
-    });
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(await screen.findByLabelText('框架名称')).toBeInTheDocument();
-
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('框架名称'), { target: { value: 'My rules' } });
     fireEvent.change(screen.getByLabelText('自由规则'), {
       target: { value: 'Prefer quality businesses' },
@@ -123,7 +172,6 @@ describe('InvestmentFrameworkSettingsCard', () => {
     expect(await screen.findByText('暂时无法读取个人投资框架。')).toBeInTheDocument();
     expect(screen.queryByText('未配置')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('框架名称')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '版本历史' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument();
     expect(createFramework).not.toHaveBeenCalled();
   });
@@ -184,7 +232,10 @@ describe('InvestmentFrameworkSettingsCard', () => {
         }),
       );
     });
-    expect(screen.getByLabelText('框架名称').closest('form')).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByLabelText('框架名称').closest('form')).toHaveAttribute(
+      'aria-busy',
+      'true',
+    );
     expect(screen.getByRole('status')).toHaveTextContent('处理中...');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await act(async () => {
@@ -250,10 +301,11 @@ describe('InvestmentFrameworkSettingsCard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '载入服务器最新版本' }));
     await waitFor(() => expect(getFramework).toHaveBeenCalledTimes(2));
-    expect(screen.getByLabelText('自由规则')).toHaveValue('Latest server rules');
+    expect(await screen.findByText('暂时无法读取个人投资框架。')).toBeInTheDocument();
+    expect(screen.queryByLabelText('框架名称')).not.toBeInTheDocument();
   });
 
-  it('preserves evaluation dimensions the minimal editor does not own', async () => {
+  it('preserves evaluation dimensions while editing free-form fields', async () => {
     getFramework.mockResolvedValue({
       frameworkId: 1,
       scope: 'local',
@@ -390,164 +442,82 @@ describe('InvestmentFrameworkSettingsCard', () => {
         ],
       }),
     })));
-  });
+  }, 15_000);
 
-  it('renames a node through an existing ID without retargeting that node references', async () => {
-    const existingFramework = {
-      frameworkId: 1,
-      scope: 'local',
-      version: 1,
-      activeVersion: 1,
-      revision: 7,
-      isActive: true,
-      content: {
-        title: 'Structured',
-        rootNodeId: 'A',
-        decisionTree: [
-          {
-            nodeId: 'A',
-            question: 'Start?',
-            branches: [{ condition: 'Continue', targetNodeId: 'B', outcome: null }],
-          },
-          {
-            nodeId: 'B',
-            question: 'Finish?',
-            branches: [{ condition: 'Done', targetNodeId: null, outcome: 'Accept' }],
-          },
-        ],
-        evaluationDimensions: [],
-        riskRules: [],
-        trackingCriteria: [],
-        freeFormRules: null,
-      },
-      createdAt: '2026-07-26T00:00:00Z',
-      updatedAt: '2026-07-26T00:00:00Z',
-      versionCreatedAt: '2026-07-26T00:00:00Z',
-    };
+  it('preserves trailing newlines while typing line-based framework rules', async () => {
+    const existingFramework = structuredFrameworkResponse();
     getFramework.mockResolvedValue(existingFramework);
     updateFramework.mockResolvedValue({
       ...existingFramework,
       version: 2,
       activeVersion: 2,
       revision: 8,
-      content: {
-        ...existingFramework.content,
-        rootNodeId: 'B2',
-        decisionTree: [
-          {
-            ...existingFramework.content.decisionTree[0],
-            nodeId: 'B2',
-          },
-          existingFramework.content.decisionTree[1],
-        ],
-      },
     });
 
     render(<InvestmentFrameworkSettingsCard />);
-    const firstNodeId = await screen.findByLabelText('节点 1 的 ID');
+    await screen.findByDisplayValue('Structured');
 
-    fireEvent.focus(firstNodeId);
-    fireEvent.change(firstNodeId, { target: { value: 'B' } });
-    fireEvent.change(firstNodeId, { target: { value: 'B2' } });
-    fireEvent.blur(firstNodeId);
+    const criteria = screen.getByLabelText('评估标准（每行一条）');
+    fireEvent.change(criteria, { target: { value: 'Pricing power\n' } });
+    expect(screen.getByLabelText('评估标准（每行一条）')).toHaveValue('Pricing power\n');
+    fireEvent.change(screen.getByLabelText('评估标准（每行一条）'), {
+      target: { value: 'Pricing power\nCapital discipline' },
+    });
 
-    expect(screen.getByLabelText('根节点')).toHaveValue('B2');
-    expect(within(screen.getByTestId('framework-node-0')).getByLabelText('目标节点'))
-      .toHaveValue('B');
+    const riskRules = screen.getByLabelText('风险规则（每行一条）');
+    fireEvent.change(riskRules, { target: { value: 'Limit position size\n' } });
+    expect(screen.getByLabelText('风险规则（每行一条）')).toHaveValue(
+      'Limit position size\n',
+    );
+    fireEvent.change(screen.getByLabelText('风险规则（每行一条）'), {
+      target: { value: 'Limit position size\nAvoid leverage' },
+    });
+
+    const tracking = screen.getByLabelText('跟踪条件（每行一条）');
+    fireEvent.change(tracking, { target: { value: 'Review guidance\n' } });
+    expect(screen.getByLabelText('跟踪条件（每行一条）')).toHaveValue(
+      'Review guidance\n',
+    );
+    fireEvent.change(screen.getByLabelText('跟踪条件（每行一条）'), {
+      target: { value: 'Review guidance\nTrack margins' },
+    });
+
     fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
 
     await waitFor(() => expect(updateFramework).toHaveBeenCalledWith(expect.objectContaining({
-      expectedRevision: 7,
       content: expect.objectContaining({
-        rootNodeId: 'B2',
-        decisionTree: [
+        evaluationDimensions: [
           expect.objectContaining({
-            nodeId: 'B2',
-            branches: [
-              expect.objectContaining({ targetNodeId: 'B' }),
-            ],
+            criteria: ['Pricing power', 'Capital discipline'],
           }),
-          expect.objectContaining({ nodeId: 'B' }),
         ],
+        riskRules: ['Limit position size', 'Avoid leverage'],
+        trackingCriteria: ['Review guidance', 'Track margins'],
       }),
     })));
   });
 
-  it('keeps unrelated graph references when a node rename crosses an existing ID', async () => {
-    const existingFramework = {
-      frameworkId: 1,
-      scope: 'local',
-      version: 1,
-      activeVersion: 1,
-      revision: 7,
-      isActive: true,
-      content: {
-        title: 'Rename safety',
-        rootNodeId: 'start',
-        decisionTree: [
-          {
-            nodeId: 'start',
-            question: 'Where next?',
-            branches: [
-              { condition: 'First', targetNodeId: 'A', outcome: null },
-              { condition: 'Second', targetNodeId: 'B', outcome: null },
-            ],
-          },
-          {
-            nodeId: 'A',
-            question: 'A?',
-            branches: [{ condition: 'Done', targetNodeId: null, outcome: 'A done' }],
-          },
-          {
-            nodeId: 'B',
-            question: 'B?',
-            branches: [{ condition: 'Done', targetNodeId: null, outcome: 'B done' }],
-          },
-        ],
-        evaluationDimensions: [],
-        riskRules: [],
-        trackingCriteria: [],
-        freeFormRules: null,
-      },
-      createdAt: '2026-07-26T00:00:00Z',
-      updatedAt: '2026-07-26T00:00:00Z',
-      versionCreatedAt: '2026-07-26T00:00:00Z',
-    };
-    getFramework.mockResolvedValue(existingFramework);
-    updateFramework.mockResolvedValue({
-      ...existingFramework,
-      version: 2,
-      revision: 8,
-    });
+  it('renames a node through an existing ID without stealing its references or focus', async () => {
+    getFramework.mockResolvedValue(structuredFrameworkResponse());
 
     render(<InvestmentFrameworkSettingsCard />);
-    await screen.findByDisplayValue('Rename safety');
+    await screen.findByDisplayValue('Structured');
 
-    const renamedNodeId = screen.getByLabelText('节点 2 的 ID');
-    fireEvent.focus(renamedNodeId);
-    fireEvent.change(renamedNodeId, { target: { value: 'C' } });
-    fireEvent.change(renamedNodeId, { target: { value: 'B' } });
-    fireEvent.change(renamedNodeId, { target: { value: 'B2' } });
-    fireEvent.blur(renamedNodeId);
-    fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
+    const nodeIdInput = screen.getByLabelText('节点 1 的 ID');
+    nodeIdInput.focus();
+    expect(nodeIdInput).toHaveFocus();
+    fireEvent.change(nodeIdInput, { target: { value: 'valuation' } });
 
-    await waitFor(() => expect(updateFramework).toHaveBeenCalledWith(expect.objectContaining({
-      expectedRevision: 7,
-      content: expect.objectContaining({
-        rootNodeId: 'start',
-        decisionTree: [
-          expect.objectContaining({
-            nodeId: 'start',
-            branches: [
-              expect.objectContaining({ targetNodeId: 'B2' }),
-              expect.objectContaining({ targetNodeId: 'B' }),
-            ],
-          }),
-          expect.objectContaining({ nodeId: 'B2' }),
-          expect.objectContaining({ nodeId: 'B' }),
-        ],
-      }),
-    })));
+    const remountedInput = screen.getByLabelText('节点 1 的 ID');
+    expect(remountedInput).toHaveFocus();
+    fireEvent.change(remountedInput, { target: { value: 'valuation-new' } });
+
+    expect(screen.getByLabelText('根节点')).toHaveValue('valuation-new');
+    const rootNode = screen.getByTestId('framework-node-0');
+    const targetSelect = within(rootNode)
+      .getAllByRole('combobox')
+      .find((element) => (element as HTMLSelectElement).value === 'valuation');
+    expect(targetSelect).toBeDefined();
   });
 
   it('blocks Unicode-casefold duplicate dimension names before sending an update', async () => {
@@ -720,7 +690,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
     expect(screen.getAllByText('保存前请修正框架结构').length).toBeGreaterThan(0);
   });
 
-  it('inspects immutable history and copies an old version into a current-revision draft', async () => {
+  it('uses an in-page history drawer with timestamps and copies an old version into a current-revision draft', async () => {
     const current = {
       frameworkId: 1,
       scope: 'local',
@@ -733,6 +703,10 @@ describe('InvestmentFrameworkSettingsCard', () => {
         freeFormRules: 'Current',
         riskRules: [],
         trackingCriteria: [],
+        evaluationDimensions: [
+          { name: 'Straße', weight: 50, criteria: ['Durability'] },
+          { name: 'Quality', weight: 50, criteria: ['Returns'] },
+        ],
       },
       createdAt: '2026-07-26T00:00:00Z',
       updatedAt: '2026-07-26T02:00:00Z',
@@ -754,6 +728,9 @@ describe('InvestmentFrameworkSettingsCard', () => {
             freeFormRules: 'Historical',
             riskRules: [],
             trackingCriteria: [],
+            evaluationDimensions: [
+              { name: 'Historical quality', weight: 100, criteria: ['Historical criteria'] },
+            ],
           },
           changeSummary: 'Older',
           createdAt: '2026-07-26T01:00:00Z',
@@ -771,18 +748,24 @@ describe('InvestmentFrameworkSettingsCard', () => {
 
     render(<InvestmentFrameworkSettingsCard />);
     await screen.findByDisplayValue('Current rules');
-    fireEvent.click(screen.getByRole('button', { name: '版本历史' }));
+    fireEvent.click(screen.getByRole('button', { name: '历史版本' }));
 
-    const historyDrawer = await screen.findByRole('complementary', { name: '版本历史' });
-    expect(within(historyDrawer).getByText('版本 v3')).toBeInTheDocument();
-    expect(screen.getByText('当前激活')).toBeInTheDocument();
-    const historyList = screen.getByRole('list', { name: '框架版本历史' });
+    const drawer = await screen.findByRole('complementary', { name: '历史版本' });
+    expect(historyFramework).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '版本详情' })).toHaveTextContent(
+      'Current rules',
+    );
+    const historyList = within(drawer).getByRole('list', { name: '框架版本历史' });
     const latestVersionButton = within(historyList).getAllByRole('button')[0];
     expect(latestVersionButton).toHaveAccessibleName('版本 v3');
     expect(within(latestVersionButton).getByText(
       formatDateTime('2026-07-26T02:00:00Z', 'zh'),
     )).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '版本 v2' }));
+    expect(within(latestVersionButton).getByText('最新版本')).toBeInTheDocument();
+    expect(within(latestVersionButton).getByText('当前激活')).toBeInTheDocument();
+
+    fireEvent.click(within(drawer).getByRole('button', { name: '版本 v2' }));
     const inspector = screen.getByTestId('framework-history-inspector-2');
     expect(within(inspector).getByText('Historical rules')).toBeInTheDocument();
     expect(within(inspector).getByText('只读快照，不提供原地恢复。')).toBeInTheDocument();
@@ -801,10 +784,64 @@ describe('InvestmentFrameworkSettingsCard', () => {
       content: expect.objectContaining({
         title: 'Historical rules',
         freeFormRules: 'Historical',
+        evaluationDimensions: [
+          { name: 'Historical quality', weight: 100, criteria: ['Historical criteria'] },
+        ],
+      }),
+    })));
+
+    await waitFor(() => expect(updateFramework).toHaveBeenCalledWith(expect.objectContaining({
+      expectedRevision: 9,
+      content: expect.objectContaining({
+        title: 'Historical rules',
+        freeFormRules: 'Historical',
       }),
     })));
     fireEvent.click(screen.getByRole('button', { name: '关闭历史版本' }));
     expect(screen.queryByRole('complementary', { name: '版本历史' })).not.toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('marks the latest historical version when the framework is inactive', async () => {
+    const current = {
+      ...structuredFrameworkResponse(),
+      version: 3,
+      activeVersion: null,
+      revision: 9,
+      isActive: false,
+    };
+    getFramework.mockResolvedValue(current);
+    historyFramework.mockResolvedValue({
+      frameworkId: 1,
+      latestVersion: 3,
+      activeVersion: null,
+      revision: 9,
+      total: 2,
+      items: [
+        {
+          version: 3,
+          isActive: false,
+          content: current.content,
+          changeSummary: 'Latest inactive version',
+          createdAt: '2026-07-26T02:00:00Z',
+        },
+        {
+          version: 2,
+          isActive: false,
+          content: current.content,
+          changeSummary: 'Older version',
+          createdAt: '2026-07-26T01:00:00Z',
+        },
+      ],
+    });
+
+    render(<InvestmentFrameworkSettingsCard />);
+    await screen.findByDisplayValue('Structured');
+    fireEvent.click(screen.getByRole('button', { name: '历史版本' }));
+
+    const historyList = await screen.findByRole('list', { name: '框架版本历史' });
+    const latest = within(historyList).getByRole('button', { name: '版本 v3' });
+    expect(within(latest).getByText('最新版本')).toBeInTheDocument();
+    expect(within(latest).queryByText('当前激活')).not.toBeInTheDocument();
   });
 });

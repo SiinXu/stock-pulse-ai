@@ -324,6 +324,18 @@ function frameworkPathFromServerLocation(location: unknown): string {
 }
 
 function serverIssueCode(path: string, type: string): InvestmentFrameworkValidationCode {
+  const structuralCodes: Record<string, InvestmentFrameworkValidationCode> = {
+    investment_framework_empty_content: 'criteria_required',
+    investment_framework_duplicate_node_id: 'duplicate_node_id',
+    investment_framework_root_unknown: 'root_unknown',
+    investment_framework_root_requires_tree: 'root_unknown',
+    investment_framework_target_unknown: 'target_unknown',
+    investment_framework_cycle: 'cycle',
+    investment_framework_unreachable: 'unreachable',
+    investment_framework_duplicate_dimension_name: 'duplicate_dimension_name',
+  };
+  if (structuralCodes[type]) return structuralCodes[type];
+
   const required = type.includes('missing') || type.includes('too_short');
   if (path === 'title') return required ? 'title_required' : 'title_too_long';
   if (path === 'description') return 'description_length';
@@ -369,7 +381,6 @@ function issueValueForPath(
   code: InvestmentFrameworkValidationCode,
   path: string,
   content: InvestmentFrameworkContent,
-  fallbackMessage: string,
 ): string | undefined {
   const parts = path.split('.');
   const nodeIndex = parts[0] === 'decisionTree' ? Number(parts[1]) : Number.NaN;
@@ -386,15 +397,22 @@ function issueValueForPath(
   ) {
     return node?.nodeId || String(nodeIndex + 1);
   }
-  if (code === 'invalid_node_id') return node?.nodeId ?? '';
+  if (code === 'invalid_node_id' || code === 'duplicate_node_id') {
+    return node?.nodeId ?? '';
+  }
   if (code === 'target_unknown') {
     const branchIndex = Number(parts[3]);
     return Number.isInteger(branchIndex)
       ? node?.branches[branchIndex]?.targetNodeId ?? ''
       : '';
   }
+  if (code === 'cycle' || code === 'unreachable') {
+    return node?.nodeId ?? '';
+  }
+  if (code === 'duplicate_dimension_name') {
+    return casefoldInvestmentFrameworkDimensionName(dimension?.name.trim() ?? '');
+  }
   if (code === 'invalid_weight') return String(dimension?.weight ?? '');
-  if (code === 'server_validation') return fallbackMessage.slice(0, 200);
   return undefined;
 }
 
@@ -405,14 +423,11 @@ export function validationIssuesFromFrameworkApiDetails(
   return validationIssueRecords(details).map((detail) => {
     const path = frameworkPathFromServerLocation(detail.loc);
     const type = typeof detail.type === 'string' ? detail.type : 'validation_error';
-    const message = typeof detail.msg === 'string' && detail.msg.trim()
-      ? detail.msg.trim()
-      : 'Request value is invalid';
     const code = serverIssueCode(path, type);
     return {
       code,
       path,
-      value: issueValueForPath(code, path, content, message),
+      value: issueValueForPath(code, path, content),
     };
   });
 }
@@ -440,39 +455,16 @@ export function cloneInvestmentFrameworkContent(
   return JSON.parse(JSON.stringify(content)) as InvestmentFrameworkContent;
 }
 
-export function normalizeInvestmentFrameworkNodeId(
-  value: string | null | undefined,
-): string {
-  return value?.trim() ?? '';
-}
-
-export function canCommitInvestmentFrameworkNodeRename(
-  nodes: InvestmentFrameworkDecisionNode[],
-  nodeIndex: number,
-  nextNodeId: string,
-): boolean {
-  const normalizedNodeId = normalizeInvestmentFrameworkNodeId(nextNodeId);
-  return (
-    NODE_ID_PATTERN.test(normalizedNodeId)
-    && trimmedLength(normalizedNodeId) <= INVESTMENT_FRAMEWORK_LIMITS.nodeIdLength
-    && nodes.every((node, index) => (
-      index === nodeIndex
-      || normalizeInvestmentFrameworkNodeId(node.nodeId) !== normalizedNodeId
-    ))
-  );
-}
-
 export function nextFrameworkNodeId(
   nodes: InvestmentFrameworkDecisionNode[],
   base = 'node',
 ): string {
-  const used = new Set(nodes.map((node) => normalizeInvestmentFrameworkNodeId(node.nodeId)));
-  const normalizedBase = normalizeInvestmentFrameworkNodeId(base) || 'node';
+  const used = new Set(nodes.map((node) => node.nodeId));
   let candidateIndex = nodes.length + 1;
-  let candidate = `${normalizedBase}-${candidateIndex}`;
-  while (used.has(normalizeInvestmentFrameworkNodeId(candidate))) {
+  let candidate = `${base}-${candidateIndex}`;
+  while (used.has(candidate)) {
     candidateIndex += 1;
-    candidate = `${normalizedBase}-${candidateIndex}`;
+    candidate = `${base}-${candidateIndex}`;
   }
   return candidate;
 }
@@ -480,21 +472,20 @@ export function nextFrameworkNodeId(
 export function nodeDeleteBlockers(
   content: InvestmentFrameworkContent,
   nodeId: string,
-): string[] {
-  const blockers = new Set<string>();
-  const normalizedNodeId = normalizeInvestmentFrameworkNodeId(nodeId);
-  if (!normalizedNodeId) return [];
-  if (normalizeInvestmentFrameworkNodeId(content.rootNodeId) === normalizedNodeId) {
-    blockers.add('root');
-  }
+): { isRoot: boolean; inboundNodeIds: string[] } {
+  const normalizedNodeId = nodeId.trim();
+  const inboundNodeIds: string[] = [];
   for (const node of content.decisionTree ?? []) {
     if (node.branches.some(
-      (branch) => normalizeInvestmentFrameworkNodeId(branch.targetNodeId) === normalizedNodeId,
+      (branch) => branch.targetNodeId?.trim() === normalizedNodeId,
     )) {
-      blockers.add(normalizeInvestmentFrameworkNodeId(node.nodeId));
+      inboundNodeIds.push(node.nodeId);
     }
   }
-  return [...blockers];
+  return {
+    isRoot: content.rootNodeId?.trim() === normalizedNodeId,
+    inboundNodeIds,
+  };
 }
 
 export function validateInvestmentFrameworkContent(
@@ -535,7 +526,7 @@ export function validateInvestmentFrameworkContent(
   const nodeIdIndexes = new Map<string, number[]>();
   nodes.forEach((node, nodeIndex) => {
     const nodePath = `decisionTree.${nodeIndex}`;
-    const nodeId = normalizeInvestmentFrameworkNodeId(node.nodeId);
+    const nodeId = node.nodeId.trim();
     const indexes = nodeIdIndexes.get(nodeId) ?? [];
     indexes.push(nodeIndex);
     nodeIdIndexes.set(nodeId, indexes);
@@ -573,51 +564,47 @@ export function validateInvestmentFrameworkContent(
   });
 
   nodeIdIndexes.forEach((indexes, nodeId) => {
-    if (indexes.length > 1) {
-      indexes.forEach((nodeIndex) => {
-        issues.push({
-          code: 'duplicate_node_id',
-          path: `decisionTree.${nodeIndex}.nodeId`,
-          value: nodeId,
-        });
+    if (indexes.length <= 1) return;
+    indexes.forEach((nodeIndex) => {
+      issues.push({
+        code: 'duplicate_node_id',
+        path: `decisionTree.${nodeIndex}.nodeId`,
+        value: nodeId,
       });
-    }
+    });
   });
 
   if (nodes.length > 0) {
-    const knownIds = new Set(nodes.map(
-      (node) => normalizeInvestmentFrameworkNodeId(node.nodeId),
-    ));
-    const rootNodeId = normalizeInvestmentFrameworkNodeId(content.rootNodeId);
-    if (!rootNodeId) {
+    const knownIds = new Set(nodes.map((node) => node.nodeId.trim()));
+    if (!content.rootNodeId?.trim()) {
       issues.push({ code: 'root_required', path: 'rootNodeId' });
-    } else if (!knownIds.has(rootNodeId)) {
-      issues.push({ code: 'root_unknown', path: 'rootNodeId', value: rootNodeId });
+    } else if (!knownIds.has(content.rootNodeId.trim())) {
+      issues.push({ code: 'root_unknown', path: 'rootNodeId', value: content.rootNodeId });
     }
     nodes.forEach((node, nodeIndex) => {
       node.branches.forEach((branch, branchIndex) => {
-        const targetNodeId = normalizeInvestmentFrameworkNodeId(branch.targetNodeId);
-        if (targetNodeId && !knownIds.has(targetNodeId)) {
+        if (branch.targetNodeId && !knownIds.has(branch.targetNodeId.trim())) {
           issues.push({
             code: 'target_unknown',
             path: `decisionTree.${nodeIndex}.branches.${branchIndex}.targetNodeId`,
-            value: targetNodeId,
+            value: branch.targetNodeId,
           });
         }
       });
     });
 
+    const normalizedRootNodeId = content.rootNodeId?.trim();
     if (
-      rootNodeId
-      && knownIds.has(rootNodeId)
+      normalizedRootNodeId
+      && knownIds.has(normalizedRootNodeId)
       && !issues.some((issue) => issue.code === 'duplicate_node_id' || issue.code === 'target_unknown')
     ) {
       const adjacency = new Map(
         nodes.map((node) => [
-          normalizeInvestmentFrameworkNodeId(node.nodeId),
+          node.nodeId.trim(),
           node.branches
-            .map((branch) => normalizeInvestmentFrameworkNodeId(branch.targetNodeId))
-            .filter(Boolean),
+            .map((branch) => branch.targetNodeId?.trim())
+            .filter((target): target is string => Boolean(target)),
         ]),
       );
       const visited = new Set<string>();
@@ -634,7 +621,7 @@ export function validateInvestmentFrameworkContent(
         visiting.delete(nodeId);
         visited.add(nodeId);
       };
-      visit(rootNodeId);
+      visit(normalizedRootNodeId);
       if (hasCycle) {
         issues.push({ code: 'cycle', path: 'decisionTree' });
       }
@@ -643,12 +630,8 @@ export function validateInvestmentFrameworkContent(
         issues.push({ code: 'unreachable', path: 'decisionTree', value: unreachable.join(', ') });
       }
     }
-  } else if (normalizeInvestmentFrameworkNodeId(content.rootNodeId)) {
-    issues.push({
-      code: 'root_unknown',
-      path: 'rootNodeId',
-      value: normalizeInvestmentFrameworkNodeId(content.rootNodeId),
-    });
+  } else if (content.rootNodeId) {
+    issues.push({ code: 'root_unknown', path: 'rootNodeId', value: content.rootNodeId });
   }
 
   const dimensionNames = new Map<string, number[]>();

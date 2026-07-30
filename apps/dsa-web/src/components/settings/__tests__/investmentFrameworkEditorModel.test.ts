@@ -7,7 +7,6 @@ import {
   INVESTMENT_FRAMEWORK_CASEFOLD_UNICODE_VERSION,
   INVESTMENT_FRAMEWORK_LIMITS,
   casefoldInvestmentFrameworkDimensionName,
-  nextFrameworkNodeId,
   nodeDeleteBlockers,
   validationIssuesFromFrameworkApiDetails,
   validateInvestmentFrameworkContent,
@@ -85,81 +84,6 @@ describe('investmentFrameworkEditorModel', () => {
     expect(validateInvestmentFrameworkContent(content)).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: expectedCode })]),
     );
-  });
-
-  it('locates a normalized duplicate node ID at every related node', () => {
-    const content = validContent();
-    content.decisionTree![1].nodeId = ' root ';
-
-    expect(validateInvestmentFrameworkContent(content).filter(
-      (issue) => issue.code === 'duplicate_node_id',
-    )).toEqual([
-      {
-        code: 'duplicate_node_id',
-        path: 'decisionTree.0.nodeId',
-        value: 'root',
-      },
-      {
-        code: 'duplicate_node_id',
-        path: 'decisionTree.1.nodeId',
-        value: 'root',
-      },
-    ]);
-  });
-
-  it('matches backend whitespace normalization throughout graph validation', () => {
-    const content = validContent();
-    content.rootNodeId = 'root';
-    content.decisionTree = [
-      {
-        nodeId: ' root ',
-        question: 'Start?',
-        branches: [{ condition: 'Continue', targetNodeId: ' child ', outcome: null }],
-      },
-      {
-        nodeId: ' child ',
-        question: 'Finish?',
-        branches: [{ condition: 'Done', targetNodeId: null, outcome: 'Accept' }],
-      },
-    ];
-
-    expect(validateInvestmentFrameworkContent(content)).toEqual([]);
-    expect(nodeDeleteBlockers(content, 'child')).toContain('root');
-  });
-
-  it('detects cycles after applying backend whitespace normalization', () => {
-    const content = validContent();
-    content.rootNodeId = ' A ';
-    content.decisionTree = [
-      {
-        nodeId: ' A ',
-        question: 'A?',
-        branches: [{ condition: 'To B', targetNodeId: ' B ', outcome: null }],
-      },
-      {
-        nodeId: ' B ',
-        question: 'B?',
-        branches: [{ condition: 'To A', targetNodeId: ' A ', outcome: null }],
-      },
-    ];
-
-    expect(validateInvestmentFrameworkContent(content)).toEqual(
-      expect.arrayContaining([expect.objectContaining({ code: 'cycle' })]),
-    );
-  });
-
-  it('does not generate a node ID that collides after backend whitespace normalization', () => {
-    const content = validContent();
-    content.decisionTree = [
-      ...content.decisionTree!,
-      {
-        nodeId: ' node-3 ',
-        question: 'Third?',
-        branches: [{ condition: 'Done', targetNodeId: null, outcome: 'Done' }],
-      },
-    ];
-
-    expect(nextFrameworkNodeId(content.decisionTree)).toBe('node-4');
   });
 
   it('matches backend Unicode casefold semantics for duplicate dimension names', () => {
@@ -242,8 +166,24 @@ describe('investmentFrameworkEditorModel', () => {
   it('blocks deletion of the root and nodes with inbound references', () => {
     const content = validContent();
 
-    expect(nodeDeleteBlockers(content, 'root')).toContain('root');
-    expect(nodeDeleteBlockers(content, 'valuation')).toContain('root');
+    expect(nodeDeleteBlockers(content, 'root')).toEqual({
+      isRoot: true,
+      inboundNodeIds: [],
+    });
+    expect(nodeDeleteBlockers(content, 'valuation')).toEqual({
+      isRoot: false,
+      inboundNodeIds: ['root'],
+    });
+  });
+
+  it('normalizes root, node, and target IDs consistently with the backend', () => {
+    const content = validContent();
+    content.rootNodeId = ' root ';
+    content.decisionTree![0].nodeId = ' root ';
+    content.decisionTree![0].branches[0].targetNodeId = ' valuation ';
+    content.decisionTree![1].nodeId = ' valuation ';
+
+    expect(validateInvestmentFrameworkContent(content)).toEqual([]);
   });
 
   it('accepts every backend collection limit at its exact boundary', () => {
@@ -502,6 +442,76 @@ describe('investmentFrameworkEditorModel', () => {
       {
         code: 'rule_length',
         path: 'riskRules.2',
+        value: undefined,
+      },
+    ]);
+  });
+
+  it('maps real structural 422 types to editor-addressable node and dimension paths', () => {
+    const content = validContent();
+
+    expect(validationIssuesFromFrameworkApiDetails({
+      issues: [
+        {
+          type: 'investment_framework_duplicate_node_id',
+          loc: ['body', 'content', 'decision_tree', 1, 'node_id'],
+          msg: 'Decision-tree node IDs must be unique',
+        },
+        {
+          type: 'investment_framework_cycle',
+          loc: ['body', 'content', 'decision_tree', 0, 'branches', 0, 'target_node_id'],
+          msg: 'Decision tree must not contain cycles',
+        },
+        {
+          type: 'investment_framework_unreachable',
+          loc: ['body', 'content', 'decision_tree', 1, 'node_id'],
+          msg: 'Every decision-tree node must be reachable from the root',
+        },
+        {
+          type: 'investment_framework_duplicate_dimension_name',
+          loc: ['body', 'content', 'evaluation_dimensions', 0, 'name'],
+          msg: 'Evaluation dimension names must be unique',
+        },
+      ],
+    }, content)).toEqual([
+      {
+        code: 'duplicate_node_id',
+        path: 'decisionTree.1.nodeId',
+        value: 'valuation',
+      },
+      {
+        code: 'cycle',
+        path: 'decisionTree.0.branches.0.targetNodeId',
+        value: 'root',
+      },
+      {
+        code: 'unreachable',
+        path: 'decisionTree.1.nodeId',
+        value: 'valuation',
+      },
+      {
+        code: 'duplicate_dimension_name',
+        path: 'evaluationDimensions.0.name',
+        value: 'moat',
+      },
+    ]);
+  });
+
+  it('keeps unknown server diagnostics out of the localized primary error', () => {
+    const content = validContent();
+
+    expect(validationIssuesFromFrameworkApiDetails({
+      issues: [
+        {
+          type: 'future_validation_type',
+          loc: ['body', 'content', 'future_field'],
+          msg: 'Provider diagnostic must remain in error details',
+        },
+      ],
+    }, content)).toEqual([
+      {
+        code: 'server_validation',
+        path: 'future_field',
         value: undefined,
       },
     ]);

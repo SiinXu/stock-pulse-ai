@@ -78,7 +78,7 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 | `FEISHU_WEBHOOK_SECRET` | Feishu Webhook signing secret (required when “Signature” security is enabled) | Optional |
 | `FEISHU_WEBHOOK_KEYWORD` | Feishu Webhook keyword (required when “Keyword” security is enabled) | Optional |
 | `DINGTALK_WEBHOOK_URL` | DingTalk group robot Webhook URL; configurable and testable in Web Settings | Optional |
-| `DINGTALK_SECRET` | DingTalk group robot signing secret; required only when that robot enables signature verification | Optional |
+| `DINGTALK_SECRET` | DingTalk group robot signing secret (`SEC...`); required only when that robot enables signature verification | Optional |
 | `TELEGRAM_BOT_TOKEN` | Telegram Bot Token (get from @BotFather) | Optional |
 | `TELEGRAM_CHAT_ID` | Telegram Chat ID | Optional |
 | `TELEGRAM_MESSAGE_THREAD_ID` | Telegram Topic ID (for sending to topics) | Optional |

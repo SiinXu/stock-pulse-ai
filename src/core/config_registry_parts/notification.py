@@ -76,7 +76,7 @@ NOTIFICATION_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_editable": True,
         "default_value": None,
         "options": [],
-        "validation": {},
+        "validation": {"pattern": r"^SEC[A-Za-z0-9_-]+$"},
         "display_order": 19,
         "help_key": "settings.notification.webhooks",
         "examples": [

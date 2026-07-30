@@ -41,10 +41,11 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertFalse(validation["valid"])
         self.assertTrue(any(issue["code"] == "invalid_url" for issue in validation["issues"]))
 
-    def test_validate_reports_invalid_dingtalk_group_webhook_url(self) -> None:
+    def test_validate_reports_invalid_dingtalk_group_webhook_fields(self) -> None:
         validation = self.service.validate(
             items=[
                 {"key": "DINGTALK_WEBHOOK_URL", "value": "dingtalk-hook-without-scheme"},
+                {"key": "DINGTALK_SECRET", "value": "malformed-secret"},
             ]
         )
 
@@ -56,16 +57,17 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
                 for issue in validation["issues"]
             )
         )
+        self.assertTrue(
+            any(
+                issue["key"] == "DINGTALK_SECRET"
+                and issue["code"] == "invalid_format"
+                for issue in validation["issues"]
+            )
+        )
+
     def test_validate_allows_empty_optional_dingtalk_signing_secret(self) -> None:
         validation = self.service.validate(
             items=[{"key": "DINGTALK_SECRET", "value": ""}]
-        )
-
-        self.assertTrue(validation["valid"])
-
-    def test_validate_treats_dingtalk_signing_secret_as_opaque(self) -> None:
-        validation = self.service.validate(
-            items=[{"key": "DINGTALK_SECRET", "value": "provider-issued-secret"}]
         )
 
         self.assertTrue(validation["valid"])

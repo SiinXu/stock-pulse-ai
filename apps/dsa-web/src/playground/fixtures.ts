@@ -641,7 +641,7 @@ export const fixtureDingtalkGroupConfigItems: SystemConfigItem[] = [
       isEditable: true,
       defaultValue: '',
       options: [],
-      validation: {},
+      validation: { pattern: '^SEC[A-Za-z0-9_-]+$' },
       displayOrder: 19,
       helpKey: 'settings.notification.DINGTALK_SECRET',
       warningCodes: ['secret_value'],

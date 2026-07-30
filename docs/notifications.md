@@ -44,7 +44,7 @@ Discord 长报告发送复用现有分片链路：单条 `content` 运行时不�
 
 设置 → 通知渠道 → 钉钉会把 `DINGTALK_WEBHOOK_URL` / `DINGTALK_SECRET` 的**群机器人 Webhook**与 `DINGTALK_APP_KEY` / `DINGTALK_APP_SECRET` / `DINGTALK_STREAM_ENABLED` 的**应用机器人 / Stream**分区展示；两者不是互相替代的开关。Webhook URL 和签名密钥均按敏感字段遮罩，遮罩值在保存和测试草稿中沿用服务器已保存值，不会写回字面量 `******`。
 
-通知测试的渠道列表包含 `dingtalk`，会把当前未保存草稿交给服务端的隔离配置进行真实发送，不持久化草稿。提供 `DINGTALK_SECRET` 时发送器附加 `timestamp` / `sign`；留空时保留既有的未加签群机器人兼容行为。URL 必须是 `http` / `https` URL；签名密钥属于钉钉签发的不透明敏感值，系统不额外限定其字符集。
+通知测试的渠道列表包含 `dingtalk`，会把当前未保存草稿交给服务端的隔离配置进行真实发送，不持久化草稿。提供 `DINGTALK_SECRET` 时发送器附加 `timestamp` / `sign`；留空时保留既有的未加签群机器人兼容行为。URL 必须是 `http` / `https` URL；非空签名密钥必须符合 `SEC...` 格式。
 
 ## 报告渲染与分片
 

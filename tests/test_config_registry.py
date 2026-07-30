@@ -126,14 +126,16 @@ class TestDingTalkGroupWebhookFieldsRegistered(unittest.TestCase):
             self.assertEqual(field["ui_control"], "password")
             self.assertNotIn(key, WEB_SETTINGS_HIDDEN_FROM_UI)
 
-    def test_webhook_url_is_validated_and_optional_secret_stays_opaque(self):
+    def test_webhook_url_and_optional_secret_have_authoritative_validation(self):
         webhook = get_field_definition("DINGTALK_WEBHOOK_URL")
         secret = get_field_definition("DINGTALK_SECRET")
 
         self.assertEqual(webhook["validation"]["item_type"], "url")
         self.assertIn("https", webhook["validation"]["allowed_schemes"])
         self.assertFalse(secret["is_required"])
-        self.assertEqual(secret["validation"], {})
+        pattern = re.compile(secret["validation"]["pattern"])
+        self.assertIsNotNone(pattern.fullmatch("SECabc_123-xyz"))
+        self.assertIsNone(pattern.fullmatch("malformed-secret"))
 
     def test_schema_response_includes_dingtalk_group_webhook_fields(self):
         schema = build_schema_response()
