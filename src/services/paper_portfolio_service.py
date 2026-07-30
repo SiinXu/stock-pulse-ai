@@ -134,6 +134,112 @@ class PaperPortfolioService:
                 return float(entry.get("total_cash", 0.0))
         return 0.0
 
+    @staticmethod
+    def _legacy_trade_payload(
+        *,
+        account_id: int,
+        symbol: str,
+        trade_date: date,
+        side: str,
+        quantity: float,
+        price: Optional[float],
+        note: Optional[str],
+    ) -> Dict[str, Any]:
+        """Rebuild the request shape used by the pre-BF paper-trade writer."""
+
+        return {
+            "account_id": int(account_id),
+            "symbol": symbol,
+            "trade_date": trade_date.isoformat(),
+            "side": side,
+            "quantity": float(quantity),
+            "price": float(price) if price is not None else None,
+            "fee": 0.0,
+            "tax": 0.0,
+            "market": None,
+            "currency": None,
+            "trade_uid": None,
+            "dedup_hash": None,
+            "note": (note or "").strip() or None,
+        }
+
+    def _replay_legacy_trade_operation_in_session(
+        self,
+        *,
+        session: Any,
+        operation_id: Optional[str],
+        account_id: int,
+        symbol: str,
+        trade_date: date,
+        side: str,
+        quantity: float,
+        requested_price: Optional[float],
+        note: Optional[str],
+    ) -> Optional[Dict[str, Any]]:
+        """Replay paper requests stored under the former trade.create type."""
+
+        if operation_id is None:
+            return None
+
+        legacy_payload = self._legacy_trade_payload(
+            account_id=account_id,
+            symbol=symbol,
+            trade_date=trade_date,
+            side=side,
+            quantity=quantity,
+            price=requested_price,
+            note=note,
+        )
+        replay_price = requested_price
+
+        def compatible_payload(response: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+            nonlocal replay_price
+            try:
+                replay_id = int(response["id"])
+            except (KeyError, TypeError, ValueError):
+                return None
+            replay_row = self.portfolio.repo.get_trade_in_session(
+                session=session,
+                account_id=int(account_id),
+                trade_id=replay_id,
+            )
+            if replay_row is None:
+                return None
+            replay_price = float(replay_row.price)
+            return self._legacy_trade_payload(
+                account_id=account_id,
+                symbol=symbol,
+                trade_date=trade_date,
+                side=side,
+                quantity=quantity,
+                price=replay_price,
+                note=note,
+            )
+
+        replay = self.portfolio.replay_operation_in_session(
+            session=session,
+            operation_id=operation_id,
+            operation_type="trade.create",
+            scope_account_id=account_id,
+            payload=legacy_payload,
+            compatible_payload_from_response=(
+                compatible_payload if requested_price is None else None
+            ),
+        )
+
+        if replay is None:
+            return None
+        result = dict(replay)
+        if replay_price is None:
+            raise RuntimeError(
+                f"Legacy paper trade is missing for operation_id={operation_id}"
+            )
+        result["price"] = replay_price
+        result["price_source"] = (
+            "manual" if requested_price is not None else "latest_close"
+        )
+        return result
+
     def record_paper_trade(
         self,
         *,
@@ -183,6 +289,20 @@ class PaperPortfolioService:
             )
             if replay is not None:
                 return replay
+
+            legacy_replay = self._replay_legacy_trade_operation_in_session(
+                session=session,
+                operation_id=operation_id,
+                account_id=int(account_id),
+                symbol=symbol_norm,
+                trade_date=trade_date,
+                side=side_norm,
+                quantity=float(quantity),
+                requested_price=requested_price,
+                note=note,
+            )
+            if legacy_replay is not None:
+                return legacy_replay
 
             self._require_paper_account(account_id)
             fill = self._resolve_fill_price(
