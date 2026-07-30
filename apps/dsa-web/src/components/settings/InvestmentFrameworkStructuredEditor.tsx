@@ -1,6 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type React from 'react';
 import { ArrowDown, ArrowUp, Copy, Plus, Trash2 } from 'lucide-react';
 import type {
@@ -13,9 +13,11 @@ import type { UiTextKey } from '../../i18n/uiText';
 import { Button, ConfirmDialog } from '../common';
 import { SettingsAlert } from './SettingsAlert';
 import {
+  canCommitInvestmentFrameworkNodeRename,
   INVESTMENT_FRAMEWORK_LIMITS,
   nextFrameworkNodeId,
   nodeDeleteBlockers,
+  normalizeInvestmentFrameworkNodeId,
   type InvestmentFrameworkValidationIssue,
 } from './investmentFrameworkEditorModel';
 
@@ -26,6 +28,13 @@ type InvestmentFrameworkStructuredEditorProps = {
   onChange: (content: InvestmentFrameworkContent) => void;
   formatIssue: (issue: InvestmentFrameworkValidationIssue) => string;
   t: (key: UiTextKey, params?: Record<string, string | number>) => string;
+};
+
+type NodeRenameSession = {
+  nodeIndex: number;
+  originalNodeId: string;
+  rootReferencesNode: boolean;
+  branchReferences: Array<{ nodeIndex: number; branchIndex: number }>;
 };
 
 const fieldClass =
@@ -55,6 +64,7 @@ const InvestmentFrameworkStructuredEditor: React.FC<
 }) => {
   const [pendingDeleteNode, setPendingDeleteNode] = useState<number | null>(null);
   const [dependencyWarning, setDependencyWarning] = useState('');
+  const renameSession = useRef<NodeRenameSession | null>(null);
   const nodes = content.decisionTree ?? [];
   const dimensions = content.evaluationDimensions ?? [];
 
@@ -69,17 +79,67 @@ const InvestmentFrameworkStructuredEditor: React.FC<
     setNodes(next);
   };
 
-  const renameNode = (index: number, nextId: string) => {
-    const previousId = nodes[index].nodeId;
-    const next = nodes.map((node, nodeIndex) => ({
+  const beginNodeRename = (nodeIndex: number) => {
+    if (renameSession.current?.nodeIndex === nodeIndex) return;
+    const originalNodeId = nodes[nodeIndex]?.nodeId;
+    if (originalNodeId === undefined) return;
+    const normalizedNodeId = normalizeInvestmentFrameworkNodeId(originalNodeId);
+    const branchReferences: NodeRenameSession['branchReferences'] = [];
+    nodes.forEach((node, currentNodeIndex) => {
+      node.branches.forEach((branch, branchIndex) => {
+        if (
+          normalizedNodeId
+          && normalizeInvestmentFrameworkNodeId(branch.targetNodeId) === normalizedNodeId
+        ) {
+          branchReferences.push({ nodeIndex: currentNodeIndex, branchIndex });
+        }
+      });
+    });
+    renameSession.current = {
+      nodeIndex,
+      originalNodeId,
+      rootReferencesNode: Boolean(
+        normalizedNodeId
+        && normalizeInvestmentFrameworkNodeId(content.rootNodeId) === normalizedNodeId
+      ),
+      branchReferences,
+    };
+  };
+
+  const updateNodeIdDraft = (nodeIndex: number, nextNodeId: string) => {
+    beginNodeRename(nodeIndex);
+    updateNode(nodeIndex, { nodeId: nextNodeId });
+  };
+
+  const finishNodeRename = (nodeIndex: number) => {
+    const session = renameSession.current;
+    if (!session || session.nodeIndex !== nodeIndex) return;
+    renameSession.current = null;
+    const nextNodeId = nodes[nodeIndex]?.nodeId;
+    if (
+      nextNodeId === undefined
+      || !canCommitInvestmentFrameworkNodeRename(nodes, nodeIndex, nextNodeId)
+    ) {
+      updateNode(nodeIndex, { nodeId: session.originalNodeId });
+      return;
+    }
+    const referencedBranches = new Set(
+      session.branchReferences.map(
+        (reference) => `${reference.nodeIndex}:${reference.branchIndex}`,
+      ),
+    );
+    const next = nodes.map((node, currentNodeIndex) => ({
       ...node,
-      nodeId: nodeIndex === index ? nextId : node.nodeId,
-      branches: node.branches.map((branch) => ({
-        ...branch,
-        targetNodeId: branch.targetNodeId === previousId ? nextId : branch.targetNodeId,
-      })),
+      branches: node.branches.map((branch, branchIndex) => (
+        referencedBranches.has(`${currentNodeIndex}:${branchIndex}`)
+          ? { ...branch, targetNodeId: nextNodeId }
+          : branch
+      )),
     }));
-    setNodes(next, content.rootNodeId === previousId ? nextId : content.rootNodeId);
+    setNodes(
+      next,
+      session.rootReferencesNode ? nextNodeId : content.rootNodeId,
+    );
   };
 
   const updateBranch = (
@@ -105,7 +165,10 @@ const InvestmentFrameworkStructuredEditor: React.FC<
 
   const duplicateNode = (index: number) => {
     const source = nodes[index];
-    const nodeId = nextFrameworkNodeId(nodes, `${source.nodeId}-copy`);
+    const nodeId = nextFrameworkNodeId(
+      nodes,
+      `${normalizeInvestmentFrameworkNodeId(source.nodeId)}-copy`,
+    );
     setNodes([
       ...nodes.slice(0, index + 1),
       {
@@ -251,7 +314,7 @@ const InvestmentFrameworkStructuredEditor: React.FC<
             const nodeIssues = issues.filter((issue) => issue.path.startsWith(`decisionTree.${nodeIndex}`));
             return (
               <article
-                key={`${node.nodeId}-${nodeIndex}`}
+                key={nodeIndex}
                 className="rounded-xl border settings-border bg-background/35 p-4"
                 data-testid={`framework-node-${nodeIndex}`}
                 data-validation-error={nodeIssues.length ? 'true' : undefined}
@@ -318,7 +381,9 @@ const InvestmentFrameworkStructuredEditor: React.FC<
                       aria-label={t('settings.frameworkNodeIdAria', { number: nodeIndex + 1 })}
                       value={node.nodeId}
                       disabled={disabled}
-                      onChange={(event) => renameNode(nodeIndex, event.target.value)}
+                      onFocus={() => beginNodeRename(nodeIndex)}
+                      onBlur={() => finishNodeRename(nodeIndex)}
+                      onChange={(event) => updateNodeIdDraft(nodeIndex, event.target.value)}
                     />
                   </label>
                   <label className="block space-y-1">

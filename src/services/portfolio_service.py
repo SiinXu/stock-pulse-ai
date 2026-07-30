@@ -828,6 +828,28 @@ class PortfolioService:
             "accounts": accounts_payload,
         }
 
+    def get_available_cash_in_session(
+        self,
+        *,
+        session: Any,
+        account_id: int,
+        as_of: date,
+    ) -> float:
+        """Replay an account in the caller's transaction and return its cash."""
+
+        account = self._require_active_account_in_session(
+            session=session,
+            account_id=int(account_id),
+        )
+        replay = self._replay_account(
+            account=account,
+            as_of_date=as_of,
+            cost_method="fifo",
+            include_realtime=False,
+            session=session,
+        )
+        return float(replay["total_cash"])
+
     def refresh_fx_rates(
         self,
         *,
@@ -1149,10 +1171,31 @@ class PortfolioService:
         as_of_date: date,
         cost_method: str,
         include_realtime: bool,
+        session: Optional[Any] = None,
     ) -> Dict[str, Any]:
-        trades = self.repo.list_trades(account.id, as_of=as_of_date)
-        cash_ledger = self.repo.list_cash_ledger(account.id, as_of=as_of_date)
-        corporate_actions = self.repo.list_corporate_actions(account.id, as_of=as_of_date)
+        if session is None:
+            trades = self.repo.list_trades(account.id, as_of=as_of_date)
+            cash_ledger = self.repo.list_cash_ledger(account.id, as_of=as_of_date)
+            corporate_actions = self.repo.list_corporate_actions(
+                account.id,
+                as_of=as_of_date,
+            )
+        else:
+            trades = self.repo.list_trades_in_session(
+                session=session,
+                account_id=account.id,
+                as_of=as_of_date,
+            )
+            cash_ledger = self.repo.list_cash_ledger_in_session(
+                session=session,
+                account_id=account.id,
+                as_of=as_of_date,
+            )
+            corporate_actions = self.repo.list_corporate_actions_in_session(
+                session=session,
+                account_id=account.id,
+                as_of=as_of_date,
+            )
 
         events = []
         for row in cash_ledger:

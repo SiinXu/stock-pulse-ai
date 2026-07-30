@@ -409,6 +409,166 @@ describe('InvestmentFrameworkSettingsCard', () => {
     })));
   });
 
+  it('renames a node through an existing ID without retargeting that node references', async () => {
+    const existingFramework = {
+      frameworkId: 1,
+      scope: 'local',
+      version: 1,
+      activeVersion: 1,
+      revision: 7,
+      isActive: true,
+      content: {
+        title: 'Structured',
+        rootNodeId: 'A',
+        decisionTree: [
+          {
+            nodeId: 'A',
+            question: 'Start?',
+            branches: [{ condition: 'Continue', targetNodeId: 'B', outcome: null }],
+          },
+          {
+            nodeId: 'B',
+            question: 'Finish?',
+            branches: [{ condition: 'Done', targetNodeId: null, outcome: 'Accept' }],
+          },
+        ],
+        evaluationDimensions: [],
+        riskRules: [],
+        trackingCriteria: [],
+        freeFormRules: null,
+      },
+      createdAt: '2026-07-26T00:00:00Z',
+      updatedAt: '2026-07-26T00:00:00Z',
+      versionCreatedAt: '2026-07-26T00:00:00Z',
+    };
+    getFramework.mockResolvedValue(existingFramework);
+    updateFramework.mockResolvedValue({
+      ...existingFramework,
+      version: 2,
+      activeVersion: 2,
+      revision: 8,
+      content: {
+        ...existingFramework.content,
+        rootNodeId: 'B2',
+        decisionTree: [
+          {
+            ...existingFramework.content.decisionTree[0],
+            nodeId: 'B2',
+          },
+          existingFramework.content.decisionTree[1],
+        ],
+      },
+    });
+
+    render(<InvestmentFrameworkSettingsCard />);
+    fireEvent.click(await screen.findByRole('button', { name: '查看配置项' }));
+    const firstNodeId = await screen.findByLabelText('节点 1 的 ID');
+
+    fireEvent.focus(firstNodeId);
+    fireEvent.change(firstNodeId, { target: { value: 'B' } });
+    fireEvent.change(firstNodeId, { target: { value: 'B2' } });
+    fireEvent.blur(firstNodeId);
+
+    expect(screen.getByLabelText('根节点')).toHaveValue('B2');
+    expect(within(screen.getByTestId('framework-node-0')).getByLabelText('目标节点'))
+      .toHaveValue('B');
+    fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
+
+    await waitFor(() => expect(updateFramework).toHaveBeenCalledWith(expect.objectContaining({
+      expectedRevision: 7,
+      content: expect.objectContaining({
+        rootNodeId: 'B2',
+        decisionTree: [
+          expect.objectContaining({
+            nodeId: 'B2',
+            branches: [
+              expect.objectContaining({ targetNodeId: 'B' }),
+            ],
+          }),
+          expect.objectContaining({ nodeId: 'B' }),
+        ],
+      }),
+    })));
+  });
+
+  it('keeps unrelated graph references when a node rename crosses an existing ID', async () => {
+    const existingFramework = {
+      frameworkId: 1,
+      scope: 'local',
+      version: 1,
+      activeVersion: 1,
+      revision: 7,
+      isActive: true,
+      content: {
+        title: 'Rename safety',
+        rootNodeId: 'start',
+        decisionTree: [
+          {
+            nodeId: 'start',
+            question: 'Where next?',
+            branches: [
+              { condition: 'First', targetNodeId: 'A', outcome: null },
+              { condition: 'Second', targetNodeId: 'B', outcome: null },
+            ],
+          },
+          {
+            nodeId: 'A',
+            question: 'A?',
+            branches: [{ condition: 'Done', targetNodeId: null, outcome: 'A done' }],
+          },
+          {
+            nodeId: 'B',
+            question: 'B?',
+            branches: [{ condition: 'Done', targetNodeId: null, outcome: 'B done' }],
+          },
+        ],
+        evaluationDimensions: [],
+        riskRules: [],
+        trackingCriteria: [],
+        freeFormRules: null,
+      },
+      createdAt: '2026-07-26T00:00:00Z',
+      updatedAt: '2026-07-26T00:00:00Z',
+      versionCreatedAt: '2026-07-26T00:00:00Z',
+    };
+    getFramework.mockResolvedValue(existingFramework);
+    updateFramework.mockResolvedValue({
+      ...existingFramework,
+      version: 2,
+      revision: 8,
+    });
+
+    render(<InvestmentFrameworkSettingsCard />);
+    fireEvent.click(await screen.findByRole('button', { name: '查看配置项' }));
+    await screen.findByDisplayValue('Rename safety');
+
+    const renamedNodeId = screen.getByLabelText('节点 2 的 ID');
+    fireEvent.focus(renamedNodeId);
+    fireEvent.change(renamedNodeId, { target: { value: 'C' } });
+    fireEvent.change(renamedNodeId, { target: { value: 'B' } });
+    fireEvent.change(renamedNodeId, { target: { value: 'B2' } });
+    fireEvent.blur(renamedNodeId);
+    fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
+
+    await waitFor(() => expect(updateFramework).toHaveBeenCalledWith(expect.objectContaining({
+      expectedRevision: 7,
+      content: expect.objectContaining({
+        rootNodeId: 'start',
+        decisionTree: [
+          expect.objectContaining({
+            nodeId: 'start',
+            branches: [
+              expect.objectContaining({ targetNodeId: 'B2' }),
+              expect.objectContaining({ targetNodeId: 'B' }),
+            ],
+          }),
+          expect.objectContaining({ nodeId: 'B2' }),
+          expect.objectContaining({ nodeId: 'B' }),
+        ],
+      }),
+    })));
+  });
+
   it('blocks Unicode-casefold duplicate dimension names before sending an update', async () => {
     getFramework.mockResolvedValue({
       frameworkId: 1,

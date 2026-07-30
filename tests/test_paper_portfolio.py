@@ -19,7 +19,10 @@ from src.services.paper_portfolio_service import (
     PaperPortfolioService,
     PaperQuoteUnavailableError,
 )
-from src.services.portfolio_service import PortfolioService
+from src.services.portfolio_service import (
+    PortfolioIdempotencyConflictError,
+    PortfolioService,
+)
 from src.storage import DatabaseManager, StockDaily
 
 
@@ -161,6 +164,60 @@ def test_paper_buy_rejected_when_insufficient_cash(isolated_db) -> None:
             side="buy",
             quantity=2000,  # 2000 * 100 = 200000 > 100000 initial cash
         )
+
+
+def test_paper_trade_replays_before_quote_and_cash_change(isolated_db) -> None:
+    """Replay a committed paper trade before consulting mutable market state."""
+
+    service = _service()
+    account = _create_account(service, account_type="paper")
+    _add_close(isolated_db, as_of=date(2024, 6, 2), close=100.0)
+    request = {
+        "account_id": account["id"],
+        "symbol": "600519",
+        "trade_date": _AS_OF,
+        "side": "buy",
+        "quantity": 1000,
+        "operation_id": "paper-timeout-after-commit-1",
+    }
+
+    first = PaperPortfolioService(service).record_paper_trade(**request)
+    _add_close(isolated_db, as_of=_AS_OF, close=120.0)
+    replay = PaperPortfolioService(_service()).record_paper_trade(**request)
+
+    assert replay == first
+    assert replay["price"] == pytest.approx(100.0)
+    assert replay["price_source"] == "latest_close"
+    assert service.list_trade_events(account_id=account["id"])["total"] == 1
+    assert _account_cash(service, account["id"]) == pytest.approx(0.0)
+
+
+def test_paper_trade_same_operation_id_rejects_changed_payload(isolated_db) -> None:
+    """Reject changed paper payloads before mutable cash validation."""
+
+    service = _service()
+    account = _create_account(service, account_type="paper")
+    operation_id = "paper-conflict-1"
+    request = {
+        "account_id": account["id"],
+        "symbol": "600519",
+        "trade_date": _AS_OF,
+        "side": "buy",
+        "quantity": 10,
+        "price": 100.0,
+        "operation_id": operation_id,
+    }
+    PaperPortfolioService(service).record_paper_trade(**request)
+
+    with pytest.raises(
+        PortfolioIdempotencyConflictError,
+        match=rf"^operation_id already used for a different request: {operation_id}$",
+    ):
+        PaperPortfolioService(_service()).record_paper_trade(
+            **{**request, "quantity": 2000}
+        )
+
+    assert service.list_trade_events(account_id=account["id"])["total"] == 1
 
 
 def test_paper_trade_requires_paper_account(isolated_db) -> None:

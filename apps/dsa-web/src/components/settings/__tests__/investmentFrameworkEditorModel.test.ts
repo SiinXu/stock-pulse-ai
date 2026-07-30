@@ -7,6 +7,7 @@ import {
   INVESTMENT_FRAMEWORK_CASEFOLD_UNICODE_VERSION,
   INVESTMENT_FRAMEWORK_LIMITS,
   casefoldInvestmentFrameworkDimensionName,
+  nextFrameworkNodeId,
   nodeDeleteBlockers,
   validationIssuesFromFrameworkApiDetails,
   validateInvestmentFrameworkContent,
@@ -84,6 +85,81 @@ describe('investmentFrameworkEditorModel', () => {
     expect(validateInvestmentFrameworkContent(content)).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: expectedCode })]),
     );
+  });
+
+  it('locates a normalized duplicate node ID at every related node', () => {
+    const content = validContent();
+    content.decisionTree![1].nodeId = ' root ';
+
+    expect(validateInvestmentFrameworkContent(content).filter(
+      (issue) => issue.code === 'duplicate_node_id',
+    )).toEqual([
+      {
+        code: 'duplicate_node_id',
+        path: 'decisionTree.0.nodeId',
+        value: 'root',
+      },
+      {
+        code: 'duplicate_node_id',
+        path: 'decisionTree.1.nodeId',
+        value: 'root',
+      },
+    ]);
+  });
+
+  it('matches backend whitespace normalization throughout graph validation', () => {
+    const content = validContent();
+    content.rootNodeId = 'root';
+    content.decisionTree = [
+      {
+        nodeId: ' root ',
+        question: 'Start?',
+        branches: [{ condition: 'Continue', targetNodeId: ' child ', outcome: null }],
+      },
+      {
+        nodeId: ' child ',
+        question: 'Finish?',
+        branches: [{ condition: 'Done', targetNodeId: null, outcome: 'Accept' }],
+      },
+    ];
+
+    expect(validateInvestmentFrameworkContent(content)).toEqual([]);
+    expect(nodeDeleteBlockers(content, 'child')).toContain('root');
+  });
+
+  it('detects cycles after applying backend whitespace normalization', () => {
+    const content = validContent();
+    content.rootNodeId = ' A ';
+    content.decisionTree = [
+      {
+        nodeId: ' A ',
+        question: 'A?',
+        branches: [{ condition: 'To B', targetNodeId: ' B ', outcome: null }],
+      },
+      {
+        nodeId: ' B ',
+        question: 'B?',
+        branches: [{ condition: 'To A', targetNodeId: ' A ', outcome: null }],
+      },
+    ];
+
+    expect(validateInvestmentFrameworkContent(content)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'cycle' })]),
+    );
+  });
+
+  it('does not generate a node ID that collides after backend whitespace normalization', () => {
+    const content = validContent();
+    content.decisionTree = [
+      ...content.decisionTree!,
+      {
+        nodeId: ' node-3 ',
+        question: 'Third?',
+        branches: [{ condition: 'Done', targetNodeId: null, outcome: 'Done' }],
+      },
+    ];
+
+    expect(nextFrameworkNodeId(content.decisionTree)).toBe('node-4');
   });
 
   it('matches backend Unicode casefold semantics for duplicate dimension names', () => {

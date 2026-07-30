@@ -777,20 +777,35 @@ class PortfolioRepository:
 
     def get_latest_close_with_date(self, symbol: str, as_of: date) -> Optional[Tuple[float, date]]:
         with self.db.get_session() as session:
-            row = session.execute(
-                select(StockDaily)
-                .where(
-                    and_(
-                        StockDaily.code == symbol,
-                        StockDaily.date <= as_of,
-                    )
+            return self.get_latest_close_with_date_in_session(
+                session=session,
+                symbol=symbol,
+                as_of=as_of,
+            )
+
+    def get_latest_close_with_date_in_session(
+        self,
+        *,
+        session: Any,
+        symbol: str,
+        as_of: date,
+    ) -> Optional[Tuple[float, date]]:
+        """Return the latest close using the caller's transaction."""
+
+        row = session.execute(
+            select(StockDaily)
+            .where(
+                and_(
+                    StockDaily.code == symbol,
+                    StockDaily.date <= as_of,
                 )
-                .order_by(desc(StockDaily.date))
-                .limit(1)
-            ).scalar_one_or_none()
-            if row is None or row.close is None:
-                return None
-            return float(row.close), row.date
+            )
+            .order_by(desc(StockDaily.date))
+            .limit(1)
+        ).scalar_one_or_none()
+        if row is None or row.close is None:
+            return None
+        return float(row.close), row.date
 
     def save_fx_rate(
         self,
