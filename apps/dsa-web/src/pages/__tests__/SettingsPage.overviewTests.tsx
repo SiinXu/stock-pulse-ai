@@ -226,6 +226,7 @@ export function registerSettingsPageOverviewTests(): void {
     expect(await screen.findByText('初始状态')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '刷新检查' }));
+    fireEvent.click(screen.getByRole('button', { name: '查看配置项' }));
     fireEvent.click(screen.getByRole('button', { name: 'merge stock list' }));
 
     await waitFor(() => expect(getSetupStatus).toHaveBeenCalledTimes(3));
@@ -245,6 +246,7 @@ export function registerSettingsPageOverviewTests(): void {
 
     await waitFor(() => expect(screen.getByText('最新状态')).toBeInTheDocument());
     expect(screen.queryByText('过期状态')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }));
     expect(screen.getByRole('button', { name: '简短试跑' })).toBeEnabled();
   });
 
@@ -909,9 +911,29 @@ export function registerSettingsPageOverviewTests(): void {
 
     render(<SettingsPage />);
 
+    expect(screen.queryByRole('button', { name: 'merge stock list' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '查看配置项' }));
+    expect(screen.getByRole('dialog', { name: '智能导入' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'merge stock list' }));
 
     expect(refreshAfterExternalSave).toHaveBeenCalledWith(['STOCK_LIST']);
     expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders the investment framework as its own Agent Behavior view', () => {
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'agent' }));
+    routerSearchParamsMock.params = new URLSearchParams({
+      section: 'agent_behavior',
+      view: 'investment_framework',
+    });
+
+    render(<SettingsPage />);
+
+    expect(screen.getByRole('radio', { name: '投资框架' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(screen.getByTestId('investment-framework-settings-card')).toBeInTheDocument();
+    expect(screen.queryByText('当前分类暂无可配置项')).not.toBeInTheDocument();
   });
 }

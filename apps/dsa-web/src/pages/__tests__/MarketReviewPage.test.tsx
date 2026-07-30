@@ -139,6 +139,10 @@ describe('MarketReviewPage', () => {
     const primaryActions = screen.getAllByRole('button', { name: '大盘复盘' });
     expect(primaryActions.length).toBeGreaterThanOrEqual(2);
     expect(primaryActions.every((button) => button.getAttribute('data-variant') === 'primary')).toBe(true);
+    const historyRail = screen.getByTestId('home-history-list-scroll')
+      .closest('aside')?.parentElement;
+    expect(historyRail).toHaveClass('self-start');
+    expect(historyRail).not.toHaveClass('min-h-96');
   });
 
   it('consumes a one-shot command action while preserving unrelated URL state', async () => {

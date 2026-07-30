@@ -216,12 +216,12 @@ describe('SidebarNav', () => {
     );
 
     const researchToggle = screen.getByRole('button', { name: '收起研究菜单' });
-    expect(screen.getByRole('link', { name: '研究概览' }))
+    expect(screen.getByRole('link', { name: '研究' }))
       .toHaveAttribute('href', APP_ROUTE_PATHS.research);
     expect(researchToggle).toHaveAttribute('aria-expanded', 'true');
     expect(researchToggle).toHaveAttribute('data-sidebar-group-toggle', 'research');
-    expect(researchToggle).toHaveClass('w-full');
-    expect(researchToggle.querySelectorAll('svg')).toHaveLength(2);
+    expect(researchToggle).toHaveClass('h-8', 'w-8');
+    expect(researchToggle.querySelectorAll('svg')).toHaveLength(1);
     expect(screen.getByRole('status', { name: 'current location' })).toHaveTextContent(
       APP_ROUTE_PATHS.home,
     );
@@ -237,7 +237,7 @@ describe('SidebarNav', () => {
       APP_ROUTE_PATHS.home,
     );
     expect(researchToggle).not.toHaveAttribute('aria-controls');
-    expect(screen.queryByRole('link', { name: '研究概览' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '研究' })).toBeVisible();
     expect(screen.queryByRole('link', { name: '大盘复盘' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '发现' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '分析工作台' })).not.toBeInTheDocument();
@@ -247,13 +247,13 @@ describe('SidebarNav', () => {
     expect(researchToggle).toHaveAttribute('aria-expanded', 'true');
     expect(researchToggle).toHaveAccessibleName('收起研究菜单');
     expect(researchToggle).toHaveAttribute('aria-controls', 'shell-nav-research-children');
-    expect(screen.getByRole('link', { name: '研究概览' })).toBeVisible();
+    expect(screen.getByRole('link', { name: '研究' })).toBeVisible();
     expect(screen.getByRole('link', { name: '大盘复盘' })).toBeVisible();
     expect(screen.getByRole('link', { name: '发现' })).toBeVisible();
     expect(screen.getByRole('link', { name: '分析工作台' })).toBeVisible();
   });
 
-  it('uses the Research row as one disclosure and keeps overview navigation in its children', async () => {
+  it('uses the Research row for overview navigation and a separate disclosure control', async () => {
     const onNavigate = vi.fn();
     render(
       <MemoryRouter initialEntries={[APP_ROUTE_PATHS.home]}>
@@ -268,14 +268,27 @@ describe('SidebarNav', () => {
       .toHaveTextContent(APP_ROUTE_PATHS.home);
     expect(onNavigate).not.toHaveBeenCalled();
 
-    fireEvent.click(researchToggle);
-    fireEvent.click(screen.getByRole('link', { name: '研究概览' }));
+    fireEvent.click(screen.getByRole('link', { name: '研究' }));
 
     await waitFor(() => {
       expect(screen.getByRole('status', { name: 'current location' }))
         .toHaveTextContent(APP_ROUTE_PATHS.research);
     });
     expect(onNavigate).toHaveBeenCalledOnce();
+  });
+
+  it('keeps global actions beside the profile in the sidebar footer', () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={['/']}>
+        <SidebarNav globalActions={<button type="button">Notifications</button>} />
+      </MemoryRouter>,
+    );
+
+    const footer = container.querySelector<HTMLElement>('[data-sidebar-footer="true"]');
+    const actions = container.querySelector<HTMLElement>('[data-sidebar-global-actions="true"]');
+    expect(footer).toContainElement(screen.getByRole('button', { name: 'StockPulse' }));
+    expect(footer).toContainElement(actions);
+    expect(actions).toContainElement(screen.getByRole('button', { name: 'Notifications' }));
   });
 
   it('keeps the Discover navigation item stable after config save events', () => {
@@ -475,10 +488,11 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    const overviewParent = screen.getByRole('link', { name: '研究概览' });
+    const overviewParent = screen.getByRole('link', { name: '研究' });
     const overviewGroup = screen.getByRole('button', { name: '收起研究菜单' });
     expect(overviewParent).toHaveAttribute('aria-current', 'page');
-    expect(overviewGroup).toHaveAttribute('data-navigation-active', 'true');
+    expect(overviewParent).toHaveAttribute('data-navigation-active', 'true');
+    expect(overviewGroup).not.toHaveAttribute('data-navigation-active');
     expect(screen.getByRole('link', { name: '大盘复盘' })).not.toHaveAttribute('aria-current');
     let currentLinks = overviewRender.container.querySelectorAll('a[aria-current="page"]');
     expect(currentLinks).toHaveLength(1);
@@ -491,7 +505,7 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    const researchParent = screen.getByRole('button', { name: '收起研究菜单' });
+    const researchParent = screen.getByRole('link', { name: '研究' });
     const expandedMarketChild = screen.getByRole('link', { name: '大盘复盘' });
     expect(researchParent).not.toHaveAttribute('aria-current', 'page');
     expect(researchParent).toHaveAttribute('data-navigation-active', 'true');
@@ -618,14 +632,14 @@ describe('SidebarNav', () => {
       'data-route-focus-key',
       'shell-nav-desktop:research-analysis',
     );
-    const researchToggle = screen.getByRole('button', { name: '收起研究菜单' });
-    expect(researchToggle).toHaveAttribute(
+    const researchLink = screen.getByRole('link', { name: '研究' });
+    expect(researchLink).toHaveAttribute(
       'data-route-focus-key',
       'shell-nav-desktop:research',
     );
-    expect(screen.getByRole('link', { name: '研究概览' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: '收起研究菜单' })).toHaveAttribute(
       'data-route-focus-key',
-      'shell-nav-desktop:research-overview',
+      'shell-nav-desktop:research-toggle',
     );
     screen.getAllByRole('link').forEach((link) => expect(link).toHaveClass('shrink-0'));
 

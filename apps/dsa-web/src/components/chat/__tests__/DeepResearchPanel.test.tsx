@@ -9,6 +9,16 @@ vi.mock('../../../api/agent', () => ({
   agentApi: { research: vi.fn() },
 }));
 
+vi.mock('../../../hooks/useStockIndex', () => ({
+  useStockIndex: () => ({
+    index: [],
+    loading: false,
+    error: null,
+    fallback: false,
+    loaded: true,
+  }),
+}));
+
 vi.mock('react-markdown', () => ({
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
@@ -35,6 +45,10 @@ describe('DeepResearchPanel', () => {
   it('shows the empty hint before a run', () => {
     renderPanel();
     expect(screen.getByText('Enter a question to start deep research.')).toBeTruthy();
+    expect(screen.getByRole('combobox', { name: 'Related stock code' })).toHaveAttribute(
+      'aria-haspopup',
+      'listbox',
+    );
   });
 
   it('keeps the empty hint lightweight and the research configuration at the bottom', () => {

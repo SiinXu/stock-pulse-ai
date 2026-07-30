@@ -5,7 +5,8 @@ import remarkGfm from 'remark-gfm';
 import { Search, StopCircle } from 'lucide-react';
 import { agentApi } from '../../api/agent';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
-import { ApiErrorAlert, Button, Field, InlineAlert, Input, StatePanel, Surface, Textarea } from '../common';
+import { ApiErrorAlert, Button, Field, InlineAlert, StatePanel, Surface, Textarea } from '../common';
+import { StockAutocomplete } from '../StockAutocomplete';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import {
   DEEP_RESEARCH_SESSION_STORAGE_PREFIX,
@@ -186,12 +187,16 @@ export const DeepResearchPanel: React.FC<DeepResearchPanelProps> = ({ sessionId 
         />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <Field controlId="deep-research-stock" label={t('research.stockCodeLabel')} hint={t('research.stockCodeHint')} className="sm:w-64">
-            <Input
+            <StockAutocomplete
               id="deep-research-stock"
               value={stockCode}
-              onChange={(event) => setStockCode(event.target.value)}
+              onChange={setStockCode}
+              onSubmit={(code, _name, _source, metadata) => {
+                setStockCode(metadata?.displayCode ?? code);
+              }}
               disabled={running}
-              autoComplete="off"
+              placeholder={t('research.stockCodeHint')}
+              ariaLabel={t('research.stockCodeLabel')}
             />
           </Field>
           {running ? (
