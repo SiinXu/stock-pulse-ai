@@ -301,8 +301,10 @@ describe('InvestmentFrameworkSettingsCard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '载入服务器最新版本' }));
     await waitFor(() => expect(getFramework).toHaveBeenCalledTimes(2));
-    expect(await screen.findByText('暂时无法读取个人投资框架。')).toBeInTheDocument();
-    expect(screen.queryByLabelText('框架名称')).not.toBeInTheDocument();
+    expect(await screen.findByLabelText('自由规则')).toHaveValue('Latest server rules');
+    expect(screen.getByText('并发 revision：4')).toBeInTheDocument();
+    expect(screen.queryByText('配置已被其他操作更新。')).not.toBeInTheDocument();
+    expect(screen.queryByText(/当前草稿仍被保留/)).not.toBeInTheDocument();
   });
 
   it('preserves evaluation dimensions while editing free-form fields', async () => {
@@ -798,7 +800,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
       }),
     })));
     fireEvent.click(screen.getByRole('button', { name: '关闭历史版本' }));
-    expect(screen.queryByRole('complementary', { name: '版本历史' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: '历史版本' })).not.toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 

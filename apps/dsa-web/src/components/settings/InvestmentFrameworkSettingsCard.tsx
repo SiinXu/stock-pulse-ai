@@ -70,16 +70,6 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
   >([]);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [loadError, setLoadError] = useState<ParsedApiError | null>(null);
-  const [error, setError] = useState<ParsedApiError | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [isConflict, setIsConflict] = useState(false);
-  const [showValidation, setShowValidation] = useState(false);
-  const [serverValidationIssues, setServerValidationIssues] = useState<
-    InvestmentFrameworkValidationIssue[]
-  >([]);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-
   const [history, setHistory] = useState<InvestmentFrameworkHistoryResponse | null>(null);
   const [selectedHistoryVersion, setSelectedHistoryVersion] = useState<number | null>(null);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
@@ -643,41 +633,18 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
         {isHistoryOpen ? (
           <aside
             id="investment-framework-history-drawer"
-            className="min-w-0 space-y-3 rounded-xl border settings-border bg-background/20 p-4"
+            className="min-w-0 self-start rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4 shadow-soft-card"
             aria-label={t('settings.frameworkHistory')}
           >
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
-                    <History className="h-4 w-4" aria-hidden="true" />
-                    {t('settings.frameworkHistory')}
-                  </h3>
-                  <p className="mt-1 text-xs leading-5 text-secondary-text">
-                    {t('settings.frameworkHistoryDescription')}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1">
-                  <IconButton
-                    type="button"
-                    variant="outline"
-                    size="compact"
-                    disabled={isHistoryLoading || !exists}
-                    isLoading={isHistoryLoading}
-                    aria-label={t('settings.frameworkHistoryRefresh')}
-                    onClick={() => void loadHistory()}
-                  >
-                    <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                  </IconButton>
-                  <IconButton
-                    type="button"
-                    variant="outline"
-                    size="compact"
-                    aria-label={t('settings.frameworkHistoryClose')}
-                    onClick={() => setIsHistoryOpen(false)}
-                  >
-                    <X className="h-4 w-4" aria-hidden="true" />
-                  </IconButton>
-                </div>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <History className="h-4 w-4" aria-hidden="true" />
+                  {t('settings.frameworkHistory')}
+                </h3>
+                <p className="mt-1 text-xs leading-5 text-muted-text">
+                  {t('settings.frameworkHistoryDescription')}
+                </p>
               </div>
               <div className="flex items-center gap-1">
                 <IconButton
@@ -703,6 +670,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
               </div>
             </div>
 
+            <div className="mt-4 space-y-3">
               {isHistoryLoading && !history ? (
                 <StatePanel
                   state="loading"
@@ -727,7 +695,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
               ) : null}
               {history?.items.length ? (
                 <div
-                  className="max-h-52 space-y-2 overflow-y-auto pr-1"
+                  className="max-h-56 space-y-2 overflow-y-auto pr-1"
                   role="list"
                   aria-label={t('settings.frameworkHistoryList')}
                 >
@@ -739,7 +707,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                           version: item.version,
                         })}
                         aria-pressed={selectedHistoryVersion === item.version}
-                        className="flex w-full items-center justify-between gap-2 rounded-lg border settings-border px-3 py-2 text-left hover:bg-[var(--settings-surface-hover)]"
+                        className="flex w-full items-center justify-between gap-2 rounded-lg border border-[var(--settings-border)] px-3 py-2 text-left transition-colors hover:bg-[var(--settings-surface-hover)]"
                         onClick={() => setSelectedHistoryVersion(item.version)}
                       >
                         <span className="min-w-0">
@@ -831,6 +799,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                   </Button>
                 </section>
               ) : null}
+            </div>
           </aside>
         ) : null}
       </div>
