@@ -560,7 +560,15 @@ describe('decisionSignalsApi', () => {
       market: 'cn',
       status: 'active',
     });
-    const listed = await decisionSignalsApi.listOutcomes({ signalId: 13, horizon: '3d' });
+    const listed = await decisionSignalsApi.listOutcomes({
+      signalId: 13,
+      horizon: '3d',
+      engineVersion: 'decision-signal-v1',
+      evalStatus: 'completed',
+      outcome: 'hit',
+      page: 2,
+      pageSize: 20,
+    });
 
     expect(post).toHaveBeenCalledWith('/api/v1/decision-signals/outcomes/run', {
       signal_id: 13,
@@ -570,7 +578,15 @@ describe('decisionSignalsApi', () => {
       status: 'active',
     });
     expect(get).toHaveBeenCalledWith('/api/v1/decision-signals/outcomes', {
-      params: { signal_id: 13, horizon: '3d' },
+      params: {
+        signal_id: 13,
+        horizon: '3d',
+        engine_version: 'decision-signal-v1',
+        eval_status: 'completed',
+        outcome: 'hit',
+        page: 2,
+        page_size: 20,
+      },
     });
     expect(run.items[0].signalId).toBe(13);
     expect(run.items[0].stockReturnPct).toBe(5);
@@ -683,5 +699,45 @@ describe('decisionSignalsApi', () => {
     expect(outcomes.total).toBe(0);
     expect(feedback.feedbackValue).toBeNull();
     expect(updated.feedbackValue).toBe('useful');
+  });
+
+  it('reads and patches independent decision-memory flags', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        signal_id: 13,
+        memorable: true,
+        ignored: false,
+        created_at: '2026-07-29T01:00:00Z',
+        updated_at: '2026-07-29T01:01:00Z',
+      },
+    });
+    patch.mockResolvedValueOnce({
+      data: {
+        signal_id: 13,
+        memorable: true,
+        ignored: true,
+        created_at: '2026-07-29T01:00:00Z',
+        updated_at: '2026-07-29T01:02:00Z',
+      },
+    });
+
+    const loaded = await decisionSignalsApi.getMemoryFlag(13);
+    const updated = await decisionSignalsApi.updateMemoryFlag(13, { ignored: true });
+
+    expect(get).toHaveBeenCalledWith('/api/v1/decision-signals/13/memory-flag');
+    expect(patch).toHaveBeenCalledWith('/api/v1/decision-signals/13/memory-flag', {
+      ignored: true,
+    });
+    expect(loaded).toEqual(expect.objectContaining({
+      signalId: 13,
+      memorable: true,
+      ignored: false,
+      updatedAt: '2026-07-29T01:01:00Z',
+    }));
+    expect(updated).toEqual(expect.objectContaining({
+      signalId: 13,
+      memorable: true,
+      ignored: true,
+    }));
   });
 });

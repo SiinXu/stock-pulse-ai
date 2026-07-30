@@ -73,6 +73,14 @@ describe('alertsApi', () => {
             severity: 'warning',
             enabled: true,
             source: 'api',
+            cooldown_policy: {
+              cooldown_seconds: 3600,
+              server_owned_mode: 'rolling',
+            },
+            notification_policy: {
+              channel_order: ['email'],
+              retry_budget: 2,
+            },
             last_triggered_at: '2026-05-18T09:05:00',
             cooldown_until: '2026-05-18T10:05:00',
             cooldown_active: true,
@@ -109,6 +117,14 @@ describe('alertsApi', () => {
     expect(result.items[0].cooldownUntil).toBe('2026-05-18T10:05:00');
     expect(result.items[0].cooldownActive).toBe(true);
     expect(result.items[0].updatedAt).toBe('2026-05-18T09:10:00');
+    expect(result.items[0].cooldownPolicy).toEqual({
+      cooldown_seconds: 3600,
+      server_owned_mode: 'rolling',
+    });
+    expect(result.items[0].notificationPolicy).toEqual({
+      channel_order: ['email'],
+      retry_budget: 2,
+    });
   });
 
   it('creates rules with snake_case payload fields', async () => {
@@ -146,6 +162,86 @@ describe('alertsApi', () => {
       enabled: true,
     });
     expect(created.parameters.changePct).toBe(3);
+  });
+
+  it('round-trips explicit cooldown policies without rewriting opaque keys', async () => {
+    post
+      .mockResolvedValueOnce({
+        data: {
+          id: 8,
+          name: 'no cooldown',
+          target_scope: 'single_symbol',
+          target: 'AAPL',
+          alert_type: 'price_cross',
+          parameters: { direction: 'above', price: 200 },
+          severity: 'warning',
+          enabled: true,
+          source: 'api',
+          cooldown_policy: {
+            cooldown_seconds: 0,
+            server_owned_mode: 'rolling',
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          id: 9,
+          name: 'custom cooldown',
+          target_scope: 'single_symbol',
+          target: 'MSFT',
+          alert_type: 'price_cross',
+          parameters: { direction: 'above', price: 500 },
+          severity: 'warning',
+          enabled: true,
+          source: 'api',
+          cooldown_policy: {
+            cooldown_seconds: 7200,
+            server_owned_mode: 'fixed',
+          },
+        },
+      });
+
+    const disabled = await alertsApi.createRule({
+      target: 'AAPL',
+      alertType: 'price_cross',
+      parameters: { direction: 'above', price: 200 },
+      severity: 'warning',
+      cooldownPolicy: {
+        cooldown_seconds: 0,
+        server_owned_mode: 'rolling',
+      },
+    });
+    const custom = await alertsApi.createRule({
+      target: 'MSFT',
+      alertType: 'price_cross',
+      parameters: { direction: 'above', price: 500 },
+      severity: 'warning',
+      cooldownPolicy: {
+        cooldown_seconds: 7200,
+        server_owned_mode: 'fixed',
+      },
+    });
+
+    expect(post).toHaveBeenNthCalledWith(1, '/api/v1/alerts/rules', expect.objectContaining({
+      cooldown_policy: {
+        cooldown_seconds: 0,
+        server_owned_mode: 'rolling',
+      },
+    }));
+    expect(post).toHaveBeenNthCalledWith(2, '/api/v1/alerts/rules', expect.objectContaining({
+      cooldown_policy: {
+        cooldown_seconds: 7200,
+        server_owned_mode: 'fixed',
+      },
+    }));
+    expect(disabled.cooldownPolicy).toEqual({
+      cooldown_seconds: 0,
+      server_owned_mode: 'rolling',
+    });
+    expect(custom.cooldownPolicy).toEqual({
+      cooldown_seconds: 7200,
+      server_owned_mode: 'fixed',
+    });
   });
 
   it('creates technical indicator rules with snake_case parameter fields', async () => {

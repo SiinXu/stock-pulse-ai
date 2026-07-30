@@ -136,6 +136,9 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
 
   entry('signals', 'decision-signal-card', 'DecisionSignalCard', 'components/decision-signals/DecisionSignalDisplay.tsx', ['default', 'interactive', 'states']),
   entry('signals', 'decision-signal-details', 'DecisionSignalDetails', 'components/decision-signals/DecisionSignalDisplay.tsx', ['default', 'loading', 'empty', 'error']),
+  entry('signals', 'decision-signal-memory-controls', 'DecisionSignalMemoryControls', 'components/decision-signals/DecisionSignalMemoryControls.tsx', ['default', 'error']),
+  entry('signals', 'decision-signal-outcome-badge', 'DecisionSignalOutcomeBadge', 'components/decision-signals/DecisionSignalDisplay.tsx', ['variants']),
+  entry('signals', 'decision-signal-outcome-explorer', 'DecisionSignalOutcomeExplorer', 'components/decision-signals/DecisionSignalOutcomeExplorer.tsx', ['default', 'empty', 'error']),
   entry('signals', 'portfolio-signal-summary', 'PortfolioSignalSummary', 'components/decision-signals/DecisionSignalDisplay.tsx', ['default', 'loading', 'empty']),
   entry('signals', 'timeline-tooltip', 'TimelineTooltip', 'components/decision-signals/DecisionSignalTimeline.tsx'),
   entry('signals', 'decision-signal-timeline', 'DecisionSignalTimeline', 'components/decision-signals/DecisionSignalTimeline.tsx', ['default', 'loading', 'empty', 'error']),

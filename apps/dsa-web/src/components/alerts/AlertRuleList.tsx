@@ -7,6 +7,7 @@ import { formatUiText, type UiLanguage } from '../../i18n/uiText';
 import {
   ALERT_DIRECTION_LABELS,
   ALERT_ENABLED_FILTER_OPTIONS,
+  ALERT_FORM_TEXT,
   ALERT_LIST_TEXT,
   ALERT_MARKET_LIGHT_STATUS_LABELS,
   ALERT_MARKET_REGION_LABELS,
@@ -17,6 +18,7 @@ import {
 } from '../../locales/alerts';
 import type { AlertRuleItem, AlertType, MarketRegion } from '../../types/alerts';
 import { formatUiDateTime } from '../../utils/uiLocale';
+import { getEffectiveAlertCooldown } from '../../utils/alertCooldown';
 
 export type AlertRuleEnabledFilter = 'all' | 'enabled' | 'disabled';
 export type AlertTypeFilter = 'all' | AlertType;
@@ -67,6 +69,14 @@ function formatParameters(rule: AlertRuleItem, language: UiLanguage): string {
 
 function isCoolingDown(rule: AlertRuleItem): boolean {
   return rule.cooldownActive === true;
+}
+
+function formatCooldownPolicy(rule: AlertRuleItem, language: UiLanguage): string {
+  const text = ALERT_FORM_TEXT[language];
+  const cooldown = getEffectiveAlertCooldown(rule.cooldownPolicy);
+  if (cooldown.mode === 'default') return text.cooldownDefaultSummary;
+  if (cooldown.mode === 'disabled') return text.cooldownDisabled;
+  return formatUiText(text.cooldownCustomSummary, { seconds: cooldown.seconds });
 }
 
 function formatTarget(rule: AlertRuleItem, language: UiLanguage): string {
@@ -181,7 +191,8 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
       header: text.cooldown,
       cell: (rule) => (
         <div className="text-xs">
-          <div>{isCoolingDown(rule) ? text.coolingDown : text.notCoolingDown}</div>
+          <div className="font-medium text-foreground">{formatCooldownPolicy(rule, language)}</div>
+          <div className="mt-1">{isCoolingDown(rule) ? text.coolingDown : text.notCoolingDown}</div>
           <div className="mt-1">{formatUiDateTime(rule.cooldownUntil, language, { dateStyle: 'medium', timeStyle: 'short' })}</div>
           {hasChildTargetCooldown(rule) ? (
             <div className="mt-1 text-muted-text">{text.childTargetCooldown}</div>

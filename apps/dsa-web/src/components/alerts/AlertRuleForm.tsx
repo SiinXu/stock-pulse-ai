@@ -2,6 +2,7 @@ import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { portfolioApi } from '../../api/portfolio';
 import type {
+  AlertCooldownPolicy,
   AlertRuleCreateRequest,
   AlertRuleItem,
   AlertSeverity,
@@ -30,9 +31,16 @@ import {
   ALERT_THRESHOLD_DIRECTION_OPTIONS,
 } from '../../locales/alerts';
 import { validateStockCode } from '../../utils/validation';
+import {
+  ALERT_COOLDOWN_SECONDS_KEY,
+  DEFAULT_ALERT_COOLDOWN_SECONDS,
+  getEffectiveAlertCooldown,
+} from '../../utils/alertCooldown';
 import { Button, Checkbox, Input, Select } from '../common';
 
 const MAX_REQUESTED_DAYS = 365;
+const DEFAULT_CUSTOM_COOLDOWN_SECONDS = String(DEFAULT_ALERT_COOLDOWN_SECONDS);
+type AlertCooldownMode = 'default' | 'disabled' | 'custom';
 
 interface AlertRuleFormValues {
   name: string;
@@ -61,10 +69,39 @@ interface AlertRuleFormValues {
   dPeriod: string;
   marketLightStatuses: MarketLightStatus[];
   minDrop: string;
+  cooldownMode: AlertCooldownMode;
+  customCooldownSeconds: string;
 }
 
 function numText(value: number | undefined | null, fallback = ''): string {
   return value === undefined || value === null ? fallback : String(value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function parseStoredCooldown(policy: AlertCooldownPolicy | null | undefined): {
+  mode: AlertCooldownMode;
+  customSeconds: string;
+} {
+  const effective = getEffectiveAlertCooldown(policy);
+  if (effective.mode === 'default') {
+    return { mode: 'default', customSeconds: DEFAULT_CUSTOM_COOLDOWN_SECONDS };
+  }
+  if (effective.mode === 'disabled') {
+    return { mode: 'disabled', customSeconds: DEFAULT_CUSTOM_COOLDOWN_SECONDS };
+  }
+  return { mode: 'custom', customSeconds: String(effective.seconds) };
+}
+
+function unknownCooldownPolicyFields(
+  policy: AlertCooldownPolicy | null | undefined,
+): AlertCooldownPolicy {
+  if (!isRecord(policy)) return {};
+  return Object.fromEntries(
+    Object.entries(policy).filter(([key]) => key !== ALERT_COOLDOWN_SECONDS_KEY),
+  );
 }
 
 // Reverse the create payload back into editable form field state so the
@@ -73,6 +110,7 @@ function alertRuleToFormValues(rule: AlertRuleItem): AlertRuleFormValues {
   const params = rule.parameters ?? {};
   const scope = rule.targetScope as AlertTargetScope;
   const direction = params.direction;
+  const cooldown = parseStoredCooldown(rule.cooldownPolicy);
   return {
     name: rule.name ?? '',
     targetScope: scope,
@@ -102,6 +140,8 @@ function alertRuleToFormValues(rule: AlertRuleItem): AlertRuleFormValues {
       ? params.statuses
       : ['red', 'yellow'],
     minDrop: numText(params.minDrop, '10'),
+    cooldownMode: cooldown.mode,
+    customCooldownSeconds: cooldown.customSeconds,
   };
 }
 
@@ -170,6 +210,12 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
   const [dPeriod, setDPeriod] = useState(seed?.dPeriod ?? '3');
   const [marketLightStatuses, setMarketLightStatuses] = useState<MarketLightStatus[]>(seed?.marketLightStatuses ?? ['red', 'yellow']);
   const [minDrop, setMinDrop] = useState(seed?.minDrop ?? '10');
+  const [cooldownMode, setCooldownMode] = useState<AlertCooldownMode>(
+    seed?.cooldownMode ?? 'default',
+  );
+  const [customCooldownSeconds, setCustomCooldownSeconds] = useState(
+    seed?.customCooldownSeconds ?? DEFAULT_CUSTOM_COOLDOWN_SECONDS,
+  );
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -379,6 +425,29 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
     return {};
   };
 
+  const buildCooldownPolicy = (): AlertRuleCreateRequest['cooldownPolicy'] | undefined => {
+    const originalPolicy = initialRule?.cooldownPolicy;
+    const unknownFields = unknownCooldownPolicyFields(originalPolicy);
+    if (cooldownMode === 'default') {
+      if (
+        isRecord(originalPolicy)
+        && Object.hasOwn(originalPolicy, ALERT_COOLDOWN_SECONDS_KEY)
+      ) {
+        return Object.keys(unknownFields).length > 0 ? unknownFields : null;
+      }
+      return undefined;
+    }
+    if (cooldownMode === 'disabled') {
+      return { ...unknownFields, [ALERT_COOLDOWN_SECONDS_KEY]: 0 };
+    }
+    const parsed = Number(customCooldownSeconds.trim());
+    if (!Number.isSafeInteger(parsed) || parsed < 1) {
+      setValidationError('alert-cooldown-seconds', text.cooldownInvalid);
+      return undefined;
+    }
+    return { ...unknownFields, [ALERT_COOLDOWN_SECONDS_KEY]: parsed };
+  };
+
   const handleScopeChange = (value: string) => {
     const nextScope = value as AlertTargetScope;
     const nextType = defaultAlertTypeForScope(nextScope);
@@ -415,6 +484,8 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
 
     const parameters = buildParameters();
     if (parameters == null) return;
+    const cooldownPolicy = buildCooldownPolicy();
+    if (cooldownMode === 'custom' && cooldownPolicy === undefined) return;
 
     setFormError(null);
     const submitted = await onSubmit({
@@ -425,6 +496,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
       parameters,
       severity,
       enabled,
+      ...(cooldownPolicy !== undefined ? { cooldownPolicy } : {}),
     });
     if (submitted === false) return;
     // In edit mode the parent closes the modal on success; keep the values so
@@ -447,6 +519,8 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
     setDPeriod('3');
     setMarketLightStatuses(['red', 'yellow']);
     setMinDrop('10');
+    setCooldownMode('default');
+    setCustomCooldownSeconds(DEFAULT_CUSTOM_COOLDOWN_SECONDS);
     resetParameters(alertType);
     setEnabled(true);
   };
@@ -829,6 +903,50 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
             disabled={isSubmitting}
           />
         ) : null}
+
+        <div className="rounded-xl border border-border/60 bg-elevated/35 p-3">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Select
+              label={text.cooldownMode}
+              value={cooldownMode}
+              options={[
+                { value: 'default', label: text.cooldownDefault },
+                { value: 'disabled', label: text.cooldownDisabled },
+                { value: 'custom', label: text.cooldownCustom },
+              ]}
+              disabled={isSubmitting}
+              onChange={(value) => {
+                setCooldownMode(value as AlertCooldownMode);
+                setFormError(null);
+                setFieldErrors((current) => {
+                  const next = { ...current };
+                  delete next['alert-cooldown-seconds'];
+                  return next;
+                });
+              }}
+            />
+            {cooldownMode === 'custom' ? (
+              <Input
+                id="alert-cooldown-seconds"
+                label={text.cooldownCustomSeconds}
+                type="number"
+                min="1"
+                step="1"
+                value={customCooldownSeconds}
+                error={fieldErrors['alert-cooldown-seconds']}
+                onChange={(event) => setCustomCooldownSeconds(event.target.value)}
+                disabled={isSubmitting}
+              />
+            ) : null}
+          </div>
+          <p className="mt-2 text-xs leading-5 text-secondary-text">
+            {cooldownMode === 'default'
+              ? text.cooldownDefaultHint
+              : cooldownMode === 'disabled'
+                ? text.cooldownDisabledHint
+                : text.cooldownCustomHint}
+          </p>
+        </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Checkbox

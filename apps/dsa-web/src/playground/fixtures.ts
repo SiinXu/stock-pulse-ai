@@ -408,6 +408,10 @@ export const fixtureAlertRules: AlertRuleItem[] = [
     severity: 'warning',
     enabled: true,
     source: 'playground',
+    cooldownPolicy: {
+      cooldown_seconds: 0,
+      preserve_for_server: 'fixture-value',
+    },
     cooldownActive: false,
     createdAt: FIXTURE_TIMESTAMP,
     updatedAt: FIXTURE_TIMESTAMP,
@@ -422,6 +426,7 @@ export const fixtureAlertRules: AlertRuleItem[] = [
     severity: 'critical',
     enabled: false,
     source: 'playground',
+    cooldownPolicy: { cooldown_seconds: 7200 },
     cooldownActive: true,
     createdAt: FIXTURE_TIMESTAMP,
     updatedAt: FIXTURE_TIMESTAMP,
