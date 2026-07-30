@@ -79,11 +79,15 @@ vi.mock('../../api/decisionSignals', () => ({
   getDecisionSignalReassessBlockedError: vi.fn(),
   decisionSignalsApi: {
     list: vi.fn(),
+    get: vi.fn(),
     getLatest: vi.fn(),
+    listOutcomes: vi.fn(),
     getOutcomeStats: vi.fn(),
     getSignalOutcomes: vi.fn(),
     getFeedback: vi.fn(),
+    getMemoryFlag: vi.fn(),
     putFeedback: vi.fn(),
+    updateMemoryFlag: vi.fn(),
     updateStatus: vi.fn(),
     reassess: vi.fn(),
   },
@@ -496,16 +500,28 @@ beforeEach(() => {
   watchlistCodes = ['600519', 'AAPL'];
   vi.mocked(historyApi.getStockBarList).mockResolvedValue(stockBarResponse);
   vi.mocked(decisionSignalsApi.list).mockResolvedValue(listResponse());
+  vi.mocked(decisionSignalsApi.get).mockResolvedValue(signal);
   vi.mocked(decisionSignalsApi.getLatest).mockResolvedValue(listResponse([signal]));
+  vi.mocked(decisionSignalsApi.listOutcomes).mockResolvedValue(outcomeList);
   vi.mocked(decisionSignalsApi.getOutcomeStats).mockResolvedValue(outcomeStats);
   vi.mocked(decisionSignalsApi.getSignalOutcomes).mockResolvedValue(outcomeList);
   vi.mocked(decisionSignalsApi.getFeedback).mockResolvedValue(emptyFeedback);
+  vi.mocked(decisionSignalsApi.getMemoryFlag).mockResolvedValue({
+    signalId: signal.id,
+    memorable: false,
+    ignored: false,
+  });
   vi.mocked(decisionSignalsApi.putFeedback).mockResolvedValue({
     ...emptyFeedback,
     feedbackValue: 'useful',
     source: 'web',
   });
   vi.mocked(decisionSignalsApi.updateStatus).mockResolvedValue({ ...signal, status: 'invalidated' });
+  vi.mocked(decisionSignalsApi.updateMemoryFlag).mockResolvedValue({
+    signalId: signal.id,
+    memorable: true,
+    ignored: false,
+  });
   vi.mocked(decisionSignalsApi.reassess).mockResolvedValue(reassessResponse);
   vi.mocked(getDecisionSignalReassessBlockedError).mockReturnValue(null);
   vi.mocked(alertsApi.listRules).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 });
@@ -892,6 +908,10 @@ describe('DecisionSignalsPage', () => {
     expect(screen.getByText('贵州茅台')).toBeInTheDocument();
     openSignalsView('信号表现统计');
     expect(screen.getByRole('tabpanel', { name: '再评估与统计' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: '全局后验结果' })).toBeInTheDocument();
+    await waitFor(() => expect(decisionSignalsApi.listOutcomes).toHaveBeenCalledWith(
+      expect.objectContaining({ page: 1, pageSize: 20 }),
+    ));
     expect(screen.getByText('50%')).toBeInTheDocument();
     expect(screen.getByText('当前统计为全局已复盘 outcome 口径，不等于当前可见信号数量，也不随当前股票过滤。')).toBeInTheDocument();
     expect(screen.getByText('全局')).toBeInTheDocument();
@@ -2619,6 +2639,8 @@ describe('DecisionSignalsPage', () => {
     const dialog = await screen.findByRole('dialog', { name: '信号详情' });
     expect(within(dialog).getByText('贵州茅台')).toBeInTheDocument();
     await waitFor(() => expect(decisionSignalsApi.getSignalOutcomes).toHaveBeenCalledWith(7));
+    await waitFor(() => expect(decisionSignalsApi.getMemoryFlag).toHaveBeenCalledWith(7));
+    expect(within(dialog).getByRole('heading', { name: '决策记忆' })).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole('button', { name: '关闭抽屉' }));
     await waitFor(() => expect(new URLSearchParams(window.location.search).get('signal')).toBeNull());
   });

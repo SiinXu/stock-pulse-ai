@@ -208,9 +208,9 @@ P4 让真实告警触发具备可排障的通知结果，并让通过 Alert API 
   - DB 持久化规则正常路径使用 `alert_cooldowns` 作为告警业务冷却，不再由 worker 进程内 fingerprint 决定；仅当读取持久化冷却状态失败时，临时使用进程内 fingerprint 防止同一规则在 DB 异常期间每轮重复推送。
   - legacy `AGENT_EVENT_ALERT_RULES_JSON` 规则继续使用 worker 进程内 fingerprint，不写 `alert_cooldowns`。
   - `notification_noise.py` 仍作为通知基础设施层的全局安全网；它不是告警业务 cooldown，且被其抑制时不会写入或延长 `alert_cooldowns`。
-- DB 规则的 `cooldown_policy.cooldown_seconds` 归一为非负整数；缺失时使用默认 24 小时业务冷却，`0` 表示关闭 DB 业务冷却。
+- DB 规则的 `cooldown_policy.cooldown_seconds` 归一为非负整数并由 worker 限制在最多 31,536,000 秒（365 天）；缺失时使用默认 24 小时业务冷却，`0` 表示关闭 DB 业务冷却。为兼容已存储的旧 opaque policy，布尔值继续按 worker 的整数转换处理（`true = 1`、`false = 0`），无效值按 `0` 执行。
 - `GET /api/v1/alerts/rules` 会返回只读 `last_triggered_at` / `cooldown_until` / `cooldown_active` 摘要；`cooldown_active` 由后端按同一冷却时间语义计算，Web 不在浏览器本地解析 naive ISO 字符串来推断状态。
-- Web 告警中心只读展示冷却状态和通知结果，不提供 cooldown policy 编辑表单。
+- Web 告警中心展示后端返回的当前冷却状态，也允许在创建和编辑规则时选择“使用后端默认值”“关闭冷却（`0` 秒）”或“自定义 1–31,536,000 整数秒”。默认模式省略 `cooldown_seconds`，当前后端按 24 小时执行；编辑时只替换已知的 `cooldown_seconds`，保留 `cooldown_policy` 中其他服务端字段。已有超大值按 worker 上限展示，旧布尔值按其等价秒数展示，避免普通编辑改变当前执行语义。`notification_policy` 继续作为 opaque 数据处理，本页面不提供自定义执行策略编辑器。
 
 P4 不做：
 
@@ -417,7 +417,7 @@ P8 不新增规则类型、API、表结构或 worker 行为；它把 P0-P7 已�
 
 ### Web 与 Desktop
 
-Web 持久化规则的主要入口是统一信号中心 `/signals?tab=rules`：可以创建、启停、删除规则，执行一次性 dry-run 测试，并在同页“推送历史”中查看触发历史、通知尝试和只读冷却状态。规则列表支持 All / Holdings / Watchlist scope；触发历史与通知尝试仍是全局记录，因此该 tab 不显示 scope 控件，但会保留 URL 中的 scope 上下文供返回规则或信号流时继续使用。旧 `/alerts` 会按原 `view` 参数重定向到对应 tab。批量规则的列表冷却状态是父规则摘要，子目标是否冷却以触发历史中的 `target` / `effective_target` 为准。
+Web 持久化规则的主要入口是统一信号中心 `/signals?tab=rules`：可以创建、编辑、启停、删除规则，执行一次性 dry-run 测试，配置默认/关闭/自定义秒数三种业务冷却策略，并在同页“推送历史”中查看触发历史、通知尝试和当前冷却状态。规则列表支持 All / Holdings / Watchlist scope；触发历史与通知尝试仍是全局记录，因此该 tab 不显示 scope 控件，但会保留 URL 中的 scope 上下文供返回规则或信号流时继续使用。旧 `/alerts` 会按原 `view` 参数重定向到对应 tab。批量规则的列表冷却状态是父规则摘要，子目标是否冷却以触发历史中的 `target` / `effective_target` 为准。
 
 Desktop 不新增原生告警管理界面；桌面用户复用内置或外部 WebUI 的统一信号中心。Desktop 回滚不需要清理额外状态。
 

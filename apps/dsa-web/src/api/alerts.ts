@@ -13,6 +13,26 @@ import type {
   AlertTriggerListResponse,
 } from '../types/alerts';
 
+function toAlertRuleItem(data: Record<string, unknown>): AlertRuleItem {
+  const item = toCamelCase<AlertRuleItem>(data);
+  if ('cooldown_policy' in data) {
+    item.cooldownPolicy = data.cooldown_policy as AlertRuleItem['cooldownPolicy'];
+  }
+  if ('notification_policy' in data) {
+    item.notificationPolicy = data.notification_policy as AlertRuleItem['notificationPolicy'];
+  }
+  return item;
+}
+
+function toAlertRuleListResponse(data: Record<string, unknown>): AlertRuleListResponse {
+  const response = toCamelCase<AlertRuleListResponse>(data);
+  if (!Array.isArray(data.items)) {
+    throw new Error('Alert rule list response items must be an array');
+  }
+  response.items = data.items.map((item) => toAlertRuleItem(item as Record<string, unknown>));
+  return response;
+}
+
 function omitUndefined(input: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(input).filter(([, value]) => value !== undefined),
@@ -27,6 +47,7 @@ function toSnakeRulePayload(payload: AlertRuleCreateRequest): Record<string, unk
   if (payload.alertType !== undefined) request.alert_type = payload.alertType;
   if (payload.severity !== undefined) request.severity = payload.severity;
   if (payload.enabled !== undefined) request.enabled = payload.enabled;
+  if (payload.cooldownPolicy !== undefined) request.cooldown_policy = payload.cooldownPolicy;
   if (payload.parameters !== undefined) {
     request.parameters = omitUndefined({
       direction: payload.parameters.direction,
@@ -86,7 +107,7 @@ export const alertsApi = {
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/alerts/rules', {
       params: toRuleListParams(query),
     });
-    return toCamelCase<AlertRuleListResponse>(response.data);
+    return toAlertRuleListResponse(response.data);
   },
 
   async createRule(payload: AlertRuleCreateRequest): Promise<AlertRuleItem> {
@@ -94,12 +115,12 @@ export const alertsApi = {
       '/api/v1/alerts/rules',
       toSnakeRulePayload(payload),
     );
-    return toCamelCase<AlertRuleItem>(response.data);
+    return toAlertRuleItem(response.data);
   },
 
   async getRule(ruleId: number): Promise<AlertRuleItem> {
     const response = await apiClient.get<Record<string, unknown>>(`/api/v1/alerts/rules/${ruleId}`);
-    return toCamelCase<AlertRuleItem>(response.data);
+    return toAlertRuleItem(response.data);
   },
 
   async updateRule(ruleId: number, payload: AlertRuleCreateRequest): Promise<AlertRuleItem> {
@@ -107,7 +128,7 @@ export const alertsApi = {
       `/api/v1/alerts/rules/${ruleId}`,
       toSnakeRulePayload(payload),
     );
-    return toCamelCase<AlertRuleItem>(response.data);
+    return toAlertRuleItem(response.data);
   },
 
   async deleteRule(ruleId: number): Promise<AlertDeleteResponse> {
@@ -117,12 +138,12 @@ export const alertsApi = {
 
   async enableRule(ruleId: number): Promise<AlertRuleItem> {
     const response = await apiClient.post<Record<string, unknown>>(`/api/v1/alerts/rules/${ruleId}/enable`);
-    return toCamelCase<AlertRuleItem>(response.data);
+    return toAlertRuleItem(response.data);
   },
 
   async disableRule(ruleId: number): Promise<AlertRuleItem> {
     const response = await apiClient.post<Record<string, unknown>>(`/api/v1/alerts/rules/${ruleId}/disable`);
-    return toCamelCase<AlertRuleItem>(response.data);
+    return toAlertRuleItem(response.data);
   },
 
   async testRule(ruleId: number): Promise<AlertRuleTestResponse> {
