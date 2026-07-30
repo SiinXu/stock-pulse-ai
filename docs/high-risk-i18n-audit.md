@@ -20,15 +20,15 @@ Only copy merged at the recorded baseline was audited. Open PRs #98, #101, and #
 
 ## Result
 
-The executable audit covers six required categories, ten UI locales, and 308 distinct stable translation keys. Category counts overlap where one string has more than one risk dimension. Its 93 recorded stable-key decisions and 501 locale-value revisions are protected by separate counts and SHA-256 digests, so removing or changing decision evidence fails the normal guard even when candidate bundle snapshots remain unchanged.
+The executable audit covers six required categories, ten UI locales, and 318 distinct stable translation keys. Category counts overlap where one string has more than one risk dimension. Its 95 recorded stable-key decisions and 517 locale-value revisions are protected by separate counts and SHA-256 digests, so removing or changing decision evidence fails the normal guard even when candidate bundle snapshots remain unchanged.
 
 | Category | Stable keys | Boundary |
 | --- | ---: | --- |
 | Trading action | 18 | Decision-signal and portfolio action codes remain internal; labels are informational display states. |
-| Risk | 73 | Volume, turnover, score, confidence, orchestrator risk-stage order, risk-agent veto, BIAS threshold, market-context guardrails, portfolio risk, alert severity, and strategy labels keep their product meaning. |
-| Authentication | 87 | Login, password, session, transport, password-change, retry-limit, and admin-auth settings copy states the actual authentication condition. |
+| Risk | 75 | Volume, turnover, score, confidence, orchestrator risk-stage order, risk-agent veto, BIAS threshold, market-context guardrails, portfolio risk, alert severity, and strategy labels keep their product meaning. |
+| Authentication | 89 | Login, password, session, transport, password-change, retry-limit, and admin-auth settings copy states the actual authentication condition. |
 | Credential | 43 | Credential, password, API key, provider-key routing, CLI login state, runtime secret, and usage-telemetry HMAC secret remain distinct concepts. |
-| Error | 102 | Stable error codes remain contract values; localized title/message pairs are display copy. |
+| Error | 110 | Stable error codes remain contract values; localized title/message pairs are display copy. |
 | Disclaimer | 3 | Screening notices preserve research scope, no-investment-advice language, and user responsibility. |
 
 All currently shipped keys in these selectors are snapshotted per locale. Adding, removing, or changing an audited key fails `npm run i18n:high-risk` until the evidence and semantic decision are reviewed together. The explicit baseline mode also parses the recorded `en.ts` and translated bundles with the TypeScript AST, checks that the current branch merge-base is the recorded audit commit, verifies every `before` value against that commit, and requires the actual baseline-to-candidate revision set to equal the complete decision set.
@@ -78,6 +78,7 @@ Other `zh` / `en` high-risk source values were retained because they match the c
 | Alert semantics | `Propina`, `自己選択株`, `Temps de recharge`, `Auslösergeschichte` | Information severity, watchlist, suppression interval, and trigger record. |
 | API key and provider access | `API Legende`, `touches`, `teclas`, omitted routing paths, and broken credential-file warnings | API key/secret terminology, provider-key precedence, and the boundary between StockPulse and CLI login state. |
 | Authentication errors | Mixed formality and malformed password/session text | Consistent recovery text while retaining stable internal error codes. |
+| Rollback-unavailable errors | English fallback copied into all eight translated bundles | Localized title and recovery message preserve that no stable snapshot exists and no configuration was changed. |
 | Orchestrator, risk-agent, and BIAS controls | Reordered or missing pipeline stages, translated `full/specialist` values, malformed risk-stage gates, generic tracking, and average-return wording | Literal mode/stage values, explicit `tech→intel→risk→decision` order, risk-stage gating, chase-risk warnings, and mean-reversion risk. |
 | Admin authentication | Sentence fragments that obscured login, persistence, and reset behavior | WebUI login scope, persisted auth data, refresh/restart behavior, and the exact reset command. |
 | Usage HMAC secret | Broken wording that conflated a telemetry secret, key, and generic usage | Message-fingerprint signing, no login-secret reuse, local generation, cross-deployment comparison, and key-version rotation. |

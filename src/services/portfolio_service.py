@@ -828,6 +828,28 @@ class PortfolioService:
             "accounts": accounts_payload,
         }
 
+    def get_available_cash_in_session(
+        self,
+        *,
+        session: Any,
+        account_id: int,
+        as_of: date,
+    ) -> float:
+        """Replay an account in the caller's transaction and return its cash."""
+
+        account = self._require_active_account_in_session(
+            session=session,
+            account_id=int(account_id),
+        )
+        replay = self._replay_account(
+            account=account,
+            as_of_date=as_of,
+            cost_method="fifo",
+            include_realtime=False,
+            session=session,
+        )
+        return float(replay["total_cash"])
+
     def refresh_fx_rates(
         self,
         *,
@@ -909,6 +931,9 @@ class PortfolioService:
         operation_type: str,
         scope_account_id: int,
         payload: Any,
+        compatible_payload_from_response: Optional[
+            Callable[[Dict[str, Any]], Optional[Any]]
+        ] = None,
     ) -> Optional[Dict[str, Any]]:
         operation_id_norm = self.normalize_operation_id(operation_id)
         if operation_id_norm is None:
@@ -935,11 +960,26 @@ class PortfolioService:
             # migration preserves them unscoped, and this scoped query therefore
             # fails closed to a new operation without crossing owner boundaries.
             return None
+        response = None
         if existing.request_hash != request_hash:
-            raise PortfolioIdempotencyConflictError(
-                f"operation_id already used for a different request: {operation_id_norm}"
-            )
-        response = json.loads(existing.response_json)
+            compatible_payload = None
+            if compatible_payload_from_response is not None:
+                # Derive compatibility only from the already scope-checked
+                # record; the reconstructed request must still match its hash.
+                response = json.loads(existing.response_json)
+                if isinstance(response, dict):
+                    compatible_payload = compatible_payload_from_response(response)
+            if (
+                compatible_payload is None
+                or existing.request_hash
+                != self._operation_request_hash(compatible_payload)
+            ):
+                raise PortfolioIdempotencyConflictError(
+                    "operation_id already used for a different request: "
+                    f"{operation_id_norm}"
+                )
+        if response is None:
+            response = json.loads(existing.response_json)
         if not isinstance(response, dict):
             raise RuntimeError(f"Invalid stored response for operation_id={operation_id_norm}")
         return response
@@ -1149,10 +1189,31 @@ class PortfolioService:
         as_of_date: date,
         cost_method: str,
         include_realtime: bool,
+        session: Optional[Any] = None,
     ) -> Dict[str, Any]:
-        trades = self.repo.list_trades(account.id, as_of=as_of_date)
-        cash_ledger = self.repo.list_cash_ledger(account.id, as_of=as_of_date)
-        corporate_actions = self.repo.list_corporate_actions(account.id, as_of=as_of_date)
+        if session is None:
+            trades = self.repo.list_trades(account.id, as_of=as_of_date)
+            cash_ledger = self.repo.list_cash_ledger(account.id, as_of=as_of_date)
+            corporate_actions = self.repo.list_corporate_actions(
+                account.id,
+                as_of=as_of_date,
+            )
+        else:
+            trades = self.repo.list_trades_in_session(
+                session=session,
+                account_id=account.id,
+                as_of=as_of_date,
+            )
+            cash_ledger = self.repo.list_cash_ledger_in_session(
+                session=session,
+                account_id=account.id,
+                as_of=as_of_date,
+            )
+            corporate_actions = self.repo.list_corporate_actions_in_session(
+                session=session,
+                account_id=account.id,
+                as_of=as_of_date,
+            )
 
         events = []
         for row in cash_ledger:

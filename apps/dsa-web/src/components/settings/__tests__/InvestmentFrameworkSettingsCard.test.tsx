@@ -244,7 +244,63 @@ describe('InvestmentFrameworkSettingsCard', () => {
     expect(await screen.findByText('已保存为新版本并激活')).toBeInTheDocument();
   });
 
-  it('preserves a stale draft on conflict until the user explicitly loads latest', async () => {
+  it('automatically replaces a stale draft with the latest server state after a conflict', async () => {
+    const existingFramework = {
+      frameworkId: 1,
+      scope: 'local',
+      version: 2,
+      activeVersion: 2,
+      revision: 3,
+      isActive: true,
+      content: {
+        title: 'Existing',
+        freeFormRules: 'Hold cash when uncertain',
+        riskRules: [],
+        trackingCriteria: [],
+      },
+      createdAt: '2026-07-26T00:00:00Z',
+      updatedAt: '2026-07-26T00:00:00Z',
+      versionCreatedAt: '2026-07-26T00:00:00Z',
+    };
+    getFramework
+      .mockResolvedValueOnce(existingFramework)
+      .mockResolvedValueOnce({
+        ...existingFramework,
+        version: 3,
+        revision: 4,
+        content: {
+          ...existingFramework.content,
+          freeFormRules: 'Latest server rules',
+        },
+      });
+    updateFramework.mockRejectedValue(
+      createApiError(
+        createParsedApiError({
+          title: '框架版本冲突',
+          message: '配置已被其他操作更新。',
+          rawMessage: 'revision conflict',
+          status: 409,
+          category: 'http_error',
+          code: 'investment_framework_revision_conflict',
+        }),
+      ),
+    );
+
+    render(<InvestmentFrameworkSettingsCard />);
+
+    await screen.findByDisplayValue('Existing');
+    fireEvent.change(screen.getByLabelText('自由规则'), {
+      target: { value: 'My pending conflict draft' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
+
+    await waitFor(() => expect(getFramework).toHaveBeenCalledTimes(2));
+    expect(await screen.findByLabelText('自由规则')).toHaveValue('Latest server rules');
+    expect(screen.getByText('并发 revision：4')).toBeInTheDocument();
+    expect(screen.queryByText('配置已被其他操作更新。')).not.toBeInTheDocument();
+  });
+
+  it('does not expose a stale draft when conflict refresh fails', async () => {
     const existingFramework = {
       frameworkId: 1,
       scope: 'local',
@@ -297,15 +353,10 @@ describe('InvestmentFrameworkSettingsCard', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
 
-    expect(await screen.findByText('配置已被其他操作更新。')).toBeInTheDocument();
-    expect(getFramework).toHaveBeenCalledTimes(1);
-    expect(screen.getByLabelText('自由规则')).toHaveValue('My pending conflict draft');
-    expect(screen.getByText(/当前草稿仍被保留/)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: '载入服务器最新版本' }));
     await waitFor(() => expect(getFramework).toHaveBeenCalledTimes(2));
     expect(await screen.findByText('暂时无法读取个人投资框架。')).toBeInTheDocument();
     expect(screen.queryByLabelText('框架名称')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument();
   });
 
   it('preserves evaluation dimensions while editing free-form fields', async () => {
@@ -514,6 +565,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
     const remountedInput = screen.getByLabelText('节点 1 的 ID');
     expect(remountedInput).toHaveFocus();
     fireEvent.change(remountedInput, { target: { value: 'valuation-new' } });
+    fireEvent.blur(remountedInput);
 
     expect(screen.getByLabelText('根节点')).toHaveValue('valuation-new');
     const rootNode = screen.getByTestId('framework-node-0');
@@ -521,6 +573,103 @@ describe('InvestmentFrameworkSettingsCard', () => {
       .getAllByRole('combobox')
       .find((element) => (element as HTMLSelectElement).value === 'valuation');
     expect(targetSelect).toBeDefined();
+  });
+
+  it('reverts a colliding node ID without rewriting graph references', async () => {
+    getFramework.mockResolvedValue(structuredFrameworkResponse());
+
+    render(<InvestmentFrameworkSettingsCard />);
+    await screen.findByDisplayValue('Structured');
+
+    const nodeIdInput = screen.getByLabelText('节点 2 的 ID');
+    fireEvent.focus(nodeIdInput);
+    fireEvent.change(nodeIdInput, { target: { value: 'root' } });
+    fireEvent.blur(nodeIdInput);
+
+    expect(screen.getByLabelText('节点 2 的 ID')).toHaveValue('valuation');
+    expect(screen.getByLabelText('根节点')).toHaveValue('root');
+    const rootNode = screen.getByTestId('framework-node-0');
+    const targetSelect = within(rootNode)
+      .getAllByRole('combobox')
+      .find((element) => (element as HTMLSelectElement).value === 'valuation');
+    expect(targetSelect).toBeDefined();
+  });
+
+  it('keeps unrelated graph references when a node rename crosses an existing ID', async () => {
+    const existingFramework = {
+      frameworkId: 1,
+      scope: 'local',
+      version: 1,
+      activeVersion: 1,
+      revision: 7,
+      isActive: true,
+      content: {
+        title: 'Rename safety',
+        rootNodeId: 'start',
+        decisionTree: [
+          {
+            nodeId: 'start',
+            question: 'Where next?',
+            branches: [
+              { condition: 'First', targetNodeId: 'A', outcome: null },
+              { condition: 'Second', targetNodeId: 'B', outcome: null },
+            ],
+          },
+          {
+            nodeId: 'A',
+            question: 'A?',
+            branches: [{ condition: 'Done', targetNodeId: null, outcome: 'A done' }],
+          },
+          {
+            nodeId: 'B',
+            question: 'B?',
+            branches: [{ condition: 'Done', targetNodeId: null, outcome: 'B done' }],
+          },
+        ],
+        evaluationDimensions: [],
+        riskRules: [],
+        trackingCriteria: [],
+        freeFormRules: null,
+      },
+      createdAt: '2026-07-26T00:00:00Z',
+      updatedAt: '2026-07-26T00:00:00Z',
+      versionCreatedAt: '2026-07-26T00:00:00Z',
+    };
+    getFramework.mockResolvedValue(existingFramework);
+    updateFramework.mockResolvedValue({
+      ...existingFramework,
+      version: 2,
+      revision: 8,
+    });
+
+    render(<InvestmentFrameworkSettingsCard />);
+    await screen.findByDisplayValue('Rename safety');
+
+    const renamedNodeId = screen.getByLabelText('节点 2 的 ID');
+    fireEvent.focus(renamedNodeId);
+    fireEvent.change(renamedNodeId, { target: { value: 'C' } });
+    fireEvent.change(renamedNodeId, { target: { value: 'B' } });
+    fireEvent.change(renamedNodeId, { target: { value: 'B2' } });
+    fireEvent.blur(renamedNodeId);
+    fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
+
+    await waitFor(() => expect(updateFramework).toHaveBeenCalledWith(expect.objectContaining({
+      expectedRevision: 7,
+      content: expect.objectContaining({
+        rootNodeId: 'start',
+        decisionTree: [
+          expect.objectContaining({
+            nodeId: 'start',
+            branches: [
+              expect.objectContaining({ targetNodeId: 'B2' }),
+              expect.objectContaining({ targetNodeId: 'B' }),
+            ],
+          }),
+          expect.objectContaining({ nodeId: 'B2' }),
+          expect.objectContaining({ nodeId: 'B' }),
+        ],
+      }),
+    })));
   });
 
   it('blocks Unicode-casefold duplicate dimension names before sending an update', async () => {
@@ -706,6 +855,10 @@ describe('InvestmentFrameworkSettingsCard', () => {
         freeFormRules: 'Current',
         riskRules: [],
         trackingCriteria: [],
+        evaluationDimensions: [
+          { name: 'Straße', weight: 50, criteria: ['Durability'] },
+          { name: 'Quality', weight: 50, criteria: ['Returns'] },
+        ],
       },
       createdAt: '2026-07-26T00:00:00Z',
       updatedAt: '2026-07-26T02:00:00Z',
@@ -791,6 +944,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '关闭历史版本' }));
     expect(screen.queryByRole('complementary', { name: '历史版本' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('marks the latest historical version when the framework is inactive', async () => {

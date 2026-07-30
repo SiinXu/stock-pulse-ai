@@ -4,6 +4,7 @@ export * from './AnalysisContextSummary';
 export * from './MarketStructureCard';
 export * from './ReportOverview';
 export * from './ReportStrategy';
+export * from './ReportStructuredInsights';
 export * from './ReportStrata';
 export * from './ReportNews';
 export * from './ReportDetails';

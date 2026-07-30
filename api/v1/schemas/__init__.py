@@ -35,6 +35,7 @@ from api.v1.schemas.history import (
     ReportStrategy,
     ReportDetails,
 )
+from api.v1.schemas.report_structured_insights import ReportStructuredInsights
 from api.v1.schemas.stocks import (
     StockQuote,
     StockHistoryResponse,
@@ -178,6 +179,7 @@ __all__ = [
     "ReportSummary",
     "ReportStrategy",
     "ReportDetails",
+    "ReportStructuredInsights",
     # stocks
     "StockQuote",
     "StockHistoryResponse",

@@ -17,6 +17,7 @@ flowchart TD
   E --> F[6 Market position]
   F --> G[7 Phase and data quality]
   G --> H[8 Optional attribution]
+  H --> I[9 Optional strategy synthesis]
 ```
 
 | Step | What | Concepts | Plain meaning |
@@ -29,6 +30,7 @@ flowchart TD
 | 6 | Market position | theme / role (more common on A-shares) | Leader vs fringe; do not invent missing evidence |
 | 7 | Phase and quality | pre/in/post session, degradation | Intraday partial bar → lower confidence |
 | 8 | Optional attribution | technical / news / fundamental / market weights | Explains lean; not an order |
+| 9 | Optional strategy synthesis | final signal, consensus, support/opposition, conflicts | Shows whether strategies actually agree and preserves dissent |
 
 ## Action labels (intuition)
 
@@ -60,6 +62,18 @@ flowchart TD
 | Intraday / lunch / closing window | Daily bar may be **partial** |
 | Degraded / missing data | Sources failed; system should not invent |
 | Non-trading day | Reuses last session; stay conservative |
+
+## Structured decision sections
+
+New synchronous reports, completed task results, and history details share one optional presentation contract. When the underlying structured data exists, the report shows these first-class sections near the top:
+
+| Section | What to read |
+| --- | --- |
+| Phase Decision | market phase, immediate action, action window, watch conditions, rationale, phase warnings, and data limitations |
+| Signal Attribution | visible technical / news / fundamental / market percentages plus the strongest bullish and bearish evidence; percentages are not return probabilities |
+| Strategy Synthesis | final signal, weighted score, confidence, consensus, conflict severity, supporting and opposing strategies, conflict participants, and excluded-opinion count |
+
+These sections consume structured fields only; they do not infer meaning from Chinese, English, or Korean narrative text. Older, single-strategy, and partial reports may omit any unavailable section. Raw JSON, Markdown, and evidence strata remain available for traceability. A malformed optional section is ignored rather than replaced with an invented conclusion.
 
 ## Report evidence strata (shipped on main)
 

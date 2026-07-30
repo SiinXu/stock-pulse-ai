@@ -33,6 +33,7 @@ import { ReportNews } from '../../components/report/ReportNews';
 import { ReportOverview } from '../../components/report/ReportOverview';
 import { ReportStrata } from '../../components/report/ReportStrata';
 import { ReportStrategy } from '../../components/report/ReportStrategy';
+import { ReportStructuredInsights } from '../../components/report/ReportStructuredInsights';
 import { ReportSummary } from '../../components/report/ReportSummary';
 import { RunFlowEventList } from '../../components/run-flow/RunFlowEventList';
 import { RunFlowGraph } from '../../components/run-flow/RunFlowGraph';
@@ -357,6 +358,16 @@ const ReportStrataStory = () => {
   );
 };
 
+const ReportStructuredInsightsStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  return (
+    <ReportStructuredInsights
+      insights={scenario === 'empty' ? undefined : fixtureReport.details?.structuredInsights}
+      language="en"
+    />
+  );
+};
+
 const ReportSummaryStory = () => <ReportSummary data={fixtureReport} isHistory onOpenRunFlow={() => undefined} />;
 
 const RunFlowEventListStory = () => {
@@ -439,6 +450,7 @@ export const DECISION_REPORT_RUN_FLOW_SCENARIOS: Record<string, PlaygroundScenar
   'report-overview': ReportOverviewStory,
   'report-strata': ReportStrataStory,
   'report-strategy': ReportStrategyStory,
+  'report-structured-insights': ReportStructuredInsightsStory,
   'report-summary': ReportSummaryStory,
   'deep-research-panel': DeepResearchPanelStory,
   'run-flow-event-list': RunFlowEventListStory,

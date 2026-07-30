@@ -253,6 +253,56 @@ describe('StockAutocomplete', () => {
     expect(screen.getByLabelText('当前股票')).toBeInTheDocument();
   });
 
+  it('shows Japan/Korea suffix examples and links the guidance to the input', () => {
+    render(
+      <StockAutocomplete
+        id="market-search"
+        value=""
+        onChange={mockOnChange}
+        onSubmit={mockOnSubmit}
+      />
+    );
+
+    const input = screen.getByRole('combobox', { name: '股票搜索' });
+    expect(screen.getByText(/7203\.T/)).toBeInTheDocument();
+    expect(screen.getByText(/005930\.KS/)).toBeInTheDocument();
+    expect(screen.getByText(/035900\.KQ/)).toBeInTheDocument();
+    expect(input).toHaveAttribute(
+      'aria-describedby',
+      expect.stringContaining('market-search-stock-search-hint'),
+    );
+  });
+
+  it('explains manual entry when the local index has no match', () => {
+    autocompleteHookImpl = () => ({
+      query: '999999.KQ',
+      setQuery: vi.fn(),
+      suggestions: [],
+      isOpen: false,
+      highlightedIndex: -1,
+      setHighlightedIndex: vi.fn(),
+      highlightPrevious: vi.fn(),
+      highlightNext: vi.fn(),
+      handleSelect: vi.fn(),
+      close: vi.fn(),
+      reset: vi.fn(),
+      isComposing: false,
+      setIsComposing: vi.fn(),
+      runtimeFallback: false,
+      error: null,
+    });
+
+    render(
+      <StockAutocomplete
+        value="999999.KQ"
+        onChange={mockOnChange}
+        onSubmit={mockOnSubmit}
+      />
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent('仍可直接提交');
+  });
+
   describe('fallback mode', () => {
     it('renders a plain input when index loading fallback is active', () => {
       stockIndexHookImpl = () => ({
@@ -429,6 +479,38 @@ describe('StockAutocomplete', () => {
   });
 
   describe('keyboard submission', () => {
+    it('submits a valid suffixed Korea symbol even when it is absent from local suggestions', () => {
+      autocompleteHookImpl = () => ({
+        query: '999999.KQ',
+        setQuery: vi.fn(),
+        suggestions: [],
+        isOpen: false,
+        highlightedIndex: -1,
+        setHighlightedIndex: vi.fn(),
+        highlightPrevious: vi.fn(),
+        highlightNext: vi.fn(),
+        handleSelect: vi.fn(),
+        close: vi.fn(),
+        reset: vi.fn(),
+        isComposing: false,
+        setIsComposing: vi.fn(),
+        runtimeFallback: false,
+        error: null,
+      });
+
+      render(
+        <StockAutocomplete
+          value="999999.KQ"
+          onChange={mockOnChange}
+          onSubmit={mockOnSubmit}
+        />
+      );
+
+      fireEvent.keyDown(screen.getByDisplayValue('999999.KQ'), { key: 'Enter' });
+
+      expect(mockOnSubmit).toHaveBeenCalledWith('999999.KQ');
+    });
+
     it('submits the raw input when suggestions are open but nothing is highlighted', () => {
       autocompleteHookImpl = () => ({
         query: '',

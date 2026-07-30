@@ -139,6 +139,78 @@ export const fixtureReport: AnalysisReport = {
     sectorRankings: { top: [{ name: 'Beverages', changePct: 1.6 }], bottom: [{ name: 'Cyclicals', changePct: -0.8 }] },
     conceptRankings: { top: [{ name: 'Premium consumption', changePct: 2.1 }], bottom: [] },
     marketStructure: fixtureMarketStructure,
+    structuredInsights: {
+      schemaVersion: 'report-structured-insights-v1',
+      phaseDecision: {
+        phaseContext: {
+          phase: 'postmarket',
+          market: 'CN',
+          marketLocalTime: '2026-07-20T17:00:00+08:00',
+          triggerSource: 'playground',
+          analysisIntent: 'auto',
+          warnings: ['The closing price should be confirmed against the next session.'],
+        },
+        immediateAction: 'Review the closing structure before placing a new order.',
+        actionWindow: 'Next trading session',
+        nextCheckTime: 'Next market open',
+        confidenceReason: 'Trend evidence is constructive, but valuation limits conviction.',
+        watchConditions: [
+          'Price holds above the 20-day moving average.',
+          'Volume confirms a pullback reversal.',
+        ],
+        dataLimitations: ['Fundamental coverage was unavailable for this fixture run.'],
+      },
+      signalAttribution: {
+        technicalIndicators: 45,
+        newsSentiment: 15,
+        fundamentals: 20,
+        marketConditions: 20,
+        strongestBullishSignal: 'Trend and relative strength remain aligned.',
+        strongestBearishSignal: 'Valuation leaves limited room for execution error.',
+      },
+      strategySynthesis: {
+        finalSignal: 'watch',
+        weightedScore: 3.62,
+        confidence: 0.68,
+        conflictCount: 1,
+        conflictSeverity: 'medium',
+        consensusLevel: 'medium',
+        supportingSkills: [
+          {
+            skillId: 'bull_trend',
+            signal: 'buy',
+            confidence: 0.78,
+            reasoning: 'Trend structure remains constructive.',
+          },
+          {
+            skillId: 'growth_quality',
+            signal: 'watch',
+            confidence: 0.69,
+            reasoning: 'Quality is supportive while valuation needs discipline.',
+          },
+        ],
+        opposingSkills: [
+          {
+            skillId: 'box_oscillation',
+            signal: 'reduce',
+            confidence: 0.72,
+            reasoning: 'Price is near the upper edge of the current range.',
+          },
+        ],
+        conflicts: [
+          {
+            conflictType: 'directional_opposition',
+            severity: 'medium',
+            participants: ['bull_trend', 'box_oscillation'],
+          },
+        ],
+        summaryParams: {
+          opinionCount: 3,
+          totalOpinionCount: 4,
+          invalidOpinionCount: 1,
+        },
+      },
+    },
   },
 };
 
@@ -569,7 +641,7 @@ export const fixtureDingtalkGroupConfigItems: SystemConfigItem[] = [
       isEditable: true,
       defaultValue: '',
       options: [],
-      validation: { pattern: '^SEC[A-Za-z0-9_-]+$' },
+      validation: {},
       displayOrder: 19,
       helpKey: 'settings.notification.DINGTALK_SECRET',
       warningCodes: ['secret_value'],

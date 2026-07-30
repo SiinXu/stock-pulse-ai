@@ -13,6 +13,7 @@ Output: apps/dsa-web/public/stocks.index.json
 Usage:
     python3 scripts/generate_index_from_csv.py              # 默认使用 Tushare
     python3 scripts/generate_index_from_csv.py --source akshare
+    python3 scripts/generate_index_from_csv.py --curated-seeds-only
     python3 scripts/generate_index_from_csv.py --test       # 测试模式
 """
 
@@ -160,6 +161,36 @@ def load_tushare_data(data_dir: Path) -> List[Dict[str, Any]]:
             print(f"    [Error] 读取 {csv_file.name} 失败：{e}")
 
     return all_stocks
+
+
+CURATED_SEED_MARKETS = {
+    "JP": "stock_list_jp.csv",
+    "KR": "stock_list_kr.csv",
+}
+
+
+def load_curated_seed_data(seed_dir: Optional[Path] = None) -> List[Dict[str, Any]]:
+    """Load the maintained Japan/Korea autocomplete seed set."""
+    resolved_seed_dir = seed_dir or Path(__file__).parent / "stock_index_seeds"
+    stocks: List[Dict[str, Any]] = []
+    for market, file_name in CURATED_SEED_MARKETS.items():
+        csv_file = resolved_seed_dir / file_name
+        if not csv_file.exists():
+            print(f"[Error] Curated seed file not found: {csv_file}")
+            return []
+        with open(csv_file, "r", encoding="utf-8-sig") as source:
+            reader = csv.DictReader(source)
+            market_stocks = [
+                parsed
+                for parsed in (
+                    parse_stock_row(row, market)
+                    for row in reader
+                )
+                if parsed is not None
+            ]
+        stocks.extend(market_stocks)
+        print(f"    ✓ Loaded {len(market_stocks)} curated {market} stocks")
+    return stocks
 
 
 def get_us_delist_priority(row: Dict[str, str]) -> int:
@@ -622,6 +653,66 @@ def compress_index(index: List[Dict[str, Any]]) -> List[List]:
     return compressed
 
 
+def merge_curated_market_rows(
+    existing: List[List[Any]],
+    curated: List[List[Any]],
+) -> List[List[Any]]:
+    """Replace only JP/KR rows while preserving every other generated market.
+
+    This makes curated seed refreshes reproducible even when the optional
+    Tushare source CSV files are unavailable locally.
+    """
+    target_markets = set(CURATED_SEED_MARKETS)
+    curated_by_code: Dict[str, List[Any]] = {
+        str(row[0]): row
+        for row in curated
+        if isinstance(row, list)
+        and len(row) >= 7
+        and row[6] in target_markets
+        and row[0]
+    }
+    ordered_codes = [
+        str(row[0])
+        for row in curated
+        if isinstance(row, list)
+        and len(row) >= 7
+        and row[6] in target_markets
+        and row[0]
+    ]
+    merged: List[List[Any]] = []
+    inserted: set[str] = set()
+
+    for row in existing:
+        if not isinstance(row, list) or len(row) < 7:
+            merged.append(row)
+            continue
+        if row[6] not in target_markets:
+            merged.append(row)
+            continue
+        code = str(row[0])
+        replacement = curated_by_code.get(code)
+        if replacement is not None and code not in inserted:
+            merged.append(replacement)
+            inserted.add(code)
+
+    for code in ordered_codes:
+        if code not in inserted:
+            merged.append(curated_by_code[code])
+            inserted.add(code)
+
+    return merged
+
+
+def write_compressed_index(output_path: Path, compressed: List[List[Any]]) -> None:
+    """Write the generated compact JSON format deterministically."""
+    with open(output_path, "w", encoding="utf-8") as output:
+        output.write("[\n")
+        for index, item in enumerate(compressed):
+            json.dump(item, output, ensure_ascii=False, separators=(",", ":"))
+            output.write(",\n" if index < len(compressed) - 1 else "\n")
+        output.write("]\n")
+
+
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(description='从 CSV 生成股票自动补全索引')
@@ -636,19 +727,26 @@ def main():
         action='store_true',
         help='测试模式：只验证不写入文件'
     )
+    parser.add_argument(
+        '--curated-seeds-only',
+        action='store_true',
+        help='Regenerate and merge only the curated Japan/Korea seeds while preserving other markets',
+    )
     args = parser.parse_args()
 
     print("=" * 60)
     print("股票索引生成工具（从 CSV）")
     print("=" * 60)
-    print(f"数据源：{args.source}")
+    print(f"Data source: {'curated JP/KR seeds' if args.curated_seeds_only else args.source}")
 
     if not require_pypinyin():
         return 1
 
     # Load data
     print("\n[1/5] 读取 CSV 数据...")
-    if args.source == 'tushare':
+    if args.curated_seeds_only:
+        stocks = load_curated_seed_data()
+    elif args.source == 'tushare':
         data_dir = Path(__file__).parent.parent / 'data'
         stocks = load_tushare_data(data_dir)
     elif args.source == 'akshare':
@@ -675,6 +773,20 @@ def main():
 
     print("\n[3/5] 压缩索引数据...")
     compressed = compress_index(index)
+    if args.curated_seeds_only:
+        if not output_path.exists():
+            print(f"[Error] Existing index not found; cannot merge curated seeds only: {output_path}")
+            return 1
+        try:
+            with open(output_path, "r", encoding="utf-8") as source:
+                existing = json.load(source)
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"[Error] Failed to read the existing index: {exc}")
+            return 1
+        if not isinstance(existing, list) or not existing:
+            print("[Error] Existing index format is invalid; cannot merge curated seeds only")
+            return 1
+        compressed = merge_curated_market_rows(existing, compressed)
 
     if args.test:
         print("\n[4/5] 测试模式：跳过写入文件")
@@ -692,15 +804,7 @@ def main():
                 print(f"        {i + 1}. {item}")
     else:
         print(f"\n[4/5] 写入文件：{output_path}")
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write('[\n')
-            for i, item in enumerate(compressed):
-                json.dump(item, f, ensure_ascii=False, separators=(',', ':'))
-                if i < len(compressed) - 1:
-                    f.write(',\n')
-                else:
-                    f.write('\n')
-            f.write(']\n')
+        write_compressed_index(output_path, compressed)
 
         file_size = output_path.stat().st_size
         print(f"      文件大小：{file_size / 1024:.2f} KB")

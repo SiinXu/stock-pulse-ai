@@ -29,11 +29,13 @@ A 股大盘复盘会复用既有行业/概念涨跌榜和主要指数行情，�
 
 - 日本：`7203.T`、`6758.T`
 - 韩国 KOSPI：`005930.KS`
-- 韩国 KOSDAQ：`035720.KQ`
+- 韩国 KOSDAQ：`035900.KQ`
 
 约束与边界：
 
 - 手动输入裸代码时会先检索本地/远程股票池；若 `005930`、`000660` 等裸码命中 `005930.KS`、`000660.KS` 等日韩条目，则按命中的市场提交分析；若股票池未命中，仍按既有 6 位数字代码规则默认落到 A 股语义，并保留为可追踪的跨市场歧义边界。
+- Web 搜索框会持续显示 `.T` / `.KS` / `.KQ` 示例。若本地索引没有建议，仍可输入有效的完整 suffix 代码并按 Enter 提交；该提示不会把未命中误写成不支持，也不会触发远程全市场查询。
+- 仓内维护的日股、韩股种子各 60 只。种子源位于 `scripts/stock_index_seeds/`，更新后使用 `python scripts/generate_index_from_csv.py --curated-seeds-only` 只替换生成索引中的 JP/KR 行并保留其他市场，不手工编辑 `stocks.index.json`。代表性成分与上市状态可分别通过 [Nikkei 225 Components](https://indexes.nikkei.co.jp/en/nkave/index/component?idx=nk225)、[JPX Listed Issues](https://www.jpx.co.jp/english/markets/statistics-equities/misc/01.html) 和 [KRX Listed Company](https://global.krx.co.kr/contents/GLB/03/0308/0308010000/GLB0308010000.jsp) 复核。
 - 日股/韩股 suffix 识别已集中到共享市场代码工具，数据源路由、Prompt 市场识别、交易日历和股票索引裸码解析复用同一组规则，减少后续市场扩展时的规则漂移。
 - 日股/韩股日线和基础实时/近实时行情只走 `YfinanceFetcher`，不尝试 AkShare、Tushare、Efinance、Pytdx、Baostock 等 A 股专属数据源；yfinance 报价会尽量带上 `market`、`currency`、`data_quality`、`missing_fields` 等质量元数据。
 - 基本面复用既有 offshore yfinance 轻量路径；A 股专属资金流、龙虎榜、板块等能力按 `not_supported` 降级，offshore 基本面上下文也会标记 provider、as_of、data_quality 和缺失块。
@@ -59,7 +61,7 @@ A 股大盘复盘会复用既有行业/概念涨跌榜和主要指数行情，�
 
 - 不承诺实时行情；Yahoo Finance 数据可能延迟或字段缺失。
 - 不承诺完整基本面、行业/板块、市场宽度或涨跌家数。JP/KR 大盘复盘 v1 仅提供主要指数、新闻线索与模板/LLM 复盘，不提供日韩市场宽度或板块排行。
-- 不承诺完整日韩全市场股票列表；Web 自动补全当前仅覆盖仓内种子索引中的常用标的（已扩充至各 30 只左右的头部标的），未命中时仍可手动输入 suffix 代码。
+- 不承诺完整日韩全市场股票列表；Web 自动补全当前仅覆盖仓内各 60 只常用种子标的，不做远程全市场补全。未命中时仍可手动输入有效的完整 suffix 代码。
 - 不补齐 Portfolio 的 JPY/KRW 汇率、成本、市值完整口径；相关字段仅放开市场类型以避免前后端校验拒绝。
 
 回滚方式：移除 `jp/kr` 市场识别、交易日历注册、YFinance 路由扩展、Web/API 类型放行、`scripts/stock_index_seeds/` 日韩种子索引，并删除本文档中的能力声明。

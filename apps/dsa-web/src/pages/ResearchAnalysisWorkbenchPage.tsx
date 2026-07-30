@@ -45,6 +45,7 @@ import {
   WorkspaceLayout,
   getTabPanelId,
 } from '../components/common';
+import { AnalysisPhaseSelect } from '../components/analysis';
 import { useToast } from '../components/common/toastContext';
 import { DashboardStateBlock } from '../components/dashboard';
 import { HistoryList, StockHistoryTrendDrawer } from '../components/history';
@@ -76,7 +77,7 @@ import {
   type AnalysisWorkbenchRouteState,
 } from '../routing/analysisWorkbenchRouteState';
 import { useStockPoolStore } from '../stores/stockPoolStore';
-import type { TaskInfo } from '../types/analysis';
+import type { AnalysisPhase, TaskInfo } from '../types/analysis';
 import type { RunFlowSnapshotSource } from '../types/runFlow';
 import { normalizeBatchAnalysisCodes, submitBatchAnalysis } from '../utils/batchAnalysis';
 import { buildDeepLink } from '../utils/deepLink';
@@ -151,6 +152,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
   const consumedStockContextRef = useRef<string | null>(null);
   const [analysisSkills, setAnalysisSkills] = useState<SkillInfo[]>([]);
   const [selectedStrategyId, setSelectedStrategyId] = useState('');
+  const [analysisPhase, setAnalysisPhase] = useState<AnalysisPhase>('auto');
   const [experiencePreference, setExperiencePreference] = useState<{
     mode: ExperienceMode;
     explicit: boolean;
@@ -537,6 +539,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
       originalQuery: query,
       selectionSource,
       reportType: experienceMode === 'beginner' ? 'brief' : 'detailed',
+      analysisPhase,
       skills: selectedAnalysisSkills,
     });
     if (!isMountedRef.current) return;
@@ -547,7 +550,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
     if (taskAccepted || latest.duplicateTask) {
       selectSegment(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
     }
-  }, [analysisTasks, experienceMode, isExperienceModeReady, query, selectSegment, selectedAnalysisSkills, submitAnalysis]);
+  }, [analysisPhase, analysisTasks, experienceMode, isExperienceModeReady, query, selectSegment, selectedAnalysisSkills, submitAnalysis]);
 
   const submitBatch = useCallback(async (sourceCodes: readonly string[]) => {
     if (!isExperienceModeReady) return;
@@ -566,6 +569,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
           stockCodes,
           reportType: experienceMode === 'beginner' ? 'brief' : 'detailed',
           notify,
+          analysisPhase,
           skills: selectedAnalysisSkills,
         }),
         reconcile: refreshActiveTasks,
@@ -610,7 +614,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
     } finally {
       setIsBatchSubmitting(false);
     }
-  }, [experienceMode, isExperienceModeReady, language, notify, refreshActiveTasks, selectSegment, selectedAnalysisSkills, t]);
+  }, [analysisPhase, experienceMode, isExperienceModeReady, language, notify, refreshActiveTasks, selectSegment, selectedAnalysisSkills, t]);
 
   const submitWatchlistBatch = useCallback(async (mode: WatchlistAnalyzeMode) => {
     if (mode === 'pending' && watchlistCoverage.isTodayStatusBlocked) {
@@ -848,6 +852,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
       originalQuery: selectedAnalysisReport.meta.stockCode,
       selectionSource: 'manual',
       forceRefresh: true,
+      analysisPhase,
       skills: selectedAnalysisSkills,
     });
     if (!isMountedRef.current) return;
@@ -861,6 +866,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
       selectSegment(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
     }
   }, [
+    analysisPhase,
     analysisTasks,
     selectSegment,
     selectedAnalysisReport,
@@ -973,7 +979,7 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
               </p>
             </div>
 
-            <div className="grid gap-4 rounded-xl border border-border bg-background/20 p-4 lg:grid-cols-2 lg:items-end">
+            <div className="grid gap-4 rounded-xl border border-border bg-background/20 p-4 lg:grid-cols-3 lg:items-end">
               <div>
                 <label
                   htmlFor="analysis-workbench-stock-search"
@@ -1001,6 +1007,14 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
                 disabled={isAnalyzing || !isExperienceModeReady}
                 className="w-full"
                 triggerClassName="w-full"
+              />
+              <AnalysisPhaseSelect
+                id="analysis-workbench-phase"
+                value={analysisPhase}
+                onChange={setAnalysisPhase}
+                label={t('analysis.phase')}
+                hint={t('analysis.phaseHint')}
+                disabled={isAnalyzing || isBatchSubmitting || !isExperienceModeReady}
               />
             </div>
 
@@ -1197,7 +1211,16 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
               ) : selectedAnalysisReport ? (
                 <>
                   {!isHistoryTrendOpen ? (
-                    <div className="mb-3 flex flex-wrap justify-end gap-2">
+                    <div className="mb-3 flex flex-wrap items-end justify-end gap-2">
+                      <AnalysisPhaseSelect
+                        id="analysis-workbench-reanalysis-phase"
+                        value={analysisPhase}
+                        onChange={setAnalysisPhase}
+                        label={t('analysis.phase')}
+                        hint={t('analysis.phaseHint')}
+                        disabled={isAnalyzing}
+                        className="mr-auto w-full sm:w-64"
+                      />
                       <Button
                         type="button"
                         variant="secondary"

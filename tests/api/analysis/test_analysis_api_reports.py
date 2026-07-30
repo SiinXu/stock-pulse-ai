@@ -1251,6 +1251,66 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             "机器人概念",
         )
 
+    def test_get_analysis_status_projects_structured_insights_from_completed_history(self) -> None:
+        if get_analysis_status is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        record = SimpleNamespace(
+            id=1,
+            code="AAPL",
+            name="Apple",
+            report_type="detailed",
+            created_at=datetime(2026, 7, 29, 12, 0, 0),
+            raw_result=json.dumps(
+                {
+                    "model_used": "test-model",
+                    "report_language": "en",
+                    "dashboard": {
+                        "phase_decision": {
+                            "phase_context": {"phase": "intraday", "market": "US"},
+                            "immediate_action": "Wait for confirmation",
+                        },
+                        "strategy_synthesis": {
+                            "final_signal": "hold",
+                            "consensus_level": "low",
+                            "opposing_skills": [
+                                {"skill_id": "event_driven", "signal": "sell"},
+                            ],
+                        },
+                    },
+                }
+            ),
+            context_snapshot=None,
+            news_content=None,
+            sentiment_score=50,
+            operation_advice="Hold",
+            trend_prediction="Neutral",
+            analysis_summary="summary",
+            ideal_buy=None,
+            secondary_buy=None,
+            stop_loss=None,
+            take_profit=None,
+        )
+        mock_db = MagicMock()
+        mock_db.get_analysis_history.return_value = [record]
+        mock_db.get_latest_fundamental_snapshot.return_value = None
+
+        with patch("api.v1.endpoints.analysis.get_task_queue") as queue_mock, \
+             patch("src.storage.DatabaseManager.get_instance", return_value=mock_db):
+            queue_mock.return_value.get_task.return_value = None
+            status = get_analysis_status("task_structured_insights")
+
+        insights = status.result.report["details"]["structured_insights"]
+        self.assertEqual(insights["schema_version"], "report-structured-insights-v1")
+        self.assertEqual(
+            insights["phase_decision"]["phase_context"]["phase"],
+            "intraday",
+        )
+        self.assertEqual(
+            insights["strategy_synthesis"]["opposing_skills"][0]["skill_id"],
+            "event_driven",
+        )
+
     def test_get_analysis_status_completed_db_snapshot_includes_agent_snapshot_board_details(self) -> None:
         if get_analysis_status is None:
             self.skipTest("analysis endpoint helpers unavailable in this environment")
@@ -1490,4 +1550,57 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         load_sources.assert_called_once_with(
             query_id="task_no_snapshot_in_memory_1",
             stock_code="600519",
+        )
+
+    def test_build_analysis_report_projects_structured_insights_from_raw_result(self) -> None:
+        if _build_analysis_report is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        report = _build_analysis_report(
+            report_data={
+                "meta": {"report_language": "en"},
+                "summary": {"analysis_summary": "summary"},
+                "details": {
+                    "raw_result": {
+                        "dashboard": {
+                            "phase_decision": {
+                                "phase_context": {"phase": "intraday", "market": "US"},
+                                "immediate_action": "Wait for confirmation",
+                            },
+                            "signal_attribution": {
+                                "technical_indicators": 40,
+                                "news_sentiment": 20,
+                                "fundamentals": 30,
+                                "market_conditions": 10,
+                            },
+                            "strategy_synthesis": {
+                                "final_signal": "buy",
+                                "consensus_level": "medium",
+                                "opposing_skills": [
+                                    {"skill_id": "bear_case", "signal": "sell"},
+                                ],
+                            },
+                        }
+                    }
+                },
+            },
+            query_id="q-structured-insights",
+            stock_code="AAPL",
+            stock_name="Apple",
+        )
+
+        self.assertIsNotNone(report.details)
+        insights = report.details.structured_insights
+        self.assertEqual(insights["schema_version"], "report-structured-insights-v1")
+        self.assertEqual(
+            insights["phase_decision"]["phase_context"]["phase"],
+            "intraday",
+        )
+        self.assertEqual(
+            insights["signal_attribution"]["technical_indicators"],
+            40,
+        )
+        self.assertEqual(
+            insights["strategy_synthesis"]["opposing_skills"][0]["skill_id"],
+            "bear_case",
         )

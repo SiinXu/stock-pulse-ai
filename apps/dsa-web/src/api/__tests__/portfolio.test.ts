@@ -9,6 +9,127 @@ vi.mock('../index', () => ({
   default: { post, put },
 }));
 
+describe('portfolioApi account and paper-trade mapping', () => {
+  beforeEach(() => {
+    post.mockReset();
+  });
+
+  it('keeps real as the default account type and maps the response type', async () => {
+    post.mockResolvedValue({
+      data: {
+        id: 7,
+        name: 'Main',
+        market: 'us',
+        base_currency: 'USD',
+        is_active: true,
+        account_type: 'real',
+      },
+    });
+
+    const created = await portfolioApi.createAccount({
+      name: 'Main',
+      market: 'us',
+      baseCurrency: 'USD',
+    });
+
+    expect(post).toHaveBeenCalledWith('/api/v1/portfolio/accounts', {
+      name: 'Main',
+      broker: undefined,
+      market: 'us',
+      base_currency: 'USD',
+      owner_id: undefined,
+      account_type: 'real',
+    });
+    expect(created.accountType).toBe('real');
+  });
+
+  it('maps paper account creation and explicit-price paper trades', async () => {
+    post
+      .mockResolvedValueOnce({
+        data: {
+          id: 8,
+          name: 'Simulation',
+          market: 'us',
+          base_currency: 'USD',
+          is_active: true,
+          account_type: 'paper',
+        },
+      })
+      .mockResolvedValueOnce({
+        data: { id: 91, price: 205.5, price_source: 'manual' },
+      });
+
+    const account = await portfolioApi.createAccount({
+      name: 'Simulation',
+      market: 'us',
+      baseCurrency: 'USD',
+      accountType: 'paper',
+    });
+    const trade = await portfolioApi.createPaperTrade(8, {
+      operationId: 'portfolio-paper-1',
+      symbol: 'AAPL',
+      tradeDate: '2026-07-29',
+      side: 'buy',
+      quantity: 2,
+      price: 205.5,
+      note: 'Paper entry',
+    });
+
+    expect(post.mock.calls[0]).toEqual([
+      '/api/v1/portfolio/accounts',
+      {
+        name: 'Simulation',
+        broker: undefined,
+        market: 'us',
+        base_currency: 'USD',
+        owner_id: undefined,
+        account_type: 'paper',
+      },
+    ]);
+    expect(post.mock.calls[1]).toEqual([
+      '/api/v1/portfolio/accounts/8/paper-trades',
+      {
+        operation_id: 'portfolio-paper-1',
+        symbol: 'AAPL',
+        trade_date: '2026-07-29',
+        side: 'buy',
+        quantity: 2,
+        price: 205.5,
+        note: 'Paper entry',
+      },
+      { headers: { 'Idempotency-Key': 'portfolio-paper-1' } },
+    ]);
+    expect(account.accountType).toBe('paper');
+    expect(trade).toEqual({ id: 91, price: 205.5, priceSource: 'manual' });
+  });
+
+  it('omits paper-trade price so the backend can use the latest close', async () => {
+    post.mockResolvedValue({
+      data: { id: 92, price: 204, price_source: 'latest_close' },
+    });
+
+    await portfolioApi.createPaperTrade(8, {
+      operationId: 'portfolio-paper-2',
+      symbol: 'AAPL',
+      tradeDate: '2026-07-29',
+      side: 'sell',
+      quantity: 1,
+    });
+
+    expect(post).toHaveBeenCalledWith(
+      '/api/v1/portfolio/accounts/8/paper-trades',
+      {
+        operation_id: 'portfolio-paper-2',
+        symbol: 'AAPL',
+        trade_date: '2026-07-29',
+        side: 'sell',
+        quantity: 1,
+      },
+      { headers: { 'Idempotency-Key': 'portfolio-paper-2' } },
+    );
+  });
+});
+
 describe('portfolioApi.updateAccount', () => {
   beforeEach(() => {
     put.mockReset();

@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Treated DingTalk signing secrets as opaque provider values and localized newly added Web settings and analysis copy across all translated bundles.
+- [Fixed] Separated successful paper-trade submission from follow-up portfolio refresh failures, with a page-level refresh retry and accurate success copy.
+- [Added] Added shared structured phase, signal-attribution, and strategy-synthesis report sections across synchronous, task, and history results, and expanded Japan/Korea search seeds with explicit suffix and manual-entry guidance.
+- [Added] Added Web paper-account trading with explicit account labeling, optional latest-close pricing, actionable failures, and in-place portfolio refreshes.
+- [Added] Added per-request Web analysis-phase controls for single, batch, import, reanalysis, and portfolio analysis flows while keeping automatic inference as the default.
 - [Added] Completed Settings lifecycle controls with last-good configuration rollback, durable scheduled-run history, structured investment-framework editing and immutable history copy-to-draft, plus masked DingTalk group webhook configuration and testing.
 - [Fixed] Aligned investment-framework history timestamps and latest markers, stable line and node-ID editing, Unicode 15 dimension uniqueness, collection/rule limits, and field-addressable backend validation with the authoritative schema.
 - [Changed] Refined Web Home and Settings with bordered attention panels, compact shared help and local-model icons, and a cleaner embedded Usage header.

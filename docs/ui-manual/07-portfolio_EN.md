@@ -11,7 +11,7 @@ It cooperates with AI signals; it does not replace them:
 > **Why “Portfolio” and “Holdings”?**  
 > Sidebar nav is often **Portfolio**; the page title is often **Holdings**. Same module—search either word.
 
-> P&L numbers and AI suggestions are research aids only — **not investment advice**. Keep paper trading (if offered) separate from live books.
+> P&L numbers and AI suggestions are research aids only — **not investment advice**. Paper trades are simulated bookkeeping, never real orders; keep them separate from live books.
 
 ## How to open
 
@@ -28,7 +28,7 @@ It cooperates with AI signals; it does not replace them:
 | Only trying AI reports | You can skip bookkeeping; analysis still works |
 | Want “advice vs real size” | Create one account; enter a few trades |
 | Broker CSV available | Use import; always preview first |
-| Practice without live risk | Use paper/sim account if the UI offers it |
+| Practice without live risk | Create a **Paper account** and use its paper-trade flow |
 
 ## Page map
 
@@ -46,6 +46,7 @@ flowchart TB
 
 - **All accounts**: overview; many write actions may require a specific account.  
 - **One account**: bookkeeping and import—confirm the account before every write.
+- At creation, choose a **Real account** or **Paper account**; Real is the default. Paper accounts are labeled in the selector, page heading, and holdings rows. Account type is read-only after creation.
 
 ### Cost method
 
@@ -64,13 +65,25 @@ Typical columns: code, qty, cost, last, value, floating P&L, analyze action, opt
 
 ## First bookkeeping (five steps)
 
-1. **Create account** (name required; broker/currency optional).  
+1. **Create account** (name required; choose Real or Paper; broker/currency optional).
 2. **Select that account** (not “All”).  
 3. **Enter a buy** (code, date, price, qty; fees if known).  
 4. Confirm table qty/cost.  
 5. Try an oversized sell—if blocked, protections work.
 
 Then add sells, deposits/withdrawals, dividends as needed.
+
+## Paper trading (Paper accounts only)
+
+Selecting a labeled **Paper account** exposes a dedicated **Paper trade** action. Real accounts never show this action, and Paper accounts do not reuse the live/manual fill form with fee and tax fields.
+
+1. Select a Paper account.
+2. Choose buy or sell, then enter the ticker, trade date, and quantity. A note is optional.
+3. Leave price blank to use the latest available close on or before the trade date, or enter an explicit simulated fill price.
+4. After submission, confirm the effective price and source shown in the success message (`entered price` or `latest close`). This message confirms only that the trade was recorded; it does not claim that the follow-up page refresh completed.
+5. The page then refreshes cash, holdings, the trade ledger, and risk data without a full-page reload. If that refresh fails, a page-level warning says the paper trade was recorded but the page data is incomplete. Choose **Retry refresh**; do not submit the same trade again.
+
+Paper trades currently exclude fees, taxes, and slippage; the ticket states this explicitly. Actionable failures cover insufficient paper cash, selling more than the held quantity, and unavailable latest-close data. For an unavailable quote, enter an explicit price or change the trade date. A failed submission preserves the draft for correction and retry.
 
 ## Event types
 
@@ -104,6 +117,9 @@ Preview → fix mapping errors → import → spot-check qty.
 **C — Concentration check**  
 All accounts view → read concentration / risk strip → open Signal Center with holdings scope.
 
+**D — Practice without a live order**
+Create Paper account → select it → open Paper trade → submit a buy with blank price → verify the latest-close source → confirm cash, holdings, and the trade ledger refresh.
+
 ## Glossary
 
 | Term | Meaning |
@@ -113,6 +129,8 @@ All accounts view → read concentration / risk strip → open Signal Center wit
 | Floating P&L | Mark-to-market vs cost under the chosen method |
 | Corporate action | Dividend, split, and similar events |
 | Dry-run import | Preview without writing |
+| Paper account | A clearly labeled simulated book that never sends real orders |
+| Paper trade | A simulated fill written only to a Paper account; fees, taxes, and slippage are currently excluded |
 
 ## Related
 

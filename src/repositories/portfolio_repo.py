@@ -480,6 +480,24 @@ class PortfolioRepository:
         session.refresh(row)
         return row
 
+    def get_trade_in_session(
+        self,
+        *,
+        session: Any,
+        account_id: int,
+        trade_id: int,
+    ) -> Optional[PortfolioTrade]:
+        return session.execute(
+            select(PortfolioTrade)
+            .where(
+                and_(
+                    PortfolioTrade.id == trade_id,
+                    PortfolioTrade.account_id == account_id,
+                )
+            )
+            .limit(1)
+        ).scalar_one_or_none()
+
     def delete_trade_in_session(self, *, session: Any, trade_id: int) -> bool:
         row = session.execute(
             select(PortfolioTrade).where(PortfolioTrade.id == trade_id).limit(1)
@@ -777,20 +795,35 @@ class PortfolioRepository:
 
     def get_latest_close_with_date(self, symbol: str, as_of: date) -> Optional[Tuple[float, date]]:
         with self.db.get_session() as session:
-            row = session.execute(
-                select(StockDaily)
-                .where(
-                    and_(
-                        StockDaily.code == symbol,
-                        StockDaily.date <= as_of,
-                    )
+            return self.get_latest_close_with_date_in_session(
+                session=session,
+                symbol=symbol,
+                as_of=as_of,
+            )
+
+    def get_latest_close_with_date_in_session(
+        self,
+        *,
+        session: Any,
+        symbol: str,
+        as_of: date,
+    ) -> Optional[Tuple[float, date]]:
+        """Return the latest close using the caller's transaction."""
+
+        row = session.execute(
+            select(StockDaily)
+            .where(
+                and_(
+                    StockDaily.code == symbol,
+                    StockDaily.date <= as_of,
                 )
-                .order_by(desc(StockDaily.date))
-                .limit(1)
-            ).scalar_one_or_none()
-            if row is None or row.close is None:
-                return None
-            return float(row.close), row.date
+            )
+            .order_by(desc(StockDaily.date))
+            .limit(1)
+        ).scalar_one_or_none()
+        if row is None or row.close is None:
+            return None
+        return float(row.close), row.date
 
     def save_fx_rate(
         self,

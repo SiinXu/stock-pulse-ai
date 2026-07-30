@@ -455,16 +455,39 @@ export function cloneInvestmentFrameworkContent(
   return JSON.parse(JSON.stringify(content)) as InvestmentFrameworkContent;
 }
 
+export function normalizeInvestmentFrameworkNodeId(
+  value: string | null | undefined,
+): string {
+  return value?.trim() ?? '';
+}
+
+export function canCommitInvestmentFrameworkNodeRename(
+  nodes: InvestmentFrameworkDecisionNode[],
+  nodeIndex: number,
+  nextNodeId: string,
+): boolean {
+  const normalizedNodeId = normalizeInvestmentFrameworkNodeId(nextNodeId);
+  return (
+    NODE_ID_PATTERN.test(normalizedNodeId)
+    && trimmedLength(normalizedNodeId) <= INVESTMENT_FRAMEWORK_LIMITS.nodeIdLength
+    && nodes.every((node, index) => (
+      index === nodeIndex
+      || normalizeInvestmentFrameworkNodeId(node.nodeId) !== normalizedNodeId
+    ))
+  );
+}
+
 export function nextFrameworkNodeId(
   nodes: InvestmentFrameworkDecisionNode[],
   base = 'node',
 ): string {
-  const used = new Set(nodes.map((node) => node.nodeId));
+  const used = new Set(nodes.map((node) => normalizeInvestmentFrameworkNodeId(node.nodeId)));
+  const normalizedBase = normalizeInvestmentFrameworkNodeId(base) || 'node';
   let candidateIndex = nodes.length + 1;
-  let candidate = `${base}-${candidateIndex}`;
-  while (used.has(candidate)) {
+  let candidate = `${normalizedBase}-${candidateIndex}`;
+  while (used.has(normalizeInvestmentFrameworkNodeId(candidate))) {
     candidateIndex += 1;
-    candidate = `${base}-${candidateIndex}`;
+    candidate = `${normalizedBase}-${candidateIndex}`;
   }
   return candidate;
 }
@@ -473,18 +496,19 @@ export function nodeDeleteBlockers(
   content: InvestmentFrameworkContent,
   nodeId: string,
 ): { isRoot: boolean; inboundNodeIds: string[] } {
-  const normalizedNodeId = nodeId.trim();
-  const inboundNodeIds: string[] = [];
+  const normalizedNodeId = normalizeInvestmentFrameworkNodeId(nodeId);
+  if (!normalizedNodeId) return { isRoot: false, inboundNodeIds: [] };
+  const inboundNodeIds = new Set<string>();
   for (const node of content.decisionTree ?? []) {
     if (node.branches.some(
-      (branch) => branch.targetNodeId?.trim() === normalizedNodeId,
+      (branch) => normalizeInvestmentFrameworkNodeId(branch.targetNodeId) === normalizedNodeId,
     )) {
-      inboundNodeIds.push(node.nodeId);
+      inboundNodeIds.add(normalizeInvestmentFrameworkNodeId(node.nodeId));
     }
   }
   return {
-    isRoot: content.rootNodeId?.trim() === normalizedNodeId,
-    inboundNodeIds,
+    isRoot: normalizeInvestmentFrameworkNodeId(content.rootNodeId) === normalizedNodeId,
+    inboundNodeIds: [...inboundNodeIds],
   };
 }
 
@@ -526,7 +550,7 @@ export function validateInvestmentFrameworkContent(
   const nodeIdIndexes = new Map<string, number[]>();
   nodes.forEach((node, nodeIndex) => {
     const nodePath = `decisionTree.${nodeIndex}`;
-    const nodeId = node.nodeId.trim();
+    const nodeId = normalizeInvestmentFrameworkNodeId(node.nodeId);
     const indexes = nodeIdIndexes.get(nodeId) ?? [];
     indexes.push(nodeIndex);
     nodeIdIndexes.set(nodeId, indexes);
@@ -564,47 +588,51 @@ export function validateInvestmentFrameworkContent(
   });
 
   nodeIdIndexes.forEach((indexes, nodeId) => {
-    if (indexes.length <= 1) return;
-    indexes.forEach((nodeIndex) => {
-      issues.push({
-        code: 'duplicate_node_id',
-        path: `decisionTree.${nodeIndex}.nodeId`,
-        value: nodeId,
+    if (indexes.length > 1) {
+      indexes.forEach((nodeIndex) => {
+        issues.push({
+          code: 'duplicate_node_id',
+          path: `decisionTree.${nodeIndex}.nodeId`,
+          value: nodeId,
+        });
       });
-    });
+    }
   });
 
   if (nodes.length > 0) {
-    const knownIds = new Set(nodes.map((node) => node.nodeId.trim()));
-    if (!content.rootNodeId?.trim()) {
+    const knownIds = new Set(nodes.map(
+      (node) => normalizeInvestmentFrameworkNodeId(node.nodeId),
+    ));
+    const rootNodeId = normalizeInvestmentFrameworkNodeId(content.rootNodeId);
+    if (!rootNodeId) {
       issues.push({ code: 'root_required', path: 'rootNodeId' });
-    } else if (!knownIds.has(content.rootNodeId.trim())) {
-      issues.push({ code: 'root_unknown', path: 'rootNodeId', value: content.rootNodeId });
+    } else if (!knownIds.has(rootNodeId)) {
+      issues.push({ code: 'root_unknown', path: 'rootNodeId', value: rootNodeId });
     }
     nodes.forEach((node, nodeIndex) => {
       node.branches.forEach((branch, branchIndex) => {
-        if (branch.targetNodeId && !knownIds.has(branch.targetNodeId.trim())) {
+        const targetNodeId = normalizeInvestmentFrameworkNodeId(branch.targetNodeId);
+        if (targetNodeId && !knownIds.has(targetNodeId)) {
           issues.push({
             code: 'target_unknown',
             path: `decisionTree.${nodeIndex}.branches.${branchIndex}.targetNodeId`,
-            value: branch.targetNodeId,
+            value: targetNodeId,
           });
         }
       });
     });
 
-    const normalizedRootNodeId = content.rootNodeId?.trim();
     if (
-      normalizedRootNodeId
-      && knownIds.has(normalizedRootNodeId)
+      rootNodeId
+      && knownIds.has(rootNodeId)
       && !issues.some((issue) => issue.code === 'duplicate_node_id' || issue.code === 'target_unknown')
     ) {
       const adjacency = new Map(
         nodes.map((node) => [
-          node.nodeId.trim(),
+          normalizeInvestmentFrameworkNodeId(node.nodeId),
           node.branches
-            .map((branch) => branch.targetNodeId?.trim())
-            .filter((target): target is string => Boolean(target)),
+            .map((branch) => normalizeInvestmentFrameworkNodeId(branch.targetNodeId))
+            .filter(Boolean),
         ]),
       );
       const visited = new Set<string>();
@@ -621,7 +649,7 @@ export function validateInvestmentFrameworkContent(
         visiting.delete(nodeId);
         visited.add(nodeId);
       };
-      visit(normalizedRootNodeId);
+      visit(rootNodeId);
       if (hasCycle) {
         issues.push({ code: 'cycle', path: 'decisionTree' });
       }
@@ -630,8 +658,12 @@ export function validateInvestmentFrameworkContent(
         issues.push({ code: 'unreachable', path: 'decisionTree', value: unreachable.join(', ') });
       }
     }
-  } else if (content.rootNodeId) {
-    issues.push({ code: 'root_unknown', path: 'rootNodeId', value: content.rootNodeId });
+  } else if (normalizeInvestmentFrameworkNodeId(content.rootNodeId)) {
+    issues.push({
+      code: 'root_unknown',
+      path: 'rootNodeId',
+      value: normalizeInvestmentFrameworkNodeId(content.rootNodeId),
+    });
   }
 
   const dimensionNames = new Map<string, number[]>();

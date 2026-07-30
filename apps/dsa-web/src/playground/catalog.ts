@@ -158,6 +158,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('reports', 'report-overview', 'ReportOverview', 'components/report/ReportOverview.tsx', ['default', 'states']),
   entry('reports', 'report-strata', 'ReportStrata', 'components/report/ReportStrata.tsx', ['default', 'empty']),
   entry('reports', 'report-strategy', 'ReportStrategy', 'components/report/ReportStrategy.tsx', ['default', 'empty']),
+  entry('reports', 'report-structured-insights', 'ReportStructuredInsights', 'components/report/ReportStructuredInsights.tsx', ['default', 'empty']),
   entry('reports', 'report-summary', 'ReportSummary', 'components/report/ReportSummary.tsx', ['default', 'loading', 'error']),
   entry('reports', 'deep-research-panel', 'DeepResearchPanel', 'components/chat/DeepResearchPanel.tsx', ['interactive', 'empty', 'error']),
 
@@ -199,6 +200,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
 
   entry('stockSearch', 'stock-autocomplete', 'StockAutocomplete', 'components/StockAutocomplete/StockAutocomplete.tsx', ['interactive', 'states']),
   entry('stockSearch', 'suggestions-list', 'SuggestionsList', 'components/StockAutocomplete/SuggestionsList.tsx', ['default', 'empty']),
+  entry('tasks', 'analysis-phase-select', 'AnalysisPhaseSelect', 'components/analysis/AnalysisPhaseSelect.tsx', ['interactive', 'states']),
   entry('tasks', 'task-panel', 'TaskPanel', 'components/tasks/TaskPanel.tsx', ['default', 'loading', 'states']),
   entry('watchlist', 'home-stock-workspace', 'HomeStockWorkspace', 'components/watchlist/HomeStockWorkspace.tsx', ['interactive', 'loading', 'empty', 'error']),
 ];

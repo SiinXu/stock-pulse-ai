@@ -17,6 +17,8 @@ import type {
   PortfolioImportBrokerListResponse,
   PortfolioImportCommitResponse,
   PortfolioImportParseResponse,
+  PaperTradeCreateRequest,
+  PaperTradeCreatedResponse,
   PortfolioPositionAnalysisRequest,
   PortfolioRiskResponse,
   PortfolioSnapshotResponse,
@@ -121,6 +123,7 @@ export const portfolioApi = {
       market: payload.market,
       base_currency: payload.baseCurrency,
       owner_id: payload.ownerId,
+      account_type: payload.accountType ?? 'real',
     });
     return toCamelCase<PortfolioAccountItem>(response.data);
   },
@@ -195,6 +198,26 @@ export const portfolioApi = {
       note: payload.note,
     }, { headers: { 'Idempotency-Key': payload.operationId } });
     return toCamelCase<PortfolioEventCreatedResponse>(response.data);
+  },
+
+  async createPaperTrade(
+    accountId: number,
+    payload: PaperTradeCreateRequest,
+  ): Promise<PaperTradeCreatedResponse> {
+    const response = await apiClient.post<Record<string, unknown>>(
+      `/api/v1/portfolio/accounts/${accountId}/paper-trades`,
+      {
+        operation_id: payload.operationId,
+        symbol: payload.symbol,
+        trade_date: payload.tradeDate,
+        side: payload.side,
+        quantity: payload.quantity,
+        ...(payload.price !== undefined ? { price: payload.price } : {}),
+        ...(payload.note !== undefined ? { note: payload.note } : {}),
+      },
+      { headers: { 'Idempotency-Key': payload.operationId } },
+    );
+    return toCamelCase<PaperTradeCreatedResponse>(response.data);
   },
 
   async deleteTrade(tradeId: number): Promise<PortfolioDeleteResponse> {

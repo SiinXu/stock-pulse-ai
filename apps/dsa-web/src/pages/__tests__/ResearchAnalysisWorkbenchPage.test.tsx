@@ -217,6 +217,12 @@ function renderedSearch(): URLSearchParams {
   return new URL(location, 'http://stockpulse.local').searchParams;
 }
 
+function chooseSelectOption(trigger: HTMLElement, optionName: string) {
+  fireEvent.click(trigger);
+  const listbox = document.getElementById(trigger.getAttribute('aria-controls')!)!;
+  fireEvent.click(within(listbox).getByRole('option', { name: optionName }));
+}
+
 describe('ResearchAnalysisWorkbenchPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -395,6 +401,7 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     const strategySelect = await screen.findByRole('combobox', { name: '策略' });
     fireEvent.click(strategySelect);
     fireEvent.click(await screen.findByRole('option', { name: 'Owner strategy' }));
+    chooseSelectOption(screen.getByRole('combobox', { name: '分析阶段' }), '盘中');
     fireEvent.click(screen.getByRole('tab', { name: '历史与对比' }));
 
     expect(await screen.findByTestId('report-summary')).toHaveTextContent('Apple');
@@ -407,6 +414,7 @@ describe('ResearchAnalysisWorkbenchPage', () => {
         originalQuery: 'AAPL',
         selectionSource: 'manual',
         forceRefresh: true,
+        analysisPhase: 'intraday',
         skills: ['owner-strategy'],
       }),
     ));
@@ -540,7 +548,26 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(expect.objectContaining({
       stockCode: 'AAPL',
       reportType: 'detailed',
+      analysisPhase: 'auto',
     }));
+  });
+
+  it('sends an explicit phase for a single-stock launch', async () => {
+    useStockPoolStore.setState({ query: 'AAPL' });
+    renderWorkbench();
+
+    chooseSelectOption(
+      await screen.findByRole('combobox', { name: '分析阶段' }),
+      '盘前',
+    );
+    fireEvent.click((await screen.findAllByRole('button', { name: '分析' })).at(-1)!);
+
+    await waitFor(() => expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stockCode: 'AAPL',
+        analysisPhase: 'premarket',
+      }),
+    ));
   });
 
   it('consumes stock context once and allows a different symbol to be submitted', async () => {
@@ -589,6 +616,10 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     const file = new File(['symbol'], 'stocks.csv', { type: 'text/csv' });
     const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
 
+    chooseSelectOption(
+      await screen.findByRole('combobox', { name: '分析阶段' }),
+      '盘后',
+    );
     fireEvent.change(input, { target: { files: [file] } });
 
     expect(await screen.findByText('已识别 2 只股票，可批量提交分析。')).toBeInTheDocument();
@@ -597,6 +628,7 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     await waitFor(() => {
       expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(expect.objectContaining({
         stockCodes: ['AAPL', 'MSFT'],
+        analysisPhase: 'postmarket',
       }));
     });
     await waitFor(() => {

@@ -14,9 +14,11 @@ import { Button, ConfirmDialog } from '../common';
 import LineListTextarea from './LineListTextarea';
 import { SettingsAlert } from './SettingsAlert';
 import {
+  canCommitInvestmentFrameworkNodeRename,
   INVESTMENT_FRAMEWORK_LIMITS,
   nextFrameworkNodeId,
   nodeDeleteBlockers,
+  normalizeInvestmentFrameworkNodeId,
   type InvestmentFrameworkValidationIssue,
 } from './investmentFrameworkEditorModel';
 
@@ -27,6 +29,13 @@ type InvestmentFrameworkStructuredEditorProps = {
   onChange: (content: InvestmentFrameworkContent) => void;
   formatIssue: (issue: InvestmentFrameworkValidationIssue) => string;
   t: (key: UiTextKey, params?: Record<string, string | number>) => string;
+};
+
+type NodeRenameSession = {
+  nodeIndex: number;
+  originalNodeId: string;
+  rootReferencesNode: boolean;
+  branchReferences: Array<{ nodeIndex: number; branchIndex: number }>;
 };
 
 const fieldClass =
@@ -40,12 +49,6 @@ function moveItem<T>(items: T[], from: number, to: number): T[] {
   return next;
 }
 
-type NodeRenameSession = {
-  nodeIndex: number;
-  updatesRoot: boolean;
-  inboundBranches: Set<string>;
-};
-
 const InvestmentFrameworkStructuredEditor: React.FC<
   InvestmentFrameworkStructuredEditorProps
 > = ({
@@ -58,7 +61,7 @@ const InvestmentFrameworkStructuredEditor: React.FC<
 }) => {
   const [pendingDeleteNode, setPendingDeleteNode] = useState<number | null>(null);
   const [dependencyWarning, setDependencyWarning] = useState('');
-  const nodeRenameSession = useRef<NodeRenameSession | null>(null);
+  const renameSession = useRef<NodeRenameSession | null>(null);
   const nodes = content.decisionTree ?? [];
   const dimensions = content.evaluationDimensions ?? [];
 
@@ -73,40 +76,67 @@ const InvestmentFrameworkStructuredEditor: React.FC<
     setNodes(next);
   };
 
-  const beginNodeRename = (index: number): NodeRenameSession => {
-    const previousId = nodes[index].nodeId;
-    const session = {
-      nodeIndex: index,
-      updatesRoot: content.rootNodeId === previousId,
-      inboundBranches: new Set(
-        nodes.flatMap((node, nodeIndex) => (
-          node.branches.flatMap((branch, branchIndex) => (
-            branch.targetNodeId === previousId
-              ? [`${nodeIndex}:${branchIndex}`]
-              : []
-          ))
-        )),
+  const beginNodeRename = (nodeIndex: number) => {
+    if (renameSession.current?.nodeIndex === nodeIndex) return;
+    const originalNodeId = nodes[nodeIndex]?.nodeId;
+    if (originalNodeId === undefined) return;
+    const normalizedNodeId = normalizeInvestmentFrameworkNodeId(originalNodeId);
+    const branchReferences: NodeRenameSession['branchReferences'] = [];
+    nodes.forEach((node, currentNodeIndex) => {
+      node.branches.forEach((branch, branchIndex) => {
+        if (
+          normalizedNodeId
+          && normalizeInvestmentFrameworkNodeId(branch.targetNodeId) === normalizedNodeId
+        ) {
+          branchReferences.push({ nodeIndex: currentNodeIndex, branchIndex });
+        }
+      });
+    });
+    renameSession.current = {
+      nodeIndex,
+      originalNodeId,
+      rootReferencesNode: Boolean(
+        normalizedNodeId
+        && normalizeInvestmentFrameworkNodeId(content.rootNodeId) === normalizedNodeId
       ),
+      branchReferences,
     };
-    nodeRenameSession.current = session;
-    return session;
   };
 
-  const renameNode = (index: number, nextId: string) => {
-    const session = nodeRenameSession.current?.nodeIndex === index
-      ? nodeRenameSession.current
-      : beginNodeRename(index);
-    const next = nodes.map((node, nodeIndex) => ({
+  const updateNodeIdDraft = (nodeIndex: number, nextNodeId: string) => {
+    beginNodeRename(nodeIndex);
+    updateNode(nodeIndex, { nodeId: nextNodeId });
+  };
+
+  const finishNodeRename = (nodeIndex: number) => {
+    const session = renameSession.current;
+    if (!session || session.nodeIndex !== nodeIndex) return;
+    renameSession.current = null;
+    const nextNodeId = nodes[nodeIndex]?.nodeId;
+    if (
+      nextNodeId === undefined
+      || !canCommitInvestmentFrameworkNodeRename(nodes, nodeIndex, nextNodeId)
+    ) {
+      updateNode(nodeIndex, { nodeId: session.originalNodeId });
+      return;
+    }
+    const referencedBranches = new Set(
+      session.branchReferences.map(
+        (reference) => `${reference.nodeIndex}:${reference.branchIndex}`,
+      ),
+    );
+    const next = nodes.map((node, currentNodeIndex) => ({
       ...node,
-      nodeId: nodeIndex === index ? nextId : node.nodeId,
-      branches: node.branches.map((branch, branchIndex) => ({
-        ...branch,
-        targetNodeId: session.inboundBranches.has(`${nodeIndex}:${branchIndex}`)
-          ? nextId
-          : branch.targetNodeId,
-      })),
+      branches: node.branches.map((branch, branchIndex) => (
+        referencedBranches.has(`${currentNodeIndex}:${branchIndex}`)
+          ? { ...branch, targetNodeId: nextNodeId }
+          : branch
+      )),
     }));
-    setNodes(next, session.updatesRoot ? nextId : content.rootNodeId);
+    setNodes(
+      next,
+      session.rootReferencesNode ? nextNodeId : content.rootNodeId,
+    );
   };
 
   const updateBranch = (
@@ -132,7 +162,10 @@ const InvestmentFrameworkStructuredEditor: React.FC<
 
   const duplicateNode = (index: number) => {
     const source = nodes[index];
-    const nodeId = nextFrameworkNodeId(nodes, `${source.nodeId}-copy`);
+    const nodeId = nextFrameworkNodeId(
+      nodes,
+      `${normalizeInvestmentFrameworkNodeId(source.nodeId)}-copy`,
+    );
     setNodes([
       ...nodes.slice(0, index + 1),
       {
@@ -350,12 +383,8 @@ const InvestmentFrameworkStructuredEditor: React.FC<
                       value={node.nodeId}
                       disabled={disabled}
                       onFocus={() => beginNodeRename(nodeIndex)}
-                      onChange={(event) => renameNode(nodeIndex, event.target.value)}
-                      onBlur={() => {
-                        if (nodeRenameSession.current?.nodeIndex === nodeIndex) {
-                          nodeRenameSession.current = null;
-                        }
-                      }}
+                      onBlur={() => finishNodeRename(nodeIndex)}
+                      onChange={(event) => updateNodeIdDraft(nodeIndex, event.target.value)}
                     />
                   </label>
                   <label className="block space-y-1">

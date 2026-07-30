@@ -38,6 +38,7 @@ const {
   listCashLedger,
   listCorporateActions,
   createTrade,
+  createPaperTrade,
   deleteTrade,
   createCashLedger,
   deleteCashLedger,
@@ -61,6 +62,7 @@ const {
   listCashLedger: vi.fn(),
   listCorporateActions: vi.fn(),
   createTrade: vi.fn(),
+  createPaperTrade: vi.fn(),
   deleteTrade: vi.fn(),
   createCashLedger: vi.fn(),
   deleteCashLedger: vi.fn(),
@@ -94,6 +96,7 @@ vi.mock('../../api/portfolio', () => ({
     listCashLedger,
     listCorporateActions,
     createTrade,
+    createPaperTrade,
     deleteTrade,
     createCashLedger,
     deleteCashLedger,
@@ -122,6 +125,7 @@ type AccountItem = {
   name: string;
   market?: 'cn' | 'hk' | 'us' | 'jp' | 'kr' | 'tw';
   baseCurrency?: string;
+  accountType?: 'real' | 'paper';
 };
 
 function makeAccounts(items: AccountItem[] = [{ id: 1, name: 'Main' }]) {
@@ -133,6 +137,7 @@ function makeAccounts(items: AccountItem[] = [{ id: 1, name: 'Main' }]) {
       market: item.market ?? 'us',
       baseCurrency: item.baseCurrency ?? 'CNY',
       isActive: true,
+      accountType: item.accountType ?? 'real',
       ownerId: null,
       createdAt: '2026-03-19T00:00:00Z',
       updatedAt: '2026-03-19T00:00:00Z',
@@ -339,6 +344,7 @@ describe('PortfolioPage FX refresh', () => {
     listCashLedger.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 });
     listCorporateActions.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 });
     createTrade.mockResolvedValue({ id: 1 });
+    createPaperTrade.mockResolvedValue({ id: 2, price: 205, priceSource: 'manual' });
     deleteTrade.mockResolvedValue({ deleted: 1 });
     createCashLedger.mockResolvedValue({ id: 1 });
     deleteCashLedger.mockResolvedValue({ deleted: 1 });
@@ -483,6 +489,53 @@ describe('PortfolioPage FX refresh', () => {
     expect(screen.getByRole('button', { name: '添加账户' })).toBeInTheDocument();
     expect(screen.queryByText('总权益')).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: '持仓明细' })).not.toBeInTheDocument();
+  });
+
+  it('defaults new accounts to the real account type', async () => {
+    getAccounts
+      .mockResolvedValueOnce(makeAccounts([]))
+      .mockResolvedValueOnce(makeAccounts([{ id: 3, name: 'Live book', accountType: 'real' }]));
+    createAccount.mockResolvedValue({
+      ...makeAccounts([{ id: 3, name: 'Live book', accountType: 'real' }]).accounts[0],
+    });
+    renderPortfolioPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: '添加账户' }));
+    expect(screen.getByRole('combobox', { name: '账户类型' })).toHaveTextContent('实盘账户');
+    fireEvent.change(screen.getByLabelText('账户名称'), { target: { value: 'Live book' } });
+    fireEvent.click(screen.getByRole('button', { name: '新建账户' }));
+
+    await waitFor(() => expect(createAccount).toHaveBeenCalledWith({
+      name: 'Live book',
+      broker: 'Demo',
+      market: 'cn',
+      baseCurrency: 'CNY',
+      accountType: 'real',
+    }));
+  });
+
+  it('creates and visually labels a paper account', async () => {
+    getAccounts
+      .mockResolvedValueOnce(makeAccounts([]))
+      .mockResolvedValueOnce(makeAccounts([{ id: 4, name: 'Practice', accountType: 'paper' }]));
+    createAccount.mockResolvedValue({
+      ...makeAccounts([{ id: 4, name: 'Practice', accountType: 'paper' }]).accounts[0],
+    });
+    renderPortfolioPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: '添加账户' }));
+    chooseOption(screen.getByRole('combobox', { name: '账户类型' }), 'paper');
+    fireEvent.change(screen.getByLabelText('账户名称'), { target: { value: 'Practice' } });
+    fireEvent.click(screen.getByRole('button', { name: '新建账户' }));
+
+    await waitFor(() => expect(createAccount).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'Practice',
+      accountType: 'paper',
+    })));
+    await waitFor(() => {
+      expect(screen.getAllByRole('combobox')[0]).toHaveTextContent('Practice (#4) · 纸上账户');
+    });
+    expect(screen.getAllByText('纸上账户').length).toBeGreaterThan(0);
   });
 
   it('edits the selected account via a PUT that preserves the account id', async () => {
@@ -1171,6 +1224,24 @@ describe('PortfolioPage FX refresh', () => {
     expect(await screen.findByText('已提交 HK00700 分析任务：task-portfolio-1')).toBeInTheDocument();
   });
 
+  it('sends an explicit phase for portfolio-triggered analysis', async () => {
+    getSnapshot.mockResolvedValueOnce(makeSnapshot({
+      positions: [makePosition({ symbol: 'AAPL', market: 'us', currency: 'USD' })],
+    }));
+    renderPortfolioPage();
+    await waitForInitialLoad();
+
+    chooseOption(screen.getByRole('combobox', { name: '分析阶段' }), 'postmarket');
+    const row = screen.getByText('AAPL').closest('tr');
+    fireEvent.click(within(row as HTMLTableRowElement).getByRole('button', { name: '分析' }));
+
+    await waitFor(() => expect(analyzePosition).toHaveBeenCalledWith('AAPL', {
+      accountId: 1,
+      analysisPhase: 'postmarket',
+      force: false,
+    }));
+  });
+
   it('prefers disabled feedback over empty-pair feedback when refresh is disabled', async () => {
     refreshFx.mockResolvedValueOnce({
       asOf: '2026-03-19',
@@ -1430,6 +1501,179 @@ describe('PortfolioPage FX refresh', () => {
     const accountListbox = document.getElementById(accountSelect.getAttribute('aria-controls')!)!;
     expect(within(accountListbox).getByRole('option', { name: 'Alt (#2)' })).toBeInTheDocument();
     expect(within(accountListbox).queryByRole('option', { name: 'Main (#1)' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the paper-trade endpoint unavailable for real accounts', async () => {
+    renderPortfolioPage();
+    await waitForInitialLoad();
+
+    chooseOption(screen.getAllByRole('combobox')[0], '1');
+    await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({
+      accountId: 1,
+      costMethod: 'fifo',
+      includeRealtime: false,
+    }));
+
+    expect(screen.queryByRole('button', { name: '纸上交易' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '录入交易' })).toBeEnabled();
+  });
+
+  it('records an explicit-price paper buy and refreshes portfolio surfaces', async () => {
+    getAccounts.mockResolvedValue(makeAccounts([
+      { id: 1, name: 'Practice', accountType: 'paper' },
+    ]));
+    createPaperTrade.mockResolvedValueOnce({
+      id: 81,
+      price: 205.5,
+      priceSource: 'manual',
+    });
+    renderPortfolioPage();
+    await waitForInitialLoad();
+
+    const accountSelect = screen.getAllByRole('combobox')[0];
+    expect(accountSelect).toHaveTextContent('全部账户');
+    chooseOption(accountSelect, '1');
+    await waitFor(() => expect(accountSelect).toHaveTextContent('Practice (#1) · 纸上账户'));
+    await waitForPortfolioLoad();
+    expect(screen.queryByRole('button', { name: '录入交易' })).not.toBeInTheDocument();
+
+    const snapshotCallsBeforeTrade = getSnapshot.mock.calls.length;
+    const riskCallsBeforeTrade = getRisk.mock.calls.length;
+    const accountCallsBeforeTrade = getAccounts.mock.calls.length;
+    const tradeListCallsBeforeTrade = listTrades.mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: '纸上交易' }));
+    const dialog = screen.getByRole('dialog', { name: '纸上交易' });
+    expect(dialog).toHaveTextContent('不计算手续费、税费或滑点');
+    fireEvent.change(within(dialog).getByLabelText('股票代码'), { target: { value: 'AAPL' } });
+    fireEvent.change(within(dialog).getByLabelText('数量'), { target: { value: '2' } });
+    fireEvent.change(within(dialog).getByLabelText('成交价'), { target: { value: '205.5' } });
+    fireEvent.change(within(dialog).getByLabelText('备注'), { target: { value: 'Practice entry' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '纸上交易' }));
+
+    await waitFor(() => expect(createPaperTrade).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        symbol: 'AAPL',
+        side: 'buy',
+        quantity: 2,
+        price: 205.5,
+        note: 'Practice entry',
+        operationId: expect.stringMatching(/^portfolio-paper-trade-/),
+      }),
+    ));
+    expect(await screen.findByText(/已记录买入 AAPL.*成交价 205.5（输入价格）/u))
+      .toBeInTheDocument();
+    await waitFor(() => expect(getAccounts).toHaveBeenCalledTimes(accountCallsBeforeTrade + 1));
+    await waitFor(() => expect(getSnapshot).toHaveBeenCalledTimes(snapshotCallsBeforeTrade + 1));
+    await waitFor(() => expect(getRisk).toHaveBeenCalledTimes(riskCallsBeforeTrade + 1));
+    await waitFor(() => expect(listTrades.mock.calls.length).toBeGreaterThan(tradeListCallsBeforeTrade));
+  });
+
+  it('keeps a recorded paper trade successful when the follow-up refresh fails and retries only the refresh', async () => {
+    getAccounts.mockResolvedValue(makeAccounts([
+      { id: 1, name: 'Practice', accountType: 'paper' },
+    ]));
+    createPaperTrade.mockResolvedValueOnce({
+      id: 83,
+      price: 205.5,
+      priceSource: 'manual',
+    });
+    renderPortfolioPage();
+    await waitForInitialLoad();
+
+    chooseOption(screen.getAllByRole('combobox')[0], '1');
+    await waitForPortfolioLoad();
+    const accountCallsBeforeTrade = getAccounts.mock.calls.length;
+    getAccounts.mockRejectedValueOnce(new Error('post-trade account refresh failed'));
+
+    fireEvent.click(screen.getByRole('button', { name: '纸上交易' }));
+    const dialog = screen.getByRole('dialog', { name: '纸上交易' });
+    fireEvent.change(within(dialog).getByLabelText('股票代码'), { target: { value: 'AAPL' } });
+    fireEvent.change(within(dialog).getByLabelText('数量'), { target: { value: '2' } });
+    fireEvent.change(within(dialog).getByLabelText('成交价'), { target: { value: '205.5' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '纸上交易' }));
+
+    expect(await screen.findByText(/已记录买入 AAPL.*成交价 205.5（输入价格）/u))
+      .toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: '纸上交易' })).not.toBeInTheDocument();
+    expect(screen.queryByText('纸上交易失败')).not.toBeInTheDocument();
+    expect(screen.queryByText(/余额、持仓和交易流水已刷新/u)).not.toBeInTheDocument();
+    expect(await screen.findByText('纸上交易已记录，页面数据未完全刷新'))
+      .toBeInTheDocument();
+    expect(screen.getByText(
+      '成交已经保存，但余额、持仓、风险或交易流水未能全部刷新。请重试刷新，不要重复提交同一笔交易。',
+    )).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '重试刷新' }));
+
+    await waitFor(() => expect(getAccounts).toHaveBeenCalledTimes(accountCallsBeforeTrade + 2));
+    await waitFor(() => expect(
+      screen.queryByText('纸上交易已记录，页面数据未完全刷新'),
+    ).not.toBeInTheDocument());
+    expect(createPaperTrade).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses latest-close paper execution when price is omitted', async () => {
+    getAccounts.mockResolvedValue(makeAccounts([
+      { id: 1, name: 'Practice', accountType: 'paper' },
+    ]));
+    createPaperTrade.mockResolvedValueOnce({
+      id: 82,
+      price: 204,
+      priceSource: 'latest_close',
+    });
+    renderPortfolioPage();
+    await waitForInitialLoad();
+
+    chooseOption(screen.getAllByRole('combobox')[0], '1');
+    await waitForPortfolioLoad();
+    fireEvent.click(screen.getByRole('button', { name: '纸上交易' }));
+    const dialog = screen.getByRole('dialog', { name: '纸上交易' });
+    fireEvent.change(within(dialog).getByLabelText('股票代码'), { target: { value: 'AAPL' } });
+    fireEvent.change(within(dialog).getByLabelText('数量'), { target: { value: '1' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '纸上交易' }));
+
+    await waitFor(() => expect(createPaperTrade).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        symbol: 'AAPL',
+        quantity: 1,
+        price: undefined,
+      }),
+    ));
+    expect(await screen.findByText(/成交价 204（最新收盘价）/u)).toBeInTheDocument();
+  });
+
+  it('shows actionable paper-trade server errors and preserves the draft', async () => {
+    getAccounts.mockResolvedValue(makeAccounts([
+      { id: 1, name: 'Practice', accountType: 'paper' },
+    ]));
+    createPaperTrade.mockRejectedValueOnce({
+      response: {
+        status: 400,
+        data: {
+          error: 'insufficient_cash',
+          message: 'required=10000 available=1000',
+        },
+      },
+    });
+    renderPortfolioPage();
+    await waitForInitialLoad();
+
+    chooseOption(screen.getAllByRole('combobox')[0], '1');
+    await waitForPortfolioLoad();
+    fireEvent.click(screen.getByRole('button', { name: '纸上交易' }));
+    const dialog = screen.getByRole('dialog', { name: '纸上交易' });
+    fireEvent.change(within(dialog).getByLabelText('股票代码'), { target: { value: 'AAPL' } });
+    fireEvent.change(within(dialog).getByLabelText('数量'), { target: { value: '100' } });
+    fireEvent.change(within(dialog).getByLabelText('成交价'), { target: { value: '100' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '纸上交易' }));
+
+    expect(await within(dialog).findByText(
+      '模拟现金不足。请减少买入数量或填写更低的有效成交价。',
+    )).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('股票代码')).toHaveValue('AAPL');
+    expect(within(dialog).getByLabelText('数量')).toHaveValue(100);
   });
 
   it('reuses the cash operation ID after a failed request and preserves the form', async () => {
