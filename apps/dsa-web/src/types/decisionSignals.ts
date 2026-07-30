@@ -307,3 +307,16 @@ export interface DecisionSignalFeedbackRequest {
   note?: string | null;
   source?: DecisionSignalFeedbackSource;
 }
+
+export interface DecisionSignalMemoryFlagItem {
+  signalId: number;
+  memorable: boolean;
+  ignored: boolean;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface DecisionSignalMemoryFlagUpdateRequest {
+  memorable?: boolean;
+  ignored?: boolean;
+}

@@ -77,9 +77,10 @@ Web 展示必须把这些 wire value 映射为当前 UI 语言的用户可读标
 - `GET /api/v1/decision-signals`：分页查询，支持市场、股票、动作、阶段、`decision_profile`、来源、状态、时间范围和持仓过滤。省略或传空 `decision_profile` 不加 profile 条件，返回所有 profile；`decision_profile=unknown` 查询 `NULL` 行；合法 profile 精确匹配。
 - `GET /api/v1/decision-signals/{signal_id}`：查询单条。
 - `PATCH /api/v1/decision-signals/{signal_id}/status`：更新状态和可选 metadata。object/null 替换只替换调用方 metadata；已持久化的 `report_language` 作为 canonical presentation provenance 保留，没有正式 provenance 时也不会从替换 object 提升该键，避免单纯状态更新改变同一信号的本地化标签。
+- `GET/PATCH /api/v1/decision-signals/{signal_id}/memory-flag`：读取或局部更新独立的 `memorable` / `ignored` 标记；请求省略的字段保持原值。`ignored` 会排除历史决策记忆检索，`memorable` 会提高优先级，两者同时为 `true` 时以 `ignored` 为准。
 - `GET /api/v1/decision-signals/latest/{stock_code}`：查询股票最新 active 信号。
 - `POST /api/v1/decision-signals/outcomes/run`：显式触发后验评估。
-- `GET /api/v1/decision-signals/outcomes`、`GET /api/v1/decision-signals/outcomes/stats`、`GET /api/v1/decision-signals/{signal_id}/outcomes`：查询后验结果与统计。
+- `GET /api/v1/decision-signals/outcomes`、`GET /api/v1/decision-signals/outcomes/stats`、`GET /api/v1/decision-signals/{signal_id}/outcomes`：查询后验结果与统计。全局 outcome 列表实际支持 `signal_id`、`horizon`、`engine_version`、`eval_status`、`outcome`、`page` 和 `page_size`。
 - `GET/PUT /api/v1/decision-signals/{signal_id}/feedback`：查询或写入 useful / not useful 反馈。
 - `POST /api/v1/decision-signals/reassess`：基于来源历史报告快照重新计算不同决策风格下的信号；`persist=false` 只预览，`persist=true` 由服务端重算并保存通过 guardrail 的结果。
 
@@ -141,11 +142,12 @@ Web 的唯一信号中心入口位于 `/signals`。旧 `/decision-signals` 会�
 - 时间线 status filter 只支持 `all` 与 `active`：`all` 不传 `status`，`active` 传 `status=active`。P1 不提供 terminal status filter，也不做前端 terminal 过滤。
 - 时间线支持 profile filter，复用 list API 的 server-side `decision_profile` 查询；`unknown` 只用于筛选和展示 legacy `NULL` 行。普通高级列表不新增 profile filter。
 - 信号表现统计保持全局已复盘 outcome 口径，不等于当前可见信号数量，也不随当前股票或高级列表筛选变化；当已复盘样本数为 0 时，Web 显示零样本空状态而不是一组 `0/-` 指标。
+- “再评估与统计”同时提供全局后验结果列表，直接使用后端 outcome list 的周期、结果、评估状态、引擎版本和信号 ID 筛选及服务端分页；每行复用详情中的 outcome/status 展示，并可打开对应信号详情。筛选保留在页面状态中，打开和关闭详情抽屉不会清空。
 - 统计卡片内提供“运行后验”入口，按安全默认参数触发 `POST /api/v1/decision-signals/outcomes/run`：固定 `status=active`、`force=false`、`limit=100`，只补算 active 信号中缺失或可重试的 outcome，不会重算全部或强制覆盖，避免误触发大批量重算或反复请求数据源。触发前需二次确认；运行同步返回后展示 `evaluated`/`created`/`updated`/`skipped` 汇总与引擎版本，并把本次运行追加到“最近运行”会话列表（仅前端会话内保留，后端无运行历史）。运行期间禁用触发并由 in-flight 守卫防重复提交，失败时展示错误与 trace，成功后刷新后验统计。
 - Web 展示优先读取正式 `decision_profile` 字段，只有字段缺失时才回退 legacy metadata；历史缺失或非法 profile 的信号显示为 `unknown`，不会误标为 `balanced`。
 - 卡片、详情、组合摘要和时间线统一以顶层 `action` 决定方向，并读取 `presentation` 的 confidence、summary、risk、timestamp；`presentation.action` 只作为同值派生镜像返回。时间线 rank、颜色和 tooltip 不再各自解释方向，排序与持仓等价代码匹配只按 canonical timestamp 选择最新信号。
 - market filter 在 API / 服务层与 Web 前端均已支持 `cn/hk/us/jp/kr/tw`；`jp/kr/tw` 的前端本地化标签均已补齐，`tw` 信号可经 API 正常写入、按 `market=tw` 查询，并可在 Web DecisionSignal 页面通过市场筛选项选择台股（tw）；告警（大盘红绿灯）市场支持 `cn/hk/us/jp/kr`。
-- 详情抽屉展示动作、状态、评分、置信度、周期、计划质量、市场阶段、价格计划、风险、观察条件、证据、数据质量和 metadata。
+- 详情抽屉展示动作、状态、评分、置信度、周期、计划质量、市场阶段、价格计划、风险、观察条件、证据、数据质量和 metadata。打开详情时还会从服务端加载“重点记忆”和“忽略”两个独立开关，保存期间串行化修改并以响应为准；切换信号时旧请求不能覆盖新信号。两者同时开启时界面明确提示“忽略”优先，加载或保存失败均提供可见重试。
 - 详情抽屉或已有来源报告 ID 的页面上下文可以发起 reassess preview；没有可用来源报告 ID 时入口禁用。Preview 本身不加入列表、latest 或时间线；通过 guardrail 后可由用户二次确认保存。保存会重新请求 `persist=true`，成功后只使用响应中的后端 `item`；`created`、`existing`、`refreshed` 使用不同反馈，existing 不会被描述为新建，终态 existing 不会被乐观注入 active latest/时间线，created/refreshed 才按返回状态更新并刷新相关视图。Web 不会把 preview 拼成本地信号。
 - 保存时的 guardrail 调整 warning 会保留显示。如果 persist 重算被 guardrail 阻断，Web 会显示 `blocked_reason` 和结构化 warning，保留 preview 供用户理解，且不会把失败结果加入时间线。
 - 分析工作台发起表单不提供 `decision_profile`；默认自动生成路径仍只使用 `balanced`。

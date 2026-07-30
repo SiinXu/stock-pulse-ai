@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 - [Changed] Refined Web Home and Settings with bordered attention panels, compact shared help and local-model icons, and a cleaner embedded Usage header.
 - [Changed] Refined Web Home, Research, Chat, and Settings layouts with modal intelligent import, a dedicated investment-framework tab with an inline editor and in-page history drawer, stock autocomplete in Deep Research, compact retry controls, a navigable Research parent row, right-opening Profile preferences, and adaptive history and scheduler panels.
+- [Added] Added Web decision-memory controls, bounded editable alert cooldown policies, and a global filtered decision-outcome explorer.
+- [Changed] Refined Web Home and Settings with bordered attention panels, a modal investment-framework editor, compact shared help and local-model icons, a unified Research disclosure row, and a cleaner embedded Usage header.
 - [Changed] Made native, platform-matched loopback Web/API/Ollama setup download the official macOS or Windows installer directly, re-detect the runtime when users return, retain server-side guidance for detected remote, proxy, container, and Linux environments, and document loopback-preserving tunnel limits.
 - [Fixed] Retried route-focus restoration when a POP target marker is not mounted yet, so browser Forward restores the details Back control instead of racing to the H1 fallback.
 - [Added] Registered `SIGNAL_SCORECARD_PUBLIC_ENABLED` and `SIGNAL_SCORECARD_MIN_SAMPLES` in the config registry/Settings pipeline (default off) and added a read-only Settings scorecard preview that uses the public route and documents enable-for-preview behavior.

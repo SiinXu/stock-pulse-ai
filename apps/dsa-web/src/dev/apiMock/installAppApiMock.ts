@@ -10,11 +10,13 @@ import camelcaseKeys from 'camelcase-keys';
 import { FIXTURE_TIMESTAMP, fixtureConnectionFields } from '../../playground/fixtures';
 import { installPlaygroundApiMock } from '../../playground/mockApi';
 import type { PlaygroundFixtureProfile } from '../../playground/types';
+import type { AlertRuleItem } from '../../types/alerts';
 import type { SystemConfigItem } from '../../types/systemConfig';
 import {
   richAlertNotifications,
   richAlertRules,
   richAlertTriggers,
+  richDecisionOutcomes,
   richDecisionSignals,
   richHistoryItems,
   richIntelligenceItems,
@@ -48,7 +50,30 @@ function reply(profile: PlaygroundFixtureProfile, ready: unknown, empty: unknown
   return [200, profile === 'empty' ? empty : ready];
 }
 
+function toAlertRuleWireItem(item: AlertRuleItem): Record<string, unknown> {
+  const {
+    cooldownPolicy,
+    notificationPolicy,
+    ...wireItem
+  } = item;
+  return {
+    ...wireItem,
+    ...(cooldownPolicy !== undefined ? { cooldown_policy: cooldownPolicy } : {}),
+    ...(notificationPolicy !== undefined ? { notification_policy: notificationPolicy } : {}),
+  };
+}
+
 function registerPriorityHandlers(mock: AxiosMockAdapter, profile: PlaygroundFixtureProfile): void {
+  const memoryFlags = new Map<number, { memorable: boolean; ignored: boolean }>(
+    richDecisionSignals.map((signal, index) => [
+      signal.id,
+      {
+        memorable: index % 4 === 1 || index % 4 === 3,
+        ignored: index % 4 === 2 || index % 4 === 3,
+      },
+    ]),
+  );
+
   mock.onGet('/api/v1/system/config').reply(() => reply(profile, {
     configVersion: 'dev-mock-v1',
     maskToken: '******',
@@ -246,13 +271,128 @@ function registerPriorityHandlers(mock: AxiosMockAdapter, profile: PlaygroundFix
     page: 1,
     page_size: 20,
   }, { items: [], total: 0, page: 1, page_size: 20 }));
+  mock.onGet('/api/v1/decision-signals/outcomes').reply((config) => {
+    if (profile === 'error') return [503, ERROR_PAYLOAD];
+    if (profile === 'empty') return [200, { items: [], total: 0, page: 1, page_size: 20 }];
+    const params = config.params ?? {};
+    const signalId = Number(params.signal_id);
+    const page = Math.max(1, Number(params.page) || 1);
+    const pageSize = Math.max(1, Number(params.page_size) || 20);
+    const filtered = richDecisionOutcomes.filter((item) => (
+      (!Number.isInteger(signalId) || item.signalId === signalId)
+      && (!params.horizon || item.horizon === params.horizon)
+      && (!params.engine_version || item.engineVersion === params.engine_version)
+      && (!params.eval_status || item.evalStatus === params.eval_status)
+      && (!params.outcome || item.outcome === params.outcome)
+    ));
+    const offset = (page - 1) * pageSize;
+    return [200, {
+      items: filtered.slice(offset, offset + pageSize),
+      total: filtered.length,
+      page,
+      page_size: pageSize,
+    }];
+  });
+  mock.onGet('/api/v1/decision-signals/outcomes/stats').reply(() => {
+    if (profile === 'error') return [503, ERROR_PAYLOAD];
+    const outcomes = profile === 'empty' ? [] : richDecisionOutcomes;
+    const completed = outcomes.filter((item) => item.evalStatus === 'completed');
+    const hit = completed.filter((item) => item.outcome === 'hit').length;
+    const returns = completed.flatMap((item) => (
+      typeof item.stockReturnPct === 'number' ? [item.stockReturnPct] : []
+    ));
+    return [200, {
+      engine_version: 'fixture-v2',
+      horizons: null,
+      statuses: ['active', 'expired'],
+      total: outcomes.length,
+      completed: completed.length,
+      unable: outcomes.length - completed.length,
+      hit,
+      miss: completed.filter((item) => item.outcome === 'miss').length,
+      neutral: completed.filter((item) => item.outcome === 'neutral').length,
+      hit_rate_pct: completed.length > 0 ? (hit / completed.length) * 100 : null,
+      avg_stock_return_pct: returns.length > 0
+        ? returns.reduce((sum, value) => sum + value, 0) / returns.length
+        : null,
+      unable_reasons: outcomes.length > completed.length
+        ? { insufficient_price_history: outcomes.length - completed.length }
+        : {},
+      breakdowns: {},
+    }];
+  });
+  mock.onGet(/\/api\/v1\/decision-signals\/\d+$/).reply((config) => {
+    if (profile === 'error') return [503, ERROR_PAYLOAD];
+    const signalId = Number(String(config.url || '').split('/').at(-1));
+    const item = richDecisionSignals.find((signal) => signal.id === signalId);
+    return item ? [200, item] : [404, { error: 'not_found', message: 'Decision signal not found.' }];
+  });
+  mock.onGet(/\/api\/v1\/decision-signals\/\d+\/outcomes$/).reply((config) => {
+    if (profile === 'error') return [503, ERROR_PAYLOAD];
+    const signalId = Number(String(config.url || '').split('/').at(-2));
+    const items = profile === 'empty'
+      ? []
+      : richDecisionOutcomes.filter((item) => item.signalId === signalId);
+    return [200, { items, total: items.length, page: 1, page_size: 20 }];
+  });
+  mock.onGet(/\/api\/v1\/decision-signals\/\d+\/feedback$/).reply((config) => {
+    if (profile === 'error') return [503, ERROR_PAYLOAD];
+    const signalId = Number(String(config.url || '').split('/').at(-2));
+    return [200, {
+      signal_id: signalId,
+      feedback_value: null,
+      reason_code: null,
+      note: null,
+      source: null,
+      created_at: null,
+      updated_at: null,
+    }];
+  });
+  mock.onGet(/\/api\/v1\/decision-signals\/\d+\/memory-flag$/).reply((config) => {
+    if (profile === 'error') return [503, ERROR_PAYLOAD];
+    const signalId = Number(String(config.url || '').split('/').at(-2));
+    const flags = memoryFlags.get(signalId) ?? { memorable: false, ignored: false };
+    return [200, {
+      signal_id: signalId,
+      ...flags,
+      created_at: FIXTURE_TIMESTAMP,
+      updated_at: FIXTURE_TIMESTAMP,
+    }];
+  });
+  mock.onPatch(/\/api\/v1\/decision-signals\/\d+\/memory-flag$/).reply((config) => {
+    if (profile === 'error') return [503, ERROR_PAYLOAD];
+    const signalId = Number(String(config.url || '').split('/').at(-2));
+    const body = typeof config.data === 'string'
+      ? JSON.parse(config.data) as Record<string, unknown>
+      : {};
+    const current = memoryFlags.get(signalId) ?? { memorable: false, ignored: false };
+    const next = {
+      memorable: typeof body.memorable === 'boolean' ? body.memorable : current.memorable,
+      ignored: typeof body.ignored === 'boolean' ? body.ignored : current.ignored,
+    };
+    memoryFlags.set(signalId, next);
+    return [200, {
+      signal_id: signalId,
+      ...next,
+      created_at: FIXTURE_TIMESTAMP,
+      updated_at: FIXTURE_TIMESTAMP,
+    }];
+  });
 
   mock.onGet('/api/v1/alerts/rules').reply(() => reply(profile, {
-    items: richAlertRules,
+    items: richAlertRules.map(toAlertRuleWireItem),
     total: richAlertRules.length,
     page: 1,
     pageSize: 20,
   }, { items: [], total: 0, page: 1, pageSize: 20 }));
+  mock.onGet(/\/api\/v1\/alerts\/rules\/\d+$/).reply((config) => {
+    if (profile === 'error') return [503, ERROR_PAYLOAD];
+    const ruleId = Number(String(config.url || '').split('/').at(-1));
+    const item = richAlertRules.find((rule) => rule.id === ruleId);
+    return item
+      ? [200, toAlertRuleWireItem(item)]
+      : [404, { error: 'not_found', message: 'Alert rule not found.' }];
+  });
   mock.onGet('/api/v1/alerts/triggers').reply(() => reply(profile, {
     items: richAlertTriggers,
     total: richAlertTriggers.length,

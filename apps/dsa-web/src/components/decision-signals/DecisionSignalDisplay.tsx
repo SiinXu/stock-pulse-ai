@@ -59,6 +59,19 @@ const OUTCOME_VARIANTS: Record<DecisionSignalOutcomeValue, BadgeVariant> = {
   neutral: 'warning',
 };
 
+export const DecisionSignalOutcomeBadge: React.FC<{
+  item: Pick<DecisionSignalOutcomeItem, 'evalStatus' | 'outcome'>;
+}> = ({ item }) => {
+  const { t } = useUiLanguage();
+  return item.evalStatus === 'completed' && item.outcome ? (
+    <Badge variant={OUTCOME_VARIANTS[item.outcome]}>
+      {getOutcomeLabel(item.outcome, t)}
+    </Badge>
+  ) : (
+    <Badge variant="warning">{t('decisionSignals.outcome.unable')}</Badge>
+  );
+};
+
 function formatDateTime(value: string | null | undefined, language: UiLanguage): string {
   const date = parseDecisionSignalDate(value);
   if (!date) return '-';
@@ -395,13 +408,7 @@ export const DecisionSignalDetails: React.FC<DecisionSignalDetailsProps> = ({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium text-foreground">{getDecisionSignalHorizonLabel(outcome.horizon, t)}</span>
-                    {outcome.outcome ? (
-                      <Badge variant={OUTCOME_VARIANTS[outcome.outcome]}>
-                        {getOutcomeLabel(outcome.outcome, t)}
-                      </Badge>
-                    ) : (
-                      <Badge variant="warning">{t('decisionSignals.outcome.unable')}</Badge>
-                    )}
+                    <DecisionSignalOutcomeBadge item={outcome} />
                   </div>
                   <span className="text-xs text-secondary-text">{outcome.engineVersion}</span>
                 </div>

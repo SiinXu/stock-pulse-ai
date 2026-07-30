@@ -49,6 +49,8 @@ import {
 import { useRouteFocusTarget } from '../components/routing';
 import { DecisionSignalCreateDrawer } from '../components/decision-signals/DecisionSignalCreateDrawer';
 import { DecisionSignalOutcomeRunPanel } from '../components/decision-signals/DecisionSignalOutcomeRunPanel';
+import { DecisionSignalMemoryControls } from '../components/decision-signals/DecisionSignalMemoryControls';
+import { DecisionSignalOutcomeExplorer } from '../components/decision-signals/DecisionSignalOutcomeExplorer';
 import {
   EMPTY_MANUAL_SIGNAL_DRAFT,
   type ManualSignalDraft,
@@ -171,7 +173,7 @@ type PendingStatusChange = {
 
 type SelectedSignal = {
   item: DecisionSignalItem;
-  source: 'list' | 'latest' | 'timeline' | 'persisted';
+  source: 'list' | 'latest' | 'timeline' | 'persisted' | 'outcome';
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -732,6 +734,7 @@ const DecisionSignalsPage: React.FC = () => {
   const [outcomeStats, setOutcomeStats] = useState<DecisionSignalOutcomeStatsResponse | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState<ParsedApiError | null>(null);
+  const [outcomeExplorerRefreshKey, setOutcomeExplorerRefreshKey] = useState(0);
   const [stockDraft, setStockDraft] = useState('');
   const [stockContextModalOpen, setStockContextModalOpen] = useState(false);
   const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
@@ -840,6 +843,12 @@ const DecisionSignalsPage: React.FC = () => {
     setSelected({ source, item });
     updateDecisionSignalSearchParams({ signal: item.id });
   }, [updateDecisionSignalSearchParams]);
+
+  const handleOpenOutcomeSignal = useCallback(async (signalId: number) => {
+    const item = await decisionSignalsApi.get(signalId);
+    if (!mountedRef.current) return;
+    handleSelectSignal('outcome', item);
+  }, [handleSelectSignal]);
 
   const handleCloseSignal = useCallback(() => {
     pendingSelectedSignalIdRef.current = null;
@@ -1563,6 +1572,9 @@ const DecisionSignalsPage: React.FC = () => {
         }
         if (current.source === 'persisted') {
           return { source: 'persisted', item: updated };
+        }
+        if (current.source === 'outcome') {
+          return { source: 'outcome', item: updated };
         }
         if (!parseSourceReportId(appliedFilters.sourceReportId) && appliedFilters.status && updated.status !== appliedFilters.status) return null;
         return { source: 'list', item: updated };
@@ -2407,8 +2419,19 @@ const DecisionSignalsPage: React.FC = () => {
                 icon={<BarChart3 className="h-6 w-6" />}
               />
             )}
-            <DecisionSignalOutcomeRunPanel onCompleted={() => void loadOutcomeStats()} />
+            <DecisionSignalOutcomeRunPanel
+              onCompleted={() => {
+                void loadOutcomeStats();
+                setOutcomeExplorerRefreshKey((current) => current + 1);
+              }}
+            />
           </Card>
+          {signalCenterTab === SIGNAL_CENTER_TAB_VALUES.review ? (
+            <DecisionSignalOutcomeExplorer
+              refreshKey={outcomeExplorerRefreshKey}
+              onOpenSignal={handleOpenOutcomeSignal}
+            />
+          ) : null}
         </TabPanel>
 
         <TabPanel
@@ -2461,6 +2484,10 @@ const DecisionSignalsPage: React.FC = () => {
               <ApiErrorAlert error={statusError} onDismiss={() => setStatusError(null)} />
             ) : null}
             {renderReassessPanel()}
+            <DecisionSignalMemoryControls
+              key={selected.item.id}
+              signalId={selected.item.id}
+            />
             <DecisionSignalDetails
               item={selected.item}
               outcomes={selectedOutcomes}
