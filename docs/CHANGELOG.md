@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 - [Added] Completed Settings lifecycle controls with last-good configuration rollback, durable scheduled-run history, structured investment-framework editing and immutable history copy-to-draft, plus masked DingTalk group webhook configuration and testing.
 - [Fixed] Aligned investment-framework history timestamps and latest markers, stable line and node-ID editing, Unicode 15 dimension uniqueness, collection/rule limits, and field-addressable backend validation with the authoritative schema.
+- [Added] Added Web decision-memory controls, bounded editable alert cooldown policies, and a global filtered decision-outcome explorer.
 - [Changed] Refined Web Home and Settings with bordered attention panels, a modal investment-framework editor, compact shared help and local-model icons, a unified Research disclosure row, and a cleaner embedded Usage header.
 - [Changed] Made native, platform-matched loopback Web/API/Ollama setup download the official macOS or Windows installer directly, re-detect the runtime when users return, retain server-side guidance for detected remote, proxy, container, and Linux environments, and document loopback-preserving tunnel limits.
 - [Fixed] Retried route-focus restoration when a POP target marker is not mounted yet, so browser Forward restores the details Back control instead of racing to the H1 fallback.

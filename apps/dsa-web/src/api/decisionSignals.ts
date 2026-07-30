@@ -8,6 +8,8 @@ import type {
   DecisionSignalLatestParams,
   DecisionSignalListParams,
   DecisionSignalListResponse,
+  DecisionSignalMemoryFlagItem,
+  DecisionSignalMemoryFlagUpdateRequest,
   DecisionSignalMutationResponse,
   DecisionSignalOutcomeItem,
   DecisionSignalOutcomeListParams,
@@ -154,6 +156,10 @@ function toDecisionSignalFeedbackItem(data: Record<string, unknown>): DecisionSi
   return toCamelCase<DecisionSignalFeedbackItem>(data);
 }
 
+function toDecisionSignalMemoryFlagItem(data: Record<string, unknown>): DecisionSignalMemoryFlagItem {
+  return toCamelCase<DecisionSignalMemoryFlagItem>(data);
+}
+
 function toSnakeCreatePayload(payload: DecisionSignalCreateRequest): Record<string, unknown> {
   return omitUndefined({
     stock_code: payload.stockCode,
@@ -278,6 +284,15 @@ function toSnakeFeedbackPayload(payload: DecisionSignalFeedbackRequest): Record<
   });
 }
 
+function toSnakeMemoryFlagPayload(
+  payload: DecisionSignalMemoryFlagUpdateRequest,
+): Record<string, unknown> {
+  return omitUndefined({
+    memorable: payload.memorable,
+    ignored: payload.ignored,
+  });
+}
+
 function toLatestStockCodePath(stockCode: string): string {
   if (stockCode.includes('/')) {
     throw new Error(
@@ -388,5 +403,23 @@ export const decisionSignalsApi = {
       toSnakeFeedbackPayload(payload),
     );
     return toDecisionSignalFeedbackItem(response.data);
+  },
+
+  async getMemoryFlag(signalId: number): Promise<DecisionSignalMemoryFlagItem> {
+    const response = await apiClient.get<Record<string, unknown>>(
+      `/api/v1/decision-signals/${signalId}/memory-flag`,
+    );
+    return toDecisionSignalMemoryFlagItem(response.data);
+  },
+
+  async updateMemoryFlag(
+    signalId: number,
+    payload: DecisionSignalMemoryFlagUpdateRequest,
+  ): Promise<DecisionSignalMemoryFlagItem> {
+    const response = await apiClient.patch<Record<string, unknown>>(
+      `/api/v1/decision-signals/${signalId}/memory-flag`,
+      toSnakeMemoryFlagPayload(payload),
+    );
+    return toDecisionSignalMemoryFlagItem(response.data);
   },
 };

@@ -24,6 +24,9 @@ export type MarketRegion = 'cn' | 'hk' | 'us';
 export type MarketLightStatus = 'yellow' | 'red';
 export type AlertDryRunStatus = 'triggered' | 'not_triggered' | 'evaluation_error';
 export type AlertTriggerStatus = 'triggered' | 'skipped' | 'degraded' | 'failed';
+export type AlertCooldownPolicy = Record<string, unknown> & {
+  cooldown_seconds?: unknown;
+};
 
 export interface AlertRuleParameters {
   direction?: AlertDirection;
@@ -53,7 +56,7 @@ export interface AlertRuleItem {
   severity: AlertSeverity;
   enabled: boolean;
   source: string;
-  cooldownPolicy?: Record<string, unknown> | null;
+  cooldownPolicy?: AlertCooldownPolicy | null;
   notificationPolicy?: Record<string, unknown> | null;
   lastTriggeredAt?: string | null;
   cooldownUntil?: string | null;
@@ -77,6 +80,11 @@ export interface AlertRuleCreateRequest {
   parameters: AlertRuleParameters;
   severity: AlertSeverity;
   enabled?: boolean;
+  /**
+   * Opaque server policy. Inner keys stay in their wire format so unknown
+   * server-owned fields survive edit round-trips.
+   */
+  cooldownPolicy?: AlertCooldownPolicy | null;
 }
 
 export interface AlertDeleteResponse {

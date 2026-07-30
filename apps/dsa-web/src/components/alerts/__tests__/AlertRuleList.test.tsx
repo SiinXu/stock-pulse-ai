@@ -50,6 +50,7 @@ const rules: AlertRuleItem[] = [
     severity: 'info',
     enabled: true,
     source: 'api',
+    cooldownPolicy: { cooldown_seconds: 0 },
     cooldownActive: false,
     createdAt: '2026-05-18T09:00:00',
     updatedAt: '2026-05-18T09:30:00',
@@ -64,6 +65,7 @@ const rules: AlertRuleItem[] = [
     severity: 'warning',
     enabled: true,
     source: 'api',
+    cooldownPolicy: { cooldown_seconds: 3600 },
     cooldownActive: false,
     createdAt: '2026-05-18T09:00:00',
     updatedAt: '2026-05-18T09:30:00',
@@ -140,6 +142,9 @@ describe('AlertRuleList', () => {
     expect(screen.getByText('MACD(12,26,9) 金叉')).toBeInTheDocument();
     expect(screen.getByText('KDJ(9,3,3) 死叉')).toBeInTheDocument();
     expect(screen.getByText('冷却中')).toBeInTheDocument();
+    expect(screen.getByText('后端默认 · 24 小时')).toBeInTheDocument();
+    expect(screen.getByText('关闭冷却 · 0 秒')).toBeInTheDocument();
+    expect(screen.getByText('自定义 · 3,600 秒')).toBeInTheDocument();
 
     chooseOption(screen.getByLabelText('启停状态'), 'enabled');
     chooseOption(screen.getByLabelText('规则类型'), 'price_cross');
