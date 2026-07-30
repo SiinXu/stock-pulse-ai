@@ -5,6 +5,7 @@ import type { AlertCooldownPolicy } from '../types/alerts';
 
 export const ALERT_COOLDOWN_SECONDS_KEY = 'cooldown_seconds';
 export const DEFAULT_ALERT_COOLDOWN_SECONDS = 24 * 60 * 60;
+export const MAX_ALERT_COOLDOWN_SECONDS = 365 * 24 * 60 * 60;
 
 export type AlertCooldownSelection = {
   mode: 'default' | 'disabled' | 'custom';
@@ -18,7 +19,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /**
  * Mirrors the worker contract: a missing key uses 24 hours, zero disables the
  * cooldown, positive values are truncated to whole seconds, and invalid or
- * negative stored values execute as zero.
+ * negative stored values execute as zero. The worker caps persisted policies
+ * at one year so its datetime update always remains bounded.
  */
 export function getEffectiveAlertCooldown(
   policy: AlertCooldownPolicy | null | undefined,
@@ -27,13 +29,18 @@ export function getEffectiveAlertCooldown(
     return { mode: 'default', seconds: DEFAULT_ALERT_COOLDOWN_SECONDS };
   }
   const rawValue = policy[ALERT_COOLDOWN_SECONDS_KEY];
-  const parsed = typeof rawValue === 'number'
-    ? Math.trunc(rawValue)
-    : typeof rawValue === 'string' && /^[+-]?\d+$/.test(rawValue.trim())
-      ? Number(rawValue)
-      : 0;
+  const parsed = typeof rawValue === 'boolean'
+    ? Number(rawValue)
+    : typeof rawValue === 'number'
+      ? Math.trunc(rawValue)
+      : typeof rawValue === 'string' && /^[+-]?\d+$/.test(rawValue.trim())
+        ? Number(rawValue)
+        : 0;
   if (!Number.isFinite(parsed) || parsed <= 0) {
     return { mode: 'disabled', seconds: 0 };
   }
-  return { mode: 'custom', seconds: parsed };
+  return {
+    mode: 'custom',
+    seconds: Math.min(parsed, MAX_ALERT_COOLDOWN_SECONDS),
+  };
 }

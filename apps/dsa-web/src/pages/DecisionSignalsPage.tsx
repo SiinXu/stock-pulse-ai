@@ -2484,7 +2484,10 @@ const DecisionSignalsPage: React.FC = () => {
               <ApiErrorAlert error={statusError} onDismiss={() => setStatusError(null)} />
             ) : null}
             {renderReassessPanel()}
-            <DecisionSignalMemoryControls signalId={selected.item.id} />
+            <DecisionSignalMemoryControls
+              key={selected.item.id}
+              signalId={selected.item.id}
+            />
             <DecisionSignalDetails
               item={selected.item}
               outcomes={selectedOutcomes}
