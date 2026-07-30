@@ -495,21 +495,21 @@ export function nextFrameworkNodeId(
 export function nodeDeleteBlockers(
   content: InvestmentFrameworkContent,
   nodeId: string,
-): string[] {
-  const blockers = new Set<string>();
+): { isRoot: boolean; inboundNodeIds: string[] } {
   const normalizedNodeId = normalizeInvestmentFrameworkNodeId(nodeId);
-  if (!normalizedNodeId) return [];
-  if (normalizeInvestmentFrameworkNodeId(content.rootNodeId) === normalizedNodeId) {
-    blockers.add('root');
-  }
+  if (!normalizedNodeId) return { isRoot: false, inboundNodeIds: [] };
+  const inboundNodeIds = new Set<string>();
   for (const node of content.decisionTree ?? []) {
     if (node.branches.some(
       (branch) => normalizeInvestmentFrameworkNodeId(branch.targetNodeId) === normalizedNodeId,
     )) {
-      blockers.add(normalizeInvestmentFrameworkNodeId(node.nodeId));
+      inboundNodeIds.add(normalizeInvestmentFrameworkNodeId(node.nodeId));
     }
   }
-  return [...blockers];
+  return {
+    isRoot: normalizeInvestmentFrameworkNodeId(content.rootNodeId) === normalizedNodeId,
+    inboundNodeIds: [...inboundNodeIds],
+  };
 }
 
 export function validateInvestmentFrameworkContent(

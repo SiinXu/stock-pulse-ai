@@ -124,7 +124,10 @@ describe('investmentFrameworkEditorModel', () => {
     ];
 
     expect(validateInvestmentFrameworkContent(content)).toEqual([]);
-    expect(nodeDeleteBlockers(content, 'child')).toContain('root');
+    expect(nodeDeleteBlockers(content, 'child')).toEqual({
+      isRoot: false,
+      inboundNodeIds: ['root'],
+    });
   });
 
   it('detects cycles after applying backend whitespace normalization', () => {
@@ -242,8 +245,28 @@ describe('investmentFrameworkEditorModel', () => {
   it('blocks deletion of the root and nodes with inbound references', () => {
     const content = validContent();
 
-    expect(nodeDeleteBlockers(content, 'root')).toContain('root');
-    expect(nodeDeleteBlockers(content, 'valuation')).toContain('root');
+    expect(nodeDeleteBlockers(content, 'root')).toEqual({
+      isRoot: true,
+      inboundNodeIds: [],
+    });
+    expect(nodeDeleteBlockers(content, 'valuation')).toEqual({
+      isRoot: false,
+      inboundNodeIds: ['root'],
+    });
+  });
+
+  it('normalizes deletion dependencies consistently with graph validation', () => {
+    const content = validContent();
+    content.rootNodeId = ' root ';
+    content.decisionTree![0].nodeId = ' root ';
+    content.decisionTree![0].branches[0].targetNodeId = ' valuation ';
+    content.decisionTree![1].nodeId = ' valuation ';
+
+    expect(validateInvestmentFrameworkContent(content)).toEqual([]);
+    expect(nodeDeleteBlockers(content, ' valuation ')).toEqual({
+      isRoot: false,
+      inboundNodeIds: ['root'],
+    });
   });
 
   it('accepts every backend collection limit at its exact boundary', () => {

@@ -180,10 +180,14 @@ const InvestmentFrameworkStructuredEditor: React.FC<
   const requestDeleteNode = (index: number) => {
     const node = nodes[index];
     const blockers = nodeDeleteBlockers(content, node.nodeId);
-    if (blockers.length) {
+    if (blockers.isRoot || blockers.inboundNodeIds.length) {
+      const dependencies = [
+        ...(blockers.isRoot ? [t('settings.frameworkRootNode')] : []),
+        ...blockers.inboundNodeIds,
+      ];
       setDependencyWarning(t('settings.frameworkNodeDeleteBlocked', {
         node: node.nodeId,
-        dependencies: blockers.join(', '),
+        dependencies: dependencies.join(', '),
       }));
       return;
     }

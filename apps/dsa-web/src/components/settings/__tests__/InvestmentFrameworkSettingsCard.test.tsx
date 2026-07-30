@@ -244,6 +244,62 @@ describe('InvestmentFrameworkSettingsCard', () => {
     expect(await screen.findByText('已保存为新版本并激活')).toBeInTheDocument();
   });
 
+  it('automatically replaces a stale draft with the latest server state after a conflict', async () => {
+    const existingFramework = {
+      frameworkId: 1,
+      scope: 'local',
+      version: 2,
+      activeVersion: 2,
+      revision: 3,
+      isActive: true,
+      content: {
+        title: 'Existing',
+        freeFormRules: 'Hold cash when uncertain',
+        riskRules: [],
+        trackingCriteria: [],
+      },
+      createdAt: '2026-07-26T00:00:00Z',
+      updatedAt: '2026-07-26T00:00:00Z',
+      versionCreatedAt: '2026-07-26T00:00:00Z',
+    };
+    getFramework
+      .mockResolvedValueOnce(existingFramework)
+      .mockResolvedValueOnce({
+        ...existingFramework,
+        version: 3,
+        revision: 4,
+        content: {
+          ...existingFramework.content,
+          freeFormRules: 'Latest server rules',
+        },
+      });
+    updateFramework.mockRejectedValue(
+      createApiError(
+        createParsedApiError({
+          title: '框架版本冲突',
+          message: '配置已被其他操作更新。',
+          rawMessage: 'revision conflict',
+          status: 409,
+          category: 'http_error',
+          code: 'investment_framework_revision_conflict',
+        }),
+      ),
+    );
+
+    render(<InvestmentFrameworkSettingsCard />);
+
+    await screen.findByDisplayValue('Existing');
+    fireEvent.change(screen.getByLabelText('自由规则'), {
+      target: { value: 'My pending conflict draft' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
+
+    await waitFor(() => expect(getFramework).toHaveBeenCalledTimes(2));
+    expect(await screen.findByLabelText('自由规则')).toHaveValue('Latest server rules');
+    expect(screen.getByText('并发 revision：4')).toBeInTheDocument();
+    expect(screen.queryByText('配置已被其他操作更新。')).not.toBeInTheDocument();
+  });
+
   it('does not expose a stale draft when conflict refresh fails', async () => {
     const existingFramework = {
       frameworkId: 1,
@@ -779,6 +835,10 @@ describe('InvestmentFrameworkSettingsCard', () => {
         freeFormRules: 'Current',
         riskRules: [],
         trackingCriteria: [],
+        evaluationDimensions: [
+          { name: 'Straße', weight: 50, criteria: ['Durability'] },
+          { name: 'Quality', weight: 50, criteria: ['Returns'] },
+        ],
       },
       createdAt: '2026-07-26T00:00:00Z',
       updatedAt: '2026-07-26T02:00:00Z',
@@ -820,9 +880,9 @@ describe('InvestmentFrameworkSettingsCard', () => {
 
     render(<InvestmentFrameworkSettingsCard />);
     await screen.findByDisplayValue('Current rules');
-    fireEvent.click(screen.getByRole('button', { name: '版本历史' }));
+    fireEvent.click(screen.getByRole('button', { name: '历史版本' }));
 
-    const drawer = await screen.findByRole('complementary', { name: '版本历史' });
+    const drawer = await screen.findByRole('complementary', { name: '历史版本' });
     expect(historyFramework).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByRole('region', { name: '版本详情' })).toHaveTextContent(
@@ -863,7 +923,8 @@ describe('InvestmentFrameworkSettingsCard', () => {
     })));
 
     fireEvent.click(screen.getByRole('button', { name: '关闭历史版本' }));
-    expect(screen.queryByRole('complementary', { name: '版本历史' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: '历史版本' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('marks the latest historical version when the framework is inactive', async () => {
@@ -901,7 +962,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
 
     render(<InvestmentFrameworkSettingsCard />);
     await screen.findByDisplayValue('Structured');
-    fireEvent.click(screen.getByRole('button', { name: '版本历史' }));
+    fireEvent.click(screen.getByRole('button', { name: '历史版本' }));
 
     const historyList = await screen.findByRole('list', { name: '框架版本历史' });
     const latest = within(historyList).getByRole('button', { name: '版本 v3' });
