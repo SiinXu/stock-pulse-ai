@@ -1,6 +1,8 @@
 """Domain-schema tests for personal investment framework content."""
 
+import re
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -16,11 +18,13 @@ from api.v1.schemas.investment_framework import (
     InvestmentFrameworkUpdateRequest,
 )
 from src.schemas.investment_framework import (
+    INVESTMENT_FRAMEWORK_CASEFOLD_UNICODE_VERSION,
     InvestmentFrameworkAnalysisContext,
     InvestmentFrameworkContent,
     InvestmentFrameworkDecisionBranch,
     InvestmentFrameworkDecisionNode,
     InvestmentFrameworkEvaluationDimension,
+    casefold_investment_framework_dimension_name,
 )
 
 
@@ -61,6 +65,37 @@ def _structured_content() -> dict:
         "risk_rules": ["Do not exceed the documented position limit"],
         "tracking_criteria": ["Review after material guidance revisions"],
     }
+
+
+def _frontend_casefold_contract() -> tuple[str, dict[int, str]]:
+    editor_model = (
+        Path(__file__).resolve().parents[2]
+        / "apps"
+        / "dsa-web"
+        / "src"
+        / "components"
+        / "settings"
+        / "investmentFrameworkEditorModel.ts"
+    ).read_text(encoding="utf-8")
+    match = re.search(
+        r"INVESTMENT_FRAMEWORK_CASEFOLD_UNICODE_VERSION = '([^']+)';"
+        r".*?const UNICODE_15_FULL_CASEFOLD_DATA = `\n(.*?)\n`;",
+        editor_model,
+        re.DOTALL,
+    )
+    assert match is not None
+
+    mappings: dict[int, str] = {}
+    for raw_record in match.group(2).split(";"):
+        record = raw_record.strip()
+        if not record:
+            continue
+        source, targets = record.split(":")
+        mappings[int(source, 16)] = "".join(
+            chr(int(target, 16))
+            for target in targets.split(",")
+        )
+    return match.group(1), mappings
 
 
 def test_structured_framework_content_is_stable_and_strict() -> None:
@@ -251,6 +286,122 @@ def test_framework_rejects_empty_content_and_duplicate_dimensions() -> None:
     duplicate["evaluation_dimensions"][1]["name"] = "moat"
     with pytest.raises(ValidationError, match="must be unique"):
         InvestmentFrameworkContent.model_validate(duplicate)
+
+
+def test_pinned_frontend_casefold_table_matches_backend_contract() -> None:
+    version, frontend_mappings = _frontend_casefold_contract()
+    for code_point in range(0x110000):
+        character = chr(code_point)
+        assert casefold_investment_framework_dimension_name(
+            character
+        ) == frontend_mappings.get(code_point, character)
+
+    assert version == INVESTMENT_FRAMEWORK_CASEFOLD_UNICODE_VERSION == "15.0.0"
+    assert len(frontend_mappings) == 1530
+
+
+def test_dimension_casefold_contract_rejects_duplicates_and_allows_newer_additions() -> None:
+    duplicate = _structured_content()
+    duplicate["evaluation_dimensions"][0]["name"] = "Straße"
+    duplicate["evaluation_dimensions"][1]["name"] = "STRASSE"
+    with pytest.raises(ValidationError, match="must be unique"):
+        InvestmentFrameworkContent.model_validate(duplicate)
+
+    unicode_14_duplicate = _structured_content()
+    unicode_14_duplicate["evaluation_dimensions"][0]["name"] = "\u2C2F"
+    unicode_14_duplicate["evaluation_dimensions"][1]["name"] = "\u2C5F"
+    with pytest.raises(ValidationError, match="must be unique"):
+        InvestmentFrameworkContent.model_validate(unicode_14_duplicate)
+
+    backend_allowed = _structured_content()
+    backend_allowed["evaluation_dimensions"][0]["name"] = "\uA7CB"
+    backend_allowed["evaluation_dimensions"][1]["name"] = "\u0264"
+    validated = InvestmentFrameworkContent.model_validate(backend_allowed)
+
+    assert [item.name for item in validated.evaluation_dimensions] == [
+        "\uA7CB",
+        "\u0264",
+    ]
+
+
+def test_structure_errors_expose_editor_addressable_locations() -> None:
+    duplicate_nodes = _structured_content()
+    duplicate_nodes["decision_tree"][1]["node_id"] = "quality"
+    with pytest.raises(ValidationError) as duplicate_node_error:
+        InvestmentFrameworkContent.model_validate(duplicate_nodes)
+    assert {
+        (error["type"], error["loc"])
+        for error in duplicate_node_error.value.errors(include_url=False)
+    } >= {
+        (
+            "investment_framework_duplicate_node_id",
+            ("decision_tree", 0, "node_id"),
+        ),
+        (
+            "investment_framework_duplicate_node_id",
+            ("decision_tree", 1, "node_id"),
+        ),
+    }
+
+    unknown_target = _structured_content()
+    unknown_target["decision_tree"][0]["branches"][0]["target_node_id"] = "missing"
+    with pytest.raises(ValidationError) as target_error:
+        InvestmentFrameworkContent.model_validate(unknown_target)
+    assert (
+        "investment_framework_target_unknown",
+        ("decision_tree", 0, "branches", 0, "target_node_id"),
+    ) in {
+        (error["type"], error["loc"])
+        for error in target_error.value.errors(include_url=False)
+    }
+
+    cyclic = _structured_content()
+    cyclic["decision_tree"][1]["branches"][0] = {
+        "condition": "Loop",
+        "target_node_id": "quality",
+    }
+    with pytest.raises(ValidationError) as cycle_error:
+        InvestmentFrameworkContent.model_validate(cyclic)
+    assert (
+        "investment_framework_cycle",
+        ("decision_tree", 1, "branches", 0, "target_node_id"),
+    ) in {
+        (error["type"], error["loc"])
+        for error in cycle_error.value.errors(include_url=False)
+    }
+
+    unreachable = _structured_content()
+    unreachable["decision_tree"][0]["branches"][0] = {
+        "condition": "Stop",
+        "outcome": "Terminal",
+    }
+    with pytest.raises(ValidationError) as unreachable_error:
+        InvestmentFrameworkContent.model_validate(unreachable)
+    assert (
+        "investment_framework_unreachable",
+        ("decision_tree", 1, "node_id"),
+    ) in {
+        (error["type"], error["loc"])
+        for error in unreachable_error.value.errors(include_url=False)
+    }
+
+    duplicate_dimensions = _structured_content()
+    duplicate_dimensions["evaluation_dimensions"][1]["name"] = "moat"
+    with pytest.raises(ValidationError) as dimension_error:
+        InvestmentFrameworkContent.model_validate(duplicate_dimensions)
+    assert {
+        (error["type"], error["loc"])
+        for error in dimension_error.value.errors(include_url=False)
+    } >= {
+        (
+            "investment_framework_duplicate_dimension_name",
+            ("evaluation_dimensions", 0, "name"),
+        ),
+        (
+            "investment_framework_duplicate_dimension_name",
+            ("evaluation_dimensions", 1, "name"),
+        ),
+    }
 
 
 def test_decision_tree_rejects_cycles_and_unreachable_nodes() -> None:

@@ -26,6 +26,7 @@ import {
 import { SettingsAlert } from './SettingsAlert';
 import { SettingsSectionCard } from './SettingsSectionCard';
 import InvestmentFrameworkStructuredEditor from './InvestmentFrameworkStructuredEditor';
+import LineListTextarea from './LineListTextarea';
 import {
   cloneInvestmentFrameworkContent,
   emptyInvestmentFrameworkContent,
@@ -34,14 +35,6 @@ import {
   validateInvestmentFrameworkContent,
   type InvestmentFrameworkValidationIssue,
 } from './investmentFrameworkEditorModel';
-
-function linesToList(value: string): string[] {
-  return value.split('\n').map((line) => line.trim()).filter(Boolean);
-}
-
-function listToLines(values: string[] | undefined): string {
-  return (values ?? []).join('\n');
-}
 
 function editableContent(content: InvestmentFrameworkContent): InvestmentFrameworkContent {
   return {
@@ -491,15 +484,15 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                         limit: INVESTMENT_FRAMEWORK_LIMITS.ruleLength,
                       })}
                     </span>
-                    <textarea
+                    <LineListTextarea
                       id="investment-framework-risk-rules"
                       className={`${fieldClass} min-h-20`}
                       aria-label={t('settings.frameworkRiskRulesLabel')}
-                      value={listToLines(content.riskRules)}
+                      values={content.riskRules}
                       disabled={isSubmitting}
-                      onChange={(event) => setContent((current) => ({
+                      onValuesChange={(riskRules) => setContent((current) => ({
                         ...current,
-                        riskRules: linesToList(event.target.value),
+                        riskRules,
                       }))}
                       placeholder={t('settings.frameworkListPlaceholder')}
                     />
@@ -527,15 +520,15 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                         limit: INVESTMENT_FRAMEWORK_LIMITS.ruleLength,
                       })}
                     </span>
-                    <textarea
+                    <LineListTextarea
                       id="investment-framework-tracking"
                       className={`${fieldClass} min-h-20`}
                       aria-label={t('settings.frameworkTrackingLabel')}
-                      value={listToLines(content.trackingCriteria)}
+                      values={content.trackingCriteria}
                       disabled={isSubmitting}
-                      onChange={(event) => setContent((current) => ({
+                      onValuesChange={(trackingCriteria) => setContent((current) => ({
                         ...current,
-                        trackingCriteria: linesToList(event.target.value),
+                        trackingCriteria,
                       }))}
                       placeholder={t('settings.frameworkListPlaceholder')}
                     />
@@ -710,11 +703,18 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                             </time>
                           </span>
                         </span>
-                        {item.isActive ? (
-                          <Badge variant="success" size="sm">
-                            {t('settings.frameworkHistoryActive')}
-                          </Badge>
-                        ) : null}
+                        <span className="flex flex-wrap justify-end gap-1">
+                          {item.version === history.latestVersion ? (
+                            <Badge variant="default" size="sm">
+                              {t('settings.frameworkHistoryLatest')}
+                            </Badge>
+                          ) : null}
+                          {item.isActive ? (
+                            <Badge variant="success" size="sm">
+                              {t('settings.frameworkHistoryActive')}
+                            </Badge>
+                          ) : null}
+                        </span>
                       </button>
                     </div>
                   ))}

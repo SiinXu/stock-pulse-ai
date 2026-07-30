@@ -1,6 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type React from 'react';
 import { ArrowDown, ArrowUp, Copy, Plus, Trash2 } from 'lucide-react';
 import type {
@@ -11,6 +11,7 @@ import type {
 } from '../../types/investmentFramework';
 import type { UiTextKey } from '../../i18n/uiText';
 import { Button, ConfirmDialog } from '../common';
+import LineListTextarea from './LineListTextarea';
 import { SettingsAlert } from './SettingsAlert';
 import {
   INVESTMENT_FRAMEWORK_LIMITS,
@@ -39,9 +40,11 @@ function moveItem<T>(items: T[], from: number, to: number): T[] {
   return next;
 }
 
-function linesToList(value: string): string[] {
-  return value.split('\n').map((line) => line.trim()).filter(Boolean);
-}
+type NodeRenameSession = {
+  nodeIndex: number;
+  updatesRoot: boolean;
+  inboundBranches: Set<string>;
+};
 
 const InvestmentFrameworkStructuredEditor: React.FC<
   InvestmentFrameworkStructuredEditorProps
@@ -55,6 +58,7 @@ const InvestmentFrameworkStructuredEditor: React.FC<
 }) => {
   const [pendingDeleteNode, setPendingDeleteNode] = useState<number | null>(null);
   const [dependencyWarning, setDependencyWarning] = useState('');
+  const nodeRenameSession = useRef<NodeRenameSession | null>(null);
   const nodes = content.decisionTree ?? [];
   const dimensions = content.evaluationDimensions ?? [];
 
@@ -69,17 +73,40 @@ const InvestmentFrameworkStructuredEditor: React.FC<
     setNodes(next);
   };
 
-  const renameNode = (index: number, nextId: string) => {
+  const beginNodeRename = (index: number): NodeRenameSession => {
     const previousId = nodes[index].nodeId;
+    const session = {
+      nodeIndex: index,
+      updatesRoot: content.rootNodeId === previousId,
+      inboundBranches: new Set(
+        nodes.flatMap((node, nodeIndex) => (
+          node.branches.flatMap((branch, branchIndex) => (
+            branch.targetNodeId === previousId
+              ? [`${nodeIndex}:${branchIndex}`]
+              : []
+          ))
+        )),
+      ),
+    };
+    nodeRenameSession.current = session;
+    return session;
+  };
+
+  const renameNode = (index: number, nextId: string) => {
+    const session = nodeRenameSession.current?.nodeIndex === index
+      ? nodeRenameSession.current
+      : beginNodeRename(index);
     const next = nodes.map((node, nodeIndex) => ({
       ...node,
       nodeId: nodeIndex === index ? nextId : node.nodeId,
-      branches: node.branches.map((branch) => ({
+      branches: node.branches.map((branch, branchIndex) => ({
         ...branch,
-        targetNodeId: branch.targetNodeId === previousId ? nextId : branch.targetNodeId,
+        targetNodeId: session.inboundBranches.has(`${nodeIndex}:${branchIndex}`)
+          ? nextId
+          : branch.targetNodeId,
       })),
     }));
-    setNodes(next, content.rootNodeId === previousId ? nextId : content.rootNodeId);
+    setNodes(next, session.updatesRoot ? nextId : content.rootNodeId);
   };
 
   const updateBranch = (
@@ -120,10 +147,14 @@ const InvestmentFrameworkStructuredEditor: React.FC<
   const requestDeleteNode = (index: number) => {
     const node = nodes[index];
     const blockers = nodeDeleteBlockers(content, node.nodeId);
-    if (blockers.length) {
+    if (blockers.isRoot || blockers.inboundNodeIds.length) {
+      const dependencies = [
+        ...(blockers.isRoot ? [t('settings.frameworkRootNode')] : []),
+        ...blockers.inboundNodeIds,
+      ];
       setDependencyWarning(t('settings.frameworkNodeDeleteBlocked', {
         node: node.nodeId,
-        dependencies: blockers.join(', '),
+        dependencies: dependencies.join(', '),
       }));
       return;
     }
@@ -163,7 +194,7 @@ const InvestmentFrameworkStructuredEditor: React.FC<
       ...dimensions.slice(0, index + 1),
       {
         ...source,
-        name: `${source.name} copy`.trim(),
+        name: `${source.name} ${t('common.copy')}`.trim(),
         criteria: [...(source.criteria ?? [])],
       },
       ...dimensions.slice(index + 1),
@@ -251,7 +282,7 @@ const InvestmentFrameworkStructuredEditor: React.FC<
             const nodeIssues = issues.filter((issue) => issue.path.startsWith(`decisionTree.${nodeIndex}`));
             return (
               <article
-                key={`${node.nodeId}-${nodeIndex}`}
+                key={nodeIndex}
                 className="rounded-xl border settings-border bg-background/35 p-4"
                 data-testid={`framework-node-${nodeIndex}`}
                 data-validation-error={nodeIssues.length ? 'true' : undefined}
@@ -318,7 +349,13 @@ const InvestmentFrameworkStructuredEditor: React.FC<
                       aria-label={t('settings.frameworkNodeIdAria', { number: nodeIndex + 1 })}
                       value={node.nodeId}
                       disabled={disabled}
+                      onFocus={() => beginNodeRename(nodeIndex)}
                       onChange={(event) => renameNode(nodeIndex, event.target.value)}
+                      onBlur={() => {
+                        if (nodeRenameSession.current?.nodeIndex === nodeIndex) {
+                          nodeRenameSession.current = null;
+                        }
+                      }}
                     />
                   </label>
                   <label className="block space-y-1">
@@ -629,15 +666,13 @@ const InvestmentFrameworkStructuredEditor: React.FC<
                     limit: INVESTMENT_FRAMEWORK_LIMITS.ruleLength,
                   })}
                 </span>
-                <textarea
+                <LineListTextarea
                   className={`${fieldClass} min-h-20`}
                   aria-label={t('settings.frameworkDimensionCriteria')}
-                  value={(dimension.criteria ?? []).join('\n')}
+                  values={dimension.criteria}
                   disabled={disabled}
                   placeholder={t('settings.frameworkListPlaceholder')}
-                  onChange={(event) => updateDimension(index, {
-                    criteria: linesToList(event.target.value),
-                  })}
+                  onValuesChange={(criteria) => updateDimension(index, { criteria })}
                 />
               </label>
               {currentDimensionIssues.length ? (

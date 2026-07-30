@@ -33,6 +33,59 @@ vi.mock('../../../api/investmentFramework', () => ({
   },
 }));
 
+function structuredFrameworkResponse() {
+  return {
+    frameworkId: 1,
+    scope: 'local' as const,
+    version: 1,
+    activeVersion: 1,
+    revision: 7,
+    isActive: true,
+    content: {
+      schemaVersion: 'investment-framework-content-v1' as const,
+      title: 'Structured',
+      rootNodeId: 'root',
+      decisionTree: [
+        {
+          nodeId: 'root',
+          question: 'Start?',
+          branches: [
+            {
+              condition: 'Continue',
+              targetNodeId: 'valuation',
+              outcome: null,
+            },
+          ],
+        },
+        {
+          nodeId: 'valuation',
+          question: 'Value?',
+          branches: [
+            {
+              condition: 'Finish',
+              targetNodeId: null,
+              outcome: 'Done',
+            },
+          ],
+        },
+      ],
+      evaluationDimensions: [
+        {
+          name: 'Moat',
+          weight: 50,
+          criteria: ['Pricing power'],
+        },
+      ],
+      riskRules: ['Limit position size'],
+      trackingCriteria: ['Review guidance'],
+      freeFormRules: null,
+    },
+    createdAt: '2026-07-26T00:00:00Z',
+    updatedAt: '2026-07-26T00:00:00Z',
+    versionCreatedAt: '2026-07-26T00:00:00Z',
+  };
+}
+
 describe('InvestmentFrameworkSettingsCard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -407,6 +460,84 @@ describe('InvestmentFrameworkSettingsCard', () => {
         ],
       }),
     })));
+  }, 15_000);
+
+  it('preserves trailing newlines while typing line-based framework rules', async () => {
+    const existingFramework = structuredFrameworkResponse();
+    getFramework.mockResolvedValue(existingFramework);
+    updateFramework.mockResolvedValue({
+      ...existingFramework,
+      version: 2,
+      activeVersion: 2,
+      revision: 8,
+    });
+
+    render(<InvestmentFrameworkSettingsCard />);
+    fireEvent.click(await screen.findByRole('button', { name: '查看配置项' }));
+    await screen.findByDisplayValue('Structured');
+
+    const criteria = screen.getByLabelText('评估标准（每行一条）');
+    fireEvent.change(criteria, { target: { value: 'Pricing power\n' } });
+    expect(screen.getByLabelText('评估标准（每行一条）')).toHaveValue('Pricing power\n');
+    fireEvent.change(screen.getByLabelText('评估标准（每行一条）'), {
+      target: { value: 'Pricing power\nCapital discipline' },
+    });
+
+    const riskRules = screen.getByLabelText('风险规则（每行一条）');
+    fireEvent.change(riskRules, { target: { value: 'Limit position size\n' } });
+    expect(screen.getByLabelText('风险规则（每行一条）')).toHaveValue(
+      'Limit position size\n',
+    );
+    fireEvent.change(screen.getByLabelText('风险规则（每行一条）'), {
+      target: { value: 'Limit position size\nAvoid leverage' },
+    });
+
+    const tracking = screen.getByLabelText('跟踪条件（每行一条）');
+    fireEvent.change(tracking, { target: { value: 'Review guidance\n' } });
+    expect(screen.getByLabelText('跟踪条件（每行一条）')).toHaveValue(
+      'Review guidance\n',
+    );
+    fireEvent.change(screen.getByLabelText('跟踪条件（每行一条）'), {
+      target: { value: 'Review guidance\nTrack margins' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
+
+    await waitFor(() => expect(updateFramework).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.objectContaining({
+        evaluationDimensions: [
+          expect.objectContaining({
+            criteria: ['Pricing power', 'Capital discipline'],
+          }),
+        ],
+        riskRules: ['Limit position size', 'Avoid leverage'],
+        trackingCriteria: ['Review guidance', 'Track margins'],
+      }),
+    })));
+  });
+
+  it('renames a node through an existing ID without stealing its references or focus', async () => {
+    getFramework.mockResolvedValue(structuredFrameworkResponse());
+
+    render(<InvestmentFrameworkSettingsCard />);
+    fireEvent.click(await screen.findByRole('button', { name: '查看配置项' }));
+    await screen.findByDisplayValue('Structured');
+
+    const nodeIdInput = screen.getByLabelText('节点 1 的 ID');
+    nodeIdInput.focus();
+    expect(nodeIdInput).toHaveFocus();
+    fireEvent.change(nodeIdInput, { target: { value: 'valuation' } });
+
+    const remountedInput = screen.getByLabelText('节点 1 的 ID');
+    expect(remountedInput).toHaveFocus();
+    fireEvent.change(remountedInput, { target: { value: 'valuation-new' } });
+
+    expect(screen.getByLabelText('根节点')).toHaveValue('valuation-new');
+    const rootNode = screen.getByTestId('framework-node-0');
+    const targetSelect = within(rootNode)
+      .getAllByRole('combobox')
+      .find((element) => (element as HTMLSelectElement).value === 'valuation');
+    expect(targetSelect).toBeDefined();
   });
 
   it('blocks Unicode-casefold duplicate dimension names before sending an update', async () => {
@@ -663,5 +794,47 @@ describe('InvestmentFrameworkSettingsCard', () => {
         freeFormRules: 'Historical',
       }),
     })));
+  });
+
+  it('marks the latest historical version when the framework is inactive', async () => {
+    const current = {
+      ...structuredFrameworkResponse(),
+      version: 3,
+      activeVersion: null,
+      revision: 9,
+      isActive: false,
+    };
+    getFramework.mockResolvedValue(current);
+    historyFramework.mockResolvedValue({
+      frameworkId: 1,
+      latestVersion: 3,
+      activeVersion: null,
+      revision: 9,
+      total: 2,
+      items: [
+        {
+          version: 3,
+          isActive: false,
+          content: current.content,
+          changeSummary: 'Latest inactive version',
+          createdAt: '2026-07-26T02:00:00Z',
+        },
+        {
+          version: 2,
+          isActive: false,
+          content: current.content,
+          changeSummary: 'Older version',
+          createdAt: '2026-07-26T01:00:00Z',
+        },
+      ],
+    });
+
+    render(<InvestmentFrameworkSettingsCard />);
+    fireEvent.click(await screen.findByRole('button', { name: '查看配置项' }));
+
+    const historyList = await screen.findByRole('list', { name: '框架版本历史' });
+    const latest = within(historyList).getByRole('button', { name: '版本 v3' });
+    expect(within(latest).getByText('最新版本')).toBeInTheDocument();
+    expect(within(latest).queryByText('当前激活')).not.toBeInTheDocument();
   });
 });
