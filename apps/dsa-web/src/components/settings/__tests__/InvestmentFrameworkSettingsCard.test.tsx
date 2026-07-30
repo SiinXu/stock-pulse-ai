@@ -587,6 +587,26 @@ describe('InvestmentFrameworkSettingsCard', () => {
     expect(targetSelect).toBeDefined();
   });
 
+  it('reverts a colliding node ID without rewriting graph references', async () => {
+    getFramework.mockResolvedValue(structuredFrameworkResponse());
+
+    render(<InvestmentFrameworkSettingsCard />);
+    await screen.findByDisplayValue('Structured');
+
+    const nodeIdInput = screen.getByLabelText('节点 2 的 ID');
+    fireEvent.focus(nodeIdInput);
+    fireEvent.change(nodeIdInput, { target: { value: 'root' } });
+    fireEvent.blur(nodeIdInput);
+
+    expect(screen.getByLabelText('节点 2 的 ID')).toHaveValue('valuation');
+    expect(screen.getByLabelText('根节点')).toHaveValue('root');
+    const rootNode = screen.getByTestId('framework-node-0');
+    const targetSelect = within(rootNode)
+      .getAllByRole('combobox')
+      .find((element) => (element as HTMLSelectElement).value === 'valuation');
+    expect(targetSelect).toBeDefined();
+  });
+
   it('keeps unrelated graph references when a node rename crosses an existing ID', async () => {
     const existingFramework = {
       frameworkId: 1,
