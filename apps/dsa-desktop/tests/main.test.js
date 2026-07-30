@@ -226,13 +226,92 @@ test('desktop package includes the isolated floating assistant surface and tray 
   assert.doesNotMatch(assistantScript, /innerHTML/);
 });
 
-test('desktop package includes the backend runtime module', () => {
+test('Electron Builder selects the backend runtime modules', () => {
+  const { getMainFileMatchers } = require('app-builder-lib/out/fileMatcher');
+  const appDir = path.resolve(__dirname, '..');
   const packageMetadata = JSON.parse(
-    fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf-8')
+    fs.readFileSync(path.join(appDir, 'package.json'), 'utf-8')
+  );
+  const config = packageMetadata.build;
+  const matchers = getMainFileMatchers(
+    appDir,
+    path.join(appDir, '.builder-file-selection'),
+    (value) => value,
+    {},
+    {
+      info: {
+        projectDir: appDir,
+        buildResourcesDir: config.directories?.buildResources || 'build',
+        isPrepackedAppAsar: false,
+        config,
+        debugLogger: { isEnabled: false },
+      },
+    },
+    path.resolve(appDir, config.directories?.output || 'dist'),
+    false
   );
 
-  assert.ok(packageMetadata.build.files.includes('backend-runtime.js'));
-  assert.equal(fs.existsSync(path.join(__dirname, '..', 'backend-runtime.js')), true);
+  assert.equal(matchers.length, 1);
+  const isSelected = matchers[0].createFilter();
+  for (const file of [
+    'main.js',
+    'backend-runtime.js',
+    'desktop-env.js',
+    'preload.js',
+    'package.json',
+  ]) {
+    const filePath = path.join(appDir, file);
+    assert.equal(
+      isSelected(filePath, fs.statSync(filePath)),
+      true,
+      `Electron Builder must select ${file}`
+    );
+  }
+});
+
+test('shared Desktop env mechanics stay outside the backend lifecycle owner', () => {
+  const desktopEnv = require('../desktop-env');
+  const backendRuntimeModule = require('../backend-runtime');
+  const sharedNames = [
+    'extendMacDesktopBackendPath',
+    'hasOwnValue',
+    'normalizeBackendHost',
+    'readEnvFileValue',
+    'readEnvFileValues',
+  ];
+
+  for (const name of sharedNames) {
+    assert.equal(typeof desktopEnv[name], 'function');
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(backendRuntimeModule, name),
+      false,
+      `${name} must not be owned by the backend lifecycle module`
+    );
+  }
+});
+
+test('backend lifecycle compatibility facade retains legacy signatures', (t) => {
+  const mainModule = loadMainModule(t);
+  const expectedArities = {
+    buildBackendArgs: 1,
+    buildBackendEnvironment: 1,
+    buildBackendUrl: 2,
+    extendMacDesktopBackendPath: 1,
+    findAvailablePort: 0,
+    readEnvFileValue: 2,
+    resolveBackendBindHost: 0,
+    resolveDesktopConnectHost: 1,
+    resolveDesktopProviderDailyCacheDir: 0,
+    startBackend: 1,
+    stopBackend: 0,
+    waitForBackendExit: 1,
+  };
+
+  for (const [name, arity] of Object.entries(expectedArities)) {
+    assert.equal(typeof mainModule[name], 'function');
+    assert.equal(mainModule[name].name, name);
+    assert.equal(mainModule[name].length, arity);
+  }
 });
 
 test('desktop assistant actions map only to allowlisted routes', (t) => {
@@ -1045,6 +1124,7 @@ test('buildBackendEnvironment extends macOS GUI PATH with Homebrew CLI directori
     envFile: '/tmp/dsa/.env',
     dbPath: '/tmp/dsa/data.db',
     logDir: '/tmp/dsa/logs',
+    modelPackAttestationEnv: 'OVERRIDE_ATTESTATION_ENV',
     sourceEnv: {
       PATH: '/usr/bin:/bin:/usr/sbin:/sbin',
       CUSTOM_FLAG: 'kept',
@@ -1064,6 +1144,10 @@ test('buildBackendEnvironment extends macOS GUI PATH with Homebrew CLI directori
   assert.equal(env.LOG_DIR, '/tmp/dsa/logs');
   assert.equal(env.WEBUI_HOST, '127.0.0.1');
   assert.match(env[mainModule.DESKTOP_MODEL_PACK_ATTESTATION_ENV], /^[0-9a-f]{64}$/);
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(env, 'OVERRIDE_ATTESTATION_ENV'),
+    false
+  );
 });
 
 test('Desktop Model Pack attestation binds validated metadata to one short-lived token', (t) => {

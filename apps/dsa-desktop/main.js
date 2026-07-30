@@ -14,15 +14,17 @@ const fs = require('fs');
 const crypto = require('crypto');
 const os = require('os');
 const {
-  DESKTOP_BACKEND_DEFAULT_HOST,
-  buildBackendArgs,
-  buildBackendUrl,
-  createBackendRuntime,
   extendMacDesktopBackendPath,
   hasOwnValue,
   normalizeBackendHost,
   readEnvFileValue,
   readEnvFileValues,
+} = require('./desktop-env');
+const {
+  DESKTOP_BACKEND_DEFAULT_HOST,
+  buildBackendArgs,
+  buildBackendUrl,
+  createBackendRuntime,
   resolveBackendBindHost,
   resolveDesktopConnectHost,
   resolveDesktopProviderDailyCacheDir,
