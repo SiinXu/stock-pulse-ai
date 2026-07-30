@@ -27,8 +27,10 @@ from generate_index_from_csv import (
     main,
     compress_index,
     build_stock_index,
+    load_curated_seed_data,
     load_tushare_data,
     load_akshare_data,
+    merge_curated_market_rows,
 )
 
 
@@ -136,7 +138,7 @@ class TestDetermineMarket:
 
     def test_kr_kosdaq_stock_with_yahoo_suffix(self):
         """测试韩股 KOSDAQ Yahoo 后缀"""
-        result = determine_market("035720.KQ")
+        result = determine_market("035900.KQ")
         assert result == "KR"
 
 
@@ -449,6 +451,51 @@ class TestOutputFormat:
         # Should successfully deserialize
         loaded = json.loads(json_str)
         assert len(loaded) == 1
+
+
+class TestCuratedJapanKoreaSeeds:
+    """Verify curated JP/KR coverage and non-destructive index merging."""
+
+    def test_seed_files_cover_representative_japan_and_korea_symbols(self):
+        stocks = load_curated_seed_data()
+        codes = {stock["ts_code"] for stock in stocks}
+        markets = {stock["market"] for stock in stocks}
+
+        assert len([stock for stock in stocks if stock["market"] == "JP"]) >= 60
+        assert len([stock for stock in stocks if stock["market"] == "KR"]) >= 60
+        assert markets == {"JP", "KR"}
+        assert {"7203.T", "6857.T", "005930.KS", "196170.KQ"} <= codes
+        assert "035720.KS" in codes
+        assert "035720.KQ" not in codes
+        assert "091990.KQ" not in codes
+
+    def test_merge_replaces_only_curated_markets_and_preserves_other_rows(self):
+        cn_row = ["000001.SZ", "000001", "平安银行", "py", "py", [], "CN", "stock", True, 100]
+        old_jp = ["7203.T", "7203.T", "old", "old", "old", [], "JP", "stock", True, 100]
+        stale_kr = ["091990.KQ", "091990.KQ", "stale", "stale", "stale", [], "KR", "stock", True, 100]
+        new_jp = ["7203.T", "7203.T", "Toyota", "toyota", "tyt", [], "JP", "stock", True, 100]
+        new_kr = ["005930.KS", "005930.KS", "Samsung", "samsung", "ss", [], "KR", "stock", True, 100]
+
+        merged = merge_curated_market_rows(
+            [cn_row, old_jp, stale_kr],
+            [new_jp, new_kr],
+        )
+
+        assert merged[0] is cn_row
+        assert new_jp in merged
+        assert new_kr in merged
+        assert old_jp not in merged
+        assert stale_kr not in merged
+
+    def test_generated_asset_contains_every_curated_seed(self):
+        root = Path(__file__).parent.parent
+        generated = json.loads(
+            (root / "apps/dsa-web/public/stocks.index.json").read_text(encoding="utf-8")
+        )
+        generated_codes = {row[0] for row in generated if isinstance(row, list) and row}
+        seed_codes = {stock["ts_code"] for stock in load_curated_seed_data()}
+
+        assert seed_codes <= generated_codes
 
 
 class TestIntegration:

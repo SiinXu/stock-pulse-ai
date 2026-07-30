@@ -1724,6 +1724,55 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             report.details.raw_result,
         )
 
+    def test_history_detail_projects_structured_report_insights_without_snapshot(self) -> None:
+        """Persisted dashboard data uses the same bounded contract as live reports."""
+        if get_history_detail is None:
+            self.skipTest("fastapi is not installed in this test environment")
+
+        result = self._build_result()
+        result.dashboard = {
+            "phase_decision": {
+                "phase_context": {"phase": "postmarket", "market": "CN"},
+                "immediate_action": "Review after close",
+            },
+            "signal_attribution": {
+                "technical_indicators": 25,
+                "news_sentiment": 25,
+                "fundamentals": 25,
+                "market_conditions": 25,
+                "strongest_bullish_signal": "Earnings quality",
+            },
+            "strategy_synthesis": {
+                "final_signal": "hold",
+                "consensus_level": "low",
+                "opposing_skills": [
+                    {"skill_id": "event_driven", "signal": "sell"},
+                ],
+            },
+        }
+        saved = self.db.save_analysis_history(
+            result=result,
+            query_id="query_structured_insights",
+            report_type="simple",
+            news_content="新闻摘要",
+            context_snapshot=None,
+            save_snapshot=False,
+        )
+
+        report = get_history_detail(str(saved), db_manager=self.db)
+
+        self.assertIsNone(report.details.context_snapshot)
+        insights = report.details.structured_insights
+        self.assertEqual(insights["schema_version"], "report-structured-insights-v1")
+        self.assertEqual(
+            insights["phase_decision"]["phase_context"]["phase"],
+            "postmarket",
+        )
+        self.assertEqual(
+            insights["strategy_synthesis"]["opposing_skills"][0]["skill_id"],
+            "event_driven",
+        )
+
     def test_history_markdown_localizes_english_report_and_placeholder_name(self) -> None:
         """History markdown should preserve report_language for English reports."""
         result = AnalysisResult(

@@ -5,7 +5,7 @@
  * Supports keyboard navigation, IME input method, graceful degradation
  */
 
-import { Component, useRef, useEffect, useState } from 'react';
+import { Component, useRef, useEffect, useId, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -56,26 +56,36 @@ function FallbackInput({
   className,
 }: StockAutocompleteProps) {
   const { language } = useUiLanguage();
+  const generatedHintId = useId();
+  const hintId = `${id || generatedHintId}-stock-search-hint`;
+  const text = STOCK_SEARCH_TEXT[language];
   const resolvedPlaceholder = placeholder ?? STOCK_SEARCH_TEXT[language].placeholder;
   const resolvedAriaLabel = ariaLabel ?? STOCK_SEARCH_TEXT[language].inputLabel;
   return (
-    <input
-      id={id}
-      type="text"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' && !disabled && value) {
-          e.preventDefault();
-          onSubmit(value);
-        }
-      }}
-      placeholder={resolvedPlaceholder}
-      aria-label={resolvedAriaLabel}
-      disabled={disabled}
-      className={cn(AUTOCOMPLETE_INPUT_CLASS, className)}
-      data-autocomplete-mode="fallback"
-    />
+    <div className="w-full space-y-1.5">
+      <input
+        id={id}
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !disabled && value) {
+            e.preventDefault();
+            onSubmit(value);
+          }
+        }}
+        placeholder={resolvedPlaceholder}
+        aria-label={resolvedAriaLabel}
+        aria-describedby={hintId}
+        disabled={disabled}
+        className={cn(AUTOCOMPLETE_INPUT_CLASS, className)}
+        data-autocomplete-mode="fallback"
+      />
+      <p id={hintId} className="px-1 text-xs leading-5 text-muted-text">
+        <span className="block">{text.suffixExamples}</span>
+        <span className="block">{text.manualEntryHint}</span>
+      </p>
+    </div>
   );
 }
 
@@ -123,6 +133,10 @@ function StockAutocompleteInner({
   className,
 }: StockAutocompleteProps) {
   const { language, t } = useUiLanguage();
+  const generatedHintId = useId();
+  const hintId = `${id || generatedHintId}-stock-search-hint`;
+  const noMatchId = `${id || generatedHintId}-stock-search-no-match`;
+  const searchText = STOCK_SEARCH_TEXT[language];
   const resolvedPlaceholder = placeholder ?? STOCK_SEARCH_TEXT[language].placeholder;
   const resolvedAriaLabel = ariaLabel ?? STOCK_SEARCH_TEXT[language].inputLabel;
   const { index, loading, fallback } = useStockIndex();
@@ -267,7 +281,7 @@ function StockAutocompleteInner({
   }
 
   return (
-    <div className="relative stock-autocomplete">
+    <div className="relative w-full space-y-1.5 stock-autocomplete">
       <input
         id={id}
         ref={inputRef}
@@ -285,6 +299,7 @@ function StockAutocompleteInner({
         onBlur={handleBlur}
         placeholder={resolvedPlaceholder}
         aria-label={resolvedAriaLabel}
+        aria-describedby={`${hintId}${value.trim() && suggestions.length === 0 && !isOpen ? ` ${noMatchId}` : ''}`}
         disabled={disabled}
         className={cn(
           AUTOCOMPLETE_INPUT_CLASS,
@@ -326,6 +341,21 @@ function StockAutocompleteInner({
         />,
         document.body
       )}
+
+      <p id={hintId} className="px-1 text-xs leading-5 text-muted-text">
+        <span className="block">{searchText.suffixExamples}</span>
+        <span className="block">{searchText.manualEntryHint}</span>
+      </p>
+      {value.trim() && suggestions.length === 0 && !isOpen ? (
+        <p
+          id={noMatchId}
+          role="status"
+          aria-live="polite"
+          className="px-1 text-xs leading-5 text-secondary-text"
+        >
+          {searchText.noMatchManual}
+        </p>
+      ) : null}
     </div>
   );
 }

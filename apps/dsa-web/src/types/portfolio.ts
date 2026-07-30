@@ -2,6 +2,7 @@ import type { DecisionSignalItem } from './decisionSignals';
 
 export type PortfolioCostMethod = 'fifo' | 'avg';
 export type PortfolioSide = 'buy' | 'sell';
+export type PortfolioAccountType = 'real' | 'paper';
 export type PortfolioCashDirection = 'in' | 'out';
 export type PortfolioCorporateActionType = 'cash_dividend' | 'split_adjustment';
 
@@ -13,6 +14,7 @@ export interface PortfolioAccountItem {
   market: 'cn' | 'hk' | 'us' | 'jp' | 'kr' | 'tw';
   baseCurrency: string;
   isActive: boolean;
+  accountType: PortfolioAccountType;
   createdAt?: string | null;
   updatedAt?: string | null;
 }
@@ -27,6 +29,7 @@ export interface PortfolioAccountCreateRequest {
   market: 'cn' | 'hk' | 'us' | 'jp' | 'kr' | 'tw';
   baseCurrency: string;
   ownerId?: string;
+  accountType?: PortfolioAccountType;
 }
 
 export interface PortfolioAccountUpdateRequest {
@@ -201,6 +204,22 @@ export interface PortfolioTradeCreateRequest {
   currency?: string;
   tradeUid?: string;
   note?: string;
+}
+
+export interface PaperTradeCreateRequest {
+  operationId: string;
+  symbol: string;
+  tradeDate: string;
+  side: PortfolioSide;
+  quantity: number;
+  price?: number;
+  note?: string;
+}
+
+export interface PaperTradeCreatedResponse {
+  id: number;
+  price: number;
+  priceSource: 'manual' | 'latest_close' | string;
 }
 
 export interface PortfolioCashLedgerCreateRequest {

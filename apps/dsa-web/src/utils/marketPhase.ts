@@ -7,6 +7,13 @@ import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import type { UiLanguage } from '../i18n/uiText';
 import { normalizeUiLanguage } from './uiLanguage';
 
+export const ANALYSIS_PHASE_VALUES = [
+  'auto',
+  'premarket',
+  'intraday',
+  'postmarket',
+] as const satisfies readonly AnalysisPhase[];
+
 const REQUEST_PHASE_LABELS: Record<UiLanguage, Record<AnalysisPhase, string>> = createUiLanguageRecord(
   'utils.marketPhase.REQUEST_PHASE_LABELS',
   {
@@ -93,6 +100,16 @@ const TEXT = createUiLanguageRecord(
 
 const resolveUiLanguage = (language?: UiLanguage | null): UiLanguage =>
   normalizeUiLanguage(language) ?? 'zh';
+
+export const getAnalysisPhaseOptions = (
+  language?: UiLanguage | null,
+): Array<{ value: AnalysisPhase; label: string }> => {
+  const uiLanguage = resolveUiLanguage(language);
+  return ANALYSIS_PHASE_VALUES.map((value) => ({
+    value,
+    label: REQUEST_PHASE_LABELS[uiLanguage][value],
+  }));
+};
 
 export const getRequestedPhaseLabel = (
   phase?: AnalysisPhase | null,

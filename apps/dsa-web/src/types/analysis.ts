@@ -398,6 +398,95 @@ export interface ReportStrata {
   disclaimer?: string;
 }
 
+export interface ReportPhaseContext {
+  phase?: string;
+  market?: string;
+  marketLocalTime?: string;
+  sessionDate?: string;
+  effectiveDailyBarDate?: string;
+  isTradingDay?: boolean;
+  isMarketOpenNow?: boolean;
+  isPartialBar?: boolean;
+  minutesToOpen?: number;
+  minutesToClose?: number;
+  triggerSource?: string;
+  analysisIntent?: string;
+  warnings?: string[];
+}
+
+export interface ReportPhaseDecision {
+  phaseContext?: ReportPhaseContext;
+  actionWindow?: string;
+  immediateAction?: string;
+  watchConditions?: string[];
+  nextCheckTime?: string;
+  confidenceReason?: string;
+  dataLimitations?: string[];
+}
+
+export interface ReportSignalAttribution {
+  technicalIndicators?: number;
+  newsSentiment?: number;
+  fundamentals?: number;
+  marketConditions?: number;
+  strongestBullishSignal?: string;
+  strongestBearishSignal?: string;
+}
+
+export interface ReportStrategySynthesisSkill {
+  skillId?: string;
+  agentName?: string;
+  signal?: string;
+  confidence?: number;
+  reasoning?: string;
+  scoreAdjustment?: number;
+  conditionsMet?: string[];
+  invalidSignal?: boolean;
+}
+
+export interface ReportStrategySynthesisConflict {
+  conflictType?: string;
+  severity?: string;
+  descriptionKey?: string;
+  participants?: string[];
+}
+
+export interface ReportStrategySynthesisSummaryParams {
+  opinionCount?: number;
+  totalOpinionCount?: number;
+  invalidOpinionCount?: number;
+  finalSignal?: string;
+  consensusLevel?: string;
+  conflictSeverity?: string;
+  conflictCount?: number;
+}
+
+export interface ReportStrategySynthesis {
+  finalSignal?: string;
+  weightedScore?: number;
+  confidence?: number;
+  originalConfidence?: number;
+  conflictCount?: number;
+  conflictSeverity?: string;
+  conflicts?: ReportStrategySynthesisConflict[];
+  supportingSkills?: ReportStrategySynthesisSkill[];
+  opposingSkills?: ReportStrategySynthesisSkill[];
+  consensusLevel?: string;
+  summaryKey?: string;
+  summaryParams?: ReportStrategySynthesisSummaryParams;
+}
+
+/**
+ * Optional additive contract shared by synchronous, task, and history reports.
+ * Missing sections are expected for legacy, partial, or single-strategy runs.
+ */
+export interface ReportStructuredInsights {
+  schemaVersion: 'report-structured-insights-v1';
+  phaseDecision?: ReportPhaseDecision;
+  signalAttribution?: ReportSignalAttribution;
+  strategySynthesis?: ReportStrategySynthesis;
+}
+
 /** Details section */
 export interface ReportDetails {
   newsContent?: string;
@@ -411,6 +500,7 @@ export interface ReportDetails {
   conceptRankings?: SectorRankings;
   marketStructure?: MarketStructureContext | null;
   reportStrata?: ReportStrata | null;
+  structuredInsights?: ReportStructuredInsights | null;
 }
 
 /** Full analysis report */

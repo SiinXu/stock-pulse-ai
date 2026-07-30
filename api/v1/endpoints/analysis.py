@@ -1357,6 +1357,14 @@ def get_analysis_status(task_id: str) -> TaskStatus:
                 language=report_language,
                 log_context={"task_id": task_id, "path": "get_analysis_status"},
             )
+            from src.schemas.report_structured_insights import (
+                project_report_structured_insights_for_api,
+            )
+
+            structured_insights = project_report_structured_insights_for_api(
+                raw_result,
+                log_context={"task_id": task_id, "path": "get_analysis_status"},
+            )
             details = None
             if (
                 any(extracted_fundamental.values())
@@ -1365,6 +1373,7 @@ def get_analysis_status(task_id: str) -> TaskStatus:
                 or context_snapshot is not None
                 or analysis_context_pack_overview is not None
                 or report_strata is not None
+                or structured_insights is not None
                 or raw_result is not None
             ):
                 details = ReportDetails(
@@ -1379,6 +1388,7 @@ def get_analysis_status(task_id: str) -> TaskStatus:
                     concept_rankings=extracted_boards.get("concept_rankings"),
                     market_structure=market_structure,
                     report_strata=report_strata,
+                    structured_insights=structured_insights,
                 )
 
             raw_dict = raw_result if isinstance(raw_result, dict) else {}
@@ -1667,6 +1677,16 @@ def _build_analysis_report(
         language=report_language,
         log_context={"path": "_build_analysis_report"},
     )
+    from src.schemas.report_structured_insights import (
+        project_report_structured_insights_for_api,
+    )
+
+    structured_insights = project_report_structured_insights_for_api(
+        raw_result_data,
+        details_data,
+        fallback_raw_result_payload,
+        log_context={"path": "_build_analysis_report"},
+    )
     details = None
     has_board_details = (
         bool(extracted_boards.get("belong_boards"))
@@ -1681,6 +1701,7 @@ def _build_analysis_report(
         or context_snapshot is not None
         or analysis_context_pack_overview is not None
         or report_strata is not None
+        or structured_insights is not None
     ):
         details = ReportDetails(
             news_content=details_data.get("news_summary") or details_data.get("news_content"),
@@ -1694,6 +1715,7 @@ def _build_analysis_report(
             concept_rankings=extracted_boards.get("concept_rankings"),
             market_structure=market_structure,
             report_strata=report_strata,
+            structured_insights=structured_insights,
         )
 
     return AnalysisReport(

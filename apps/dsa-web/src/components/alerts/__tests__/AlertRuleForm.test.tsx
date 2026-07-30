@@ -110,6 +110,119 @@ describe('AlertRuleForm', () => {
     });
   });
 
+  it('distinguishes disabled and custom cooldown policies', async () => {
+    render(<AlertRuleForm onSubmit={onSubmit} />);
+
+    fireEvent.change(screen.getByLabelText('标的代码'), { target: { value: '600519' } });
+    fireEvent.change(screen.getByLabelText('价格阈值'), { target: { value: '1800' } });
+    chooseOption(screen.getByLabelText('预警冷却'), 'disabled');
+    fireEvent.click(screen.getByRole('button', { name: '创建规则' }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenLastCalledWith(expect.objectContaining({
+        cooldownPolicy: { cooldown_seconds: 0 },
+      }));
+    });
+
+    fireEvent.change(screen.getByLabelText('标的代码'), { target: { value: '600519' } });
+    fireEvent.change(screen.getByLabelText('价格阈值'), { target: { value: '1800' } });
+    chooseOption(screen.getByLabelText('预警冷却'), 'custom');
+    fireEvent.change(screen.getByLabelText('自定义冷却（秒）'), {
+      target: { value: '7200' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '创建规则' }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenLastCalledWith(expect.objectContaining({
+        cooldownPolicy: { cooldown_seconds: 7200 },
+      }));
+    });
+  });
+
+  it('rejects a non-positive custom cooldown', () => {
+    render(<AlertRuleForm onSubmit={onSubmit} />);
+
+    fireEvent.change(screen.getByLabelText('标的代码'), { target: { value: '600519' } });
+    fireEvent.change(screen.getByLabelText('价格阈值'), { target: { value: '1800' } });
+    chooseOption(screen.getByLabelText('预警冷却'), 'custom');
+    fireEvent.change(screen.getByLabelText('自定义冷却（秒）'), {
+      target: { value: '0' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '创建规则' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      '自定义冷却必须是大于 0 的整数秒数。',
+    );
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('prefills a custom cooldown and preserves unknown policy keys on edit', async () => {
+    const rule = {
+      id: 7,
+      name: '旧名称',
+      targetScope: 'single_symbol',
+      target: '600519',
+      alertType: 'price_cross',
+      parameters: { direction: 'above', price: 1800 },
+      severity: 'warning',
+      enabled: true,
+      source: 'api',
+      cooldownPolicy: {
+        cooldown_seconds: 3600,
+        server_owned_mode: 'rolling',
+      },
+    } as const;
+
+    render(<AlertRuleForm mode="edit" initialRule={rule} onSubmit={onSubmit} />);
+
+    expect(screen.getByLabelText('预警冷却')).toHaveAttribute('data-value', 'custom');
+    expect(screen.getByLabelText('自定义冷却（秒）')).toHaveValue(3600);
+    fireEvent.change(screen.getByLabelText('自定义冷却（秒）'), {
+      target: { value: '7200' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '更新规则' }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+        cooldownPolicy: {
+          cooldown_seconds: 7200,
+          server_owned_mode: 'rolling',
+        },
+      }));
+    });
+  });
+
+  it('clears only the known cooldown key when an edited rule returns to backend default', async () => {
+    const rule = {
+      id: 7,
+      name: '旧名称',
+      targetScope: 'single_symbol',
+      target: '600519',
+      alertType: 'price_cross',
+      parameters: { direction: 'above', price: 1800 },
+      severity: 'warning',
+      enabled: true,
+      source: 'api',
+      cooldownPolicy: {
+        cooldown_seconds: 3600,
+        server_owned_mode: 'rolling',
+      },
+    } as const;
+
+    render(<AlertRuleForm mode="edit" initialRule={rule} onSubmit={onSubmit} />);
+
+    chooseOption(screen.getByLabelText('预警冷却'), 'default');
+    fireEvent.click(screen.getByRole('button', { name: '更新规则' }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+        cooldownPolicy: {
+          server_owned_mode: 'rolling',
+        },
+      }));
+    });
+  });
+
   it('submits a price_change_percent rule payload', async () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 

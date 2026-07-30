@@ -9,6 +9,7 @@ import {
   FIXTURE_TIMESTAMP,
   fixtureAlertRules,
   fixtureAlertTriggers,
+  fixtureDecisionOutcome,
   fixtureDecisionSignal,
   fixtureDecisionSignals,
   fixtureHistoryItems,
@@ -17,7 +18,10 @@ import {
 } from '../../playground/fixtures';
 import type { DecisionAction, HistoryItem, StockBarItem, TaskInfo } from '../../types/analysis';
 import type { AlertRuleItem, AlertSeverity, AlertTriggerItem } from '../../types/alerts';
-import type { DecisionSignalItem } from '../../types/decisionSignals';
+import type {
+  DecisionSignalItem,
+  DecisionSignalOutcomeItem,
+} from '../../types/decisionSignals';
 import type { LlmProviderCatalogEntry } from '../../types/systemConfig';
 
 const titleCase = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
@@ -132,6 +136,39 @@ export const richDecisionSignals: DecisionSignalItem[] = [
   makeDecisionSignal(315, 'AMD', 'Advanced Micro Devices', 'us', 'reduce', 48, 0.54, 'expired', '2026-07-16T15:30:00Z'),
 ];
 
+const OUTCOME_VALUES: NonNullable<DecisionSignalOutcomeItem['outcome']>[] = [
+  'hit',
+  'miss',
+  'neutral',
+];
+
+export const richDecisionOutcomes: DecisionSignalOutcomeItem[] = richDecisionSignals.flatMap(
+  (signal, signalIndex) => (['5d', '10d'] as const).map((horizon, horizonIndex) => {
+    const index = signalIndex * 2 + horizonIndex;
+    const unable = index % 9 === 8;
+    const outcome = OUTCOME_VALUES[index % OUTCOME_VALUES.length];
+    const returnPct = outcome === 'hit' ? 3.2 : outcome === 'miss' ? -2.1 : 0.3;
+    return {
+      ...fixtureDecisionOutcome,
+      id: 401 + index,
+      signalId: signal.id,
+      horizon,
+      engineVersion: index % 4 === 0 ? 'fixture-v2' : 'fixture-v1',
+      evalStatus: unable ? 'unable' : 'completed',
+      outcome: unable ? null : outcome,
+      unableReason: unable ? 'insufficient_price_history' : null,
+      directionCorrect: unable ? null : outcome === 'hit',
+      stockReturnPct: unable ? null : returnPct,
+      action: signal.action,
+      market: signal.market,
+      marketPhase: signal.marketPhase,
+      sourceType: signal.sourceType,
+      planQuality: signal.planQuality,
+      updatedAt: signal.updatedAt,
+    };
+  }),
+);
+
 const makeAlertRule = (
   id: number,
   name: string,
@@ -155,9 +192,22 @@ const makeAlertRule = (
 });
 
 export const richAlertRules: AlertRuleItem[] = [
-  ...fixtureAlertRules,
-  makeAlertRule(503, 'CATL breakout', '300750', 'info', true, 210),
-  makeAlertRule(504, 'NVIDIA momentum', 'NVDA', 'warning', true, 145),
+  {
+    ...fixtureAlertRules[0],
+    cooldownPolicy: { cooldown_seconds: 0, preserve_for_server: 'fixture-value' },
+  },
+  {
+    ...fixtureAlertRules[1],
+    cooldownPolicy: { cooldown_seconds: 7200 },
+  },
+  {
+    ...makeAlertRule(503, 'CATL breakout', '300750', 'info', true, 210),
+    cooldownPolicy: { cooldown_seconds: 3600 },
+  },
+  {
+    ...makeAlertRule(504, 'NVIDIA momentum', 'NVDA', 'warning', true, 145),
+    cooldownPolicy: null,
+  },
   makeAlertRule(505, 'BYD support break', '002594', 'critical', true, 235),
   makeAlertRule(506, 'Tencent target', '00700', 'info', false, 420),
   makeAlertRule(507, 'Tesla stop watch', 'TSLA', 'warning', true, 250),

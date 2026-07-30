@@ -10,6 +10,71 @@ vi.mock('../index', () => ({
   default: { post },
 }));
 
+describe('analysisApi phase request mapping', () => {
+  beforeEach(() => {
+    post.mockReset();
+  });
+
+  it('preserves the automatic phase payload when no override is selected', async () => {
+    post.mockResolvedValue({
+      status: 202,
+      data: { task_id: 'task-auto', status: 'pending', analysis_phase: 'auto' },
+    });
+
+    await analysisApi.analyzeAsync({ stockCode: 'AAPL' });
+
+    expect(post.mock.calls[0][0]).toBe('/api/v1/analysis/analyze');
+    expect(post.mock.calls[0][1]).toEqual({
+      stock_code: 'AAPL',
+      stock_codes: undefined,
+      report_type: 'detailed',
+      force_refresh: false,
+      async_mode: true,
+      analysis_phase: 'auto',
+      stock_name: undefined,
+      original_query: undefined,
+      selection_source: undefined,
+      skills: undefined,
+      report_language: undefined,
+    });
+    expect(post.mock.calls[0][2]).toEqual({
+      validateStatus: expect.any(Function),
+    });
+  });
+
+  it('maps an explicit phase exactly for a batch request', async () => {
+    post.mockResolvedValue({
+      status: 202,
+      data: { accepted: [], duplicates: [] },
+    });
+
+    await analysisApi.analyzeAsync({
+      stockCodes: ['AAPL', 'MSFT'],
+      reportType: 'brief',
+      forceRefresh: true,
+      analysisPhase: 'postmarket',
+      notify: false,
+      skills: ['quality'],
+      reportLanguage: 'en',
+    });
+
+    expect(post.mock.calls[0][1]).toEqual({
+      stock_code: undefined,
+      stock_codes: ['AAPL', 'MSFT'],
+      report_type: 'brief',
+      force_refresh: true,
+      async_mode: true,
+      analysis_phase: 'postmarket',
+      stock_name: undefined,
+      original_query: undefined,
+      selection_source: undefined,
+      skills: ['quality'],
+      report_language: 'en',
+      notify: false,
+    });
+  });
+});
+
 describe('analysisApi conflict handling', () => {
   beforeEach(() => {
     post.mockReset();

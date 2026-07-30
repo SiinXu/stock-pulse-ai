@@ -208,14 +208,16 @@ Phase 2 只在 Phase 1 契约下新增 2–4 策略并发调度与阶段调度�
 - Phase 2 不改变 Baseline Evidence Chain / Diagnostics 分离原则、不改变阵营语义、不改变共识门槛、不改变 payload schema。
 - Phase 2 不改变 renderer 展示逻辑；`invalid_opinion_count` 计数天然覆盖超时/异常 skill。
 
-## Phase 3 前端多语言完整展示（未实现）
+## Phase 3 报告详情多语言完整展示（已实现）
 
-Phase 3 只在 Phase 2 之上补前端（`apps/dsa-web/`、`apps/dsa-desktop/`）对 `strategy_synthesis` 的完整多语言展示：
+报告详情消费面已通过共享 Web 组件完成多语言展示；Phase 2 的并发调度仍保持未实现，二者不互相伪装为已交付。实现边界如下：
 
 - Web 报告详情页展示 `final_signal` / `consensus_level` / `supporting_skills` / `opposing_skills` / `conflicts` / `invalid_opinion_count`。
 - 桌面端复用 Web 展示逻辑。
-- 多语言 label 表复用 `src/report_language.py` 已有的 zh/en/ko 三语；前端只做投影，不重新定义。
-- Phase 3 不改变 Baseline 契约、不新增 payload 字段、不新增 API 端点。
+- 同步分析、任务状态和历史详情都从权威 `dashboard.strategy_synthesis` 生成同一个可选 `details.structured_insights` 展示投影；投影同时容纳阶段决策和信号归因，不修改权威 dashboard payload。
+- 前端 zh/en/ko 标签与 `src/report_language.py` 的 canonical signal、共识和冲突枚举保持语义一致，只展示结构化字段，不解析本地化叙事。
+- 旧记录、单策略结果、部分 payload 和坏数据保持兼容：无有意义内容时不显示区块，坏列表项被隔离，原始 JSON / Markdown 回退仍保留。
+- 该实现只新增可选 API 字段，不新增 API 端点、数据库字段或配置项，也不修改分析工作台。
 
 ## Phase 4 权重回测反馈闭环（未实现）
 

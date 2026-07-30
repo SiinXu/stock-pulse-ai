@@ -266,6 +266,13 @@ class ReportDetails(BaseModel):
         None,
         description="Issue #616 evidence strata (facts/gaps/inference/risks/framework/disclaimer)",
     )
+    structured_insights: Optional[Any] = Field(
+        None,
+        description=(
+            "Optional report-structured-insights-v1 projection containing phase decision, "
+            "signal attribution, and multi-strategy synthesis"
+        ),
+    )
 
     @model_validator(mode="after")
     def populate_context_derived_details(self) -> "ReportDetails":

@@ -8,6 +8,7 @@ import type {
 } from '../../types/analysis';
 import type { UiLanguage } from '../../i18n/uiText';
 import {
+  getAnalysisPhaseOptions,
   getMarketPhaseSummaryLabel,
   getPartialBarLabel,
   getRequestedPhaseLabel,
@@ -53,6 +54,12 @@ const createSummary = (
 
 describe('market phase labels', () => {
   it('formats representative requested and resolved phases', () => {
+    expect(getAnalysisPhaseOptions('en')).toEqual([
+      { value: 'auto', label: 'Auto' },
+      { value: 'premarket', label: 'Pre-market' },
+      { value: 'intraday', label: 'Intraday' },
+      { value: 'postmarket', label: 'Post-market' },
+    ]);
     expect(getRequestedPhaseLabel('intraday', 'en')).toBe('Requested phase: Intraday');
     expect(getRequestedPhaseLabel('postmarket', 'zh')).toBe('请求阶段: 盘后');
     expect(getMarketPhaseSummaryLabel(createSummary('lunch_break', ' hk '), 'en'))

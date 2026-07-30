@@ -6,9 +6,8 @@ ts_code,symbol,name,enname,aliases
 035420.KS,035420.KS,NAVER,NAVER Corporation,Naver|NAVER|네이버
 051910.KS,051910.KS,LG化学,LG Chem Ltd.,LG Chem|LG化学
 006400.KS,006400.KS,三星SDI,Samsung SDI Co. Ltd.,Samsung SDI|三星SDI
-035720.KQ,035720.KQ,Kakao,Kakao Corp.,Kakao|可可|카카오
+035720.KS,035720.KS,Kakao,Kakao Corp.,Kakao|可可|카카오
 247540.KQ,247540.KQ,Ecopro BM,Ecopro BM Co. Ltd.,Ecopro BM|ECOPRO BM|에코프로비엠
-091990.KQ,091990.KQ,赛尔群医疗,Celltrion Healthcare Co. Ltd.,Celltrion Healthcare|Celltrion|셀트리온헬스케어
 000270.KS,000270.KS,起亚,Kia Corporation,Kia|起亚|기아
 068270.KS,068270.KS,赛尔群,Celltrion Inc.,Celltrion|셀트리온
 105560.KS,105560.KS,KB金融集团,KB Financial Group Inc.,KB Financial|KB금융
@@ -29,3 +28,34 @@ ts_code,symbol,name,enname,aliases
 011200.KS,011200.KS,HMM,HMM Co. Ltd.,HMM|现代商船
 090430.KS,090430.KS,爱茉莉太平洋,Amorepacific Corporation,Amorepacific|아모레퍼시픽
 086520.KQ,086520.KQ,Ecopro,Ecopro Co. Ltd.,Ecopro|에코프로
+207940.KS,207940.KS,三星生物制剂,Samsung Biologics Co. Ltd.,Samsung Biologics|三星生物|삼성바이오로직스
+005490.KS,005490.KS,POSCO控股,POSCO Holdings Inc.,POSCO|浦项|포스코홀딩스
+015760.KS,015760.KS,韩国电力,Korea Electric Power Corporation,KEPCO|韩国电力|한국전력
+010140.KS,010140.KS,三星重工,Samsung Heavy Industries Co. Ltd.,Samsung Heavy|三星重工|삼성중공업
+329180.KS,329180.KS,HD现代重工,HD Hyundai Heavy Industries Co. Ltd.,HD Hyundai Heavy|现代重工|HD현대중공업
+012450.KS,012450.KS,韩华航空航天,Hanwha Aerospace Co. Ltd.,Hanwha Aerospace|韩华|한화에어로스페이스
+064350.KS,064350.KS,现代Rotem,Hyundai Rotem Company,Hyundai Rotem|现代乐铁|현대로템
+034020.KS,034020.KS,斗山能源,Doosan Enerbility Co. Ltd.,Doosan Enerbility|斗山|두산에너빌리티
+323410.KS,323410.KS,KakaoBank,KakaoBank Corp.,KakaoBank|카카오뱅크
+377300.KS,377300.KS,Kakao Pay,Kakao Pay Corp.,Kakao Pay|카카오페이
+000810.KS,000810.KS,三星火灾海上保险,Samsung Fire and Marine Insurance,Samsung Fire|三星火灾|삼성화재
+006800.KS,006800.KS,未来资产证券,Mirae Asset Securities Co. Ltd.,Mirae Asset|未来资产|미래에셋증권
+138040.KS,138040.KS,Meritz金融,Meritz Financial Group Inc.,Meritz Financial|메리츠금융지주
+316140.KS,316140.KS,友利金融,Woori Financial Group Inc.,Woori Financial|友利|우리금융지주
+032640.KS,032640.KS,LG Uplus,LG Uplus Corp.,LG U+|LG Uplus|LG유플러스
+030200.KS,030200.KS,KT,KT Corporation,KT|韩国电信|케이티
+034220.KS,034220.KS,LG显示,LG Display Co. Ltd.,LG Display|LGD|LG디스플레이
+011070.KS,011070.KS,LG伊诺特,LG Innotek Co. Ltd.,LG Innotek|LG伊诺特|LG이노텍
+402340.KS,402340.KS,SK Square,SK Square Co. Ltd.,SK Square|SK스퀘어
+259960.KS,259960.KS,Krafton,Krafton Inc.,Krafton|魁匠团|크래프톤
+036570.KS,036570.KS,NCsoft,NCsoft Corporation,NCsoft|NCSOFT|엔씨소프트
+352820.KS,352820.KS,HYBE,HYBE Co. Ltd.,HYBE|Hybe Labels|하이브
+326030.KS,326030.KS,SK生物制药,SK Biopharmaceuticals Co. Ltd.,SK Biopharm|SK生物|SK바이오팜
+042660.KS,042660.KS,韩华海洋,Hanwha Ocean Co. Ltd.,Hanwha Ocean|大宇造船|한화오션
+047810.KS,047810.KS,韩国航空宇宙产业,Korea Aerospace Industries Ltd.,KAI|韩国航空宇宙|한국항공우주
+196170.KQ,196170.KQ,Alteogen,Alteogen Inc.,Alteogen|阿尔特奥根|알테오젠
+028300.KQ,028300.KQ,HLB,HLB Inc.,HLB|에이치엘비
+068760.KQ,068760.KQ,赛尔群制药,Celltrion Pharm Inc.,Celltrion Pharm|셀트리온제약
+277810.KQ,277810.KQ,Rainbow Robotics,Rainbow Robotics Co. Ltd.,Rainbow Robotics|彩虹机器人|레인보우로보틱스
+035900.KQ,035900.KQ,JYP娱乐,JYP Entertainment Corporation,JYP|JYP Entertainment|JYP엔터테인먼트
+041510.KQ,041510.KQ,SM娱乐,SM Entertainment Co. Ltd.,SM Entertainment|SM|에스엠

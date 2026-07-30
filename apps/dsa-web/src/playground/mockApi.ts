@@ -290,6 +290,21 @@ function readJsonRecord(value: unknown): Record<string, unknown> {
   }
 }
 
+function toAlertRuleWireItem(
+  item: typeof fixtureAlertRules[number],
+): Record<string, unknown> {
+  const {
+    cooldownPolicy,
+    notificationPolicy,
+    ...wireItem
+  } = item;
+  return {
+    ...wireItem,
+    ...(cooldownPolicy !== undefined ? { cooldown_policy: cooldownPolicy } : {}),
+    ...(notificationPolicy !== undefined ? { notification_policy: notificationPolicy } : {}),
+  };
+}
+
 export function installPlaygroundApiMock(
   profile: PlaygroundFixtureProfile,
   options: InstallPlaygroundApiMockOptions = {},
@@ -331,6 +346,9 @@ export function installPlaygroundApiMock(
       setupState: 'password_retained',
     },
   };
+  const decisionMemoryFlags = new Map<number, { memorable: boolean; ignored: boolean }>([
+    [fixtureDecisionSignal.id, { memorable: true, ignored: false }],
+  ]);
   const delayResponse = options.delayResponse ?? (profile === 'slow' ? 1200 : 120);
   const mock = new AxiosMockAdapter(apiClient, { delayResponse });
   let requestSequence = 0;
@@ -877,6 +895,24 @@ export function installPlaygroundApiMock(
     skipped: 0,
     engine_version: 'playground-v1',
   }));
+  mock.onGet('/api/v1/decision-signals/outcomes').reply((config) => {
+    if (profile === 'error') return [503, errorPayload];
+    const params = config.params ?? {};
+    const signalId = Number(params.signal_id);
+    const matches = profile !== 'empty'
+      && (!Number.isInteger(signalId) || fixtureDecisionOutcome.signalId === signalId)
+      && (!params.horizon || fixtureDecisionOutcome.horizon === params.horizon)
+      && (!params.engine_version || fixtureDecisionOutcome.engineVersion === params.engine_version)
+      && (!params.eval_status || fixtureDecisionOutcome.evalStatus === params.eval_status)
+      && (!params.outcome || fixtureDecisionOutcome.outcome === params.outcome);
+    const items = matches ? [fixtureDecisionOutcome] : [];
+    return [200, {
+      items,
+      total: items.length,
+      page: Math.max(1, Number(params.page) || 1),
+      page_size: Math.max(1, Number(params.page_size) || 20),
+    }];
+  });
   mock.onGet('/api/v1/decision-signals').reply(() => {
     if (profile === 'error') return [503, errorPayload];
     return [200, {
@@ -884,6 +920,34 @@ export function installPlaygroundApiMock(
       total: state.decisionSignals.length,
       page: 1,
       page_size: 20,
+    }];
+  });
+  mock.onGet(/\/api\/v1\/decision-signals\/\d+\/memory-flag$/).reply((config) => {
+    if (profile === 'error') return [503, errorPayload];
+    const signalId = Number(requestPath(config as InternalAxiosRequestConfig).split('/').at(-2));
+    const flags = decisionMemoryFlags.get(signalId) ?? { memorable: false, ignored: false };
+    return [200, {
+      signal_id: signalId,
+      ...flags,
+      created_at: FIXTURE_TIMESTAMP,
+      updated_at: FIXTURE_TIMESTAMP,
+    }];
+  });
+  mock.onPatch(/\/api\/v1\/decision-signals\/\d+\/memory-flag$/).reply((config) => {
+    if (profile === 'error') return [503, errorPayload];
+    const signalId = Number(requestPath(config as InternalAxiosRequestConfig).split('/').at(-2));
+    const body = readJsonRecord(config.data);
+    const current = decisionMemoryFlags.get(signalId) ?? { memorable: false, ignored: false };
+    const next = {
+      memorable: typeof body.memorable === 'boolean' ? body.memorable : current.memorable,
+      ignored: typeof body.ignored === 'boolean' ? body.ignored : current.ignored,
+    };
+    decisionMemoryFlags.set(signalId, next);
+    return [200, {
+      signal_id: signalId,
+      ...next,
+      created_at: FIXTURE_TIMESTAMP,
+      updated_at: FIXTURE_TIMESTAMP,
     }];
   });
   mock.onPost('/api/v1/decision-signals').reply((config) => {
@@ -992,7 +1056,7 @@ export function installPlaygroundApiMock(
   }, { items: [], total: 0, page: 1, page_size: 20 }));
 
   mock.onGet('/api/v1/alerts/rules').reply(() => responseFor(profile, {
-    items: state.alertRules,
+    items: state.alertRules.map(toAlertRuleWireItem),
     total: state.alertRules.length,
     page: 1,
     pageSize: 20,
@@ -1009,11 +1073,16 @@ export function installPlaygroundApiMock(
       parameters: body.parameters && typeof body.parameters === 'object' ? body.parameters : fixtureAlertRules[0].parameters,
       severity: typeof body.severity === 'string' ? body.severity : fixtureAlertRules[0].severity,
       enabled: typeof body.enabled === 'boolean' ? body.enabled : true,
+      cooldownPolicy: body.cooldown_policy && typeof body.cooldown_policy === 'object'
+        ? body.cooldown_policy
+        : body.cooldown_policy === null
+          ? null
+          : undefined,
       id: Math.max(0, ...state.alertRules.map((item) => item.id)) + 1,
       source: 'playground',
     } as typeof fixtureAlertRules[number];
     state.alertRules.push(created);
-    return [200, created];
+    return [200, toAlertRuleWireItem(created)];
   });
   mock.onDelete(/\/api\/v1\/alerts\/rules\/\d+$/).reply((config) => {
     if (profile === 'error') return [503, errorPayload];

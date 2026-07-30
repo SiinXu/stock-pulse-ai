@@ -6,8 +6,11 @@ import { DecisionSignalCreateDrawer } from '../../components/decision-signals/De
 import {
   DecisionSignalCard,
   DecisionSignalDetails,
+  DecisionSignalOutcomeBadge,
   PortfolioSignalSummary,
 } from '../../components/decision-signals/DecisionSignalDisplay';
+import { DecisionSignalMemoryControls } from '../../components/decision-signals/DecisionSignalMemoryControls';
+import { DecisionSignalOutcomeExplorer } from '../../components/decision-signals/DecisionSignalOutcomeExplorer';
 import { DecisionSignalOutcomeRunPanel } from '../../components/decision-signals/DecisionSignalOutcomeRunPanel';
 import {
   EMPTY_MANUAL_SIGNAL_DRAFT,
@@ -30,6 +33,7 @@ import { ReportNews } from '../../components/report/ReportNews';
 import { ReportOverview } from '../../components/report/ReportOverview';
 import { ReportStrata } from '../../components/report/ReportStrata';
 import { ReportStrategy } from '../../components/report/ReportStrategy';
+import { ReportStructuredInsights } from '../../components/report/ReportStructuredInsights';
 import { ReportSummary } from '../../components/report/ReportSummary';
 import { RunFlowEventList } from '../../components/run-flow/RunFlowEventList';
 import { RunFlowGraph } from '../../components/run-flow/RunFlowGraph';
@@ -95,6 +99,36 @@ const DecisionSignalDetailsStory = () => {
     />
   );
 };
+
+const DecisionSignalMemoryControlsStory = () => (
+  <DecisionSignalMemoryControls signalId={fixtureDecisionSignal.id} />
+);
+
+const DecisionSignalOutcomeBadgeStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  const variants = scenario === 'variants'
+    ? [
+        fixtureDecisionOutcome,
+        { ...fixtureDecisionOutcome, id: 402, outcome: 'miss' as const },
+        { ...fixtureDecisionOutcome, id: 403, outcome: 'neutral' as const },
+        {
+          ...fixtureDecisionOutcome,
+          id: 404,
+          evalStatus: 'unable' as const,
+          outcome: null,
+        },
+      ]
+    : [fixtureDecisionOutcome];
+  return (
+    <div className="flex flex-wrap gap-2">
+      {variants.map((item) => <DecisionSignalOutcomeBadge key={item.id} item={item} />)}
+    </div>
+  );
+};
+
+const DecisionSignalOutcomeExplorerStory = () => (
+  <DecisionSignalOutcomeExplorer onOpenSignal={() => undefined} />
+);
 
 const PortfolioSignalSummaryStory = () => {
   const { scenario } = usePlaygroundScenario();
@@ -324,6 +358,16 @@ const ReportStrataStory = () => {
   );
 };
 
+const ReportStructuredInsightsStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  return (
+    <ReportStructuredInsights
+      insights={scenario === 'empty' ? undefined : fixtureReport.details?.structuredInsights}
+      language="en"
+    />
+  );
+};
+
 const ReportSummaryStory = () => <ReportSummary data={fixtureReport} isHistory onOpenRunFlow={() => undefined} />;
 
 const RunFlowEventListStory = () => {
@@ -385,6 +429,9 @@ const RunFlowSummaryBarStory = () => <RunFlowSummaryBar snapshot={fixtureRunFlow
 export const DECISION_REPORT_RUN_FLOW_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'decision-signal-card': DecisionSignalCardStory,
   'decision-signal-details': DecisionSignalDetailsStory,
+  'decision-signal-memory-controls': DecisionSignalMemoryControlsStory,
+  'decision-signal-outcome-badge': DecisionSignalOutcomeBadgeStory,
+  'decision-signal-outcome-explorer': DecisionSignalOutcomeExplorerStory,
   'portfolio-signal-summary': PortfolioSignalSummaryStory,
   'timeline-tooltip': TimelineTooltipStory,
   'decision-signal-timeline': DecisionSignalTimelineStory,
@@ -403,6 +450,7 @@ export const DECISION_REPORT_RUN_FLOW_SCENARIOS: Record<string, PlaygroundScenar
   'report-overview': ReportOverviewStory,
   'report-strata': ReportStrataStory,
   'report-strategy': ReportStrategyStory,
+  'report-structured-insights': ReportStructuredInsightsStory,
   'report-summary': ReportSummaryStory,
   'deep-research-panel': DeepResearchPanelStory,
   'run-flow-event-list': RunFlowEventListStory,

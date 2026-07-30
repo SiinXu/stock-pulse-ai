@@ -2,6 +2,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { Bell, Check, Copy, Info, Save, Search, Trash2 } from 'lucide-react';
 import { createParsedApiError } from '../../api/error';
+import { AnalysisPhaseSelect } from '../../components/analysis';
 import {
   AdvancedFilterSheet,
   Alert,
@@ -76,6 +77,7 @@ import {
 } from '../../components/common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { PLAYGROUND_TEXT } from '../../locales/playground';
+import type { AnalysisPhase } from '../../types/analysis';
 import { usePlaygroundScenario } from '../scenarioContext';
 import type { PlaygroundScenarioRenderer } from '../types';
 
@@ -167,6 +169,23 @@ const FileInputStory = () => {
 const useSampleText = () => {
   const { language } = useUiLanguage();
   return PLAYGROUND_TEXT[language].samples;
+};
+
+const AnalysisPhaseSelectStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  const { t } = useUiLanguage();
+  const [phase, setPhase] = useState<AnalysisPhase>('auto');
+  return (
+    <Surface>
+      <AnalysisPhaseSelect
+        value={phase}
+        onChange={setPhase}
+        label={t('analysis.phase')}
+        hint={t('analysis.phaseHint')}
+        disabled={scenario === 'states'}
+      />
+    </Surface>
+  );
 };
 
 const ButtonStory = () => {
@@ -1028,6 +1047,7 @@ const ModalStory = () => {
 };
 
 export const COMMON_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
+  'analysis-phase-select': AnalysisPhaseSelectStory,
   button: ButtonStory,
   pressable: PressableStory,
   'selection-chip': SelectionChipStory,

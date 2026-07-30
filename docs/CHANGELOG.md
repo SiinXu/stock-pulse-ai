@@ -8,8 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Aligned Web investment-framework dimension uniqueness with backend Unicode case folding and field-level duplicate errors.
+- [Fixed] Separated successful paper-trade submission from follow-up portfolio refresh failures, with a page-level refresh retry and accurate success copy.
+- [Added] Added shared structured phase, signal-attribution, and strategy-synthesis report sections across synchronous, task, and history results, and expanded Japan/Korea search seeds with explicit suffix and manual-entry guidance.
+- [Added] Added Web paper-account trading with explicit account labeling, optional latest-close pricing, actionable failures, and in-place portfolio refreshes.
+- [Added] Added per-request Web analysis-phase controls for single, batch, import, reanalysis, and portfolio analysis flows while keeping automatic inference as the default.
 - [Added] Completed Settings lifecycle controls with last-good configuration rollback, durable scheduled-run history, structured investment-framework editing and immutable history copy-to-draft, plus masked DingTalk group webhook configuration and testing.
 - [Fixed] Aligned investment-framework history timestamps, editor collection and rule limits, and backend validation placement with the authoritative schema.
+- [Added] Added Web decision-memory controls, editable alert cooldown policies, and a global filtered decision-outcome explorer.
 - [Changed] Refined Web Home and Settings with bordered attention panels, a modal investment-framework editor, compact shared help and local-model icons, a unified Research disclosure row, and a cleaner embedded Usage header.
 - [Changed] Made native, platform-matched loopback Web/API/Ollama setup download the official macOS or Windows installer directly, re-detect the runtime when users return, retain server-side guidance for detected remote, proxy, container, and Linux environments, and document loopback-preserving tunnel limits.
 - [Fixed] Retried route-focus restoration when a POP target marker is not mounted yet, so browser Forward restores the details Back control instead of racing to the H1 fallback.

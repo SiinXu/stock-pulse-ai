@@ -6000,6 +6000,16 @@
               "market_structure": {
                 "type": "object",
                 "description": "市场结构上下文（题材主线与个股市场位置信息，JSON）"
+              },
+              "structured_insights": {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Structured Insights",
+                "description": "Optional report-structured-insights-v1 projection containing phase decision, signal attribution, and multi-strategy synthesis"
               }
             }
           }

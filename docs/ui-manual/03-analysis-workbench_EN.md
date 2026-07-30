@@ -45,10 +45,11 @@ sequenceDiagram
 1. Enter a code (`600519`, `hk00700`, `AAPL`, …).  
 2. Optionally pick from the watchlist.  
 3. Optionally choose a **Skill** (style pack); omit for default.  
-4. Optionally set **Beginner / Professional** or brief/detailed.  
-5. Start.  
-6. Watch **Running tasks**.  
-7. Open History when complete.
+4. Choose an **Analysis phase**: Auto by default, or Premarket, Intraday, or Postmarket for this request.
+5. Optionally set **Beginner / Professional** or brief/detailed.
+6. Start.
+7. Watch **Running tasks**.
+8. Open History when complete.
 
 ### Recommended UI settings
 
@@ -57,10 +58,13 @@ sequenceDiagram
 | Mode | Beginner | Shorter conclusion, conservative risk tone |
 | Detail | brief if available | Learn the skeleton first |
 | Skill | none | Fewer variables |
+| Analysis phase | Auto | Preserves the existing market/session inference behavior |
 | Batch size | 1–3 | Cost and rate limits |
 
 > ⚠️ **Cost & time**  
 > Each run calls an LLM (large language model) and may call news APIs. Larger batches cost more.
+
+The selected phase applies consistently to single-symbol, batch, watchlist, smart-import, and reanalysis submissions. It is a per-request override and does not change system settings. One-click analysis in Portfolio has its own equivalent phase selector.
 
 ### Ticker formats
 
@@ -80,7 +84,9 @@ sequenceDiagram
 | Completed | Report ready | Open History |
 | Failed | Error | Read the reason, then retry |
 
-“Automatic phase” means session inference; the **report page** is authoritative for the final phase label.
+The selector offers **Auto, Premarket, Intraday, and Postmarket**. Auto is the default and preserves the pre-existing market/session inference behavior; a manual choice overrides only the current request.
+
+The task list shows the **requested phase**, so you can confirm whether Auto or an explicit phase was submitted. The report page shows the **final phase** used after analysis and remains authoritative. These are intentionally distinct.
 
 ## History & compare
 
@@ -102,7 +108,7 @@ Preference is usually local to the browser/client.
 
 - **Smoke test**: `600519`, no skill, Beginner → read conclusion + risk only.  
 - **Compare views**: run again later → history trend for suggestion changes.  
-- **From Portfolio**: one-click analysis still lands in this task flow.
+- **From Portfolio**: choose a phase before one-click analysis; the job still lands in this task flow, where the requested phase is visible and the report remains authoritative for the final phase.
 
 Continue in chat from a report when the entry exists — see [05 Agent chat](05-agent-chat_EN.md).
 

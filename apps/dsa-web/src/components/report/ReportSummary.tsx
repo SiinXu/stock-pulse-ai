@@ -2,6 +2,7 @@ import React from 'react';
 import type { AnalysisResult, AnalysisReport } from '../../types/analysis';
 import { ReportOverview } from './ReportOverview';
 import { ReportStrategy } from './ReportStrategy';
+import { ReportStructuredInsights } from './ReportStructuredInsights';
 import { ReportStrata } from './ReportStrata';
 import { ReportNews } from './ReportNews';
 import { ReportDetails } from './ReportDetails';
@@ -67,6 +68,12 @@ export const ReportSummary: React.FC<ReportSummaryProps> = ({
         details={details}
         isHistory={isHistory}
         watchlist={watchlist}
+      />
+
+      {/* Structured phase, attribution, and multi-strategy synthesis. */}
+      <ReportStructuredInsights
+        insights={details?.structuredInsights}
+        language={reportLanguage}
       />
 
       {/* Strategy target zone. */}

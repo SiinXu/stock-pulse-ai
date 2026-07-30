@@ -136,6 +136,9 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
 
   entry('signals', 'decision-signal-card', 'DecisionSignalCard', 'components/decision-signals/DecisionSignalDisplay.tsx', ['default', 'interactive', 'states']),
   entry('signals', 'decision-signal-details', 'DecisionSignalDetails', 'components/decision-signals/DecisionSignalDisplay.tsx', ['default', 'loading', 'empty', 'error']),
+  entry('signals', 'decision-signal-memory-controls', 'DecisionSignalMemoryControls', 'components/decision-signals/DecisionSignalMemoryControls.tsx', ['default', 'error']),
+  entry('signals', 'decision-signal-outcome-badge', 'DecisionSignalOutcomeBadge', 'components/decision-signals/DecisionSignalDisplay.tsx', ['variants']),
+  entry('signals', 'decision-signal-outcome-explorer', 'DecisionSignalOutcomeExplorer', 'components/decision-signals/DecisionSignalOutcomeExplorer.tsx', ['default', 'empty', 'error']),
   entry('signals', 'portfolio-signal-summary', 'PortfolioSignalSummary', 'components/decision-signals/DecisionSignalDisplay.tsx', ['default', 'loading', 'empty']),
   entry('signals', 'timeline-tooltip', 'TimelineTooltip', 'components/decision-signals/DecisionSignalTimeline.tsx'),
   entry('signals', 'decision-signal-timeline', 'DecisionSignalTimeline', 'components/decision-signals/DecisionSignalTimeline.tsx', ['default', 'loading', 'empty', 'error']),
@@ -155,6 +158,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('reports', 'report-overview', 'ReportOverview', 'components/report/ReportOverview.tsx', ['default', 'states']),
   entry('reports', 'report-strata', 'ReportStrata', 'components/report/ReportStrata.tsx', ['default', 'empty']),
   entry('reports', 'report-strategy', 'ReportStrategy', 'components/report/ReportStrategy.tsx', ['default', 'empty']),
+  entry('reports', 'report-structured-insights', 'ReportStructuredInsights', 'components/report/ReportStructuredInsights.tsx', ['default', 'empty']),
   entry('reports', 'report-summary', 'ReportSummary', 'components/report/ReportSummary.tsx', ['default', 'loading', 'error']),
   entry('reports', 'deep-research-panel', 'DeepResearchPanel', 'components/chat/DeepResearchPanel.tsx', ['interactive', 'empty', 'error']),
 
@@ -196,6 +200,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
 
   entry('stockSearch', 'stock-autocomplete', 'StockAutocomplete', 'components/StockAutocomplete/StockAutocomplete.tsx', ['interactive', 'states']),
   entry('stockSearch', 'suggestions-list', 'SuggestionsList', 'components/StockAutocomplete/SuggestionsList.tsx', ['default', 'empty']),
+  entry('tasks', 'analysis-phase-select', 'AnalysisPhaseSelect', 'components/analysis/AnalysisPhaseSelect.tsx', ['interactive', 'states']),
   entry('tasks', 'task-panel', 'TaskPanel', 'components/tasks/TaskPanel.tsx', ['default', 'loading', 'states']),
   entry('watchlist', 'home-stock-workspace', 'HomeStockWorkspace', 'components/watchlist/HomeStockWorkspace.tsx', ['interactive', 'loading', 'empty', 'error']),
 ];

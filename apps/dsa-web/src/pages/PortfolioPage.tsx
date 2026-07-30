@@ -6,7 +6,8 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { decisionSignalsApi } from '../api/decisionSignals';
 import { portfolioApi } from '../api/portfolio';
 import type { ParsedApiError } from '../api/error';
-import { getParsedApiError } from '../api/error';
+import { createParsedApiError, getParsedApiError } from '../api/error';
+import { AnalysisPhaseSelect } from '../components/analysis';
 import { ApiErrorAlert, AppPage, Badge, Button, Card, Checkbox, ConfirmDialog, DataTable, type DataTableColumn, DatePicker, EmptyState, FileInput, IconButton, InlineAlert, Input, Loading, Modal, PageHeader, Select, Surface } from '../components/common';
 import { PortfolioSignalSummary } from '../components/decision-signals/DecisionSignalDisplay';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
@@ -37,7 +38,11 @@ import type {
   DecisionSignalMarket,
 } from '../types/decisionSignals';
 import type {
+  AnalysisPhase,
+} from '../types/analysis';
+import type {
   PortfolioAccountItem,
+  PortfolioAccountType,
   PortfolioCashDirection,
   PortfolioCashLedgerListItem,
   PortfolioCorporateActionListItem,
@@ -51,6 +56,7 @@ import type {
   PortfolioSide,
   PortfolioSnapshotResponse,
   PortfolioTradeListItem,
+  PaperTradeCreatedResponse,
 } from '../types/portfolio';
 import { areStockCodesEquivalent, normalizeStockCode } from '../utils/stockCode';
 import { parseDecisionSignalDate } from '../utils/decisionSignalTime';
@@ -81,6 +87,7 @@ type EventType = 'trade' | 'cash' | 'corporate';
 type FlatPosition = PortfolioPositionItem & {
   accountId: number;
   accountName: string;
+  accountType: PortfolioAccountType;
 };
 
 type PortfolioSignalLookup = {
@@ -215,10 +222,16 @@ const PortfolioPage: React.FC = () => {
   setSearchParamsRef.current = setSearchParams;
   const [showCreateAccount, setShowCreateAccount] = useState(false);
   const [tradeModalOpen, setTradeModalOpen] = useState(false);
+  const [paperTradeModalOpen, setPaperTradeModalOpen] = useState(false);
   const [cashModalOpen, setCashModalOpen] = useState(false);
   const [corpModalOpen, setCorpModalOpen] = useState(false);
   const [tradeSubmitting, setTradeSubmitting] = useState(false);
   const [tradeError, setTradeError] = useState<ParsedApiError | null>(null);
+  const [paperTradeSubmitting, setPaperTradeSubmitting] = useState(false);
+  const [paperTradeError, setPaperTradeError] = useState<ParsedApiError | null>(null);
+  const [paperTradeSuccess, setPaperTradeSuccess] = useState<string | null>(null);
+  const [paperTradeRefreshing, setPaperTradeRefreshing] = useState(false);
+  const [paperTradeRefreshWarning, setPaperTradeRefreshWarning] = useState<string | null>(null);
   const [cashSubmitting, setCashSubmitting] = useState(false);
   const [cashError, setCashError] = useState<ParsedApiError | null>(null);
   const [corpSubmitting, setCorpSubmitting] = useState(false);
@@ -234,8 +247,10 @@ const PortfolioPage: React.FC = () => {
     broker: 'Demo',
     market: 'cn' as PortfolioAccountMarket,
     baseCurrency: 'CNY',
+    accountType: 'real' as PortfolioAccountType,
   });
   const [costMethod, setCostMethod] = useState<PortfolioCostMethod>('fifo');
+  const [positionAnalysisPhase, setPositionAnalysisPhase] = useState<AnalysisPhase>('auto');
   const [snapshot, setSnapshot] = useState<PortfolioSnapshotResponse | null>(null);
   const [risk, setRisk] = useState<PortfolioRiskResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -304,6 +319,14 @@ const PortfolioPage: React.FC = () => {
     tradeUid: '',
     note: '',
   });
+  const [paperTradeForm, setPaperTradeForm] = useState({
+    symbol: '',
+    tradeDate: getTodayIso(),
+    side: 'buy' as PortfolioSide,
+    quantity: '',
+    price: '',
+    note: '',
+  });
   const [cashForm, setCashForm] = useState({
     eventDate: getTodayIso(),
     direction: 'in' as PortfolioCashDirection,
@@ -320,6 +343,7 @@ const PortfolioPage: React.FC = () => {
     note: '',
   });
   const tradeOperationRef = useRef<OperationAttempt | null>(null);
+  const paperTradeOperationRef = useRef<OperationAttempt | null>(null);
   const cashOperationRef = useRef<OperationAttempt | null>(null);
   const corporateOperationRef = useRef<OperationAttempt | null>(null);
   const csvOperationRef = useRef<OperationAttempt | null>(null);
@@ -333,6 +357,8 @@ const PortfolioPage: React.FC = () => {
   const hasAccounts = accounts.length > 0;
   const writableAccount = selectedAccount === 'all' ? undefined : accounts.find((item) => item.id === selectedAccount);
   const writableAccountId = writableAccount?.id;
+  const writableAccountType = writableAccount?.accountType ?? 'real';
+  const isPaperAccountSelected = Boolean(writableAccount) && writableAccountType === 'paper';
   const writeBlocked = !writableAccountId;
   const canDeleteSelectedAccount = Boolean(writableAccountId) && !isLoading && !fxRefreshing && !accountDeleteLoading;
   const totalEventPages = Math.max(1, Math.ceil(eventTotal / DEFAULT_PAGE_SIZE));
@@ -390,7 +416,7 @@ const PortfolioPage: React.FC = () => {
     );
   };
 
-  const loadAccounts = useCallback(async () => {
+  const loadAccounts = useCallback(async (): Promise<boolean> => {
     try {
       const response = await portfolioApi.getAccounts(false);
       const items = response.accounts || [];
@@ -401,8 +427,10 @@ const PortfolioPage: React.FC = () => {
       } else if (currentAccount !== 'all' && !items.some((item) => item.id === currentAccount)) {
         setSelectedAccount(items[0].id, true, currentAccount);
       }
+      return true;
     } catch (err) {
       setError(getParsedApiError(err));
+      return false;
     } finally {
       setAccountsLoaded(true);
     }
@@ -430,7 +458,7 @@ const PortfolioPage: React.FC = () => {
     }
   }, [text.brokerListEmpty, text.brokerListUnavailable]);
 
-  const loadSnapshotAndRisk = useCallback(async () => {
+  const loadSnapshotAndRisk = useCallback(async (): Promise<boolean> => {
     const requestId = snapshotRequestRef.current + 1;
     snapshotRequestRef.current = requestId;
     setIsLoading(true);
@@ -441,7 +469,7 @@ const PortfolioPage: React.FC = () => {
         costMethod,
         includeRealtime: false,
       });
-      if (requestId !== snapshotRequestRef.current) return;
+      if (requestId !== snapshotRequestRef.current) return false;
       setSnapshot(snapshotData);
       setError(null);
 
@@ -451,19 +479,21 @@ const PortfolioPage: React.FC = () => {
           costMethod,
           includeRealtime: false,
         });
-        if (requestId === snapshotRequestRef.current) {
-          setRisk(riskData);
-        }
+        if (requestId !== snapshotRequestRef.current) return false;
+        setRisk(riskData);
+        return true;
       } catch (riskErr) {
-        if (requestId !== snapshotRequestRef.current) return;
+        if (requestId !== snapshotRequestRef.current) return false;
         setRisk(null);
         setRiskWarning(getParsedApiError(riskErr, language).message || text.riskFallback);
+        return false;
       }
     } catch (err) {
-      if (requestId !== snapshotRequestRef.current) return;
+      if (requestId !== snapshotRequestRef.current) return false;
       setSnapshot(null);
       setRisk(null);
       setError(getParsedApiError(err));
+      return false;
     } finally {
       if (requestId === snapshotRequestRef.current) {
         setIsLoading(false);
@@ -471,13 +501,16 @@ const PortfolioPage: React.FC = () => {
     }
   }, [queryAccountId, costMethod, language, text.riskFallback]);
 
-  const loadEventsPage = useCallback(async (page: number) => {
+  const loadEventsPage = useCallback(async (
+    page: number,
+    requestedEventType: EventType = eventType,
+  ): Promise<boolean> => {
     const requestId = eventRequestRef.current + 1;
     eventRequestRef.current = requestId;
     setEventLoading(true);
     setEventError(null);
     try {
-      if (eventType === 'trade') {
+      if (requestedEventType === 'trade') {
         const response = await portfolioApi.listTrades({
           accountId: queryAccountId,
           dateFrom: appliedEventFilters.dateFrom || undefined,
@@ -487,10 +520,10 @@ const PortfolioPage: React.FC = () => {
           page,
           pageSize: DEFAULT_PAGE_SIZE,
         });
-        if (requestId !== eventRequestRef.current) return;
+        if (requestId !== eventRequestRef.current) return false;
         setTradeEvents(response.items || []);
         setEventTotal(response.total || 0);
-      } else if (eventType === 'cash') {
+      } else if (requestedEventType === 'cash') {
         const response = await portfolioApi.listCashLedger({
           accountId: queryAccountId,
           dateFrom: appliedEventFilters.dateFrom || undefined,
@@ -499,7 +532,7 @@ const PortfolioPage: React.FC = () => {
           page,
           pageSize: DEFAULT_PAGE_SIZE,
         });
-        if (requestId !== eventRequestRef.current) return;
+        if (requestId !== eventRequestRef.current) return false;
         setCashEvents(response.items || []);
         setEventTotal(response.total || 0);
       } else {
@@ -512,14 +545,16 @@ const PortfolioPage: React.FC = () => {
           page,
           pageSize: DEFAULT_PAGE_SIZE,
         });
-        if (requestId !== eventRequestRef.current) return;
+        if (requestId !== eventRequestRef.current) return false;
         setCorporateEvents(response.items || []);
         setEventTotal(response.total || 0);
       }
+      return true;
     } catch (err) {
       if (requestId === eventRequestRef.current) {
         setEventError(getParsedApiError(err));
       }
+      return false;
     } finally {
       if (requestId === eventRequestRef.current) {
         setEventLoading(false);
@@ -551,6 +586,36 @@ const PortfolioPage: React.FC = () => {
   const refreshPortfolioData = useCallback(async (page = eventPage) => {
     await Promise.all([loadSnapshotAndRisk(), loadEventsPage(page)]);
   }, [eventPage, loadEventsPage, loadSnapshotAndRisk]);
+
+  const refreshPaperTradeSurfaces = useCallback(async (): Promise<boolean> => {
+    setPaperTradeRefreshing(true);
+    try {
+      const results = await Promise.allSettled([
+        loadAccounts(),
+        loadSnapshotAndRisk(),
+        loadEventsPage(1, 'trade'),
+      ]);
+      const fullyRefreshed = results.every((result) => (
+        result.status === 'fulfilled' && result.value
+      ));
+      if (!fullyRefreshed) {
+        setPaperTradeRefreshWarning(text.paperTradeRefreshWarning);
+        return false;
+      }
+      setPaperTradeRefreshWarning(null);
+      setEventType('trade');
+      setEventPage(1);
+      setPortfolioSignalsRefreshKey((current) => current + 1);
+      return true;
+    } finally {
+      setPaperTradeRefreshing(false);
+    }
+  }, [
+    loadAccounts,
+    loadEventsPage,
+    loadSnapshotAndRisk,
+    text.paperTradeRefreshWarning,
+  ]);
 
   useEffect(() => {
     void loadAccounts();
@@ -584,6 +649,13 @@ const PortfolioPage: React.FC = () => {
     }
   }, [writeBlocked]);
 
+  useEffect(() => {
+    if (!isPaperAccountSelected && !paperTradeSubmitting) {
+      setPaperTradeModalOpen(false);
+      setPaperTradeError(null);
+    }
+  }, [isPaperAccountSelected, paperTradeSubmitting]);
+
   const positionRows: FlatPosition[] = useMemo(() => {
     if (!snapshot) return [];
     const rows: FlatPosition[] = [];
@@ -593,12 +665,13 @@ const PortfolioPage: React.FC = () => {
           ...position,
           accountId: account.accountId,
           accountName: account.accountName,
+          accountType: accounts.find((item) => item.id === account.accountId)?.accountType ?? 'real',
         });
       }
     }
     rows.sort((a, b) => Number(b.marketValueBase || 0) - Number(a.marketValueBase || 0));
     return rows;
-  }, [snapshot]);
+  }, [accounts, snapshot]);
 
   const snapshotMatchesAccountScope = useMemo(() => {
     if (!snapshot) return false;
@@ -699,7 +772,7 @@ const PortfolioPage: React.FC = () => {
     try {
       const task = await portfolioApi.analyzePosition(row.symbol, {
         accountId: row.accountId,
-        analysisPhase: 'auto',
+        analysisPhase: positionAnalysisPhase,
         force: false,
       });
       setPositionAnalysisMessage(formatUiText(text.analysisSubmitted, { symbol: row.symbol, taskId: task.taskId }));
@@ -788,6 +861,100 @@ const PortfolioPage: React.FC = () => {
     setTradeModalOpen(false);
     setTradeSubmitting(false);
     await refreshPortfolioData();
+  };
+
+  const handlePaperTradeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!writableAccountId || !isPaperAccountSelected) {
+      setPaperTradeError(createParsedApiError({
+        title: text.paperTradeFailed,
+        message: text.paperAccountRequired,
+        code: 'paper_account_required',
+      }));
+      return;
+    }
+    if (!paperTradeForm.symbol.trim()) {
+      document.getElementById('portfolio-paper-trade-symbol')?.focus();
+      return;
+    }
+    if (!Number.isFinite(Number(paperTradeForm.quantity)) || Number(paperTradeForm.quantity) <= 0) {
+      document.getElementById('portfolio-paper-trade-quantity')?.focus();
+      return;
+    }
+    const requestedPrice = paperTradeForm.price.trim();
+    if (
+      requestedPrice
+      && (!Number.isFinite(Number(requestedPrice)) || Number(requestedPrice) <= 0)
+    ) {
+      document.getElementById('portfolio-paper-trade-price')?.focus();
+      return;
+    }
+    if (paperTradeSubmitting) return;
+
+    const requestPayload = {
+      symbol: paperTradeForm.symbol.trim(),
+      tradeDate: paperTradeForm.tradeDate,
+      side: paperTradeForm.side,
+      quantity: Number(paperTradeForm.quantity),
+      price: requestedPrice ? Number(requestedPrice) : undefined,
+      note: paperTradeForm.note.trim() || undefined,
+    };
+    const attempt = resolveOperationAttempt(
+      paperTradeOperationRef.current,
+      JSON.stringify(requestPayload),
+      'portfolio-paper-trade',
+    );
+    paperTradeOperationRef.current = attempt;
+    setPaperTradeSubmitting(true);
+    setPaperTradeError(null);
+    setPaperTradeSuccess(null);
+    setWriteWarning(null);
+
+    let result: PaperTradeCreatedResponse;
+    try {
+      result = await portfolioApi.createPaperTrade(writableAccountId, {
+        ...requestPayload,
+        operationId: attempt.operationId,
+      });
+    } catch (err) {
+      const parsed = getParsedApiError(err, language);
+      const message = parsed.code === 'paper_account_required'
+        ? text.paperAccountRequired
+        : parsed.code === 'insufficient_cash'
+          ? text.paperInsufficientCash
+          : parsed.code === 'quote_unavailable'
+            ? text.paperQuoteUnavailable
+            : null;
+      setPaperTradeError(message
+        ? { ...parsed, title: text.paperTradeFailed, message }
+        : parsed);
+      setPaperTradeSubmitting(false);
+      return;
+    }
+
+    paperTradeOperationRef.current = null;
+    setPaperTradeSubmitting(false);
+    const priceSource = result.priceSource === 'latest_close'
+      ? text.paperLatestClose
+      : result.priceSource === 'manual'
+        ? text.paperEnteredPrice
+        : result.priceSource;
+    setPaperTradeSuccess(formatUiText(text.paperTradeRecorded, {
+      side: paperTradeForm.side === 'buy' ? text.buy : text.sell,
+      symbol: requestPayload.symbol,
+      quantity: requestPayload.quantity,
+      price: result.price,
+      source: priceSource,
+    }));
+    setPaperTradeForm((current) => ({
+      ...current,
+      symbol: '',
+      quantity: '',
+      price: '',
+      note: '',
+    }));
+    setPaperTradeModalOpen(false);
+    await refreshPaperTradeSurfaces();
   };
 
   const handleCashSubmit = async (e: React.FormEvent) => {
@@ -1042,6 +1209,7 @@ const PortfolioPage: React.FC = () => {
         broker: accountForm.broker.trim() || undefined,
         market: accountForm.market,
         baseCurrency: accountForm.baseCurrency.trim() || 'CNY',
+        accountType: accountForm.accountType,
       });
       await loadAccounts();
       setSelectedAccount(created.id, true);
@@ -1052,6 +1220,7 @@ const PortfolioPage: React.FC = () => {
         broker: 'Demo',
         market: accountForm.market,
         baseCurrency: accountForm.baseCurrency,
+        accountType: 'real',
       });
       setAccountCreateSuccess(text.accountCreated);
     } catch (err) {
@@ -1069,6 +1238,7 @@ const PortfolioPage: React.FC = () => {
       broker: account.broker ?? '',
       market: account.market,
       baseCurrency: account.baseCurrency,
+      accountType: account.accountType ?? 'real',
     });
     setAccountCreateError(null);
     setAccountCreateSuccess(null);
@@ -1232,7 +1402,14 @@ const PortfolioPage: React.FC = () => {
     {
       id: 'account',
       header: text.account,
-      cell: (row) => <span className="text-secondary">{row.accountName}</span>,
+      cell: (row) => (
+        <span className="flex flex-wrap items-center gap-1.5 text-secondary">
+          <span>{row.accountName}</span>
+          {row.accountType === 'paper' ? (
+            <Badge variant="info">{text.paperAccount}</Badge>
+          ) : null}
+        </span>
+      ),
     },
     {
       id: 'code',
@@ -1365,6 +1542,9 @@ const PortfolioPage: React.FC = () => {
             >
               <BriefcaseBusiness className="h-4 w-4" aria-hidden="true" />
               <span>{t('layout.nav.portfolio')}</span>
+              {isPaperAccountSelected ? (
+                <Badge variant="info">{text.paperAccount}</Badge>
+              ) : null}
             </div>
           )}
         />
@@ -1377,6 +1557,33 @@ const PortfolioPage: React.FC = () => {
       ) : null}
       {accountCreateSuccess ? (
         <InlineAlert variant="success" size="compact" message={accountCreateSuccess} />
+      ) : null}
+      {paperTradeSuccess ? (
+        <InlineAlert
+          variant="success"
+          size="compact"
+          title={text.paperTradeSuccessTitle}
+          message={paperTradeSuccess}
+        />
+      ) : null}
+      {paperTradeRefreshWarning ? (
+        <InlineAlert
+          variant="warning"
+          title={text.paperTradeRefreshWarningTitle}
+          message={paperTradeRefreshWarning}
+          action={(
+            <Button
+              type="button"
+              variant="secondary"
+              size="compact"
+              onClick={() => void refreshPaperTradeSurfaces()}
+              isLoading={paperTradeRefreshing}
+              loadingText={text.refreshing}
+            >
+              {text.retryPaperTradeRefresh}
+            </Button>
+          )}
+        />
       ) : null}
       {unavailableAccountId !== null ? (
         <InlineAlert
@@ -1461,6 +1668,37 @@ const PortfolioPage: React.FC = () => {
                 { value: 'tw', label: text.marketTw },
               ]}
             />
+            {editingAccountId == null ? (
+              <div className="md:col-span-2">
+                <Select
+                  label={text.accountType}
+                  value={accountForm.accountType}
+                  onChange={(value) => setAccountForm((prev) => ({
+                    ...prev,
+                    accountType: value as PortfolioAccountType,
+                  }))}
+                  options={[
+                    { value: 'real', label: text.realAccount },
+                    { value: 'paper', label: text.paperAccount },
+                  ]}
+                  className="w-full"
+                  triggerClassName="w-full"
+                />
+                <p className="mt-1.5 text-xs text-secondary-text">
+                  {accountForm.accountType === 'paper'
+                    ? text.paperAccountCreateHint
+                    : text.realAccountCreateHint}
+                </p>
+              </div>
+            ) : (
+              <div className="md:col-span-2">
+                <p className="mb-1.5 text-xs font-medium text-secondary-text">{text.accountType}</p>
+                <Badge variant={accountForm.accountType === 'paper' ? 'info' : 'default'}>
+                  {accountForm.accountType === 'paper' ? text.paperAccount : text.realAccount}
+                </Badge>
+                <p className="mt-1.5 text-xs text-secondary-text">{text.accountTypeLocked}</p>
+              </div>
+            )}
             <Button
               type="submit"
               variant="secondary"
@@ -1486,6 +1724,13 @@ const PortfolioPage: React.FC = () => {
               variant="primary"
               onClick={() => {
                 setEditingAccountId(null);
+                setAccountForm({
+                  name: '',
+                  broker: 'Demo',
+                  market: accountForm.market,
+                  baseCurrency: accountForm.baseCurrency,
+                  accountType: 'real',
+                });
                 setShowCreateAccount(true);
                 setAccountCreateError(null);
                 setAccountCreateSuccess(null);
@@ -1515,9 +1760,17 @@ const PortfolioPage: React.FC = () => {
                   label={text.accountView}
                   value={String(selectedAccount)}
                   onChange={(value) => setSelectedAccount(value === 'all' ? 'all' : Number(value))}
+                  disabled={paperTradeSubmitting || paperTradeRefreshing}
                   options={[
                     { value: 'all', label: text.allAccounts },
-                    ...accounts.map((account) => ({ value: String(account.id), label: `${account.name} (#${account.id})` })),
+                    ...accounts.map((account) => ({
+                      value: String(account.id),
+                      label: `${account.name} (#${account.id})${
+                        (account.accountType ?? 'real') === 'paper'
+                          ? ` · ${text.paperAccount}`
+                          : ''
+                      }`,
+                    })),
                   ]}
                 />
                 <Select
@@ -1537,7 +1790,13 @@ const PortfolioPage: React.FC = () => {
                     className="whitespace-nowrap"
                     onClick={() => {
                       setEditingAccountId(null);
-                      setAccountForm({ name: '', broker: 'Demo', market: accountForm.market, baseCurrency: accountForm.baseCurrency });
+                      setAccountForm({
+                        name: '',
+                        broker: 'Demo',
+                        market: accountForm.market,
+                        baseCurrency: accountForm.baseCurrency,
+                        accountType: 'real',
+                      });
                       setShowCreateAccount(true);
                       setAccountCreateError(null);
                       setAccountCreateSuccess(null);
@@ -1663,9 +1922,22 @@ const PortfolioPage: React.FC = () => {
 
       <section className="grid grid-cols-1 gap-3">
         <Card padding="md">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-foreground">{text.positionsTitle}</h2>
-            <span className="text-xs text-secondary">{formatUiText(text.countItems, { count: positionRows.length })}</span>
+          <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">{text.positionsTitle}</h2>
+              <span className="mt-1 block text-xs text-secondary">
+                {formatUiText(text.countItems, { count: positionRows.length })}
+              </span>
+            </div>
+            <AnalysisPhaseSelect
+              id="portfolio-analysis-phase"
+              value={positionAnalysisPhase}
+              onChange={setPositionAnalysisPhase}
+              label={t('analysis.phase')}
+              hint={t('analysis.phaseHint')}
+              disabled={positionAnalysisLoadingKey !== null}
+              className="w-full sm:w-64"
+            />
           </div>
           {portfolioSignalsWarning ? (
             <InlineAlert
@@ -1760,7 +2032,23 @@ const PortfolioPage: React.FC = () => {
       </section>
 
       <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="secondary" size="comfortable" onClick={() => setTradeModalOpen(true)} disabled={!writableAccountId}>{text.enterTrade}</Button>
+        {isPaperAccountSelected ? (
+          <Button
+            type="button"
+            variant="primary"
+            size="comfortable"
+            onClick={() => {
+              setPaperTradeError(null);
+              setPaperTradeSuccess(null);
+              setPaperTradeModalOpen(true);
+            }}
+            disabled={!writableAccountId || paperTradeSubmitting || paperTradeRefreshing}
+          >
+            {text.enterPaperTrade}
+          </Button>
+        ) : (
+          <Button type="button" variant="secondary" size="comfortable" onClick={() => setTradeModalOpen(true)} disabled={!writableAccountId}>{text.enterTrade}</Button>
+        )}
         <Button type="button" variant="secondary" size="comfortable" onClick={() => setCashModalOpen(true)} disabled={!writableAccountId}>{text.enterCash}</Button>
         <Button type="button" variant="secondary" size="comfortable" onClick={() => setCorpModalOpen(true)} disabled={!writableAccountId}>{text.enterCorporate}</Button>
         <Button type="button" variant="secondary" size="comfortable" className="text-xs" onClick={() => setCsvModalOpen(true)}>{text.csvImport}</Button>
@@ -1820,6 +2108,120 @@ const PortfolioPage: React.FC = () => {
             </div>
             </fieldset>
           </form>
+      </Modal>
+
+      <Modal
+        isOpen={paperTradeModalOpen}
+        closeDisabled={paperTradeSubmitting}
+        onClose={() => {
+          setPaperTradeError(null);
+          setPaperTradeModalOpen(false);
+        }}
+        title={text.enterPaperTrade}
+      >
+        <form onSubmit={handlePaperTradeSubmit} aria-busy={paperTradeSubmitting}>
+          <fieldset disabled={paperTradeSubmitting} className="m-0 min-w-0 space-y-2 border-0 p-0">
+            <InlineAlert
+              variant="info"
+              size="compact"
+              title={text.paperAccount}
+              message={text.paperTradeSimulationHint}
+            />
+            <Input
+              id="portfolio-paper-trade-symbol"
+              label={text.stockCode}
+              placeholder={text.stockExample}
+              value={paperTradeForm.symbol}
+              onChange={(event) => setPaperTradeForm((current) => ({
+                ...current,
+                symbol: event.target.value,
+              }))}
+              required
+            />
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <DatePicker
+                label={text.tradeDate}
+                value={paperTradeForm.tradeDate}
+                onChange={(tradeDate) => setPaperTradeForm((current) => ({
+                  ...current,
+                  tradeDate,
+                }))}
+                required
+                className="w-full"
+                triggerClassName={PORTFOLIO_DATE_TRIGGER_CLASS}
+              />
+              <Select
+                label={text.side}
+                value={paperTradeForm.side}
+                disabled={paperTradeSubmitting}
+                onChange={(value) => setPaperTradeForm((current) => ({
+                  ...current,
+                  side: value as PortfolioSide,
+                }))}
+                options={[
+                  { value: 'buy', label: text.buy },
+                  { value: 'sell', label: text.sell },
+                ]}
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <Input
+                id="portfolio-paper-trade-quantity"
+                label={text.quantity}
+                type="number"
+                min="0.0001"
+                step="0.0001"
+                placeholder={text.required}
+                value={paperTradeForm.quantity}
+                onChange={(event) => setPaperTradeForm((current) => ({
+                  ...current,
+                  quantity: event.target.value,
+                }))}
+                required
+              />
+              <Input
+                id="portfolio-paper-trade-price"
+                label={text.tradePrice}
+                type="number"
+                min="0.0001"
+                step="0.0001"
+                placeholder={text.optional}
+                value={paperTradeForm.price}
+                onChange={(event) => setPaperTradeForm((current) => ({
+                  ...current,
+                  price: event.target.value,
+                }))}
+              />
+            </div>
+            <p className="text-xs text-secondary-text">{text.paperPriceHint}</p>
+            <Input
+              label={text.note}
+              placeholder={text.optional}
+              maxLength={255}
+              value={paperTradeForm.note}
+              onChange={(event) => setPaperTradeForm((current) => ({
+                ...current,
+                note: event.target.value,
+              }))}
+            />
+            {paperTradeError ? (
+              <ApiErrorAlert
+                error={paperTradeError}
+                onDismiss={() => setPaperTradeError(null)}
+              />
+            ) : null}
+            <Button
+              type="submit"
+              variant="primary"
+              size="comfortable"
+              disabled={!isPaperAccountSelected}
+              isLoading={paperTradeSubmitting}
+              loadingText={text.submitting}
+            >
+              {text.enterPaperTrade}
+            </Button>
+          </fieldset>
+        </form>
       </Modal>
 
       <Modal isOpen={cashModalOpen} closeDisabled={cashSubmitting} onClose={() => { setCashError(null); setCashModalOpen(false); }} title={text.manualCash}>
