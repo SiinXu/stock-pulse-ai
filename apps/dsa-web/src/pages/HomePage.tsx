@@ -371,7 +371,7 @@ const HomePage: React.FC = () => {
             >
               <RefreshCw aria-hidden="true" />
             </IconButton>
-            <Button variant="primary" size="comfortable" onClick={() => navigate(analysisHref)}>
+            <Button variant="primary" size="primary" onClick={() => navigate(analysisHref)}>
               <PlayCircle aria-hidden="true" />
               {t('home.startAnalysisTitle')}
             </Button>
@@ -431,7 +431,7 @@ const HomePage: React.FC = () => {
         <Section
           title={t('home.todayFocus')}
           description={t('home.todayFocusDescription')}
-          level="canvas"
+          level="interactive"
           padding="md"
           actions={<Activity className="h-5 w-5 text-primary" aria-hidden="true" />}
         >

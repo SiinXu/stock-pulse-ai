@@ -66,6 +66,12 @@ describe('ThemeToggle', () => {
   });
 
   it('uses the compact neutral Select presentation when requested', () => {
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function mockRect(this: HTMLElement) {
+      if (this.getAttribute('role') === 'combobox') {
+        return new DOMRect(100, 200, 160, 44);
+      }
+      return new DOMRect(0, 0, 180, 117);
+    });
     render(
       <ThemeProvider>
         <ThemeToggle menuLayout="select" />
@@ -79,9 +85,11 @@ describe('ThemeToggle', () => {
     expect(screen.queryByRole('menu', { name: '主题模式' })).not.toBeInTheDocument();
     const options = screen.getAllByRole('option');
     expect(options).toHaveLength(3);
+    expect(screen.getByRole('listbox')).toHaveStyle({ left: '264px', top: '200px' });
     options.forEach((option) => {
       expect(option).toHaveClass('text-xs');
       expect(option).not.toHaveClass('bg-primary/10', 'text-primary');
     });
+    rectSpy.mockRestore();
   });
 });

@@ -51,6 +51,7 @@ UI may show casual samples. Prefer research-oriented phrasing:
 | Notify | Push to a channel | Needs a working channel in Settings |
 | Watchlist add/remove | Sync watchlist | Same list as Settings |
 | Strategy expand | Choose a Skill | Beginners can skip |
+| Deep-research stock field | Scope a research question to a symbol | Supports code/name suggestions |
 | Generate analysis | Heavier path | Costs more; use deliberately |
 | Thinking / reasoning pane | Intermediate traces | Reference only |
 | Context compression | Save tokens on long chats | Check unsaved state after edits |

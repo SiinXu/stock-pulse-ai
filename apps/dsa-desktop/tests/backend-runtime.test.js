@@ -10,6 +10,7 @@ const { TextDecoder } = require('node:util');
 const {
   createBackendRuntime,
 } = require('../backend-runtime');
+const desktopEnv = require('../desktop-env');
 
 const MODEL_PACK_ATTESTATION_ENV = 'STOCKPULSE_DESKTOP_MODEL_PACK_ATTESTATION_KEY';
 const MODEL_PACK_ATTESTATION_KEY = 'a'.repeat(64);
@@ -60,6 +61,26 @@ function makeRuntime(options = {}) {
   });
   return { runtime, unavailableSnapshots, logs };
 }
+
+test('shared Desktop env mechanics stay outside the backend lifecycle owner', () => {
+  const { runtime } = makeRuntime();
+  const sharedNames = [
+    'extendMacDesktopBackendPath',
+    'hasOwnValue',
+    'normalizeBackendHost',
+    'readEnvFileValue',
+    'readEnvFileValues',
+  ];
+
+  for (const name of sharedNames) {
+    assert.equal(typeof desktopEnv[name], 'function');
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(runtime, name),
+      false,
+      `${name} must not be owned by the backend lifecycle runtime`
+    );
+  }
+});
 
 test('waitUntilHealthy resolves one successful probe and preserves the current generation', async () => {
   const child = makeChild(1001);

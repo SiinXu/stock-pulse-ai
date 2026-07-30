@@ -85,7 +85,7 @@ describe('SystemConfigRollbackCard', () => {
 
     expect(await screen.findByText('服务器配置已更新，请刷新后重新应用本次修改。')).toBeInTheDocument();
     expect(rollback).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole('button', { name: '载入最新配置' }));
+    fireEvent.click(await screen.findByRole('button', { name: '载入最新配置' }));
     await waitFor(() => expect(onReloadLatest).toHaveBeenCalledTimes(1));
     expect(rollback).toHaveBeenCalledTimes(1);
   });

@@ -230,7 +230,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
             message={t('settings.schedulerDualTrackWarning')}
           />
         ) : null}
-        <div className="grid grid-cols-1 gap-3">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2 xl:items-start">
           <Surface level="interactive" className="space-y-4 px-4 py-4">
             <div className="flex min-h-11 items-center justify-between gap-3">
               <div>
@@ -346,7 +346,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                 {t('settings.schedulerStatusScopeNote')}
               </p>
             </div>
-            <dl className="grid grid-cols-1 gap-2 text-xs">
+            <dl className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
               <Surface as="div" level="interactive" className="px-3 py-2">
                 <dt className="text-muted-text">{t('settings.schedulerEffectiveTimes')}</dt>
                 <dd className="mt-1 font-medium text-foreground">{effectiveStatusTimes.join(', ') || '-'}</dd>

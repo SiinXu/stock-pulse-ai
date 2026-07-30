@@ -372,7 +372,9 @@ never a credential or masked value. Settings field rows reserve one 240px
 desktop control column, and every shared field control fills that same column;
 `Input` and `Select` use the same control height. The sidebar profile consumes
 `ThemeToggle`'s opt-in compact `Select` presentation so theme and language
-choices use the same neutral option geometry. Standalone ThemeToggle consumers
+choices use the same neutral option geometry. On desktop, both Profile menus
+open to the right of their field; shared popup collision handling keeps them
+inside the viewport and caps long option lists. Standalone ThemeToggle consumers
 retain the default vertical menu.
 
 `RouteFocusCoordinator` is mounted once inside the data Router. A page may
@@ -413,17 +415,17 @@ application navigation descriptor exposes five stable primary domains: Home,
 Research, Portfolio, Agent, and Settings. Home temporarily owns one Signal
 Center child until the global notification entry replaces it, while Research
 owns a dedicated overview plus Market Review, Discover, Analysis Workbench, and
-Backtest. In expanded desktop navigation and the mobile drawer, the full
-Research row expands or collapses the child navigation without changing the
-route; Research Overview is the first child and navigates to `/research`.
-Compact navigation keeps Research as a menu trigger and presents Research
-Overview as the first item in the right-side hover or keyboard flyout, followed by the four tools;
-Right Arrow enters the flyout and Left Arrow or Escape restores its trigger.
-On `/research`, the expanded or compact Research Overview item is the current
-page. On a child route, the visible active child is the sole
-`aria-current="page"` link, while the Research branch retains visual
-active-section treatment. Market Review remains a distinct page at
-`/research/market`.
+Backtest. In expanded desktop navigation and the mobile drawer, the Research
+parent row navigates to `/research`; a separate trailing control expands or
+collapses the four tool links without adding a duplicate Research Overview
+child. Compact navigation keeps Research as a menu trigger and presents
+Research Overview as the first item in the right-side hover or keyboard flyout,
+followed by the four tools; Right Arrow enters the flyout and Left Arrow or
+Escape restores its trigger. On `/research`, the expanded or mobile Research
+parent link and the compact Research Overview item identify the current page.
+On a child route, the visible active child is the sole `aria-current="page"`
+link, while the Research branch retains visual active-section treatment.
+Market Review remains a distinct page at `/research/market`.
 
 Canonical Research paths are `/research`, `/research/market`,
 `/research/discover`, `/research/analysis`, and `/research/backtest`. Analysis

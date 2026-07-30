@@ -30,7 +30,7 @@ export interface SelectProps {
   triggerClassName?: string;
   error?: boolean;
   menuAlign?: 'start' | 'end';
-  menuPlacement?: 'auto' | 'bottom' | 'top';
+  menuPlacement?: 'auto' | 'bottom' | 'top' | 'right';
   size?: SelectSize;
 }
 
@@ -109,6 +109,12 @@ export const Select: React.FC<SelectProps> = ({
     placement: menuPlacement,
     align: menuAlign,
   });
+  const listboxStyle = popupStyle && typeof popupStyle.maxHeight === 'number'
+    ? {
+        ...popupStyle,
+        maxHeight: `min(15rem, ${popupStyle.maxHeight}px)`,
+      }
+    : popupStyle;
 
   const openList = useCallback(() => {
     setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0);
@@ -235,7 +241,7 @@ export const Select: React.FC<SelectProps> = ({
             aria-labelledby={label ? resolvedId : undefined}
             aria-label={!label ? ariaLabel : undefined}
             data-dialog-popup="true"
-            style={popupStyle}
+            style={listboxStyle}
             className="fixed max-h-60 w-max overflow-auto rounded-xl border border-border bg-elevated p-1 shadow-lg"
           >
             {options.map((option, index) => (
