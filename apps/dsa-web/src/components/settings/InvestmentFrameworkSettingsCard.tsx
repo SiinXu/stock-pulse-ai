@@ -71,6 +71,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
   const [loadError, setLoadError] = useState<ParsedApiError | null>(null);
   const [error, setError] = useState<ParsedApiError | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isConflict, setIsConflict] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
   const [serverValidationIssues, setServerValidationIssues] = useState<
     InvestmentFrameworkValidationIssue[]
@@ -95,6 +96,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
         setChangeSummary('');
         setShowValidation(false);
       }
+      setIsConflict(false);
       return true;
     } catch (err) {
       const parsed = getParsedApiError(err);
@@ -106,6 +108,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
           setChangeSummary('');
           setShowValidation(false);
         }
+        setIsConflict(false);
         return true;
       }
       setLoadError(parsed);
@@ -264,6 +267,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
         setSuccessMessage(t('settings.frameworkSaved'));
       }
       setShowValidation(false);
+      setIsConflict(false);
       if (isHistoryOpen) {
         await loadHistory(!exists);
       }
@@ -276,12 +280,10 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
         setShowValidation(true);
       }
       setError(parsed);
-      if (
+      setIsConflict(
         parsed.status === 409
-        || parsed.code === 'investment_framework_revision_conflict'
-      ) {
-        await load(true);
-      }
+        || parsed.code === 'investment_framework_revision_conflict',
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -305,12 +307,10 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
     } catch (err) {
       const parsed = getParsedApiError(err);
       setError(parsed);
-      if (
+      setIsConflict(
         parsed.status === 409
-        || parsed.code === 'investment_framework_revision_conflict'
-      ) {
-        await load(true);
-      }
+        || parsed.code === 'investment_framework_revision_conflict',
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -586,7 +586,16 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                 />
               ) : null}
               {error ? (
-                <ApiErrorAlert error={error} />
+                <ApiErrorAlert
+                  error={error}
+                  actionLabel={isConflict ? t('settings.frameworkLoadLatest') : undefined}
+                  onAction={isConflict ? () => void load(true) : undefined}
+                />
+              ) : null}
+              {isConflict ? (
+                <p className="text-xs leading-5 text-secondary-text">
+                  {t('settings.frameworkConflictDraftPreserved')}
+                </p>
               ) : null}
               {successMessage ? (
                 <SettingsAlert

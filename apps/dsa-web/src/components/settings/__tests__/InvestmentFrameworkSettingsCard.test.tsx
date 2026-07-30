@@ -193,7 +193,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
     expect(await screen.findByText('已保存为新版本并激活')).toBeInTheDocument();
   });
 
-  it('does not expose a stale draft when conflict refresh fails', async () => {
+  it('preserves a stale draft on conflict until the user explicitly loads latest', async () => {
     const existingFramework = {
       frameworkId: 1,
       scope: 'local',
@@ -213,18 +213,15 @@ describe('InvestmentFrameworkSettingsCard', () => {
     };
     getFramework
       .mockResolvedValueOnce(existingFramework)
-      .mockRejectedValueOnce(
-        createApiError(
-          createParsedApiError({
-            title: '框架加载失败',
-            message: '暂时无法读取个人投资框架。',
-            rawMessage: 'framework unavailable',
-            status: 500,
-            category: 'http_error',
-            code: 'framework_load_failed',
-          }),
-        ),
-      );
+      .mockResolvedValueOnce({
+        ...existingFramework,
+        version: 3,
+        revision: 4,
+        content: {
+          ...existingFramework.content,
+          freeFormRules: 'Latest server rules',
+        },
+      });
     updateFramework.mockRejectedValue(
       createApiError(
         createParsedApiError({
@@ -246,10 +243,14 @@ describe('InvestmentFrameworkSettingsCard', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
 
+    expect(await screen.findByText('配置已被其他操作更新。')).toBeInTheDocument();
+    expect(getFramework).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText('自由规则')).toHaveValue('My pending conflict draft');
+    expect(screen.getByText(/当前草稿仍被保留/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '载入服务器最新版本' }));
     await waitFor(() => expect(getFramework).toHaveBeenCalledTimes(2));
-    expect(await screen.findByText('暂时无法读取个人投资框架。')).toBeInTheDocument();
-    expect(screen.queryByLabelText('框架名称')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument();
+    expect(screen.getByLabelText('自由规则')).toHaveValue('Latest server rules');
   });
 
   it('preserves evaluation dimensions the minimal editor does not own', async () => {

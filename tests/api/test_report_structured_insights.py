@@ -6,6 +6,15 @@ from api.v1.schemas.report_structured_insights import (
     REPORT_STRUCTURED_INSIGHTS_SCHEMA_VERSION,
     project_report_structured_insights_for_api,
 )
+from src.schemas.report_structured_insights import (
+    REPORT_STRUCTURED_INSIGHTS_SCHEMA_VERSION as LEGACY_SCHEMA_VERSION,
+    project_report_structured_insights_for_api as legacy_project_for_api,
+)
+
+
+def test_legacy_bf_marker_reexports_the_authoritative_projection() -> None:
+    assert LEGACY_SCHEMA_VERSION == REPORT_STRUCTURED_INSIGHTS_SCHEMA_VERSION
+    assert legacy_project_for_api is project_report_structured_insights_for_api
 
 
 def test_projects_complete_dashboard_payload() -> None:
