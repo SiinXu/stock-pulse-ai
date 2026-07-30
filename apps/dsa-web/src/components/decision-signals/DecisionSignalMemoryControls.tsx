@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { decisionSignalsApi } from '../../api/decisionSignals';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { DECISION_SIGNAL_WORKSTREAM_TEXT } from '../../locales/decisionSignals';
 import type {
   DecisionSignalMemoryFlagItem,
   DecisionSignalMemoryFlagUpdateRequest,
@@ -15,6 +16,7 @@ import {
   Badge,
   InlineAlert,
   Section,
+  Spinner,
   Switch,
 } from '../common';
 
@@ -24,17 +26,25 @@ export interface DecisionSignalMemoryControlsProps {
 
 type MemoryFlagKey = keyof Pick<DecisionSignalMemoryFlagItem, 'memorable' | 'ignored'>;
 
+interface FailedMemorySave {
+  signalId: number;
+  payload: DecisionSignalMemoryFlagUpdateRequest;
+}
+
 export const DecisionSignalMemoryControls: React.FC<DecisionSignalMemoryControlsProps> = ({
   signalId,
 }) => {
-  const { t } = useUiLanguage();
+  const { language, t } = useUiLanguage();
+  const text = DECISION_SIGNAL_WORKSTREAM_TEXT[language];
   const [flags, setFlags] = useState<DecisionSignalMemoryFlagItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<ParsedApiError | null>(null);
   const [errorKind, setErrorKind] = useState<'load' | 'save'>('load');
+  const [failedSave, setFailedSave] = useState<FailedMemorySave | null>(null);
   const operationEpochRef = useRef(0);
   const saveInFlightRef = useRef(false);
+  const currentFlags = flags?.signalId === signalId ? flags : null;
 
   const loadFlags = useCallback(async () => {
     const epoch = operationEpochRef.current + 1;
@@ -44,9 +54,13 @@ export const DecisionSignalMemoryControls: React.FC<DecisionSignalMemoryControls
     setSaving(false);
     setError(null);
     setErrorKind('load');
+    setFailedSave(null);
     try {
       const response = await decisionSignalsApi.getMemoryFlag(signalId);
       if (operationEpochRef.current !== epoch) return;
+      if (response.signalId !== signalId) {
+        throw new Error('Decision-memory response signal ID mismatch');
+      }
       setFlags(response);
     } catch (requestError) {
       if (operationEpochRef.current !== epoch) return;
@@ -59,6 +73,7 @@ export const DecisionSignalMemoryControls: React.FC<DecisionSignalMemoryControls
 
   useEffect(() => {
     setFlags(null);
+    setFailedSave(null);
     void loadFlags();
     return () => {
       operationEpochRef.current += 1;
@@ -66,103 +81,134 @@ export const DecisionSignalMemoryControls: React.FC<DecisionSignalMemoryControls
     };
   }, [loadFlags]);
 
-  const updateFlag = useCallback(async (key: MemoryFlagKey, nextValue: boolean) => {
-    if (!flags || loading || saveInFlightRef.current) return;
+  const saveFlags = useCallback(async (
+    targetSignalId: number,
+    payload: DecisionSignalMemoryFlagUpdateRequest,
+  ) => {
+    if (targetSignalId !== signalId || saveInFlightRef.current) return;
     const epoch = operationEpochRef.current;
-    const payload: DecisionSignalMemoryFlagUpdateRequest = key === 'memorable'
-      ? { memorable: nextValue }
-      : { ignored: nextValue };
     saveInFlightRef.current = true;
     setSaving(true);
     setError(null);
     setErrorKind('save');
+    setFailedSave(null);
     try {
-      const response = await decisionSignalsApi.updateMemoryFlag(signalId, payload);
+      const response = await decisionSignalsApi.updateMemoryFlag(targetSignalId, payload);
       if (operationEpochRef.current !== epoch) return;
+      if (response.signalId !== targetSignalId) {
+        throw new Error('Decision-memory response signal ID mismatch');
+      }
       setFlags(response);
     } catch (requestError) {
       if (operationEpochRef.current !== epoch) return;
       setError(getParsedApiError(requestError));
+      setFailedSave({ signalId: targetSignalId, payload });
     } finally {
       if (operationEpochRef.current === epoch) {
         saveInFlightRef.current = false;
         setSaving(false);
       }
     }
-  }, [flags, loading, signalId]);
+  }, [signalId]);
 
-  const controlsDisabled = loading || saving || flags === null;
+  const updateFlag = useCallback((key: MemoryFlagKey, nextValue: boolean) => {
+    if (!currentFlags || loading || saveInFlightRef.current) return;
+    const payload: DecisionSignalMemoryFlagUpdateRequest = key === 'memorable'
+      ? { memorable: nextValue }
+      : { ignored: nextValue };
+    void saveFlags(signalId, payload);
+  }, [currentFlags, loading, saveFlags, signalId]);
+
+  const retryFailedSave = useCallback(() => {
+    if (!failedSave || failedSave.signalId !== signalId) return;
+    void saveFlags(failedSave.signalId, failedSave.payload);
+  }, [failedSave, saveFlags, signalId]);
+
+  const controlsDisabled = loading || saving || currentFlags === null;
   const errorTitle = errorKind === 'load'
-    ? t('decisionSignals.memoryLoadErrorTitle')
-    : t('decisionSignals.memorySaveErrorTitle');
+    ? text.memoryLoadErrorTitle
+    : text.memorySaveErrorTitle;
+  const canRetrySave = errorKind === 'save' && failedSave?.signalId === signalId;
 
   return (
     <Section
-      title={t('decisionSignals.memoryTitle')}
-      description={t('decisionSignals.memoryDescription')}
+      title={text.memoryTitle}
+      description={text.memoryDescription}
       headingAs="h3"
       level="section"
       padding="sm"
       actions={(
         <div className="flex flex-wrap gap-2">
-          {flags?.memorable ? (
-            <Badge variant="info">{t('decisionSignals.memoryMemorable')}</Badge>
+          {currentFlags?.memorable ? (
+            <Badge variant="info">{text.memoryMemorable}</Badge>
           ) : null}
-          {flags?.ignored ? (
-            <Badge variant="warning">{t('decisionSignals.memoryIgnored')}</Badge>
+          {currentFlags?.ignored ? (
+            <Badge variant="warning">{text.memoryIgnored}</Badge>
           ) : null}
-          {flags && !flags.memorable && !flags.ignored ? (
-            <Badge variant="default">{t('decisionSignals.memoryDefault')}</Badge>
+          {currentFlags && !currentFlags.memorable && !currentFlags.ignored ? (
+            <Badge variant="default">{text.memoryDefault}</Badge>
           ) : null}
         </div>
       )}
     >
       <div className="space-y-3" aria-busy={loading || saving || undefined}>
+        {loading || saving ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex items-center gap-2 text-sm text-secondary-text"
+          >
+            <Spinner size="sm" />
+            <span>
+              {loading ? t('common.loading') : t('decisionSignals.reassessPersisting')}
+            </span>
+          </div>
+        ) : null}
         {error ? (
           <ApiErrorAlert
             error={{ ...error, title: errorTitle }}
             actionLabel={t('common.retry')}
-            onAction={() => void loadFlags()}
+            onAction={canRetrySave ? retryFailedSave : () => void loadFlags()}
           />
         ) : null}
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-elevated/40 px-3 py-3">
             <div>
               <p className="text-sm font-medium text-foreground">
-                {t('decisionSignals.memoryMemorable')}
+                {text.memoryMemorable}
               </p>
               <p className="mt-1 text-xs leading-5 text-secondary-text">
-                {t('decisionSignals.memoryMemorableDescription')}
+                {text.memoryMemorableDescription}
               </p>
             </div>
             <Switch
-              checked={flags?.memorable ?? false}
+              checked={currentFlags?.memorable ?? false}
               disabled={controlsDisabled}
-              aria-label={t('decisionSignals.memoryMemorable')}
+              aria-label={text.memoryMemorable}
               onCheckedChange={(next) => void updateFlag('memorable', next)}
             />
           </div>
           <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-elevated/40 px-3 py-3">
             <div>
               <p className="text-sm font-medium text-foreground">
-                {t('decisionSignals.memoryIgnored')}
+                {text.memoryIgnored}
               </p>
               <p className="mt-1 text-xs leading-5 text-secondary-text">
-                {t('decisionSignals.memoryIgnoredDescription')}
+                {text.memoryIgnoredDescription}
               </p>
             </div>
             <Switch
-              checked={flags?.ignored ?? false}
+              checked={currentFlags?.ignored ?? false}
               disabled={controlsDisabled}
-              aria-label={t('decisionSignals.memoryIgnored')}
+              aria-label={text.memoryIgnored}
               onCheckedChange={(next) => void updateFlag('ignored', next)}
             />
           </div>
         </div>
-        {flags?.memorable && flags.ignored ? (
+        {currentFlags?.memorable && currentFlags.ignored ? (
           <InlineAlert
             variant="warning"
-            message={t('decisionSignals.memoryIgnoredPrecedence')}
+            message={text.memoryIgnoredPrecedence}
           />
         ) : null}
       </div>

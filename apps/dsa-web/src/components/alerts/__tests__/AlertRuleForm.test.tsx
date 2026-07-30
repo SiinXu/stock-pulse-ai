@@ -151,9 +151,59 @@ describe('AlertRuleForm', () => {
     fireEvent.click(screen.getByRole('button', { name: '创建规则' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent(
-      '自定义冷却必须是大于 0 的整数秒数。',
+      '自定义冷却必须是 1 到 31,536,000 的整数秒数。',
     );
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('rejects a custom cooldown above the worker-supported maximum', () => {
+    render(<AlertRuleForm onSubmit={onSubmit} />);
+
+    fireEvent.change(screen.getByLabelText('标的代码'), { target: { value: '600519' } });
+    fireEvent.change(screen.getByLabelText('价格阈值'), { target: { value: '1800' } });
+    chooseOption(screen.getByLabelText('预警冷却'), 'custom');
+    const customCooldown = screen.getByLabelText('自定义冷却（秒）');
+    expect(customCooldown).toHaveAttribute('max', '31536000');
+    fireEvent.change(customCooldown, { target: { value: '31536001' } });
+    fireEvent.click(screen.getByRole('button', { name: '创建规则' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      '自定义冷却必须是 1 到 31,536,000 的整数秒数。',
+    );
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('prefills a legacy boolean policy with the worker-equivalent duration', async () => {
+    const rule = {
+      id: 7,
+      name: '旧名称',
+      targetScope: 'single_symbol',
+      target: '600519',
+      alertType: 'price_cross',
+      parameters: { direction: 'above', price: 1800 },
+      severity: 'warning',
+      enabled: true,
+      source: 'api',
+      cooldownPolicy: {
+        cooldown_seconds: true,
+        server_owned_mode: 'rolling',
+      },
+    } as const;
+
+    render(<AlertRuleForm mode="edit" initialRule={rule} onSubmit={onSubmit} />);
+
+    expect(screen.getByLabelText('预警冷却')).toHaveAttribute('data-value', 'custom');
+    expect(screen.getByLabelText('自定义冷却（秒）')).toHaveValue(1);
+    fireEvent.click(screen.getByRole('button', { name: '更新规则' }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+        cooldownPolicy: {
+          cooldown_seconds: 1,
+          server_owned_mode: 'rolling',
+        },
+      }));
+    });
   });
 
   it('prefills a custom cooldown and preserves unknown policy keys on edit', async () => {

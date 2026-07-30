@@ -17,7 +17,7 @@ import {
   ALERT_TYPE_LABELS,
 } from '../../locales/alerts';
 import type { AlertRuleItem, AlertType, MarketRegion } from '../../types/alerts';
-import { formatUiDateTime } from '../../utils/uiLocale';
+import { formatUiDateTime, formatUiNumber } from '../../utils/uiLocale';
 import { getEffectiveAlertCooldown } from '../../utils/alertCooldown';
 
 export type AlertRuleEnabledFilter = 'all' | 'enabled' | 'disabled';
@@ -76,7 +76,9 @@ function formatCooldownPolicy(rule: AlertRuleItem, language: UiLanguage): string
   const cooldown = getEffectiveAlertCooldown(rule.cooldownPolicy);
   if (cooldown.mode === 'default') return text.cooldownDefaultSummary;
   if (cooldown.mode === 'disabled') return text.cooldownDisabled;
-  return formatUiText(text.cooldownCustomSummary, { seconds: cooldown.seconds });
+  return formatUiText(text.cooldownCustomSummary, {
+    seconds: formatUiNumber(cooldown.seconds, language),
+  });
 }
 
 function formatTarget(rule: AlertRuleItem, language: UiLanguage): string {

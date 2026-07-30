@@ -144,7 +144,7 @@ describe('AlertRuleList', () => {
     expect(screen.getByText('冷却中')).toBeInTheDocument();
     expect(screen.getByText('后端默认 · 24 小时')).toBeInTheDocument();
     expect(screen.getByText('关闭冷却 · 0 秒')).toBeInTheDocument();
-    expect(screen.getByText('自定义 · 3600 秒')).toBeInTheDocument();
+    expect(screen.getByText('自定义 · 3,600 秒')).toBeInTheDocument();
 
     chooseOption(screen.getByLabelText('启停状态'), 'enabled');
     chooseOption(screen.getByLabelText('规则类型'), 'price_cross');

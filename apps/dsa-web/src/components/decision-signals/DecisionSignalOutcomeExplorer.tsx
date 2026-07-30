@@ -7,7 +7,8 @@ import { Activity, RefreshCw } from 'lucide-react';
 import { decisionSignalsApi } from '../../api/decisionSignals';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
-import type { UiTextKey } from '../../i18n/uiText';
+import { formatUiText, type UiTextKey } from '../../i18n/uiText';
+import { DECISION_SIGNAL_WORKSTREAM_TEXT } from '../../locales/decisionSignals';
 import type {
   DecisionSignalHorizon,
   DecisionSignalOutcomeEvalStatus,
@@ -15,6 +16,7 @@ import type {
   DecisionSignalOutcomeListParams,
   DecisionSignalOutcomeValue,
 } from '../../types/decisionSignals';
+import { buildDecisionActionLabelMap } from '../../utils/decisionAction';
 import { getDecisionSignalHorizonLabel } from '../../utils/decisionSignalLabels';
 import { formatUiDateTime, getUiLocale } from '../../utils/uiLocale';
 import {
@@ -95,6 +97,7 @@ export const DecisionSignalOutcomeExplorer: React.FC<DecisionSignalOutcomeExplor
   refreshKey = 0,
 }) => {
   const { language, t } = useUiLanguage();
+  const text = DECISION_SIGNAL_WORKSTREAM_TEXT[language];
   const [filters, setFilters] = useState<OutcomeFilters>(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<OutcomeFilters>(EMPTY_FILTERS);
   const [items, setItems] = useState<DecisionSignalOutcomeItem[]>([]);
@@ -108,6 +111,7 @@ export const DecisionSignalOutcomeExplorer: React.FC<DecisionSignalOutcomeExplor
   const [reloadToken, setReloadToken] = useState(0);
   const requestIdRef = useRef(0);
   const locale = getUiLocale(language);
+  const actionLabels = useMemo(() => buildDecisionActionLabelMap(t), [t]);
 
   const loadOutcomes = useCallback(async () => {
     const requestId = requestIdRef.current + 1;
@@ -141,7 +145,7 @@ export const DecisionSignalOutcomeExplorer: React.FC<DecisionSignalOutcomeExplor
 
   const applyFilters = () => {
     if (filters.signalId.trim() && parseSignalId(filters.signalId) === undefined) {
-      setFilterError(t('decisionSignals.outcomeExplorerInvalidSignalId'));
+      setFilterError(text.outcomeExplorerInvalidSignalId);
       return;
     }
     setFilterError(null);
@@ -174,12 +178,12 @@ export const DecisionSignalOutcomeExplorer: React.FC<DecisionSignalOutcomeExplor
   const columns = useMemo<DataTableColumn<DecisionSignalOutcomeItem>[]>(() => [
     {
       id: 'signal',
-      header: t('decisionSignals.outcomeExplorerSignalId'),
+      header: text.outcomeExplorerSignalId,
       cell: (item) => (
         <div>
           <span className="font-mono text-foreground">#{item.signalId}</span>
           {item.action ? (
-            <div className="mt-1 text-xs text-secondary-text">{item.action}</div>
+            <div className="mt-1 text-xs text-secondary-text">{actionLabels[item.action]}</div>
           ) : null}
         </div>
       ),
@@ -210,12 +214,12 @@ export const DecisionSignalOutcomeExplorer: React.FC<DecisionSignalOutcomeExplor
     },
     {
       id: 'engine',
-      header: t('decisionSignals.outcomeExplorerEngineVersion'),
+      header: text.outcomeExplorerEngineVersion,
       cell: (item) => <span className="font-mono text-xs">{item.engineVersion}</span>,
     },
     {
       id: 'updated',
-      header: t('decisionSignals.outcomeExplorerUpdatedAt'),
+      header: text.outcomeExplorerUpdatedAt,
       cell: (item) => formatUiDateTime(
         item.updatedAt ?? item.createdAt,
         language,
@@ -234,14 +238,14 @@ export const DecisionSignalOutcomeExplorer: React.FC<DecisionSignalOutcomeExplor
           isLoading={openingSignalId === item.signalId}
           loadingText={t('common.loading')}
           disabled={openingSignalId !== null && openingSignalId !== item.signalId}
-          aria-label={t('decisionSignals.outcomeExplorerOpenSignal', { id: item.signalId })}
+          aria-label={formatUiText(text.outcomeExplorerOpenSignal, { id: item.signalId })}
           onClick={() => void handleOpenSignal(item.signalId)}
         >
           {t('common.details')}
         </Button>
       ),
     },
-  ], [handleOpenSignal, language, locale, openingSignalId, t]);
+  ], [actionLabels, handleOpenSignal, language, locale, openingSignalId, t, text]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const activeFilterCount = [
@@ -254,8 +258,8 @@ export const DecisionSignalOutcomeExplorer: React.FC<DecisionSignalOutcomeExplor
 
   return (
     <Card
-      title={t('decisionSignals.outcomeExplorerTitle')}
-      subtitle={t('decisionSignals.outcomeExplorerDescription')}
+      title={text.outcomeExplorerTitle}
+      subtitle={text.outcomeExplorerDescription}
       padding="md"
       variant="bordered"
       headerRight={(
@@ -275,8 +279,8 @@ export const DecisionSignalOutcomeExplorer: React.FC<DecisionSignalOutcomeExplor
       <ResponsiveFilterPanel
         className="mb-4"
         filterLabel={t('decisionSignals.filter')}
-        drawerTitle={t('decisionSignals.outcomeExplorerTitle')}
-        applyLabel={t('decisionSignals.outcomeExplorerApplyFilters')}
+        drawerTitle={text.outcomeExplorerTitle}
+        applyLabel={text.outcomeExplorerApplyFilters}
         loadingLabel={t('common.loading')}
         isApplying={loading}
         activeCount={activeFilterCount}
@@ -296,7 +300,7 @@ export const DecisionSignalOutcomeExplorer: React.FC<DecisionSignalOutcomeExplor
                 horizon: value as OutcomeFilters['horizon'],
               }))}
               options={[
-                { value: '', label: t('decisionSignals.outcomeExplorerAllHorizons') },
+                { value: '', label: text.outcomeExplorerAllHorizons },
                 ...HORIZONS.map((horizon) => ({
                   value: horizon,
                   label: getDecisionSignalHorizonLabel(horizon, t),
@@ -311,7 +315,7 @@ export const DecisionSignalOutcomeExplorer: React.FC<DecisionSignalOutcomeExplor
                 outcome: value as OutcomeFilters['outcome'],
               }))}
               options={[
-                { value: '', label: t('decisionSignals.outcomeExplorerAllOutcomes') },
+                { value: '', label: text.outcomeExplorerAllOutcomes },
                 ...OUTCOME_VALUES.map((outcome) => ({
                   value: outcome,
                   label: t(`decisionSignals.outcome.${outcome}` as UiTextKey),
@@ -330,7 +334,7 @@ export const DecisionSignalOutcomeExplorer: React.FC<DecisionSignalOutcomeExplor
                 evalStatus: value as OutcomeFilters['evalStatus'],
               }))}
               options={[
-                { value: '', label: t('decisionSignals.outcomeExplorerAllStatuses') },
+                { value: '', label: text.outcomeExplorerAllStatuses },
                 ...EVAL_STATUSES.map((status) => ({
                   value: status,
                   label: t(`decisionSignals.outcomeEvalStatus.${status}` as UiTextKey),
@@ -338,7 +342,7 @@ export const DecisionSignalOutcomeExplorer: React.FC<DecisionSignalOutcomeExplor
               ]}
             />
             <Input
-              label={t('decisionSignals.outcomeExplorerEngineVersion')}
+              label={text.outcomeExplorerEngineVersion}
               value={filters.engineVersion}
               onChange={(event) => setFilters((current) => ({
                 ...current,
@@ -346,7 +350,7 @@ export const DecisionSignalOutcomeExplorer: React.FC<DecisionSignalOutcomeExplor
               }))}
             />
             <Input
-              label={t('decisionSignals.outcomeExplorerSignalId')}
+              label={text.outcomeExplorerSignalId}
               type="text"
               inputMode="numeric"
               value={filters.signalId}
@@ -365,7 +369,7 @@ export const DecisionSignalOutcomeExplorer: React.FC<DecisionSignalOutcomeExplor
       {error ? (
         <ApiErrorAlert
           className="mb-4"
-          error={{ ...error, title: t('decisionSignals.outcomeExplorerErrorTitle') }}
+          error={{ ...error, title: text.outcomeExplorerErrorTitle }}
           actionLabel={t('common.retry')}
           onAction={() => void loadOutcomes()}
         />
@@ -378,35 +382,39 @@ export const DecisionSignalOutcomeExplorer: React.FC<DecisionSignalOutcomeExplor
         />
       ) : null}
 
-      <div className="mb-3 text-sm text-secondary-text">
-        {t('decisionSignals.total', { total })}
-      </div>
-      <DataTable<DecisionSignalOutcomeItem>
-        caption={t('decisionSignals.outcomeExplorerTitle')}
-        columns={columns}
-        rows={items}
-        getRowKey={(item) => item.id}
-        status={loading
-          ? {
-              state: 'loading',
-              title: t('common.loading'),
-              description: t('decisionSignals.outcomeExplorerDescription'),
-            }
-          : undefined}
-        emptyState={{
-          icon: <Activity className="h-6 w-6" />,
-          title: t('decisionSignals.noOutcomes'),
-          description: t('decisionSignals.outcomeExplorerEmptyDescription'),
-        }}
-        density="compact"
-        minWidth="wide"
-      />
-      <Pagination
-        className="mt-4"
-        currentPage={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
-      />
+      {!error ? (
+        <>
+          <div className="mb-3 text-sm text-secondary-text">
+            {t('decisionSignals.total', { total })}
+          </div>
+          <DataTable<DecisionSignalOutcomeItem>
+            caption={text.outcomeExplorerTitle}
+            columns={columns}
+            rows={items}
+            getRowKey={(item) => item.id}
+            status={loading
+              ? {
+                  state: 'loading',
+                  title: t('common.loading'),
+                  description: text.outcomeExplorerDescription,
+                }
+              : undefined}
+            emptyState={{
+              icon: <Activity className="h-6 w-6" />,
+              title: t('decisionSignals.noOutcomes'),
+              description: text.outcomeExplorerEmptyDescription,
+            }}
+            density="compact"
+            minWidth="wide"
+          />
+          <Pagination
+            className="mt-4"
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+          />
+        </>
+      ) : null}
     </Card>
   );
 };

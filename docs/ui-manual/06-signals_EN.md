@@ -99,7 +99,7 @@ Closing / archiving usually confirms; terminal states often cannot return to act
 5. Save and enable.  
 6. Ensure **one** notification channel tests green in Settings first.
 
-Alert cooldown has three explicit choices: use the backend default (currently 24 hours), disable cooldown (send `0` seconds), or enter a custom positive whole number of seconds. Omitted/default and explicit zero are different. Keep cooldowns sane—zero cooldown plus an always-true condition can spam. Editing changes only the known cooldown value and preserves other server-owned policy fields. Empty rule lists are fine; the product will not invent alerts. Create-from-signal saves typing. Other rule types (percent move, volume, indicators, portfolio risk, market status) follow the live option list.
+Alert cooldown has three explicit choices: use the backend default (currently 24 hours), disable cooldown (send `0` seconds), or enter a custom whole number from 1 to 31,536,000 seconds (up to 365 days). Omitted/default and explicit zero are different. Keep cooldowns sane—zero cooldown plus an always-true condition can spam. Editing changes only the known cooldown value and preserves other server-owned policy fields. Existing oversized or legacy boolean policies display using the worker-equivalent bounded duration, so an ordinary edit does not silently change execution semantics. Empty rule lists are fine; the product will not invent alerts. Create-from-signal saves typing. Other rule types (percent move, volume, indicators, portfolio risk, market status) follow the live option list.
 
 ---
 

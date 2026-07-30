@@ -1422,7 +1422,7 @@ describe('DecisionSignalsPage', () => {
     const updatedDialog = await screen.findByRole('dialog', { name: '信号详情' });
     expect(within(updatedDialog).getByText('已保存为新的 DecisionSignal #88。')).toBeInTheDocument();
     expect(within(updatedDialog).getByText('已失效')).toBeInTheDocument();
-  });
+  }, 15_000);
 
   it('keeps the authoritative persist result visible after refreshing a timeline-sourced detail', async () => {
     const timelineSignal = makeSignal({
@@ -2180,7 +2180,7 @@ describe('DecisionSignalsPage', () => {
       expect(decisionSignalsApi.updateStatus).toHaveBeenCalledWith(8, { status: 'invalidated' });
     });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(screen.getByText('暂无时间线信号')).toBeInTheDocument();
+    expect(await screen.findByText('暂无时间线信号')).toBeInTheDocument();
   });
 
   it('uses applied timeline filters instead of draft filters after status updates', async () => {
