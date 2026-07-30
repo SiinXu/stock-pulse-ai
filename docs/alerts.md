@@ -208,9 +208,9 @@ P4 让真实告警触发具备可排障的通知结果，并让通过 Alert API 
   - DB 持久化规则正常路径使用 `alert_cooldowns` 作为告警业务冷却，不再由 worker 进程内 fingerprint 决定；仅当读取持久化冷却状态失败时，临时使用进程内 fingerprint 防止同一规则在 DB 异常期间每轮重复推送。
   - legacy `AGENT_EVENT_ALERT_RULES_JSON` 规则继续使用 worker 进程内 fingerprint，不写 `alert_cooldowns`。
   - `notification_noise.py` 仍作为通知基础设施层的全局安全网；它不是告警业务 cooldown，且被其抑制时不会写入或延长 `alert_cooldowns`。
-- DB 规则的 `cooldown_policy.cooldown_seconds` 归一为非负整数；缺失时使用默认 24 小时业务冷却，`0` 表示关闭 DB 业务冷却。
+- DB 规则的 `cooldown_policy.cooldown_seconds` 归一为非负整数并由 worker 限制在最多 31,536,000 秒（365 天）；缺失时使用默认 24 小时业务冷却，`0` 表示关闭 DB 业务冷却。为兼容已存储的旧 opaque policy，布尔值继续按 worker 的整数转换处理（`true = 1`、`false = 0`），无效值按 `0` 执行。
 - `GET /api/v1/alerts/rules` 会返回只读 `last_triggered_at` / `cooldown_until` / `cooldown_active` 摘要；`cooldown_active` 由后端按同一冷却时间语义计算，Web 不在浏览器本地解析 naive ISO 字符串来推断状态。
-- Web 告警中心展示后端返回的当前冷却状态，也允许在创建和编辑规则时选择“使用后端默认值”“关闭冷却（`0` 秒）”或“自定义正整数秒数”。默认模式省略 `cooldown_seconds`，当前后端按 24 小时执行；编辑时只替换已知的 `cooldown_seconds`，保留 `cooldown_policy` 中其他服务端字段。`notification_policy` 继续作为 opaque 数据处理，本页面不提供自定义执行策略编辑器。
+- Web 告警中心展示后端返回的当前冷却状态，也允许在创建和编辑规则时选择“使用后端默认值”“关闭冷却（`0` 秒）”或“自定义 1–31,536,000 整数秒”。默认模式省略 `cooldown_seconds`，当前后端按 24 小时执行；编辑时只替换已知的 `cooldown_seconds`，保留 `cooldown_policy` 中其他服务端字段。已有超大值按 worker 上限展示，旧布尔值按其等价秒数展示，避免普通编辑改变当前执行语义。`notification_policy` 继续作为 opaque 数据处理，本页面不提供自定义执行策略编辑器。
 
 P4 不做：
 

@@ -24,7 +24,12 @@ from src.services.alert_indicators import (
     normalize_indicator_parameters,
 )
 from src.services.alert_service import AlertService
-from src.services.alert_worker import AlertWorker
+from src.services.alert_worker import (
+    AlertWorker,
+    DEFAULT_DB_ALERT_COOLDOWN_SECONDS,
+    MAX_DB_ALERT_COOLDOWN_SECONDS,
+    RuntimeAlertRule,
+)
 from src.services.decision_signal_service import DecisionSignalService
 from src.storage import DatabaseManager
 
@@ -272,6 +277,28 @@ class AlertWorkerTestCase(unittest.TestCase):
         }
         payload.update(overrides)
         return self.service.create_rule(payload)
+
+    def test_cooldown_seconds_normalization_is_bounded_and_legacy_compatible(self) -> None:
+        cases = [
+            (None, DEFAULT_DB_ALERT_COOLDOWN_SECONDS),
+            ({}, DEFAULT_DB_ALERT_COOLDOWN_SECONDS),
+            ({"cooldown_seconds": True}, 1),
+            ({"cooldown_seconds": False}, 0),
+            ({"cooldown_seconds": "invalid"}, 0),
+            ({"cooldown_seconds": float("inf")}, 0),
+            ({"cooldown_seconds": 60.9}, 60),
+            ({"cooldown_seconds": 10**20}, MAX_DB_ALERT_COOLDOWN_SECONDS),
+        ]
+
+        for policy, expected in cases:
+            with self.subTest(policy=policy):
+                runtime_rule = RuntimeAlertRule(
+                    key="test",
+                    rule=SimpleNamespace(),
+                    source="api",
+                    cooldown_policy=policy,
+                )
+                self.assertEqual(AlertWorker._cooldown_seconds(runtime_rule), expected)
 
     def _triggers(self, **filters) -> list[dict]:
         return self.service.list_triggers(page_size=100, **filters)["items"]

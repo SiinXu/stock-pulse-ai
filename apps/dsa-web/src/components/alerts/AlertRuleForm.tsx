@@ -35,7 +35,9 @@ import {
   ALERT_COOLDOWN_SECONDS_KEY,
   DEFAULT_ALERT_COOLDOWN_SECONDS,
   getEffectiveAlertCooldown,
+  MAX_ALERT_COOLDOWN_SECONDS,
 } from '../../utils/alertCooldown';
+import { formatUiNumber } from '../../utils/uiLocale';
 import { Button, Checkbox, Input, Select } from '../common';
 
 const MAX_REQUESTED_DAYS = 365;
@@ -441,8 +443,17 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
       return { ...unknownFields, [ALERT_COOLDOWN_SECONDS_KEY]: 0 };
     }
     const parsed = Number(customCooldownSeconds.trim());
-    if (!Number.isSafeInteger(parsed) || parsed < 1) {
-      setValidationError('alert-cooldown-seconds', text.cooldownInvalid);
+    if (
+      !Number.isSafeInteger(parsed)
+      || parsed < 1
+      || parsed > MAX_ALERT_COOLDOWN_SECONDS
+    ) {
+      setValidationError(
+        'alert-cooldown-seconds',
+        formatUiText(text.cooldownInvalid, {
+          max: formatUiNumber(MAX_ALERT_COOLDOWN_SECONDS, language),
+        }),
+      );
       return undefined;
     }
     return { ...unknownFields, [ALERT_COOLDOWN_SECONDS_KEY]: parsed };
@@ -931,6 +942,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
                 label={text.cooldownCustomSeconds}
                 type="number"
                 min="1"
+                max={String(MAX_ALERT_COOLDOWN_SECONDS)}
                 step="1"
                 value={customCooldownSeconds}
                 error={fieldErrors['alert-cooldown-seconds']}
@@ -944,7 +956,9 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
               ? text.cooldownDefaultHint
               : cooldownMode === 'disabled'
                 ? text.cooldownDisabledHint
-                : text.cooldownCustomHint}
+                : formatUiText(text.cooldownCustomHint, {
+                    max: formatUiNumber(MAX_ALERT_COOLDOWN_SECONDS, language),
+                  })}
           </p>
         </div>
 

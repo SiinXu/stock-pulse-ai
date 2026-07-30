@@ -50,6 +50,27 @@ describe('DecisionSignalMemoryControls', () => {
     updateMemoryFlag.mockReset();
   });
 
+  it('shows an explicit loading state until server flags arrive', async () => {
+    let resolveLoad!: (value: DecisionSignalMemoryFlagItem) => void;
+    getMemoryFlag.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveLoad = resolve;
+    }));
+
+    renderControls();
+
+    expect(screen.getByRole('status')).toHaveTextContent('正在加载');
+    expect(screen.getByRole('switch', { name: '重点记忆' })).toBeDisabled();
+    expect(screen.getByRole('switch', { name: '忽略' })).toBeDisabled();
+
+    await act(async () => {
+      resolveLoad(memoryFlags(7, false, false));
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
+    expect(screen.getByRole('switch', { name: '重点记忆' })).toBeEnabled();
+  });
+
   it.each([
     { memorable: false, ignored: false, badge: '未标记', warning: false },
     { memorable: true, ignored: false, badge: '重点记忆', warning: false },
@@ -123,6 +144,7 @@ describe('DecisionSignalMemoryControls', () => {
 
     expect(updateMemoryFlag).toHaveBeenCalledTimes(1);
     expect(updateMemoryFlag).toHaveBeenCalledWith(7, { memorable: true });
+    expect(screen.getByRole('status')).toHaveTextContent('正在保存');
     expect(memorableSwitch).toHaveAttribute('aria-checked', 'false');
     expect(ignoredSwitch).toBeDisabled();
 
@@ -152,9 +174,11 @@ describe('DecisionSignalMemoryControls', () => {
     expect(getMemoryFlag).toHaveBeenCalledTimes(2);
   });
 
-  it('keeps confirmed flags unchanged when a save fails', async () => {
+  it('retries the failed PATCH payload while keeping confirmed flags unchanged', async () => {
     getMemoryFlag.mockResolvedValueOnce(memoryFlags(7, false, true));
-    updateMemoryFlag.mockRejectedValueOnce(new Error('save failed'));
+    updateMemoryFlag
+      .mockRejectedValueOnce(new Error('save failed'))
+      .mockResolvedValueOnce(memoryFlags(7, true, true));
 
     renderControls();
 
@@ -164,5 +188,23 @@ describe('DecisionSignalMemoryControls', () => {
     expect(await screen.findByText('决策记忆标记保存失败')).toBeInTheDocument();
     expect(memorableSwitch).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('switch', { name: '忽略' })).toHaveAttribute('aria-checked', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+
+    await waitFor(() => expect(updateMemoryFlag).toHaveBeenCalledTimes(2));
+    expect(updateMemoryFlag).toHaveBeenNthCalledWith(1, 7, { memorable: true });
+    expect(updateMemoryFlag).toHaveBeenNthCalledWith(2, 7, { memorable: true });
+    await waitFor(() => expect(memorableSwitch).toHaveAttribute('aria-checked', 'true'));
+  });
+
+  it('rejects a response whose signal ID does not match the selected signal', async () => {
+    getMemoryFlag.mockResolvedValueOnce(memoryFlags(8, true, true));
+
+    renderControls(7);
+
+    expect(await screen.findByText('决策记忆标记加载失败')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: '重点记忆' })).toBeDisabled();
+    expect(screen.getByRole('switch', { name: '忽略' })).toBeDisabled();
+    expect(screen.queryByText(/“忽略”优先/)).not.toBeInTheDocument();
   });
 });

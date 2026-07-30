@@ -77,6 +77,8 @@ describe('DecisionSignalOutcomeExplorer', () => {
     renderExplorer();
 
     expect(await screen.findByText('#13')).toBeInTheDocument();
+    expect(screen.getByText('Buy')).toBeInTheDocument();
+    expect(screen.queryByText('buy')).not.toBeInTheDocument();
     chooseOption(screen.getByLabelText('Horizon'), '3d');
     chooseOption(screen.getByLabelText('Outcome results'), 'hit');
     chooseOption(screen.getByLabelText('Status'), 'completed');
@@ -124,6 +126,9 @@ describe('DecisionSignalOutcomeExplorer', () => {
     renderExplorer();
 
     expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByText('No outcome results yet')).not.toBeInTheDocument();
+    expect(screen.queryByText('No outcome results match the current filters.'))
+      .not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 
     expect(await screen.findByText('#13')).toBeInTheDocument();

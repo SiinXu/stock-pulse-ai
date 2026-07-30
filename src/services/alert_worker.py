@@ -50,6 +50,7 @@ if TYPE_CHECKING:
 
 ALERT_WORKER_FINGERPRINT_TTL_SECONDS = 24 * 60 * 60
 DEFAULT_DB_ALERT_COOLDOWN_SECONDS = 24 * 60 * 60
+MAX_DB_ALERT_COOLDOWN_SECONDS = 365 * 24 * 60 * 60
 ALERT_WORKER_RULE_LIMIT = 1000
 WRITABLE_TRIGGER_STATUSES = frozenset({"triggered", "skipped", "degraded", "failed"})
 
@@ -992,8 +993,11 @@ class AlertWorker:
         if not policy or "cooldown_seconds" not in policy:
             return DEFAULT_DB_ALERT_COOLDOWN_SECONDS
         try:
-            return max(0, int(policy.get("cooldown_seconds") or 0))
-        except (TypeError, ValueError):
+            return min(
+                MAX_DB_ALERT_COOLDOWN_SECONDS,
+                max(0, int(policy.get("cooldown_seconds") or 0)),
+            )
+        except (OverflowError, TypeError, ValueError):
             return 0
 
     def _now_datetime(self) -> datetime:
