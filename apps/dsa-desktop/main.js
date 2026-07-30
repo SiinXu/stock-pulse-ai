@@ -13,6 +13,13 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const os = require('os');
+const {
+  extendMacDesktopBackendPath,
+  hasOwnValue,
+  normalizeBackendHost,
+  readEnvFileValue,
+  readEnvFileValues,
+} = require('./desktop-env');
 const { loadDesktopLocalModelPresets } = require('./local-model-catalog');
 const { ModelPackError, importModelPack } = require('./model-pack');
 const {
@@ -1320,11 +1327,7 @@ const {
   buildBackendEnvironment,
   buildBackendUrl,
   ensureEnvFile,
-  extendMacDesktopBackendPath,
   findAvailablePort,
-  normalizeBackendHost,
-  readEnvFileValue,
-  readEnvFileValues,
   resolveBackendBindHost,
   resolveDesktopConnectHost,
   resolveDesktopProviderDailyCacheDir,
@@ -1332,10 +1335,6 @@ const {
   stopBackend,
   waitForBackendExit,
 } = backendRuntime;
-
-function hasOwnValue(object, key) {
-  return Object.prototype.hasOwnProperty.call(object || {}, key);
-}
 
 function sleep(ms) {
   return new Promise((resolve) => {

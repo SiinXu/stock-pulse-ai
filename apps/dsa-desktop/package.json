@@ -41,6 +41,7 @@
     "files": [
       "main.js",
       "backend-runtime.js",
+      "desktop-env.js",
       "local-model-catalog.js",
       "assistant-preload.js",
       "model-pack.js",
