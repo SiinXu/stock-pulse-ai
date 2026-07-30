@@ -83,11 +83,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
       expect(getFramework).toHaveBeenCalled();
     });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('框架名称')).not.toBeInTheDocument();
-    const createConfigButton = screen.getByRole('button', { name: '查看配置项' });
-    await waitFor(() => expect(createConfigButton).toBeEnabled());
-    fireEvent.click(createConfigButton);
-    expect(screen.getByRole('dialog', { name: '个人投资框架' })).toBeInTheDocument();
+    expect(await screen.findByLabelText('框架名称')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('框架名称'), { target: { value: 'My rules' } });
     fireEvent.change(screen.getByLabelText('自由规则'), {
@@ -126,7 +122,8 @@ describe('InvestmentFrameworkSettingsCard', () => {
 
     expect(await screen.findByText('暂时无法读取个人投资框架。')).toBeInTheDocument();
     expect(screen.queryByText('未配置')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '查看配置项' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('框架名称')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '版本历史' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument();
     expect(createFramework).not.toHaveBeenCalled();
   });
@@ -173,9 +170,6 @@ describe('InvestmentFrameworkSettingsCard', () => {
 
     render(<InvestmentFrameworkSettingsCard />);
 
-    const editConfigButton = await screen.findByRole('button', { name: '查看配置项' });
-    await waitFor(() => expect(editConfigButton).toBeEnabled());
-    fireEvent.click(editConfigButton);
     await screen.findByDisplayValue('Existing');
     fireEvent.change(screen.getByLabelText('自由规则'), {
       target: { value: 'Updated free form' },
@@ -190,16 +184,16 @@ describe('InvestmentFrameworkSettingsCard', () => {
         }),
       );
     });
-    expect(screen.getByRole('dialog').querySelector('form')).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByLabelText('框架名称').closest('form')).toHaveAttribute('aria-busy', 'true');
     expect(screen.getByRole('status')).toHaveTextContent('处理中...');
-    expect(screen.getByRole('button', { name: '关闭' })).toBeDisabled();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await act(async () => {
       resolveUpdate(updatedFramework);
     });
     expect(await screen.findByText('已保存为新版本并激活')).toBeInTheDocument();
   });
 
-  it('preserves a stale draft on conflict until the user explicitly loads latest', async () => {
+  it('does not expose a stale draft when conflict refresh fails', async () => {
     const existingFramework = {
       frameworkId: 1,
       scope: 'local',
@@ -246,24 +240,16 @@ describe('InvestmentFrameworkSettingsCard', () => {
 
     render(<InvestmentFrameworkSettingsCard />);
 
-    const editConfigButton = await screen.findByRole('button', { name: '查看配置项' });
-    await waitFor(() => expect(editConfigButton).toBeEnabled());
-    fireEvent.click(editConfigButton);
     await screen.findByDisplayValue('Existing');
     fireEvent.change(screen.getByLabelText('自由规则'), {
       target: { value: 'My pending conflict draft' },
     });
     fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
 
-    expect(await screen.findByText('配置已被其他操作更新。')).toBeInTheDocument();
-    expect(getFramework).toHaveBeenCalledTimes(1);
-    const dialog = screen.getByRole('dialog', { name: '个人投资框架' });
-    expect(within(dialog).getByLabelText('自由规则')).toHaveValue('My pending conflict draft');
-    expect(within(dialog).getByText(/当前草稿仍被保留/)).toBeInTheDocument();
-
-    fireEvent.click(within(dialog).getByRole('button', { name: '载入服务器最新版本' }));
     await waitFor(() => expect(getFramework).toHaveBeenCalledTimes(2));
-    expect(await within(dialog).findByText('暂时无法读取个人投资框架。')).toBeInTheDocument();
+    expect(await screen.findByText('暂时无法读取个人投资框架。')).toBeInTheDocument();
+    expect(screen.queryByLabelText('框架名称')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument();
   });
 
   it('preserves evaluation dimensions the minimal editor does not own', async () => {
@@ -309,9 +295,6 @@ describe('InvestmentFrameworkSettingsCard', () => {
     });
 
     render(<InvestmentFrameworkSettingsCard />);
-    const structuredConfigButton = await screen.findByRole('button', { name: '查看配置项' });
-    await waitFor(() => expect(structuredConfigButton).toBeEnabled());
-    fireEvent.click(structuredConfigButton);
     await screen.findByDisplayValue('Structured');
     fireEvent.change(screen.getByLabelText('自由规则'), {
       target: { value: 'Keep free form updated' },
@@ -360,7 +343,6 @@ describe('InvestmentFrameworkSettingsCard', () => {
     });
 
     render(<InvestmentFrameworkSettingsCard />);
-    fireEvent.click(await screen.findByRole('button', { name: '查看配置项' }));
     await screen.findByDisplayValue('Structured');
 
     fireEvent.click(screen.getByRole('button', { name: '添加节点' }));
@@ -461,7 +443,6 @@ describe('InvestmentFrameworkSettingsCard', () => {
     });
 
     render(<InvestmentFrameworkSettingsCard />);
-    fireEvent.click(await screen.findByRole('button', { name: '查看配置项' }));
     const firstNodeId = await screen.findByLabelText('节点 1 的 ID');
 
     fireEvent.focus(firstNodeId);
@@ -539,7 +520,6 @@ describe('InvestmentFrameworkSettingsCard', () => {
     });
 
     render(<InvestmentFrameworkSettingsCard />);
-    fireEvent.click(await screen.findByRole('button', { name: '查看配置项' }));
     await screen.findByDisplayValue('Rename safety');
 
     const renamedNodeId = screen.getByLabelText('节点 2 的 ID');
@@ -593,7 +573,6 @@ describe('InvestmentFrameworkSettingsCard', () => {
     });
 
     render(<InvestmentFrameworkSettingsCard />);
-    fireEvent.click(await screen.findByRole('button', { name: '查看配置项' }));
     await screen.findByDisplayValue('Straße');
     fireEvent.change(screen.getByLabelText('维度 2 的名称'), {
       target: { value: 'STRASSE' },
@@ -644,7 +623,6 @@ describe('InvestmentFrameworkSettingsCard', () => {
     });
 
     render(<InvestmentFrameworkSettingsCard />);
-    fireEvent.click(await screen.findByRole('button', { name: '查看配置项' }));
     await screen.findByDisplayValue('\uA7CB');
     fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
 
@@ -724,7 +702,6 @@ describe('InvestmentFrameworkSettingsCard', () => {
     }));
 
     render(<InvestmentFrameworkSettingsCard />);
-    fireEvent.click(await screen.findByRole('button', { name: '查看配置项' }));
     await screen.findByDisplayValue('Structured');
     fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
 
@@ -792,9 +769,11 @@ describe('InvestmentFrameworkSettingsCard', () => {
     updateFramework.mockResolvedValue({ ...current, version: 4, revision: 10 });
 
     render(<InvestmentFrameworkSettingsCard />);
-    fireEvent.click(await screen.findByRole('button', { name: '查看配置项' }));
+    await screen.findByDisplayValue('Current rules');
+    fireEvent.click(screen.getByRole('button', { name: '版本历史' }));
 
-    expect(await screen.findByText('版本 v3')).toBeInTheDocument();
+    const historyDrawer = await screen.findByRole('complementary', { name: '版本历史' });
+    expect(within(historyDrawer).getByText('版本 v3')).toBeInTheDocument();
     expect(screen.getByText('当前激活')).toBeInTheDocument();
     const historyList = screen.getByRole('list', { name: '框架版本历史' });
     const latestVersionButton = within(historyList).getAllByRole('button')[0];
@@ -823,5 +802,8 @@ describe('InvestmentFrameworkSettingsCard', () => {
         freeFormRules: 'Historical',
       }),
     })));
+    fireEvent.click(screen.getByRole('button', { name: '关闭历史版本' }));
+    expect(screen.queryByRole('complementary', { name: '版本历史' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

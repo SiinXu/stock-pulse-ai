@@ -83,7 +83,10 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'agent_behavior',
     label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.agent_behavior.label", { zh: 'Agent 行为', en: 'Agent Behavior' }),
-    views: [{ id: 'execution', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.agent_behavior.views.execution.label", { zh: '执行', en: 'Execution' }) }],
+    views: [
+      { id: 'execution', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.agent_behavior.views.execution.label", { zh: '执行', en: 'Execution' }) },
+      { id: 'investment_framework', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.agent_behavior.views.investment_framework.label", { zh: '投资框架', en: 'Investment Framework' }) },
+    ],
     defaultView: 'execution',
   },
   {

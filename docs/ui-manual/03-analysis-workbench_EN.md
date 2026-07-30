@@ -42,7 +42,7 @@ sequenceDiagram
 
 ## Start an analysis
 
-1. Enter a code (`600519`, `hk00700`, `AAPL`, …).  
+1. Enter a code or name in the suggestion-enabled stock search (`600519`, `hk00700`, `AAPL`, …).
 2. Optionally pick from the watchlist.  
 3. Optionally choose a **Skill** (style pack); omit for default.  
 4. Choose an **Analysis phase**: Auto by default, or Premarket, Intraday, or Postmarket for this request.
@@ -50,6 +50,10 @@ sequenceDiagram
 6. Start.
 7. Watch **Running tasks**.
 8. Open History when complete.
+
+The Launch & batch view separates stock and Skill, mode and notification, and
+batch actions into three groups. Confirm them from top to bottom before
+submitting so a single-stock run is not confused with an imported batch.
 
 ### Recommended UI settings
 

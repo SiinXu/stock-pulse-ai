@@ -203,6 +203,41 @@ test.describe('application shell foundation', () => {
       const themeTrigger = profileDialog.getByRole('combobox', { name: 'Toggle theme' });
       await expect(themeTrigger).toBeFocused();
       expect((await themeTrigger.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+      await themeTrigger.click();
+      const themeListbox = page.getByRole('listbox');
+      await expect(themeListbox).toBeVisible();
+      const themeTriggerBox = await themeTrigger.boundingBox();
+      const themeListboxBox = await themeListbox.boundingBox();
+      expect(themeTriggerBox).not.toBeNull();
+      expect(themeListboxBox).not.toBeNull();
+      expect(themeListboxBox!.y).toBeGreaterThanOrEqual(8);
+      expect(themeListboxBox!.x + themeListboxBox!.width).toBeLessThanOrEqual(width - 8);
+      expect(themeListboxBox!.y + themeListboxBox!.height).toBeLessThanOrEqual(height - 8);
+      if (width >= 1024) {
+        expect(themeListboxBox!.x).toBeGreaterThanOrEqual(
+          themeTriggerBox!.x + themeTriggerBox!.width,
+        );
+      }
+      await themeListbox.locator('[role="option"][aria-selected="true"]').click();
+
+      const languageTrigger = profileDialog.getByRole('combobox', { name: 'Switch UI language' });
+      await languageTrigger.click();
+      const languageListbox = page.getByRole('listbox');
+      await expect(languageListbox).toBeVisible();
+      const languageTriggerBox = await languageTrigger.boundingBox();
+      const languageListboxBox = await languageListbox.boundingBox();
+      expect(languageTriggerBox).not.toBeNull();
+      expect(languageListboxBox).not.toBeNull();
+      expect(languageListboxBox!.y).toBeGreaterThanOrEqual(8);
+      expect(languageListboxBox!.x + languageListboxBox!.width).toBeLessThanOrEqual(width - 8);
+      expect(languageListboxBox!.y + languageListboxBox!.height).toBeLessThanOrEqual(height - 8);
+      if (width >= 1024) {
+        expect(languageListboxBox!.x).toBeGreaterThanOrEqual(
+          languageTriggerBox!.x + languageTriggerBox!.width,
+        );
+      }
+      await languageListbox.locator('[role="option"][aria-selected="true"]').click();
+
       await page.keyboard.press('Escape');
       await expect(profileDialog).toBeHidden();
       await expect(profileTrigger).toBeFocused();
@@ -316,13 +351,15 @@ test.describe('application shell foundation', () => {
     await expectSidebarWidth(sidebar, 240);
     const navigation = sidebar.getByRole('navigation', { name: 'Main navigation' });
     const researchToggle = navigation.locator('[data-sidebar-group-toggle="research"]');
-    const researchOverview = navigation.getByRole('link', { name: 'Research overview' });
+    const researchParent = navigation.getByRole('link', { name: 'Research' });
     const discoverChild = navigation.getByRole('link', { name: 'Discover' });
     await expect(researchToggle).toHaveAccessibleName('Collapse Research menu');
     await expect(researchToggle).toHaveAttribute('aria-expanded', 'true');
-    await expect(researchOverview).toHaveAttribute('href', '/research');
-    await expect(researchOverview).not.toHaveAttribute('aria-current');
-    await expect(researchToggle).toHaveAttribute('data-navigation-active', 'true');
+    await expect(researchParent).toHaveAttribute('href', '/research');
+    await expect(researchParent).not.toHaveAttribute('aria-current');
+    await expect(researchParent).toHaveAttribute('data-navigation-active', 'true');
+    await expect(researchToggle).not.toHaveAttribute('data-navigation-active');
+    await expect(navigation.getByRole('link', { name: 'Research overview' })).toHaveCount(0);
     await expect(discoverChild).toHaveAttribute('aria-current', 'page');
     await researchToggle.click();
     await expect(researchToggle).toHaveAttribute('aria-expanded', 'false');
@@ -371,9 +408,12 @@ test.describe('application shell foundation', () => {
     await page.getByRole('button', { name: 'Open navigation' }).click();
     const drawer = page.getByRole('dialog', { name: 'Navigation' });
     const mobileNavigation = drawer.getByRole('navigation', { name: 'Main navigation' });
-    const mobileResearch = mobileNavigation.getByRole('link', { name: 'Research overview' });
+    const mobileResearch = mobileNavigation.getByRole('link', { name: 'Research' });
     const mobileResearchToggle = mobileNavigation.locator('[data-sidebar-group-toggle="research"]');
     await expect(mobileResearch).toHaveAttribute('href', '/research');
+    await expect(mobileResearch).toHaveAttribute('data-navigation-active', 'true');
+    await expect(mobileResearchToggle).not.toHaveAttribute('data-navigation-active');
+    await expect(mobileNavigation.getByRole('link', { name: 'Research overview' })).toHaveCount(0);
     await expect(mobileResearchToggle).toHaveAccessibleName('Collapse Research menu');
     await expect(mobileResearchToggle).toHaveAttribute('aria-expanded', 'true');
     await mobileResearchToggle.click();

@@ -47,7 +47,7 @@ flowchart TB
 | --- | --- | --- |
 | Primary nav | Left / top | Catalog: Home, Research, Portfolio, Agent, Settings |
 | Main content | Center | The page you are using |
-| Notification bell | Near top bar | New signals / alerts |
+| Notification bell | Desktop sidebar footer, beside the profile entry | New signals / alerts |
 | Command palette | Shortcut or search box | Universal jump |
 
 Desktop and Web share the same information architecture; desktop-only windows follow the live client.
@@ -66,10 +66,10 @@ These five top-level items match the product navigation:
 | **Agent** | `/chat` | Multi-turn chat (page title often **Ask stock**) | [05](05-agent-chat_EN.md) |
 | **Settings** | `/settings` | Models, data sources, notifications, security | [10](10-settings_EN.md) |
 
-On expanded desktop navigation and in the mobile drawer, the full **Research**
-row expands or collapses its children; the first child, **Research overview**,
-opens `/research`. On the compact rail, **Research** opens a flyout whose first
-item is also **Research overview**.
+On expanded desktop navigation and in the mobile drawer, the **Research** label
+opens `/research`; the trailing arrow only expands or collapses the Research
+tools, without a duplicate **Research overview** child. On the compact rail,
+**Research** still opens a flyout whose first item is **Research overview**.
 
 ### Research pages
 
@@ -121,7 +121,7 @@ Opens recent signals and alerts and deep-links into Signal Center. An empty bell
 
 They are independent: English menus + Chinese reports is a valid combination.
 
-Theme and UI language use the same compact dropdown treatment in the Profile menu, with a neutral selected state.
+Theme and UI language use the same compact dropdown treatment in the Profile menu, with a neutral selected state. On wide screens, both menus open to the right of their setting; on narrow screens, they adapt their direction and height to stay within the viewport.
 
 ---
 

@@ -450,15 +450,18 @@ vi.mock('../../components/settings', async () => {
   SettingsSectionCard: ({
     title,
     description,
+    actions,
     children,
   }: {
     title: string;
     description?: string;
+    actions?: React.ReactNode;
     children: React.ReactNode;
   }) => (
     <section>
       <h2>{title}</h2>
       {description ? <p>{description}</p> : null}
+      {actions}
       {children}
     </section>
   ),

@@ -87,7 +87,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
   );
   const itemActiveClass = 'border-[var(--nav-active-border)] bg-[var(--nav-active-bg)] font-medium text-foreground shadow-[0_1px_2px_var(--nav-active-shadow)]';
   const itemIconClass = cn('h-5 w-5', 'shrink-0');
-  const itemLabelClass = cn('min-w-0 flex-1 truncate', isRail ? 'text-center' : '');
+  const itemLabelClass = cn('min-w-0 flex-1 truncate text-left', isRail ? 'text-center' : '');
   const cancelGroupClose = useCallback(() => {
     if (groupCloseTimerRef.current !== null) {
       window.clearTimeout(groupCloseTimerRef.current);
@@ -176,11 +176,6 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               ) : null}
             </div>
           </div>
-          {globalActions ? (
-            <div data-sidebar-global-actions="true" className="mb-3 flex justify-center">
-              {globalActions}
-            </div>
-          ) : null}
         </>
       ) : (
         <>
@@ -202,11 +197,6 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               </Tooltip>
             ) : null}
           </div>
-          {globalActions ? (
-            <div data-sidebar-global-actions="true" className="mb-3 flex justify-end px-1">
-              {globalActions}
-            </div>
-          ) : null}
         </>
       )}
 
@@ -416,31 +406,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               : t('layout.expandNavGroup', { label });
             return (
               <div key={key} className="flex shrink-0 flex-col gap-1">
-                <button
-                  type="button"
-                  aria-label={toggleLabel}
-                  aria-expanded={childrenExpanded}
-                  aria-controls={childrenExpanded ? childrenId : undefined}
-                  data-navigation-active={groupActive ? 'true' : undefined}
-                  data-sidebar-group-toggle={key}
-                  data-route-focus-key={`${focusKeyPrefix}:${key}`}
-                  data-route-focus-return-key={returnFocusKey}
-                  onClick={() => toggleGroupChildren(key)}
-                  className={cn(
-                    itemInteractiveClass,
-                    groupActive && 'font-medium text-foreground',
-                  )}
-                >
-                  {renderItemContent(groupActive)}
-                  <ChevronRight
-                    className={cn(
-                      'h-4 w-4 shrink-0 transition-transform motion-reduce:transition-none',
-                      childrenExpanded && 'rotate-90',
-                    )}
-                    aria-hidden="true"
-                  />
-                </button>
-                {childrenExpanded ? <div id={childrenId} className="ml-4 flex flex-col gap-1 border-l border-border pl-3">
+                <div className="relative flex w-full">
                   <Link
                     to={navigationTarget}
                     onClick={(event) => {
@@ -448,25 +414,42 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                         onNavigate?.();
                       }
                     }}
-                    aria-label={t(item.overviewLabelKey)}
+                    aria-label={label}
                     aria-current={groupSelfActive ? 'page' : undefined}
-                    data-sidebar-group-link={key}
-                    data-route-focus-key={`${focusKeyPrefix}:${key}-overview`}
+                    data-navigation-active={groupActive ? 'true' : undefined}
+                    data-route-focus-key={`${focusKeyPrefix}:${key}`}
                     data-route-focus-return-key={returnFocusKey}
                     className={cn(
                       itemInteractiveClass,
-                      'min-h-10 gap-2.5 px-2.5 text-xs',
-                      groupSelfActive ? itemActiveClass : '',
+                      'pr-11',
+                      groupSelfActive ? itemActiveClass : groupActive ? 'font-medium text-foreground' : '',
                     )}
                   >
-                    <Icon className={cn(
-                      'h-4 w-4 shrink-0',
-                      groupSelfActive
-                        ? 'text-[var(--nav-icon-active)]'
-                        : 'text-current',
-                    )} />
-                    <span className="truncate">{t(item.overviewLabelKey)}</span>
+                    {renderItemContent(groupActive)}
                   </Link>
+                  <Tooltip content={toggleLabel} className="absolute right-1 top-1/2 -translate-y-1/2">
+                    <button
+                      type="button"
+                      aria-label={toggleLabel}
+                      aria-expanded={childrenExpanded}
+                      aria-controls={childrenExpanded ? childrenId : undefined}
+                      data-sidebar-group-toggle={key}
+                      data-route-focus-key={`${focusKeyPrefix}:${key}-toggle`}
+                      data-route-focus-return-key={returnFocusKey}
+                      onClick={() => toggleGroupChildren(key)}
+                      className="flex h-8 w-8 items-center justify-center rounded-md text-secondary-text transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-foreground focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25"
+                    >
+                      <ChevronRight
+                        className={cn(
+                          'h-4 w-4 shrink-0 transition-transform motion-reduce:transition-none',
+                          childrenExpanded && 'rotate-90',
+                        )}
+                        aria-hidden="true"
+                      />
+                    </button>
+                  </Tooltip>
+                </div>
+                {childrenExpanded ? <div id={childrenId} className="ml-4 flex flex-col gap-1 border-l border-border pl-3">
                   {item.children.map((child) => {
                     const ChildIcon = child.icon;
                     const childLabel = t(child.labelKey);
@@ -544,13 +527,27 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
 
       </nav>
 
-      <SidebarProfile
-        collapsed={collapsed}
-        open={profileOpen}
-        onOpenChange={onProfileOpenChange}
-        triggerRef={profileTriggerRef}
-        presentation={profilePresentation}
-      />
+      <div
+        data-sidebar-footer="true"
+        className={cn(
+          'mt-2 flex shrink-0',
+          collapsed ? 'flex-col items-center gap-1' : 'items-center gap-1',
+        )}
+      >
+        <SidebarProfile
+          collapsed={collapsed}
+          open={profileOpen}
+          onOpenChange={onProfileOpenChange}
+          triggerRef={profileTriggerRef}
+          presentation={profilePresentation}
+          rootClassName={cn('mt-0', !collapsed && 'min-w-0 flex-1')}
+        />
+        {globalActions ? (
+          <div data-sidebar-global-actions="true" className="shrink-0">
+            {globalActions}
+          </div>
+        ) : null}
+      </div>
 
       {collapsed && logoutButton ? (
           <Tooltip content={t('layout.logout')} className={cn('w-full', isRail ? 'mt-1.5' : 'mt-5')}>

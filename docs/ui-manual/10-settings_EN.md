@@ -82,6 +82,11 @@ A **backup model on a connection** is not the same as **fallback generation back
 
 Comma-separated codes, e.g. `600519,hk00700,AAPL`. Paste from tables often works; Save normalizes separators. Start with 1–3 familiar names. Home, batch analysis, and some notification scopes read this list.
 
+To extract watchlist symbols from a screenshot, CSV / Excel file, or clipboard
+text, use **View fields** on the **Intelligent Import** card. Recognition and
+merge controls open in a dialog, and closing it keeps the current Settings
+section in place.
+
 ## Data sources
 
 News / search keys improve events and themes; technical-only runs may still work without them. Intel sources are often default-off. Provider panels show status and plugins when present.
@@ -111,7 +116,8 @@ English menus + Chinese reports is valid.
 | Section | When you need it |
 | --- | --- |
 | Conversation · context | Long Agent chats / compression |
-| Agent behavior | Advanced Agent boundaries |
+| Agent behavior · Execution | Advanced Agent boundaries |
+| Agent behavior · Investment Framework | Maintain the personal framework injected read-only into research; the editor is inline on this horizontal tab and saved versions open in an in-page drawer where they can be copied into the current draft |
 | Usage & cost | Token / spend visibility |
 | Backtest · engine | Engine defaults |
 | System & security · scheduling | Daily auto analysis (long-running process required) |
@@ -165,7 +171,7 @@ Trust **current `origin/main`**. Older running builds may still lack entries—b
 | --- | --- | --- | --- |
 | **Scheduled tasks** | **Shipped, including run history** | Settings → **Scheduling** (enable, daily times, next run, run once, versioned-definition run history); Home **Today's scheduled tasks** (read-only) | See Scheduling above and [02 Home](02-home_EN.md); contract: `docs/scheduled-tasks.md` |
 | **Notification channel plugins** | **Shipped** | Settings → notifications / plugin surfaces when discovery is enabled | Prove one built-in channel with **test push** first; plugin channels follow the UI list |
-| **Personal investment framework** | **Structured Web editor and history shipped** | Settings → **Agent behavior**; the page shows compact status and **View fields** opens the configuration dialog | Supports decision trees, evaluation dimensions, immutable history inspection/copy-to-draft, versioned save, deactivate, and delete; see `docs/personal-investment-framework_EN.md` |
+| **Personal investment framework** | **Structured Web editor and history shipped** | Settings → **Agent behavior → Investment Framework**; the structured editor is inline on its own horizontal tab and history uses a read-only in-page drawer | Supports decision trees, evaluation dimensions, immutable history inspection/copy-to-draft, versioned save, deactivate, and delete; see `docs/personal-investment-framework_EN.md` |
 | **Local model pack import** | **Shipped** | Settings → **AI & Models → Local Models** → Import Model Pack (labels as in UI) | Catalog pull/activate still apply; import path: `docs/model-packs.md` and in-product help |
 | **HITL human approvals** | **Shipped** (default off) | **Not** in primary sidebar; route `/approvals`; Home **Review human approvals** when administrator sign-in is enabled | See [01 Shell](01-shell_EN.md); contract `docs/human-approvals_EN.md`. One-shot risk-bypass approval — **not** broker trade approval |
 | **Report evidence strata** | **Shipped** | Full-report Web view strata panel (labels as in UI) | See [08 Reading reports](08-reading-reports_EN.md); contract `docs/report-strata-contract_EN.md` |

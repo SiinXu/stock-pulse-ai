@@ -1,6 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { SettingsSectionNav, SettingsViewTabs } from '../SettingsNavigation';
 
@@ -206,6 +206,26 @@ describe('SettingsViewTabs', () => {
     );
     fireEvent.click(screen.getByRole('radio', { name: '可靠性' }));
     expect(onSelect).toHaveBeenCalledWith('reliability');
+  });
+
+  it('renders Investment Framework as a horizontal Agent Behavior tab', () => {
+    render(
+      <SettingsViewTabs
+        section="agent_behavior"
+        activeView="investment_framework"
+        onSelectView={() => {}}
+        language="en"
+        tabsLabel="Agent Behavior views"
+      />,
+    );
+
+    const tabs = screen.getByRole('radiogroup', { name: 'Agent Behavior views' });
+    expect(within(tabs).getAllByRole('radio').map((tab) => tab.textContent)).toEqual([
+      'Execution',
+      'Investment Framework',
+    ]);
+    expect(within(tabs).getByRole('radio', { name: 'Investment Framework' }))
+      .toHaveAttribute('aria-checked', 'true');
   });
 
   it('renders nothing for a single-view section', () => {

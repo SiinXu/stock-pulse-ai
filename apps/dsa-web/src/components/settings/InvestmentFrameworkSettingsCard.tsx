@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Copy, History, RefreshCw } from 'lucide-react';
+import { Copy, History, RefreshCw, X } from 'lucide-react';
 import { investmentFrameworkApi } from '../../api/investmentFramework';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -20,7 +20,6 @@ import {
   ConfirmDialog,
   EmptyState,
   IconButton,
-  Modal,
   StatePanel,
 } from '../common';
 import { SettingsAlert } from './SettingsAlert';
@@ -68,11 +67,10 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
   const [changeSummary, setChangeSummary] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [loadError, setLoadError] = useState<ParsedApiError | null>(null);
   const [error, setError] = useState<ParsedApiError | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [isConflict, setIsConflict] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
   const [serverValidationIssues, setServerValidationIssues] = useState<
     InvestmentFrameworkValidationIssue[]
@@ -97,7 +95,6 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
         setChangeSummary('');
         setShowValidation(false);
       }
-      setIsConflict(false);
       return true;
     } catch (err) {
       const parsed = getParsedApiError(err);
@@ -109,7 +106,6 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
           setChangeSummary('');
           setShowValidation(false);
         }
-        setIsConflict(false);
         return true;
       }
       setLoadError(parsed);
@@ -152,10 +148,10 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
   }, [load]);
 
   useEffect(() => {
-    if (isConfigOpen) {
+    if (isHistoryOpen) {
       void loadHistory();
     }
-  }, [isConfigOpen, loadHistory]);
+  }, [isHistoryOpen, loadHistory]);
 
   const validationIssues = useMemo(
     () => validateInvestmentFrameworkContent(content),
@@ -268,8 +264,9 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
         setSuccessMessage(t('settings.frameworkSaved'));
       }
       setShowValidation(false);
-      setIsConflict(false);
-      await loadHistory(!exists);
+      if (isHistoryOpen) {
+        await loadHistory(!exists);
+      }
     } catch (err) {
       const parsed = getParsedApiError(err);
       if (parsed.status === 422 || parsed.code === 'validation_error') {
@@ -279,10 +276,12 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
         setShowValidation(true);
       }
       setError(parsed);
-      setIsConflict(
+      if (
         parsed.status === 409
-        || parsed.code === 'investment_framework_revision_conflict',
-      );
+        || parsed.code === 'investment_framework_revision_conflict'
+      ) {
+        await load(true);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -300,11 +299,18 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
       setFramework(updated);
       setContent(editableContent(updated.content));
       setSuccessMessage(t('settings.frameworkDeactivated'));
-      await loadHistory();
+      if (isHistoryOpen) {
+        await loadHistory();
+      }
     } catch (err) {
       const parsed = getParsedApiError(err);
       setError(parsed);
-      setIsConflict(parsed.status === 409);
+      if (
+        parsed.status === 409
+        || parsed.code === 'investment_framework_revision_conflict'
+      ) {
+        await load(true);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -322,8 +328,10 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
       setExists(false);
       setContent(emptyInvestmentFrameworkContent());
       setChangeSummary('');
+      setIsHistoryOpen(false);
       setHistory(null);
       setSelectedHistoryVersion(null);
+      setHistoryError(null);
       setSuccessMessage(t('settings.frameworkDeleted'));
     } catch (err) {
       setError(getParsedApiError(err));
@@ -358,57 +366,52 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
       title={t('settings.frameworkTitle')}
       description={t('settings.frameworkDescription')}
       actions={(
-        <>
+        <div className="flex flex-wrap items-center gap-2">
           <Badge
             variant={loadError ? 'danger' : framework?.isActive ? 'success' : 'default'}
             size="sm"
+            className={
+              loadError || framework?.isActive
+                ? ''
+                : 'border-[var(--settings-border)] bg-[var(--settings-surface-hover)] text-secondary-text'
+            }
           >
             {statusLabel}
           </Badge>
-          {!loadError ? (
-            <Button
-              variant="secondary"
-              size="default"
-              aria-haspopup="dialog"
-              disabled={isLoading}
-              onClick={() => setIsConfigOpen(true)}
-            >
-              {t('settings.openConfigItems')}
-            </Button>
-          ) : null}
-        </>
+          <Button
+            type="button"
+            variant="secondary"
+            size="default"
+            aria-controls="investment-framework-history-drawer"
+            aria-expanded={isHistoryOpen}
+            disabled={!exists || isLoading}
+            onClick={() => setIsHistoryOpen((current) => !current)}
+          >
+            <History className="h-3.5 w-3.5" aria-hidden="true" />
+            {t('settings.frameworkHistory')}
+          </Button>
+        </div>
       )}
     >
-      <p className="text-xs leading-6 text-muted-text">{t('settings.frameworkDisclaimer')}</p>
-      {loadError ? (
-        <SettingsAlert
-          title={loadError.title}
-          message={loadError.message}
-          actionLabel={t('common.retry')}
-          onAction={() => void load()}
-        />
-      ) : null}
-
-      <Modal
-        isOpen={isConfigOpen}
-        onClose={() => setIsConfigOpen(false)}
-        title={t('settings.frameworkTitle')}
-        description={t('settings.frameworkDescription')}
-        size="fullscreen"
-        closeDisabled={isSubmitting}
+      <div
+        className={
+          isHistoryOpen
+            ? 'grid max-w-6xl grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]'
+            : 'max-w-4xl'
+        }
       >
-        <p className="mb-4 text-xs leading-6 text-muted-text">{t('settings.frameworkDisclaimer')}</p>
-        {isLoading ? (
-          <StatePanel state="loading" title={t('common.loading')} size="compact" titleAs="p" />
-        ) : loadError ? (
-          <SettingsAlert
-            title={loadError.title}
-            message={loadError.message}
-            actionLabel={t('common.retry')}
-            onAction={() => void load()}
-          />
-        ) : (
-          <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="min-w-0 space-y-4">
+          <p className="text-xs leading-6 text-muted-text">{t('settings.frameworkDisclaimer')}</p>
+          {isLoading ? (
+            <StatePanel state="loading" title={t('common.loading')} size="compact" titleAs="p" />
+          ) : loadError ? (
+            <SettingsAlert
+              title={loadError.title}
+              message={loadError.message}
+              actionLabel={t('common.retry')}
+              onAction={() => void load()}
+            />
+          ) : (
             <form className="min-w-0 space-y-5" aria-busy={isSubmitting} onSubmit={handleSave}>
               {framework ? (
                 <div className="grid grid-cols-1 gap-2 text-xs text-secondary-text sm:grid-cols-3">
@@ -583,16 +586,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                 />
               ) : null}
               {error ? (
-                <ApiErrorAlert
-                  error={error}
-                  actionLabel={isConflict ? t('settings.frameworkLoadLatest') : undefined}
-                  onAction={isConflict ? () => void load(true) : undefined}
-                />
-              ) : null}
-              {isConflict ? (
-                <p className="text-xs leading-5 text-secondary-text">
-                  {t('settings.frameworkConflictDraftPreserved')}
-                </p>
+                <ApiErrorAlert error={error} />
               ) : null}
               {successMessage ? (
                 <SettingsAlert
@@ -633,8 +627,15 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                 ) : null}
               </div>
             </form>
+          )}
+        </div>
 
-            <aside className="min-w-0 space-y-3 rounded-xl border settings-border bg-background/20 p-4">
+        {isHistoryOpen ? (
+          <aside
+            id="investment-framework-history-drawer"
+            className="min-w-0 space-y-3 rounded-xl border settings-border bg-background/20 p-4"
+            aria-label={t('settings.frameworkHistory')}
+          >
               <div className="flex items-center justify-between gap-2">
                 <div>
                   <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
@@ -645,17 +646,28 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                     {t('settings.frameworkHistoryDescription')}
                   </p>
                 </div>
-                <IconButton
-                  type="button"
-                  variant="outline"
-                  size="compact"
-                  disabled={isHistoryLoading || !exists}
-                  isLoading={isHistoryLoading}
-                  aria-label={t('settings.frameworkHistoryRefresh')}
-                  onClick={() => void loadHistory()}
-                >
-                  <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                </IconButton>
+                <div className="flex items-center gap-1">
+                  <IconButton
+                    type="button"
+                    variant="outline"
+                    size="compact"
+                    disabled={isHistoryLoading || !exists}
+                    isLoading={isHistoryLoading}
+                    aria-label={t('settings.frameworkHistoryRefresh')}
+                    onClick={() => void loadHistory()}
+                  >
+                    <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                  </IconButton>
+                  <IconButton
+                    type="button"
+                    variant="outline"
+                    size="compact"
+                    aria-label={t('settings.frameworkHistoryClose')}
+                    onClick={() => setIsHistoryOpen(false)}
+                  >
+                    <X className="h-4 w-4" aria-hidden="true" />
+                  </IconButton>
+                </div>
               </div>
 
               {isHistoryLoading && !history ? (
@@ -724,7 +736,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
               {selectedHistory ? (
                 <section
                   className="space-y-3 border-t border-border/60 pt-3"
-                  aria-label={t('settings.frameworkHistoryInspector')}
+                  aria-label={t('settings.frameworkHistoryDetails')}
                   data-testid={`framework-history-inspector-${selectedHistory.version}`}
                 >
                   <div>
@@ -774,10 +786,9 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                   </Button>
                 </section>
               ) : null}
-            </aside>
-          </div>
-        )}
-      </Modal>
+          </aside>
+        ) : null}
+      </div>
 
       <ConfirmDialog
         isOpen={deleteConfirmOpen}

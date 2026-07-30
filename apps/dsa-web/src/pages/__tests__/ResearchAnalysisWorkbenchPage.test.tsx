@@ -275,7 +275,12 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     }));
     const registration = routeFocusRegister.mock.calls.at(-1)?.[0];
     expect(registration?.headingRef.current).toBe(heading);
-    expect(screen.getByRole('combobox', { name: '股票搜索' })).toBeInTheDocument();
+    const stockSearch = screen.getByRole('combobox', { name: '股票搜索' });
+    const launchHeading = screen.getByRole('heading', { name: '发起与批量' });
+    expect(stockSearch).toBeInTheDocument();
+    expect(screen.getByText('股票搜索', { selector: 'label' })).toBeInTheDocument();
+    expect(launchHeading.parentElement?.parentElement).toHaveClass('max-w-5xl', 'space-y-6');
+    expect(stockSearch.closest('.grid')).toHaveClass('rounded-xl', 'border');
     expect(document.title).toBe('分析工作台 - StockPulse');
     const workbenchTabs = screen.getByRole('tablist', { name: '分析工作台分段' });
     expect(workbenchTabs).toHaveClass('segmented-control');
@@ -289,7 +294,8 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     expect(within(informationDensity).getByRole('radio', { name: '专业' }))
       .toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('button', { name: '导入图表/文档到分析' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '分析全部' })).toBeInTheDocument();
+    const analyzeAll = screen.getByRole('button', { name: '分析全部' });
+    expect(analyzeAll.parentElement?.parentElement).toHaveClass('rounded-xl', 'border');
   });
 
   it('switches segments without a reload and gives the empty tasks view a primary action', async () => {
