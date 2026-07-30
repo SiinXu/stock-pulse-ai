@@ -346,6 +346,10 @@ export interface ImportSystemConfigRequest {
   reloadNow?: boolean;
 }
 
+export interface RollbackSystemConfigRequest {
+  configVersion: string;
+}
+
 export interface ConfigValidationIssue {
   key: string;
   code: string;
@@ -419,6 +423,7 @@ export interface TestLLMChannelResponse {
 
 export type NotificationTestChannel =
   | 'wechat'
+  | 'dingtalk'
   | 'feishu'
   | 'telegram'
   | 'email'

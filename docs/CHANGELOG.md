@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Added] Completed Settings lifecycle controls with last-good configuration rollback, durable scheduled-run history, structured investment-framework editing and immutable history copy-to-draft, plus masked DingTalk group webhook configuration and testing.
+- [Fixed] Aligned investment-framework history timestamps, editor collection and rule limits, and backend validation placement with the authoritative schema.
 - [Changed] Refined Web Home and Settings with bordered attention panels, a modal investment-framework editor, compact shared help and local-model icons, a unified Research disclosure row, and a cleaner embedded Usage header.
 - [Changed] Made native, platform-matched loopback Web/API/Ollama setup download the official macOS or Windows installer directly, re-detect the runtime when users return, retain server-side guidance for detected remote, proxy, container, and Linux environments, and document loopback-preserving tunnel limits.
 - [Fixed] Retried route-focus restoration when a POP target marker is not mounted yet, so browser Forward restores the details Back control instead of racing to the H1 fallback.

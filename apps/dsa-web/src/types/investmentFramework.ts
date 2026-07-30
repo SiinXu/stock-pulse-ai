@@ -3,6 +3,7 @@
 
 /** Domain content for the local personal investment framework. */
 export interface InvestmentFrameworkContent {
+  [key: string]: unknown;
   schemaVersion?: 'investment-framework-content-v1';
   title: string;
   description?: string | null;
@@ -15,18 +16,21 @@ export interface InvestmentFrameworkContent {
 }
 
 export interface InvestmentFrameworkDecisionBranch {
+  [key: string]: unknown;
   condition: string;
   targetNodeId?: string | null;
   outcome?: string | null;
 }
 
 export interface InvestmentFrameworkDecisionNode {
+  [key: string]: unknown;
   nodeId: string;
   question: string;
   branches: InvestmentFrameworkDecisionBranch[];
 }
 
 export interface InvestmentFrameworkEvaluationDimension {
+  [key: string]: unknown;
   name: string;
   weight: number;
   criteria?: string[];

@@ -25,6 +25,41 @@ const t = (key: keyof typeof UI_TEXT.en, params?: Record<string, string | number
   ));
 };
 
+const scheduledTask = {
+  compatibility: 'supported' as const,
+  id: 'task-1',
+  schemaVersion: 2,
+  name: 'AAPL risk check',
+  taskType: 'risk_check',
+  enabled: true,
+  nextRunAt: '2026-07-26T15:00:00Z',
+  createdAt: '2026-07-25T10:00:00Z',
+  updatedAt: '2026-07-25T10:00:00Z',
+};
+
+function buildRun(id: string, overrides: Record<string, unknown> = {}) {
+  return {
+    id,
+    taskId: 'task-1',
+    scheduledFor: '2026-07-26T20:30:00Z',
+    status: 'succeeded' as const,
+    attemptCount: 1,
+    dispatchFailureCount: 0,
+    executionTaskIds: [`execution-${id}`],
+    resultRefs: [`result-${id}`],
+    notificationStatus: 'succeeded',
+    notificationChannels: ['email'],
+    notificationFailedChannels: [],
+    errorCode: null,
+    nextAttemptAt: null,
+    startedAt: '2026-07-26T20:30:01Z',
+    finishedAt: '2026-07-26T20:31:00Z',
+    createdAt: '2026-07-26T20:30:00Z',
+    updatedAt: '2026-07-26T20:31:00Z',
+    ...overrides,
+  };
+}
+
 describe('ScheduledTasksPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -270,5 +305,87 @@ describe('ScheduledTasksPanel', () => {
 
     expect(await screen.findByText('Max attempts must be an integer from 1 to 3.')).toBeInTheDocument();
     expect(scheduledTasksApi.create).not.toHaveBeenCalled();
+  });
+
+  it('loads multiple run records lazily and exposes failure and notification diagnostics', async () => {
+    vi.mocked(scheduledTasksApi.list).mockResolvedValue({ total: 1, items: [scheduledTask] });
+    vi.mocked(scheduledTasksApi.listRuns).mockResolvedValue({
+      total: 2,
+      items: [
+        buildRun('run-success'),
+        buildRun('run-failed', {
+          status: 'failed',
+          attemptCount: 3,
+          dispatchFailureCount: 2,
+          executionTaskIds: ['execution-failed'],
+          resultRefs: [],
+          notificationStatus: 'partial_failure',
+          notificationChannels: ['email', 'dingtalk'],
+          notificationFailedChannels: ['dingtalk'],
+          errorCode: 'analysis_failed',
+        }),
+      ],
+    });
+
+    render(<ScheduledTasksPanel t={t} language="en" />);
+
+    expect(await screen.findByText('AAPL risk check')).toBeInTheDocument();
+    expect(scheduledTasksApi.listRuns).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('settings-scheduled-task-history-toggle-task-1'));
+
+    await waitFor(() => expect(scheduledTasksApi.listRuns).toHaveBeenCalledWith(
+      'task-1',
+      { limit: 10 },
+    ));
+    expect(await screen.findByTestId('settings-scheduled-task-run-run-success')).toBeInTheDocument();
+    const failed = await screen.findByTestId('settings-scheduled-task-run-run-failed');
+    expect(failed).toHaveTextContent('Failed');
+    expect(failed).toHaveTextContent('3 attempts · 2 dispatch failures');
+    expect(failed).toHaveTextContent('execution-failed');
+    expect(failed).toHaveTextContent('partial_failure · email, dingtalk');
+    expect(failed).toHaveTextContent('dingtalk');
+    expect(failed).toHaveTextContent('analysis_failed');
+  });
+
+  it('shows an empty history and uses the API limit contract for load more and refresh', async () => {
+    vi.mocked(scheduledTasksApi.list).mockResolvedValue({ total: 1, items: [scheduledTask] });
+    vi.mocked(scheduledTasksApi.listRuns)
+      .mockResolvedValueOnce({ total: 0, items: [] })
+      .mockResolvedValueOnce({ total: 11, items: [buildRun('run-1')] })
+      .mockResolvedValueOnce({
+        total: 2,
+        items: [buildRun('run-1'), buildRun('run-2')],
+      })
+      .mockResolvedValueOnce({
+        total: 2,
+        items: [buildRun('run-1'), buildRun('run-2')],
+      });
+
+    render(<ScheduledTasksPanel t={t} language="en" />);
+
+    await screen.findByText('AAPL risk check');
+    fireEvent.click(screen.getByTestId('settings-scheduled-task-history-toggle-task-1'));
+    expect(await screen.findByText('No run history')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', {
+      name: 'Refresh run history for “AAPL risk check”',
+    }));
+    expect(await screen.findByTestId('settings-scheduled-task-run-run-1')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
+    await waitFor(() => expect(scheduledTasksApi.listRuns).toHaveBeenNthCalledWith(
+      3,
+      'task-1',
+      { limit: 20 },
+    ));
+    expect(await screen.findByTestId('settings-scheduled-task-run-run-2')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', {
+      name: 'Refresh run history for “AAPL risk check”',
+    }));
+    await waitFor(() => expect(scheduledTasksApi.listRuns).toHaveBeenNthCalledWith(
+      4,
+      'task-1',
+      { limit: 20 },
+    ));
   });
 });

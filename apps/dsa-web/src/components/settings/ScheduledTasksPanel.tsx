@@ -34,6 +34,7 @@ import {
 import { SettingsAlert } from './SettingsAlert';
 import { SettingsSectionCard } from './SettingsSectionCard';
 import { SettingsSwitch } from './SettingsSwitch';
+import ScheduledTaskRunHistory from './ScheduledTaskRunHistory';
 
 type ScheduledTasksPanelProps = {
   disabled?: boolean;
@@ -494,50 +495,59 @@ const ScheduledTasksPanel: React.FC<ScheduledTasksPanelProps> = ({
             return (
               <div
                 key={task.id}
-                className="flex min-h-14 flex-wrap items-center justify-between gap-3 py-3"
+                className="py-3"
                 data-testid={`settings-scheduled-task-${task.id}`}
               >
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="truncate text-sm font-medium text-foreground">
-                      {task.name}
-                    </span>
-                    <Badge variant={unsupported ? 'warning' : 'default'} className="shrink-0">
-                      {unsupported
-                        ? t('settings.scheduledTasksUnsupported')
-                        : taskTypeLabel(task.taskType, t)}
-                    </Badge>
-                    {latestRun ? (
-                      <Badge
-                        variant={runStatusVariant(latestRun.status)}
-                        className="shrink-0"
-                        data-testid={`settings-scheduled-task-status-${task.id}`}
-                      >
-                        {runStatusLabel(latestRun.status, t)}
+                <div className="flex min-h-14 flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="truncate text-sm font-medium text-foreground">
+                        {task.name}
+                      </span>
+                      <Badge variant={unsupported ? 'warning' : 'default'} className="shrink-0">
+                        {unsupported
+                          ? t('settings.scheduledTasksUnsupported')
+                          : taskTypeLabel(task.taskType, t)}
                       </Badge>
-                    ) : null}
+                      {latestRun ? (
+                        <Badge
+                          variant={runStatusVariant(latestRun.status)}
+                          className="shrink-0"
+                          data-testid={`settings-scheduled-task-status-${task.id}`}
+                        >
+                          {runStatusLabel(latestRun.status, t)}
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 text-xs text-secondary-text">
+                      {nextRun
+                        ? t('settings.scheduledTasksNextRun', { time: nextRun })
+                        : t('settings.scheduledTasksNoNextRun')}
+                    </p>
+                    <p className="mt-0.5 text-xs text-secondary-text">
+                      {latestRun && lastRunTime
+                        ? t('settings.scheduledTasksLastRun', {
+                            status: runStatusLabel(latestRun.status, t),
+                            time: lastRunTime,
+                          })
+                        : t('settings.scheduledTasksNoLastRun')}
+                    </p>
                   </div>
-                  <p className="mt-1 text-xs text-secondary-text">
-                    {nextRun
-                      ? t('settings.scheduledTasksNextRun', { time: nextRun })
-                      : t('settings.scheduledTasksNoNextRun')}
-                  </p>
-                  <p className="mt-0.5 text-xs text-secondary-text">
-                    {latestRun && lastRunTime
-                      ? t('settings.scheduledTasksLastRun', {
-                          status: runStatusLabel(latestRun.status, t),
-                          time: lastRunTime,
-                        })
-                      : t('settings.scheduledTasksNoLastRun')}
-                  </p>
+                  <SettingsSwitch
+                    checked={task.enabled}
+                    disabled={disabled || unsupported || busy || isRefreshing}
+                    onCheckedChange={(checked) => {
+                      void handleToggle(task, checked);
+                    }}
+                    aria-label={t('settings.scheduledTasksToggleAria', { name: task.name })}
+                  />
                 </div>
-                <SettingsSwitch
-                  checked={task.enabled}
-                  disabled={disabled || unsupported || busy || isRefreshing}
-                  onCheckedChange={(checked) => {
-                    void handleToggle(task, checked);
-                  }}
-                  aria-label={t('settings.scheduledTasksToggleAria', { name: task.name })}
+                <ScheduledTaskRunHistory
+                  taskId={task.id}
+                  taskName={task.name}
+                  disabled={disabled || isRefreshing}
+                  t={t}
+                  language={language}
                 />
               </div>
             );

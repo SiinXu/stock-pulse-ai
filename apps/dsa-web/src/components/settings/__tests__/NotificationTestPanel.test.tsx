@@ -74,6 +74,7 @@ describe('NotificationTestPanel', () => {
     expect(channelSelect.parentElement?.parentElement).toHaveClass('w-full');
     expect(titleInput.parentElement?.parentElement).toHaveClass('w-full');
     const channelListbox = openListbox(channelSelect);
+    expect(within(channelListbox).getByRole('option', { name: '钉钉' })).toBeInTheDocument();
     expect(within(channelListbox).getByRole('option', { name: 'ntfy' })).toBeInTheDocument();
     expect(within(channelListbox).getByRole('option', { name: 'Gotify' })).toBeInTheDocument();
     fireEvent.click(channelSelect);
@@ -90,6 +91,55 @@ describe('NotificationTestPanel', () => {
     expect(await screen.findByText('测试成功')).toBeInTheDocument();
     expect(screen.getByText('HTTP 200')).toBeInTheDocument();
     expect(screen.getByText('https://example.com/hook?token=***')).toBeInTheDocument();
+  });
+
+  it('tests a DingTalk draft while preserving masked group robot secrets', async () => {
+    testNotificationChannel.mockResolvedValueOnce({
+      success: true,
+      message: 'dingtalk 通知测试成功',
+      errorCode: null,
+      stage: 'notification_send',
+      retryable: false,
+      latencyMs: 9,
+      attempts: [
+        {
+          channel: 'dingtalk',
+          success: true,
+          message: '通知测试发送成功',
+          target: 'https://oapi.dingtalk.com/robot/send?access_token=***',
+          errorCode: null,
+          stage: 'notification_send',
+          retryable: false,
+          latencyMs: 9,
+          httpStatus: 200,
+        },
+      ],
+    });
+
+    render(
+      <NotificationTestPanel
+        items={[
+          { key: 'DINGTALK_WEBHOOK_URL', value: '******' },
+          { key: 'DINGTALK_SECRET', value: '******' },
+        ]}
+        maskToken="******"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '配置' }));
+    chooseOption(screen.getByLabelText('渠道'), 'dingtalk');
+    fireEvent.click(screen.getByRole('button', { name: /发送测试/ }));
+
+    await waitFor(() => expect(testNotificationChannel).toHaveBeenCalledWith(expect.objectContaining({
+      channel: 'dingtalk',
+      items: [
+        { key: 'DINGTALK_WEBHOOK_URL', value: '******' },
+        { key: 'DINGTALK_SECRET', value: '******' },
+      ],
+      maskToken: '******',
+    })));
+    expect(await screen.findByText('测试成功')).toBeInTheDocument();
+    expect(screen.getByText('https://oapi.dingtalk.com/robot/send?access_token=***')).toBeInTheDocument();
   });
 
   it('uses translated defaults when UI language changes and user has not edited fields', async () => {

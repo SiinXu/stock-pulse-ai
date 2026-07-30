@@ -75,4 +75,59 @@ describe('NotificationChannelsPanel', () => {
     expect(screen.getByRole('button', { name: /飞书.*已配置/ })).toBeInTheDocument();
     expect(container).not.toHaveTextContent('******');
   });
+
+  it('separates DingTalk group webhook settings from app bot and Stream settings', () => {
+    const groupWebhook = buildItem({
+      key: 'DINGTALK_WEBHOOK_URL',
+      value: '******',
+      rawValueExists: true,
+      isMasked: true,
+      schema: {
+        ...buildItem().schema!,
+        key: 'DINGTALK_WEBHOOK_URL',
+        title: 'DingTalk Group Webhook URL',
+        uiControl: 'password',
+        isSensitive: true,
+        options: [],
+      },
+    });
+    const signingSecret = buildItem({
+      ...groupWebhook,
+      key: 'DINGTALK_SECRET',
+      schema: {
+        ...groupWebhook.schema!,
+        key: 'DINGTALK_SECRET',
+        title: 'DingTalk signing secret',
+      },
+    });
+    const appKey = buildItem({
+      ...groupWebhook,
+      key: 'DINGTALK_APP_KEY',
+      schema: {
+        ...groupWebhook.schema!,
+        key: 'DINGTALK_APP_KEY',
+        title: 'DingTalk App Key',
+      },
+    });
+
+    const { container } = render(
+      <NotificationChannelsPanel
+        items={[groupWebhook, signingSecret, appKey]}
+        configuredChannels={['dingtalk']}
+        disabled={false}
+        onChange={vi.fn()}
+        issueByKey={{}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /钉钉.*已配置/ }));
+
+    const dialog = screen.getByRole('dialog', { name: '钉钉' });
+    expect(within(dialog).getByRole('heading', { name: '群机器人 Webhook' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('heading', { name: '应用机器人 / Stream' })).toBeInTheDocument();
+    expect(within(dialog).getByTestId('settings-field-DINGTALK_WEBHOOK_URL')).toBeInTheDocument();
+    expect(within(dialog).getByTestId('settings-field-DINGTALK_SECRET')).toBeInTheDocument();
+    expect(within(dialog).getByTestId('settings-field-DINGTALK_APP_KEY')).toBeInTheDocument();
+    expect(container).not.toHaveTextContent('******');
+  });
 });

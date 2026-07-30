@@ -7,9 +7,14 @@
 // (behind import.meta.env.DEV), so none of this ships to production.
 import type AxiosMockAdapter from 'axios-mock-adapter';
 import camelcaseKeys from 'camelcase-keys';
-import { FIXTURE_TIMESTAMP, fixtureConnectionFields } from '../../playground/fixtures';
+import {
+  FIXTURE_TIMESTAMP,
+  fixtureConnectionFields,
+  fixtureDingtalkGroupConfigItems,
+} from '../../playground/fixtures';
 import { installPlaygroundApiMock } from '../../playground/mockApi';
 import type { PlaygroundFixtureProfile } from '../../playground/types';
+import type { InvestmentFrameworkContent } from '../../types/investmentFramework';
 import type { SystemConfigItem } from '../../types/systemConfig';
 import {
   richAlertNotifications,
@@ -36,6 +41,48 @@ const REAL_CONFIG_SCHEMA = camelcaseKeys(REAL_SYSTEM_CONFIG_SCHEMA as Record<str
   categories: unknown[];
 };
 
+const READY_FRAMEWORK_CONTENT: InvestmentFrameworkContent = {
+  schemaVersion: 'investment-framework-content-v1',
+  title: 'Quality compounder framework',
+  description: 'A deterministic fixture for structured editing and immutable-history review.',
+  rootNodeId: 'business_quality',
+  decisionTree: [
+    {
+      nodeId: 'business_quality',
+      question: 'Does the business have a durable moat and understandable economics?',
+      branches: [
+        { condition: 'Yes', targetNodeId: 'valuation' },
+        { condition: 'No', outcome: 'Reject' },
+      ],
+    },
+    {
+      nodeId: 'valuation',
+      question: 'Does the expected return compensate for valuation and downside risk?',
+      branches: [
+        { condition: 'Yes', outcome: 'Eligible for sizing' },
+        { condition: 'No', outcome: 'Watchlist only' },
+      ],
+    },
+  ],
+  evaluationDimensions: [
+    {
+      name: 'Business quality',
+      weight: 60,
+      criteria: ['Durable moat', 'Healthy reinvestment runway'],
+      description: 'Assess durability before forecasting returns.',
+    },
+    {
+      name: 'Valuation and risk',
+      weight: 40,
+      criteria: ['Downside protection', 'Expected return'],
+      description: 'Require a margin of safety.',
+    },
+  ],
+  riskRules: ['Do not average down when the thesis is invalidated.'],
+  trackingCriteria: ['Quarterly moat evidence', 'Capital allocation discipline'],
+  freeFormRules: 'Document the disconfirming evidence before opening a position.',
+};
+
 const ERROR_PAYLOAD = {
   error: 'dev_mock_error',
   message: 'The selected dev mock profile returns a deterministic service error.',
@@ -52,8 +99,8 @@ function registerPriorityHandlers(mock: AxiosMockAdapter, profile: PlaygroundFix
   mock.onGet('/api/v1/system/config').reply(() => reply(profile, {
     configVersion: 'dev-mock-v1',
     maskToken: '******',
-    items: REAL_CONFIG_ITEMS,
-    configuredNotificationChannels: ['email', 'feishu', 'webhook'],
+    items: [...REAL_CONFIG_ITEMS, ...fixtureDingtalkGroupConfigItems],
+    configuredNotificationChannels: ['email', 'feishu', 'webhook', 'dingtalk'],
     updatedAt: FIXTURE_TIMESTAMP,
   }, {
     configVersion: 'dev-mock-v1',
@@ -75,6 +122,44 @@ function registerPriorityHandlers(mock: AxiosMockAdapter, profile: PlaygroundFix
     updatedKeys: [],
     warnings: ['Dev mock does not persist configuration edits.'],
   }]));
+  mock.onPost('/api/v1/system/config/rollback').reply(() => (
+    profile === 'error'
+      ? [503, ERROR_PAYLOAD]
+      : [200, {
+        success: true,
+        config_version: 'dev-mock-v0',
+        applied_count: 2,
+        skipped_masked_count: 0,
+        reload_triggered: true,
+        updated_keys: ['SCHEDULE_TIME', 'DINGTALK_WEBHOOK_URL'],
+        warnings: ['Dev mock rollback is deterministic and does not persist.'],
+      }]
+  ));
+  mock.onPost('/api/v1/system/config/notification/test-channel').reply((config) => {
+    if (profile === 'error') return [503, ERROR_PAYLOAD];
+    let body: Record<string, unknown> = {};
+    if (typeof config.data === 'string') {
+      body = JSON.parse(config.data) as Record<string, unknown>;
+    } else if (config.data && typeof config.data === 'object') {
+      body = config.data as Record<string, unknown>;
+    }
+    const channel = typeof body.channel === 'string' ? body.channel : 'unknown';
+    return [200, {
+      success: true,
+      message: `Fixture ${channel} notification delivered.`,
+      retryable: false,
+      latency_ms: 32,
+      attempts: [{
+        channel,
+        success: true,
+        message: 'Delivered',
+        stage: 'dispatch',
+        retryable: false,
+        latency_ms: 32,
+        http_status: 200,
+      }],
+    }];
+  });
 
   mock.onGet('/api/v1/system/config/llm/providers').reply(() => reply(profile, {
     providers: richProviders,
@@ -92,6 +177,71 @@ function registerPriorityHandlers(mock: AxiosMockAdapter, profile: PlaygroundFix
     total: richStockBarItems.length,
     items: richStockBarItems,
   }, { total: 0, items: [] }));
+
+  mock.onGet('/api/v1/investment-framework').reply(() => {
+    if (profile === 'error') return [503, ERROR_PAYLOAD];
+    if (profile === 'empty') {
+      return [404, { error: 'not_found', message: 'No investment framework exists.' }];
+    }
+    return [200, {
+      framework_id: 1,
+      scope: 'local',
+      version: 3,
+      active_version: 3,
+      revision: 7,
+      is_active: true,
+      content: READY_FRAMEWORK_CONTENT,
+      change_summary: 'Refined valuation branch and tracking criteria.',
+      created_at: '2026-06-01T08:00:00Z',
+      updated_at: '2026-07-29T08:00:00Z',
+      version_created_at: '2026-07-29T08:00:00Z',
+    }];
+  });
+  mock.onGet('/api/v1/investment-framework/history').reply(() => {
+    if (profile === 'error') return [503, ERROR_PAYLOAD];
+    if (profile === 'empty') {
+      return [404, { error: 'not_found', message: 'No investment framework exists.' }];
+    }
+    return [200, {
+      framework_id: 1,
+      latest_version: 3,
+      active_version: 3,
+      revision: 7,
+      total: 3,
+      items: [
+        {
+          version: 3,
+          is_active: true,
+          content: READY_FRAMEWORK_CONTENT,
+          change_summary: 'Refined valuation branch and tracking criteria.',
+          created_at: '2026-07-29T08:00:00Z',
+        },
+        {
+          version: 2,
+          is_active: false,
+          content: {
+            ...READY_FRAMEWORK_CONTENT,
+            title: 'Quality and valuation framework v2',
+            trackingCriteria: ['Quarterly moat evidence'],
+          },
+          change_summary: 'Added a valuation decision node.',
+          created_at: '2026-07-10T08:00:00Z',
+        },
+        {
+          version: 1,
+          is_active: false,
+          content: {
+            ...READY_FRAMEWORK_CONTENT,
+            title: 'Initial quality framework',
+            decisionTree: READY_FRAMEWORK_CONTENT.decisionTree?.slice(0, 1),
+            rootNodeId: 'business_quality',
+          },
+          change_summary: 'Initial framework.',
+          created_at: '2026-06-01T08:00:00Z',
+        },
+      ],
+    }];
+  });
 
   mock.onGet('/api/v1/analysis/tasks').reply(() => {
     if (profile === 'error') return [503, ERROR_PAYLOAD];
@@ -131,6 +281,52 @@ function registerPriorityHandlers(mock: AxiosMockAdapter, profile: PlaygroundFix
     total: 0,
     items: [],
   }));
+  mock.onGet(/\/api\/v1\/scheduled-tasks\/[^/]+\/runs$/).reply((config) => {
+    if (profile === 'error') return [503, ERROR_PAYLOAD];
+    const taskId = String(config.url || '').split('/').at(-2) || 'scheduled-task';
+    const items = profile === 'empty' ? [] : [
+      {
+        id: `${taskId}-run-success`,
+        task_id: taskId,
+        scheduled_for: '2026-07-29T14:30:00Z',
+        status: 'succeeded',
+        attempt_count: 1,
+        dispatch_failure_count: 0,
+        execution_task_ids: ['analysis-task-aapl-0729'],
+        result_refs: ['report:aapl:2026-07-29'],
+        notification_status: 'delivered',
+        notification_channels: ['dingtalk'],
+        notification_failed_channels: [],
+        error_code: null,
+        next_attempt_at: null,
+        started_at: '2026-07-29T14:30:02Z',
+        finished_at: '2026-07-29T14:31:18Z',
+        created_at: '2026-07-29T14:30:00Z',
+        updated_at: '2026-07-29T14:31:18Z',
+      },
+      {
+        id: `${taskId}-run-failed`,
+        task_id: taskId,
+        scheduled_for: '2026-07-28T14:30:00Z',
+        status: 'failed',
+        attempt_count: 3,
+        dispatch_failure_count: 1,
+        execution_task_ids: ['analysis-task-aapl-0728'],
+        result_refs: [],
+        notification_status: 'partial_failure',
+        notification_channels: ['email', 'dingtalk'],
+        notification_failed_channels: ['email'],
+        error_code: 'upstream_timeout',
+        next_attempt_at: null,
+        started_at: '2026-07-28T14:30:01Z',
+        finished_at: '2026-07-28T14:35:00Z',
+        created_at: '2026-07-28T14:30:00Z',
+        updated_at: '2026-07-28T14:35:00Z',
+      },
+    ];
+    const limit = Math.max(1, Number(config.params?.limit) || 10);
+    return [200, { items: items.slice(0, limit), total: items.length }];
+  });
   mock.onPost(/\/api\/v1\/scheduled-tasks\/[^/]+\/enable$/).reply((config) => {
     const id = String(config.url || '').split('/').slice(-2, -1)[0] || 'task';
     return reply(profile, {

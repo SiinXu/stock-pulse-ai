@@ -31,6 +31,65 @@ NOTIFICATION_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": ["webhook_secret_value"],
     },
+    "DINGTALK_WEBHOOK_URL": {
+        "title": "DingTalk Group Webhook URL",
+        "description": (
+            "Webhook URL for a DingTalk group robot. This is separate from "
+            "DingTalk application bot and Stream mode."
+        ),
+        "category": "notification",
+        "data_type": "string",
+        "ui_control": "password",
+        "is_sensitive": True,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": None,
+        "options": [],
+        "validation": {
+            "item_type": "url",
+            "allowed_schemes": ["http", "https"],
+        },
+        "display_order": 18,
+        "help_key": "settings.notification.webhooks",
+        "examples": [
+            "DINGTALK_WEBHOOK_URL=https://oapi.dingtalk.com/robot/send?access_token=xxxx",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：通知渠道配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#通知渠道详细配置",
+            },
+        ],
+        "warning_codes": ["webhook_secret_value"],
+    },
+    "DINGTALK_SECRET": {
+        "title": "DingTalk Group Webhook Signing Secret",
+        "description": (
+            "Optional signing secret for a DingTalk group robot. Leave empty only "
+            "when signature verification is disabled for that robot."
+        ),
+        "category": "notification",
+        "data_type": "string",
+        "ui_control": "password",
+        "is_sensitive": True,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": None,
+        "options": [],
+        "validation": {"pattern": r"^SEC[A-Za-z0-9_-]+$"},
+        "display_order": 19,
+        "help_key": "settings.notification.webhooks",
+        "examples": [
+            "DINGTALK_SECRET=SECxxxxxxxxxxxxxxxxxxxxxxxx",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：通知渠道配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#通知渠道详细配置",
+            },
+        ],
+        "warning_codes": ["webhook_secret_value"],
+    },
     "DINGTALK_APP_KEY": {
         "title": "DingTalk App Key",
         "description": "DingTalk app key.",

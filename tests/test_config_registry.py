@@ -113,6 +113,41 @@ class TestFeishuWebhookFieldsRegistered(unittest.TestCase):
             self.assertIn(key, field_keys, f"{key} missing from schema response")
 
 
+class TestDingTalkGroupWebhookFieldsRegistered(unittest.TestCase):
+    """DingTalk group webhook settings must be safe and Web-editable."""
+
+    _DINGTALK_GROUP_KEYS = ("DINGTALK_WEBHOOK_URL", "DINGTALK_SECRET")
+
+    def test_group_webhook_fields_are_visible_sensitive_passwords(self):
+        for key in self._DINGTALK_GROUP_KEYS:
+            field = get_field_definition(key)
+            self.assertEqual(field["category"], "notification")
+            self.assertTrue(field["is_sensitive"])
+            self.assertEqual(field["ui_control"], "password")
+            self.assertNotIn(key, WEB_SETTINGS_HIDDEN_FROM_UI)
+
+    def test_webhook_url_and_optional_secret_have_authoritative_validation(self):
+        webhook = get_field_definition("DINGTALK_WEBHOOK_URL")
+        secret = get_field_definition("DINGTALK_SECRET")
+
+        self.assertEqual(webhook["validation"]["item_type"], "url")
+        self.assertIn("https", webhook["validation"]["allowed_schemes"])
+        self.assertFalse(secret["is_required"])
+        pattern = re.compile(secret["validation"]["pattern"])
+        self.assertIsNotNone(pattern.fullmatch("SECabc_123-xyz"))
+        self.assertIsNone(pattern.fullmatch("malformed-secret"))
+
+    def test_schema_response_includes_dingtalk_group_webhook_fields(self):
+        schema = build_schema_response()
+        notification = next(
+            category
+            for category in schema["categories"]
+            if category["category"] == "notification"
+        )
+        field_keys = {field["key"] for field in notification["fields"]}
+        self.assertTrue(set(self._DINGTALK_GROUP_KEYS).issubset(field_keys))
+
+
 class TestAstrBotFieldsRegistered(unittest.TestCase):
     """AstrBot config keys must be explicitly registered for settings UI."""
 

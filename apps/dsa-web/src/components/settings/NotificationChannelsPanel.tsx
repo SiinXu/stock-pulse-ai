@@ -51,6 +51,24 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
 
   const openChannel = NOTIFICATION_CHANNELS.find((channel) => channel.id === openChannelId) ?? null;
   const openChannelItems = openChannelId ? itemsByChannel.get(openChannelId) ?? [] : [];
+  const dingtalkGroupKeys = new Set(['DINGTALK_WEBHOOK_URL', 'DINGTALK_SECRET']);
+  const dingtalkGroupItems = openChannel?.id === 'dingtalk'
+    ? openChannelItems.filter((item) => dingtalkGroupKeys.has(item.key))
+    : [];
+  const dingtalkAppItems = openChannel?.id === 'dingtalk'
+    ? openChannelItems.filter((item) => !dingtalkGroupKeys.has(item.key))
+    : [];
+
+  const renderFields = (fieldItems: SystemConfigItem[]) => fieldItems.map((item) => (
+    <SettingsField
+      key={item.key}
+      item={item}
+      value={item.value}
+      disabled={disabled}
+      onChange={onChange}
+      issues={issueByKey[item.key] || []}
+    />
+  ));
 
   return (
     <>
@@ -93,16 +111,36 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
           size="wide"
         >
           <form className="divide-y divide-transparent" onSubmit={(event) => event.preventDefault()}>
-            {openChannelItems.map((item) => (
-              <SettingsField
-                key={item.key}
-                item={item}
-                value={item.value}
-                disabled={disabled}
-                onChange={onChange}
-                issues={issueByKey[item.key] || []}
-              />
-            ))}
+            {openChannel.id === 'dingtalk' ? (
+              <div className="space-y-6">
+                {dingtalkGroupItems.length ? (
+                  <section aria-labelledby="dingtalk-group-webhook-heading">
+                    <h3 id="dingtalk-group-webhook-heading" className="text-sm font-semibold text-foreground">
+                      {text.dingtalkGroupWebhook}
+                    </h3>
+                    <p className="mt-1 text-xs leading-5 text-secondary-text">
+                      {text.dingtalkGroupWebhookDescription}
+                    </p>
+                    <div className="mt-2 divide-y divide-transparent">
+                      {renderFields(dingtalkGroupItems)}
+                    </div>
+                  </section>
+                ) : null}
+                {dingtalkAppItems.length ? (
+                  <section aria-labelledby="dingtalk-app-bot-heading">
+                    <h3 id="dingtalk-app-bot-heading" className="text-sm font-semibold text-foreground">
+                      {text.dingtalkAppBot}
+                    </h3>
+                    <p className="mt-1 text-xs leading-5 text-secondary-text">
+                      {text.dingtalkAppBotDescription}
+                    </p>
+                    <div className="mt-2 divide-y divide-transparent">
+                      {renderFields(dingtalkAppItems)}
+                    </div>
+                  </section>
+                ) : null}
+              </div>
+            ) : renderFields(openChannelItems)}
           </form>
         </Modal>
       ) : null}

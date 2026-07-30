@@ -124,6 +124,63 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertTrue(payload["success"])
         self.assertEqual(mock_post.call_args[0][0], "https://saved.example.com/hook?key=savedsecret")
 
+    @patch("src.notification_sender.dingtalk_sender.safe_post")
+    def test_test_dingtalk_channel_signs_draft_without_persisting(self, mock_post) -> None:
+        mock_post.return_value = self._mock_http_response(200, {"errcode": 0})
+
+        with self._notification_test_env():
+            payload = self.service.test_notification_channel(
+                channel="dingtalk",
+                items=[
+                    {
+                        "key": "DINGTALK_WEBHOOK_URL",
+                        "value": "https://oapi.dingtalk.com/robot/send?access_token=draft-token",
+                    },
+                    {"key": "DINGTALK_SECRET", "value": "SECdraft_signing_secret"},
+                ],
+                title="Test title",
+                content="hello",
+                timeout_seconds=3,
+            )
+
+        self.assertTrue(payload["success"])
+        request_url = mock_post.call_args.args[0]
+        self.assertIn("timestamp=", request_url)
+        self.assertIn("sign=", request_url)
+        self.assertNotIn("draft-token", str(payload))
+        self.assertNotIn("DINGTALK_WEBHOOK_URL", self.env_path.read_text(encoding="utf-8"))
+        self.assertNotIn("DINGTALK_SECRET", self.env_path.read_text(encoding="utf-8"))
+
+    @patch("src.notification_sender.dingtalk_sender.safe_post")
+    def test_test_dingtalk_channel_preserves_masked_secret_and_allows_unsigned_bot(
+        self,
+        mock_post,
+    ) -> None:
+        self._rewrite_env(
+            "DINGTALK_WEBHOOK_URL=https://oapi.dingtalk.com/robot/send?access_token=saved-token",
+            "DINGTALK_SECRET=",
+        )
+        mock_post.return_value = self._mock_http_response(200, {"errcode": 0})
+
+        with self._notification_test_env():
+            payload = self.service.test_notification_channel(
+                channel="dingtalk",
+                items=[
+                    {"key": "DINGTALK_WEBHOOK_URL", "value": "******"},
+                    {"key": "DINGTALK_SECRET", "value": "******"},
+                ],
+                mask_token="******",
+                title="Test title",
+                content="hello",
+                timeout_seconds=3,
+            )
+
+        self.assertTrue(payload["success"])
+        self.assertEqual(
+            mock_post.call_args.args[0],
+            "https://oapi.dingtalk.com/robot/send?access_token=saved-token",
+        )
+
     @patch("src.notification_sender.custom_webhook_sender.requests.post")
     def test_test_notification_channel_returns_custom_webhook_attempts(self, mock_post) -> None:
         mock_post.side_effect = [

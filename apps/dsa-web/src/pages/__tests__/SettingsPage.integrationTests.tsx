@@ -18,14 +18,32 @@ const {
   notifyAlphaSiftConfigChanged,
   notifySystemConfigChanged,
   refreshAfterExternalSave,
+  rollbackSystemConfig,
   routerSearchParamsMock,
   save,
   updateSystemConfig,
   useSystemConfigMock,
+  useAdvancedConfigState,
   withTestConnectionCoreFields,
 } = SettingsPageTestHarness;
 
 export function registerSettingsPageIntegrationTests(): void {
+  it('refreshes rollback-updated keys while preserving unrelated settings drafts', async () => {
+    useAdvancedConfigState();
+    render(<SettingsPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: '回滚配置' }));
+    fireEvent.click(screen.getByRole('button', { name: '确认回滚' }));
+
+    await waitFor(() => expect(rollbackSystemConfig).toHaveBeenCalledWith({
+      configVersion: 'v1',
+    }));
+    await waitFor(() => expect(refreshAfterExternalSave).toHaveBeenCalledWith([
+      'STOCK_LIST',
+      'DINGTALK_WEBHOOK_URL',
+    ]));
+  });
+
   it('splits notification fields so Reports and Alerts render independent field sets', () => {
     const notifyField = (key: string, uiControl = 'text') => ({
       key,

@@ -173,20 +173,21 @@ returns the committed result and logs `scheduled_task_runtime_reconcile_deferred
 the owner loop retries discovery on its next polling interval.
 
 
-## Web UI (minimal)
+## Web UI
 
 The product surface is intentionally small:
 
 | Surface | Behavior |
 | --- | --- |
 | Settings → System & Security → Scheduling → Legacy day-batch | Configures `SCHEDULE_*` + shows legacy status only. Copy labels it as legacy and warns when both tracks appear enabled. |
-| Settings → System & Security → Scheduling → Saved definitions | Create supported definitions (`stock_analysis` / `research_brief` / `risk_check`), list persisted definitions, show next run and latest run status when the status API returns them, and enable/disable supported definitions. Unsupported future schemas are visible but not mutable. |
+| Settings → System & Security → Scheduling → Saved definitions | Create supported definitions (`stock_analysis` / `research_brief` / `risk_check`), list persisted definitions, show next/latest status, enable/disable supported definitions, and expand durable run history. Unsupported future schemas are visible but not mutable. |
 | Home → Configurable area → Versioned scheduled tasks today | Read-only today projection from `GET /scheduled-tasks/today` (versioned track only). Empty state links to Settings management. |
 
 Defaults and framing:
 
 - Create uses the existing `POST /scheduled-tasks` contract only. There is still no edit/delete definition form, natural-language planner, multi-tenant ownership, or distributed scheduler in this UI.
-- Latest status is loaded via `GET /scheduled-tasks/{id}/status` after list refresh (fail-soft per item). Full run-history browsing stays API-only for now.
+- Latest status is loaded via `GET /scheduled-tasks/{id}/status` after list refresh (fail-soft per item). Expanding **Run history** lazily calls `GET /scheduled-tasks/{id}/runs?limit=10`; refresh repeats the current limit, while **Load more** increases the real API limit by 10 (up to the server maximum) rather than presenting a fake cursor.
+- Each history row shows explicit text status, scheduled/start/end/next-attempt times, attempt and dispatch-failure counts, run/execution IDs, result references, error code, notification status/channels, and failed notification channels. Optional fields omitted by older records render as `—`. Result references are shown as opaque IDs because this endpoint does not guarantee a resolvable Web route.
 - Execution remains process-local through `AnalysisTaskQueue` / ADR-008.
 - Research brief and risk-check schedules are research-only aids, not investment advice.
 - Daily stock-list scheduler env (`SCHEDULE_*`) remains the separate **legacy** system-config card on the same Settings view; it is not the versioned definitions list.

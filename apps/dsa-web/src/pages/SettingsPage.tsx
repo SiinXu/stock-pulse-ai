@@ -54,6 +54,7 @@ import {
   ModelFallbackEditor,
   type ModelReferenceReplacement,
 } from '../components/settings';
+import SystemConfigRollbackCard from '../components/settings/SystemConfigRollbackCard';
 import { parseModelAccessFieldKey, type ModelAccessFieldFocusRequest } from '../utils/modelAccessFieldKey';
 import { getProviderDisplayLabel } from '../components/settings/llmConnectionContract';
 import { connectionItemsRespectSchema } from '../components/settings/settingsConnectionUpdateContract';
@@ -2536,6 +2537,15 @@ const SettingsPage: React.FC = () => {
                     <SettingsAlert title={t('settings.actionSuccess')} message={envBackupActionSuccess} variant="success" />
                   ) : null}
                 </Surface>
+                <SystemConfigRollbackCard
+                  configVersion={configVersion}
+                  disabled={isSaving || isLoading || isImportingEnv || isExportingEnv}
+                  onRolledBack={async (result) => {
+                    await refreshAfterExternalSave(result.updatedKeys);
+                    applyPostSaveEffects();
+                  }}
+                  onReloadLatest={() => refreshAfterExternalSave([])}
+                />
               </SettingsSectionCard>
             ) : null}
             {activeCategory === 'base' ? (

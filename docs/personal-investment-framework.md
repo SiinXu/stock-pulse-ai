@@ -10,7 +10,7 @@ Issue #465 以**后端**切片起步。当前 `main` 已有**部分**分析注�
 
 - 本地版本化存储、CRUD/历史 API、乐观并发
 - 稳定的 `InvestmentFrameworkContextReader` 只读 adapter
-- **Settings → Agent 行为** 最小编辑器：创建、版本化保存、停用、删除（标题/说明/自由规则/按行风险与跟踪条件；决策树与完整维度矩阵 UI 仍可后续扩展）
+- **Settings → Agent 行为** 结构化编辑器：创建、版本化保存、停用、删除，以及决策树、评估维度和不可变历史检查
 - **个股分析路径**注入：active 框架经 `inject_framework_into_analysis_context`（`src/core/stages/analysis_stock.py` → analyzer 的 `personal_investment_framework_prompt`）作为**只读研究上下文**
 - 报告分层 **对齐槽位填充**：有 active 框架时由 `enrich_dashboard_framework_alignment` 写入；否则 `framework_alignment.status=not_configured` 与本地化空槽摘要
 
@@ -39,7 +39,7 @@ Issue #465 以**后端**切片起步。当前 `main` 已有**部分**分析注�
 - `tracking_criteria`：持续跟踪条件。
 - `free_form_rules`：无法结构化表达的补充规则。
 
-未知字段和标量类型强制转换都会被拒绝，例如 JSON body 中的字符串 `"1"` 不能代替整数 revision，字符串 `"25"` 不能代替数值 weight；响应 DTO 同样不会掩盖服务层类型漂移。`DELETE` 的 revision 仍按 HTTP query 参数的既有 typed parsing 规则处理。该严格边界同样用于持久化内容读取，旧数据中的类型漂移或未知 `schema_version` 会 fail closed，而不会在读取时被静默转换。框架必须至少包含一种实际 criteria；树引用必须指向已声明 node，所有 node 必须从 root 可达且不能形成环，node ID 和维度名称必须唯一。权重范围是 `0..100` 的相对权重，本阶段不强制总和等于 100。
+未知字段和标量类型强制转换都会被拒绝，例如 JSON body 中的字符串 `"1"` 不能代替整数 revision，字符串 `"25"` 不能代替数值 weight；响应 DTO 同样不会掩盖服务层类型漂移。`DELETE` 的 revision 仍按 HTTP query 参数的既有 typed parsing 规则处理。该严格边界同样用于持久化内容读取，旧数据中的类型漂移或未知 `schema_version` 会 fail closed，而不会在读取时被静默转换。框架必须至少包含一种实际 criteria；树引用必须指向已声明 node，所有 node 必须从 root 可达且不能形成环，node ID 和维度名称必须唯一。维度名称唯一性使用固定的 Unicode 15.0 默认完整 casefold（`C+F`、非 Turkic）契约；后端和 Web 均使用仓库内固定映射，不依赖 Python、浏览器或 Node 的 Unicode/ICU 版本，重复错误会同时定位到所有相关维度名称字段。权重范围是 `0..100` 的相对权重，本阶段不强制总和等于 100。
 
 ## 存储与版本语义
 
@@ -73,14 +73,17 @@ Create、update 或 deactivate flush 后，repository 会使 ORM identity state 
 
 ## Web 编辑入口
 
-Settings → **Agent 行为** 显示框架状态；点击 **查看配置项** 后在配置弹框中提供最小编辑器：
+Settings → **Agent 行为** 显示框架状态；点击 **查看配置项** 后在全屏配置弹框中提供结构化编辑器：
 
 - 创建本机唯一框架（`POST /api/v1/investment-framework`）
 - 保存时携带 `expected_revision` 创建新版本并激活（`PUT`）
 - 停用（`POST .../deactivate`）后分析不再注入框架
 - 删除（`DELETE`）会移除 aggregate 与全部历史
+- 读取按版本降序排列的不可变历史；历史详情只读，可复制到草稿后以当前 revision 保存为新版本
 
-编辑器当前支持标题、说明、自由规则，以及按行填写的风险规则/跟踪条件。决策树与完整维度矩阵 UI 仍可在后续扩展；若 API 收到更完整 content，历史与 GET 仍会返回。保存自由文本字段时会保留服务端已有的 `decision_tree` / `evaluation_dimensions`，避免最小编辑器覆盖结构化内容。修订冲突（HTTP 409）时界面会重新加载服务端状态。
+编辑器支持标题、说明、自由规则、按行填写的风险规则/跟踪条件，以及决策树的根节点、节点 ID、问题、条件分支、目标/终局和评估维度的名称、权重、说明、标准。保存前会检查 ID/名称唯一性、目标有效性、根节点、可达性、循环与 `0..100` 权重，并镜像后端数量边界：最多 100 个节点、每节点 20 个分支、50 个维度、每维度 30 条标准、100 条风险规则和 100 条跟踪条件。节点问题、分支条件/终局、维度标准、风险规则和跟踪条件均为每条 1–1000 字符；标题、说明、维度名称与自由规则仍分别遵守 schema 的独立上限。重命名节点会同步现有根节点和分支引用；仍被根节点或入站分支引用的节点不能删除，并会显示依赖。
+
+历史列表和只读检查器都会展示版本 `created_at`；历史版本不会原地恢复或修改。“复制到当前草稿”只复制内容，后续保存仍携带当前 aggregate revision 并创建新版本。修订冲突（HTTP 409）不会自动覆盖草稿；页面明确提示冲突，只有用户选择“载入服务器最新版本”时才替换当前草稿。后端 422 校验仍是最终权威；公开且已脱敏的 `details.issues[].loc` 会映射到对应节点、维度或按行规则，并同时保留全局错误提示。编辑已知字段时使用对象合并，并在传输边界保留未知的未来字段，避免滚动升级期间静默丢失服务器所有内容。
 
 页面固定展示研究用途免责声明：不构成投资建议。
 
