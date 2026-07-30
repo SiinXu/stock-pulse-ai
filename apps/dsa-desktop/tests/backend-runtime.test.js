@@ -1,5 +1,9 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+
 const assert = require('node:assert/strict');
 const test = require('node:test');
+const { spawn } = require('node:child_process');
 const { EventEmitter } = require('node:events');
 const { TextDecoder } = require('node:util');
 
@@ -18,7 +22,10 @@ function makeChild(pid) {
   child.killed = false;
   child.stdout = new EventEmitter();
   child.stderr = new EventEmitter();
-  child.kill = () => true;
+  child.kill = () => {
+    child.killed = true;
+    return true;
+  };
   return child;
 }
 
@@ -131,7 +138,7 @@ test('waitUntilHealthy records probe and total timeout diagnostics', async () =>
   assert.equal(unavailableSnapshots.length, 1);
 });
 
-test('startBackend owns synchronous spawn failures and publishes an unavailable snapshot', () => {
+test('startBackend rethrows synchronous spawn failures without changing facade state', () => {
   const spawnError = new Error('synchronous spawn failure');
   const { runtime, unavailableSnapshots } = makeRuntime({
     spawnImpl: () => {
@@ -150,9 +157,8 @@ test('startBackend owns synchronous spawn failures and publishes an unavailable 
   );
 
   assert.equal(runtime.getSnapshot().process, null);
-  assert.equal(runtime.getSnapshot().startError, spawnError);
-  assert.equal(unavailableSnapshots.length, 1);
-  assert.equal(unavailableSnapshots[0].startError, spawnError);
+  assert.equal(runtime.getSnapshot().startError, null);
+  assert.equal(unavailableSnapshots.length, 0);
 });
 
 test('replaced backend generations cannot mutate runtime state or logs', () => {
@@ -201,5 +207,92 @@ test('stopBackend waits for POSIX child exit before clearing the owned process',
   await runtime.stopBackend();
 
   assert.deepEqual(signals, ['SIGTERM']);
+  assert.equal(runtime.getSnapshot().process, null);
+});
+
+test('stopBackend escalates when SIGTERM was sent but the POSIX child has not exited', async (t) => {
+  const child = makeChild(3002);
+  const signals = [];
+  const originalSetTimeout = global.setTimeout;
+  child.kill = (signal) => {
+    signals.push(signal);
+    child.killed = true;
+    if (signal === 'SIGKILL') {
+      process.nextTick(() => {
+        child.signalCode = 'SIGKILL';
+        child.emit('exit', null, 'SIGKILL');
+      });
+    }
+    return true;
+  };
+  global.setTimeout = (callback, delay, ...args) => (
+    originalSetTimeout(callback, delay >= 3000 ? 0 : delay, ...args)
+  );
+  t.after(() => {
+    global.setTimeout = originalSetTimeout;
+  });
+  const { runtime } = makeRuntime();
+  runtime.setProcessForTest(child);
+
+  await Promise.race([
+    runtime.stopBackend(),
+    new Promise((_, reject) => originalSetTimeout(
+      () => reject(new Error('stopBackend did not resolve')),
+      200
+    )),
+  ]);
+
+  assert.deepEqual(signals, ['SIGTERM', 'SIGKILL']);
+  assert.equal(runtime.getSnapshot().process, null);
+});
+
+test('stopBackend terminates a real SIGTERM-resistant POSIX child within the bound', {
+  skip: process.platform === 'win32',
+}, async (t) => {
+  const child = spawn(process.execPath, [
+    '-e',
+    "process.on('SIGTERM', () => {}); console.log('ready'); setInterval(() => {}, 1000);",
+  ], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  t.after(() => {
+    if (child.exitCode === null && child.signalCode === null && child.pid) {
+      try {
+        process.kill(child.pid, 'SIGKILL');
+      } catch (_error) {
+      }
+    }
+  });
+
+  let readyTimer = null;
+  await Promise.race([
+    new Promise((resolve, reject) => {
+      child.once('error', reject);
+      child.stdout.once('data', resolve);
+    }),
+    new Promise((_, reject) => {
+      readyTimer = setTimeout(
+        () => reject(new Error('POSIX child did not become ready')),
+        2000
+      );
+    }),
+  ]);
+  clearTimeout(readyTimer);
+
+  const { runtime } = makeRuntime();
+  runtime.setProcessForTest(child);
+  let stopTimer = null;
+  await Promise.race([
+    runtime.stopBackend(),
+    new Promise((_, reject) => {
+      stopTimer = setTimeout(
+        () => reject(new Error('POSIX child was not terminated within the bound')),
+        8000
+      );
+    }),
+  ]);
+  clearTimeout(stopTimer);
+
+  assert.equal(child.signalCode, 'SIGKILL');
   assert.equal(runtime.getSnapshot().process, null);
 });

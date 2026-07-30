@@ -1,3 +1,6 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+
 'use strict';
 
 const fs = require('fs');
@@ -638,37 +641,32 @@ function createBackendRuntime({
     let launchCwd = '';
     let launchedProcess = null;
 
-    try {
-      if (backendPath) {
-        if (!fs.existsSync(backendPath)) {
-          throw new Error(`Backend executable not found: ${backendPath}`);
-        }
-        launchMode = 'packaged';
-        launchCommand = formatCommand(backendPath, args);
-        launchCwd = path.dirname(backendPath);
-        launchedProcess = spawnImpl(backendPath, args, {
-          env,
-          cwd: launchCwd,
-          stdio: 'pipe',
-          windowsHide: true,
-        });
-      } else {
-        const pythonPath = resolvePythonPath(sourceEnv);
-        const scriptPath = path.join(appRootDev, 'main.py');
-        const pythonArgs = ['-X', 'utf8', scriptPath, ...args];
-        launchMode = 'development';
-        launchCommand = formatCommand(pythonPath, pythonArgs);
-        launchCwd = appRootDev;
-        launchedProcess = spawnImpl(pythonPath, pythonArgs, {
-          env,
-          cwd: launchCwd,
-          stdio: 'pipe',
-          windowsHide: true,
-        });
+    if (backendPath) {
+      if (!fs.existsSync(backendPath)) {
+        throw new Error(`Backend executable not found: ${backendPath}`);
       }
-    } catch (error) {
-      recordStartError(error);
-      throw error;
+      launchMode = 'packaged';
+      launchCommand = formatCommand(backendPath, args);
+      launchCwd = path.dirname(backendPath);
+      launchedProcess = spawnImpl(backendPath, args, {
+        env,
+        cwd: launchCwd,
+        stdio: 'pipe',
+        windowsHide: true,
+      });
+    } else {
+      const pythonPath = resolvePythonPath(sourceEnv);
+      const scriptPath = path.join(appRootDev, 'main.py');
+      const pythonArgs = ['-X', 'utf8', scriptPath, ...args];
+      launchMode = 'development';
+      launchCommand = formatCommand(pythonPath, pythonArgs);
+      launchCwd = appRootDev;
+      launchedProcess = spawnImpl(pythonPath, pythonArgs, {
+        env,
+        cwd: launchCwd,
+        stdio: 'pipe',
+        windowsHide: true,
+      });
     }
 
     backendProcess = launchedProcess;
@@ -799,8 +797,8 @@ function createBackendRuntime({
       processToStop.kill('SIGTERM');
     }
     setTimeout(() => {
-      if (processToStop.killed
-        || processToStop.exitCode !== null
+      // `killed` only records that a signal was sent; exit state confirms termination.
+      if (processToStop.exitCode !== null
         || processToStop.signalCode) {
         return;
       }

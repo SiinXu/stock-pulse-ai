@@ -1488,6 +1488,7 @@ test('startBackend passes WEBUI_HOST from env file to backend args and env', (t)
 test('startBackend reports spawn failures without logging backend environment secrets', (t) => {
   const originalConsoleLog = console.log;
   const logs = [];
+  let spawnedEnvironment = null;
   const fakeBackendProcess = new EventEmitter();
   fakeBackendProcess.pid = 8123;
   fakeBackendProcess.exitCode = null;
@@ -1498,7 +1499,10 @@ test('startBackend reports spawn failures without logging backend environment se
   const mainModule = loadMainModule(t, {
     platform: 'linux',
     childProcess: {
-      spawn: () => fakeBackendProcess,
+      spawn: (_command, _args, options) => {
+        spawnedEnvironment = options.env;
+        return fakeBackendProcess;
+      },
     },
   });
   const originalSecret = process.env.AD05_CHARACTERIZATION_SECRET;
@@ -1523,18 +1527,54 @@ test('startBackend reports spawn failures without logging backend environment se
     dbPath: '/tmp/dsa/stock_analysis.db',
     logDir: '/tmp/dsa/logs',
   });
+  const attestationKey = spawnedEnvironment[mainModule.DESKTOP_MODEL_PACK_ATTESTATION_ENV];
   fakeBackendProcess.emit('spawn');
   fakeBackendProcess.emit('error', new Error('spawn failed'));
 
+  assert.match(attestationKey, /^[0-9a-f]{64}$/);
   assert.ok(logs.some((line) => line.includes('[backend] spawned pid=8123')));
   assert.ok(logs.some((line) => line.includes('[backend] failed to start: spawn failed')));
   assert.ok(logs.every((line) => !line.includes('must-not-appear-in-desktop-logs')));
+  assert.ok(logs.every((line) => !line.includes(attestationKey)));
+  assert.ok(logs.every((line) => !line.includes(mainModule.DESKTOP_MODEL_PACK_ATTESTATION_ENV)));
   assert.equal(mainModule.buildDesktopAssistantState().serviceStatus, 'unavailable');
 });
 
+test('startBackend preserves facade state when spawn throws synchronously', (t) => {
+  const spawnError = new Error('synchronous spawn failure');
+  const mainModule = loadMainModule(t, {
+    platform: 'linux',
+    childProcess: {
+      spawn: () => {
+        throw spawnError;
+      },
+    },
+  });
+
+  assert.throws(
+    () => mainModule.startBackend({
+      port: 8123,
+      envFile: '/tmp/dsa/.env',
+      dbPath: '/tmp/dsa/stock_analysis.db',
+      logDir: '/tmp/dsa/logs',
+    }),
+    spawnError
+  );
+  assert.equal(mainModule.__getBackendProcessForTest(), null);
+  assert.equal(mainModule.buildDesktopAssistantState().serviceStatus, 'starting');
+});
+
 test('startBackend ignores lifecycle events from a replaced process generation', async (t) => {
+  const originalConsoleLog = console.log;
+  const logs = [];
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-desktop-backend-generation-'));
-  t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+  console.log = (line) => {
+    logs.push(String(line));
+  };
+  t.after(() => {
+    console.log = originalConsoleLog;
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
   const backendProcesses = Array.from({ length: 2 }, (_value, index) => {
     const processRef = new EventEmitter();
     processRef.pid = 4100 + index;
@@ -1569,7 +1609,10 @@ test('startBackend ignores lifecycle events from a replaced process generation',
   mainModule.startBackend({ ...launchOptions, port: 8124 });
   mainModule.__setDesktopAssistantStateForTest({ webReady: true });
 
+  backendProcesses[0].stdout.emit('data', 'stale backend output');
+  backendProcesses[0].stderr.emit('data', 'stale backend diagnostic');
   backendProcesses[0].emit('error', new Error('stale backend failed'));
+  assert.ok(logs.every((line) => !line.includes('stale backend')));
   assert.equal(mainModule.buildDesktopAssistantState().serviceStatus, 'ready');
   backendProcesses[0].exitCode = 0;
   backendProcesses[0].emit('exit', 0, null);
@@ -2902,6 +2945,7 @@ test('stopBackend escalates from SIGTERM to SIGKILL when the POSIX child remains
   fakeBackend.signalCode = null;
   fakeBackend.kill = (signal) => {
     killSignals.push(signal);
+    fakeBackend.killed = true;
     if (signal === 'SIGKILL') {
       process.nextTick(() => {
         fakeBackend.signalCode = 'SIGKILL';
