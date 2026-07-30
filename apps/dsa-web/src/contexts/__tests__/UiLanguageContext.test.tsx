@@ -148,4 +148,23 @@ describe('UiLanguageContext', () => {
     }
     expect(within(selector).getByRole('combobox')).toHaveAttribute('data-value', 'id');
   });
+
+  it('places the profile language list to the right of its trigger', () => {
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function mockRect(this: HTMLElement) {
+      if (this.getAttribute('role') === 'combobox') {
+        return new DOMRect(100, 200, 160, 44);
+      }
+      return new DOMRect(0, 0, 181, 369);
+    });
+    render(
+      <UiLanguageProvider initialLanguage="zh">
+        <UiLanguageToggle popover />
+      </UiLanguageProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('combobox', { name: '切换界面语言' }));
+
+    expect(screen.getByRole('listbox')).toHaveStyle({ left: '264px', top: '200px' });
+    rectSpy.mockRestore();
+  });
 });

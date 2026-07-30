@@ -303,7 +303,11 @@ const MarketReviewPage: React.FC = () => {
 
       <div className="mt-4 grid min-h-0 gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
         <HistoryList
-          className="self-start"
+          className={
+            marketReviewHistoryHasMore
+              ? 'h-[min(36rem,calc(100dvh-10rem))] min-h-72'
+              : 'self-start'
+          }
           title={t('home.marketReviewHistoryTitle')}
           emptyTitle={t('home.marketReviewHistoryEmptyTitle')}
           emptyDescription={t('home.marketReviewHistoryEmptyDescription')}

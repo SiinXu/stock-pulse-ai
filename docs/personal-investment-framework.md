@@ -73,14 +73,16 @@ Create、update 或 deactivate flush 后，repository 会使 ORM identity state 
 
 ## Web 编辑入口
 
-Settings → **Agent 行为** 显示框架状态；点击 **查看配置项** 后在配置弹框中提供最小编辑器：
+Settings → **Agent 行为 → 投资框架** 横向 Tab 提供独立的页内最小编辑器和框架状态：
 
 - 创建本机唯一框架（`POST /api/v1/investment-framework`）
 - 保存时携带 `expected_revision` 创建新版本并激活（`PUT`）
 - 停用（`POST .../deactivate`）后分析不再注入框架
 - 删除（`DELETE`）会移除 aggregate 与全部历史
 
-编辑器当前支持标题、说明、自由规则，以及按行填写的风险规则/跟踪条件。决策树与完整维度矩阵 UI 仍可在后续扩展；若 API 收到更完整 content，历史与 GET 仍会返回。保存自由文本字段时会保留服务端已有的 `decision_tree` / `evaluation_dimensions`，避免最小编辑器覆盖结构化内容。修订冲突（HTTP 409）时界面会重新加载服务端状态。
+**历史版本** 会在同一页面打开只读抽屉，按版本倒序展示不可变历史及当前激活状态。用户可以将任一历史版本复制到当前草稿，再使用 aggregate 的当前 `revision` 保存为一个新版本；复制操作本身不会修改历史或激活状态。
+
+编辑器当前支持标题、说明、自由规则，以及按行填写的风险规则/跟踪条件。决策树与完整维度矩阵 UI 仍可在后续扩展；若 API 收到更完整 content，历史与 GET 仍会返回。保存自由文本字段时会保留当前草稿来源（当前版本或复制的历史版本）中的 `decision_tree` / `evaluation_dimensions`，避免最小编辑器覆盖结构化内容。修订冲突（HTTP 409）时界面会重新加载服务端状态。
 
 页面固定展示研究用途免责声明：不构成投资建议。
 

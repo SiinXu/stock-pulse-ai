@@ -77,6 +77,7 @@ export const DeepResearchPanel: React.FC<DeepResearchPanelProps> = ({ sessionId 
   const [question, setQuestion] = useState(initialRun?.question ?? '');
   const [stockCode, setStockCode] = useState(initialRun?.stockCode ?? '');
   const [error, setError] = useState<ParsedApiError | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const runSeqRef = useRef(0);
   const mountedRef = useRef(true);
@@ -176,7 +177,7 @@ export const DeepResearchPanel: React.FC<DeepResearchPanelProps> = ({ sessionId 
         <p className="text-sm text-muted-text">{t('research.emptyHint')}</p>
       ) : null}
 
-      <form className="mt-auto space-y-3" onSubmit={handleRun}>
+      <form ref={formRef} className="mt-auto space-y-3" onSubmit={handleRun}>
         <Textarea
           label={t('research.questionLabel')}
           value={question}
@@ -191,8 +192,11 @@ export const DeepResearchPanel: React.FC<DeepResearchPanelProps> = ({ sessionId 
               id="deep-research-stock"
               value={stockCode}
               onChange={setStockCode}
-              onSubmit={(code, _name, _source, metadata) => {
+              onSubmit={(code, _name, source, metadata) => {
                 setStockCode(metadata?.displayCode ?? code);
+                if (source !== 'autocomplete') {
+                  formRef.current?.requestSubmit();
+                }
               }}
               disabled={running}
               placeholder={t('research.stockCodeHint')}

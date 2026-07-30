@@ -145,6 +145,26 @@ describe('MarketReviewPage', () => {
     expect(historyRail).not.toHaveClass('min-h-96');
   });
 
+  it('bounds paginated history while keeping complete history content-sized', async () => {
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 11,
+      page: 1,
+      limit: 10,
+      items: [marketReviewHistoryItem],
+    });
+
+    renderMarketReview();
+
+    await screen.findByRole('button', { name: /大盘复盘 MARKET 历史记录/ });
+    const historyRail = screen.getByTestId('home-history-list-scroll')
+      .closest('aside')?.parentElement;
+    expect(historyRail).toHaveClass(
+      'h-[min(36rem,calc(100dvh-10rem))]',
+      'min-h-72',
+    );
+    expect(historyRail).not.toHaveClass('self-start');
+  });
+
   it('consumes a one-shot command action while preserving unrelated URL state', async () => {
     renderMarketReview(
       `${buildResearchMarketHref({ action: RESEARCH_MARKET_ACTION_VALUES.run })}&keep=yes#summary`,

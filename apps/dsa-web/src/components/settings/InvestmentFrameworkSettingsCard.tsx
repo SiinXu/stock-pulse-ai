@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { History, RefreshCw, X } from 'lucide-react';
+import { Copy, History, RefreshCw, X } from 'lucide-react';
 import { investmentFrameworkApi } from '../../api/investmentFramework';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type {
   InvestmentFrameworkContent,
+  InvestmentFrameworkHistoryItem,
   InvestmentFrameworkHistoryResponse,
   InvestmentFrameworkResponse,
 } from '../../types/investmentFramework';
@@ -82,6 +83,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
   const [framework, setFramework] = useState<InvestmentFrameworkResponse | null>(null);
   const [exists, setExists] = useState(false);
   const [draft, setDraft] = useState(emptyDraft);
+  const [draftSourceContent, setDraftSourceContent] = useState<InvestmentFrameworkContent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadError, setLoadError] = useState<ParsedApiError | null>(null);
@@ -102,12 +104,14 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
       setFramework(current);
       setExists(true);
       setDraft(draftFromResponse(current));
+      setDraftSourceContent(null);
     } catch (err) {
       const parsed = getParsedApiError(err);
       if (parsed.status === 404 || parsed.code === 'investment_framework_not_found') {
         setFramework(null);
         setExists(false);
         setDraft(emptyDraft());
+        setDraftSourceContent(null);
       } else {
         setLoadError(parsed);
       }
@@ -174,7 +178,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
     if (!draft.title.trim()) {
       return t('settings.frameworkTitleRequired');
     }
-    const content = contentFromDraft(draft, framework?.content);
+    const content = contentFromDraft(draft, draftSourceContent ?? framework?.content);
     const hasStructured = Boolean(
       (content.decisionTree && content.decisionTree.length)
       || (content.evaluationDimensions && content.evaluationDimensions.length),
@@ -199,7 +203,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
       setError(validationError);
       return;
     }
-    const content = contentFromDraft(draft, framework?.content);
+    const content = contentFromDraft(draft, draftSourceContent ?? framework?.content);
     setIsSubmitting(true);
     try {
       if (!exists || !framework) {
@@ -210,6 +214,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
         setFramework(created);
         setExists(true);
         setDraft(draftFromResponse(created));
+        setDraftSourceContent(null);
         setSuccessMessage(t('settings.frameworkCreated'));
       } else {
         const updated = await investmentFrameworkApi.update({
@@ -219,6 +224,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
         });
         setFramework(updated);
         setDraft(draftFromResponse(updated));
+        setDraftSourceContent(null);
         setSuccessMessage(t('settings.frameworkSaved'));
         if (isHistoryOpen) {
           await loadHistory();
@@ -252,6 +258,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
       });
       setFramework(updated);
       setDraft(draftFromResponse(updated));
+      setDraftSourceContent(null);
       setSuccessMessage(t('settings.frameworkDeactivated'));
       if (isHistoryOpen) {
         await loadHistory();
@@ -278,6 +285,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
       setFramework(null);
       setExists(false);
       setDraft(emptyDraft());
+      setDraftSourceContent(null);
       setIsHistoryOpen(false);
       setHistory(null);
       setSelectedHistoryVersion(null);
@@ -295,6 +303,19 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
   const selectedHistory = history?.items.find(
     (item) => item.version === selectedHistoryVersion,
   ) ?? null;
+  const copyHistoryIntoDraft = (item: InvestmentFrameworkHistoryItem) => {
+    setDraft({
+      title: item.content.title ?? '',
+      description: item.content.description ?? '',
+      freeFormRules: item.content.freeFormRules ?? '',
+      riskRules: listToLines(item.content.riskRules),
+      trackingCriteria: listToLines(item.content.trackingCriteria),
+      changeSummary: t('settings.frameworkCopiedSummary', { version: item.version }),
+    });
+    setDraftSourceContent(item.content);
+    setError(null);
+    setSuccessMessage(t('settings.frameworkCopiedToDraft', { version: item.version }));
+  };
 
   return (
     <SettingsSectionCard
@@ -620,6 +641,16 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                       </ul>
                     </div>
                   ) : null}
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="default"
+                    disabled={isSubmitting}
+                    onClick={() => copyHistoryIntoDraft(selectedHistory)}
+                  >
+                    <Copy className="h-4 w-4" aria-hidden="true" />
+                    {t('settings.frameworkCopyToDraft')}
+                  </Button>
                 </section>
               ) : null}
             </div>

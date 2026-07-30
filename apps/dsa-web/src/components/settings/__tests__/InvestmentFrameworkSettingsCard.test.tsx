@@ -131,6 +131,9 @@ describe('InvestmentFrameworkSettingsCard', () => {
         freeFormRules: 'Hold cash when uncertain',
         riskRules: ['Max 10% per name'],
         trackingCriteria: [],
+        evaluationDimensions: [
+          { name: 'Current quality', weight: 100, criteria: ['Current criteria'] },
+        ],
       },
       createdAt: '2026-07-26T00:00:00Z',
       updatedAt: '2026-07-26T00:00:00Z',
@@ -335,6 +338,9 @@ describe('InvestmentFrameworkSettingsCard', () => {
             freeFormRules: 'Protect capital',
             riskRules: [],
             trackingCriteria: [],
+            evaluationDimensions: [
+              { name: 'Historical quality', weight: 100, criteria: ['Historical criteria'] },
+            ],
           },
           changeSummary: 'Initial version',
           createdAt: '2026-07-25T00:00:00Z',
@@ -353,6 +359,26 @@ describe('InvestmentFrameworkSettingsCard', () => {
         },
       ],
     });
+    updateFramework.mockResolvedValue({
+      frameworkId: 1,
+      scope: 'local',
+      version: 3,
+      activeVersion: 3,
+      revision: 4,
+      isActive: true,
+      content: {
+        title: 'Original rules',
+        freeFormRules: 'Protect capital',
+        riskRules: [],
+        trackingCriteria: [],
+        evaluationDimensions: [
+          { name: 'Historical quality', weight: 100, criteria: ['Historical criteria'] },
+        ],
+      },
+      createdAt: '2026-07-26T00:00:00Z',
+      updatedAt: '2026-07-27T00:00:00Z',
+      versionCreatedAt: '2026-07-27T00:00:00Z',
+    });
 
     render(<InvestmentFrameworkSettingsCard />);
 
@@ -365,6 +391,28 @@ describe('InvestmentFrameworkSettingsCard', () => {
     expect(drawer).toHaveTextContent('版本 v1');
     expect(screen.getByRole('region', { name: '版本详情' })).toHaveTextContent('Latest rules');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^版本 v1/ }));
+    fireEvent.click(screen.getByRole('button', { name: '复制到当前草稿' }));
+    expect(screen.getByLabelText('框架名称')).toHaveValue('Original rules');
+    expect(screen.getByLabelText('自由规则')).toHaveValue('Protect capital');
+    expect(screen.getByLabelText('变更说明（可选）')).toHaveValue('基于历史版本 v1');
+    expect(screen.getByText('已将 v1 复制到草稿；保存时会使用当前 revision 创建新版本。'))
+      .toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
+    await waitFor(() => {
+      expect(updateFramework).toHaveBeenCalledWith(
+        expect.objectContaining({
+          expectedRevision: 3,
+          content: expect.objectContaining({
+            evaluationDimensions: [
+              { name: 'Historical quality', weight: 100, criteria: ['Historical criteria'] },
+            ],
+          }),
+        }),
+      );
+    });
 
     fireEvent.click(screen.getByRole('button', { name: '关闭历史版本' }));
     expect(screen.queryByRole('complementary', { name: '历史版本' })).not.toBeInTheDocument();

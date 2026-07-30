@@ -82,6 +82,30 @@ describe('DeepResearchPanel', () => {
     expect(screen.getByText('What is the moat?')).toBeTruthy();
   });
 
+  it('preserves Enter submission for a manually entered stock code', async () => {
+    researchMock.mockResolvedValue({
+      success: true,
+      content: 'Submitted with the keyboard.',
+      sources: [],
+      token_usage: 20,
+    });
+    renderPanel();
+
+    fireEvent.change(screen.getByLabelText('Research question'), {
+      target: { value: 'Keyboard submission?' },
+    });
+    const stockInput = screen.getByLabelText('Related stock code');
+    fireEvent.change(stockInput, { target: { value: 'AAPL' } });
+    fireEvent.keyDown(stockInput, { key: 'Enter' });
+
+    await waitFor(() => {
+      expect(researchMock).toHaveBeenCalledWith(
+        { question: 'Keyboard submission?', stockCode: 'AAPL' },
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
+    });
+  });
+
   it('surfaces an error when the research response is unsuccessful', async () => {
     researchMock.mockResolvedValue({ success: false, content: '', sources: [], token_usage: 0, error: 'timed out after 180s' });
     renderPanel();
