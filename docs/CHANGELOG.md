@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Routed DingTalk-only aggregate reports through the canonical notification dispatch policy.
 - [Fixed] Kept Portfolio operation identities account/file scoped and prevented stale ledger, FX, and post-write projection races from blocking controls or showing out-of-scope data.
 - [Fixed] Treated DingTalk signing secrets as opaque provider values and localized newly added Web settings and analysis copy across all translated bundles.
 - [Fixed] Separated successful paper-trade submission from follow-up portfolio refresh failures, with a page-level refresh retry and accurate success copy.

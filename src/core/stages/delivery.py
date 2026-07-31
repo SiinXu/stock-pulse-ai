@@ -4,12 +4,8 @@
 import logging
 import sys
 import threading
-from collections import defaultdict
-from contextlib import ExitStack
-from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from data_provider.base import normalize_stock_code
 from src.analyzer import AnalysisResult
 from src.config import get_config as _get_config_impl
 from src.core.pipeline_stage_results import (
@@ -20,7 +16,6 @@ from src.core.pipeline_stage_results import (
 from src.enums import ReportType
 from src.notification import (
     ChannelAttemptResult as _ChannelAttemptResult,
-    NotificationChannel,
 )
 from src.services.run_diagnostics import (
     PipelineStageObservation,
@@ -29,7 +24,6 @@ from src.services.run_diagnostics import (
 )
 from src.utils.sanitize import (
     log_safe_exception,
-    sanitize_exception_chain as _sanitize_exception_chain,
 )
 
 
@@ -63,12 +57,12 @@ def _run_plugin_delivery_attempt(
     side_effect_key: Tuple[Any, ...],
     send: Callable[[], _ChannelAttemptResult],
 ) -> PipelineStageResult[_ChannelAttemptResult]:
-    """Fence one structured adapter attempt with its retry decision."""
+    """Fence one structured channel attempt with its retry decision."""
 
     def _dispatch() -> PipelineStageResult[_ChannelAttemptResult]:
         attempt = send()
         if not isinstance(attempt, _ChannelAttemptResult):
-            raise TypeError("plugin notification attempt is invalid")
+            raise TypeError("notification attempt is invalid")
         if attempt.success:
             return PipelineStageResult.success(
                 PipelineStageName.DISPATCH,
@@ -93,7 +87,6 @@ def _run_plugin_delivery_attempt(
         retryable=True,
         side_effect_key=side_effect_key,
     )
-
 
 class _DeliveryStageMixin:
     """Provide rendering and notification delivery stages for the pipeline."""
@@ -657,28 +650,12 @@ class _DeliveryStageMixin:
         report_type: ReportType = ReportType.SIMPLE,
         skip_push: bool = False,
     ) -> None:
-        (
-            "\n"
-            "        发送分析结果通知\n"
-            "        \n"
-            "        生成决策仪表盘格式的报告\n"
-            "        \n"
-            "        Args:\n"
-            "            results: 分析结果列表\n"
-            "            skip_push: 是否跳过推送（仅保存到本地，用于单股推送模式）\n"
-            "        "
+        """Render an aggregate report, then dispatch through NotificationService."""
+
+        from src.notification_parts.dispatch import (
+            dispatch_aggregate_with_results,
         )
-        noise_decision = None
-        noise_finalized = False
-        delivery_attempt_count = 0
-        delivery_failure_count = 0
-        delivery_reused_count = 0
-        delivery_reused_channels: set[str] = set()
-        delivery_failure_retryability: list[bool] = []
-        static_delivery_scope: Optional[Tuple[Any, ...]] = None
-        static_delivery_confirmed = False
-        static_delivery_scope_owned = False
-        static_scope_guards = ExitStack()
+
         render_stage = observe_pipeline_stage(
             "render",
             input_summary={
@@ -689,19 +666,22 @@ class _DeliveryStageMixin:
             retryable=False,
         )
         dispatch_stage: Optional[PipelineStageObservation] = None
+        execution = None
+        static_delivery_scope: Optional[Tuple[Any, ...]] = None
         try:
             logger.info("Generating the decision dashboard")
             report = self._generate_aggregate_report(results, report_type)
-            render_result = PipelineStageResult.success(
-                PipelineStageName.RENDER,
-                report,
-            )
             self._finish_pipeline_stage(
                 render_stage,
-                render_result,
+                PipelineStageResult.success(
+                    PipelineStageName.RENDER,
+                    report,
+                ),
                 output_summary={
                     "content_length": (
-                        len(report) if isinstance(report, (str, bytes)) else None
+                        len(report)
+                        if isinstance(report, (str, bytes))
+                        else None
                     ),
                     "route": "aggregate_notification",
                 },
@@ -716,7 +696,6 @@ class _DeliveryStageMixin:
                 retryable=True,
             )
 
-            # Skip push notifications (single stock mode / merged mode: report saved by _save_local_report)
             if skip_push:
                 self._finish_pipeline_stage(
                     dispatch_stage,
@@ -744,840 +723,211 @@ class _DeliveryStageMixin:
                 )
                 return
 
-            context_route_available = False
-            has_context_channel = getattr(
-                self.notifier,
-                "_has_context_channel",
-                None,
+            stage_runner = self._get_pipeline_stage_runner()
+            delivery_key = self._delivery_stage_key(
+                route="aggregate",
+                results=results,
+                report_type=report_type,
             )
-            if callable(has_context_channel):
-                try:
-                    context_route_available = bool(has_context_channel())
-                except Exception as e:  # broad-exception: optional_metadata - Context-route availability only refines diagnostics and cannot block delivery.
-                    log_safe_exception(
-                        logger,
-                        "Context notification availability check failed",
-                        e,
-                        error_code="pipeline_context_notification_availability_failed",
-                        level=logging.WARNING,
-                    )
-
-            # Resolve availability and aggregate targets from one retained
-            # plugin snapshot. The compatibility fallback is only for test or
-            # third-party notifiers that predate the snapshot API.
-            delivery_snapshot = getattr(
-                self.notifier,
-                "_notification_delivery_snapshot",
-                None,
+            static_delivery_scope = (
+                "aggregate_static_delivery",
+                delivery_key,
             )
-            if callable(delivery_snapshot):
-                channels = list(
-                    static_scope_guards.enter_context(
-                        delivery_snapshot("report")
-                    )
+            report_type_key = (
+                report_type.value
+                if isinstance(report_type, ReportType)
+                else str(report_type)
+            )
+            codes_key = ",".join(
+                sorted(
+                    str(getattr(result, "code", "") or "")
+                    for result in results
                 )
-                notification_available = bool(channels) or context_route_available
-            else:
-                notification_available = self.notifier.is_available()
-                if notification_available:
-                    channels = self.notifier.get_available_channels()
-                    channels = self.notifier.get_channels_for_route(
-                        "report",
-                        channels=channels,
-                    )
+            )
+            noise_key = f"report:aggregate:{report_type_key}:{codes_key}"
 
-            # Send notifications
-            if notification_available:
-                def _channel_id(channel: Any) -> str:
-                    return (
-                        channel.value
-                        if isinstance(channel, NotificationChannel)
-                        else channel.channel_id
-                    )
+            def _execute_attempt(
+                channel_label: str,
+                send: Callable[[], _ChannelAttemptResult],
+            ) -> tuple[_ChannelAttemptResult, bool]:
+                """Fence one canonical dispatch attempt by channel label."""
 
-                def _send_channel_safely(
-                    channel_label: str,
-                    send_func: Callable[[], bool],
-                ) -> tuple[bool, Optional[Exception]]:
-                    delivery_result = self._run_delivery_attempt(
-                        side_effect_key=self._delivery_stage_key(
-                            route="aggregate",
-                            results=results,
-                            report_type=report_type,
-                            channel=channel_label,
-                        ),
-                        send=send_func,
-                    )
-                    if delivery_result.reused:
-                        delivery_reused_channels.add(channel_label)
-                    delivery_error = delivery_result.error
-                    if isinstance(delivery_error, Exception):
-                        log_safe_exception(
-                            logger,
-                            "Notification channel delivery failed; continuing with remaining channels",
-                            delivery_error,
-                            error_code="pipeline_notification_channel_failed",
-                            context={"channel": channel_label},
-                        )
-                    return bool(delivery_result.value), (
-                        delivery_error
-                        if isinstance(delivery_error, Exception)
-                        else None
-                    )
-
-                def _send_plugin_channel_safely(
-                    channel_label: str,
-                    send_func: Callable[[], _ChannelAttemptResult],
-                ) -> _ChannelAttemptResult:
-                    delivery_result = _run_plugin_delivery_attempt(
-                        self,
-                        side_effect_key=self._delivery_stage_key(
-                            route="aggregate",
-                            results=results,
-                            report_type=report_type,
-                            channel=channel_label,
-                        ),
-                        send=send_func,
-                    )
-                    if delivery_result.reused:
-                        delivery_reused_channels.add(channel_label)
-                    if isinstance(delivery_result.value, _ChannelAttemptResult):
-                        return delivery_result.value
-                    delivery_error = delivery_result.error
-                    if isinstance(delivery_error, Exception):
-                        log_safe_exception(
-                            logger,
-                            "Plugin notification delivery failed; continuing "
-                            "with remaining channels",
-                            delivery_error,
-                            error_code="pipeline_notification_channel_failed",
-                            context={"channel": channel_label},
-                            exception_redaction_values=(),
-                        )
-                        diagnostics = _sanitize_exception_chain(
-                            delivery_error,
-                            redact_diagnostics=True,
-                        )
-                    else:
-                        diagnostics = "Plugin notification attempt was unavailable."
-                    return _ChannelAttemptResult(
-                        channel=channel_label,
-                        success=False,
-                        error_code="exception",
-                        retryable=True,
-                        diagnostics=diagnostics,
-                    )
-
-                def _record_channel_result(
-                    channel_label: str,
-                    success: bool,
-                    error_message: Optional[Any] = None,
-                    target_results: Optional[List[AnalysisResult]] = None,
-                    *,
-                    retryable: bool = True,
-                ) -> None:
-                    nonlocal delivery_attempt_count, delivery_failure_count
-                    nonlocal delivery_reused_count
-                    nonlocal static_delivery_confirmed
-                    if channel_label != "__context__" and success:
-                        static_delivery_confirmed = True
-                    if not success:
-                        delivery_failure_retryability.append(retryable)
-                    if channel_label in delivery_reused_channels:
-                        delivery_reused_count += 1
-                        delivery_reused_channels.discard(channel_label)
-                        return
-                    delivery_attempt_count += 1
-                    if not success:
-                        delivery_failure_count += 1
-                    notification_run = self._build_notification_run_snapshot(
-                        channel=channel_label,
-                        status="success" if success else "failed",
-                        success=success,
-                        error_message=error_message,
-                    )
-                    record_notification_run(
-                        channel=channel_label,
-                        status="success" if success else "failed",
-                        success=success,
-                        error_message=error_message,
-                    )
-                    self._refresh_saved_diagnostic_snapshot(
-                        results=results if target_results is None else target_results,
-                        notification_run=notification_run,
-                    )
-
-                context_delivery = self._run_delivery_attempt(
+                delivery_result = _run_plugin_delivery_attempt(
+                    self,
                     side_effect_key=self._delivery_stage_key(
                         route="aggregate",
                         results=results,
                         report_type=report_type,
-                        channel="__context__",
+                        channel=channel_label,
                     ),
-                    send=lambda: self.notifier.send_to_context(report),
+                    send=send,
                 )
-                send_context = bool(context_delivery.unwrap())
-                if context_delivery.reused:
-                    delivery_reused_channels.add("__context__")
-                if send_context:
-                    _record_channel_result("__context__", True)
-                elif context_route_available:
-                    _record_channel_result("__context__", False)
+                attempt = delivery_result.value
+                if not isinstance(attempt, _ChannelAttemptResult):
+                    delivery_result.unwrap()
+                    raise TypeError("notification attempt is unavailable")
+                return attempt, delivery_result.reused
 
-                should_broadcast_static = True
-                should_broadcast_static_func = getattr(
+            with stage_runner.scope_guard(static_delivery_scope):
+                execution = dispatch_aggregate_with_results(
                     self.notifier,
-                    "should_broadcast_static_channels",
-                    None,
-                )
-                if callable(should_broadcast_static_func):
-                    should_broadcast_static = bool(should_broadcast_static_func())
-                if not should_broadcast_static:
-                    if not send_context and not context_route_available:
-                        _record_channel_result("__context__", False)
-                    if send_context:
-                        logger.info("Decision dashboard delivered")
-                    else:
-                        logger.warning("Decision dashboard delivery failed")
-                    logger.info(
-                        "Interactive context-reply mode enabled; static notification channels skipped"
-                    )
-                    context_dispatch_result = (
-                        PipelineStageResult.success(
-                            PipelineStageName.DISPATCH,
-                            True,
-                            side_effect_committed=True,
-                        )
-                        if send_context
-                        else PipelineStageResult.failed(
-                            PipelineStageName.DISPATCH,
-                            value=False,
-                            retryable=True,
-                            reason="Context-reply delivery failed.",
-                        )
-                    )
-                    self._finish_pipeline_stage(
-                        dispatch_stage,
-                        context_dispatch_result,
-                        output_summary={
-                            "delivered": bool(send_context),
-                            "route": "context_reply",
-                        },
-                    )
-                    self._refresh_saved_diagnostic_snapshot(results=results)
-                    return
-
-                static_delivery_scope = (
-                    "aggregate_static_delivery",
-                    self._delivery_stage_key(
-                        route="aggregate",
-                        results=results,
-                        report_type=report_type,
+                    report,
+                    results=results,
+                    report_type=report_type,
+                    config=self.config,
+                    render_aggregate=self._generate_aggregate_report,
+                    execute_attempt=_execute_attempt,
+                    scope_started=lambda: stage_runner.scope_started(
+                        static_delivery_scope
                     ),
-                )
-                static_delivery_entered = True
-                static_delivery_reentry = False
-                if channels:
-                    stage_runner = self._get_pipeline_stage_runner()
-                    static_scope_guards.enter_context(
-                        stage_runner.scope_guard(static_delivery_scope)
-                    )
-                    static_delivery_reentry = stage_runner.scope_started(
+                    mark_scope_started=lambda: stage_runner.mark_scope_started(
                         static_delivery_scope
-                    )
-                    if (
-                        not static_delivery_reentry
-                        and hasattr(self.notifier, "evaluate_noise_control")
-                    ):
-                        report_type_key = (
-                            report_type.value
-                            if isinstance(report_type, ReportType)
-                            else str(report_type)
-                        )
-                        codes_key = ",".join(
-                            sorted(
-                                str(getattr(result, "code", "") or "")
-                                for result in results
-                            )
-                        )
-                        noise_key = (
-                            f"report:aggregate:{report_type_key}:{codes_key}"
-                        )
-                        noise_decision = self.notifier.evaluate_noise_control(
-                            report,
-                            route_type="report",
-                            severity="info",
-                            dedup_key=noise_key,
-                            cooldown_key=noise_key,
-                        )
-                        static_delivery_entered = bool(
-                            noise_decision.should_send
-                        )
-                    if static_delivery_entered and not static_delivery_reentry:
-                        stage_runner.mark_scope_started(static_delivery_scope)
-                        static_delivery_scope_owned = True
-
-                if not static_delivery_entered:
-                    if send_context:
-                        suppressed_dispatch_status = "success"
-                        suppressed_retryable = False
-                        suppressed_reason = None
-                    elif context_route_available:
-                        suppressed_dispatch_status = "failed"
-                        suppressed_retryable = True
-                        suppressed_reason = (
-                            "Context-reply delivery failed and static channels "
-                            "were suppressed by noise control."
-                        )
-                    else:
-                        suppressed_dispatch_status = "skipped"
-                        suppressed_retryable = False
-                        suppressed_reason = None
-                    if suppressed_dispatch_status == "success":
-                        suppressed_result = PipelineStageResult.success(
-                            PipelineStageName.DISPATCH,
-                            True,
-                            side_effect_committed=bool(send_context),
-                        )
-                    elif suppressed_dispatch_status == "failed":
-                        suppressed_result = PipelineStageResult.failed(
-                            PipelineStageName.DISPATCH,
-                            value=False,
-                            retryable=suppressed_retryable,
-                            reason=suppressed_reason,
-                        )
-                    else:
-                        suppressed_result = PipelineStageResult.skipped(
-                            PipelineStageName.DISPATCH,
-                            reason="noise_control",
-                            value=False,
-                        )
-                    self._finish_pipeline_stage(
-                        dispatch_stage,
-                        suppressed_result,
-                        output_summary={
-                            "reason": "noise_control",
-                            "reason_code": noise_decision.reason_code,
-                            "context_delivered": bool(send_context),
-                            "context_attempted": context_route_available,
-                            "static_suppressed": True,
-                        },
-                    )
-                    notification_run = self._build_notification_run_snapshot(
-                        channel="report",
-                        status="skipped",
-                        success=False,
-                        attempts=0,
-                    )
-                    record_notification_run(
-                        channel="report",
-                        status="skipped",
-                        success=False,
-                        attempts=0,
-                    )
-                    self._refresh_saved_diagnostic_snapshot(
-                        results=results,
-                        notification_run=notification_run,
-                    )
-                    logger.info(
-                        "Notification suppressed by noise control: reason_code=%s "
-                        "route_type=%s severity=%s",
-                        noise_decision.reason_code,
-                        noise_decision.route_type,
-                        noise_decision.severity,
-                    )
-                    return
-
-                if static_delivery_reentry:
-                    logger.debug(
-                        "Aggregate delivery re-entry bypassed the first-entry "
-                        "noise gate; per-channel fences remain authoritative"
-                    )
-
-                # Issue #455: Markdown to image conversion (consistent with notification.send logic).
-                from src.md2img import markdown_to_image
-
-                channels_needing_image = tuple(
-                    ch
-                    for ch in channels
-                    if _channel_id(ch) in self.notifier._markdown_to_image_channels
-                    and _channel_id(ch)
-                    not in {
-                        NotificationChannel.NTFY.value,
-                        NotificationChannel.GOTIFY.value,
-                    }
-                )
-                non_wechat_channels_needing_image = tuple(
-                    ch
-                    for ch in channels_needing_image
-                    if _channel_id(ch) != NotificationChannel.WECHAT.value
-                )
-
-                def _get_md2img_hint() -> str:
-                    engine = getattr(
-                        self.config,
-                        "md2img_engine",
-                        "wkhtmltoimage",
-                    )
-                    return (
-                        "npm i -g markdown-to-file" if engine == "markdown-to-file"
-                        else "wkhtmltopdf (apt install wkhtmltopdf / brew install wkhtmltopdf)"
-                    )
-
-                image_bytes = None
-                if non_wechat_channels_needing_image:
-                    image_bytes = markdown_to_image(
-                        report, max_chars=self.notifier._markdown_to_image_max_chars
-                    )
-                    if image_bytes:
-                        logger.info(
-                            "Markdown converted to an image for channels: %s",
-                            [
-                                _channel_id(ch)
-                                for ch in non_wechat_channels_needing_image
-                            ],
-                        )
-                    else:
-                        logger.warning(
-                            "Markdown-to-image conversion failed; falling back to text. "
-                            "Check MARKDOWN_TO_IMAGE_CHANNELS and install %s",
-                            _get_md2img_hint(),
-                        )
-
-                # WeCom accepts only the condensed report because of platform limits.
-                wechat_success = False
-                if NotificationChannel.WECHAT in channels:
-                    def _send_wechat_report() -> bool:
-                        if report_type == ReportType.BRIEF:
-                            dashboard_content = self.notifier.generate_brief_report(results)
-                        else:
-                            dashboard_content = self.notifier.generate_wechat_dashboard(results)
-                        logger.info(
-                            "WeCom dashboard prepared: character_count=%s",
-                            len(dashboard_content),
-                        )
-                        wechat_image_bytes = None
-                        if NotificationChannel.WECHAT in channels_needing_image:
-                            wechat_image_bytes = markdown_to_image(
-                                dashboard_content,
-                                max_chars=self.notifier._markdown_to_image_max_chars,
-                            )
-                            if wechat_image_bytes is None:
-                                logger.warning(
-                                    "WeCom Markdown-to-image conversion failed; falling back to text. "
-                                    "Check MARKDOWN_TO_IMAGE_CHANNELS and install %s",
-                                    _get_md2img_hint(),
-                                )
-                        use_image = self.notifier._should_use_image_for_channel(
-                            NotificationChannel.WECHAT, wechat_image_bytes
-                        )
-                        if use_image:
-                            return self.notifier._send_wechat_image(wechat_image_bytes)
-                        return self.notifier.send_to_wechat(dashboard_content)
-
-                    wechat_success, wechat_error = _send_channel_safely(
-                        NotificationChannel.WECHAT.value,
-                        _send_wechat_report,
-                    )
-                    _record_channel_result(
-                        NotificationChannel.WECHAT.value,
-                        wechat_success,
-                        wechat_error,
-                    )
-
-                # Other channels: send complete report (to avoid custom Webhooks being polluted by WeChat logic).
-                non_wechat_success = False
-                stock_email_groups = getattr(self.config, 'stock_email_groups', []) or []
-                for channel in channels:
-                    if channel == NotificationChannel.WECHAT:
-                        continue
-                    if not isinstance(channel, NotificationChannel):
-                        channel_id = _channel_id(channel)
-
-                        def _send_plugin_report(
-                            channel=channel,
-                            channel_id=channel_id,
-                        ) -> _ChannelAttemptResult:
-                            return self.notifier._send_to_plugin_channel(
-                                channel,
-                                report,
-                                image_bytes=(
-                                    image_bytes
-                                    if channel_id
-                                    in self.notifier._markdown_to_image_channels
-                                    else None
-                                ),
-                                email_stock_codes=[
-                                    str(result.code) for result in results
-                                ],
-                                route_type="report",
-                                severity="info",
-                            )
-
-                        plugin_attempt = _send_plugin_channel_safely(
-                            channel_id,
-                            _send_plugin_report,
-                        )
-                        channel_success = plugin_attempt.success
-                        non_wechat_success = (
-                            channel_success or non_wechat_success
-                        )
-                        plugin_error = " | ".join(
-                            value
-                            for value in (
-                                plugin_attempt.error_code,
-                                plugin_attempt.diagnostics,
-                            )
-                            if value
-                        ) or None
-                        _record_channel_result(
-                            channel_id,
-                            channel_success,
-                            plugin_error,
-                            retryable=plugin_attempt.retryable,
-                        )
-                    elif channel == NotificationChannel.FEISHU:
-                        def _send_feishu_report() -> bool:
-                            if getattr(self.notifier, "_feishu_send_as_file", False):
-                                date_str = datetime.now().strftime('%Y%m%d')
-                                filepath = self.notifier.save_report_to_file(
-                                    report, filename=f"dashboard_{date_str}.md"
-                                )
-                                return self.notifier.send_feishu_file(filepath)
-                            return self.notifier.send_to_feishu(report)
-
-                        channel_success, channel_error = _send_channel_safely(
-                            channel.value,
-                            _send_feishu_report,
-                        )
-                        non_wechat_success = channel_success or non_wechat_success
-                        _record_channel_result(
-                            channel.value,
-                            channel_success,
-                            channel_error,
-                        )
-                    elif channel == NotificationChannel.TELEGRAM:
-                        def _send_telegram_report() -> bool:
-                            use_image = self.notifier._should_use_image_for_channel(
-                                channel, image_bytes
-                            )
-                            if use_image:
-                                return self.notifier._send_telegram_photo(image_bytes)
-                            return self.notifier.send_to_telegram(report)
-
-                        channel_success, channel_error = _send_channel_safely(
-                            channel.value,
-                            _send_telegram_report,
-                        )
-                        non_wechat_success = channel_success or non_wechat_success
-                        _record_channel_result(
-                            channel.value,
-                            channel_success,
-                            channel_error,
-                        )
-                    elif channel == NotificationChannel.EMAIL:
-                        if stock_email_groups:
-                            code_to_emails: Dict[str, Optional[List[str]]] = {}
-                            for r in results:
-                                if r.code not in code_to_emails:
-                                    canonical = normalize_stock_code(r.code)
-                                    emails = []
-                                    for stocks, emails_list in stock_email_groups:
-                                        if canonical in stocks:
-                                            emails.extend(emails_list)
-                                    code_to_emails[r.code] = list(dict.fromkeys(emails)) if emails else None
-                            emails_to_results: Dict[Optional[Tuple], List] = defaultdict(list)
-                            for r in results:
-                                recs = code_to_emails.get(r.code)
-                                key = tuple(recs) if recs else None
-                                emails_to_results[key].append(r)
-                            for key, group_results in emails_to_results.items():
-                                receivers = list(key) if key is not None else None
-
-                                def _send_email_group(
-                                    group_results=group_results,
-                                    receivers=receivers,
-                                ) -> bool:
-                                    grp_report = self._generate_aggregate_report(group_results, report_type)
-                                    grp_image_bytes = None
-                                    if channel.value in self.notifier._markdown_to_image_channels:
-                                        grp_image_bytes = markdown_to_image(
-                                            grp_report,
-                                            max_chars=self.notifier._markdown_to_image_max_chars,
-                                        )
-                                    use_image = self.notifier._should_use_image_for_channel(
-                                        channel, grp_image_bytes
-                                    )
-                                    if use_image:
-                                        return self.notifier._send_email_with_inline_image(
-                                            grp_image_bytes, receivers=receivers
-                                        )
-                                    return self.notifier.send_to_email(
-                                        grp_report, receivers=receivers
-                                    )
-
-                                email_label = (
-                                    f"{channel.value}:{','.join(receivers)}"
-                                    if receivers else f"{channel.value}:default"
-                                )
-                                channel_success, channel_error = _send_channel_safely(
-                                    email_label,
-                                    _send_email_group,
-                                )
-                                non_wechat_success = channel_success or non_wechat_success
-                                _record_channel_result(
-                                    email_label,
-                                    channel_success,
-                                    channel_error,
-                                    target_results=group_results,
-                                )
-                        else:
-                            def _send_email_report() -> bool:
-                                use_image = self.notifier._should_use_image_for_channel(
-                                    channel, image_bytes
-                                )
-                                if use_image:
-                                    return self.notifier._send_email_with_inline_image(image_bytes)
-                                return self.notifier.send_to_email(report)
-
-                            channel_success, channel_error = _send_channel_safely(
-                                channel.value,
-                                _send_email_report,
-                            )
-                            non_wechat_success = channel_success or non_wechat_success
-                            _record_channel_result(
-                                channel.value,
-                                channel_success,
-                                channel_error,
-                            )
-                    elif channel == NotificationChannel.CUSTOM:
-                        def _send_custom_report() -> bool:
-                            use_image = self.notifier._should_use_image_for_channel(
-                                channel, image_bytes
-                            )
-                            if use_image:
-                                return self.notifier._send_custom_webhook_image(
-                                    image_bytes, fallback_content=report
-                                )
-                            return self.notifier.send_to_custom(report)
-
-                        channel_success, channel_error = _send_channel_safely(
-                            channel.value,
-                            _send_custom_report,
-                        )
-                        non_wechat_success = channel_success or non_wechat_success
-                        _record_channel_result(
-                            channel.value,
-                            channel_success,
-                            channel_error,
-                        )
-                    elif channel == NotificationChannel.PUSHPLUS:
-                        channel_success, channel_error = _send_channel_safely(
-                            channel.value,
-                            lambda: self.notifier.send_to_pushplus(report),
-                        )
-                        non_wechat_success = channel_success or non_wechat_success
-                        _record_channel_result(
-                            channel.value,
-                            channel_success,
-                            channel_error,
-                        )
-                    elif channel == NotificationChannel.SERVERCHAN3:
-                        channel_success, channel_error = _send_channel_safely(
-                            channel.value,
-                            lambda: self.notifier.send_to_serverchan3(report),
-                        )
-                        non_wechat_success = channel_success or non_wechat_success
-                        _record_channel_result(
-                            channel.value,
-                            channel_success,
-                            channel_error,
-                        )
-                    elif channel == NotificationChannel.DISCORD:
-                        channel_success, channel_error = _send_channel_safely(
-                            channel.value,
-                            lambda: self.notifier.send_to_discord(report),
-                        )
-                        non_wechat_success = channel_success or non_wechat_success
-                        _record_channel_result(
-                            channel.value,
-                            channel_success,
-                            channel_error,
-                        )
-                    elif channel == NotificationChannel.PUSHOVER:
-                        channel_success, channel_error = _send_channel_safely(
-                            channel.value,
-                            lambda: self.notifier.send_to_pushover(report),
-                        )
-                        non_wechat_success = channel_success or non_wechat_success
-                        _record_channel_result(
-                            channel.value,
-                            channel_success,
-                            channel_error,
-                        )
-                    elif channel == NotificationChannel.NTFY:
-                        channel_success, channel_error = _send_channel_safely(
-                            channel.value,
-                            lambda: self.notifier.send_to_ntfy(report),
-                        )
-                        non_wechat_success = channel_success or non_wechat_success
-                        _record_channel_result(
-                            channel.value,
-                            channel_success,
-                            channel_error,
-                        )
-                    elif channel == NotificationChannel.GOTIFY:
-                        channel_success, channel_error = _send_channel_safely(
-                            channel.value,
-                            lambda: self.notifier.send_to_gotify(report),
-                        )
-                        non_wechat_success = channel_success or non_wechat_success
-                        _record_channel_result(
-                            channel.value,
-                            channel_success,
-                            channel_error,
-                        )
-                    elif channel == NotificationChannel.ASTRBOT:
-                        channel_success, channel_error = _send_channel_safely(
-                            channel.value,
-                            lambda: self.notifier.send_to_astrbot(report),
-                        )
-                        non_wechat_success = channel_success or non_wechat_success
-                        _record_channel_result(
-                            channel.value,
-                            channel_success,
-                            channel_error,
-                        )
-                    elif channel == NotificationChannel.SLACK:
-                        def _send_slack_report() -> bool:
-                            use_image = self.notifier._should_use_image_for_channel(
-                                channel, image_bytes
-                            )
-                            if use_image and self.notifier._slack_bot_token and self.notifier._slack_channel_id:
-                                return self.notifier._send_slack_image(
-                                    image_bytes, fallback_content=report
-                                )
-                            return self.notifier.send_to_slack(report)
-
-                        channel_success, channel_error = _send_channel_safely(
-                            channel.value,
-                            _send_slack_report,
-                        )
-                        non_wechat_success = channel_success or non_wechat_success
-                        _record_channel_result(
-                            channel.value,
-                            channel_success,
-                            channel_error,
-                        )
-                    else:
-                        logger.warning("Unknown notification channel: %s", channel)
-
-                has_targeted_channels = bool(channels)
-                success = wechat_success or non_wechat_success or send_context
-                if (
-                    (wechat_success or non_wechat_success)
-                    and noise_decision is not None
-                    and hasattr(self.notifier, "record_noise_control")
-                ):
-                    self.notifier.record_noise_control(noise_decision)
-                    noise_finalized = True
-                elif (
-                    noise_decision is not None
-                    and hasattr(self.notifier, "release_noise_control")
-                ):
-                    self.notifier.release_noise_control(noise_decision)
-                    noise_finalized = True
-                if (
-                    static_delivery_scope is not None
-                    and static_delivery_scope_owned
-                    and not static_delivery_confirmed
-                ):
-                    self._get_pipeline_stage_runner().clear_scope_started(
+                    ),
+                    clear_scope_started=lambda: stage_runner.clear_scope_started(
                         static_delivery_scope
-                    )
-                if success:
-                    logger.info("Decision dashboard delivered")
-                else:
-                    logger.warning("Decision dashboard delivery failed")
-                if not has_targeted_channels and not send_context:
-                    channel_label = ",".join(
-                        _channel_id(channel) for channel in channels
-                    ) or "report"
-                    notification_run = self._build_notification_run_snapshot(
-                        channel=channel_label,
-                        status="success" if success else "failed",
-                        success=success,
-                    )
-                    record_notification_run(
-                        channel=channel_label,
-                        status="success" if success else "failed",
-                        success=success,
-                    )
-                    self._refresh_saved_diagnostic_snapshot(
-                        results=results,
-                        notification_run=notification_run,
-                    )
-                dispatch_status = (
-                    "degraded"
-                    if success and delivery_failure_retryability
-                    else ("success" if success else "failed")
+                    ),
+                    dedup_key=noise_key,
+                    cooldown_key=noise_key,
                 )
-                if dispatch_status == "degraded":
-                    aggregate_dispatch_result = PipelineStageResult.degraded(
-                        PipelineStageName.DISPATCH,
-                        success,
-                        reason="Some notification deliveries failed.",
-                        retryable=any(delivery_failure_retryability),
-                        side_effect_committed=True,
+
+            dispatch_result = execution.result
+            channel_results = list(dispatch_result.channel_results)
+            failed_attempts = [
+                attempt for attempt in channel_results if not attempt.success
+            ]
+            for record in execution.records:
+                if record.reused:
+                    continue
+                attempt = record.attempt
+                error_message = " | ".join(
+                    value
+                    for value in (
+                        attempt.error_code,
+                        attempt.diagnostics,
                     )
-                elif dispatch_status == "success":
-                    aggregate_dispatch_result = PipelineStageResult.success(
-                        PipelineStageName.DISPATCH,
-                        success,
-                        side_effect_committed=bool(success),
-                    )
-                else:
-                    aggregate_dispatch_result = PipelineStageResult.failed(
-                        PipelineStageName.DISPATCH,
-                        value=False,
-                        reason="All configured notification deliveries failed.",
-                        retryable=(
-                            any(delivery_failure_retryability)
-                            if delivery_failure_retryability
-                            else True
-                        ),
-                    )
-                self._finish_pipeline_stage(
-                    dispatch_stage,
-                    aggregate_dispatch_result,
-                    output_summary={
-                        "delivered": bool(success),
-                        "channel_count": len(channels),
-                        "context_delivered": bool(send_context),
-                        "attempt_count": delivery_attempt_count,
-                        "failure_count": delivery_failure_count,
-                        "reused_count": delivery_reused_count,
-                    },
+                    if value
+                ) or None
+                notification_run = self._build_notification_run_snapshot(
+                    channel=attempt.channel,
+                    status="success" if attempt.success else "failed",
+                    success=bool(attempt.success),
+                    error_message=error_message,
                 )
-                self._refresh_saved_diagnostic_snapshot(results=results)
+                record_notification_run(
+                    channel=attempt.channel,
+                    status="success" if attempt.success else "failed",
+                    success=bool(attempt.success),
+                    error_message=error_message,
+                )
+                self._refresh_saved_diagnostic_snapshot(
+                    results=(
+                        results
+                        if record.target_results is None
+                        else record.target_results
+                    ),
+                    notification_run=notification_run,
+                )
+
+            if dispatch_result.status == "partial_failed":
+                stage_result = PipelineStageResult.degraded(
+                    PipelineStageName.DISPATCH,
+                    bool(dispatch_result.success),
+                    reason="Some notification deliveries failed.",
+                    retryable=any(
+                        bool(attempt.retryable)
+                        for attempt in failed_attempts
+                    ),
+                    side_effect_committed=True,
+                )
+            elif dispatch_result.status == "sent":
+                stage_result = PipelineStageResult.success(
+                    PipelineStageName.DISPATCH,
+                    True,
+                    side_effect_committed=True,
+                )
+            elif dispatch_result.status in {
+                "noise_suppressed",
+                "no_channel",
+            }:
+                stage_result = PipelineStageResult.skipped(
+                    PipelineStageName.DISPATCH,
+                    value=False,
+                    reason=dispatch_result.status,
+                )
             else:
-                self._finish_pipeline_stage(
-                    dispatch_stage,
-                    PipelineStageResult.skipped(
-                        PipelineStageName.DISPATCH,
-                        reason="notification_not_configured",
+                stage_result = PipelineStageResult.failed(
+                    PipelineStageName.DISPATCH,
+                    value=False,
+                    reason=(
+                        dispatch_result.message
+                        or "All configured notification deliveries failed."
                     ),
-                    output_summary={"reason": "notification_not_configured"},
+                    retryable=(
+                        any(
+                            bool(attempt.retryable)
+                            for attempt in failed_attempts
+                        )
+                        if failed_attempts
+                        else True
+                    ),
+                )
+
+            if execution.context_only:
+                output_summary = {
+                    "delivered": bool(dispatch_result.success),
+                    "route": "context_reply",
+                }
+            elif execution.static_suppressed:
+                output_summary = {
+                    "reason": "noise_control",
+                    "reason_code": execution.noise_reason_code,
+                    "context_delivered": any(
+                        attempt.channel == "__context__"
+                        and bool(attempt.success)
+                        for attempt in channel_results
+                    ),
+                    "context_attempted": execution.context_attempted,
+                    "static_suppressed": True,
+                }
+            elif dispatch_result.status == "no_channel":
+                output_summary = {
+                    "reason": "notification_not_configured",
+                }
+            else:
+                output_summary = {
+                    "delivered": bool(dispatch_result.success),
+                    "channel_count": execution.target_channel_count,
+                    "context_delivered": any(
+                        attempt.channel == "__context__"
+                        and bool(attempt.success)
+                        for attempt in channel_results
+                    ),
+                    "attempt_count": execution.attempt_count,
+                    "failure_count": execution.failure_count,
+                    "reused_count": execution.reused_count,
+                }
+
+            self._finish_pipeline_stage(
+                dispatch_stage,
+                stage_result,
+                output_summary=output_summary,
+            )
+
+            if not execution.records:
+                notification_status = (
+                    "skipped"
+                    if dispatch_result.status == "noise_suppressed"
+                    else "not_configured"
                 )
                 notification_run = self._build_notification_run_snapshot(
                     channel="report",
-                    status="not_configured",
+                    status=notification_status,
                     success=False,
                     attempts=0,
                 )
                 record_notification_run(
                     channel="report",
-                    status="not_configured",
+                    status=notification_status,
                     success=False,
                     attempts=0,
                 )
@@ -1585,15 +935,26 @@ class _DeliveryStageMixin:
                     results=results,
                     notification_run=notification_run,
                 )
-                logger.info("No notification channel is configured; skipping delivery")
+            else:
+                self._refresh_saved_diagnostic_snapshot(results=results)
 
-        except Exception as e:  # broad-exception: fallback_recorded - Dispatch failures are recorded and safely logged without changing analysis results.
+            if dispatch_result.success:
+                logger.info("Decision dashboard delivered")
+            elif dispatch_result.status in {
+                "noise_suppressed",
+                "no_channel",
+            }:
+                logger.info("Decision dashboard delivery skipped")
+            else:
+                logger.warning("Decision dashboard delivery failed")
+
+        except Exception as exc:  # broad-exception: fallback_recorded - notification failures do not change analysis success
             if not render_stage.finished:
                 self._finish_pipeline_stage(
                     render_stage,
                     PipelineStageResult.failed(
                         PipelineStageName.RENDER,
-                        error=e,
+                        error=exc,
                         retryable=False,
                     ),
                 )
@@ -1609,79 +970,79 @@ class _DeliveryStageMixin:
                     output_summary={"reason": "render_failed"},
                 )
             elif dispatch_stage is not None and not dispatch_stage.finished:
-                confirmed_delivery_count = max(
-                    0,
-                    delivery_attempt_count - delivery_failure_count,
-                ) + delivery_reused_count
-                failed_dispatch_result = (
+                confirmed_delivery_count = (
+                    sum(
+                        bool(record.attempt.success)
+                        for record in execution.records
+                    )
+                    if execution is not None
+                    else 0
+                )
+                failed_result = (
                     PipelineStageResult.degraded(
                         PipelineStageName.DISPATCH,
                         False,
                         reason=(
-                            "Dispatch failed after one or more deliveries succeeded."
+                            "Dispatch failed after one or more deliveries "
+                            "succeeded."
                         ),
                         side_effect_committed=True,
-                        error=e,
+                        error=exc,
                     )
                     if confirmed_delivery_count
                     else PipelineStageResult.failed(
                         PipelineStageName.DISPATCH,
-                        error=e,
+                        error=exc,
                         retryable=True,
-                        reason="Dispatch failed before any delivery was confirmed.",
+                        reason=(
+                            "Dispatch failed before any delivery was confirmed."
+                        ),
                     )
                 )
                 self._finish_pipeline_stage(
                     dispatch_stage,
-                    failed_dispatch_result,
+                    failed_result,
                     output_summary={
-                        "attempt_count": delivery_attempt_count,
-                        "failure_count": delivery_failure_count,
+                        "attempt_count": (
+                            execution.attempt_count
+                            if execution is not None
+                            else 0
+                        ),
+                        "failure_count": (
+                            execution.failure_count
+                            if execution is not None
+                            else 0
+                        ),
                         "confirmed_delivery_count": confirmed_delivery_count,
-                        "reused_count": delivery_reused_count,
+                        "reused_count": (
+                            execution.reused_count
+                            if execution is not None
+                            else 0
+                        ),
                     },
                 )
             notification_run = self._build_notification_run_snapshot(
                 channel="report",
                 status="failed",
                 success=False,
-                error_message=e,
+                error_message=exc,
             )
             record_notification_run(
                 channel="report",
                 status="failed",
                 success=False,
-                error_message=e,
+                error_message=exc,
             )
             self._refresh_saved_diagnostic_snapshot(
                 results=results,
                 notification_run=notification_run,
             )
-            if noise_decision is not None and not noise_finalized:
-                if (
-                    static_delivery_confirmed
-                    and hasattr(self.notifier, "record_noise_control")
-                ):
-                    self.notifier.record_noise_control(noise_decision)
-                elif hasattr(self.notifier, "release_noise_control"):
-                    self.notifier.release_noise_control(noise_decision)
-            if (
-                static_delivery_scope is not None
-                and static_delivery_scope_owned
-                and not static_delivery_confirmed
-            ):
-                self._get_pipeline_stage_runner().clear_scope_started(
-                    static_delivery_scope
-                )
             log_safe_exception(
                 logger,
                 "Notification delivery failed",
-                e,
+                exc,
                 error_code="pipeline_notification_delivery_failed",
             )
-        finally:
-            static_scope_guards.close()
-
     def _generate_aggregate_report(
         self,
         results: List[AnalysisResult],
