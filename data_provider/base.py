@@ -4486,19 +4486,6 @@ class DataFetcherManager:
 # patches against this module continue to intercept moved implementations.
 from . import _capability_catalog as _capability_catalog_module  # noqa: E402
 
-_CAPABILITY_CATALOG_CONSTANT_NAMES = (
-    _capability_catalog_module._reset_capability_inventory()
-)
-for _capability_catalog_constant_name in _CAPABILITY_CATALOG_CONSTANT_NAMES:
-    setattr(
-        DataFetcherManager,
-        _capability_catalog_constant_name,
-        getattr(
-            _capability_catalog_module,
-            _capability_catalog_constant_name,
-        ),
-    )
-
 _EXPECTED_CAPABILITY_CATALOG_METHOD_NAMES = (
     "plugin_registry",
     "_assign_fetcher_static_order_locked",
@@ -4520,25 +4507,38 @@ _EXPECTED_CAPABILITY_CATALOG_METHOD_NAMES = (
     "add_fetcher",
     "available_fetchers",
 )
-_bound_capability_catalog_method_names = (
-    _capability_catalog_module.bind_capability_catalog_facade(
+
+
+def _assemble_capability_catalog_facade(
+    catalog_module=_capability_catalog_module,
+    expected_method_names=_EXPECTED_CAPABILITY_CATALOG_METHOD_NAMES,
+) -> None:
+    constant_names = catalog_module._reset_capability_inventory()
+    for constant_name in constant_names:
+        setattr(
+            DataFetcherManager,
+            constant_name,
+            getattr(catalog_module, constant_name),
+        )
+
+    bound_method_names = catalog_module.bind_capability_catalog_facade(
         DataFetcherManager,
         globals(),
     )
+    if bound_method_names != expected_method_names:
+        raise ImportError(
+            "Unexpected DataFetcherManager capability catalog methods: "
+            f"{bound_method_names!r}"
+        )
+
+
+_assemble_capability_catalog_facade()
+_capability_catalog_module._install_facade_reload_hook(
+    _assemble_capability_catalog_facade
 )
-if (
-    _bound_capability_catalog_method_names
-    != _EXPECTED_CAPABILITY_CATALOG_METHOD_NAMES
-):
-    raise ImportError(
-        "Unexpected DataFetcherManager capability catalog methods: "
-        f"{_bound_capability_catalog_method_names!r}"
-    )
 
 del (
-    _CAPABILITY_CATALOG_CONSTANT_NAMES,
     _EXPECTED_CAPABILITY_CATALOG_METHOD_NAMES,
-    _bound_capability_catalog_method_names,
-    _capability_catalog_constant_name,
+    _assemble_capability_catalog_facade,
     _capability_catalog_module,
 )

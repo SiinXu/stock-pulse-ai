@@ -4,7 +4,16 @@
 
 import logging
 from types import FunctionType
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Type,
+)
 
 from src.utils.sanitize import log_safe_exception
 
@@ -15,6 +24,14 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger("data_provider.base")
+
+
+# ``importlib.reload`` retains a module dictionary. Preserve the callback
+# installed by the loaded compatibility facade so an owner reload can
+# atomically rebuild and rebind both sides of the seam.
+_FACADE_RELOAD_HOOK: Optional[Callable[[], None]] = globals().get(
+    "_FACADE_RELOAD_HOOK"
+)
 
 
 def _reset_capability_inventory() -> Tuple[str, ...]:
@@ -500,3 +517,21 @@ def bind_capability_catalog_facade(
         )
         bound_names.append(name)
     return tuple(bound_names)
+
+
+def _install_facade_reload_hook(hook: Callable[[], None]) -> None:
+    """Register the loaded facade assembly callback for owner reloads."""
+
+    global _FACADE_RELOAD_HOOK
+    _FACADE_RELOAD_HOOK = hook
+
+
+def _rebind_loaded_facade() -> None:
+    """Refresh a registered facade after this owner module is reloaded."""
+
+    hook = _FACADE_RELOAD_HOOK
+    if hook is not None:
+        hook()
+
+
+_rebind_loaded_facade()

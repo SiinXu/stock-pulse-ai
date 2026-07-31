@@ -25,7 +25,9 @@ importing public names from `data_provider.base`. Prefer patching
 `data_provider.base.<name>` in tests that target the public surface. Slice 1
 facade attributes and Slice 2 inventory constants preserve object identity with
 their owner module for each import; Slice 2 descriptor functions are cloned
-against facade globals to preserve established patch seams. New
+against facade globals to preserve established patch seams. Reloading either
+the facade or the private owner runs the same assembly callback, so both reload
+orders converge on one current inventory and descriptor set. New
 **implementations** of extracted responsibilities belong in the owner module
 below, then re-exported from the facade when a public name must remain stable.
 

@@ -107,6 +107,158 @@ def _descriptor_function(descriptor):
     return descriptor, "function"
 
 
+_RELOAD_CONTRACT_PREAMBLE = r"""
+import importlib
+from types import SimpleNamespace
+
+import data_provider._capability_catalog as capability_catalog
+import data_provider.base as base
+
+inventory_names = (
+    "_DAILY_MARKET_FETCHER_SUPPORT",
+    "_BUILTIN_DATA_PROVIDER_IDS",
+    "_BUILTIN_DATA_PROVIDER_PLUGIN_ID",
+    "_DAILY_MARKETS",
+)
+descriptor_names = __DESCRIPTOR_NAMES__
+
+
+def descriptor_function(descriptor):
+    if isinstance(descriptor, (staticmethod, classmethod)):
+        return descriptor.__func__
+    if isinstance(descriptor, property):
+        return descriptor.fget
+    return descriptor
+
+
+def descriptor_bindings():
+    source_descriptors = {}
+    source_functions = {}
+    facade_functions = {}
+    facade_descriptors = {}
+    for name in descriptor_names:
+        source_descriptor = vars(
+            capability_catalog._CapabilityCatalogMethods
+        )[name]
+        facade_descriptor = vars(base.DataFetcherManager)[name]
+        source_function = descriptor_function(source_descriptor)
+        facade_function = descriptor_function(facade_descriptor)
+
+        assert facade_function is not source_function
+        assert facade_function.__code__ is source_function.__code__
+        assert facade_function.__globals__ is vars(base)
+        assert facade_function.__module__ == "data_provider.base"
+        assert facade_function.__qualname__ == f"DataFetcherManager.{name}"
+
+        source_descriptors[name] = source_descriptor
+        source_functions[name] = source_function
+        facade_functions[name] = facade_function
+        facade_descriptors[name] = facade_descriptor
+    return (
+        source_descriptors,
+        source_functions,
+        facade_descriptors,
+        facade_functions,
+    )
+
+
+def mutate_inventory():
+    old_support = base.DataFetcherManager._DAILY_MARKET_FETCHER_SUPPORT
+    old_provider_ids = base.DataFetcherManager._BUILTIN_DATA_PROVIDER_IDS
+    old_support["MutatedFetcher"] = {"us"}
+    old_support["EfinanceFetcher"].add("us")
+    old_provider_ids["MutatedFetcher"] = "mutated"
+    return old_support, old_provider_ids
+
+
+def assert_inventory_reset(old_support, old_provider_ids):
+    support = base.DataFetcherManager._DAILY_MARKET_FETCHER_SUPPORT
+    provider_ids = base.DataFetcherManager._BUILTIN_DATA_PROVIDER_IDS
+    assert support is not old_support
+    assert provider_ids is not old_provider_ids
+    assert support["EfinanceFetcher"] == {"cn"}
+    assert "MutatedFetcher" not in support
+    assert "MutatedFetcher" not in provider_ids
+    for name in inventory_names:
+        assert getattr(base.DataFetcherManager, name) is getattr(
+            capability_catalog,
+            name,
+        )
+
+
+def assert_descriptor_refresh(before, after, *, source_changed):
+    (
+        before_source_descriptors,
+        before_sources,
+        before_facade_descriptors,
+        before_facades,
+    ) = before
+    (
+        after_source_descriptors,
+        after_sources,
+        after_facade_descriptors,
+        after_facades,
+    ) = after
+    for name in descriptor_names:
+        if source_changed:
+            assert (
+                after_source_descriptors[name]
+                is not before_source_descriptors[name]
+            )
+            assert after_sources[name] is not before_sources[name]
+        else:
+            assert (
+                after_source_descriptors[name]
+                is before_source_descriptors[name]
+            )
+            assert after_sources[name] is before_sources[name]
+        assert after_facades[name] is not before_facades[name]
+        assert (
+            after_facade_descriptors[name]
+            is not before_facade_descriptors[name]
+        )
+
+
+def assert_facade_patch_seam():
+    recorded = []
+    base.log_safe_exception = (
+        lambda *args, **kwargs: recorded.append((args, kwargs))
+    )
+    fetcher = SimpleNamespace(
+        name="UnavailableFetcher",
+        is_available_for_request=lambda _capability: (
+            _ for _ in ()
+        ).throw(RuntimeError("probe failed")),
+    )
+
+    assert (
+        base.DataFetcherManager._call_availability_probe(
+            fetcher,
+            "is_available_for_request",
+            "daily_data",
+        )
+        is False
+    )
+    assert len(recorded) == 1
+    assert recorded[0][1]["context"]["capability"] == "daily_data"
+"""
+
+
+def _run_reload_contract(body: str) -> None:
+    code = _RELOAD_CONTRACT_PREAMBLE.replace(
+        "__DESCRIPTOR_NAMES__",
+        repr(tuple(_MOVED_DESCRIPTOR_CONTRACT)),
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", f"{code}\n{body}"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+
+
 def test_capability_catalog_facade_preserves_import_and_reflection_contract() -> None:
     assert data_provider.DataFetcherManager is base.DataFetcherManager
 
@@ -158,59 +310,93 @@ def test_private_catalog_owns_facade_implementations_and_inventory() -> None:
     assert tuple(source_names) == tuple(_MOVED_DESCRIPTOR_CONTRACT)
 
 
-def test_capability_catalog_reload_rebuilds_mutable_inventory() -> None:
-    code = r"""
-import importlib
-import data_provider._capability_catalog as capability_catalog
-import data_provider.base as base
+def test_facade_reload_rebuilds_inventory_and_descriptors() -> None:
+    _run_reload_contract(
+        r"""
+old_class = base.DataFetcherManager
+old_support, old_provider_ids = mutate_inventory()
+before = descriptor_bindings()
 
-inventory_names = (
-    "_DAILY_MARKET_FETCHER_SUPPORT",
-    "_BUILTIN_DATA_PROVIDER_IDS",
-    "_BUILTIN_DATA_PROVIDER_PLUGIN_ID",
-    "_DAILY_MARKETS",
-)
-old_support = base.DataFetcherManager._DAILY_MARKET_FETCHER_SUPPORT
-old_provider_ids = base.DataFetcherManager._BUILTIN_DATA_PROVIDER_IDS
-old_support["MutatedFetcher"] = {"us"}
-old_support["EfinanceFetcher"].add("us")
-old_provider_ids["MutatedFetcher"] = "mutated"
+base = importlib.reload(base)
 
-assert capability_catalog._DAILY_MARKET_FETCHER_SUPPORT is old_support
-assert capability_catalog._BUILTIN_DATA_PROVIDER_IDS is old_provider_ids
-
-first = importlib.reload(base)
-first_support = first.DataFetcherManager._DAILY_MARKET_FETCHER_SUPPORT
-first_provider_ids = first.DataFetcherManager._BUILTIN_DATA_PROVIDER_IDS
-
-assert first_support is not old_support
-assert first_provider_ids is not old_provider_ids
-assert "MutatedFetcher" not in first_support
-assert "MutatedFetcher" not in first_provider_ids
-assert first_support["EfinanceFetcher"] == {"cn"}
-for name in inventory_names:
-    assert getattr(first.DataFetcherManager, name) is getattr(
-        capability_catalog,
-        name,
-    )
-
-second = importlib.reload(first)
-assert second.DataFetcherManager._DAILY_MARKET_FETCHER_SUPPORT is not first_support
-assert second.DataFetcherManager._BUILTIN_DATA_PROVIDER_IDS is not first_provider_ids
-for name in inventory_names:
-    assert getattr(second.DataFetcherManager, name) is getattr(
-        capability_catalog,
-        name,
-    )
+assert base.DataFetcherManager is not old_class
+assert_inventory_reset(old_support, old_provider_ids)
+after = descriptor_bindings()
+assert_descriptor_refresh(before, after, source_changed=False)
+assert_facade_patch_seam()
 """
-    completed = subprocess.run(
-        [sys.executable, "-c", code],
-        check=False,
-        capture_output=True,
-        text=True,
     )
 
-    assert completed.returncode == 0, completed.stderr
+
+def test_private_catalog_reload_rebinds_loaded_facade() -> None:
+    _run_reload_contract(
+        r"""
+old_class = base.DataFetcherManager
+old_support, old_provider_ids = mutate_inventory()
+before = descriptor_bindings()
+
+capability_catalog = importlib.reload(capability_catalog)
+
+assert base.DataFetcherManager is old_class
+assert_inventory_reset(old_support, old_provider_ids)
+after = descriptor_bindings()
+assert_descriptor_refresh(before, after, source_changed=True)
+assert_facade_patch_seam()
+"""
+    )
+
+
+def test_catalog_then_facade_reload_keeps_one_current_contract() -> None:
+    _run_reload_contract(
+        r"""
+old_class = base.DataFetcherManager
+old_support, old_provider_ids = mutate_inventory()
+before = descriptor_bindings()
+
+capability_catalog = importlib.reload(capability_catalog)
+
+assert base.DataFetcherManager is old_class
+assert_inventory_reset(old_support, old_provider_ids)
+after_catalog = descriptor_bindings()
+assert_descriptor_refresh(before, after_catalog, source_changed=True)
+
+support_after_catalog, ids_after_catalog = mutate_inventory()
+base = importlib.reload(base)
+
+assert base.DataFetcherManager is not old_class
+assert_inventory_reset(support_after_catalog, ids_after_catalog)
+after_base = descriptor_bindings()
+assert_descriptor_refresh(after_catalog, after_base, source_changed=False)
+assert_facade_patch_seam()
+"""
+    )
+
+
+def test_facade_then_catalog_reload_keeps_one_current_contract() -> None:
+    _run_reload_contract(
+        r"""
+old_class = base.DataFetcherManager
+old_support, old_provider_ids = mutate_inventory()
+before = descriptor_bindings()
+
+base = importlib.reload(base)
+
+assert base.DataFetcherManager is not old_class
+assert_inventory_reset(old_support, old_provider_ids)
+after_base = descriptor_bindings()
+assert_descriptor_refresh(before, after_base, source_changed=False)
+
+support_after_base, ids_after_base = mutate_inventory()
+reloaded_class = base.DataFetcherManager
+capability_catalog = importlib.reload(capability_catalog)
+
+assert base.DataFetcherManager is reloaded_class
+assert_inventory_reset(support_after_base, ids_after_base)
+after_catalog = descriptor_bindings()
+assert_descriptor_refresh(after_base, after_catalog, source_changed=True)
+assert_facade_patch_seam()
+"""
+    )
 
 
 def test_capability_catalog_availability_probe_uses_base_patch_seam(
