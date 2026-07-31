@@ -83,6 +83,10 @@ export const DatePicker = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const calendarButtonRef = useRef<HTMLButtonElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
+  const isControlDisabled = useCallback(
+    () => inputRef.current?.matches(':disabled') === true,
+    [],
+  );
   const [isOpen, setIsOpen] = useState(false);
   const selectedDate = parseIsoDate(value);
   const today = useMemo(() => new Date(), []);
@@ -113,7 +117,7 @@ export const DatePicker = ({
   }), [language]);
 
   const openPicker = useCallback(() => {
-    if (disabled) return;
+    if (isControlDisabled()) return;
     const initialDate = parseIsoDate(value) ?? today;
     let initialIso = toIsoDate(initialDate);
     if (min && initialIso < min) initialIso = min;
@@ -123,7 +127,7 @@ export const DatePicker = ({
     setFocusedDateIso(initialIso);
     prepareForOpen();
     setIsOpen(true);
-  }, [disabled, max, min, prepareForOpen, today, value]);
+  }, [isControlDisabled, max, min, prepareForOpen, today, value]);
 
   const closePicker = useCallback((restoreFocus = false) => {
     setIsOpen(false);
@@ -134,6 +138,28 @@ export const DatePicker = ({
       });
     }
   }, [resetPosition]);
+
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    const observer = new MutationObserver(() => {
+      if (isControlDisabled()) {
+        closePicker();
+      }
+    });
+    observer.observe(input, { attributes: true, attributeFilter: ['disabled'] });
+
+    let ancestor = input.parentElement;
+    while (ancestor) {
+      if (ancestor instanceof HTMLFieldSetElement) {
+        observer.observe(ancestor, { attributes: true, attributeFilter: ['disabled'] });
+      }
+      ancestor = ancestor.parentElement;
+    }
+
+    return () => observer.disconnect();
+  }, [closePicker, isControlDisabled]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -309,6 +335,7 @@ export const DatePicker = ({
             aria-label={`${t('common.clear')} ${resolvedFieldLabel}`}
             onClick={(event) => {
               event.stopPropagation();
+              if (isControlDisabled()) return;
               onChange('');
               closePicker();
               inputRef.current?.focus();
@@ -399,6 +426,10 @@ export const DatePicker = ({
                   onFocus={() => setFocusedDateIso(isoDate)}
                   onKeyDown={(event) => handleDayKeyDown(date, event)}
                   onClick={() => {
+                    if (isControlDisabled()) {
+                      closePicker();
+                      return;
+                    }
                     onChange(isoDate);
                     closePicker(true);
                   }}

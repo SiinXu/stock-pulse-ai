@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { DatePicker } from '../DatePicker';
 
@@ -101,6 +101,54 @@ describe('DatePicker', () => {
     expect(screen.getByRole('button', { name: '打开 日期 日历' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: '清除 日期' })).not.toBeInTheDocument();
     fireEvent.click(input.parentElement!);
+    expect(screen.queryByRole('dialog', { name: '日期' })).not.toBeInTheDocument();
+  });
+
+  it('inherits disabled fieldset semantics across wrapper and portal interactions', async () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <fieldset>
+        <DatePicker value="2026-07-18" onChange={onChange} ariaLabel="日期" />
+      </fieldset>,
+    );
+
+    const input = screen.getByRole('textbox', { name: '日期' });
+    fireEvent.click(input.parentElement!);
+    expect(screen.getByRole('dialog', { name: '日期' })).toBeInTheDocument();
+
+    rerender(
+      <fieldset disabled>
+        <DatePicker value="2026-07-18" onChange={onChange} ariaLabel="日期" />
+      </fieldset>,
+    );
+
+    expect(input).toBeDisabled();
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: '日期' })).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(input.parentElement!);
+
+    expect(screen.queryByRole('dialog', { name: '日期' })).not.toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('guards an open portal when its ancestor fieldset becomes disabled outside React', () => {
+    const onChange = vi.fn();
+    const { container } = render(
+      <fieldset>
+        <DatePicker value="2026-07-18" onChange={onChange} ariaLabel="日期" />
+      </fieldset>,
+    );
+
+    fireEvent.click(screen.getByRole('textbox', { name: '日期' }).parentElement!);
+    const day = document.querySelector<HTMLButtonElement>('[data-date="2026-07-20"]');
+    expect(day).not.toBeNull();
+
+    container.querySelector('fieldset')!.disabled = true;
+    fireEvent.click(day!);
+
+    expect(onChange).not.toHaveBeenCalled();
     expect(screen.queryByRole('dialog', { name: '日期' })).not.toBeInTheDocument();
   });
 
