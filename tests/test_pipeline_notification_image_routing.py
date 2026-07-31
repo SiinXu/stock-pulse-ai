@@ -5,7 +5,10 @@ Regression tests for pipeline email image routing with stock email groups.
 
 import os
 import sys
+import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -18,6 +21,7 @@ ensure_litellm_stub()
 from src.core.pipeline import StockAnalysisPipeline, NotificationChannel
 from src.core.pipeline_stage_results import (
     PipelineStageName,
+    PipelineStageRunner,
     PipelineStageStatus,
 )
 from src.services.run_diagnostics import (
@@ -268,6 +272,82 @@ class _FakeRoutedNotifier:
 
 
 class TestPipelineReportRouteFiltering(unittest.TestCase):
+    def test_aggregate_dispatch_retains_patched_delivery_snapshot(self):
+        """Keep a compatibility snapshot open through the physical send."""
+
+        pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+        pipeline.notifier = _FakeRoutedNotifier([])
+        pipeline.notifier.get_available_channels.return_value = []
+        pipeline.notifier.send_to_dingtalk = MagicMock()
+        pipeline.config = SimpleNamespace(stock_email_groups=[])
+        snapshot_state = {
+            "active": False,
+            "entered": 0,
+            "exited": 0,
+        }
+
+        @contextmanager
+        def _delivery_snapshot(route_type):
+            self.assertEqual(route_type, "report")
+            snapshot_state["active"] = True
+            snapshot_state["entered"] += 1
+            try:
+                yield (NotificationChannel.DINGTALK,)
+            finally:
+                snapshot_state["active"] = False
+                snapshot_state["exited"] += 1
+
+        def _send_dingtalk(content):
+            self.assertTrue(snapshot_state["active"])
+            self.assertEqual(content, "report:000001")
+            return True
+
+        pipeline.notifier._notification_delivery_snapshot = MagicMock(
+            side_effect=_delivery_snapshot
+        )
+        pipeline.notifier.send_to_dingtalk.side_effect = _send_dingtalk
+
+        pipeline._send_notifications(
+            [SimpleNamespace(code="000001")],
+            ReportType.SIMPLE,
+        )
+
+        pipeline.notifier._notification_delivery_snapshot.assert_called_once_with(
+            "report"
+        )
+        pipeline.notifier.send_to_dingtalk.assert_called_once_with(
+            "report:000001"
+        )
+        self.assertEqual(snapshot_state["entered"], 1)
+        self.assertEqual(snapshot_state["exited"], 1)
+        dispatch_stage = pipeline._get_pipeline_stage_runner().latest(
+            PipelineStageName.DISPATCH
+        )
+        self.assertIsNotNone(dispatch_stage)
+        self.assertEqual(dispatch_stage.status, PipelineStageStatus.SUCCESS)
+
+    def test_aggregate_dispatch_honors_legacy_unavailable_notifier(self):
+        """Preserve the pre-snapshot is_available compatibility gate."""
+
+        pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+        pipeline.notifier = _FakeRoutedNotifier([NotificationChannel.NTFY])
+        pipeline.notifier.is_available.return_value = False
+        pipeline.config = SimpleNamespace(stock_email_groups=[])
+
+        pipeline._send_notifications(
+            [SimpleNamespace(code="000001")],
+            ReportType.SIMPLE,
+        )
+
+        pipeline.notifier.is_available.assert_called_once_with()
+        pipeline.notifier.send_to_context.assert_not_called()
+        pipeline.notifier.send_to_ntfy.assert_not_called()
+        dispatch_stage = pipeline._get_pipeline_stage_runner().latest(
+            PipelineStageName.DISPATCH
+        )
+        self.assertIsNotNone(dispatch_stage)
+        self.assertEqual(dispatch_stage.status, PipelineStageStatus.SKIPPED)
+
     def test_send_notifications_applies_report_route_before_channel_iteration(self):
         pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
         pipeline.notifier = _FakeRoutedNotifier([NotificationChannel.TELEGRAM])
@@ -320,6 +400,39 @@ class TestPipelineReportRouteFiltering(unittest.TestCase):
         output_summary = snapshot["pipeline_stage_runs"][-1]["output_summary"]
         self.assertEqual(output_summary["channel_count"], 1)
         self.assertEqual(output_summary["attempt_count"], 2)
+
+    def test_available_context_failure_without_static_target_is_retryable(self):
+        """Keep one failed context attempt when no static target is routed."""
+
+        pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+        pipeline.notifier = _FakeRoutedNotifier([])
+        pipeline.notifier._has_context_channel = MagicMock(return_value=True)
+        pipeline.config = SimpleNamespace(stock_email_groups=[])
+        token = activate_run_diagnostic_context(
+            trace_id="context-only-failure"
+        )
+        try:
+            pipeline._send_notifications(
+                [SimpleNamespace(code="000001")],
+                ReportType.SIMPLE,
+            )
+            snapshot = current_diagnostic_snapshot()
+        finally:
+            reset_run_diagnostic_context(token)
+
+        dispatch_stage = pipeline._get_pipeline_stage_runner().latest(
+            PipelineStageName.DISPATCH
+        )
+        self.assertIsNotNone(dispatch_stage)
+        self.assertEqual(dispatch_stage.status, PipelineStageStatus.FAILED)
+        self.assertTrue(dispatch_stage.retryable)
+        self.assertFalse(dispatch_stage.side_effect_committed)
+        self.assertIsNotNone(snapshot)
+        output_summary = snapshot["pipeline_stage_runs"][-1]["output_summary"]
+        self.assertEqual(output_summary["channel_count"], 0)
+        self.assertFalse(output_summary["context_delivered"])
+        self.assertEqual(output_summary["attempt_count"], 1)
+        self.assertEqual(output_summary["failure_count"], 1)
 
     def test_markdown_to_image_uses_route_filtered_channels(self):
         pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
@@ -417,6 +530,168 @@ class TestPipelineReportRouteFiltering(unittest.TestCase):
 
         pipeline.notifier.record_noise_control.assert_not_called()
         pipeline.notifier.release_noise_control.assert_called_once()
+
+    def test_noise_record_failure_preserves_delivery_and_releases_reservation(self):
+        """Keep a confirmed send when noise finalization raises."""
+
+        pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+        pipeline.notifier = _FakeRoutedNotifier([NotificationChannel.NTFY])
+        pipeline.config = SimpleNamespace(stock_email_groups=[])
+        results = [
+            SimpleNamespace(
+                code="000001",
+                query_id="noise-finalization",
+            )
+        ]
+        canary = "notification-noise-finalization-canary"
+        pipeline.notifier.record_noise_control.side_effect = RuntimeError(
+            f"record failed api_key={canary} at "
+            f"https://private.example.invalid/noise?token={canary}"
+        )
+        token = activate_run_diagnostic_context(
+            trace_id="noise-finalization"
+        )
+        try:
+            with self.assertLogs("src.notification", level="ERROR") as logs:
+                pipeline._send_notifications(results, ReportType.SIMPLE)
+            snapshot = current_diagnostic_snapshot()
+        finally:
+            reset_run_diagnostic_context(token)
+
+        pipeline.notifier.send_to_ntfy.assert_called_once_with(
+            "report:000001"
+        )
+        pipeline.notifier.record_noise_control.assert_called_once()
+        pipeline.notifier.release_noise_control.assert_called_once()
+        dispatch_stage = pipeline._get_pipeline_stage_runner().latest(
+            PipelineStageName.DISPATCH
+        )
+        self.assertIsNotNone(dispatch_stage)
+        self.assertEqual(dispatch_stage.status, PipelineStageStatus.SUCCESS)
+        self.assertTrue(dispatch_stage.side_effect_committed)
+        self.assertIsNotNone(snapshot)
+        output_summary = snapshot["pipeline_stage_runs"][-1]["output_summary"]
+        self.assertEqual(output_summary["attempt_count"], 1)
+        self.assertEqual(output_summary["failure_count"], 0)
+        static_scope = (
+            "aggregate_static_delivery",
+            pipeline._delivery_stage_key(
+                route="aggregate",
+                results=results,
+                report_type=ReportType.SIMPLE,
+            ),
+        )
+        self.assertTrue(
+            pipeline._get_pipeline_stage_runner().scope_started(static_scope)
+        )
+        rendered_logs = "\n".join(logs.output)
+        self.assertIn(
+            "error_code=notification_noise_finalization_failed",
+            rendered_logs,
+        )
+        self.assertIn("[REDACTED]", rendered_logs)
+        self.assertIn("[REDACTED_URL]", rendered_logs)
+        self.assertNotIn(canary, rendered_logs)
+        self.assertNotIn("private.example.invalid", rendered_logs)
+
+    def test_concurrent_waiter_error_preserves_committed_static_scope(self):
+        """Keep the owner's committed scope when a serialized waiter fails."""
+
+        pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+        pipeline.notifier = _FakeRoutedNotifier([NotificationChannel.NTFY])
+        pipeline.config = SimpleNamespace(stock_email_groups=[])
+        pipeline._refresh_saved_diagnostic_snapshot = MagicMock()
+        runner = PipelineStageRunner()
+        pipeline._pipeline_stage_runner = runner
+        results = [
+            SimpleNamespace(
+                code="000001",
+                query_id="concurrent-scope-owner",
+            )
+        ]
+        owner_gate_entered = threading.Event()
+        waiter_guard_requested = threading.Event()
+        guard_request_lock = threading.Lock()
+        availability_lock = threading.Lock()
+        state = {
+            "guard_requests": 0,
+            "owner_thread_id": None,
+            "waiter_failed": False,
+        }
+        original_scope_guard = runner.scope_guard
+
+        @contextmanager
+        def _observed_scope_guard(scope_key):
+            with guard_request_lock:
+                state["guard_requests"] += 1
+                if state["guard_requests"] == 2:
+                    waiter_guard_requested.set()
+            with original_scope_guard(scope_key):
+                yield
+
+        def _available_channels():
+            thread_id = threading.get_ident()
+            with availability_lock:
+                if state["owner_thread_id"] is None:
+                    state["owner_thread_id"] = thread_id
+                elif (
+                    thread_id != state["owner_thread_id"]
+                    and not state["waiter_failed"]
+                ):
+                    state["waiter_failed"] = True
+                    raise RuntimeError("waiter routing failed")
+            return [NotificationChannel.NTFY]
+
+        def _evaluate_noise(*_args, **_kwargs):
+            owner_gate_entered.set()
+            self.assertTrue(waiter_guard_requested.wait(timeout=2))
+            return SimpleNamespace(
+                should_send=True,
+                message="",
+                reason_code="allowed",
+            )
+
+        runner.scope_guard = _observed_scope_guard
+        pipeline.notifier.get_available_channels.side_effect = (
+            _available_channels
+        )
+        pipeline.notifier.evaluate_noise_control.side_effect = _evaluate_noise
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            owner = executor.submit(
+                pipeline._send_notifications,
+                results,
+                ReportType.SIMPLE,
+            )
+            self.assertTrue(owner_gate_entered.wait(timeout=2))
+            waiter = executor.submit(
+                pipeline._send_notifications,
+                results,
+                ReportType.SIMPLE,
+            )
+            self.assertIsNone(owner.result(timeout=3))
+            self.assertIsNone(waiter.result(timeout=3))
+
+        static_scope = (
+            "aggregate_static_delivery",
+            pipeline._delivery_stage_key(
+                route="aggregate",
+                results=results,
+                report_type=ReportType.SIMPLE,
+            ),
+        )
+        scope_survived_waiter = runner.scope_started(static_scope)
+        pipeline._send_notifications(results, ReportType.SIMPLE)
+
+        self.assertTrue(scope_survived_waiter)
+        self.assertEqual(
+            pipeline.notifier.evaluate_noise_control.call_count,
+            1,
+        )
+        pipeline.notifier.send_to_ntfy.assert_called_once_with(
+            "report:000001"
+        )
+        pipeline.notifier.record_noise_control.assert_called_once()
 
     def test_image_preparation_exception_releases_noise_reservation(self):
         """Release the noise reservation when aggregate image setup raises."""

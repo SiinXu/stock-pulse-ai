@@ -851,6 +851,55 @@ def _dispatch_target_attempts(
     return records
 
 
+def _release_noise_reservation(service: Any, decision: Any) -> None:
+    """Best-effort release for a noise-control in-flight reservation."""
+
+    release_noise = getattr(service, "release_noise_control", None)
+    if not callable(release_noise):
+        return
+    try:
+        release_noise(decision)
+    except Exception as exc:  # broad-exception: fallback_recorded - cleanup failures are safely logged without changing the dispatch outcome
+        from src.notification import logger, log_safe_exception
+
+        log_safe_exception(
+            logger,
+            "Notification noise reservation release failed",
+            exc,
+            error_code="notification_noise_reservation_release_failed",
+            level=logging.WARNING,
+        )
+
+
+def _finalize_noise_control(
+    service: Any,
+    decision: Any,
+    *,
+    static_success: bool,
+) -> None:
+    """Finalize noise state without invalidating a completed delivery."""
+
+    if decision is None:
+        return
+    if static_success:
+        record_noise = getattr(service, "record_noise_control", None)
+        if callable(record_noise):
+            try:
+                record_noise(decision)
+                return
+            except Exception as exc:  # broad-exception: fallback_recorded - a successful delivery remains committed when noise persistence fails
+                from src.notification import logger, log_safe_exception
+
+                log_safe_exception(
+                    logger,
+                    "Notification noise finalization failed",
+                    exc,
+                    error_code="notification_noise_finalization_failed",
+                    context={"action": "record"},
+                )
+    _release_noise_reservation(service, decision)
+
+
 def _dispatch_with_results_under_lease(
     service: Any,
     content: str,
@@ -862,6 +911,8 @@ def _dispatch_with_results_under_lease(
     dedup_key: Optional[str],
     cooldown_key: Optional[str],
     aggregate: Optional[_AggregateDispatchContext] = None,
+    retained_target_channels: Optional[List[Any]] = None,
+    notification_available: Optional[bool] = None,
 ) -> _DispatchExecution:
     """Run the canonical route/noise/isolation/mapping/aggregation policy."""
 
@@ -872,6 +923,16 @@ def _dispatch_with_results_under_lease(
         logger,
         log_safe_exception,
     )
+
+    if notification_available is False:
+        return _DispatchExecution(
+            result=NotificationDispatchResult(
+                dispatched=False,
+                success=False,
+                status="no_channel",
+                message="notification service unavailable",
+            ),
+        )
 
     records: List[_DispatchAttemptRecord] = []
     context_available = False
@@ -937,34 +998,40 @@ def _dispatch_with_results_under_lease(
             context_only=True,
         )
 
-    application_services = getattr(service, "_application_services", None)
-    plugin_snapshot = (
-        application_services.notification_channel_snapshot()
-        if application_services is not None
-        else ()
-    )
-    available_plugins = _available_notification_channel_snapshot(plugin_snapshot)
-    available_static = service.get_available_channels()
-    available_channels = [*available_static, *available_plugins]
-    allowed_channel_ids = tuple(
-        dict.fromkeys(
-            (
-                *_ROUTABLE_NOTIFICATION_CHANNELS,
-                *(channel.channel_id for channel in plugin_snapshot),
+    if retained_target_channels is not None:
+        available_channels = list(retained_target_channels)
+        target_channels = list(retained_target_channels)
+    else:
+        application_services = getattr(service, "_application_services", None)
+        plugin_snapshot = (
+            application_services.notification_channel_snapshot()
+            if application_services is not None
+            else ()
+        )
+        available_plugins = _available_notification_channel_snapshot(
+            plugin_snapshot
+        )
+        available_static = service.get_available_channels()
+        available_channels = [*available_static, *available_plugins]
+        allowed_channel_ids = tuple(
+            dict.fromkeys(
+                (
+                    *_ROUTABLE_NOTIFICATION_CHANNELS,
+                    *(channel.channel_id for channel in plugin_snapshot),
+                )
             )
         )
-    )
-    if hasattr(service, "_notification_runtime_lock"):
-        target_channels = service.get_channels_for_route(
-            route_type,
-            channels=available_channels,
-            allowed_channel_ids=allowed_channel_ids,
-        )
-    else:
-        target_channels = service.get_channels_for_route(
-            route_type,
-            channels=available_channels,
-        )
+        if hasattr(service, "_notification_runtime_lock"):
+            target_channels = service.get_channels_for_route(
+                route_type,
+                channels=available_channels,
+                allowed_channel_ids=allowed_channel_ids,
+            )
+        else:
+            target_channels = service.get_channels_for_route(
+                route_type,
+                channels=available_channels,
+            )
 
     if not available_channels or not target_channels:
         if context_success:
@@ -973,6 +1040,16 @@ def _dispatch_with_results_under_lease(
                 success=True,
                 status="sent",
                 channel_results=[context_record.attempt],
+            )
+        elif aggregate is not None and context_available:
+            result = NotificationDispatchResult(
+                dispatched=True,
+                success=False,
+                status="all_failed",
+                channel_results=[context_record.attempt],
+                message=(
+                    "context delivery failed and no static channel was routed"
+                ),
             )
         else:
             message = (
@@ -1063,9 +1140,7 @@ def _dispatch_with_results_under_lease(
         )
     except Exception:
         if not static_scope_reentry and noise_decision is not None:
-            release_noise = getattr(service, "release_noise_control", None)
-            if callable(release_noise):
-                release_noise(noise_decision)
+            _release_noise_reservation(service, noise_decision)
         if aggregate is not None and not static_scope_reentry:
             aggregate.clear_scope_started()
         raise
@@ -1077,15 +1152,11 @@ def _dispatch_with_results_under_lease(
     ]
     static_success = any(record.attempt.success for record in static_records)
     if not static_scope_reentry:
-        if noise_decision is not None:
-            if static_success:
-                record_noise = getattr(service, "record_noise_control", None)
-                if callable(record_noise):
-                    record_noise(noise_decision)
-            else:
-                release_noise = getattr(service, "release_noise_control", None)
-                if callable(release_noise):
-                    release_noise(noise_decision)
+        _finalize_noise_control(
+            service,
+            noise_decision,
+            static_success=static_success,
+        )
 
     if (
         aggregate is not None
@@ -1169,17 +1240,42 @@ def dispatch_aggregate_with_results(
         else nullcontext()
     )
     with dispatch_lease:
-        return _dispatch_with_results_under_lease(
+        delivery_snapshot = getattr(
             service,
-            content,
-            email_stock_codes=[str(result.code) for result in results],
-            email_send_to_all=False,
-            route_type="report",
-            severity="info",
-            dedup_key=dedup_key,
-            cooldown_key=cooldown_key,
-            aggregate=aggregate,
+            "_notification_delivery_snapshot",
+            None,
         )
+        snapshot_context = (
+            delivery_snapshot("report")
+            if callable(delivery_snapshot)
+            else nullcontext(None)
+        )
+        with snapshot_context as target_snapshot:
+            notification_available = None
+            if not callable(delivery_snapshot):
+                is_available = getattr(service, "is_available", None)
+                if callable(is_available):
+                    notification_available = bool(is_available())
+            retained_target_channels = (
+                list(target_snapshot)
+                if target_snapshot is not None
+                else None
+            )
+            return _dispatch_with_results_under_lease(
+                service,
+                content,
+                email_stock_codes=[
+                    str(result.code) for result in results
+                ],
+                email_send_to_all=False,
+                route_type="report",
+                severity="info",
+                dedup_key=dedup_key,
+                cooldown_key=cooldown_key,
+                aggregate=aggregate,
+                retained_target_channels=retained_target_channels,
+                notification_available=notification_available,
+            )
 
 
 class _DispatchMethods:

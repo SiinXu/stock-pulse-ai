@@ -668,7 +668,6 @@ class _DeliveryStageMixin:
         dispatch_stage: Optional[PipelineStageObservation] = None
         execution = None
         static_delivery_scope: Optional[Tuple[Any, ...]] = None
-        static_delivery_scope_was_started = False
         try:
             logger.info("Generating the decision dashboard")
             report = self._generate_aggregate_report(results, report_type)
@@ -733,9 +732,6 @@ class _DeliveryStageMixin:
             static_delivery_scope = (
                 "aggregate_static_delivery",
                 delivery_key,
-            )
-            static_delivery_scope_was_started = stage_runner.scope_started(
-                static_delivery_scope
             )
             report_type_key = (
                 report_type.value
@@ -953,14 +949,6 @@ class _DeliveryStageMixin:
                 logger.warning("Decision dashboard delivery failed")
 
         except Exception as exc:  # broad-exception: fallback_recorded - notification failures do not change analysis success
-            if (
-                static_delivery_scope is not None
-                and execution is None
-                and not static_delivery_scope_was_started
-            ):
-                self._get_pipeline_stage_runner().clear_scope_started(
-                    static_delivery_scope
-                )
             if not render_stage.finished:
                 self._finish_pipeline_stage(
                     render_stage,
