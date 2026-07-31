@@ -314,6 +314,276 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
         mock_custom.assert_called_once_with("content")
 
     @mock.patch("src.notification.get_config")
+    def test_dingtalk_only_aggregate_dispatch_routes_sends_and_reports_success(
+        self,
+        mock_get_config: mock.MagicMock,
+    ):
+        """Route a DingTalk-only aggregate report and record one success."""
+
+        from types import SimpleNamespace
+
+        from src.core.pipeline import StockAnalysisPipeline
+        from src.core.pipeline_stage_results import (
+            PipelineStageName,
+            PipelineStageStatus,
+        )
+        from src.enums import ReportType
+        from src.services.run_diagnostics import (
+            activate_run_diagnostic_context,
+            current_diagnostic_snapshot,
+            reset_run_diagnostic_context,
+        )
+
+        cfg = _make_config(
+            dingtalk_webhook_url="https://dingtalk.example/hook",
+            notification_report_channels=["dingtalk"],
+        )
+        mock_get_config.return_value = cfg
+        service = NotificationService()
+        pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+        pipeline.notifier = service
+        pipeline.config = cfg
+        pipeline._generate_aggregate_report = mock.MagicMock(
+            return_value="aggregate report"
+        )
+        pipeline._refresh_saved_diagnostic_snapshot = mock.MagicMock()
+        results = [
+            SimpleNamespace(
+                code="600519",
+                query_id="dingtalk-only-aggregate",
+                success=True,
+            )
+        ]
+
+        token = activate_run_diagnostic_context(
+            trace_id="dingtalk-only-aggregate"
+        )
+        try:
+            with mock.patch.object(
+                service,
+                "get_channels_for_route",
+                wraps=service.get_channels_for_route,
+            ) as route_spy, mock.patch.object(
+                service,
+                "_send_to_static_channel",
+                wraps=service._send_to_static_channel,
+            ) as static_dispatch, mock.patch.object(
+                service,
+                "send_to_dingtalk",
+                return_value=True,
+            ) as send_to_dingtalk:
+                pipeline._send_notifications(results, ReportType.SIMPLE)
+                diagnostic_snapshot = current_diagnostic_snapshot()
+        finally:
+            reset_run_diagnostic_context(token)
+
+        routed_channels = route_spy.call_args.kwargs["channels"]
+        self.assertEqual(routed_channels, [NotificationChannel.DINGTALK])
+        self.assertEqual(
+            static_dispatch.call_args.args[:2],
+            (NotificationChannel.DINGTALK, "aggregate report"),
+        )
+        send_to_dingtalk.assert_called_once_with("aggregate report")
+        dispatch_stage = pipeline._get_pipeline_stage_runner().latest(
+            PipelineStageName.DISPATCH
+        )
+        self.assertIsNotNone(dispatch_stage)
+        self.assertEqual(dispatch_stage.status, PipelineStageStatus.SUCCESS)
+        self.assertTrue(dispatch_stage.value)
+        self.assertFalse(dispatch_stage.retryable)
+        self.assertTrue(dispatch_stage.side_effect_committed)
+        self.assertIsNotNone(diagnostic_snapshot)
+        dispatch_run = diagnostic_snapshot["pipeline_stage_runs"][-1]
+        self.assertEqual(dispatch_run["output_summary"]["attempt_count"], 1)
+        self.assertEqual(dispatch_run["output_summary"]["failure_count"], 0)
+
+    @mock.patch("src.notification.get_config")
+    def test_dispatch_honors_facade_image_policy_patch(
+        self,
+        mock_get_config: mock.MagicMock,
+    ):
+        """Keep the frozen facade image-policy monkeypatch seam observable."""
+
+        cfg = _make_config(
+            dingtalk_webhook_url="https://dingtalk.example/hook",
+            notification_report_channels=["dingtalk"],
+        )
+        mock_get_config.return_value = cfg
+        service = NotificationService()
+
+        with mock.patch.object(
+            service,
+            "_should_use_image_for_channel",
+            return_value=False,
+        ) as image_policy, mock.patch.object(
+            service,
+            "send_to_dingtalk",
+            return_value=True,
+        ):
+            result = service.send_with_results(
+                "report",
+                route_type="report",
+            )
+
+        self.assertTrue(result.success)
+        image_policy.assert_called_once_with(
+            NotificationChannel.DINGTALK,
+            None,
+        )
+
+    @mock.patch("src.notification.get_config")
+    def test_telegram_dispatch_honors_frozen_facade_static_sender(
+        self,
+        mock_get_config: mock.MagicMock,
+    ):
+        """Dispatch Telegram through the frozen facade monkeypatch seam."""
+
+        cfg = _make_config(
+            telegram_bot_token="telegram-token",
+            telegram_chat_id="telegram-chat",
+            notification_report_channels=["telegram"],
+        )
+        mock_get_config.return_value = cfg
+        service = NotificationService()
+
+        with mock.patch.object(
+            service,
+            "_send_to_static_channel",
+            return_value=True,
+        ) as static_sender:
+            result = service.send_with_results(
+                "telegram report",
+                route_type="report",
+            )
+
+        self.assertTrue(result.success)
+        static_sender.assert_called_once_with(
+            NotificationChannel.TELEGRAM,
+            "telegram report",
+            image_bytes=None,
+            email_stock_codes=None,
+            email_send_to_all=False,
+            route_type="report",
+        )
+
+    @mock.patch("src.notification.get_config")
+    def test_dingtalk_only_aggregate_false_return_is_retryable_failure(
+        self,
+        mock_get_config: mock.MagicMock,
+    ):
+        """Record one retryable DingTalk failure without a committed effect."""
+
+        from types import SimpleNamespace
+
+        from src.core.pipeline import StockAnalysisPipeline
+        from src.core.pipeline_stage_results import (
+            PipelineStageName,
+            PipelineStageStatus,
+        )
+        from src.enums import ReportType
+        from src.services.run_diagnostics import (
+            activate_run_diagnostic_context,
+            current_diagnostic_snapshot,
+            reset_run_diagnostic_context,
+        )
+
+        cfg = _make_config(
+            dingtalk_webhook_url="https://dingtalk.example/hook",
+            notification_report_channels=["dingtalk"],
+        )
+        mock_get_config.return_value = cfg
+        service = NotificationService()
+        pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+        pipeline.notifier = service
+        pipeline.config = cfg
+        pipeline._generate_aggregate_report = mock.MagicMock(
+            return_value="aggregate report"
+        )
+        pipeline._refresh_saved_diagnostic_snapshot = mock.MagicMock()
+        results = [
+            SimpleNamespace(
+                code="600519",
+                query_id="dingtalk-only-failure",
+                success=True,
+            )
+        ]
+
+        token = activate_run_diagnostic_context(
+            trace_id="dingtalk-only-failure"
+        )
+        try:
+            with mock.patch.object(
+                service,
+                "send_to_dingtalk",
+                return_value=False,
+            ) as send_to_dingtalk:
+                pipeline._send_notifications(results, ReportType.SIMPLE)
+                diagnostic_snapshot = current_diagnostic_snapshot()
+        finally:
+            reset_run_diagnostic_context(token)
+
+        send_to_dingtalk.assert_called_once_with("aggregate report")
+        dispatch_stage = pipeline._get_pipeline_stage_runner().latest(
+            PipelineStageName.DISPATCH
+        )
+        self.assertIsNotNone(dispatch_stage)
+        self.assertEqual(dispatch_stage.status, PipelineStageStatus.FAILED)
+        self.assertTrue(dispatch_stage.retryable)
+        self.assertFalse(dispatch_stage.side_effect_committed)
+        self.assertIsNotNone(diagnostic_snapshot)
+        dispatch_run = diagnostic_snapshot["pipeline_stage_runs"][-1]
+        self.assertEqual(dispatch_run["output_summary"]["attempt_count"], 1)
+        self.assertEqual(dispatch_run["output_summary"]["failure_count"], 1)
+
+    @mock.patch("src.notification.get_config")
+    def test_context_exception_aborts_before_custom_static_delivery(
+        self,
+        mock_get_config: mock.MagicMock,
+    ):
+        """Preserve context exception ordering before any static side effect."""
+
+        from types import SimpleNamespace
+
+        from src.core.pipeline import StockAnalysisPipeline
+        from src.enums import ReportType
+
+        cfg = _make_config(
+            custom_webhook_urls=["https://custom.example/hook"],
+            notification_report_channels=["custom"],
+        )
+        mock_get_config.return_value = cfg
+        service = NotificationService()
+        pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+        pipeline.notifier = service
+        pipeline.config = cfg
+        pipeline._generate_aggregate_report = mock.MagicMock(
+            return_value="aggregate report"
+        )
+        pipeline._refresh_saved_diagnostic_snapshot = mock.MagicMock()
+
+        with mock.patch.object(
+            service,
+            "send_to_context",
+            side_effect=RuntimeError("context unavailable"),
+        ), mock.patch.object(
+            service,
+            "send_to_custom",
+            return_value=True,
+        ) as send_to_custom:
+            pipeline._send_notifications(
+                [
+                    SimpleNamespace(
+                        code="600519",
+                        query_id="context-exception",
+                        success=True,
+                    )
+                ],
+                ReportType.SIMPLE,
+            )
+
+        send_to_custom.assert_not_called()
+
+    @mock.patch("src.notification.get_config")
     def test_send_alert_and_system_error_routes_filter_independently(self, mock_get_config: mock.MagicMock):
         cfg = _make_config(
             wechat_webhook_url="https://wechat.example/hook",

@@ -16,6 +16,10 @@ from tests.litellm_stub import ensure_litellm_stub
 ensure_litellm_stub()
 
 from src.core.pipeline import StockAnalysisPipeline, NotificationChannel
+from src.core.pipeline_stage_results import (
+    PipelineStageName,
+    PipelineStageStatus,
+)
 from src.services.run_diagnostics import (
     activate_run_diagnostic_context,
     build_run_diagnostic_summary,
@@ -130,6 +134,28 @@ class TestPipelineEmailGroupImageRouting(unittest.TestCase):
         self.assertEqual(calls[1].kwargs["code"], "600519")
         self.assertEqual(calls[1].kwargs["notification_runs"][0]["status"], "success")
         self.assertEqual(calls[1].kwargs["notification_runs"][0]["channel"], "email:default")
+
+    @patch("src.md2img.markdown_to_image", return_value=None)
+    def test_email_groups_preserve_routed_channel_count(self, _mock_md2img):
+        """Count one routed email channel while retaining two attempts."""
+
+        pipeline = self._build_pipeline()
+        token = activate_run_diagnostic_context(
+            trace_id="email-group-channel-count"
+        )
+        try:
+            pipeline._send_notifications(
+                self._make_results(),
+                ReportType.SIMPLE,
+            )
+            snapshot = current_diagnostic_snapshot()
+        finally:
+            reset_run_diagnostic_context(token)
+
+        self.assertIsNotNone(snapshot)
+        output_summary = snapshot["pipeline_stage_runs"][-1]["output_summary"]
+        self.assertEqual(output_summary["channel_count"], 1)
+        self.assertEqual(output_summary["attempt_count"], 2)
 
 
 class _FakeWechatNotifier:
@@ -269,6 +295,32 @@ class TestPipelineReportRouteFiltering(unittest.TestCase):
         self.assertEqual(noise_kwargs["cooldown_key"], "report:aggregate:simple:000001")
         pipeline.notifier.record_noise_control.assert_called_once()
 
+    def test_context_and_telegram_preserve_routed_channel_count(self):
+        """Exclude a successful context attempt from routed channel count."""
+
+        pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+        pipeline.notifier = _FakeRoutedNotifier(
+            [NotificationChannel.TELEGRAM]
+        )
+        pipeline.notifier.send_to_context.return_value = True
+        pipeline.config = SimpleNamespace(stock_email_groups=[])
+        token = activate_run_diagnostic_context(
+            trace_id="context-telegram-channel-count"
+        )
+        try:
+            pipeline._send_notifications(
+                [SimpleNamespace(code="000001")],
+                ReportType.SIMPLE,
+            )
+            snapshot = current_diagnostic_snapshot()
+        finally:
+            reset_run_diagnostic_context(token)
+
+        self.assertIsNotNone(snapshot)
+        output_summary = snapshot["pipeline_stage_runs"][-1]["output_summary"]
+        self.assertEqual(output_summary["channel_count"], 1)
+        self.assertEqual(output_summary["attempt_count"], 2)
+
     def test_markdown_to_image_uses_route_filtered_channels(self):
         pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
         pipeline.notifier = _FakeRoutedNotifier(
@@ -365,6 +417,115 @@ class TestPipelineReportRouteFiltering(unittest.TestCase):
 
         pipeline.notifier.record_noise_control.assert_not_called()
         pipeline.notifier.release_noise_control.assert_called_once()
+
+    def test_image_preparation_exception_releases_noise_reservation(self):
+        """Release the noise reservation when aggregate image setup raises."""
+
+        pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+        pipeline.notifier = _FakeRoutedNotifier(
+            [NotificationChannel.TELEGRAM],
+            image_channels={"telegram"},
+        )
+        pipeline.config = SimpleNamespace(stock_email_groups=[])
+        results = [SimpleNamespace(code="000001")]
+
+        with patch(
+            "src.md2img.markdown_to_image",
+            side_effect=RuntimeError("image renderer unavailable"),
+        ):
+            pipeline._send_notifications(results, ReportType.SIMPLE)
+
+        pipeline.notifier.send_to_telegram.assert_not_called()
+        pipeline.notifier.record_noise_control.assert_not_called()
+        pipeline.notifier.release_noise_control.assert_called_once()
+
+    def test_context_success_survives_image_preparation_failure(self):
+        """Retain a committed context delivery when Telegram image setup fails."""
+
+        pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+        pipeline.notifier = _FakeRoutedNotifier(
+            [NotificationChannel.TELEGRAM],
+            image_channels={"telegram"},
+        )
+        pipeline.notifier.send_to_context.return_value = True
+        pipeline.config = SimpleNamespace(stock_email_groups=[])
+        token = activate_run_diagnostic_context(
+            trace_id="context-image-preparation-failure"
+        )
+        try:
+            with patch(
+                "src.md2img.markdown_to_image",
+                side_effect=RuntimeError("image renderer unavailable"),
+            ):
+                pipeline._send_notifications(
+                    [SimpleNamespace(code="000001")],
+                    ReportType.SIMPLE,
+                )
+            snapshot = current_diagnostic_snapshot()
+        finally:
+            reset_run_diagnostic_context(token)
+
+        pipeline.notifier.send_to_context.assert_called_once_with(
+            "report:000001"
+        )
+        pipeline.notifier.send_to_telegram.assert_not_called()
+        pipeline.notifier._send_telegram_photo.assert_not_called()
+        pipeline.notifier.record_noise_control.assert_not_called()
+        pipeline.notifier.release_noise_control.assert_called_once()
+        dispatch_stage = pipeline._get_pipeline_stage_runner().latest(
+            PipelineStageName.DISPATCH
+        )
+        self.assertIsNotNone(dispatch_stage)
+        self.assertEqual(
+            dispatch_stage.status,
+            PipelineStageStatus.DEGRADED,
+        )
+        self.assertTrue(dispatch_stage.side_effect_committed)
+        self.assertIsNotNone(snapshot)
+        output_summary = snapshot["pipeline_stage_runs"][-1]["output_summary"]
+        self.assertTrue(output_summary["context_delivered"])
+        self.assertEqual(output_summary["channel_count"], 1)
+        self.assertEqual(output_summary["attempt_count"], 2)
+        self.assertEqual(output_summary["failure_count"], 1)
+
+    def test_post_success_email_preparation_failure_remains_partial(self):
+        """Retain NTFY success when later email-group preparation fails."""
+
+        pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+        pipeline.notifier = _FakeRoutedNotifier(
+            [NotificationChannel.NTFY, NotificationChannel.EMAIL]
+        )
+        pipeline.config = SimpleNamespace(
+            stock_email_groups=[
+                (None, ["ops@example.com"]),
+            ]
+        )
+        token = activate_run_diagnostic_context(
+            trace_id="post-success-preparation-failure"
+        )
+        try:
+            pipeline._send_notifications(
+                [SimpleNamespace(code="000001")],
+                ReportType.SIMPLE,
+            )
+            snapshot = current_diagnostic_snapshot()
+        finally:
+            reset_run_diagnostic_context(token)
+
+        pipeline.notifier.send_to_ntfy.assert_called_once_with("report:000001")
+        pipeline.notifier.send_to_email.assert_not_called()
+        pipeline.notifier.record_noise_control.assert_called_once()
+        pipeline.notifier.release_noise_control.assert_not_called()
+        self.assertIsNotNone(snapshot)
+        dispatch_run = snapshot["pipeline_stage_runs"][-1]
+        self.assertEqual(dispatch_run["status"], "degraded")
+        self.assertEqual(dispatch_run["output_summary"]["attempt_count"], 2)
+        self.assertEqual(dispatch_run["output_summary"]["failure_count"], 1)
+        dispatch_stage = pipeline._get_pipeline_stage_runner().latest(
+            PipelineStageName.DISPATCH
+        )
+        self.assertIsNotNone(dispatch_stage)
+        self.assertTrue(dispatch_stage.side_effect_committed)
 
     def test_channel_exception_does_not_skip_later_channel_and_records_noise(self):
         pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
