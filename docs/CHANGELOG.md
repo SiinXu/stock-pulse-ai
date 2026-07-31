@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [Fixed] Made shared Web date fields picker-only while preserving required validation and optional-date clearing, and improved Market Review history height fill, Backtest validation-mode contrast in dark mode, and adaptive Deep Research stock input layout.
+- [Fixed] Routed DingTalk-only aggregate reports through the canonical notification dispatch policy.
+- [Fixed] Kept Portfolio operation identities account/file scoped and prevented stale ledger, FX, and post-write projection races from blocking controls or showing out-of-scope data.
 - [Fixed] Treated DingTalk signing secrets as opaque provider values and localized newly added Web settings and analysis copy across all translated bundles.
 - [Fixed] Separated successful paper-trade submission from follow-up portfolio refresh failures, with a page-level refresh retry and accurate success copy.
 - [Added] Added shared structured phase, signal-attribution, and strategy-synthesis report sections across synchronous, task, and history results, and expanded Japan/Korea search seeds with explicit suffix and manual-entry guidance.

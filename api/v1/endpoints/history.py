@@ -23,10 +23,6 @@ from api.v1.schemas.history import (
     NewsIntelItem,
     NewsIntelResponse,
     AnalysisReport,
-    ReportMeta,
-    ReportSummary,
-    ReportStrategy,
-    ReportDetails,
     MarkdownReportResponse,
     RunDiagnosticSummaryResponse,
     StockBarItem,
@@ -35,12 +31,9 @@ from api.v1.schemas.history import (
 from api.v1.schemas.common import ErrorResponse
 from api.v1.schemas.run_flow import RunFlowSnapshot
 from src.storage import DatabaseManager
-from src.report_language import (
-    get_sentiment_label,
-    get_localized_stock_name,
-    localize_operation_advice,
-    localize_trend_prediction,
-    normalize_report_language,
+from src.report_language import normalize_report_language
+from src.services._analysis_report_projection import (
+    project_persisted_analysis_report,
 )
 from src.services.history_service import (
     HistoryService,
@@ -50,17 +43,8 @@ from src.services.history_service import (
 from src.schemas.decision_action import build_action_fields
 from src.utils.data_processing import (
     normalize_model_used,
-    extract_fundamental_detail_fields,
-    extract_board_detail_fields,
-    extract_market_structure_detail_field,
-    extract_realtime_detail_fields,
 )
 from src.utils.sanitize import log_safe_exception
-from src.analysis_context_pack_overview import (
-    extract_analysis_context_pack_overview,
-    sanitize_context_snapshot_for_api,
-)
-from src.market_phase_summary import extract_market_phase_summary
 
 logger = logging.getLogger(__name__)
 
@@ -485,131 +469,27 @@ def get_history_detail(
                 }
             )
         
-        # Extract price information from context_snapshot
-        # Note: Use `is None` instead of `or` to avoid misinterpreting 0.0 (flat) as a missing value.
-        # Do not mix `change_60d` (60-day cumulative percentage change) as a fallback for daily change_pct.
-        context_snapshot = result.get("context_snapshot")
-        analysis_context_pack_overview = extract_analysis_context_pack_overview(context_snapshot)
-        market_phase_summary = result.get("market_phase_summary")
-        if market_phase_summary is None:
-            market_phase_summary = extract_market_phase_summary(context_snapshot)
-        api_context_snapshot = sanitize_context_snapshot_for_api(context_snapshot)
-        realtime_fields = extract_realtime_detail_fields(context_snapshot)
-        current_price = realtime_fields.get("current_price")
-        change_pct = realtime_fields.get("change_pct")
-        
-        raw_result = result.get("raw_result")
-        if not isinstance(raw_result, dict):
-            raw_result = {}
-        report_language = normalize_report_language(
-            result.get("report_language")
-            or raw_result.get("report_language")
-            or (
-                context_snapshot.get("report_language")
-                if isinstance(context_snapshot, dict)
-                else None
-            )
-        )
-        stock_name = get_localized_stock_name(
-            result.get("stock_name"),
-            result.get("stock_code", ""),
-            report_language,
-        )
-
-        # Build the response model
-        meta = ReportMeta(
-            id=result.get("id"),
-            query_id=result.get("query_id", ""),
-            stock_code=result.get("stock_code", ""),
-            stock_name=stock_name,
-            report_type=result.get("report_type"),
-            report_language=report_language,
-            created_at=result.get("created_at"),
-            current_price=current_price,
-            change_pct=change_pct,
-            model_used=normalize_model_used(result.get("model_used")),
-            market_phase_summary=market_phase_summary,
-        )
-        
-        summary = ReportSummary(
-            analysis_summary=result.get("analysis_summary"),
-            operation_advice=localize_operation_advice(
-                result.get("operation_advice"),
-                report_language,
-            ),
-            action=result.get("action"),
-            action_label=result.get("action_label"),
-            trend_prediction=localize_trend_prediction(
-                result.get("trend_prediction"),
-                report_language,
-            ),
-            sentiment_score=result.get("sentiment_score"),
-            sentiment_label=(
-                get_sentiment_label(result.get("sentiment_score"), report_language)
-                if result.get("sentiment_score") is not None
-                else result.get("sentiment_label")
-            )
-        )
-        
-        strategy = ReportStrategy(
-            ideal_buy=result.get("ideal_buy"),
-            secondary_buy=result.get("secondary_buy"),
-            stop_loss=result.get("stop_loss"),
-            take_profit=result.get("take_profit")
-        )
-        
         fallback_fundamental = db_manager.get_latest_fundamental_snapshot(
             query_id=result.get("query_id", ""),
             code=result.get("storage_stock_code") or result.get("stock_code", ""),
         )
-        extracted_fundamental = extract_fundamental_detail_fields(
-            context_snapshot=result.get("context_snapshot"),
-            fallback_fundamental_payload=fallback_fundamental,
-        )
-        extracted_boards = extract_board_detail_fields(
-            context_snapshot=result.get("context_snapshot"),
-            fallback_fundamental_payload=fallback_fundamental,
-        )
-        market_structure = extract_market_structure_detail_field(
-            result.get("context_snapshot"),
-            result.get("raw_result"),
-        )
-        from src.schemas.report_strata import project_report_strata_for_api
-
-        report_strata = project_report_strata_for_api(
-            result.get("raw_result"),
-            language=report_language,
-            log_context={"record_id": record_id, "path": "history_detail"},
-        )
-        from api.v1.schemas.report_structured_insights import (
-            project_report_structured_insights_for_api,
-        )
-
-        structured_insights = project_report_structured_insights_for_api(
-            result.get("raw_result"),
-            log_context={"record_id": record_id, "path": "history_detail"},
-        )
-
-        details = ReportDetails(
-            news_content=result.get("news_content"),
-            raw_result=result.get("raw_result"),
-            context_snapshot=api_context_snapshot,
-            analysis_context_pack_overview=analysis_context_pack_overview,
-            financial_report=extracted_fundamental.get("financial_report"),
-            dividend_metrics=extracted_fundamental.get("dividend_metrics"),
-            belong_boards=extracted_boards.get("belong_boards"),
-            sector_rankings=extracted_boards.get("sector_rankings"),
-            concept_rankings=extracted_boards.get("concept_rankings"),
-            market_structure=market_structure,
-            report_strata=report_strata,
-            structured_insights=structured_insights,
-        )
-        
-        return AnalysisReport(
-            meta=meta,
-            summary=summary,
-            strategy=strategy,
-            details=details
+        return AnalysisReport.model_validate(
+            project_persisted_analysis_report(
+                result,
+                context_snapshot=result.get("context_snapshot"),
+                raw_result=result.get("raw_result"),
+                fallback_fundamental_payload=fallback_fundamental,
+                resolved_action_authority=True,
+                resolved_language_authority=True,
+                localized_name_uses_display_code=True,
+                localize_summary_fields=True,
+                prefer_source_market_phase_summary=True,
+                always_include_details=True,
+                log_context={
+                    "record_id": record_id,
+                    "path": "history_detail",
+                },
+            )
         )
         
     except HTTPException:

@@ -489,6 +489,47 @@ describe('PortfolioPage FX refresh', () => {
     expect(screen.getByRole('status')).toHaveTextContent('链接包含无效或敏感的状态参数');
   });
 
+  it('drops a late snapshot response after switching account scope', async () => {
+    const accountOneSnapshot = deferredPromise<ReturnType<typeof makeSnapshot>>();
+    getAccounts.mockResolvedValueOnce(makeAccounts([
+      { id: 1, name: 'Main' },
+      { id: 2, name: 'Alt' },
+    ]));
+    getSnapshot.mockImplementation(({ accountId }: { accountId?: number } = {}) => {
+      if (accountId === 1) return accountOneSnapshot.promise;
+      return Promise.resolve(makeSnapshot({
+        accountId,
+        accountCount: accountId ? 1 : 2,
+        positions: [makePosition({ symbol: accountId === 2 ? 'ACCOUNT_TWO' : 'ALL_ACCOUNTS' })],
+      }));
+    });
+
+    renderPortfolioPage();
+    await waitForInitialLoad();
+
+    const accountSelect = screen.getAllByRole('combobox')[0];
+    chooseOption(accountSelect, '1');
+    await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({
+      accountId: 1,
+      costMethod: 'fifo',
+      includeRealtime: false,
+    }));
+
+    chooseOption(accountSelect, '2');
+    expect(await screen.findByText('ACCOUNT_TWO')).toBeInTheDocument();
+
+    await act(async () => {
+      accountOneSnapshot.resolve(makeSnapshot({
+        accountId: 1,
+        positions: [makePosition({ symbol: 'ACCOUNT_ONE' })],
+      }));
+      await accountOneSnapshot.promise;
+    });
+
+    expect(screen.getByText('ACCOUNT_TWO')).toBeInTheDocument();
+    expect(screen.queryByText('ACCOUNT_ONE')).not.toBeInTheDocument();
+  });
+
   it('shows only the account onboarding state when no portfolio account exists', async () => {
     getAccounts.mockResolvedValueOnce(makeAccounts([]));
 
@@ -1685,6 +1726,78 @@ describe('PortfolioPage FX refresh', () => {
     expect(within(dialog).getByLabelText('数量')).toHaveValue(100);
   });
 
+  it('reuses a manual-trade operation ID only for the same failed command and refreshes after commit', async () => {
+    createTrade
+      .mockRejectedValueOnce(
+        createApiError(createParsedApiError({ title: '提交失败', message: '响应超时' })),
+      )
+      .mockResolvedValueOnce({ id: 90 });
+    renderPortfolioPage();
+    await waitForInitialLoad();
+
+    chooseOption(screen.getAllByRole('combobox')[0], '1');
+    await waitForPortfolioLoad();
+    const snapshotCallsBeforeSubmit = getSnapshot.mock.calls.length;
+    const tradeListCallsBeforeSubmit = listTrades.mock.calls.length;
+
+    fireEvent.click(screen.getByRole('button', { name: '录入交易' }));
+    fireEvent.change(screen.getByLabelText('股票代码'), { target: { value: 'AAPL' } });
+    fireEvent.change(screen.getByLabelText('数量'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('成交价'), { target: { value: '210' } });
+    fireEvent.click(screen.getByRole('button', { name: '提交交易' }));
+
+    expect(await screen.findByText('提交失败')).toBeInTheDocument();
+    const firstOperationId = createTrade.mock.calls[0][0].operationId;
+    expect(firstOperationId).toMatch(/^portfolio-trade-/);
+    expect(getSnapshot).toHaveBeenCalledTimes(snapshotCallsBeforeSubmit);
+    expect(listTrades).toHaveBeenCalledTimes(tradeListCallsBeforeSubmit);
+
+    fireEvent.click(screen.getByRole('button', { name: '提交交易' }));
+    await waitFor(() => expect(createTrade).toHaveBeenCalledTimes(2));
+    expect(createTrade.mock.calls[1][0].operationId).toBe(firstOperationId);
+    await waitFor(() => expect(getSnapshot).toHaveBeenCalledTimes(snapshotCallsBeforeSubmit + 1));
+    await waitFor(() => expect(listTrades).toHaveBeenCalledTimes(tradeListCallsBeforeSubmit + 1));
+  });
+
+  it('scopes paper-trade operation identity to the selected account after a failed attempt', async () => {
+    getAccounts.mockResolvedValue(makeAccounts([
+      { id: 1, name: 'Practice One', accountType: 'paper' },
+      { id: 2, name: 'Practice Two', accountType: 'paper' },
+    ]));
+    createPaperTrade
+      .mockRejectedValueOnce(
+        createApiError(createParsedApiError({ title: '纸上交易失败', message: '响应超时' })),
+      )
+      .mockResolvedValueOnce({ id: 93, price: 205, priceSource: 'manual' });
+    renderPortfolioPage();
+    await waitForInitialLoad();
+
+    const accountSelect = screen.getAllByRole('combobox')[0];
+    chooseOption(accountSelect, '1');
+    await waitForPortfolioLoad();
+    fireEvent.click(screen.getByRole('button', { name: '纸上交易' }));
+    const dialog = screen.getByRole('dialog', { name: '纸上交易' });
+    fireEvent.change(within(dialog).getByLabelText('股票代码'), { target: { value: 'AAPL' } });
+    fireEvent.change(within(dialog).getByLabelText('数量'), { target: { value: '1' } });
+    fireEvent.change(within(dialog).getByLabelText('成交价'), { target: { value: '205' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '纸上交易' }));
+
+    expect(await within(dialog).findByText('纸上交易失败')).toBeInTheDocument();
+    const accountOneOperationId = createPaperTrade.mock.calls[0][1].operationId;
+
+    chooseOption(accountSelect, '2');
+    await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({
+      accountId: 2,
+      costMethod: 'fifo',
+      includeRealtime: false,
+    }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '纸上交易' }));
+
+    await waitFor(() => expect(createPaperTrade).toHaveBeenCalledTimes(2));
+    expect(createPaperTrade.mock.calls[1][0]).toBe(2);
+    expect(createPaperTrade.mock.calls[1][1].operationId).not.toBe(accountOneOperationId);
+  });
+
   it('reuses the cash operation ID after a failed request and preserves the form', async () => {
     createCashLedger
       .mockRejectedValueOnce(
@@ -1708,6 +1821,79 @@ describe('PortfolioPage FX refresh', () => {
     fireEvent.click(screen.getByRole('button', { name: '提交资金流水' }));
     await waitFor(() => expect(createCashLedger).toHaveBeenCalledTimes(2));
     expect(createCashLedger.mock.calls[1][0].operationId).toBe(firstOperationId);
+  });
+
+  it('reuses a corporate-action operation ID after failure and refreshes after commit', async () => {
+    createCorporateAction
+      .mockRejectedValueOnce(
+        createApiError(createParsedApiError({ title: '提交失败', message: '响应超时' })),
+      )
+      .mockResolvedValueOnce({ id: 94 });
+    renderPortfolioPage();
+    await waitForInitialLoad();
+
+    chooseOption(screen.getAllByRole('combobox')[0], '1');
+    await waitForPortfolioLoad();
+    const snapshotCallsBeforeSubmit = getSnapshot.mock.calls.length;
+    const tradeListCallsBeforeSubmit = listTrades.mock.calls.length;
+
+    fireEvent.click(screen.getByRole('button', { name: '录入公司行为' }));
+    fireEvent.change(screen.getByLabelText('股票代码'), { target: { value: 'AAPL' } });
+    fireEvent.change(screen.getByLabelText('每股分红'), { target: { value: '0.25' } });
+    fireEvent.click(screen.getByRole('button', { name: '提交公司行为' }));
+
+    expect(await screen.findByText('提交失败')).toBeInTheDocument();
+    const firstOperationId = createCorporateAction.mock.calls[0][0].operationId;
+    expect(firstOperationId).toMatch(/^portfolio-corporate-/);
+
+    fireEvent.click(screen.getByRole('button', { name: '提交公司行为' }));
+    await waitFor(() => expect(createCorporateAction).toHaveBeenCalledTimes(2));
+    expect(createCorporateAction.mock.calls[1][0].operationId).toBe(firstOperationId);
+    await waitFor(() => expect(getSnapshot).toHaveBeenCalledTimes(snapshotCallsBeforeSubmit + 1));
+    await waitFor(() => expect(listTrades).toHaveBeenCalledTimes(tradeListCallsBeforeSubmit + 1));
+  });
+
+  it('refreshes the active account scope when a pending mutation commits after navigation', async () => {
+    const pendingTrade = deferredPromise<{ id: number }>();
+    getAccounts.mockResolvedValueOnce(makeAccounts([
+      { id: 1, name: 'Main' },
+      { id: 2, name: 'Alt' },
+    ]));
+    createTrade.mockReturnValueOnce(pendingTrade.promise);
+    renderPortfolioPage();
+    await waitForInitialLoad();
+
+    const accountSelect = screen.getAllByRole('combobox')[0];
+    chooseOption(accountSelect, '1');
+    await waitForPortfolioLoad();
+    fireEvent.click(screen.getByRole('button', { name: '录入交易' }));
+    fireEvent.change(screen.getByLabelText('股票代码'), { target: { value: 'AAPL' } });
+    fireEvent.change(screen.getByLabelText('数量'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('成交价'), { target: { value: '210' } });
+    fireEvent.click(screen.getByRole('button', { name: '提交交易' }));
+
+    chooseOption(accountSelect, '2');
+    await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({
+      accountId: 2,
+      costMethod: 'fifo',
+      includeRealtime: false,
+    }));
+    const snapshotCallsBeforeCommit = getSnapshot.mock.calls.length;
+    const tradeListCallsBeforeCommit = listTrades.mock.calls.length;
+
+    await act(async () => {
+      pendingTrade.resolve({ id: 95 });
+      await pendingTrade.promise;
+    });
+
+    await waitFor(() => expect(getSnapshot).toHaveBeenCalledTimes(snapshotCallsBeforeCommit + 1));
+    await waitFor(() => expect(listTrades).toHaveBeenCalledTimes(tradeListCallsBeforeCommit + 1));
+    expect(getSnapshot).toHaveBeenLastCalledWith({
+      accountId: 2,
+      costMethod: 'fifo',
+      includeRealtime: false,
+    });
+    expect(listTrades).toHaveBeenLastCalledWith(expect.objectContaining({ accountId: 2 }));
   });
 
   it('locks trade fields and close behavior while a mutation is pending', async () => {
@@ -1808,10 +1994,12 @@ describe('PortfolioPage FX refresh', () => {
 
     expect(await screen.findByText('导入失败')).toBeInTheDocument();
     const firstOperationId = commitCsvImport.mock.calls[0][3];
+    const snapshotCallsBeforeRetry = getSnapshot.mock.calls.length;
     fireEvent.click(screen.getByRole('button', { name: '提交导入' }));
     await waitFor(() => expect(commitCsvImport).toHaveBeenCalledTimes(2));
     expect(commitCsvImport.mock.calls[1][3]).toBe(firstOperationId);
     expect(await screen.findByText('CSV 提交结果')).toBeInTheDocument();
+    await waitFor(() => expect(getSnapshot).toHaveBeenCalledTimes(snapshotCallsBeforeRetry + 1));
 
     fireEvent.click(screen.getByLabelText('仅预演（不写入）'));
     expect(screen.getByText('CSV 提交结果')).toBeInTheDocument();

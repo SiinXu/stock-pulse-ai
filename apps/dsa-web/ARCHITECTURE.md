@@ -61,6 +61,22 @@ Feature components may compose shared UI and lower layers. Layout, routing, and 
 compose `components/common` primitives. Application composition may import pages and any provider
 needed to assemble the application.
 
+### Portfolio route-local workflows
+
+`hooks/portfolio/` contains feature-private workflow Modules for the Portfolio route. They live
+under the behavior/state layer but are not a shared cross-feature facade:
+
+- `usePortfolioProjectionSession` owns account/cost scope acceptance, stale-response rejection,
+  snapshot-to-risk projection, ledger query dispatch, and the refresh surfaces used after writes.
+- `usePortfolioLedgerMutationWorkflow` owns operation identity for the five idempotent ledger
+  writes, commit-before-refresh sequencing, paper-trade refresh-only retry, and CSV partial-result
+  attempt rotation.
+
+`PortfolioPage` remains the route composition root and presentation owner: it owns URL composition,
+form validation, modal state, localized error presentation, tables, and all rendered structure.
+The route-local workflows consume the existing Portfolio transport adapter and public Web types;
+they do not redefine either contract.
+
 ## Module Entry Points
 
 - A directory barrel may expose modules owned by that directory. It must not hide an upward or
