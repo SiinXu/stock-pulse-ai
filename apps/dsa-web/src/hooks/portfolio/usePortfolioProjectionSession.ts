@@ -134,6 +134,7 @@ export function usePortfolioProjectionSession({
     requestId: 0,
     scopeKey: snapshotScopeKey,
   });
+  const snapshotLoadingOwnerRef = useRef<ProjectionRequest | null>(null);
   const eventRequestRef = useRef<EventProjectionRequest>({
     requestId: 0,
     accountScopeKey,
@@ -175,23 +176,39 @@ export function usePortfolioProjectionSession({
     };
   }, []);
 
-  const setEventType = useCallback((nextEventType: PortfolioEventType) => {
-    if (nextEventType === eventType) return;
-    invalidateEventRequest();
-    setEventTypeState(nextEventType);
-  }, [eventType, invalidateEventRequest]);
-
+  const activeEventTypeRef = useRef(eventType);
   const eventPageRef = useRef(eventPage);
+  activeEventTypeRef.current = eventType;
   eventPageRef.current = eventPage;
+
+  const transitionEventQuery = useCallback((
+    nextEventType: PortfolioEventType,
+    nextPage: number,
+    forceInvalidate = false,
+  ): boolean => {
+    const typeChanged = nextEventType !== activeEventTypeRef.current;
+    const pageChanged = nextPage !== eventPageRef.current;
+    if (!typeChanged && !pageChanged && !forceInvalidate) return false;
+
+    invalidateEventRequest();
+    activeEventTypeRef.current = nextEventType;
+    eventPageRef.current = nextPage;
+    if (typeChanged) setEventTypeState(nextEventType);
+    if (pageChanged) setEventPageState(nextPage);
+    return true;
+  }, [invalidateEventRequest]);
+
+  const setEventType = useCallback((nextEventType: PortfolioEventType) => {
+    if (nextEventType === activeEventTypeRef.current) return;
+    transitionEventQuery(nextEventType, 1);
+  }, [transitionEventQuery]);
+
   const setEventPage = useCallback((nextPage: SetStateAction<number>) => {
     const resolvedPage = typeof nextPage === 'function'
       ? nextPage(eventPageRef.current)
       : nextPage;
-    if (resolvedPage === eventPageRef.current) return;
-    invalidateEventRequest();
-    eventPageRef.current = resolvedPage;
-    setEventPageState(resolvedPage);
-  }, [invalidateEventRequest]);
+    transitionEventQuery(activeEventTypeRef.current, resolvedPage);
+  }, [transitionEventQuery]);
 
   const loadSnapshotAndRiskForActiveScope = useCallback(async (
     showLoading: boolean,
@@ -201,7 +218,13 @@ export function usePortfolioProjectionSession({
       requestId: snapshotRequestRef.current.requestId + 1,
     };
     snapshotRequestRef.current = request;
-    if (showLoading) setIsLoading(true);
+    if (showLoading) {
+      snapshotLoadingOwnerRef.current = request;
+      setIsLoading(true);
+    } else if (snapshotLoadingOwnerRef.current !== null) {
+      snapshotLoadingOwnerRef.current = null;
+      setIsLoading(false);
+    }
     setRiskWarning(null);
 
     try {
@@ -246,7 +269,8 @@ export function usePortfolioProjectionSession({
       setError(getParsedApiError(snapshotError));
       return { snapshotAccepted: false, riskAccepted: false };
     } finally {
-      if (showLoading && isActiveSnapshotRequest(request)) {
+      if (showLoading && snapshotLoadingOwnerRef.current === request) {
+        snapshotLoadingOwnerRef.current = null;
         setIsLoading(false);
       }
     }
@@ -375,17 +399,13 @@ export function usePortfolioProjectionSession({
     ));
     if (!fullyRefreshed) return false;
 
-    setEventTypeState('trade');
-    eventPageRef.current = 1;
-    setEventPageState(1);
+    transitionEventQuery('trade', 1);
     setPaperTradeProjectionRevision((current) => current + 1);
     return true;
-  }, []);
+  }, [transitionEventQuery]);
 
   const applyEventFilters = useCallback(() => {
-    invalidateEventRequest();
-    eventPageRef.current = 1;
-    setEventPageState(1);
+    transitionEventQuery(activeEventTypeRef.current, 1, true);
     setAppliedEventFilters({
       dateFrom: eventDateFrom,
       dateTo: eventDateTo,
@@ -402,7 +422,7 @@ export function usePortfolioProjectionSession({
     eventDirection,
     eventSide,
     eventSymbol,
-    invalidateEventRequest,
+    transitionEventQuery,
   ]);
 
   const handleRefreshFx = useCallback(async () => {
@@ -462,11 +482,8 @@ export function usePortfolioProjectionSession({
   }, [snapshotScopeKey]);
 
   useEffect(() => {
-    if (eventPageRef.current === 1) return;
-    invalidateEventRequest();
-    eventPageRef.current = 1;
-    setEventPageState(1);
-  }, [accountId, eventType, invalidateEventRequest]);
+    transitionEventQuery(activeEventTypeRef.current, 1);
+  }, [accountId, transitionEventQuery]);
 
   const totalEventPages = Math.max(1, Math.ceil(eventTotal / DEFAULT_PAGE_SIZE));
   const currentEventCount = eventType === 'trade'
