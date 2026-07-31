@@ -9,7 +9,7 @@ describe('DatePicker', () => {
       <DatePicker value="2026-07-18" onChange={onChange} ariaLabel="交易日期" />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '打开 交易日期 日历' }));
+    fireEvent.click(screen.getByRole('textbox', { name: '交易日期' }));
     expect(screen.getByRole('dialog', { name: '交易日期' })).toBeInTheDocument();
 
     const nextDate = document.querySelector<HTMLButtonElement>('[data-date="2026-07-20"]');
@@ -32,19 +32,27 @@ describe('DatePicker', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '打开 日期 日历' }));
+    fireEvent.click(screen.getByRole('textbox', { name: '日期' }));
     expect(document.querySelector('[data-date="2026-07-09"]')).toBeDisabled();
     expect(document.querySelector('[data-date="2026-07-20"]')).not.toBeDisabled();
   });
 
-  it('keeps focus in the editable input instead of opening the calendar on focus', () => {
-    render(<DatePicker value="2026-07-18" onChange={() => undefined} ariaLabel="日期" />);
+  it('keeps the date field read-only and opens the calendar from the keyboard', () => {
+    const onChange = vi.fn();
+    render(<DatePicker value="2026-07-18" onChange={onChange} ariaLabel="日期" />);
 
     const input = screen.getByRole('textbox', { name: '日期' });
+    expect(input).toHaveAttribute('readonly');
     input.focus();
 
     expect(input).toHaveFocus();
     expect(screen.queryByRole('dialog', { name: '日期' })).not.toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: '2026-07-19' } });
+    expect(onChange).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(screen.getByRole('dialog', { name: '日期' })).toBeInTheDocument();
   });
 
   it('applies compact geometry to both the trigger and calendar action', () => {

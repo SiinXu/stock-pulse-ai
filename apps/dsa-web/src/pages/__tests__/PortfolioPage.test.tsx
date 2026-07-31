@@ -1710,6 +1710,7 @@ describe('PortfolioPage FX refresh', () => {
     chooseOption(screen.getAllByRole('combobox')[0], '1');
     await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 1, costMethod: 'fifo', includeRealtime: false }));
     fireEvent.click(screen.getByRole('button', { name: '录入交易' }));
+    expect(screen.getByLabelText('交易日期')).toHaveAttribute('readonly');
     expect(screen.getByLabelText('股票代码')).toHaveAttribute('data-size', 'comfortable');
     expect(screen.getByLabelText('数量')).toHaveAttribute('data-size', 'comfortable');
     expect(screen.getByLabelText('成交价')).toHaveAttribute('data-size', 'comfortable');

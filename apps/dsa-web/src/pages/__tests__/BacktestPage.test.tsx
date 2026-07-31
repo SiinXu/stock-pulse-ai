@@ -155,8 +155,10 @@ describe('BacktestPage', () => {
     expect(screen.getByRole('button', { name: '运行回测' })).toHaveAttribute('data-size', 'primary');
     expect(startDateInput).toHaveAttribute('aria-haspopup', 'dialog');
     expect(startDateInput).toHaveAttribute('aria-expanded', 'false');
+    expect(startDateInput).toHaveAttribute('readonly');
     expect(endDateInput).toHaveAttribute('aria-haspopup', 'dialog');
     expect(endDateInput).toHaveAttribute('aria-expanded', 'false');
+    expect(endDateInput).toHaveAttribute('readonly');
     expect(startDateInput.parentElement).toHaveAttribute('data-size', 'compact');
     expect(endDateInput.parentElement).toHaveAttribute('data-size', 'compact');
 
@@ -310,10 +312,15 @@ describe('BacktestPage', () => {
   });
 
   it('filters results with stock code, window, phase, and analysis date range when clicking Filter', async () => {
+    const initialSearch = new URLSearchParams({
+      ref: 'dashboard',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.from]: '2026-03-01',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.to]: '2026-03-31',
+    });
     window.history.replaceState(
       {},
       '',
-      `${APP_ROUTE_PATHS.researchBacktest}?ref=dashboard#results`,
+      `${APP_ROUTE_PATHS.researchBacktest}?${initialSearch}#results`,
     );
     renderPage();
 
@@ -332,8 +339,8 @@ describe('BacktestPage', () => {
     await waitFor(() =>
       expect(mockGetResults).toHaveBeenCalledWith(expect.objectContaining({ analysisPhase: 'intraday' })),
     );
-    fireEvent.change(fromInput, { target: { value: '2026-03-01' } });
-    fireEvent.change(toInput, { target: { value: '2026-03-31' } });
+    expect(fromInput).toHaveValue('2026-03-01');
+    expect(toInput).toHaveValue('2026-03-31');
     fireEvent.click(screen.getByRole('button', { name: '筛选' }));
 
     await waitFor(() => {
@@ -427,6 +434,15 @@ describe('BacktestPage', () => {
   });
 
   it('runs a backtest and refreshes results using the shared filter values', async () => {
+    const initialSearch = new URLSearchParams({
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.from]: '2026-03-01',
+      [RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.to]: '2026-03-31',
+    });
+    window.history.replaceState(
+      {},
+      '',
+      `${APP_ROUTE_PATHS.researchBacktest}?${initialSearch}`,
+    );
     mockRun.mockResolvedValueOnce({
       processed: 0,
       saved: 0,
@@ -440,13 +456,9 @@ describe('BacktestPage', () => {
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
-    const fromInput = screen.getByLabelText('分析开始日期');
-    const toInput = screen.getByLabelText('分析结束日期');
 
     fireEvent.change(filterInput, { target: { value: '600519.SH' } });
     fireEvent.change(windowInput, { target: { value: '15' } });
-    fireEvent.change(fromInput, { target: { value: '2026-03-01' } });
-    fireEvent.change(toInput, { target: { value: '2026-03-31' } });
     fireEvent.click(screen.getByRole('button', { name: '运行回测' }));
 
     await waitFor(() => {
@@ -620,13 +632,9 @@ describe('BacktestPage', () => {
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
-    const fromInput = screen.getByLabelText('分析开始日期');
-    const toInput = screen.getByLabelText('分析结束日期');
 
     fireEvent.change(filterInput, { target: { value: '600519.SH' } });
     fireEvent.change(windowInput, { target: { value: '' } });
-    fireEvent.change(fromInput, { target: { value: '2026-03-01' } });
-    fireEvent.change(toInput, { target: { value: '2026-03-31' } });
     fireEvent.click(screen.getByRole('button', { name: '运行回测' }));
 
     expect(mockRun).not.toHaveBeenCalled();
@@ -640,6 +648,12 @@ describe('BacktestPage', () => {
 
     await screen.findByText('600519');
     const oneDayButton = screen.getByRole('radio', { name: '1 日验证' });
+    expect(screen.getByRole('radiogroup', { name: '评估窗口' })).toHaveClass(
+      'dark:!bg-foreground/10',
+      'dark:[&_.segmented-control-tab[aria-checked=true]]:!bg-foreground',
+      'dark:[&_.segmented-control-tab[aria-checked=true]]:text-background',
+      'dark:[&_.segmented-control-tab[aria-checked=false]]:text-foreground/70',
+    );
     expect(oneDayButton).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('switch', { name: '强制重跑' })).toHaveAttribute('aria-checked', 'false');
     const nextDayResults = createDeferred<{

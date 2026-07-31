@@ -244,8 +244,9 @@ export const DatePicker = ({
         ref={triggerRef}
         data-control="date-picker"
         data-size={size}
+        onClick={() => (isOpen ? closePicker() : openPicker())}
         className={cn(
-          'flex w-full cursor-text items-center justify-between gap-2 rounded-lg border border-border bg-transparent px-3 text-xs text-foreground',
+          'flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-border bg-transparent px-3 text-xs text-foreground',
           'transition-colors duration-200 hover:bg-hover focus:outline-none focus-visible:border-muted-text disabled:cursor-not-allowed disabled:opacity-60',
           DATE_PICKER_SIZE_STYLES[size].trigger,
           triggerClassName,
@@ -255,11 +256,11 @@ export const DatePicker = ({
           ref={inputRef}
           id={resolvedId}
           type="text"
-          inputMode="numeric"
           data-testid={testId}
           data-value={value}
           value={value}
           disabled={disabled}
+          readOnly
           required={required}
           pattern="\d{4}-\d{2}-\d{2}"
           aria-label={resolvedAriaLabel}
@@ -268,17 +269,19 @@ export const DatePicker = ({
           aria-haspopup="dialog"
           aria-expanded={isOpen}
           placeholder={resolvedPlaceholder}
-          onChange={(event) => onChange(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Escape' && isOpen) {
               event.preventDefault();
               closePicker();
-            } else if (event.altKey && event.key === 'ArrowDown') {
+            } else if (
+              !isOpen
+              && (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowDown')
+            ) {
               event.preventDefault();
               openPicker();
             }
           }}
-          className="h-full min-w-0 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-text tabular-nums sm:text-xs"
+          className="h-full min-w-0 flex-1 cursor-pointer bg-transparent text-base text-foreground outline-none placeholder:text-muted-text tabular-nums sm:text-xs"
         />
         <button
           ref={calendarButtonRef}
@@ -287,7 +290,6 @@ export const DatePicker = ({
           aria-label={formatUiText(t('common.openCalendar'), { field: resolvedAriaLabel ?? resolvedPlaceholder })}
           aria-haspopup="dialog"
           aria-expanded={isOpen}
-          onClick={() => (isOpen ? closePicker() : openPicker())}
           className={cn(
             'flex shrink-0 items-center justify-center gap-1 rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed disabled:opacity-60',
             DATE_PICKER_SIZE_STYLES[size].action,

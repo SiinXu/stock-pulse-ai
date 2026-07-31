@@ -777,6 +777,7 @@ const BacktestPage: React.FC = () => {
             onChange={handleValidationModeChange}
             ariaLabel={text.evalWindow}
             semantics="single-select"
+            className="dark:!bg-foreground/10 dark:[&_.segmented-control-tab[aria-checked=true]]:!bg-foreground dark:[&_.segmented-control-tab[aria-checked=true]]:text-background dark:[&_.segmented-control-tab[aria-checked=false]]:text-foreground/70"
           />
           <div className="flex h-8 items-center gap-1.5">
             <span className="whitespace-nowrap text-xs font-medium text-secondary-text">{text.forceRerun}</span>
