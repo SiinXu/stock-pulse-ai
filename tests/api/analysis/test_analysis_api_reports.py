@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 """Report construction and service contracts for the analysis API."""
 
+import ast
+from copy import deepcopy
+from pathlib import Path
+
 from tests.analysis_api_contract_support import (
     AnalysisService,
     MagicMock,
@@ -1097,6 +1101,34 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         self.assertEqual(report.meta.report_language, "en")
 
+    def test_build_analysis_report_skips_config_when_language_is_explicit(self) -> None:
+        if _build_analysis_report is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        for source, meta, context_snapshot in (
+            ("meta", {"report_language": "en"}, {"report_language": "zh"}),
+            ("context", {}, {"report_language": "en"}),
+        ):
+            with self.subTest(source=source), patch(
+                "api.v1.endpoints.analysis.Config.get_instance",
+                side_effect=RuntimeError("config unavailable"),
+            ):
+                report = _build_analysis_report(
+                    report_data={
+                        "meta": meta,
+                        "summary": {"analysis_summary": "English output"},
+                        "strategy": {},
+                        "details": {},
+                    },
+                    query_id=f"q-explicit-language-{source}",
+                    stock_code="AAPL",
+                    stock_name="Apple",
+                    context_snapshot=context_snapshot,
+                    fallback_fundamental_payload=None,
+                )
+
+            self.assertEqual(report.meta.report_language, "en")
+
     def test_load_sync_fundamental_sources_uses_query_and_code_for_fallback(self) -> None:
         if _load_sync_fundamental_sources is None:
             self.skipTest("analysis endpoint helpers unavailable in this environment")
@@ -1551,6 +1583,739 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             query_id="task_no_snapshot_in_memory_1",
             stock_code="600519",
         )
+
+    def test_canonical_report_contract_matches_all_report_delivery_paths(self) -> None:
+        if get_analysis_status is None or _handle_sync_analysis is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        from api.v1.endpoints.history import get_history_detail
+
+        query_id = "q-canonical-report"
+        created_at = "2026-07-30T16:00:00+00:00"
+        phase_summary = {
+            "market": "us",
+            "phase": "intraday",
+            "market_local_time": "2026-07-30T12:00:00-04:00",
+            "session_date": "2026-07-30",
+            "effective_daily_bar_date": "2026-07-29",
+            "is_trading_day": True,
+            "is_market_open_now": True,
+            "is_partial_bar": True,
+            "minutes_to_open": None,
+            "minutes_to_close": 240,
+            "trigger_source": "api",
+            "analysis_intent": "auto",
+            "warnings": ["partial_bar"],
+        }
+        structured_insights = {
+            "schema_version": "report-structured-insights-v1",
+            "phase_decision": {
+                "phase_context": {
+                    "phase": "intraday",
+                    "market": "us",
+                },
+                "immediate_action": "Wait for confirmation",
+            },
+            "signal_attribution": {
+                "technical_indicators": 40,
+                "news_sentiment": 20,
+                "fundamentals": 30,
+                "market_conditions": 10,
+                "strongest_bullish_signal": "earnings",
+                "strongest_bearish_signal": "valuation",
+            },
+            "strategy_synthesis": {
+                "final_signal": "hold",
+                "consensus_level": "medium",
+            },
+        }
+        raw_result = {
+            "model_used": "test-model",
+            "report_language": "en",
+            "analysis_summary": "Canonical summary",
+            "operation_advice": "Watch",
+            "action": "watch",
+            "trend_prediction": "Sideways",
+            "sentiment_score": 50,
+            "dashboard": {
+                "phase_decision": {
+                    "phase_context": {
+                        "phase": "intraday",
+                        "market": "us",
+                    },
+                    "immediate_action": "Wait for confirmation",
+                },
+                "signal_attribution": {
+                    "technical_indicators": 40,
+                    "news_sentiment": 20,
+                    "fundamentals": 30,
+                    "market_conditions": 10,
+                    "strongest_bullish_signal": "earnings",
+                    "strongest_bearish_signal": "valuation",
+                },
+                "strategy_synthesis": {
+                    "final_signal": "hold",
+                    "consensus_level": "medium",
+                },
+            },
+        }
+        context_snapshot = {
+            "realtime_quote": {
+                "price": 123.45,
+                "change_pct": 0.0,
+            },
+            "market_phase_summary": phase_summary,
+        }
+        report_data = {
+            "meta": {
+                "id": 17,
+                "query_id": query_id,
+                "stock_code": "AAPL",
+                "stock_name": "Apple",
+                "report_type": "detailed",
+                "report_language": "en",
+                "created_at": created_at,
+                "current_price": 123.45,
+                "change_pct": 0.0,
+                "model_used": "test-model",
+                "market_phase_summary": phase_summary,
+            },
+            "summary": {
+                "analysis_summary": "Canonical summary",
+                "operation_advice": "Watch",
+                "action": "watch",
+                "action_label": "Watch",
+                "trend_prediction": "Sideways",
+                "sentiment_score": 50,
+                "sentiment_label": "Neutral",
+            },
+            "strategy": {
+                "ideal_buy": "120",
+                "secondary_buy": "115",
+                "stop_loss": "110",
+                "take_profit": "140",
+            },
+            "details": {
+                "news_content": "Canonical news",
+                "raw_result": raw_result,
+            },
+        }
+        expected_report = {
+            "meta": {
+                "id": 17,
+                "query_id": query_id,
+                "stock_code": "AAPL",
+                "stock_name": "Apple",
+                "report_type": "detailed",
+                "report_language": "en",
+                "created_at": created_at,
+                "current_price": 123.45,
+                "change_pct": 0.0,
+                "model_used": "test-model",
+                "market_phase_summary": phase_summary,
+            },
+            "summary": {
+                "analysis_summary": "Canonical summary",
+                "operation_advice": "Watch",
+                "action": "watch",
+                "action_label": "Watch",
+                "trend_prediction": "Sideways",
+                "sentiment_score": 50,
+                "sentiment_label": "Neutral",
+            },
+            "strategy": {
+                "ideal_buy": "120",
+                "secondary_buy": "115",
+                "stop_loss": "110",
+                "take_profit": "140",
+            },
+            "details": {
+                "news_content": "Canonical news",
+                "raw_result": raw_result,
+                "context_snapshot": {
+                    "realtime_quote": {
+                        "price": 123.45,
+                        "change_pct": 0.0,
+                    },
+                },
+                "analysis_context_pack_overview": None,
+                "financial_report": None,
+                "dividend_metrics": None,
+                "belong_boards": [],
+                "sector_rankings": None,
+                "concept_rankings": None,
+                "market_structure": None,
+                "report_strata": None,
+                "structured_insights": structured_insights,
+            },
+        }
+
+        def exercise_delivery_paths(
+            *,
+            case_query_id: str,
+            storage_code: str,
+            display_code: str,
+            market: str,
+            stock_name: str,
+            legacy_snapshot: bool = False,
+            malformed_partial_raw_result: bool = False,
+            double_encoded_persisted_raw: bool = False,
+            missing_raw_language: bool = False,
+            nullable_report_fields: bool = False,
+            fallback_fundamental: bool = False,
+        ) -> None:
+            display_code_by_alias = {
+                storage_code.strip().upper(): display_code,
+                display_code.strip().upper(): display_code,
+            }
+
+            def resolve_display_code(code: object) -> str | None:
+                return display_code_by_alias.get(str(code or "").strip().upper())
+
+            case_raw_result = deepcopy(raw_result)
+            case_raw_result["dashboard"]["phase_decision"]["phase_context"][
+                "market"
+            ] = market
+            case_context_snapshot = deepcopy(context_snapshot)
+            case_context_snapshot["market_phase_summary"]["market"] = market
+            if legacy_snapshot:
+                case_context_snapshot = {
+                    "enhanced_context": {
+                        "realtime": {
+                            "price": 123.45,
+                            "change_pct": 0.0,
+                        }
+                    },
+                    "market_phase_summary": case_context_snapshot[
+                        "market_phase_summary"
+                    ],
+                }
+            if malformed_partial_raw_result:
+                case_raw_result.pop("dashboard")
+            if missing_raw_language:
+                case_raw_result.pop("report_language")
+                case_context_snapshot["report_language"] = "en"
+            fallback_fundamental_payload = None
+            if fallback_fundamental:
+                fallback_fundamental_payload = {
+                    "earnings": {
+                        "data": {
+                            "financial_report": {
+                                "report_date": "2025-12-31",
+                            },
+                            "dividend": {
+                                "ttm_dividend_yield_pct": 2.6,
+                            },
+                        }
+                    }
+                }
+            case_report_data = deepcopy(report_data)
+            case_report_data["meta"].update(
+                {
+                    "query_id": case_query_id,
+                    "stock_code": storage_code,
+                    "stock_name": stock_name,
+                    "market_phase_summary": case_context_snapshot[
+                        "market_phase_summary"
+                    ],
+                }
+            )
+            if missing_raw_language:
+                case_report_data["meta"].pop("report_language")
+            if nullable_report_fields:
+                case_raw_result.pop("model_used")
+                case_report_data["meta"].pop("model_used")
+                case_report_data["summary"]["analysis_summary"] = None
+                case_report_data["strategy"] = {}
+            case_report_data["details"]["raw_result"] = (
+                "legacy-malformed"
+                if malformed_partial_raw_result
+                else case_raw_result
+            )
+
+            service = MagicMock()
+            service.analyze_stock.return_value = {
+                "query_id": case_query_id,
+                "trace_id": case_query_id,
+                "stock_code": storage_code,
+                "stock_name": stock_name,
+                "report": case_report_data,
+            }
+            with patch(
+                "uuid.uuid4",
+                return_value=SimpleNamespace(hex=case_query_id),
+            ), patch(
+                "src.services.analysis_service.AnalysisService",
+                return_value=service,
+            ), patch(
+                "api.v1.endpoints.analysis._load_sync_fundamental_sources",
+                return_value=(
+                    case_context_snapshot,
+                    fallback_fundamental_payload,
+                    case_raw_result,
+                ),
+            ), patch(
+                "api.v1.endpoints.analysis.resolve_index_stock_code",
+                side_effect=resolve_display_code,
+            ):
+                sync_result = _handle_sync_analysis(
+                    storage_code,
+                    SimpleNamespace(
+                        report_type="detailed",
+                        force_refresh=False,
+                        notify=False,
+                        skills=None,
+                        analysis_phase="auto",
+                        report_language="en",
+                        use_memory=None,
+                    ),
+                )
+
+            task = SimpleNamespace(
+                task_id=case_query_id,
+                trace_id=case_query_id,
+                stock_code=storage_code,
+                stock_name=stock_name,
+                status=TaskStatus.COMPLETED,
+                progress=100,
+                message=None,
+                message_code="task.completed",
+                message_params={},
+                result={
+                    "query_id": case_query_id,
+                    "trace_id": case_query_id,
+                    "stock_code": storage_code,
+                    "stock_name": stock_name,
+                    "report": case_report_data,
+                    "created_at": created_at,
+                },
+                error=None,
+                original_query=None,
+                selection_source=None,
+                analysis_phase="auto",
+                skills=None,
+                created_at=datetime.fromisoformat(created_at),
+                completed_at=datetime.fromisoformat(created_at),
+            )
+            with patch(
+                "api.v1.endpoints.analysis.get_task_queue"
+            ) as queue_mock, patch(
+                "api.v1.endpoints.analysis._load_sync_fundamental_sources",
+                return_value=(
+                    case_context_snapshot,
+                    fallback_fundamental_payload,
+                    case_raw_result,
+                ),
+            ), patch(
+                "api.v1.endpoints.analysis.resolve_index_stock_code",
+                side_effect=resolve_display_code,
+            ):
+                queue_mock.return_value.get_task.return_value = task
+                memory_status = get_analysis_status(case_query_id)
+
+            persisted_raw_result = json.dumps(case_raw_result)
+            if double_encoded_persisted_raw:
+                persisted_raw_result = json.dumps(persisted_raw_result)
+            record = SimpleNamespace(
+                id=17,
+                query_id=case_query_id,
+                code=storage_code,
+                name=stock_name,
+                report_type="detailed",
+                created_at=datetime.fromisoformat(created_at),
+                raw_result=persisted_raw_result,
+                context_snapshot=json.dumps(case_context_snapshot),
+                news_content="Canonical news",
+                sentiment_score=50,
+                operation_advice="Watch",
+                trend_prediction="Sideways",
+                analysis_summary=(
+                    None if nullable_report_fields else "Canonical summary"
+                ),
+                ideal_buy=None if nullable_report_fields else "120",
+                secondary_buy=None if nullable_report_fields else "115",
+                stop_loss=None if nullable_report_fields else "110",
+                take_profit=None if nullable_report_fields else "140",
+            )
+            database = MagicMock()
+            database.get_analysis_history.return_value = [record]
+            database.get_latest_analysis_by_query_id.return_value = record
+            database.get_latest_fundamental_snapshot.return_value = (
+                fallback_fundamental_payload
+            )
+            with patch(
+                "api.v1.endpoints.analysis.get_task_queue"
+            ) as queue_mock, patch(
+                "src.storage.DatabaseManager.get_instance",
+                return_value=database,
+            ), patch(
+                "api.v1.endpoints.analysis.resolve_index_stock_code",
+                side_effect=resolve_display_code,
+            ):
+                queue_mock.return_value.get_task.return_value = None
+                database_status = get_analysis_status(case_query_id)
+
+            with patch(
+                "src.services.history_service.resolve_index_stock_code",
+                side_effect=resolve_display_code,
+            ):
+                history_report = get_history_detail(
+                    case_query_id,
+                    db_manager=database,
+                )
+
+            actual_reports = {
+                "sync_completion": sync_result.report,
+                "memory_status": memory_status.result.report,
+                "database_status": database_status.result.report,
+                "history_detail": history_report.model_dump(),
+            }
+            case_expected_report = deepcopy(expected_report)
+            case_expected_report["meta"].update(
+                {
+                    "query_id": case_query_id,
+                    "stock_code": display_code,
+                    "stock_name": stock_name,
+                    "market_phase_summary": case_context_snapshot[
+                        "market_phase_summary"
+                    ],
+                }
+            )
+            case_expected_report["details"]["raw_result"] = case_raw_result
+            case_expected_report["details"]["context_snapshot"] = deepcopy(
+                case_context_snapshot
+            )
+            case_expected_report["details"]["context_snapshot"].pop(
+                "market_phase_summary",
+                None,
+            )
+            if malformed_partial_raw_result:
+                case_expected_report["details"]["structured_insights"] = None
+            else:
+                case_expected_report["details"]["structured_insights"][
+                    "phase_decision"
+                ]["phase_context"]["market"] = market
+            if fallback_fundamental:
+                case_expected_report["details"]["financial_report"] = {
+                    "report_date": "2025-12-31",
+                }
+                case_expected_report["details"]["dividend_metrics"] = {
+                    "ttm_dividend_yield_pct": 2.6,
+                }
+            if nullable_report_fields:
+                case_expected_report["meta"]["model_used"] = None
+                case_expected_report["summary"]["analysis_summary"] = None
+                case_expected_report["strategy"] = None
+            if missing_raw_language:
+                case_expected_report["meta"]["stock_name"] = (
+                    stock_name
+                    if storage_code != display_code
+                    else "Unnamed Stock"
+                )
+            expected_reports = {
+                path: deepcopy(case_expected_report)
+                for path in actual_reports
+            }
+            expected_reports["sync_completion"]["meta"]["id"] = None
+            expected_reports["memory_status"]["meta"]["id"] = None
+            expected_reports["history_detail"]["meta"]["created_at"] = (
+                datetime.fromisoformat(created_at).astimezone().isoformat()
+            )
+            expected_reports["database_status"]["summary"][
+                "sentiment_label"
+            ] = None
+            if nullable_report_fields:
+                persisted_strategy = {
+                    "ideal_buy": None,
+                    "secondary_buy": None,
+                    "stop_loss": None,
+                    "take_profit": None,
+                }
+                expected_reports["database_status"]["strategy"] = deepcopy(
+                    persisted_strategy
+                )
+                expected_reports["history_detail"]["strategy"] = deepcopy(
+                    persisted_strategy
+                )
+            if missing_raw_language:
+                expected_reports["database_status"]["meta"].update(
+                    {
+                        "report_language": "zh",
+                        "stock_name": "待确认股票",
+                    }
+                )
+                expected_reports["database_status"]["summary"][
+                    "action_label"
+                ] = "观望"
+                expected_reports["history_detail"]["summary"][
+                    "action_label"
+                ] = "观望"
+            if double_encoded_persisted_raw:
+                parsed_once_raw_result = json.dumps(case_raw_result)
+                for persisted_path in ("database_status", "history_detail"):
+                    expected_reports[persisted_path]["meta"].update(
+                        {
+                            "report_language": "zh",
+                            "model_used": None,
+                        }
+                    )
+                    expected_reports[persisted_path]["summary"][
+                        "action_label"
+                    ] = "观望"
+                    expected_reports[persisted_path]["details"][
+                        "raw_result"
+                    ] = parsed_once_raw_result
+                expected_reports["history_detail"]["summary"].update(
+                    {
+                        "operation_advice": "观望",
+                        "trend_prediction": "震荡",
+                        "sentiment_label": "中性",
+                    }
+                )
+            for path, actual_report in actual_reports.items():
+                with self.subTest(
+                    market=market,
+                    path=path,
+                ):
+                    self.assertEqual(actual_report, expected_reports[path])
+
+        for market_case in (
+            {
+                "case_query_id": query_id,
+                "storage_code": "aapl",
+                "display_code": "AAPL",
+                "market": "us",
+                "stock_name": "Apple",
+            },
+            {
+                "case_query_id": "q-canonical-cn",
+                "storage_code": "SH600519",
+                "display_code": "600519.SH",
+                "market": "cn",
+                "stock_name": "SH600519",
+                "legacy_snapshot": True,
+                "missing_raw_language": True,
+                "nullable_report_fields": True,
+            },
+            {
+                "case_query_id": "q-canonical-hk",
+                "storage_code": "00700.HK",
+                "display_code": "HK00700",
+                "market": "hk",
+                "stock_name": "Tencent",
+                "malformed_partial_raw_result": True,
+                "double_encoded_persisted_raw": True,
+                "fallback_fundamental": True,
+            },
+        ):
+            exercise_delivery_paths(**market_case)
+
+    def test_persisted_report_paths_parse_legacy_payloads_once(self) -> None:
+        if get_analysis_status is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        from api.v1.endpoints.history import get_history_detail
+
+        raw_payload = {
+            "report_language": "en",
+            "model_used": "hidden-model",
+            "operation_advice": "Sell",
+            "action": "sell",
+        }
+        context_payload = {"report_language": "en"}
+        parsed_once_raw = json.dumps(raw_payload)
+        parsed_once_context = json.dumps(context_payload)
+        record = SimpleNamespace(
+            id=51,
+            query_id="q-double-encoded-history",
+            code="AAPL",
+            name="AAPL",
+            report_type="detailed",
+            created_at=datetime(2026, 7, 30, 12, 0, 0),
+            raw_result=json.dumps(parsed_once_raw),
+            context_snapshot=json.dumps(parsed_once_context),
+            news_content=None,
+            sentiment_score=50,
+            operation_advice="Watch",
+            trend_prediction="Sideways",
+            analysis_summary="Persisted summary",
+            ideal_buy=None,
+            secondary_buy=None,
+            stop_loss=None,
+            take_profit=None,
+        )
+        database = MagicMock()
+        database.get_analysis_history.return_value = [record]
+        database.get_latest_analysis_by_query_id.return_value = record
+        database.get_latest_fundamental_snapshot.return_value = None
+
+        with patch(
+            "api.v1.endpoints.analysis.get_task_queue"
+        ) as queue_mock, patch(
+            "src.storage.DatabaseManager.get_instance",
+            return_value=database,
+        ):
+            queue_mock.return_value.get_task.return_value = None
+            database_status = get_analysis_status(record.query_id)
+
+        history_report = get_history_detail(
+            record.query_id,
+            db_manager=database,
+        )
+        reports = {
+            "database_status": database_status.result.report,
+            "history_detail": history_report.model_dump(),
+        }
+        for path, report in reports.items():
+            with self.subTest(path=path):
+                self.assertEqual(report["meta"]["report_language"], "zh")
+                self.assertEqual(report["meta"]["stock_name"], "待确认股票")
+                self.assertIsNone(report["meta"]["model_used"])
+                self.assertEqual(report["summary"]["action"], "watch")
+                self.assertEqual(report["summary"]["action_label"], "观望")
+                self.assertEqual(
+                    report["details"]["raw_result"],
+                    parsed_once_raw,
+                )
+                self.assertEqual(
+                    report["details"]["context_snapshot"],
+                    context_payload,
+                )
+
+        self.assertEqual(
+            reports["database_status"]["summary"]["operation_advice"],
+            "Watch",
+        )
+        self.assertEqual(
+            reports["history_detail"]["summary"]["operation_advice"],
+            "观望",
+        )
+
+    def test_history_detail_preserves_top_level_phase_summary_precedence(self) -> None:
+        from api.v1.endpoints.history import get_history_detail
+
+        context_phase = _market_phase_summary()
+        top_level_phase = deepcopy(context_phase)
+        top_level_phase.update(
+            {
+                "phase": "postmarket",
+                "is_market_open_now": False,
+                "is_partial_bar": False,
+                "minutes_to_close": None,
+                "warnings": ["top_level_history_phase"],
+            }
+        )
+        result = {
+            "id": 41,
+            "query_id": "q-history-phase-precedence",
+            "stock_code": "600519",
+            "storage_stock_code": "600519",
+            "stock_name": "贵州茅台",
+            "report_type": "detailed",
+            "report_language": "zh",
+            "created_at": "2026-07-30T16:00:00+00:00",
+            "model_used": None,
+            "analysis_summary": None,
+            "operation_advice": None,
+            "action": None,
+            "action_label": None,
+            "trend_prediction": None,
+            "sentiment_score": None,
+            "sentiment_label": None,
+            "ideal_buy": None,
+            "secondary_buy": None,
+            "stop_loss": None,
+            "take_profit": None,
+            "news_content": None,
+            "raw_result": {},
+            "context_snapshot": {
+                "market_phase_summary": context_phase,
+            },
+            "market_phase_summary": top_level_phase,
+        }
+        service = MagicMock()
+        service.resolve_and_get_detail.return_value = result
+        database = MagicMock()
+        database.get_latest_fundamental_snapshot.return_value = None
+
+        with patch(
+            "api.v1.endpoints.history.HistoryService",
+            return_value=service,
+        ):
+            report = get_history_detail(
+                result["query_id"],
+                db_manager=database,
+            )
+        self.assertEqual(
+            report.meta.market_phase_summary.model_dump(),
+            top_level_phase,
+        )
+
+        fallback_result = dict(result)
+        fallback_result["market_phase_summary"] = None
+        service.resolve_and_get_detail.return_value = fallback_result
+        with patch(
+            "api.v1.endpoints.history.HistoryService",
+            return_value=service,
+        ):
+            fallback_report = get_history_detail(
+                result["query_id"],
+                db_manager=database,
+            )
+        self.assertEqual(
+            fallback_report.meta.market_phase_summary.model_dump(),
+            context_phase,
+        )
+
+    def test_private_report_projection_module_is_transport_neutral_owner(self) -> None:
+        from src.services import _analysis_report_projection as projection
+
+        projection_path = Path(projection.__file__)
+        projection_tree = ast.parse(
+            projection_path.read_text(encoding="utf-8"),
+            filename=str(projection_path),
+        )
+        imported_modules = {
+            node.module
+            for node in ast.walk(projection_tree)
+            if isinstance(node, ast.ImportFrom) and node.module
+        }
+        imported_modules.update(
+            alias.name
+            for node in ast.walk(projection_tree)
+            if isinstance(node, ast.Import)
+            for alias in node.names
+        )
+        transport_imports = sorted(
+            module
+            for module in imported_modules
+            if module == "api"
+            or module.startswith("api.")
+            or module == "fastapi"
+            or module.startswith("fastapi.")
+        )
+        self.assertEqual(transport_imports, [])
+
+        repository_root = projection_path.parents[2]
+        endpoint_paths = (
+            repository_root / "api/v1/endpoints/analysis.py",
+            repository_root / "api/v1/endpoints/history.py",
+        )
+        projection_symbols = (
+            "extract_analysis_context_pack_overview",
+            "sanitize_context_snapshot_for_api",
+            "extract_fundamental_detail_fields",
+            "extract_board_detail_fields",
+            "extract_market_structure_detail_field",
+            "extract_realtime_detail_fields",
+            "project_report_strata_for_api",
+            "project_report_structured_insights_for_api",
+        )
+        for endpoint_path in endpoint_paths:
+            endpoint_source = endpoint_path.read_text(encoding="utf-8")
+            for symbol in projection_symbols:
+                with self.subTest(endpoint=endpoint_path.name, symbol=symbol):
+                    self.assertNotIn(symbol, endpoint_source)
 
     def test_build_analysis_report_projects_structured_insights_from_raw_result(self) -> None:
         if _build_analysis_report is None:
