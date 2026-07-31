@@ -1101,6 +1101,34 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         self.assertEqual(report.meta.report_language, "en")
 
+    def test_build_analysis_report_skips_config_when_language_is_explicit(self) -> None:
+        if _build_analysis_report is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        for source, meta, context_snapshot in (
+            ("meta", {"report_language": "en"}, {"report_language": "zh"}),
+            ("context", {}, {"report_language": "en"}),
+        ):
+            with self.subTest(source=source), patch(
+                "api.v1.endpoints.analysis.Config.get_instance",
+                side_effect=RuntimeError("config unavailable"),
+            ):
+                report = _build_analysis_report(
+                    report_data={
+                        "meta": meta,
+                        "summary": {"analysis_summary": "English output"},
+                        "strategy": {},
+                        "details": {},
+                    },
+                    query_id=f"q-explicit-language-{source}",
+                    stock_code="AAPL",
+                    stock_name="Apple",
+                    context_snapshot=context_snapshot,
+                    fallback_fundamental_payload=None,
+                )
+
+            self.assertEqual(report.meta.report_language, "en")
+
     def test_load_sync_fundamental_sources_uses_query_and_code_for_fallback(self) -> None:
         if _load_sync_fundamental_sources is None:
             self.skipTest("analysis endpoint helpers unavailable in this environment")
@@ -1563,7 +1591,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         from api.v1.endpoints.history import get_history_detail
 
         query_id = "q-canonical-report"
-        created_at = "2026-07-30T09:00:00-07:00"
+        created_at = "2026-07-30T16:00:00+00:00"
         phase_summary = {
             "market": "us",
             "phase": "intraday",
@@ -1731,10 +1759,19 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             stock_name: str,
             legacy_snapshot: bool = False,
             malformed_partial_raw_result: bool = False,
+            double_encoded_persisted_raw: bool = False,
             missing_raw_language: bool = False,
             nullable_report_fields: bool = False,
             fallback_fundamental: bool = False,
         ) -> None:
+            display_code_by_alias = {
+                storage_code.strip().upper(): display_code,
+                display_code.strip().upper(): display_code,
+            }
+
+            def resolve_display_code(code: object) -> str | None:
+                return display_code_by_alias.get(str(code or "").strip().upper())
+
             case_raw_result = deepcopy(raw_result)
             case_raw_result["dashboard"]["phase_decision"]["phase_context"][
                 "market"
@@ -1817,6 +1854,9 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                     fallback_fundamental_payload,
                     case_raw_result,
                 ),
+            ), patch(
+                "api.v1.endpoints.analysis.resolve_index_stock_code",
+                side_effect=resolve_display_code,
             ):
                 sync_result = _handle_sync_analysis(
                     storage_code,
@@ -1866,10 +1906,16 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                     fallback_fundamental_payload,
                     case_raw_result,
                 ),
+            ), patch(
+                "api.v1.endpoints.analysis.resolve_index_stock_code",
+                side_effect=resolve_display_code,
             ):
                 queue_mock.return_value.get_task.return_value = task
                 memory_status = get_analysis_status(case_query_id)
 
+            persisted_raw_result = json.dumps(case_raw_result)
+            if double_encoded_persisted_raw:
+                persisted_raw_result = json.dumps(persisted_raw_result)
             record = SimpleNamespace(
                 id=17,
                 query_id=case_query_id,
@@ -1877,7 +1923,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 name=stock_name,
                 report_type="detailed",
                 created_at=datetime.fromisoformat(created_at),
-                raw_result=json.dumps(case_raw_result),
+                raw_result=persisted_raw_result,
                 context_snapshot=json.dumps(case_context_snapshot),
                 news_content="Canonical news",
                 sentiment_score=50,
@@ -1902,14 +1948,21 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             ) as queue_mock, patch(
                 "src.storage.DatabaseManager.get_instance",
                 return_value=database,
+            ), patch(
+                "api.v1.endpoints.analysis.resolve_index_stock_code",
+                side_effect=resolve_display_code,
             ):
                 queue_mock.return_value.get_task.return_value = None
                 database_status = get_analysis_status(case_query_id)
 
-            history_report = get_history_detail(
-                case_query_id,
-                db_manager=database,
-            )
+            with patch(
+                "src.services.history_service.resolve_index_stock_code",
+                side_effect=resolve_display_code,
+            ):
+                history_report = get_history_detail(
+                    case_query_id,
+                    db_manager=database,
+                )
 
             actual_reports = {
                 "sync_completion": sync_result.report,
@@ -1954,13 +2007,20 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 case_expected_report["summary"]["analysis_summary"] = None
                 case_expected_report["strategy"] = None
             if missing_raw_language:
-                case_expected_report["meta"]["stock_name"] = "Unnamed Stock"
+                case_expected_report["meta"]["stock_name"] = (
+                    stock_name
+                    if storage_code != display_code
+                    else "Unnamed Stock"
+                )
             expected_reports = {
                 path: deepcopy(case_expected_report)
                 for path in actual_reports
             }
             expected_reports["sync_completion"]["meta"]["id"] = None
             expected_reports["memory_status"]["meta"]["id"] = None
+            expected_reports["history_detail"]["meta"]["created_at"] = (
+                datetime.fromisoformat(created_at).astimezone().isoformat()
+            )
             expected_reports["database_status"]["summary"][
                 "sentiment_label"
             ] = None
@@ -1990,6 +2050,28 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 expected_reports["history_detail"]["summary"][
                     "action_label"
                 ] = "观望"
+            if double_encoded_persisted_raw:
+                parsed_once_raw_result = json.dumps(case_raw_result)
+                for persisted_path in ("database_status", "history_detail"):
+                    expected_reports[persisted_path]["meta"].update(
+                        {
+                            "report_language": "zh",
+                            "model_used": None,
+                        }
+                    )
+                    expected_reports[persisted_path]["summary"][
+                        "action_label"
+                    ] = "观望"
+                    expected_reports[persisted_path]["details"][
+                        "raw_result"
+                    ] = parsed_once_raw_result
+                expected_reports["history_detail"]["summary"].update(
+                    {
+                        "operation_advice": "观望",
+                        "trend_prediction": "震荡",
+                        "sentiment_label": "中性",
+                    }
+                )
             for path, actual_report in actual_reports.items():
                 with self.subTest(
                     market=market,
@@ -2000,32 +2082,114 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         for market_case in (
             {
                 "case_query_id": query_id,
-                "storage_code": "AAPL",
+                "storage_code": "aapl",
                 "display_code": "AAPL",
                 "market": "us",
                 "stock_name": "Apple",
             },
             {
                 "case_query_id": "q-canonical-cn",
-                "storage_code": "600519.SH",
+                "storage_code": "SH600519",
                 "display_code": "600519.SH",
                 "market": "cn",
-                "stock_name": "600519.SH",
+                "stock_name": "SH600519",
                 "legacy_snapshot": True,
                 "missing_raw_language": True,
                 "nullable_report_fields": True,
             },
             {
                 "case_query_id": "q-canonical-hk",
-                "storage_code": "HK00700",
+                "storage_code": "00700.HK",
                 "display_code": "HK00700",
                 "market": "hk",
                 "stock_name": "Tencent",
                 "malformed_partial_raw_result": True,
+                "double_encoded_persisted_raw": True,
                 "fallback_fundamental": True,
             },
         ):
             exercise_delivery_paths(**market_case)
+
+    def test_persisted_report_paths_parse_legacy_payloads_once(self) -> None:
+        if get_analysis_status is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        from api.v1.endpoints.history import get_history_detail
+
+        raw_payload = {
+            "report_language": "en",
+            "model_used": "hidden-model",
+            "operation_advice": "Sell",
+            "action": "sell",
+        }
+        context_payload = {"report_language": "en"}
+        parsed_once_raw = json.dumps(raw_payload)
+        parsed_once_context = json.dumps(context_payload)
+        record = SimpleNamespace(
+            id=51,
+            query_id="q-double-encoded-history",
+            code="AAPL",
+            name="AAPL",
+            report_type="detailed",
+            created_at=datetime(2026, 7, 30, 12, 0, 0),
+            raw_result=json.dumps(parsed_once_raw),
+            context_snapshot=json.dumps(parsed_once_context),
+            news_content=None,
+            sentiment_score=50,
+            operation_advice="Watch",
+            trend_prediction="Sideways",
+            analysis_summary="Persisted summary",
+            ideal_buy=None,
+            secondary_buy=None,
+            stop_loss=None,
+            take_profit=None,
+        )
+        database = MagicMock()
+        database.get_analysis_history.return_value = [record]
+        database.get_latest_analysis_by_query_id.return_value = record
+        database.get_latest_fundamental_snapshot.return_value = None
+
+        with patch(
+            "api.v1.endpoints.analysis.get_task_queue"
+        ) as queue_mock, patch(
+            "src.storage.DatabaseManager.get_instance",
+            return_value=database,
+        ):
+            queue_mock.return_value.get_task.return_value = None
+            database_status = get_analysis_status(record.query_id)
+
+        history_report = get_history_detail(
+            record.query_id,
+            db_manager=database,
+        )
+        reports = {
+            "database_status": database_status.result.report,
+            "history_detail": history_report.model_dump(),
+        }
+        for path, report in reports.items():
+            with self.subTest(path=path):
+                self.assertEqual(report["meta"]["report_language"], "zh")
+                self.assertEqual(report["meta"]["stock_name"], "待确认股票")
+                self.assertIsNone(report["meta"]["model_used"])
+                self.assertEqual(report["summary"]["action"], "watch")
+                self.assertEqual(report["summary"]["action_label"], "观望")
+                self.assertEqual(
+                    report["details"]["raw_result"],
+                    parsed_once_raw,
+                )
+                self.assertEqual(
+                    report["details"]["context_snapshot"],
+                    context_payload,
+                )
+
+        self.assertEqual(
+            reports["database_status"]["summary"]["operation_advice"],
+            "Watch",
+        )
+        self.assertEqual(
+            reports["history_detail"]["summary"]["operation_advice"],
+            "观望",
+        )
 
     def test_history_detail_preserves_top_level_phase_summary_precedence(self) -> None:
         from api.v1.endpoints.history import get_history_detail

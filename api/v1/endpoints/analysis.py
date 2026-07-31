@@ -22,6 +22,7 @@ import json
 import logging
 import re
 import uuid
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Union, Dict, Any
@@ -1337,6 +1338,24 @@ def _build_analysis_report(
 ) -> AnalysisReport:
     """Compatibility facade for callers and patch seams outside the endpoint."""
 
+    report_meta = report_data.get("meta")
+    explicit_report_language = (
+        report_meta.get("report_language")
+        if isinstance(report_meta, Mapping)
+        else None
+    ) or (
+        context_snapshot.get("report_language")
+        if isinstance(context_snapshot, Mapping)
+        else None
+    )
+    default_report_language = None
+    if not explicit_report_language:
+        default_report_language = getattr(
+            Config.get_instance(),
+            "report_language",
+            "zh",
+        )
+
     return AnalysisReport.model_validate(
         project_analysis_report(
             report_data,
@@ -1346,11 +1365,7 @@ def _build_analysis_report(
             context_snapshot=context_snapshot,
             fallback_fundamental_payload=fallback_fundamental_payload,
             fallback_raw_result_payload=fallback_raw_result_payload,
-            default_report_language=getattr(
-                Config.get_instance(),
-                "report_language",
-                "zh",
-            ),
+            default_report_language=default_report_language,
             display_stock_code=_display_stock_code_from_index,
             log_context={"path": "_build_analysis_report"},
         )

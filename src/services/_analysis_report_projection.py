@@ -39,11 +39,11 @@ from src.utils.data_processing import (
     extract_market_structure_detail_field,
     extract_realtime_detail_fields,
     normalize_model_used,
-    parse_json_field,
 )
 
 
 DisplayStockCode = Callable[[Any], str]
+_UNSET = object()
 
 
 def _identity_stock_code(value: Any) -> str:
@@ -193,14 +193,13 @@ def project_analysis_report(
     display_stock_code: DisplayStockCode = _identity_stock_code,
     log_context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Project one AnalysisService report payload into the canonical report dict."""
+    """Project one AnalysisService report and its adapter-decoded context."""
 
     meta_data = _mapping(report_data.get("meta"))
     summary_data = _mapping(report_data.get("summary"))
     strategy_data = _mapping(report_data.get("strategy"))
     details_data = _mapping(report_data.get("details"))
-    parsed_context = parse_json_field(context_snapshot)
-    context_data = _mapping(parsed_context)
+    context_data = _mapping(context_snapshot)
 
     report_language = normalize_report_language(
         meta_data.get("report_language")
@@ -381,8 +380,8 @@ def project_persisted_analysis_report(
     source: Any,
     *,
     query_id: Optional[str] = None,
-    context_snapshot: Any = None,
-    raw_result: Any = None,
+    context_snapshot: Any = _UNSET,
+    raw_result: Any = _UNSET,
     fallback_fundamental_payload: Optional[Mapping[str, Any]] = None,
     resolved_action_authority: bool = False,
     resolved_language_authority: bool = False,
@@ -393,15 +392,19 @@ def project_persisted_analysis_report(
     display_stock_code: DisplayStockCode = _identity_stock_code,
     log_context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Project one persisted history/status source into the canonical report dict."""
+    """Project one persisted history/status source into the canonical report dict.
 
-    if context_snapshot is None:
+    Adapters own JSON decoding and pass the decoded value, including an explicit
+    ``None``. Omitting either argument reads the source value as-is so projection
+    never interprets an already-decoded legacy payload a second time.
+    """
+
+    if context_snapshot is _UNSET:
         context_snapshot = _source_value(source, "context_snapshot")
-    if raw_result is None:
+    if raw_result is _UNSET:
         raw_result = _source_value(source, "raw_result")
-    raw_result = parse_json_field(raw_result)
     raw_data = _mapping(raw_result)
-    context_data = _mapping(parse_json_field(context_snapshot))
+    context_data = _mapping(context_snapshot)
 
     source_stock_code = _source_value(source, "stock_code")
     if source_stock_code is None:
