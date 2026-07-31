@@ -14,9 +14,7 @@ import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { getUiClauseSeparator } from '../utils/uiLocale';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import { PORTFOLIO_FILE_TEXT, PORTFOLIO_LIMITATION_LABELS, PORTFOLIO_TEXT } from '../locales/portfolio';
-import type { FxRefreshFeedback } from '../utils/portfolioFormat';
 import {
-  buildFxRefreshFeedback,
   formatBrokerLabel,
   formatCashDirectionLabel,
   formatCorporateActionLabel,
@@ -44,31 +42,29 @@ import type {
   PortfolioAccountItem,
   PortfolioAccountType,
   PortfolioCashDirection,
-  PortfolioCashLedgerListItem,
-  PortfolioCorporateActionListItem,
   PortfolioCorporateActionType,
   PortfolioCostMethod,
   PortfolioImportBrokerItem,
   PortfolioImportCommitResponse,
   PortfolioImportParseResponse,
   PortfolioPositionItem,
-  PortfolioRiskResponse,
   PortfolioSide,
-  PortfolioSnapshotResponse,
-  PortfolioTradeListItem,
-  PaperTradeCreatedResponse,
 } from '../types/portfolio';
 import { areStockCodesEquivalent, normalizeStockCode } from '../utils/stockCode';
 import { parseDecisionSignalDate } from '../utils/decisionSignalTime';
 import { buildDecisionActionLabelMap } from '../utils/decisionAction';
 import { getDecisionSignalPresentation } from '../utils/decisionSignalPresentation';
-import { createOperationId } from '../utils/operationId';
 import { parseDeepLink } from '../utils/deepLink';
 import {
   SIGNAL_CENTER_SCOPE_VALUES,
   SIGNAL_CENTER_TAB_VALUES,
   buildSignalCenterHref,
 } from '../routing/routes';
+import {
+  type PortfolioEventType,
+  usePortfolioProjectionSession,
+} from '../hooks/portfolio/usePortfolioProjectionSession';
+import { usePortfolioLedgerMutationWorkflow } from '../hooks/portfolio/usePortfolioLedgerMutationWorkflow';
 
 const PIE_COLORS = [
   'hsl(var(--primary))',
@@ -78,11 +74,9 @@ const PIE_COLORS = [
   'hsl(var(--muted-text))',
   'hsl(var(--foreground) / 0.65)',
 ];
-const DEFAULT_PAGE_SIZE = 20;
 const PORTFOLIO_SIGNAL_LOOKUP_CONCURRENCY = 6;
 
 type AccountOption = 'all' | number;
-type EventType = 'trade' | 'cash' | 'corporate';
 
 type FlatPosition = PortfolioPositionItem & {
   accountId: number;
@@ -109,27 +103,6 @@ type PendingAccountDelete = {
   accountId: number;
   accountName: string;
 };
-
-type FxRefreshContext = {
-  viewKey: string;
-  requestId: number;
-};
-
-type OperationAttempt = {
-  fingerprint: string;
-  operationId: string;
-};
-
-function resolveOperationAttempt(
-  current: OperationAttempt | null,
-  fingerprint: string,
-  scope: string,
-): OperationAttempt {
-  if (current?.fingerprint === fingerprint) {
-    return current;
-  }
-  return { fingerprint, operationId: createOperationId(scope) };
-}
 
 const PORTFOLIO_DATE_TRIGGER_CLASS =
   'h-11 w-full rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
@@ -225,16 +198,10 @@ const PortfolioPage: React.FC = () => {
   const [paperTradeModalOpen, setPaperTradeModalOpen] = useState(false);
   const [cashModalOpen, setCashModalOpen] = useState(false);
   const [corpModalOpen, setCorpModalOpen] = useState(false);
-  const [tradeSubmitting, setTradeSubmitting] = useState(false);
   const [tradeError, setTradeError] = useState<ParsedApiError | null>(null);
-  const [paperTradeSubmitting, setPaperTradeSubmitting] = useState(false);
   const [paperTradeError, setPaperTradeError] = useState<ParsedApiError | null>(null);
   const [paperTradeSuccess, setPaperTradeSuccess] = useState<string | null>(null);
-  const [paperTradeRefreshing, setPaperTradeRefreshing] = useState(false);
-  const [paperTradeRefreshWarning, setPaperTradeRefreshWarning] = useState<string | null>(null);
-  const [cashSubmitting, setCashSubmitting] = useState(false);
   const [cashError, setCashError] = useState<ParsedApiError | null>(null);
-  const [corpSubmitting, setCorpSubmitting] = useState(false);
   const [corpError, setCorpError] = useState<ParsedApiError | null>(null);
   const [csvModalOpen, setCsvModalOpen] = useState(false);
   const [eventModalOpen, setEventModalOpen] = useState(false);
@@ -251,13 +218,7 @@ const PortfolioPage: React.FC = () => {
   });
   const [costMethod, setCostMethod] = useState<PortfolioCostMethod>('fifo');
   const [positionAnalysisPhase, setPositionAnalysisPhase] = useState<AnalysisPhase>('auto');
-  const [snapshot, setSnapshot] = useState<PortfolioSnapshotResponse | null>(null);
-  const [risk, setRisk] = useState<PortfolioRiskResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [fxRefreshing, setFxRefreshing] = useState(false);
-  const [fxRefreshFeedback, setFxRefreshFeedback] = useState<FxRefreshFeedback | null>(null);
   const [error, setError] = useState<ParsedApiError | null>(null);
-  const [riskWarning, setRiskWarning] = useState<string | null>(null);
   const [writeWarning, setWriteWarning] = useState<string | null>(null);
   const [portfolioSignals, setPortfolioSignals] = useState<DecisionSignalItem[]>([]);
   const [portfolioSignalsLoading, setPortfolioSignalsLoading] = useState(false);
@@ -272,35 +233,11 @@ const PortfolioPage: React.FC = () => {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvDryRun, setCsvDryRun] = useState(true);
   const [csvParsing, setCsvParsing] = useState(false);
-  const [csvCommitting, setCsvCommitting] = useState(false);
   const [csvError, setCsvError] = useState<ParsedApiError | null>(null);
   const [csvParseResult, setCsvParseResult] = useState<PortfolioImportParseResponse | null>(null);
   const [csvCommitResult, setCsvCommitResult] = useState<PortfolioImportCommitResponse | null>(null);
   const [brokerLoadWarning, setBrokerLoadWarning] = useState<string | null>(null);
 
-  const [eventType, setEventType] = useState<EventType>('trade');
-  const [eventDateFrom, setEventDateFrom] = useState('');
-  const [eventDateTo, setEventDateTo] = useState('');
-  const [eventSymbol, setEventSymbol] = useState('');
-  const [eventSide, setEventSide] = useState<'' | PortfolioSide>('');
-  const [eventDirection, setEventDirection] = useState<'' | PortfolioCashDirection>('');
-  const [eventActionType, setEventActionType] = useState<'' | PortfolioCorporateActionType>('');
-  const [appliedEventFilters, setAppliedEventFilters] = useState({
-    dateFrom: '',
-    dateTo: '',
-    symbol: '',
-    side: '' as '' | PortfolioSide,
-    direction: '' as '' | PortfolioCashDirection,
-    actionType: '' as '' | PortfolioCorporateActionType,
-  });
-  const [eventPage, setEventPage] = useState(1);
-  const [eventRefreshKey, setEventRefreshKey] = useState(0);
-  const [eventTotal, setEventTotal] = useState(0);
-  const [eventLoading, setEventLoading] = useState(false);
-  const [eventError, setEventError] = useState<ParsedApiError | null>(null);
-  const [tradeEvents, setTradeEvents] = useState<PortfolioTradeListItem[]>([]);
-  const [cashEvents, setCashEvents] = useState<PortfolioCashLedgerListItem[]>([]);
-  const [corporateEvents, setCorporateEvents] = useState<PortfolioCorporateActionListItem[]>([]);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -342,31 +279,15 @@ const PortfolioPage: React.FC = () => {
     splitRatio: '',
     note: '',
   });
-  const tradeOperationRef = useRef<OperationAttempt | null>(null);
-  const paperTradeOperationRef = useRef<OperationAttempt | null>(null);
-  const cashOperationRef = useRef<OperationAttempt | null>(null);
-  const corporateOperationRef = useRef<OperationAttempt | null>(null);
-  const csvOperationRef = useRef<OperationAttempt | null>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
-  const snapshotRequestRef = useRef(0);
-  const eventRequestRef = useRef(0);
 
   const queryAccountId = selectedAccount === 'all' ? undefined : selectedAccount;
-  const refreshViewKey = `${selectedAccount === 'all' ? 'all' : `account:${selectedAccount}`}:cost:${costMethod}`;
-  const refreshContextRef = useRef<FxRefreshContext>({ viewKey: refreshViewKey, requestId: 0 });
   const hasAccounts = accounts.length > 0;
   const writableAccount = selectedAccount === 'all' ? undefined : accounts.find((item) => item.id === selectedAccount);
   const writableAccountId = writableAccount?.id;
   const writableAccountType = writableAccount?.accountType ?? 'real';
   const isPaperAccountSelected = Boolean(writableAccount) && writableAccountType === 'paper';
   const writeBlocked = !writableAccountId;
-  const canDeleteSelectedAccount = Boolean(writableAccountId) && !isLoading && !fxRefreshing && !accountDeleteLoading;
-  const totalEventPages = Math.max(1, Math.ceil(eventTotal / DEFAULT_PAGE_SIZE));
-  const currentEventCount = eventType === 'trade'
-    ? tradeEvents.length
-    : eventType === 'cash'
-      ? cashEvents.length
-      : corporateEvents.length;
 
   const setSelectedAccount = useCallback((
     account: AccountOption,
@@ -408,13 +329,6 @@ const PortfolioPage: React.FC = () => {
     }
     setSelectedAccount(accounts[0]?.id ?? 'all', true, requestedAccountId);
   }, [accounts, accountsLoaded, requestedAccountId, setSelectedAccount]);
-
-  const isActiveRefreshContext = (requestedViewKey: string, requestedRequestId: number) => {
-    return (
-      refreshContextRef.current.viewKey === requestedViewKey
-      && refreshContextRef.current.requestId === requestedRequestId
-    );
-  };
 
   const loadAccounts = useCallback(async (): Promise<boolean> => {
     try {
@@ -458,190 +372,86 @@ const PortfolioPage: React.FC = () => {
     }
   }, [text.brokerListEmpty, text.brokerListUnavailable]);
 
-  const loadSnapshotAndRisk = useCallback(async (): Promise<boolean> => {
-    const requestId = snapshotRequestRef.current + 1;
-    snapshotRequestRef.current = requestId;
-    setIsLoading(true);
-    setRiskWarning(null);
-    try {
-      const snapshotData = await portfolioApi.getSnapshot({
-        accountId: queryAccountId,
-        costMethod,
-        includeRealtime: false,
-      });
-      if (requestId !== snapshotRequestRef.current) return false;
-      setSnapshot(snapshotData);
-      setError(null);
-
-      try {
-        const riskData = await portfolioApi.getRisk({
-          accountId: queryAccountId,
-          costMethod,
-          includeRealtime: false,
-        });
-        if (requestId !== snapshotRequestRef.current) return false;
-        setRisk(riskData);
-        return true;
-      } catch (riskErr) {
-        if (requestId !== snapshotRequestRef.current) return false;
-        setRisk(null);
-        setRiskWarning(getParsedApiError(riskErr, language).message || text.riskFallback);
-        return false;
-      }
-    } catch (err) {
-      if (requestId !== snapshotRequestRef.current) return false;
-      setSnapshot(null);
-      setRisk(null);
-      setError(getParsedApiError(err));
-      return false;
-    } finally {
-      if (requestId === snapshotRequestRef.current) {
-        setIsLoading(false);
-      }
-    }
-  }, [queryAccountId, costMethod, language, text.riskFallback]);
-
-  const loadEventsPage = useCallback(async (
-    page: number,
-    requestedEventType: EventType = eventType,
-  ): Promise<boolean> => {
-    const requestId = eventRequestRef.current + 1;
-    eventRequestRef.current = requestId;
-    setEventLoading(true);
-    setEventError(null);
-    try {
-      if (requestedEventType === 'trade') {
-        const response = await portfolioApi.listTrades({
-          accountId: queryAccountId,
-          dateFrom: appliedEventFilters.dateFrom || undefined,
-          dateTo: appliedEventFilters.dateTo || undefined,
-          symbol: appliedEventFilters.symbol || undefined,
-          side: appliedEventFilters.side || undefined,
-          page,
-          pageSize: DEFAULT_PAGE_SIZE,
-        });
-        if (requestId !== eventRequestRef.current) return false;
-        setTradeEvents(response.items || []);
-        setEventTotal(response.total || 0);
-      } else if (requestedEventType === 'cash') {
-        const response = await portfolioApi.listCashLedger({
-          accountId: queryAccountId,
-          dateFrom: appliedEventFilters.dateFrom || undefined,
-          dateTo: appliedEventFilters.dateTo || undefined,
-          direction: appliedEventFilters.direction || undefined,
-          page,
-          pageSize: DEFAULT_PAGE_SIZE,
-        });
-        if (requestId !== eventRequestRef.current) return false;
-        setCashEvents(response.items || []);
-        setEventTotal(response.total || 0);
-      } else {
-        const response = await portfolioApi.listCorporateActions({
-          accountId: queryAccountId,
-          dateFrom: appliedEventFilters.dateFrom || undefined,
-          dateTo: appliedEventFilters.dateTo || undefined,
-          symbol: appliedEventFilters.symbol || undefined,
-          actionType: appliedEventFilters.actionType || undefined,
-          page,
-          pageSize: DEFAULT_PAGE_SIZE,
-        });
-        if (requestId !== eventRequestRef.current) return false;
-        setCorporateEvents(response.items || []);
-        setEventTotal(response.total || 0);
-      }
-      return true;
-    } catch (err) {
-      if (requestId === eventRequestRef.current) {
-        setEventError(getParsedApiError(err));
-      }
-      return false;
-    } finally {
-      if (requestId === eventRequestRef.current) {
-        setEventLoading(false);
-      }
-    }
-  }, [
-    appliedEventFilters,
-    eventType,
-    queryAccountId,
-  ]);
-
-  const loadEvents = useCallback(async () => {
-    await loadEventsPage(eventPage);
-  }, [eventPage, loadEventsPage]);
-
-  const applyEventFilters = useCallback(() => {
-    setEventPage(1);
-    setAppliedEventFilters({
-      dateFrom: eventDateFrom,
-      dateTo: eventDateTo,
-      symbol: eventSymbol.trim(),
-      side: eventSide,
-      direction: eventDirection,
-      actionType: eventActionType,
-    });
-    setEventRefreshKey((current) => current + 1);
-  }, [eventActionType, eventDateFrom, eventDateTo, eventDirection, eventSide, eventSymbol]);
-
-  const refreshPortfolioData = useCallback(async (page = eventPage) => {
-    await Promise.all([loadSnapshotAndRisk(), loadEventsPage(page)]);
-  }, [eventPage, loadEventsPage, loadSnapshotAndRisk]);
-
-  const refreshPaperTradeSurfaces = useCallback(async (): Promise<boolean> => {
-    setPaperTradeRefreshing(true);
-    try {
-      const results = await Promise.allSettled([
-        loadAccounts(),
-        loadSnapshotAndRisk(),
-        loadEventsPage(1, 'trade'),
-      ]);
-      const fullyRefreshed = results.every((result) => (
-        result.status === 'fulfilled' && result.value
-      ));
-      if (!fullyRefreshed) {
-        setPaperTradeRefreshWarning(text.paperTradeRefreshWarning);
-        return false;
-      }
-      setPaperTradeRefreshWarning(null);
-      setEventType('trade');
-      setEventPage(1);
-      setPortfolioSignalsRefreshKey((current) => current + 1);
-      return true;
-    } finally {
-      setPaperTradeRefreshing(false);
-    }
-  }, [
-    loadAccounts,
-    loadEventsPage,
-    loadSnapshotAndRisk,
-    text.paperTradeRefreshWarning,
-  ]);
-
   useEffect(() => {
     void loadAccounts();
     void loadBrokers();
   }, [loadAccounts, loadBrokers]);
 
-  useEffect(() => {
-    void loadSnapshotAndRisk();
-  }, [loadSnapshotAndRisk]);
+  const {
+    snapshot,
+    risk,
+    isLoading,
+    riskWarning,
+    fxRefreshing,
+    fxRefreshFeedback,
+    handleRefreshFx,
+    loadSnapshotAndRisk,
+    eventType,
+    setEventType,
+    eventDateFrom,
+    setEventDateFrom,
+    eventDateTo,
+    setEventDateTo,
+    eventSymbol,
+    setEventSymbol,
+    eventSide,
+    setEventSide,
+    eventDirection,
+    setEventDirection,
+    eventActionType,
+    setEventActionType,
+    eventPage,
+    setEventPage,
+    totalEventPages,
+    currentEventCount,
+    eventLoading,
+    eventError,
+    setEventError,
+    tradeEvents,
+    cashEvents,
+    corporateEvents,
+    applyEventFilters,
+    loadEventsPage,
+    refreshPortfolioData,
+    refreshPaperTradeSurfaces: refreshPaperTradeProjection,
+    paperTradeProjectionRevision,
+  } = usePortfolioProjectionSession({
+    accountId: queryAccountId,
+    costMethod,
+    hasAccounts,
+    language,
+    riskFallbackMessage: text.riskFallback,
+    loadAccounts,
+    setError,
+  });
 
-  useEffect(() => {
-    void loadEvents();
-  }, [eventRefreshKey, loadEvents]);
-
-  useEffect(() => {
-    refreshContextRef.current = {
-      viewKey: refreshViewKey,
-      requestId: refreshContextRef.current.requestId + 1,
-    };
-    setFxRefreshing(false);
-    setFxRefreshFeedback(null);
-  }, [refreshViewKey]);
-
-  useEffect(() => {
-    setEventPage(1);
-  }, [eventType, queryAccountId]);
+  const {
+    tradeSubmitting,
+    paperTradeSubmitting,
+    paperTradeRefreshing,
+    paperTradeRefreshIncomplete,
+    cashSubmitting,
+    corpSubmitting,
+    csvCommitting,
+    submitTrade,
+    submitPaperTrade,
+    submitCash,
+    submitCorporateAction,
+    commitCsv,
+    retryPaperTradeRefresh,
+  } = usePortfolioLedgerMutationWorkflow({
+    refreshPortfolioData,
+    refreshPaperTradeSurfaces: refreshPaperTradeProjection,
+  });
+  const paperTradeRefreshWarning = paperTradeRefreshIncomplete
+    ? text.paperTradeRefreshWarning
+    : null;
+  const canDeleteSelectedAccount = (
+    Boolean(writableAccountId)
+    && !isLoading
+    && !fxRefreshing
+    && !accountDeleteLoading
+  );
 
   useEffect(() => {
     if (!writeBlocked) {
@@ -740,7 +550,13 @@ const PortfolioPage: React.FC = () => {
     return () => {
       portfolioSignalsRequestRef.current += 1;
     };
-  }, [portfolioSignalsRefreshKey, positionSignalLookups, snapshotMatchesAccountScope, t]);
+  }, [
+    paperTradeProjectionRevision,
+    portfolioSignalsRefreshKey,
+    positionSignalLookups,
+    snapshotMatchesAccountScope,
+    t,
+  ]);
 
   const signalByPositionKey = useMemo(() => {
     const mapped = new Map<string, DecisionSignalItem>();
@@ -837,30 +653,16 @@ const PortfolioPage: React.FC = () => {
       tradeUid: tradeForm.tradeUid || undefined,
       note: tradeForm.note || undefined,
     };
-    const attempt = resolveOperationAttempt(
-      tradeOperationRef.current,
-      JSON.stringify(requestPayload),
-      'portfolio-trade',
-    );
-    tradeOperationRef.current = attempt;
-    setTradeSubmitting(true);
     setTradeError(null);
     setWriteWarning(null);
     try {
-      await portfolioApi.createTrade({
-        ...requestPayload,
-        operationId: attempt.operationId,
+      await submitTrade(requestPayload, () => {
+        setTradeForm((prev) => ({ ...prev, symbol: '', tradeUid: '', note: '' }));
+        setTradeModalOpen(false);
       });
     } catch (err) {
       setTradeError(getParsedApiError(err));
-      setTradeSubmitting(false);
-      return;
     }
-    tradeOperationRef.current = null;
-    setTradeForm((prev) => ({ ...prev, symbol: '', tradeUid: '', note: '' }));
-    setTradeModalOpen(false);
-    setTradeSubmitting(false);
-    await refreshPortfolioData();
   };
 
   const handlePaperTradeSubmit = async (e: React.FormEvent) => {
@@ -899,22 +701,32 @@ const PortfolioPage: React.FC = () => {
       price: requestedPrice ? Number(requestedPrice) : undefined,
       note: paperTradeForm.note.trim() || undefined,
     };
-    const attempt = resolveOperationAttempt(
-      paperTradeOperationRef.current,
-      JSON.stringify(requestPayload),
-      'portfolio-paper-trade',
-    );
-    paperTradeOperationRef.current = attempt;
-    setPaperTradeSubmitting(true);
     setPaperTradeError(null);
     setPaperTradeSuccess(null);
     setWriteWarning(null);
 
-    let result: PaperTradeCreatedResponse;
     try {
-      result = await portfolioApi.createPaperTrade(writableAccountId, {
-        ...requestPayload,
-        operationId: attempt.operationId,
+      await submitPaperTrade(writableAccountId, requestPayload, (result) => {
+        const priceSource = result.priceSource === 'latest_close'
+          ? text.paperLatestClose
+          : result.priceSource === 'manual'
+            ? text.paperEnteredPrice
+            : result.priceSource;
+        setPaperTradeSuccess(formatUiText(text.paperTradeRecorded, {
+          side: paperTradeForm.side === 'buy' ? text.buy : text.sell,
+          symbol: requestPayload.symbol,
+          quantity: requestPayload.quantity,
+          price: result.price,
+          source: priceSource,
+        }));
+        setPaperTradeForm((current) => ({
+          ...current,
+          symbol: '',
+          quantity: '',
+          price: '',
+          note: '',
+        }));
+        setPaperTradeModalOpen(false);
       });
     } catch (err) {
       const parsed = getParsedApiError(err, language);
@@ -928,33 +740,7 @@ const PortfolioPage: React.FC = () => {
       setPaperTradeError(message
         ? { ...parsed, title: text.paperTradeFailed, message }
         : parsed);
-      setPaperTradeSubmitting(false);
-      return;
     }
-
-    paperTradeOperationRef.current = null;
-    setPaperTradeSubmitting(false);
-    const priceSource = result.priceSource === 'latest_close'
-      ? text.paperLatestClose
-      : result.priceSource === 'manual'
-        ? text.paperEnteredPrice
-        : result.priceSource;
-    setPaperTradeSuccess(formatUiText(text.paperTradeRecorded, {
-      side: paperTradeForm.side === 'buy' ? text.buy : text.sell,
-      symbol: requestPayload.symbol,
-      quantity: requestPayload.quantity,
-      price: result.price,
-      source: priceSource,
-    }));
-    setPaperTradeForm((current) => ({
-      ...current,
-      symbol: '',
-      quantity: '',
-      price: '',
-      note: '',
-    }));
-    setPaperTradeModalOpen(false);
-    await refreshPaperTradeSurfaces();
   };
 
   const handleCashSubmit = async (e: React.FormEvent) => {
@@ -976,30 +762,16 @@ const PortfolioPage: React.FC = () => {
       currency: cashForm.currency || undefined,
       note: cashForm.note || undefined,
     };
-    const attempt = resolveOperationAttempt(
-      cashOperationRef.current,
-      JSON.stringify(requestPayload),
-      'portfolio-cash',
-    );
-    cashOperationRef.current = attempt;
-    setCashSubmitting(true);
     setCashError(null);
     setWriteWarning(null);
     try {
-      await portfolioApi.createCashLedger({
-        ...requestPayload,
-        operationId: attempt.operationId,
+      await submitCash(requestPayload, () => {
+        setCashForm((prev) => ({ ...prev, note: '' }));
+        setCashModalOpen(false);
       });
     } catch (err) {
       setCashError(getParsedApiError(err));
-      setCashSubmitting(false);
-      return;
     }
-    cashOperationRef.current = null;
-    setCashForm((prev) => ({ ...prev, note: '' }));
-    setCashModalOpen(false);
-    setCashSubmitting(false);
-    await refreshPortfolioData();
   };
 
   const handleCorporateSubmit = async (e: React.FormEvent) => {
@@ -1025,30 +797,16 @@ const PortfolioPage: React.FC = () => {
       splitRatio: corpForm.splitRatio ? Number(corpForm.splitRatio) : undefined,
       note: corpForm.note || undefined,
     };
-    const attempt = resolveOperationAttempt(
-      corporateOperationRef.current,
-      JSON.stringify(requestPayload),
-      'portfolio-corporate',
-    );
-    corporateOperationRef.current = attempt;
-    setCorpSubmitting(true);
     setCorpError(null);
     setWriteWarning(null);
     try {
-      await portfolioApi.createCorporateAction({
-        ...requestPayload,
-        operationId: attempt.operationId,
+      await submitCorporateAction(requestPayload, () => {
+        setCorpForm((prev) => ({ ...prev, symbol: '', note: '' }));
+        setCorpModalOpen(false);
       });
     } catch (err) {
       setCorpError(getParsedApiError(err));
-      setCorpSubmitting(false);
-      return;
     }
-    corporateOperationRef.current = null;
-    setCorpForm((prev) => ({ ...prev, symbol: '', note: '' }));
-    setCorpModalOpen(false);
-    setCorpSubmitting(false);
-    await refreshPortfolioData();
   };
 
   const handleParseCsv = async () => {
@@ -1072,48 +830,20 @@ const PortfolioPage: React.FC = () => {
       setWriteWarning(text.selectAccountWrite);
       return;
     }
-    const fingerprint = JSON.stringify({
-      accountId: writableAccountId,
-      broker: selectedBroker,
-      dryRun: csvDryRun,
-      file: {
-        name: csvFile.name,
-        size: csvFile.size,
-        type: csvFile.type,
-        lastModified: csvFile.lastModified,
-      },
-    });
-    const attempt = resolveOperationAttempt(
-      csvOperationRef.current,
-      fingerprint,
-      'portfolio-csv',
-    );
-    csvOperationRef.current = attempt;
     try {
       setWriteWarning(null);
-      setCsvCommitting(true);
       setCsvError(null);
-      const committed = await portfolioApi.commitCsvImport(
-        writableAccountId,
-        selectedBroker,
-        csvFile,
-        attempt.operationId,
-        csvDryRun,
+      await commitCsv(
+        {
+          accountId: writableAccountId,
+          broker: selectedBroker,
+          file: csvFile,
+          dryRun: csvDryRun,
+        },
+        setCsvCommitResult,
       );
-      setCsvCommitResult(committed);
-      if (committed.failedCount > 0) {
-        // A replay of the same operation ID would permanently return the first
-        // partial result. Start a new attempt so failed rows can run again;
-        // stable trade UID/dedup hashes keep already-inserted rows idempotent.
-        csvOperationRef.current = null;
-      }
-      if (!csvDryRun) {
-        await refreshPortfolioData();
-      }
     } catch (err) {
       setCsvError(getParsedApiError(err));
-    } finally {
-      setCsvCommitting(false);
     }
   };
 
@@ -1285,107 +1015,13 @@ const PortfolioPage: React.FC = () => {
   };
 
   const handleRefresh = async () => {
-    await Promise.all([loadAccounts(), loadSnapshotAndRisk(), loadEvents(), loadBrokers()]);
+    await Promise.all([
+      loadAccounts(),
+      loadSnapshotAndRisk(),
+      loadEventsPage(eventPage),
+      loadBrokers(),
+    ]);
     setPortfolioSignalsRefreshKey((current) => current + 1);
-  };
-
-  const reloadSnapshotAndRiskForScope = useCallback(async (
-    requestedViewKey: string,
-    requestedRequestId: number,
-    requestedAccountId: number | undefined,
-    requestedCostMethod: PortfolioCostMethod,
-  ): Promise<boolean> => {
-    if (!isActiveRefreshContext(requestedViewKey, requestedRequestId)) {
-      return false;
-    }
-
-    setRiskWarning(null);
-
-    try {
-      const snapshotData = await portfolioApi.getSnapshot({
-        accountId: requestedAccountId,
-        costMethod: requestedCostMethod,
-        includeRealtime: false,
-      });
-      if (!isActiveRefreshContext(requestedViewKey, requestedRequestId)) {
-        return false;
-      }
-      setSnapshot(snapshotData);
-      setError(null);
-
-      try {
-        const riskData = await portfolioApi.getRisk({
-          accountId: requestedAccountId,
-          costMethod: requestedCostMethod,
-          includeRealtime: false,
-        });
-        if (!isActiveRefreshContext(requestedViewKey, requestedRequestId)) {
-          return false;
-        }
-        setRisk(riskData);
-        setRiskWarning(null);
-      } catch (riskErr) {
-        if (!isActiveRefreshContext(requestedViewKey, requestedRequestId)) {
-          return false;
-        }
-        setRisk(null);
-        setRiskWarning(getParsedApiError(riskErr, language).message || text.riskFallback);
-      }
-      return true;
-    } catch (err) {
-      if (!isActiveRefreshContext(requestedViewKey, requestedRequestId)) {
-        return false;
-      }
-      setSnapshot(null);
-      setRisk(null);
-      setError(getParsedApiError(err));
-      return false;
-    }
-  }, [language, text.riskFallback]);
-
-  const handleRefreshFx = async () => {
-    if (!hasAccounts || isLoading || fxRefreshing) {
-      return;
-    }
-
-    const requestedViewKey = refreshViewKey;
-    const requestedAccountId = queryAccountId;
-    const requestedCostMethod = costMethod;
-    const requestedRequestId = refreshContextRef.current.requestId + 1;
-    refreshContextRef.current = {
-      viewKey: requestedViewKey,
-      requestId: requestedRequestId,
-    };
-
-    try {
-      setFxRefreshing(true);
-      setFxRefreshFeedback(null);
-      const result = await portfolioApi.refreshFx({
-        accountId: requestedAccountId,
-      });
-      if (!isActiveRefreshContext(requestedViewKey, requestedRequestId)) {
-        return;
-      }
-      const reloaded = await reloadSnapshotAndRiskForScope(
-        requestedViewKey,
-        requestedRequestId,
-        requestedAccountId,
-        requestedCostMethod,
-      );
-      if (!reloaded || !isActiveRefreshContext(requestedViewKey, requestedRequestId)) {
-        return;
-      }
-      setFxRefreshFeedback(buildFxRefreshFeedback(result, language));
-    } catch (err) {
-      if (!isActiveRefreshContext(requestedViewKey, requestedRequestId)) {
-        return;
-      }
-      setError(getParsedApiError(err));
-    } finally {
-      if (isActiveRefreshContext(requestedViewKey, requestedRequestId)) {
-        setFxRefreshing(false);
-      }
-    }
   };
 
   const decisionSignalRiskPreviewItems = (risk?.decisionSignalRisk?.items ?? []).slice(0, 3);
@@ -1576,7 +1212,7 @@ const PortfolioPage: React.FC = () => {
               type="button"
               variant="secondary"
               size="compact"
-              onClick={() => void refreshPaperTradeSurfaces()}
+              onClick={() => void retryPaperTradeRefresh()}
               isLoading={paperTradeRefreshing}
               loadingText={text.refreshing}
             >
@@ -2336,7 +1972,6 @@ const PortfolioPage: React.FC = () => {
                 value={selectedBroker}
                 onChange={(value) => {
                   setSelectedBroker(value);
-                  csvOperationRef.current = null;
                   setCsvCommitResult(null);
                 }}
                 disabled={csvParsing || csvCommitting || brokers.length === 0}
@@ -2360,7 +1995,6 @@ const PortfolioPage: React.FC = () => {
                   disabled={csvParsing || csvCommitting || brokers.length === 0}
                   onChange={(e) => {
                     setCsvFile(e.target.files && e.target.files[0] ? e.target.files[0] : null);
-                    csvOperationRef.current = null;
                     setCsvParseResult(null);
                     setCsvCommitResult(null);
                   }}
@@ -2379,7 +2013,6 @@ const PortfolioPage: React.FC = () => {
                       onClick={() => {
                         setCsvFile(null);
                         if (csvInputRef.current) csvInputRef.current.value = '';
-                        csvOperationRef.current = null;
                         setCsvParseResult(null);
                         setCsvCommitResult(null);
                       }}
@@ -2395,7 +2028,6 @@ const PortfolioPage: React.FC = () => {
               checked={csvDryRun}
               onChange={(event) => {
                 setCsvDryRun(event.target.checked);
-                csvOperationRef.current = null;
               }}
               containerClassName="min-h-11 text-xs text-secondary"
               label={<span className="text-xs font-normal text-secondary-text">{text.dryRun}</span>}
@@ -2437,7 +2069,7 @@ const PortfolioPage: React.FC = () => {
               <Select
                 label={text.type}
                 value={eventType}
-                onChange={(value) => setEventType(value as EventType)}
+                onChange={(value) => setEventType(value as PortfolioEventType)}
                 options={[
                   { value: 'trade', label: text.tradeLedger },
                   { value: 'cash', label: text.cashLedger },
