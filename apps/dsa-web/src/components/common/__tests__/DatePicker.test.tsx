@@ -37,12 +37,13 @@ describe('DatePicker', () => {
     expect(document.querySelector('[data-date="2026-07-20"]')).not.toBeDisabled();
   });
 
-  it('keeps the date field read-only and opens the calendar from the keyboard', () => {
+  it('keeps the date field picker-only and opens the calendar from the keyboard', () => {
     const onChange = vi.fn();
     render(<DatePicker value="2026-07-18" onChange={onChange} ariaLabel="日期" />);
 
     const input = screen.getByRole('textbox', { name: '日期' });
-    expect(input).toHaveAttribute('readonly');
+    expect(input).not.toHaveAttribute('readonly');
+    expect(input).toHaveAttribute('aria-readonly', 'true');
     input.focus();
 
     expect(input).toHaveFocus();
@@ -50,9 +51,57 @@ describe('DatePicker', () => {
 
     fireEvent.change(input, { target: { value: '2026-07-19' } });
     expect(onChange).not.toHaveBeenCalled();
+    expect(input).toHaveValue('2026-07-18');
 
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(screen.getByRole('dialog', { name: '日期' })).toBeInTheDocument();
+  });
+
+  it('keeps native required and pattern validation active', () => {
+    const { rerender } = render(
+      <DatePicker value="" onChange={() => undefined} ariaLabel="交易日期" required />,
+    );
+
+    const input = screen.getByRole('textbox', { name: '交易日期' }) as HTMLInputElement;
+    expect(input.willValidate).toBe(true);
+    expect(input.validity.valueMissing).toBe(true);
+    expect(input.checkValidity()).toBe(false);
+
+    rerender(
+      <DatePicker value="07/18/2026" onChange={() => undefined} ariaLabel="交易日期" required />,
+    );
+    expect(input.validity.patternMismatch).toBe(true);
+    expect(input.checkValidity()).toBe(false);
+  });
+
+  it('clears only optional values without opening the calendar and returns focus to the field', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <DatePicker value="2026-07-18" onChange={onChange} ariaLabel="日期" />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '清除 日期' }));
+    expect(onChange).toHaveBeenCalledWith('');
+    expect(screen.queryByRole('dialog', { name: '日期' })).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: '日期' })).toHaveFocus();
+
+    rerender(
+      <DatePicker value="2026-07-18" onChange={onChange} ariaLabel="日期" required />,
+    );
+    expect(screen.queryByRole('button', { name: '清除 日期' })).not.toBeInTheDocument();
+  });
+
+  it('does not open or expose a clear action while disabled', () => {
+    render(
+      <DatePicker value="2026-07-18" onChange={() => undefined} ariaLabel="日期" disabled />,
+    );
+
+    const input = screen.getByRole('textbox', { name: '日期' });
+    expect(input).toBeDisabled();
+    expect(screen.getByRole('button', { name: '打开 日期 日历' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: '清除 日期' })).not.toBeInTheDocument();
+    fireEvent.click(input.parentElement!);
+    expect(screen.queryByRole('dialog', { name: '日期' })).not.toBeInTheDocument();
   });
 
   it('applies compact geometry to both the trigger and calendar action', () => {

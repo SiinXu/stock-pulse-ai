@@ -24,6 +24,15 @@ function chooseOption(trigger: HTMLElement, value: string) {
   fireEvent.click(option);
 }
 
+function chooseVisibleDate(label: string): string {
+  fireEvent.click(screen.getByRole('textbox', { name: label }));
+  const dialog = screen.getByRole('dialog', { name: label });
+  const day = dialog.querySelector<HTMLButtonElement>('button[data-calendar-day="true"]:not(:disabled)')!;
+  const value = day.dataset.date!;
+  fireEvent.click(day);
+  return value;
+}
+
 function createDeferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((next) => {
@@ -155,10 +164,12 @@ describe('BacktestPage', () => {
     expect(screen.getByRole('button', { name: '运行回测' })).toHaveAttribute('data-size', 'primary');
     expect(startDateInput).toHaveAttribute('aria-haspopup', 'dialog');
     expect(startDateInput).toHaveAttribute('aria-expanded', 'false');
-    expect(startDateInput).toHaveAttribute('readonly');
+    expect(startDateInput).toHaveAttribute('aria-readonly', 'true');
+    expect(startDateInput).not.toHaveAttribute('readonly');
     expect(endDateInput).toHaveAttribute('aria-haspopup', 'dialog');
     expect(endDateInput).toHaveAttribute('aria-expanded', 'false');
-    expect(endDateInput).toHaveAttribute('readonly');
+    expect(endDateInput).toHaveAttribute('aria-readonly', 'true');
+    expect(endDateInput).not.toHaveAttribute('readonly');
     expect(startDateInput.parentElement).toHaveAttribute('data-size', 'compact');
     expect(endDateInput.parentElement).toHaveAttribute('data-size', 'compact');
 
@@ -362,6 +373,55 @@ describe('BacktestPage', () => {
     });
     expect(new URLSearchParams(window.location.search).get('ref')).toBe('dashboard');
     expect(window.location.hash).toBe('#results');
+  });
+
+  it('removes applied analysis-date filters after both dates are set and cleared', async () => {
+    renderPage();
+    await screen.findByText('600519');
+
+    const from = chooseVisibleDate('分析开始日期');
+    const to = chooseVisibleDate('分析结束日期');
+    mockGetResults.mockClear();
+    mockGetOverallPerformance.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: '筛选' }));
+
+    await waitFor(() => {
+      expect(mockGetResults).toHaveBeenLastCalledWith(expect.objectContaining({
+        analysisDateFrom: from,
+        analysisDateTo: to,
+      }));
+    });
+    await waitFor(() => {
+      const appliedSearch = new URLSearchParams(window.location.search);
+      expect(appliedSearch.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.from)).toBe(from);
+      expect(appliedSearch.get(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.to)).toBe(to);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '清除 分析开始日期' }));
+    fireEvent.click(screen.getByRole('button', { name: '清除 分析结束日期' }));
+    expect(screen.getByLabelText('分析开始日期')).toHaveValue('');
+    expect(screen.getByLabelText('分析结束日期')).toHaveValue('');
+    await waitFor(() => expect(screen.getByRole('button', { name: '筛选' })).toBeEnabled());
+
+    mockGetResults.mockClear();
+    mockGetOverallPerformance.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: '筛选' }));
+
+    await waitFor(() => {
+      expect(mockGetResults).toHaveBeenLastCalledWith(expect.objectContaining({
+        analysisDateFrom: undefined,
+        analysisDateTo: undefined,
+      }));
+      expect(mockGetOverallPerformance).toHaveBeenLastCalledWith(expect.objectContaining({
+        analysisDateFrom: undefined,
+        analysisDateTo: undefined,
+      }));
+    });
+    await waitFor(() => {
+      const clearedSearch = new URLSearchParams(window.location.search);
+      expect(clearedSearch.has(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.from)).toBe(false);
+      expect(clearedSearch.has(RESEARCH_BACKTEST_ROUTE_QUERY_KEYS.to)).toBe(false);
+    });
   });
 
   it('removes malformed URL filters before API requests while preserving unrelated query and hash state', async () => {
